@@ -94,6 +94,8 @@ final class FusionFiches
         'federations.parent_company_id',
         'health_practitioners.company_id',
         'journalists.company_id',
+        // 2026-09-30 : une organisation cochée dans une liste manuelle.
+        'listes_manuelles_membres.company_id',
         'media.company_id',
         'personnes.company_id',
         'scraper_runs.company_id',
@@ -458,6 +460,20 @@ final class FusionFiches
             [$gardeId, $ws, $absorbeeId, $gardeId],
         ), 'id');
 
+        // Listes manuelles (2026-09-30) : l'organisation cochée dans une liste
+        // le reste sous la fiche gardée. Si la fiche gardée y est déjà, la
+        // ligne de l'absorbée reste où elle est (à la corbeille avec elle) —
+        // la fiche gardée est membre, rien n'est perdu. Les PERSONNES cochées
+        // suivent `contacts.company_id`, déjà rattaché plus haut.
+        $deplacements['listes_manuelles_membres'] = $this->ids(DB::select(
+            'UPDATE listes_manuelles_membres lmm_abs SET company_id = ?
+             WHERE lmm_abs.workspace_id = ? AND lmm_abs.company_id = ?
+               AND NOT EXISTS (SELECT 1 FROM listes_manuelles_membres lmm_gar WHERE lmm_gar.company_id = ?
+                               AND lmm_gar.liste_id = lmm_abs.liste_id)
+             RETURNING lmm_abs.id',
+            [$gardeId, $ws, $absorbeeId, $gardeId],
+        ), 'id');
+
         foreach (self::TABLES_SIMPLES as $table) {
             $deplacements[$table] = $this->ids(DB::select(
                 "UPDATE {$table} SET company_id = ? WHERE workspace_id = ? AND company_id = ? RETURNING id",
@@ -795,7 +811,7 @@ final class FusionFiches
         }
 
         $parCle = [
-            'contacts' => 'id', 'audience_members' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
+            'contacts' => 'id', 'audience_members' => 'id', 'listes_manuelles_membres' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
             'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id',
             'company_tag' => 'tag_id', 'event_organizers' => 'event_id',
         ];

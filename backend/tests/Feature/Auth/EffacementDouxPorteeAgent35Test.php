@@ -311,6 +311,9 @@ test('B10-016-PORTEE — la liste des tables portant deleted_at est celle du 202
         'email_audiences',
         'health_practitioners',
         'journalists',
+        // 2026-09-30 : les listes manuelles vont à la CORBEILLE, jamais
+        // supprimées (modèle `ListeManuelle`, `SoftDeletes`).
+        'listes_manuelles',
         'media',
         'scraping_campaigns',
         'users',
@@ -404,6 +407,9 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
         'email_audiences' => 0,
         'health_practitioners' => 2,
         'journalists' => 1,
+        // 2026-09-30 : aucune lecture `DB::table('listes_manuelles')` — le
+        // modèle `ListeManuelle` (SoftDeletes) est le seul lecteur.
+        'listes_manuelles' => 0,
         'media' => 5,
         'scraping_campaigns' => 1,
         // 2 -> 3 le 2026-08-23, APRES examen, jamais pour accommoder un rouge.

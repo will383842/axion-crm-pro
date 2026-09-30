@@ -378,6 +378,14 @@ final class ImportListe
             }
         }
 
+        // La presse n'entre dans aucune liste tant que son segment est fermé
+        // (`GardePresse`) : `ListesManuelles::ajouter()` la refusera. On le
+        // compte DÈS L'ANALYSE à blanc, pour que l'écran l'annonce avant
+        // l'import — sans rien retirer des clés (le refus reste au seul
+        // endroit qui écrit).
+        [$orgsAdmises, $persAdmises] = ListesManuelles::sansPresse(array_values($organisations), array_values($personnes));
+        $presse = (count($organisations) - count($orgsAdmises)) + (count($personnes) - count($persAdmises));
+
         return [
             'cles' => ['organisations' => array_values($organisations), 'personnes' => array_values($personnes)],
             'bilan' => [
@@ -389,6 +397,7 @@ final class ImportListe
                 'par_type' => $parSorte,
                 'organisations_retrouvees' => count($organisations),
                 'personnes_retrouvees' => count($personnes),
+                'presse_refusees' => $presse,
                 'exemples_rejets' => $exemples,
             ],
         ];

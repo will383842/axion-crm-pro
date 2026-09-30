@@ -42,6 +42,11 @@ export interface BilanAjout {
   reactives: number;
   deja_presents: number;
   introuvables: number;
+  /**
+   * Médias et journalistes REFUSÉS : la presse n'entre dans aucune liste tant
+   * que son segment est fermé (`GardePresse` côté serveur).
+   */
+  presse_refusees?: number;
 }
 
 export interface BilanImport {
@@ -53,6 +58,8 @@ export interface BilanImport {
   par_type: { crm: number; siren: number; email_personne: number; email_organisation: number };
   organisations_retrouvees: number;
   personnes_retrouvees: number;
+  /** Lignes rapprochées de la presse, que l'import refusera (segment fermé). */
+  presse_refusees?: number;
   exemples_rejets: Array<{ ligne: number; motif: string }>;
   a_blanc: boolean;
   ajout?: BilanAjout;
@@ -114,5 +121,6 @@ export function resumerAjout(b: BilanAjout): string {
   const morceaux = [`${b.ajoutes + b.reactives} fiche(s) ajoutée(s)`];
   if (b.deja_presents > 0) morceaux.push(`${b.deja_presents} déjà présente(s)`);
   if (b.introuvables > 0) morceaux.push(`${b.introuvables} introuvable(s)`);
+  if ((b.presse_refusees ?? 0) > 0) morceaux.push(`${b.presse_refusees ?? 0} de presse refusée(s) (segment presse fermé)`);
   return `${morceaux.join(', ')}.`;
 }

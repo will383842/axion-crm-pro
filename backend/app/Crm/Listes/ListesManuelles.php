@@ -2,6 +2,8 @@
 
 namespace App\Crm\Listes;
 
+use App\Crm\Campagnes\GardePresse;
+use App\Crm\Campagnes\Segments;
 use App\Models\ListeManuelle;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +22,28 @@ use Illuminate\Support\Facades\DB;
  * Un membre RETIRÉ (`retire_le` posé) n'appartient plus à la liste ; sa ligne
  * reste, et un nouvel ajout la réactive. Rien n'est jamais supprimé ici — ni
  * la fiche, ni la ligne d'appartenance.
+ *
+ * 🔴 LA PRESSE N'ENTRE DANS AUCUNE LISTE tant que le segment presse est fermé
+ * (`GardePresse`, condition de fusion de #266 posée par Will) :
+ *
+ *  - À L'ENTRÉE : `ajouter()` (cocher une fiche, importer un fichier) REFUSE
+ *    une fiche de presse (tag `FichesProtegees::TAG_PRESSE`), une personne de
+ *    la presse (journaliste harmonisé, source `presse-2026`) et toute personne
+ *    rattachée à une fiche de presse. Refus COMPTÉ (`presse_refusees`) et dit
+ *    à l'écran — jamais silencieux, jamais une ligne écrite. Choix cohérent
+ *    avec #264 : `GardePresse` dit « ne peut entrer dans une audience, une
+ *    liste ou une campagne » ; accepter puis rendre inerte laisserait croire à
+ *    l'opérateur qu'il a ciblé un journaliste. Rien n'est supprimé : la fiche
+ *    et le journaliste restent intacts dans le CRM.
+ *  - À LA LECTURE : une ligne d'appartenance écrite AVANT que la fiche ne
+ *    devienne presse (harmonisation passée après l'ajout) reste en base, mais
+ *    `organisationsMembres`, `organisationEstMembre` et `personnesMembres` ne
+ *    la voient plus — par fiche (`GardePresse::conditionSql`) ET par personne
+ *    (`GardePresse::conditionContactsSql`). Un journaliste coché ne fait donc
+ *    pas non plus entrer son organisation.
+ *
+ * Ouvrir la presse (ajouter `Segments::PRESSE` à `Segments::OUVERTS`) lève les
+ * deux d'un coup : ces conditions valent alors `TRUE`.
  */
 final class ListesManuelles
 {
@@ -49,14 +73,20 @@ final class ListesManuelles
             ->select('lmm_o.company_id')
             ->whereIn('lmm_o.liste_id', $listeIds)
             ->whereNull('lmm_o.retire_le')
-            ->whereNotNull('lmm_o.company_id');
+            ->whereNotNull('lmm_o.company_id')
+            // La presse n'est membre de rien tant que son segment est fermé.
+            ->whereRaw(GardePresse::conditionSql('lmm_o.company_id'));
 
         $parPersonne = DB::table('listes_manuelles_membres as lmm_p')
             ->join('contacts as lmm_ct', 'lmm_ct.id', '=', 'lmm_p.contact_id')
             ->select('lmm_ct.company_id')
             ->whereIn('lmm_p.liste_id', $listeIds)
             ->whereNull('lmm_p.retire_le')
-            ->whereNull('lmm_ct.deleted_at');
+            ->whereNull('lmm_ct.deleted_at')
+            // Un journaliste coché ne fait pas entrer son organisation, ni une
+            // personne cochée une fiche de presse (`GardePresse`).
+            ->whereRaw(GardePresse::conditionContactsSql('lmm_ct'))
+            ->whereRaw(GardePresse::conditionSql('lmm_ct.company_id'));
 
         return $directes->union($parPersonne);
     }
@@ -68,7 +98,7 @@ final class ListesManuelles
      */
     public static function organisationEstMembre(int $companyId, array $listeIds): bool
     {
-        if ($listeIds === []) {
+        if ($listeIds === [] || ! GardePresse::admissible($companyId)) {
             return false;
         }
 
@@ -81,7 +111,8 @@ final class ListesManuelles
                         $s->selectRaw('1')->from('contacts as lmm_ec')
                             ->whereColumn('lmm_ec.id', 'lmm_e.contact_id')
                             ->where('lmm_ec.company_id', $companyId)
-                            ->whereNull('lmm_ec.deleted_at');
+                            ->whereNull('lmm_ec.deleted_at')
+                            ->whereRaw(GardePresse::conditionContactsSql('lmm_ec'));
                     });
             })
             ->exists();
@@ -105,6 +136,7 @@ final class ListesManuelles
             ->whereIn('lmm_pm.liste_id', $listeIds)
             ->whereNull('lmm_pm.retire_le')
             ->whereNull('lmm_pc.deleted_at')
+            ->whereRaw(GardePresse::conditionContactsSql('lmm_pc'))
             ->whereIn('lmm_pc.company_id', $companyIds)
             ->pluck('lmm_pm.contact_id');
 
@@ -139,11 +171,13 @@ final class ListesManuelles
     /**
      * Ajoute des fiches à une liste. Seules les fiches VIVANTES de l'espace de
      * la liste sont retenues ; les autres identifiants sont comptés
-     * `introuvables` — jamais créés, jamais devinés.
+     * `introuvables` — jamais créés, jamais devinés. Les fiches et personnes
+     * de la presse sont REFUSÉES tant que le segment presse est fermé, et
+     * comptées `presse_refusees` (cf. l'en-tête de la classe).
      *
      * @param  list<int>  $companyIds
      * @param  list<int>  $contactIds
-     * @return array{ajoutes: int, reactives: int, deja_presents: int, introuvables: int}
+     * @return array{ajoutes: int, reactives: int, deja_presents: int, introuvables: int, presse_refusees: int}
      */
     public static function ajouter(ListeManuelle $liste, array $companyIds, array $contactIds, ?string $par, string $origine): array
     {
@@ -164,12 +198,17 @@ final class ListesManuelles
             ->pluck('id')
             ->all());
 
+        [$companiesAdmises, $contactsAdmis] = self::sansPresse($companiesVivantes, $contactsVivants);
+
         $bilan = [
             'ajoutes' => 0,
             'reactives' => 0,
             'deja_presents' => 0,
             'introuvables' => (count($companyIds) - count($companiesVivantes)) + (count($contactIds) - count($contactsVivants)),
+            'presse_refusees' => (count($companiesVivantes) - count($companiesAdmises)) + (count($contactsVivants) - count($contactsAdmis)),
         ];
+        $companiesVivantes = $companiesAdmises;
+        $contactsVivants = $contactsAdmis;
 
         DB::transaction(function () use ($liste, $ws, $companiesVivantes, $contactsVivants, $par, $origine, &$bilan): void {
             foreach (['company_id' => $companiesVivantes, 'contact_id' => $contactsVivants] as $colonne => $ids) {
@@ -219,6 +258,41 @@ final class ListesManuelles
         });
 
         return $bilan;
+    }
+
+    /**
+     * Les fiches et personnes qui PEUVENT entrer dans une liste : sans la
+     * presse tant que son segment est fermé — fiche de presse (par fiche),
+     * personne de la presse (par personne) ou personne rattachée à une fiche
+     * de presse. Ne fait que lire ; ne supprime rien.
+     *
+     * @param  list<int>  $companyIds
+     * @param  list<int>  $contactIds
+     * @param  list<string>  $ouverts  réservé aux tests (les deux états de la garde)
+     * @return array{0: list<int>, 1: list<int>}
+     */
+    public static function sansPresse(array $companyIds, array $contactIds, array $ouverts = Segments::OUVERTS): array
+    {
+        if (GardePresse::ouverte($ouverts)) {
+            return [$companyIds, $contactIds];
+        }
+        $companies = $companyIds === [] ? [] : self::entiers(DB::table('companies')
+            ->whereIn('id', $companyIds)
+            ->whereRaw(GardePresse::conditionSql('companies.id', $ouverts))
+            ->pluck('id')
+            ->all());
+        $contacts = $contactIds === [] ? [] : self::entiers(DB::table('contacts')
+            ->whereIn('id', $contactIds)
+            ->whereRaw(GardePresse::conditionContactsSql('contacts', $ouverts))
+            ->whereRaw('(contacts.company_id IS NULL OR ' . GardePresse::conditionSql('contacts.company_id', $ouverts) . ')')
+            ->pluck('id')
+            ->all());
+
+        // L'ordre d'entrée est gardé (`whereIn` ne le garantit pas).
+        return [
+            array_values(array_intersect($companyIds, $companies)),
+            array_values(array_intersect($contactIds, $contacts)),
+        ];
     }
 
     /**

@@ -117,6 +117,12 @@ final class ResolveurDestinataires
                     ->where('workspace_id', $ws)
                     ->whereIn('company_id', $ids)
                     ->whereNotNull('email')
+                    // Une personne de la presse n'est JAMAIS une adresse
+                    // candidate tant que le segment presse est fermé — même sur
+                    // une fiche non-presse, même cochée dans une liste exigée
+                    // (garde PAR CONTACT, `GardePresse`). La fiche de presse,
+                    // elle, est déjà écartée par `buildPublicQuery`.
+                    ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                     ->orderBy('id')
                     ->get(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at'])
                     ->groupBy('company_id');

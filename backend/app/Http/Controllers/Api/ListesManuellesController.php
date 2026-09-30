@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\Listes\ImportListe;
 use App\Crm\Listes\ListesManuelles;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
@@ -10,6 +11,7 @@ use App\Models\ListeManuelle;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Support\AuditLogger;
 use App\Support\MasquageCoordonnees;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -28,10 +30,19 @@ use InvalidArgumentException;
  * Rien n'est jamais supprimé : une liste va à la corbeille (`deleted_at`),
  * un membre retiré garde sa ligne (`retire_le`), et une fiche n'est jamais
  * touchée par une liste.
+ *
+ * La presse (`GardePresse`) n'entre dans aucune liste tant que son segment est
+ * fermé : l'ajout la REFUSE en le disant (`presse_refusees` + message), et une
+ * ligne écrite avant qu'une fiche ne devienne presse n'est plus ni lue, ni
+ * comptée, ni montrée avec ses adresses (`membres`, effectifs).
  */
 class ListesManuellesController extends ApiController
 {
     use VerrouOptimiste;
+
+    /** Le refus d'une fiche de presse, dit à l'écran (vouvoiement). */
+    public const MESSAGE_PRESSE = 'Les médias et les journalistes ne peuvent pas être ajoutés à une liste tant que le segment presse est fermé : '
+        . 'la ou les fiches de presse désignées n\'ont pas été ajoutées (elles restent intactes dans le CRM).';
 
     /**
      * GET /listes-manuelles — les listes de l'espace, avec leurs effectifs.
@@ -179,13 +190,13 @@ class ListesManuellesController extends ApiController
         $parPage = max(1, min(100, (int) $r->query('per_page', '50')));
         $page = max(1, (int) $r->query('page', '1'));
 
-        $base = DB::table('listes_manuelles_membres as m')
+        $base = self::membresLisibles(DB::table('listes_manuelles_membres as m')
+            ->leftJoin('contacts as ct', 'ct.id', '=', 'm.contact_id')
             ->where('m.liste_id', $liste->id)
-            ->whereNull('m.retire_le');
+            ->whereNull('m.retire_le'));
         $total = (clone $base)->count();
 
         $lignes = (clone $base)
-            ->leftJoin('contacts as ct', 'ct.id', '=', 'm.contact_id')
             ->leftJoin('companies as c', 'c.id', '=', DB::raw('coalesce(m.company_id, ct.company_id)'))
             ->orderByDesc('m.ajoute_le')
             ->orderByDesc('m.id')
@@ -217,7 +228,14 @@ class ListesManuellesController extends ApiController
         $bilan = ListesManuelles::ajouter($liste, $companyIds, $contactIds, $this->utilisateur($r), ListesManuelles::ORIGINE_COCHE);
         $this->journal('liste_manuelle.fiches_ajoutees', $liste, $bilan);
 
-        return $this->ok(['data' => $bilan]);
+        // Rien d'autre que de la presse désignée : REFUS explicite (422), rien
+        // n'a été écrit. Un geste mixte passe pour le reste, et le dit.
+        if ($bilan['presse_refusees'] > 0
+            && $bilan['ajoutes'] + $bilan['reactives'] + $bilan['deja_presents'] + $bilan['introuvables'] === 0) {
+            return $this->ok(['message' => self::MESSAGE_PRESSE . ' Rien n\'a été ajouté.', 'data' => $bilan], 422);
+        }
+
+        return $this->ok(['data' => $bilan] + ($bilan['presse_refusees'] > 0 ? ['message' => self::MESSAGE_PRESSE] : []));
     }
 
     /**
@@ -269,10 +287,23 @@ class ListesManuellesController extends ApiController
             return $this->ok(['message' => $e->getMessage()], 422);
         }
 
-        return $this->ok(['data' => $bilan]);
+        // Des lignes rapprochées de la presse : refusées, et dit (`GardePresse`).
+        return $this->ok(['data' => $bilan] + ((int) ($bilan['presse_refusees'] ?? 0) > 0 ? ['message' => self::MESSAGE_PRESSE] : []));
     }
 
     // ── Outils ───────────────────────────────────────────────────────────────
+
+    /**
+     * Les lignes d'appartenance LISIBLES : sans la presse tant que son segment
+     * est fermé, par fiche (`coalesce(m.company_id, ct.company_id)`) ET par
+     * personne. La requête doit joindre `contacts as ct` sur `m.contact_id`.
+     */
+    private static function membresLisibles(QueryBuilder $q): QueryBuilder
+    {
+        return $q
+            ->whereRaw(GardePresse::conditionSql('coalesce(m.company_id, ct.company_id)'))
+            ->whereRaw('(m.contact_id IS NULL OR ' . GardePresse::conditionContactsSql('ct') . ')');
+    }
 
     private function espaceOuRefus(): string
     {
@@ -328,11 +359,12 @@ class ListesManuellesController extends ApiController
             return [];
         }
         $effectifs = [];
-        foreach (DB::table('listes_manuelles_membres')
-            ->whereIn('liste_id', $ids)
-            ->whereNull('retire_le')
-            ->groupBy('liste_id')
-            ->selectRaw('liste_id, count(company_id) AS organisations, count(contact_id) AS personnes')
+        foreach (self::membresLisibles(DB::table('listes_manuelles_membres as m')
+            ->leftJoin('contacts as ct', 'ct.id', '=', 'm.contact_id')
+            ->whereIn('m.liste_id', $ids)
+            ->whereNull('m.retire_le'))
+            ->groupBy('m.liste_id')
+            ->selectRaw('m.liste_id, count(m.company_id) AS organisations, count(m.contact_id) AS personnes')
             ->get() as $l) {
             $effectifs[(int) $l->liste_id] = ['organisations' => (int) $l->organisations, 'personnes' => (int) $l->personnes];
         }

@@ -145,7 +145,6 @@ test('chaque media_type autorise par la base a son etiquette, et chaque etiquett
         expect(FamillesEtiquettes::famille($slug, 'auto')['type'])->toBe(FamillesEtiquettes::TYPE_GOUVERNEE)
             ->and($spec['category'])->toBe(FamillesEtiquettes::categorieAttendue($slug, 'auto'));
     }
-    expect(array_keys(Taxonomy::BUSINESS_RELATION_LIBELLES))->toBe(Taxonomy::BUSINESS_RELATION_TYPES);
 });
 
 test('la zone de diffusion vient de la source SEULEMENT : aucune zone inventee', function () {

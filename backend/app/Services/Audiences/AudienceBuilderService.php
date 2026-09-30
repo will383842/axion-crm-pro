@@ -25,17 +25,21 @@ class AudienceBuilderService
      * `entreprise`), indexée, et ses valeurs sont celles de
      * `Taxonomy::ENTITY_NATURES`.
      *
-     * `relation_type` (2026-09-30, harmonisation de la presse) : une campagne
-     * de PROSPECTION doit pouvoir EXCLURE la presse et les clients
-     * (`not` → `relation_type in [presse_media, client]`), et une campagne peut
-     * viser une relation. Valeurs : `Taxonomy::BUSINESS_RELATION_TYPES`. Les
-     * types, zones et thèmes de média se visent par leurs étiquettes
-     * (`tags` / `contains_any` : `media-type:radio`, `media-zone:regional`…).
+     * Les types, zones et thèmes de média (harmonisation de la presse,
+     * 2026-09-30) se visent par leurs étiquettes (`tags` / `contains_any` :
+     * `media-type:radio`, `media-zone:regional`…) ; la relation, par
+     * `relation_type` (ajouté par le chantier B).
      */
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
-        'size_category', 'sector_main', 'entity_nature', 'relation_type', 'priority', 'quality_score',
+        'size_category', 'sector_main', 'entity_nature', 'priority', 'quality_score',
         'tags', 'has_email', 'enriched_at', 'best_email_confidence',
+        // 2026-10-01 — statut de la relation (chantier B : exclure les clients,
+        // partenaires… d'une prospection, cf. `RelationsProspection`), pays
+        // (chantier C : « étranger » = `country_code` ≠ FR, colonne NOT NULL)
+        // et joignabilité calculée (chantier D, `Joignabilite`). Colonnes
+        // ordinaires de `companies` : mêmes opérateurs, même sémantique NULL.
+        'relation_type', 'lifecycle_stage', 'country_code', 'joignabilite',
     ];
 
     public const WHITELIST_OPS = [

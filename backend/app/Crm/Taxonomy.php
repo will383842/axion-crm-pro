@@ -48,32 +48,6 @@ final class Taxonomy
     ];
 
     /**
-     * Libellés des relations, pour l'écran (constructeur d'audiences) — mêmes
-     * clés que `BUSINESS_RELATION_TYPES`, dans le même ordre (garde
-     * `PresseHarmonisationTest`).
-     *
-     * @var array<string, string>
-     */
-    public const BUSINESS_RELATION_LIBELLES = [
-        'prospect' => 'Prospect',
-        'client' => 'Client',
-        'presse_media' => 'Presse et médias',
-        'partenaire' => 'Partenaire',
-        'investisseur' => 'Investisseur',
-        'conference' => 'Conférence',
-        'newsletter' => 'Lettre d\'information',
-        'fournisseur' => 'Fournisseur',
-    ];
-
-    /**
-     * Relations qu'une campagne de PROSPECTION exclut (préréglage de l'écran
-     * « Audiences ») : on ne prospecte ni la presse ni un client.
-     *
-     * @var list<string>
-     */
-    public const RELATIONS_HORS_PROSPECTION = ['presse_media', 'client'];
-
-    /**
      * TYPE DE MÉDIA, tel que l'étiquette `media-type:<valeur>` le dit — valeur
      * d'étiquette => libellé. Dérivé de `media.media_type` par
      * `MEDIA_TYPE_VERS_ETIQUETTE` (plusieurs types techniques peuvent donner la

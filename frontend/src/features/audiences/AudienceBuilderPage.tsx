@@ -11,10 +11,12 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers, Newspaper, Ban,
+  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers,
+  Newspaper, Ban,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
+  JOIGNABILITES,
   NATURES,
   REGIONS,
   SECTEURS,
@@ -38,14 +40,23 @@ import type {
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
 import {
-  EXCLUSIONS_PROSPECTION,
-  RELATION_PRESETS,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
-  critereRelations,
+  avecExclusions,
   criteresMedias,
   exclusions,
 } from './presse';
+import {
+  RELATIONS_EXCLUES_PAR_DEFAUT,
+  SANS_TAILLE,
+  aUnCriterePositif,
+  construireCriteres,
+  type ChoixPays,
+} from './criteres-relation';
+import {
+  LIFECYCLE_LABELS,
+  RELATION_TYPE_LABELS,
+} from '@/features/crm-console/types';
 
 // ---------------------------------------------------------------------------
 // Presets
@@ -72,7 +83,22 @@ const enPresets = (liste: readonly EntreeReferentiel[]): Array<{ code: string; l
   liste.map((e) => ({ code: e.code, label: e.libelle }));
 
 const REGION_PRESETS = enPresets(REGIONS);
-const SIZE_PRESETS = enPresets(TAILLES);
+// « Taille non renseignée » : effectif inconnu OU organisation (association,
+// fédération…), pour qui la taille d'entreprise ne s'applique pas. Aucun
+// effectif n'est deviné : on cible ou on exclut ces fiches EN CONNAISSANCE
+// de cause (chantier C).
+const SIZE_PRESETS = [
+  ...enPresets(TAILLES),
+  { code: SANS_TAILLE, label: 'Taille non renseignée (effectif inconnu ou organisation)' },
+];
+const RELATION_PRESETS = Object.entries(RELATION_TYPE_LABELS).map(([code, label]) => ({ code, label }));
+const ETAPE_PRESETS = Object.entries(LIFECYCLE_LABELS).map(([code, label]) => ({ code, label }));
+const JOIGNABILITE_PRESETS = enPresets(JOIGNABILITES);
+const PAYS_OPTIONS: Array<{ code: ChoixPays; label: string }> = [
+  { code: 'tous', label: 'Tous pays' },
+  { code: 'france', label: 'France' },
+  { code: 'etranger', label: 'Étranger (hors France)' },
+];
 const SECTOR_PRESETS = enPresets(SECTEURS);
 const NATURE_PRESETS = enPresets(NATURES);
 
@@ -116,11 +142,19 @@ export function AudienceBuilderPage() {
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
   const [tagsInput, setTagsInput] = useState<string>('');
-  // Relation, presse et exclusions (harmonisation des contacts, 2026-09-30).
-  const [relations, setRelations] = useState<string[]>([]);
+  // Chantiers B, C, D (2026-10-01) — relation, pays, joignabilité. Les
+  // relations établies sont EXCLUES par défaut d'une prospection : visible,
+  // décochable (`criteres-relation.ts`).
+  const [relationsVisees, setRelationsVisees] = useState<string[]>([]);
+  const [relationsExclues, setRelationsExclues] = useState<string[]>([...RELATIONS_EXCLUES_PAR_DEFAUT]);
+  const [etapesVisees, setEtapesVisees] = useState<string[]>([]);
+  const [etapesExclues, setEtapesExclues] = useState<string[]>([]);
+  const [pays, setPays] = useState<ChoixPays>('tous');
+  const [joignabilitesVisees, setJoignabilitesVisees] = useState<string[]>([]);
+  const [joignabilitesExclues, setJoignabilitesExclues] = useState<string[]>([]);
+  // Presse et exclusions (harmonisation des contacts, 2026-09-30).
   const [typesMedia, setTypesMedia] = useState<string[]>([]);
   const [zonesMedia, setZonesMedia] = useState<string[]>([]);
-  const [exclRelations, setExclRelations] = useState<string[]>([]);
   const [exclNatures, setExclNatures] = useState<string[]>([]);
   const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
 
@@ -129,12 +163,8 @@ export function AudienceBuilderPage() {
     const all: AudienceCondition[] = [];
     if (departments.length > 0) all.push({ field: 'department_code', op: 'in', value: departments });
     if (regions.length > 0)     all.push({ field: 'region_code',     op: 'in', value: regions });
-    if (sizes.length > 0)       all.push({ field: 'size_category',   op: 'in', value: sizes });
     if (sectors.length > 0)     all.push({ field: 'sector_main',     op: 'in', value: sectors });
     if (natures.length > 0)     all.push({ field: 'entity_nature',   op: 'in', value: natures });
-    const relation = critereRelations(relations);
-    if (relation !== null)      all.push(relation);
-    all.push(...criteresMedias(typesMedia, zonesMedia));
     // Métier : l'étiquette `metier-<code>` (chantier 2), en `contains_any`.
     const metier = critereMetiers(metiers);
     if (metier !== null)        all.push(metier);
@@ -147,14 +177,30 @@ export function AudienceBuilderPage() {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
+    all.push(...criteresMedias(typesMedia, zonesMedia));
 
-    // Le bloc `not` n'est envoyé que s'il exclut quelque chose.
-    const not = exclusions({ relations: exclRelations, natures: exclNatures, typesMedia: exclTypesMedia });
-    return not.length > 0 ? { all, not } : { all };
+    const criteres = construireCriteres(all, {
+      relationsVisees,
+      relationsExclues,
+      etapesVisees,
+      etapesExclues,
+      pays,
+      tailles: sizes,
+      joignabilitesVisees,
+      joignabilitesExclues,
+    });
+    return avecExclusions(criteres, exclusions({ natures: exclNatures, typesMedia: exclTypesMedia }));
   }, [
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
-    relations, typesMedia, zonesMedia, exclRelations, exclNatures, exclTypesMedia,
+    relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
+    typesMedia, zonesMedia, exclNatures, exclTypesMedia,
   ]);
+  const aDesCriteres = aUnCriterePositif(criteria);
+  const conditionsRecap = [
+    ...(criteria.all ?? []).map((c) => ({ bloc: 'ET', c })),
+    ...(criteria.any ?? []).map((c) => ({ bloc: 'OU', c })),
+    ...(criteria.not ?? []).map((c) => ({ bloc: 'SAUF', c })),
+  ];
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -176,15 +222,14 @@ export function AudienceBuilderPage() {
   }, []);
 
   useEffect(() => {
-    const hasAny = (criteria.all?.length ?? 0) > 0;
-    if (!hasAny) {
+    if (!aDesCriteres) {
       setPreview(null);
       setPreviewError(null);
       return;
     }
     const timer = setTimeout(() => { void fetchPreview(criteria); }, 500);
     return () => { clearTimeout(timer); };
-  }, [criteria, fetchPreview]);
+  }, [criteria, aDesCriteres, fetchPreview]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -193,7 +238,7 @@ export function AudienceBuilderPage() {
   });
 
   const onSubmit = handleSubmit(async (form) => {
-    if ((criteria.all?.length ?? 0) === 0) {
+    if (!aDesCriteres) {
       toast.error('Ajoute au moins un critère');
       return;
     }
@@ -216,7 +261,7 @@ export function AudienceBuilderPage() {
   // D26-010 — le compteur a besoin de la valeur COURANTE, pas seulement de
   // celle qui sera soumise : la troncature se produit pendant la frappe.
   const watchedDescription = watch('description');
-  const canCreate = watchedName.trim().length > 0 && (criteria.all?.length ?? 0) > 0;
+  const canCreate = watchedName.trim().length > 0 && aDesCriteres;
 
   return (
     <div className="px-6 py-6">
@@ -292,6 +337,80 @@ export function AudienceBuilderPage() {
                 placeholder="Aucune région"
               />
             </Field>
+            <Field label="Pays">
+              <select
+                aria-label="Pays"
+                value={pays}
+                onChange={(e) => setPays(e.target.value as ChoixPays)}
+                className="w-full rounded-lg bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+              >
+                {PAYS_OPTIONS.map((o) => (
+                  <option key={o.code} value={o.code}>{o.label}</option>
+                ))}
+              </select>
+            </Field>
+          </Card>
+
+          {/* Relation et joignabilité (chantiers B et D) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Users2 className="h-4 w-4" />} title="Relation et joignabilité" />
+            <Field label="Types de relation visés">
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={relationsVisees}
+                onChange={setRelationsVisees}
+                placeholder="Tous types"
+                masquerCode
+              />
+            </Field>
+            <Field label="Types de relation EXCLUS">
+              <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+                Clients, partenaires, presse, fournisseurs et investisseurs sont exclus par défaut d’une prospection, décochez pour les inclure.
+              </p>
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={relationsExclues}
+                onChange={setRelationsExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
+              />
+            </Field>
+            <Field label="Étapes visées">
+              <ChipsMultiSelect
+                options={ETAPE_PRESETS}
+                selected={etapesVisees}
+                onChange={setEtapesVisees}
+                placeholder="Toutes étapes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Étapes exclues">
+              <ChipsMultiSelect
+                options={ETAPE_PRESETS}
+                selected={etapesExclues}
+                onChange={setEtapesExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
+              />
+            </Field>
+            <Field label="Joignabilité visée">
+              <ChipsMultiSelect
+                options={JOIGNABILITE_PRESETS}
+                selected={joignabilitesVisees}
+                onChange={setJoignabilitesVisees}
+                placeholder="Toutes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Joignabilité exclue">
+              <ChipsMultiSelect
+                options={JOIGNABILITE_PRESETS}
+                selected={joignabilitesExclues}
+                onChange={setJoignabilitesExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
+              />
+            </Field>
           </Card>
 
           {/* Taille / Secteur */}
@@ -323,27 +442,13 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
-          {/* Relation (harmonisation des contacts) */}
-          <Card padding="md" className="space-y-4">
-            <SectionHeading icon={<Users2 className="h-4 w-4" />} title="Relation" />
-            <Field label="Relations visées">
-              <ChipsMultiSelect
-                options={RELATION_PRESETS}
-                selected={relations}
-                onChange={setRelations}
-                placeholder="Toutes relations"
-                masquerCode
-              />
-            </Field>
-          </Card>
-
           {/* Presse et médias : étiquettes `media-type:` / `media-zone:` */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Les fiches de presse harmonisées sont protégées : comme les fédérations, elles
-              n’entrent dans aucune audience générale et ne partent que par leur segment dédié.
-              Ces critères visent les fiches de média non protégées (production audiovisuelle…).
+              Les fiches de presse harmonisées sont protégées : elles n’entrent dans aucune audience
+              tant que le segment presse n’est pas ouvert. Ces critères visent les fiches de média
+              non protégées (production audiovisuelle…).
             </p>
             <Field label="Types de média">
               <ChipsMultiSelect
@@ -365,26 +470,17 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
-          {/* Exclusions (bloc `not`) : une fiche est retirée dès qu'une exclusion la vise */}
+          {/* Exclusions de nature et de type de média (bloc `not`) */}
           <Card padding="md" className="space-y-4">
-            <SectionHeading icon={<Ban className="h-4 w-4" />} title="Exclusions" />
+            <SectionHeading icon={<Ban className="h-4 w-4" />} title="Exclusions (nature, type de média)" />
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => { setExclRelations([...new Set([...exclRelations, ...EXCLUSIONS_PROSPECTION])]); }}
+              onClick={() => { setRelationsExclues([...new Set([...relationsExclues, ...RELATIONS_EXCLUES_PAR_DEFAUT])]); }}
             >
-              Prospection : exclure la presse et les clients
+              Prospection : rétablir l’exclusion des relations établies
             </Button>
-            <Field label="Relations exclues">
-              <ChipsMultiSelect
-                options={RELATION_PRESETS}
-                selected={exclRelations}
-                onChange={setExclRelations}
-                placeholder="Aucune relation exclue"
-                masquerCode
-              />
-            </Field>
             <Field label="Natures exclues">
               <ChipsMultiSelect
                 options={NATURE_PRESETS}
@@ -494,27 +590,24 @@ export function AudienceBuilderPage() {
             )}
 
             {/* Recap critères */}
-            {(criteria.all?.length ?? 0) > 0 ? (
+            {conditionsRecap.length > 0 ? (
               <div className="space-y-1.5">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Critères ({criteria.all?.length})
+                  Critères ({conditionsRecap.length})
                 </div>
                 <ul className="space-y-1">
-                  {criteria.all?.map((c, i) => (
+                  {conditionsRecap.map(({ bloc, c }, i) => (
                     <li key={i} className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+                      <span className="text-slate-400">{bloc}</span>{' '}
                       <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
                       <span className="text-slate-400">{c.op}</span>{' '}
                       <span className="text-sky-700 dark:text-sky-300">
-                        {Array.isArray(c.value) ? `[${c.value.length}]` : String(c.value)}
+                        {Array.isArray(c.value)
+                          ? `[${c.value.length}]`
+                          : typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean'
+                            ? String(c.value)
+                            : ''}
                       </span>
-                    </li>
-                  ))}
-                  {criteria.not?.map((c, i) => (
-                    <li key={`sauf-${i}`} className="rounded-md bg-rose-50 px-2 py-1 text-[11px] font-mono text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                      <span>sauf</span>{' '}
-                      <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
-                      <span className="text-slate-400">{c.op}</span>{' '}
-                      <span>{Array.isArray(c.value) ? `[${c.value.length}]` : String(c.value)}</span>
                     </li>
                   ))}
                 </ul>
@@ -617,7 +710,7 @@ function ChipsMultiSelect({
                   : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700',
               )}
             >
-              {masquerCode ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
+              {masquerCode || opt.code.startsWith('__') ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
               <span>{opt.label}</span>
               {active ? <X className="h-3 w-3" /> : null}
             </button>

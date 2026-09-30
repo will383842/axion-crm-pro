@@ -123,10 +123,14 @@ use Throwable;
  * aucune requête vers eux, avec ou sans l'option (Will, 27/09 : les contacts
  * de ces fiches ne se suppriment pas).
  *
- * Pour les fiches protégées seulement, la NATURE n'est jamais DEVINÉE
- * (`entreprise` pour une fiche INSEE qui n'en a pas) : un organisateur ou une
- * fédération rattaché à une fiche INSEE n'est pas une société commerciale.
- * Déjà renseignée, elle ne bouge jamais — c'est la règle commune.
+ * Pour les ORGANISATEURS et les FÉDÉRATIONS seulement
+ * (`FichesProtegees::TAGS_NATURE_NON_DEVINEE`), la NATURE n'est jamais
+ * DEVINÉE (`entreprise` pour une fiche INSEE qui n'en a pas) : un organisateur
+ * ou une fédération rattaché à une fiche INSEE n'est pas une société
+ * commerciale. Les participants GOFAB, protégés eux aussi, sont des
+ * entreprises : la règle commune s'applique à eux (chantier C, 2026-10-01 —
+ * ils étaient pris dans cette exception par accident). Déjà renseignée, la
+ * nature ne bouge jamais — c'est la règle commune.
  *
  * Pour TOUTES les fiches (seules les fédérations la déclenchent aujourd'hui) :
  * B4 — un secteur VALIDE choisi par l'import des fédérations
@@ -565,7 +569,7 @@ class CrmReferentielsReclasser extends Command
         }
         $lignes = DB::select(
             'SELECT c.id, c.naf_nomenclature, c.naf_rev2, ' . implode(', ', $colonnes) . ',
-                    NOT ' . FichesProtegees::conditionSql('c.id') . ' AS protegee
+                    NOT ' . FichesProtegees::conditionSql('c.id', FichesProtegees::TAGS_NATURE_NON_DEVINEE) . ' AS nature_protegee
              FROM companies c
              WHERE c.workspace_id = ? AND c.id > ? AND ' . $this->horsProtegees('c.id') . '
              ORDER BY c.id
@@ -624,10 +628,11 @@ class CrmReferentielsReclasser extends Command
                 }
                 $calcul['sector_main'] = $secteurActuel;
             }
-            // Fiche protégée : la nature n'est jamais DEVINÉE — vide, elle
-            // reste vide ; renseignée, elle ne bouge de toute façon jamais
-            // (`Classement::nature`).
-            if ((bool) $f->protegee && self::brut($f->entity_nature) === null && $calcul['entity_nature'] !== null) {
+            // Organisateur ou fédération : la nature n'est jamais DEVINÉE —
+            // vide, elle reste vide ; renseignée, elle ne bouge de toute façon
+            // jamais (`Classement::nature`). Pas les participants GOFAB, qui
+            // sont des entreprises (`FichesProtegees::TAGS_NATURE_NON_DEVINEE`).
+            if ((bool) $f->nature_protegee && self::brut($f->entity_nature) === null && $calcul['entity_nature'] !== null) {
                 $calcul['entity_nature'] = null;
                 $this->compteurs['natures_protegees_non_devinees']++;
             }

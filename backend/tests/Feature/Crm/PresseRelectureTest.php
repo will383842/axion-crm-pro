@@ -32,6 +32,7 @@ use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Domain\DomainFinderService;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -278,7 +279,8 @@ test('une fiche de presse n est JAMAIS fusionnee automatiquement ; a la main, un
 
     // Le témoin : sans homonyme, la fusion MANUELLE passe (règles de #260).
     DB::table('contacts')->where('company_id', $editeur)->where('last_name', 'ZZJUMEAU')->update(['last_name' => 'ZZAUTRE']);
-    $fusion->fusionner($this->espace, $editeur, $provisoire, 'presse_titre_editeur', FusionFiches::MODE_MANUEL);
+    // (La fusion interroge la base dans le contexte de l'espace, comme l'écran.)
+    WorkspaceContext::run($this->espace, fn (): int => $fusion->fusionner($this->espace, $editeur, $provisoire, 'presse_titre_editeur', FusionFiches::MODE_MANUEL));
     expect(DB::table('companies')->where('id', $provisoire)->value('deleted_at'))->not->toBeNull()
         ->and((int) DB::table('contacts')->where('external_ref', 'journaliste:' . $j)->value('company_id'))->toBe($editeur);
 });

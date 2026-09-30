@@ -115,6 +115,10 @@ final class CompanyQueryFilters
             // Roumanie » sans les mélanger aux 4,29 M de fiches françaises.
             AllowedFilter::exact('country_code'),
             AllowedFilter::exact('entity_nature'),
+            // Joignabilité calculée (chantier D, `App\Crm\Joignabilite\Joignabilite`) :
+            // `filter[joignabilite]=email_valide` (plusieurs : `=a,b` = OU).
+            // Index `(workspace_id, joignabilite)`.
+            AllowedFilter::exact('joignabilite'),
             // `filter[tag]=implantation-ro` (multi : `filter[tag]=a,b` = ET
             // logique) — indispensable pour retrouver un SEGMENT taggé (ex.
             // campagne « implantations Roumanie ») dans la liste, l'export ET

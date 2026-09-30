@@ -25,6 +25,9 @@ final class ContactQueryFilters
             AllowedFilter::exact('email_status'),
             AllowedFilter::exact('discovery_source'),
             AllowedFilter::exact('company_id'),
+            // Joignabilité calculée de la PERSONNE (chantier D) —
+            // `filter[joignabilite]=email_valide`. Index `(workspace_id, joignabilite)`.
+            AllowedFilter::exact('joignabilite'),
 
             // Pays et statut de prospection vivent sur l'ENTREPRISE, pas sur la
             // personne. Sans ces deux filtres, les 605 contacts roumains

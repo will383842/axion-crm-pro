@@ -24,6 +24,8 @@ import { ContactsCard, type ContactItem } from './components/ContactsCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
 import { EvenementsCard } from './components/EvenementsCard';
+import { RelationCard } from './components/RelationCard';
+import type { LifecycleStage, RelationType } from '@/features/crm-console/types';
 
 interface CompanyDetail {
   id: number;
@@ -53,6 +55,11 @@ interface CompanyDetail {
   created_at?: string | null;
   enriched_at?: string | null;
   contacts?: ContactItem[];
+  // Chantiers B et D (2026-10-01).
+  relation_type?: RelationType;
+  lifecycle_stage?: LifecycleStage;
+  relation_saisie_manuelle_at?: string | null;
+  joignabilite?: string | null;
 }
 
 export function CompanyDetailPage() {
@@ -260,6 +267,14 @@ export function CompanyDetailPage() {
 
         {/* RIGHT COLUMN (1/3) */}
         <aside className="space-y-6">
+          <RelationCard
+            key={`${c.relation_type ?? 'prospect'}-${c.lifecycle_stage ?? 'nouveau'}-${c.relation_saisie_manuelle_at ?? ''}`}
+            companyId={c.id}
+            relationType={c.relation_type ?? 'prospect'}
+            lifecycleStage={c.lifecycle_stage ?? 'nouveau'}
+            saisieManuelleLe={c.relation_saisie_manuelle_at}
+            joignabilite={c.joignabilite}
+          />
           <ContactsCard contacts={c.contacts ?? []} />
           <EvenementsCard companyId={c.id} />
           <QualityScoreCard

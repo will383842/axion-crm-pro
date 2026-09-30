@@ -29,6 +29,12 @@ class AudienceBuilderService
         'prospection_status', 'department_code', 'region_code', 'commune_code',
         'size_category', 'sector_main', 'entity_nature', 'priority', 'quality_score',
         'tags', 'has_email', 'enriched_at', 'best_email_confidence',
+        // 2026-10-01 — statut de la relation (chantier B : exclure les clients,
+        // partenaires… d'une prospection, cf. `RelationsProspection`), pays
+        // (chantier C : « étranger » = `country_code` ≠ FR, colonne NOT NULL)
+        // et joignabilité calculée (chantier D, `Joignabilite`). Colonnes
+        // ordinaires de `companies` : mêmes opérateurs, même sémantique NULL.
+        'relation_type', 'lifecycle_stage', 'country_code', 'joignabilite',
     ];
 
     public const WHITELIST_OPS = [

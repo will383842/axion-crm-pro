@@ -102,6 +102,9 @@ class ContactsController extends ApiController
             // 50 lignes, cinquante vérifications de permission identiques.
             'email' => $masquer ? MasquageCoordonnees::email($c->email) : $c->email,
             'email_status' => $c->email_status,
+            // Chantier D — l'état calculé (`Joignabilite`), null tant que
+            // `crm:joignabilite:calculer` n'est pas passé.
+            'joignabilite' => $c->getAttribute('joignabilite'),
             'email_score' => $c->email_score,
             'phone' => $masquer ? MasquageCoordonnees::telephone($c->phone) : $c->phone,
             'linkedin_url' => $c->linkedin_url,

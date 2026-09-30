@@ -271,3 +271,20 @@ export type CleMetier = (typeof METIERS)[number]['code'];
 
 /** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */
 export const PREFIXE_ETIQUETTE_METIER = "metier-";
+
+/** Joignabilité calculée — `companies.joignabilite`, `contacts.joignabilite`. */
+export const JOIGNABILITES = [
+  { code: "email_valide", libelle: "E-mail vérifié valide (part en campagne)" },
+  { code: "email_partage", libelle: "E-mail partagé (cabinet, domiciliation) — exclu par défaut" },
+  { code: "email_non_verifie", libelle: "E-mail non vérifié" },
+  { code: "email_personnel", libelle: "E-mail personnel (jamais en campagne)" },
+  { code: "email_invalide", libelle: "E-mail invalide (gardé, jamais envoyé)" },
+  { code: "email_interdit", libelle: "E-mail interdit (opposition ou suppression)" },
+  { code: "sans_email_avec_telephone", libelle: "Sans e-mail, avec téléphone" },
+  { code: "sans_contact", libelle: "Sans contact" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleJoignabilite = (typeof JOIGNABILITES)[number]['code'];
+
+/** Types de relation qu'une audience de PROSPECTION exclut par défaut (`RelationsProspection`). */
+export const RELATIONS_HORS_PROSPECTION = ["client", "partenaire", "presse_media", "fournisseur", "investisseur"] as const;

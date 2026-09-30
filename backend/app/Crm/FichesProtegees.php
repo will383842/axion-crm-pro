@@ -92,6 +92,26 @@ final class FichesProtegees
     ];
 
     /**
+     * Les fiches protégées dont la NATURE n'est jamais devinée : organisateurs
+     * et fédérations, qui ne sont pas des sociétés commerciales même rattachés
+     * à une fiche INSEE (chantier C, 2026-10-01).
+     *
+     * Les participants GOFAB n'y sont PAS : leur source les décrit comme des
+     * « entreprises ordinaires » (migration `2026_09_30_000010`). Ils étaient
+     * pris dans la règle par accident, parce qu'elle lisait `TAGS` entier quand
+     * le tag GOFAB y a été ajouté — c'est l'une des deux raisons pour
+     * lesquelles `--inclure-protegees` ne posait pas leur nature (l'autre :
+     * ces fiches ne viennent pas de l'INSEE, et ne portent ni code NAF ni
+     * catégorie juridique ; `crm:referentiels:combler-trous` s'en charge).
+     *
+     * @var list<string>
+     */
+    public const TAGS_NATURE_NON_DEVINEE = [
+        self::TAG_ORGANISATEURS,
+        self::TAG_FEDERATIONS,
+    ];
+
+    /**
      * Exclut les fiches protégées d'une requête sur `companies` (modifie la
      * requête en place).
      */
@@ -118,11 +138,14 @@ final class FichesProtegees
      * dans l'espace », et elle écartait TOUTES les lignes dès qu'une seule
      * fiche protégée existait (garde `ReclassementReferentielsTest`, S1).
      */
-    public static function conditionSql(string $colonneId = 'companies.id'): string
+    /**
+     * @param  list<string>|null  $tags  sous-ensemble de `TAGS` (défaut : tous)
+     */
+    public static function conditionSql(string $colonneId = 'companies.id', ?array $tags = null): string
     {
         $slugs = implode(', ', array_map(
             static fn (string $slug): string => "'" . str_replace("'", "''", $slug) . "'",
-            self::TAGS,
+            $tags ?? self::TAGS,
         ));
 
         return 'NOT EXISTS (SELECT 1 FROM company_tag fp_ct JOIN tags fp_t ON fp_t.id = fp_ct.tag_id'

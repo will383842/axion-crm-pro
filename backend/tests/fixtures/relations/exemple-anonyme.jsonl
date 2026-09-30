@@ -1,0 +1,11 @@
+{"source":"site-client","siren":"941000001","denomination":"ZZ Societe Cliente","email":null,"relation_type":"client","lifecycle_stage":"client"}
+{"source":"site-contact","siren":null,"denomination":"ZZ Contact","email":"Direction@zz-personne.example","relation_type":null,"lifecycle_stage":"qualifie"}
+{"source":"site-rdv","siren":null,"denomination":null,"email":"accueil@zz-generique.example","relation_type":null,"lifecycle_stage":"opportunite"}
+{"source":"site-partenaire","siren":null,"denomination":"ZZ Partenaire","email":"quelquun@zz-domaine.example","relation_type":"partenaire","lifecycle_stage":null}
+{"source":"site-contact","siren":null,"denomination":"ZZ Doublon","email":"x@zz-doublon.example","relation_type":"client","lifecycle_stage":null}
+{"source":"site-contact","siren":null,"denomination":"Particulier","email":"particulier-fictif.zz@yahoo.zz","relation_type":"client","lifecycle_stage":null}
+{"source":"site-contact","siren":null,"denomination":"Inconnu","email":"personne@zz-inconnu.invalid","relation_type":"client","lifecycle_stage":null}
+{"source":"site-client","siren":"941000099","denomination":"ZZ Corbeille","email":null,"relation_type":"client","lifecycle_stage":null}
+{"source":"site-client","siren":"941000001","relation":"client"}
+
+{"source":"site-contact","siren":"941000002","email":null,"relation_type":"newsletter","lifecycle_stage":null}

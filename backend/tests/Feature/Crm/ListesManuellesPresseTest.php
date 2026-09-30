@@ -275,3 +275,59 @@ test('🔴 membres et effectifs d une liste : ni la fiche de presse ni le journa
     // Les lignes restent en base : rien n'est supprimé.
     expect(DB::table('listes_manuelles_membres')->where('liste_id', $g->id)->count())->toBe(5);
 });
+
+// ── Relecture A09 de #266 : l'écran compte ce que le résolveur cible ─────────
+
+test('🔴 membres et effectifs : une fiche ou une personne à la CORBEILLE n est plus comptée ; les témoins vivants, si', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->actingAs(lpCompte($this->ws));
+    $vivante = lpPersonne($this->ws, $this->salon, 'ZZVIVANTE', 'vivante@zz-salon.example.invalid');
+    $h = lpListe($this->ws, 'ZZ Corbeille');
+    lpLigne($this->ws, $h->id, $this->salon, null);
+    lpLigne($this->ws, $h->id, $this->cercle, null);
+    lpLigne($this->ws, $h->id, null, $this->membreCercle);
+    lpLigne($this->ws, $h->id, null, $this->temoin);
+    lpLigne($this->ws, $h->id, null, $vivante);
+    // Corbeille (jamais un DELETE) : la fiche du cercle, et le témoin.
+    DB::table('companies')->where('id', $this->cercle)->update(['deleted_at' => now()]);
+    DB::table('contacts')->where('id', $this->temoin)->update(['deleted_at' => now()]);
+
+    $membres = $this->getJson("/api/v1/listes-manuelles/{$h->id}/membres")->assertOk()->assertJsonPath('meta.total', 2);
+    expect($membres->getContent())->toContain('vivante@zz-salon')->not->toContain('temoin@zz-salon')->not->toContain('membre@zz-cercle');
+
+    $this->getJson("/api/v1/listes-manuelles/{$h->id}")->assertOk()
+        ->assertJsonPath('data.organisations', 1)->assertJsonPath('data.personnes', 1);
+    expect(DB::table('listes_manuelles_membres')->where('liste_id', $h->id)->count())->toBe(5);
+});
+
+test('🔴 index ?company_id= / ?contact_id= : « contient » applique la garde presse et la corbeille ; les témoins, si', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->actingAs(lpCompte($this->ws));
+    $k = lpListe($this->ws, 'ZZ Contient');
+    lpLigne($this->ws, $k->id, $this->journal, null);
+    lpLigne($this->ws, $k->id, $this->salon, null);
+    lpLigne($this->ws, $k->id, $this->cercle, null);
+    lpLigne($this->ws, $k->id, null, $this->journaliste);
+    lpLigne($this->ws, $k->id, null, $this->temoin);
+    DB::table('companies')->where('id', $this->cercle)->update(['deleted_at' => now()]);
+
+    $contient = fn (string $q): bool => (bool) collect($this->getJson('/api/v1/listes-manuelles?' . $q)->assertOk()->json('data'))
+        ->firstWhere('id', $k->id)['contient'];
+
+    expect($contient('company_id=' . $this->journal))->toBeFalse()
+        ->and($contient('company_id=' . $this->cercle))->toBeFalse()
+        ->and($contient('contact_id=' . $this->journaliste))->toBeFalse()
+        ->and($contient('company_id=' . $this->salon))->toBeTrue()
+        ->and($contient('contact_id=' . $this->temoin))->toBeTrue();
+});
+
+test('🔴 API : presse + identifiants introuvables, rien d écrit → 422 avec un message clair', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->actingAs(lpCompte($this->ws));
+    $liste = (int) $this->postJson('/api/v1/listes-manuelles', ['nom' => 'ZZ Introuvables'])->assertCreated()->json('data.id');
+
+    $refus = $this->postJson("/api/v1/listes-manuelles/{$liste}/membres", ['company_ids' => [$this->journal, 987654321], 'contact_ids' => [987654322]])
+        ->assertStatus(422)->assertJsonPath('data.presse_refusees', 1)->assertJsonPath('data.introuvables', 2);
+    expect((string) $refus->json('message'))->toContain('segment presse est fermé')->toContain('introuvables')->toContain('Rien n\'a été ajouté')
+        ->and(DB::table('listes_manuelles_membres')->where('liste_id', $liste)->count())->toBe(0);
+});

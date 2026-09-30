@@ -34,7 +34,9 @@ use InvalidArgumentException;
  * La presse (`GardePresse`) n'entre dans aucune liste tant que son segment est
  * fermé : l'ajout la REFUSE en le disant (`presse_refusees` + message), et une
  * ligne écrite avant qu'une fiche ne devienne presse n'est plus ni lue, ni
- * comptée, ni montrée avec ses adresses (`membres`, effectifs).
+ * comptée, ni montrée avec ses adresses (`membres`, effectifs, `contient`).
+ * Une fiche ou une personne à la corbeille non plus : l'écran compte ce que
+ * le résolveur cible.
  */
 class ListesManuellesController extends ApiController
 {
@@ -63,14 +65,17 @@ class ListesManuellesController extends ApiController
         $contactId = (int) $r->query('contact_id', '0');
         $contient = [];
         if ($companyId > 0 || $contactId > 0) {
-            $contient = DB::table('listes_manuelles_membres')
-                ->where('workspace_id', $ws)
-                ->whereNull('retire_le')
+            // Même lecture que l'écran de la liste (`membresLisibles`) : une
+            // fiche devenue presse, ou mise à la corbeille, n'y est plus.
+            $contient = self::membresLisibles(DB::table('listes_manuelles_membres as m')
+                ->leftJoin('contacts as ct', 'ct.id', '=', 'm.contact_id')
+                ->where('m.workspace_id', $ws)
+                ->whereNull('m.retire_le')
                 ->where(function ($w) use ($companyId, $contactId): void {
-                    $w->where('company_id', $companyId > 0 ? $companyId : -1)
-                        ->orWhere('contact_id', $contactId > 0 ? $contactId : -1);
-                })
-                ->pluck('liste_id')
+                    $w->where('m.company_id', $companyId > 0 ? $companyId : -1)
+                        ->orWhere('m.contact_id', $contactId > 0 ? $contactId : -1);
+                }))
+                ->pluck('m.liste_id')
                 ->map(static fn (mixed $id): int => (int) $id)
                 ->flip()
                 ->all();
@@ -228,11 +233,16 @@ class ListesManuellesController extends ApiController
         $bilan = ListesManuelles::ajouter($liste, $companyIds, $contactIds, $this->utilisateur($r), ListesManuelles::ORIGINE_COCHE);
         $this->journal('liste_manuelle.fiches_ajoutees', $liste, $bilan);
 
-        // Rien d'autre que de la presse désignée : REFUS explicite (422), rien
-        // n'a été écrit. Un geste mixte passe pour le reste, et le dit.
+        // Rien d'autre que de la presse désignée (et, au plus, des fiches
+        // introuvables) : REFUS explicite (422), rien n'a été écrit. Un geste
+        // mixte passe pour le reste, et le dit.
         if ($bilan['presse_refusees'] > 0
-            && $bilan['ajoutes'] + $bilan['reactives'] + $bilan['deja_presents'] + $bilan['introuvables'] === 0) {
-            return $this->ok(['message' => self::MESSAGE_PRESSE . ' Rien n\'a été ajouté.', 'data' => $bilan], 422);
+            && $bilan['ajoutes'] + $bilan['reactives'] + $bilan['deja_presents'] === 0) {
+            $introuvables = $bilan['introuvables'] > 0
+                ? ' Les autres fiches désignées sont introuvables dans cet espace.'
+                : '';
+
+            return $this->ok(['message' => self::MESSAGE_PRESSE . $introuvables . ' Rien n\'a été ajouté.', 'data' => $bilan], 422);
         }
 
         return $this->ok(['data' => $bilan] + ($bilan['presse_refusees'] > 0 ? ['message' => self::MESSAGE_PRESSE] : []));
@@ -294,13 +304,17 @@ class ListesManuellesController extends ApiController
     // ── Outils ───────────────────────────────────────────────────────────────
 
     /**
-     * Les lignes d'appartenance LISIBLES : sans la presse tant que son segment
-     * est fermé, par fiche (`coalesce(m.company_id, ct.company_id)`) ET par
-     * personne. La requête doit joindre `contacts as ct` sur `m.contact_id`.
+     * Les lignes d'appartenance LISIBLES, comme le résolveur les lit : sans la
+     * presse tant que son segment est fermé, par fiche
+     * (`coalesce(m.company_id, ct.company_id)`) ET par personne ; sans fiche
+     * ni personne à la corbeille. La requête doit joindre `contacts as ct` sur
+     * `m.contact_id`.
      */
     private static function membresLisibles(QueryBuilder $q): QueryBuilder
     {
         return $q
+            ->whereRaw('(m.contact_id IS NULL OR ct.deleted_at IS NULL)')
+            ->whereRaw('EXISTS (SELECT 1 FROM companies ml_c WHERE ml_c.id = coalesce(m.company_id, ct.company_id) AND ml_c.deleted_at IS NULL)')
             ->whereRaw(GardePresse::conditionSql('coalesce(m.company_id, ct.company_id)'))
             ->whereRaw('(m.contact_id IS NULL OR ' . GardePresse::conditionContactsSql('ct') . ')');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Crm\Ingest;
 
+use App\Crm\Relations\PromotionRelation;
 use App\Crm\Taxonomy;
 
 /**
@@ -187,18 +188,8 @@ final class SiteSyncClassifier
             return $incoming;
         }
 
-        $priority = Taxonomy::BUSINESS_RELATION_PRIORITY;
-        $rankCurrent = array_search($current, $priority, true);
-        $rankIncoming = array_search($incoming, $priority, true);
-
-        if ($rankCurrent === false) {
-            return $incoming;
-        }
-        if ($rankIncoming === false) {
-            return $current;
-        }
-
-        return $rankIncoming < $rankCurrent ? $incoming : $current;
+        // L'ordre UNIQUE de tous les automatismes (2026-10-01).
+        return PromotionRelation::relation($current, $incoming);
     }
 
     /**

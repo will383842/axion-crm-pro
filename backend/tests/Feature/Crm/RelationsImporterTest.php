@@ -66,8 +66,8 @@ function riJeu(string $espace): array
         'doublon2' => riFiche($espace, ['website' => 'zz-doublon.example/']),
         'corbeille' => riFiche($espace, ['siren' => '941000099', 'deleted_at' => now()]),
         'newsletter' => riFiche($espace, ['siren' => '941000002']),
-        // Une fiche qui porte un gmail en générique : un webmail ne rapproche JAMAIS par domaine.
-        'webmail' => riFiche($espace, ['website' => 'https://gmail.com']),
+        // Une fiche dont le site est une messagerie grand public (famille « yahoo », extension .zz jamais déléguée) : un webmail ne rapproche JAMAIS par domaine.
+        'webmail' => riFiche($espace, ['website' => 'https://yahoo.zz']),
     ];
     riContact($espace, $f['personne'], 'direction@zz-personne.example');
 
@@ -117,7 +117,8 @@ test('SIREN, puis e-mail de personne ou generique, puis domaine unique — et RI
         ->and(riEtat($f['siren']))->toBe(['client', 'client'])
         ->and(riEtat($f['personne']))->toBe(['prospect', 'qualifie'])
         ->and(riEtat($f['generique']))->toBe(['prospect', 'opportunite'])
-        ->and(riEtat($f['domaine']))->toBe(['partenaire', 'nouveau'])
+        // Rapprochée par DOMAINE : un type hors prospection n'y est JAMAIS posé.
+        ->and(riEtat($f['domaine']))->toBe(['prospect', 'nouveau'])
         // Ambiguë : deux fiches pour le même domaine — aucune n'est touchée.
         ->and(riEtat($f['doublon1']))->toBe(['prospect', 'nouveau'])
         ->and(riEtat($f['doublon2']))->toBe(['prospect', 'nouveau'])
@@ -125,7 +126,7 @@ test('SIREN, puis e-mail de personne ou generique, puis domaine unique — et RI
         ->and(riEtat($f['webmail']))->toBe(['prospect', 'nouveau'])
         // À la corbeille : jamais rapprochée.
         ->and(riEtat($f['corbeille']))->toBe(['prospect', 'nouveau'])
-        // Newsletter ne remplace pas prospect.
+        // Une source déclarative (`site-contact`) ne pose aucun type.
         ->and(riEtat($f['newsletter']))->toBe(['prospect', 'nouveau'])
         // Rien de créé, rien de supprimé.
         ->and(DB::table('companies')->count())->toBe($fiches)
@@ -138,8 +139,10 @@ test('SIREN, puis e-mail de personne ou generique, puis domaine unique — et RI
         ->and(riCompteur($r['sortie'], 'ambigues'))->toBe(1)
         ->and(riCompteur($r['sortie'], 'non_rapprochees'))->toBe(3)
         ->and(riCompteur($r['sortie'], 'domaines_webmail_ecartes'))->toBe(1)
-        ->and(riCompteur($r['sortie'], 'demandes_refusees_sans_recul'))->toBe(1)
-        ->and(riCompteur($r['sortie'], 'fiches_modifiees'))->toBe(4)
+        ->and(riCompteur($r['sortie'], 'demandes_refusees_sans_recul'))->toBe(0)
+        ->and(riCompteur($r['sortie'], 'demandes_refusees_confiance'))->toBe(2)
+        ->and(riCompteur($r['sortie'], 'types_hors_prospection_refuses'))->toBe(1)
+        ->and(riCompteur($r['sortie'], 'fiches_modifiees'))->toBe(3)
         ->and(riCompteur($r['sortie'], 'cle_inconnue'))->toBe(1);
 });
 
@@ -249,7 +252,7 @@ test('chaque fiche promue a son activite dans la timeline, chaque paquet ecrit s
         ->and($payload['source'])->toBe('crm:relations:importer')
         ->and($payload['origines'])->toBe(['site-client'])
         ->and($payload['relation'])->toEqual(['from' => 'prospect', 'to' => 'client'])
-        ->and(DB::table('activities')->where('kind', 'stage_changed')->count())->toBe(4)
+        ->and(DB::table('activities')->where('kind', 'stage_changed')->count())->toBe(3)
         ->and(DB::table('audit_logs')->where('event_type', 'RELATIONS_IMPORT_PAQUET')->count())->toBeGreaterThanOrEqual(1)
         ->and(DB::table('audit_logs')->where('event_type', 'RELATIONS_IMPORT_FIN')->count())->toBe(1);
 });
@@ -273,4 +276,81 @@ test('aucune adresse ni denomination a l ecran ; --compteurs-seulement ne montre
 test('un fichier introuvable ou un espace inconnu echouent sans rien ecrire', function () {
     expect(riImporter($this->slug, '/nexiste/pas.jsonl')['code'])->toBe(1)
         ->and(riImporter('zz-espace-inconnu', RI_FIXTURE)['code'])->toBe(1);
+});
+
+// ── Relecture de #265 : confiance, fournisseur, corbeille, comptage ─────────
+
+test('un type hors prospection n est pose QUE par site-client, par SIREN ou e-mail exact', function () {
+    $parSiren = riFiche($this->espace);
+    $parEmail = riFiche($this->espace, ['email_generic' => 'achat@zz-confiance.example']);
+    $parDomaine = riFiche($this->espace, ['website' => 'https://zz-domaine-confiance.example']);
+    $formulaire = riFiche($this->espace);
+    // TÉMOIN : la même ligne de formulaire promeut l'ÉTAPE.
+    $etape = riFiche($this->espace);
+    $sirens = DB::table('companies')->whereIn('id', [$parSiren, $formulaire, $etape])->pluck('siren', 'id');
+
+    $r = riImporter($this->slug, riFichier([
+        ['source' => 'site-client', 'siren' => $sirens[$parSiren], 'relation_type' => 'partenaire'],
+        ['source' => 'site-client', 'email' => 'achat@zz-confiance.example', 'relation_type' => 'client'],
+        ['source' => 'site-client', 'email' => 'x@zz-domaine-confiance.example', 'relation_type' => 'client', 'lifecycle_stage' => 'client'],
+        ['source' => 'site-contact', 'siren' => $sirens[$formulaire], 'relation_type' => 'presse_media', 'lifecycle_stage' => 'client'],
+        ['source' => 'site-contact', 'siren' => $sirens[$etape], 'relation_type' => 'partenaire', 'lifecycle_stage' => 'opportunite'],
+    ]));
+
+    expect(riEtat($parSiren))->toBe(['partenaire', 'nouveau'])
+        ->and(riEtat($parEmail))->toBe(['client', 'client'])
+        ->and(riEtat($parDomaine))->toBe(['prospect', 'nouveau'])
+        ->and(riEtat($formulaire))->toBe(['prospect', 'nouveau'])
+        ->and(riEtat($etape))->toBe(['prospect', 'opportunite'])
+        ->and(riCompteur($r['sortie'], 'types_hors_prospection_refuses'))->toBe(3)
+        ->and(riCompteur($r['sortie'], 'demandes_refusees_confiance'))->toBe(2);
+});
+
+test('fournisseur (saisie manuelle seulement) n est jamais importe ; une fiche hors prospection n y revient jamais', function () {
+    $fournisseur = riFiche($this->espace, ['relation_type' => 'fournisseur']);
+    $cible = riFiche($this->espace);
+    $sirens = DB::table('companies')->whereIn('id', [$fournisseur, $cible])->pluck('siren', 'id');
+
+    $r = riImporter($this->slug, riFichier([
+        ['source' => 'site-client', 'siren' => $sirens[$cible], 'relation_type' => 'fournisseur'],
+        ['source' => 'site-client', 'siren' => $sirens[$fournisseur], 'relation_type' => 'conference'],
+    ]));
+
+    expect(riEtat($cible))->toBe(['prospect', 'nouveau'])
+        ->and(riEtat($fournisseur))->toBe(['fournisseur', 'nouveau'])
+        ->and(riCompteur($r['sortie'], 'relation_saisie_manuelle'))->toBe(1)
+        ->and(riCompteur($r['sortie'], 'demandes_refusees_sans_recul'))->toBe(1);
+});
+
+test('une personne vivante d une fiche a la corbeille ne rapproche rien', function () {
+    $supprimee = riFiche($this->espace, ['deleted_at' => now()]);
+    riContact($this->espace, $supprimee, 'vivant@zz-corbeille.example');
+
+    $r = riImporter($this->slug, riFichier([
+        ['source' => 'site-client', 'email' => 'vivant@zz-corbeille.example', 'relation_type' => 'client'],
+    ]));
+
+    expect(riEtat($supprimee))->toBe(['prospect', 'nouveau'])
+        ->and(riCompteur($r['sortie'], 'rapprochees_par_email'))->toBe(0)
+        ->and(riCompteur($r['sortie'], 'non_rapprochees'))->toBe(1);
+});
+
+test('chaque ligne lue tombe dans UN compteur, et un seul', function () {
+    riJeu($this->espace);
+    $main = riFiche($this->espace, ['relation_saisie_manuelle_at' => now()]);
+    $siren = (string) DB::table('companies')->where('id', $main)->value('siren');
+    $fichier = riFichier(array_merge(
+        array_map(static fn (string $l): array => (array) json_decode($l, true), array_values(array_filter(file(RI_FIXTURE, FILE_IGNORE_NEW_LINES) ?: [], static fn (string $l): bool => trim($l) !== '' && str_contains($l, '"relation_type"')))),
+        [['source' => 'site-client', 'siren' => $siren, 'relation_type' => 'client'], ['source' => 'site-client', 'siren' => '941000001', 'relation_type' => 'client']],
+    ));
+
+    $r = riImporter($this->slug, $fichier);
+    $n = static fn (string $c): int => (int) riCompteur($r['sortie'], $c);
+
+    $ventilees = $n('lignes_rejetees') + $n('ambigues') + $n('non_rapprochees') + $n('lignes_appliquees') + $n('deja_a_jour')
+        + $n('demandes_refusees_sans_recul') + $n('demandes_refusees_confiance') + $n('verrouillees_a_la_main') + $n('fiches_disparues');
+    expect($n('lignes_lues'))->toBeGreaterThan(5)
+        ->and($ventilees)->toBe($n('lignes_lues'))
+        ->and($n('verrouillees_a_la_main'))->toBe(1)
+        ->and($n('deja_a_jour'))->toBe(1);
 });

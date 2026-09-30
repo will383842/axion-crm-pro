@@ -1,6 +1,5 @@
 <?php
 
-use App\Crm\Relations\RelationsProspection;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,11 +11,15 @@ use Illuminate\Support\Facades\Log;
  * PROSPECTION (« Prospects contactables », « … — Île-de-France »,
  * « Confiance email A »). Le seeder ne tourne pas au déploiement : celles qui
  * existent déjà en base reçoivent ici le même bloc `not` que le seeder pose
- * désormais (`RelationsProspection::conditionExclusion()`).
+ * désormais (`RelationsProspection::conditionExclusion()`), FIGÉ ici
+ * (`EXCLUSION`) : `down()` retire exactement ce que `up()` a posé, même si
+ * la liste `HORS_PROSPECTION` change plus tard (relecture R7).
  *
  * Ce qui la rend sûre :
  *  - elle ne touche une audience QUE si ses critères sont EXACTEMENT ceux que
- *    le seeder avait posés (comparaison sur le JSON décodé). Une audience que
+ *    le seeder avait posés — comparaison STRICTE (`===`) sur une forme
+ *    canonique (clés triées : `jsonb` ne garde pas l'ordre des clés, et
+ *    `true` n'y vaut jamais `1`). Une audience que
  *    Will a réécrite à l'écran n'est pas modifiée : elle est comptée dans le
  *    journal, et c'est à lui de décider ;
  *  - aujourd'hui, TOUTES les fiches valent `prospect` : l'exclusion ne retire
@@ -60,6 +63,27 @@ return new class extends Migration
         ],
     ];
 
+    /** L'exclusion posée par cette migration, figée (voir l'en-tête). */
+    private const EXCLUSION = [
+        'field' => 'relation_type',
+        'op' => 'in',
+        'value' => ['client', 'partenaire', 'presse_media', 'fournisseur', 'investisseur'],
+    ];
+
+    /** Forme canonique : clés des objets triées, listes gardées dans leur ordre. */
+    private static function canonique(mixed $valeur): mixed
+    {
+        if (! is_array($valeur)) {
+            return $valeur;
+        }
+        $canon = array_map(static fn (mixed $v): mixed => self::canonique($v), $valeur);
+        if (! array_is_list($canon)) {
+            ksort($canon);
+        }
+
+        return $canon;
+    }
+
     public function up(): void
     {
         $this->parEspace(function (stdClass $audience, array $criteres): ?array {
@@ -67,7 +91,7 @@ return new class extends Migration
             if ($origine === null) {
                 return null;
             }
-            if ($criteres != $origine) {
+            if (self::canonique($criteres) !== self::canonique($origine)) {
                 Log::notice('Audience par défaut réécrite à la main : exclusion des relations NON ajoutée', [
                     'audience_id' => $audience->id,
                 ]);
@@ -75,7 +99,7 @@ return new class extends Migration
                 return null;
             }
 
-            return $origine + ['not' => [RelationsProspection::conditionExclusion()]];
+            return $origine + ['not' => [self::EXCLUSION]];
         });
     }
 
@@ -85,7 +109,7 @@ return new class extends Migration
             if (! array_key_exists((string) $audience->name, self::CRITERES_D_ORIGINE)) {
                 return null;
             }
-            if (($criteres['not'] ?? null) != [RelationsProspection::conditionExclusion()]) {
+            if (self::canonique($criteres['not'] ?? null) !== self::canonique([self::EXCLUSION])) {
                 return null;
             }
             unset($criteres['not']);

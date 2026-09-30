@@ -6,57 +6,50 @@ use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Taxonomy;
 
 /**
- * LA RÈGLE DE PROMOTION du statut de relation — écrite une fois, lue par
- * `crm:relations:importer` (chantier B, 2026-10-01).
+ * LA RÈGLE DE PROMOTION du statut de relation — UNE pour tous les
+ * automatismes : le canal site (`SiteSyncClassifier::mergeRelationType`),
+ * `crm:relations:importer`, et la presse (#264, qui lit
+ * `RelationsProspection::HORS_PROSPECTION`).
  *
  * ── Le type de relation (`relation_type`) ───────────────────────────────────
  *
- * On ne rétrograde JAMAIS. Ordre (du plus engageant au moins engageant) :
+ * On ne rétrograde JAMAIS, selon l'ordre UNIQUE
+ * `Taxonomy::BUSINESS_RELATION_PRIORITY` :
  *
- *     client > investisseur > partenaire > presse_media > conference
- *            > fournisseur > prospect > newsletter
+ *     client > investisseur > partenaire > presse_media > fournisseur
+ *            > conference > prospect > newsletter
  *
- * C'est l'ordre canonique `Taxonomy::BUSINESS_RELATION_PRIORITY`, à UNE
- * différence près, assumée : `prospect` y passe du 2ᵉ rang à l'avant-dernier.
- * Dans le canal site → CRM, `prospect` est un type DÉCLARÉ (la personne a
- * rempli un formulaire) ; ici il est la valeur PAR DÉFAUT des 4,3 M de fiches
- * collectées, qui ne dit rien. Laisser `prospect` au 2ᵉ rang rendrait l'import
- * inopérant : aucune fiche ne deviendrait jamais partenaire. `newsletter` reste
- * sous `prospect`, comme dans l'ordre canonique : une inscription à la lettre
- * ne fait pas perdre un statut de prospect.
+ * Trois règles, gardées par des tests :
  *
- * `client` l'emporte donc toujours.
+ *  1. `client` l'emporte toujours ;
+ *  2. une promotion ne fait JAMAIS sortir une fiche de
+ *     `RelationsProspection::HORS_PROSPECTION` vers un type prospectable : tous
+ *     les types hors prospection sont au-dessus des autres dans l'ordre, et la
+ *     règle est AUSSI écrite en toutes lettres ici — un ordre réécrit un jour
+ *     ne la ferait pas tomber en silence ;
+ *  3. un automatisme ne pose JAMAIS un type réservé à la saisie manuelle
+ *     (`Taxonomy::BUSINESS_RELATION_TYPES_SAISIE_MANUELLE`, B13-008 :
+ *     `fournisseur`). La demande est refusée, comptée, et la fiche garde son
+ *     type.
  *
  * ── L'étape (`lifecycle_stage`) ─────────────────────────────────────────────
  *
- * `SiteSyncClassifier::mergeLifecycleStage` — la règle du canal site, reprise
- * telle quelle : nouveau < qualifie < opportunite < client ; `perdu` est
- * terminal pour tout automatisme ; `dormant` se réveille. Une fiche qui
- * devient `client` (type) passe au moins à l'étape `client` ; une ligne qui
- * annonce l'étape `client` fait de la fiche une `client` (type).
+ * `SiteSyncClassifier::mergeLifecycleStage` : nouveau < qualifie < opportunite
+ * < client ; `perdu` est terminal pour tout automatisme ; `dormant` se
+ * réveille. Une fiche qui devient `client` (type) passe au moins à l'étape
+ * `client` ; une ligne qui annonce l'étape `client` fait de la fiche une
+ * `client` (type) — sous réserve des règles de confiance de l'appelant.
  *
- * L'import ne pose ni `dormant` ni `perdu` : ce sont des constats humains, pas
- * des promotions (ligne rejetée, motif `etape_non_importable`).
+ * L'import ne pose ni `dormant` ni `perdu` : ce sont des constats humains.
  *
  * ── Posée à la main ─────────────────────────────────────────────────────────
  *
  * Une fiche dont la relation a été posée à la main (`relation_saisie_manuelle_at`)
- * n'est JAMAIS modifiée par l'import — ni le type ni l'étape.
+ * n'est modifiée par AUCUN automatisme — ni le type ni l'étape. La règle est
+ * appliquée par chaque appelant (import, canal site).
  */
 final class PromotionRelation
 {
-    /** @var list<string> du plus engageant au moins engageant */
-    public const ORDRE_RELATION = [
-        'client',
-        'investisseur',
-        'partenaire',
-        'presse_media',
-        'conference',
-        'fournisseur',
-        'prospect',
-        'newsletter',
-    ];
-
     /** @var list<string> étapes qu'un import peut poser */
     public const ETAPES_IMPORTABLES = ['nouveau', 'qualifie', 'opportunite', 'client'];
 
@@ -68,8 +61,18 @@ final class PromotionRelation
         if ($demandee === null || $demandee === $actuelle) {
             return $actuelle;
         }
-        $rangActuel = array_search($actuelle, self::ORDRE_RELATION, true);
-        $rangDemande = array_search($demandee, self::ORDRE_RELATION, true);
+        // Règle 3 : jamais un type réservé à la saisie manuelle.
+        if (in_array($demandee, Taxonomy::BUSINESS_RELATION_TYPES_SAISIE_MANUELLE, true)) {
+            return $actuelle;
+        }
+        // Règle 2 : on ne sort jamais de la liste hors prospection.
+        if (in_array($actuelle, RelationsProspection::HORS_PROSPECTION, true)
+            && ! in_array($demandee, RelationsProspection::HORS_PROSPECTION, true)) {
+            return $actuelle;
+        }
+        $ordre = Taxonomy::BUSINESS_RELATION_PRIORITY;
+        $rangActuel = array_search($actuelle, $ordre, true);
+        $rangDemande = array_search($demandee, $ordre, true);
         if ($rangDemande === false) {
             return $actuelle;
         }
@@ -116,7 +119,7 @@ final class PromotionRelation
     /** L'ordre couvre-t-il EXACTEMENT le vocabulaire fermé ? (garde de test) */
     public static function ordreCompletPour(): bool
     {
-        $a = self::ORDRE_RELATION;
+        $a = Taxonomy::BUSINESS_RELATION_PRIORITY;
         $b = Taxonomy::BUSINESS_RELATION_TYPES;
         sort($a);
         sort($b);

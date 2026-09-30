@@ -717,7 +717,7 @@ class CrmEmailsVerifier extends Command
         if ($ids === []) {
             return;
         }
-        $ecrites = Joignabilite::recalculer($workspaceId, $ids);
+        $ecrites = Joignabilite::recalculer($workspaceId, $ids, $this->univers);
         $this->compteurs['joignabilites_recalculees'] += $ecrites['entreprises'] + $ecrites['personnes'];
     }
 

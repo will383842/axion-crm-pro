@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 /**
@@ -103,13 +104,22 @@ class CompanyRelationController extends ApiController
 
         // APRÈS le COMMIT : `AuditLogger` avale ses échecs, et un échec SQL
         // dans la transaction l'aurait laissée avortée.
-        AuditLogger::log('company.relation.saisie', [
+        $trace = AuditLogger::log('company.relation.saisie', [
             'workspace_id' => $workspaceId,
             'resource_type' => 'company',
             'resource_id' => (string) $company->id,
             'avant' => $changement[0],
             'apres' => $changement[1],
         ]);
+        if (! $trace) {
+            // La saisie est faite (et tracée dans la timeline) ; c'est
+            // l'événement d'audit qui manque. On le DIT, au niveau erreur,
+            // plutôt que de l'avaler (relecture sécurité R3).
+            Log::error('company.relation.saisie : événement d audit NON écrit', [
+                'company_id' => $company->id,
+                'workspace_id' => $workspaceId,
+            ]);
+        }
 
         $fraiche = $company->fresh() ?? $company;
 

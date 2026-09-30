@@ -266,6 +266,12 @@ final class SiteSyncIngestService
             ),
             'updated_at' => now(),
         ];
+        // Une relation posée À LA MAIN (`relation_saisie_manuelle_at`, fiche
+        // entreprise de la console) n'est touchée par AUCUN automatisme : ni
+        // le type, ni l'étape (2026-10-01, relecture de #265).
+        if (($existing->relation_saisie_manuelle_at ?? null) !== null) {
+            unset($update['relation_type'], $update['lifecycle_stage']);
+        }
 
         // Règle « le DÉCLARÉ gagne » (audit d'harmonisation §B.4.3) : une valeur
         // saisie par la personne écrase une valeur collectée. L'inverse est

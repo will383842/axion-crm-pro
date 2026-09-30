@@ -137,16 +137,30 @@ final class Taxonomy
      * Ordre de priorité pour l'« upgrade » automatique du type : une fiche
      * porte TOUJOURS le type le plus engageant qu'elle a atteint.
      *
+     * UN SEUL ordre pour TOUS les automatismes (canal site, import des
+     * relations, presse), appliqué par `App\Crm\Relations\PromotionRelation`
+     * (2026-10-01, relecture de #265). Deux règles le façonnent :
+     *
+     *  - les types HORS PROSPECTION (`RelationsProspection::HORS_PROSPECTION`)
+     *    sont TOUS au-dessus des types prospectables : aucune promotion ne fait
+     *    revenir en prospection une fiche qui en était exclue (un fournisseur
+     *    n'est jamais « promu » en `conference`) ;
+     *  - `prospect` n'est plus au 2ᵉ rang : c'est la valeur par DÉFAUT des
+     *    4,3 M de fiches collectées. Au 2ᵉ rang, un formulaire du site
+     *    rétrogradait un partenaire, une presse ou un investisseur en
+     *    `prospect`. Il reste au-dessus de `newsletter` : une inscription à la
+     *    lettre ne fait pas perdre un statut de prospect.
+     *
      * @var list<string>
      */
     public const BUSINESS_RELATION_PRIORITY = [
         'client',
-        'prospect',
         'investisseur',
         'partenaire',
         'presse_media',
-        'conference',
         'fournisseur',
+        'conference',
+        'prospect',
         'newsletter',
     ];
 

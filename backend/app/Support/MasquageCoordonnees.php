@@ -23,6 +23,17 @@ use Illuminate\Database\Eloquent\Model;
  * `p***@axion-ia.com` reste utile : un opérateur reconnaît l'entreprise et
  * peut travailler. Masquer le domaine aussi rendrait la liste illisible sans
  * rien protéger de plus — le domaine se déduit de la fiche entreprise.
+ *
+ * ── Ce qui n'est PAS masqué, à dessein : la joignabilité (2026-10-01) ─────
+ *
+ * `companies.joignabilite` / `contacts.joignabilite` (chantier D) restent
+ * lisibles par un compte en lecture seule, `email_interdit` compris — alors
+ * que cet état révèle qu'une adresse s'est opposée ou a été supprimée. Choix
+ * assumé (relecture sécurité R2) : ce n'est pas une COORDONNÉE (l'adresse,
+ * elle, reste masquée), et le cacher ferait l'inverse de ce qu'il protège —
+ * quelqu'un qui prépare une liste doit VOIR qu'une personne ne doit pas être
+ * écrite. La même information se lit déjà dans les listes de suppression
+ * que la console expose.
  */
 final class MasquageCoordonnees
 {

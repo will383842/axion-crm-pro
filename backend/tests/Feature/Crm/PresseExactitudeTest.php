@@ -132,20 +132,32 @@ test('une chaine et ses emissions : harmonisees une fois par passage, a blanc = 
         ->and($f->phone)->toBeNull();
 });
 
-test('media:sync-from-companies ne remplace plus le site propre d un media ; une emission n herite rien de sa chaine ; le trou est comble', function () {
-    $fiche = (int) DB::table('companies')->insertGetId([
+test('media:sync-from-companies : un titre rattache a son EDITEUR suit le site de la fiche ; un titre rattache par l harmonisation garde le sien ; une emission n herite rien', function () {
+    $editeur = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $this->espace, 'siren' => '900000901', 'denomination' => 'ZZ EDITEUR', 'website' => 'https://zz-editeur.example.invalid',
         'email_generic' => 'contact@zz-editeur.example.invalid', 'created_at' => now(), 'updated_at' => now(),
     ]);
-    $titre = pxMedia($this->espace, ['company_id' => $fiche, 'name' => 'ZZ Titre', 'website' => 'https://zz-titre.example.invalid']);
-    $sansSite = pxMedia($this->espace, ['company_id' => $fiche, 'name' => 'ZZ Sans site', 'media_type' => 'tv']);
-    $emission = pxMedia($this->espace, ['company_id' => $fiche, 'name' => 'ZZ Emission', 'media_type' => 'tv_emission', 'parent_media_id' => $sansSite]);
+    $provisoire = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'country_code' => 'FR', 'foreign_id' => 'media:999999', 'denomination' => 'ZZ TITRE PROVISOIRE',
+        'website' => 'https://zz-provisoire-fiche.example.invalid', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Rattaché à son éditeur (SIREN, extraction NAF) : suit la correction du site de la fiche.
+    $titreEditeur = pxMedia($this->espace, ['company_id' => $editeur, 'name' => 'ZZ Titre editeur', 'website' => 'https://zz-ancien-site.example.invalid', 'source' => 'naf-extract']);
+    // Rattachés par l'harmonisation (fiche provisoire, liste de diffusion) : gardent le leur.
+    $titreProvisoire = pxMedia($this->espace, ['company_id' => $provisoire, 'name' => 'ZZ Titre provisoire', 'website' => 'https://zz-titre.example.invalid']);
+    $titreListe = pxMedia($this->espace, ['company_id' => $editeur, 'name' => 'ZZ Titre liste', 'website' => 'https://zz-liste.example.invalid', 'source' => 'liste-presse']);
+    $sansSite = pxMedia($this->espace, ['company_id' => $provisoire, 'name' => 'ZZ Sans site', 'media_type' => 'tv']);
+    $emission = pxMedia($this->espace, ['company_id' => $provisoire, 'name' => 'ZZ Emission', 'media_type' => 'tv_emission', 'parent_media_id' => $sansSite]);
 
     Artisan::call('media:sync-from-companies');
 
-    expect(DB::table('media')->where('id', $titre)->value('website'))->toBe('https://zz-titre.example.invalid')
-        ->and(DB::table('media')->where('id', $sansSite)->value('website'))->toBe('https://zz-editeur.example.invalid')
-        ->and(DB::table('media')->where('id', $emission)->value('website'))->toBeNull()
+    $site = static fn (int $id): mixed => DB::table('media')->where('id', $id)->value('website');
+    expect($site($titreEditeur))->toBe('https://zz-editeur.example.invalid')
+        ->and($site($titreProvisoire))->toBe('https://zz-titre.example.invalid')
+        ->and($site($titreListe))->toBe('https://zz-liste.example.invalid')
+        // Le trou est comblé, même rattaché par l'harmonisation.
+        ->and($site($sansSite))->toBe('https://zz-provisoire-fiche.example.invalid')
+        ->and($site($emission))->toBeNull()
         ->and(DB::table('media')->where('id', $emission)->value('email'))->toBeNull();
 });
 

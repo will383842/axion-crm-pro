@@ -51,15 +51,19 @@ use Illuminate\Support\Facades\DB;
  *     journaliste, quel que soit le chemin qui les exerce (relecture sécurité
  *     de #264, veto RGPD). Deux déclencheurs, `SECURITY DEFINER` :
  *     - `contacts_retrait_atteint_journalistes` (BEFORE DELETE sur
- *       `contacts`) : la ligne `journalists` liée est opposée, vidée de son
- *       adresse et de son téléphone, mise à la corbeille — la suppression d'un
- *       contact est un effacement (aucune purge n'est permise, ordre de Will) ;
+ *       `contacts`) : quand la suppression est un EFFACEMENT (le chemin
+ *       d'effacement pose `app.effacement_personne`), la ligne `journalists`
+ *       liée est opposée, vidée de son adresse et de son téléphone, mise à la
+ *       corbeille ; une suppression technique ne la touche pas ;
  *     - `opt_out_atteint_journalistes` (AFTER INSERT sur `opt_out`, portée
  *       business) : tout journaliste dont l'adresse ou le téléphone — ou ceux
  *       de son contact lié — correspondent à l'opposition passe `opt_out`.
  *       L'adresse est comparée par l'empreinte de `ListeSuppression`
  *       (sha256 de l'adresse en minuscules) ; le téléphone par ses chiffres
  *       ramenés à la forme nationale (`presse_telephone_national`).
+ *     - `journalists_opposition_existante` (BEFORE INSERT/UPDATE sur
+ *       `journalists`) : une opposition déjà inscrite vaut pour le journaliste
+ *       qui entre, quel que soit l'importeur.
  *     Le sens journaliste → contact est porté par le code
  *     (`App\Crm\Presse\LienJournalisteContact`).
  *
@@ -133,6 +137,15 @@ return new class extends Migration
             SET search_path = public, pg_catalog
             AS $fn$
             BEGIN
+                -- Seul un EFFACEMENT (art. 17, opposition) se reporte sur le
+                -- journaliste : le chemin d'effacement le dit par
+                -- `SET LOCAL app.effacement_personne = 'on'`
+                -- (`LienJournalisteContact::marquerEffacement`). Une
+                -- suppression technique ne détruit rien (ordre de Will).
+                IF COALESCE(current_setting('app.effacement_personne', true), '') <> 'on' THEN
+                    RETURN OLD;
+                END IF;
+
                 UPDATE public.journalists
                    SET opt_out = true,
                        email = NULL,
@@ -193,6 +206,52 @@ return new class extends Migration
             CREATE TRIGGER opt_out_atteint_journalistes
                 AFTER INSERT ON public.opt_out
                 FOR EACH ROW EXECUTE FUNCTION public.opt_out_atteint_journalistes();
+
+            -- Une opposition DÉJÀ inscrite vaut pour un journaliste qui entre
+            -- (ou dont l'adresse, le téléphone ou le contact changent) : quel
+            -- que soit l'importeur qui l'écrit.
+            CREATE OR REPLACE FUNCTION public.journalists_opposition_existante()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            DECLARE
+                v_tel TEXT := public.presse_telephone_national(NEW.phone);
+            BEGIN
+                IF NEW.opt_out THEN
+                    RETURN NEW;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM public.opt_out o
+                     WHERE COALESCE(o.scope, 'business') = 'business'
+                       AND (
+                            (NEW.email IS NOT NULL AND (
+                                o.email_hash = encode(digest(lower(trim(NEW.email::text)), 'sha256'), 'hex')
+                                OR o.email = NEW.email))
+                         OR (v_tel IS NOT NULL AND public.presse_telephone_national(o.phone) = v_tel)
+                       )
+                ) OR (NEW.contact_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM public.contacts c JOIN public.opt_out o ON COALESCE(o.scope, 'business') = 'business'
+                     WHERE c.id = NEW.contact_id
+                       AND ((c.email IS NOT NULL AND (
+                                o.email_hash = encode(digest(lower(trim(c.email::text)), 'sha256'), 'hex')
+                                OR o.email = c.email))
+                            OR (public.presse_telephone_national(c.phone) IS NOT NULL
+                                AND public.presse_telephone_national(o.phone) = public.presse_telephone_national(c.phone)))
+                )) THEN
+                    NEW.opt_out := true;
+                END IF;
+
+                RETURN NEW;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS journalists_opposition_existante ON public.journalists;
+            CREATE TRIGGER journalists_opposition_existante
+                BEFORE INSERT OR UPDATE OF email, phone, contact_id ON public.journalists
+                FOR EACH ROW EXECUTE FUNCTION public.journalists_opposition_existante();
         SQL);
     }
 
@@ -214,6 +273,8 @@ return new class extends Migration
         }
 
         DB::unprepared(<<<'SQL'
+            DROP TRIGGER IF EXISTS journalists_opposition_existante ON public.journalists;
+            DROP FUNCTION IF EXISTS public.journalists_opposition_existante();
             DROP TRIGGER IF EXISTS opt_out_atteint_journalistes ON public.opt_out;
             DROP TRIGGER IF EXISTS contacts_retrait_atteint_journalistes ON public.contacts;
             DROP FUNCTION IF EXISTS public.opt_out_atteint_journalistes();

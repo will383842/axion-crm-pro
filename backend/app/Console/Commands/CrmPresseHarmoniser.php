@@ -192,7 +192,8 @@ class CrmPresseHarmoniser extends Command
             'emails_grand_public_non_poses',
             'journalistes_convertis', 'journalistes_deja_harmonises', 'journalistes_opposes',
             'journalistes_retires_ignores', 'journalistes_sans_nom', 'journalistes_non_retrouves',
-            'journalistes_homonymes_ecartes', 'emails_journalistes_retenus_par_acces',
+            'journalistes_homonymes_ecartes', 'journalistes_homonymes_autre_adresse', 'journalistes_sur_fiche_d_un_segment_ouvert',
+            'emails_journalistes_retenus_par_acces',
             'contacts_crees', 'contacts_completes', 'personnes_opposees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
         ], 0);
@@ -456,12 +457,25 @@ class CrmPresseHarmoniser extends Command
             return (int) $fiche;
         }
 
-        $ficheDeLaChaine = $chaine['fiche'] ?? null;
-        if ($chaine !== null && $ficheDeLaChaine === null && $m->company_id === null
-            && in_array($chaine['refus'], self::REFUS_DE_CHAINE, true)) {
-            // La rédaction qu'on joindrait a été écartée par Will : l'émission
-            // ne recrée pas une fiche à sa place.
-            throw new InvalidArgumentException('chaine_a_la_corbeille');
+        // Une ÉMISSION de groupe : la fiche de sa chaîne est lue EN BASE
+        // (`media.company_id` du parent, fiche vivante), jamais déduite du
+        // succès de la chaîne pendant ce passage.
+        $ficheDeLaChaine = null;
+        if ($chaine !== null) {
+            $idChaine = DB::table('media as p')
+                ->join('companies as c', 'c.id', '=', 'p.company_id')
+                ->where('p.workspace_id', $this->workspaceId)->where('p.id', $m->parent_media_id)
+                ->whereNull('p.deleted_at')->whereNull('c.deleted_at')
+                ->value('c.id');
+            $ficheDeLaChaine = $idChaine === null ? null : (int) $idChaine;
+            if ($ficheDeLaChaine === null && $m->company_id === null) {
+                // Sa chaîne n'a pas de fiche (écartée par Will, refusée,
+                // introuvable) : l'émission ne crée JAMAIS une fiche à sa place
+                // et ne verse jamais ses coordonnées nulle part.
+                throw new InvalidArgumentException(in_array($chaine['refus'], self::REFUS_DE_CHAINE, true)
+                    ? 'chaine_a_la_corbeille'
+                    : 'chaine_sans_fiche');
+            }
         }
 
         // ── La fiche qui portera ce média ─────────────────────────────────
@@ -481,8 +495,15 @@ class CrmPresseHarmoniser extends Command
             }
             $ficheConnue = (int) $fiche->id;
             // Une émission DÉJÀ portée par la fiche de sa chaîne le reste : elle
-            // n'apporte que ses personnes, à chaque passage.
-            $surLaChaine = $ficheDeLaChaine !== null && $ficheConnue === $ficheDeLaChaine;
+            // n'apporte que ses personnes, à chaque passage. Lu EN BASE
+            // (`parent.company_id = m.company_id`), même si la chaîne a échoué
+            // pendant ce passage ou n'est plus traitée comme telle.
+            // Le parent est lu corbeille comprise, sciemment : une chaîne mise à
+            // la corbeille ne fait pas de ses émissions des fiches autonomes.
+            $parent = $m->media_type === 'tv_emission' && $m->parent_media_id !== null
+                ? DB::selectOne('SELECT company_id FROM media WHERE workspace_id = ? AND id = ?', [$this->workspaceId, $m->parent_media_id])
+                : null;
+            $surLaChaine = $parent !== null && $parent->company_id !== null && (int) $parent->company_id === $ficheConnue;
             $this->compter($delta, $surLaChaine ? 'emissions_deja_sur_la_chaine' : 'fiches_existantes');
         } elseif ($m->harmonise_le !== null) {
             // Déjà harmonisé, et sa fiche a disparu depuis : supprimée par Will.
@@ -558,6 +579,12 @@ class CrmPresseHarmoniser extends Command
             QualificationPresse::completerContact($contactId, 'journaliste:' . $j['id'], $j['metadata']);
             DB::table('journalists')->where('id', $j['id'])->update(['contact_id' => $contactId, 'harmonise_le' => now()]);
             $this->compter($delta, 'journalistes_convertis');
+        }
+        // Journalistes posés sur une fiche qui porte AUSSI un segment de
+        // campagne ouvert (un groupe de presse qui organise des salons) : ils
+        // y sont exclus des envois (`GardePresse`), on le compte.
+        if ($journalistes !== [] && QualificationPresse::porteUnSegmentOuvert($companyId)) {
+            $this->compter($delta, 'journalistes_sur_fiche_d_un_segment_ouvert', count($journalistes));
         }
 
         QualificationPresse::etiqueter($companyId);
@@ -654,6 +681,14 @@ class CrmPresseHarmoniser extends Command
             if (isset($nomsDuMessage[$cleNom])
                 || ($ficheConnue !== null && QualificationPresse::homonymeJournaliste($ficheConnue, $prenom, $nom, (int) $j->id))) {
                 $this->compter($delta, 'journalistes_homonymes_ecartes');
+
+                continue;
+            }
+            // Un homonyme de la fiche qui porte une AUTRE adresse (venue
+            // d'ailleurs) n'est pas réputé être ce journaliste : ni fusion, ni
+            // rattachement — compté.
+            if ($ficheConnue !== null && QualificationPresse::homonymeAutreAdresse($ficheConnue, $prenom, $nom, $email)) {
+                $this->compter($delta, 'journalistes_homonymes_autre_adresse');
 
                 continue;
             }

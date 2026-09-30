@@ -21,6 +21,7 @@ use App\Crm\Campagnes\Segments;
 use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\EtiquettesMedia;
+use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Presse\QualificationPresse;
 use App\Crm\Taxonomy;
 use Database\Seeders\ScrapingSourcesSeeder;
@@ -354,7 +355,10 @@ test('une personne RETIREE ne revient jamais : contact supprime, a la corbeille,
     // Will supprime Ana (vraie suppression) et met Dom à la corbeille ; il
     // corrige le nom de Gus PUIS le met à la corbeille — seule sa référence
     // `journaliste:<id>` dit encore que c'est lui.
-    DB::table('contacts')->where('external_ref', 'journaliste:' . $a)->delete();
+    DB::transaction(function () use ($a): void {
+        LienJournalisteContact::marquerEffacement();
+        DB::table('contacts')->where('external_ref', 'journaliste:' . $a)->delete();
+    });
     DB::table('contacts')->where('external_ref', 'journaliste:' . $d)->update(['deleted_at' => now()]);
     DB::table('contacts')->where('external_ref', 'journaliste:' . $g)->update(['last_name' => 'ZZAPRESRENOMMAGE', 'deleted_at' => now()]);
     // Le déclencheur a inscrit Ana au registre (source presse-2026).

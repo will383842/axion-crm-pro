@@ -35,6 +35,9 @@ class GdprErasureService
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
         return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
+            // Effacement art. 17 : les contacts supprimés ici emportent leur
+            // ligne `journalists` liée (déclencheur, harmonisation presse).
+            LienJournalisteContact::marquerEffacement();
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
 

@@ -11,16 +11,18 @@ use Illuminate\Support\Facades\DB;
  * l'enrichissement « entreprise » et l'enrichissement « média » du MÊME entité :
  * un média rattaché à une company n'invente rien, il HÉRITE.
  *
- *  - website : hérité si le média n'en a pas encore ;
+ *  - website : miroir du site de la fiche (autoritaire) pour un média rattaché
+ *    à son ÉDITEUR (extraction NAF, `media:link-to-companies` par SIREN) — il
+ *    suit une correction légitime du site de la fiche ; SEULEMENT hérité quand
+ *    il manque pour un média rattaché par l'HARMONISATION DE LA PRESSE ;
  *  - email / phone : hérités si le média ne les a pas encore.
  *
- * 🔴 2026-09-30 (relecture de #264) — le site était un MIROIR AUTORITAIRE :
- * dès que la fiche avait un site, il ÉCRASAIT celui du média, sans trace.
- * Depuis l'harmonisation de la presse, un titre autonome ou une émission
- * reçoit un `company_id` : son site propre (celui du titre, de l'émission)
- * aurait été remplacé chaque nuit par celui de la fiche. Rien ne doit être
- * perdu : le site n'est plus qu'HÉRITÉ quand le média n'en a pas, comme
- * l'e-mail et le téléphone (même règle que `media:sync-emissions-from-parent`).
+ * 🔴 2026-09-30 (relecture de #264) — l'harmonisation de la presse donne un
+ * `company_id` aux titres autonomes (fiche provisoire `media:<id>`) et aux
+ * lignes des listes de diffusion (source `liste-presse`) : leur site propre
+ * (celui du titre) aurait été remplacé chaque nuit par celui de la fiche, sans
+ * trace. Rien ne doit être perdu : pour ceux-là, le site n'est qu'HÉRITÉ quand
+ * il manque (même règle que `media:sync-emissions-from-parent`).
  *
  * Une ÉMISSION portée par la fiche de sa CHAÎNE (même `company_id` que son
  * média parent) n'hérite de RIEN : les coordonnées de la chaîne ne sont pas
@@ -38,7 +40,8 @@ class MediaSyncFromCompanies extends Command
 
     public function handle(): int
     {
-        // 1) Site web : hérité SEULEMENT si le média n'en a pas (jamais écrasé).
+        // 1) Site web : miroir pour un média rattaché à son éditeur ; hérité
+        //    SEULEMENT s'il manque pour un média rattaché par l'harmonisation.
         $siteSynced = DB::affectingStatement(<<<'SQL'
             UPDATE media m
             SET website = c.website,
@@ -51,7 +54,11 @@ class MediaSyncFromCompanies extends Command
             FROM companies c
             WHERE m.company_id = c.id
               AND c.website IS NOT NULL
-              AND NULLIF(m.website, '') IS NULL
+              AND m.website IS DISTINCT FROM c.website
+              AND (
+                    NULLIF(m.website, '') IS NULL
+                 OR NOT (c.foreign_id LIKE 'media:%' OR m.source = 'liste-presse')
+              )
               AND m.deleted_at IS NULL
               AND NOT EXISTS (
                     SELECT 1 FROM media p

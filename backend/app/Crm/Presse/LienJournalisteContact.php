@@ -69,6 +69,18 @@ final class LienJournalisteContact
     }
 
     /**
+     * Dit à la base que les suppressions de contacts de la transaction en
+     * cours sont des EFFACEMENTS (art. 17, opposition) : le déclencheur
+     * `contacts_retrait_atteint_journalistes` ne reporte que ceux-là sur la
+     * ligne `journalists` liée. Une suppression technique (hors de ce
+     * marqueur) ne détruit rien. `SET LOCAL` : la portée est la transaction.
+     */
+    public static function marquerEffacement(): void
+    {
+        DB::statement("SET LOCAL app.effacement_personne = 'on'");
+    }
+
+    /**
      * Effacement d'un ou plusieurs journalistes : leurs contacts liés sont
      * supprimés (et inscrits au registre des retraits).
      *
@@ -91,6 +103,8 @@ final class LienJournalisteContact
         DB::table('contacts')->whereIn('id', $contacts)
             ->whereRaw("NOT (COALESCE(sources, '[]'::jsonb) @> '[\"presse-2026\"]'::jsonb)")
             ->update(['sources' => DB::raw("COALESCE(sources, '[]'::jsonb) || '[\"presse-2026\"]'::jsonb")]);
+
+        self::marquerEffacement();
 
         return DB::table('contacts')->whereIn('id', $contacts)->delete();
     }

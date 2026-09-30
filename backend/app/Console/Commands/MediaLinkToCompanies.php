@@ -2,6 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Doublons\FusionFiches;
+use App\Crm\Doublons\Rapprochement;
+use App\Crm\Doublons\RefusFusion;
+use App\Crm\Presse\QualificationPresse;
+use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +37,19 @@ use Illuminate\Support\Facades\DB;
  * Requêtes 100 % ENSEMBLISTES + indexées (pas de N+1 sur 4,3M lignes).
  *
  * `--dry-run` compte matchés SIREN / matchés nom-unique / ambigus / sans match.
+ *
+ * ── Les médias portés par une fiche PROVISOIRE `media:<id>` (2026-09-30) ──
+ * L'harmonisation de la presse donne une fiche (`foreign_id` = `media:<id>`)
+ * aux titres qui n'en avaient pas. Ils restent AUTONOMES au sens de cette
+ * commande : dès que leur SIREN désigne la vraie fiche de leur éditeur, la
+ * fiche provisoire est FUSIONNÉE dans la fiche SIREN par le mécanisme des
+ * doublons (`FusionFiches`, motif `meme_siren`, journalisée et annulable par
+ * `crm:doublons:fusionner --annuler=<n>`) : le média, ses journalistes, les
+ * contacts et les étiquettes passent sur la fiche de l'éditeur, la fiche
+ * provisoire va à la CORBEILLE avec un renvoi — jamais supprimée, jamais deux
+ * fiches durables. Par SIREN exact seulement : une fiche ne se fusionne pas
+ * sur un nom. Une fiche provisoire dont les titres désignent PLUSIEURS
+ * éditeurs n'est pas touchée (comptée).
  */
 class MediaLinkToCompanies extends Command
 {
@@ -91,9 +109,66 @@ class MediaLinkToCompanies extends Command
               AND normalize_name(COALESCE(NULLIF(m.publisher, ''), m.name)) = u.norm
         SQL);
 
-        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique.");
+        [$fusionnees, $ambigues, $refusees] = $this->fusionnerFichesProvisoires(false);
+
+        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique, {$fusionnees} fiche(s) provisoire(s) fusionnée(s) dans la fiche de l'éditeur ({$ambigues} ambiguë(s), {$refusees} refus de fusion).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Les fiches PROVISOIRES `media:<id>` dont un titre porte le SIREN d'une
+     * fiche d'éditeur vivante : fusionnées dans celle-ci (ou comptées, à blanc).
+     *
+     * @return array{0: int, 1: int, 2: int} fusionnées (ou à fusionner), ambiguës, refusées
+     */
+    private function fusionnerFichesProvisoires(bool $aBlanc): array
+    {
+        $paires = DB::select(
+            "SELECT f.workspace_id, f.id AS provisoire, array_agg(DISTINCT c.id) AS editeurs
+               FROM media m
+               JOIN companies f ON f.id = m.company_id AND f.deleted_at IS NULL
+                               AND f.foreign_id LIKE '" . QualificationPresse::PREFIXE_ANCRE_MEDIA . "%'
+               JOIN companies c ON c.siren = m.siren AND c.workspace_id = m.workspace_id
+                               AND c.deleted_at IS NULL AND c.id <> f.id
+              WHERE m.deleted_at IS NULL AND m.siren IS NOT NULL
+              GROUP BY f.workspace_id, f.id
+              ORDER BY f.id",
+        );
+
+        $fusionnees = 0;
+        $ambigues = 0;
+        $refusees = 0;
+        $fusion = app(FusionFiches::class);
+        foreach ($paires as $p) {
+            $editeurs = array_values(array_filter(array_map('intval', explode(',', trim((string) $p->editeurs, '{}')))));
+            if (count($editeurs) !== 1) {
+                $ambigues++;
+
+                continue;
+            }
+            if ($aBlanc) {
+                $fusionnees++;
+
+                continue;
+            }
+            try {
+                WorkspaceContext::run((string) $p->workspace_id, fn (): int => $fusion->fusionner(
+                    (string) $p->workspace_id,
+                    $editeurs[0],
+                    (int) $p->provisoire,
+                    Rapprochement::MEME_SIREN,
+                    FusionFiches::MODE_MANUEL,
+                    operateur: 'media:link-to-companies',
+                ));
+                $fusionnees++;
+            } catch (RefusFusion $e) {
+                $refusees++;
+                $this->line("  fiche provisoire non fusionnée : {$e->getMessage()}");
+            }
+        }
+
+        return [$fusionnees, $ambigues, $refusees];
     }
 
     /**
@@ -168,6 +243,8 @@ class MediaLinkToCompanies extends Command
         $this->line("   • Nom exact UNIQUE     : {$uniqueMatch}  (seraient rattachés)");
         $this->line("   • Nom AMBIGU (>1)      : {$ambiguous}  (NON rattachés, garde-fou)");
         $this->line("   • Sans correspondance  : {$noMatch}");
+        [$aFusionner, $ambigues] = $this->fusionnerFichesProvisoires(true);
+        $this->line("   • Fiches provisoires media:<id> à fusionner dans l'éditeur (SIREN) : {$aFusionner} ({$ambigues} ambiguë(s), non touchées)");
 
         return self::SUCCESS;
     }

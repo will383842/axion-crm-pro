@@ -78,6 +78,7 @@ use Throwable;
  * `champ_obligatoire_manquant`, `type_inconnu`, `zone_inconnue`,
  * `theme_trop_long`, `journaliste_invalide`, `journaliste_sans_nom`,
  * `acces_inconnu`, `titre_existant_non_harmonise`, `rapprochement_ambigu`,
+ * `rapprochement_siren_contradictoire`,
  * `fiche_existante_hors_presse`,
  * `fiche_a_la_corbeille`, `pivot_<code>`, `erreur_base`.
  *
@@ -198,7 +199,7 @@ class CrmPresseImporter extends Command
             'fiches_creees', 'fiches_rattachees', 'titres_rapproches', 'medias_crees', 'medias_completes', 'medias_inchanges',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
             'emails_redaction_non_poses',
-            'journalistes_lus', 'journalistes_opposes', 'emails_journalistes_retenus_par_acces', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
+            'journalistes_lus', 'journalistes_opposes', 'journalistes_homonymes_autre_adresse', 'journalistes_sur_fiche_d_un_segment_ouvert', 'emails_journalistes_retenus_par_acces', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
             'personnes_ecartees', 'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
         ], 0);
@@ -368,9 +369,10 @@ class CrmPresseImporter extends Command
             : ['foreign_id' => $l['identifiant'], 'country' => self::PAYS];
         $ancreRegistre = $this->ancreRegistre($l);
         $ficheRapprochee = null;
-        if ($trouvee === null && $l['siren'] === null) {
-            // Un titre DÉJÀ en base sans SIREN (fiche `media:<id>` de
-            // l'harmonisation) : on le rejoint, jamais de fiche parallèle.
+        if ($trouvee === null) {
+            // Un titre DÉJÀ en base (fiche `media:<id>` de l'harmonisation,
+            // ou fiche d'éditeur) : on le rejoint, jamais de fiche parallèle —
+            // que la ligne porte un SIREN ou un identifiant.
             $ficheRapprochee = $this->rapprocher($l);
             if ($ficheRapprochee !== null) {
                 $trouvee = $ficheRapprochee;
@@ -421,6 +423,15 @@ class CrmPresseImporter extends Command
                     $j['email'] = null;
                     $delta['emails_journalistes_retenus_par_acces'] = 1;
                 }
+            }
+            if ($j !== null && $trouvee !== null
+                && QualificationPresse::homonymeAutreAdresse((int) $trouvee->id, $j['prenom'], $j['nom'], $j['email'])) {
+                // Un homonyme de la fiche porte une AUTRE adresse : ce n'est pas
+                // réputé être cette personne — ni fusion, ni rattachement.
+                $delta['journalistes_homonymes_autre_adresse'] = 1;
+                $j = null;
+            }
+            if ($j !== null) {
                 $personnes[] = array_filter([
                     'kind' => 'person',
                     'first_name' => $j['prenom'],
@@ -495,6 +506,10 @@ class CrmPresseImporter extends Command
                     'acces' => $j['acces'],
                     'email_type' => $j['email'] === null ? null : 'nominatif',
                 ]);
+                if (QualificationPresse::porteUnSegmentOuvert($companyId)) {
+                    // Exclu des envois de ce segment (`GardePresse`) : compté.
+                    $delta['journalistes_sur_fiche_d_un_segment_ouvert'] = 1;
+                }
             }
         }
 
@@ -532,9 +547,17 @@ class CrmPresseImporter extends Command
             throw new InvalidArgumentException('rapprochement_ambigu');
         }
         $fiche = DB::table('companies')->where('workspace_id', $this->workspaceId)->where('id', $fiches->first())
-            ->first(['id', 'deleted_at']);
+            ->first(['id', 'siren', 'deleted_at']);
+        if (! $fiche instanceof \stdClass) {
+            return null;
+        }
+        // La ligne porte un SIREN, et le titre trouvé est sur une fiche d'un
+        // AUTRE SIREN (aucune fiche ne porte celui de la ligne) : doute.
+        if ($l['siren'] !== null && $fiche->siren !== null && $fiche->siren !== $l['siren']) {
+            throw new InvalidArgumentException('rapprochement_siren_contradictoire');
+        }
 
-        return $fiche instanceof \stdClass ? $fiche : null;
+        return $fiche;
     }
 
     /**
@@ -588,6 +611,10 @@ class CrmPresseImporter extends Command
     {
         $valeurs = [
             'media_type' => $l['type'],
+            // Le SIREN de la ligne, posé sur le TITRE : `media:link-to-companies`
+            // rattachera la fiche provisoire à celle de l'éditeur quand elle
+            // existera (fusion journalisée).
+            'siren' => $l['siren'],
             'diffusion_zone' => $l['zone'] === null ? null : EtiquettesMedia::zoneStockee($l['zone']),
             'editorial_theme' => $l['theme'],
             'department_code' => $l['departement'],

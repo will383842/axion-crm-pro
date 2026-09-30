@@ -16,6 +16,7 @@
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
+use App\Crm\Presse\LienJournalisteContact;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Models\User;
@@ -138,14 +139,18 @@ test('l effacement RGPD (GdprErasureService) atteint le contact lie par contact_
 
 // ── Sens contact → journaliste (porté par la base) ─────────────────────────
 
-test('la suppression d un contact atteint la ligne journalists liee : opposee, videe, a la corbeille', function () {
+test('l EFFACEMENT d un contact atteint la ligne journalists liee : opposee, videe, a la corbeille', function () {
     [, $j, $contact] = pdHarmonise($this->espace, ['email' => 'zoe.sup@zz-droits.example.invalid', 'acces' => 'email_redaction', 'phone' => '06 00 00 00 12']);
     $temoin = (int) DB::table('journalists')->insertGetId([
         'workspace_id' => $this->espace, 'first_name' => 'Tim', 'last_name' => 'ZZTEMOIN', 'email' => 'tim@zz-droits.example.invalid',
         'source' => 'wikidata', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    DB::table('contacts')->where('id', $contact)->delete();
+    // Un EFFACEMENT : le chemin d'effacement pose son marqueur.
+    DB::transaction(function () use ($contact): void {
+        LienJournalisteContact::marquerEffacement();
+        DB::table('contacts')->where('id', $contact)->delete();
+    });
 
     $ligne = DB::table('journalists')->where('id', $j)->first();
     expect($ligne->opt_out)->toBeTrue()

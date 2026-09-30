@@ -522,8 +522,8 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // opposables (4e relecture) ; même geste, seule la ligne a bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:107',
-        'app/Services/Rgpd/GdprErasureService.php:268',
+        'app/Services/Rgpd/GdprErasureService.php:110',
+        'app/Services/Rgpd/GdprErasureService.php:271',
     ]);
 });
 

@@ -3,6 +3,7 @@
 namespace App\Crm\Campagnes;
 
 use App\Crm\FichesProtegees;
+use App\Crm\Presse\QualificationPresse;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -95,5 +96,42 @@ final class GardePresse
             ->where('company_tag.company_id', $companyId)
             ->where('tags.slug', FichesProtegees::TAG_PRESSE)
             ->exists();
+    }
+
+    /**
+     * SQL : ce contact n'est PAS une personne de la presse (journaliste
+     * harmonisé `journaliste:<id>`, ou personne entrée par la source
+     * `presse-2026` — harmonisation ou liste de diffusion). `TRUE` quand le
+     * segment presse est ouvert. `$alias` n'est jamais une donnée utilisateur.
+     *
+     * C'est la règle PAR CONTACT (relecture sécurité de #264) : une fiche peut
+     * porter à la fois un segment ouvert (un groupe de presse qui organise des
+     * salons est aussi un organisateur d'événements) et des journalistes —
+     * ceux-là ne partent JAMAIS par ce segment tant que la presse est fermée.
+     *
+     * @param  list<string>  $ouverts
+     */
+    public static function conditionContactsSql(string $alias = 'contacts', array $ouverts = Segments::OUVERTS): string
+    {
+        if (self::ouverte($ouverts)) {
+            return 'TRUE';
+        }
+
+        return "NOT (COALESCE({$alias}.external_ref, '') LIKE 'journaliste:%'"
+            . " OR COALESCE({$alias}.sources, '[]'::jsonb) @> '[\"" . QualificationPresse::SOURCE . "\"]'::jsonb)";
+    }
+
+    /**
+     * Retire les personnes de la presse d'une requête sur `contacts` tant que
+     * le segment presse est fermé (modifie la requête en place). À appeler par
+     * TOUT chemin qui produit des adresses d'envoi.
+     *
+     * @param  list<string>  $ouverts
+     */
+    public static function exclureContacts(EloquentBuilder|QueryBuilder $query, string $alias = 'contacts', array $ouverts = Segments::OUVERTS): void
+    {
+        if (! self::ouverte($ouverts)) {
+            $query->whereRaw(self::conditionContactsSql($alias, $ouverts));
+        }
     }
 }

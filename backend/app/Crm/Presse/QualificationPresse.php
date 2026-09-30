@@ -2,7 +2,9 @@
 
 namespace App\Crm\Presse;
 
+use App\Crm\Campagnes\Segments;
 use App\Crm\Relations\PromotionRelation;
+use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +32,8 @@ use Illuminate\Support\Facades\DB;
  * > prospect > newsletter. `presse_media` ne remplace que ce qui est en
  * dessous ; on ne rétrograde jamais (un média client reste client). Et une
  * relation POSÉE À LA MAIN (`relation_saisie_manuelle_at`) n'est jamais
- * touchée, quelle qu'elle soit. L'étape (`lifecycle_stage`) ne bouge JAMAIS :
+ * touchée, quelle qu'elle soit — ni `fournisseur`, relation qu'on ne pose
+ * qu'à la main (B13-008), même sans la marque (antérieure au chantier B). L'étape (`lifecycle_stage`) ne bouge JAMAIS :
  * aucune source de la presse ne demande d'étape (a fortiori pas `client`).
  *
  * ── Sources DÉCLARATIVES (veto de la relecture sécurité de #265) ────────
@@ -59,6 +62,24 @@ final class QualificationPresse
     public const NATURE = 'media';
 
     public const RELATION = 'presse_media';
+
+    /**
+     * Ancre (`foreign_id`) d'une fiche créée par l'harmonisation pour un média
+     * qui n'en avait pas (`media:<id>`) : une fiche PROVISOIRE, qui cède la
+     * place à la fiche SIREN de l'éditeur dès qu'un rattachement certain la
+     * trouve (`media:link-to-companies`, par fusion journalisée).
+     */
+    public const PREFIXE_ANCRE_MEDIA = 'media:';
+
+    /**
+     * SQL : ce média est-il AUTONOME — sans fiche, ou porté par une fiche
+     * provisoire `media:<id>` ? `$alias` n'est jamais une donnée utilisateur.
+     */
+    public static function conditionMediaAutonome(string $alias = 'media'): string
+    {
+        return "({$alias}.company_id IS NULL OR EXISTS (SELECT 1 FROM companies ma_c"
+            . " WHERE ma_c.id = {$alias}.company_id AND ma_c.foreign_id LIKE '" . self::PREFIXE_ANCRE_MEDIA . "%'))";
+    }
 
     /** Clé de `companies.metadata` qui garde l'état d'avant. */
     public const CLE_AVANT = 'harmonisation_presse';
@@ -152,6 +173,12 @@ final class QualificationPresse
         if ($saisieManuelle !== null) {
             return false;
         }
+        // Une relation qu'on ne pose QU'À LA MAIN (`fournisseur`, B13-008) est
+        // une saisie manuelle par définition, même sans la marque — qui
+        // n'existait pas avant le chantier B : jamais remplacée.
+        if ($relation !== null && in_array($relation, Taxonomy::BUSINESS_RELATION_TYPES_SAISIE_MANUELLE, true)) {
+            return false;
+        }
         if ($relation === null) {
             return ! $declaratif;
         }
@@ -207,14 +234,61 @@ final class QualificationPresse
             }
         }
 
-        $id = DB::table('contacts')->where('company_id', $companyId)->whereNull('deleted_at')
+        $contact = DB::table('contacts')->where('company_id', $companyId)->whereNull('deleted_at')
             ->whereRaw(
                 "normalized_hash = encode(digest(normalize_name(coalesce(?, '') || '_' || ?) || '_' || ?::TEXT, 'sha256'), 'hex')",
                 [$prenom, $nom, $companyId],
             )
-            ->orderBy('id')->value('id');
+            ->orderBy('id')->first(['id', 'email']);
+        if ($contact === null) {
+            return null;
+        }
+        // Un homonyme qui porte une AUTRE adresse (venue d'ailleurs) n'est pas
+        // réputé être cette personne : jamais de rattachement.
+        if ($contact->email !== null && mb_strtolower((string) $contact->email) !== mb_strtolower((string) $email)) {
+            return null;
+        }
 
-        return $id === null ? null : (int) $id;
+        return (int) $contact->id;
+    }
+
+    /**
+     * Un contact HOMONYME de la fiche (hors journaliste harmonisé) porte-t-il
+     * une adresse venue d'ailleurs — différente de celle de cette personne,
+     * ou alors qu'elle n'en a pas ? Le funnel le prendrait pour elle (dédup
+     * par nom + fiche) et lui verserait fonction, téléphone et source presse :
+     * on ne lui envoie pas cette personne.
+     */
+    public static function homonymeAutreAdresse(int $companyId, ?string $prenom, string $nom, ?string $email): bool
+    {
+        return DB::table('contacts')->where('company_id', $companyId)->whereNull('deleted_at')
+            ->whereNotNull('email')
+            ->where(static fn ($q) => $q->whereNull('external_ref')->orWhere('external_ref', 'not like', 'journaliste:%'))
+            ->whereRaw(
+                "normalized_hash = encode(digest(normalize_name(coalesce(?, '') || '_' || ?) || '_' || ?::TEXT, 'sha256'), 'hex')",
+                [$prenom, $nom, $companyId],
+            )
+            ->when($email !== null, static fn ($q) => $q->whereRaw('lower(email::text) <> ?', [mb_strtolower((string) $email)]))
+            ->exists();
+    }
+
+    /**
+     * La fiche porte-t-elle le tag d'un segment de campagne OUVERT autre que la
+     * presse (un groupe de presse qui organise des salons) ? Ses journalistes
+     * y restent exclus des envois (`GardePresse::conditionContactsSql`) : on
+     * le compte pour le dire.
+     */
+    public static function porteUnSegmentOuvert(int $companyId): bool
+    {
+        $tags = [];
+        foreach (Segments::OUVERTS as $segment) {
+            if ($segment !== Segments::PRESSE) {
+                $tags[] = Segments::tag($segment);
+            }
+        }
+
+        return $tags !== [] && DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+            ->where('company_tag.company_id', $companyId)->whereIn('tags.slug', $tags)->exists();
     }
 
     /**

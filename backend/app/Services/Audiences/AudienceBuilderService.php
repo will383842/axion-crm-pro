@@ -73,6 +73,7 @@ class AudienceBuilderService
         $contacts = DB::table('contacts')
             ->whereIn('company_id', $contactableCompanyIds)
             ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
             ->count();
         $companyOnlyEmails = (clone $query)
             ->whereNotNull('email_generic')
@@ -124,6 +125,7 @@ class AudienceBuilderService
             $contactsByCompany = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
                 ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                 ->select('id', 'company_id')
                 ->get()
                 ->groupBy('company_id');

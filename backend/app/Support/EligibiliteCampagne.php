@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Models\Company;
 use App\Models\Contact;
 use Illuminate\Database\Eloquent\Builder;
@@ -97,6 +98,9 @@ final class EligibiliteCampagne
     public static function appliquerContacts(Builder $query): Builder
     {
         $query->whereNotNull('email')->whereNull('deleted_at');
+        // Une personne de la presse n'est éligible à AUCUNE campagne tant que
+        // le segment presse est fermé (`GardePresse`, relecture de #264).
+        GardePresse::exclureContacts($query, 'contacts');
 
         return self::appliquerPortes($query, 'contacts.email');
     }

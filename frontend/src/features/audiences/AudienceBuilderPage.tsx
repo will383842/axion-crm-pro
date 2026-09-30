@@ -11,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers,
+  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers, Newspaper, Ban,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
@@ -37,6 +37,15 @@ import type {
   EmailAudience,
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
+import {
+  EXCLUSIONS_PROSPECTION,
+  RELATION_PRESETS,
+  TYPE_MEDIA_PRESETS,
+  ZONE_MEDIA_PRESETS,
+  critereRelations,
+  criteresMedias,
+  exclusions,
+} from './presse';
 
 // ---------------------------------------------------------------------------
 // Presets
@@ -107,6 +116,13 @@ export function AudienceBuilderPage() {
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
   const [tagsInput, setTagsInput] = useState<string>('');
+  // Relation, presse et exclusions (harmonisation des contacts, 2026-09-30).
+  const [relations, setRelations] = useState<string[]>([]);
+  const [typesMedia, setTypesMedia] = useState<string[]>([]);
+  const [zonesMedia, setZonesMedia] = useState<string[]>([]);
+  const [exclRelations, setExclRelations] = useState<string[]>([]);
+  const [exclNatures, setExclNatures] = useState<string[]>([]);
+  const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
 
   // Build criteria
   const criteria = useMemo<AudienceCriteria>(() => {
@@ -116,6 +132,9 @@ export function AudienceBuilderPage() {
     if (sizes.length > 0)       all.push({ field: 'size_category',   op: 'in', value: sizes });
     if (sectors.length > 0)     all.push({ field: 'sector_main',     op: 'in', value: sectors });
     if (natures.length > 0)     all.push({ field: 'entity_nature',   op: 'in', value: natures });
+    const relation = critereRelations(relations);
+    if (relation !== null)      all.push(relation);
+    all.push(...criteresMedias(typesMedia, zonesMedia));
     // Métier : l'étiquette `metier-<code>` (chantier 2), en `contains_any`.
     const metier = critereMetiers(metiers);
     if (metier !== null)        all.push(metier);
@@ -129,8 +148,13 @@ export function AudienceBuilderPage() {
       .filter((t) => t.length > 0);
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
 
-    return { all };
-  }, [departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput]);
+    // Le bloc `not` n'est envoyé que s'il exclut quelque chose.
+    const not = exclusions({ relations: exclRelations, natures: exclNatures, typesMedia: exclTypesMedia });
+    return not.length > 0 ? { all, not } : { all };
+  }, [
+    departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
+    relations, typesMedia, zonesMedia, exclRelations, exclNatures, exclTypesMedia,
+  ]);
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -299,6 +323,87 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
+          {/* Relation (harmonisation des contacts) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Users2 className="h-4 w-4" />} title="Relation" />
+            <Field label="Relations visées">
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={relations}
+                onChange={setRelations}
+                placeholder="Toutes relations"
+                masquerCode
+              />
+            </Field>
+          </Card>
+
+          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Les fiches de presse harmonisées sont protégées : comme les fédérations, elles
+              n’entrent dans aucune audience générale et ne partent que par leur segment dédié.
+              Ces critères visent les fiches de média non protégées (production audiovisuelle…).
+            </p>
+            <Field label="Types de média">
+              <ChipsMultiSelect
+                options={TYPE_MEDIA_PRESETS}
+                selected={typesMedia}
+                onChange={setTypesMedia}
+                placeholder="Tous types"
+                masquerCode
+              />
+            </Field>
+            <Field label="Zones de diffusion">
+              <ChipsMultiSelect
+                options={ZONE_MEDIA_PRESETS}
+                selected={zonesMedia}
+                onChange={setZonesMedia}
+                placeholder="Toutes zones"
+                masquerCode
+              />
+            </Field>
+          </Card>
+
+          {/* Exclusions (bloc `not`) : une fiche est retirée dès qu'une exclusion la vise */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Ban className="h-4 w-4" />} title="Exclusions" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setExclRelations([...new Set([...exclRelations, ...EXCLUSIONS_PROSPECTION])]); }}
+            >
+              Prospection : exclure la presse et les clients
+            </Button>
+            <Field label="Relations exclues">
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={exclRelations}
+                onChange={setExclRelations}
+                placeholder="Aucune relation exclue"
+                masquerCode
+              />
+            </Field>
+            <Field label="Natures exclues">
+              <ChipsMultiSelect
+                options={NATURE_PRESETS}
+                selected={exclNatures}
+                onChange={setExclNatures}
+                placeholder="Aucune nature exclue"
+              />
+            </Field>
+            <Field label="Types de média exclus">
+              <ChipsMultiSelect
+                options={TYPE_MEDIA_PRESETS}
+                selected={exclTypesMedia}
+                onChange={setExclTypesMedia}
+                placeholder="Aucun type exclu"
+                masquerCode
+              />
+            </Field>
+          </Card>
+
           {/* Métiers (chantier 2) */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Building className="h-4 w-4" />} title="Métiers" />
@@ -402,6 +507,14 @@ export function AudienceBuilderPage() {
                       <span className="text-sky-700 dark:text-sky-300">
                         {Array.isArray(c.value) ? `[${c.value.length}]` : String(c.value)}
                       </span>
+                    </li>
+                  ))}
+                  {criteria.not?.map((c, i) => (
+                    <li key={`sauf-${i}`} className="rounded-md bg-rose-50 px-2 py-1 text-[11px] font-mono text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                      <span>sauf</span>{' '}
+                      <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
+                      <span className="text-slate-400">{c.op}</span>{' '}
+                      <span>{Array.isArray(c.value) ? `[${c.value.length}]` : String(c.value)}</span>
                     </li>
                   ))}
                 </ul>

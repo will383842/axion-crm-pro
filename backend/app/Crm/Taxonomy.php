@@ -48,6 +48,91 @@ final class Taxonomy
     ];
 
     /**
+     * Libellés des relations, pour l'écran (constructeur d'audiences) — mêmes
+     * clés que `BUSINESS_RELATION_TYPES`, dans le même ordre (garde
+     * `PresseHarmonisationTest`).
+     *
+     * @var array<string, string>
+     */
+    public const BUSINESS_RELATION_LIBELLES = [
+        'prospect' => 'Prospect',
+        'client' => 'Client',
+        'presse_media' => 'Presse et médias',
+        'partenaire' => 'Partenaire',
+        'investisseur' => 'Investisseur',
+        'conference' => 'Conférence',
+        'newsletter' => 'Lettre d\'information',
+        'fournisseur' => 'Fournisseur',
+    ];
+
+    /**
+     * Relations qu'une campagne de PROSPECTION exclut (préréglage de l'écran
+     * « Audiences ») : on ne prospecte ni la presse ni un client.
+     *
+     * @var list<string>
+     */
+    public const RELATIONS_HORS_PROSPECTION = ['presse_media', 'client'];
+
+    /**
+     * TYPE DE MÉDIA, tel que l'étiquette `media-type:<valeur>` le dit — valeur
+     * d'étiquette => libellé. Dérivé de `media.media_type` par
+     * `MEDIA_TYPE_VERS_ETIQUETTE` (plusieurs types techniques peuvent donner la
+     * même étiquette : `presse_mensuel` et `presse_revue` sont des magazines).
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_TYPES_ETIQUETTE = [
+        'presse-quotidienne' => 'Presse quotidienne',
+        'presse-hebdomadaire' => 'Presse hebdomadaire',
+        'presse-magazine' => 'Presse magazine et revues',
+        'presse-journal' => 'Journal (périodicité inconnue)',
+        'presse-autre' => 'Publication de presse',
+        'radio' => 'Radio',
+        'tv' => 'Télévision',
+        'emission-tv' => 'Émission de télévision',
+        'agence' => 'Agence de presse',
+        'web' => 'Presse en ligne',
+        'blog' => 'Blog',
+        'production' => 'Production audiovisuelle',
+    ];
+
+    /**
+     * `media.media_type` (CHECK `media_media_type_check`) => valeur d'étiquette.
+     * Chaque type technique a sa ligne (garde `PresseHarmonisationTest`).
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_TYPE_VERS_ETIQUETTE = [
+        'presse_quotidien' => 'presse-quotidienne',
+        'presse_hebdo' => 'presse-hebdomadaire',
+        'presse_mensuel' => 'presse-magazine',
+        'presse_revue' => 'presse-magazine',
+        'presse_journal' => 'presse-journal',
+        'presse_autre' => 'presse-autre',
+        'radio' => 'radio',
+        'tv' => 'tv',
+        'tv_emission' => 'emission-tv',
+        'agence_presse' => 'agence',
+        'portail_web' => 'web',
+        'blog' => 'blog',
+        'production_audiovisuelle' => 'production',
+    ];
+
+    /**
+     * ZONE DE DIFFUSION d'un média — `media-zone:<valeur>`. `inconnue` est une
+     * valeur à part entière : ne pas savoir n'est pas « local ».
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_ZONES = [
+        'national' => 'Nationale',
+        'regional' => 'Régionale',
+        'departemental' => 'Départementale',
+        'local' => 'Locale',
+        'inconnue' => 'Inconnue',
+    ];
+
+    /**
      * Valeurs de `BUSINESS_RELATION_TYPES` qu'AUCUN événement du canal
      * site → CRM ne peut produire : elles n'existent que par la saisie manuelle
      * en console.
@@ -408,6 +493,12 @@ final class Taxonomy
         'taille-adherents' => 'size',
         'pertinence' => 'custom',
         'contactabilite' => 'custom',
+        // Presse (harmonisation des contacts, 2026-09-30) : étiquettes DÉRIVÉES
+        // des lignes `media` rattachées à la fiche (`App\Crm\Presse\EtiquettesMedia`),
+        // posées et retirées par la même synchro automatique.
+        'media-type' => 'custom',
+        'media-zone' => 'geo',
+        'media-theme' => 'custom',
     ];
 
     /**

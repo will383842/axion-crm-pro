@@ -1,0 +1,200 @@
+<?php
+
+use App\Crm\Taxonomy;
+use Database\Seeders\ScrapingSourcesSeeder;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * LA PRESSE SUIT LE MÊME MODÈLE QUE TOUS LES AUTRES CONTACTS (2026-09-30).
+ *
+ * Demande de Will : « harmoniser l'ensemble des contacts ». Les médias
+ * (`media`) et les journalistes (`journalists`) vivaient à part : le moteur de
+ * campagnes, qui vise des FICHES (`companies`) et leurs CONTACTS, ne pouvait
+ * pas les voir. `crm:presse:harmoniser` rattache chaque média à une fiche
+ * (nature `media`, relation `presse_media`) et chaque journaliste à un contact
+ * de cette fiche ; `crm:presse:importer` fait entrer les listes de diffusion
+ * presse par le même chemin. Cette migration prépare le terrain, et elle est
+ * PUREMENT ADDITIVE — ordre permanent de Will : rien n'est supprimé.
+ *
+ *  1. La source `presse-2026` entre au REGISTRE (`scraping_sources`) : le
+ *     funnel d'ingestion refuse une source inconnue, et les seeders ne
+ *     tournent pas au déploiement.
+ *
+ *  2. Son tag de provenance `src:scraping-presse-2026` devient PROTÉGÉ
+ *     (`FichesProtegees::TAGS`) : le déclencheur de la base, dont la liste est
+ *     FIGÉE, est réinstallé avec les quatre tags (`FichesProtegeesTest` lit la
+ *     fonction installée).
+ *
+ *  3. Le registre des retraits (`contacts_retires`) connaît aussi les
+ *     personnes de la presse : les deux déclencheurs qui l'alimentent
+ *     (suppression d'une personne ; suppression d'une fiche, avant la
+ *     cascade) retiennent désormais les contacts dont `sources` cite
+ *     `federations-2026` OU `presse-2026`. Une personne de la presse retirée ne
+ *     revient jamais par un nouvel import. Corps repris À L'IDENTIQUE de
+ *     `2026_09_30_000001`, seule la condition de source s'élargit.
+ *
+ *  4. Le LIEN, sans rien déplacer ni supprimer :
+ *     - `journalists.contact_id` : le contact qui porte désormais ce
+ *       journaliste. `journalists` RESTE la table source de l'écran « Médias &
+ *       Presse » (porte d'accès, relation LinkedIn, envois presse) ; le
+ *       contact est la vue harmonisée que les campagnes visent. `ON DELETE SET
+ *       NULL` : effacer le contact (droit à l'effacement) ne casse pas la ligne
+ *       source ;
+ *     - `journalists.harmonise_le`, `media.harmonise_le` : la date à laquelle
+ *       l'harmonisation les a traités. Elle survit à la suppression de la fiche
+ *       ou du contact (dont les liens repassent à NULL) : c'est elle qui
+ *       interdit à un second passage de RECRÉER une fiche ou une personne que
+ *       Will a supprimée.
+ */
+return new class extends Migration
+{
+    private const SLUGS_AVANT = ['src:scraping-evenements-pro', 'src:scraping-federations-2026', 'src:scraping-gofab-2026'];
+
+    private const SLUGS = ['src:scraping-evenements-pro', 'src:scraping-federations-2026', 'src:scraping-gofab-2026', 'src:scraping-presse-2026'];
+
+    public function up(): void
+    {
+        DB::statement("SET LOCAL lock_timeout = '30s'");
+
+        (new ScrapingSourcesSeeder)->run();
+
+        $this->installerProtection(self::SLUGS);
+        $this->installerRetraits(
+            "COALESCE(OLD.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb OR COALESCE(OLD.sources, '[]'::jsonb) @> '[\"presse-2026\"]'::jsonb",
+            "(COALESCE(ct.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb OR COALESCE(ct.sources, '[]'::jsonb) @> '[\"presse-2026\"]'::jsonb)",
+        );
+
+        DB::statement('ALTER TABLE journalists ADD COLUMN IF NOT EXISTS contact_id BIGINT NULL REFERENCES contacts(id) ON DELETE SET NULL');
+        DB::statement('ALTER TABLE journalists ADD COLUMN IF NOT EXISTS harmonise_le TIMESTAMPTZ NULL');
+        DB::statement('ALTER TABLE media ADD COLUMN IF NOT EXISTS harmonise_le TIMESTAMPTZ NULL');
+        // Nom VÉRIFIÉ LIBRE le 2026-09-30.
+        DB::statement('CREATE INDEX IF NOT EXISTS journalists_contact_idx ON journalists (contact_id) WHERE contact_id IS NOT NULL');
+
+        DB::statement("COMMENT ON COLUMN journalists.contact_id IS 'Contact (contacts.id) qui porte ce journaliste depuis l''harmonisation presse. journalists reste la table source de l''ecran Medias & Presse.'");
+        DB::statement("COMMENT ON COLUMN journalists.harmonise_le IS 'Traite par crm:presse:harmoniser. Survit a la suppression du contact : une personne retiree n''est jamais recreee.'");
+        DB::statement("COMMENT ON COLUMN media.harmonise_le IS 'Traite par crm:presse:harmoniser ou crm:presse:importer. Survit a la suppression de la fiche : une fiche supprimee n''est jamais recreee.'");
+    }
+
+    /**
+     * Retour arrière : le déclencheur et le registre reprennent leur état
+     * d'avant. Les COLONNES et leurs valeurs RESTENT (même doctrine que B1 pour
+     * `contacts_retires`) : les retirer effacerait la mémoire de ce qui a été
+     * supprimé, qui reviendrait au prochain passage une fois la migration
+     * rejouée. La source est COUPÉE, jamais supprimée (`scraper_runs` la cite).
+     */
+    public function down(): void
+    {
+        $this->installerProtection(self::SLUGS_AVANT);
+        $this->installerRetraits(
+            "COALESCE(OLD.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb",
+            "COALESCE(ct.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb",
+        );
+
+        DB::table('scraping_sources')->where('slug', 'presse-2026')
+            ->update(['enabled' => false, 'updated_at' => now()]);
+    }
+
+    /** @param  list<string>  $slugs */
+    private function installerProtection(array $slugs): void
+    {
+        $liste = Taxonomy::sqlList($slugs);
+
+        DB::unprepared(<<<SQL
+            CREATE OR REPLACE FUNCTION public.refuser_suppression_fiche_protegee()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS \$fn\$
+            BEGIN
+                IF COALESCE(current_setting('app.autoriser_suppression_protegee', true), '') = 'on' THEN
+                    RETURN OLD;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM   public.company_tag ct
+                    JOIN   public.tags t ON t.id = ct.tag_id
+                    WHERE  ct.company_id = OLD.id
+                    AND    t.slug IN ({$liste})
+                ) THEN
+                    RAISE EXCEPTION 'fiche_protegee : suppression refusee (company_id=%)', OLD.id
+                        USING HINT = 'Organisateurs d''evenements, federations, participants GOFAB ou presse. Levee volontaire : SET LOCAL app.autoriser_suppression_protegee = ''on''.';
+                END IF;
+
+                RETURN OLD;
+            END
+            \$fn\$;
+        SQL);
+    }
+
+    /**
+     * Les deux déclencheurs du registre, corps de `2026_09_30_000001`, avec la
+     * condition de source donnée (pour une personne : `OLD` ; pour les
+     * personnes d'une fiche supprimée : `ct`). Ces conditions sont écrites dans
+     * ce fichier, jamais une donnée.
+     */
+    private function installerRetraits(string $conditionPersonne, string $conditionFiche): void
+    {
+        DB::unprepared(<<<SQL
+            CREATE OR REPLACE FUNCTION public.contacts_memoriser_retrait()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS \$fn\$
+            DECLARE
+                v_siren      CHAR(9);
+                v_pays       CHAR(2);
+                v_foreign_id TEXT;
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = OLD.workspace_id) THEN
+                    RETURN OLD;
+                END IF;
+
+                IF ({$conditionPersonne}) THEN
+                    SELECT c.siren, c.country_code, c.foreign_id INTO v_siren, v_pays, v_foreign_id
+                    FROM public.companies c WHERE c.id = OLD.company_id;
+                    IF NOT FOUND THEN
+                        -- Suppression EN CASCADE de la fiche : le déclencheur
+                        -- de `companies` (BEFORE DELETE) a déjà inscrit ses
+                        -- personnes, avec son SIREN ou son ancre.
+                        RETURN OLD;
+                    END IF;
+
+                    INSERT INTO public.contacts_retires (workspace_id, company_id, siren, country_code, foreign_id, cle_nom)
+                    VALUES (OLD.workspace_id, OLD.company_id, v_siren, v_pays, v_foreign_id,
+                            public.contacts_retires_empreinte(OLD.first_name, OLD.last_name))
+                    ON CONFLICT DO NOTHING;
+                END IF;
+
+                RETURN OLD;
+            END
+            \$fn\$;
+
+            CREATE OR REPLACE FUNCTION public.companies_memoriser_retraits()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS \$fn\$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = OLD.workspace_id) THEN
+                    RETURN OLD;
+                END IF;
+
+                INSERT INTO public.contacts_retires (workspace_id, company_id, siren, country_code, foreign_id, cle_nom)
+                SELECT ct.workspace_id, ct.company_id, OLD.siren, OLD.country_code, OLD.foreign_id,
+                       public.contacts_retires_empreinte(ct.first_name, ct.last_name)
+                FROM   public.contacts ct
+                WHERE  ct.company_id = OLD.id
+                AND    {$conditionFiche}
+                ON CONFLICT DO NOTHING;
+
+                RETURN OLD;
+            END
+            \$fn\$;
+        SQL);
+    }
+};

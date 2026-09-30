@@ -1,0 +1,65 @@
+name: CRM — Presse harmonisée (prod, à la main)
+
+# Harmonisation des contacts presse (2026-09-30) : `crm:presse:harmoniser` sur
+# le serveur de production, par SSH, LANCÉ À LA MAIN seulement.
+#
+# Par défaut : ESSAI À BLANC — chaque paquet est parcouru puis annulé, rien
+# n'est écrit ; le bilan donne les chiffres (fiches créées, natures et
+# relations posées ou conservées, journalistes convertis, écartés par motif).
+# Le mode qui écrit se choisit explicitement.
+#
+# `--compteurs-seulement` TOUJOURS : ce dépôt est PUBLIC, ses journaux aussi —
+# que des nombres, jamais un nom, une adresse ou un identifiant.
+#
+# Rien n'est jamais supprimé (ordre permanent de Will) : la commande est
+# additive, idempotente, et reprend là où elle s'est arrêtée si on la relance.
+#
+# L'import d'une liste de diffusion (`crm:presse:importer`) ne passe PAS par
+# ce workflow : son fichier vit hors du dépôt, sur le serveur.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Ce que fait le workflow"
+        type: choice
+        default: harmoniser-a-blanc
+        options:
+          - harmoniser-a-blanc
+          - harmoniser
+
+permissions:
+  contents: read
+
+jobs:
+  presse:
+    name: Presse sur prod (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    # ≈ 56 000 médias par paquets de 500.
+    timeout-minutes: 180
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Presse via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            harmoniser-a-blanc) CMD="crm:presse:harmoniser --dry-run" ;;
+            harmoniser)         CMD="crm:presse:harmoniser" ;;
+            *) echo "::error::mode inconnu : $MODE"; exit 1 ;;
+          esac
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
+            set -euo pipefail
+            cd "$PROJECT_PATH"
+            # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
+            # reste du heredoc comme stdin et avale les commandes suivantes.
+            docker compose exec -u root -T api php artisan $CMD --compteurs-seulement < /dev/null
+          EOF

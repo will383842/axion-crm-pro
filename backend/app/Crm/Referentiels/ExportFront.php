@@ -47,6 +47,15 @@ final class ExportFront
             self::liste('METIERS', 'CleMetier', Metiers::liste(), 'Métiers — étiquette automatique `metier-<code>` (depuis la sous-classe NAF rév. 2).'),
             "/** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */\n"
                 . 'export const PREFIXE_ETIQUETTE_METIER = ' . self::chaine(EtiquettesClassement::PREFIXE_METIER) . ";\n",
+            // Relations et presse (harmonisation des contacts, 2026-09-30).
+            self::liste('RELATIONS', 'CleRelation', Taxonomy::BUSINESS_RELATION_LIBELLES, 'Relations — `companies.relation_type`.'),
+            "/** Relations qu'une campagne de prospection exclut (préréglage). */\n"
+                . 'export const RELATIONS_HORS_PROSPECTION = [' . implode(', ', array_map(self::chaine(...), Taxonomy::RELATIONS_HORS_PROSPECTION)) . "] as const;\n",
+            self::liste('TYPES_MEDIA', 'CleTypeMedia', Taxonomy::MEDIA_TYPES_ETIQUETTE, 'Types de média — étiquette automatique `media-type:<code>`.'),
+            self::liste('ZONES_MEDIA', 'CleZoneMedia', Taxonomy::MEDIA_ZONES, 'Zones de diffusion — étiquette automatique `media-zone:<code>`.'),
+            "/** Préfixes des étiquettes d'un média : type et zone de diffusion. */\n"
+                . "export const PREFIXE_ETIQUETTE_TYPE_MEDIA = \"media-type:\";\n"
+                . "export const PREFIXE_ETIQUETTE_ZONE_MEDIA = \"media-zone:\";\n",
         ];
 
         return <<<'TS'

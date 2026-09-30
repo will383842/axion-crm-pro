@@ -24,10 +24,17 @@ class AudienceBuilderService
      * désormais renseignée sur toutes les fiches (les fiches INSEE portent
      * `entreprise`), indexée, et ses valeurs sont celles de
      * `Taxonomy::ENTITY_NATURES`.
+     *
+     * `relation_type` (2026-09-30, harmonisation de la presse) : une campagne
+     * de PROSPECTION doit pouvoir EXCLURE la presse et les clients
+     * (`not` → `relation_type in [presse_media, client]`), et une campagne peut
+     * viser une relation. Valeurs : `Taxonomy::BUSINESS_RELATION_TYPES`. Les
+     * types, zones et thèmes de média se visent par leurs étiquettes
+     * (`tags` / `contains_any` : `media-type:radio`, `media-zone:regional`…).
      */
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
-        'size_category', 'sector_main', 'entity_nature', 'priority', 'quality_score',
+        'size_category', 'sector_main', 'entity_nature', 'relation_type', 'priority', 'quality_score',
         'tags', 'has_email', 'enriched_at', 'best_email_confidence',
     ];
 

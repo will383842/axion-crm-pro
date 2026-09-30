@@ -271,3 +271,53 @@ export type CleMetier = (typeof METIERS)[number]['code'];
 
 /** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */
 export const PREFIXE_ETIQUETTE_METIER = "metier-";
+
+/** Relations — `companies.relation_type`. */
+export const RELATIONS = [
+  { code: "prospect", libelle: "Prospect" },
+  { code: "client", libelle: "Client" },
+  { code: "presse_media", libelle: "Presse et médias" },
+  { code: "partenaire", libelle: "Partenaire" },
+  { code: "investisseur", libelle: "Investisseur" },
+  { code: "conference", libelle: "Conférence" },
+  { code: "newsletter", libelle: "Lettre d'information" },
+  { code: "fournisseur", libelle: "Fournisseur" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleRelation = (typeof RELATIONS)[number]['code'];
+
+/** Relations qu'une campagne de prospection exclut (préréglage). */
+export const RELATIONS_HORS_PROSPECTION = ["presse_media", "client"] as const;
+
+/** Types de média — étiquette automatique `media-type:<code>`. */
+export const TYPES_MEDIA = [
+  { code: "presse-quotidienne", libelle: "Presse quotidienne" },
+  { code: "presse-hebdomadaire", libelle: "Presse hebdomadaire" },
+  { code: "presse-magazine", libelle: "Presse magazine et revues" },
+  { code: "presse-journal", libelle: "Journal (périodicité inconnue)" },
+  { code: "presse-autre", libelle: "Publication de presse" },
+  { code: "radio", libelle: "Radio" },
+  { code: "tv", libelle: "Télévision" },
+  { code: "emission-tv", libelle: "Émission de télévision" },
+  { code: "agence", libelle: "Agence de presse" },
+  { code: "web", libelle: "Presse en ligne" },
+  { code: "blog", libelle: "Blog" },
+  { code: "production", libelle: "Production audiovisuelle" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleTypeMedia = (typeof TYPES_MEDIA)[number]['code'];
+
+/** Zones de diffusion — étiquette automatique `media-zone:<code>`. */
+export const ZONES_MEDIA = [
+  { code: "national", libelle: "Nationale" },
+  { code: "regional", libelle: "Régionale" },
+  { code: "departemental", libelle: "Départementale" },
+  { code: "local", libelle: "Locale" },
+  { code: "inconnue", libelle: "Inconnue" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleZoneMedia = (typeof ZONES_MEDIA)[number]['code'];
+
+/** Préfixes des étiquettes d'un média : type et zone de diffusion. */
+export const PREFIXE_ETIQUETTE_TYPE_MEDIA = "media-type:";
+export const PREFIXE_ETIQUETTE_ZONE_MEDIA = "media-zone:";

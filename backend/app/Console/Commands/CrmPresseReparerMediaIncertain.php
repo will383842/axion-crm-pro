@@ -44,7 +44,7 @@ use Throwable;
  *    pas été saisie à la main (`relation_saisie_manuelle_at`) — sinon quelqu'un
  *    l'a posée depuis, on n'y touche pas (`relations_saisies_a_la_main`,
  *    `relations_changees_depuis`). `relation_avant` connue : elle est remise
- *    telle quelle (même vide). Inconnue (pas de métadonnée) : `prospect`,
+ *    telle quelle. Inconnue (pas de métadonnée) : `prospect`,
  *    SEULEMENT si aucune fusion n'implique la fiche ; sinon comptée, intacte
  *    (`relations_avant_inconnues`).
  *  - NATURE : touchée seulement si elle vaut encore `media`. `nature_avant`
@@ -285,8 +285,10 @@ class CrmPresseReparerMediaIncertain extends Command
         if ($f->relation_type === QualificationPresse::RELATION) {
             if ($manuelle) {
                 $this->compter($delta, 'relations_saisies_a_la_main');
-            } elseif ($avant !== null && array_key_exists('relation_avant', $avant) && $avant['relation_avant'] !== QualificationPresse::RELATION) {
-                $maj['relation_type'] = is_string($avant['relation_avant']) ? $avant['relation_avant'] : null;
+            } elseif ($avant !== null && is_string($avant['relation_avant'] ?? null) && $avant['relation_avant'] !== QualificationPresse::RELATION) {
+                // `relation_type` est NOT NULL : une relation d'avant absente ou
+                // vide n'est pas un état connu.
+                $maj['relation_type'] = $avant['relation_avant'];
                 $this->compter($delta, 'relations_remises');
             } elseif (! $fusion) {
                 $maj['relation_type'] = 'prospect';

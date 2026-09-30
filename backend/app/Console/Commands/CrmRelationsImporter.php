@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Crm\Console\CompteursHub;
-use App\Crm\EspaceProspection;
 use App\Crm\Emails\QualificationEmail;
+use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Crm\Relations\LigneRelation;
 use App\Crm\Relations\PromotionRelation;

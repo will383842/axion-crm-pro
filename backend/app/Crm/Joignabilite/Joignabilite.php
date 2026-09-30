@@ -265,10 +265,10 @@ final class Joignabilite
                 $liaisons[] = $workspaceId;
                 $lignes = DB::select(
                     "UPDATE {$table} AS t SET joignabilite = v.etat
-                     FROM (VALUES " . implode(', ', array_fill(0, count($paquet), '(?::bigint, ?::text)')) . ") AS v(id, etat)
+                     FROM (VALUES " . implode(', ', array_fill(0, count($paquet), '(?::bigint, ?::text)')) . ') AS v(id, etat)
                      WHERE t.id = v.id AND t.workspace_id = ?::uuid AND t.deleted_at IS NULL
                        AND t.joignabilite IS DISTINCT FROM v.etat
-                     RETURNING t.id",
+                     RETURNING t.id',
                     $liaisons,
                 );
                 $ecrites[$cle] += count($lignes);

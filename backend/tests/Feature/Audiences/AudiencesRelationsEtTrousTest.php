@@ -19,7 +19,6 @@ use App\Services\Audiences\AudienceBuilderService;
 use Database\Seeders\DefaultAudiencesSeeder;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;

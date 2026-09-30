@@ -8,6 +8,7 @@
  * Fixtures FICTIVES (dépôt public) : SIREN 942xxxxxx, noms « ZZ ».
  */
 
+use App\Console\Commands\CrmReferentielsComblerTrous;
 use App\Crm\FichesProtegees;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -164,7 +165,7 @@ test('une fiche modifiee entre la lecture et l ecriture n est pas ecrasee', func
     $id = ctFiche($this->espace, ['region_code' => null, 'department_code' => '38']);
     // On simule la course : la fiche change de département APRÈS la lecture
     // du lot, en rejouant l'écriture avec une garde périmée.
-    $commande = new App\Console\Commands\CrmReferentielsComblerTrous;
+    $commande = new CrmReferentielsComblerTrous;
     $ecrire = (new ReflectionClass($commande))->getMethod('ecrire');
     $fiche = DB::selectOne('SELECT id, entity_nature, region_code, department_code, postcode, country_code, legal_form, naf, naf_rev2, siren FROM companies WHERE id = ?', [$id]);
     DB::table('companies')->where('id', $id)->update(['department_code' => '75']);

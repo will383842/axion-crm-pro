@@ -277,11 +277,13 @@ final class ListesManuelles
             return [$companyIds, $contactIds];
         }
         $companies = $companyIds === [] ? [] : self::entiers(DB::table('companies')
+            ->whereNull('deleted_at')
             ->whereIn('id', $companyIds)
             ->whereRaw(GardePresse::conditionSql('companies.id', $ouverts))
             ->pluck('id')
             ->all());
         $contacts = $contactIds === [] ? [] : self::entiers(DB::table('contacts')
+            ->whereNull('deleted_at')
             ->whereIn('id', $contactIds)
             ->whereRaw(GardePresse::conditionContactsSql('contacts', $ouverts))
             ->whereRaw('(contacts.company_id IS NULL OR ' . GardePresse::conditionSql('contacts.company_id', $ouverts) . ')')

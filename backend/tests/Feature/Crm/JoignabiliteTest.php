@@ -341,13 +341,22 @@ test('R4 — le calcul relit ses donnees sous verrou, DANS la transaction du lot
     foreach (array_merge($verrous, $ecritures) as $e) {
         expect($e['niveau'])->toBeGreaterThan($base);
     }
+    // Et la lecture verrouillée PRÉCÈDE l'écriture (positions dans le journal
+    // du passage réel, relevées AVANT de le vider pour le témoin).
+    $position = static function (array $cherche) use ($journal): int {
+        foreach ($journal as $i => $e) {
+            if ($e === $cherche) {
+                return $i;
+            }
+        }
+
+        return -1;
+    };
+    expect($position($verrous[0]))->toBeGreaterThanOrEqual(0)
+        ->and($position($verrous[0]))->toBeLessThan($position($ecritures[0]));
     // TÉMOIN : l'essai à blanc ne verrouille rien.
     $journal = [];
     jgCalculer($this->slug, ['--dry-run' => true]);
-    expect(array_filter($journal, static fn (array $e): bool => str_contains($e['sql'], 'for update')))->toBe([]);
-    // Et l'écriture suit la lecture verrouillée dans la MÊME transaction :
-    // aucune lecture de `companies` NON verrouillée entre les deux.
-    $premierVerrou = array_search($verrous[0], $journal, true);
-    $premiereEcriture = array_search($ecritures[0], $journal, true);
-    expect($premierVerrou)->toBeLessThan($premiereEcriture);
+    expect(array_filter($journal, static fn (array $e): bool => str_contains($e['sql'], 'for update')))->toBe([])
+        ->and($journal)->not->toBe([]);
 });

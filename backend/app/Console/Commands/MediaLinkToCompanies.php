@@ -170,7 +170,7 @@ class MediaLinkToCompanies extends Command
                     'entity_b_id' => $provisoire,
                     'similarity' => Rapprochement::score(Rapprochement::PRESSE_TITRE_EDITEUR),
                     'motif' => Rapprochement::PRESSE_TITRE_EDITEUR,
-                    'fusion_auto' => false,
+                    'fusion_auto' => true,
                     'detected_at' => now(),
                 ]);
             }

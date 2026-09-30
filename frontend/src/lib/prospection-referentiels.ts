@@ -10,6 +10,7 @@
  */
 
 import {
+  JOIGNABILITES,
   NATURES,
   REGIONS,
   SECTEURS,
@@ -77,6 +78,13 @@ export const COUNTRY_OPTIONS: OptionReferentiel[] = [
  * cabinets et enseignement. Elle vient désormais du référentiel généré.
  */
 export const NATURE_OPTIONS: OptionReferentiel[] = optionsReferentiel(NATURES, 'Toutes natures');
+
+/**
+ * Joignabilité calculée (chantier D, 2026-10-01) — `filter[joignabilite]`
+ * sur les listes Entreprises et Contacts. Une adresse invalide ou interdite
+ * reste sur sa fiche : elle est seulement exclue des envois.
+ */
+export const JOIGNABILITE_OPTIONS: OptionReferentiel[] = optionsReferentiel(JOIGNABILITES, 'Toute joignabilité');
 
 /**
  * Statut de prospection — LE vocabulaire qui répond à « qui puis-je contacter ».

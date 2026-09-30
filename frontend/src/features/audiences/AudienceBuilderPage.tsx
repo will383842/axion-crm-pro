@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
+  JOIGNABILITES,
   NATURES,
   REGIONS,
   SECTEURS,
@@ -37,6 +38,17 @@ import type {
   EmailAudience,
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
+import {
+  RELATIONS_EXCLUES_PAR_DEFAUT,
+  SANS_TAILLE,
+  aUnCriterePositif,
+  construireCriteres,
+  type ChoixPays,
+} from './criteres-relation';
+import {
+  LIFECYCLE_LABELS,
+  RELATION_TYPE_LABELS,
+} from '@/features/crm-console/types';
 
 // ---------------------------------------------------------------------------
 // Presets
@@ -63,7 +75,22 @@ const enPresets = (liste: readonly EntreeReferentiel[]): Array<{ code: string; l
   liste.map((e) => ({ code: e.code, label: e.libelle }));
 
 const REGION_PRESETS = enPresets(REGIONS);
-const SIZE_PRESETS = enPresets(TAILLES);
+// « Taille non renseignée » : effectif inconnu OU organisation (association,
+// fédération…), pour qui la taille d'entreprise ne s'applique pas. Aucun
+// effectif n'est deviné : on cible ou on exclut ces fiches EN CONNAISSANCE
+// de cause (chantier C).
+const SIZE_PRESETS = [
+  ...enPresets(TAILLES),
+  { code: SANS_TAILLE, label: 'Taille non renseignée (effectif inconnu ou organisation)' },
+];
+const RELATION_PRESETS = Object.entries(RELATION_TYPE_LABELS).map(([code, label]) => ({ code, label }));
+const ETAPE_PRESETS = Object.entries(LIFECYCLE_LABELS).map(([code, label]) => ({ code, label }));
+const JOIGNABILITE_PRESETS = enPresets(JOIGNABILITES);
+const PAYS_OPTIONS: Array<{ code: ChoixPays; label: string }> = [
+  { code: 'tous', label: 'Tous pays' },
+  { code: 'france', label: 'France' },
+  { code: 'etranger', label: 'Étranger (hors France)' },
+];
 const SECTOR_PRESETS = enPresets(SECTEURS);
 const NATURE_PRESETS = enPresets(NATURES);
 
@@ -107,13 +134,22 @@ export function AudienceBuilderPage() {
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
   const [tagsInput, setTagsInput] = useState<string>('');
+  // Chantiers B, C, D (2026-10-01) — relation, pays, joignabilité. Les
+  // relations établies sont EXCLUES par défaut d'une prospection : visible,
+  // décochable (`criteres-relation.ts`).
+  const [relationsVisees, setRelationsVisees] = useState<string[]>([]);
+  const [relationsExclues, setRelationsExclues] = useState<string[]>([...RELATIONS_EXCLUES_PAR_DEFAUT]);
+  const [etapesVisees, setEtapesVisees] = useState<string[]>([]);
+  const [etapesExclues, setEtapesExclues] = useState<string[]>([]);
+  const [pays, setPays] = useState<ChoixPays>('tous');
+  const [joignabilitesVisees, setJoignabilitesVisees] = useState<string[]>([]);
+  const [joignabilitesExclues, setJoignabilitesExclues] = useState<string[]>([]);
 
   // Build criteria
   const criteria = useMemo<AudienceCriteria>(() => {
     const all: AudienceCondition[] = [];
     if (departments.length > 0) all.push({ field: 'department_code', op: 'in', value: departments });
     if (regions.length > 0)     all.push({ field: 'region_code',     op: 'in', value: regions });
-    if (sizes.length > 0)       all.push({ field: 'size_category',   op: 'in', value: sizes });
     if (sectors.length > 0)     all.push({ field: 'sector_main',     op: 'in', value: sectors });
     if (natures.length > 0)     all.push({ field: 'entity_nature',   op: 'in', value: natures });
     // Métier : l'étiquette `metier-<code>` (chantier 2), en `contains_any`.
@@ -129,8 +165,26 @@ export function AudienceBuilderPage() {
       .filter((t) => t.length > 0);
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
 
-    return { all };
-  }, [departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput]);
+    return construireCriteres(all, {
+      relationsVisees,
+      relationsExclues,
+      etapesVisees,
+      etapesExclues,
+      pays,
+      tailles: sizes,
+      joignabilitesVisees,
+      joignabilitesExclues,
+    });
+  }, [
+    departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
+    relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
+  ]);
+  const aDesCriteres = aUnCriterePositif(criteria);
+  const conditionsRecap = [
+    ...(criteria.all ?? []).map((c) => ({ bloc: 'ET', c })),
+    ...(criteria.any ?? []).map((c) => ({ bloc: 'OU', c })),
+    ...(criteria.not ?? []).map((c) => ({ bloc: 'SAUF', c })),
+  ];
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -152,15 +206,14 @@ export function AudienceBuilderPage() {
   }, []);
 
   useEffect(() => {
-    const hasAny = (criteria.all?.length ?? 0) > 0;
-    if (!hasAny) {
+    if (!aDesCriteres) {
       setPreview(null);
       setPreviewError(null);
       return;
     }
     const timer = setTimeout(() => { void fetchPreview(criteria); }, 500);
     return () => { clearTimeout(timer); };
-  }, [criteria, fetchPreview]);
+  }, [criteria, aDesCriteres, fetchPreview]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -169,7 +222,7 @@ export function AudienceBuilderPage() {
   });
 
   const onSubmit = handleSubmit(async (form) => {
-    if ((criteria.all?.length ?? 0) === 0) {
+    if (!aDesCriteres) {
       toast.error('Ajoute au moins un critère');
       return;
     }
@@ -192,7 +245,7 @@ export function AudienceBuilderPage() {
   // D26-010 — le compteur a besoin de la valeur COURANTE, pas seulement de
   // celle qui sera soumise : la troncature se produit pendant la frappe.
   const watchedDescription = watch('description');
-  const canCreate = watchedName.trim().length > 0 && (criteria.all?.length ?? 0) > 0;
+  const canCreate = watchedName.trim().length > 0 && aDesCriteres;
 
   return (
     <div className="px-6 py-6">
@@ -266,6 +319,80 @@ export function AudienceBuilderPage() {
                 selected={regions}
                 onChange={setRegions}
                 placeholder="Aucune région"
+              />
+            </Field>
+            <Field label="Pays">
+              <select
+                aria-label="Pays"
+                value={pays}
+                onChange={(e) => setPays(e.target.value as ChoixPays)}
+                className="w-full rounded-lg bg-white px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+              >
+                {PAYS_OPTIONS.map((o) => (
+                  <option key={o.code} value={o.code}>{o.label}</option>
+                ))}
+              </select>
+            </Field>
+          </Card>
+
+          {/* Relation et joignabilité (chantiers B et D) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Users2 className="h-4 w-4" />} title="Relation et joignabilité" />
+            <Field label="Types de relation visés">
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={relationsVisees}
+                onChange={setRelationsVisees}
+                placeholder="Tous types"
+                masquerCode
+              />
+            </Field>
+            <Field label="Types de relation EXCLUS">
+              <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+                Clients, partenaires, presse, fournisseurs et investisseurs sont exclus par défaut d’une prospection, décochez pour les inclure.
+              </p>
+              <ChipsMultiSelect
+                options={RELATION_PRESETS}
+                selected={relationsExclues}
+                onChange={setRelationsExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
+              />
+            </Field>
+            <Field label="Étapes visées">
+              <ChipsMultiSelect
+                options={ETAPE_PRESETS}
+                selected={etapesVisees}
+                onChange={setEtapesVisees}
+                placeholder="Toutes étapes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Étapes exclues">
+              <ChipsMultiSelect
+                options={ETAPE_PRESETS}
+                selected={etapesExclues}
+                onChange={setEtapesExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
+              />
+            </Field>
+            <Field label="Joignabilité visée">
+              <ChipsMultiSelect
+                options={JOIGNABILITE_PRESETS}
+                selected={joignabilitesVisees}
+                onChange={setJoignabilitesVisees}
+                placeholder="Toutes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Joignabilité exclue">
+              <ChipsMultiSelect
+                options={JOIGNABILITE_PRESETS}
+                selected={joignabilitesExclues}
+                onChange={setJoignabilitesExclues}
+                placeholder="Aucune exclusion"
+                masquerCode
               />
             </Field>
           </Card>
@@ -389,18 +516,19 @@ export function AudienceBuilderPage() {
             )}
 
             {/* Recap critères */}
-            {(criteria.all?.length ?? 0) > 0 ? (
+            {conditionsRecap.length > 0 ? (
               <div className="space-y-1.5">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Critères ({criteria.all?.length})
+                  Critères ({conditionsRecap.length})
                 </div>
                 <ul className="space-y-1">
-                  {criteria.all?.map((c, i) => (
+                  {conditionsRecap.map(({ bloc, c }, i) => (
                     <li key={i} className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+                      <span className="text-slate-400">{bloc}</span>{' '}
                       <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
                       <span className="text-slate-400">{c.op}</span>{' '}
                       <span className="text-sky-700 dark:text-sky-300">
-                        {Array.isArray(c.value) ? `[${c.value.length}]` : String(c.value)}
+                        {Array.isArray(c.value) ? `[${c.value.length}]` : c.value === null ? '' : String(c.value)}
                       </span>
                     </li>
                   ))}
@@ -504,7 +632,7 @@ function ChipsMultiSelect({
                   : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700',
               )}
             >
-              {masquerCode ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
+              {masquerCode || opt.code.startsWith('__') ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
               <span>{opt.label}</span>
               {active ? <X className="h-3 w-3" /> : null}
             </button>

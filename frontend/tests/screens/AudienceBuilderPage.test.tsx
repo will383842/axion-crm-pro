@@ -92,8 +92,10 @@ describe('AudienceBuilderPage — rendu', () => {
     // démarrerait à vide enverrait la première campagne à toute la base.
     await renderScreen(<AudienceBuilderPage />, { path: PATH, landingRoutes: LANDING });
 
-    expect(screen.getByText('Critères (1)')).toBeVisible();
+    // + l'exclusion PAR DÉFAUT des relations établies (chantier B), visible.
+    expect(screen.getByText('Critères (2)')).toBeVisible();
     expect(screen.getByText('prospection_status')).toBeVisible();
+    expect(screen.getByText('relation_type')).toBeVisible();
   });
 });
 
@@ -155,7 +157,7 @@ describe('AudienceBuilderPage — parcours', () => {
 
     await user.click(puce('75', 'Paris'));
     await waitFor(() => expect(apercu.bodies.length).toBeGreaterThan(0), DEBOUNCE);
-    expect(screen.getByText('Critères (2)')).toBeVisible();
+    expect(screen.getByText('Critères (3)')).toBeVisible();
 
     await user.click(puce('75', 'Paris'));
 
@@ -163,7 +165,7 @@ describe('AudienceBuilderPage — parcours', () => {
       const dernier = apercu.bodies[apercu.bodies.length - 1];
       expect(dernier?.criteria.all.some((c) => c.field === 'department_code')).toBe(false);
     }, DEBOUNCE);
-    expect(screen.getByText('Critères (1)')).toBeVisible();
+    expect(screen.getByText('Critères (2)')).toBeVisible();
   });
 
   it('nommer puis créer POSTe l’audience et ATTERRIT sur sa fiche', async () => {
@@ -201,6 +203,36 @@ describe('AudienceBuilderPage — parcours', () => {
     await waitFor(() => {
       expect(view.router.state.location.pathname).toBe('/audiences/77');
     });
+  });
+
+  it('les relations établies sont EXCLUES par défaut (bloc not), et se décochent (chantier B)', async () => {
+    const user = userEvent.setup();
+    const apercu = recordPost<{ criteria: { all: Critere[]; not?: Critere[] } }>('/audiences/preview', {
+      companies: 3,
+      contacts: 1,
+    });
+
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [apercu.handler],
+    });
+
+    await waitFor(() => {
+      const dernier = apercu.bodies[apercu.bodies.length - 1];
+      expect(dernier?.criteria.not).toEqual([
+        { field: 'relation_type', op: 'in', value: ['client', 'partenaire', 'presse_media', 'fournisseur', 'investisseur'] },
+      ]);
+    }, DEBOUNCE);
+
+    // Décocher « Clients » dans les EXCLUS : les clients redeviennent ciblables.
+    const clientsExclus = screen.getAllByRole('button').filter((b) => b.textContent === 'Clients');
+    await user.click(clientsExclus[1] as HTMLElement);
+
+    await waitFor(() => {
+      const dernier = apercu.bodies[apercu.bodies.length - 1];
+      expect(dernier?.criteria.not?.[0]?.value).toEqual(['partenaire', 'presse_media', 'fournisseur', 'investisseur']);
+    }, DEBOUNCE);
   });
 
   it('choisir un MÉTIER vise son étiquette `metier-<code>` en contains_any (chantier 2)', async () => {

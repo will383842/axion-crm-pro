@@ -412,14 +412,12 @@ test('N4 bis — une ligne dont le SIREN ne rejoint AUCUNE fiche ni aucun titre 
     $fiches = DB::table('companies')->count();
 
     $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-prl-n4b-');
-    file_put_contents($fichier, implode("
-", array_map('json_encode', [
+    file_put_contents($fichier, implode("\n", array_map('json_encode', [
         ['siren' => '900000571', 'nom' => 'ZZ Titre Sans Fiche', 'type' => 'presse_quotidien', 'departement' => '69',
             'journaliste' => ['prenom' => 'Ines', 'nom' => 'ZZSANSFICHE', 'acces' => 'email_redaction',
                 'email' => 'ines.sansfiche@zz-titre.example.invalid']],
         ['identifiant' => 'presse:zz:temoin-n4b', 'nom' => 'ZZ Titre Temoin N4b', 'type' => 'presse_quotidien'],
-    ])) . "
-");
+    ])) . "\n");
     Artisan::call('crm:presse:importer', ['file' => $fichier]);
     $sortie = Artisan::output();
     @unlink($fichier);

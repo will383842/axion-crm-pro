@@ -60,6 +60,13 @@ use Throwable;
  * Plusieurs lignes d'un même média (un journaliste par ligne) visent la même
  * fiche par la même ancre.
  *
+ * ── Le SIREN ne vient QUE des registres officiels (décision de Will) ────
+ * Une ligne `{"siren": …}` ne peut que REJOINDRE une fiche existante qui
+ * porte déjà ce SIREN (posé par le registre), ou un titre existant par
+ * rapprochement. Si elle ne rejoint rien, elle est rejetée
+ * (`siren_sans_fiche_existante`) : jamais de fiche créée avec le SIREN d'une
+ * liste. Une ligne qui doit créer un titre porte un `identifiant`.
+ *
  * ── Une source DÉCLARATIVE (veto de la relecture sécurité de #265) ──────
  * Une ligne visant une fiche EXISTANTE (par SIREN ou par rapprochement) qui
  * n'est pas déjà de la presse est rejetée (`fiche_existante_hors_presse`) :
@@ -78,13 +85,13 @@ use Throwable;
  * `champ_obligatoire_manquant`, `type_inconnu`, `zone_inconnue`,
  * `theme_trop_long`, `journaliste_invalide`, `journaliste_sans_nom`,
  * `acces_inconnu`, `titre_existant_non_harmonise`, `rapprochement_ambigu`,
- * `rapprochement_siren_contradictoire`,
+ * `rapprochement_siren_contradictoire`, `siren_sans_fiche_existante`,
  * `fiche_existante_hors_presse`,
  * `fiche_a_la_corbeille`, `pivot_<code>`, `erreur_base`.
  *
  * ── Ce que fait une ligne ────────────────────────────────────────────────
  *  - la fiche entre par la PORTE COMMUNE (funnel, source `presse-2026`) :
- *    ancre SIREN ou (FR, identifiant), backfill-only, opposition (e-mail ET
+ *    ancre SIREN (fiche existante seulement) ou (FR, identifiant), backfill-only, opposition (e-mail ET
  *    téléphone), validation MX, dédup des personnes, tag de provenance
  *    VERROUILLÉ `src:scraping-presse-2026` qui PROTÈGE la fiche. Le
  *    journaliste devient un contact, `legitimate_interest_b2b` ;
@@ -382,6 +389,15 @@ class CrmPresseImporter extends Command
                     : ['foreign_id' => (string) $ancreRegistre['foreign_id'], 'country' => (string) $ancreRegistre['pays']];
                 $delta['titres_rapproches'] = 1;
             }
+        }
+        if ($trouvee === null && $l['siren'] !== null) {
+            // Décision de Will : le SIREN d'un journal ne vient QUE des
+            // registres officiels. Une ligne qui porte un SIREN peut REJOINDRE
+            // une fiche qui l'a déjà (posé par le registre) ou un titre en
+            // base ; elle ne CRÉE jamais une fiche avec ce SIREN — une liste
+            // qui attribue par erreur le SIREN d'une PME absente du CRM
+            // protégerait la PME à son entrée par le registre.
+            throw new InvalidArgumentException('siren_sans_fiche_existante');
         }
         if ($trouvee !== null && $trouvee->deleted_at !== null) {
             // À la corbeille (Will, ou fusion) : un import ne la ressuscite pas.

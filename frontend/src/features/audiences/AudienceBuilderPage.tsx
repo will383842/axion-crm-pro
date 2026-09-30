@@ -528,7 +528,11 @@ export function AudienceBuilderPage() {
                       <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
                       <span className="text-slate-400">{c.op}</span>{' '}
                       <span className="text-sky-700 dark:text-sky-300">
-                        {Array.isArray(c.value) ? `[${c.value.length}]` : c.value === null ? '' : String(c.value)}
+                        {Array.isArray(c.value)
+                          ? `[${c.value.length}]`
+                          : typeof c.value === 'string' || typeof c.value === 'number' || typeof c.value === 'boolean'
+                            ? String(c.value)
+                            : ''}
                       </span>
                     </li>
                   ))}

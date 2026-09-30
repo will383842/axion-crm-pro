@@ -6,6 +6,7 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Listes\ListesManuelles;
+use App\Models\Company;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
@@ -101,11 +102,14 @@ final class ResolveurDestinataires
         $occurrences = [];
 
         $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals'])
-            ->chunkById(1000, function ($fiches) use ($ws, $reglage, $exigees, &$organisations, &$occurrences): void {
-                $ids = [];
-                foreach ($fiches as $f) {
-                    $ids[] = (int) $f->getAttribute('id');
+            ->chunkById(1000, function (iterable $lot) use ($ws, $reglage, $exigees, &$organisations, &$occurrences): void {
+                $fiches = [];
+                foreach ($lot as $f) {
+                    if ($f instanceof Company) {
+                        $fiches[] = $f;
+                    }
                 }
+                $ids = array_map(static fn (Company $f): int => (int) $f->getAttribute('id'), $fiches);
                 $contacts = DB::table('contacts')
                     ->whereNull('deleted_at')
                     ->where('workspace_id', $ws)
@@ -164,7 +168,7 @@ final class ResolveurDestinataires
                 }
             }
 
-            $eligible = static fn (array $c): bool => ($verdicts[$c['email']] ?? null) === null;
+            $eligible = /** @param Candidat $c */ static fn (array $c): bool => ($verdicts[$c['email']] ?? null) === null;
             $nominativesOk = array_values(array_filter($nominatives, $eligible));
             $generiquesOk = array_values(array_filter($generiques, $eligible));
 
@@ -228,7 +232,7 @@ final class ResolveurDestinataires
      * écarte d'emblée (`ecartee`) — le verdict d'éligibilité vient après.
      *
      * @param  array<string, mixed>  $fiche
-     * @param  list<\stdClass>  $contacts
+     * @param  array<array-key, \stdClass>  $contacts
      * @param  array<int, true>  $cochees
      * @return list<Candidat>
      */
@@ -355,12 +359,13 @@ final class ResolveurDestinataires
      */
     private function bilan(ReglageDestinataires $reglage, int $organisations, int $avecDestinataire, array $retenues, array $exclues, array $ecartees, ?int $echantillon): array
     {
+        /** @var array<string, int> $parType */
         $parType = [self::GENERIQUE => 0, self::NOMINATIVE => 0];
         $partagees = 0;
         $regroupees = 0;
         $lignes = [];
         foreach ($retenues as $email => $r) {
-            $parType[$r['type']]++;
+            $parType[$r['type']] = ($parType[$r['type']] ?? 0) + 1;
             $n = count($r['organisations']);
             if ($n > 1) {
                 $partagees++;

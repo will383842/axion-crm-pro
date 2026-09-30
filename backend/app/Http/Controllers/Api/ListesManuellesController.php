@@ -46,7 +46,7 @@ class ListesManuellesController extends ApiController
             $q->onlyTrashed();
         }
         $listes = $q->limit(500)->get();
-        $effectifs = $this->effectifs($listes->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all());
+        $effectifs = $this->effectifs(array_values($listes->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all()));
 
         $companyId = (int) $r->query('company_id', '0');
         $contactId = (int) $r->query('contact_id', '0');
@@ -197,7 +197,7 @@ class ListesManuellesController extends ApiController
                 'c.deleted_at as organisation_supprimee_le',
                 'ct.first_name', 'ct.last_name', 'ct.role', 'ct.email', 'ct.deleted_at as personne_supprimee_le',
             ])
-            ->map(static function (object $l): object {
+            ->map(static function (\stdClass $l): \stdClass {
                 $l->type = $l->contact_id !== null ? 'personne' : 'organisation';
 
                 return $l;

@@ -173,7 +173,7 @@ class CrmCampagneDestinataires extends Command
             // est partagée avec l'aperçu des destinataires d'une audience.
             $motif = EligibiliteAdresse::motif($email, $occurrences, (bool) $this->option('non-informes'));
             if ($motif !== null) {
-                $bilan[self::COMPTEURS_MOTIFS[$motif]]++;
+                $bilan[self::COMPTEURS_MOTIFS[$motif] ?? 'ecartees_invalides']++;
 
                 continue;
             }

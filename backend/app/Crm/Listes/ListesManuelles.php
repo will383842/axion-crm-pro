@@ -128,13 +128,12 @@ final class ListesManuelles
             return [];
         }
 
-        return ListeManuelle::query()
+        return array_values(ListeManuelle::query()
             ->where('workspace_id', $workspaceId)
             ->whereIn('id', $ids)
             ->pluck('id')
             ->map(static fn (mixed $id): int => (int) $id)
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**

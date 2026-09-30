@@ -304,26 +304,32 @@ final class ImportListe
 
         $organisations = [];
         $personnes = [];
-        $bilan = [
-            'lignes_lues' => count($cles),
-            'rapprochees' => 0,
-            'rejetees' => [self::FORMAT_INCONNU => 0, self::INTROUVABLE => 0],
-            'doublons_dans_le_fichier' => 0,
-            'rapprochees_a_plusieurs_fiches' => 0,
-            'par_type' => ['crm' => 0, 'siren' => 0, 'email_personne' => 0, 'email_organisation' => 0],
-            'exemples_rejets' => [],
-        ];
+        /** @var array<string, int> $rejetees */
+        $rejetees = [self::FORMAT_INCONNU => 0, self::INTROUVABLE => 0];
+        /** @var array<string, int> $parSorte */
+        $parSorte = ['crm' => 0, 'siren' => 0, 'email_personne' => 0, 'email_organisation' => 0];
+        /** @var list<array{ligne: int, motif: string}> $exemples */
+        $exemples = [];
+        $rapprochees = 0;
+        $doublons = 0;
+        $plusieurs = 0;
         $vues = [];
+        $rejeter = static function (int $numero, string $motif) use (&$rejetees, &$exemples): void {
+            $rejetees[$motif] = ($rejetees[$motif] ?? 0) + 1;
+            if (count($exemples) < self::EXEMPLES_MAX) {
+                $exemples[] = ['ligne' => $numero, 'motif' => $motif];
+            }
+        };
 
         foreach ($cles as $c) {
             if ($c['type'] === null) {
-                self::rejeter($bilan, $c['numero'], self::FORMAT_INCONNU);
+                $rejeter($c['numero'], self::FORMAT_INCONNU);
 
                 continue;
             }
             $cle = $c['type'] . ':' . $c['valeur'];
             if (isset($vues[$cle])) {
-                $bilan['doublons_dans_le_fichier']++;
+                $doublons++;
 
                 continue;
             }
@@ -353,14 +359,16 @@ final class ImportListe
             }
 
             if ($orgs === [] && $pers === []) {
-                self::rejeter($bilan, $c['numero'], self::INTROUVABLE);
+                // Rien dans le CRM ne porte cette valeur : la ligne est
+                // REJETÉE. On ne crée jamais de fiche, ni d'adresse libre.
+                $rejeter($c['numero'], self::INTROUVABLE);
 
                 continue;
             }
-            $bilan['rapprochees']++;
-            $bilan['par_type'][$sorte]++;
+            $rapprochees++;
+            $parSorte[$sorte] = ($parSorte[$sorte] ?? 0) + 1;
             if (count($orgs) + count($pers) > 1) {
-                $bilan['rapprochees_a_plusieurs_fiches']++;
+                $plusieurs++;
             }
             foreach ($orgs as $id) {
                 $organisations[$id] = $id;
@@ -370,22 +378,20 @@ final class ImportListe
             }
         }
 
-        $bilan['organisations_retrouvees'] = count($organisations);
-        $bilan['personnes_retrouvees'] = count($personnes);
-
         return [
             'cles' => ['organisations' => array_values($organisations), 'personnes' => array_values($personnes)],
-            'bilan' => $bilan,
+            'bilan' => [
+                'lignes_lues' => count($cles),
+                'rapprochees' => $rapprochees,
+                'rejetees' => $rejetees,
+                'doublons_dans_le_fichier' => $doublons,
+                'rapprochees_a_plusieurs_fiches' => $plusieurs,
+                'par_type' => $parSorte,
+                'organisations_retrouvees' => count($organisations),
+                'personnes_retrouvees' => count($personnes),
+                'exemples_rejets' => $exemples,
+            ],
         ];
-    }
-
-    /** @param  array<string, mixed>  $bilan */
-    private static function rejeter(array &$bilan, int $numero, string $motif): void
-    {
-        $bilan['rejetees'][$motif]++;
-        if (count($bilan['exemples_rejets']) < self::EXEMPLES_MAX) {
-            $bilan['exemples_rejets'][] = ['ligne' => $numero, 'motif' => $motif];
-        }
     }
 
     /**

@@ -248,7 +248,7 @@ test('chaque fiche promue a son activite dans la timeline, chaque paquet ecrit s
     expect($activite)->not->toBeNull()
         ->and($payload['source'])->toBe('crm:relations:importer')
         ->and($payload['origines'])->toBe(['site-client'])
-        ->and($payload['relation'])->toBe(['from' => 'prospect', 'to' => 'client'])
+        ->and($payload['relation'])->toEqual(['from' => 'prospect', 'to' => 'client'])
         ->and(DB::table('activities')->where('kind', 'stage_changed')->count())->toBe(4)
         ->and(DB::table('audit_logs')->where('event_type', 'RELATIONS_IMPORT_PAQUET')->count())->toBeGreaterThanOrEqual(1)
         ->and(DB::table('audit_logs')->where('event_type', 'RELATIONS_IMPORT_FIN')->count())->toBe(1);

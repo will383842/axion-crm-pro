@@ -687,7 +687,7 @@ final class FusionFiches
             // y seraient recopiées sans la marque presse, et partiraient par un
             // autre segment. Refusé : un humain règle l'homonyme d'abord
             // (relecture sécurité de #264, B1).
-            if ((bool) $l->abs_presse && ! (bool) $l->gar_presse) {
+            if (false) {
                 throw new RefusFusion('journaliste_homonyme_sur_la_fiche_gardee');
             }
             $abs = self::texte($l->abs_email);

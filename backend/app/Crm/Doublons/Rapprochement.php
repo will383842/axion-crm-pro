@@ -41,6 +41,15 @@ final class Rapprochement
     public const SANS_SIREN_NOM = 'sans_siren_nom';
 
     /**
+     * Harmonisation de la presse (2026-09-30) : un titre porté par une fiche
+     * provisoire `media:<id>` dont le SIREN (registre officiel du titre) est
+     * celui d'une fiche d'éditeur. Jamais certain, jamais fusionné sans un
+     * humain : la paire va dans la file « Doublons à vérifier »
+     * (`media:link-to-companies`).
+     */
+    public const PRESSE_TITRE_EDITEUR = 'presse_titre_editeur';
+
+    /**
      * Motif => [score, libellé]. Le score va dans `duplicate_flags.similarity`
      * (NUMERIC(4,3)) : il ordonne la file, il ne décide rien.
      *
@@ -53,6 +62,7 @@ final class Rapprochement
         self::NOM_SITE => [0.9, 'Même nom et même site, codes postaux différents (fiche sans SIREN et fiche avec SIREN)'],
         self::NOM_CP => [0.85, 'Même nom et même code postal, sites différents ou absents (fiche sans SIREN et fiche avec SIREN)'],
         self::SANS_SIREN_NOM => [0.8, 'Deux fiches sans SIREN au même nom, même code postal ou même site'],
+        self::PRESSE_TITRE_EDITEUR => [0.7, 'Titre de presse et fiche de son éditeur (SIREN du registre du titre) : à vérifier, jamais fusionné sans vous'],
     ];
 
     /** Les seuls motifs qui peuvent autoriser une fusion sans relecture. */

@@ -2,11 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Crm\Doublons\FusionFiches;
 use App\Crm\Doublons\Rapprochement;
-use App\Crm\Doublons\RefusFusion;
 use App\Crm\Presse\QualificationPresse;
-use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -40,16 +37,16 @@ use Illuminate\Support\Facades\DB;
  *
  * ── Les médias portés par une fiche PROVISOIRE `media:<id>` (2026-09-30) ──
  * L'harmonisation de la presse donne une fiche (`foreign_id` = `media:<id>`)
- * aux titres qui n'en avaient pas. Ils restent AUTONOMES au sens de cette
- * commande : dès que leur SIREN désigne la vraie fiche de leur éditeur, la
- * fiche provisoire est FUSIONNÉE dans la fiche SIREN par le mécanisme des
- * doublons (`FusionFiches`, motif `meme_siren`, journalisée et annulable par
- * `crm:doublons:fusionner --annuler=<n>`) : le média, ses journalistes, les
- * contacts et les étiquettes passent sur la fiche de l'éditeur, la fiche
- * provisoire va à la CORBEILLE avec un renvoi — jamais supprimée, jamais deux
- * fiches durables. Par SIREN exact seulement : une fiche ne se fusionne pas
- * sur un nom. Une fiche provisoire dont les titres désignent PLUSIEURS
- * éditeurs n'est pas touchée (comptée).
+ * aux titres qui n'en avaient pas. Quand le SIREN d'un de ces titres (posé
+ * par un registre officiel seulement : CPPAP, SPEL, agences, Sirene) désigne
+ * la fiche d'un éditeur, la commande NE FUSIONNE RIEN (décision du
+ * coordinateur, relecture de #264) : la paire (fiche de l'éditeur ↔ fiche
+ * provisoire) est DÉPOSÉE dans la file « Doublons à vérifier » (#260), motif
+ * `presse_titre_editeur`, jamais `fusion_auto`. Un humain décide ; une fusion
+ * passe ensuite par les règles de #260. Une paire déjà écartée (« ce ne sont
+ * pas des doublons »), déjà en file, ou dont une fusion a eu lieu (même
+ * annulée) n'est JAMAIS redéposée. Une fiche provisoire dont les titres
+ * désignent PLUSIEURS éditeurs n'est pas déposée (comptée).
  */
 class MediaLinkToCompanies extends Command
 {
@@ -109,20 +106,21 @@ class MediaLinkToCompanies extends Command
               AND normalize_name(COALESCE(NULLIF(m.publisher, ''), m.name)) = u.norm
         SQL);
 
-        [$fusionnees, $ambigues, $refusees] = $this->fusionnerFichesProvisoires(false);
+        [$deposees, $ambigues] = $this->deposerPairesTitreEditeur(false);
 
-        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique, {$fusionnees} fiche(s) provisoire(s) fusionnée(s) dans la fiche de l'éditeur ({$ambigues} ambiguë(s), {$refusees} refus de fusion).");
+        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique ; {$deposees} paire(s) titre ↔ éditeur déposée(s) dans « Doublons à vérifier » ({$ambigues} ambiguë(s), non déposée(s)).");
 
         return self::SUCCESS;
     }
 
     /**
      * Les fiches PROVISOIRES `media:<id>` dont un titre porte le SIREN d'une
-     * fiche d'éditeur vivante : fusionnées dans celle-ci (ou comptées, à blanc).
+     * fiche d'éditeur vivante : la paire va dans la file de vérification des
+     * doublons — jamais fusionnée ici.
      *
-     * @return array{0: int, 1: int, 2: int} fusionnées (ou à fusionner), ambiguës, refusées
+     * @return array{0: int, 1: int} paires déposées (ou à déposer, à blanc), ambiguës
      */
-    private function fusionnerFichesProvisoires(bool $aBlanc): array
+    private function deposerPairesTitreEditeur(bool $aBlanc): array
     {
         $paires = DB::select(
             "SELECT f.workspace_id, f.id AS provisoire, array_agg(DISTINCT c.id) AS editeurs
@@ -136,10 +134,8 @@ class MediaLinkToCompanies extends Command
               ORDER BY f.id",
         );
 
-        $fusionnees = 0;
+        $deposees = 0;
         $ambigues = 0;
-        $refusees = 0;
-        $fusion = app(FusionFiches::class);
         foreach ($paires as $p) {
             $editeurs = array_values(array_filter(array_map('intval', explode(',', trim((string) $p->editeurs, '{}')))));
             if (count($editeurs) !== 1) {
@@ -147,28 +143,41 @@ class MediaLinkToCompanies extends Command
 
                 continue;
             }
-            if ($aBlanc) {
-                $fusionnees++;
-
+            $ws = (string) $p->workspace_id;
+            $editeur = $editeurs[0];
+            $provisoire = (int) $p->provisoire;
+            // Jamais redéposée : une paire déjà en file ou traitée (écartée,
+            // fusionnée), dans un sens ou dans l'autre, ou déjà fusionnée —
+            // même si la fusion a été annulée.
+            $connue = DB::table('duplicate_flags')->where('workspace_id', $ws)->where('entity_type', 'company')
+                ->where(static fn ($q) => $q
+                    ->where(static fn ($x) => $x->where('entity_a_id', $editeur)->where('entity_b_id', $provisoire))
+                    ->orWhere(static fn ($x) => $x->where('entity_a_id', $provisoire)->where('entity_b_id', $editeur)))
+                ->exists()
+                || DB::table('fusions_fiches')->where('workspace_id', $ws)
+                    ->where(static fn ($q) => $q
+                        ->where(static fn ($x) => $x->where('garde_id', $editeur)->where('absorbee_id', $provisoire))
+                        ->orWhere(static fn ($x) => $x->where('garde_id', $provisoire)->where('absorbee_id', $editeur)))
+                    ->exists();
+            if ($connue) {
                 continue;
             }
-            try {
-                WorkspaceContext::run((string) $p->workspace_id, fn (): int => $fusion->fusionner(
-                    (string) $p->workspace_id,
-                    $editeurs[0],
-                    (int) $p->provisoire,
-                    Rapprochement::MEME_SIREN,
-                    FusionFiches::MODE_MANUEL,
-                    operateur: 'media:link-to-companies',
-                ));
-                $fusionnees++;
-            } catch (RefusFusion $e) {
-                $refusees++;
-                $this->line("  fiche provisoire non fusionnée : {$e->getMessage()}");
+            if (! $aBlanc) {
+                DB::table('duplicate_flags')->insert([
+                    'workspace_id' => $ws,
+                    'entity_type' => 'company',
+                    'entity_a_id' => $editeur,
+                    'entity_b_id' => $provisoire,
+                    'similarity' => Rapprochement::score(Rapprochement::PRESSE_TITRE_EDITEUR),
+                    'motif' => Rapprochement::PRESSE_TITRE_EDITEUR,
+                    'fusion_auto' => false,
+                    'detected_at' => now(),
+                ]);
             }
+            $deposees++;
         }
 
-        return [$fusionnees, $ambigues, $refusees];
+        return [$deposees, $ambigues];
     }
 
     /**
@@ -243,8 +252,8 @@ class MediaLinkToCompanies extends Command
         $this->line("   • Nom exact UNIQUE     : {$uniqueMatch}  (seraient rattachés)");
         $this->line("   • Nom AMBIGU (>1)      : {$ambiguous}  (NON rattachés, garde-fou)");
         $this->line("   • Sans correspondance  : {$noMatch}");
-        [$aFusionner, $ambigues] = $this->fusionnerFichesProvisoires(true);
-        $this->line("   • Fiches provisoires media:<id> à fusionner dans l'éditeur (SIREN) : {$aFusionner} ({$ambigues} ambiguë(s), non touchées)");
+        [$aDeposer, $ambigues] = $this->deposerPairesTitreEditeur(true);
+        $this->line("   • Paires titre ↔ éditeur à déposer dans « Doublons à vérifier » : {$aDeposer} ({$ambigues} ambiguë(s), non déposées)");
 
         return self::SUCCESS;
     }

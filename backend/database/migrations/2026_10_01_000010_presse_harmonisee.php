@@ -1,5 +1,6 @@
 <?php
 
+use App\Crm\Doublons\Rapprochement;
 use App\Crm\Taxonomy;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Database\Migrations\Migration;
@@ -104,6 +105,24 @@ return new class extends Migration
         DB::statement("COMMENT ON COLUMN media.harmonise_le IS 'Traite par crm:presse:harmoniser ou crm:presse:importer. Survit a la suppression de la fiche : une fiche supprimee n''est jamais recreee.'");
 
         $this->installerDroitsContactVersJournaliste();
+        $this->installerMotifsDoublons(array_keys(Rapprochement::MOTIFS));
+    }
+
+    /**
+     * Le motif `presse_titre_editeur` entre dans les deux listes fermées des
+     * doublons (#260) : la file de vérification (`duplicate_flags`) et le
+     * journal des fusions (`fusions_fiches`). Une paire titre ↔ éditeur n'est
+     * JAMAIS fusionnée sans un humain (`media:link-to-companies`).
+     *
+     * @param  list<string>  $motifs
+     */
+    private function installerMotifsDoublons(array $motifs): void
+    {
+        $liste = Taxonomy::sqlList($motifs);
+        DB::statement('ALTER TABLE duplicate_flags DROP CONSTRAINT IF EXISTS duplicate_flags_motif_check');
+        DB::statement("ALTER TABLE duplicate_flags ADD CONSTRAINT duplicate_flags_motif_check CHECK (motif IS NULL OR motif IN ({$liste}))");
+        DB::statement('ALTER TABLE fusions_fiches DROP CONSTRAINT IF EXISTS fusions_fiches_motif_check');
+        DB::statement("ALTER TABLE fusions_fiches ADD CONSTRAINT fusions_fiches_motif_check CHECK (motif IN ({$liste}))");
     }
 
     /**
@@ -120,7 +139,7 @@ return new class extends Migration
             RETURNS TEXT
             LANGUAGE sql
             IMMUTABLE
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS $fn$
                 SELECT CASE
                     WHEN d ~ '^0[1-9][0-9]{8}$' THEN d
@@ -134,7 +153,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS $fn$
             BEGIN
                 -- Seul un EFFACEMENT (art. 17, opposition) se reporte sur le
@@ -168,7 +187,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS $fn$
             DECLARE
                 v_tel TEXT := public.presse_telephone_national(NEW.phone);
@@ -214,7 +233,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS $fn$
             DECLARE
                 v_tel TEXT := public.presse_telephone_national(NEW.phone);
@@ -282,6 +301,7 @@ return new class extends Migration
             DROP FUNCTION IF EXISTS public.presse_telephone_national(TEXT);
         SQL);
 
+        $this->installerMotifsDoublons(array_values(array_diff(array_keys(Rapprochement::MOTIFS), [Rapprochement::PRESSE_TITRE_EDITEUR])));
         $this->installerProtection(self::SLUGS_AVANT);
         $this->installerRetraits(
             "COALESCE(OLD.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb",
@@ -302,7 +322,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS \$fn\$
             BEGIN
                 IF COALESCE(current_setting('app.autoriser_suppression_protegee', true), '') = 'on' THEN
@@ -339,7 +359,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS \$fn\$
             DECLARE
                 v_siren      CHAR(9);
@@ -374,7 +394,7 @@ return new class extends Migration
             RETURNS trigger
             LANGUAGE plpgsql
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS \$fn\$
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.id = OLD.workspace_id) THEN

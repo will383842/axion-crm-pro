@@ -567,6 +567,7 @@ class CrmPresseHarmoniser extends Command
         }
 
         // ── Le lien journaliste → contact ────────────────────────────────
+        $convertis = 0;
         foreach ($journalistes as $j) {
             $contactId = QualificationPresse::contactDe($companyId, $j['prenom'], $j['nom'], $j['email']);
             if ($contactId === null) {
@@ -579,12 +580,13 @@ class CrmPresseHarmoniser extends Command
             QualificationPresse::completerContact($contactId, 'journaliste:' . $j['id'], $j['metadata']);
             DB::table('journalists')->where('id', $j['id'])->update(['contact_id' => $contactId, 'harmonise_le' => now()]);
             $this->compter($delta, 'journalistes_convertis');
+            $convertis++;
         }
-        // Journalistes posés sur une fiche qui porte AUSSI un segment de
-        // campagne ouvert (un groupe de presse qui organise des salons) : ils
-        // y sont exclus des envois (`GardePresse`), on le compte.
-        if ($journalistes !== [] && QualificationPresse::porteUnSegmentOuvert($companyId)) {
-            $this->compter($delta, 'journalistes_sur_fiche_d_un_segment_ouvert', count($journalistes));
+        // Journalistes RÉELLEMENT convertis sur une fiche qui porte AUSSI un
+        // segment de campagne ouvert (un groupe de presse qui organise des
+        // salons) : ils y sont exclus des envois (`GardePresse`), on le compte.
+        if ($convertis > 0 && QualificationPresse::porteUnSegmentOuvert($companyId)) {
+            $this->compter($delta, 'journalistes_sur_fiche_d_un_segment_ouvert', $convertis);
         }
 
         QualificationPresse::etiqueter($companyId);

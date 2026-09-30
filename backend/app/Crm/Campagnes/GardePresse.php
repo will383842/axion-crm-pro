@@ -117,7 +117,16 @@ final class GardePresse
             return 'TRUE';
         }
 
-        return "NOT (COALESCE({$alias}.external_ref, '') LIKE 'journaliste:%'"
+        return 'NOT ' . self::estContactPresseSql($alias);
+    }
+
+    /**
+     * SQL : ce contact EST une personne de la presse (marque indépendante de
+     * l'ouverture du segment). `$alias` n'est jamais une donnée utilisateur.
+     */
+    public static function estContactPresseSql(string $alias = 'contacts'): string
+    {
+        return "(COALESCE({$alias}.external_ref, '') LIKE 'journaliste:%'"
             . " OR COALESCE({$alias}.sources, '[]'::jsonb) @> '[\"" . QualificationPresse::SOURCE . "\"]'::jsonb)";
     }
 

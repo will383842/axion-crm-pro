@@ -611,10 +611,10 @@ class CrmPresseImporter extends Command
     {
         $valeurs = [
             'media_type' => $l['type'],
-            // Le SIREN de la ligne, posé sur le TITRE : `media:link-to-companies`
-            // rattachera la fiche provisoire à celle de l'éditeur quand elle
-            // existera (fusion journalisée).
-            'siren' => $l['siren'],
+            // PAS de `siren` : une liste de diffusion est DÉCLARATIVE. Le SIREN
+            // d'un titre (`media.siren`, qui déclenche un rapprochement avec la
+            // fiche de l'éditeur) ne vient que d'un registre officiel (CPPAP,
+            // SPEL, agences, Sirene) — relecture de #264, constat 3.
             'diffusion_zone' => $l['zone'] === null ? null : EtiquettesMedia::zoneStockee($l['zone']),
             'editorial_theme' => $l['theme'],
             'department_code' => $l['departement'],

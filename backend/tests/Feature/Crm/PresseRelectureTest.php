@@ -20,18 +20,26 @@
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
+use App\Crm\Doublons\FusionFiches;
+use App\Crm\Doublons\RefusFusion;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Presse\QualificationPresse;
 use App\Models\Contact;
+use App\Models\EmailAudience;
+use App\Models\User;
+use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Domain\DomainFinderService;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
@@ -213,28 +221,107 @@ test('N1 — media:find-websites cherche AUSSI le site des titres portes par une
         ->and(DB::table('media')->where('id', $editeur)->value('website'))->toBeNull();
 });
 
-test('N1 — media:link-to-companies rattache un titre de fiche provisoire a la fiche SIREN de son editeur : fusion journalisee, rien supprime ; le temoin reste', function () {
-    $titre = prlMedia($this->espace, ['name' => 'ZZ Titre a rattacher', 'siren' => '900000441']);
+test('N1 — media:link-to-companies ne FUSIONNE jamais : la paire titre <-> editeur va dans la file de verification, une fois ; jamais redeposee si ecartee ou deja fusionnee', function () {
+    $titre = prlMedia($this->espace, ['name' => 'ZZ Titre a verifier', 'siren' => '900000441']);
+    $titre2 = prlMedia($this->espace, ['name' => 'ZZ Titre deja fusionne', 'siren' => '900000443']);
     $seul = prlMedia($this->espace, ['name' => 'ZZ Titre sans editeur', 'siren' => '900000442']);
-    DB::table('journalists')->insert(['workspace_id' => $this->espace, 'media_id' => $titre, 'first_name' => 'Zoe', 'last_name' => 'ZZFUSION',
-        'source' => 'wikidata', 'created_at' => now(), 'updated_at' => now()]);
     Artisan::call('crm:presse:harmoniser');
     $provisoire = (int) DB::table('media')->where('id', $titre)->value('company_id');
-    $provisoireSeul = (int) DB::table('media')->where('id', $seul)->value('company_id');
+    $provisoire2 = (int) DB::table('media')->where('id', $titre2)->value('company_id');
     $editeur = prlFiche($this->espace, ['siren' => '900000441', 'denomination' => 'ZZ EDITIONS DU TITRE']);
-    $fiches = DB::table('companies')->count();
+    $editeur2 = prlFiche($this->espace, ['siren' => '900000443', 'denomination' => 'ZZ EDITIONS DEUX']);
+    // Une fusion de cette paire a déjà eu lieu, puis a été annulée : jamais redéposée.
+    DB::table('fusions_fiches')->insert(['workspace_id' => $this->espace, 'garde_id' => $editeur2, 'absorbee_id' => $provisoire2,
+        'motif' => 'nom_cp', 'mode' => 'manuel', 'journal' => '{}', 'absorbee_supprimee_le' => now(), 'annulee_at' => now()]);
+    $fiches = DB::table('companies')->whereNull('deleted_at')->count();
 
     Artisan::call('media:link-to-companies');
 
-    expect((int) DB::table('media')->where('id', $titre)->value('company_id'))->toBe($editeur)
-        ->and(DB::table('companies')->count())->toBe($fiches)
-        ->and(DB::table('companies')->where('id', $provisoire)->value('deleted_at'))->not->toBeNull()
-        ->and(DB::table('fusions_fiches')->where('garde_id', $editeur)->where('absorbee_id', $provisoire)->exists())->toBeTrue()
-        ->and(DB::table('contacts')->where('last_name', 'ZZFUSION')->value('company_id'))->toBe($editeur)
-        ->and(FichesProtegees::estProtegee($editeur))->toBeTrue()
-        // Le témoin : aucun éditeur ne porte son SIREN.
-        ->and((int) DB::table('media')->where('id', $seul)->value('company_id'))->toBe($provisoireSeul)
-        ->and(DB::table('companies')->where('id', $provisoireSeul)->value('deleted_at'))->toBeNull();
+    $flag = DB::table('duplicate_flags')->where('entity_a_id', $editeur)->where('entity_b_id', $provisoire)->first();
+    expect($flag)->not->toBeNull()
+        ->and($flag->motif)->toBe('presse_titre_editeur')
+        ->and($flag->fusion_auto)->toBeFalse()
+        ->and($flag->reviewed_at)->toBeNull()
+        // Rien n'est fusionné : les deux fiches vivent, le titre reste sur la sienne.
+        ->and(DB::table('companies')->whereNull('deleted_at')->count())->toBe($fiches)
+        ->and(DB::table('fusions_fiches')->where('absorbee_id', $provisoire)->exists())->toBeFalse()
+        ->and((int) DB::table('media')->where('id', $titre)->value('company_id'))->toBe($provisoire)
+        ->and(DB::table('duplicate_flags')->where('entity_b_id', $provisoire2)->exists())->toBeFalse()
+        ->and(DB::table('duplicate_flags')->whereIn('entity_b_id', [(int) DB::table('media')->where('id', $seul)->value('company_id')])->exists())->toBeFalse();
+
+    // Écartée par un humain (« ce ne sont pas des doublons ») : jamais redéposée ni rouverte.
+    DB::table('duplicate_flags')->where('id', $flag->id)->update(['reviewed_at' => now(), 'resolution' => 'keep_both']);
+    Artisan::call('media:link-to-companies');
+    expect(DB::table('duplicate_flags')->where('entity_b_id', $provisoire)->count())->toBe(1)
+        ->and(DB::table('duplicate_flags')->where('id', $flag->id)->value('resolution'))->toBe('keep_both');
+});
+
+test('une fiche de presse n est JAMAIS fusionnee automatiquement ; a la main, un journaliste homonyme d une personne hors presse de la fiche gardee bloque la fusion', function () {
+    $titre = prlMedia($this->espace, ['name' => 'ZZ Titre fusion']);
+    $j = (int) DB::table('journalists')->insertGetId(['workspace_id' => $this->espace, 'media_id' => $titre, 'first_name' => 'Zoe', 'last_name' => 'ZZJUMEAU',
+        'email' => 'zoe.jumeau@zz-b1.example.invalid', 'acces' => 'email_redaction', 'source' => 'wikidata', 'created_at' => now(), 'updated_at' => now()]);
+    Artisan::call('crm:presse:harmoniser');
+    $provisoire = (int) DB::table('media')->where('id', $titre)->value('company_id');
+    $editeur = prlFiche($this->espace, ['siren' => '900000661', 'denomination' => 'ZZ EDITEUR B1']);
+    // Homonyme HORS presse sur la fiche de l'éditeur, sans adresse : il recevrait celle du journaliste.
+    DB::table('contacts')->insert(['workspace_id' => $this->espace, 'company_id' => $editeur, 'first_name' => 'Zoe', 'last_name' => 'ZZJUMEAU',
+        'sources' => json_encode(['insee']), 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+    $fusion = app(FusionFiches::class);
+
+    expect(fn () => $fusion->fusionner($this->espace, $editeur, $provisoire, 'nom_cp_site', FusionFiches::MODE_AUTO))
+        ->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_verification_humaine']);
+    expect(fn () => $fusion->fusionner($this->espace, $editeur, $provisoire, 'presse_titre_editeur', FusionFiches::MODE_MANUEL))
+        ->toThrow(RefusFusion::class, RefusFusion::MESSAGES['journaliste_homonyme_sur_la_fiche_gardee']);
+    expect(DB::table('companies')->where('id', $provisoire)->value('deleted_at'))->toBeNull()
+        ->and(DB::table('contacts')->where('company_id', $editeur)->where('last_name', 'ZZJUMEAU')->value('email'))->toBeNull()
+        ->and(DB::table('journalists')->where('id', $j)->value('contact_id'))->not->toBeNull();
+
+    // Le témoin : sans homonyme, la fusion MANUELLE passe (règles de #260).
+    DB::table('contacts')->where('company_id', $editeur)->where('last_name', 'ZZJUMEAU')->update(['last_name' => 'ZZAUTRE']);
+    $fusion->fusionner($this->espace, $editeur, $provisoire, 'presse_titre_editeur', FusionFiches::MODE_MANUEL);
+    expect(DB::table('companies')->where('id', $provisoire)->value('deleted_at'))->not->toBeNull()
+        ->and((int) DB::table('contacts')->where('external_ref', 'journaliste:' . $j)->value('company_id'))->toBe($editeur);
+});
+
+test('constat 6 — l apercu d une audience compte comme son rafraichissement quand les seuls contacts joignables sont de la presse', function () {
+    $fiche = prlFiche($this->espace, ['email_generic' => 'contact@zz-c6.example.invalid', 'size_category' => 'PME']);
+    DB::table('contacts')->insert(['workspace_id' => $this->espace, 'company_id' => $fiche, 'first_name' => 'Ana', 'last_name' => 'ZZPRESSE',
+        'email' => 'ana@zz-c6.example.invalid', 'email_status' => 'valid', 'sources' => json_encode([QualificationPresse::SOURCE]),
+        'metadata' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+    $criteria = ['all' => [['field' => 'size_category', 'op' => 'in', 'value' => ['PME']]]];
+    $service = app(AudienceBuilderService::class);
+
+    $apercu = $service->preview($this->espace, $criteria);
+    $audience = EmailAudience::create(['workspace_id' => $this->espace, 'name' => 'ZZ c6', 'criteria' => $criteria, 'is_active' => true, 'auto_refresh' => false]);
+    $service->refresh($audience);
+    $membres = DB::table('audience_members')->where('audience_id', $audience->id)->count();
+
+    expect($apercu['contacts'])->toBe($membres)
+        ->and($membres)->toBe(1)
+        ->and(DB::table('audience_members')->where('audience_id', $audience->id)->whereNotNull('contact_id')->exists())->toBeFalse();
+});
+
+test('R-a — l export CSV des entreprises ne sort aucun contact de la presse tant que le segment est ferme ; le temoin, si', function () {
+    $fiche = prlFiche($this->espace, ['denomination' => 'ZZ FICHE EXPORT']);
+    foreach ([['ZZPRESSEEXPORT', [QualificationPresse::SOURCE]], ['ZZTEMOINEXPORT', ['insee']]] as [$nom, $sources]) {
+        DB::table('contacts')->insert(['workspace_id' => $this->espace, 'company_id' => $fiche, 'first_name' => 'Zed', 'last_name' => $nom,
+            'email' => strtolower($nom) . '@zz-export.example.invalid', 'sources' => json_encode($sources), 'metadata' => '{}',
+            'created_at' => now(), 'updated_at' => now()]);
+    }
+    $utilisateur = User::create(['id' => (string) Str::uuid(), 'email' => Str::uuid() . '@example.test', 'name' => 'Export',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->espace, 'first_login_completed_at' => now()]);
+    $this->seed(PermissionsAndRolesSeeder::class);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->espace);
+    $utilisateur->assignRole('owner');
+    $this->actingAs($utilisateur);
+
+    $reponse = $this->get('/api/v1/companies/export');
+    $reponse->assertOk();
+    ob_start();
+    $reponse->baseResponse->sendContent();
+    $csv = (string) ob_get_clean();
+
+    expect($csv)->toContain('ZZTEMOINEXPORT')->not->toContain('ZZPRESSEEXPORT');
 });
 
 test('N3 — une emission dont la chaine n a pas de fiche est rejetee et comptee ; une emission deja portee par sa chaine n y verse jamais ses coordonnees, meme chaine a la corbeille', function () {
@@ -265,7 +352,7 @@ test('N3 — une emission dont la chaine n a pas de fiche est rejetee et comptee
         ->and($f->email_generic)->toBeNull();
 });
 
-test('N4 — l import rejoint un titre de fiche provisoire meme quand la ligne porte un SIREN, pose ce SIREN sur le titre ; un SIREN contradictoire est rejete', function () {
+test('N4 — l import rejoint un titre de fiche provisoire meme quand la ligne porte un SIREN, sans JAMAIS poser ce SIREN (source declarative) ; un SIREN contradictoire est rejete', function () {
     $titre = prlMedia($this->espace, ['name' => 'ZZ Mensuel Fictif', 'media_type' => 'presse_mensuel', 'department_code' => '38']);
     Artisan::call('crm:presse:harmoniser');
     $provisoire = (int) DB::table('media')->where('id', $titre)->value('company_id');
@@ -284,7 +371,7 @@ test('N4 — l import rejoint un titre de fiche provisoire meme quand la ligne p
 
     expect(DB::table('companies')->count())->toBe($fiches)
         ->and(DB::table('companies')->where('siren', '900000551')->exists())->toBeFalse()
-        ->and(DB::table('media')->where('id', $titre)->value('siren'))->toBe('900000551')
+        ->and(DB::table('media')->where('id', $titre)->value('siren'))->toBeNull()
         ->and((int) DB::table('media')->where('id', $titre)->value('company_id'))->toBe($provisoire)
         ->and($sortie)->toContain('rapprochement_siren_contradictoire : 1');
 });

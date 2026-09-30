@@ -65,9 +65,10 @@ final class QualificationPresse
 
     /**
      * Ancre (`foreign_id`) d'une fiche créée par l'harmonisation pour un média
-     * qui n'en avait pas (`media:<id>`) : une fiche PROVISOIRE, qui cède la
-     * place à la fiche SIREN de l'éditeur dès qu'un rattachement certain la
-     * trouve (`media:link-to-companies`, par fusion journalisée).
+     * qui n'en avait pas (`media:<id>`) : une fiche PROVISOIRE. Quand le SIREN
+     * officiel d'un de ses titres désigne la fiche d'un éditeur, la paire est
+     * déposée dans « Doublons à vérifier » (`media:link-to-companies`) : un
+     * humain décide, rien n'est fusionné automatiquement.
      */
     public const PREFIXE_ANCRE_MEDIA = 'media:';
 

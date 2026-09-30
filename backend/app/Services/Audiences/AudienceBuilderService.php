@@ -77,10 +77,13 @@ class AudienceBuilderService
             ->count();
         $companyOnlyEmails = (clone $query)
             ->whereNotNull('email_generic')
+            // Même garde par contact que `refresh()` : une fiche dont les
+            // seuls contacts joignables sont de la presse compte par son
+            // adresse générique, comme elle entre au rafraîchissement.
             ->whereDoesntHave('contacts', fn ($q) => $q->whereIn(
                 'email_status',
                 TriageAutoService::CONTACTABLE_EMAIL_STATUSES,
-            ))
+            )->whereRaw(GardePresse::conditionContactsSql('contacts')))
             ->count();
 
         return [

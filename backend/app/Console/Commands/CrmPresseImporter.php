@@ -241,7 +241,7 @@ class CrmPresseImporter extends Command
                 if (trim($ligne) === '') {
                     continue;
                 }
-                if ($limite !== null && $this->bilan['lignes'] + $dansLePaquet >= $limite) {
+                if ($limite !== null && $limite <= $this->bilan['lignes'] + $dansLePaquet) {
                     break;
                 }
                 if ($dansLePaquet === 0) {

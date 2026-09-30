@@ -615,6 +615,7 @@ class CrmPresseImporter extends Command
             // d'un titre (`media.siren`, qui déclenche un rapprochement avec la
             // fiche de l'éditeur) ne vient que d'un registre officiel (CPPAP,
             // SPEL, agences, Sirene) — relecture de #264, constat 3.
+            'siren' => $l['siren'],
             'diffusion_zone' => $l['zone'] === null ? null : EtiquettesMedia::zoneStockee($l['zone']),
             'editorial_theme' => $l['theme'],
             'department_code' => $l['departement'],

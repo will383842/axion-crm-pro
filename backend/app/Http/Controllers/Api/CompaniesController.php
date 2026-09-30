@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
@@ -242,6 +243,9 @@ class CompaniesController extends ApiController
         // résoluble par l'analyse statique.
         $chargeContacts = static function (Relation $relation): void {
             EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
+            // Les personnes de la presse ne sortent que par l'export presse
+            // dédié, tant que le segment presse est fermé (`GardePresse`).
+            GardePresse::exclureContacts($relation->getQuery(), 'contacts');
         };
 
         // `getEloquentBuilder()` : `buildFilteredQuery()` rend un

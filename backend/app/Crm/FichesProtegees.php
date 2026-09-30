@@ -79,6 +79,16 @@ final class FichesProtegees
     public const TAG_GOFAB = 'src:scraping-gofab-2026';
 
     /**
+     * Médias et journalistes (source `presse-2026`, harmonisation des contacts
+     * du 2026-09-30) : `crm:presse:harmoniser` et `crm:presse:importer`. Ordre
+     * permanent de Will : ne JAMAIS rien purger. Même régime que les
+     * fédérations : ni purge, ni enrichissement automatique, ni reclassement,
+     * ni audience générale — la presse ne part en campagne que par son
+     * segment (`Segments::PRESSE`), FERMÉ tant que Will ne l'ouvre pas.
+     */
+    public const TAG_PRESSE = 'src:scraping-presse-2026';
+
+    /**
      * ⚠️ Chaque slug ajouté ici exige une NOUVELLE migration qui réinstalle le
      * déclencheur de la base (sa liste est figée) — `FichesProtegeesTest` lit la
      * fonction installée et rougit sinon.
@@ -89,6 +99,27 @@ final class FichesProtegees
         self::TAG_ORGANISATEURS,
         self::TAG_FEDERATIONS,
         self::TAG_GOFAB,
+        self::TAG_PRESSE,
+    ];
+
+    /**
+     * Les fiches protégées dont la NATURE n'est jamais devinée : organisateurs
+     * et fédérations, qui ne sont pas des sociétés commerciales même rattachés
+     * à une fiche INSEE (chantier C, 2026-10-01).
+     *
+     * Les participants GOFAB n'y sont PAS : leur source les décrit comme des
+     * « entreprises ordinaires » (migration `2026_09_30_000010`). Ils étaient
+     * pris dans la règle par accident, parce qu'elle lisait `TAGS` entier quand
+     * le tag GOFAB y a été ajouté — c'est l'une des deux raisons pour
+     * lesquelles `--inclure-protegees` ne posait pas leur nature (l'autre :
+     * ces fiches ne viennent pas de l'INSEE, et ne portent ni code NAF ni
+     * catégorie juridique ; `crm:referentiels:combler-trous` s'en charge).
+     *
+     * @var list<string>
+     */
+    public const TAGS_NATURE_NON_DEVINEE = [
+        self::TAG_ORGANISATEURS,
+        self::TAG_FEDERATIONS,
     ];
 
     /**
@@ -118,11 +149,14 @@ final class FichesProtegees
      * dans l'espace », et elle écartait TOUTES les lignes dès qu'une seule
      * fiche protégée existait (garde `ReclassementReferentielsTest`, S1).
      */
-    public static function conditionSql(string $colonneId = 'companies.id'): string
+    /**
+     * @param  list<string>|null  $tags  sous-ensemble de `TAGS` (défaut : tous)
+     */
+    public static function conditionSql(string $colonneId = 'companies.id', ?array $tags = null): string
     {
         $slugs = implode(', ', array_map(
             static fn (string $slug): string => "'" . str_replace("'", "''", $slug) . "'",
-            self::TAGS,
+            $tags ?? self::TAGS,
         ));
 
         return 'NOT EXISTS (SELECT 1 FROM company_tag fp_ct JOIN tags fp_t ON fp_t.id = fp_ct.tag_id'

@@ -48,6 +48,65 @@ final class Taxonomy
     ];
 
     /**
+     * TYPE DE MÉDIA, tel que l'étiquette `media-type:<valeur>` le dit — valeur
+     * d'étiquette => libellé. Dérivé de `media.media_type` par
+     * `MEDIA_TYPE_VERS_ETIQUETTE` (plusieurs types techniques peuvent donner la
+     * même étiquette : `presse_mensuel` et `presse_revue` sont des magazines).
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_TYPES_ETIQUETTE = [
+        'presse-quotidienne' => 'Presse quotidienne',
+        'presse-hebdomadaire' => 'Presse hebdomadaire',
+        'presse-magazine' => 'Presse magazine et revues',
+        'presse-journal' => 'Journal (périodicité inconnue)',
+        'presse-autre' => 'Publication de presse',
+        'radio' => 'Radio',
+        'tv' => 'Télévision',
+        'emission-tv' => 'Émission de télévision',
+        'agence' => 'Agence de presse',
+        'web' => 'Presse en ligne',
+        'blog' => 'Blog',
+        'production' => 'Production audiovisuelle',
+    ];
+
+    /**
+     * `media.media_type` (CHECK `media_media_type_check`) => valeur d'étiquette.
+     * Chaque type technique a sa ligne (garde `PresseHarmonisationTest`).
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_TYPE_VERS_ETIQUETTE = [
+        'presse_quotidien' => 'presse-quotidienne',
+        'presse_hebdo' => 'presse-hebdomadaire',
+        'presse_mensuel' => 'presse-magazine',
+        'presse_revue' => 'presse-magazine',
+        'presse_journal' => 'presse-journal',
+        'presse_autre' => 'presse-autre',
+        'radio' => 'radio',
+        'tv' => 'tv',
+        'tv_emission' => 'emission-tv',
+        'agence_presse' => 'agence',
+        'portail_web' => 'web',
+        'blog' => 'blog',
+        'production_audiovisuelle' => 'production',
+    ];
+
+    /**
+     * ZONE DE DIFFUSION d'un média — `media-zone:<valeur>`. `inconnue` est une
+     * valeur à part entière : ne pas savoir n'est pas « local ».
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_ZONES = [
+        'national' => 'Nationale',
+        'regional' => 'Régionale',
+        'departemental' => 'Départementale',
+        'local' => 'Locale',
+        'inconnue' => 'Inconnue',
+    ];
+
+    /**
      * Valeurs de `BUSINESS_RELATION_TYPES` qu'AUCUN événement du canal
      * site → CRM ne peut produire : elles n'existent que par la saisie manuelle
      * en console.
@@ -78,16 +137,30 @@ final class Taxonomy
      * Ordre de priorité pour l'« upgrade » automatique du type : une fiche
      * porte TOUJOURS le type le plus engageant qu'elle a atteint.
      *
+     * UN SEUL ordre pour TOUS les automatismes (canal site, import des
+     * relations, presse), appliqué par `App\Crm\Relations\PromotionRelation`
+     * (2026-10-01, relecture de #265). Deux règles le façonnent :
+     *
+     *  - les types HORS PROSPECTION (`RelationsProspection::HORS_PROSPECTION`)
+     *    sont TOUS au-dessus des types prospectables : aucune promotion ne fait
+     *    revenir en prospection une fiche qui en était exclue (un fournisseur
+     *    n'est jamais « promu » en `conference`) ;
+     *  - `prospect` n'est plus au 2ᵉ rang : c'est la valeur par DÉFAUT des
+     *    4,3 M de fiches collectées. Au 2ᵉ rang, un formulaire du site
+     *    rétrogradait un partenaire, une presse ou un investisseur en
+     *    `prospect`. Il reste au-dessus de `newsletter` : une inscription à la
+     *    lettre ne fait pas perdre un statut de prospect.
+     *
      * @var list<string>
      */
     public const BUSINESS_RELATION_PRIORITY = [
         'client',
-        'prospect',
         'investisseur',
         'partenaire',
         'presse_media',
-        'conference',
         'fournisseur',
+        'conference',
+        'prospect',
         'newsletter',
     ];
 
@@ -408,6 +481,12 @@ final class Taxonomy
         'taille-adherents' => 'size',
         'pertinence' => 'custom',
         'contactabilite' => 'custom',
+        // Presse (harmonisation des contacts, 2026-09-30) : étiquettes DÉRIVÉES
+        // des lignes `media` rattachées à la fiche (`App\Crm\Presse\EtiquettesMedia`),
+        // posées et retirées par la même synchro automatique.
+        'media-type' => 'custom',
+        'media-zone' => 'geo',
+        'media-theme' => 'custom',
     ];
 
     /**

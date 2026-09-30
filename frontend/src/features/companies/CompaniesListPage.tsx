@@ -22,6 +22,7 @@ import {
   CONFIANCE_EMAIL_OPTIONS,
   COUNTRY_OPTIONS,
   ELIGIBILITE_OPTIONS,
+  JOIGNABILITE_OPTIONS,
   NATURE_OPTIONS,
   SECTEUR_OPTIONS,
   TAILLE_OPTIONS,
@@ -95,6 +96,7 @@ interface Filter {
   best_email_confidence: string;
   eligible_campagne: string;
   entity_nature: string;
+  joignabilite: string;
   tag: string;
   cree_apres: string;
   cree_avant: string;
@@ -115,6 +117,7 @@ const EMPTY_FILTER: Filter = {
   best_email_confidence: "",
   eligible_campagne: "",
   entity_nature: "",
+  joignabilite: "",
   tag: "",
   cree_apres: "",
   cree_avant: "",
@@ -230,6 +233,7 @@ export function CompaniesListPage() {
       ...(filter.cree_apres ? { "filter[cree_apres]": filter.cree_apres } : {}),
       ...(filter.cree_avant ? { "filter[cree_avant]": filter.cree_avant } : {}),
       ...(filter.entity_nature ? { "filter[entity_nature]": filter.entity_nature } : {}),
+      ...(filter.joignabilite ? { "filter[joignabilite]": filter.joignabilite } : {}),
     });
   }
 
@@ -288,6 +292,7 @@ export function CompaniesListPage() {
         ...(f.cree_apres ? { "filter[cree_apres]": f.cree_apres } : {}),
         ...(f.cree_avant ? { "filter[cree_avant]": f.cree_avant } : {}),
         ...(f.entity_nature ? { "filter[entity_nature]": f.entity_nature } : {}),
+        ...(f.joignabilite ? { "filter[joignabilite]": f.joignabilite } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -364,7 +369,8 @@ export function CompaniesListPage() {
     filter.tag ||
     filter.cree_apres ||
     filter.cree_avant ||
-    filter.entity_nature;
+    filter.entity_nature ||
+    filter.joignabilite;
 
   const activeFilterCount = [
     filter.search,
@@ -384,6 +390,7 @@ export function CompaniesListPage() {
     filter.cree_apres,
     filter.cree_avant,
     filter.entity_nature,
+    filter.joignabilite,
   ].filter(Boolean).length;
 
   return (
@@ -533,6 +540,12 @@ export function CompaniesListPage() {
               onChange={(v) => setFilterAndReset({ entity_nature: v })}
               options={NATURE_OPTIONS}
               ariaLabel="Filtre nature d'entité"
+            />
+            <FilterSelect
+              value={filter.joignabilite}
+              onChange={(v) => setFilterAndReset({ joignabilite: v })}
+              options={JOIGNABILITE_OPTIONS}
+              ariaLabel="Filtre joignabilité"
             />
             <FilterSelect
               value={filter.quality}

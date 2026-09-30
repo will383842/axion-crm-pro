@@ -15,7 +15,20 @@ interface JournalistItem {
   opt_out: boolean;
 }
 
+/**
+ * La fiche CRM qui porte ce média depuis l'harmonisation de la presse
+ * (`crm:presse:harmoniser`, 2026-09-30) : nature « média », relation « presse
+ * et médias », journalistes devenus ses contacts. `GET /media/{id}` la charge
+ * déjà (`company`) ; absente tant que le média n'est pas harmonisé.
+ */
+interface FicheHarmonisee {
+  id: number;
+  denomination: string | null;
+}
+
 interface MediaDetail extends MediaItem {
+  company_id?: number | null;
+  company?: FicheHarmonisee | null;
   siren: string | null;
   region_code: string | null;
   postcode: string | null;
@@ -122,6 +135,18 @@ export function MediaDetailPage() {
           </span>
         ) : null}
         {data.enrich_status ? <span className="text-xs">enrichissement : {data.enrich_status}</span> : null}
+        {data.company ? (
+          <span className="text-xs">
+            Fiche CRM :{" "}
+            <Link
+              to="/companies/$companyId"
+              params={{ companyId: String(data.company.id) }}
+              className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {data.company.denomination ?? "voir la fiche"}
+            </Link>
+          </span>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

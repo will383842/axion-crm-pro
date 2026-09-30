@@ -2,6 +2,7 @@
 
 namespace App\Services\Rgpd;
 
+use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
@@ -34,6 +35,9 @@ class GdprErasureService
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
         return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
+            // Effacement art. 17 : les contacts supprimés ici emportent leur
+            // ligne `journalists` liée (déclencheur, harmonisation presse).
+            LienJournalisteContact::marquerEffacement();
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
 
@@ -88,7 +92,12 @@ class GdprErasureService
 
             // Journalistes (données personnelles B2B) : anonymisation + opt-out + soft-delete
             // plutôt que suppression dure, pour conserver la traçabilité de l'effacement.
-            $deleted['journalists'] = DB::table('journalists')
+            //
+            // Harmonisation presse (relecture sécurité #264) : le CONTACT lié à
+            // chacun de ces journalistes (`journalists.contact_id`) est supprimé
+            // lui aussi — même sans adresse, il porte le nom et la fonction de la
+            // personne — et inscrit au registre des retraits.
+            $journalistesEffaces = array_values(array_map('intval', DB::table('journalists')
                 ->whereNull('deleted_at')
                 ->where(function ($q) use ($email, $phone) {
                     $q->where('email', $email);
@@ -96,6 +105,10 @@ class GdprErasureService
                         $q->orWhere('phone', $phone);
                     }
                 })
+                ->pluck('id')->all()));
+            $deleted['contacts'] += LienJournalisteContact::effacerContactsDe($journalistesEffaces);
+            $deleted['journalists'] = DB::table('journalists')
+                ->whereIn('id', $journalistesEffaces)
                 ->update([
                     'email' => null,
                     'phone' => null,

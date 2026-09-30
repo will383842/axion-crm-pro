@@ -2,6 +2,7 @@
 
 namespace App\Services\Audiences;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Crm\Listes\ListesManuelles;
 use App\Jobs\RefreshAudienceChunkJob;
@@ -25,11 +26,22 @@ class AudienceBuilderService
      * désormais renseignée sur toutes les fiches (les fiches INSEE portent
      * `entreprise`), indexée, et ses valeurs sont celles de
      * `Taxonomy::ENTITY_NATURES`.
+     *
+     * Les types, zones et thèmes de média (harmonisation de la presse,
+     * 2026-09-30) se visent par leurs étiquettes (`tags` / `contains_any` :
+     * `media-type:radio`, `media-zone:regional`…) ; la relation, par
+     * `relation_type` (ajouté par le chantier B).
      */
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
         'size_category', 'sector_main', 'entity_nature', 'priority', 'quality_score',
         'tags', 'has_email', 'enriched_at', 'best_email_confidence',
+        // 2026-10-01 — statut de la relation (chantier B : exclure les clients,
+        // partenaires… d'une prospection, cf. `RelationsProspection`), pays
+        // (chantier C : « étranger » = `country_code` ≠ FR, colonne NOT NULL)
+        // et joignabilité calculée (chantier D, `Joignabilite`). Colonnes
+        // ordinaires de `companies` : mêmes opérateurs, même sémantique NULL.
+        'relation_type', 'lifecycle_stage', 'country_code', 'joignabilite',
         // 2026-09-30 — membres d'une LISTE MANUELLE (`in` / `not_in`, valeur =
         // identifiants de listes) : « membres de la liste X », « sauf liste Y ».
         self::CHAMP_LISTE_MANUELLE,
@@ -83,13 +95,17 @@ class AudienceBuilderService
         $contacts = DB::table('contacts')
             ->whereIn('company_id', $contactableCompanyIds)
             ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
             ->count();
         $companyOnlyEmails = (clone $query)
             ->whereNotNull('email_generic')
+            // Même garde par contact que `refresh()` : une fiche dont les
+            // seuls contacts joignables sont de la presse compte par son
+            // adresse générique, comme elle entre au rafraîchissement.
             ->whereDoesntHave('contacts', fn ($q) => $q->whereIn(
                 'email_status',
                 TriageAutoService::CONTACTABLE_EMAIL_STATUSES,
-            ))
+            )->whereRaw(GardePresse::conditionContactsSql('contacts')))
             ->count();
 
         return [
@@ -134,6 +150,7 @@ class AudienceBuilderService
             $contactsByCompany = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
                 ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                 ->select('id', 'company_id')
                 ->get()
                 ->groupBy('company_id');
@@ -254,6 +271,12 @@ class AudienceBuilderService
      */
     public function evaluateForCompany(Company $company): array
     {
+        // La presse harmonisée n'entre dans aucune audience tant que Will n'a
+        // pas ouvert son segment (`GardePresse`), quel que soit le chemin.
+        if (! GardePresse::admissible((int) $company->id)) {
+            return [];
+        }
+
         $audiences = EmailAudience::query()
             ->where('workspace_id', $company->workspace_id)
             ->where('is_active', true)
@@ -447,6 +470,11 @@ class AudienceBuilderService
                 $q->orWhereIn('companies.id', ListesManuelles::organisationsMembres($exigees));
             });
         }
+        // Et la presse harmonisée, par SA garde (`GardePresse`), HORS de la
+        // porte ci-dessus : être membre d'une liste manuelle exigée lève la
+        // protection générale, JAMAIS celle de la presse (fermée tant que Will
+        // n'a pas ouvert `Segments::PRESSE`).
+        GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {

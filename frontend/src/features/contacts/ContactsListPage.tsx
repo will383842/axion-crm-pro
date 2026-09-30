@@ -16,7 +16,8 @@ import {
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
-import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
+import { COUNTRY_OPTIONS, JOIGNABILITE_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
+import { JOIGNABILITES } from '@/lib/referentiels.generated';
 import { AjouterAUneListe } from '@/features/listes/AjouterAUneListe';
 
 interface Contact {
@@ -26,6 +27,8 @@ interface Contact {
   role?: string | null;
   email?: string | null;
   email_status?: string | null;
+  // Chantier D — état calculé (`crm:joignabilite:calculer`), null tant qu'il ne l'est pas.
+  joignabilite?: string | null;
   email_score?: number | null;
   phone?: string | null;
   linkedin_url?: string | null;
@@ -76,6 +79,21 @@ function translateEmailStatus(status: string): string {
   return map[status.toLowerCase()] ?? status;
 }
 
+const JOIGNABILITE_TONE: Record<string, StatusTone> = {
+  email_valide: 'success',
+  email_partage: 'warning',
+  email_non_verifie: 'neutral',
+  email_personnel: 'warning',
+  email_invalide: 'danger',
+  email_interdit: 'danger',
+  sans_email_avec_telephone: 'info',
+  sans_contact: 'neutral',
+};
+
+function libelleJoignabilite(code: string): string {
+  return JOIGNABILITES.find((j) => j.code === code)?.libelle ?? code;
+}
+
 const SELECT_CLS =
   'h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
 
@@ -83,6 +101,7 @@ export function ContactsListPage() {
   const [emailStatus, setEmailStatus] = useState('');
   const [country, setCountry] = useState('');
   const [prospection, setProspection] = useState('');
+  const [joignabilite, setJoignabilite] = useState('');
   const [search, setSearch] = useState('');
   // G42-010 — anti-rebond de 300 ms AVANT la requete.
   //
@@ -98,12 +117,13 @@ export function ContactsListPage() {
   const [cochees, setCochees] = useState<Set<number>>(new Set());
 
   const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
-    queryKey: ['contacts', emailStatus, country, prospection, rechercheDifferee],
+    queryKey: ['contacts', emailStatus, country, prospection, joignabilite, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '50' });
       if (emailStatus) params.set('filter[email_status]', emailStatus);
       if (country) params.set('filter[country_code]', country);
       if (prospection) params.set('filter[prospection_status]', prospection);
+      if (joignabilite) params.set('filter[joignabilite]', joignabilite);
       if (rechercheDifferee) params.set('filter[last_name]', rechercheDifferee);
       return (await api.get<ContactsResponse>(`/contacts?${params}`)).data;
     },
@@ -116,7 +136,7 @@ export function ContactsListPage() {
 
   const total = data?.meta.total;
   const rows = data?.data ?? [];
-  const hasFilter = Boolean(emailStatus || country || prospection || search);
+  const hasFilter = Boolean(emailStatus || country || prospection || joignabilite || search);
 
   return (
     <div className="px-6 py-6">
@@ -178,6 +198,19 @@ export function ContactsListPage() {
               className={SELECT_CLS}
             >
               {PROSPECTION_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={joignabilite}
+              onChange={(e) => setJoignabilite(e.target.value)}
+              aria-label="Filtre joignabilité"
+              className={SELECT_CLS}
+            >
+              {JOIGNABILITE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -266,6 +299,13 @@ export function ContactsListPage() {
                       {c.company?.denomination ? (
                         <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                           {c.company.denomination}
+                        </div>
+                      ) : null}
+                      {c.joignabilite ? (
+                        <div className="mt-1">
+                          <StatusPill tone={JOIGNABILITE_TONE[c.joignabilite] ?? 'neutral'}>
+                            {libelleJoignabilite(c.joignabilite)}
+                          </StatusPill>
                         </div>
                       ) : null}
                     </div>

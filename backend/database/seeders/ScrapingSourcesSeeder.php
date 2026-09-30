@@ -157,6 +157,13 @@ class ScrapingSourcesSeeder extends Seeder
             'dedup_key_pattern' => 'siren',
             'legal_note' => 'Annuaire des participants (visiteurs et exposants) de la plateforme de rendez-vous d\'affaires du salon GOFAB 2026, organisé par la CCI Lyon Métropole Saint-Étienne Roanne : coordonnées professionnelles communiquées par les participants pour être contactés entre professionnels du salon. Identité des entreprises résolue par SIREN via l\'API publique recherche-entreprises (data.gouv). Finalité : rencontres d\'affaires et offres d\'Axion-IA. Intérêt légitime B2B ; opposition respectée. Rattachement backfill-only : aucune valeur existante n\'est remplacée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience par défaut.',
         ],
+        'presse-2026' => [
+            'name' => 'Médias et journalistes (harmonisation presse 2026)',
+            'kind' => 'import',
+            'ttl_days' => 365,
+            'dedup_key_pattern' => 'siren',
+            'legal_note' => 'Base médias du CRM (registres publics CPPAP, services de presse en ligne et agences agréées de data.culture.gouv.fr, catégories ARCOM, Sirene, Wikidata) et listes de diffusion presse importées : coordonnées de rédaction et coordonnées professionnelles de journalistes publiées pour être contactées dans le cadre de leur fonction. Finalité : relations presse d\'Axion-IA. Intérêt légitime B2B ; information art. 14 au premier message ; opposition respectée ; une personne retirée ne revient jamais (registre contacts_retires). Porte d\'accès des journalistes (journalists.acces) respectée. Fiches protégées (FichesProtegees) : ni purge, ni enrichissement automatique, ni audience générale ; segment presse fermé tant que Will ne l\'ouvre pas.',
+        ],
         'gplaces' => [
             'name' => 'Google Places API',
             'kind' => 'api',

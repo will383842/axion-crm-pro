@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
@@ -361,6 +362,10 @@ class CrmCampagneDestinataires extends Command
             ->where('company_id', $org->id)
             ->whereNull('deleted_at')
             ->whereNotNull('email')
+            // Les journalistes ne partent JAMAIS par un autre segment que le
+            // leur, fermé tant que Will ne l'ouvre pas — même quand la fiche
+            // porte aussi le tag de ce segment-ci (`GardePresse`).
+            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
             ->orderBy('id')
             ->get(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at']);
 

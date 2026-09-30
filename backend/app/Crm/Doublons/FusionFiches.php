@@ -2,6 +2,7 @@
 
 namespace App\Crm\Doublons;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Services\Audit\AuditHashChain;
 use App\Support\TotalListe;
@@ -407,6 +408,11 @@ final class FusionFiches
         if ($flagId !== null) {
             $this->verrouillerPaire($ws, $flagId, $gardeId, $absorbeeId);
         }
+        // Harmonisation de la presse (relecture de #264) : une fiche de
+        // presse n'est JAMAIS fusionnée sans un humain.
+        if ($mode === self::MODE_AUTO && ($this->estFichePresse($ws, $gardeId) || $this->estFichePresse($ws, $absorbeeId))) {
+            throw new RefusFusion('presse_verification_humaine');
+        }
         if ($mode === self::MODE_AUTO && ! Rapprochement::preuveCertaine(
             $motif,
             self::pourPreuve($garde),
@@ -657,7 +663,9 @@ final class FusionFiches
      */
     private function jumeaux(string $ws, int $gardeId, int $absorbeeId): array
     {
-        $cols = ['ct_abs.deleted_at AS abs_supprime', 'ct_gar.deleted_at AS gar_supprime'];
+        $cols = ['ct_abs.deleted_at AS abs_supprime', 'ct_gar.deleted_at AS gar_supprime',
+            GardePresse::estContactPresseSql('ct_abs') . ' AS abs_presse',
+            GardePresse::estContactPresseSql('ct_gar') . ' AS gar_presse'];
         foreach (self::CHAMPS_PERSONNE as $c) {
             $cols[] = "ct_abs.{$c} AS abs_{$c}";
             $cols[] = "ct_gar.{$c} AS gar_{$c}";
@@ -689,6 +697,14 @@ final class FusionFiches
             // disparaîtrait de la vue. À régler à la main.
             if ($l->gar_supprime !== null) {
                 throw new RefusFusion('homonyme_supprime_sur_la_fiche_gardee');
+            }
+            // Un JOURNALISTE (contact presse) de la fiche absorbée, homonyme
+            // d'une personne hors presse de la fiche gardée : ses coordonnées
+            // y seraient recopiées sans la marque presse, et partiraient par un
+            // autre segment. Refusé : un humain règle l'homonyme d'abord
+            // (relecture sécurité de #264, B1).
+            if ((bool) $l->abs_presse && ! (bool) $l->gar_presse) {
+                throw new RefusFusion('journaliste_homonyme_sur_la_fiche_gardee');
             }
             $abs = self::texte($l->abs_email);
             $gar = self::texte($l->gar_email);
@@ -896,6 +912,14 @@ final class FusionFiches
     }
 
     // ── Outils ──────────────────────────────────────────────────────────────
+
+    /** La fiche porte-t-elle le tag de provenance de la presse ? (corbeille comprise) */
+    private function estFichePresse(string $ws, int $companyId): bool
+    {
+        return DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+            ->where('company_tag.workspace_id', $ws)->where('company_tag.company_id', $companyId)
+            ->where('tags.slug', FichesProtegees::TAG_PRESSE)->exists();
+    }
 
     private function estProtegee(string $ws, int $companyId): bool
     {

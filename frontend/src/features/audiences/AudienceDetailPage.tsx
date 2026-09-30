@@ -418,7 +418,7 @@ function DestinatairesTab({ audience }: { audience: EmailAudience }) {
   });
 
   const enregistrement = useMutation({
-    mutationFn: async () => (await api.put(`/audiences/${audience.id}`, reglageVersApi(reglage))).data as unknown,
+    mutationFn: async () => (await api.put<unknown>(`/audiences/${audience.id}`, reglageVersApi(reglage))).data,
     onSuccess: () => {
       toast.success('Réglage des destinataires enregistré');
       void qc.invalidateQueries({ queryKey: ['audience', audience.id] });

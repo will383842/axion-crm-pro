@@ -38,7 +38,7 @@ export function ListesManuellesPage() {
   });
 
   const restauration = useMutation({
-    mutationFn: async (id: number) => (await api.post(`/listes-manuelles/${id}/restaurer`)).data as unknown,
+    mutationFn: async (id: number) => (await api.post<unknown>(`/listes-manuelles/${id}/restaurer`)).data,
     onSuccess: () => {
       toast.success('Liste sortie de la corbeille.');
       void qc.invalidateQueries({ queryKey: ['listes-manuelles'] });

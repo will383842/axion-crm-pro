@@ -137,8 +137,11 @@ describe('listes manuelles', () => {
       ...(aBlanc ? {} : { ajout: { ajoutes: 2, reactives: 0, deja_presents: 0, introuvables: 0 } }),
     });
     const importHandler = http.post(apiUrl('/listes-manuelles/7/import'), async ({ request }) => {
-      const corps = await request.formData();
-      const aBlanc = corps.get('a_blanc') === '1';
+      // Corps multipart lu en TEXTE : l'analyse de `formData()` dépend de
+      // l'environnement ; le champ `a_blanc` y est écrit en clair.
+      const corps = await request.text();
+      const aBlanc = /name="a_blanc"\r?\n\r?\n1/.test(corps);
+      expect(corps).toContain('name="fichier"');
       envois.push(aBlanc ? 'a_blanc' : 'reel');
       return HttpResponse.json({ data: bilan(aBlanc) });
     });

@@ -62,7 +62,7 @@ export function ListeManuelleDetailPage() {
 
   const renommage = useMutation({
     mutationFn: async (valeurs: { nom: string; description: string }) =>
-      (await api.put(`/listes-manuelles/${id}`, { nom: valeurs.nom.trim(), description: valeurs.description.trim() || null })).data as unknown,
+      (await api.put<unknown>(`/listes-manuelles/${id}`, { nom: valeurs.nom.trim(), description: valeurs.description.trim() || null })).data,
     onSuccess: () => {
       toast.success('Liste enregistrée.');
       setEdition(null);
@@ -88,7 +88,7 @@ export function ListeManuelleDetailPage() {
   });
 
   const corbeille = useMutation({
-    mutationFn: async () => (await api.delete(`/listes-manuelles/${id}`)).data as unknown,
+    mutationFn: async () => (await api.delete<unknown>(`/listes-manuelles/${id}`)).data,
     onSuccess: () => {
       toast.success('Liste mise à la corbeille (elle peut en sortir).');
       void qc.invalidateQueries({ queryKey: ['listes-manuelles'] });
@@ -337,6 +337,9 @@ function ImportFichier({ listeId, onImporte }: { listeId: number; onImporte: () 
     onError: (e) => toast.error(messageServeur(e) ?? 'Import impossible.'),
   });
 
+  const importable = fichier !== null && bilan !== null && bilan.a_blanc && bilan.rapprochees > 0;
+  const importEnCours = envoi.isPending;
+
   return (
     <Card padding="md" className="mb-6">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -363,7 +366,7 @@ function ImportFichier({ listeId, onImporte }: { listeId: number; onImporte: () 
         </Button>
         <Button
           size="sm"
-          disabled={fichier === null || bilan === null || !bilan.a_blanc || bilan.rapprochees === 0 || envoi.isPending}
+          disabled={importEnCours || !importable}
           loading={envoi.isPending}
           onClick={() => envoi.mutate(false)}
         >

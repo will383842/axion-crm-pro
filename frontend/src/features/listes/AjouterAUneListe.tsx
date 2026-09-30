@@ -50,6 +50,7 @@ export function AjouterAUneListe({
 
   const nbFiches = companyIds.length + contactIds.length;
   const pret = nbFiches > 0 && (choix === NOUVELLE ? nom.trim() !== '' : choix !== '');
+  const enCours = ajout.isPending;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -82,7 +83,7 @@ export function AjouterAUneListe({
         size="sm"
         variant="secondary"
         iconLeft={<ListPlus className="h-3.5 w-3.5" />}
-        disabled={!pret || ajout.isPending}
+        disabled={enCours || !pret}
         loading={ajout.isPending}
         onClick={() => ajout.mutate()}
       >

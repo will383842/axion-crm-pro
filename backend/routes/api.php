@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\FederationsController;
 use App\Http\Controllers\Api\GlobalSearchController;
 use App\Http\Controllers\Api\JournalistAttachmentController;
 use App\Http\Controllers\Api\JournalistsController;
+use App\Http\Controllers\Api\ListesManuellesController;
 use App\Http\Controllers\Api\LlmUsageController;
 use App\Http\Controllers\Api\LlmUseCasesController;
 use App\Http\Controllers\Api\MediaController;
@@ -358,6 +359,35 @@ Route::prefix('v1')->group(function () {
         Route::post('/audiences/{audience}/refresh', [AudiencesController::class, 'refresh'])
             ->middleware('permission:companies.update');
         Route::get('/audiences/{audience}/members', [AudiencesController::class, 'members']);
+        // 2026-09-30 — à qui l'audience écrirait (aperçu chiffré, rien n'est envoyé).
+        Route::get('/audiences/{audience}/destinataires', [AudiencesController::class, 'destinataires']);
+        Route::post('/audiences/apercu-destinataires', [AudiencesController::class, 'apercuDestinataires'])
+            ->middleware('permission:companies.update');
+
+        // Listes manuelles (2026-09-30) : des fiches choisies à la main, sous un
+        // nom. Lecture : droits des fiches ; écriture : `companies.update` ;
+        // corbeille : `companies.delete`. Rien n'est jamais supprimé.
+        Route::get('/listes-manuelles', [ListesManuellesController::class, 'index'])
+            ->middleware('permission:companies.view');
+        Route::post('/listes-manuelles', [ListesManuellesController::class, 'store'])
+            ->middleware('permission:companies.update');
+        Route::get('/listes-manuelles/{liste}', [ListesManuellesController::class, 'show'])
+            ->middleware('permission:companies.view');
+        Route::put('/listes-manuelles/{liste}', [ListesManuellesController::class, 'update'])
+            ->middleware('permission:companies.update');
+        Route::delete('/listes-manuelles/{liste}', [ListesManuellesController::class, 'destroy'])
+            ->middleware('permission:companies.delete');
+        Route::post('/listes-manuelles/{liste}/restaurer', [ListesManuellesController::class, 'restaurer'])
+            ->withTrashed()
+            ->middleware('permission:companies.delete');
+        Route::get('/listes-manuelles/{liste}/membres', [ListesManuellesController::class, 'membres'])
+            ->middleware('permission:companies.view');
+        Route::post('/listes-manuelles/{liste}/membres', [ListesManuellesController::class, 'ajouterMembres'])
+            ->middleware('permission:companies.update');
+        Route::post('/listes-manuelles/{liste}/membres/retirer', [ListesManuellesController::class, 'retirerMembres'])
+            ->middleware('permission:companies.update');
+        Route::post('/listes-manuelles/{liste}/import', [ListesManuellesController::class, 'importer'])
+            ->middleware('permission:companies.update');
 
         Route::get('/search', [GlobalSearchController::class, 'index']);
         Route::get('/notifications', [NotificationsController::class, 'index']);

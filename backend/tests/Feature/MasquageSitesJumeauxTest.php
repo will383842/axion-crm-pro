@@ -291,6 +291,20 @@ beforeEach(function () {
         'workspace_id' => $this->workspace->id,
     ]);
 
+    // 2026-09-30 : une LISTE MANUELLE qui porte la fiche ET la personne, pour
+    // que le balayage visite `/listes-manuelles/{liste}` et ses membres (qui
+    // rendent l'adresse générique et celle de la personne).
+    $this->listeId = (int) DB::table('listes_manuelles')->insertGetId([
+        'workspace_id' => $this->workspace->id,
+        'nom' => 'ZZ LISTE',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('listes_manuelles_membres')->insert([
+        ['workspace_id' => $this->workspace->id, 'liste_id' => $this->listeId, 'company_id' => $this->companyId, 'contact_id' => null, 'origine' => 'coche'],
+        ['workspace_id' => $this->workspace->id, 'liste_id' => $this->listeId, 'company_id' => null, 'contact_id' => $this->contactId, 'origine' => 'coche'],
+    ]);
+
     // Activité ORPHELINE : la file d'arbitrage. La coordonnée n'est pas dans
     // une colonne, elle est dans le JSON `payload -> pending_match`.
     DB::table('activities')->insert([
@@ -569,6 +583,8 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         // entreprise — elle rend l'e-mail générique, le téléphone ET les
         // contacts, donc le balayage doit la visiter.
         'federation' => $this->companyId,
+        // 2026-09-30 : la liste manuelle et ses membres.
+        'liste' => $this->listeId,
     ];
 
     $cibles = [];

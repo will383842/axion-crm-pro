@@ -40,6 +40,7 @@ import {
   CalendarDays,
   Landmark,
   CopyCheck,
+  ListChecks,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -103,6 +104,8 @@ const SECTIONS_APRES_CONTACTS: NavSection[] = [
     title: 'Pilotage',
     items: [
       { to: '/audiences', label: 'Audiences (segments)', icon: <Users2 className="h-4 w-4" /> },
+      // 2026-09-30 — des fiches choisies à la main, critère d'audience.
+      { to: '/listes', label: 'Listes manuelles', icon: <ListChecks className="h-4 w-4" /> },
       { to: '/admin/observability', label: 'Observabilité', icon: <Activity className="h-4 w-4" /> },
     ],
   },

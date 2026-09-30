@@ -74,6 +74,8 @@ const LABELS: Record<string, string> = {
   '/evenements': 'Événements',
   '/federations': 'Fédérations',
   '/doublons': 'Doublons à vérifier',
+  // 2026-09-30 — listes manuelles (fiches choisies à la main).
+  '/listes': 'Listes manuelles',
   '/console': 'Console CRM',
   '/console/contacts': 'Contacts',
   '/console/vivier': 'Vivier candidats',

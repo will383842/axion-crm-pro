@@ -18,6 +18,7 @@ import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, JOIGNABILITE_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { JOIGNABILITES } from '@/lib/referentiels.generated';
+import { AjouterAUneListe } from '@/features/listes/AjouterAUneListe';
 
 interface Contact {
   id: number;
@@ -111,6 +112,9 @@ export function ContactsListPage() {
   // ⚠️ Le champ garde `search` (valeur IMMEDIATE) pour son `value` : la
   // lettre s'affiche sans attendre. Seule la requete patiente.
   const rechercheDifferee = useAntiRebond(search);
+  // 2026-09-30 — les personnes cochées vont dans une liste manuelle
+  // (« seulement certains contacts »). Identifiants VISIBLES seulement.
+  const [cochees, setCochees] = useState<Set<number>>(new Set());
 
   const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
     queryKey: ['contacts', emailStatus, country, prospection, joignabilite, rechercheDifferee],
@@ -230,6 +234,12 @@ export function ContactsListPage() {
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
+          {cochees.size > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-brand-50/60 px-4 py-2 text-sm dark:border-slate-800 dark:bg-slate-800/60">
+              <span className="font-medium text-slate-700 dark:text-slate-200">{cochees.size} personne(s) cochée(s)</span>
+              <AjouterAUneListe contactIds={[...cochees]} onAjoute={() => setCochees(new Set())} />
+            </div>
+          ) : null}
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1062 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
@@ -268,6 +278,19 @@ export function ContactsListPage() {
                   style={{ gridTemplateColumns: GRID }}
                 >
                   <div className="flex min-w-0 items-center gap-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Cocher ${name}`}
+                      checked={cochees.has(c.id)}
+                      onChange={() =>
+                        setCochees((actuelles) => {
+                          const suivantes = new Set(actuelles);
+                          if (suivantes.has(c.id)) suivantes.delete(c.id);
+                          else suivantes.add(c.id);
+                          return suivantes;
+                        })
+                      }
+                    />
                     <Avatar name={name} size="sm" />
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-900 dark:text-white">

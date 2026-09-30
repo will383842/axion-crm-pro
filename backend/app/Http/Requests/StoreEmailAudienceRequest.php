@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Crm\Campagnes\ReglageDestinataires;
 use App\Services\Audiences\AudienceBuilderService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -73,6 +74,23 @@ class StoreEmailAudienceRequest extends FormRequest
 
             'is_active' => ['sometimes', 'boolean'],
             'auto_refresh' => ['sometimes', 'boolean'],
+        ] + self::reglesDestinataires();
+    }
+
+    /**
+     * Le réglage « à qui écrire dans chaque organisation » (2026-09-30),
+     * partagé par la création et la modification d'une audience.
+     *
+     * @return array<string, mixed>
+     */
+    public static function reglesDestinataires(): array
+    {
+        return [
+            'destinataires_mode' => ['sometimes', 'string', Rule::in(ReglageDestinataires::MODES)],
+            'destinataires_fonctions' => ['sometimes', 'array', 'max:' . ReglageDestinataires::FONCTIONS_MAX],
+            'destinataires_fonctions.*' => ['string', 'max:' . ReglageDestinataires::FONCTION_LONGUEUR_MAX, 'regex:' . ReglageDestinataires::MOTIF_FONCTION],
+            'destinataires_personnes_listees' => ['sometimes', 'boolean'],
+            'destinataires_avec_adresses_partagees' => ['sometimes', 'boolean'],
         ];
     }
 }

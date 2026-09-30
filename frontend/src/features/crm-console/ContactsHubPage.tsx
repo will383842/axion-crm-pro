@@ -29,6 +29,7 @@ import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
+import { AjouterAUneListe } from '@/features/listes/AjouterAUneListe';
 import {
   LIFECYCLE_LABELS,
   RELATION_TYPES,
@@ -78,6 +79,17 @@ function ContactsHubContent() {
   // fiches étrangères restaient introuvables depuis la console.
   const [country, setCountry] = useState('');
   const [prospection, setProspection] = useState('');
+  // 2026-09-30 — cocher des organisations ou des PERSONNES pour les mettre dans
+  // une liste manuelle (« seulement certains contacts »). Des identifiants
+  // VISIBLES seulement : jamais « tout ce qui correspond au filtre ».
+  const [orgsCochees, setOrgsCochees] = useState<Set<number>>(new Set());
+  const [personnesCochees, setPersonnesCochees] = useState<Set<number>>(new Set());
+  const basculer = (ensemble: Set<number>, id: number): Set<number> => {
+    const suivant = new Set(ensemble);
+    if (suivant.has(id)) suivant.delete(id);
+    else suivant.add(id);
+    return suivant;
+  };
 
   const counts = useQuery<CountsResponse>({
     queryKey: ['crm', 'contacts-hub', 'counts'],
@@ -238,10 +250,32 @@ function ContactsHubContent() {
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
+            {orgsCochees.size + personnesCochees.size > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-brand-50/60 px-4 py-2 text-sm dark:border-slate-800 dark:bg-slate-800/60">
+                <span className="font-medium text-slate-700 dark:text-slate-200">
+                  {orgsCochees.size} organisation(s), {personnesCochees.size} personne(s) cochée(s)
+                </span>
+                <AjouterAUneListe
+                  companyIds={[...orgsCochees]}
+                  contactIds={[...personnesCochees]}
+                  onAjoute={() => {
+                    setOrgsCochees(new Set());
+                    setPersonnesCochees(new Set());
+                  }}
+                />
+              </div>
+            ) : null}
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {rows.map((company) => (
                 <li key={company.id} className="px-4 py-3">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <input
+                      type="checkbox"
+                      className="self-center"
+                      aria-label={`Cocher l’organisation ${company.denomination ?? company.id}`}
+                      checked={orgsCochees.has(company.id)}
+                      onChange={() => setOrgsCochees((e) => basculer(e, company.id))}
+                    />
                     <span className="text-sm font-semibold text-slate-900 dark:text-white">
                       {company.denomination ?? company.siren ?? `Fiche ${company.id}`}
                     </span>
@@ -263,7 +297,13 @@ function ContactsHubContent() {
                   {(company.contacts?.length ?? 0) > 0 && (
                     <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-600 dark:text-slate-300">
                       {company.contacts.slice(0, 3).map((contact) => (
-                        <span key={contact.id}>
+                        <span key={contact.id} className="inline-flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            aria-label={`Cocher ${contact.first_name ?? ''} ${contact.last_name}`}
+                            checked={personnesCochees.has(contact.id)}
+                            onChange={() => setPersonnesCochees((e) => basculer(e, contact.id))}
+                          />
                           {contact.person_key !== null ? (
                             <Link
                               to="/console/personnes/$personKey"

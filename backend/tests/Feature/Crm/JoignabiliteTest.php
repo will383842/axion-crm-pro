@@ -8,10 +8,13 @@
  * FICTIVES (dépôt public) : domaines `.example` / `.invalid`.
  */
 
+use App\Crm\Doublons\Rapprochement;
 use App\Crm\Emails\Dns\ResolveurDns;
 use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\VerificationEmail;
+use App\Crm\FichesProtegees;
 use App\Crm\Joignabilite\Joignabilite;
+use App\Crm\Taxonomy;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\EligibiliteCampagne;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
@@ -164,7 +168,7 @@ test('le lot en une requete dit exactement ce que peutRecevoir dit, adresse par 
     DB::table('email_suppressions')->insert(['scope' => 'vivier', 'email_hash' => ListeSuppression::empreinte('vivier@zz-sym.example'), 'reason' => 'manual', 'source' => 'test']);
     $adresses = ['oppose@zz-sym.example', 'PLAINTE@zz-sym.example', 'vivier@zz-sym.example', 'libre@zz-sym.example'];
 
-    $interdites = Joignabilite::interditesParmi($adresses);
+    $interdites = Joignabilite::interditesParmi($adresses, 'business');
     foreach ($adresses as $a) {
         expect(isset($interdites[ListeSuppression::empreinte(strtolower($a))]))->toBe(! EligibiliteCampagne::peutRecevoir($a));
     }
@@ -209,4 +213,105 @@ test('les listes Entreprises et Contacts filtrent par joignabilite', function ()
     expect($entreprises)->toBe(collect([$j['valide'], $j['par_personne']])->sort()->values()->all())
         ->and(array_column($contacts, 'id'))->toBe([$j['personne_opposee']])
         ->and($contacts[0]['joignabilite'])->toBe(Joignabilite::EMAIL_INTERDIT);
+});
+
+// ── Relecture de #265 ───────────────────────────────────────────────────────
+
+/** Une fiche d'ORGANISATEUR (segment de campagne), adresse générique vérifiée. */
+function jgOrganisateur(string $espace, ?string $email, string $verification = 'valide'): int
+{
+    $attrs = ['siren' => null, 'foreign_id' => 'zz-org-' . Str::random(8)];
+    if ($email !== null) {
+        $attrs['email_generic'] = $email;
+        $attrs['signals'] = json_encode(['email_generic_verification' => json_decode(jgVerif($email, $verification), true)]);
+    }
+    $id = jgFiche($espace, $attrs);
+    F::proteger($espace, $id, FichesProtegees::TAG_ORGANISATEURS);
+
+    return $id;
+}
+
+test('R3 — ACCORD : email_valide <=> l adresse part dans crm:campagne:destinataires', function () {
+    config(['crm.ingest.business_workspace' => $this->slug]);
+    $valide = jgOrganisateur($this->espace, 'bureau@zz-part.example.invalid');
+    $opposee = jgOrganisateur($this->espace, 'non@zz-oppose.example.invalid');
+    DB::table('opt_out')->insert(['email_hash' => ListeSuppression::empreinte('non@zz-oppose.example.invalid'), 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    // Opposée ET invalide : interdite (l'opposition d'abord).
+    $opposeeInvalide = jgOrganisateur($this->espace, 'mort-et-oppose@zz-oppose.example.invalid', 'invalide');
+    DB::table('opt_out')->insert(['email_hash' => ListeSuppression::empreinte('mort-et-oppose@zz-oppose.example.invalid'), 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    // Vérifiée valide sur UNE fiche, `invalid` sur une autre : condamnée PARTOUT.
+    $condamnee = jgOrganisateur($this->espace, 'rebond@zz-rebond.example.invalid');
+    $autre = jgOrganisateur($this->espace, null);
+    jgPersonne($this->espace, $autre, ['email' => 'rebond@zz-rebond.example.invalid', 'email_status' => 'invalid']);
+    $nonVerifiee = jgOrganisateur($this->espace, 'jamais@zz-jamais.example.invalid', 'aucune');
+    $perso = jgOrganisateur($this->espace, 'zz-fictif@yahoo.zz');
+    // Cabinet comptable porté par 3 fiches : exclu par défaut.
+    $cabinets = [];
+    foreach ([1, 2, 3] as $i) {
+        $cabinets[] = jgOrganisateur($this->espace, 'compta@zz-cabinet.example.invalid');
+    }
+    DB::table('adresses_partagees')->insert([
+        'workspace_id' => $this->espace, 'email_empreinte' => F::empreinteAdresse('compta@zz-cabinet.example.invalid'), 'nb_fiches' => 3, 'nature' => Rapprochement::CABINET_COMPTABLE,
+    ]);
+
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-jg-');
+    Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $fichier]);
+    $partent = [];
+    foreach (file($fichier, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $ligne) {
+        $partent[] = (string) json_decode($ligne, true)['email'];
+    }
+    @unlink($fichier);
+    jgCalculer($this->slug);
+
+    $toutes = ['bureau@zz-part.example.invalid', 'non@zz-oppose.example.invalid', 'mort-et-oppose@zz-oppose.example.invalid',
+        'rebond@zz-rebond.example.invalid', 'jamais@zz-jamais.example.invalid', 'zz-fictif@yahoo.zz', 'compta@zz-cabinet.example.invalid'];
+    $etats = Joignabilite::etatsAdresses($this->espace, $toutes, 'business');
+    $valides = array_keys(array_filter($etats, static fn (string $e): bool => $e === Joignabilite::EMAIL_VALIDE));
+    sort($valides);
+    sort($partent);
+
+    expect($valides)->toBe($partent)
+        ->and($partent)->toBe(['bureau@zz-part.example.invalid'])
+        ->and(jgEtat('companies', $valide))->toBe(Joignabilite::EMAIL_VALIDE)
+        ->and(jgEtat('companies', $opposee))->toBe(Joignabilite::EMAIL_INTERDIT)
+        ->and(jgEtat('companies', $opposeeInvalide))->toBe(Joignabilite::EMAIL_INTERDIT)
+        ->and(jgEtat('companies', $condamnee))->toBe(Joignabilite::EMAIL_INVALIDE)
+        ->and(jgEtat('companies', $autre))->toBe(Joignabilite::EMAIL_INVALIDE)
+        ->and(jgEtat('companies', $nonVerifiee))->toBe(Joignabilite::EMAIL_NON_VERIFIE)
+        ->and(jgEtat('companies', $perso))->toBe(Joignabilite::EMAIL_PERSONNEL)
+        ->and(jgEtat('companies', $cabinets[0]))->toBe(Joignabilite::EMAIL_PARTAGE);
+});
+
+test('Securite R1 — l univers de la liste de suppression est celui de l espace (vivier pour les candidats)', function () {
+    $vivier = (string) DB::table('workspaces')->where('slug', Taxonomy::VIVIER_WORKSPACE_SLUG)->value('id');
+    if ($vivier === '') {
+        $vivier = (string) Str::uuid();
+        Workspace::create(['id' => $vivier, 'slug' => Taxonomy::VIVIER_WORKSPACE_SLUG, 'name' => 'ZZ vivier', 'settings' => []]);
+    }
+    DB::table('email_suppressions')->insert(['scope' => 'vivier', 'email_hash' => ListeSuppression::empreinte('supprime@zz-vivier.example'), 'reason' => 'manual', 'source' => 'test']);
+    $dansLeVivier = jgFiche($vivier, ['email_generic' => 'supprime@zz-vivier.example']);
+    // TÉMOIN : la même adresse dans un espace business n'est pas interdite.
+    $dansLeBusiness = jgFiche($this->espace, ['email_generic' => 'supprime@zz-vivier.example']);
+
+    expect(Joignabilite::universDe($vivier))->toBe('vivier')
+        ->and(Joignabilite::universDe($this->espace))->toBe('business');
+
+    Artisan::call('crm:joignabilite:calculer', ['--workspace' => $vivier]);
+    jgCalculer($this->slug);
+
+    expect(jgEtat('companies', $dansLeVivier))->toBe(Joignabilite::EMAIL_INTERDIT)
+        ->and(jgEtat('companies', $dansLeBusiness))->toBe(Joignabilite::EMAIL_NON_VERIFIE);
+});
+
+test('R4 — le calcul relit ses donnees sous verrou, dans la transaction qui ecrit', function () {
+    jgJeu($this->espace);
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes): void {
+        $requetes[] = strtolower($q->sql);
+    });
+
+    jgCalculer($this->slug);
+
+    $verrouillees = array_filter($requetes, static fn (string $sql): bool => str_contains($sql, 'for update') && (str_contains($sql, '"companies"') || str_contains($sql, '"contacts"')));
+    expect(count($verrouillees))->toBeGreaterThanOrEqual(2);
 });

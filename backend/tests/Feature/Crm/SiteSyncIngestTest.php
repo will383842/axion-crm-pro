@@ -912,3 +912,57 @@ test('B13-005 — quand rien n est écarté, `tags_ignores` est présent et VIDE
         . 'soit le collecteur d écartés compte à tort.',
     );
 });
+
+// ── Relecture de #265 (2026-10-01) : UN ordre pour tous les automatismes ────
+
+/** Une fiche existante au SIREN du formulaire type (`900000101`). */
+function siteSyncFicheExistante(array $attrs = []): void
+{
+    DB::table('companies')->insert(array_merge([
+        'workspace_id' => siteSyncBusinessWorkspaceId(),
+        'siren' => '900000101',
+        'denomination' => 'ZZ TEST SAS',
+        'signals' => '{}',
+        'metadata' => '{}',
+        'quality_score' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $attrs));
+}
+
+test('R2 — un formulaire du site ne retrograde JAMAIS un partenaire en prospect', function () {
+    siteSyncFicheExistante(['relation_type' => 'partenaire', 'lifecycle_stage' => 'qualifie']);
+
+    siteSyncPost(siteSyncEvent(['form_type' => 'autre']))->assertOk();
+
+    $company = DB::table('companies')->where('siren', '900000101')->first();
+    expect($company->relation_type)->toBe('partenaire');
+});
+
+test('R2 — le canal site promeut un prospect en partenaire (meme ordre que l import)', function () {
+    siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
+
+    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+
+    expect(DB::table('companies')->where('siren', '900000101')->value('relation_type'))->toBe('partenaire');
+});
+
+test('R2 — une relation posee A LA MAIN n est touchee par aucun formulaire du site', function () {
+    siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau', 'relation_saisie_manuelle_at' => now()]);
+
+    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+
+    $company = DB::table('companies')->where('siren', '900000101')->first();
+    expect($company->relation_type)->toBe('prospect')
+        ->and($company->lifecycle_stage)->toBe('nouveau');
+});
+
+test('R2 — TEMOIN : sans la marque manuelle, le meme formulaire promeut la fiche', function () {
+    siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
+
+    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+
+    $company = DB::table('companies')->where('siren', '900000101')->first();
+    expect($company->relation_type)->toBe('partenaire')
+        ->and($company->lifecycle_stage)->toBe('qualifie');
+});

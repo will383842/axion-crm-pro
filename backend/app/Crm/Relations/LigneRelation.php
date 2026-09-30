@@ -22,6 +22,10 @@ use App\Crm\Taxonomy;
  *                       ne désigne pas une fiche avec certitude) ni affiché ;
  *  - `email`            adresse ou null ;
  *  - `relation_type`    une valeur de `Taxonomy::BUSINESS_RELATION_TYPES`, ou null ;
+ *                       jamais `fournisseur` (réservé à la saisie manuelle,
+ *                       B13-008 : ligne rejetée, `relation_saisie_manuelle`).
+ *                       Seules les lignes `site-client` rapprochées par SIREN
+ *                       ou e-mail exact posent un type (voir l'import) ;
  *  - `lifecycle_stage`  `nouveau` | `qualifie` | `opportunite` | `client`, ou null.
  *
  * Il faut au moins un `siren` ou un `email` (de quoi rapprocher), et au moins
@@ -92,6 +96,11 @@ final class LigneRelation
         $relation = $donnees['relation_type'] ?? null;
         if ($relation !== null && (! is_string($relation) || ! in_array($relation, Taxonomy::BUSINESS_RELATION_TYPES, true))) {
             return 'relation_inconnue';
+        }
+        // B13-008 : un type réservé à la SAISIE MANUELLE (`fournisseur`) ne se
+        // pose par aucun automatisme — l'import compris.
+        if ($relation !== null && in_array($relation, Taxonomy::BUSINESS_RELATION_TYPES_SAISIE_MANUELLE, true)) {
+            return 'relation_saisie_manuelle';
         }
         $etape = $donnees['lifecycle_stage'] ?? null;
         if ($etape !== null && (! is_string($etape) || ! in_array($etape, PromotionRelation::ETAPES_IMPORTABLES, true))) {

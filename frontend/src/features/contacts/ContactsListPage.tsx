@@ -80,7 +80,9 @@ function translateEmailStatus(status: string): string {
 
 const JOIGNABILITE_TONE: Record<string, StatusTone> = {
   email_valide: 'success',
+  email_partage: 'warning',
   email_non_verifie: 'neutral',
+  email_personnel: 'warning',
   email_invalide: 'danger',
   email_interdit: 'danger',
   sans_email_avec_telephone: 'info',

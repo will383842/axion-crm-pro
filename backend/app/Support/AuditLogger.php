@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Log;
  *       'member_count' => $audience->member_count,
  *   ]);
  *
+ * Rend `true` si la ligne est écrite, `false` sinon — l'appelant qui doit
+ * pouvoir le dire (saisie manuelle d'une relation) le journalise.
+ *
  * Fail-open : si insert échoue (table absente en rollback, FK violation…),
  * on Log::warning mais on ne propage jamais (un audit log ne doit pas
  * casser une opération business réussie).
@@ -33,14 +36,14 @@ class AuditLogger
      *   ...
      * }  $context
      */
-    public static function log(string $action, array $context): void
+    public static function log(string $action, array $context): bool
     {
         $workspaceId = $context['workspace_id'] ?? null;
         if (! $workspaceId) {
             // Sans workspace impossible de respecter la RLS — on skip silencieux.
             Log::debug('AuditLogger skipped: no workspace_id', ['action' => $action]);
 
-            return;
+            return false;
         }
 
         $resourceType = $context['resource_type'] ?? null;
@@ -66,12 +69,16 @@ class AuditLogger
                 'context' => empty($payload) ? null : json_encode($payload, JSON_UNESCAPED_UNICODE),
                 'created_at' => now(),
             ]);
+
+            return true;
         } catch (\Throwable $e) {
             Log::warning('AuditLogger insert failed', [
                 'action' => $action,
                 'error' => $e->getMessage(),
             ]);
         }
+
+        return false;
     }
 
     private static function resolveActor(): ?string

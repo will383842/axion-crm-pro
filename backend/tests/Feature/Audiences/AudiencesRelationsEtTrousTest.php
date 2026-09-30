@@ -195,3 +195,20 @@ test('l API accepte les nouveaux champs et refuse un champ inconnu', function ()
     $this->postJson('/api/v1/audiences', ['name' => 'ZZ faute', 'criteria' => ['all' => [['field' => 'relation', 'op' => 'eq', 'value' => 'client']]]])
         ->assertStatus(422);
 });
+
+test('R7 — la migration compare STRICTEMENT : un 11 entier ou un 1 a la place de true n est pas « le seeder »', function () {
+    $presque = EmailAudience::create(['workspace_id' => $this->workspace->id, 'name' => 'Prospects contactables — Île-de-France', 'criteria' => ['all' => [
+        ['field' => 'has_email', 'op' => 'eq', 'value' => true],
+        ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
+        ['field' => 'region_code', 'op' => 'eq', 'value' => 11],
+    ]]]);
+    $unAuLieuDeVrai = EmailAudience::create(['workspace_id' => $this->workspace->id, 'name' => 'Confiance email A (domaine = site)', 'criteria' => ['all' => [
+        ['field' => 'has_email', 'op' => 'eq', 'value' => 1],
+        ['field' => 'best_email_confidence', 'op' => 'eq', 'value' => 'A'],
+    ]]]);
+
+    (require database_path('migrations/2026_10_01_000021_audiences_par_defaut_hors_relations.php'))->up();
+
+    expect($presque->fresh()?->criteria)->not->toHaveKey('not')
+        ->and($unAuLieuDeVrai->fresh()?->criteria)->not->toHaveKey('not');
+});

@@ -8,6 +8,7 @@ use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Crm\Relations\LigneRelation;
 use App\Crm\Relations\PromotionRelation;
+use App\Crm\Relations\RelationsProspection;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -40,7 +41,16 @@ use Throwable;
  *  4. sinon la ligne est comptée « non rapprochée » et NE CRÉE RIEN : pas de
  *     fiche pour l'e-mail d'un particulier.
  *
- * Les fiches à la corbeille (`deleted_at`) ne sont jamais rapprochées.
+ * Les fiches à la corbeille (`deleted_at`) ne sont jamais rapprochées — ni
+ * directement, ni par une personne vivante d'une fiche supprimée.
+ *
+ * ── Qui peut poser quoi (relecture sécurité R4) ─────────────────────────────
+ *
+ * Un TYPE de relation (client, partenaire, presse… — ceux qui SORTENT une
+ * fiche de la prospection) et l'étape `client` ne sont posés que par une ligne
+ * `site-client` (`SOURCES_DE_CONFIANCE`) rapprochée par SIREN ou par e-mail
+ * exact. Toute autre ligne — rapprochée par domaine, ou venue d'un formulaire
+ * — ne promeut que l'ÉTAPE. `fournisseur` n'est jamais importé (B13-008).
  *
  * ── Ce qui la rend sûre ──────────────────────────────────────────────────────
  *
@@ -82,6 +92,17 @@ class CrmRelationsImporter extends Command
     protected $description = 'Importe le statut de relation (client, partenaire…) depuis un fichier JSONL — promotion seulement, rien de créé ni de supprimé.';
 
     private const PAQUET_MAX = 2000;
+
+    /**
+     * Les sources dont une ligne peut poser un TYPE de relation (et l'étape
+     * `client`) — à condition d'être rapprochée par SIREN ou e-mail exact.
+     * `site-client` : l'export des clients du site, que seul l'administrateur
+     * produit. Tout le reste (formulaires de contact, rendez-vous…) est
+     * déclaratif : n'importe qui peut le remplir.
+     *
+     * @var list<string>
+     */
+    public const SOURCES_DE_CONFIANCE = ['site-client'];
 
     /** Numéros de ligne affichés au plus, par motif. */
     private const LIGNES_AFFICHEES = 20;
@@ -204,7 +225,8 @@ class CrmRelationsImporter extends Command
             'rapprochees_par_siren', 'rapprochees_par_email', 'rapprochees_par_domaine',
             'ambigues', 'non_rapprochees', 'domaines_webmail_ecartes',
             'fiches_distinctes', 'dont_protegees',
-            'deja_a_jour', 'verrouillees_a_la_main', 'demandes_refusees_sans_recul',
+            'lignes_appliquees', 'promotions_partielles', 'deja_a_jour', 'verrouillees_a_la_main',
+            'demandes_refusees_sans_recul', 'demandes_refusees_confiance', 'types_hors_prospection_refuses', 'fiches_disparues',
             'fiches_a_modifier', 'fiches_modifiees', 'modifiees_entre_temps',
         ], 0);
         $this->rejets = [];
@@ -273,10 +295,12 @@ class CrmRelationsImporter extends Command
     }
 
     /**
-     * Les fiches reconnues : company_id => lignes qui la désignent.
+     * Les fiches reconnues : company_id => lignes qui la désignent, avec la
+     * MÉTHODE qui les a rapprochées (`siren`, `email`, `domaine`) — elle
+     * décide de ce que la ligne a le droit de poser (`planifier()`).
      *
      * @param  list<LigneRelation>  $lot
-     * @return array<int, list<LigneRelation>>
+     * @return array<int, list<array{ligne: LigneRelation, methode: string}>>
      */
     private function rapprocher(string $workspaceId, array $lot): array
     {
@@ -293,18 +317,28 @@ class CrmRelationsImporter extends Command
         }
         foreach ($lot as $l) {
             if ($l->siren !== null && isset($parSiren[$l->siren])) {
-                $cibles[$parSiren[$l->siren]][] = $l;
+                $cibles[$parSiren[$l->siren]][] = ['ligne' => $l, 'methode' => 'siren'];
                 $this->compteurs['rapprochees_par_siren']++;
             } else {
                 $restantes[] = $l;
             }
         }
 
-        // 2. E-mail exact (personne ou générique)
+        // 2. E-mail exact (personne ou générique). Une adresse de messagerie
+        //    grand public (gmail…) est ACCEPTÉE ici, et c'est voulu : l'égalité
+        //    EXACTE avec l'adresse d'une personne ou d'une fiche désigne cette
+        //    fiche-là. C'est au rapprochement par DOMAINE qu'un webmail ne
+        //    prouve rien (des millions de boîtes partagent `gmail.com`).
         $emails = array_values(array_unique(array_filter(array_map(static fn (LigneRelation $l): ?string => $l->email, $restantes))));
         $parEmail = [];
         if ($emails !== []) {
-            foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('email', $emails)->whereNull('deleted_at')->get(['company_id', 'email']) as $c) {
+            // La personne ET sa fiche hors corbeille : une personne vivante
+            // d'une fiche supprimée ne désigne plus rien.
+            foreach (DB::table('contacts')
+                ->join('companies', 'companies.id', '=', 'contacts.company_id')
+                ->where('contacts.workspace_id', $workspaceId)->whereIn('contacts.email', $emails)
+                ->whereNull('contacts.deleted_at')->whereNull('companies.deleted_at')
+                ->get(['contacts.company_id', 'contacts.email']) as $c) {
                 $parEmail[QualificationEmail::normaliser((string) $c->email)][(int) $c->company_id] = true;
             }
             // Servie par `idx_companies_email_generic_minuscules` (expression ET prédicat partiel).
@@ -317,7 +351,7 @@ class CrmRelationsImporter extends Command
         foreach ($restantes as $l) {
             $fiches = $l->email === null ? [] : array_keys($parEmail[$l->email] ?? []);
             if (count($fiches) === 1) {
-                $cibles[$fiches[0]][] = $l;
+                $cibles[$fiches[0]][] = ['ligne' => $l, 'methode' => 'email'];
                 $this->compteurs['rapprochees_par_email']++;
             } elseif (count($fiches) > 1) {
                 $this->compteurs['ambigues']++;
@@ -347,6 +381,8 @@ class CrmRelationsImporter extends Command
         }
         $parDomaine = [];
         if ($domaines !== []) {
+            // Servie par `idx_companies_domaine_site` (migration
+            // `2026_10_01_000024`, même expression, même prédicat partiel).
             $expression = self::expressionDomaineDuSite('website');
             foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNotNull('website')->whereNull('deleted_at')
                 ->whereIn(DB::raw($expression), array_keys($domaines))
@@ -357,7 +393,7 @@ class CrmRelationsImporter extends Command
         foreach ($aChercher as $l) {
             $fiches = array_keys($parDomaine[(string) $l->domaine()] ?? []);
             if (count($fiches) === 1) {
-                $cibles[$fiches[0]][] = $l;
+                $cibles[$fiches[0]][] = ['ligne' => $l, 'methode' => 'domaine'];
                 $this->compteurs['rapprochees_par_domaine']++;
             } elseif (count($fiches) > 1) {
                 $this->compteurs['ambigues']++;
@@ -383,7 +419,23 @@ class CrmRelationsImporter extends Command
     /**
      * Ce qu'il faut écrire : company_id => état lu et état voulu.
      *
-     * @param  array<int, list<LigneRelation>>  $cibles
+     * CONFIANCE (relecture sécurité R4) : un TYPE de relation — dont les types
+     * hors prospection — et l'étape `client` (qui fait une cliente) ne sont
+     * posés que par une ligne d'une SOURCE DE CONFIANCE
+     * (`SOURCES_DE_CONFIANCE`) rapprochée par SIREN ou par e-mail EXACT. Une
+     * ligne rapprochée par DOMAINE, ou venue d'une source déclarative (un
+     * formulaire que n'importe qui remplit), ne promeut que l'ÉTAPE
+     * (`nouveau` → `qualifie` → `opportunite`). Sinon, un inconnu qui
+     * remplit un formulaire avec une adresse du bon domaine ferait passer la
+     * fiche en « partenaire », et la sortirait de toute prospection.
+     *
+     * Chaque ligne rapprochée tombe dans UN compteur, et un seul :
+     * `lignes_appliquees`, `deja_a_jour`, `demandes_refusees_sans_recul`,
+     * `demandes_refusees_confiance`, `verrouillees_a_la_main` ou
+     * `fiches_disparues` (fiche passée à la corbeille entre le rapprochement et
+     * la planification).
+     *
+     * @param  array<int, list<array{ligne: LigneRelation, methode: string}>>  $cibles
      * @return array<int, array{lu_relation: string, lu_etape: string, relation_type: string, lifecycle_stage: string, sources: list<string>}>
      */
     private function planifier(string $workspaceId, array $cibles): array
@@ -397,9 +449,11 @@ class CrmRelationsImporter extends Command
             ->whereNull('c.deleted_at')
             ->get(['c.id', 'c.relation_type', 'c.lifecycle_stage', 'c.relation_saisie_manuelle_at', DB::raw('NOT ' . FichesProtegees::conditionSql('c.id') . ' AS protegee')]);
 
+        $trouvees = [];
         $plan = [];
         foreach ($fiches as $f) {
             $id = (int) $f->id;
+            $trouvees[$id] = true;
             if (! isset($this->prevu[$id])) {
                 $this->compteurs['fiches_distinctes']++;
                 if ((bool) $f->protegee) {
@@ -415,19 +469,35 @@ class CrmRelationsImporter extends Command
             $lu = ['relation_type' => (string) $f->relation_type, 'lifecycle_stage' => (string) $f->lifecycle_stage];
             // Ce que les paquets précédents ont prévu (essai à blanc) ou déjà
             // écrit (exécution) : c'est de là que l'on part.
-            $depart = $this->prevu[$id] ?? $lu;
-            $etat = $depart;
+            $etat = $this->prevu[$id] ?? $lu;
             $sources = [];
-            foreach ($cibles[$id] as $l) {
-                $suivant = PromotionRelation::appliquer($etat['relation_type'], $etat['lifecycle_stage'], $l->relationType, $l->lifecycleStage);
-                $voulu = ['relation_type' => $l->relationType ?? $suivant['relation_type'], 'lifecycle_stage' => $l->lifecycleStage ?? $suivant['lifecycle_stage']];
+            foreach ($cibles[$id] as ['ligne' => $l, 'methode' => $methode]) {
+                $relationDemandee = $l->relationType;
+                $etapeDemandee = $l->lifecycleStage;
+                $confiance = $methode !== 'domaine' && in_array($l->source, self::SOURCES_DE_CONFIANCE, true);
+                if (! $confiance && ($relationDemandee !== null || $etapeDemandee === 'client')) {
+                    if (in_array($relationDemandee, RelationsProspection::HORS_PROSPECTION, true) || $etapeDemandee === 'client') {
+                        $this->compteurs['types_hors_prospection_refuses']++;
+                    }
+                    $relationDemandee = null;
+                    $etapeDemandee = $etapeDemandee === 'client' ? null : $etapeDemandee;
+                    if ($etapeDemandee === null) {
+                        $this->compteurs['demandes_refusees_confiance']++;
+                        $this->noter('refusee_confiance', $l->numero);
+
+                        continue;
+                    }
+                }
+                $suivant = PromotionRelation::appliquer($etat['relation_type'], $etat['lifecycle_stage'], $relationDemandee, $etapeDemandee);
+                $voulu = ['relation_type' => $relationDemandee ?? $suivant['relation_type'], 'lifecycle_stage' => $etapeDemandee ?? $suivant['lifecycle_stage']];
                 if ($suivant === $etat) {
                     $voulu === $etat ? $this->compteurs['deja_a_jour']++ : $this->compteurs['demandes_refusees_sans_recul']++;
-                } elseif ($suivant['relation_type'] !== $voulu['relation_type'] || $suivant['lifecycle_stage'] !== $voulu['lifecycle_stage']) {
-                    // Promue en partie : l'autre moitié aurait été un recul.
-                    $this->compteurs['demandes_refusees_sans_recul']++;
-                }
-                if ($suivant !== $etat) {
+                } else {
+                    $this->compteurs['lignes_appliquees']++;
+                    if ($suivant !== $voulu) {
+                        // Promue en partie : l'autre moitié aurait été un recul.
+                        $this->compteurs['promotions_partielles']++;
+                    }
                     $sources[] = $l->source;
                 }
                 $etat = $suivant;
@@ -442,6 +512,14 @@ class CrmRelationsImporter extends Command
                     'lifecycle_stage' => $etat['lifecycle_stage'],
                     'sources' => array_values(array_unique($sources)),
                 ];
+            }
+        }
+        foreach ($cibles as $id => $lignes) {
+            if (! isset($trouvees[$id])) {
+                $this->compteurs['fiches_disparues'] += count($lignes);
+                foreach ($lignes as ['ligne' => $l]) {
+                    $this->noter('fiche_disparue', $l->numero);
+                }
             }
         }
 

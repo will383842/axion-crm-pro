@@ -2,8 +2,10 @@
 
 namespace App\Crm\Joignabilite;
 
-use App\Crm\Emails\QualificationEmail;
+use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
+use App\Crm\Personnes\NatureEmail;
+use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use Illuminate\Support\Facades\DB;
 use stdClass;
@@ -13,53 +15,68 @@ use stdClass;
  *
  * Modèle : `federations.contactabilite` (#255), étendu à TOUTES les fiches
  * (`companies`) et à toutes les personnes (`contacts`). L'état est rangé dans
- * la colonne `joignabilite` des deux tables (migration `2026_10_01_000022`,
- * qui dit pourquoi une colonne plutôt qu'une vue ou des étiquettes).
+ * la colonne `joignabilite` des deux tables (migrations `2026_10_01_000022`
+ * et `000023`, qui disent pourquoi une colonne plutôt qu'une vue ou des
+ * étiquettes).
  *
- * ── Les états ───────────────────────────────────────────────────────────────
+ * ── `email_valide` DIT CE QUE DIT L'ENVOI ────────────────────────────────────
  *
- *  - `email_valide`       l'adresse a été vérifiée VALIDE par `crm:emails:verifier`
- *                         (`VerificationEmail::statutDe` = `valide`), son statut
- *                         n'est ni `invalid` ni `disposable`, et elle n'est ni
- *                         opposée ni en liste de suppression. C'est la règle de
- *                         `crm:campagne:destinataires`, mot pour mot ;
- *  - `email_non_verifie`  une adresse existe, rien ne la condamne, mais elle n'a
- *                         pas (encore) été vérifiée par `crm:emails:verifier` ;
- *  - `email_invalide`     l'adresse est GARDÉE, jamais envoyée : syntaxe fausse,
- *                         domaine qui ne reçoit pas, jetable, ou statut
- *                         `invalid`/`disposable` (un rebond dur l'écrit) ;
- *  - `email_interdit`     l'adresse est GARDÉE, jamais envoyée : opposition
- *                         (`opt_out`) ou liste de suppression (plainte, rebonds
- *                         répétés, manuel) — `EligibiliteCampagne::peutRecevoir`
- *                         répondrait NON. État ajouté aux cinq demandés : une
- *                         opposition n'est pas une adresse invalide, et les
- *                         confondre rendrait impossible de répondre à « cette
- *                         personne s'est-elle opposée ? » ;
- *  - `sans_email_avec_telephone`  aucune adresse, un téléphone ;
- *  - `sans_contact`       ni adresse ni téléphone.
+ * La règle est celle de `crm:campagne:destinataires`, et elle se décide PAR
+ * ADRESSE, jamais par fiche : toutes les occurrences d'une adresse dans
+ * l'espace (adresse générique d'une fiche, adresse d'une personne) sont
+ * regroupées, et UNE seule occurrence qui la condamne la condamne PARTOUT. Un
+ * test d'accord (`JoignabiliteTest`) joue la commande de campagne sur le même
+ * jeu et exige : `email_valide` ⟺ l'adresse part.
+ *
+ * ── Les états d'une ADRESSE, dans l'ordre où ils se décident ────────────────
+ *
+ *  1. `email_interdit`     opposition (`opt_out`) ou liste de suppression, dans
+ *                          l'UNIVERS de l'espace (`business`, ou `vivier` pour
+ *                          l'espace des candidats) — la question de
+ *                          `EligibiliteCampagne::peutRecevoir`, posée par lot.
+ *                          Testée EN PREMIER : une adresse opposée ET invalide
+ *                          est `email_interdit`, parce que l'opposition est une
+ *                          VOLONTÉ, qui doit se lire telle quelle ;
+ *  2. `email_invalide`     GARDÉE, jamais envoyée : syntaxe refusée par
+ *                          `FILTER_VALIDATE_EMAIL` (la règle de la campagne),
+ *                          une occurrence au statut `invalid`/`disposable`, ou
+ *                          une vérification `invalide`/`jetable` ;
+ *  3. `email_non_verifie`  aucune occurrence n'a été vérifiée `valide` par
+ *                          `crm:emails:verifier` ;
+ *  4. `email_personnel`    messagerie grand public (`NatureEmail`, gmail…) ou
+ *                          adresse marquée personnelle : jamais en campagne
+ *                          (décision D3) ;
+ *  5. `email_partage`      adresse de CABINET COMPTABLE ou de DOMICILIATION
+ *                          portée par plusieurs fiches (`AdressesPartagees`) :
+ *                          écartée par défaut de la campagne,
+ *                          `--avec-adresses-partagees` la garde. ÉTAT DÉDIÉ
+ *                          plutôt qu'une note « exclue par défaut » : sinon
+ *                          `email_valide` compterait des adresses qui ne partent
+ *                          pas, exactement l'écart que cet état doit fermer ;
+ *  6. `email_valide`       elle part.
+ *
+ * Sans adresse : `sans_email_avec_telephone`, sinon `sans_contact`.
  *
  * ── Une ENTREPRISE ──────────────────────────────────────────────────────────
  *
- * Elle est joignable par la MEILLEURE de ses adresses : l'e-mail générique
- * (`email_generic`, vérification dans `signals.email_generic_verification`)
- * et celles de ses personnes non supprimées — exactement les adresses que lit
- * `crm:campagne:destinataires`. Ordre : valide > non vérifiée > invalide >
- * interdite. Sans aucune adresse : téléphone de la fiche OU d'une personne,
- * sinon `sans_contact`.
+ * La MEILLEURE de ses adresses (générique et personnes non supprimées), dans
+ * l'ordre de `ETATS`. Sans aucune adresse : téléphone de la fiche OU d'une
+ * personne, sinon `sans_contact`.
  *
- * ⚠️ UNE PHOTO. L'état est juste au moment du calcul ; une opposition arrivée
- * depuis ne le change qu'au prochain calcul. Il sert à CIBLER. L'envoi, lui,
- * repose la question adresse par adresse (`EligibiliteCampagne::peutRecevoir`),
- * comme toujours.
+ * ⚠️ UNE PHOTO. Une opposition arrivée depuis ne change l'état qu'au prochain
+ * calcul. Il sert à CIBLER ; l'envoi repose la question adresse par adresse.
  *
- * Rien ici ne supprime ni ne réécrit une adresse : garder une adresse invalide
- * empêche de la réimporter et de la réécrire.
+ * Rien ici ne supprime ni ne réécrit une adresse.
  */
 final class Joignabilite
 {
     public const EMAIL_VALIDE = 'email_valide';
 
+    public const EMAIL_PARTAGE = 'email_partage';
+
     public const EMAIL_NON_VERIFIE = 'email_non_verifie';
+
+    public const EMAIL_PERSONNEL = 'email_personnel';
 
     public const EMAIL_INVALIDE = 'email_invalide';
 
@@ -70,13 +87,15 @@ final class Joignabilite
     public const SANS_CONTACT = 'sans_contact';
 
     /**
-     * Du plus joignable au moins joignable — l'ordre de l'agrégation.
+     * Du plus joignable au moins joignable — l'ordre de l'agrégation par fiche.
      *
      * @var list<string>
      */
     public const ETATS = [
         self::EMAIL_VALIDE,
+        self::EMAIL_PARTAGE,
         self::EMAIL_NON_VERIFIE,
+        self::EMAIL_PERSONNEL,
         self::EMAIL_INVALIDE,
         self::EMAIL_INTERDIT,
         self::SANS_EMAIL_AVEC_TELEPHONE,
@@ -85,57 +104,139 @@ final class Joignabilite
 
     /** @var array<string, string> libellés (exportés vers l'écran) */
     public const LIBELLES = [
-        self::EMAIL_VALIDE => 'E-mail vérifié valide',
+        self::EMAIL_VALIDE => 'E-mail vérifié valide (part en campagne)',
+        self::EMAIL_PARTAGE => 'E-mail partagé (cabinet, domiciliation) — exclu par défaut',
         self::EMAIL_NON_VERIFIE => 'E-mail non vérifié',
+        self::EMAIL_PERSONNEL => 'E-mail personnel (jamais en campagne)',
         self::EMAIL_INVALIDE => 'E-mail invalide (gardé, jamais envoyé)',
         self::EMAIL_INTERDIT => 'E-mail interdit (opposition ou suppression)',
         self::SANS_EMAIL_AVEC_TELEPHONE => 'Sans e-mail, avec téléphone',
         self::SANS_CONTACT => 'Sans contact',
     ];
 
-    /** Statuts de personne qui condamnent l'adresse (règle de la liste de campagne). */
+    /** Statuts qui condamnent l'adresse (règle de la liste de campagne). */
     private const STATUTS_CONDAMNES = ['invalid', 'disposable'];
 
-    /**
-     * L'état d'UNE adresse (null si aucune adresse).
-     *
-     * @param  array<string, true>  $interdites  empreintes (`ListeSuppression::empreinte`) opposées ou supprimées
-     */
-    public static function etatAdresse(?string $email, ?string $statut, mixed $verification, array $interdites): ?string
+    /** La clé d'une adresse : celle de la liste de campagne. */
+    public static function cle(string $email): string
     {
-        $email = is_string($email) ? trim($email) : '';
-        if ($email === '') {
-            return null;
-        }
-        $verdict = VerificationEmail::statutDe($verification, QualificationEmail::normaliser($email));
-        if (! QualificationEmail::syntaxeValide($email)
-            || in_array($statut, self::STATUTS_CONDAMNES, true)
-            || $verdict === VerificationEmail::INVALIDE
-            || $verdict === VerificationEmail::JETABLE
-        ) {
-            return self::EMAIL_INVALIDE;
-        }
-        if (isset($interdites[ListeSuppression::empreinte(QualificationEmail::normaliser($email))])) {
+        return mb_strtolower(trim($email));
+    }
+
+    /**
+     * L'univers de la liste de suppression d'un espace : `vivier` pour
+     * l'espace des candidats, `business` sinon — la règle de
+     * `crm:emails:verifier`.
+     */
+    public static function universDe(string $workspaceId): string
+    {
+        return DB::table('workspaces')->where('id', $workspaceId)->whereNull('deleted_at')->value('slug') === Taxonomy::VIVIER_WORKSPACE_SLUG
+            ? 'vivier'
+            : 'business';
+    }
+
+    /**
+     * L'état d'UNE adresse, connaissant TOUTES ses occurrences — la décision
+     * pure (sans base), dans l'ordre de l'en-tête.
+     *
+     * @param  list<array{statut: ?string, verification: ?string, perso: bool}>  $occurrences
+     */
+    public static function decider(string $cle, array $occurrences, bool $interdite, bool $partagee): string
+    {
+        if ($interdite) {
             return self::EMAIL_INTERDIT;
         }
+        foreach ($occurrences as $o) {
+            if (in_array($o['statut'], self::STATUTS_CONDAMNES, true)
+                || in_array($o['verification'], [VerificationEmail::INVALIDE, VerificationEmail::JETABLE], true)) {
+                return self::EMAIL_INVALIDE;
+            }
+        }
+        if (filter_var($cle, FILTER_VALIDATE_EMAIL) === false) {
+            return self::EMAIL_INVALIDE;
+        }
+        $verifiee = false;
+        $perso = NatureEmail::de($cle) === 'perso';
+        foreach ($occurrences as $o) {
+            $verifiee = $verifiee || $o['verification'] === VerificationEmail::VALIDE;
+            $perso = $perso || $o['perso'];
+        }
+        if (! $verifiee) {
+            return self::EMAIL_NON_VERIFIE;
+        }
+        if ($perso) {
+            return self::EMAIL_PERSONNEL;
+        }
 
-        return $verdict === VerificationEmail::VALIDE ? self::EMAIL_VALIDE : self::EMAIL_NON_VERIFIE;
+        return $partagee ? self::EMAIL_PARTAGE : self::EMAIL_VALIDE;
     }
 
     /**
-     * L'état d'une PERSONNE.
+     * L'état de chaque adresse donnée, lu sur TOUTES ses occurrences dans
+     * l'espace.
      *
-     * @param  array<string, true>  $interdites
+     * @param  list<string>  $emails
+     * @return array<string, string> clé (`cle()`) => état
      */
-    public static function etatPersonne(?string $email, ?string $statut, mixed $verification, ?string $telephone, array $interdites): string
+    public static function etatsAdresses(string $workspaceId, array $emails, string $univers): array
     {
-        return self::etatAdresse($email, $statut, $verification, $interdites)
-            ?? (self::renseigne($telephone) ? self::SANS_EMAIL_AVEC_TELEPHONE : self::SANS_CONTACT);
+        $cles = [];
+        foreach ($emails as $e) {
+            $c = self::cle($e);
+            if ($c !== '') {
+                $cles[$c] = true;
+            }
+        }
+        $cles = array_keys($cles);
+        if ($cles === []) {
+            return [];
+        }
+
+        /** @var array<string, list<array{statut: ?string, verification: ?string, perso: bool}>> $occurrences */
+        $occurrences = array_fill_keys($cles, []);
+        foreach (array_chunk($cles, 1000) as $paquet) {
+            // `contacts.email` est un CITEXT : la casse est déjà ignorée, et
+            // l'index `idx_contacts_email` sert la recherche.
+            foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('email', $paquet)->whereNull('deleted_at')
+                ->get(['email', 'email_status', DB::raw("metadata -> 'email_verification' AS verif"), DB::raw("metadata ->> 'email_nature' AS nature")]) as $p) {
+                $c = self::cle((string) $p->email);
+                $occurrences[$c][] = [
+                    'statut' => self::texte($p->email_status),
+                    'verification' => VerificationEmail::statutDe(self::json($p->verif), $c),
+                    'perso' => $p->nature === 'perso',
+                ];
+            }
+            // Servie par `idx_companies_email_generic_minuscules`.
+            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNotNull('email_generic')
+                ->whereIn(DB::raw('lower(email_generic)'), $paquet)->whereNull('deleted_at')
+                ->get(['email_generic', DB::raw("signals -> 'email_generic_verification' AS verif")]) as $f) {
+                $c = self::cle((string) $f->email_generic);
+                $occurrences[$c][] = [
+                    'statut' => null,
+                    'verification' => VerificationEmail::statutDe(self::json($f->verif), (string) $f->email_generic),
+                    'perso' => false,
+                ];
+            }
+        }
+
+        $interdites = self::interditesParmi($cles, $univers);
+        $partagees = AdressesPartagees::exclues($workspaceId, $cles);
+
+        $etats = [];
+        foreach ($cles as $c) {
+            $etats[$c] = self::decider(
+                $c,
+                $occurrences[$c] ?? [],
+                isset($interdites[ListeSuppression::empreinte($c)]),
+                isset($partagees[$c]),
+            );
+        }
+
+        return $etats;
     }
 
     /**
-     * L'état d'une ENTREPRISE, connaissant celui de son adresse générique et
-     * ceux de ses personnes.
+     * L'état d'une ENTREPRISE, connaissant ceux de ses adresses.
      *
      * @param  list<?string>  $etatsAdresses  états des adresses (null = pas d'adresse)
      */
@@ -155,20 +256,20 @@ final class Joignabilite
     }
 
     /**
-     * Les adresses opposées OU supprimées parmi celles données, en DEUX
-     * requêtes — la même question que `EligibiliteCampagne::peutRecevoir`
-     * (portée `business`, empreinte seule), posée pour un lot entier.
+     * Les adresses opposées OU supprimées parmi celles données, dans UN
+     * univers, en deux requêtes — la question de
+     * `EligibiliteCampagne::peutRecevoir($email, $univers)`, posée pour un lot.
      *
      * @param  list<string>  $emails
      * @return array<string, true> empreinte => true
      */
-    public static function interditesParmi(array $emails): array
+    public static function interditesParmi(array $emails, string $univers): array
     {
         $empreintes = [];
         foreach ($emails as $email) {
-            $normalise = QualificationEmail::normaliser($email);
-            if ($normalise !== '') {
-                $empreintes[ListeSuppression::empreinte($normalise)] = true;
+            $c = self::cle($email);
+            if ($c !== '') {
+                $empreintes[ListeSuppression::empreinte($c)] = true;
             }
         }
         if ($empreintes === []) {
@@ -177,7 +278,7 @@ final class Joignabilite
         $interdites = [];
         foreach (array_chunk(array_keys($empreintes), 1000) as $paquet) {
             foreach (['opt_out', 'email_suppressions'] as $table) {
-                foreach (DB::table($table)->where('scope', 'business')->whereIn('email_hash', $paquet)->pluck('email_hash') as $h) {
+                foreach (DB::table($table)->where('scope', $univers)->whereIn('email_hash', $paquet)->pluck('email_hash') as $h) {
                     $interdites[(string) $h] = true;
                 }
             }
@@ -187,42 +288,47 @@ final class Joignabilite
     }
 
     /**
-     * Calcule l'état des entreprises données ET de leurs personnes (lecture
-     * seule). Les fiches à la corbeille sont ignorées.
+     * Calcule l'état des entreprises données ET de leurs personnes. Les fiches
+     * à la corbeille sont ignorées.
+     *
+     * `$verrouiller` (dans une transaction) : les fiches et leurs personnes
+     * sont lues `FOR UPDATE`. Une écriture concurrente de `crm:emails:verifier`
+     * attend alors la fin du calcul et recalcule APRÈS lui — jamais un état
+     * périmé écrit par-dessus son résultat ; et si elle est passée avant, la
+     * lecture verrouillée voit ses données.
      *
      * @param  array<int>  $ids
      * @return array{entreprises: array<int, array{avant: ?string, apres: string}>, personnes: array<int, array{avant: ?string, apres: string}>}
      */
-    public static function calculer(string $workspaceId, array $ids): array
+    public static function calculer(string $workspaceId, array $ids, string $univers, bool $verrouiller = false): array
     {
         $resultat = ['entreprises' => [], 'personnes' => []];
         $ids = array_values($ids);
         if ($ids === []) {
             return $resultat;
         }
-        $fiches = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('id', $ids)
-            ->whereNull('deleted_at')
-            ->get(['id', 'email_generic', 'phone', 'joignabilite', DB::raw("signals -> 'email_generic_verification' AS verif")]);
-        $personnes = DB::table('contacts')
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('company_id', $ids)
-            ->whereNull('deleted_at')
-            ->get(['id', 'company_id', 'email', 'email_status', 'phone', 'joignabilite', DB::raw("metadata -> 'email_verification' AS verif")]);
+        $requeteFiches = DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', $ids)->whereNull('deleted_at')->orderBy('id');
+        $requetePersonnes = DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('company_id', $ids)->whereNull('deleted_at')->orderBy('id');
+        if ($verrouiller) {
+            $requeteFiches->lockForUpdate();
+            $requetePersonnes->lockForUpdate();
+        }
+        $fiches = $requeteFiches->get(['id', 'email_generic', 'phone', 'joignabilite']);
+        $personnes = $requetePersonnes->get(['id', 'company_id', 'email', 'phone', 'joignabilite']);
 
         $emails = [];
         foreach ($fiches as $f) {
-            if (is_string($f->email_generic) && trim($f->email_generic) !== '') {
-                $emails[] = $f->email_generic;
+            if (self::renseigne(self::texte($f->email_generic))) {
+                $emails[] = (string) $f->email_generic;
             }
         }
         foreach ($personnes as $p) {
-            if (is_string($p->email) && trim($p->email) !== '') {
-                $emails[] = $p->email;
+            if (self::renseigne(self::texte($p->email))) {
+                $emails[] = (string) $p->email;
             }
         }
-        $interdites = self::interditesParmi($emails);
+        $etats = self::etatsAdresses($workspaceId, $emails, $univers);
+        $etatDe = static fn (?string $email): ?string => self::renseigne($email) ? ($etats[self::cle((string) $email)] ?? null) : null;
 
         /** @var array<int, list<stdClass>> $parFiche */
         $parFiche = [];
@@ -231,15 +337,18 @@ final class Joignabilite
         }
 
         foreach ($fiches as $f) {
-            $etats = [self::etatAdresse(self::texte($f->email_generic), null, self::json($f->verif), $interdites)];
+            $adresses = [$etatDe(self::texte($f->email_generic))];
             $telephone = self::renseigne(self::texte($f->phone));
             foreach ($parFiche[(int) $f->id] ?? [] as $p) {
-                $etatPersonne = self::etatPersonne(self::texte($p->email), self::texte($p->email_status), self::json($p->verif), self::texte($p->phone), $interdites);
-                $resultat['personnes'][(int) $p->id] = ['avant' => self::texte($p->joignabilite), 'apres' => $etatPersonne];
-                $etats[] = self::etatAdresse(self::texte($p->email), self::texte($p->email_status), self::json($p->verif), $interdites);
+                $etat = $etatDe(self::texte($p->email));
+                $resultat['personnes'][(int) $p->id] = [
+                    'avant' => self::texte($p->joignabilite),
+                    'apres' => $etat ?? (self::renseigne(self::texte($p->phone)) ? self::SANS_EMAIL_AVEC_TELEPHONE : self::SANS_CONTACT),
+                ];
+                $adresses[] = $etat;
                 $telephone = $telephone || self::renseigne(self::texte($p->phone));
             }
-            $resultat['entreprises'][(int) $f->id] = ['avant' => self::texte($f->joignabilite), 'apres' => self::etatEntreprise($etats, $telephone)];
+            $resultat['entreprises'][(int) $f->id] = ['avant' => self::texte($f->joignabilite), 'apres' => self::etatEntreprise($adresses, $telephone)];
         }
 
         return $resultat;
@@ -279,16 +388,53 @@ final class Joignabilite
     }
 
     /**
-     * Recalcule et écrit, pour les fiches données (et leurs personnes). Appelé
-     * par `crm:emails:verifier` dans la transaction du lot qui vient de changer
-     * une vérification ou un statut.
+     * Recalcule et écrit, pour les fiches données ET pour toutes les fiches qui
+     * portent l'une de leurs adresses (une adresse condamnée l'est PARTOUT).
+     * Appelé par `crm:emails:verifier` dans la transaction du lot qui vient de
+     * changer une vérification ou un statut.
      *
      * @param  array<int>  $ids
      * @return array{entreprises: int, personnes: int}
      */
-    public static function recalculer(string $workspaceId, array $ids): array
+    public static function recalculer(string $workspaceId, array $ids, string $univers): array
     {
-        return self::ecrire($workspaceId, self::calculer($workspaceId, array_values(array_unique($ids))));
+        $ids = array_values(array_unique($ids));
+        if ($ids === []) {
+            return ['entreprises' => 0, 'personnes' => 0];
+        }
+
+        return self::ecrire($workspaceId, self::calculer($workspaceId, self::fichesPortantLesMemesAdresses($workspaceId, $ids), $univers));
+    }
+
+    /**
+     * Les fiches données, plus toutes celles qui portent l'une de leurs
+     * adresses (générique ou personne).
+     *
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    public static function fichesPortantLesMemesAdresses(string $workspaceId, array $ids): array
+    {
+        $cles = [];
+        foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', $ids)->whereNull('deleted_at')->whereNotNull('email_generic')->pluck('email_generic') as $e) {
+            $cles[self::cle((string) $e)] = true;
+        }
+        foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('company_id', $ids)->whereNull('deleted_at')->whereNotNull('email')->pluck('email') as $e) {
+            $cles[self::cle((string) $e)] = true;
+        }
+        $tous = array_fill_keys($ids, true);
+        $liste = array_values(array_filter(array_map('strval', array_keys($cles)), static fn (string $k): bool => $k !== ''));
+        foreach (array_chunk($liste, 1000) as $paquet) {
+            foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('email', $paquet)->whereNull('deleted_at')->pluck('company_id') as $id) {
+                $tous[(int) $id] = true;
+            }
+            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNotNull('email_generic')
+                ->whereIn(DB::raw('lower(email_generic)'), $paquet)->whereNull('deleted_at')->pluck('id') as $id) {
+                $tous[(int) $id] = true;
+            }
+        }
+
+        return array_keys($tous);
     }
 
     private static function renseigne(?string $valeur): bool

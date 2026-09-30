@@ -98,6 +98,7 @@ class CrmJoignabiliteCalculer extends Command
         $erreur = null;
         try {
             WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lot, $maxLots, $pauseMs, $dryRun, $audit, $operateur, &$dernier, &$termine, &$erreur): void {
+                $univers = Joignabilite::universDe($workspaceId);
                 $lots = 0;
                 while (true) {
                     $ids = DB::table('companies')
@@ -120,22 +121,28 @@ class CrmJoignabiliteCalculer extends Command
                     $avantRepartitions = $this->repartitions;
 
                     try {
-                        $calcul = Joignabilite::calculer($workspaceId, $ids);
-                        $this->compter($calcul);
-                        $aEcrire = $this->compteurs['entreprises_a_modifier'] - $avant['entreprises_a_modifier']
-                            + $this->compteurs['personnes_a_modifier'] - $avant['personnes_a_modifier'];
-                        if (! $dryRun && $aEcrire > 0) {
-                            DB::transaction(function () use ($workspaceId, $calcul, $audit, $operateur, $bas, $haut, $avant): void {
+                        if ($dryRun) {
+                            $this->compter(Joignabilite::calculer($workspaceId, $ids, $univers));
+                        } else {
+                            // Relire ET écrire dans la MÊME transaction, fiches et
+                            // personnes verrouillées (`FOR UPDATE`) : jamais un état
+                            // périmé par-dessus un résultat récent de
+                            // `crm:emails:verifier` (réserve R4 de la relecture).
+                            DB::transaction(function () use ($workspaceId, $ids, $univers, $audit, $operateur, $bas, $haut): void {
                                 DB::statement("SET LOCAL lock_timeout = '5s'");
                                 DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
+                                $calcul = Joignabilite::calculer($workspaceId, $ids, $univers, true);
+                                $this->compter($calcul);
                                 $ecrites = Joignabilite::ecrire($workspaceId, $calcul);
                                 $this->compteurs['entreprises_modifiees'] += $ecrites['entreprises'];
                                 $this->compteurs['personnes_modifiees'] += $ecrites['personnes'];
-                                $this->auditer($audit, $workspaceId, $operateur, 'JOIGNABILITE_LOT', 200, [
-                                    'ids' => [$bas, $haut],
-                                    'entreprises_modifiees' => $this->compteurs['entreprises_modifiees'] - $avant['entreprises_modifiees'],
-                                    'personnes_modifiees' => $this->compteurs['personnes_modifiees'] - $avant['personnes_modifiees'],
-                                ], "ids {$bas}-{$haut}");
+                                if ($ecrites['entreprises'] + $ecrites['personnes'] > 0) {
+                                    $this->auditer($audit, $workspaceId, $operateur, 'JOIGNABILITE_LOT', 200, [
+                                        'ids' => [$bas, $haut],
+                                        'entreprises_modifiees' => $ecrites['entreprises'],
+                                        'personnes_modifiees' => $ecrites['personnes'],
+                                    ], "ids {$bas}-{$haut}");
+                                }
                             });
                         }
                     } catch (Throwable $e) {

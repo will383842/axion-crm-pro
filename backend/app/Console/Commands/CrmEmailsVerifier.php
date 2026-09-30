@@ -9,6 +9,7 @@ use App\Crm\Emails\Dns\ResultatDns;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\EspaceProspection;
+use App\Crm\Joignabilite\Joignabilite;
 use App\Crm\Taxonomy;
 use App\Services\Audit\AuditHashChain;
 use App\Support\ListeSuppression;
@@ -384,7 +385,7 @@ class CrmEmailsVerifier extends Command
             'webmails', 'generiques', 'nominatives', 'partagees', 'deja_verifiees_ignorees', 'canaux_illisibles',
             'domaines_du_cache', 'domaines_resolus', 'domaines_indetermines', 'memoire_dns_videe', 'resolveur_rejuge',
             'fiches_a_modifier', 'fiches_modifiees', 'contacts_a_modifier', 'contacts_modifies',
-            'statuts_contacts_changes', 'modifiees_entre_temps',
+            'statuts_contacts_changes', 'modifiees_entre_temps', 'joignabilites_recalculees',
         ], 0);
     }
 
@@ -531,6 +532,9 @@ class CrmEmailsVerifier extends Command
             );
             $this->compteurs['fiches_modifiees'] += count($ecrites);
             $this->compteurs['modifiees_entre_temps'] += count($aEcrire) - count($ecrites);
+            // Chantier D : la joignabilité des fiches dont la vérification vient
+            // de changer, recalculée DANS la transaction du lot.
+            $this->recalculerJoignabilite($workspaceId, array_map(static fn (mixed $l): int => $l instanceof stdClass ? (int) $l->id : 0, $ecrites));
         }, $tracer);
     }
 
@@ -683,11 +687,13 @@ class CrmEmailsVerifier extends Command
                      WHERE c.id = v.fiche_id AND c.workspace_id = ? AND c.deleted_at IS NULL
                        AND lower(btrim(c.email::text)) = v.adresse_attendue
                        AND c.email_status IS NOT DISTINCT FROM v.statut_attendu' . $gardeRebond . '
-                     RETURNING c.id',
+                     RETURNING c.id, c.company_id',
                     $liaisons,
                     false,
                 );
                 $this->compteurs['contacts_modifies'] += count($ecrites);
+                // Chantier D : la personne ET sa fiche (son état dépend de ses personnes).
+                $this->recalculerJoignabilite($workspaceId, array_map(static fn (mixed $l): int => $l instanceof stdClass ? (int) $l->company_id : 0, $ecrites));
                 $this->compteurs['modifiees_entre_temps'] += count($lignes) - count($ecrites);
                 if ($avecStatut) {
                     $this->compteurs['statuts_contacts_changes'] += count($ecrites);
@@ -697,6 +703,23 @@ class CrmEmailsVerifier extends Command
     }
 
     // ── Commun ───────────────────────────────────────────────────────────────
+
+    /**
+     * Recalcule la joignabilité (`App\Crm\Joignabilite\Joignabilite`) des
+     * fiches données et de leurs personnes — appelée DANS la transaction du
+     * lot, après l'écriture : un statut qui change change l'état.
+     *
+     * @param  list<int>  $ids
+     */
+    private function recalculerJoignabilite(string $workspaceId, array $ids): void
+    {
+        $ids = array_values(array_filter(array_unique($ids), static fn (int $id): bool => $id > 0));
+        if ($ids === []) {
+            return;
+        }
+        $ecrites = Joignabilite::recalculer($workspaceId, $ids);
+        $this->compteurs['joignabilites_recalculees'] += $ecrites['entreprises'] + $ecrites['personnes'];
+    }
 
     /**
      * La fiche de vérification d'une adresse, comptée dans le bilan ; null si

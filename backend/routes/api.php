@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
+use App\Http\Controllers\Api\CompanyRelationController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
@@ -164,6 +165,10 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:companies.create');
         Route::get('/companies/{company}', [CompaniesController::class, 'show']);
         Route::put('/companies/{company}', [CompaniesController::class, 'update'])
+            ->middleware('permission:companies.update');
+        // Statut de la relation posé À LA MAIN (chantier B, 2026-10-01) :
+        // tracé, et jamais écrasé ensuite par `crm:relations:importer`.
+        Route::put('/companies/{company}/relation', [CompanyRelationController::class, 'update'])
             ->middleware('permission:companies.update');
         Route::delete('/companies/{company}', [CompaniesController::class, 'destroy'])
             ->middleware('permission:companies.delete');

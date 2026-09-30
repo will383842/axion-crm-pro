@@ -204,6 +204,112 @@ final class Classement
         return $d === '' ? null : (Taxonomy::REGION_PAR_DEPARTEMENT[$d] ?? null);
     }
 
+    /**
+     * Département d'un code postal FRANÇAIS à 5 chiffres (null sinon) — la
+     * règle de `AutoClassifierService` : Corse 200xx-201xx = 2A, 202xx-206xx =
+     * 2B ; outre-mer (97x, 98x) sur trois chiffres ; ailleurs les deux premiers.
+     *
+     * Un code postal peut desservir une commune d'un département voisin : le
+     * département ainsi lu ne sert qu'à en déduire la RÉGION, jamais à être
+     * écrit comme département.
+     */
+    public static function departementDuCodePostal(?string $codePostal): ?string
+    {
+        $cp = preg_replace('/\s+/', '', (string) $codePostal) ?? '';
+        if (preg_match('/^\d{5}$/', $cp) !== 1) {
+            return null;
+        }
+        $deux = substr($cp, 0, 2);
+        if ($deux === '20') {
+            return (int) $cp[2] <= 1 ? '2A' : '2B';
+        }
+        if ($deux === '97' || $deux === '98') {
+            return substr($cp, 0, 3);
+        }
+
+        return $deux;
+    }
+
+    /**
+     * Région d'une fiche FRANÇAISE depuis ses données : le département, sinon
+     * le code postal. Null si ni l'un ni l'autre ne la donne — rien n'est
+     * deviné au-delà (une collectivité d'outre-mer sans région, un code
+     * inconnu, une fiche sans adresse restent sans région).
+     *
+     * @return array{0: ?string, 1: ?string} [région, 'departement'|'code_postal'|null]
+     */
+    public static function regionFrancaise(?string $departement, ?string $codePostal): array
+    {
+        $parDepartement = self::regionDuDepartement($departement);
+        if ($parDepartement !== null) {
+            return [$parDepartement, 'departement'];
+        }
+        $parCodePostal = self::regionDuDepartement(self::departementDuCodePostal($codePostal));
+
+        return $parCodePostal !== null ? [$parCodePostal, 'code_postal'] : [null, null];
+    }
+
+    /**
+     * Nature DÉDUITE d'une fiche qui n'en a pas (chantier C, 2026-10-01), avec
+     * le motif — ou [null, null] : rien n'est deviné. Dans cet ordre :
+     *
+     *  1. la catégorie juridique INSEE (`legal_form`) quand elle tranche :
+     *     `92xx` (associations loi 1901) → `association` ; `5xxx` (sociétés
+     *     commerciales) et `1xxx` (entrepreneur individuel) → `entreprise` ;
+     *  2. le code NAF quand il désigne une organisation : 94.11Z (organisations
+     *     patronales et consulaires), 94.12Z (professionnelles), 94.20Z
+     *     (syndicats de salariés) → `federation` ; 94.99Z (organisations
+     *     fonctionnant par adhésion volontaire) → `association` ; 84.xx
+     *     (administration publique) → `institution` ;
+     *  3. un SIREN, sans catégorie juridique qui dise autre chose, et sans code
+     *     NAF d'organisation (84, 94, 99) → `entreprise` : une fiche immatriculée
+     *     au répertoire SIRENE dont rien ne dit qu'elle n'est pas une société.
+     *
+     * Une catégorie juridique CONNUE et non tranchée (droit public 7xxx, autre
+     * personne morale 6xxx, 8xxx, 9xxx hors 92) n'est pas surchargée par la
+     * règle du SIREN : la fiche reste sans nature, et elle est comptée.
+     *
+     * N'est PAS appelée par la collecte, l'enrichissement ni le reclassement
+     * (`nature()` y reste la règle « INSEE → entreprise ») : seulement par
+     * `crm:referentiels:combler-trous`, sur demande, essai à blanc d'abord.
+     *
+     * @return array{0: ?string, 1: ?string} [nature, 'forme_juridique'|'naf'|'siren'|null]
+     */
+    public static function natureDeduite(?string $formeJuridique, ?string $naf, ?string $nafRev2, ?string $siren): array
+    {
+        $forme = preg_replace('/\D/', '', (string) $formeJuridique) ?? '';
+        if ($forme !== '') {
+            if (str_starts_with($forme, '92')) {
+                return ['association', 'forme_juridique'];
+            }
+            if ($forme[0] === '5' || $forme[0] === '1') {
+                return ['entreprise', 'forme_juridique'];
+            }
+        }
+
+        $code = trim((string) $nafRev2);
+        if ($code === '' && trim((string) $naf) !== '') {
+            $code = (string) (NomenclatureNaf::classer($naf)->codeRev2 ?? '');
+        }
+        $parNaf = match (true) {
+            in_array($code, ['94.11Z', '94.12Z', '94.20Z'], true) => 'federation',
+            $code === '94.99Z' => 'association',
+            str_starts_with($code, '84.') => 'institution',
+            default => null,
+        };
+        if ($parNaf !== null) {
+            return [$parNaf, 'naf'];
+        }
+
+        $nafOrganisation = str_starts_with($code, '84.') || str_starts_with($code, '94.') || str_starts_with($code, '99.');
+        $sirenValide = preg_match('/^\d{9}$/', trim((string) $siren)) === 1;
+        if ($sirenValide && $forme === '' && ! $nafOrganisation) {
+            return ['entreprise', 'siren'];
+        }
+
+        return [null, null];
+    }
+
     public static function libelleSecteur(string $cle): string
     {
         return Taxonomy::SECTEURS[$cle] ?? $cle;

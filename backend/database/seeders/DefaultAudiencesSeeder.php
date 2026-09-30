@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Crm\Relations\RelationsProspection;
 use App\Models\EmailAudience;
 use App\Models\Workspace;
 use Illuminate\Database\Seeder;
@@ -16,6 +17,11 @@ use Illuminate\Database\Seeder;
  *
  * Idempotent : updateOrCreate sur (workspace_id, name). Les critères n'utilisent que
  * des champs de AudienceBuilderService::WHITELIST_FIELDS.
+ *
+ * 2026-10-01 (chantier B) — ce sont des audiences de PROSPECTION : chacune
+ * exclut les relations établies (clients, partenaires, presse, fournisseurs,
+ * investisseurs) par un bloc `not` visible, `RelationsProspection`. Les
+ * audiences déjà en base le reçoivent par la migration `2026_10_01_000021`.
  */
 class DefaultAudiencesSeeder extends Seeder
 {
@@ -30,6 +36,7 @@ class DefaultAudiencesSeeder extends Seeder
                         ['field' => 'has_email', 'op' => 'eq', 'value' => true],
                         ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
                     ],
+                    'not' => [RelationsProspection::conditionExclusion()],
                 ],
             ],
             [
@@ -41,6 +48,7 @@ class DefaultAudiencesSeeder extends Seeder
                         ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
                         ['field' => 'region_code', 'op' => 'eq', 'value' => '11'],
                     ],
+                    'not' => [RelationsProspection::conditionExclusion()],
                 ],
             ],
             [
@@ -51,6 +59,7 @@ class DefaultAudiencesSeeder extends Seeder
                         ['field' => 'has_email', 'op' => 'eq', 'value' => true],
                         ['field' => 'best_email_confidence', 'op' => 'eq', 'value' => 'A'],
                     ],
+                    'not' => [RelationsProspection::conditionExclusion()],
                 ],
             ],
         ];

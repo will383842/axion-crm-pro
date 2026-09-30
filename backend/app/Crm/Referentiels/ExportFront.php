@@ -2,6 +2,8 @@
 
 namespace App\Crm\Referentiels;
 
+use App\Crm\Joignabilite\Joignabilite;
+use App\Crm\Relations\RelationsProspection;
 use App\Crm\Taxonomy;
 
 /**
@@ -47,6 +49,13 @@ final class ExportFront
             self::liste('METIERS', 'CleMetier', Metiers::liste(), 'Métiers — étiquette automatique `metier-<code>` (depuis la sous-classe NAF rév. 2).'),
             "/** Préfixe du slug de l'étiquette d'un métier : `metier-` + code. */\n"
                 . 'export const PREFIXE_ETIQUETTE_METIER = ' . self::chaine(EtiquettesClassement::PREFIXE_METIER) . ";\n",
+            // Joignabilité (chantier D, 2026-10-01) — `companies.joignabilite`, `contacts.joignabilite`.
+            self::liste('JOIGNABILITES', 'CleJoignabilite', Joignabilite::LIBELLES, 'Joignabilité calculée — `companies.joignabilite`, `contacts.joignabilite`.'),
+            // Chantier B (2026-10-01) — le défaut d'exclusion des audiences de prospection.
+            "/** Types de relation qu'une audience de PROSPECTION exclut par défaut (`RelationsProspection`). */\n"
+                . 'export const RELATIONS_HORS_PROSPECTION = ['
+                . implode(', ', array_map(static fn (string $v): string => self::chaine($v), RelationsProspection::HORS_PROSPECTION))
+                . "] as const;\n",
         ];
 
         return <<<'TS'

@@ -154,7 +154,7 @@ class MediaLinkToCompanies extends Command
                     ->where(static fn ($x) => $x->where('entity_a_id', $editeur)->where('entity_b_id', $provisoire))
                     ->orWhere(static fn ($x) => $x->where('entity_a_id', $provisoire)->where('entity_b_id', $editeur)))
                 ->exists()
-                || DB::table('fusions_fiches')->where('workspace_id', $ws)
+                || false && DB::table('fusions_fiches')->where('workspace_id', $ws)
                     ->where(static fn ($q) => $q
                         ->where(static fn ($x) => $x->where('garde_id', $editeur)->where('absorbee_id', $provisoire))
                         ->orWhere(static fn ($x) => $x->where('garde_id', $provisoire)->where('absorbee_id', $editeur)))

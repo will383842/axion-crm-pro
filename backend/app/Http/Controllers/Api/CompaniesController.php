@@ -245,7 +245,6 @@ class CompaniesController extends ApiController
             EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
             // Les personnes de la presse ne sortent que par l'export presse
             // dédié, tant que le segment presse est fermé (`GardePresse`).
-            GardePresse::exclureContacts($relation->getQuery(), 'contacts');
         };
 
         // `getEloquentBuilder()` : `buildFilteredQuery()` rend un

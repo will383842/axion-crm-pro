@@ -47,6 +47,10 @@ const SD_TABLES = ['company_tag', 'candidate_tag', 'tags'];
 const SD_PERMIS = [
     // Retrait des liens automatiques devenus faux (classement), et suppression
     // des étiquettes inemployées SUR OPTION seulement (--supprimer-etiquettes-orphelines).
+    // Levée du tag de provenance presse (`src:scraping-presse-2026`) d'une fiche
+    // réparée, SUR OPTION seulement (--lever-provenance-posee-par-harmonisation),
+    // quand il est PROUVÉ que l'harmonisation l'y a posé (2026-09-30, PR #268).
+    'Console/Commands/CrmPresseReparerMediaIncertain.php' => ['requete' => 1],
     'Console/Commands/CrmReferentielsReclasser.php' => ['sql' => 2],
     // Texte d'aide affiché à l'opérateur (procédure de retour arrière), pas une requête.
     'Console/Commands/ScrapingBackfillSrcTags.php' => ['sql' => 1],

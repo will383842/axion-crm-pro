@@ -487,6 +487,10 @@ final class Taxonomy
         'media-type' => 'custom',
         'media-zone' => 'geo',
         'media-theme' => 'custom',
+        // Média INCERTAIN (2026-09-30) : fiche vue comme média par son seul code
+        // NAF 63.12Z / 58.19Z (`App\Crm\Presse\MediaIncertain`) — dérivée,
+        // posée et retirée par la synchro automatique ; à vérifier (chantier F).
+        'media-possible' => 'custom',
     ];
 
     /**

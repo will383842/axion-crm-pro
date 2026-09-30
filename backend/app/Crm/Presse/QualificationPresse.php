@@ -193,13 +193,24 @@ final class QualificationPresse
     /**
      * La fiche est-elle DÉJÀ une fiche de presse ? Tag de provenance presse,
      * ligne `media` vivante rattachée, nature `media` ou relation
-     * `presse_media`.
+     * `presse_media` — jamais un média incertain (`MediaIncertain`).
      */
     public static function estFichePresse(int $companyId): bool
     {
         $fiche = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')
-            ->first(['entity_nature', 'relation_type']);
+            ->first(['entity_nature', 'relation_type', 'relation_saisie_manuelle_at']);
         if ($fiche === null) {
+            return false;
+        }
+        // Une relation `presse_media` SAISIE À LA MAIN : Will a tranché, la fiche
+        // est de la presse — avant toute autre règle.
+        if ($fiche->relation_type === self::RELATION && $fiche->relation_saisie_manuelle_at !== null) {
+            return true;
+        }
+        // Un MÉDIA INCERTAIN (NAF 63.12Z / 58.19Z, seule source `naf-extract`)
+        // n'est pas de la presse, même s'il a été basculé à tort avant la
+        // règle : une liste déclarative ne s'y rattache pas.
+        if (MediaIncertain::fiche($companyId)) {
             return false;
         }
         if ($fiche->entity_nature === self::NATURE || $fiche->relation_type === self::RELATION) {

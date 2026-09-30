@@ -30,7 +30,7 @@ import {
 const PAR_PAGE = 50;
 
 export function ListeManuelleDetailPage() {
-  const params = useParams({ strict: false }) as { listeId?: string };
+  const params: { listeId?: string } = useParams({ strict: false });
   const id = Number(params.listeId);
   const lisible = Number.isFinite(id) && id > 0;
   const qc = useQueryClient();

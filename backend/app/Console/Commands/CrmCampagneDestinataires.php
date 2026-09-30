@@ -78,6 +78,16 @@ class CrmCampagneDestinataires extends Command
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
 
+    /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
+    private const COMPTEURS_MOTIFS = [
+        EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
+        EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
+        EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
+        EligibiliteAdresse::DEJA_INFORMEE => 'ecartees_deja_informees',
+        EligibiliteAdresse::OPPOSITION => 'ecartees_opposition',
+        EligibiliteAdresse::ADRESSE_PARTAGEE => 'ecartees_adresse_partagee',
+    ];
+
     public function handle(): int
     {
         $segment = (string) $this->argument('segment');

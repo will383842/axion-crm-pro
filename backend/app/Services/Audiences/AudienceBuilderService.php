@@ -381,8 +381,9 @@ class AudienceBuilderService
                     $ou . ' : le champ liste_manuelle n admet que in et not_in, recu ' . self::citer($op),
                 );
             }
-            $ids = is_array($value) ? ListesManuelles::entiers($value) : [];
-            if ($ids === [] || ! is_array($value) || count($ids) !== count($value) || count($ids) > ListesManuelles::MAX_LISTES_PAR_CRITERE) {
+            // `in` / `not_in` exigent déjà une liste (contrôle ci-dessus).
+            $ids = ListesManuelles::entiers($value);
+            if ($ids === [] || count($ids) !== count($value) || count($ids) > ListesManuelles::MAX_LISTES_PAR_CRITERE) {
                 throw CritereAudienceInvalide::parce(
                     $ou . ' : liste_manuelle exige de 1 a ' . ListesManuelles::MAX_LISTES_PAR_CRITERE
                     . ' identifiants de listes distincts (entiers positifs)',

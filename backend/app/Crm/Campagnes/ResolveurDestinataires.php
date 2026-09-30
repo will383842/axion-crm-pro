@@ -8,6 +8,7 @@ use App\Crm\Emails\VerificationEmail;
 use App\Crm\Listes\ListesManuelles;
 use App\Models\Company;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Services\Audiences\CritereAudienceInvalide;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -73,6 +74,7 @@ final class ResolveurDestinataires
      * @return array<string, mixed>
      *
      * @throws RuntimeException audience trop large pour un aperçu direct
+     * @throws CritereAudienceInvalide critères refusés (liste inconnue, champ hors liste blanche…)
      */
     public function resoudre(string $workspaceId, array $criteria, ReglageDestinataires $reglage, ?int $echantillon = 20): array
     {

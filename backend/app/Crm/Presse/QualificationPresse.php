@@ -172,14 +172,18 @@ final class QualificationPresse
      */
     public static function completerContact(int $contactId, ?string $externalRef, array $metadata): void
     {
-        $contact = DB::table('contacts')->where('id', $contactId)->first(['id', 'workspace_id', 'external_ref', 'metadata']);
+        $contact = DB::table('contacts')->where('id', $contactId)->whereNull('deleted_at')
+            ->first(['id', 'workspace_id', 'external_ref', 'metadata']);
         if ($contact === null) {
             return;
         }
 
         $maj = [];
-        if ($externalRef !== null && $contact->external_ref === null
-            && ! DB::table('contacts')->where('workspace_id', $contact->workspace_id)->where('external_ref', $externalRef)->exists()) {
+        // La référence est UNIQUE par espace, corbeille comprise : une
+        // référence portée par un contact à la corbeille n'est pas libre.
+        $prise = $externalRef === null ? null : DB::table('contacts')->where('workspace_id', $contact->workspace_id)
+            ->where('external_ref', $externalRef)->first(['id', 'deleted_at']);
+        if ($externalRef !== null && $contact->external_ref === null && $prise === null) {
             $maj['external_ref'] = $externalRef;
         }
 

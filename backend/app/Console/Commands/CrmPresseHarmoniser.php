@@ -658,8 +658,9 @@ class CrmPresseHarmoniser extends Command
         if ($id !== null) {
             return (int) $id;
         }
-        // Rejoué (IDEMPOTENT) sur une fiche absorbée depuis par une fusion.
-        $absorbee = DB::table('companies')->where('workspace_id', $this->workspaceId);
+        // Rejoué (IDEMPOTENT) sur une fiche absorbée depuis par une fusion :
+        // elle est à la corbeille, et sa fiche gardée est celle à qualifier.
+        $absorbee = DB::table('companies')->where('workspace_id', $this->workspaceId)->whereNotNull('deleted_at');
         if (isset($ancre['siren'])) {
             $absorbee->where('siren', $ancre['siren']);
         } else {

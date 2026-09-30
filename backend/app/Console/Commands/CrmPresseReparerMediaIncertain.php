@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\MediaIncertain;
 use App\Crm\Presse\QualificationPresse;
@@ -276,8 +275,9 @@ class CrmPresseReparerMediaIncertain extends Command
         $meta = is_array($meta) ? $meta : [];
         $avant = is_array($meta[QualificationPresse::CLE_AVANT] ?? null) ? $meta[QualificationPresse::CLE_AVANT] : null;
         $manuelle = $f->relation_saisie_manuelle_at !== null;
-        $fusion = DB::table('companies')->where('id', $id)
-            ->whereRaw('NOT (' . FusionFiches::conditionSql('companies.id') . ')')->exists();
+        // Une fusion EN COURS (non annulée) implique la fiche, gardée ou absorbée.
+        $fusion = DB::table('fusions_fiches')->where('workspace_id', $this->workspaceId)->whereNull('annulee_at')
+            ->where(static fn ($q) => $q->where('garde_id', $id)->orWhere('absorbee_id', $id))->exists();
 
         $maj = [];
 

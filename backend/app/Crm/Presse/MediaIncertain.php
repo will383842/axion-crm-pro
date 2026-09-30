@@ -56,10 +56,10 @@ final class MediaIncertain
 
     public const NOM_ETIQUETTE = 'Média possible : à vérifier (lecture du site)';
 
-    /** La fiche est-elle un média incertain (règle ci-dessus) ? */
+    /** La fiche VIVANTE est-elle un média incertain (règle ci-dessus) ? */
     public static function fiche(int $companyId): bool
     {
-        return DB::table('companies as c')->where('c.id', $companyId)
+        return DB::table('companies as c')->where('c.id', $companyId)->whereNull('c.deleted_at')
             ->whereRaw(self::conditionSql('c.id', 'c'))
             ->exists();
     }

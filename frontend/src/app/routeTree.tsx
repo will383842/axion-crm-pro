@@ -14,6 +14,8 @@ import { EvenementDetailPage } from '@/features/evenements/EvenementDetailPage';
 import { FederationsPage } from '@/features/federations/FederationsPage';
 import { FederationDetailPage } from '@/features/federations/FederationDetailPage';
 import { DoublonsPage } from '@/features/doublons/DoublonsPage';
+import { ListesManuellesPage } from '@/features/listes/ListesManuellesPage';
+import { ListeManuelleDetailPage } from '@/features/listes/ListeManuelleDetailPage';
 // D22-005 — la route `/contacts` ne monte plus l'écran directement : elle passe
 // par `ContactsRoute`, qui redirige vers `/console/contacts` quand le drapeau
 // `console_v2` est ouvert. Sans cela, l'écran restait joignable par signet alors
@@ -120,6 +122,9 @@ const federationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: 
 const federationDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/federations/$companyId', component: FederationDetailPage });
 // 2026-09-30 — chantier 5 : la file des doublons à vérifier.
 const doublonsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/doublons', component: DoublonsPage });
+// 2026-09-30 — listes manuelles : des fiches choisies à la main, sous un nom.
+const listesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/listes', component: ListesManuellesPage });
+const listeDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/listes/$listeId', component: ListeManuelleDetailPage });
 const mediaRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media', component: MediaListPage });
 const mediaDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/media/$mediaId', component: MediaDetailPage });
 const journalistsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/journalists', component: JournalistsListPage });
@@ -302,6 +307,8 @@ export const routeTree = rootRoute.addChildren([
     federationsRoute,
     federationDetailRoute,
     doublonsRoute,
+    listesRoute,
+    listeDetailRoute,
     mediaRoute,
     mediaDetailRoute,
     journalistsRoute,

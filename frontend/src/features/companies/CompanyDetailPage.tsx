@@ -24,6 +24,7 @@ import { ContactsCard, type ContactItem } from './components/ContactsCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
 import { EvenementsCard } from './components/EvenementsCard';
+import { ListesDeLaFiche } from '@/features/listes/ListesDeLaFiche';
 
 interface CompanyDetail {
   id: number;
@@ -262,6 +263,8 @@ export function CompanyDetailPage() {
         <aside className="space-y-6">
           <ContactsCard contacts={c.contacts ?? []} />
           <EvenementsCard companyId={c.id} />
+          {/* 2026-09-30 — les listes manuelles de la fiche, et « ajouter à une liste ». */}
+          <ListesDeLaFiche companyId={c.id} contacts={c.contacts ?? []} />
           <QualityScoreCard
             score={c.quality_score}
             breakdown={c.quality_breakdown ?? undefined}

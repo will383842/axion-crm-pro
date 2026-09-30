@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
 import { Pagination } from "./components/Pagination";
+import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
 
 type Company = CompanyRowData & {
   discovery_source?: string | null;
@@ -672,6 +673,8 @@ export function CompaniesListPage() {
               >
                 Retirer
               </Button>
+              {/* 2026-09-30 — les fiches cochées vont dans une liste manuelle. */}
+              <AjouterAUneListe companyIds={[...selection]} onAjoute={() => setSelection(new Set())} />
               <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
                 Annuler la sélection
               </Button>

@@ -28,6 +28,14 @@ import {
   type TabItem,
 } from '@/components/ui';
 import type { EmailAudience } from './AudiencesListPage';
+import {
+  REGLAGE_PAR_DEFAUT,
+  reglageVersApi,
+  type ApercuDestinataires,
+  type ReglageDestinataires,
+} from './destinataires';
+import { ReglageDestinatairesChamps } from './ReglageDestinatairesChamps';
+import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,10 +58,12 @@ interface MembersResponse {
   data: AudienceMember[];
 }
 
-type DetailTab = 'members' | 'criteria' | 'campaign';
+type DetailTab = 'members' | 'destinataires' | 'criteria' | 'campaign';
 
 const TABS: Array<TabItem<DetailTab>> = [
   { id: 'members',  label: 'Membres',               icon: <Users2 className="h-3.5 w-3.5" /> },
+  // 2026-09-30 — à qui l'audience écrirait : réglage et aperçu chiffré.
+  { id: 'destinataires', label: 'Destinataires',    icon: <Mail className="h-3.5 w-3.5" /> },
   { id: 'criteria', label: 'Critères',              icon: <Zap className="h-3.5 w-3.5" /> },
   { id: 'campaign', label: 'Préparation campagne',  icon: <Send className="h-3.5 w-3.5" /> },
 ];
@@ -282,6 +292,9 @@ export function AudienceDetailPage() {
           onRetry={() => void membersRefetch()}
         />
       ) : null}
+      {tab === 'destinataires' ? (
+        <DestinatairesTab audience={audience} />
+      ) : null}
       {tab === 'criteria' ? (
         <CriteriaTab audience={audience} />
       ) : null}
@@ -380,6 +393,65 @@ function MembersTab({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab — Destinataires (2026-09-30)
+// ---------------------------------------------------------------------------
+/**
+ * Le réglage « à qui écrire dans chaque organisation », enregistré sur
+ * l'audience, et l'aperçu chiffré qu'il donne : organisations, adresses
+ * DISTINCTES (jamais deux fois la même), exclues par motif. Rien n'est envoyé.
+ */
+function DestinatairesTab({ audience }: { audience: EmailAudience }) {
+  const qc = useQueryClient();
+  const [reglage, setReglage] = useState<ReglageDestinataires>(audience.destinataires ?? REGLAGE_PAR_DEFAUT);
+  const listeExigee = (audience.criteria.all ?? []).some(
+    (c) => c.field === 'liste_manuelle' && c.op === 'in',
+  );
+
+  const apercu = useQuery({
+    queryKey: ['audience', audience.id, 'destinataires'],
+    queryFn: async () =>
+      enveloppe<ApercuDestinataires>((await api.get(`/audiences/${audience.id}/destinataires`)).data),
+  });
+
+  const enregistrement = useMutation({
+    mutationFn: async () => (await api.put(`/audiences/${audience.id}`, reglageVersApi(reglage))).data as unknown,
+    onSuccess: () => {
+      toast.success('Réglage des destinataires enregistré');
+      void qc.invalidateQueries({ queryKey: ['audience', audience.id] });
+    },
+    onError: (e) => toast.error(extractApiMessage(e) ?? 'Enregistrement impossible'),
+  });
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <Card padding="md" className="space-y-4">
+        <ReglageDestinatairesChamps valeur={reglage} onChange={setReglage} listeExigee={listeExigee} />
+        <Button
+          variant="primary"
+          size="md"
+          loading={enregistrement.isPending}
+          onClick={() => enregistrement.mutate()}
+        >
+          Enregistrer le réglage
+        </Button>
+      </Card>
+      <Card padding="md">
+        <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Aperçu (rien n’est envoyé)</h3>
+        {apercu.isLoading ? (
+          <div className="flex h-24 items-center justify-center"><Spinner /></div>
+        ) : apercu.error !== null ? (
+          <QueryErrorState error={apercu.error} contexte="les destinataires de cette audience" onRetry={() => void apercu.refetch()} />
+        ) : apercu.data ? (
+          <ApercuDestinatairesCarte apercu={apercu.data} />
+        ) : (
+          <ReponseVideState contexte="les destinataires de cette audience" onRetry={() => void apercu.refetch()} />
+        )}
+      </Card>
+    </div>
   );
 }
 

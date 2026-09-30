@@ -268,7 +268,7 @@ final class QualificationPresse
                 "normalized_hash = encode(digest(normalize_name(coalesce(?, '') || '_' || ?) || '_' || ?::TEXT, 'sha256'), 'hex')",
                 [$prenom, $nom, $companyId],
             )
-            ->when($email !== null, static fn ($q) => $q->whereRaw('lower(email::text) <> ?', [mb_strtolower((string) $email)]))
+            ->when($email !== null, static fn ($q) => $q->where('email', '<>', (string) $email))
             ->exists();
     }
 

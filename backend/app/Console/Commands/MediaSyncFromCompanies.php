@@ -57,7 +57,7 @@ class MediaSyncFromCompanies extends Command
               AND m.website IS DISTINCT FROM c.website
               AND (
                     NULLIF(m.website, '') IS NULL
-                 OR NOT (c.foreign_id LIKE 'media:%' OR m.source = 'liste-presse')
+                 OR NOT (COALESCE(c.foreign_id, '') LIKE 'media:%' OR COALESCE(m.source, '') = 'liste-presse')
               )
               AND m.deleted_at IS NULL
               AND NOT EXISTS (

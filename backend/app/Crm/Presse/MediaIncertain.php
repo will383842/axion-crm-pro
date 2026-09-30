@@ -2,6 +2,7 @@
 
 namespace App\Crm\Presse;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\Taxonomy;
 use Illuminate\Support\Facades\DB;
 
@@ -29,8 +30,21 @@ use Illuminate\Support\Facades\DB;
  *      presse (`cppap`, `spel`, `agence`, `press-kit`, `liste-presse`, `arcom`,
  *      `wikidata`…) suffit à en faire un média ;
  *   2. son code NAF (`naf`, tel que l'INSEE l'a donné, ou `naf_rev2`) commence
- *      par 63.12 ou 58.19 — ou, faute de tout code NAF sur la fiche, toutes ses
- *      lignes sont de type `portail_web` / `presse_autre`.
+ *      par 63.12 ou 58.19 — OU toutes ses lignes sont `portail_web` (type que
+ *      `naf-extract` ne donne qu'au 63.12 : si le NAF a changé depuis
+ *      l'extraction, la ligne reste une déduction du 63.12) — OU, faute de
+ *      tout code NAF sur la fiche, toutes ses lignes sont `portail_web` /
+ *      `presse_autre` ;
+ *   3. AUCUNE autre preuve de presse (relecture A09 de #268) :
+ *      - pas de relation `presse_media` SAISIE À LA MAIN (Will a tranché) ;
+ *      - aucun passage d'une LISTE PRESSE importée (`scraper_runs`
+ *        `presse-2026:liste:…`) — l'importeur complète SUR PLACE une ligne
+ *        `naf-extract` existante sans en changer la source : c'est le passage
+ *        qui en garde la trace ;
+ *      - aucun contact de la presse (`GardePresse::estContactPresseSql`,
+ *        définition de référence : `journaliste:<id>` ou source `presse-2026`),
+ *        corbeille comprise ;
+ *      - aucun journaliste vivant rattaché à l'une de ses lignes `media`.
  *
  * On se fonde sur le NAF de la FICHE (ce que dit l'INSEE aujourd'hui) et sur
  * la SOURCE des lignes (ce qui a fait croire que c'est un média), jamais sur
@@ -66,7 +80,7 @@ final class MediaIncertain
 
     /**
      * SQL : la fiche `$aliasFiche` (dont l'identifiant est `$colonneId`) est un
-     * média incertain. Alias INTERNES réservés : `mi_a`, `mi_b`, `mi_c`. Aucun
+     * média incertain. Alias INTERNES réservés : `mi_a` à `mi_g`. Aucun
      * argument n'est une donnée utilisateur.
      */
     public static function conditionSql(string $colonneId = 'companies.id', string $aliasFiche = 'companies'): string
@@ -77,13 +91,26 @@ final class MediaIncertain
         $naf = "regexp_replace(upper(coalesce({$aliasFiche}.naf, '')), '[^0-9A-Z]', '', 'g')";
         $nafRev2 = "regexp_replace(upper(coalesce({$aliasFiche}.naf_rev2, '')), '[^0-9A-Z]', '', 'g')";
 
+        $presse = QualificationPresse::SOURCE;
+        $relation = QualificationPresse::RELATION;
+        $liste = 'pivot:' . $presse . ':' . $presse . ':liste:%';
+
         return "(EXISTS (SELECT 1 FROM media mi_a WHERE mi_a.company_id = {$colonneId} AND mi_a.deleted_at IS NULL)"
             . " AND NOT EXISTS (SELECT 1 FROM media mi_b WHERE mi_b.company_id = {$colonneId} AND mi_b.deleted_at IS NULL"
             . " AND mi_b.source IS DISTINCT FROM '{$source}')"
             . " AND ({$naf} ~ '{$motif}' OR {$nafRev2} ~ '{$motif}'"
+            . " OR NOT EXISTS (SELECT 1 FROM media mi_f WHERE mi_f.company_id = {$colonneId} AND mi_f.deleted_at IS NULL"
+            . " AND mi_f.media_type <> 'portail_web')"
             . " OR ({$naf} = '' AND {$nafRev2} = ''"
             . " AND NOT EXISTS (SELECT 1 FROM media mi_c WHERE mi_c.company_id = {$colonneId} AND mi_c.deleted_at IS NULL"
-            . " AND mi_c.media_type NOT IN ({$types})))))";
+            . " AND mi_c.media_type NOT IN ({$types}))))"
+            . " AND NOT ({$aliasFiche}.relation_type = '{$relation}' AND {$aliasFiche}.relation_saisie_manuelle_at IS NOT NULL)"
+            . " AND NOT EXISTS (SELECT 1 FROM scraper_runs mi_d WHERE mi_d.company_id = {$colonneId}"
+            . " AND mi_d.source = '{$presse}' AND mi_d.dedup_key LIKE '{$liste}')"
+            . " AND NOT EXISTS (SELECT 1 FROM contacts mi_e WHERE mi_e.company_id = {$colonneId}"
+            . ' AND ' . GardePresse::estContactPresseSql('mi_e') . ')'
+            . ' AND NOT EXISTS (SELECT 1 FROM journalists mi_g JOIN media mi_gm ON mi_gm.id = mi_g.media_id'
+            . " WHERE mi_gm.company_id = {$colonneId} AND mi_gm.deleted_at IS NULL AND mi_g.deleted_at IS NULL))";
     }
 
     /**

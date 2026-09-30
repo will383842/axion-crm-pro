@@ -228,20 +228,68 @@ test('la reparation remet la nature et la relation d AVANT, pose media-possible,
         ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT)->count())->toBe(1);
 });
 
-test('la reparation ne touche PAS une relation saisie a la main', function () {
+test('une relation presse_media saisie a la main : la fiche reste presse, la reparation ne la touche pas', function () {
     $fiche = pmiFiche($this->espace, '63.12Z');
     pmiMedia($this->espace, $fiche, 'portail_web');
     pmiBasculer($this->espace, $fiche);
     // Will confirme ensuite « presse » à la main.
     DB::table('companies')->where('id', $fiche)->update(['relation_saisie_manuelle_at' => now()]);
 
+    // Will a tranché : ce n'est plus un média incertain, c'est de la presse.
+    expect(MediaIncertain::fiche($fiche))->toBeFalse()
+        ->and(QualificationPresse::estFichePresse($fiche))->toBeTrue();
+
     $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true]);
 
     $f = DB::table('companies')->where('id', $fiche)->first();
     expect($r['code'])->toBe(0)
         ->and($f->relation_type)->toBe('presse_media')
-        ->and(pmiCompteur($r['sortie'], 'relations_saisies_a_la_main'))->toBe(1)
+        ->and($f->entity_nature)->toBe('media')
+        ->and(pmiCompteur($r['sortie'], 'fiches_lues'))->toBe(0)
         ->and(pmiCompteur($r['sortie'], 'relations_remises'))->toBe(0);
+});
+
+test('un portail_web naf-extract reste incertain meme si le NAF de la fiche a change depuis l extraction', function () {
+    $portail = pmiFiche($this->espace, '62.01Z');
+    pmiMedia($this->espace, $portail, 'portail_web');
+    $temoin = pmiFiche($this->espace, '62.01Z');
+    pmiMedia($this->espace, $temoin, 'presse_revue');
+
+    expect(MediaIncertain::fiche($portail))->toBeTrue()
+        ->and(MediaIncertain::fiche($temoin))->toBeFalse();
+
+    $r = pmiCommande('crm:presse:harmoniser');
+
+    expect($r['code'])->toBe(0)
+        ->and(DB::table('companies')->where('id', $portail)->value('relation_type'))->toBe('prospect')
+        ->and(DB::table('companies')->where('id', $temoin)->value('relation_type'))->toBe('presse_media');
+});
+
+test('des journalistes rattaches (contact presse) : la fiche n est pas incertaine, la reparation ne la touche pas', function () {
+    $fiche = pmiFiche($this->espace, '58.14Z');
+    $media = pmiMedia($this->espace, $fiche, 'presse_revue');
+    DB::table('journalists')->insert([
+        'workspace_id' => $this->espace, 'media_id' => $media, 'first_name' => 'Zoe', 'last_name' => 'ZZJOURNALISTE',
+        'email' => 'zoe.zz@zz-revue.example.invalid', 'acces' => 'email_redaction', 'source' => 'ours',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    expect(pmiCommande('crm:presse:harmoniser')['code'])->toBe(0);
+    expect(DB::table('contacts')->where('company_id', $fiche)->where('external_ref', 'like', 'journaliste:%')->exists())->toBeTrue();
+    // L'ancienne harmonisation ne regardait pas le NAF : le NAF réel est 63.12Z.
+    DB::table('companies')->where('id', $fiche)->update(['naf' => '63.12Z']);
+    expect(MediaIncertain::fiche($fiche))->toBeFalse();
+
+    // Le journaliste retiré de la ligne source : le CONTACT presse suffit encore.
+    DB::table('journalists')->where('media_id', $media)->update(['deleted_at' => now()]);
+    expect(MediaIncertain::fiche($fiche))->toBeFalse();
+
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true]);
+
+    $f = DB::table('companies')->where('id', $fiche)->first();
+    expect($r['code'])->toBe(0)
+        ->and($f->relation_type)->toBe('presse_media')
+        ->and($f->entity_nature)->toBe('media')
+        ->and(pmiCompteur($r['sortie'], 'fiches_lues'))->toBe(0);
 });
 
 test('la reparation ne touche jamais une fiche portee aussi par une vraie source presse', function () {
@@ -307,7 +355,7 @@ test('sans --appliquer (ou avec --dry-run) la reparation n ecrit RIEN, et compte
 function pmiBasculeeParHarmonisation(string $espace): int
 {
     $fiche = pmiFiche($espace, '58.14Z');
-    pmiMedia($espace, $fiche, 'portail_web');
+    pmiMedia($espace, $fiche, 'presse_revue');
     expect(pmiCommande('crm:presse:harmoniser')['code'])->toBe(0);
     DB::table('companies')->where('id', $fiche)->update(['naf' => '63.12Z']);
     expect(DB::table('companies')->where('id', $fiche)->value('relation_type'))->toBe('presse_media')
@@ -340,21 +388,70 @@ test('levee : le tag de provenance pose par l harmonisation est retire, journali
         ->and(DB::table('companies')->where('id', $fiche)->whereNull('deleted_at')->exists())->toBeTrue();
 });
 
-test('levee REFUSEE quand une liste presse importee est aussi passee par la fiche', function () {
-    $fiche = pmiBasculeeParHarmonisation($this->espace);
-    DB::table('scraper_runs')->insert([
-        'workspace_id' => $this->espace, 'company_id' => $fiche, 'source' => QualificationPresse::SOURCE, 'status' => 'success',
-        'started_at' => now(), 'finished_at' => now(), 'created_at' => now(),
-        'dedup_key' => 'pivot:' . QualificationPresse::SOURCE . ':' . QualificationPresse::SOURCE . ':liste:presse:zz:1:abcdef',
-    ]);
+test('une VRAIE liste presse importee sur la ligne naf-extract : ni incertaine, ni reparee, ni levee', function () {
+    // Harmonisée (58.14Z), puis une liste presse RÉELLE la rejoint par son SIREN
+    // et complète SUR PLACE sa ligne `naf-extract` (la source ne change pas).
+    $fiche = pmiFiche($this->espace, '58.14Z');
+    $media = pmiMedia($this->espace, $fiche, 'presse_revue');
+    expect(pmiCommande('crm:presse:harmoniser')['code'])->toBe(0);
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-pmi-');
+    file_put_contents($fichier, json_encode([
+        'siren' => (string) DB::table('companies')->where('id', $fiche)->value('siren'),
+        'nom' => 'ZZ media fictif', 'type' => 'presse_revue', 'departement' => '69',
+        'site' => 'https://zz-revue.example.invalid', 'journaliste' => null,
+    ], JSON_UNESCAPED_UNICODE) . "\n");
+    try {
+        $import = pmiCommande('crm:presse:importer', ['file' => $fichier]);
+    } finally {
+        @unlink($fichier);
+    }
+    expect($import['code'])->toBe(0)
+        ->and(DB::table('media')->where('id', $media)->value('source'))->toBe('naf-extract')
+        ->and(DB::table('scraper_runs')->where('company_id', $fiche)->where('dedup_key', 'like', '%:liste:%')->exists())->toBeTrue();
+
+    // Le NAF réel est 63.12Z (l'ancienne harmonisation ne le regardait pas).
+    DB::table('companies')->where('id', $fiche)->update(['naf' => '63.12Z']);
+    expect(MediaIncertain::fiche($fiche))->toBeFalse();
 
     $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true, '--force' => true]);
 
+    $f = DB::table('companies')->where('id', $fiche)->first();
     expect($r['code'])->toBe(0)
+        ->and($f->relation_type)->toBe('presse_media')
+        ->and($f->entity_nature)->toBe('media')
         ->and(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
-        ->and(pmiCompteur($r['sortie'], 'provenance_presse_gardee'))->toBe(1)
+        ->and(pmiCompteur($r['sortie'], 'fiches_lues'))->toBe(0)
         ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(0)
+        ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT)->count())->toBe(0)
         ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT_LEVEE)->count())->toBe(0);
+});
+
+test('le plafond de la levee se mesure sur l espace traite, pas sur les liens de tous les espaces', function () {
+    $fiche = pmiFiche($this->espace, '63.12Z');
+    pmiMedia($this->espace, $fiche, 'portail_web');
+    pmiBasculer($this->espace, $fiche);
+
+    // Un autre espace, riche en liens : sur TOUTE la table, la levée pèserait peu.
+    $autre = (string) Str::uuid();
+    DB::table('workspaces')->insert([
+        'id' => $autre, 'slug' => 'zz-autre-espace', 'name' => 'ZZ autre', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $tag = DB::table('tags')->insertGetId([
+        'workspace_id' => $autre, 'slug' => 'zz-autre', 'name' => 'zz-autre', 'category' => 'custom',
+        'kind' => 'manual', 'rules' => '{}', 'is_locked' => false, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    for ($i = 0; $i < 12; $i++) {
+        $c = pmiFiche($autre, '62.01Z');
+        DB::table('company_tag')->insert(['company_id' => $c, 'tag_id' => $tag, 'workspace_id' => $autre, 'assigned_at' => now(), 'assigned_by' => 'user']);
+    }
+    expect(DB::table('company_tag')->where('workspace_id', $this->espace)->count())->toBeLessThan(4);
+
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true]);
+
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('au-delà du plafond')
+        ->and(DB::table('companies')->where('id', $fiche)->value('relation_type'))->toBe('presse_media');
 });
 
 test('levee REFUSEE quand le tag n a pas ete pose par l harmonisation (aucun passage de la porte commune)', function () {

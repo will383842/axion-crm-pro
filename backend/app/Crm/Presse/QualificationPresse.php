@@ -198,9 +198,14 @@ final class QualificationPresse
     public static function estFichePresse(int $companyId): bool
     {
         $fiche = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')
-            ->first(['entity_nature', 'relation_type']);
+            ->first(['entity_nature', 'relation_type', 'relation_saisie_manuelle_at']);
         if ($fiche === null) {
             return false;
+        }
+        // Une relation `presse_media` SAISIE À LA MAIN : Will a tranché, la fiche
+        // est de la presse — avant toute autre règle.
+        if ($fiche->relation_type === self::RELATION && $fiche->relation_saisie_manuelle_at !== null) {
+            return true;
         }
         // Un MÉDIA INCERTAIN (NAF 63.12Z / 58.19Z, seule source `naf-extract`)
         // n'est pas de la presse, même s'il a été basculé à tort avant la

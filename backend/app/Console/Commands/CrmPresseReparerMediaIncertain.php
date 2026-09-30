@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\MediaIncertain;
 use App\Crm\Presse\QualificationPresse;
@@ -163,7 +164,10 @@ class CrmPresseReparerMediaIncertain extends Command
                 ->whereExists(static fn ($q) => $q->selectRaw('1')->from('company_tag as ct')->join('tags as t', 't.id', '=', 'ct.tag_id')
                     ->whereColumn('ct.company_id', 'c.id')->where('t.slug', FichesProtegees::TAG_PRESSE))
                 ->count();
-            if ($auPlus > 0 && ! $this->suppressionAutorisee('company_tag (tag ' . FichesProtegees::TAG_PRESSE . ', au plus)', $auPlus, (int) DB::table('company_tag')->count())) {
+            // Le plafond se mesure sur l'ESPACE traité, pas sur les liens de
+            // tous les espaces (relecture A09 de #268).
+            $total = (int) DB::table('company_tag')->where('workspace_id', $this->workspaceId)->count();
+            if ($auPlus > 0 && ! $this->suppressionAutorisee('company_tag (tag ' . FichesProtegees::TAG_PRESSE . ', au plus)', $auPlus, $total)) {
                 return self::FAILURE;
             }
         }
@@ -450,7 +454,8 @@ class CrmPresseReparerMediaIncertain extends Command
      *    une ligne `media` `naf-extract` de CETTE fiche ;
      *  - le tag a été posé au même moment que le premier de ces passages
      *    (± 5 minutes : même transaction de la porte commune) ;
-     *  - aucun contact de journaliste (`journaliste:<id>`) sur la fiche : ces
+     *  - aucun contact de la presse sur la fiche
+     *    (`GardePresse::estContactPresseSql`, corbeille comprise) : ces
      *    personnes relèvent du régime de la presse.
      * Un passage purgé (`PruneScraperRuns`) fait tomber la preuve : on garde.
      */
@@ -488,7 +493,16 @@ class CrmPresseReparerMediaIncertain extends Command
             return false;
         }
 
-        return ! DB::table('contacts')->where('company_id', $id)->whereNull('deleted_at')->where('external_ref', 'like', 'journaliste:%')->exists();
+        // Définition UNIQUE du contact de presse (`GardePresse`), corbeille comprise.
+        // Corbeille COMPRISE, voulu : un journaliste retiré reste la preuve que
+        // la fiche a porté des personnes de la presse.
+        $contactPresse = DB::selectOne(
+            'SELECT EXISTS (SELECT 1 FROM contacts WHERE contacts.company_id = ? AND '
+            . GardePresse::estContactPresseSql('contacts') . ') AS e',
+            [$id],
+        );
+
+        return ! (bool) ($contactPresse->e ?? true);
     }
 
     /** @param  array<string, int>  $delta */

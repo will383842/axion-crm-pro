@@ -897,7 +897,16 @@ final class FusionFiches
 
     // ── Outils ──────────────────────────────────────────────────────────────
 
-    /** La fiche porte-t-elle le tag de provenance de la presse ? (corbeille comprise) */
+    /**
+     * La fiche porte-t-elle le tag de provenance de la presse ? (corbeille comprise)
+     *
+     * ⚠️ Ce n'est PAS `QualificationPresse::estFichePresse`, et c'est voulu
+     * (relecture A09 de #268) : celle-ci ignore la corbeille (une fiche
+     * absorbée y est) et répond « presse » dès qu'une ligne `media` est
+     * rattachée — elle bloquerait la fusion automatique de ~30 000 fiches Sirene
+     * (productions audiovisuelles, extractions NAF) que rien ne protège. Ici, la
+     * question est la PROTECTION posée par l'harmonisation : le tag, seul.
+     */
     private function estFichePresse(string $ws, int $companyId): bool
     {
         return DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')

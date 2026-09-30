@@ -360,3 +360,35 @@ test('un journaliste OPPOSE ou EFFACE dans la console n est jamais recree : par 
         // Ni réactivée, ni touchée : la console garde son opposition.
         ->and(DB::table('journalists')->where('opt_out', true)->count())->toBe($opposes);
 });
+
+test('source DECLARATIVE : une fiche existante hors presse est rejetee intacte ; une fiche de presse existante ne recoit pas presse_media ; une fiche creee, si', function () {
+    $ordinaire = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000881', 'denomination' => 'ZZ PROSPECT ORDINAIRE',
+        'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $presse = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000882', 'denomination' => 'ZZ EDITEUR PAS ENCORE HARMONISE',
+        'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('media')->insert([
+        'workspace_id' => $this->espace, 'company_id' => $presse, 'name' => 'ZZ Titre existant', 'media_type' => 'presse_journal',
+        'media_family' => 'editorial', 'source' => 'naf-extract', 'enrich_status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $r = piImporter([
+        piLigne(['identifiant' => null, 'siren' => '900000881', 'nom' => 'ZZ Pretendu media']),
+        piLigne(['identifiant' => null, 'siren' => '900000882', 'nom' => 'ZZ Titre existant', 'journaliste' => null]),
+        piLigne(['identifiant' => 'presse:zz:nouveau', 'nom' => 'ZZ Nouveau titre', 'journaliste' => null]),
+    ]);
+
+    expect($r['sortie'])->toContain('fiche_existante_hors_presse : 1')
+        ->and(DB::table('companies')->where('id', $ordinaire)->value('relation_type'))->toBe('prospect')
+        ->and(piSlugs($ordinaire))->not->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(DB::table('contacts')->where('company_id', $ordinaire)->exists())->toBeFalse()
+        ->and(DB::table('media')->where('company_id', $ordinaire)->exists())->toBeFalse()
+        // Fiche de presse existante : la relation déclarée n'est pas imposée.
+        ->and(DB::table('companies')->where('id', $presse)->value('relation_type'))->toBe('prospect')
+        ->and(DB::table('companies')->where('id', $presse)->value('lifecycle_stage'))->toBe('nouveau')
+        // Fiche créée par la ligne : presse.
+        ->and(DB::table('companies')->where('foreign_id', 'presse:zz:nouveau')->value('relation_type'))->toBe('presse_media');
+});

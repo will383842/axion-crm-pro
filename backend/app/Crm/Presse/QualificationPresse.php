@@ -26,11 +26,22 @@ use Illuminate\Support\Facades\DB;
  *
  * ── Relation ─────────────────────────────────────────────────────────────
  * L'ordre de promotion UNIQUE du CRM (`PromotionRelation`, chantier B) :
- * client > investisseur > partenaire > presse_media > conference > fournisseur
+ * client > investisseur > partenaire > presse_media > fournisseur > conference
  * > prospect > newsletter. `presse_media` ne remplace que ce qui est en
  * dessous ; on ne rétrograde jamais (un média client reste client). Et une
  * relation POSÉE À LA MAIN (`relation_saisie_manuelle_at`) n'est jamais
- * touchée, quelle qu'elle soit. L'étape (`lifecycle_stage`) ne bouge pas.
+ * touchée, quelle qu'elle soit. L'étape (`lifecycle_stage`) ne bouge JAMAIS :
+ * aucune source de la presse ne demande d'étape (a fortiori pas `client`).
+ *
+ * ── Sources DÉCLARATIVES (veto de la relecture sécurité de #265) ────────
+ * Une source déclarative (une liste de diffusion importée : ses lignes ne sont
+ * confirmées par personne) ne pose JAMAIS un type hors prospection sur une
+ * fiche EXISTANTE : `PromotionRelation::relationDeclarative`
+ * (`$declaratif = true`). L'harmonisation (`crm:presse:harmoniser`) n'est pas
+ * déclarative : elle lit la table `media` du CRM, constituée par ses propres
+ * importeurs depuis des registres publics (CPPAP, services de presse en ligne
+ * et agences agréées, catégories ARCOM, Sirene, Wikidata) — aucun tiers ne
+ * peut y écrire une ligne.
  *
  * ── Réversible ───────────────────────────────────────────────────────────
  * La première fois qu'une fiche change, sa nature et sa relation d'AVANT sont
@@ -82,7 +93,7 @@ final class QualificationPresse
      *
      * @return array<string, int>
      */
-    public static function qualifier(int $companyId): array
+    public static function qualifier(int $companyId, bool $declaratif = false): array
     {
         $fiche = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')
             ->first(['id', 'entity_nature', 'relation_type', 'relation_saisie_manuelle_at', 'metadata']);
@@ -102,7 +113,7 @@ final class QualificationPresse
         }
 
         $relation = $fiche->relation_type;
-        if (self::relationRemplacable($relation, $fiche->relation_saisie_manuelle_at)) {
+        if (self::relationRemplacable($relation, $fiche->relation_saisie_manuelle_at, $declaratif)) {
             $maj['relation_type'] = self::RELATION;
             $delta['relations_posees'] = 1;
         } elseif ($relation !== self::RELATION) {
@@ -136,16 +147,40 @@ final class QualificationPresse
      * fournisseur, prospect, lettre deviennent presse. Et JAMAIS une relation
      * posée à la main (`relation_saisie_manuelle_at`).
      */
-    public static function relationRemplacable(?string $relation, mixed $saisieManuelle): bool
+    public static function relationRemplacable(?string $relation, mixed $saisieManuelle, bool $declaratif = false): bool
     {
         if ($saisieManuelle !== null) {
             return false;
         }
         if ($relation === null) {
+            return ! $declaratif;
+        }
+        $retenue = $declaratif
+            ? PromotionRelation::relationDeclarative($relation, self::RELATION)
+            : PromotionRelation::relation($relation, self::RELATION);
+
+        return $relation !== self::RELATION && $retenue === self::RELATION;
+    }
+
+    /**
+     * La fiche est-elle DÉJÀ une fiche de presse ? Tag de provenance presse,
+     * ligne `media` vivante rattachée, nature `media` ou relation
+     * `presse_media`.
+     */
+    public static function estFichePresse(int $companyId): bool
+    {
+        $fiche = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')
+            ->first(['entity_nature', 'relation_type']);
+        if ($fiche === null) {
+            return false;
+        }
+        if ($fiche->entity_nature === self::NATURE || $fiche->relation_type === self::RELATION) {
             return true;
         }
 
-        return $relation !== self::RELATION && PromotionRelation::relation($relation, self::RELATION) === self::RELATION;
+        return DB::table('media')->where('company_id', $companyId)->whereNull('deleted_at')->exists()
+            || DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+                ->where('company_tag.company_id', $companyId)->where('tags.slug', 'src:scraping-' . self::SOURCE)->exists();
     }
 
     /** Resynchronise les étiquettes automatiques de la fiche (dont `media-*`). */

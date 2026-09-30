@@ -253,6 +253,17 @@ test('R3 — ACCORD : email_valide <=> l adresse part dans crm:campagne:destinat
     DB::table('adresses_partagees')->insert([
         'workspace_id' => $this->espace, 'email_empreinte' => F::empreinteAdresse('compta@zz-cabinet.example.invalid'), 'nb_fiches' => 3, 'nature' => Rapprochement::CABINET_COMPTABLE,
     ]);
+    // À la CORBEILLE : une fiche et une personne d'une fiche supprimée qui
+    // condamnent `bureau@` — la campagne ne les lit pas, la joignabilité non plus.
+    jgFiche($this->espace, ['email_generic' => 'bureau@zz-part.example.invalid', 'deleted_at' => now(),
+        'signals' => json_encode(['email_generic_verification' => json_decode(jgVerif('bureau@zz-part.example.invalid', 'invalide'), true)])]);
+    $supprimee = jgFiche($this->espace, ['deleted_at' => now()]);
+    jgPersonne($this->espace, $supprimee, ['email' => 'bureau@zz-part.example.invalid', 'email_status' => 'invalid']);
+    // HORS SEGMENT (limite documentée) : `seg@` n'est pas vérifiée dans le
+    // segment, mais l'est sur une fiche vivante HORS segment (sans le tag).
+    jgOrganisateur($this->espace, 'seg@zz-seg.example.invalid', 'aucune');
+    jgFiche($this->espace, ['email_generic' => 'seg@zz-seg.example.invalid',
+        'signals' => json_encode(['email_generic_verification' => json_decode(jgVerif('seg@zz-seg.example.invalid', 'valide'), true)])]);
 
     $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-jg-');
     Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $fichier]);
@@ -270,8 +281,13 @@ test('R3 — ACCORD : email_valide <=> l adresse part dans crm:campagne:destinat
     sort($valides);
     sort($partent);
 
+    // L'équivalence, sur les adresses dont toutes les occurrences sont dans le segment…
     expect($valides)->toBe($partent)
         ->and($partent)->toBe(['bureau@zz-part.example.invalid'])
+        // … et la LIMITE, figée : hors segment, l'espace voit une vérification
+        // que le segment n'a pas ; la joignabilité dit valide, la campagne
+        // l'écarte. La liste de campagne reste la vérité de l'envoi.
+        ->and(Joignabilite::etatsAdresses($this->espace, ['seg@zz-seg.example.invalid'], 'business'))->toBe(['seg@zz-seg.example.invalid' => Joignabilite::EMAIL_VALIDE])
         ->and(jgEtat('companies', $valide))->toBe(Joignabilite::EMAIL_VALIDE)
         ->and(jgEtat('companies', $opposee))->toBe(Joignabilite::EMAIL_INTERDIT)
         ->and(jgEtat('companies', $opposeeInvalide))->toBe(Joignabilite::EMAIL_INTERDIT)
@@ -303,15 +319,44 @@ test('Securite R1 — l univers de la liste de suppression est celui de l espace
         ->and(jgEtat('companies', $dansLeBusiness))->toBe(Joignabilite::EMAIL_NON_VERIFIE);
 });
 
-test('R4 — le calcul relit ses donnees sous verrou, dans la transaction qui ecrit', function () {
+test('R4 — le calcul relit ses donnees sous verrou, DANS la transaction du lot qui ecrit', function () {
     jgJeu($this->espace);
-    $requetes = [];
-    DB::listen(function ($q) use (&$requetes): void {
-        $requetes[] = strtolower($q->sql);
+    // Le test tourne déjà dans une transaction (RefreshDatabase) : on mesure
+    // le niveau AU-DESSUS de celui-ci.
+    $base = DB::transactionLevel();
+    $journal = [];
+    DB::listen(function ($q) use (&$journal): void {
+        $journal[] = ['sql' => strtolower($q->sql), 'niveau' => DB::transactionLevel()];
     });
 
     jgCalculer($this->slug);
 
-    $verrouillees = array_filter($requetes, static fn (string $sql): bool => str_contains($sql, 'for update') && (str_contains($sql, '"companies"') || str_contains($sql, '"contacts"')));
-    expect(count($verrouillees))->toBeGreaterThanOrEqual(2);
+    $verrous = array_values(array_filter($journal, static fn (array $e): bool => str_contains($e['sql'], 'for update')
+        && (str_contains($e['sql'], '"companies"') || str_contains($e['sql'], '"contacts"'))));
+    $ecritures = array_values(array_filter($journal, static fn (array $e): bool => str_starts_with(ltrim($e['sql']), 'update') && str_contains($e['sql'], 'joignabilite')));
+    expect(count($verrous))->toBeGreaterThanOrEqual(2)
+        ->and(count($ecritures))->toBeGreaterThanOrEqual(1);
+    // Chaque lecture verrouillée ET chaque écriture sont DANS la transaction
+    // du lot (un niveau au-dessus de celui du test).
+    foreach (array_merge($verrous, $ecritures) as $e) {
+        expect($e['niveau'])->toBeGreaterThan($base);
+    }
+    // Et la lecture verrouillée PRÉCÈDE l'écriture (positions dans le journal
+    // du passage réel, relevées AVANT de le vider pour le témoin).
+    $position = static function (array $cherche) use ($journal): int {
+        foreach ($journal as $i => $e) {
+            if ($e === $cherche) {
+                return $i;
+            }
+        }
+
+        return -1;
+    };
+    expect($position($verrous[0]))->toBeGreaterThanOrEqual(0)
+        ->and($position($verrous[0]))->toBeLessThan($position($ecritures[0]));
+    // TÉMOIN : l'essai à blanc ne verrouille rien.
+    $journal = [];
+    jgCalculer($this->slug, ['--dry-run' => true]);
+    expect(array_filter($journal, static fn (array $e): bool => str_contains($e['sql'], 'for update')))->toBe([])
+        ->and($journal)->not->toBe([]);
 });

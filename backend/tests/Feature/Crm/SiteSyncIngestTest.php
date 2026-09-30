@@ -939,9 +939,35 @@ test('R2 — un formulaire du site ne retrograde JAMAIS un partenaire en prospec
     expect($company->relation_type)->toBe('partenaire');
 });
 
-test('R2 — le canal site promeut un prospect en partenaire (meme ordre que l import)', function () {
+test('VETO — un formulaire partenariat ANONYME sur une fiche EXISTANTE ne change pas son type (etape seulement)', function () {
     siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
 
+    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+
+    $company = DB::table('companies')->where('siren', '900000101')->first();
+    expect($company->relation_type)->toBe('prospect')
+        ->and($company->lifecycle_stage)->toBe('qualifie');
+});
+
+test('VETO — presse et investisseur non plus : aucun type hors prospection sur une fiche existante', function (string $formulaire) {
+    siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
+
+    siteSyncPost(siteSyncEvent(['form_type' => $formulaire]))->assertOk();
+
+    expect(DB::table('companies')->where('siren', '900000101')->value('relation_type'))->toBe('prospect');
+})->with(['presse', 'investisseur']);
+
+test('VETO — un avis public ne rend pas une fiche existante cliente (etape plafonnee a qualifie)', function () {
+    siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
+
+    siteSyncPost(siteSyncEvent(['event_type' => 'review_posted', 'form_type' => null]))->assertOk();
+
+    $company = DB::table('companies')->where('siren', '900000101')->first();
+    expect($company->relation_type)->toBe('prospect')
+        ->and($company->lifecycle_stage)->toBe('qualifie');
+});
+
+test('VETO — TEMOIN : une fiche que le canal CREE recoit le type declare (personne ne sort de la prospection)', function () {
     siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
 
     expect(DB::table('companies')->where('siren', '900000101')->value('relation_type'))->toBe('partenaire');
@@ -950,19 +976,19 @@ test('R2 — le canal site promeut un prospect en partenaire (meme ordre que l i
 test('R2 — une relation posee A LA MAIN n est touchee par aucun formulaire du site', function () {
     siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau', 'relation_saisie_manuelle_at' => now()]);
 
-    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+    siteSyncPost(siteSyncEvent(['form_type' => 'audit']))->assertOk();
 
     $company = DB::table('companies')->where('siren', '900000101')->first();
     expect($company->relation_type)->toBe('prospect')
         ->and($company->lifecycle_stage)->toBe('nouveau');
 });
 
-test('R2 — TEMOIN : sans la marque manuelle, le meme formulaire promeut la fiche', function () {
+test('R2 — TEMOIN : sans la marque manuelle, le meme formulaire promeut l etape', function () {
     siteSyncFicheExistante(['relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau']);
 
-    siteSyncPost(siteSyncEvent(['form_type' => 'partenariat']))->assertOk();
+    siteSyncPost(siteSyncEvent(['form_type' => 'audit']))->assertOk();
 
     $company = DB::table('companies')->where('siren', '900000101')->first();
-    expect($company->relation_type)->toBe('partenaire')
-        ->and($company->lifecycle_stage)->toBe('qualifie');
+    expect($company->relation_type)->toBe('prospect')
+        ->and($company->lifecycle_stage)->toBe('opportunite');
 });

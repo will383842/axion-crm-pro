@@ -60,6 +60,15 @@ use Throwable;
  * Plusieurs lignes d'un même média (un journaliste par ligne) visent la même
  * fiche par la même ancre.
  *
+ * ── Une source DÉCLARATIVE (veto de la relecture sécurité de #265) ──────
+ * Une ligne visant une fiche EXISTANTE (par SIREN ou par rapprochement) qui
+ * n'est pas déjà de la presse est rejetée (`fiche_existante_hors_presse`) :
+ * la rattacher la protégerait et la sortirait de la prospection. Sur une
+ * fiche existante de presse, la relation suit
+ * `PromotionRelation::relationDeclarative` (jamais un type hors prospection
+ * imposé) ; aucune étape n'est jamais demandée. Seule une fiche CRÉÉE par la
+ * ligne reçoit `presse_media`.
+ *
  * Un titre DÉJÀ en base sans SIREN (fiche `media:<id>` née de l'harmonisation)
  * est REJOINT (même nom normalisé, même type, département compatible), jamais
  * doublé d'une fiche parallèle ; en cas de doute la ligne est rejetée.
@@ -69,6 +78,7 @@ use Throwable;
  * `champ_obligatoire_manquant`, `type_inconnu`, `zone_inconnue`,
  * `theme_trop_long`, `journaliste_invalide`, `journaliste_sans_nom`,
  * `acces_inconnu`, `titre_existant_non_harmonise`, `rapprochement_ambigu`,
+ * `fiche_existante_hors_presse`,
  * `fiche_a_la_corbeille`, `pivot_<code>`, `erreur_base`.
  *
  * ── Ce que fait une ligne ────────────────────────────────────────────────
@@ -375,6 +385,14 @@ class CrmPresseImporter extends Command
             // À la corbeille (Will, ou fusion) : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
         }
+        // Une liste de diffusion est une source DÉCLARATIVE (ses lignes ne
+        // sont confirmées par personne) : elle ne sort JAMAIS de la
+        // prospection une fiche existante qui n'est pas déjà de la presse —
+        // ni par la relation, ni par la protection (veto de #265).
+        $ficheExistante = $trouvee !== null;
+        if ($ficheExistante && ! QualificationPresse::estFichePresse((int) $trouvee->id)) {
+            throw new InvalidArgumentException('fiche_existante_hors_presse');
+        }
 
         // Le journaliste : retiré, ou à la corbeille sur la fiche, il ne revient pas.
         $personnes = [];
@@ -464,7 +482,7 @@ class CrmPresseImporter extends Command
         $companyId = (int) $companyId;
         $delta[$trouvee === null ? 'fiches_creees' : 'fiches_rattachees'] = 1;
 
-        foreach (QualificationPresse::qualifier($companyId) as $cle => $n) {
+        foreach (QualificationPresse::qualifier($companyId, declaratif: $ficheExistante) as $cle => $n) {
             $delta[$cle] = ($delta[$cle] ?? 0) + $n;
         }
         $delta[$this->ecrireMedia($companyId, $l, $emailRedaction)] = 1;

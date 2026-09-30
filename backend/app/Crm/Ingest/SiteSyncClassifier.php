@@ -54,9 +54,12 @@ final class SiteSyncClassifier
     {
         return match ($event->eventType) {
             'newsletter_optin', 'newsletter_optout' => 'newsletter',
-            // L'auteur d'un avis est un client réel (il le certifie dans le
-            // formulaire d'avis) : c'est le seul événement entrant du site qui
-            // porte cette qualité par lui-même.
+            // L'auteur d'un avis se DÉCLARE client dans le formulaire d'avis.
+            // Ce type n'est posé que sur une fiche que le canal CRÉE : sur une
+            // fiche EXISTANTE, un avis public (que n'importe qui peut déposer
+            // avec un SIREN public) ne pose aucun type hors prospection et
+            // plafonne l'étape à `qualifie` (`PromotionRelation::relationDeclarative`,
+            // `etapeDeclarative` — veto de la relecture sécurité de #265).
             'review_posted' => 'client',
             'form_submission' => match ($event->formType) {
                 'partenariat' => 'partenaire',

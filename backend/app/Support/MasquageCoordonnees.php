@@ -27,8 +27,11 @@ use Illuminate\Database\Eloquent\Model;
  * ── Ce qui n'est PAS masqué, à dessein : la joignabilité (2026-10-01) ─────
  *
  * `companies.joignabilite` / `contacts.joignabilite` (chantier D) restent
- * lisibles par un compte en lecture seule, `email_interdit` compris — alors
- * que cet état révèle qu'une adresse s'est opposée ou a été supprimée. Choix
+ * lisibles par un compte en lecture seule — y compris `email_interdit` (une
+ * adresse s'est opposée ou a été supprimée), `email_personnel` (l'adresse est
+ * une messagerie grand public ou marquée personnelle) et `email_partage`
+ * (adresse de cabinet comptable ou de domiciliation portée par plusieurs
+ * fiches). Choix
  * assumé (relecture sécurité R2) : ce n'est pas une COORDONNÉE (l'adresse,
  * elle, reste masquée), et le cacher ferait l'inverse de ce qu'il protège —
  * quelqu'un qui prépare une liste doit VOIR qu'une personne ne doit pas être

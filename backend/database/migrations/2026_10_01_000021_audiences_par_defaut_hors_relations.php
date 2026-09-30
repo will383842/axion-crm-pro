@@ -62,7 +62,7 @@ return new class extends Migration
 
     public function up(): void
     {
-        $this->parEspace(function (object $audience, array $criteres): ?array {
+        $this->parEspace(function (stdClass $audience, array $criteres): ?array {
             $origine = self::CRITERES_D_ORIGINE[(string) $audience->name] ?? null;
             if ($origine === null) {
                 return null;
@@ -81,7 +81,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $this->parEspace(function (object $audience, array $criteres): ?array {
+        $this->parEspace(function (stdClass $audience, array $criteres): ?array {
             if (! array_key_exists((string) $audience->name, self::CRITERES_D_ORIGINE)) {
                 return null;
             }
@@ -95,7 +95,7 @@ return new class extends Migration
     }
 
     /**
-     * @param  Closure(object, array<string, mixed>): ?array<string, mixed>  $nouveaux
+     * @param  Closure(stdClass, array<string, mixed>): ?array<string, mixed>  $nouveaux
      */
     private function parEspace(Closure $nouveaux): void
     {

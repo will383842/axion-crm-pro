@@ -301,7 +301,9 @@ final class Classement
             return [$parNaf, 'naf'];
         }
 
-        $nafOrganisation = str_starts_with($code, '84.') || str_starts_with($code, '94.') || str_starts_with($code, '99.');
+        // 84.xx a déjà rendu `institution` plus haut : restent 94 (hors les
+        // quatre codes tranchés) et 99 (organisations extraterritoriales).
+        $nafOrganisation = str_starts_with($code, '94.') || str_starts_with($code, '99.');
         $sirenValide = preg_match('/^\d{9}$/', trim((string) $siren)) === 1;
         if ($sirenValide && $forme === '' && ! $nafOrganisation) {
             return ['entreprise', 'siren'];

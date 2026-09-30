@@ -190,12 +190,13 @@ final class Joignabilite
      * Calcule l'état des entreprises données ET de leurs personnes (lecture
      * seule). Les fiches à la corbeille sont ignorées.
      *
-     * @param  list<int>  $ids
+     * @param  array<int>  $ids
      * @return array{entreprises: array<int, array{avant: ?string, apres: string}>, personnes: array<int, array{avant: ?string, apres: string}>}
      */
     public static function calculer(string $workspaceId, array $ids): array
     {
         $resultat = ['entreprises' => [], 'personnes' => []];
+        $ids = array_values($ids);
         if ($ids === []) {
             return $resultat;
         }
@@ -282,7 +283,7 @@ final class Joignabilite
      * par `crm:emails:verifier` dans la transaction du lot qui vient de changer
      * une vérification ou un statut.
      *
-     * @param  list<int>  $ids
+     * @param  array<int>  $ids
      * @return array{entreprises: int, personnes: int}
      */
     public static function recalculer(string $workspaceId, array $ids): array

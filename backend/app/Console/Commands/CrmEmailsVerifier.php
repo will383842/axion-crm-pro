@@ -709,7 +709,7 @@ class CrmEmailsVerifier extends Command
      * fiches données et de leurs personnes — appelée DANS la transaction du
      * lot, après l'écriture : un statut qui change change l'état.
      *
-     * @param  list<int>  $ids
+     * @param  array<int>  $ids
      */
     private function recalculerJoignabilite(string $workspaceId, array $ids): void
     {

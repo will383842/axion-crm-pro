@@ -7,6 +7,7 @@ use App\Crm\Emails\VerificationEmail;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use stdClass;
 
@@ -220,7 +221,9 @@ final class Joignabilite
         }
 
         $interdites = self::interditesParmi($cles, $univers);
-        $partagees = AdressesPartagees::exclues($workspaceId, $cles);
+        // Question posée DANS le contexte de l'espace (la fonction SQL le
+        // vérifie) : ce calcul peut être appelé hors de lui.
+        $partagees = WorkspaceContext::run($workspaceId, static fn (): array => AdressesPartagees::exclues($workspaceId, $cles));
 
         $etats = [];
         foreach ($cles as $c) {

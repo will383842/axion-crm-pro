@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Crm\Presse\LienJournalisteContact;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreJournalistRequest;
 use App\Http\Requests\UpdateJournalistRequest;
@@ -634,7 +635,14 @@ class JournalistsController extends ApiController
 
         $email = $journalist->email;
 
-        $journalist->update(['opt_out' => true]);
+        // Harmonisation presse (relecture sécurité #264) : l'opposition vaut
+        // AUSSI pour le contact lié et entre dans `opt_out`, la table que lisent
+        // le funnel et la liste de campagne — sans quoi la personne opposée ici
+        // resterait joignable par son contact.
+        DB::transaction(function () use ($journalist): void {
+            $journalist->update(['opt_out' => true]);
+            LienJournalisteContact::opposer((int) $journalist->id);
+        });
 
         // Lot L5 — l'opposition décidée DANS la console doit converger vers le
         // site : sans cela le site continuerait d'adresser une personne que le
@@ -677,7 +685,18 @@ class JournalistsController extends ApiController
         // où l'effacement deviendra une anonymisation.
         $email = $journalist->email;
 
-        $journalist->delete();
+        // Harmonisation presse (relecture sécurité #264) : l'effacement atteint
+        // le contact lié (supprimé, inscrit au registre des retraits, même sans
+        // adresse), ses coordonnées entrent dans `opt_out` (anti-réinsertion),
+        // et la ligne source est vidée de ses coordonnées comme le fait
+        // `GdprErasureService`.
+        DB::transaction(function () use ($journalist): void {
+            LienJournalisteContact::opposer((int) $journalist->id);
+            LienJournalisteContact::effacerContactsDe([(int) $journalist->id]);
+            $journalist->delete();
+            DB::table('journalists')->where('id', $journalist->id)
+                ->update(['email' => null, 'phone' => null, 'opt_out' => true]);
+        });
 
         // 🔴 CONSTAT B14-010 (S1), mesuré le 2026-08-20. L'effacement n'émettait
         // RIEN, dans le contrôleur même où `optOut()` — deux méthodes plus haut —

@@ -264,6 +264,61 @@ describe('AudienceBuilderPage — parcours', () => {
     }, DEBOUNCE);
   });
 
+  it('exclure un TYPE de média l’AJOUTE au bloc `not`, à côté du défaut « hors prospection » qui reste (harmonisation presse)', async () => {
+    const user = userEvent.setup();
+    const apercu = recordPost<{ criteria: { all: Critere[]; not?: Critere[] } }>('/audiences/preview', {
+      companies: 5,
+      contacts: 3,
+    });
+
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [apercu.handler],
+    });
+
+    // La SECONDE puce « Production audiovisuelle » est celle des types EXCLUS.
+    const production = screen.getAllByRole('button').filter((b) => b.textContent === 'Production audiovisuelle');
+    expect(production).toHaveLength(2);
+    await user.click(production[1] as HTMLElement);
+
+    await waitFor(() => {
+      const dernier = apercu.bodies[apercu.bodies.length - 1];
+      expect(dernier?.criteria.not).toEqual(expect.arrayContaining([
+        { field: 'relation_type', op: 'in', value: ['client', 'partenaire', 'presse_media', 'fournisseur', 'investisseur'] },
+        { field: 'tags', op: 'contains_any', value: ['media-type:production'] },
+      ]));
+      // L'exclusion ne se glisse JAMAIS dans `all` : ce serait VISER.
+      expect(dernier?.criteria.all.some((c) => c.field === 'tags')).toBe(false);
+    }, DEBOUNCE);
+  });
+
+  it('choisir un TYPE de média vise son étiquette `media-type:<code>` en contains_any', async () => {
+    const user = userEvent.setup();
+    const apercu = recordPost<{ criteria: { all: Critere[] } }>('/audiences/preview', {
+      companies: 2,
+      contacts: 1,
+    });
+
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [apercu.handler],
+    });
+
+    // La première puce « Radio » est celle des types VISÉS (les exclus suivent).
+    const radio = screen.getAllByRole('button').find((b) => b.textContent === 'Radio');
+    expect(radio).toBeDefined();
+    await user.click(radio as HTMLElement);
+
+    await waitFor(() => {
+      const dernier = apercu.bodies[apercu.bodies.length - 1];
+      expect(dernier?.criteria.all).toEqual(
+        expect.arrayContaining([{ field: 'tags', op: 'contains_any', value: ['media-type:radio'] }]),
+      );
+    }, DEBOUNCE);
+  });
+
   it('aperçu en échec : l’écran affiche le message du serveur, jamais un compte faux', async () => {
     // Le pire défaut possible ici serait d'afficher le dernier compte connu
     // après une erreur : on lancerait une campagne sur un volume imaginaire.

@@ -288,3 +288,36 @@ export type CleJoignabilite = (typeof JOIGNABILITES)[number]['code'];
 
 /** Types de relation qu'une audience de PROSPECTION exclut par défaut (`RelationsProspection`). */
 export const RELATIONS_HORS_PROSPECTION = ["client", "partenaire", "presse_media", "fournisseur", "investisseur"] as const;
+
+/** Types de média — étiquette automatique `media-type:<code>`. */
+export const TYPES_MEDIA = [
+  { code: "presse-quotidienne", libelle: "Presse quotidienne" },
+  { code: "presse-hebdomadaire", libelle: "Presse hebdomadaire" },
+  { code: "presse-magazine", libelle: "Presse magazine et revues" },
+  { code: "presse-journal", libelle: "Journal (périodicité inconnue)" },
+  { code: "presse-autre", libelle: "Publication de presse" },
+  { code: "radio", libelle: "Radio" },
+  { code: "tv", libelle: "Télévision" },
+  { code: "emission-tv", libelle: "Émission de télévision" },
+  { code: "agence", libelle: "Agence de presse" },
+  { code: "web", libelle: "Presse en ligne" },
+  { code: "blog", libelle: "Blog" },
+  { code: "production", libelle: "Production audiovisuelle" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleTypeMedia = (typeof TYPES_MEDIA)[number]['code'];
+
+/** Zones de diffusion — étiquette automatique `media-zone:<code>`. */
+export const ZONES_MEDIA = [
+  { code: "national", libelle: "Nationale" },
+  { code: "regional", libelle: "Régionale" },
+  { code: "departemental", libelle: "Départementale" },
+  { code: "local", libelle: "Locale" },
+  { code: "inconnue", libelle: "Inconnue" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleZoneMedia = (typeof ZONES_MEDIA)[number]['code'];
+
+/** Préfixes des étiquettes d'un média : type et zone de diffusion. */
+export const PREFIXE_ETIQUETTE_TYPE_MEDIA = "media-type:";
+export const PREFIXE_ETIQUETTE_ZONE_MEDIA = "media-zone:";

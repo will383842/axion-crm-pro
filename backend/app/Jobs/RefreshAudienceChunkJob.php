@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\Company;
 use App\Models\EmailAudience;
@@ -100,6 +101,8 @@ class RefreshAudienceChunkJob implements ShouldQueue
             $contactRows = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
                 ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                // Jamais un journaliste tant que le segment presse est fermé.
+                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                 ->select('id', 'company_id')
                 ->get();
 

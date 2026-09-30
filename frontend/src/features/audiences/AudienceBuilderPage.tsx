@@ -12,6 +12,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers,
+  Newspaper, Ban,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
@@ -38,6 +39,13 @@ import type {
   EmailAudience,
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
+import {
+  TYPE_MEDIA_PRESETS,
+  ZONE_MEDIA_PRESETS,
+  avecExclusions,
+  criteresMedias,
+  exclusions,
+} from './presse';
 import {
   RELATIONS_EXCLUES_PAR_DEFAUT,
   SANS_TAILLE,
@@ -144,6 +152,11 @@ export function AudienceBuilderPage() {
   const [pays, setPays] = useState<ChoixPays>('tous');
   const [joignabilitesVisees, setJoignabilitesVisees] = useState<string[]>([]);
   const [joignabilitesExclues, setJoignabilitesExclues] = useState<string[]>([]);
+  // Presse et exclusions (harmonisation des contacts, 2026-09-30).
+  const [typesMedia, setTypesMedia] = useState<string[]>([]);
+  const [zonesMedia, setZonesMedia] = useState<string[]>([]);
+  const [exclNatures, setExclNatures] = useState<string[]>([]);
+  const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
 
   // Build criteria
   const criteria = useMemo<AudienceCriteria>(() => {
@@ -164,8 +177,9 @@ export function AudienceBuilderPage() {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
+    all.push(...criteresMedias(typesMedia, zonesMedia));
 
-    return construireCriteres(all, {
+    const criteres = construireCriteres(all, {
       relationsVisees,
       relationsExclues,
       etapesVisees,
@@ -175,9 +189,11 @@ export function AudienceBuilderPage() {
       joignabilitesVisees,
       joignabilitesExclues,
     });
+    return avecExclusions(criteres, exclusions({ natures: exclNatures, typesMedia: exclTypesMedia }));
   }, [
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
     relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
+    typesMedia, zonesMedia, exclNatures, exclTypesMedia,
   ]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
@@ -422,6 +438,64 @@ export function AudienceBuilderPage() {
                 selected={natures}
                 onChange={setNatures}
                 placeholder="Toutes natures"
+              />
+            </Field>
+          </Card>
+
+          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Les fiches de presse harmonisées sont protégées : elles n’entrent dans aucune audience
+              tant que le segment presse n’est pas ouvert. Ces critères visent les fiches de média
+              non protégées (production audiovisuelle…).
+            </p>
+            <Field label="Types de média">
+              <ChipsMultiSelect
+                options={TYPE_MEDIA_PRESETS}
+                selected={typesMedia}
+                onChange={setTypesMedia}
+                placeholder="Tous types"
+                masquerCode
+              />
+            </Field>
+            <Field label="Zones de diffusion">
+              <ChipsMultiSelect
+                options={ZONE_MEDIA_PRESETS}
+                selected={zonesMedia}
+                onChange={setZonesMedia}
+                placeholder="Toutes zones"
+                masquerCode
+              />
+            </Field>
+          </Card>
+
+          {/* Exclusions de nature et de type de média (bloc `not`) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Ban className="h-4 w-4" />} title="Exclusions (nature, type de média)" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setRelationsExclues([...new Set([...relationsExclues, ...RELATIONS_EXCLUES_PAR_DEFAUT])]); }}
+            >
+              Prospection : rétablir l’exclusion des relations établies
+            </Button>
+            <Field label="Natures exclues">
+              <ChipsMultiSelect
+                options={NATURE_PRESETS}
+                selected={exclNatures}
+                onChange={setExclNatures}
+                placeholder="Aucune nature exclue"
+              />
+            </Field>
+            <Field label="Types de média exclus">
+              <ChipsMultiSelect
+                options={TYPE_MEDIA_PRESETS}
+                selected={exclTypesMedia}
+                onChange={setExclTypesMedia}
+                placeholder="Aucun type exclu"
+                masquerCode
               />
             </Field>
           </Card>

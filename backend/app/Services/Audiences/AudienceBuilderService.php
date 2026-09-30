@@ -2,6 +2,7 @@
 
 namespace App\Services\Audiences;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
@@ -24,6 +25,11 @@ class AudienceBuilderService
      * désormais renseignée sur toutes les fiches (les fiches INSEE portent
      * `entreprise`), indexée, et ses valeurs sont celles de
      * `Taxonomy::ENTITY_NATURES`.
+     *
+     * Les types, zones et thèmes de média (harmonisation de la presse,
+     * 2026-09-30) se visent par leurs étiquettes (`tags` / `contains_any` :
+     * `media-type:radio`, `media-zone:regional`…) ; la relation, par
+     * `relation_type` (ajouté par le chantier B).
      */
     public const WHITELIST_FIELDS = [
         'prospection_status', 'department_code', 'region_code', 'commune_code',
@@ -67,13 +73,17 @@ class AudienceBuilderService
         $contacts = DB::table('contacts')
             ->whereIn('company_id', $contactableCompanyIds)
             ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
             ->count();
         $companyOnlyEmails = (clone $query)
             ->whereNotNull('email_generic')
+            // Même garde par contact que `refresh()` : une fiche dont les
+            // seuls contacts joignables sont de la presse compte par son
+            // adresse générique, comme elle entre au rafraîchissement.
             ->whereDoesntHave('contacts', fn ($q) => $q->whereIn(
                 'email_status',
                 TriageAutoService::CONTACTABLE_EMAIL_STATUSES,
-            ))
+            )->whereRaw(GardePresse::conditionContactsSql('contacts')))
             ->count();
 
         return [
@@ -118,6 +128,7 @@ class AudienceBuilderService
             $contactsByCompany = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
                 ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                 ->select('id', 'company_id')
                 ->get()
                 ->groupBy('company_id');
@@ -238,6 +249,12 @@ class AudienceBuilderService
      */
     public function evaluateForCompany(Company $company): array
     {
+        // La presse harmonisée n'entre dans aucune audience tant que Will n'a
+        // pas ouvert son segment (`GardePresse`), quel que soit le chemin.
+        if (! GardePresse::admissible((int) $company->id)) {
+            return [];
+        }
+
         $audiences = EmailAudience::query()
             ->where('workspace_id', $company->workspace_id)
             ->where('is_active', true)
@@ -396,6 +413,9 @@ class AudienceBuilderService
         // passera par un flux dédié, décidé par Will — jamais par une audience
         // générale où le triage les aurait rangées (`ready_for_outreach`).
         FichesProtegees::exclure($query);
+        // Et la presse harmonisée, par SA garde (`GardePresse`) : elle vaut
+        // même si un chemin lève un jour la protection générale ci-dessus.
+        GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {

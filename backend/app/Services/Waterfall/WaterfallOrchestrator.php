@@ -7,6 +7,7 @@ use App\Contracts\BanGeocoder;
 use App\Contracts\BodaccClient;
 use App\Contracts\InseeClient;
 use App\Contracts\LLMClient;
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Data\LLM\LLMRequestData;
 use App\Jobs\DispatchScrapeJob;
@@ -708,6 +709,8 @@ class WaterfallOrchestrator
                 $contactIds = DB::table('contacts')
                     ->where('company_id', $company->id)
                     ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                    // Défense en profondeur : jamais un journaliste (`GardePresse`).
+                    ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                     ->pluck('id')
                     ->all();
 

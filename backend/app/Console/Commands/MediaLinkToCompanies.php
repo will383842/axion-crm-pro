@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Doublons\Rapprochement;
+use App\Crm\Presse\QualificationPresse;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +34,19 @@ use Illuminate\Support\Facades\DB;
  * Requêtes 100 % ENSEMBLISTES + indexées (pas de N+1 sur 4,3M lignes).
  *
  * `--dry-run` compte matchés SIREN / matchés nom-unique / ambigus / sans match.
+ *
+ * ── Les médias portés par une fiche PROVISOIRE `media:<id>` (2026-09-30) ──
+ * L'harmonisation de la presse donne une fiche (`foreign_id` = `media:<id>`)
+ * aux titres qui n'en avaient pas. Quand le SIREN d'un de ces titres (posé
+ * par un registre officiel seulement : CPPAP, SPEL, agences, Sirene) désigne
+ * la fiche d'un éditeur, la commande NE FUSIONNE RIEN (décision du
+ * coordinateur, relecture de #264) : la paire (fiche de l'éditeur ↔ fiche
+ * provisoire) est DÉPOSÉE dans la file « Doublons à vérifier » (#260), motif
+ * `presse_titre_editeur`, jamais `fusion_auto`. Un humain décide ; une fusion
+ * passe ensuite par les règles de #260. Une paire déjà écartée (« ce ne sont
+ * pas des doublons »), déjà en file, ou dont une fusion a eu lieu (même
+ * annulée) n'est JAMAIS redéposée. Une fiche provisoire dont les titres
+ * désignent PLUSIEURS éditeurs n'est pas déposée (comptée).
  */
 class MediaLinkToCompanies extends Command
 {
@@ -91,9 +106,78 @@ class MediaLinkToCompanies extends Command
               AND normalize_name(COALESCE(NULLIF(m.publisher, ''), m.name)) = u.norm
         SQL);
 
-        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique.");
+        [$deposees, $ambigues] = $this->deposerPairesTitreEditeur(false);
+
+        $this->info("✓ Rattachement média→entreprise : {$bySiren} par SIREN exact, {$byName} par nom exact unique ; {$deposees} paire(s) titre ↔ éditeur déposée(s) dans « Doublons à vérifier » ({$ambigues} ambiguë(s), non déposée(s)).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Les fiches PROVISOIRES `media:<id>` dont un titre porte le SIREN d'une
+     * fiche d'éditeur vivante : la paire va dans la file de vérification des
+     * doublons — jamais fusionnée ici.
+     *
+     * @return array{0: int, 1: int} paires déposées (ou à déposer, à blanc), ambiguës
+     */
+    private function deposerPairesTitreEditeur(bool $aBlanc): array
+    {
+        $paires = DB::select(
+            "SELECT f.workspace_id, f.id AS provisoire, array_agg(DISTINCT c.id) AS editeurs
+               FROM media m
+               JOIN companies f ON f.id = m.company_id AND f.deleted_at IS NULL
+                               AND f.foreign_id LIKE '" . QualificationPresse::PREFIXE_ANCRE_MEDIA . "%'
+               JOIN companies c ON c.siren = m.siren AND c.workspace_id = m.workspace_id
+                               AND c.deleted_at IS NULL AND c.id <> f.id
+              WHERE m.deleted_at IS NULL AND m.siren IS NOT NULL
+              GROUP BY f.workspace_id, f.id
+              ORDER BY f.id",
+        );
+
+        $deposees = 0;
+        $ambigues = 0;
+        foreach ($paires as $p) {
+            $editeurs = array_values(array_filter(array_map('intval', explode(',', trim((string) $p->editeurs, '{}')))));
+            if (count($editeurs) !== 1) {
+                $ambigues++;
+
+                continue;
+            }
+            $ws = (string) $p->workspace_id;
+            $editeur = $editeurs[0];
+            $provisoire = (int) $p->provisoire;
+            // Jamais redéposée : une paire déjà en file ou traitée (écartée,
+            // fusionnée), dans un sens ou dans l'autre, ou déjà fusionnée —
+            // même si la fusion a été annulée.
+            $connue = DB::table('duplicate_flags')->where('workspace_id', $ws)->where('entity_type', 'company')
+                ->where(static fn ($q) => $q
+                    ->where(static fn ($x) => $x->where('entity_a_id', $editeur)->where('entity_b_id', $provisoire))
+                    ->orWhere(static fn ($x) => $x->where('entity_a_id', $provisoire)->where('entity_b_id', $editeur)))
+                ->exists()
+                || DB::table('fusions_fiches')->where('workspace_id', $ws)
+                    ->where(static fn ($q) => $q
+                        ->where(static fn ($x) => $x->where('garde_id', $editeur)->where('absorbee_id', $provisoire))
+                        ->orWhere(static fn ($x) => $x->where('garde_id', $provisoire)->where('absorbee_id', $editeur)))
+                    ->exists();
+            if ($connue) {
+                continue;
+            }
+            if (! $aBlanc) {
+                DB::table('duplicate_flags')->insert([
+                    'workspace_id' => $ws,
+                    'entity_type' => 'company',
+                    'entity_a_id' => $editeur,
+                    'entity_b_id' => $provisoire,
+                    'similarity' => Rapprochement::score(Rapprochement::PRESSE_TITRE_EDITEUR),
+                    'motif' => Rapprochement::PRESSE_TITRE_EDITEUR,
+                    'fusion_auto' => false,
+                    'detected_at' => now(),
+                ]);
+            }
+            $deposees++;
+        }
+
+        return [$deposees, $ambigues];
     }
 
     /**
@@ -168,6 +252,8 @@ class MediaLinkToCompanies extends Command
         $this->line("   • Nom exact UNIQUE     : {$uniqueMatch}  (seraient rattachés)");
         $this->line("   • Nom AMBIGU (>1)      : {$ambiguous}  (NON rattachés, garde-fou)");
         $this->line("   • Sans correspondance  : {$noMatch}");
+        [$aDeposer, $ambigues] = $this->deposerPairesTitreEditeur(true);
+        $this->line("   • Paires titre ↔ éditeur à déposer dans « Doublons à vérifier » : {$aDeposer} ({$ambigues} ambiguë(s), non déposées)");
 
         return self::SUCCESS;
     }

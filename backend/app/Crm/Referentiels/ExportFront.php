@@ -56,6 +56,12 @@ final class ExportFront
                 . 'export const RELATIONS_HORS_PROSPECTION = ['
                 . implode(', ', array_map(static fn (string $v): string => self::chaine($v), RelationsProspection::HORS_PROSPECTION))
                 . "] as const;\n",
+            // Presse (harmonisation des contacts, 2026-09-30) — étiquettes `media-type:` / `media-zone:`.
+            self::liste('TYPES_MEDIA', 'CleTypeMedia', Taxonomy::MEDIA_TYPES_ETIQUETTE, 'Types de média — étiquette automatique `media-type:<code>`.'),
+            self::liste('ZONES_MEDIA', 'CleZoneMedia', Taxonomy::MEDIA_ZONES, 'Zones de diffusion — étiquette automatique `media-zone:<code>`.'),
+            "/** Préfixes des étiquettes d'un média : type et zone de diffusion. */\n"
+                . "export const PREFIXE_ETIQUETTE_TYPE_MEDIA = \"media-type:\";\n"
+                . "export const PREFIXE_ETIQUETTE_ZONE_MEDIA = \"media-zone:\";\n",
         ];
 
         return <<<'TS'

@@ -4,6 +4,7 @@ namespace App\Services\Tags;
 
 use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\Federations\EtiquettesFederation;
+use App\Crm\Presse\EtiquettesMedia;
 use App\Crm\Referentiels\EtiquettesClassement;
 use App\Crm\Taxonomy;
 use App\Models\Company;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
  *  - metier-{cle}   (category=sector, kind=auto)   — depuis naf_rev2 (`Metiers`)
  *  - famille:, niveau:, secteur:, taille-adherents:, pertinence:,
  *    contactabilite: (kind=auto) — depuis la ligne `federations` de la fiche
+ *  - media-type:, media-zone:, media-theme: (kind=auto) — depuis les lignes
+ *    `media` vivantes rattachées à la fiche (`EtiquettesMedia`)
  *  - {tag}          (category=ia, kind=llm)        — depuis signals.llm_classification.tags
  *
  * Règle de nommage : `App\Crm\Etiquettes\FamillesEtiquettes` (chaque
@@ -185,6 +188,15 @@ class AutoTaggerService
         // resynchro retirerait ces étiquettes automatiques. Une fiche sans
         // ligne (toute entreprise ordinaire) n'en désire aucune.
         foreach (EtiquettesFederation::desirees(EtiquettesFederation::ligne((int) $company->id)) as $slug => $spec) {
+            $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
+        }
+
+        // Média (harmonisation presse, 2026-09-30) : type, zone de diffusion,
+        // thème éditorial — DÉRIVÉS des lignes `media` vivantes de la fiche.
+        // Une seule définition (`EtiquettesMedia`) : sans elle ici, la première
+        // resynchro retirerait ces étiquettes. Une fiche sans média n'en
+        // désire aucune.
+        foreach (EtiquettesMedia::desirees(EtiquettesMedia::lignes((int) $company->id)) as $slug => $spec) {
             $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 

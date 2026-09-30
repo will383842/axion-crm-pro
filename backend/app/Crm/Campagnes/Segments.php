@@ -26,8 +26,16 @@ use InvalidArgumentException;
  *    (`--avec-syndicats-salaries`) : art. 9.2.e — coordonnées rendues
  *    manifestement publiques par les responsables syndicaux, message lié à
  *    leur fonction. Une fiche sans classement connu n'est jamais visée.
- *  - prospects INSEE, journalistes/médias : FERMÉS tant que Will ne les ouvre
- *    pas (volume, chauffe d'IP, autre usage).
+ *  - `presse` (2026-09-30) : les médias et journalistes harmonisés
+ *    (`crm:presse:harmoniser`, `crm:presse:importer`), désignés par leur tag de
+ *    provenance protégé. DÉFINI mais FERMÉ : il n'est pas dans `OUVERTS` tant
+ *    que Will ne l'ouvre pas (autre usage que la prospection, chauffe d'IP,
+ *    porte d'accès `journalists.acces` à respecter). L'ouvrir = l'ajouter à
+ *    `OUVERTS`, rien d'autre. Tant qu'il est fermé,
+ *    `GardePresse` écarte ces fiches de TOUTE audience, quel que soit le
+ *    chemin (y compris un chemin qui lèverait la protection générale).
+ *  - prospects INSEE : FERMÉS tant que Will ne les ouvre pas (volume, chauffe
+ *    d'IP).
  *  - vivier candidats, personnes de la lettre : JAMAIS — les premiers ne sont
  *    pas des prospects, les seconds partent du site sur leur propre liste.
  *
@@ -39,6 +47,9 @@ final class Segments
     public const ORGANISATEURS_EVENEMENTS = 'organisateurs-evenements';
 
     public const FEDERATIONS = 'federations';
+
+    /** Médias et journalistes — défini, FERMÉ (hors `OUVERTS`) : décision de Will. */
+    public const PRESSE = 'presse';
 
     /** @var list<string> */
     public const OUVERTS = [self::ORGANISATEURS_EVENEMENTS, self::FEDERATIONS];
@@ -56,6 +67,7 @@ final class Segments
         return match ($segment) {
             self::ORGANISATEURS_EVENEMENTS => FichesProtegees::TAG_ORGANISATEURS,
             self::FEDERATIONS => FichesProtegees::TAG_FEDERATIONS,
+            self::PRESSE => FichesProtegees::TAG_PRESSE,
             default => throw new InvalidArgumentException("Segment inconnu : « {$segment} »."),
         };
     }

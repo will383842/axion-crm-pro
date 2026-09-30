@@ -2,6 +2,7 @@
 
 namespace App\Crm\Rgpd;
 
+use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Taxonomy;
 use App\Jobs\VerifierEffacementRgpd;
 use App\Services\Audit\AuditHashChain;
@@ -211,6 +212,9 @@ final class SiteGdprService
                 $deleted['business'] = WorkspaceContext::run(
                     $businessId,
                     fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones, $clesNom): array {
+                        // Effacement art. 17 : emporte aussi la ligne `journalists`
+                        // liée aux contacts supprimés (harmonisation presse).
+                        LienJournalisteContact::marquerEffacement();
                         $contacts = DB::table('contacts')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {

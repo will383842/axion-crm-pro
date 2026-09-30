@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Presse\QualificationPresse;
 use App\Models\Media;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Console\Command;
@@ -38,8 +39,10 @@ class MediaFindWebsites extends Command
                 ->whereNotNull('name')
                 // Anti-divergence : les médias LIÉS à une entreprise héritent du site
                 // de celle-ci (media:sync-from-companies). On ne devine QUE pour les
-                // médias autonomes (titres CPPAP, agences) sans entreprise.
-                ->whereNull('company_id')
+                // médias autonomes (titres CPPAP, agences) — sans fiche, ou portés
+                // par la fiche PROVISOIRE `media:<id>` que l'harmonisation de la
+                // presse leur a donnée (elle n'est pas une entreprise éditrice).
+                ->whereRaw(QualificationPresse::conditionMediaAutonome('media'))
                 ->limit($batch)
                 ->get();
             if ($medias->isEmpty()) {

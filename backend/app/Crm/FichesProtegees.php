@@ -79,6 +79,16 @@ final class FichesProtegees
     public const TAG_GOFAB = 'src:scraping-gofab-2026';
 
     /**
+     * Médias et journalistes (source `presse-2026`, harmonisation des contacts
+     * du 2026-09-30) : `crm:presse:harmoniser` et `crm:presse:importer`. Ordre
+     * permanent de Will : ne JAMAIS rien purger. Même régime que les
+     * fédérations : ni purge, ni enrichissement automatique, ni reclassement,
+     * ni audience générale — la presse ne part en campagne que par son
+     * segment (`Segments::PRESSE`), FERMÉ tant que Will ne l'ouvre pas.
+     */
+    public const TAG_PRESSE = 'src:scraping-presse-2026';
+
+    /**
      * ⚠️ Chaque slug ajouté ici exige une NOUVELLE migration qui réinstalle le
      * déclencheur de la base (sa liste est figée) — `FichesProtegeesTest` lit la
      * fonction installée et rougit sinon.
@@ -89,6 +99,7 @@ final class FichesProtegees
         self::TAG_ORGANISATEURS,
         self::TAG_FEDERATIONS,
         self::TAG_GOFAB,
+        self::TAG_PRESSE,
     ];
 
     /**

@@ -55,9 +55,13 @@ final class ScrapedRecordIngestService
      * fédération départementale siège souvent aussi à la nationale, et chaque
      * organisme l'affiche comme SON contact.
      *
+     * `presse-2026` (2026-09-30) : un journaliste est le contact de la
+     * RÉDACTION qui l'affiche, même si son adresse est aussi portée par sa
+     * propre société (pigiste en SASU, par exemple).
+     *
      * @var list<string>
      */
-    private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro', 'federations-2026'];
+    private const SOURCES_DEDUP_PAR_ORGANISATION = ['evenements-pro', 'federations-2026', 'presse-2026'];
 
     public function __construct(private readonly EmailMxValidator $mx) {}
 

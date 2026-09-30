@@ -200,10 +200,12 @@ test('un media AVEC fiche : la fiche devient media / presse_media, protegee, eti
     expect(DB::table('companies')->where('id', $fiche)->exists())->toBeTrue();
 });
 
-test('une relation ou une nature deja qualifiee n est JAMAIS ecrasee ; le temoin froid l est', function () {
+test('ordre de promotion unique : on ne retrograde jamais, une relation posee a la main n est JAMAIS touchee ; une nature qualifiee reste', function () {
     $cas = [
         'client' => ['relation_type' => 'client', 'lifecycle_stage' => 'client'],
         'partenaire' => ['relation_type' => 'partenaire'],
+        'manuelle' => ['relation_type' => 'prospect', 'relation_saisie_manuelle_at' => now()],
+        'conference' => ['relation_type' => 'conference'],
         'prospect_qualifie' => ['relation_type' => 'prospect', 'lifecycle_stage' => 'qualifie'],
         'association' => ['entity_nature' => 'association'],
         'temoin' => [],
@@ -220,7 +222,11 @@ test('une relation ou une nature deja qualifiee n est JAMAIS ecrasee ; le temoin
     $nat = fn (string $n) => DB::table('companies')->where('id', $fiches[$n])->value('entity_nature');
     expect($rel('client'))->toBe('client')
         ->and($rel('partenaire'))->toBe('partenaire')
-        ->and($rel('prospect_qualifie'))->toBe('prospect')
+        ->and($rel('manuelle'))->toBe('prospect')
+        // Sous `presse_media` dans l'ordre de promotion : promues.
+        ->and($rel('conference'))->toBe('presse_media')
+        ->and($rel('prospect_qualifie'))->toBe('presse_media')
+        ->and(DB::table('companies')->where('id', $fiches['prospect_qualifie'])->value('lifecycle_stage'))->toBe('qualifie')
         ->and($nat('association'))->toBe('association')
         ->and($rel('association'))->toBe('presse_media')
         ->and($rel('temoin'))->toBe('presse_media')
@@ -302,6 +308,8 @@ test('chaque journaliste vivant et non oppose devient un contact de la fiche, re
     $c = phJournaliste($this->espace, $media, ['first_name' => 'Cyd', 'last_name' => 'ZZCORBEILLE', 'deleted_at' => now()]);
     $d = phJournaliste($this->espace, $media, ['first_name' => 'Dan', 'last_name' => 'ZZPROD', 'email' => 'dan.zz@zz-gazette.example.invalid', 'acces' => 'redaction_prod']);
     phJournaliste($this->espace, $media, ['first_name' => 'Eve', 'last_name' => null]);
+    // Porte NON posée : le refus est la règle par défaut, l'adresse ne part pas.
+    $n = phJournaliste($this->espace, $media, ['first_name' => 'Nia', 'last_name' => 'ZZSANSPORTE', 'email' => 'nia.zz@zz-gazette.example.invalid']);
 
     $r = phHarmoniser();
 
@@ -325,10 +333,12 @@ test('chaque journaliste vivant et non oppose devient un contact de la fiche, re
         ->and(DB::table('contacts')->where('last_name', 'ZZOPPOSE')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('last_name', 'ZZCORBEILLE')->exists())->toBeFalse()
         ->and(DB::table('journalists')->whereIn('id', [$b, $c])->whereNotNull('contact_id')->exists())->toBeFalse()
-        ->and(phCompteur($r['sortie'], 'journalistes_convertis'))->toBe(2)
+        ->and(DB::table('contacts')->where('external_ref', 'journaliste:' . $n)->value('email'))->toBeNull()
+        ->and(DB::table('contacts')->where('external_ref', 'journaliste:' . $n)->exists())->toBeTrue()
+        ->and(phCompteur($r['sortie'], 'journalistes_convertis'))->toBe(3)
         ->and(phCompteur($r['sortie'], 'journalistes_opposes'))->toBe(1)
         ->and(phCompteur($r['sortie'], 'journalistes_sans_nom'))->toBe(1)
-        ->and(phCompteur($r['sortie'], 'emails_journalistes_retenus_par_acces'))->toBe(1)
+        ->and(phCompteur($r['sortie'], 'emails_journalistes_retenus_par_acces'))->toBe(2)
         // La ligne source n'est pas touchée : elle garde son adresse.
         ->and(DB::table('journalists')->where('id', $d)->value('email'))->toBe('dan.zz@zz-gazette.example.invalid');
 });
@@ -348,8 +358,11 @@ test('une personne RETIREE ne revient jamais : contact supprime, a la corbeille,
     DB::table('contacts')->where('external_ref', 'journaliste:' . $d)->update(['deleted_at' => now()]);
     DB::table('contacts')->where('external_ref', 'journaliste:' . $g)->update(['last_name' => 'ZZAPRESRENOMMAGE', 'deleted_at' => now()]);
     // Le déclencheur a inscrit Ana au registre (source presse-2026).
+    // … et la base a reporté la suppression sur la ligne `journalists` d'Ana.
     expect(DB::table('contacts_retires')->where('company_id', $fiche)->count())->toBe(1)
-        ->and(DB::table('journalists')->where('id', $a)->value('contact_id'))->toBeNull();
+        ->and(DB::table('journalists')->where('id', $a)->value('contact_id'))->toBeNull()
+        ->and(DB::table('journalists')->where('id', $a)->value('opt_out'))->toBeTrue()
+        ->and(DB::table('journalists')->where('id', $a)->value('deleted_at'))->not->toBeNull();
 
     // Une personne retirée AVANT l'harmonisation (registre seulement).
     DB::table('contacts')->insert([
@@ -367,7 +380,8 @@ test('une personne RETIREE ne revient jamais : contact supprime, a la corbeille,
         ->and(DB::table('contacts')->where('last_name', 'ZZREGISTRE')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('last_name', 'ZZAVANTRENOMMAGE')->exists())->toBeFalse()
         ->and(DB::table('contacts')->where('external_ref', 'journaliste:' . $temoin)->exists())->toBeTrue()
-        ->and(phCompteur($r['sortie'], 'journalistes_retires_ignores'))->toBe(4)
+        // Ana n'est même plus lue (à la corbeille) ; Dom, Gus et Rex sont écartés.
+        ->and(phCompteur($r['sortie'], 'journalistes_retires_ignores'))->toBe(3)
         ->and(phCompteur($r['sortie'], 'journalistes_convertis'))->toBe(1);
 });
 

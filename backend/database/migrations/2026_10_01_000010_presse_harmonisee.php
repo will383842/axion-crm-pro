@@ -46,6 +46,26 @@ use Illuminate\Support\Facades\DB;
  *       ou du contact (dont les liens repassent à NULL) : c'est elle qui
  *       interdit à un second passage de RECRÉER une fiche ou une personne que
  *       Will a supprimée.
+ *
+ *  5. Les DROITS de la personne traversent le lien, dans le sens contact →
+ *     journaliste, quel que soit le chemin qui les exerce (relecture sécurité
+ *     de #264, veto RGPD). Deux déclencheurs, `SECURITY DEFINER` :
+ *     - `contacts_retrait_atteint_journalistes` (BEFORE DELETE sur
+ *       `contacts`) : la ligne `journalists` liée est opposée, vidée de son
+ *       adresse et de son téléphone, mise à la corbeille — la suppression d'un
+ *       contact est un effacement (aucune purge n'est permise, ordre de Will) ;
+ *     - `opt_out_atteint_journalistes` (AFTER INSERT sur `opt_out`, portée
+ *       business) : tout journaliste dont l'adresse ou le téléphone — ou ceux
+ *       de son contact lié — correspondent à l'opposition passe `opt_out`.
+ *       L'adresse est comparée par l'empreinte de `ListeSuppression`
+ *       (sha256 de l'adresse en minuscules) ; le téléphone par ses chiffres
+ *       ramenés à la forme nationale (`presse_telephone_national`).
+ *     Le sens journaliste → contact est porté par le code
+ *     (`App\Crm\Presse\LienJournalisteContact`).
+ *
+ * ── Retour arrière ───────────────────────────────────────────────────────
+ * REFUSÉ dès qu'une fiche porte le tag de la presse : retirer sa protection
+ * la rendrait purgeable, ce que Will interdit.
  */
 return new class extends Migration
 {
@@ -58,6 +78,10 @@ return new class extends Migration
         DB::statement("SET LOCAL lock_timeout = '30s'");
 
         (new ScrapingSourcesSeeder)->run();
+        // Le seeder ne touche jamais `enabled` d'une source existante : un
+        // `up()` rejoué après un `down()` (qui la COUPE) doit la rouvrir,
+        // sinon les deux commandes refuseraient de tourner.
+        DB::table('scraping_sources')->where('slug', 'presse-2026')->update(['enabled' => true, 'updated_at' => now()]);
 
         $this->installerProtection(self::SLUGS);
         $this->installerRetraits(
@@ -74,6 +98,102 @@ return new class extends Migration
         DB::statement("COMMENT ON COLUMN journalists.contact_id IS 'Contact (contacts.id) qui porte ce journaliste depuis l''harmonisation presse. journalists reste la table source de l''ecran Medias & Presse.'");
         DB::statement("COMMENT ON COLUMN journalists.harmonise_le IS 'Traite par crm:presse:harmoniser. Survit a la suppression du contact : une personne retiree n''est jamais recreee.'");
         DB::statement("COMMENT ON COLUMN media.harmonise_le IS 'Traite par crm:presse:harmoniser ou crm:presse:importer. Survit a la suppression de la fiche : une fiche supprimee n''est jamais recreee.'");
+
+        $this->installerDroitsContactVersJournaliste();
+    }
+
+    /**
+     * Le sens contact → journaliste, porté par la base : ni l'effacement d'un
+     * contact ni une opposition ne peuvent laisser la ligne `journalists` liée
+     * joignable. `SECURITY DEFINER` et `search_path` fixé, comme les autres
+     * déclencheurs du registre : une opposition est GLOBALE (`opt_out` n'a pas
+     * d'espace), elle atteint le journaliste où qu'il soit.
+     */
+    private function installerDroitsContactVersJournaliste(): void
+    {
+        DB::unprepared(<<<'SQL'
+            CREATE OR REPLACE FUNCTION public.presse_telephone_national(p TEXT)
+            RETURNS TEXT
+            LANGUAGE sql
+            IMMUTABLE
+            SET search_path = public, pg_catalog
+            AS $fn$
+                SELECT CASE
+                    WHEN d ~ '^0[1-9][0-9]{8}$' THEN d
+                    WHEN d ~ '^(0033|33)0?[1-9][0-9]{8}$' THEN '0' || right(d, 9)
+                    ELSE NULLIF(d, '')
+                END
+                FROM (SELECT regexp_replace(COALESCE(p, ''), '[^0-9]', '', 'g') AS d) s
+            $fn$;
+
+            CREATE OR REPLACE FUNCTION public.contacts_retrait_atteint_journalistes()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            BEGIN
+                UPDATE public.journalists
+                   SET opt_out = true,
+                       email = NULL,
+                       phone = NULL,
+                       harmonise_le = COALESCE(harmonise_le, now()),
+                       deleted_at = COALESCE(deleted_at, now()),
+                       updated_at = now()
+                 WHERE contact_id = OLD.id;
+
+                RETURN OLD;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS contacts_retrait_atteint_journalistes ON public.contacts;
+            CREATE TRIGGER contacts_retrait_atteint_journalistes
+                BEFORE DELETE ON public.contacts
+                FOR EACH ROW EXECUTE FUNCTION public.contacts_retrait_atteint_journalistes();
+
+            CREATE OR REPLACE FUNCTION public.opt_out_atteint_journalistes()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            AS $fn$
+            DECLARE
+                v_tel TEXT := public.presse_telephone_national(NEW.phone);
+            BEGIN
+                IF COALESCE(NEW.scope, 'business') <> 'business' THEN
+                    RETURN NEW;
+                END IF;
+                IF NEW.email_hash IS NULL AND NEW.email IS NULL AND v_tel IS NULL THEN
+                    RETURN NEW;
+                END IF;
+
+                UPDATE public.journalists j
+                   SET opt_out = true,
+                       updated_at = now()
+                 WHERE j.opt_out = false
+                   AND (
+                        (j.email IS NOT NULL AND (
+                            encode(digest(lower(trim(j.email::text)), 'sha256'), 'hex') = NEW.email_hash
+                            OR j.email = NEW.email))
+                     OR (v_tel IS NOT NULL AND public.presse_telephone_national(j.phone) = v_tel)
+                     OR (j.contact_id IS NOT NULL AND EXISTS (
+                            SELECT 1 FROM public.contacts c
+                             WHERE c.id = j.contact_id
+                               AND ((c.email IS NOT NULL AND (
+                                        encode(digest(lower(trim(c.email::text)), 'sha256'), 'hex') = NEW.email_hash
+                                        OR c.email = NEW.email))
+                                    OR (v_tel IS NOT NULL AND public.presse_telephone_national(c.phone) = v_tel))))
+                   );
+
+                RETURN NEW;
+            END
+            $fn$;
+
+            DROP TRIGGER IF EXISTS opt_out_atteint_journalistes ON public.opt_out;
+            CREATE TRIGGER opt_out_atteint_journalistes
+                AFTER INSERT ON public.opt_out
+                FOR EACH ROW EXECUTE FUNCTION public.opt_out_atteint_journalistes();
+        SQL);
     }
 
     /**
@@ -85,6 +205,22 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Ordre de Will : une fiche de presse n'est JAMAIS purgeable. Retirer
+        // sa protection alors qu'il en existe serait l'y exposer.
+        $presse = DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+            ->where('tags.slug', 'src:scraping-presse-2026')->exists();
+        if ($presse) {
+            throw new RuntimeException('Retour arriere refuse : des fiches portent src:scraping-presse-2026 et resteraient sans protection.');
+        }
+
+        DB::unprepared(<<<'SQL'
+            DROP TRIGGER IF EXISTS opt_out_atteint_journalistes ON public.opt_out;
+            DROP TRIGGER IF EXISTS contacts_retrait_atteint_journalistes ON public.contacts;
+            DROP FUNCTION IF EXISTS public.opt_out_atteint_journalistes();
+            DROP FUNCTION IF EXISTS public.contacts_retrait_atteint_journalistes();
+            DROP FUNCTION IF EXISTS public.presse_telephone_national(TEXT);
+        SQL);
+
         $this->installerProtection(self::SLUGS_AVANT);
         $this->installerRetraits(
             "COALESCE(OLD.sources, '[]'::jsonb) @> '[\"federations-2026\"]'::jsonb",

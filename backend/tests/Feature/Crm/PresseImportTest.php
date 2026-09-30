@@ -64,7 +64,7 @@ function piLigne(array $surcharge = []): array
         'theme' => 'Économie',
         'journaliste' => [
             'prenom' => 'Zoe', 'nom' => 'ZZREDACTRICE', 'fonction' => 'Rédactrice en chef', 'rubrique' => 'Économie',
-            'email' => 'zoe.zz@zz-quotidien.example.invalid', 'linkedin' => 'https://www.linkedin.com/in/zz-fictif',
+            'email' => 'zoe.zz@zz-quotidien.example.invalid', 'acces' => 'email_redaction', 'linkedin' => 'https://www.linkedin.com/in/zz-fictif',
         ],
     ], $surcharge);
 }
@@ -304,4 +304,57 @@ test('options et fichier controles ; --compteurs-seulement ne cite aucune valeur
 
     // La source est la même que l'harmonisation : un seul tag, une seule protection.
     expect(QualificationPresse::SOURCE)->toBe('presse-2026');
+});
+
+test('porte d acces : l adresse n est posee QUE si la porte vaut email_redaction ; sans porte ou autre porte, le contact nait sans adresse', function () {
+    $j = static fn (string $nom, ?string $acces): array => array_filter([
+        'prenom' => 'Zed', 'nom' => $nom, 'email' => strtolower($nom) . '@zz-quotidien.example.invalid', 'acces' => $acces,
+    ], static fn ($v): bool => $v !== null);
+
+    $r = piImporter([
+        piLigne(['journaliste' => $j('ZZSANSPORTE', null)]),
+        piLigne(['journaliste' => $j('ZZLINKEDIN', 'linkedin_direct')]),
+        piLigne(['journaliste' => $j('ZZAQUALIFIER', 'a_qualifier')]),
+        piLigne(['journaliste' => $j('ZZREDACTION', 'email_redaction')]),
+        piLigne(['journaliste' => $j('ZZPORTEINVENTEE', 'pigeon_voyageur')]),
+    ]);
+
+    $email = static fn (string $nom): mixed => DB::table('contacts')->where('last_name', $nom)->value('email');
+    expect($email('ZZSANSPORTE'))->toBeNull()
+        ->and($email('ZZLINKEDIN'))->toBeNull()
+        ->and($email('ZZAQUALIFIER'))->toBeNull()
+        ->and(DB::table('contacts')->where('last_name', 'ZZSANSPORTE')->exists())->toBeTrue()
+        ->and($email('ZZREDACTION'))->toBe('zzredaction@zz-quotidien.example.invalid')
+        ->and(json_decode((string) DB::table('contacts')->where('last_name', 'ZZLINKEDIN')->value('metadata'), true)['acces'])->toBe('linkedin_direct')
+        ->and(piCompteur($r['sortie'], 'emails_journalistes_retenus_par_acces'))->toBe(3)
+        ->and($r['sortie'])->toContain('acces_inconnu : 1')
+        ->and(DB::table('contacts')->where('last_name', 'ZZPORTEINVENTEE')->exists())->toBeFalse();
+});
+
+test('un journaliste OPPOSE ou EFFACE dans la console n est jamais recree : par nom et media, ou par adresse ; le temoin entre', function () {
+    $media = (int) DB::table('media')->insertGetId([
+        'workspace_id' => $this->espace, 'name' => 'ZZ Quotidien fictif', 'media_type' => 'presse_quotidien',
+        'media_family' => 'editorial', 'source' => 'cppap', 'enrich_status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $ligne = static fn (array $v): array => $v + ['workspace_id' => test()->espace, 'source' => 'wikidata', 'created_at' => now(), 'updated_at' => now()];
+    // Opposée, même nom (accents et casse près), même média.
+    DB::table('journalists')->insert($ligne(['media_id' => $media, 'first_name' => 'Zoé', 'last_name' => 'zzredactrice', 'opt_out' => true]));
+    // Effacée (corbeille, coordonnées vidées), même nom, même média.
+    DB::table('journalists')->insert($ligne(['media_id' => $media, 'first_name' => 'Eva', 'last_name' => 'ZZEFFACEE', 'opt_out' => true, 'deleted_at' => now()]));
+    // Opposée, autre nom, mais même adresse.
+    DB::table('journalists')->insert($ligne(['first_name' => 'Ali', 'last_name' => 'ZZAILLEURS', 'email' => 'ali.zz@zz-quotidien.example.invalid', 'opt_out' => true]));
+    $opposes = DB::table('journalists')->where('opt_out', true)->count();
+
+    $r = piImporter([
+        piLigne(),
+        piLigne(['journaliste' => ['prenom' => 'Eva', 'nom' => 'ZZEFFACEE']]),
+        piLigne(['journaliste' => ['prenom' => 'Alain', 'nom' => 'ZZAUTRENOM', 'email' => 'ali.zz@zz-quotidien.example.invalid', 'acces' => 'email_redaction']]),
+        piLigne(['journaliste' => ['prenom' => 'Tim', 'nom' => 'ZZTEMOIN']]),
+    ]);
+
+    expect(DB::table('contacts')->whereIn('last_name', ['ZZREDACTRICE', 'ZZEFFACEE', 'ZZAUTRENOM'])->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('last_name', 'ZZTEMOIN')->exists())->toBeTrue()
+        ->and(piCompteur($r['sortie'], 'journalistes_opposes'))->toBe(3)
+        // Ni réactivée, ni touchée : la console garde son opposition.
+        ->and(DB::table('journalists')->where('opt_out', true)->count())->toBe($opposes);
 });

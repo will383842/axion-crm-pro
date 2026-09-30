@@ -29,7 +29,13 @@ use Throwable;
  * `contacts` par nature, relation, taille, étiquettes et audiences, ne pouvait
  * pas les voir.
  *
- * ── Ce que fait un passage, média par média (ordre des identifiants) ─────
+ * ── Ce que fait un passage, GROUPE par groupe ────────────────────────────
+ *
+ * Un groupe = un média « tête » (tout média, sauf une émission rattachée à une
+ * chaîne) suivi des ÉMISSIONS de cette chaîne. Les groupes sont parcourus dans
+ * l'ordre des identifiants de leur tête ; un groupe tient toujours dans UN
+ * paquet. Ainsi une chaîne est harmonisée UNE fois par passage, avant ses
+ * émissions, et l'essai à blanc compte exactement comme le réel.
  *
  *  - média AVEC fiche : la fiche passe par la porte commune (funnel
  *    `ScrapedRecordIngestService`, source `presse-2026`) — backfill-only :
@@ -38,18 +44,21 @@ use Throwable;
  *    `src:scraping-presse-2026` la PROTÈGE (`FichesProtegees`). Puis nature
  *    `media` et relation `presse_media` selon la règle de
  *    `QualificationPresse` (jamais une relation posée à la main) ;
- *  - média SANS fiche (titres CPPAP, services en ligne, agences sans SIREN,
- *    émissions) : une fiche naît, ancrée sur (`FR`, `media:<id>`), et
- *    `media.company_id` la relie. Une ÉMISSION rattachée à une chaîne
- *    (`parent_media_id`) va sur la fiche de sa chaîne — la rédaction qu'on
- *    joint —, harmonisée d'abord s'il le faut ;
+ *  - média SANS fiche (titres CPPAP, services en ligne, agences sans SIREN) :
+ *    une fiche naît, ancrée sur (`FR`, `media:<id>`), et `media.company_id` la
+ *    relie ;
+ *  - une ÉMISSION va sur la fiche de sa CHAÎNE — la rédaction qu'on joint.
+ *    Elle n'apporte à cette fiche que ses personnes, jamais son site, son
+ *    téléphone ni son adresse, au premier passage comme aux suivants ;
  *  - étiquettes : `media-type:`, `media-zone:`, `media-theme:` (dérivées des
  *    lignes `media`, `EtiquettesMedia`), plus `nature-media` ;
  *  - chaque journaliste vivant, non opposé, jamais retiré : un CONTACT de la
  *    fiche (prénom, nom, fonction, e-mail et téléphone s'ils existent,
  *    LinkedIn), base `legitimate_interest_b2b` (funnel), référence
  *    `journaliste:<id>`, rubrique / porte d'accès / média dans `metadata`, et
- *    `journalists.contact_id` pour garder le lien.
+ *    `journalists.contact_id` pour garder le lien. Deux journalistes de MÊME
+ *    nom sur la même fiche ne sont jamais fusionnés en un contact : le second
+ *    est écarté et compté (`journalistes_homonymes_ecartes`).
  *
  * ── Rien n'est supprimé (ordre permanent de Will) ────────────────────────
  * Aucune ligne `media`, `journalists`, `companies`, `contacts` n'est
@@ -62,6 +71,7 @@ use Throwable;
  *    le média est écarté (`fiche_a_la_corbeille`) ;
  *  - une fiche SUPPRIMÉE après un premier passage (`media.harmonise_le` posé,
  *    `company_id` revenu à NULL) : écartée (`fiche_supprimee_non_recreee`) ;
+ *    les émissions d'une telle chaîne aussi (`chaine_a_la_corbeille`) ;
  *  - un journaliste OPPOSÉ (`opt_out`), à la corbeille, dont le contact a été
  *    supprimé ou effacé (référence `journaliste:<id>` à la corbeille,
  *    `harmonise_le` posé sans contact, homonyme à la corbeille sur la fiche,
@@ -69,10 +79,11 @@ use Throwable;
  *    fiches qu'elle a absorbées).
  *
  * ── La porte d'accès (`journalists.acces`) ──────────────────────────────
- * Seule `email_redaction` est diffusable par e-mail (migration du 25/08) :
- * l'adresse d'un journaliste qu'on atteint par la production, par LinkedIn
- * ou « à qualifier » n'est PAS recopiée sur son contact — elle reste sur la
- * ligne source. La porte est gardée dans `metadata.acces`.
+ * Seule `email_redaction` est diffusable par e-mail (migration du 25/08). Le
+ * REFUS est la règle par défaut (relecture sécurité de #264) : l'adresse
+ * n'est recopiée sur le contact QUE si la porte vaut `email_redaction`. Sans
+ * porte posée, par la production, par LinkedIn ou « à qualifier », elle reste
+ * sur la ligne source. La porte est gardée dans `metadata.acces`.
  *
  * ── La production audiovisuelle ─────────────────────────────────────────
  * Décision de Will du 14/07 : la production audiovisuelle (NAF 59.11/59.12,
@@ -80,36 +91,38 @@ use Throwable;
  * entreprises, souvent des prospects : par défaut, leur fiche reçoit ses
  * étiquettes `media-type:production` (visables, excluables) et RIEN d'autre —
  * ni nature, ni relation, ni protection, ni contact. `--inclure-production`
- * les traite comme la presse, en connaissance de cause.
+ * les traite comme la presse, en connaissance de cause. Une production n'est
+ * jamais la « chaîne » d'une émission.
  *
- * ── Par PAQUETS, reprenable ─────────────────────────────────────────────
- * Chaque paquet (`--paquet`, 500 par défaut) est validé seul, un point de
- * sauvegarde par média à l'intérieur (même raison que les fédérations : les
+ * ── Par PAQUETS, reprenable, IDEMPOTENTE ────────────────────────────────
+ * Chaque paquet (`--paquet` groupes, 500 par défaut) est validé seul, un point
+ * de sauvegarde par média à l'intérieur (même raison que les fédérations : les
  * verrous d'identifiant de transaction restent bornés par le paquet).
  * `updated_at` des fiches n'est pas touché (`app.conserver_updated_at`) :
  * qualifier n'est pas modifier. Une interruption laisse les paquets validés
- * en base ; `--depuis-id=N` reprend au média N, et relancer depuis le début
- * est sans danger (idempotente : même contenu = même `run_id`, rien
- * n'est réécrit).
+ * en base ; `--depuis-id=N` reprend au groupe dont la tête est N. Le `run_id`
+ * de la porte commune est l'EMPREINTE du contenu (coordonnées du média et
+ * journalistes admissibles, déjà harmonisés compris) : repasser sur un média
+ * inchangé n'écrit rien — ni fiche, ni `scraper_runs`, ni activité.
  *
  * ── Essai à blanc HONNÊTE ───────────────────────────────────────────────
  * `--dry-run` passe par le MÊME chemin, paquet par paquet, et ANNULE chaque
- * paquet. Limite dite en sortie : un média ne voit pas ce qu'un paquet
- * PRÉCÉDENT aurait créé (la fiche d'une chaîne créée dans un paquet annulé est
- * recréée pour l'émission d'un paquet suivant, et comptée deux fois).
+ * paquet. Une chaîne et ses émissions étant dans le même paquet, les compteurs
+ * sont ceux du réel.
  *
  * `--compteurs-seulement` : journaux publics des workflows (dépôt PUBLIC) —
- * que des nombres, ni nom, ni adresse, ni identifiant. Sans cette option, la
- * sortie ne cite jamais de nom ni d'adresse non plus : des compteurs, des
- * motifs, et le dernier identifiant de média validé (pour reprendre).
+ * que des nombres, ni nom, ni adresse, ni identifiant, et un message FIXE en
+ * cas d'interruption. Sans cette option, la sortie ne cite jamais de nom ni
+ * d'adresse non plus : des compteurs, des motifs, et le dernier identifiant
+ * de tête validé (pour reprendre).
  */
 class CrmPresseHarmoniser extends Command
 {
     protected $signature = 'crm:presse:harmoniser
                             {--dry-run : Tout parcourir paquet par paquet, annuler chaque paquet, et afficher le bilan}
-                            {--depuis-id= : Reprendre au média d\'identifiant N (inclus)}
-                            {--limite= : Ne traiter que les N premiers médias (passage par étapes)}
-                            {--paquet=500 : Médias validés par transaction : borne les verrous tenus}
+                            {--depuis-id= : Reprendre au groupe dont le média de tête a l\'identifiant N (inclus)}
+                            {--limite= : Ne traiter que les N premiers groupes (une chaîne compte avec ses émissions)}
+                            {--paquet=500 : Groupes validés par transaction : borne les verrous tenus}
                             {--inclure-production : Traiter aussi la production audiovisuelle comme de la presse}
                             {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}';
 
@@ -121,8 +134,8 @@ class CrmPresseHarmoniser extends Command
     /** Département accepté par le schéma pivot (`ScrapedRecord`). */
     private const MOTIF_DEPARTEMENT = '/^(0[1-9]|1\d|2[1-9AB]|[3-8]\d|9[0-5]|97[1-6])$/';
 
-    /** Profondeur maximale de la remontée émission → chaîne. */
-    private const PROFONDEUR_MAX = 3;
+    /** Refus d'une chaîne qui interdisent à ses émissions de créer une fiche à sa place. */
+    private const REFUS_DE_CHAINE = ['fiche_a_la_corbeille', 'fiche_supprimee_non_recreee'];
 
     /** @var array<string, int> */
     private array $bilan = [];
@@ -172,14 +185,14 @@ class CrmPresseHarmoniser extends Command
         }
 
         $this->bilan = array_fill_keys([
-            'medias_lus', 'medias_rejetes', 'paquets',
-            'fiches_creees', 'fiches_existantes', 'emissions_sur_la_chaine',
+            'groupes', 'medias_lus', 'medias_rejetes', 'paquets',
+            'fiches_creees', 'fiches_existantes', 'emissions_sur_la_chaine', 'emissions_deja_sur_la_chaine',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
             'production_etiquetee', 'production_sans_fiche_ignoree',
             'emails_grand_public_non_poses',
             'journalistes_convertis', 'journalistes_deja_harmonises', 'journalistes_opposes',
             'journalistes_retires_ignores', 'journalistes_sans_nom', 'journalistes_non_retrouves',
-            'emails_journalistes_retenus_par_acces',
+            'journalistes_homonymes_ecartes', 'emails_journalistes_retenus_par_acces',
             'contacts_crees', 'contacts_completes', 'personnes_opposees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
         ], 0);
@@ -192,18 +205,17 @@ class CrmPresseHarmoniser extends Command
             WorkspaceContext::run($this->workspaceId, function () use ($depuis, $limite, $paquet, $dryRun, $discret, &$dernierValide): void {
                 $curseur = ($depuis ?? 1) - 1;
                 while (true) {
-                    $restant = $limite === null ? $paquet : min($paquet, $limite - $this->bilan['medias_lus']);
+                    $restant = $limite === null ? $paquet : min($paquet, $limite - $this->bilan['groupes']);
                     if ($restant <= 0) {
                         break;
                     }
-                    $ids = array_values(array_map('intval', DB::table('media')->where('workspace_id', $this->workspaceId)
-                        ->whereNull('deleted_at')->where('id', '>', $curseur)->orderBy('id')->limit($restant)->pluck('id')->all()));
-                    if ($ids === []) {
+                    $tetes = $this->tetes($curseur, $restant);
+                    if ($tetes === []) {
                         break;
                     }
 
-                    $this->traiterPaquet($ids, $dryRun, $discret);
-                    $curseur = max($ids);
+                    $this->traiterPaquet($tetes, $dryRun, $discret);
+                    $curseur = max($tetes);
                     $dernierValide = $curseur;
                 }
             });
@@ -231,6 +243,15 @@ class CrmPresseHarmoniser extends Command
                 . ($dryRun ? ' (à blanc : rien n\'a été écrit).' : ' : ils restent en base. Relancer REPREND (idempotente).' . $reprise),
             );
 
+            if ($discret) {
+                // Journaux publics : le message d'une exception peut citer une
+                // valeur (une requête SQL, un nom). Un message fixe, et le
+                // détail au journal du serveur seulement.
+                Log::error('crm:presse:harmoniser interrompu', ['exception' => $interruption]);
+
+                throw new RuntimeException('crm:presse:harmoniser interrompu (détail masqué : --compteurs-seulement, voir le journal du serveur).');
+            }
+
             throw $interruption;
         }
 
@@ -248,10 +269,10 @@ class CrmPresseHarmoniser extends Command
             array_values($this->bilan),
         ));
         if ($dryRun) {
-            $this->line('MESURÉ paquet par paquet, chaque paquet annulé : un média ne voit pas ce qu\'un paquet PRÉCÉDENT aurait créé (une chaîne créée pour une émission peut être comptée deux fois).');
+            $this->line('MESURÉ paquet par paquet, chaque paquet annulé ; une chaîne et ses émissions sont toujours dans le même paquet.');
         }
         if (! $discret && $dernierValide !== null) {
-            $this->line("Dernier média traité : {$dernierValide} (reprendre avec --depuis-id=" . ($dernierValide + 1) . ').');
+            $this->line("Dernier groupe traité : tête {$dernierValide} (reprendre avec --depuis-id=" . ($dernierValide + 1) . ').');
         }
         if ($this->rejets !== []) {
             ksort($this->rejets);
@@ -265,13 +286,63 @@ class CrmPresseHarmoniser extends Command
     }
 
     /**
+     * Les têtes de groupe suivantes : tout média vivant, sauf une ÉMISSION dont
+     * la chaîne (média parent vivant, ni émission, ni production) existe —
+     * celle-là est traitée dans le groupe de sa chaîne.
+     *
+     * @return list<int>
+     */
+    private function tetes(int $curseur, int $combien): array
+    {
+        $lignes = DB::select(
+            "SELECT m.id
+               FROM media m
+               LEFT JOIN media p
+                      ON p.id = m.parent_media_id
+                     AND p.id <> m.id
+                     AND p.workspace_id = m.workspace_id
+                     AND p.deleted_at IS NULL
+                     AND p.media_type NOT IN ('tv_emission', 'production_audiovisuelle')
+                     AND p.media_family <> 'audiovisual_production'
+              WHERE m.workspace_id = ?
+                AND m.deleted_at IS NULL
+                AND m.id > ?
+                AND NOT (m.media_type = 'tv_emission' AND p.id IS NOT NULL)
+              ORDER BY m.id
+              LIMIT ?",
+            [$this->workspaceId, $curseur, $combien],
+        );
+
+        return array_values(array_map(static fn (\stdClass $l): int => (int) $l->id, $lignes));
+    }
+
+    /**
+     * Les émissions d'une chaîne (vide si la tête n'est pas une chaîne).
+     *
+     * @return list<int>
+     */
+    private function emissionsDe(int $teteId): array
+    {
+        $tete = DB::table('media')->where('workspace_id', $this->workspaceId)->where('id', $teteId)
+            ->whereNull('deleted_at')->first(['id', 'media_type', 'media_family']);
+        if ($tete === null || in_array($tete->media_type, ['tv_emission', 'production_audiovisuelle'], true)
+            || $tete->media_family === 'audiovisual_production') {
+            return [];
+        }
+
+        return array_values(array_map('intval', DB::table('media')->where('workspace_id', $this->workspaceId)
+            ->where('parent_media_id', $teteId)->where('id', '<>', $teteId)->where('media_type', 'tv_emission')
+            ->whereNull('deleted_at')->orderBy('id')->pluck('id')->all()));
+    }
+
+    /**
      * Un paquet : une transaction, un point de sauvegarde par média, validée
      * (ou annulée à blanc) d'un bloc. Ses compteurs ne sont reportés qu'à sa
      * fermeture.
      *
-     * @param  list<int>  $ids
+     * @param  list<int>  $tetes
      */
-    private function traiterPaquet(array $ids, bool $dryRun, bool $discret): void
+    private function traiterPaquet(array $tetes, bool $dryRun, bool $discret): void
     {
         /** @var list<string> $rejetsDuPaquet */
         $rejetsDuPaquet = [];
@@ -280,28 +351,11 @@ class CrmPresseHarmoniser extends Command
             // Qualifier n'est pas modifier : `updated_at` des fiches reste celui
             // d'avant (déclencheur `trg_set_updated_at`, `companies` et `tags`).
             DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
-            foreach ($ids as $id) {
-                $this->enCours['medias_lus'] = ($this->enCours['medias_lus'] ?? 0) + 1;
-                try {
-                    $delta = [];
-                    DB::transaction(function () use ($id, &$delta): void {
-                        $delta = [];
-                        $this->harmoniserMedia($id, $delta, 0);
-                    });
-                    foreach ($delta as $cle => $n) {
-                        $this->enCours[$cle] = ($this->enCours[$cle] ?? 0) + $n;
-                    }
-                } catch (InvalidArgumentException $e) {
-                    $rejetsDuPaquet[] = $e->getMessage();
-                } catch (ScrapeIngestRejection $e) {
-                    // Le MESSAGE du funnel peut citer une valeur : seul son code sort.
-                    $rejetsDuPaquet[] = 'pivot_' . $e->errorCode;
-                } catch (QueryException $e) {
-                    $rejetsDuPaquet[] = 'erreur_base';
-                    Log::warning('crm:presse:harmoniser : media refuse par la base', [
-                        'media_id' => $discret ? null : $id,
-                        'sqlstate' => $e->getCode(),
-                    ]);
+            foreach ($tetes as $tete) {
+                $this->enCours['groupes'] = ($this->enCours['groupes'] ?? 0) + 1;
+                $chaine = $this->traiterMedia($tete, null, $rejetsDuPaquet, $discret);
+                foreach ($this->emissionsDe($tete) as $emission) {
+                    $this->traiterMedia($emission, $chaine, $rejetsDuPaquet, $discret);
                 }
             }
 
@@ -329,11 +383,53 @@ class CrmPresseHarmoniser extends Command
     }
 
     /**
+     * Un média, dans son point de sauvegarde. Rend ce que ses émissions doivent
+     * savoir de lui : sa fiche, ou le motif de son refus.
+     *
+     * @param  array{fiche: ?int, refus: ?string}|null  $chaine
+     * @param  list<string>  $rejetsDuPaquet
+     * @return array{fiche: ?int, refus: ?string}
+     */
+    private function traiterMedia(int $id, ?array $chaine, array &$rejetsDuPaquet, bool $discret): array
+    {
+        $this->enCours['medias_lus'] = ($this->enCours['medias_lus'] ?? 0) + 1;
+        $motif = null;
+        $fiche = null;
+        try {
+            $delta = [];
+            DB::transaction(function () use ($id, $chaine, &$delta, &$fiche): void {
+                $delta = [];
+                $fiche = $this->harmoniserMedia($id, $delta, $chaine);
+            });
+            foreach ($delta as $cle => $n) {
+                $this->enCours[$cle] = ($this->enCours[$cle] ?? 0) + $n;
+            }
+        } catch (InvalidArgumentException $e) {
+            $motif = $e->getMessage();
+        } catch (ScrapeIngestRejection $e) {
+            // Le MESSAGE du funnel peut citer une valeur : seul son code sort.
+            $motif = 'pivot_' . $e->errorCode;
+        } catch (QueryException $e) {
+            $motif = 'erreur_base';
+            Log::warning('crm:presse:harmoniser : media refuse par la base', [
+                'media_id' => $discret ? null : $id,
+                'sqlstate' => $e->getCode(),
+            ]);
+        }
+        if ($motif !== null) {
+            $rejetsDuPaquet[] = $motif;
+        }
+
+        return ['fiche' => $fiche, 'refus' => $motif];
+    }
+
+    /**
      * Harmonise UN média ; rend la fiche qui le porte (null : pas de fiche).
      *
      * @param  array<string, int>  $delta
+     * @param  array{fiche: ?int, refus: ?string}|null  $chaine  pour une émission : ce que sa chaîne est devenue
      */
-    private function harmoniserMedia(int $mediaId, array &$delta, int $profondeur): ?int
+    private function harmoniserMedia(int $mediaId, array &$delta, ?array $chaine): ?int
     {
         $m = DB::table('media')->where('workspace_id', $this->workspaceId)->where('id', $mediaId)
             ->whereNull('deleted_at')->first();
@@ -345,7 +441,8 @@ class CrmPresseHarmoniser extends Command
         if ($production && ! $this->inclureProduction) {
             $fiche = null;
             if ($m->company_id !== null) {
-                $fiche = DB::table('companies')->where('id', $m->company_id)->whereNull('deleted_at')->value('id');
+                $fiche = DB::table('companies')->where('workspace_id', $this->workspaceId)->where('id', $m->company_id)
+                    ->whereNull('deleted_at')->value('id');
             }
             if ($fiche === null) {
                 $this->compter($delta, 'production_sans_fiche_ignoree');
@@ -359,12 +456,17 @@ class CrmPresseHarmoniser extends Command
             return (int) $fiche;
         }
 
+        $ficheDeLaChaine = $chaine['fiche'] ?? null;
+        if ($chaine !== null && $ficheDeLaChaine === null && $m->company_id === null
+            && in_array($chaine['refus'], self::REFUS_DE_CHAINE, true)) {
+            // La rédaction qu'on joindrait a été écartée par Will : l'émission
+            // ne recrée pas une fiche à sa place.
+            throw new InvalidArgumentException('chaine_a_la_corbeille');
+        }
+
         // ── La fiche qui portera ce média ─────────────────────────────────
-        $ancre = null;
-        $surLaChaine = false;
-        // La fiche DÉJÀ connue (celle du média, ou celle de sa chaîne) : c'est
-        // sous son ancre que le registre des retraits est interrogé.
-        $ficheConnue = null;
+        // `$ficheConnue` : la fiche DÉJÀ en base (celle du média, ou celle de
+        // sa chaîne) — c'est sous son ancre que le registre est interrogé.
         if ($m->company_id !== null) {
             $fiche = DB::table('companies')->where('workspace_id', $this->workspaceId)->where('id', $m->company_id)
                 ->first(['id', 'siren', 'country_code', 'foreign_id', 'deleted_at']);
@@ -378,56 +480,39 @@ class CrmPresseHarmoniser extends Command
                 throw new InvalidArgumentException('fiche_sans_ancre');
             }
             $ficheConnue = (int) $fiche->id;
-            $this->compter($delta, 'fiches_existantes');
+            // Une émission DÉJÀ portée par la fiche de sa chaîne le reste : elle
+            // n'apporte que ses personnes, à chaque passage.
+            $surLaChaine = $ficheDeLaChaine !== null && $ficheConnue === $ficheDeLaChaine;
+            $this->compter($delta, $surLaChaine ? 'emissions_deja_sur_la_chaine' : 'fiches_existantes');
         } elseif ($m->harmonise_le !== null) {
             // Déjà harmonisé, et sa fiche a disparu depuis : supprimée par Will.
             throw new InvalidArgumentException('fiche_supprimee_non_recreee');
+        } elseif ($ficheDeLaChaine !== null) {
+            $fiche = DB::table('companies')->where('workspace_id', $this->workspaceId)->where('id', $ficheDeLaChaine)
+                ->first(['id', 'siren', 'country_code', 'foreign_id', 'deleted_at']);
+            $ancre = $fiche === null || $fiche->deleted_at !== null ? null : $this->ancreDeFiche($fiche);
+            if ($ancre === null) {
+                throw new InvalidArgumentException('fiche_sans_ancre');
+            }
+            $ficheConnue = $ficheDeLaChaine;
+            $surLaChaine = true;
         } else {
-            $chaine = null;
-            // Une émission rejoint la fiche de sa CHAÎNE — jamais celle d'une
-            // société de production (hors presse par défaut).
-            $parent = null;
-            if ($m->media_type === 'tv_emission' && $m->parent_media_id !== null && (int) $m->parent_media_id !== $mediaId) {
-                $parent = DB::table('media')->where('workspace_id', $this->workspaceId)->where('id', $m->parent_media_id)
-                    ->whereNull('deleted_at')->first(['id', 'media_type', 'media_family']);
+            $ancre = ['foreign_id' => 'media:' . $mediaId, 'country' => self::PAYS];
+            $existante = DB::table('companies')->where('workspace_id', $this->workspaceId)
+                ->where('country_code', self::PAYS)->where('foreign_id', $ancre['foreign_id'])
+                ->first(['id', 'deleted_at']);
+            if ($existante !== null && $existante->deleted_at !== null) {
+                throw new InvalidArgumentException('fiche_a_la_corbeille');
             }
-            if ($parent !== null && $profondeur < self::PROFONDEUR_MAX
-                && $parent->media_type !== 'production_audiovisuelle' && $parent->media_family !== 'audiovisual_production') {
-                try {
-                    $chaine = $this->harmoniserMedia((int) $m->parent_media_id, $delta, $profondeur + 1);
-                } catch (InvalidArgumentException $e) {
-                    if ($e->getMessage() === 'fiche_a_la_corbeille' || $e->getMessage() === 'fiche_supprimee_non_recreee') {
-                        // La rédaction qu'on joindrait a été écartée par Will :
-                        // l'émission ne recrée pas une fiche à sa place.
-                        throw new InvalidArgumentException('chaine_a_la_corbeille');
-                    }
-                    $chaine = null;
-                }
-            }
-
-            if ($chaine !== null) {
-                $fiche = DB::table('companies')->where('id', $chaine)->first(['id', 'siren', 'country_code', 'foreign_id', 'deleted_at']);
-                $ancre = $fiche === null ? null : $this->ancreDeFiche($fiche);
-                $surLaChaine = $ancre !== null;
-                $ficheConnue = $surLaChaine ? $chaine : null;
-            }
-
-            if (! $surLaChaine) {
-                $ancre = ['foreign_id' => 'media:' . $mediaId, 'country' => self::PAYS];
-                $existante = DB::table('companies')->where('workspace_id', $this->workspaceId)
-                    ->where('country_code', self::PAYS)->where('foreign_id', $ancre['foreign_id'])
-                    ->first(['id', 'deleted_at']);
-                if ($existante !== null && $existante->deleted_at !== null) {
-                    throw new InvalidArgumentException('fiche_a_la_corbeille');
-                }
-            }
+            $ficheConnue = null;
+            $surLaChaine = false;
         }
 
         // ── Les journalistes à faire entrer ──────────────────────────────
-        [$personnes, $journalistes] = $this->journalistes($m, $ficheConnue, $delta);
+        [$personnes, $journalistes, $empreintes] = $this->journalistes($m, $ficheConnue, $delta);
 
         // ── Porte commune ────────────────────────────────────────────────
-        $message = $this->message($m, $ancre, $surLaChaine, $personnes, $delta);
+        $message = $this->message($m, $ancre, $surLaChaine, $personnes, $empreintes, $delta);
         $outcome = $this->funnel->ingest(ScrapedRecord::fromArray($message), false);
         if (! in_array($outcome->status, [ScrapeIngestOutcome::CREATED, ScrapeIngestOutcome::UPDATED, ScrapeIngestOutcome::IDEMPOTENT], true)) {
             throw new InvalidArgumentException('pivot_statut_inattendu');
@@ -483,10 +568,11 @@ class CrmPresseHarmoniser extends Command
     /**
      * Les journalistes du média qu'on peut faire entrer, et ceux qu'on écarte
      * (comptés). Un journaliste déjà harmonisé dont le contact est vivant
-     * n'est pas renvoyé au funnel : son lien est seulement vérifié.
+     * n'est pas renvoyé au funnel : son lien est seulement vérifié — mais il
+     * entre dans l'EMPREINTE du contenu, pour que repasser n'écrive rien.
      *
      * @param  array<string, int>  $delta
-     * @return array{0: list<array<string, string>>, 1: list<array{id: int, prenom: ?string, nom: string, email: ?string, metadata: array<string, scalar|null>}>}
+     * @return array{0: list<array<string, string>>, 1: list<array{id: int, prenom: ?string, nom: string, email: ?string, metadata: array<string, scalar|null>}>, 2: list<array<string, string>>}
      */
     private function journalistes(\stdClass $m, ?int $ficheConnue, array &$delta): array
     {
@@ -504,6 +590,8 @@ class CrmPresseHarmoniser extends Command
 
         $personnes = [];
         $retenus = [];
+        $empreintes = [];
+        $nomsDuMessage = [];
         foreach ($lignes as $j) {
             if ((bool) $j->opt_out) {
                 $this->compter($delta, 'journalistes_opposes');
@@ -513,12 +601,30 @@ class CrmPresseHarmoniser extends Command
             $prenom = $this->texte($j->first_name);
             $nom = $this->texte($j->last_name);
 
+            // La porte d'accès : SEULE `email_redaction` laisse l'adresse
+            // partir sur le contact. Sans porte, c'est non.
+            $email = $this->email($j->email);
+            $retenueParLaPorte = $email !== null && $j->acces !== 'email_redaction';
+            if ($retenueParLaPorte) {
+                $email = null;
+            }
+            $personne = array_filter([
+                'kind' => 'person',
+                'first_name' => $prenom,
+                'last_name' => $nom,
+                'role' => $this->texte($j->role),
+                'email' => $email,
+                'phone' => $this->texte($j->phone),
+                'linkedin_url' => $this->linkedin($j),
+            ], static fn ($v): bool => $v !== null);
+
             $parReference = DB::table('contacts')->where('workspace_id', $this->workspaceId)
                 ->where('external_ref', 'journaliste:' . $j->id)->first(['id', 'deleted_at']);
             if ($parReference !== null && $parReference->deleted_at === null) {
                 if ((int) ($j->contact_id ?? 0) !== (int) $parReference->id) {
                     DB::table('journalists')->where('id', $j->id)->update(['contact_id' => (int) $parReference->id, 'harmonise_le' => now()]);
                 }
+                $empreintes[] = $personne + ['journaliste' => (string) $j->id];
                 $this->compter($delta, 'journalistes_deja_harmonises');
 
                 continue;
@@ -541,23 +647,23 @@ class CrmPresseHarmoniser extends Command
                 continue;
             }
 
-            // La porte d'accès : seule `email_redaction` (ou aucune porte
-            // posée) laisse l'adresse partir sur le contact.
-            $email = $this->email($j->email);
-            if ($email !== null && $j->acces !== null && $j->acces !== 'email_redaction') {
-                $email = null;
+            // Deux journalistes de MÊME nom sur une même fiche ne deviennent
+            // jamais un seul contact (le funnel les dédoublonne par nom + fiche) :
+            // le second est écarté et compté, sa ligne source reste intacte.
+            $cleNom = $this->cleNom($prenom, $nom);
+            if (isset($nomsDuMessage[$cleNom])
+                || ($ficheConnue !== null && QualificationPresse::homonymeJournaliste($ficheConnue, $prenom, $nom, (int) $j->id))) {
+                $this->compter($delta, 'journalistes_homonymes_ecartes');
+
+                continue;
+            }
+            $nomsDuMessage[$cleNom] = true;
+
+            if ($retenueParLaPorte) {
                 $this->compter($delta, 'emails_journalistes_retenus_par_acces');
             }
-
-            $personnes[] = array_filter([
-                'kind' => 'person',
-                'first_name' => $prenom,
-                'last_name' => $nom,
-                'role' => $this->texte($j->role),
-                'email' => $email,
-                'phone' => $this->texte($j->phone),
-                'linkedin_url' => $this->linkedin($j),
-            ], static fn ($v): bool => $v !== null);
+            $personnes[] = $personne;
+            $empreintes[] = $personne + ['journaliste' => (string) $j->id];
             $retenus[] = [
                 'id' => (int) $j->id,
                 'prenom' => $prenom,
@@ -572,18 +678,19 @@ class CrmPresseHarmoniser extends Command
             ];
         }
 
-        return [$personnes, $retenus];
+        return [$personnes, $retenus, $empreintes];
     }
 
     /**
      * Le message du schéma pivot pour ce média.
      *
      * @param  array{siren?: string, foreign_id?: string, country: string}  $ancre
-     * @param  list<array<string, string>>  $personnes
+     * @param  list<array<string, string>>  $personnes  celles à faire entrer
+     * @param  list<array<string, string>>  $empreintes  toutes les admissibles (déjà harmonisées comprises)
      * @param  array<string, int>  $delta
      * @return array<string, mixed>
      */
-    private function message(\stdClass $m, array $ancre, bool $surLaChaine, array $personnes, array &$delta): array
+    private function message(\stdClass $m, array $ancre, bool $surLaChaine, array $personnes, array $empreintes, array &$delta): array
     {
         $champs = [];
         // Une émission portée par la fiche de sa chaîne n'apporte QUE ses
@@ -617,9 +724,13 @@ class CrmPresseHarmoniser extends Command
             'company' => $ancre + ['nature' => QualificationPresse::NATURE, 'fields' => $champs],
             'persons' => $personnes,
         ];
-        // Le MÊME contenu rejoué = le même run : rien n'est réécrit.
+        // L'empreinte du CONTENU, pas de l'état d'avancement : un journaliste
+        // déjà harmonisé n'est plus envoyé, mais il compte toujours. Le même
+        // contenu rejoué = le même run : le funnel n'écrit rien (ni fiche, ni
+        // `scraper_runs`, ni activité).
+        $contenu = ['company' => $message['company'], 'journalistes' => $empreintes];
         $message['run_id'] = QualificationPresse::SOURCE . ':media:' . $m->id . ':'
-            . substr(hash('sha256', json_encode($message, JSON_THROW_ON_ERROR)), 0, 16);
+            . substr(hash('sha256', json_encode($contenu, JSON_THROW_ON_ERROR)), 0, 16);
 
         return $message;
     }
@@ -670,6 +781,14 @@ class CrmPresseHarmoniser extends Command
         $renvoi = $absorbee === null ? null : FusionFiches::gardeDe($this->workspaceId, (int) $absorbee);
 
         return $renvoi === null ? null : (int) $renvoi['garde'];
+    }
+
+    /** Le nom normalisé comme la base (`normalize_name`), pour repérer les homonymes. */
+    private function cleNom(?string $prenom, string $nom): string
+    {
+        $ligne = DB::selectOne("SELECT normalize_name(coalesce(?, '') || '_' || ?) AS k", [$prenom, $nom]);
+
+        return (string) ($ligne->k ?? '');
     }
 
     /** Le profil LinkedIn d'un journaliste : son slug normalisé, sinon le lien de `socials`. */

@@ -2,6 +2,7 @@
 
 namespace App\Crm\Presse;
 
+use App\Crm\Relations\PromotionRelation;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use Illuminate\Support\Facades\DB;
@@ -24,12 +25,12 @@ use Illuminate\Support\Facades\DB;
  * ses étiquettes `media-type:` et sa relation.
  *
  * ── Relation ─────────────────────────────────────────────────────────────
- * Seule la relation FROIDE par défaut est remplacée : vide, ou `prospect` au
- * stade `nouveau` (ou sans stade) — le tampon que toute fiche collectée reçoit
- * à la naissance (funnel, règle B.2). Une relation posée à la main ou
- * réchauffée par un événement (`client`, `partenaire`, `investisseur`,
- * `conference`, `newsletter`, `fournisseur`, ou un `prospect` qualifié,
- * en opportunité, perdu…) n'est JAMAIS écrasée : un média client reste client.
+ * L'ordre de promotion UNIQUE du CRM (`PromotionRelation`, chantier B) :
+ * client > investisseur > partenaire > presse_media > conference > fournisseur
+ * > prospect > newsletter. `presse_media` ne remplace que ce qui est en
+ * dessous ; on ne rétrograde jamais (un média client reste client). Et une
+ * relation POSÉE À LA MAIN (`relation_saisie_manuelle_at`) n'est jamais
+ * touchée, quelle qu'elle soit. L'étape (`lifecycle_stage`) ne bouge pas.
  *
  * ── Réversible ───────────────────────────────────────────────────────────
  * La première fois qu'une fiche change, sa nature et sa relation d'AVANT sont
@@ -52,6 +53,28 @@ final class QualificationPresse
     public const CLE_AVANT = 'harmonisation_presse';
 
     /**
+     * L'ANNULATION de l'harmonisation, prête à jouer (dans cet ordre). Elle ne
+     * rend l'état d'avant QUE si la fiche porte encore ce que l'harmonisation
+     * y a mis : une relation ou une nature changée depuis (à la main, par un
+     * import, par le site) n'est jamais écrasée, ni une relation marquée
+     * « saisie à la main ».
+     *
+     * @var list<string>
+     */
+    public const SQL_ANNULATION = [
+        "UPDATE companies SET relation_type = metadata->'harmonisation_presse'->>'relation_avant'
+          WHERE (metadata->'harmonisation_presse') IS NOT NULL
+            AND relation_type = 'presse_media'
+            AND relation_saisie_manuelle_at IS NULL
+            AND metadata->'harmonisation_presse'->>'relation_avant' IS NOT NULL
+            AND metadata->'harmonisation_presse'->>'relation_avant' <> 'presse_media'",
+        "UPDATE companies SET entity_nature = metadata->'harmonisation_presse'->>'nature_avant'
+          WHERE (metadata->'harmonisation_presse') IS NOT NULL
+            AND entity_nature = 'media'
+            AND COALESCE(metadata->'harmonisation_presse'->>'nature_avant', '') <> 'media'",
+    ];
+
+    /**
      * Nature et relation de la fiche, selon la règle ci-dessus.
      *
      * Compteurs rendus : `natures_posees`, `natures_conservees`,
@@ -62,7 +85,7 @@ final class QualificationPresse
     public static function qualifier(int $companyId): array
     {
         $fiche = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')
-            ->first(['id', 'entity_nature', 'relation_type', 'lifecycle_stage', 'metadata']);
+            ->first(['id', 'entity_nature', 'relation_type', 'relation_saisie_manuelle_at', 'metadata']);
         if ($fiche === null) {
             return [];
         }
@@ -79,7 +102,7 @@ final class QualificationPresse
         }
 
         $relation = $fiche->relation_type;
-        if (self::relationRemplacable($relation, $fiche->lifecycle_stage)) {
+        if (self::relationRemplacable($relation, $fiche->relation_saisie_manuelle_at)) {
             $maj['relation_type'] = self::RELATION;
             $delta['relations_posees'] = 1;
         } elseif ($relation !== self::RELATION) {
@@ -106,11 +129,23 @@ final class QualificationPresse
         return $delta;
     }
 
-    /** La relation est-elle le tampon froid par défaut, donc remplaçable ? */
-    public static function relationRemplacable(?string $relation, ?string $stade): bool
+    /**
+     * `presse_media` peut-elle remplacer cette relation ? Selon l'ORDRE DE
+     * PROMOTION UNIQUE du CRM (`PromotionRelation`, chantier B) : on ne
+     * rétrograde jamais — client, investisseur, partenaire restent ; conférence,
+     * fournisseur, prospect, lettre deviennent presse. Et JAMAIS une relation
+     * posée à la main (`relation_saisie_manuelle_at`).
+     */
+    public static function relationRemplacable(?string $relation, mixed $saisieManuelle): bool
     {
-        return $relation === null
-            || ($relation === 'prospect' && ($stade === null || $stade === 'nouveau'));
+        if ($saisieManuelle !== null) {
+            return false;
+        }
+        if ($relation === null) {
+            return true;
+        }
+
+        return $relation !== self::RELATION && PromotionRelation::relation($relation, self::RELATION) === self::RELATION;
     }
 
     /** Resynchronise les étiquettes automatiques de la fiche (dont `media-*`). */

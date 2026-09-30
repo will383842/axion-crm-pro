@@ -2,6 +2,7 @@
 
 namespace App\Services\Audiences;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
@@ -243,6 +244,12 @@ class AudienceBuilderService
      */
     public function evaluateForCompany(Company $company): array
     {
+        // La presse harmonisée n'entre dans aucune audience tant que Will n'a
+        // pas ouvert son segment (`GardePresse`), quel que soit le chemin.
+        if (! GardePresse::admissible((int) $company->id)) {
+            return [];
+        }
+
         $audiences = EmailAudience::query()
             ->where('workspace_id', $company->workspace_id)
             ->where('is_active', true)
@@ -401,6 +408,9 @@ class AudienceBuilderService
         // passera par un flux dédié, décidé par Will — jamais par une audience
         // générale où le triage les aurait rangées (`ready_for_outreach`).
         FichesProtegees::exclure($query);
+        // Et la presse harmonisée, par SA garde (`GardePresse`) : elle vaut
+        // même si un chemin lève un jour la protection générale ci-dessus.
+        GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {

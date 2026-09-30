@@ -31,7 +31,9 @@ use InvalidArgumentException;
  *    provenance protégé. DÉFINI mais FERMÉ : il n'est pas dans `OUVERTS` tant
  *    que Will ne l'ouvre pas (autre usage que la prospection, chauffe d'IP,
  *    porte d'accès `journalists.acces` à respecter). L'ouvrir = l'ajouter à
- *    `OUVERTS`, rien d'autre.
+ *    `OUVERTS`, rien d'autre. Tant qu'il est fermé,
+ *    `GardePresse` écarte ces fiches de TOUTE audience, quel que soit le
+ *    chemin (y compris un chemin qui lèverait la protection générale).
  *  - prospects INSEE : FERMÉS tant que Will ne les ouvre pas (volume, chauffe
  *    d'IP).
  *  - vivier candidats, personnes de la lettre : JAMAIS — les premiers ne sont

@@ -39,10 +39,37 @@ use Throwable;
  *    "site": "https://…", "email_redaction": "redaction@…", "telephone": "…",
  *    "theme": "économie",
  *    "journaliste": {"prenom": "…", "nom": "…", "fonction": "…", "rubrique": "…",
- *                    "email": "<adresse professionnelle publiée>", "linkedin": "https://…"}}
+ *                    "email": "<adresse professionnelle publiée>", "acces": "email_redaction",
+ *                    "linkedin": "https://…"}}
+ *
+ * ── La porte d'accès du journaliste (relecture sécurité de #264) ────────
+ * `acces` prend une valeur de `Taxonomy::ACCES_PRESSE`. L'adresse n'est
+ * posée sur le contact QUE si elle vaut `email_redaction` ; absente, ou
+ * toute autre valeur : le contact est créé SANS adresse (compteur
+ * `emails_journalistes_retenus_par_acces`), comme à l'harmonisation. Choix :
+ * garder la personne (nom, fonction, LinkedIn servent aux relations presse
+ * faites à la main) sans jamais rendre son adresse diffusable par défaut —
+ * rejeter la ligne perdrait le média et la personne pour une adresse.
+ *
+ * ── Un journaliste opposé dans la console ne revient jamais ────────────
+ * Avant d'entrer, le journaliste est cherché dans `journalists` parmi les
+ * lignes OPPOSÉES ou EFFACÉES (`opt_out`, corbeille) : même nom sur le même
+ * média (média de la fiche, ou de même nom), ou même adresse. Trouvé : il
+ * n'est ni créé, ni complété, ni réactivé (`journalistes_opposes`).
  *
  * Plusieurs lignes d'un même média (un journaliste par ligne) visent la même
  * fiche par la même ancre.
+ *
+ * Un titre DÉJÀ en base sans SIREN (fiche `media:<id>` née de l'harmonisation)
+ * est REJOINT (même nom normalisé, même type, département compatible), jamais
+ * doublé d'une fiche parallèle ; en cas de doute la ligne est rejetée.
+ *
+ * Motifs de rejet : `json_invalide`, `cle_inconnue`, `type_de_valeur_invalide`,
+ * `siren_invalide`, `siren_ou_identifiant_manquant`, `identifiant_invalide`,
+ * `champ_obligatoire_manquant`, `type_inconnu`, `zone_inconnue`,
+ * `theme_trop_long`, `journaliste_invalide`, `journaliste_sans_nom`,
+ * `acces_inconnu`, `titre_existant_non_harmonise`, `rapprochement_ambigu`,
+ * `fiche_a_la_corbeille`, `pivot_<code>`, `erreur_base`.
  *
  * ── Ce que fait une ligne ────────────────────────────────────────────────
  *  - la fiche entre par la PORTE COMMUNE (funnel, source `presse-2026`) :
@@ -85,7 +112,7 @@ class CrmPresseImporter extends Command
         'site', 'email_redaction', 'telephone', 'theme', 'journaliste',
     ];
 
-    private const CLES_JOURNALISTE = ['prenom', 'nom', 'fonction', 'rubrique', 'email', 'linkedin'];
+    private const CLES_JOURNALISTE = ['prenom', 'nom', 'fonction', 'rubrique', 'email', 'acces', 'linkedin'];
 
     /** Identifiant d'un média sans SIREN : l'espace de noms `presse:` SEULEMENT. */
     public const MOTIF_IDENTIFIANT = '/^presse(:[A-Za-z0-9-]+)+$/';
@@ -158,10 +185,10 @@ class CrmPresseImporter extends Command
 
         $this->bilan = array_fill_keys([
             'lignes', 'rejetees', 'paquets',
-            'fiches_creees', 'fiches_rattachees', 'medias_crees', 'medias_completes', 'medias_inchanges',
+            'fiches_creees', 'fiches_rattachees', 'titres_rapproches', 'medias_crees', 'medias_completes', 'medias_inchanges',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
             'emails_redaction_non_poses',
-            'journalistes_lus', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
+            'journalistes_lus', 'journalistes_opposes', 'emails_journalistes_retenus_par_acces', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
             'personnes_ecartees', 'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
         ], 0);
@@ -195,6 +222,14 @@ class CrmPresseImporter extends Command
                 "INTERROMPU après {$this->bilan['paquets']} paquet(s) validé(s)"
                 . ($dryRun ? ' (à blanc : rien n\'a été écrit).' : ' : ils restent en base. Relancer le même fichier REPREND (import idempotent).'),
             );
+
+            if ($this->option('compteurs-seulement')) {
+                // Journaux publics : jamais le message d'une exception (il peut
+                // citer une valeur). Le détail va au journal du serveur.
+                Log::error('crm:presse:importer interrompu', ['exception' => $interruption]);
+
+                throw new RuntimeException('crm:presse:importer interrompu (détail masqué : --compteurs-seulement, voir le journal du serveur).');
+            }
 
             throw $interruption;
         }
@@ -318,6 +353,24 @@ class CrmPresseImporter extends Command
         $delta = [];
 
         $trouvee = $this->parAncre($l, corbeilleComprise: true)->first(['id', 'deleted_at']);
+        $ancreMessage = $l['siren'] !== null
+            ? ['siren' => $l['siren'], 'country' => self::PAYS]
+            : ['foreign_id' => $l['identifiant'], 'country' => self::PAYS];
+        $ancreRegistre = $this->ancreRegistre($l);
+        $ficheRapprochee = null;
+        if ($trouvee === null && $l['siren'] === null) {
+            // Un titre DÉJÀ en base sans SIREN (fiche `media:<id>` de
+            // l'harmonisation) : on le rejoint, jamais de fiche parallèle.
+            $ficheRapprochee = $this->rapprocher($l);
+            if ($ficheRapprochee !== null) {
+                $trouvee = $ficheRapprochee;
+                $ancreRegistre = FusionFiches::ancreDe($this->workspaceId, (int) $ficheRapprochee->id);
+                $ancreMessage = $ancreRegistre['siren'] !== null
+                    ? ['siren' => $ancreRegistre['siren'], 'country' => self::PAYS]
+                    : ['foreign_id' => (string) $ancreRegistre['foreign_id'], 'country' => (string) $ancreRegistre['pays']];
+                $delta['titres_rapproches'] = 1;
+            }
+        }
         if ($trouvee !== null && $trouvee->deleted_at !== null) {
             // À la corbeille (Will, ou fusion) : un import ne la ressuscite pas.
             throw new InvalidArgumentException('fiche_a_la_corbeille');
@@ -328,7 +381,7 @@ class CrmPresseImporter extends Command
         $j = $l['journaliste'];
         if ($j !== null) {
             $delta['journalistes_lus'] = 1;
-            $ancres = [$this->ancreRegistre($l)];
+            $ancres = [$ancreRegistre];
             if ($trouvee !== null) {
                 $tronquee = false;
                 $ancres = array_merge($ancres, FusionFiches::ancresAbsorbees($this->workspaceId, (int) $trouvee->id, $tronquee));
@@ -336,11 +389,20 @@ class CrmPresseImporter extends Command
                     $delta['chaines_de_fusion_tronquees'] = 1;
                 }
             }
-            if (FusionFiches::personneRetiree($this->workspaceId, $ancres, $j['prenom'], $j['nom'])
+            if ($this->opposeEnConsole($l, $j, $trouvee === null ? null : (int) $trouvee->id)) {
+                $delta['journalistes_opposes'] = 1;
+                $j = null;
+            } elseif (FusionFiches::personneRetiree($this->workspaceId, $ancres, $j['prenom'], $j['nom'])
                 || ($trouvee !== null && QualificationPresse::personneALaCorbeille((int) $trouvee->id, $j['prenom'], $j['nom']))) {
                 $delta['personnes_retirees_ignorees'] = 1;
                 $j = null;
             } else {
+                // La porte d'accès : SEULE `email_redaction` laisse l'adresse
+                // partir sur le contact. Sans porte, c'est non.
+                if ($j['email'] !== null && $j['acces'] !== 'email_redaction') {
+                    $j['email'] = null;
+                    $delta['emails_journalistes_retenus_par_acces'] = 1;
+                }
                 $personnes[] = array_filter([
                     'kind' => 'person',
                     'first_name' => $j['prenom'],
@@ -364,9 +426,7 @@ class CrmPresseImporter extends Command
             'schema_version' => ScrapedRecord::SCHEMA_VERSION,
             'source' => QualificationPresse::SOURCE,
             'status' => 'success',
-            'company' => [
-                ...($l['siren'] !== null ? ['siren' => $l['siren']] : ['foreign_id' => $l['identifiant']]),
-                'country' => self::PAYS,
+            'company' => $ancreMessage + [
                 'nature' => QualificationPresse::NATURE,
                 'fields' => array_filter([
                     'denomination' => $l['nom'],
@@ -397,7 +457,7 @@ class CrmPresseImporter extends Command
             $delta['chaines_de_fusion_tronquees'] = 1;
         }
 
-        $companyId = $this->parAncre($l)->value('id') ?? $outcome->companyId;
+        $companyId = $ficheRapprochee !== null ? (int) $ficheRapprochee->id : ($this->parAncre($l)->value('id') ?? $outcome->companyId);
         if ($companyId === null) {
             throw new RuntimeException('fiche_introuvable_apres_ingestion');
         }
@@ -414,6 +474,7 @@ class CrmPresseImporter extends Command
             if ($contactId !== null) {
                 QualificationPresse::completerContact($contactId, null, [
                     'rubrique' => $j['rubrique'],
+                    'acces' => $j['acces'],
                     'email_type' => $j['email'] === null ? null : 'nominatif',
                 ]);
             }
@@ -422,6 +483,80 @@ class CrmPresseImporter extends Command
         QualificationPresse::etiqueter($companyId);
 
         return $delta;
+    }
+
+    /**
+     * Le titre de cette ligne existe-t-il déjà en base, sans SIREN ? Même nom
+     * normalisé, même type, département compatible (égal, ou inconnu d'un
+     * côté). Une seule fiche : on la rejoint. Plusieurs fiches, ou un titre
+     * pas encore harmonisé (sans fiche) : DOUTE — la ligne est rejetée et
+     * comptée, jamais une fiche parallèle.
+     *
+     * @param  array<string, mixed>  $l
+     */
+    private function rapprocher(array $l): ?\stdClass
+    {
+        $candidats = DB::table('media')->where('workspace_id', $this->workspaceId)->whereNull('deleted_at')
+            ->whereRaw('normalize_name(name) = normalize_name(?)', [$l['nom']])
+            ->where('media_type', $l['type'])
+            ->when($l['departement'] !== null, static fn ($q) => $q->where(
+                static fn ($d) => $d->whereNull('department_code')->orWhere('department_code', $l['departement']),
+            ))
+            ->get(['id', 'company_id']);
+        if ($candidats->isEmpty()) {
+            return null;
+        }
+        if ($candidats->contains(static fn (\stdClass $c): bool => $c->company_id === null)) {
+            throw new InvalidArgumentException('titre_existant_non_harmonise');
+        }
+        $fiches = $candidats->pluck('company_id')->map(static fn ($v): int => (int) $v)->unique()->values();
+        if ($fiches->count() > 1) {
+            throw new InvalidArgumentException('rapprochement_ambigu');
+        }
+        $fiche = DB::table('companies')->where('workspace_id', $this->workspaceId)->where('id', $fiches->first())
+            ->first(['id', 'deleted_at']);
+
+        return $fiche instanceof \stdClass ? $fiche : null;
+    }
+
+    /**
+     * Ce journaliste a-t-il été OPPOSÉ ou EFFACÉ dans la console presse ?
+     * Même nom (normalisé comme la base) sur le même média — celui de la
+     * fiche, ou un média de même nom —, ou même adresse.
+     *
+     * @param  array<string, mixed>  $l
+     * @param  array<string, mixed>  $j
+     */
+    private function opposeEnConsole(array $l, array $j, ?int $ficheId): bool
+    {
+        return DB::table('journalists as jo')
+            ->where('jo.workspace_id', $this->workspaceId)
+            ->whereRaw('(jo.opt_out = true OR jo.deleted_at IS NOT NULL)')
+            ->where(function ($q) use ($l, $j, $ficheId): void {
+                $q->where(function ($parNom) use ($l, $j, $ficheId): void {
+                    $parNom->whereRaw(
+                        "normalize_name(coalesce(jo.first_name, '') || '_' || coalesce(jo.last_name, '')) = normalize_name(coalesce(?, '') || '_' || ?)",
+                        [$j['prenom'], $j['nom']],
+                    )->where(function ($media) use ($l, $ficheId): void {
+                        $media->whereExists(function ($m) use ($l, $ficheId): void {
+                            $m->selectRaw('1')->from('media as me')->whereColumn('me.id', 'jo.media_id')
+                                ->where(function ($mm) use ($l, $ficheId): void {
+                                    $mm->whereRaw('lower(me.name) = lower(?)', [$l['nom']]);
+                                    if ($ficheId !== null) {
+                                        $mm->orWhere('me.company_id', $ficheId);
+                                    }
+                                });
+                        });
+                        if ($ficheId !== null) {
+                            $media->orWhere('jo.company_id', $ficheId);
+                        }
+                    });
+                });
+                if ($j['email'] !== null) {
+                    $q->orWhere('jo.email', $j['email']);
+                }
+            })
+            ->exists();
     }
 
     /**
@@ -447,7 +582,7 @@ class CrmPresseImporter extends Command
         ];
 
         $media = DB::table('media')->where('workspace_id', $this->workspaceId)->where('company_id', $companyId)
-            ->whereNull('deleted_at')->whereRaw('lower(name) = lower(?)', [$l['nom']])->orderBy('id')->first();
+            ->whereNull('deleted_at')->whereRaw('normalize_name(name) = normalize_name(?)', [$l['nom']])->orderBy('id')->first();
 
         if ($media === null) {
             DB::table('media')->insert(array_filter($valeurs, static fn ($v): bool => $v !== null) + [
@@ -579,7 +714,12 @@ class CrmPresseImporter extends Command
             if ($nomJ === null) {
                 throw new InvalidArgumentException('journaliste_sans_nom');
             }
+            $acces = $this->texte($j, 'acces');
+            if ($acces !== null && ! in_array($acces, Taxonomy::ACCES_PRESSE, true)) {
+                throw new InvalidArgumentException('acces_inconnu');
+            }
             $journaliste = [
+                'acces' => $acces,
                 'prenom' => $this->texte($j, 'prenom'),
                 'nom' => $nomJ,
                 'fonction' => $this->texte($j, 'fonction'),

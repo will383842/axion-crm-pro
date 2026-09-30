@@ -3,6 +3,7 @@
 namespace App\Crm\Ingest;
 
 use App\Crm\Referentiels\Classement;
+use App\Crm\Relations\PromotionRelation;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Database\Seeders\GovernedTagsSeeder;
@@ -251,14 +252,22 @@ final class SiteSyncIngestService
             return [$id, IngestOutcome::CREATED];
         }
 
+        // FICHE EXISTANTE : l'événement du site est DÉCLARATIF (formulaire
+        // public, avis) — n'importe qui peut le remplir avec le SIREN public
+        // d'une entreprise. Il ne pose donc JAMAIS un type hors prospection
+        // (il sortirait la fiche de toute prospection, sans retour), et
+        // jamais l'étape `client` (plafonnée à `qualifie`) : la même règle que
+        // `SOURCES_DE_CONFIANCE` pour l'import (veto de la relecture sécurité
+        // de #265). Une fiche que le canal CRÉE, elle, reçoit le type déclaré :
+        // elle n'était dans aucune prospection, personne n'en sort.
         $update = [
-            'relation_type' => $this->classifier->mergeRelationType(
-                is_string($existing->relation_type ?? null) ? $existing->relation_type : null,
+            'relation_type' => PromotionRelation::relationDeclarative(
+                is_string($existing->relation_type ?? null) && $existing->relation_type !== '' ? $existing->relation_type : 'prospect',
                 $relation,
             ),
             'lifecycle_stage' => $this->classifier->mergeLifecycleStage(
                 is_string($existing->lifecycle_stage ?? null) ? $existing->lifecycle_stage : null,
-                $lifecycle,
+                (string) PromotionRelation::etapeDeclarative($lifecycle),
             ),
             'legal_basis' => $this->classifier->mergeLegalBasis(
                 is_string($existing->legal_basis ?? null) ? $existing->legal_basis : null,

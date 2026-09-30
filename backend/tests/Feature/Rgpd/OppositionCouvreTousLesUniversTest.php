@@ -274,9 +274,11 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `valid` une adresse qui a rebondi. Il n'écrit rien dans ces tables ; la
     // liste elle-même est couverte par l'effacement (`ListeSuppression`).
     // Chantier D (2026-10-01) : +1. `Joignabilite::interditesParmi` lit
-    // `opt_out` et `email_suppressions` en portée `business` SEULEMENT — la
-    // même question que `EligibiliteCampagne::peutRecevoir`, posée par lot
-    // (un test d'accord le garde). Il n'écrit rien dans ces tables.
+    // `opt_out` et `email_suppressions` dans l'UNIVERS DE L'ESPACE calculé
+    // (`Joignabilite::universDe` : `vivier` pour l'espace des candidats,
+    // `business` sinon — la règle de `crm:emails:verifier`) — la même question
+    // que `EligibiliteCampagne::peutRecevoir`, posée par lot (tests d'accord et
+    // d'univers). Il n'écrit rien dans ces tables.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/PersonnesIngestService.php',

@@ -85,6 +85,37 @@ final class PromotionRelation
     }
 
     /**
+     * Le type retenu quand la demande vient d'une source DÉCLARATIVE (un
+     * formulaire public du site, un avis, une ligne d'import non confirmée)
+     * et vise une fiche EXISTANTE : jamais un type hors prospection.
+     *
+     * Veto de la relecture sécurité de #265 : un formulaire anonyme
+     * « partenariat » qui porte le SIREN public d'une fiche la sortait de
+     * toute prospection, sans retour. Le déclaratif ne peut promouvoir que
+     * vers un type PROSPECTABLE (`conference`, par un formulaire
+     * d'intervenant) ; le reste passe par une source de confiance ou par la
+     * saisie manuelle.
+     */
+    public static function relationDeclarative(string $actuelle, ?string $demandee): string
+    {
+        if ($demandee !== null && in_array($demandee, RelationsProspection::HORS_PROSPECTION, true)) {
+            return $actuelle;
+        }
+
+        return self::relation($actuelle, $demandee);
+    }
+
+    /**
+     * L'étape demandée par une source DÉCLARATIVE sur une fiche existante :
+     * jamais `client` — un avis ou un formulaire public ne fait pas une
+     * cliente. Plafonnée à `qualifie` (la personne s'est manifestée).
+     */
+    public static function etapeDeclarative(?string $demandee): ?string
+    {
+        return $demandee === 'client' ? 'qualifie' : $demandee;
+    }
+
+    /**
      * L'étape retenue, connaissant le type retenu.
      */
     public static function etape(string $actuelle, ?string $demandee, string $relationRetenue): string

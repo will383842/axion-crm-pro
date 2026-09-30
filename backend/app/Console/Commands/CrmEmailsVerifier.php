@@ -707,7 +707,11 @@ class CrmEmailsVerifier extends Command
     /**
      * Recalcule la joignabilité (`App\Crm\Joignabilite\Joignabilite`) des
      * fiches données et de leurs personnes — appelée DANS la transaction du
-     * lot, après l'écriture : un statut qui change change l'état.
+     * lot, après l'écriture : un statut qui change change l'état. L'extension
+     * aux autres fiches qui portent la même adresse est PLAFONNÉE
+     * (`Joignabilite::EXTENSION_MAX`) : une domiciliation portée par des
+     * milliers de fiches n'allonge pas la transaction du lot ; ces fiches-là
+     * sont reprises par `crm:joignabilite:calculer`, qui relit sous verrou.
      *
      * @param  array<int>  $ids
      */

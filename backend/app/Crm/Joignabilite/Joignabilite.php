@@ -9,6 +9,7 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use stdClass;
 
 /**
@@ -24,10 +25,18 @@ use stdClass;
  *
  * La règle est celle de `crm:campagne:destinataires`, et elle se décide PAR
  * ADRESSE, jamais par fiche : toutes les occurrences d'une adresse dans
- * l'espace (adresse générique d'une fiche, adresse d'une personne) sont
- * regroupées, et UNE seule occurrence qui la condamne la condamne PARTOUT. Un
- * test d'accord (`JoignabiliteTest`) joue la commande de campagne sur le même
- * jeu et exige : `email_valide` ⟺ l'adresse part.
+ * l'espace (adresse générique d'une fiche vivante, adresse d'une personne
+ * d'une fiche vivante — la corbeille n'est jamais lue) sont regroupées, et
+ * UNE seule occurrence qui la condamne la condamne PARTOUT.
+ *
+ * ⚠️ LIMITE ASSUMÉE — ESPACE CONTRE SEGMENT. La joignabilité regroupe les
+ * occurrences de l'ESPACE ; la campagne, celles des fiches de SON SEGMENT.
+ * L'équivalence `email_valide` ⟺ « l'adresse part » tient quand toutes les
+ * occurrences de l'adresse sont dans le segment de la campagne — c'est ce
+ * que garde le test d'accord (`JoignabiliteTest`). Hors de ce cas, les deux
+ * peuvent diverger (une occurrence hors segment qui condamne ou qui vérifie
+ * l'adresse ; le test fige les deux sens). La joignabilité est un INDICATEUR
+ * DE CIBLAGE ; la liste de campagne reste la vérité au moment de l'envoi.
  *
  * ── Les états d'une ADRESSE, dans l'ordre où ils se décident ────────────────
  *
@@ -115,6 +124,13 @@ final class Joignabilite
         self::SANS_CONTACT => 'Sans contact',
     ];
 
+    /**
+     * Au plus, le nombre de fiches que `recalculer()` ajoute à celles qu'on lui
+     * donne (les autres porteuses des mêmes adresses). Au-delà, il s'en tient
+     * aux fiches données (journal `warning`).
+     */
+    public const EXTENSION_MAX = 5000;
+
     /** Statuts qui condamnent l'adresse (règle de la liste de campagne). */
     private const STATUTS_CONDAMNES = ['invalid', 'disposable'];
 
@@ -198,8 +214,13 @@ final class Joignabilite
         foreach (array_chunk($cles, 1000) as $paquet) {
             // `contacts.email` est un CITEXT : la casse est déjà ignorée, et
             // l'index `idx_contacts_email` sert la recherche.
-            foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('email', $paquet)->whereNull('deleted_at')
-                ->get(['email', 'email_status', DB::raw("metadata -> 'email_verification' AS verif"), DB::raw("metadata ->> 'email_nature' AS nature")]) as $p) {
+            // La personne ET sa fiche hors corbeille : la campagne ne lit que
+            // des fiches vivantes (relecture de #265).
+            foreach (DB::table('contacts')
+                ->join('companies', 'companies.id', '=', 'contacts.company_id')
+                ->where('contacts.workspace_id', $workspaceId)->whereIn('contacts.email', $paquet)
+                ->whereNull('contacts.deleted_at')->whereNull('companies.deleted_at')
+                ->get(['contacts.email', 'contacts.email_status', DB::raw("contacts.metadata -> 'email_verification' AS verif"), DB::raw("contacts.metadata ->> 'email_nature' AS nature")]) as $p) {
                 $c = self::cle((string) $p->email);
                 $occurrences[$c][] = [
                     'statut' => self::texte($p->email_status),
@@ -311,6 +332,8 @@ final class Joignabilite
             return $resultat;
         }
         $requeteFiches = DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', $ids)->whereNull('deleted_at')->orderBy('id');
+        // Les personnes des seules fiches lues ci-dessus (vivantes) : `calculer()`
+        // ne rend d'état que pour elles.
         $requetePersonnes = DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('company_id', $ids)->whereNull('deleted_at')->orderBy('id');
         if ($verrouiller) {
             $requeteFiches->lockForUpdate();
@@ -422,19 +445,42 @@ final class Joignabilite
         foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', $ids)->whereNull('deleted_at')->whereNotNull('email_generic')->pluck('email_generic') as $e) {
             $cles[self::cle((string) $e)] = true;
         }
-        foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('company_id', $ids)->whereNull('deleted_at')->whereNotNull('email')->pluck('email') as $e) {
+        foreach (DB::table('contacts')
+            ->join('companies', 'companies.id', '=', 'contacts.company_id')
+            ->where('contacts.workspace_id', $workspaceId)->whereIn('contacts.company_id', $ids)
+            ->whereNull('contacts.deleted_at')->whereNull('companies.deleted_at')->whereNotNull('contacts.email')
+            ->pluck('contacts.email') as $e) {
             $cles[self::cle((string) $e)] = true;
         }
         $tous = array_fill_keys($ids, true);
         $liste = array_values(array_filter(array_map('strval', array_keys($cles)), static fn (string $k): bool => $k !== ''));
         foreach (array_chunk($liste, 1000) as $paquet) {
-            foreach (DB::table('contacts')->where('workspace_id', $workspaceId)->whereIn('email', $paquet)->whereNull('deleted_at')->pluck('company_id') as $id) {
+            foreach (DB::table('contacts')
+                ->join('companies', 'companies.id', '=', 'contacts.company_id')
+                ->where('contacts.workspace_id', $workspaceId)->whereIn('contacts.email', $paquet)
+                ->whereNull('contacts.deleted_at')->whereNull('companies.deleted_at')
+                ->limit(self::EXTENSION_MAX + 1)->pluck('contacts.company_id') as $id) {
                 $tous[(int) $id] = true;
+            }
+            if (count($tous) > self::EXTENSION_MAX) {
+                break;
             }
             foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNotNull('email_generic')
-                ->whereIn(DB::raw('lower(email_generic)'), $paquet)->whereNull('deleted_at')->pluck('id') as $id) {
+                ->whereIn(DB::raw('lower(email_generic)'), $paquet)->whereNull('deleted_at')
+                ->limit(self::EXTENSION_MAX + 1)->pluck('id') as $id) {
                 $tous[(int) $id] = true;
             }
+        }
+
+        if (count($tous) > self::EXTENSION_MAX) {
+            // Une adresse portée par un très grand nombre de fiches (une
+            // domiciliation, un cabinet) : on ne recalcule pas des milliers de
+            // fiches dans la transaction d'un lot de vérification. Les fiches
+            // données, elles, sont toujours recalculées ; les autres le seront
+            // au prochain `crm:joignabilite:calculer`. On le DIT.
+            Log::warning('Joignabilité : extension du recalcul plafonnée', ['fiches' => count($ids), 'plafond' => self::EXTENSION_MAX]);
+
+            return $ids;
         }
 
         return array_keys($tous);

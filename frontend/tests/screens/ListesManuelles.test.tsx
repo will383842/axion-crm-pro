@@ -130,6 +130,7 @@ describe('listes manuelles', () => {
 
   it('l import s ANALYSE d abord : bilan par motif et numéro de ligne, puis import réel', async () => {
     const envois: string[] = [];
+    const contenus: string[] = [];
     const bilan = (aBlanc: boolean) => ({
       lignes_lues: 3, rapprochees: 2, rejetees: { introuvable: 1, format_inconnu: 0 }, doublons_dans_le_fichier: 0,
       rapprochees_a_plusieurs_fiches: 0, par_type: { crm: 0, siren: 2, email_personne: 0, email_organisation: 0 },
@@ -137,11 +138,10 @@ describe('listes manuelles', () => {
       ...(aBlanc ? {} : { ajout: { ajoutes: 2, reactives: 0, deja_presents: 0, introuvables: 0 } }),
     });
     const importHandler = http.post(apiUrl('/listes-manuelles/7/import'), async ({ request }) => {
-      // Corps multipart lu en TEXTE : l'analyse de `formData()` dépend de
-      // l'environnement ; le champ `a_blanc` y est écrit en clair.
-      const corps = await request.text();
-      const aBlanc = /name="a_blanc"\r?\n\r?\n1/.test(corps);
-      expect(corps).toContain('name="fichier"');
+      const corps = (await request.json()) as { contenu: string; a_blanc: boolean };
+      const aBlanc = corps.a_blanc;
+      // Le CONTENU du fichier part, tel quel.
+      contenus.push(corps.contenu);
       envois.push(aBlanc ? 'a_blanc' : 'reel');
       return HttpResponse.json({ data: bilan(aBlanc) });
     });
@@ -160,6 +160,7 @@ describe('listes manuelles', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /^Importer 2 ligne/ }));
     await waitFor(() => expect(envois).toEqual(['a_blanc', 'reel']));
+    expect(contenus[0]).toContain('900000499');
   });
 
   it('la corbeille refusée (liste utilisée par une audience) affiche le motif du serveur', async () => {

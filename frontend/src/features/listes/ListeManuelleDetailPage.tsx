@@ -322,10 +322,12 @@ function ImportFichier({ listeId, onImporte }: { listeId: number; onImporte: () 
   const envoi = useMutation({
     mutationFn: async (aBlanc: boolean) => {
       if (fichier === null) throw new Error('Aucun fichier choisi.');
-      const corps = new FormData();
-      corps.append('fichier', fichier);
-      corps.append('a_blanc', aBlanc ? '1' : '0');
-      return (await api.post<{ data: BilanImport }>(`/listes-manuelles/${listeId}/import`, corps)).data.data;
+      // Le fichier est lu ICI et envoyé en texte (`contenu`) : même contrôle
+      // serveur (5 Mo, 20 000 lignes), et aucune dépendance au multipart.
+      const contenu = await fichier.text();
+      return (
+        await api.post<{ data: BilanImport }>(`/listes-manuelles/${listeId}/import`, { contenu, a_blanc: aBlanc })
+      ).data.data;
     },
     onSuccess: (b) => {
       setBilan(b);

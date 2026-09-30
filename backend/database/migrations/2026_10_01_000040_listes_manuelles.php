@@ -116,7 +116,9 @@ return new class extends Migration
         DB::unprepared(
             <<<'SQL'
             CREATE OR REPLACE FUNCTION public.listes_membres_meme_espace() RETURNS trigger
-            LANGUAGE plpgsql AS $$
+            LANGUAGE plpgsql
+            SET search_path = public, pg_catalog
+            AS $$
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM listes_manuelles l
                                WHERE l.id = NEW.liste_id AND l.workspace_id = NEW.workspace_id) THEN

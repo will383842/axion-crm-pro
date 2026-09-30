@@ -151,8 +151,11 @@ describe('listes manuelles', () => {
     await userEvent.upload(screen.getByLabelText('Fichier à importer'), fichier);
     const importer = screen.getByRole('button', { name: /^Importer/ });
     expect(importer).toBeDisabled();
+    // Le fichier est bien choisi : « Analyser » est actif.
+    expect(screen.getByRole('button', { name: /Analyser/ })).toBeEnabled();
 
     await userEvent.click(screen.getByRole('button', { name: /Analyser/ }));
+    await waitFor(() => expect({ envois, erreurs: notes.erreur.mock.calls }).toEqual({ envois: ['a_blanc'], erreurs: [] }));
     const statut = await screen.findByTestId('bilan-import');
     expect(within(statut).getByText(/rien n’a été écrit/)).toBeInTheDocument();
     expect(within(statut).getByText(/n° 4 \(absente du CRM\)/)).toBeInTheDocument();

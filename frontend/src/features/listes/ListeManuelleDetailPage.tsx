@@ -310,6 +310,16 @@ export function ListeManuelleDetailPage() {
   );
 }
 
+/** Lit un fichier en texte (`FileReader`, disponible partout, y compris en test). */
+function lireTexte(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const lecteur = new FileReader();
+    lecteur.onload = () => resolve(typeof lecteur.result === 'string' ? lecteur.result : '');
+    lecteur.onerror = () => reject(lecteur.error ?? new Error('Lecture du fichier impossible.'));
+    lecteur.readAsText(f);
+  });
+}
+
 /**
  * Importer un fichier : ANALYSER (à blanc, rien n'est écrit), lire le bilan,
  * puis IMPORTER. Le bilan ne montre que des numéros de ligne, jamais les
@@ -324,7 +334,7 @@ function ImportFichier({ listeId, onImporte }: { listeId: number; onImporte: () 
       if (fichier === null) throw new Error('Aucun fichier choisi.');
       // Le fichier est lu ICI et envoyé en texte (`contenu`) : même contrôle
       // serveur (5 Mo, 20 000 lignes), et aucune dépendance au multipart.
-      const contenu = await fichier.text();
+      const contenu = await lireTexte(fichier);
       return (
         await api.post<{ data: BilanImport }>(`/listes-manuelles/${listeId}/import`, { contenu, a_blanc: aBlanc })
       ).data.data;

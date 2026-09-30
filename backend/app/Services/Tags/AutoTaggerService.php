@@ -5,6 +5,7 @@ namespace App\Services\Tags;
 use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Presse\EtiquettesMedia;
+use App\Crm\Presse\MediaIncertain;
 use App\Crm\Referentiels\EtiquettesClassement;
 use App\Crm\Taxonomy;
 use App\Models\Company;
@@ -196,7 +197,13 @@ class AutoTaggerService
         // Une seule définition (`EtiquettesMedia`) : sans elle ici, la première
         // resynchro retirerait ces étiquettes. Une fiche sans média n'en
         // désire aucune.
-        foreach (EtiquettesMedia::desirees(EtiquettesMedia::lignes((int) $company->id)) as $slug => $spec) {
+        $lignesMedia = EtiquettesMedia::lignes((int) $company->id);
+        foreach (EtiquettesMedia::desirees($lignesMedia) as $slug => $spec) {
+            $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
+        }
+        // Média INCERTAIN (NAF 63.12Z / 58.19Z venu du seul `naf-extract`) : ni
+        // nature ni relation presse, une étiquette « à vérifier » (chantier F).
+        foreach (MediaIncertain::desirees((int) $company->id, $lignesMedia !== []) as $slug => $spec) {
             $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 

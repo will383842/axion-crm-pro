@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Personnes\NatureEmail;
+use App\Crm\Presse\MediaIncertain;
 use App\Crm\Presse\QualificationPresse;
 use App\Crm\Scraping\ScrapedRecord;
 use App\Crm\Scraping\ScrapedRecordIngestService;
@@ -93,6 +94,20 @@ use Throwable;
  * ni nature, ni relation, ni protection, ni contact. `--inclure-production`
  * les traite comme la presse, en connaissance de cause. Une production n'est
  * jamais la « chaîne » d'une émission.
+ *
+ * ── Le MÉDIA INCERTAIN (constat en production du 2026-09-30) ────────────
+ * Une fiche dont les seules lignes `media` viennent de `naf-extract` et dont
+ * le NAF est 63.12Z (portails Internet) ou 58.19Z (autres éditions) n'est PAS
+ * un média : ce sont surtout des sociétés web, de vrais prospects
+ * (`MediaIncertain`). Elle ne passe PAS par la porte commune, ne change ni de
+ * nature ni de relation, ne reçoit ni protection ni contact : seulement
+ * l'étiquette automatique `media-possible:a-verifier`
+ * (`media_naf_incertain_etiquete`), pour la vérification par lecture du site
+ * (chantier F). Une ligne `naf-extract` de ce type SANS fiche ne crée pas de
+ * fiche (`media_naf_incertain_sans_fiche`). Une seule ligne d'une vraie source
+ * presse (CPPAP, SPEL, agence, kit presse, liste presse…) sur la fiche suffit
+ * à la traiter comme un média. Les fiches basculées à tort avant cette règle
+ * se réparent par `crm:presse:reparer-media-incertain`.
  *
  * ── Par PAQUETS, reprenable, IDEMPOTENTE ────────────────────────────────
  * Chaque paquet (`--paquet` groupes, 500 par défaut) est validé seul, un point
@@ -189,6 +204,7 @@ class CrmPresseHarmoniser extends Command
             'fiches_creees', 'fiches_existantes', 'emissions_sur_la_chaine', 'emissions_deja_sur_la_chaine',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
             'production_etiquetee', 'production_sans_fiche_ignoree',
+            'media_naf_incertain_etiquete', 'media_naf_incertain_sans_fiche',
             'emails_grand_public_non_poses',
             'journalistes_convertis', 'journalistes_deja_harmonises', 'journalistes_opposes',
             'journalistes_retires_ignores', 'journalistes_sans_nom', 'journalistes_non_retrouves',
@@ -457,6 +473,14 @@ class CrmPresseHarmoniser extends Command
             return (int) $fiche;
         }
 
+        // Une ligne `naf-extract` 63.12Z / 58.19Z dont la fiche a disparu : on ne
+        // fabrique pas un média à partir d'un code NAF (`MediaIncertain`).
+        if (MediaIncertain::ligneSansFiche($m)) {
+            $this->compter($delta, 'media_naf_incertain_sans_fiche');
+
+            return null;
+        }
+
         // Une ÉMISSION de groupe : la fiche de sa chaîne est lue EN BASE
         // (`media.company_id` du parent, fiche vivante), jamais déduite du
         // succès de la chaîne pendant ce passage.
@@ -488,6 +512,15 @@ class CrmPresseHarmoniser extends Command
                 // Corbeille (Will, ou fusion) : on ne la ressuscite pas, et on
                 // ne déplace pas le média sans que la fusion le journalise.
                 throw new InvalidArgumentException('fiche_a_la_corbeille');
+            }
+            // Un MÉDIA INCERTAIN (NAF 63.12Z / 58.19Z, seule source `naf-extract`)
+            // garde sa nature et sa relation : il reçoit seulement l'étiquette
+            // « média possible », à vérifier par la lecture du site.
+            if (MediaIncertain::fiche((int) $fiche->id)) {
+                QualificationPresse::etiqueter((int) $fiche->id);
+                $this->compter($delta, 'media_naf_incertain_etiquete');
+
+                return (int) $fiche->id;
             }
             $ancre = $this->ancreDeFiche($fiche);
             if ($ancre === null) {

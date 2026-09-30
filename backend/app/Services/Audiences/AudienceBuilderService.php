@@ -83,7 +83,7 @@ class AudienceBuilderService
             ->whereDoesntHave('contacts', fn ($q) => $q->whereIn(
                 'email_status',
                 TriageAutoService::CONTACTABLE_EMAIL_STATUSES,
-            )->whereRaw(GardePresse::conditionContactsSql('contacts')))
+            ))
             ->count();
 
         return [

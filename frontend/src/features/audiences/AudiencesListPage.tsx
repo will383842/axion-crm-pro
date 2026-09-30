@@ -4,6 +4,7 @@
  * Liste des audiences email (segments dynamiques). Cards avec member count,
  * status pulsé, dernière refresh relative et menu actions (refresh / toggle / delete).
  */
+import type { ReglageDestinataires } from './destinataires';
 import { useMemo } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,6 +50,8 @@ export interface EmailAudience {
   member_count: number;
   refreshed_at: string | null;
   created_at: string;
+  /** 2026-09-30 — à qui écrire dans chaque organisation. */
+  destinataires?: ReglageDestinataires;
 }
 
 interface AudiencesListResponse {

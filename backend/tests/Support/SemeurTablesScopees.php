@@ -66,6 +66,8 @@ final class SemeurTablesScopees
         'email_templates',
         'email_sends',
         'email_audiences',
+        // 2026-09-30 : la liste manuelle AVANT ses membres (clé étrangère).
+        'listes_manuelles',
         'linkedin_accounts',
         'media',
         // Lot L4-C : la personne AVANT son abonnement (clé étrangère).
@@ -113,6 +115,8 @@ final class SemeurTablesScopees
         'linkedin_messages',
         'linkedin_profiles_cache',
         'linkedin_sequences',
+        // 2026-09-30 : l'appartenance d'une fiche à une liste manuelle.
+        'listes_manuelles_membres',
         'llm_usage',
         'llm_use_cases',
         'notifications',
@@ -332,6 +336,10 @@ final class SemeurTablesScopees
             'name' => 'ZZ Audience ' . $marque,
         ]);
 
+        $id['listes_manuelles'] = $insererAvecId('listes_manuelles', [
+            'nom' => 'ZZ Liste ' . $marque,
+        ]);
+
         $id['linkedin_accounts'] = $insererAvecId('linkedin_accounts', [
             'profile_url' => 'https://linkedin.invalid/in/zz-' . $marque,
         ]);
@@ -385,6 +393,12 @@ final class SemeurTablesScopees
             'audience_id' => $id['email_audiences'],
             'company_id' => $id['companies'],
             'contact_id' => $id['contacts'],
+        ]);
+
+        $inserer('listes_manuelles_membres', [
+            'liste_id' => $id['listes_manuelles'],
+            'company_id' => $id['companies'],
+            'origine' => 'coche',
         ]);
 
         $inserer('business_events', [

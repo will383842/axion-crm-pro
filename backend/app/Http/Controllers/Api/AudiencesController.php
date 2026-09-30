@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Campagnes\GardePresse;
+use App\Crm\Campagnes\ReglageDestinataires;
+use App\Crm\Campagnes\ResolveurDestinataires;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
+use App\Services\Audiences\CritereAudienceInvalide;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,7 +66,7 @@ class AudiencesController extends ApiController
             'is_active' => $data['is_active'] ?? true,
             'auto_refresh' => $data['auto_refresh'] ?? true,
             'created_by' => optional($request->user())->id,
-        ]);
+        ] + self::reglageAEcrire($data));
 
         // First refresh inline (rapide pour audience nouvelle)
         try {
@@ -104,8 +107,11 @@ class AudiencesController extends ApiController
             'criteria' => ['sometimes', 'required', 'array'],
             'is_active' => ['sometimes', 'boolean'],
             'auto_refresh' => ['sometimes', 'boolean'],
-        ]);
-        $audience->update($data);
+        ] + StoreEmailAudienceRequest::reglesDestinataires());
+        $audience->update(self::reglageAEcrire($data) + array_diff_key($data, array_flip([
+            'destinataires_mode', 'destinataires_fonctions',
+            'destinataires_personnes_listees', 'destinataires_avec_adresses_partagees',
+        ])));
 
         // ⚠️ L'EN-TETE `ETag` PORTE LE JETON DE L'ETAT D'APRES.
         //
@@ -153,6 +159,103 @@ class AudiencesController extends ApiController
         }
 
         return $this->ok($result);
+    }
+
+    /**
+     * GET /audiences/{audience}/destinataires — À QUI l'audience écrirait,
+     * selon son réglage : organisations, adresses distinctes, exclues par
+     * motif, écartées par le réglage, et un échantillon. N'envoie rien,
+     * n'écrit rien. Adresses masquées sans `contacts.view_pii`.
+     */
+    public function destinataires(EmailAudience $audience, ResolveurDestinataires $resolveur): JsonResponse
+    {
+        $this->assertWorkspace($audience);
+        $criteres = $audience->getAttribute('criteria');
+
+        return $this->apercu(
+            $resolveur,
+            (string) $audience->workspace_id,
+            is_array($criteres) ? $criteres : [],
+            ReglageDestinataires::deLAudience($audience),
+        );
+    }
+
+    /**
+     * POST /audiences/apercu-destinataires — le même aperçu pour des critères
+     * et un réglage pas encore enregistrés (écran de création).
+     */
+    public function apercuDestinataires(Request $request, ResolveurDestinataires $resolveur): JsonResponse
+    {
+        $workspaceId = app()->bound('workspace.id') ? app('workspace.id') : null;
+        if (! $workspaceId) {
+            return $this->ok(['error' => 'workspace required'], 422);
+        }
+        $data = $request->validate([
+            'criteria' => ['required', 'array'],
+        ] + StoreEmailAudienceRequest::reglesDestinataires());
+        $criteres = $request->input('criteria', []);
+
+        return $this->apercu(
+            $resolveur,
+            (string) $workspaceId,
+            is_array($criteres) ? $criteres : [],
+            ReglageDestinataires::depuisTableau([
+                'mode' => $data['destinataires_mode'] ?? null,
+                'fonctions' => $data['destinataires_fonctions'] ?? [],
+                'personnes_listees' => $data['destinataires_personnes_listees'] ?? false,
+                'avec_adresses_partagees' => $data['destinataires_avec_adresses_partagees'] ?? false,
+            ]),
+        );
+    }
+
+    /** @param  array<mixed>  $criteres */
+    private function apercu(ResolveurDestinataires $resolveur, string $workspaceId, array $criteres, ReglageDestinataires $reglage): JsonResponse
+    {
+        try {
+            $resultat = $resolveur->resoudre($workspaceId, $criteres, $reglage);
+        } catch (CritereAudienceInvalide $e) {
+            return $this->ok(['message' => 'Critères refusés : ' . $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            return $this->ok(['message' => $e->getMessage()], 422);
+        }
+
+        // Les adresses de l'échantillon, masquées pour la lecture seule.
+        if (MasquageCoordonnees::requis()) {
+            $resultat['lignes'] = array_map(static function (array $l): array {
+                $l['email'] = MasquageCoordonnees::email(is_string($l['email'] ?? null) ? $l['email'] : null);
+
+                return $l;
+            }, is_array($resultat['lignes'] ?? null) ? $resultat['lignes'] : []);
+        }
+
+        return $this->ok(['data' => $resultat]);
+    }
+
+    /**
+     * Les colonnes du réglage à écrire, depuis une entrée validée.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private static function reglageAEcrire(array $data): array
+    {
+        $colonnes = [];
+        if (array_key_exists('destinataires_mode', $data)) {
+            $colonnes['destinataires_mode'] = (string) $data['destinataires_mode'];
+        }
+        if (array_key_exists('destinataires_fonctions', $data)) {
+            $fonctions = is_array($data['destinataires_fonctions']) ? $data['destinataires_fonctions'] : [];
+            $colonnes['destinataires_fonctions'] = ReglageDestinataires::versTableauPg(
+                ReglageDestinataires::nettoyerFonctions($fonctions),
+            );
+        }
+        foreach (['destinataires_personnes_listees', 'destinataires_avec_adresses_partagees'] as $cle) {
+            if (array_key_exists($cle, $data)) {
+                $colonnes[$cle] = (bool) $data[$cle];
+            }
+        }
+
+        return $colonnes;
     }
 
     public function refresh(EmailAudience $audience): JsonResponse

@@ -8,10 +8,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers,
+  ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers, ListChecks, Send,
   Newspaper, Ban,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -39,6 +39,15 @@ import type {
   EmailAudience,
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
+import { chargerListes } from '@/features/listes/listes';
+import {
+  REGLAGE_PAR_DEFAUT,
+  reglageVersApi,
+  type ApercuDestinataires,
+  type ReglageDestinataires,
+} from './destinataires';
+import { ReglageDestinatairesChamps } from './ReglageDestinatairesChamps';
+import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
 import {
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
@@ -142,6 +151,16 @@ export function AudienceBuilderPage() {
   const [qualityMin, setQualityMin] = useState<number>(0);
   const [hasEmail, setHasEmail] = useState<boolean>(false);
   const [tagsInput, setTagsInput] = useState<string>('');
+  // 2026-09-30 — listes manuelles : « membres de la liste X », « sauf liste Y ».
+  const [listesIncluses, setListesIncluses] = useState<string[]>([]);
+  const [listesExclues, setListesExclues] = useState<string[]>([]);
+  // 2026-09-30 — à qui écrire dans chaque organisation.
+  const [reglage, setReglage] = useState<ReglageDestinataires>(REGLAGE_PAR_DEFAUT);
+  const listes = useQuery({ queryKey: ['listes-manuelles'], queryFn: () => chargerListes() });
+  const LISTE_PRESETS = useMemo(
+    () => (listes.data ?? []).map((l) => ({ code: String(l.id), label: l.nom })),
+    [listes.data],
+  );
   // Chantiers B, C, D (2026-10-01) — relation, pays, joignabilité. Les
   // relations établies sont EXCLUES par défaut d'une prospection : visible,
   // décochable (`criteres-relation.ts`).
@@ -177,6 +196,8 @@ export function AudienceBuilderPage() {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
+    if (listesIncluses.length > 0) all.push({ field: 'liste_manuelle', op: 'in', value: listesIncluses.map(Number) });
+    if (listesExclues.length > 0) all.push({ field: 'liste_manuelle', op: 'not_in', value: listesExclues.map(Number) });
     all.push(...criteresMedias(typesMedia, zonesMedia));
 
     const criteres = construireCriteres(all, {
@@ -193,7 +214,7 @@ export function AudienceBuilderPage() {
   }, [
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
     relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
-    typesMedia, zonesMedia, exclNatures, exclTypesMedia,
+    typesMedia, zonesMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
   ]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
@@ -201,6 +222,31 @@ export function AudienceBuilderPage() {
     ...(criteria.any ?? []).map((c) => ({ bloc: 'OU', c })),
     ...(criteria.not ?? []).map((c) => ({ bloc: 'SAUF', c })),
   ];
+
+  // 2026-09-30 — aperçu des DESTINATAIRES (adresses distinctes, exclues par
+  // motif), même anti-rebond que l'aperçu des entreprises.
+  const [apercuDest, setApercuDest] = useState<ApercuDestinataires | null>(null);
+  const [apercuDestErreur, setApercuDestErreur] = useState<string | null>(null);
+  useEffect(() => {
+    if (!aDesCriteres) {
+      setApercuDest(null);
+      setApercuDestErreur(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      api
+        .post<{ data: ApercuDestinataires }>('/audiences/apercu-destinataires', { criteria, ...reglageVersApi(reglage) })
+        .then((r) => {
+          setApercuDest(r.data.data);
+          setApercuDestErreur(null);
+        })
+        .catch((err: unknown) => {
+          setApercuDest(null);
+          setApercuDestErreur(extractApiMessage(err) ?? 'Aperçu des destinataires indisponible');
+        });
+    }, 500);
+    return () => { clearTimeout(timer); };
+  }, [criteria, aDesCriteres, reglage]);
 
   // Preview live (debounced 500ms)
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -249,6 +295,7 @@ export function AudienceBuilderPage() {
         criteria,
         is_active: true,
         auto_refresh: false,
+        ...reglageVersApi(reglage),
       });
       toast.success('Audience créée');
       void navigate({ to: '/audiences/$audienceId', params: { audienceId: String(res.data.id) } });
@@ -552,6 +599,39 @@ export function AudienceBuilderPage() {
             </label>
           </Card>
 
+          {/* Listes manuelles (2026-09-30) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<ListChecks className="h-4 w-4" />} title="Listes manuelles" />
+            <Field label="Membres de ces listes (au moins une)">
+              <ChipsMultiSelect
+                options={LISTE_PRESETS}
+                selected={listesIncluses}
+                onChange={setListesIncluses}
+                placeholder="Aucune liste exigée"
+                masquerCode
+              />
+            </Field>
+            <Field label="Sauf les membres de ces listes">
+              <ChipsMultiSelect
+                options={LISTE_PRESETS}
+                selected={listesExclues}
+                onChange={setListesExclues}
+                placeholder="Aucune liste exclue"
+                masquerCode
+              />
+            </Field>
+          </Card>
+
+          {/* Destinataires (2026-09-30) */}
+          <Card padding="md" className="space-y-4">
+            <SectionHeading icon={<Send className="h-4 w-4" />} title="Destinataires" />
+            <ReglageDestinatairesChamps
+              valeur={reglage}
+              onChange={setReglage}
+              listeExigee={listesIncluses.length > 0}
+            />
+          </Card>
+
           {/* Tags */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Tag className="h-4 w-4" />} title="Tags personnalisés" />
@@ -588,6 +668,19 @@ export function AudienceBuilderPage() {
                 Ajoute au moins un critère pour voir la preview.
               </div>
             )}
+
+            {apercuDestErreur !== null ? (
+              <div className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40">
+                {apercuDestErreur}
+              </div>
+            ) : apercuDest !== null ? (
+              <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Destinataires (rien n’est envoyé)
+                </div>
+                <ApercuDestinatairesCarte apercu={apercuDest} />
+              </div>
+            ) : null}
 
             {/* Recap critères */}
             {conditionsRecap.length > 0 ? (

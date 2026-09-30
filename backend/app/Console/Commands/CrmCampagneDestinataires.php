@@ -2,15 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
-use App\Crm\Personnes\NatureEmail;
 use App\Crm\Taxonomy;
-use App\Support\EligibiliteCampagne;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +78,16 @@ class CrmCampagneDestinataires extends Command
                             {--avec-adresses-partagees : Garder les adresses de cabinet comptable / domiciliation portées par plusieurs fiches (écartées par défaut)}';
 
     protected $description = 'Prépare la liste des destinataires autorisés d\'une campagne (n\'envoie rien).';
+
+    /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
+    private const COMPTEURS_MOTIFS = [
+        EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
+        EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
+        EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
+        EligibiliteAdresse::DEJA_INFORMEE => 'ecartees_deja_informees',
+        EligibiliteAdresse::OPPOSITION => 'ecartees_opposition',
+        EligibiliteAdresse::ADRESSE_PARTAGEE => 'ecartees_adresse_partagee',
+    ];
 
     public function handle(): int
     {
@@ -171,32 +180,11 @@ class CrmCampagneDestinataires extends Command
             $bilan['adresses_distinctes']++;
             $email = (string) $email;
 
-            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
-                || $this->une($occurrences, fn ($o) => in_array($o['status'], ['invalid', 'disposable'], true))
-                || $this->une($occurrences, fn ($o) => in_array($o['verification'], [VerificationEmail::INVALIDE, VerificationEmail::JETABLE], true))) {
-                $bilan['ecartees_invalides']++;
-
-                continue;
-            }
-            // Seule une adresse VÉRIFIÉE valide part : jamais une adresse dont
-            // on ne sait pas si son domaine reçoit du courrier.
-            if (! $this->une($occurrences, fn ($o) => $o['verification'] === VerificationEmail::VALIDE)) {
-                $bilan['ecartees_non_verifiees']++;
-
-                continue;
-            }
-            if (NatureEmail::de($email) === 'perso' || $this->une($occurrences, fn ($o) => $o['perso'])) {
-                $bilan['ecartees_perso']++;
-
-                continue;
-            }
-            if ($this->option('non-informes') && $this->une($occurrences, fn ($o) => $o['deja_informe'])) {
-                $bilan['ecartees_deja_informees']++;
-
-                continue;
-            }
-            if (! EligibiliteCampagne::peutRecevoir($email, 'business')) {
-                $bilan['ecartees_opposition']++;
+            // La règle de #253, écrite UNE fois (`EligibiliteAdresse`) : elle
+            // est partagée avec l'aperçu des destinataires d'une audience.
+            $motif = EligibiliteAdresse::motif($email, $occurrences, (bool) $this->option('non-informes'));
+            if ($motif !== null) {
+                $bilan[self::COMPTEURS_MOTIFS[$motif] ?? 'ecartees_invalides']++;
 
                 continue;
             }
@@ -267,21 +255,6 @@ class CrmCampagneDestinataires extends Command
         ));
 
         return self::SUCCESS;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $occurrences
-     * @param  callable(array<string, mixed>): bool  $test
-     */
-    private function une(array $occurrences, callable $test): bool
-    {
-        foreach ($occurrences as $o) {
-            if ($test($o)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

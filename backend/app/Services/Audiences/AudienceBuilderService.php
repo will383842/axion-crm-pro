@@ -4,6 +4,7 @@ namespace App\Services\Audiences;
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\Listes\ListesManuelles;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
@@ -41,7 +42,28 @@ class AudienceBuilderService
         // et joignabilité calculée (chantier D, `Joignabilite`). Colonnes
         // ordinaires de `companies` : mêmes opérateurs, même sémantique NULL.
         'relation_type', 'lifecycle_stage', 'country_code', 'joignabilite',
+        // 2026-09-30 — membres d'une LISTE MANUELLE (`in` / `not_in`, valeur =
+        // identifiants de listes) : « membres de la liste X », « sauf liste Y ».
+        self::CHAMP_LISTE_MANUELLE,
     ];
+
+    /**
+     * Le critère « membre d'une liste manuelle » (2026-09-30).
+     *
+     * Une organisation en est membre si elle y est cochée, OU si l'une de ses
+     * personnes y est cochée (`ListesManuelles::organisationsMembres`). Seuls
+     * `in` et `not_in` ont un sens ; la valeur est une liste d'identifiants
+     * de listes VIVANTES de l'espace — une liste inconnue ou à la corbeille
+     * est REFUSÉE (jamais ignorée : ignorer élargirait l'audience).
+     *
+     * 🔴 Les FICHES PROTÉGÉES (`FichesProtegees`) n'entrent dans aucune
+     * audience… sauf par une seule porte, explicite : être MEMBRE d'une liste
+     * manuelle exigée par le bloc `all` (`liste_manuelle in [X]`). Cocher une
+     * fiche une à une, ou la rapprocher d'un fichier, c'est le choix humain que
+     * `FichesProtegees` réserve (« ni audience PAR DÉFAUT ») ; un critère
+     * général (secteur, région, tag…) ne les fait JAMAIS entrer.
+     */
+    public const CHAMP_LISTE_MANUELLE = 'liste_manuelle';
 
     public const WHITELIST_OPS = [
         'eq', 'neq', 'in', 'not_in', 'gt', 'lt', 'gte', 'lte',
@@ -376,6 +398,22 @@ class AudienceBuilderService
             );
         }
 
+        if ($field === self::CHAMP_LISTE_MANUELLE) {
+            if (! in_array($op, ['in', 'not_in'], true)) {
+                throw CritereAudienceInvalide::parce(
+                    $ou . ' : le champ liste_manuelle n admet que in et not_in, recu ' . self::citer($op),
+                );
+            }
+            // `in` / `not_in` exigent déjà une liste (contrôle ci-dessus).
+            $ids = ListesManuelles::entiers($value);
+            if ($ids === [] || count($ids) !== count($value) || count($ids) > ListesManuelles::MAX_LISTES_PAR_CRITERE) {
+                throw CritereAudienceInvalide::parce(
+                    $ou . ' : liste_manuelle exige de 1 a ' . ListesManuelles::MAX_LISTES_PAR_CRITERE
+                    . ' identifiants de listes distincts (entiers positifs)',
+                );
+            }
+        }
+
         // `has_email` n'admet que `eq`. Avec tout autre opérateur,
         // `buildPositive()` rendait null — et « ceux qui ont un e-mail »
         // devenait « tout le monde », fiches sans aucune adresse comprises.
@@ -409,12 +447,33 @@ class AudienceBuilderService
 
         $query = Company::query()->where('workspace_id', $workspaceId);
 
+        // Une liste manuelle citée doit exister, vivante, dans CET espace.
+        $listes = self::listesCitees($criteria);
+        $inconnues = array_values(array_diff($listes['toutes'], ListesManuelles::existantes($workspaceId, $listes['toutes'])));
+        if ($inconnues !== []) {
+            throw CritereAudienceInvalide::parce(
+                'liste(s) manuelle(s) inconnue(s) ou a la corbeille : ' . implode(', ', $inconnues),
+            );
+        }
+
         // Les fiches protégées n'entrent dans AUCUNE audience : les écrire
         // passera par un flux dédié, décidé par Will — jamais par une audience
         // générale où le triage les aurait rangées (`ready_for_outreach`).
-        FichesProtegees::exclure($query);
-        // Et la presse harmonisée, par SA garde (`GardePresse`) : elle vaut
-        // même si un chemin lève un jour la protection générale ci-dessus.
+        // Seule porte : être membre d'une liste manuelle EXIGÉE (bloc `all`),
+        // c'est-à-dire choisie à la main (cf. `CHAMP_LISTE_MANUELLE`).
+        if ($listes['exigees'] === []) {
+            FichesProtegees::exclure($query);
+        } else {
+            $exigees = $listes['exigees'];
+            $query->where(function (Builder $q) use ($exigees): void {
+                FichesProtegees::exclure($q);
+                $q->orWhereIn('companies.id', ListesManuelles::organisationsMembres($exigees));
+            });
+        }
+        // Et la presse harmonisée, par SA garde (`GardePresse`), HORS de la
+        // porte ci-dessus : être membre d'une liste manuelle exigée lève la
+        // protection générale, JAMAIS celle de la presse (fermée tant que Will
+        // n'a pas ouvert `Segments::PRESSE`).
         GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];
@@ -441,6 +500,41 @@ class AudienceBuilderService
         }
 
         return $query;
+    }
+
+    /**
+     * Les listes manuelles citées par des critères : `toutes`, et celles
+     * qu'EXIGE le bloc `all` (`liste_manuelle in [...]`) — les seules qui
+     * ouvrent la porte aux fiches protégées, et dont les personnes cochées
+     * peuvent restreindre les destinataires (`ResolveurDestinataires`).
+     *
+     * @param  array<mixed>  $criteria
+     * @return array{toutes: list<int>, exigees: list<int>}
+     */
+    public static function listesCitees(array $criteria): array
+    {
+        $toutes = [];
+        $exigees = [];
+        foreach (self::BLOCS as $bloc) {
+            $conditions = $criteria[$bloc] ?? [];
+            if (! is_array($conditions)) {
+                continue;
+            }
+            foreach ($conditions as $cond) {
+                if (! is_array($cond) || ($cond['field'] ?? null) !== self::CHAMP_LISTE_MANUELLE) {
+                    continue;
+                }
+                $ids = is_array($cond['value'] ?? null) ? ListesManuelles::entiers($cond['value']) : [];
+                foreach ($ids as $id) {
+                    $toutes[$id] = $id;
+                    if ($bloc === 'all' && ($cond['op'] ?? null) === 'in') {
+                        $exigees[$id] = $id;
+                    }
+                }
+            }
+        }
+
+        return ['toutes' => array_values($toutes), 'exigees' => array_values($exigees)];
     }
 
     private function applyCondition($query, array $cond, string $combinator): void
@@ -523,7 +617,7 @@ class AudienceBuilderService
     {
         // `tags` et `has_email` ne sont pas des colonnes : leurs prédicats sont
         // bâtis sur EXISTS, qui vaut toujours TRUE ou FALSE, jamais UNKNOWN.
-        $isRealColumn = ! in_array($field, ['tags', 'has_email'], true);
+        $isRealColumn = ! in_array($field, ['tags', 'has_email', self::CHAMP_LISTE_MANUELLE], true);
 
         if ($isRealColumn && in_array($op, self::NULL_SENSITIVE_OPS, true)) {
             return function ($q) use ($positive, $field) {
@@ -562,6 +656,23 @@ class AudienceBuilderService
 
             return function ($q) use ($slugs) {
                 $q->whereHas('tags', fn ($t) => $t->whereIn('slug', $slugs));
+            };
+        }
+
+        // Liste manuelle : `companies.id IN (membres)` — jamais UNKNOWN (la
+        // sous-requête ne rend aucun NULL), donc `negate()` n'a rien à corriger.
+        if ($field === self::CHAMP_LISTE_MANUELLE) {
+            $ids = is_array($value) ? ListesManuelles::entiers($value) : [];
+            if ($ids === [] || ! in_array($op, ['in', 'not_in'], true)) {
+                return null;
+            }
+
+            return function ($q) use ($ids, $op) {
+                if ($op === 'in') {
+                    $q->whereIn('companies.id', ListesManuelles::organisationsMembres($ids));
+                } else {
+                    $q->whereNotIn('companies.id', ListesManuelles::organisationsMembres($ids));
+                }
             };
         }
 
@@ -732,6 +843,15 @@ class AudienceBuilderService
             $companySlugs = $company->tags->pluck('slug')->all();
 
             return ! empty(array_intersect($value, $companySlugs));
+        }
+        if ($field === self::CHAMP_LISTE_MANUELLE) {
+            $ids = is_array($value) ? ListesManuelles::entiers($value) : [];
+            if ($ids === [] || ! in_array($op, ['in', 'not_in'], true)) {
+                return false;
+            }
+            $membre = ListesManuelles::organisationEstMembre((int) $company->id, $ids);
+
+            return $op === 'in' ? $membre : ! $membre;
         }
         if ($field === 'has_email') {
             // Sprint H8 — élargi : tout email contactable OU email_generic

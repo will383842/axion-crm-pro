@@ -57,6 +57,11 @@ class EmailAudience extends Model
         'workspace_id', 'name', 'description', 'criteria',
         'is_active', 'auto_refresh', 'member_count', 'refreshed_at',
         'created_by',
+        // 2026-09-30 — à qui écrire dans chaque organisation
+        // (`App\Crm\Campagnes\ReglageDestinataires`). `destinataires_fonctions`
+        // est un `TEXT[]` : il s'écrit par `ReglageDestinataires::versTableauPg()`.
+        'destinataires_mode', 'destinataires_fonctions',
+        'destinataires_personnes_listees', 'destinataires_avec_adresses_partagees',
     ];
 
     protected function casts(): array
@@ -67,6 +72,8 @@ class EmailAudience extends Model
             'auto_refresh' => 'boolean',
             'member_count' => 'integer',
             'refreshed_at' => 'datetime',
+            'destinataires_personnes_listees' => 'boolean',
+            'destinataires_avec_adresses_partagees' => 'boolean',
         ];
     }
 

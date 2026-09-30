@@ -95,6 +95,8 @@ final class FusionFiches
         'federations.parent_company_id',
         'health_practitioners.company_id',
         'journalists.company_id',
+        // 2026-09-30 : une organisation cochée dans une liste manuelle.
+        'listes_manuelles_membres.company_id',
         'media.company_id',
         'personnes.company_id',
         'scraper_runs.company_id',
@@ -464,6 +466,43 @@ final class FusionFiches
             [$gardeId, $ws, $absorbeeId, $gardeId],
         ), 'id');
 
+        // Listes manuelles (2026-09-30) : l'organisation cochée dans une liste
+        // le reste sous la fiche gardée. Si la fiche gardée y a déjà une
+        // ligne, la ligne de l'absorbée reste où elle est (à la corbeille avec
+        // elle) ; et si cette ligne de la fiche gardée était RETIRÉE alors que
+        // l'absorbée est ACTIVE, elle est d'abord réactivée — sinon
+        // l'appartenance cochée à la main serait perdue en silence (relecture
+        // A09 de #266). Les PERSONNES cochées suivent `contacts.company_id`,
+        // déjà rattaché plus haut ; les homonymes (qui restent sur la fiche
+        // absorbée) reportent leurs appartenances sur leur jumeau, plus bas.
+        $deplacements['listes_manuelles_reactivees'] = $this->reactiverAppartenances(
+            $ws,
+            'company_id',
+            [['absorbee' => $absorbeeId, 'garde' => $gardeId]],
+        );
+        $deplacements['listes_manuelles_membres'] = $this->ids(DB::select(
+            'UPDATE listes_manuelles_membres lmm_abs SET company_id = ?
+             WHERE lmm_abs.workspace_id = ? AND lmm_abs.company_id = ?
+               AND NOT EXISTS (SELECT 1 FROM listes_manuelles_membres lmm_gar WHERE lmm_gar.company_id = ?
+                               AND lmm_gar.liste_id = lmm_abs.liste_id)
+             RETURNING lmm_abs.id',
+            [$gardeId, $ws, $absorbeeId, $gardeId],
+        ), 'id');
+
+        // Les homonymes VIVANTS de la fiche absorbée restent sur elle (à la
+        // corbeille) : leurs appartenances passent à leur jumeau de la fiche
+        // gardée — réactivées si le jumeau avait été retiré, déplacées s'il
+        // n'avait aucune ligne dans la liste.
+        $pairesPersonnes = [];
+        foreach ($jumeaux as $j) {
+            $pairesPersonnes[] = ['absorbee' => $j['absorbee_contact'], 'garde' => $j['garde_contact']];
+        }
+        $deplacements['listes_manuelles_reactivees'] = array_merge(
+            $deplacements['listes_manuelles_reactivees'],
+            $this->reactiverAppartenances($ws, 'contact_id', $pairesPersonnes),
+        );
+        $deplacements['listes_manuelles_personnes'] = $this->reporterPersonnes($ws, $pairesPersonnes);
+
         foreach (self::TABLES_SIMPLES as $table) {
             $deplacements[$table] = $this->ids(DB::select(
                 "UPDATE {$table} SET company_id = ? WHERE workspace_id = ? AND company_id = ? RETURNING id",
@@ -811,7 +850,7 @@ final class FusionFiches
         }
 
         $parCle = [
-            'contacts' => 'id', 'audience_members' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
+            'contacts' => 'id', 'audience_members' => 'id', 'listes_manuelles_membres' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
             'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id',
             'company_tag' => 'tag_id', 'event_organizers' => 'event_id',
         ];
@@ -825,6 +864,30 @@ final class FusionFiches
                 [$absorbeeId, $ws, $gardeId, self::tableau($ids)],
             ), count($ids));
         }
+        // Les appartenances des homonymes reviennent à la personne absorbée,
+        // si elles n'ont pas bougé depuis.
+        foreach ((array) ($deplacements['listes_manuelles_personnes'] ?? []) as $p) {
+            if (! is_array($p)) {
+                continue;
+            }
+            $compter(DB::update(
+                'UPDATE listes_manuelles_membres SET contact_id = ? WHERE workspace_id = ? AND id = ? AND contact_id = ?',
+                [(int) ($p['de'] ?? 0), $ws, (int) ($p['id'] ?? 0), (int) ($p['vers'] ?? 0)],
+            ), 1);
+        }
+        // Une appartenance réactivée par la fusion redevient retirée — sauf si
+        // quelqu'un l'a retirée de nouveau depuis (elle l'est déjà).
+        foreach ((array) ($deplacements['listes_manuelles_reactivees'] ?? []) as $r) {
+            if (! is_array($r) || ($r['retire_le'] ?? null) === null) {
+                continue;
+            }
+            $compter(DB::update(
+                'UPDATE listes_manuelles_membres SET retire_le = CAST(? AS timestamptz), retire_par = CAST(? AS uuid)
+                 WHERE workspace_id = ? AND id = ? AND retire_le IS NULL',
+                [(string) $r['retire_le'], $r['retire_par'] ?? null, $ws, (int) ($r['id'] ?? 0)],
+            ), 1);
+        }
+
         $activites = self::liste($deplacements['activities'] ?? []);
         if ($activites !== []) {
             $compter(DB::update(
@@ -896,6 +959,81 @@ final class FusionFiches
     }
 
     // ── Outils ──────────────────────────────────────────────────────────────
+
+    /**
+     * Réactive, sur la fiche (ou la personne) gardée, les lignes RETIRÉES des
+     * listes où la fiche absorbée est ACTIVE. Rend, pour l'annulation, la
+     * ligne réactivée et son retrait d'avant (qui, quand).
+     *
+     * @param  'company_id'|'contact_id'  $colonne
+     * @param  list<array{absorbee: int, garde: int}>  $paires
+     * @return list<array{id: int, retire_le: string, retire_par: ?string}>
+     */
+    private function reactiverAppartenances(string $ws, string $colonne, array $paires): array
+    {
+        $vivante = $colonne === 'contact_id'
+            ? ' AND EXISTS (SELECT 1 FROM contacts ra_ct WHERE ra_ct.id = lmm_abs.contact_id AND ra_ct.deleted_at IS NULL)'
+            : '';
+        $journal = [];
+        foreach ($paires as $p) {
+            $lignes = DB::select(
+                "SELECT lmm_gar.id, CAST(lmm_gar.retire_le AS TEXT) AS retire_le, CAST(lmm_gar.retire_par AS TEXT) AS retire_par
+                 FROM listes_manuelles_membres lmm_gar
+                 WHERE lmm_gar.workspace_id = ? AND lmm_gar.{$colonne} = ? AND lmm_gar.retire_le IS NOT NULL
+                   AND EXISTS (SELECT 1 FROM listes_manuelles_membres lmm_abs
+                               WHERE lmm_abs.workspace_id = lmm_gar.workspace_id AND lmm_abs.{$colonne} = ?
+                                 AND lmm_abs.liste_id = lmm_gar.liste_id AND lmm_abs.retire_le IS NULL{$vivante})
+                 ORDER BY lmm_gar.id
+                 FOR UPDATE OF lmm_gar",
+                [$ws, $p['garde'], $p['absorbee']],
+            );
+            foreach ($lignes as $l) {
+                if (! $l instanceof stdClass) {
+                    continue;
+                }
+                DB::update(
+                    'UPDATE listes_manuelles_membres SET retire_le = NULL, retire_par = NULL WHERE workspace_id = ? AND id = ?',
+                    [$ws, (int) $l->id],
+                );
+                $journal[] = [
+                    'id' => (int) $l->id,
+                    'retire_le' => (string) $l->retire_le,
+                    'retire_par' => $l->retire_par === null ? null : (string) $l->retire_par,
+                ];
+            }
+        }
+
+        return $journal;
+    }
+
+    /**
+     * Déplace sur l'homonyme de la fiche gardée les appartenances d'une
+     * personne VIVANTE de la fiche absorbée, dans les listes où l'homonyme
+     * n'a aucune ligne.
+     *
+     * @param  list<array{absorbee: int, garde: int}>  $paires
+     * @return list<array{id: int, de: int, vers: int}>
+     */
+    private function reporterPersonnes(string $ws, array $paires): array
+    {
+        $journal = [];
+        foreach ($paires as $p) {
+            $lignes = DB::select(
+                'UPDATE listes_manuelles_membres lmm_abs SET contact_id = ?
+                 WHERE lmm_abs.workspace_id = ? AND lmm_abs.contact_id = ?
+                   AND EXISTS (SELECT 1 FROM contacts rp_ct WHERE rp_ct.id = lmm_abs.contact_id AND rp_ct.deleted_at IS NULL)
+                   AND NOT EXISTS (SELECT 1 FROM listes_manuelles_membres lmm_gar WHERE lmm_gar.contact_id = ?
+                                   AND lmm_gar.liste_id = lmm_abs.liste_id)
+                 RETURNING lmm_abs.id',
+                [$p['garde'], $ws, $p['absorbee'], $p['garde']],
+            );
+            foreach ($this->ids($lignes, 'id') as $id) {
+                $journal[] = ['id' => $id, 'de' => $p['absorbee'], 'vers' => $p['garde']];
+            }
+        }
+
+        return $journal;
+    }
 
     /**
      * La fiche porte-t-elle le tag de provenance de la presse ? (corbeille comprise)

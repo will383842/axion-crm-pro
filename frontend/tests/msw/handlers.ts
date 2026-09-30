@@ -209,6 +209,28 @@ export const defaultHandlers: HttpHandler[] = [
   // `onUnhandledRequest: 'error'` pour une raison etrangere a ce qu'il teste.
   // Corps NEUTRE : aucune notification, aucune non lue.
   getJson('/notifications', { data: [], unread_count: 0 }),
+  // 2026-09-30 — les listes manuelles sont lues par la fiche entreprise et par
+  // le constructeur d'audiences, qui demande aussi l'aperçu des destinataires.
+  // Corps NEUTRES : aucune liste, aucun destinataire. Un test qui porte SUR
+  // ces écrans empile ses propres réponses au-dessus.
+  getJson('/listes-manuelles', { data: [] }),
+  postJson('/audiences/apercu-destinataires', {
+    data: {
+      reglage: { mode: 'personne_sinon_generique', fonctions: [], personnes_listees: false, avec_adresses_partagees: false },
+      organisations: 0,
+      organisations_avec_destinataire: 0,
+      organisations_sans_destinataire: 0,
+      destinataires: 0,
+      par_type: { generique: 0, nominative: 0 },
+      adresses_partagees_entre_organisations: 0,
+      doublons_evites: 0,
+      exclues: {},
+      exclues_total: 0,
+      ecartees_par_le_reglage: {},
+      ecartees_total: 0,
+      lignes: [],
+    },
+  }),
 ];
 
 // Ré-export DIRECT (`export … from`) et non `import` puis `export { … }` :

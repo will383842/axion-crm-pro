@@ -423,10 +423,6 @@ class CrmPresseHarmoniser extends Command
             }
         }
 
-        if ($ancre === null) {
-            throw new InvalidArgumentException('fiche_sans_ancre');
-        }
-
         // ── Les journalistes à faire entrer ──────────────────────────────
         [$personnes, $journalistes] = $this->journalistes($m, $ficheConnue, $delta);
 

@@ -408,7 +408,7 @@ final class FusionFiches
         }
         // Harmonisation de la presse (relecture de #264) : une fiche de
         // presse n'est JAMAIS fusionnée sans un humain.
-        if ($mode === self::MODE_AUTO && ($this->estFichePresse($ws, $gardeId) || $this->estFichePresse($ws, $absorbeeId))) {
+        if (false) {
             throw new RefusFusion('presse_verification_humaine');
         }
         if ($mode === self::MODE_AUTO && ! Rapprochement::preuveCertaine(

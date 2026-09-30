@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\MediaIncertain;
 use App\Crm\Presse\QualificationPresse;
@@ -55,12 +56,20 @@ use Throwable;
  *    aucune relation saisie à la main ; sinon comptée, intacte
  *    (`natures_avant_inconnues`).
  *  - ÉTIQUETTES : la synchro automatique ordinaire retire `nature-media` et
- *    pose `media-possible:a-verifier` (chantier F). Le tag de provenance
- *    `src:scraping-presse-2026` n'est PAS retiré : lever une protection est
- *    une décision de Will (`FichesProtegees`), jamais un effet de bord ; il
- *    est compté (`provenance_presse_gardee`).
+ *    pose `media-possible:a-verifier` (chantier F).
+ *  - PROVENANCE : par défaut, le tag `src:scraping-presse-2026` n'est PAS
+ *    retiré — lever une protection est une décision de Will
+ *    (`FichesProtegees`), jamais un effet de bord ; il est compté
+ *    (`provenance_presse_gardee`). Sous l'option EXPLICITE
+ *    `--lever-provenance-posee-par-harmonisation` (décision de Will), il est
+ *    retiré d'une fiche RÉPARÉE seulement s'il est PROUVÉ que l'harmonisation
+ *    l'y a posé (`poseeParHarmonisation`) ; sinon gardé et compté. La levée
+ *    passe par `RefuseUneSuppressionMassive` (confirmation ou `--force`) et est
+ *    journalisée (`metadata.reparation_media_incertain.provenance_levee`,
+ *    `business_events` `company.presse_provenance_levee`, sceau d'audit).
  *
- * Rien n'est supprimé : ni fiche, ni contact, ni ligne `media`, ni journaliste.
+ * Rien d'autre n'est supprimé : ni fiche, ni contact, ni ligne `media`, ni
+ * journaliste, ni aucune autre étiquette.
  *
  * ── Journal ─────────────────────────────────────────────────────────────
  * Chaque fiche réparée reçoit `metadata.reparation_media_incertain` (date,
@@ -79,12 +88,16 @@ use Throwable;
  */
 class CrmPresseReparerMediaIncertain extends Command
 {
+    use RefuseUneSuppressionMassive;
+
     protected $signature = 'crm:presse:reparer-media-incertain
                             {--appliquer : Écrire (sans cette option : essai à blanc, rien n\'est écrit)}
                             {--dry-run : Essai à blanc explicite (c\'est déjà le défaut)}
                             {--depuis-id= : Reprendre à la fiche d\'identifiant N (incluse)}
                             {--limite= : Ne traiter que les N premières fiches}
                             {--paquet=500 : Fiches validées par transaction}
+                            {--lever-provenance-posee-par-harmonisation : Retirer le tag src:scraping-presse-2026 d\'une fiche réparée, SEULEMENT s\'il est prouvé que l\'harmonisation l\'a posé}
+                            {--force : Avec --appliquer et la levée, ne pas demander de confirmation (automatisation assumée)}
                             {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}';
 
     protected $description = 'Rend leur nature et leur relation d\'avant aux fiches basculées en presse par leur seul code NAF (63.12Z / 58.19Z).';
@@ -92,6 +105,10 @@ class CrmPresseReparerMediaIncertain extends Command
     public const EVENEMENT = 'company.presse_media_incertain_reparee';
 
     public const CLE_JOURNAL = 'reparation_media_incertain';
+
+    public const EVENEMENT_LEVEE = 'company.presse_provenance_levee';
+
+    private bool $leverProvenance = false;
 
     /** @var array<string, int> */
     private array $bilan = [];
@@ -131,8 +148,25 @@ class CrmPresseReparerMediaIncertain extends Command
             'relations_remises', 'relations_prospect_par_defaut', 'relations_saisies_a_la_main',
             'relations_changees_depuis', 'relations_avant_inconnues',
             'natures_remises', 'natures_entreprise_par_defaut', 'natures_changees_depuis', 'natures_avant_inconnues',
-            'provenance_presse_gardee',
+            'provenance_presse_gardee', 'provenance_presse_levee',
         ], 0);
+
+        // La levée RETIRE un lien fiche-étiquette (`company_tag`) : même barrière
+        // que toute commande qui supprime (`RefuseUneSuppressionMassive`) —
+        // confirmation, ou `--force`, et plafond de proportion. À blanc, rien
+        // n'est retiré (le paquet est annulé) : pas de barrière.
+        $this->leverProvenance = (bool) $this->option('lever-provenance-posee-par-harmonisation');
+        if ($this->leverProvenance && $appliquer) {
+            $auPlus = (int) DB::table('companies as c')
+                ->where('c.workspace_id', $this->workspaceId)->whereNull('c.deleted_at')
+                ->whereRaw(MediaIncertain::conditionSql('c.id', 'c'))
+                ->whereExists(static fn ($q) => $q->selectRaw('1')->from('company_tag as ct')->join('tags as t', 't.id', '=', 'ct.tag_id')
+                    ->whereColumn('ct.company_id', 'c.id')->where('t.slug', FichesProtegees::TAG_PRESSE))
+                ->count();
+            if ($auPlus > 0 && ! $this->suppressionAutorisee('company_tag (tag ' . FichesProtegees::TAG_PRESSE . ', au plus)', $auPlus, (int) DB::table('company_tag')->count())) {
+                return self::FAILURE;
+            }
+        }
 
         $dernier = null;
         $interruption = null;
@@ -321,6 +355,7 @@ class CrmPresseReparerMediaIncertain extends Command
         if ($maj === []) {
             if (isset($meta[self::CLE_JOURNAL])) {
                 $this->compter($delta, 'deja_reparees');
+                $this->provenance($id, $delta);
             }
             // L'étiquette « média possible » suit la règle, réparée ou non.
             QualificationPresse::etiqueter($id);
@@ -341,11 +376,8 @@ class CrmPresseReparerMediaIncertain extends Command
         DB::table('companies')->where('id', $id)->update($maj + ['updated_at' => now()]);
         $this->compter($delta, 'fiches_reparees');
 
+        $this->provenance($id, $delta);
         QualificationPresse::etiqueter($id);
-        if (DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
-            ->where('company_tag.company_id', $id)->where('tags.slug', FichesProtegees::TAG_PRESSE)->exists()) {
-            $this->compter($delta, 'provenance_presse_gardee');
-        }
 
         AuditLogger::log(self::EVENEMENT, [
             'workspace_id' => $this->workspaceId,
@@ -358,6 +390,105 @@ class CrmPresseReparerMediaIncertain extends Command
             'relation_remise' => array_key_exists('relation_type', $maj) ? $maj['relation_type'] : $f->relation_type,
             'etat_avant_connu' => $avant !== null,
         ]);
+    }
+
+    /**
+     * Le tag de provenance presse d'une fiche RÉPARÉE : levé seulement sous
+     * `--lever-provenance-posee-par-harmonisation` ET avec la preuve que
+     * l'harmonisation elle-même l'a posé ; sinon gardé et compté.
+     *
+     * @param  array<string, int>  $delta
+     */
+    private function provenance(int $id, array &$delta): void
+    {
+        $lien = DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+            ->where('company_tag.company_id', $id)->where('tags.slug', FichesProtegees::TAG_PRESSE)
+            ->first(['company_tag.tag_id', 'company_tag.assigned_at', 'company_tag.assigned_by']);
+        if ($lien === null) {
+            return;
+        }
+        if (! $this->leverProvenance || ! $this->poseeParHarmonisation($id, $lien)) {
+            $this->compter($delta, 'provenance_presse_gardee');
+
+            return;
+        }
+
+        DB::table('company_tag')->where('company_id', $id)->where('tag_id', (int) $lien->tag_id)->delete();
+
+        $meta = json_decode((string) (DB::table('companies')->where('id', $id)->whereNull('deleted_at')->value('metadata') ?? '{}'), true);
+        $meta = is_array($meta) ? $meta : [];
+        $journal = is_array($meta[self::CLE_JOURNAL] ?? null) ? $meta[self::CLE_JOURNAL] : [];
+        $journal['provenance_levee'] = [
+            'le' => now()->toDateString(),
+            'tag' => FichesProtegees::TAG_PRESSE,
+            'pose_le' => (string) $lien->assigned_at,
+        ];
+        $meta[self::CLE_JOURNAL] = $journal;
+        DB::table('companies')->where('id', $id)->update(['metadata' => json_encode($meta, JSON_THROW_ON_ERROR), 'updated_at' => now()]);
+
+        AuditLogger::log(self::EVENEMENT_LEVEE, [
+            'workspace_id' => $this->workspaceId,
+            'resource_type' => 'company',
+            'resource_id' => (string) $id,
+            'actor_user_id' => null,
+            'tag' => FichesProtegees::TAG_PRESSE,
+            'pose_le' => (string) $lien->assigned_at,
+        ]);
+        $this->compter($delta, 'provenance_presse_levee');
+    }
+
+    /**
+     * La PREUVE que c'est l'harmonisation qui a posé le tag sur cette fiche,
+     * et rien d'autre — toutes ces conditions à la fois :
+     *  - l'harmonisation a basculé la fiche (`metadata.harmonisation_presse`
+     *    présent : la fiche n'était pas de la presse avant) et la relation
+     *    n'est plus `presse_media` (réparée) ;
+     *  - le tag a été posé par l'automate (`assigned_by = auto-rule`) ;
+     *  - la fiche a des passages de la porte commune pour `presse-2026`, et
+     *    TOUS sont ceux de l'harmonisation (`presse-2026:media:<id>:…`) — aucun
+     *    d'une liste presse importée (`presse-2026:liste:…`) — et chacun désigne
+     *    une ligne `media` `naf-extract` de CETTE fiche ;
+     *  - le tag a été posé au même moment que le premier de ces passages
+     *    (± 5 minutes : même transaction de la porte commune) ;
+     *  - aucun contact de journaliste (`journaliste:<id>`) sur la fiche : ces
+     *    personnes relèvent du régime de la presse.
+     * Un passage purgé (`PruneScraperRuns`) fait tomber la preuve : on garde.
+     */
+    private function poseeParHarmonisation(int $id, \stdClass $lien): bool
+    {
+        $fiche = DB::table('companies')->where('id', $id)->whereNull('deleted_at')->first(['metadata', 'relation_type']);
+        $meta = $fiche === null ? null : json_decode((string) $fiche->metadata, true);
+        if (! is_array($meta) || ! is_array($meta[QualificationPresse::CLE_AVANT] ?? null) || $fiche->relation_type === QualificationPresse::RELATION) {
+            return false;
+        }
+        if ($lien->assigned_by !== 'auto-rule' || $lien->assigned_at === null) {
+            return false;
+        }
+
+        $passages = DB::table('scraper_runs')->where('workspace_id', $this->workspaceId)
+            ->where('company_id', $id)->where('source', QualificationPresse::SOURCE)
+            ->orderBy('finished_at')->get(['dedup_key', 'finished_at']);
+        if ($passages->isEmpty()) {
+            return false;
+        }
+        $prefixe = 'pivot:' . QualificationPresse::SOURCE . ':' . QualificationPresse::SOURCE . ':media:';
+        foreach ($passages as $p) {
+            if (preg_match('/^' . preg_quote($prefixe, '/') . '(\d+):/', (string) $p->dedup_key, $m) !== 1) {
+                return false;
+            }
+            $ligneNaf = DB::table('media')->where('workspace_id', $this->workspaceId)->where('id', (int) $m[1])
+                ->where('company_id', $id)->where('source', MediaIncertain::SOURCE_NAF)->whereNull('deleted_at')->exists();
+            if (! $ligneNaf) {
+                return false;
+            }
+        }
+
+        $ecart = abs(strtotime((string) $lien->assigned_at) - strtotime((string) $passages->first()->finished_at));
+        if ($ecart > 300) {
+            return false;
+        }
+
+        return ! DB::table('contacts')->where('company_id', $id)->whereNull('deleted_at')->where('external_ref', 'like', 'journaliste:%')->exists();
     }
 
     /** @param  array<string, int>  $delta */

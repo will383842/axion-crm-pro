@@ -295,3 +295,100 @@ test('sans --appliquer (ou avec --dry-run) la reparation n ecrit RIEN, et compte
 
     expect(pmiCommande('crm:presse:reparer-media-incertain', ['--dry-run' => true, '--appliquer' => true])['code'])->toBe(1);
 });
+
+// ── La levée de la provenance (option explicite) ───────────────────────────
+
+/**
+ * Une fiche basculée par l'HARMONISATION RÉELLE (porte commune, tag de
+ * provenance, `scraper_runs`), comme au passage du 30/09 : ancienne règle
+ * reproduite en harmonisant une fiche 58.14Z, puis le NAF réel (63.12Z)
+ * remis — l'harmonisation d'alors ne regardait pas le NAF.
+ */
+function pmiBasculeeParHarmonisation(string $espace): int
+{
+    $fiche = pmiFiche($espace, '58.14Z');
+    pmiMedia($espace, $fiche, 'portail_web');
+    expect(pmiCommande('crm:presse:harmoniser')['code'])->toBe(0);
+    DB::table('companies')->where('id', $fiche)->update(['naf' => '63.12Z']);
+    expect(DB::table('companies')->where('id', $fiche)->value('relation_type'))->toBe('presse_media')
+        ->and(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(DB::table('scraper_runs')->where('company_id', $fiche)->where('source', QualificationPresse::SOURCE)->exists())->toBeTrue()
+        ->and(MediaIncertain::fiche($fiche))->toBeTrue();
+
+    return $fiche;
+}
+
+test('levee : le tag de provenance pose par l harmonisation est retire, journalise, et seulement lui', function () {
+    $fiche = pmiBasculeeParHarmonisation($this->espace);
+    $autres = array_values(array_diff(pmiSlugs($fiche), [FichesProtegees::TAG_PRESSE, 'nature-media']));
+
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true, '--force' => true]);
+
+    $journal = json_decode((string) DB::table('companies')->where('id', $fiche)->value('metadata'), true)[CrmPresseReparerMediaIncertain::CLE_JOURNAL] ?? [];
+    expect($r['code'])->toBe(0)
+        ->and(pmiSlugs($fiche))->not->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(pmiSlugs($fiche))->toContain(MediaIncertain::ETIQUETTE)
+        ->and(array_values(array_intersect($autres, pmiSlugs($fiche))))->toBe($autres)
+        ->and(FichesProtegees::estProtegee($fiche))->toBeFalse()
+        ->and($journal)->toHaveKey('provenance_levee')
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(1)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_gardee'))->toBe(0)
+        ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT_LEVEE)
+            ->where('resource_id', (string) $fiche)->count())->toBe(1)
+        // Rien d'autre n'est supprimé.
+        ->and(DB::table('media')->where('company_id', $fiche)->count())->toBe(1)
+        ->and(DB::table('companies')->where('id', $fiche)->whereNull('deleted_at')->exists())->toBeTrue();
+});
+
+test('levee REFUSEE quand une liste presse importee est aussi passee par la fiche', function () {
+    $fiche = pmiBasculeeParHarmonisation($this->espace);
+    DB::table('scraper_runs')->insert([
+        'workspace_id' => $this->espace, 'company_id' => $fiche, 'source' => QualificationPresse::SOURCE, 'status' => 'success',
+        'started_at' => now(), 'finished_at' => now(), 'created_at' => now(),
+        'dedup_key' => 'pivot:' . QualificationPresse::SOURCE . ':' . QualificationPresse::SOURCE . ':liste:presse:zz:1:abcdef',
+    ]);
+
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true, '--force' => true]);
+
+    expect($r['code'])->toBe(0)
+        ->and(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_gardee'))->toBe(1)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(0)
+        ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT_LEVEE)->count())->toBe(0);
+});
+
+test('levee REFUSEE quand le tag n a pas ete pose par l harmonisation (aucun passage de la porte commune)', function () {
+    $fiche = pmiFiche($this->espace, '63.12Z');
+    pmiMedia($this->espace, $fiche, 'portail_web');
+    pmiBasculer($this->espace, $fiche);
+
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true, '--force' => true]);
+
+    expect(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_gardee'))->toBe(1)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(0);
+});
+
+test('levee : rien sans l option, et rien a blanc meme avec l option', function () {
+    $fiche = pmiBasculeeParHarmonisation($this->espace);
+
+    // À blanc AVEC l'option : compté comme le réel, rien retiré.
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--dry-run' => true, '--lever-provenance-posee-par-harmonisation' => true]);
+    expect($r['code'])->toBe(0)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(1)
+        ->and(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(DB::table('business_events')->where('action', CrmPresseReparerMediaIncertain::EVENEMENT_LEVEE)->count())->toBe(0);
+
+    // Réel SANS l'option : la fiche est réparée, le tag reste.
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true]);
+    expect($r['code'])->toBe(0)
+        ->and(DB::table('companies')->where('id', $fiche)->value('relation_type'))->toBe('prospect')
+        ->and(pmiSlugs($fiche))->toContain(FichesProtegees::TAG_PRESSE)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_gardee'))->toBe(1)
+        ->and(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(0);
+
+    // Et la levée reste possible ensuite, sur la fiche déjà réparée.
+    $r = pmiCommande('crm:presse:reparer-media-incertain', ['--appliquer' => true, '--lever-provenance-posee-par-harmonisation' => true, '--force' => true]);
+    expect(pmiCompteur($r['sortie'], 'provenance_presse_levee'))->toBe(1)
+        ->and(pmiSlugs($fiche))->not->toContain(FichesProtegees::TAG_PRESSE);
+});

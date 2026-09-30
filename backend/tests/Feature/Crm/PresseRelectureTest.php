@@ -25,11 +25,14 @@ use App\Crm\Doublons\RefusFusion;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Presse\QualificationPresse;
+use App\Jobs\RefreshAudienceChunkJob;
+use App\Models\Company;
 use App\Models\Contact;
 use App\Models\EmailAudience;
 use App\Models\User;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Domain\DomainFinderService;
+use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -95,6 +98,33 @@ function prlCompteurs(string $sortie): array
     }
 
     return $c;
+}
+
+/**
+ * Deux personnes joignables sur une fiche ORDINAIRE (sans le tag presse) :
+ * une de la presse (source `presse-2026`), et un témoin. Seule la garde PAR
+ * CONTACT peut écarter la première — la garde par fiche la laisse passer.
+ *
+ * @return array{presse: int, temoin: int}
+ */
+function prlDeuxContacts(string $espace, int $fiche, string $suffixe): array
+{
+    $ids = [];
+    foreach (['presse' => [QualificationPresse::SOURCE], 'temoin' => ['insee']] as $cle => $sources) {
+        $ids[$cle] = (int) DB::table('contacts')->insertGetId(['workspace_id' => $espace, 'company_id' => $fiche,
+            'first_name' => 'Zed', 'last_name' => 'ZZ' . strtoupper($cle) . $suffixe,
+            'email' => $cle . '.' . strtolower($suffixe) . '@zz-garde.example.invalid', 'email_status' => 'valid',
+            'sources' => json_encode($sources), 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    return $ids;
+}
+
+/** @return list<int> */
+function prlContactsMembres(int $audience): array
+{
+    return DB::table('audience_members')->where('audience_id', $audience)->whereNotNull('contact_id')
+        ->pluck('contact_id')->map(static fn ($id): int => (int) $id)->all();
 }
 
 // ── Sécurité : aucun journaliste dans une campagne d'un autre segment ───────
@@ -376,6 +406,95 @@ test('N4 — l import rejoint un titre de fiche provisoire meme quand la ligne p
         ->and(DB::table('media')->where('id', $titre)->value('siren'))->toBeNull()
         ->and((int) DB::table('media')->where('id', $titre)->value('company_id'))->toBe($provisoire)
         ->and($sortie)->toContain('rapprochement_siren_contradictoire : 1');
+});
+
+test('N4 bis — une ligne dont le SIREN ne rejoint AUCUNE fiche ni aucun titre est REJETEE : aucune fiche creee, aucune fiche avec ce SIREN (le SIREN ne vient que du registre) ; le temoin par identifiant entre', function () {
+    $fiches = DB::table('companies')->count();
+
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-prl-n4b-');
+    file_put_contents($fichier, implode("
+", array_map('json_encode', [
+        ['siren' => '900000571', 'nom' => 'ZZ Titre Sans Fiche', 'type' => 'presse_quotidien', 'departement' => '69',
+            'journaliste' => ['prenom' => 'Ines', 'nom' => 'ZZSANSFICHE', 'acces' => 'email_redaction',
+                'email' => 'ines.sansfiche@zz-titre.example.invalid']],
+        ['identifiant' => 'presse:zz:temoin-n4b', 'nom' => 'ZZ Titre Temoin N4b', 'type' => 'presse_quotidien'],
+    ])) . "
+");
+    Artisan::call('crm:presse:importer', ['file' => $fichier]);
+    $sortie = Artisan::output();
+    @unlink($fichier);
+
+    expect($sortie)->toContain('siren_sans_fiche_existante : 1')
+        ->and(DB::table('companies')->where('siren', '900000571')->exists())->toBeFalse()
+        ->and(DB::table('companies')->where('denomination', 'ZZ Titre Sans Fiche')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('last_name', 'ZZSANSFICHE')->exists())->toBeFalse()
+        ->and(DB::table('companies')->where('foreign_id', 'presse:zz:temoin-n4b')->exists())->toBeTrue()
+        ->and(DB::table('companies')->count())->toBe($fiches + 1);
+});
+
+// ── La garde PAR CONTACT, chemin par chemin (relecture exactitude de #264) ──
+// Chaque test rougit si l'on retire la garde de SON chemin : la fiche n'est
+// pas de la presse (la garde par fiche la laisse passer), seule la personne
+// de la presse doit être écartée ; le témoin de la même fiche, lui, passe.
+
+test('garde par contact — RefreshAudienceChunkJob (audiences > 5 000 fiches) n inscrit jamais une personne de la presse ; le temoin, si', function () {
+    $fiche = prlFiche($this->espace, ['email_generic' => 'contact@zz-chunk.example.invalid', 'size_category' => 'PME']);
+    $c = prlDeuxContacts($this->espace, $fiche, 'CHUNK');
+    $audience = EmailAudience::create(['workspace_id' => $this->espace, 'name' => 'ZZ chunk',
+        'criteria' => ['all' => [['field' => 'size_category', 'op' => 'in', 'value' => ['PME']]]], 'is_active' => true, 'auto_refresh' => false]);
+
+    (new RefreshAudienceChunkJob(audienceId: (int) $audience->id, offset: 0, limit: 100))
+        ->pourEspace($this->espace)
+        ->handle(app(AudienceBuilderService::class));
+
+    expect(prlContactsMembres((int) $audience->id))->toContain($c['temoin'])->not->toContain($c['presse']);
+});
+
+test('garde par contact — le waterfall (step12, segmentation auto) n inscrit jamais une personne de la presse ; le temoin, si', function () {
+    $fiche = prlFiche($this->espace, ['email_generic' => 'contact@zz-wf.example.invalid', 'size_category' => 'PME']);
+    $c = prlDeuxContacts($this->espace, $fiche, 'WATERFALL');
+    $audience = EmailAudience::create(['workspace_id' => $this->espace, 'name' => 'ZZ waterfall',
+        'criteria' => ['all' => [['field' => 'size_category', 'op' => 'eq', 'value' => 'PME']]], 'is_active' => true, 'auto_refresh' => true]);
+
+    WorkspaceContext::run($this->espace, function () use ($fiche): void {
+        $etape = new ReflectionMethod(WaterfallOrchestrator::class, 'step12_auto_segment');
+        $etape->invoke(app(WaterfallOrchestrator::class), Company::findOrFail($fiche));
+    });
+
+    expect(prlContactsMembres((int) $audience->id))->toContain($c['temoin'])->not->toContain($c['presse']);
+});
+
+test('garde par contact — EligibiliteCampagne::appliquerContacts ecarte une personne de la presse d une fiche ordinaire ; le temoin, non', function () {
+    $fiche = prlFiche($this->espace, ['denomination' => 'ZZ FICHE ELIGIBILITE']);
+    $c = prlDeuxContacts($this->espace, $fiche, 'ELIG');
+
+    $ids = EligibiliteCampagne::appliquerContacts(Contact::query()->where('company_id', $fiche))
+        ->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+
+    expect($ids)->toContain($c['temoin'])->not->toContain($c['presse']);
+});
+
+test('garde par contact — la liste des membres d une audience n affiche ni une personne de la presse ni une fiche de presse inscrites avant l harmonisation ; le temoin, si', function () {
+    $fiche = prlFiche($this->espace, ['denomination' => 'ZZ FICHE MEMBRES']);
+    $c = prlDeuxContacts($this->espace, $fiche, 'MEMBRES');
+    $fichePresse = prlFiche($this->espace, ['denomination' => 'ZZ TITRE DE PRESSE MEMBRE']);
+    prlTag($this->espace, $fichePresse, FichesProtegees::TAG_PRESSE);
+    $audience = (int) DB::table('email_audiences')->insertGetId(['workspace_id' => $this->espace, 'name' => 'ZZ membres', 'criteria' => '{}']);
+    foreach ([[$fiche, $c['presse']], [$fiche, $c['temoin']], [$fichePresse, null]] as [$f, $contact]) {
+        DB::table('audience_members')->insert(['audience_id' => $audience, 'company_id' => $f, 'contact_id' => $contact, 'workspace_id' => $this->espace]);
+    }
+    $utilisateur = User::create(['id' => (string) Str::uuid(), 'email' => Str::uuid() . '@example.test', 'name' => 'Membres',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->espace, 'first_login_completed_at' => now()]);
+    $this->seed(PermissionsAndRolesSeeder::class);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($this->espace);
+    $utilisateur->assignRole('owner');
+    $this->actingAs($utilisateur);
+
+    $contenu = (string) $this->getJson("/api/v1/audiences/{$audience}/members")->assertOk()->getContent();
+
+    expect($contenu)->toContain('ZZTEMOINMEMBRES')
+        ->not->toContain('ZZPRESSEMEMBRES')
+        ->not->toContain('ZZ TITRE DE PRESSE MEMBRE');
 });
 
 test('N5 — un fournisseur n est JAMAIS remplace par presse_media, meme sans la marque de saisie manuelle', function () {

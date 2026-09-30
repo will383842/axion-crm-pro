@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Campagnes\GardePresse;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
@@ -177,6 +178,14 @@ class AudiencesController extends ApiController
             ->leftJoin('companies as c', 'c.id', '=', 'am.company_id')
             ->leftJoin('contacts as ct', 'ct.id', '=', 'am.contact_id')
             ->where('am.audience_id', $audience->id)
+            // La presse n'est lisible dans AUCUNE audience tant que Will n'a pas
+            // ouvert son segment (`GardePresse`, relecture sécurité de #264) :
+            // un membre inscrit avant l'harmonisation reste dans
+            // `audience_members` jusqu'au prochain rafraîchissement — il ne
+            // s'affiche plus d'ici là. Par fiche ET par contact, comme
+            // `AudienceBuilderService`.
+            ->whereRaw(GardePresse::conditionSql('am.company_id'))
+            ->whereRaw('(am.contact_id IS NULL OR ' . GardePresse::conditionContactsSql('ct') . ')')
             ->select(
                 'am.id',
                 'am.added_at',

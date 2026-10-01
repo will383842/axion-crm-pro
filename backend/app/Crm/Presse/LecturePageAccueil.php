@@ -49,8 +49,9 @@ use Psr\Http\Message\ResponseInterface;
  *   Une page refusée pour ces raisons est `illisible` : la fiche est classée
  *   par son nom et MARQUÉE, donc sautée à la relance — jamais relue en boucle.
  *
- * Rien n'est gardé : la page est réduite en mémoire à quatre zones de texte
- * (`extraire`) que `ClassementMedia` réduit à son tour à des étiquettes. Aucun
+ * Rien n'est gardé : la page est réduite en mémoire à quelques zones de texte
+ * (`extraire`) que `ClassementMedia` réduit à son tour à des étiquettes, et
+ * `SiteMedia` à un oui / non (le site porte-t-il le nom du média ?). Aucun
  * texte, aucune adresse, aucun nom ne sort de cette classe vers la base.
  */
 final class LecturePageAccueil
@@ -76,7 +77,7 @@ final class LecturePageAccueil
     private const MORCEAU_DECOMPRESSION = 1024;
 
     /** Bornes des zones gardées en mémoire (caractères). */
-    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000];
+    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000, 'identite' => 2000];
 
     public const STATUT_LU = 'site';
 
@@ -451,7 +452,8 @@ final class LecturePageAccueil
         $courant = -1;
         $dansAgents = false;
         foreach (preg_split('/
-||
+|
+|
 /', $contenu) ?: [] as $ligne) {
             $ligne = trim((string) preg_replace('/#.*$/', '', $ligne));
             $deuxPoints = strpos($ligne, ':');
@@ -525,8 +527,9 @@ final class LecturePageAccueil
     }
 
     /**
-     * Réduit une page HTML aux zones lues par `ClassementMedia` et à deux
-     * compteurs de structure. Rien d'autre n'est gardé.
+     * Réduit une page HTML aux zones lues par `ClassementMedia` (titre, menu,
+     * texte), à la zone `identite` lue par `SiteMedia` et à deux compteurs de
+     * structure. Rien d'autre n'est gardé.
      *
      * @return array{zones: array<string, string>, structure: array{articles: int, dates: int}}
      */
@@ -554,6 +557,15 @@ final class LecturePageAccueil
                 . sprintf($minuscule, 'property') . " = 'og:site_name']/@content", 6),
             self::textes($xp, '//h1', 5),
         );
+        // L'IDENTITÉ de la page (`SiteMedia::correspond`) : ce que le site dit
+        // de lui-même — titre, og:site_name, og:title, h1 ; jamais la méta
+        // description, qui peut citer n'importe quoi.
+        $identite = array_merge(
+            self::textes($xp, '//title', 2),
+            self::textes($xp, '//meta[' . sprintf($minuscule, 'property') . " = 'og:site_name' or "
+                . sprintf($minuscule, 'property') . " = 'og:title']/@content", 4),
+            self::textes($xp, '//h1', 5),
+        );
         $menu = array_merge(
             self::textes($xp, "//nav//a | //header//a | //*[@role='navigation']//a", 80),
             self::textes($xp, '//h2', 30),
@@ -577,6 +589,7 @@ final class LecturePageAccueil
                 'titre' => mb_substr(implode(' . ', $titre), 0, self::BORNES['titre']),
                 'menu' => mb_substr(implode(' . ', $menu), 0, self::BORNES['menu']),
                 'texte' => mb_substr(implode(' . ', $texte), 0, self::BORNES['texte']),
+                'identite' => mb_substr(implode(' . ', $identite), 0, self::BORNES['identite']),
             ],
             'structure' => [
                 'articles' => $articles === false ? 0 : $articles->length,

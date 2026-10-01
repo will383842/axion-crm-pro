@@ -21,6 +21,14 @@ name: CRM — Presse harmonisée (prod, à la main)
 # puis `classer` sur un échantillon (limite 500), puis `classer` sans limite
 # (limite 0) — reprenable : une fiche déjà classée est sautée.
 #
+# Vérification des sites des médias (2026-10-01) : `crm:presse:verifier-sites`
+# vérifie que le site de chaque média porte son nom (les sites DEVINÉS depuis
+# le nom sont souvent faux) et en cherche un, sans service payant, quand il
+# n'en a pas ou un faux. Le classement ne lit plus QUE des sites vérifiés :
+# lancer `verifier-sites-a-blanc` (200), puis `verifier-sites` (500), puis
+# `verifier-sites` sans limite (0) — reprenable —, ET SEULEMENT ENSUITE
+# `classer` (version 5 des règles : tout est relu).
+#
 # L'import d'une liste de diffusion (`crm:presse:importer`) ne passe PAS par
 # ce workflow : son fichier vit hors du dépôt, sur le serveur.
 
@@ -36,8 +44,10 @@ on:
           - harmoniser
           - classer-a-blanc
           - classer
+          - verifier-sites-a-blanc
+          - verifier-sites
       limite:
-        description: "Classement : nombre de fiches au plus (0 = toutes)"
+        description: "Classement / vérification : nombre de fiches au plus (0 = toutes)"
         type: string
         default: "200"
 
@@ -73,6 +83,8 @@ jobs:
             harmoniser)         CMD="crm:presse:harmoniser" ;;
             classer-a-blanc)    CMD="crm:presse:classer-medias --dry-run $OPT_LIMITE" ;;
             classer)            CMD="crm:presse:classer-medias --appliquer $OPT_LIMITE" ;;
+            verifier-sites-a-blanc) CMD="crm:presse:verifier-sites --dry-run $OPT_LIMITE" ;;
+            verifier-sites)     CMD="crm:presse:verifier-sites --appliquer $OPT_LIMITE" ;;
             *) echo "::error::mode inconnu : $MODE"; exit 1 ;;
           esac
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF

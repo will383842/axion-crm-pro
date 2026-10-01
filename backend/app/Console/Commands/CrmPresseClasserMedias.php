@@ -6,6 +6,7 @@ use App\Crm\Presse\ClassementMedia;
 use App\Crm\Presse\LecturePageAccueil;
 use App\Crm\Presse\MediaIncertain;
 use App\Crm\Presse\QualificationPresse;
+use App\Crm\Presse\SiteMedia;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use App\Support\WorkspaceContext;
@@ -33,8 +34,14 @@ use Throwable;
  *
  * ── COMMENT ──────────────────────────────────────────────────────────────
  *
- * La page lue est le premier `media.website` de la fiche, CHEMIN COMPRIS (la
- * page de l'émission, de l'édition locale), à défaut `companies.website`.
+ * La page lue est le site VÉRIFIÉ de la fiche, et lui seul (v5, 2026-10-01 :
+ * les sites devinés depuis le nom étaient souvent faux) : l'URL de
+ * `metadata.site_media` quand son statut est `verifie` ou `trouve-verifie`
+ * (`SiteMedia::urlVerifiee`, posée par `crm:presse:verifier-sites` — le
+ * premier `media.website` de la fiche, CHEMIN COMPRIS, à défaut
+ * `companies.website`, ou un site trouvé). Un site non vérifié n'est PAS lu :
+ * classement au nom seul, compté `sites_non_verifies`. Lancer
+ * `crm:presse:verifier-sites` AVANT.
  * `LecturePageAccueil` la lit (robots.txt évalué pour ce chemin,
  * User-Agent identifiable, délai par domaine, délai d'attente court,
  * concurrence bornée, garde SSRF). `ClassementMedia` en tire thèmes, public,
@@ -151,7 +158,7 @@ class CrmPresseClasserMedias extends Command
 
         $this->cacheHotes = [];
         $this->bilan = array_fill_keys([
-            'fiches_lues', 'paquets', 'sites_lus', 'sans_site', 'robots_interdits', 'sites_injoignables',
+            'fiches_lues', 'paquets', 'sites_lus', 'sans_site', 'sites_non_verifies', 'robots_interdits', 'sites_injoignables',
             'sites_illisibles', 'pages_deja_lues', 'classements_ecrits', 'classements_inchanges', 'lus_sur_site_gardes',
             'etiquettes_media_ajoutees', 'etiquettes_media_retirees',
         ], 0);
@@ -233,6 +240,7 @@ class CrmPresseClasserMedias extends Command
 
         $fiches = DB::select(
             "SELECT c.id, c.denomination, c.website, c.metadata -> '" . ClassementMedia::CLE . "' AS classement,
+                    c.metadata -> '" . SiteMedia::CLE . "' AS site_media,
                     ({$incertain}) AS incertain
                FROM companies c
               WHERE c.workspace_id = ?
@@ -267,13 +275,16 @@ class CrmPresseClasserMedias extends Command
         // 1. Lire les sites (HORS transaction : aucun verrou tenu pendant le réseau).
         $bases = [];
         foreach ($fiches as $f) {
-            // L'URL du MÉDIA d'abord (chemin compris : france.tv/france-5/…,
-            // actu.fr/lyon), à défaut le site de la fiche.
-            $cible = null;
-            foreach ($f->medias as $m) {
-                $cible ??= LecturePageAccueil::cible(is_string($m->website) ? $m->website : null);
+            // Le site VÉRIFIÉ seulement (`SiteMedia`) : un site deviné depuis
+            // le nom (paris.fr pour « PARIS LIVE ») n'est jamais lu.
+            $cible = SiteMedia::urlVerifiee($f->site_media);
+            if ($cible === null) {
+                $brut = LecturePageAccueil::cible(is_string($f->website) ? $f->website : null);
+                foreach ($f->medias as $m) {
+                    $brut ??= LecturePageAccueil::cible(is_string($m->website) ? $m->website : null);
+                }
+                $f->nonVerifie = $brut !== null;
             }
-            $cible ??= LecturePageAccueil::cible(is_string($f->website) ? $f->website : null);
             $f->base = $cible;
             if ($cible !== null && ! $sansReseau) {
                 if (isset($this->cacheHotes[$cible]) || isset($bases[$cible])) {
@@ -322,7 +333,7 @@ class CrmPresseClasserMedias extends Command
         $zones = [];
         $structure = ['articles' => 0, 'dates' => 0];
         if ($f->base === null) {
-            $this->compter($delta, 'sans_site');
+            $this->compter($delta, ($f->nonVerifie ?? false) ? 'sites_non_verifies' : 'sans_site');
         } elseif (! $sansReseau) {
             $lu = $this->cacheHotes[$f->base] ?? null;
             $statut = $lu['statut'] ?? LecturePageAccueil::STATUT_INJOIGNABLE;

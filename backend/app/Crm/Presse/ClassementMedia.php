@@ -39,18 +39,22 @@ use Illuminate\Support\Str;
  * Marseille dans deux brèves n'est pas un média régional). Il faut un signal
  * dans le nom, le titre ou le menu.
  *
- * Une valeur est retenue si son score atteint `SEUIL` (4) : un mot fort
- * (poids 2) dans le menu, ou dans le nom / le titre ; un mot faible (poids 1)
- * dans le titre ne suffit pas seul. Sans aucune valeur retenue : `inconnu`.
- * On n'invente RIEN.
+ * Une valeur est retenue si son score atteint `SEUIL` (4) ET si le signal est
+ * SÛR (`retenu()`) : au moins un mot dans le NOM ou le TITRE (titre, meta, h1),
+ * ou au moins DEUX mots-clés distincts. Un seul mot de menu (« Immobilier »,
+ * « Management ») ne classe jamais ; un mot faible (poids 1) seul dans le
+ * titre non plus. Sans aucune valeur retenue : `inconnu`. On n'invente RIEN.
  *
  * Thèmes (plusieurs possibles) : `ia-tech`, `economie-entreprise`,
  * `pme-entrepreneurs`, `rh-management`, `metiers-secteurs`, `regional`,
  * `grand-public` — mots-clés dans `THEMES_MOTS`.
- *   - `metiers-secteurs` : retenu si un SECTEUR précis l'est (BTP, santé,
- *     agriculture… `SECTEURS_MOTS`, posé en plus `media-theme:secteur-<clé>`),
- *     ou si les mots de la presse professionnelle (« revue professionnelle »,
- *     « filière »…) atteignent le seuil seuls.
+ *   - `metiers-secteurs` (presse professionnelle) : signal FORT exigé, dans
+ *     le nom ou le titre. Retenu si un SECTEUR précis l'est (BTP, santé,
+ *     agriculture… `SECTEURS_MOTS`, posé en plus `media-sujet:secteur-<clé>`,
+ *     lui aussi sur signal fort), ou si les mots de la presse professionnelle
+ *     (« revue professionnelle », « le journal des professionnels ») y
+ *     atteignent le seuil. Un quotidien qui a une rubrique « Immobilier » n'est
+ *     pas une presse professionnelle.
  *   - `regional` : reçoit aussi le seuil entier quand la SOURCE a donné une
  *     zone de diffusion régionale, départementale ou locale
  *     (`media.diffusion_zone`) — une donnée, pas une déduction.
@@ -60,13 +64,16 @@ use Illuminate\Support\Str;
  * avec est retenu (PME-entrepreneurs → dirigeants ; métiers-secteurs →
  * pros-secteur ; grand-public → grand-public ; économie et RH : 1 vers
  * dirigeants). Le bonus seul (2) n'atteint pas le seuil : il faut au moins un
- * mot du public lui-même.
+ * mot du public lui-même, et le signal doit être sûr (le bonus compte pour un
+ * signal). `pros-secteur` exige un signal fort (nom, titre) ou une presse
+ * professionnelle retenue : un lien « Espace pros » ne suffit pas.
  *
  * Format (TÉLÉVISION seulement : un média `tv` ou `tv_emission`) : UN SEUL,
  * parmi `magazine-eco`, `talk-show`, `jt-info`, `tech`, `fiction-jeu` —
- * mots-clés dans `FORMATS_MOTS`. Retenu si le meilleur score atteint le seuil
- * ET vaut PLUS du double du second : une chaîne généraliste (séries ET
- * journal ET débats) reste `inconnu`, ce qui est vrai.
+ * mots-clés dans `FORMATS_MOTS`. Retenu si le meilleur est SÛR (seuil et
+ * signal sûr) ET vaut PLUS du double du second. `fiction-jeu` ne se lit QUE
+ * dans le nom ou le titre : le menu d'une chaîne généraliste (Séries, Films,
+ * Jeux, Divertissement, Info) ne dit rien de l'émission — elle reste `inconnu`.
  *   ⚠️ `fiction-jeu` ÉCARTE : une fiction ou un jeu n'invite pas d'expert. Ses
  *   thèmes utiles (IA, économie, PME, RH, métiers) et ses publics
  *   professionnels (dirigeants, pros-secteur) sont retirés — une série
@@ -81,7 +88,9 @@ use Illuminate\Support\Str;
  *   - signes de NON-MÉDIA (`VERDICT_PAS_MEDIA_MOTS`) : « devis », « nos
  *     services », « nos prestations », « agence web », « création de sites »,
  *     « ajouter au panier »… ;
- *   - `semble-media` si média ≥ 6 ET média ≥ 2 × non-média ;
+ *   - `semble-media` si média ≥ 6 ET média ≥ 2 × non-média ET au moins un
+ *     signe LEXICAL de média (la structure seule — billets datés d'un blog
+ *     d'éditeur de logiciels — ne suffit jamais) ;
  *     `semble-pas-media` si non-média ≥ 6 ET non-média ≥ 2 × média ;
  *     sinon la fiche RESTE `a-verifier`.
  * Le verdict n'est qu'une PROPOSITION : la relation, la nature, la protection
@@ -96,22 +105,22 @@ use Illuminate\Support\Str;
  * ── LES ÉTIQUETTES ───────────────────────────────────────────────────────
  *
  * DÉRIVÉES de ce classement par `AutoTaggerService::syncTags` (`desirees()`),
- * comme `EtiquettesMedia` : `media-theme:<thème>`,
- * `media-theme:secteur-<clé>`, `media-public:<public>`,
+ * comme `EtiquettesMedia` : `media-sujet:<thème>`,
+ * `media-sujet:secteur-<clé>`, `media-public:<public>`,
  * `media-format:<format>` (TV), `media-possible:semble-media` /
  * `semble-pas-media` (qui remplace alors `a-verifier`). Une resynchro ne les
  * efface pas tant que le classement dit la même chose ; une fiche sans média
  * n'en désire aucune.
  *
  * Une étiquette POSÉE À LA MAIN gagne : si la fiche porte déjà, à la main, une
- * étiquette d'un de ces namespaces (`media-theme:`, `media-public:`,
+ * étiquette d'un de ces namespaces (`media-sujet:`, `media-public:`,
  * `media-format:`, ou un verdict `media-possible:`), le classement automatique
  * n'en ajoute AUCUNE dans ce namespace.
  */
 final class ClassementMedia
 {
     /** Version des règles : la monter fait relire toutes les fiches au passage suivant. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** Clé de `companies.metadata` qui garde le classement. */
     public const CLE = 'classement_media';
@@ -125,6 +134,9 @@ final class ClassementMedia
     /** @var array<string, int> */
     public const POIDS_ZONES = ['nom' => 3, 'titre' => 3, 'menu' => 2, 'texte' => 1];
 
+    /** Zones dont un seul mot est un signal SÛR (nom du média, titre / meta / h1). */
+    public const ZONES_FORTES = ['nom', 'titre'];
+
     /** Comment la fiche a été lue. */
     public const LECTURE_SITE = 'site';
 
@@ -134,8 +146,11 @@ final class ClassementMedia
 
     public const LECTURE_INJOIGNABLE = 'injoignable';
 
+    /** Site trop gros, type refusé ou encodage inconnu : lu par le nom, marqué, sauté à la relance. */
+    public const LECTURE_ILLISIBLE = 'illisible';
+
     /** @var list<string> */
-    public const LECTURES = [self::LECTURE_SITE, self::LECTURE_NOM, self::LECTURE_ROBOTS, self::LECTURE_INJOIGNABLE];
+    public const LECTURES = [self::LECTURE_SITE, self::LECTURE_NOM, self::LECTURE_ROBOTS, self::LECTURE_INJOIGNABLE, self::LECTURE_ILLISIBLE];
 
     public const INCONNU = 'inconnu';
 
@@ -158,7 +173,7 @@ final class ClassementMedia
     private const THEMES_GARDES_PAR_FICTION = ['grand-public', 'regional'];
 
     /** Namespaces que le classement pose (et qu'une étiquette manuelle bloque). */
-    public const NAMESPACES = ['media-theme', 'media-public', 'media-format', 'media-possible'];
+    public const NAMESPACES = ['media-sujet', 'media-public', 'media-format', 'media-possible'];
 
     public const PREFIXE_SECTEUR = 'secteur-';
 
@@ -428,46 +443,59 @@ final class ClassementMedia
         $scores = [];
 
         // ── Thèmes ───────────────────────────────────────────────────────
+        // Retenu : score au seuil ET signal SÛR — dans le nom ou le titre, ou
+        // au moins deux mots distincts. Un seul mot de menu (« Immobilier »,
+        // « Management ») ne classe jamais.
         $themes = [];
         foreach (self::THEMES_MOTS as $theme => $mots) {
-            $s = self::score($z, $mots);
+            $a = self::analyse($z, $mots);
             if ($theme === 'regional' && self::zoneLocale($zonesDiffusion)) {
-                $s += self::SEUIL;
+                // Zone de diffusion donnée par la SOURCE : une donnée, signal sûr.
+                $a = ['score' => $a['score'] + self::SEUIL, 'mots' => $a['mots'] + 1, 'fort' => true];
             }
-            $scores['theme:' . $theme] = $s;
-            if ($s >= self::SEUIL) {
+            $scores['theme:' . $theme] = $a['score'];
+            if (self::retenu($a)) {
                 $themes[] = $theme;
             }
         }
+        // Presse PROFESSIONNELLE et secteur : signal FORT exigé, dans le nom
+        // ou le titre (« le journal du BTP », « la revue des professionnels »).
+        // Une rubrique de quotidien n'en fait pas une presse professionnelle.
         $secteurs = [];
         foreach (self::SECTEURS_MOTS as $secteur => $mots) {
-            $s = self::score($z, $mots);
-            if ($s > 0) {
-                $scores['secteur:' . $secteur] = $s;
+            $a = self::analyse($z, $mots);
+            if ($a['score'] > 0) {
+                $scores['secteur:' . $secteur] = $a['score'];
             }
-            if ($s >= self::SEUIL) {
+            if ($a['score'] >= self::SEUIL && $a['fort']) {
                 $secteurs[] = $secteur;
             }
         }
-        $sMetiers = self::score($z, self::METIERS_MOTS);
-        $scores['theme:metiers-secteurs'] = $sMetiers;
-        if ($secteurs !== [] || $sMetiers >= self::SEUIL) {
+        $metiers = self::analyse($z, self::METIERS_MOTS);
+        $scores['theme:metiers-secteurs'] = $metiers['score'];
+        if ($secteurs !== [] || ($metiers['score'] >= self::SEUIL && $metiers['fort'])) {
             $themes[] = 'metiers-secteurs';
         }
 
         // ── Format (télévision seulement) ──────────────────────────────────
+        // `fiction-jeu` ne se lit que dans le NOM ou le TITRE : le menu d'une
+        // chaîne généraliste (Séries, Films, Jeux) ne dit rien de l'émission.
         $format = null;
         if (array_intersect($typesMedia, self::TYPES_TV) !== []) {
             $parFormat = [];
+            $surs = [];
             foreach (self::FORMATS_MOTS as $f => $mots) {
-                $parFormat[$f] = self::score($z, $mots);
-                $scores['format:' . $f] = $parFormat[$f];
+                $a = $f === 'fiction-jeu'
+                    ? self::analyse(['nom' => $z['nom'], 'titre' => $z['titre']], $mots)
+                    : self::analyse($z, $mots);
+                $parFormat[$f] = $a['score'];
+                $surs[$f] = self::retenu($a);
+                $scores['format:' . $f] = $a['score'];
             }
             arsort($parFormat);
             $valeurs = array_values($parFormat);
             $meilleur = (string) array_key_first($parFormat);
-            $premier = $valeurs[0];
-            $format = ($premier >= self::SEUIL && $premier > 2 * $valeurs[1]) ? $meilleur : self::INCONNU;
+            $format = (($surs[$meilleur] ?? false) && $valeurs[0] > 2 * $valeurs[1]) ? $meilleur : self::INCONNU;
         }
         if ($format === 'fiction-jeu') {
             $themes = array_values(array_intersect($themes, self::THEMES_GARDES_PAR_FICTION));
@@ -475,26 +503,38 @@ final class ClassementMedia
         }
 
         // ── Public ─────────────────────────────────────────────────────────
+        // Même exigence de signal sûr ; le bonus d'un thème retenu compte pour
+        // UN signal. `pros-secteur` exige un signal FORT (nom, titre) ou une
+        // presse professionnelle retenue : un lien « Espace pros » ne suffit pas.
         $publics = [];
         foreach (self::PUBLICS_MOTS as $public => $mots) {
-            $s = self::score($z, $mots);
-            foreach (self::PUBLICS_BONUS as $theme => $bonus) {
+            $a = self::analyse($z, $mots);
+            $bonus = 0;
+            foreach (self::PUBLICS_BONUS as $theme => $parPublic) {
                 if (in_array($theme, $themes, true)) {
-                    $s += $bonus[$public] ?? 0;
+                    $bonus += $parPublic[$public] ?? 0;
                 }
             }
-            $scores['public:' . $public] = $s;
-            if ($s >= self::SEUIL && ! ($format === 'fiction-jeu' && $public !== 'grand-public')) {
+            $score = $a['score'] + $bonus;
+            $scores['public:' . $public] = $score;
+            $sur = $public === 'pros-secteur'
+                ? ($a['fort'] || in_array('metiers-secteurs', $themes, true))
+                : ($a['fort'] || $a['mots'] + ($bonus > 0 ? 1 : 0) >= 2);
+            if ($score >= self::SEUIL && $sur && $a['mots'] > 0 && ! ($format === 'fiction-jeu' && $public !== 'grand-public')) {
                 $publics[] = $public;
             }
         }
 
         // ── Verdict « média possible » ────────────────────────────────────
+        // La structure (articles, dates) ne suffit jamais seule : un blog
+        // d'éditeur de logiciels a aussi des billets datés. Il faut au moins un
+        // signe LEXICAL de média.
         $verdict = null;
         if ($incertain) {
             $verdict = self::VERDICT_A_VERIFIER;
             if ($lecture === self::LECTURE_SITE) {
-                $media = self::score($z, self::VERDICT_MEDIA_MOTS, false);
+                $lexical = self::analyse($z, self::VERDICT_MEDIA_MOTS, false);
+                $media = $lexical['score'];
                 if (($structure['articles'] ?? 0) >= self::STRUCTURE_MIN) {
                     $media += self::BONUS_STRUCTURE;
                 }
@@ -504,7 +544,7 @@ final class ClassementMedia
                 $pas = self::score($z, self::VERDICT_PAS_MEDIA_MOTS, false);
                 $scores['verdict:media'] = $media;
                 $scores['verdict:pas-media'] = $pas;
-                if ($media >= self::SEUIL_VERDICT && $media >= 2 * $pas) {
+                if ($lexical['mots'] > 0 && $media >= self::SEUIL_VERDICT && $media >= 2 * $pas) {
                     $verdict = self::VERDICT_MEDIA;
                 } elseif ($pas >= self::SEUIL_VERDICT && $pas >= 2 * $media) {
                     $verdict = self::VERDICT_PAS_MEDIA;
@@ -534,7 +574,22 @@ final class ClassementMedia
      */
     public static function score(array $zones, array $mots, bool $plafonnerTexte = true): int
     {
+        return self::analyse($zones, $mots, $plafonnerTexte)['score'];
+    }
+
+    /**
+     * Score, nombre de mots-clés DISTINCTS trouvés, et signal FORT (un mot
+     * trouvé dans le nom ou le titre).
+     *
+     * @param  array<string, string>  $zones
+     * @param  array<string, int>  $mots
+     * @return array{score: int, mots: int, fort: bool}
+     */
+    public static function analyse(array $zones, array $mots, bool $plafonnerTexte = true): array
+    {
         $total = 0;
+        $trouves = [];
+        $fort = false;
         foreach (self::POIDS_ZONES as $zone => $poidsZone) {
             $texte = $zones[$zone] ?? '';
             if (trim($texte) === '') {
@@ -544,6 +599,10 @@ final class ClassementMedia
             foreach ($mots as $mot => $poids) {
                 if (self::contient($texte, $mot)) {
                     $s += $poids * $poidsZone;
+                    $trouves[$mot] = true;
+                    if (in_array($zone, self::ZONES_FORTES, true)) {
+                        $fort = true;
+                    }
                 }
             }
             if ($zone === 'texte' && $plafonnerTexte) {
@@ -552,7 +611,18 @@ final class ClassementMedia
             $total += $s;
         }
 
-        return $total;
+        return ['score' => $total, 'mots' => count($trouves), 'fort' => $fort];
+    }
+
+    /**
+     * Une valeur est-elle retenue ? Seuil atteint ET signal sûr : fort (nom,
+     * titre) ou au moins deux mots-clés distincts.
+     *
+     * @param  array{score: int, mots: int, fort: bool}  $analyse
+     */
+    public static function retenu(array $analyse): bool
+    {
+        return $analyse['score'] >= self::SEUIL && ($analyse['fort'] || $analyse['mots'] >= 2);
     }
 
     /** Minuscules, sans accent, ponctuation → espace, entouré d'espaces. */
@@ -624,17 +694,17 @@ final class ClassementMedia
         $tags = [];
         foreach (self::chaines($classement['themes'] ?? null) as $theme) {
             if (isset(Taxonomy::MEDIA_THEMES_CLASSES[$theme])) {
-                $tags['media-theme:' . $theme] = [
-                    'name' => 'Thème du média : ' . Taxonomy::MEDIA_THEMES_CLASSES[$theme],
-                    'category' => Taxonomy::TAG_NAMESPACES['media-theme'],
+                $tags['media-sujet:' . $theme] = [
+                    'name' => 'Sujet du média : ' . Taxonomy::MEDIA_THEMES_CLASSES[$theme],
+                    'category' => Taxonomy::TAG_NAMESPACES['media-sujet'],
                 ];
             }
         }
         foreach (self::chaines($classement['secteurs'] ?? null) as $secteur) {
             if (isset(self::SECTEURS_MOTS[$secteur], Taxonomy::SECTEURS[$secteur])) {
-                $tags['media-theme:' . self::PREFIXE_SECTEUR . str_replace('_', '-', $secteur)] = [
+                $tags['media-sujet:' . self::PREFIXE_SECTEUR . str_replace('_', '-', $secteur)] = [
                     'name' => 'Secteur couvert : ' . Taxonomy::SECTEURS[$secteur],
-                    'category' => Taxonomy::TAG_NAMESPACES['media-theme'],
+                    'category' => Taxonomy::TAG_NAMESPACES['media-sujet'],
                 ];
             }
         }

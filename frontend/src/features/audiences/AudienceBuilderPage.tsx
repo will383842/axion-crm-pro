@@ -495,7 +495,7 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
-          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` / `media-theme:` / `media-public:` / `media-format:` */}
+          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` / `media-sujet:` / `media-public:` / `media-format:` */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
             <p className="text-[11px] text-slate-500 dark:text-slate-400">

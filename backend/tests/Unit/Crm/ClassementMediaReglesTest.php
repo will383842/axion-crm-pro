@@ -8,8 +8,10 @@
 
 use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\Presse\ClassementMedia;
+use App\Crm\Presse\FluxBorne;
 use App\Crm\Presse\LecturePageAccueil;
 use App\Crm\Taxonomy;
+use GuzzleHttp\Psr7\Response;
 
 /** @param array<string, string> $zones */
 function cmrClasser(array $zones, array $types = ['presse_mensuel'], bool $incertain = false, array $structure = [], array $diffusion = []): array
@@ -35,11 +37,25 @@ test('seuil : un mot fort dans le titre suffit, un mot faible seul non, le corps
 });
 
 test('plusieurs themes, et un secteur precis pour la presse professionnelle', function () {
-    $c = cmrClasser(['titre' => 'ZZ Batiment — la revue professionnelle du BTP', 'menu' => 'Chantiers . Management . Région']);
+    $c = cmrClasser(['titre' => 'ZZ Batiment — la revue professionnelle du BTP', 'menu' => 'Management . Ressources humaines']);
 
     expect($c['themes'])->toContain('metiers-secteurs', 'rh-management')
         ->and($c['secteurs'])->toBe(['btp'])
         ->and($c['publics'])->toContain('pros-secteur');
+});
+
+test('un SEUL mot de menu ne classe jamais ; une rubrique de quotidien n en fait pas une presse professionnelle', function () {
+    expect(cmrClasser(['menu' => 'Management'])['themes'])->toBe(['inconnu'])
+        ->and(cmrClasser(['menu' => 'Économie'])['themes'])->toBe(['inconnu'])
+        ->and(cmrClasser(['menu' => 'Management . Ressources humaines'])['themes'])->toBe(['rh-management']);
+
+    $quotidien = cmrClasser(['titre' => 'ZZ Le Quotidien', 'menu' => 'Actualité . Immobilier . Transports . Sport . Météo . Espace pros']);
+    expect($quotidien['themes'])->not->toContain('metiers-secteurs')
+        ->and($quotidien['secteurs'])->toBe([])
+        ->and($quotidien['publics'])->not->toContain('pros-secteur')
+        ->and($quotidien['themes'])->toContain('grand-public');
+    // Témoin : le même secteur dans le TITRE fait une presse professionnelle.
+    expect(cmrClasser(['titre' => 'ZZ Le journal de l immobilier'])['secteurs'])->toBe(['immobilier']);
 });
 
 test('regional : par le menu, ou par la zone de diffusion donnee par la source', function () {
@@ -55,6 +71,9 @@ test('format TV : seulement pour la television, dominant ou inconnu, fiction eca
         ->and(cmrClasser(['nom' => 'ZZ Le JT de 20h'], $tv)['format'])->toBe('jt-info')
         ->and(cmrClasser(['nom' => 'ZZ High-Tech, le magazine geek'], $tv)['format'])->toBe('tech')
         ->and(cmrClasser(['menu' => 'Séries . Jeux . Info . Débats'], ['tv'])['format'])->toBe('inconnu')
+        // Chaîne généraliste : le menu ne fait JAMAIS une fiction (nom ou titre seulement).
+        ->and(cmrClasser(['menu' => 'Séries . Films . Jeux . Divertissement . Info'], ['tv'])['format'])->toBe('inconnu')
+        ->and(cmrClasser(['titre' => 'ZZ Le grand jeu télévisé'], ['tv_emission'])['format'])->toBe('fiction-jeu')
         ->and(cmrClasser(['nom' => 'ZZ Le talk-show du soir'], ['radio'])['format'])->toBeNull();
 
     $fiction = cmrClasser(['nom' => 'ZZ PME : la série, saison 2, épisode 4, feuilleton'], $tv);
@@ -67,12 +86,16 @@ test('verdict : media, pas media, ou a-verifier — et jamais pour une fiche qui
     $media = cmrClasser(['menu' => 'À la une . Abonnez-vous . Rubriques', 'texte' => 'La rédaction.'], incertain: true);
     $pas = cmrClasser(['titre' => 'Agence web', 'menu' => 'Nos services . Devis'], incertain: true);
     $mixte = cmrClasser(['menu' => 'À la une . Devis . Nos services . Abonnement'], incertain: true);
-    $structure = cmrClasser(['texte' => 'Article.'], incertain: true, structure: ['articles' => 5, 'dates' => 5]);
+    // La structure SEULE (billets datés d'un blog d'éditeur) ne fait pas un média…
+    $structure = cmrClasser(['texte' => 'Bonjour.'], incertain: true, structure: ['articles' => 5, 'dates' => 5]);
+    // … il faut au moins un signe lexical de média.
+    $structureEtSigne = cmrClasser(['texte' => 'La rédaction.'], incertain: true, structure: ['articles' => 5, 'dates' => 5]);
 
     expect($media['verdict'])->toBe('semble-media')
         ->and($pas['verdict'])->toBe('semble-pas-media')
         ->and($mixte['verdict'])->toBe('a-verifier')
-        ->and($structure['verdict'])->toBe('semble-media')
+        ->and($structure['verdict'])->toBe('a-verifier')
+        ->and($structureEtSigne['verdict'])->toBe('semble-media')
         ->and(cmrClasser(['titre' => 'Agence web'])['verdict'])->toBeNull()
         ->and(ClassementMedia::classer(['titre' => 'Agence web, devis'], [], [], [], true, ClassementMedia::LECTURE_NOM)['verdict'])->toBe('a-verifier');
 });
@@ -105,22 +128,48 @@ test('extraction : titre, meta, h1 en zone titre ; menu et h2 ; paragraphes ; co
         ->and($l['structure'])->toBe(['articles' => 2, 'dates' => 2]);
 });
 
-test('base du site : schema, hote, et rien d inlisible', function () {
-    expect(LecturePageAccueil::base('exemple.test/a/b'))->toBe('https://exemple.test')
-        ->and(LecturePageAccueil::base('http://WWW.Exemple.test/'))->toBe('http://www.exemple.test')
-        ->and(LecturePageAccueil::base('ftp://exemple.test'))->toBeNull()
-        ->and(LecturePageAccueil::base(''))->toBeNull()
-        ->and(LecturePageAccueil::base('pas un site'))->toBeNull();
+test('URL lue : chemin GARDE, fragment retire, ports 80/443 seulement', function () {
+    expect(LecturePageAccueil::cible('france.tv/france-5/c-dans-l-air/'))->toBe('https://france.tv/france-5/c-dans-l-air/')
+        ->and(LecturePageAccueil::cible('http://WWW.Exemple.test'))->toBe('http://www.exemple.test/')
+        ->and(LecturePageAccueil::cible('https://actu.test/lyon?p=1#haut'))->toBe('https://actu.test/lyon?p=1')
+        ->and(LecturePageAccueil::cible('https://exemple.test:8080/'))->toBeNull()
+        ->and(LecturePageAccueil::cible('ftp://exemple.test'))->toBeNull()
+        ->and(LecturePageAccueil::cible(''))->toBeNull()
+        ->and(LecturePageAccueil::cible('pas un site'))->toBeNull()
+        ->and(LecturePageAccueil::origine('https://actu.test/lyon?p=1'))->toBe('https://actu.test')
+        ->and(LecturePageAccueil::cheminRobots('https://actu.test/lyon?p=1'))->toBe('/lyon?p=1');
+});
+
+test('taille bornee : flux plafonne PENDANT l ecriture, decompression plafonnee, encodage inconnu refuse', function () {
+    [$flux, $id] = FluxBorne::ouvrir(10);
+    expect(fwrite($flux, '12345'))->toBe(5)
+        ->and(fwrite($flux, 'abcdefgh'))->toBeLessThan(8) // curl voit l'écart et coupe le transfert
+        ->and(FluxBorne::depasse($id))->toBeTrue();
+    rewind($flux);
+    expect(stream_get_contents($flux))->toBe('12345');
+    FluxBorne::liberer($id);
+
+    $bombe = (string) gzencode(str_repeat(' ', 20_000_000), 9);
+    expect(LecturePageAccueil::decompresser($bombe, ZLIB_ENCODING_GZIP, LecturePageAccueil::CORPS_MAX))->toBeNull()
+        ->and(LecturePageAccueil::decompresser((string) gzencode('<p>ok</p>'), ZLIB_ENCODING_GZIP, 100))->toBe('<p>ok</p>')
+        ->and(LecturePageAccueil::corps(new Response(200, ['Content-Encoding' => 'br'], 'x'), 100))->toBeNull()
+        ->and(LecturePageAccueil::corps(new Response(200, [], str_repeat('a', 101)), 100))->toBeNull()
+        ->and(LecturePageAccueil::corps(new Response(200, ['Content-Encoding' => 'deflate'], (string) gzcompress('<p>d</p>')), 100))->toBe('<p>d</p>');
+
+    expect(LecturePageAccueil::entetesAcceptables(new Response(200, ['Content-Type' => 'application/pdf']), 100, true))->toBeFalse()
+        ->and(LecturePageAccueil::entetesAcceptables(new Response(200, ['Content-Length' => '101', 'Content-Type' => 'text/html']), 100, true))->toBeFalse()
+        ->and(LecturePageAccueil::entetesAcceptables(new Response(200, ['Content-Type' => 'text/html; charset=utf-8']), 100, true))->toBeTrue()
+        ->and(LecturePageAccueil::entetesAcceptables(new Response(301, ['Location' => '/x']), 100, true))->toBeTrue();
 });
 
 test('toute valeur du classement a sa famille gouvernee et sa categorie', function () {
     $slugs = [];
     foreach (array_keys(Taxonomy::MEDIA_THEMES_CLASSES) as $v) {
-        $slugs[] = 'media-theme:' . $v;
+        $slugs[] = 'media-sujet:' . $v;
     }
     foreach (array_keys(ClassementMedia::SECTEURS_MOTS) as $v) {
         expect(Taxonomy::SECTEURS)->toHaveKey($v);
-        $slugs[] = 'media-theme:' . ClassementMedia::PREFIXE_SECTEUR . str_replace('_', '-', $v);
+        $slugs[] = 'media-sujet:' . ClassementMedia::PREFIXE_SECTEUR . str_replace('_', '-', $v);
     }
     foreach (array_keys(Taxonomy::MEDIA_PUBLICS) as $v) {
         $slugs[] = 'media-public:' . $v;

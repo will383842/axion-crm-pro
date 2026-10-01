@@ -322,7 +322,7 @@ export type CleZoneMedia = (typeof ZONES_MEDIA)[number]['code'];
 export const PREFIXE_ETIQUETTE_TYPE_MEDIA = "media-type:";
 export const PREFIXE_ETIQUETTE_ZONE_MEDIA = "media-zone:";
 
-/** Thèmes de média (lecture du site) — étiquette automatique `media-theme:<code>`. */
+/** Thèmes de média (lecture du site) — étiquette automatique `media-sujet:<code>`. */
 export const THEMES_MEDIA = [
   { code: "ia-tech", libelle: "IA et technologie" },
   { code: "economie-entreprise", libelle: "Économie et entreprise" },
@@ -359,6 +359,6 @@ export const FORMATS_MEDIA = [
 export type CleFormatMedia = (typeof FORMATS_MEDIA)[number]['code'];
 
 /** Préfixes des étiquettes du classement d'un média : thème, public, format TV. */
-export const PREFIXE_ETIQUETTE_THEME_MEDIA = "media-theme:";
+export const PREFIXE_ETIQUETTE_THEME_MEDIA = "media-sujet:";
 export const PREFIXE_ETIQUETTE_PUBLIC_MEDIA = "media-public:";
 export const PREFIXE_ETIQUETTE_FORMAT_MEDIA = "media-format:";

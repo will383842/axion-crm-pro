@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
  *    contactabilite: (kind=auto) — depuis la ligne `federations` de la fiche
  *  - media-type:, media-zone:, media-theme: (kind=auto) — depuis les lignes
  *    `media` vivantes rattachées à la fiche (`EtiquettesMedia`)
- *  - media-theme:, media-public:, media-format:, media-possible:semble-*
+ *  - media-sujet:, media-public:, media-format:, media-possible:semble-*
  *    (kind=auto) — depuis `metadata.classement_media` (`ClassementMedia`,
  *    lecture de la page d'accueil du média, chantier F)
  *  - {tag}          (category=ia, kind=llm)        — depuis signals.llm_classification.tags

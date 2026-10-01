@@ -35,7 +35,7 @@ const enPresets = (liste: ReadonlyArray<{ code: string; libelle: string }>) =>
 export const TYPE_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(TYPES_MEDIA);
 export const ZONE_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(ZONES_MEDIA);
 // Classement des médias (chantier F) : thème, public, format TV — étiquettes
-// `media-theme:` / `media-public:` / `media-format:` posées par la lecture du site.
+// `media-sujet:` / `media-public:` / `media-format:` posées par la lecture du site.
 export const THEME_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(THEMES_MEDIA);
 export const PUBLIC_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(PUBLICS_MEDIA);
 export const FORMAT_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(FORMATS_MEDIA);

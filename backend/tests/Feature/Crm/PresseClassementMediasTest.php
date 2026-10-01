@@ -100,7 +100,7 @@ function pcmPage(string $titre, array $menu = [], array $paragraphes = [], strin
 /**
  * Faux réseau : robots.txt et page d'accueil par hôte ; tout le reste en 404.
  *
- * @param  array<string, array{robots?: array{0: int, 1: string}, page?: string}>  $sites
+ * @param  array<string, array{robots?: array{0: int, 1: string}, page?: string, pages?: array<string, mixed>}>  $sites
  */
 function pcmReseau(array $sites): void
 {
@@ -110,6 +110,9 @@ function pcmReseau(array $sites): void
         $faux['https://' . $hote . '/robots.txt'] = Http::response($corps, $code, ['Content-Type' => 'text/plain']);
         if (isset($s['page'])) {
             $faux['https://' . $hote . '/'] = Http::response($s['page'], 200, ['Content-Type' => 'text/html; charset=utf-8']);
+        }
+        foreach ($s['pages'] ?? [] as $chemin => $reponse) {
+            $faux['https://' . $hote . $chemin] = $reponse;
         }
     }
     $faux['*'] = Http::response('', 404);
@@ -165,11 +168,12 @@ test('theme detecte, PLUSIEURS themes, public dirigeants : lus sur la page d acc
     $c = pcmClassement($id);
     expect($r['code'])->toBe(0)
         ->and($c['lecture'])->toBe('site')
-        ->and($c['themes'])->toContain('economie-entreprise', 'pme-entrepreneurs', 'rh-management')
-        ->and($c['themes'])->not->toContain('inconnu', 'grand-public', 'regional')
+        ->and($c['themes'])->toContain('economie-entreprise', 'pme-entrepreneurs')
+        // « Management » : UN seul mot, dans le menu seulement — signal trop faible.
+        ->and($c['themes'])->not->toContain('inconnu', 'grand-public', 'regional', 'rh-management')
         ->and($c['publics'])->toContain('dirigeants')
         ->and($c['format'])->toBeNull()
-        ->and(pcmSlugs($id))->toContain('media-theme:economie-entreprise', 'media-theme:pme-entrepreneurs', 'media-public:dirigeants')
+        ->and(pcmSlugs($id))->toContain('media-sujet:economie-entreprise', 'media-sujet:pme-entrepreneurs', 'media-public:dirigeants')
         ->and(pcmCompteur($r['sortie'], 'sites_lus'))->toBe(1);
     Http::assertSent(fn (Request $q): bool => $q->url() === 'https://eco-pme.test/'
         && str_starts_with($q->header('User-Agent')[0] ?? '', 'AxionCRM-ClassementMedias/'));
@@ -186,7 +190,7 @@ test('sans signal suffisant : inconnu (theme et public) — on n invente rien', 
         $c = pcmClassement($id);
         expect($c['themes'])->toBe(['inconnu'])
             ->and($c['publics'])->toBe(['inconnu'])
-            ->and(pcmSlugs($id))->toContain('media-theme:inconnu', 'media-public:inconnu');
+            ->and(pcmSlugs($id))->toContain('media-sujet:inconnu', 'media-public:inconnu');
     }
     // Le corps de page seul (« économie » dans un paragraphe) ne suffit pas : plafond de la zone texte.
     expect(pcmClassement($neutre)['lecture'])->toBe('site')
@@ -217,7 +221,7 @@ test('TV : une fiction est ECARTEE (format fiction-jeu, aucun theme utile), un m
         ->and(pcmClassement($fiction)['themes'])->toBe(['inconnu'])
         ->and(pcmClassement($fiction)['publics'])->not->toContain('dirigeants')
         ->and(pcmSlugs($fiction))->toContain('media-format:fiction-jeu')
-        ->and(pcmSlugs($fiction))->not->toContain('media-theme:economie-entreprise');
+        ->and(pcmSlugs($fiction))->not->toContain('media-sujet:economie-entreprise');
     expect(pcmClassement($eco)['format'])->toBe('magazine-eco')
         ->and(pcmClassement($eco)['themes'])->toContain('economie-entreprise')
         ->and(pcmSlugs($eco))->toContain('media-format:magazine-eco');
@@ -352,7 +356,7 @@ test('idempotente : relancer ne relit rien, --reclasser ne reecrit rien, une res
         ->and(pcmCompteur($trois['sortie'], 'classements_inchanges'))->toBe(1)
         ->and(pcmSlugs($id))->toBe($slugs)
         ->and(DB::table('company_tag')->count())->toBe($liens)
-        ->and(DB::table('tags')->where('slug', 'media-theme:economie-entreprise')->count())->toBe(1);
+        ->and(DB::table('tags')->where('slug', 'media-sujet:economie-entreprise')->count())->toBe(1);
 });
 
 test('une etiquette posee A LA MAIN gagne : rien d automatique dans son namespace, et elle reste', function () {
@@ -362,12 +366,12 @@ test('une etiquette posee A LA MAIN gagne : rien d automatique dans son namespac
         'category' => 'custom', 'kind' => 'manual', 'rules' => '{}', 'is_locked' => false, 'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $manuel, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'user']);
-    pcmReseau(['eco-pme.test' => ['page' => pcmPage('ZZ Mag des dirigeants', ['Économie', 'PME'])]]);
+    pcmReseau(['eco-pme.test' => ['page' => pcmPage('ZZ Mag des dirigeants — économie', ['Économie', 'PME'])]]);
 
     pcmClasser(['--appliquer' => true]);
 
     expect(pcmClassement($id)['publics'])->toContain('dirigeants')
-        ->and(pcmSlugs($id))->toContain('media-public:grand-public', 'media-theme:economie-entreprise')
+        ->and(pcmSlugs($id))->toContain('media-public:grand-public', 'media-sujet:economie-entreprise')
         ->and(pcmSlugs($id))->not->toContain('media-public:dirigeants');
 });
 
@@ -394,16 +398,113 @@ test('AUCUNE donnee nominative stockee ni affichee : ni texte, ni nom, ni adress
         ->and($r['sortie'])->not->toContain('eco-pme');
 });
 
-test('lecture : un hote partage n est lu qu UNE fois par execution', function () {
+test('lecture : une page n est lue qu UNE fois, robots.txt une fois par domaine, une page par domaine et par tour', function () {
     $a = pcmPresse($this->espace, 'https://chaine.test', 'ZZ Chaîne', 'tv');
-    $b = pcmPresse($this->espace, 'chaine.test/emission', 'ZZ Émission', 'tv_emission');
-    pcmReseau(['chaine.test' => ['page' => pcmPage('ZZ', ['Accueil'])]]);
+    $b = pcmPresse($this->espace, null, 'ZZ Émission', 'tv_emission', ['website' => 'chaine.test/emission']);
+    $c = pcmPresse($this->espace, 'https://chaine.test/', 'ZZ Chaîne bis', 'tv');
+    pcmReseau(['chaine.test' => ['page' => pcmPage('ZZ', ['Accueil']), 'pages' => [
+        '/emission' => Http::response(pcmPage('ZZ', ['Accueil']), 200, ['Content-Type' => 'text/html']),
+    ]]]);
+    $attentes = [];
+    app()->bind(LecturePageAccueil::class, fn () => new LecturePageAccueil(4, 6, 0, function (int $ms) use (&$attentes): void {
+        $attentes[] = $ms;
+    }));
 
     $r = pcmClasser(['--appliquer' => true]);
 
-    Http::assertSentCount(2); // un robots.txt + une page d'accueil
-    expect(pcmCompteur($r['sortie'], 'hotes_deja_lus'))->toBe(1)
-        ->and(LecturePageAccueil::base('chaine.test/emission'))->toBe('https://chaine.test')
+    Http::assertSentCount(3); // un robots.txt + deux pages
+    expect(collect(Http::recorded())->filter(fn ($p) => str_ends_with($p[0]->url(), '/robots.txt'))->count())->toBe(1)
+        ->and(pcmCompteur($r['sortie'], 'pages_deja_lues'))->toBe(1)
+        ->and(count($attentes))->toBe(2) // deux tours : jamais deux pages du même domaine à la fois
         ->and(pcmClassement($a)['lecture'])->toBe('site')
-        ->and(pcmClassement($b)['lecture'])->toBe('site');
+        ->and(pcmClassement($b)['lecture'])->toBe('site')
+        ->and(pcmClassement($c)['lecture'])->toBe('site');
+});
+
+test('le CHEMIN du media est lu tel quel, et robots.txt est evalue pour CE chemin', function () {
+    $lyon = pcmPresse($this->espace, 'https://groupe.test', 'ZZ GROUPE FICTIF', 'presse_quotidien', ['website' => 'https://groupe.test/lyon']);
+    $prive = pcmPresse($this->espace, null, 'ZZ AUTRE FICTIF', 'presse_quotidien', ['website' => 'groupe.test/prive/edition']);
+    pcmReseau(['groupe.test' => [
+        'robots' => [200, "User-agent: *\nDisallow: /prive/\n"],
+        'page' => pcmPage('ZZ Groupe — séries, films, jeux'),
+        'pages' => ['/lyon' => Http::response(pcmPage('ZZ Lyon — actualité locale', ['Lyon', 'Villeurbanne']), 200, ['Content-Type' => 'text/html'])],
+    ]]);
+
+    pcmClasser(['--appliquer' => true]);
+
+    Http::assertSent(fn (Request $q): bool => $q->url() === 'https://groupe.test/lyon');
+    Http::assertNotSent(fn (Request $q): bool => $q->url() === 'https://groupe.test/');
+    Http::assertNotSent(fn (Request $q): bool => str_contains($q->url(), '/prive/'));
+    expect(pcmClassement($lyon)['themes'])->toContain('regional')
+        ->and(pcmClassement($prive)['lecture'])->toBe('robots-interdit');
+});
+
+test('bombe gzip : lecture coupee au plafond DECOMPRESSE, fiche marquee illisible et sautee a la relance', function () {
+    $bombe = pcmPresse($this->espace, 'https://bombe.test', 'ZZ ÉCONOMIE FICTIVE');
+    $gros = pcmPresse($this->espace, 'https://gros.test');
+    $pdf = pcmPresse($this->espace, 'https://pdf.test');
+    $sain = pcmPresse($this->espace, 'https://sain.test');
+    $corpsBombe = (string) gzencode(str_repeat(' ', 20_000_000), 9);
+    expect(strlen($corpsBombe))->toBeLessThan(LecturePageAccueil::CORPS_MAX);
+    pcmReseau([
+        'bombe.test' => ['pages' => ['/' => Http::response($corpsBombe, 200, ['Content-Type' => 'text/html', 'Content-Encoding' => 'gzip'])]],
+        'gros.test' => ['pages' => ['/' => Http::response('<p>x</p>', 200, ['Content-Type' => 'text/html', 'Content-Length' => (string) (LecturePageAccueil::CORPS_MAX + 1)])]],
+        'pdf.test' => ['pages' => ['/' => Http::response('%PDF-1.4', 200, ['Content-Type' => 'application/pdf'])]],
+        'sain.test' => ['pages' => ['/' => Http::response((string) gzencode(pcmPage('ZZ Économie', ['Économie'])), 200, ['Content-Type' => 'text/html', 'Content-Encoding' => 'gzip'])]],
+    ]);
+
+    $r = pcmClasser(['--appliquer' => true]);
+    $relance = pcmClasser(['--appliquer' => true]);
+
+    expect(pcmCompteur($r['sortie'], 'sites_illisibles'))->toBe(3)
+        ->and(pcmClassement($bombe)['lecture'])->toBe('illisible')
+        ->and(pcmClassement($gros)['lecture'])->toBe('illisible')
+        ->and(pcmClassement($pdf)['lecture'])->toBe('illisible')
+        // Repli sur le nom, comme pour un site interdit.
+        ->and(pcmClassement($bombe)['themes'])->toContain('economie-entreprise')
+        // Un gzip honnête est décompressé et lu.
+        ->and(pcmClassement($sain)['lecture'])->toBe('site')
+        ->and(pcmClassement($sain)['themes'])->toContain('economie-entreprise')
+        ->and(pcmCompteur($relance['sortie'], 'fiches_lues'))->toBe(0);
+});
+
+test('--limite et --depuis-id bornent ce qui est lu et ecrit', function () {
+    Http::fake();
+    $un = pcmPresse($this->espace, null, 'ZZ ÉCONOMIE UN');
+    $deux = pcmPresse($this->espace, null, 'ZZ ÉCONOMIE DEUX');
+    $trois = pcmPresse($this->espace, null, 'ZZ ÉCONOMIE TROIS');
+
+    $limite = pcmClasser(['--appliquer' => true, '--limite' => '1']);
+    expect(pcmCompteur($limite['sortie'], 'fiches_lues'))->toBe(1)
+        ->and(pcmClassement($un))->not->toBeNull()
+        ->and(pcmClassement($deux))->toBeNull()
+        ->and(pcmClassement($trois))->toBeNull();
+
+    $depuis = pcmClasser(['--appliquer' => true, '--depuis-id' => (string) $trois]);
+    expect(pcmCompteur($depuis['sortie'], 'fiches_lues'))->toBe(1)
+        ->and(pcmClassement($deux))->toBeNull()
+        ->and(pcmClassement($trois))->not->toBeNull();
+});
+
+test('un classement LU SUR LE SITE n est pas remplace par un classement au nom seul (--reclasser, site devenu interdit)', function () {
+    $id = pcmPresse($this->espace, 'https://eco-pme.test', 'ZZ EDITIONS FICTIVES');
+    $phase = 1;
+    Http::fake(function (Request $q) use (&$phase) {
+        if (str_ends_with($q->url(), '/robots.txt')) {
+            return $phase === 1 ? Http::response('', 404) : Http::response('', 503);
+        }
+
+        return Http::response(pcmPage('ZZ Économie', ['Économie', 'PME']), 200, ['Content-Type' => 'text/html']);
+    });
+
+    pcmClasser(['--appliquer' => true]);
+    $avant = pcmClassement($id);
+    $phase = 2;
+    $r = pcmClasser(['--appliquer' => true, '--reclasser' => true]);
+
+    expect($avant['lecture'])->toBe('site')
+        ->and(pcmCompteur($r['sortie'], 'robots_interdits'))->toBe(1)
+        ->and(pcmCompteur($r['sortie'], 'lus_sur_site_gardes'))->toBe(1)
+        ->and(pcmCompteur($r['sortie'], 'classements_ecrits'))->toBe(0)
+        ->and(pcmClassement($id))->toEqual($avant);
 });

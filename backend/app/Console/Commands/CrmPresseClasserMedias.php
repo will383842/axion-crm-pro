@@ -33,15 +33,18 @@ use Throwable;
  *
  * ── COMMENT ──────────────────────────────────────────────────────────────
  *
- * Le site est `companies.website`, à défaut le premier `media.website` de la
- * fiche. `LecturePageAccueil` lit sa page d'accueil (robots.txt respecté,
+ * La page lue est le premier `media.website` de la fiche, CHEMIN COMPRIS (la
+ * page de l'émission, de l'édition locale), à défaut `companies.website`.
+ * `LecturePageAccueil` la lit (robots.txt évalué pour ce chemin,
  * User-Agent identifiable, délai par domaine, délai d'attente court,
  * concurrence bornée, garde SSRF). `ClassementMedia` en tire thèmes, public,
  * format TV et, pour un média incertain, un verdict proposé. Sans site, ou si
  * robots.txt l'interdit, ou si le site ne répond pas : classement par le NOM
- * (fiche, médias, émission) et le thème éditorial de la source seulement —
+ * (fiche, médias, émission) et le thème éditorial de la source seulement ;
+ * page trop grosse, non HTML ou d'encodage inconnu : idem, marquée
+ * `illisible` (sautée à la relance) —
  * `inconnu` sans signal net. `--sans-reseau` : aucun appel, nom seulement.
- * Un même hôte n'est lu qu'UNE fois par exécution (une chaîne et ses
+ * Une même page n'est lue qu'UNE fois par exécution (une chaîne et ses
  * émissions partagent souvent un site).
  *
  * ── CE QUI EST ÉCRIT, ET RIEN D'AUTRE ────────────────────────────────────
@@ -50,7 +53,7 @@ use Throwable;
  *     numériques, mode de lecture, version des règles, date) — aucun texte de
  *     la page, aucun nom, aucune adresse ; `updated_at` n'est pas touché ;
  *   - les étiquettes DÉRIVÉES par la synchro automatique ordinaire
- *     (`AutoTaggerService::syncTags`) : `media-theme:`, `media-public:`,
+ *     (`AutoTaggerService::syncTags`) : `media-sujet:`, `media-public:`,
  *     `media-format:`, `media-possible:semble-media|semble-pas-media`.
  * JAMAIS la relation, la nature, la protection (`src:`, étiquettes
  * verrouillées), ni aucune suppression de fiche ou de contact. Une étiquette
@@ -139,14 +142,17 @@ class CrmPresseClasserMedias extends Command
         }
         $this->workspaceId = (string) $workspaceId;
 
-        $lecteur = new LecturePageAccueil($concurrence, $timeout, $delai);
+        // Le conteneur peut fournir le lecteur (tests : attente observée).
+        $lecteur = app()->bound(LecturePageAccueil::class)
+            ? app(LecturePageAccueil::class)
+            : new LecturePageAccueil($concurrence, $timeout, $delai);
         $sansReseau = (bool) $this->option('sans-reseau');
         $reclasser = (bool) $this->option('reclasser');
 
         $this->cacheHotes = [];
         $this->bilan = array_fill_keys([
             'fiches_lues', 'paquets', 'sites_lus', 'sans_site', 'robots_interdits', 'sites_injoignables',
-            'hotes_deja_lus', 'classements_ecrits', 'classements_inchanges', 'lus_sur_site_gardes',
+            'sites_illisibles', 'pages_deja_lues', 'classements_ecrits', 'classements_inchanges', 'lus_sur_site_gardes',
             'etiquettes_media_ajoutees', 'etiquettes_media_retirees',
         ], 0);
 
@@ -261,16 +267,19 @@ class CrmPresseClasserMedias extends Command
         // 1. Lire les sites (HORS transaction : aucun verrou tenu pendant le réseau).
         $bases = [];
         foreach ($fiches as $f) {
-            $base = LecturePageAccueil::base(is_string($f->website) ? $f->website : null);
+            // L'URL du MÉDIA d'abord (chemin compris : france.tv/france-5/…,
+            // actu.fr/lyon), à défaut le site de la fiche.
+            $cible = null;
             foreach ($f->medias as $m) {
-                $base ??= LecturePageAccueil::base(is_string($m->website) ? $m->website : null);
+                $cible ??= LecturePageAccueil::cible(is_string($m->website) ? $m->website : null);
             }
-            $f->base = $base;
-            if ($base !== null && ! $sansReseau) {
-                if (isset($this->cacheHotes[$base]) || isset($bases[$base])) {
-                    $this->bilan['hotes_deja_lus']++;
+            $cible ??= LecturePageAccueil::cible(is_string($f->website) ? $f->website : null);
+            $f->base = $cible;
+            if ($cible !== null && ! $sansReseau) {
+                if (isset($this->cacheHotes[$cible]) || isset($bases[$cible])) {
+                    $this->bilan['pages_deja_lues']++;
                 } else {
-                    $bases[$base] = true;
+                    $bases[$cible] = true;
                 }
             }
         }
@@ -325,6 +334,11 @@ class CrmPresseClasserMedias extends Command
             } elseif ($statut === LecturePageAccueil::STATUT_ROBOTS) {
                 $lecture = ClassementMedia::LECTURE_ROBOTS;
                 $this->compter($delta, 'robots_interdits');
+            } elseif ($statut === LecturePageAccueil::STATUT_ILLISIBLE) {
+                // Trop grosse, type refusé, encodage inconnu : classée par son
+                // nom ET marquée — sautée à la relance, jamais relue en boucle.
+                $lecture = ClassementMedia::LECTURE_ILLISIBLE;
+                $this->compter($delta, 'sites_illisibles');
             } else {
                 $lecture = ClassementMedia::LECTURE_INJOIGNABLE;
                 $this->compter($delta, 'sites_injoignables');

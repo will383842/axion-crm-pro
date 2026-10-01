@@ -109,11 +109,15 @@ final class Taxonomy
     /**
      * CLASSEMENT DES MÉDIAS (chantier F, 2026-10-01) — thème lu sur la page
      * d'accueil du média (ou, sans site, dans son nom) par
-     * `App\Crm\Presse\ClassementMedia` : `media-theme:<valeur>`, plusieurs
+     * `App\Crm\Presse\ClassementMedia` : `media-sujet:<valeur>`, plusieurs
      * possibles. `inconnu` : aucun signal suffisant — on n'invente rien.
      *
+     * Namespace DISTINCT de `media-theme:` (relecture A09 de #270) : celui-ci
+     * reste le thème éditorial DONNÉ PAR LA SOURCE (`EtiquettesMedia`, slug
+     * libre) ; les deux ne peuvent plus se confondre sous un même slug.
+     *
      * Le secteur couvert par une presse professionnelle s'ajoute en
-     * `media-theme:secteur-<clé de SECTEURS>` (`ClassementMedia::SECTEURS`).
+     * `media-sujet:secteur-<clé de SECTEURS>` (`ClassementMedia::SECTEURS`).
      *
      * @var array<string, string>
      */
@@ -542,10 +546,11 @@ final class Taxonomy
         // NAF 63.12Z / 58.19Z (`App\Crm\Presse\MediaIncertain`) — dérivée,
         // posée et retirée par la synchro automatique ; à vérifier (chantier F).
         'media-possible' => 'custom',
-        // Classement des médias (chantier F, 2026-10-01) : public visé et
-        // format TV, DÉRIVÉS du classement gardé dans
+        // Classement des médias (chantier F, 2026-10-01) : sujets, public visé
+        // et format TV, DÉRIVÉS du classement gardé dans
         // `companies.metadata.classement_media` (`App\Crm\Presse\ClassementMedia`),
         // posés et retirés par la même synchro automatique.
+        'media-sujet' => 'custom',
         'media-public' => 'custom',
         'media-format' => 'custom',
     ];

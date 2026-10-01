@@ -225,67 +225,82 @@ final class LecturePageAccueil
     public static function robotsAutorise(string $contenu, string $agent, string $chemin): array
     {
         $agent = strtolower($agent);
-        /** @var list<array{agents: list<string>, regles: list<array{bool, string}>, delai: float}> $groupes */
-        $groupes = [];
-        $courant = null;
+        // Trois tableaux parallèles, un indice par groupe `User-agent`.
+        /** @var list<list<string>> $agents */
+        $agents = [];
+        /** @var array<int, list<array{autorise: bool, motif: string}>> $regles */
+        $regles = [];
+        /** @var array<int, float> $delais */
+        $delais = [];
+        $courant = -1;
         $dansAgents = false;
-        foreach (preg_split('/\r\n|\r|\n/', $contenu) ?: [] as $ligne) {
+        foreach (preg_split('/
+||
+/', $contenu) ?: [] as $ligne) {
             $ligne = trim((string) preg_replace('/#.*$/', '', $ligne));
-            if ($ligne === '' || ! str_contains($ligne, ':')) {
+            $deuxPoints = strpos($ligne, ':');
+            if ($ligne === '' || $deuxPoints === false) {
                 continue;
             }
-            [$cle, $valeur] = array_map('trim', explode(':', $ligne, 2));
-            $cle = strtolower($cle);
+            $cle = strtolower(trim(substr($ligne, 0, $deuxPoints)));
+            $valeur = trim(substr($ligne, $deuxPoints + 1));
             if ($cle === 'user-agent') {
-                if (! $dansAgents || $courant === null) {
-                    $groupes[] = ['agents' => [], 'regles' => [], 'delai' => 0.0];
-                    $courant = count($groupes) - 1;
+                if (! $dansAgents || $courant < 0) {
+                    $agents[] = [];
+                    $courant = count($agents) - 1;
+                    $regles[$courant] = [];
+                    $delais[$courant] = 0.0;
                 }
-                $groupes[$courant]['agents'][] = strtolower($valeur);
+                $agents[$courant][] = strtolower($valeur);
                 $dansAgents = true;
 
                 continue;
             }
             $dansAgents = false;
-            if ($courant === null) {
+            if ($courant < 0) {
                 continue;
             }
             if ($cle === 'allow' || $cle === 'disallow') {
                 if ($valeur !== '') {
-                    $groupes[$courant]['regles'][] = [$cle === 'allow', $valeur];
+                    $regles[$courant][] = ['autorise' => $cle === 'allow', 'motif' => $valeur];
                 }
             } elseif ($cle === 'crawl-delay' && is_numeric($valeur)) {
-                $groupes[$courant]['delai'] = max(0.0, (float) $valeur);
+                $delais[$courant] = max(0.0, (float) $valeur);
             }
         }
 
-        $retenus = array_values(array_filter($groupes, static function (array $g) use ($agent): bool {
-            foreach ($g['agents'] as $a) {
+        $retenus = [];
+        foreach ($agents as $i => $liste) {
+            foreach ($liste as $a) {
                 if ($a !== '*' && $a !== '' && str_contains($agent, $a)) {
-                    return true;
+                    $retenus[] = $i;
+                    break;
                 }
             }
-
-            return false;
-        }));
+        }
         if ($retenus === []) {
-            $retenus = array_values(array_filter($groupes, static fn (array $g): bool => in_array('*', $g['agents'], true)));
+            foreach ($agents as $i => $liste) {
+                if (in_array('*', $liste, true)) {
+                    $retenus[] = $i;
+                }
+            }
         }
 
         $meilleur = -1;
         $autorise = true;
         $delai = 0.0;
-        foreach ($retenus as $g) {
-            $delai = max($delai, $g['delai']);
-            foreach ($g['regles'] as [$allow, $motif]) {
+        foreach ($retenus as $i) {
+            $delai = max($delai, $delais[$i] ?? 0.0);
+            foreach ($regles[$i] ?? [] as $regle) {
+                $motif = $regle['motif'];
                 $regex = '#^' . str_replace(['\*', '\$'], ['.*', '$'], preg_quote($motif, '#')) . '#';
                 if (preg_match($regex, $chemin) !== 1) {
                     continue;
                 }
                 $longueur = strlen($motif);
-                if ($longueur > $meilleur || ($longueur === $meilleur && $allow)) {
+                if ($longueur > $meilleur || ($longueur === $meilleur && $regle['autorise'])) {
                     $meilleur = $longueur;
-                    $autorise = $allow;
+                    $autorise = $regle['autorise'];
                 }
             }
         }
@@ -366,7 +381,7 @@ final class LecturePageAccueil
             if (count($sortie) >= $max) {
                 break;
             }
-            $t = trim((string) preg_replace('/\s+/u', ' ', $noeud->textContent));
+            $t = trim((string) preg_replace('/\s+/u', ' ', (string) $noeud->nodeValue));
             if ($t !== '') {
                 $sortie[] = mb_substr($t, 0, $longueur);
             }

@@ -466,8 +466,8 @@ final class ClassementMedia
             arsort($parFormat);
             $valeurs = array_values($parFormat);
             $meilleur = (string) array_key_first($parFormat);
-            $premier = $valeurs[0] ?? 0;
-            $format = ($premier >= self::SEUIL && $premier > 2 * ($valeurs[1] ?? 0)) ? $meilleur : self::INCONNU;
+            $premier = $valeurs[0];
+            $format = ($premier >= self::SEUIL && $premier > 2 * $valeurs[1]) ? $meilleur : self::INCONNU;
         }
         if ($format === 'fiction-jeu') {
             $themes = array_values(array_intersect($themes, self::THEMES_GARDES_PAR_FICTION));

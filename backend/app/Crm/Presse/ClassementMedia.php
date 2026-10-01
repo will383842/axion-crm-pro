@@ -663,13 +663,11 @@ final class ClassementMedia
 
     /**
      * Score, nombre de mots-clés DISTINCTS trouvés, et signal FORT (un mot
-     * trouvé dans le nom ou le titre).
+     * trouvé dans le nom ou le titre). `mots` ne compte que les mots trouvés
+     * HORS du corps de page (nom, titre, menu) ; `tous` les compte partout.
      *
      * @param  array<string, string>  $zones
      * @param  array<string, int>  $mots
-     * `mots` ne compte que les mots trouvés HORS du corps de page (nom, titre,
-     * menu) ; `tous` les compte partout.
-     *
      * @return array{score: int, mots: int, tous: int, fort: bool}
      */
     public static function analyse(array $zones, array $mots, bool $plafonnerTexte = true): array

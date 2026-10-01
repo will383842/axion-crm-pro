@@ -54,7 +54,9 @@ import {
   THEME_MEDIA_PRESETS,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
+  MOTIFS_PRESSE_ECARTEE,
   avecExclusions,
+  criteresAudiencePresse,
   criteresMedias,
   exclusions,
 } from './presse';
@@ -132,6 +134,8 @@ interface BuilderForm {
 interface PreviewResponse {
   companies: number;
   contacts: number;
+  /** Audience presse : adresses écartées par leur provenance, par motif. */
+  presse_ecartees?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +186,8 @@ export function AudienceBuilderPage() {
   const [formatsMedia, setFormatsMedia] = useState<string[]>([]);
   const [exclNatures, setExclNatures] = useState<string[]>([]);
   const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
+  // Audience presse (01/10/2026) : la presse, et seulement elle.
+  const [audiencePresse, setAudiencePresse] = useState<boolean>(false);
 
   // Build criteria
   const criteria = useMemo<AudienceCriteria>(() => {
@@ -201,10 +207,14 @@ export function AudienceBuilderPage() {
       .split(/[,\s]+/)
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
+    const medias = criteresMedias(typesMedia, zonesMedia, { themes: themesMedia, publics: publicsMedia, formats: formatsMedia });
+    if (audiencePresse) {
+      return criteresAudiencePresse({ departements: departments, regions, etiquettes: tagList }, medias, exclTypesMedia);
+    }
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
     if (listesIncluses.length > 0) all.push({ field: 'liste_manuelle', op: 'in', value: listesIncluses.map(Number) });
     if (listesExclues.length > 0) all.push({ field: 'liste_manuelle', op: 'not_in', value: listesExclues.map(Number) });
-    all.push(...criteresMedias(typesMedia, zonesMedia, { themes: themesMedia, publics: publicsMedia, formats: formatsMedia }));
+    all.push(...medias);
 
     const criteres = construireCriteres(all, {
       relationsVisees,
@@ -221,6 +231,7 @@ export function AudienceBuilderPage() {
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
     relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
     typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
+    audiencePresse,
   ]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
@@ -498,10 +509,20 @@ export function AudienceBuilderPage() {
           {/* Presse et médias : étiquettes `media-type:` / `media-zone:` / `media-sujet:` / `media-public:` / `media-format:` */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Les fiches de presse harmonisées sont protégées : elles n’entrent dans aucune audience
-              tant que le segment presse n’est pas ouvert. Ces critères visent les fiches de média
-              non protégées (production audiovisuelle…).
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={audiencePresse}
+                onChange={(e) => { setAudiencePresse(e.target.checked); }}
+                className="h-4 w-4 rounded accent-sky-600"
+                aria-describedby="aide-audience-presse"
+              />
+              Audience presse
+            </label>
+            <p id="aide-audience-presse" className="text-[11px] text-slate-500 dark:text-slate-400">
+              {audiencePresse
+                ? 'Cette audience vise uniquement la presse : seuls la géographie, les étiquettes et les critères ci-dessous s’appliquent. Seules les adresses de provenance fiable sont retenues (jamais une adresse tirée d’un site deviné).'
+                : 'Sans cette case, aucune fiche de presse n’entre dans l’audience : ces critères visent alors les fiches de média non protégées (production audiovisuelle…).'}
             </p>
             <Field label="Types de média">
               <ChipsMultiSelect
@@ -695,6 +716,15 @@ export function AudienceBuilderPage() {
               <div className="grid grid-cols-2 gap-3">
                 <PreviewStat label="Entreprises" value={preview.companies} tone="sky" />
                 <PreviewStat label="Contacts"    value={preview.contacts}  tone="violet" />
+                {preview.presse_ecartees !== undefined ? (
+                  <ul className="col-span-2 space-y-1 text-xs text-slate-600 dark:text-slate-300" aria-label="Adresses de presse écartées">
+                    {Object.entries(preview.presse_ecartees).map(([motif, n]) => (
+                      <li key={motif}>
+                        {MOTIFS_PRESSE_ECARTEE[motif] ?? motif} : {n.toLocaleString('fr-FR')} adresse(s) écartée(s)
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ) : (
               <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">

@@ -86,6 +86,11 @@ final class AdressePresseFiable
 
     public const JOURNALISTE_SANS_ACCES = 'journaliste_sans_acces';
 
+    public const JOURNALISTE_RETIRE = 'journaliste_retire';
+
+    /** Les motifs de refus, dans l'ordre où on les dit. @var list<string> */
+    public const MOTIFS = [self::SITE_DEVINE, self::JOURNALISTE_SANS_ACCES, self::JOURNALISTE_RETIRE];
+
     /**
      * La provenance d'une occurrence, ou son motif de refus.
      *
@@ -175,18 +180,78 @@ final class AdressePresseFiable
      * (`companies.metadata.emails_liste_presse`, sans doublon). Additif : rien
      * n'est retiré.
      */
-    public static function retenirEmailListe(int $companyId, string $email): void
+    public static function retenirEmailListe(int $companyId, string $email): int
     {
         $cle = QualificationEmail::normaliser($email);
         if ($cle === '') {
-            return;
+            return 0;
         }
         $champ = self::CLE_EMAILS_LISTE;
-        DB::update(
+
+        return DB::update(
             "UPDATE companies SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{{$champ}}',"
             . " COALESCE(metadata->'{$champ}', '[]'::jsonb) || to_jsonb(?::text))"
             . " WHERE id = ? AND NOT (COALESCE(metadata->'{$champ}', '[]'::jsonb) @> to_jsonb(ARRAY[?::text]))",
             [$cle, $companyId, $cle],
         );
+    }
+
+    // ── La MÊME règle en SQL, pour les audiences (aperçu, comptes,
+    // rafraîchissement) : `juger()` en est le miroir en mémoire, et les tests
+    // jouent les deux. Aucun argument n'est une donnée utilisateur ; alias
+    // internes `apf_*` réservés.
+
+    /** SQL : cette adresse est SÛRE pour la fiche (liste presse, ou source presse au site non deviné). */
+    public static function emailSurSql(string $emailExpr, string $colonneId, string $aliasFiche): string
+    {
+        $motif = self::PREFIXE_SITE_DEVINE . '%';
+        $sources = "'" . implode("','", self::SOURCES_PRESSE) . "'";
+        $cle = "lower(trim({$emailExpr}::text))";
+
+        return "(EXISTS (SELECT 1 FROM media apf_s WHERE apf_s.company_id = {$colonneId} AND apf_s.deleted_at IS NULL"
+            . " AND apf_s.source IN ({$sources}) AND COALESCE(apf_s.website_method, '') NOT LIKE '{$motif}'"
+            . " AND lower(apf_s.email::text) = {$cle})"
+            . " OR COALESCE({$aliasFiche}.metadata -> '" . self::CLE_EMAILS_LISTE . "', '[]'::jsonb) @> jsonb_build_array({$cle}))";
+    }
+
+    /** SQL : le site de la fiche est fiable (vérifié, ou jamais deviné). */
+    public static function ficheFiableSql(string $colonneId, string $aliasFiche): string
+    {
+        return '(' . self::siteVerifieSql($aliasFiche) . ' OR NOT ' . self::siteDevineSql($colonneId, $aliasFiche) . ')';
+    }
+
+    /** SQL : l'adresse générique de la fiche est de provenance fiable. */
+    public static function generiqueFiableSql(string $colonneId, string $aliasFiche): string
+    {
+        return '(' . self::emailSurSql("{$aliasFiche}.email_generic", $colonneId, $aliasFiche)
+            . ' OR ' . self::ficheFiableSql($colonneId, $aliasFiche) . ')';
+    }
+
+    /** SQL : le journaliste source de ce contact est opposé ou à la corbeille. */
+    public static function journalisteRetireSql(string $aliasContact): string
+    {
+        return "EXISTS (SELECT 1 FROM journalists apf_j WHERE {$aliasContact}.external_ref = 'journaliste:' || apf_j.id"
+            . ' AND (apf_j.opt_out OR apf_j.deleted_at IS NOT NULL))';
+    }
+
+    /**
+     * SQL : le MOTIF qui écarte l'adresse de ce contact (`journaliste_retire`,
+     * `journaliste_sans_acces`, `site_devine`), NULL si elle est fiable.
+     */
+    public static function motifContactSql(string $aliasContact, string $colonneId, string $aliasFiche): string
+    {
+        $presse = GardePresse::estContactPresseSql($aliasContact);
+        $acces = "COALESCE({$aliasContact}.metadata ->> 'acces', '') = '" . self::ACCES_DIFFUSABLE . "'";
+
+        return "(CASE WHEN {$presse} THEN (CASE WHEN " . self::journalisteRetireSql($aliasContact) . " THEN '" . self::JOURNALISTE_RETIRE . "'"
+            . " WHEN {$acces} THEN NULL ELSE '" . self::JOURNALISTE_SANS_ACCES . "' END)"
+            . ' WHEN ' . self::emailSurSql("{$aliasContact}.email", $colonneId, $aliasFiche) . ' OR ' . self::ficheFiableSql($colonneId, $aliasFiche)
+            . " THEN NULL ELSE '" . self::SITE_DEVINE . "' END)";
+    }
+
+    /** SQL : l'adresse de ce contact est de provenance fiable. */
+    public static function contactFiableSql(string $aliasContact, string $colonneId, string $aliasFiche): string
+    {
+        return '(' . self::motifContactSql($aliasContact, $colonneId, $aliasFiche) . ' IS NULL)';
     }
 }

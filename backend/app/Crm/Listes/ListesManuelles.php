@@ -43,11 +43,12 @@ use Illuminate\Support\Facades\DB;
  *    pas non plus entrer son organisation.
  *
  * Choix du 01/10/2026, à l'ouverture de la presse : une liste manuelle
- * continue de REFUSER un journaliste. La presse a sa porte UNIQUE,
- * `crm:campagne:destinataires presse`, la seule qui juge la PROVENANCE de
- * chaque adresse (`AdressePresseFiable`) ; une liste manuelle ouverte à la
- * presse ferait entrer, par une audience, des adresses tirées d'un site
- * deviné. Ouvrir ou fermer le segment ne change donc rien ici.
+ * continue de REFUSER un journaliste. La presse a ses portes à elle — le
+ * segment presse et l'audience presse (critère `segment eq presse`) —, les
+ * seules qui jugent la PROVENANCE de chaque adresse (`AdressePresseFiable`) ;
+ * une liste manuelle ouverte à la presse ferait entrer, par une audience
+ * ordinaire, des adresses tirées d'un site deviné. Ouvrir ou fermer le
+ * segment ne change donc rien ici.
  */
 final class ListesManuelles
 {

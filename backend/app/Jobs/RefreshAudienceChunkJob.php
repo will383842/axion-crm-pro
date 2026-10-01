@@ -7,7 +7,6 @@ use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
-use App\Services\Triage\TriageAutoService;
 use App\Support\WaterfallSentry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -96,40 +95,11 @@ class RefreshAudienceChunkJob implements ShouldQueue
                 return;
             }
 
-            // Sprint H8 — élargi contactable (valid|catchall|unknown).
-            // INSERT ... ON CONFLICT DO NOTHING via DB direct (~x5 vs Eloquent)
-            $contactRows = DB::table('contacts')
-                ->whereIn('company_id', $companyIds)
-                ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
-                // Jamais un journaliste dans une audience (`GardePresse`).
-                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
-                ->select('id', 'company_id')
-                ->get();
-
-            $contactsByCompany = $contactRows->groupBy('company_id');
-            $rows = [];
-            foreach ($companyIds as $companyId) {
-                $contacts = $contactsByCompany->get($companyId, collect());
-                if ($contacts->isEmpty()) {
-                    $rows[] = [
-                        'audience_id' => $audience->id,
-                        'company_id' => $companyId,
-                        'contact_id' => null,
-                        'workspace_id' => $audience->workspace_id,
-                        'added_at' => now(),
-                    ];
-                } else {
-                    foreach ($contacts as $c) {
-                        $rows[] = [
-                            'audience_id' => $audience->id,
-                            'company_id' => $companyId,
-                            'contact_id' => $c->id,
-                            'workspace_id' => $audience->workspace_id,
-                            'added_at' => now(),
-                        ];
-                    }
-                }
-            }
+            // Une seule définition des membres, partagée avec `refresh()`
+            // (`AudienceBuilderService::lignesMembres`) : jamais un
+            // journaliste hors d'une audience presse (`GardePresse`), et dans
+            // une audience presse, les seules adresses de provenance fiable.
+            $rows = $builder->lignesMembres($audience, array_map(static fn ($id): int => (int) $id, $companyIds));
 
             DB::table('audience_members')->insertOrIgnore($rows);
         } catch (\Throwable $e) {

@@ -17,9 +17,11 @@ use Illuminate\Support\Facades\DB;
  * (`estContactPresseSql`), n'entrent dans AUCUNE audience, liste manuelle,
  * export, waterfall ni segment autre que `presse` — que le segment presse soit
  * ouvert ou fermé. Décision de Will du 01/10/2026 : la presse s'OUVRE, mais
- * un journaliste n'entre que via le segment presse
- * (`crm:campagne:destinataires presse`, `Segments::ouvert(PRESSE)`), où la
- * provenance de chaque adresse est jugée (`AdressePresseFiable`). Une
+ * elle n'entre que par DEUX portes, où la provenance de chaque adresse est
+ * jugée (`AdressePresseFiable`) : le segment presse
+ * (`crm:campagne:destinataires presse`) et l'AUDIENCE PRESSE (critère
+ * `segment eq presse`, `AudienceBuilderService::CHAMP_SEGMENT`), toutes deux
+ * refusées quand le segment est fermé (`Segments::ouvert(PRESSE)`). Une
  * audience de prospection générale ne l'aspire jamais.
  *
  * Pourquoi une garde À PART de `FichesProtegees::exclure` : la protection est

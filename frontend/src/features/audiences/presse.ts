@@ -86,6 +86,40 @@ export function exclusions(choix: { natures: readonly string[]; typesMedia: read
   return not;
 }
 
+/**
+ * L'AUDIENCE PRESSE (ouverture de la presse, 01/10/2026) : le critère
+ * `segment = presse` du bloc `all`. Une audience qui le porte vise la presse
+ * harmonisée et SEULEMENT elle ; le serveur n'en retient que les adresses de
+ * provenance fiable. Sans lui, aucune fiche de presse n'entre dans une audience.
+ */
+export const CRITERE_AUDIENCE_PRESSE: AudienceCondition = { field: 'segment', op: 'eq', value: 'presse' };
+
+/** Les motifs pour lesquels une adresse de presse est écartée, dits en clair. */
+export const MOTIFS_PRESSE_ECARTEE: Record<string, string> = {
+  site_devine: 'Adresse tirée d’un site deviné, non vérifié',
+  journaliste_sans_acces: 'Journaliste sans accès « e-mail de rédaction »',
+  journaliste_retire: 'Journaliste opposé ou retiré',
+};
+
+/**
+ * Les critères d'une audience presse : le critère presse, la géographie, les
+ * étiquettes libres et les critères « Presse et médias ». Les critères de
+ * prospection (statut, relation exclue par défaut, métier…) ne s'y appliquent
+ * pas : ils en retireraient la presse elle-même.
+ */
+export function criteresAudiencePresse(
+  base: { departements: readonly string[]; regions: readonly string[]; etiquettes: readonly string[] },
+  medias: readonly AudienceCondition[],
+  exclTypesMedia: readonly string[],
+): AudienceCriteria {
+  const all: AudienceCondition[] = [CRITERE_AUDIENCE_PRESSE];
+  if (base.departements.length > 0) all.push({ field: 'department_code', op: 'in', value: [...base.departements] });
+  if (base.regions.length > 0) all.push({ field: 'region_code', op: 'in', value: [...base.regions] });
+  if (base.etiquettes.length > 0) all.push({ field: 'tags', op: 'contains_any', value: [...base.etiquettes] });
+  all.push(...medias);
+  return avecExclusions({ all }, exclusions({ natures: [], typesMedia: exclTypesMedia }));
+}
+
 /** Ajoute des exclusions au bloc `not` de critères déjà construits (jamais un `not` vide). */
 export function avecExclusions(criteres: AudienceCriteria, not: readonly AudienceCondition[]): AudienceCriteria {
   if (not.length === 0) return criteres;

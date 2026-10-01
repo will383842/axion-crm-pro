@@ -392,3 +392,28 @@ test('source DECLARATIVE : une fiche existante hors presse est rejetee intacte ;
         // Fiche créée par la ligne : presse.
         ->and(DB::table('companies')->where('foreign_id', 'presse:zz:nouveau')->value('relation_type'))->toBe('presse_media');
 });
+
+test('🔴 rattrapage : rejouer un fichier DÉJÀ importé pose la provenance « liste presse » des adresses de rédaction, sans rien créer d autre', function () {
+    $lignes = [piLigne(), piLigne(['identifiant' => 'presse:zz:hebdo-2', 'nom' => 'ZZ Hebdo fictif', 'type' => 'presse_hebdo',
+        'site' => null, 'email_redaction' => 'redaction@zz-hebdo.example.invalid', 'journaliste' => null])];
+    piImporter($lignes);
+    // L'état des fiches importées AVANT la règle de provenance : pas de trace.
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse'");
+    $volumes = piVolumes();
+
+    $r = piImporter($lignes);
+
+    $listes = DB::table('companies')->whereIn('foreign_id', ['presse:zz:quotidien-1', 'presse:zz:hebdo-2'])->orderBy('foreign_id')
+        ->pluck('metadata')->map(static fn ($m): mixed => json_decode((string) $m, true)['emails_liste_presse'] ?? null)->all();
+    expect($r['code'])->toBe(0)
+        ->and($listes)->toBe([['redaction@zz-hebdo.example.invalid'], ['redaction@zz-quotidien.example.invalid']])
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(2)
+        ->and(piVolumes())->toBe($volumes)
+        ->and(piCompteur($r['sortie'], 'fiches_creees'))->toBe(0)
+        ->and(piCompteur($r['sortie'], 'contacts_crees'))->toBe(0);
+
+    // Idempotent : un troisième passage ne pose plus rien.
+    $r3 = piImporter($lignes);
+    expect(piCompteur($r3['sortie'], 'provenances_liste_retenues'))->toBe(0)
+        ->and(piVolumes())->toBe($volumes);
+});

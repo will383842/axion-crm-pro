@@ -30,12 +30,12 @@ use InvalidArgumentException;
  *  - `presse` : OUVERT (décision de Will du 01/10/2026 ; défini le 30/09) —
  *    les médias et journalistes harmonisés (`crm:presse:harmoniser`,
  *    `crm:presse:importer`), désignés par leur tag de provenance protégé.
- *    Une seule porte : `crm:campagne:destinataires presse`. Et, dans ce
- *    segment, une adresse ne part que si sa PROVENANCE est fiable
+ *    Deux portes : `crm:campagne:destinataires presse` et l'audience presse
+ *    (critère `segment eq presse`). Et, par elles, une adresse ne part que si sa PROVENANCE est fiable
  *    (`AdressePresseFiable` : jamais une adresse tirée d'un site DEVINÉ non
  *    vérifié, jamais un journaliste sans la porte `email_redaction`).
- *    Ouvrir la presse ne la fait entrer dans AUCUN autre chemin : audiences,
- *    listes manuelles, export, waterfall, autres segments l'écartent
+ *    Ouvrir la presse ne la fait entrer dans AUCUN autre chemin : audiences
+ *    ordinaires, listes manuelles, export, waterfall, autres segments l'écartent
  *    toujours (`GardePresse`) — un journaliste n'entre que par SON segment.
  *  - prospects INSEE : FERMÉS tant que Will ne les ouvre pas (volume, chauffe
  *    d'IP).

@@ -206,7 +206,7 @@ class CrmPresseImporter extends Command
             'lignes', 'rejetees', 'paquets',
             'fiches_creees', 'fiches_rattachees', 'titres_rapproches', 'medias_crees', 'medias_completes', 'medias_inchanges',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
-            'emails_redaction_non_poses',
+            'emails_redaction_non_poses', 'provenances_liste_retenues',
             'journalistes_lus', 'journalistes_opposes', 'journalistes_homonymes_autre_adresse', 'journalistes_sur_fiche_d_un_segment_ouvert', 'emails_journalistes_retenus_par_acces', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
             'personnes_ecartees', 'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
@@ -519,7 +519,11 @@ class CrmPresseImporter extends Command
             // segment presse ne fait partir que des adresses de provenance
             // fiable (`AdressePresseFiable`) ; celle-ci l'est même si la fiche
             // porte par ailleurs un site deviné.
-            AdressePresseFiable::retenirEmailListe($companyId, $emailRedaction);
+            // Rejouer un fichier déjà importé la pose aussi (rattrapage) :
+            // rien d'autre n'est écrit, et le compteur le dit.
+            if (AdressePresseFiable::retenirEmailListe($companyId, $emailRedaction) > 0) {
+                $delta['provenances_liste_retenues'] = 1;
+            }
         }
 
         if ($j !== null) {

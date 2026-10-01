@@ -44,7 +44,13 @@ use RuntimeException;
  * dans aucune table, et ne remplace pas la porte finale `EnvoiAutorise` —
  * une audience est une PHOTO, l'éligibilité se repose juste avant d'écrire.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, ecartee: ?string}
+ * AUDIENCE PRESSE (`AudienceBuilderService::estAudiencePresse`, 01/10/2026) :
+ * les personnes de la presse y sont des candidates, et chaque adresse doit en
+ * plus avoir une PROVENANCE fiable (`AdressePresseFiable`) — sinon elle est
+ * exclue pour `site_devine`, `journaliste_sans_acces` ou
+ * `journaliste_retire`, comptée et dite à l'écran.
+ *
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -97,6 +103,7 @@ final class ResolveurDestinataires
             ));
         }
         $exigees = AudienceBuilderService::listesCitees($criteria)['exigees'];
+        $presse = AudienceBuilderService::estAudiencePresse($criteria);
 
         /** @var array<int, array{nom: string, candidats: list<Candidat>}> $organisations */
         $organisations = [];
@@ -104,7 +111,11 @@ final class ResolveurDestinataires
         $occurrences = [];
 
         $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals'])
-            ->chunkById(1000, function (iterable $lot) use ($ws, $reglage, $exigees, &$organisations, &$occurrences): void {
+            ->when($presse, static fn ($q) => $q->selectRaw(
+                AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
+                . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie',
+            ))
+            ->chunkById(1000, function (iterable $lot) use ($ws, $reglage, $exigees, $presse, &$organisations, &$occurrences): void {
                 $fiches = [];
                 foreach ($lot as $f) {
                     if ($f instanceof Company) {
@@ -118,19 +129,28 @@ final class ResolveurDestinataires
                     ->whereIn('company_id', $ids)
                     ->whereNotNull('email')
                     // Une personne de la presse n'est JAMAIS une adresse
-                    // candidate d'une audience (segment presse ouvert ou non) — même sur
-                    // une fiche non-presse, même cochée dans une liste exigée
-                    // (garde PAR CONTACT, `GardePresse`). La fiche de presse,
-                    // elle, est déjà écartée par `buildPublicQuery`.
-                    ->whereRaw(GardePresse::conditionContactsSql('contacts'))
+                    // candidate d'une audience ordinaire — même sur une fiche
+                    // non-presse, même cochée dans une liste exigée (garde PAR
+                    // CONTACT, `GardePresse`). La fiche de presse, elle, est
+                    // déjà écartée par `buildPublicQuery`. Dans une audience
+                    // presse, elle l'est, et sa provenance est jugée.
+                    ->when(! $presse, static fn ($q) => $q->whereRaw(GardePresse::conditionContactsSql('contacts')))
                     ->orderBy('id')
-                    ->get(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at'])
+                    ->select(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at'])
+                    ->when($presse, static fn ($q) => $q->selectRaw(
+                        GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
+                        . AdressePresseFiable::journalisteRetireSql('contacts') . ' AS journaliste_retire',
+                    ))
+                    ->get()
                     ->groupBy('company_id');
                 $cochees = $reglage->personnesListees ? ListesManuelles::personnesMembres($exigees, $ids) : [];
 
                 foreach ($fiches as $f) {
                     $id = (int) $f->getAttribute('id');
                     $candidats = $this->candidats($f->getAttributes(), $contacts->get($id, collect())->all(), $reglage, $cochees);
+                    if ($presse) {
+                        $candidats = $this->avecProvenance($id, $f->getAttributes(), $contacts->get($id, collect())->all(), $candidats);
+                    }
                     $organisations[$id] = ['nom' => (string) $f->getAttribute('denomination'), 'candidats' => $candidats];
                     foreach ($candidats as $c) {
                         $occurrences[$c['email']][] = $c;
@@ -141,7 +161,8 @@ final class ResolveurDestinataires
         // ── Le verdict, UNE fois par adresse, sur toutes ses occurrences ──────
         $verdicts = [];
         foreach ($occurrences as $email => $occ) {
-            $verdicts[(string) $email] = EligibiliteAdresse::motif((string) $email, $occ);
+            $verdicts[(string) $email] = ($presse ? self::motifProvenance($occ) : null)
+                ?? EligibiliteAdresse::motif((string) $email, $occ);
         }
         if (! $reglage->avecAdressesPartagees) {
             $eligibles = array_keys(array_filter($verdicts, static fn (?string $m): bool => $m === null));
@@ -232,7 +253,69 @@ final class ResolveurDestinataires
         $exclues = array_diff_key($exclues, $retenues);
         $ecartees = array_diff_key($ecartees, $retenues, $exclues);
 
-        return $this->bilan($reglage, count($organisations), $avecDestinataire, $retenues, $exclues, $ecartees, $echantillon);
+        return $this->bilan($reglage, count($organisations), $avecDestinataire, $retenues, $exclues, $ecartees, $echantillon, $presse);
+    }
+
+    /**
+     * Audience presse : la provenance de chaque candidate
+     * (`AdressePresseFiable::juger`, la même règle que
+     * `crm:campagne:destinataires presse`).
+     *
+     * @param  array<string, mixed>  $fiche
+     * @param  array<array-key, \stdClass>  $contacts
+     * @param  list<Candidat>  $candidats
+     * @return list<Candidat>
+     */
+    private function avecProvenance(int $id, array $fiche, array $contacts, array $candidats): array
+    {
+        $base = [
+            'site_devine' => (bool) ($fiche['site_devine'] ?? false),
+            'site_verifie' => (bool) ($fiche['site_verifie'] ?? false),
+            'emails_surs' => AdressePresseFiable::emailsSurs($id),
+        ];
+        $parContact = [];
+        foreach ($contacts as $c) {
+            $parContact['contact:' . (int) $c->id] = $c;
+        }
+        foreach ($candidats as $i => $c) {
+            $ct = $parContact[$c['crm_ref']] ?? null;
+            $meta = $ct !== null ? json_decode(is_string($ct->metadata ?? null) ? $ct->metadata : '{}', true) : null;
+            $acces = is_array($meta) && is_string($meta['acces'] ?? null) ? $meta['acces'] : null;
+            [$fiable, $provenance] = AdressePresseFiable::juger($c['email'], $base + [
+                'presse' => $ct !== null && (bool) ($ct->est_presse ?? false),
+                'acces' => $acces,
+            ]);
+            $candidats[$i]['provenance'] = $provenance;
+            $candidats[$i]['provenance_fiable'] = $fiable;
+            $candidats[$i]['journaliste_retire'] = $ct !== null && (bool) ($ct->journaliste_retire ?? false);
+        }
+
+        return $candidats;
+    }
+
+    /**
+     * Le motif de PROVENANCE qui exclut une adresse d'une audience presse, ou
+     * null : un journaliste retiré derrière elle l'exclut ; sinon il faut au
+     * moins une occurrence fiable.
+     *
+     * @param  list<Candidat>  $occ
+     */
+    private static function motifProvenance(array $occ): ?string
+    {
+        $fiable = false;
+        $sansAcces = false;
+        foreach ($occ as $o) {
+            if (($o['journaliste_retire'] ?? false) === true) {
+                return AdressePresseFiable::JOURNALISTE_RETIRE;
+            }
+            $fiable = $fiable || ($o['provenance_fiable'] ?? false) === true;
+            $sansAcces = $sansAcces || ($o['provenance'] ?? null) === AdressePresseFiable::JOURNALISTE_SANS_ACCES;
+        }
+        if ($fiable) {
+            return null;
+        }
+
+        return $sansAcces ? AdressePresseFiable::JOURNALISTE_SANS_ACCES : AdressePresseFiable::SITE_DEVINE;
     }
 
     /**
@@ -365,7 +448,7 @@ final class ResolveurDestinataires
      * @param  array<string, string>  $ecartees
      * @return array<string, mixed>
      */
-    private function bilan(ReglageDestinataires $reglage, int $organisations, int $avecDestinataire, array $retenues, array $exclues, array $ecartees, ?int $echantillon): array
+    private function bilan(ReglageDestinataires $reglage, int $organisations, int $avecDestinataire, array $retenues, array $exclues, array $ecartees, ?int $echantillon, bool $presse = false): array
     {
         /** @var array<string, int> $parType */
         $parType = [self::GENERIQUE => 0, self::NOMINATIVE => 0];
@@ -396,6 +479,10 @@ final class ResolveurDestinataires
         }
 
         $parMotif = array_fill_keys(array_values(array_diff(EligibiliteAdresse::MOTIFS, [EligibiliteAdresse::DEJA_INFORMEE])), 0);
+        if ($presse) {
+            // Audience presse : les motifs de provenance, toujours dits.
+            $parMotif += array_fill_keys(AdressePresseFiable::MOTIFS, 0);
+        }
         foreach ($exclues as $motif) {
             $parMotif[$motif] = ($parMotif[$motif] ?? 0) + 1;
         }

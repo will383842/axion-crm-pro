@@ -206,7 +206,7 @@ class AudienceBuilderService
      * (La lecture `DB::table('contacts')` ci-dessous est celle qui vivait dans
      * `RefreshAudienceChunkJob` jusqu'au 2026-10-01.)
      *
-     * @param  list<int>  $companyIds
+     * @param  array<int>  $companyIds
      * @return list<array{audience_id: int, company_id: int, contact_id: int|null, workspace_id: string, added_at: mixed}>
      */
     public function lignesMembres(EmailAudience $audience, array $companyIds): array
@@ -214,8 +214,8 @@ class AudienceBuilderService
         if ($companyIds === []) {
             return [];
         }
-        $criteres = is_array($audience->criteria) ? $audience->criteria : [];
-        $presse = self::estAudiencePresse($criteres);
+        $criteres = $audience->getAttribute('criteria');
+        $presse = self::estAudiencePresse(is_array($criteres) ? $criteres : []);
 
         $contacts = DB::table('contacts')
             ->whereIn('contacts.company_id', $companyIds)

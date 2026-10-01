@@ -692,12 +692,6 @@ parameters:
 			path: app/Services/Audiences/AudienceBuilderService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
 			message: '#^Method App\\Services\\Audiences\\AudienceBuilderService\:\:applyCondition\(\) has parameter \$cond with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1

@@ -587,6 +587,9 @@ final class LecturePageAccueil
             if (count($corps) >= 40) {
                 break;
             }
+            if (! $p instanceof \DOMNode) {
+                continue;
+            }
             $morceaux = $xp->query('.//text()[not(ancestor::a)]', $p);
             $t = '';
             foreach ($morceaux === false ? [] : $morceaux as $n) {

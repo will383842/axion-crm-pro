@@ -151,6 +151,7 @@ class CrmCampagneDestinataires extends Command
         }
         $famillesExclues = $avecSyndicats ? [] : Taxonomy::FEDERATION_FAMILLES_HORS_CAMPAGNE;
 
+        /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
             'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',

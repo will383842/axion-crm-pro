@@ -45,7 +45,9 @@ use RuntimeException;
  * une audience est une PHOTO, l'éligibilité se repose juste avant d'écrire.
  *
  * AUDIENCE PRESSE (`AudienceBuilderService::estAudiencePresse`, 01/10/2026) :
- * les personnes de la presse y sont des candidates, et chaque adresse doit en
+ * les candidates sont la boîte générique de la fiche et les personnes de la
+ * presse — JAMAIS un autre contact (GOFAB, organisateur, prospection) ni un
+ * canal typé de la fiche (relecture A09) —, et chaque adresse doit en
  * plus avoir une PROVENANCE fiable (`AdressePresseFiable`) — sinon elle est
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
@@ -135,6 +137,7 @@ final class ResolveurDestinataires
                     // déjà écartée par `buildPublicQuery`. Dans une audience
                     // presse, elle l'est, et sa provenance est jugée.
                     ->when(! $presse, static fn ($q) => $q->whereRaw(GardePresse::conditionContactsSql('contacts')))
+                    ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
                     ->orderBy('id')
                     ->select(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at'])
                     ->when($presse, static fn ($q) => $q->selectRaw(
@@ -147,7 +150,7 @@ final class ResolveurDestinataires
 
                 foreach ($fiches as $f) {
                     $id = (int) $f->getAttribute('id');
-                    $candidats = $this->candidats($f->getAttributes(), $contacts->get($id, collect())->all(), $reglage, $cochees);
+                    $candidats = $this->candidats($f->getAttributes(), $contacts->get($id, collect())->all(), $reglage, $cochees, $presse);
                     if ($presse) {
                         $candidats = $this->avecProvenance($id, $f->getAttributes(), $contacts->get($id, collect())->all(), $candidats);
                     }
@@ -160,6 +163,15 @@ final class ResolveurDestinataires
 
         // ── Le verdict, UNE fois par adresse, sur toutes ses occurrences ──────
         $verdicts = [];
+        // Audience presse : les adresses écartées par leur PROVENANCE, sur
+        // TOUTES les candidates, quel que soit le réglage — la définition de
+        // `AudienceBuilderService::previewPresse` (relecture A09).
+        $presseEcartees = $presse ? array_fill_keys(AdressePresseFiable::MOTIFS, 0) : null;
+        foreach ($occurrences as $email => $occ) {
+            if ($presseEcartees !== null && ($m = self::motifProvenance($occ)) !== null) {
+                $presseEcartees[$m]++;
+            }
+        }
         foreach ($occurrences as $email => $occ) {
             $verdicts[(string) $email] = ($presse ? self::motifProvenance($occ) : null)
                 ?? EligibiliteAdresse::motif((string) $email, $occ);
@@ -253,7 +265,12 @@ final class ResolveurDestinataires
         $exclues = array_diff_key($exclues, $retenues);
         $ecartees = array_diff_key($ecartees, $retenues, $exclues);
 
-        return $this->bilan($reglage, count($organisations), $avecDestinataire, $retenues, $exclues, $ecartees, $echantillon, $presse);
+        $bilan = $this->bilan($reglage, count($organisations), $avecDestinataire, $retenues, $exclues, $ecartees, $echantillon, $presse);
+        if ($presseEcartees !== null) {
+            $bilan['presse_ecartees'] = $presseEcartees;
+        }
+
+        return $bilan;
     }
 
     /**
@@ -327,7 +344,7 @@ final class ResolveurDestinataires
      * @param  array<int, true>  $cochees
      * @return list<Candidat>
      */
-    private function candidats(array $fiche, array $contacts, ReglageDestinataires $reglage, array $cochees): array
+    private function candidats(array $fiche, array $contacts, ReglageDestinataires $reglage, array $cochees, bool $presse = false): array
     {
         $id = (int) $fiche['id'];
         $signals = json_decode(is_string($fiche['signals'] ?? null) ? $fiche['signals'] : '{}', true);
@@ -348,7 +365,9 @@ final class ResolveurDestinataires
         }
 
         // Canaux typés (#255) : la liste `emails` et les clés de `details`.
-        $canaux = is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
+        // Audience presse : aucun — seules la boîte générique et les
+        // personnes de la presse y sont candidates.
+        $canaux = ! $presse && is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
         $details = [];
         foreach (is_array($canaux['details'] ?? null) ? $canaux['details'] : [] as $cle => $d) {
             $details[QualificationEmail::normaliser((string) $cle)] = is_array($d) ? $d : [];

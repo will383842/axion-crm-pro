@@ -120,7 +120,8 @@ class CrmPresseImporter extends Command
                             {--dry-run : Tout parcourir paquet par paquet, annuler chaque paquet, et afficher le bilan}
                             {--limite= : Ne traiter que les N premières lignes (import par étapes)}
                             {--paquet=500 : Lignes validées par transaction : borne les verrous tenus}
-                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}';
+                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
+                            {--provenance-seulement : Rattrapage : sur des lignes DÉJÀ importées, ne poser QUE la provenance « liste presse » des adresses de rédaction (rien d\'autre n\'est écrit)}';
 
     protected $description = 'Importe une liste de diffusion presse (médias et journalistes) dans les fiches et contacts.';
 
@@ -369,6 +370,9 @@ class CrmPresseImporter extends Command
     private function importerLigne(string $ligne): array
     {
         $l = $this->lire($ligne);
+        if ((bool) $this->option('provenance-seulement')) {
+            return $this->provenanceSeulement($l);
+        }
         $delta = [];
 
         $trouvee = $this->parAncre($l, corbeilleComprise: true)->first(['id', 'deleted_at']);
@@ -519,8 +523,11 @@ class CrmPresseImporter extends Command
             // segment presse ne fait partir que des adresses de provenance
             // fiable (`AdressePresseFiable`) ; celle-ci l'est même si la fiche
             // porte par ailleurs un site deviné.
-            // Rejouer un fichier déjà importé la pose aussi (rattrapage) :
-            // rien d'autre n'est écrit, et le compteur le dit.
+            // Un rejeu ORDINAIRE la pose aussi, mais il rejoue toute la
+            // ligne : il peut compléter un champ vide de la ligne `media`,
+            // requalifier la fiche ou ses étiquettes si elles ont changé
+            // depuis. Pour ne poser QUE la provenance, sans rien toucher
+            // d'autre : `--provenance-seulement` (`provenanceSeulement()`).
             if (AdressePresseFiable::retenirEmailListe($companyId, $emailRedaction) > 0) {
                 $delta['provenances_liste_retenues'] = 1;
             }
@@ -544,6 +551,41 @@ class CrmPresseImporter extends Command
         QualificationPresse::etiqueter($companyId);
 
         return $delta;
+    }
+
+    /**
+     * RATTRAPAGE de la provenance (`--provenance-seulement`, relecture A09) :
+     * une ligne DÉJÀ importée — sa fiche retrouvée par son ancre, ou par le
+     * même rapprochement que l'import — ne reçoit QUE la trace « liste presse »
+     * de son adresse de rédaction (`companies.metadata.emails_liste_presse`).
+     * Ni ingestion, ni ligne `media`, ni contact, ni qualification, ni
+     * étiquette : rien d'autre n'est lu en écriture. Une ligne sans fiche est
+     * rejetée (`fiche_non_importee`) — ce rattrapage ne crée rien. L'adresse
+     * passe les mêmes filtres qu'à l'import (boîte pro, ni opposée ni
+     * supprimée).
+     *
+     * @param  array<string, mixed>  $l
+     * @return array<string, int>
+     */
+    private function provenanceSeulement(array $l): array
+    {
+        $fiche = $this->parAncre($l)->value('id') ?? $this->rapprocher($l)?->id;
+        if ($fiche === null) {
+            throw new InvalidArgumentException('fiche_non_importee');
+        }
+        $fiche = (int) $fiche;
+        if (! QualificationPresse::estFichePresse($fiche)) {
+            throw new InvalidArgumentException('fiche_existante_hors_presse');
+        }
+        $email = is_string($l['email_redaction'] ?? null) ? $l['email_redaction'] : null;
+        if ($email === null) {
+            return [];
+        }
+        if (NatureEmail::de($email) !== 'pro' || ! EligibiliteCampagne::peutRecevoir($email)) {
+            return ['emails_redaction_non_poses' => 1];
+        }
+
+        return AdressePresseFiable::retenirEmailListe($fiche, $email) > 0 ? ['provenances_liste_retenues' => 1] : [];
     }
 
     /**

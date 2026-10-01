@@ -201,16 +201,27 @@ final class AdressePresseFiable
     // jouent les deux. Aucun argument n'est une donnée utilisateur ; alias
     // internes `apf_*` réservés.
 
+    /**
+     * SQL : l'adresse NORMALISÉE exactement comme `QualificationEmail::normaliser`
+     * (`mb_strtolower(trim(...))`) : `trim()` de PHP retire espace, tabulation,
+     * fins de ligne et tabulation verticale aux deux bouts — `btrim` reçoit la
+     * même liste (le NUL ne peut pas exister dans un texte Postgres).
+     */
+    public static function cleSql(string $emailExpr): string
+    {
+        return "lower(btrim({$emailExpr}::text, E' \\t\\n\\r\\x0B'))";
+    }
+
     /** SQL : cette adresse est SÛRE pour la fiche (liste presse, ou source presse au site non deviné). */
     public static function emailSurSql(string $emailExpr, string $colonneId, string $aliasFiche): string
     {
         $motif = self::PREFIXE_SITE_DEVINE . '%';
         $sources = "'" . implode("','", self::SOURCES_PRESSE) . "'";
-        $cle = "lower(trim({$emailExpr}::text))";
+        $cle = self::cleSql($emailExpr);
 
         return "(EXISTS (SELECT 1 FROM media apf_s WHERE apf_s.company_id = {$colonneId} AND apf_s.deleted_at IS NULL"
             . " AND apf_s.source IN ({$sources}) AND COALESCE(apf_s.website_method, '') NOT LIKE '{$motif}'"
-            . " AND lower(apf_s.email::text) = {$cle})"
+            . ' AND ' . self::cleSql('apf_s.email') . " = {$cle})"
             . " OR COALESCE({$aliasFiche}.metadata -> '" . self::CLE_EMAILS_LISTE . "', '[]'::jsonb) @> jsonb_build_array({$cle}))";
     }
 

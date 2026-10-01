@@ -71,6 +71,8 @@ use Illuminate\Support\Facades\DB;
  *  - journaliste : seulement avec la porte `email_redaction`
  *    (`ecartees_journaliste_sans_acces` sinon) ; un journaliste opposé ou à la
  *    corbeille côté `journalists` écarte l'adresse (`ecartees_journaliste_retire`) ;
+ *  - seules la boîte générique de la fiche et ses personnes de la PRESSE
+ *    sont candidates : jamais un autre contact (GOFAB, organisateur…) ;
  *  - adresse de la fiche : importée d'une liste presse, portée par une ligne
  *    `media` d'une source presse au site non deviné, ou fiche sans site deviné,
  *    ou site VÉRIFIÉ (`companies.metadata.site_media.statut` `verifie` ou
@@ -446,6 +448,10 @@ class CrmCampagneDestinataires extends Command
             // leur — même quand la fiche porte aussi le tag de ce segment-ci
             // (`GardePresse`).
             ->when(! $presse, static fn ($q) => $q->whereRaw(GardePresse::conditionContactsSql('contacts')))
+            // Segment presse : seules les personnes de la presse — jamais un
+            // autre contact de la fiche (GOFAB, organisateur, prospection),
+            // même règle que l'audience presse (relecture A09).
+            ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
             ->orderBy('id')
             ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at'])
             ->when($presse, static fn ($q) => $q->selectRaw(

@@ -144,6 +144,15 @@ class AudienceBuilderService
      * L'aperçu d'une audience presse : seules les adresses de provenance
      * fiable comptent, comme au rafraîchissement (`lignesMembres`).
      *
+     * `presse_ecartees` a la MÊME définition que celle de
+     * `ResolveurDestinataires` (relecture A09) : parmi les adresses
+     * CANDIDATES — la boîte générique de chaque fiche et l'adresse de chaque
+     * personne de la presse (vivante) —, les adresses DISTINCTES (normalisées)
+     * écartées par leur provenance, jugées sur toutes leurs occurrences : un
+     * journaliste retiré derrière elle l'écarte ; sinon une occurrence fiable
+     * suffit ; sinon `journaliste_sans_acces` si une personne de la presse la
+     * porte, `site_devine` autrement.
+     *
      * @param  Builder<Company>  $query
      * @return array{companies: int, contacts: int, presse_ecartees: array<string, int>}
      */
@@ -151,44 +160,65 @@ class AudienceBuilderService
     {
         $companies = (clone $query)->count();
         $ids = (clone $query)->select('companies.id');
-        $motif = AdressePresseFiable::motifContactSql('ct', 'c.id', 'c');
-        $parMotif = DB::table('contacts as ct')
+
+        // Les membres, comme `lignesMembres` : personnes de la presse fiables
+        // et joignables, sinon la boîte générique fiable de la fiche.
+        $personnes = DB::table('contacts as ct')
             ->join('companies as c', 'c.id', '=', 'ct.company_id')
             ->whereIn('ct.company_id', $ids)
             ->whereNull('ct.deleted_at')
             ->whereNotNull('ct.email')
             ->whereIn('ct.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
-            ->selectRaw("COALESCE({$motif}, 'fiable') AS motif, COUNT(*) AS n")
-            ->groupByRaw('1')
-            ->pluck('n', 'motif')
-            ->map(static fn ($n): int => (int) $n)
-            ->all();
-
+            ->whereRaw(GardePresse::estContactPresseSql('ct'))
+            ->whereRaw(AdressePresseFiable::contactFiableSql('ct', 'c.id', 'c'))
+            ->count();
         $generiques = DB::table('companies as c')
             ->whereIn('c.id', (clone $query)->select('companies.id'))
+            ->whereNull('c.deleted_at')
             ->whereNotNull('c.email_generic')
+            ->whereRaw(AdressePresseFiable::generiqueFiableSql('c.id', 'c'))
             ->whereRaw('NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = c.id AND ct.deleted_at IS NULL AND ct.email IS NOT NULL'
                 . " AND ct.email_status IN ('" . implode("','", TriageAutoService::CONTACTABLE_EMAIL_STATUSES) . "')"
+                . ' AND ' . GardePresse::estContactPresseSql('ct')
                 . ' AND ' . AdressePresseFiable::contactFiableSql('ct', 'c.id', 'c') . ')')
-            ->selectRaw('(' . AdressePresseFiable::generiqueFiableSql('c.id', 'c') . ') AS fiable, COUNT(*) AS n')
-            ->groupByRaw('1')
-            ->get();
-        $generiquesFiables = 0;
-        $ecartees = array_fill_keys(AdressePresseFiable::MOTIFS, 0);
-        foreach ($generiques as $g) {
-            if ((bool) $g->fiable) {
-                $generiquesFiables += (int) $g->n;
-            } else {
-                $ecartees[AdressePresseFiable::SITE_DEVINE] += (int) $g->n;
-            }
-        }
+            ->count();
+
+        // Les écartées : adresses distinctes, verdict sur toutes leurs occurrences.
+        $idsSql = (clone $query)->select('companies.id');
+        $occGeneriques = DB::table('companies as c')
+            ->whereIn('c.id', $idsSql)
+            ->whereNull('c.deleted_at')
+            ->whereNotNull('c.email_generic')
+            ->selectRaw(AdressePresseFiable::cleSql('c.email_generic') . ' AS adresse, CASE WHEN '
+                . AdressePresseFiable::generiqueFiableSql('c.id', 'c') . " THEN NULL ELSE '" . AdressePresseFiable::SITE_DEVINE . "' END AS motif");
+        $occPersonnes = DB::table('contacts as ct')
+            ->join('companies as c', 'c.id', '=', 'ct.company_id')
+            ->whereIn('ct.company_id', (clone $query)->select('companies.id'))
+            ->whereNull('ct.deleted_at')
+            ->whereNotNull('ct.email')
+            ->whereRaw(GardePresse::estContactPresseSql('ct'))
+            ->selectRaw(AdressePresseFiable::cleSql('ct.email') . ' AS adresse, '
+                . AdressePresseFiable::motifContactSql('ct', 'c.id', 'c') . ' AS motif');
+        $retire = AdressePresseFiable::JOURNALISTE_RETIRE;
+        $sansAcces = AdressePresseFiable::JOURNALISTE_SANS_ACCES;
+        $parAdresse = DB::query()
+            ->fromSub($occGeneriques->unionAll($occPersonnes), 'occ')
+            ->where('occ.adresse', '<>', '')
+            ->groupBy('occ.adresse')
+            ->selectRaw("CASE WHEN bool_or(occ.motif = '{$retire}') THEN '{$retire}'"
+                . ' WHEN bool_or(occ.motif IS NULL) THEN NULL'
+                . " WHEN bool_or(occ.motif = '{$sansAcces}') THEN '{$sansAcces}'"
+                . " ELSE '" . AdressePresseFiable::SITE_DEVINE . "' END AS verdict");
+        $comptes = DB::query()->fromSub($parAdresse, 'v')->whereNotNull('v.verdict')
+            ->groupBy('v.verdict')->selectRaw('v.verdict, COUNT(*) AS n')->pluck('n', 'verdict')->all();
+        $ecartees = [];
         foreach (AdressePresseFiable::MOTIFS as $m) {
-            $ecartees[$m] += $parMotif[$m] ?? 0;
+            $ecartees[$m] = (int) ($comptes[$m] ?? 0);
         }
 
         return [
             'companies' => $companies,
-            'contacts' => ($parMotif['fiable'] ?? 0) + $generiquesFiables,
+            'contacts' => $personnes + $generiques,
             'presse_ecartees' => $ecartees,
         ];
     }
@@ -199,9 +229,11 @@ class AudienceBuilderService
      *
      * Audience ordinaire : les contacts joignables (jamais un journaliste,
      * `GardePresse`), sinon une ligne « fiche » (adresse générique).
-     * Audience presse : les seuls contacts de provenance fiable
-     * (`AdressePresseFiable`), sinon une ligne « fiche » SEULEMENT si son
-     * adresse générique est fiable — une fiche sans adresse fiable n'entre pas.
+     * Audience presse : les seules PERSONNES DE LA PRESSE de provenance fiable
+     * (`AdressePresseFiable`) — jamais un autre contact de la fiche (GOFAB,
+     * organisateur, prospection), même quand la fiche porte aussi un autre
+     * tag protégé —, sinon une ligne « fiche » SEULEMENT si son adresse
+     * générique est fiable — une fiche sans adresse fiable n'entre pas.
      *
      * (La lecture `DB::table('contacts')` ci-dessous est celle qui vivait dans
      * `RefreshAudienceChunkJob` jusqu'au 2026-10-01.)
@@ -222,9 +254,15 @@ class AudienceBuilderService
             ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
         $generiquesFiables = [];
         if ($presse) {
+            // Relecture A09 : dans une audience presse, SEULES les personnes de
+            // la presse entrent — jamais un contact GOFAB, organisateur ou de
+            // prospection d'une fiche presse qui porte aussi un autre tag
+            // protégé (la protection générale est levée pour CETTE fiche, pas
+            // pour toutes ses personnes).
             $contacts->join('companies as apf_c', 'apf_c.id', '=', 'contacts.company_id')
                 ->whereNull('contacts.deleted_at')
                 ->whereNotNull('contacts.email')
+                ->whereRaw(GardePresse::estContactPresseSql('contacts'))
                 ->whereRaw(AdressePresseFiable::contactFiableSql('contacts', 'apf_c.id', 'apf_c'));
             $generiquesFiables = DB::table('companies as apf_c')
                 ->whereIn('apf_c.id', $companyIds)

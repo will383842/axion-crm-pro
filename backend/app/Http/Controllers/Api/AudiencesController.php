@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\ReglageDestinataires;
 use App\Crm\Campagnes\ResolveurDestinataires;
+use App\Crm\Campagnes\Segments;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\Schema;
 class AudiencesController extends ApiController
 {
     use VerrouOptimiste;
+
+    /** Le refus d'afficher une audience presse quand le segment presse est fermé (vouvoiement). */
+    public const MESSAGE_PRESSE_FERMEE = 'Le segment presse est fermé : les membres de cette audience presse ne sont pas affichés. '
+        . 'Rouvrez le segment presse pour les consulter.';
 
     public function __construct(private readonly AudienceBuilderService $builder) {}
 
@@ -300,6 +305,11 @@ class AudiencesController extends ApiController
         $limit = max(1, min(500, (int) $request->query('limit', 50)));
         $criteres = $audience->getAttribute('criteria');
         $criteres = is_array($criteres) ? $criteres : [];
+        // Audience presse, segment presse REFERMÉ (`crm.segments_ouverts`) :
+        // ses membres ne se lisent plus — refus dit en clair (relecture A09).
+        if (AudienceBuilderService::estAudiencePresse($criteres) && ! Segments::ouvert(Segments::PRESSE)) {
+            return $this->ok(['message' => self::MESSAGE_PRESSE_FERMEE], 422);
+        }
 
         $rows = DB::table('audience_members as am')
             ->leftJoin('companies as c', 'c.id', '=', 'am.company_id')

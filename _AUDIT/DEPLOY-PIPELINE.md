@@ -120,6 +120,13 @@ docker compose up -d --no-deps postgres redis
 # `restart` et NON `up -d --no-deps caddy` : `up -d` ne recrée que si la
 # CONFIGURATION a changé. Ici elle n'a pas bougé — c'est l'adresse de l'amont.
 # `up -d` serait un no-op, et la panne resterait entière.
+#
+# 2026-10-01 — Caddy est une image CONSTRUITE (cible `caddy-bordure` de
+# `Dockerfile.frontend` : binaire Caddy recompilé, Go et modules corrigés).
+# `up -d --build` la reconstruit et recrée le conteneur si l'image a changé
+# (no-op sinon) ; le `restart` qui suit garde son rôle. Coupure de quelques
+# secondes à la recréation.
+docker compose up -d --build --no-deps caddy
 docker compose restart caddy
 
 # Migration BLOQUANTE (plus de `|| true`). `--database=pgsql_owner` : les

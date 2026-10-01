@@ -6,7 +6,7 @@ test.describe('Companies list', () => {
       route.fulfill({ json: { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 50 } } }),
     );
     await page.goto('/companies');
-    await expect(page.getByText(/aucune entreprise/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /aucune entreprise/i })).toBeVisible();
   });
 
   test('renders table with company rows', async ({ page }) => {

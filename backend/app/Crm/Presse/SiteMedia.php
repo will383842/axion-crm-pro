@@ -58,14 +58,24 @@ use Illuminate\Support\Str;
  * (« France 3 », « France 24 ») donne le mot distinctif `france 3`.
  *
  * IDENTITÉ de la page : <title>, og:site_name, og:title, <h1> (zone
- * `identite`) — pas la méta description. On en RETIRE d'abord toute forme de
- * l'hôte essayé et de l'hôte d'arrivée (`sansHote`) : l'hôte exact (avec ou
- * sans `www.`), l'étiquette à tirets (`le-progres`), l'étiquette accolée d'un
- * hôte à tirets (`leprogres` pour `le-progres.fr`), et l'hôte points/tirets
- * changés en espaces (`le progres fr`). Une page qui ne fait que recopier son
- * adresse (« euronews.fr », « le-progres.fr — domaine à vendre ») ne prouve
- * donc rien. (L'étiquette d'un seul mot, « Libération » pour liberation.fr,
- * n'est pas retirée : c'est le nom même du titre.)
+ * `identite`) — pas la méta description. On en RETIRE d'abord ce qui
+ * ressemble à l'ADRESSE de l'hôte essayé et de l'hôte d'arrivée
+ * (`sansHote`), extension comprise : l'hôte exact (avec ou sans `www.`) et
+ * l'hôte points/tirets changés en espaces (`ouest france fr`). Une page qui
+ * ne fait que recopier son adresse (« euronews.fr ») ne prouve donc rien.
+ * L'étiquette NUE (« Ouest-France », « Paris-Normandie », « Libération »)
+ * n'est pas retirée : c'est le nom même du titre ; le parking est arrêté par
+ * `estParking`, la réponse 2xx et l'hôte d'arrivée.
+ *
+ * PARKING (`estParking`) : signaux cherchés dans le titre (title, h1, méta,
+ * og) ; dans le CORPS seulement si la page est courte (moins de
+ * `PARKING_CORPS_MAX_MOTS` mots, moins de 3 <article>) — « ce domaine est »,
+ * « GoDaddy » dans les paragraphes d'un vrai média ne le rejettent pas.
+ *
+ * DOMAINE ENREGISTRABLE : deux dernières étiquettes, trois sous un suffixe
+ * double (`SUFFIXES_DOUBLES` : co.uk, tm.fr, com.au…) ; sur un hébergeur
+ * PARTAGÉ (`HEBERGEURS_PARTAGES` : wixsite.com, blogspot.*, github.io…),
+ * le sous-domaine du site.
  *
  * Un mot est TROUVÉ dans la page en mot entier (pluriel s/x admis), ou comme
  * DÉBUT d'un mot collé (« bfm » dans « BFMTV ») s'il a 3 caractères au moins
@@ -209,7 +219,27 @@ final class SiteMedia
     ];
 
     /** Suffixes publics à deux niveaux (domaine enregistrable sur trois étiquettes). */
-    private const SUFFIXES_DOUBLES = ['co.uk', 'org.uk', 'com.fr', 'asso.fr', 'gouv.fr', 'com.au', 'co.jp', 'com.br'];
+    private const SUFFIXES_DOUBLES = [
+        'co.uk', 'org.uk', 'ac.uk', 'me.uk', 'ltd.uk', 'plc.uk', 'net.uk', 'gov.uk',
+        'com.fr', 'asso.fr', 'gouv.fr', 'tm.fr', 'nom.fr', 'presse.fr', 'prd.fr',
+        'com.au', 'net.au', 'org.au', 'co.nz', 'org.nz', 'co.za', 'org.za', 'co.jp', 'ne.jp',
+        'com.br', 'com.mx', 'com.ar', 'co.in', 'com.cn', 'com.tr', 'com.es', 'co.il', 'co.ma', 'qc.ca',
+    ];
+
+    /**
+     * Hébergeurs PARTAGÉS (motifs de suffixe, regex) : le domaine enregistrable
+     * y est le sous-domaine du site (`zz.wixsite.com`), pas l'hébergeur.
+     */
+    private const HEBERGEURS_PARTAGES = [
+        'wixsite\.com', 'wordpress\.com', 'blogspot\.[a-z]{2,3}(?:\.[a-z]{2})?', 'over-blog\.[a-z]{2,3}', 'github\.io', 'netlify\.app',
+        'webflow\.io', 'e-monsite\.com', 'jimdofree\.com', 'jimdosite\.com', 'weebly\.com', 'canalblog\.com',
+        'hautetfort\.com', 'vercel\.app', 'pages\.dev', 'wix\.com', 'squarespace\.com', 'webnode\.fr',
+        'webnode\.com', 'site123\.me', 'tumblr\.com', 'substack\.com', 'medium\.com', 'free\.fr', 'unblog\.fr',
+        'skyrock\.com', 'eklablog\.com', 'kazeo\.com', 'centerblog\.net',
+    ];
+
+    /** Au-delà de ce nombre de mots dans le corps, la page n'est pas un parking. */
+    private const PARKING_CORPS_MAX_MOTS = 120;
 
     /** Formes juridiques retirées d'un nom avant d'en tirer un domaine candidat. */
     private const FORMES_JURIDIQUES = ['sas', 'sasu', 'sarl', 'eurl', 'sa', 'sci', 'scop', 'snc', 'selarl', 'ste'];
@@ -317,7 +347,15 @@ final class SiteMedia
     /** Le domaine ENREGISTRABLE d'un hôte (`www.edition.leprogres.fr` → `leprogres.fr`). */
     public static function domaineEnregistrable(string $hote): string
     {
-        $parts = explode('.', (string) preg_replace('/^www\./', '', strtolower(rtrim($hote, '.'))));
+        $hote = (string) preg_replace('/^www\./', '', strtolower(rtrim($hote, '.')));
+        // Hébergeur partagé : chaque sous-domaine est un site distinct
+        // (`a.wixsite.com` ≠ `b.wixsite.com`).
+        foreach (self::HEBERGEURS_PARTAGES as $motif) {
+            if (preg_match('/^([a-z0-9-]+\.)*?([a-z0-9-]+\.' . $motif . ')$/', $hote, $m) === 1) {
+                return $m[2];
+            }
+        }
+        $parts = explode('.', $hote);
         $n = count($parts);
         if ($n <= 2) {
             return implode('.', $parts);
@@ -372,15 +410,12 @@ final class SiteMedia
             if ($hote === '') {
                 continue;
             }
+            // Seulement ce qui RESSEMBLE À UNE ADRESSE (extension comprise) :
+            // l'étiquette nue (« Ouest-France », « Paris-Normandie ») est le
+            // nom même du titre et reste. Le parking est arrêté ailleurs
+            // (`estParking`, réponse 2xx, hôte d'arrivée).
             $brutes[] = 'www.' . $hote;
             $brutes[] = $hote;
-            $label = self::sansExtension($hote);
-            if (str_contains($label, '-') || str_contains($label, '.')) {
-                $brutes[] = $label;
-            }
-            if (str_contains($hote, '-')) {
-                $brutes[] = self::etiquette($hote);
-            }
             $normalisees[] = self::normaliser($hote);
         }
         usort($brutes, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
@@ -403,17 +438,23 @@ final class SiteMedia
      *
      * @param  array<string, string>  $zones  zones de `LecturePageAccueil::extraire`
      */
-    public static function estParking(array $zones): bool
+    public static function estParking(array $zones, int $articles = 0): bool
     {
         $titre = self::normaliser(($zones['identite'] ?? '') . ' . ' . ($zones['titre'] ?? ''));
-        $tout = self::normaliser($titre . ' . ' . ($zones['menu'] ?? '') . ' . ' . ($zones['texte'] ?? ''));
-        foreach (self::PARKING_FORTS as $signe) {
-            if (str_contains($tout, ' ' . $signe . ' ')) {
+        foreach (array_merge(self::PARKING_FORTS, self::PARKING_TITRE) as $signe) {
+            if (str_contains($titre, ' ' . $signe . ' ')) {
                 return true;
             }
         }
-        foreach (self::PARKING_TITRE as $signe) {
-            if (str_contains($titre, ' ' . $signe . ' ')) {
+        // Le CORPS n'est lu que sur une page COURTE sans articles (une page de
+        // parking) : « ce domaine est », « GoDaddy », « domaine à vendre »
+        // dans les paragraphes d'un vrai média ne le rejettent pas.
+        $corps = self::normaliser(($zones['menu'] ?? '') . ' . ' . ($zones['texte'] ?? ''));
+        if ($articles >= 3 || str_word_count(trim($corps)) >= self::PARKING_CORPS_MAX_MOTS) {
+            return false;
+        }
+        foreach (self::PARKING_FORTS as $signe) {
+            if (str_contains($corps, ' ' . $signe . ' ')) {
                 return true;
             }
         }
@@ -522,7 +563,7 @@ final class SiteMedia
         if (self::domaineEnregistrable($arrivee) !== self::domaineEnregistrable($hote)) {
             return [self::NON_CONFORME, $cible, self::MOTIF_REDIRECTION];
         }
-        if (self::estParking($lu['zones'])) {
+        if (self::estParking($lu['zones'], $lu['structure']['articles'])) {
             return [self::NON_CONFORME, $cible, self::MOTIF_PARKING];
         }
         $r = self::correspond($noms, (string) ($lu['zones']['identite'] ?? ''), $cible, [$arrivee]);

@@ -101,7 +101,6 @@ test('une page qui RECOPIE son adresse ne prouve rien : euronews.fr, le-progres.
     expect(SiteMedia::correspond(['EURONEWS'], 'euronews.fr', 'https://euronews.fr/')['ok'])->toBeFalse()
         ->and(SiteMedia::correspond(['EURONEWS'], 'www.euronews.fr', 'https://euronews.fr/')['ok'])->toBeFalse()
         ->and(SiteMedia::correspond(['LE PROGRES'], 'le-progres.fr — domaine à vendre', 'https://le-progres.fr/')['ok'])->toBeFalse()
-        ->and(SiteMedia::correspond(['LE PROGRES'], 'le-progres', 'https://le-progres.fr/')['ok'])->toBeFalse()
         ->and(SiteMedia::correspond(['LE PROGRES'], 'progres.fr is for sale', 'https://progres.fr/')['ok'])->toBeFalse()
         ->and(SiteMedia::correspond(["L'ECO DE L'AIN"], 'eco-ain.fr', 'https://eco-ain.fr/')['ok'])->toBeFalse()
         // l'hôte d'ARRIVÉE est retiré aussi
@@ -166,4 +165,53 @@ test('robots.txt aux fins de ligne CR SEULES : les Disallow sont lus (regression
     expect(LecturePageAccueil::robotsAutorise("User-agent: *\rDisallow: /\r", $agent, '/')['autorise'])->toBeFalse()
         ->and(LecturePageAccueil::robotsAutorise("User-agent: *\r\nDisallow: /prive/\r\n", $agent, '/prive/x')['autorise'])->toBeFalse()
         ->and(LecturePageAccueil::robotsAutorise("User-agent: *\nDisallow: /\n", $agent, '/')['autorise'])->toBeFalse();
+});
+
+// ── Seconde relecture A09 de #273 ──────────────────────────────────────────
+
+test('un nom qui EST l hote (Ouest-France, Paris-Normandie, France-Antilles) est verifie ; seule l adresse avec extension est retiree', function () {
+    expect(SiteMedia::juger(['OUEST FRANCE'], 'https://www.ouest-france.fr/', smrLu("Ouest-France : toute l'actualité en continu"))[0])->toBe(SiteMedia::VERIFIE)
+        ->and(SiteMedia::juger(['PARIS NORMANDIE'], 'https://www.paris-normandie.fr/', smrLu('Paris-Normandie : actualités en Normandie'))[0])->toBe(SiteMedia::VERIFIE)
+        ->and(SiteMedia::juger(['FRANCE ANTILLES'], 'https://www.france-antilles.fr/', smrLu('France-Antilles Martinique — actualité'))[0])->toBe(SiteMedia::VERIFIE)
+        // l'adresse recopiée, elle, ne prouve rien ; le parking est rejeté
+        ->and(SiteMedia::correspond(['OUEST FRANCE'], 'ouest-france.fr', 'https://ouest-france.fr/')['ok'])->toBeFalse()
+        ->and(SiteMedia::correspond(['OUEST FRANCE'], 'www.ouest-france.fr', 'https://ouest-france.fr/')['ok'])->toBeFalse()
+        ->and(SiteMedia::juger(['OUEST FRANCE'], 'https://ouest-france.fr/', smrLu('ouest-france.fr — domaine à vendre', 'actualité')))
+        ->toBe([SiteMedia::NON_CONFORME, 'https://ouest-france.fr/', SiteMedia::MOTIF_PARKING]);
+});
+
+test('parking : les signaux du CORPS d un vrai media (page longue) ne rejettent pas ; ceux d une page courte, si', function () {
+    $long = static fn (string $phrase): string => str_repeat('Les vendanges commencent dans la vallée et la rédaction suit les récoltes. ', 20) . $phrase;
+    $vignoble = smrLu('Le Vigneron ZZ — actualité du vin', $long('Ce domaine est classé grand cru depuis 1855.'));
+    $annonce = smrLu('Le Vigneron ZZ — actualité du vin', $long('Petites annonces : domaine à vendre en Bourgogne.'));
+    $tech = smrLu('Le Vigneron ZZ — actualité du vin', $long('GoDaddy rachète un concurrent ; le domaine parked par un fonds.'));
+    foreach ([$vignoble, $annonce, $tech] as $lu) {
+        expect(SiteMedia::estParking($lu['zones']))->toBeFalse()
+            ->and(SiteMedia::juger(['LE VIGNERON ZZ'], 'https://levigneronzz.test/', $lu)[0])->toBe(SiteMedia::VERIFIE);
+    }
+    // page courte : parking ; et beaucoup d'<article> : jamais un parking
+    expect(SiteMedia::estParking(smrLu('Le Vigneron ZZ', 'Ce domaine est à vendre. GoDaddy.')['zones']))->toBeTrue()
+        ->and(SiteMedia::estParking(smrLu('Le Vigneron ZZ', 'Ce domaine est à vendre.')['zones'], 5))->toBeFalse()
+        // le TITRE, lui, compte toujours
+        ->and(SiteMedia::estParking(smrLu('levigneronzz.test is for sale', $long(''))['zones']))->toBeTrue();
+});
+
+test('domaine enregistrable : suffixes doubles et hebergeurs partages', function () {
+    $cas = [
+        'www.edition.leprogres.fr' => 'leprogres.fr',
+        'www.a.zz.co.uk' => 'zz.co.uk', 'zz.ac.uk' => 'zz.ac.uk', 'blog.zz.me.uk' => 'zz.me.uk',
+        'zz.net.au' => 'zz.net.au', 'www.zz.co.nz' => 'zz.co.nz', 'a.zz.co.za' => 'zz.co.za',
+        'zz.tm.fr' => 'zz.tm.fr', 'x.zz.nom.fr' => 'zz.nom.fr', 'www.zz.asso.fr' => 'zz.asso.fr', 'zz.com.fr' => 'zz.com.fr',
+        'monjournal.wixsite.com' => 'monjournal.wixsite.com', 'zz.wordpress.com' => 'zz.wordpress.com',
+        'www.zz.blogspot.com' => 'zz.blogspot.com', 'zz.blogspot.fr' => 'zz.blogspot.fr',
+        'zz.over-blog.com' => 'zz.over-blog.com', 'zz.github.io' => 'zz.github.io', 'zz.netlify.app' => 'zz.netlify.app',
+        'zz.webflow.io' => 'zz.webflow.io', 'zz.e-monsite.com' => 'zz.e-monsite.com', 'zz.jimdofree.com' => 'zz.jimdofree.com',
+        'zz.weebly.com' => 'zz.weebly.com', 'zz.canalblog.com' => 'zz.canalblog.com', 'zz.hautetfort.com' => 'zz.hautetfort.com',
+    ];
+    foreach ($cas as $hote => $attendu) {
+        expect(SiteMedia::domaineEnregistrable($hote))->toBe($attendu);
+    }
+    // une redirection d'un site hébergé vers un AUTRE site du même hébergeur est refusée
+    expect(SiteMedia::juger(['EURONEWS'], 'https://euronews.wixsite.com/', smrLu('Euronews', 'actualités', 200, 'https://autre.wixsite.com/')))
+        ->toBe([SiteMedia::NON_CONFORME, 'https://euronews.wixsite.com/', SiteMedia::MOTIF_REDIRECTION]);
 });

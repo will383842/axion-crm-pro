@@ -321,3 +321,44 @@ export type CleZoneMedia = (typeof ZONES_MEDIA)[number]['code'];
 /** Préfixes des étiquettes d'un média : type et zone de diffusion. */
 export const PREFIXE_ETIQUETTE_TYPE_MEDIA = "media-type:";
 export const PREFIXE_ETIQUETTE_ZONE_MEDIA = "media-zone:";
+
+/** Thèmes de média (lecture du site) — étiquette automatique `media-theme:<code>`. */
+export const THEMES_MEDIA = [
+  { code: "ia-tech", libelle: "IA et technologie" },
+  { code: "economie-entreprise", libelle: "Économie et entreprise" },
+  { code: "pme-entrepreneurs", libelle: "PME et entrepreneurs" },
+  { code: "rh-management", libelle: "RH et management" },
+  { code: "metiers-secteurs", libelle: "Métiers et secteurs (presse professionnelle)" },
+  { code: "regional", libelle: "Régional et local" },
+  { code: "grand-public", libelle: "Grand public" },
+  { code: "inconnu", libelle: "Thème inconnu" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleThemeMedia = (typeof THEMES_MEDIA)[number]['code'];
+
+/** Publics de média — étiquette automatique `media-public:<code>`. */
+export const PUBLICS_MEDIA = [
+  { code: "dirigeants", libelle: "Dirigeants et décideurs" },
+  { code: "pros-secteur", libelle: "Professionnels d'un secteur" },
+  { code: "grand-public", libelle: "Grand public" },
+  { code: "inconnu", libelle: "Public inconnu" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type ClePublicMedia = (typeof PUBLICS_MEDIA)[number]['code'];
+
+/** Formats TV — étiquette automatique `media-format:<code>`. */
+export const FORMATS_MEDIA = [
+  { code: "magazine-eco", libelle: "Magazine économique" },
+  { code: "talk-show", libelle: "Talk-show, débat" },
+  { code: "jt-info", libelle: "Journal télévisé, information" },
+  { code: "tech", libelle: "Émission tech" },
+  { code: "fiction-jeu", libelle: "Fiction ou jeu (non utile)" },
+  { code: "inconnu", libelle: "Format inconnu" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleFormatMedia = (typeof FORMATS_MEDIA)[number]['code'];
+
+/** Préfixes des étiquettes du classement d'un média : thème, public, format TV. */
+export const PREFIXE_ETIQUETTE_THEME_MEDIA = "media-theme:";
+export const PREFIXE_ETIQUETTE_PUBLIC_MEDIA = "media-public:";
+export const PREFIXE_ETIQUETTE_FORMAT_MEDIA = "media-format:";

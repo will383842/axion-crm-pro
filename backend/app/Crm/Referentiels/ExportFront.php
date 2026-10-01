@@ -62,6 +62,14 @@ final class ExportFront
             "/** Préfixes des étiquettes d'un média : type et zone de diffusion. */\n"
                 . "export const PREFIXE_ETIQUETTE_TYPE_MEDIA = \"media-type:\";\n"
                 . "export const PREFIXE_ETIQUETTE_ZONE_MEDIA = \"media-zone:\";\n",
+            // Classement des médias (chantier F, 2026-10-01) — `media-theme:` / `media-public:` / `media-format:`.
+            self::liste('THEMES_MEDIA', 'CleThemeMedia', Taxonomy::MEDIA_THEMES_CLASSES, 'Thèmes de média (lecture du site) — étiquette automatique `media-theme:<code>`.'),
+            self::liste('PUBLICS_MEDIA', 'ClePublicMedia', Taxonomy::MEDIA_PUBLICS, 'Publics de média — étiquette automatique `media-public:<code>`.'),
+            self::liste('FORMATS_MEDIA', 'CleFormatMedia', Taxonomy::MEDIA_FORMATS, 'Formats TV — étiquette automatique `media-format:<code>`.'),
+            "/** Préfixes des étiquettes du classement d'un média : thème, public, format TV. */\n"
+                . "export const PREFIXE_ETIQUETTE_THEME_MEDIA = \"media-theme:\";\n"
+                . "export const PREFIXE_ETIQUETTE_PUBLIC_MEDIA = \"media-public:\";\n"
+                . "export const PREFIXE_ETIQUETTE_FORMAT_MEDIA = \"media-format:\";\n",
         ];
 
         return <<<'TS'

@@ -49,6 +49,9 @@ import {
 import { ReglageDestinatairesChamps } from './ReglageDestinatairesChamps';
 import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
 import {
+  FORMAT_MEDIA_PRESETS,
+  PUBLIC_MEDIA_PRESETS,
+  THEME_MEDIA_PRESETS,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
   avecExclusions,
@@ -174,6 +177,9 @@ export function AudienceBuilderPage() {
   // Presse et exclusions (harmonisation des contacts, 2026-09-30).
   const [typesMedia, setTypesMedia] = useState<string[]>([]);
   const [zonesMedia, setZonesMedia] = useState<string[]>([]);
+  const [themesMedia, setThemesMedia] = useState<string[]>([]);
+  const [publicsMedia, setPublicsMedia] = useState<string[]>([]);
+  const [formatsMedia, setFormatsMedia] = useState<string[]>([]);
   const [exclNatures, setExclNatures] = useState<string[]>([]);
   const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
 
@@ -198,7 +204,7 @@ export function AudienceBuilderPage() {
     if (tagList.length > 0) all.push({ field: 'tags', op: 'contains_any', value: tagList });
     if (listesIncluses.length > 0) all.push({ field: 'liste_manuelle', op: 'in', value: listesIncluses.map(Number) });
     if (listesExclues.length > 0) all.push({ field: 'liste_manuelle', op: 'not_in', value: listesExclues.map(Number) });
-    all.push(...criteresMedias(typesMedia, zonesMedia));
+    all.push(...criteresMedias(typesMedia, zonesMedia, { themes: themesMedia, publics: publicsMedia, formats: formatsMedia }));
 
     const criteres = construireCriteres(all, {
       relationsVisees,
@@ -214,7 +220,7 @@ export function AudienceBuilderPage() {
   }, [
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
     relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
-    typesMedia, zonesMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
+    typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
   ]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
@@ -489,7 +495,7 @@ export function AudienceBuilderPage() {
             </Field>
           </Card>
 
-          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` */}
+          {/* Presse et médias : étiquettes `media-type:` / `media-zone:` / `media-theme:` / `media-public:` / `media-format:` */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Newspaper className="h-4 w-4" />} title="Presse et médias" />
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -512,6 +518,33 @@ export function AudienceBuilderPage() {
                 selected={zonesMedia}
                 onChange={setZonesMedia}
                 placeholder="Toutes zones"
+                masquerCode
+              />
+            </Field>
+            <Field label="Thèmes (lecture du site)">
+              <ChipsMultiSelect
+                options={THEME_MEDIA_PRESETS}
+                selected={themesMedia}
+                onChange={setThemesMedia}
+                placeholder="Tous thèmes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Publics visés">
+              <ChipsMultiSelect
+                options={PUBLIC_MEDIA_PRESETS}
+                selected={publicsMedia}
+                onChange={setPublicsMedia}
+                placeholder="Tous publics"
+                masquerCode
+              />
+            </Field>
+            <Field label="Formats TV">
+              <ChipsMultiSelect
+                options={FORMAT_MEDIA_PRESETS}
+                selected={formatsMedia}
+                onChange={setFormatsMedia}
+                placeholder="Tous formats"
                 masquerCode
               />
             </Field>

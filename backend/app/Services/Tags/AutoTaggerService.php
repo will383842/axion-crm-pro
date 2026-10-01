@@ -4,6 +4,7 @@ namespace App\Services\Tags;
 
 use App\Crm\Etiquettes\FamillesEtiquettes;
 use App\Crm\Federations\EtiquettesFederation;
+use App\Crm\Presse\ClassementMedia;
 use App\Crm\Presse\EtiquettesMedia;
 use App\Crm\Presse\MediaIncertain;
 use App\Crm\Referentiels\EtiquettesClassement;
@@ -26,6 +27,9 @@ use Illuminate\Support\Str;
  *    contactabilite: (kind=auto) — depuis la ligne `federations` de la fiche
  *  - media-type:, media-zone:, media-theme: (kind=auto) — depuis les lignes
  *    `media` vivantes rattachées à la fiche (`EtiquettesMedia`)
+ *  - media-theme:, media-public:, media-format:, media-possible:semble-*
+ *    (kind=auto) — depuis `metadata.classement_media` (`ClassementMedia`,
+ *    lecture de la page d'accueil du média, chantier F)
  *  - {tag}          (category=ia, kind=llm)        — depuis signals.llm_classification.tags
  *
  * Règle de nommage : `App\Crm\Etiquettes\FamillesEtiquettes` (chaque
@@ -203,7 +207,33 @@ class AutoTaggerService
         }
         // Média INCERTAIN (NAF 63.12Z / 58.19Z venu du seul `naf-extract`) : ni
         // nature ni relation presse, une étiquette « à vérifier » (chantier F).
-        foreach (MediaIncertain::desirees((int) $company->id, $lignesMedia !== []) as $slug => $spec) {
+        $incertain = MediaIncertain::desirees((int) $company->id, $lignesMedia !== []);
+        // Classement des médias (chantier F, 2026-10-01) : thèmes, public,
+        // format TV, verdict « média possible » — DÉRIVÉS du classement gardé
+        // dans `metadata.classement_media` (`ClassementMedia`). Un verdict
+        // proposé REMPLACE `a-verifier` ; il ne touche ni la relation, ni la
+        // nature, ni la protection de la fiche.
+        // Un appelant qui a chargé la fiche SANS `metadata` ne doit pas faire
+        // retirer ces étiquettes : on relit alors la colonne.
+        $classement = [];
+        if ($lignesMedia !== []) {
+            $metadata = array_key_exists('metadata', $company->getAttributes())
+                ? $company->metadata
+                : json_decode((string) DB::table('companies')->where('id', $company->id)->value('metadata'), true);
+            $classement = ClassementMedia::desirees(
+                (int) $company->id,
+                is_array($metadata) ? ($metadata[ClassementMedia::CLE] ?? null) : null,
+                true,
+                $incertain !== [],
+            );
+        }
+        if (ClassementMedia::aUnVerdict($classement)) {
+            unset($incertain[MediaIncertain::ETIQUETTE]);
+        }
+        foreach ($classement as $slug => $spec) {
+            $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
+        }
+        foreach ($incertain as $slug => $spec) {
             $tags[$slug] = $spec + ['kind' => 'auto', 'assigned_by' => 'auto-rule'];
         }
 

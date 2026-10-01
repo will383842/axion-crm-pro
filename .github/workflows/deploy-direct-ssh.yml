@@ -432,7 +432,16 @@ jobs:
           #
           # Le cout est de deux ou trois secondes de coupure, a un moment ou le
           # deploiement coupe deja.
-          echo "::group::redemarrage de Caddy (il doit re-resoudre l'adresse d'api)"
+          #
+          # 2026-10-01 — Caddy est desormais une image CONSTRUITE (cible
+          # `caddy-bordure` de Dockerfile.frontend, binaire recompile). Il faut
+          # donc d'abord la (re)construire et RECREER le conteneur quand l'image
+          # change : `up -d --build` le fait (no-op si l'image est identique),
+          # puis le `restart` ci-dessous garde son role (re-resoudre l'amont).
+          # Premiere application : recreation, donc `extra_hosts` de l'overlay
+          # prod enfin pris en compte. Coupure de quelques secondes, acceptee.
+          echo "::group::reconstruction + redemarrage de Caddy (binaire corrige, re-resolution d'api)"
+          docker compose up -d --build --no-deps caddy
           docker compose restart caddy
           echo "::endgroup::"
           echo "::endgroup::"

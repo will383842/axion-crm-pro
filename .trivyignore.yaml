@@ -19,9 +19,17 @@
 # - c-ares (CVE-2026-33630) : corrigé par la base Alpine 3.23.6 de
 #   `caddy:2-alpine` (Trivy : 0 vulnérabilité Alpine).
 #
-# ⚠️ Le proxy de BORDURE (`axion-crm-caddy`, image TIRÉE `caddy:2-alpine`)
-# embarque toujours l'ancien binaire : il n'est pas construit ici et ne relève
-# pas de ce fichier (job d'inventaire « Scan images tirées »).
+# Le proxy de BORDURE (`axion-crm-caddy`, 80/443, TLS en frontal) porte le
+# MÊME binaire recompilé (cible `caddy-bordure` de `Dockerfile.frontend`,
+# construite par le déploiement) et passe sous la même garde bloquante.
+#
+# Risque RÉSIDUEL, dit en clair : aucun avis HIGH/CRITICAL corrigeable connu
+# au 2026-10-01. Les versions sont ÉPINGLÉES (Go par digest, modules par
+# version) : elles ne bougent plus seules. Un nouvel avis sur Go ou sur ces
+# modules fera rougir la garde ; le geste est alors de monter l'épinglage du
+# stade `caddy-build`, pas d'ajouter une exception ici. Le banc local
+# `docker-compose.verif.yml` (boucle locale seulement) tire encore
+# `caddy:2-alpine`.
 #
 # Toute nouvelle exception : un `id`, un `paths` si possible, un `statement`
 # qui dit pourquoi rien n'est corrigeable ICI, et un `expired_at`.

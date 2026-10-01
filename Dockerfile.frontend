@@ -74,7 +74,7 @@ RUN pnpm build
 # Au reexamen : si une image `caddy:2-alpine` recompilee corrige ces avis,
 # ce stade peut disparaitre (et le `COPY --from=caddy-build` avec lui).
 # -----------------------------------------------------------------------------
-FROM golang:1.26.8-alpine AS caddy-build
+FROM golang:1.26.8-alpine@sha256:8ac98ca534ac3f51e1f420a1dd2c15e74c75cfa0f23f3ad27eb5d7236c349a0c AS caddy-build
 ARG CADDY_VERSION=v2.11.4
 WORKDIR /src/caddy
 ENV CGO_ENABLED=0 GOFLAGS=-trimpath
@@ -120,6 +120,24 @@ COPY frontend/Caddyfile.app /etc/caddy/Caddyfile
 EXPOSE 5173
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
     CMD wget -qO- http://localhost:5173/ || exit 1
+
+# -----------------------------------------------------------------------------
+# 4 bis) caddy-bordure : le proxy de BORDURE `axion-crm-caddy` (2026-10-01)
+#   Publié sur 80/443, il TERMINE LE TLS : c'est lui que visent au premier
+#   chef les CVE crypto/tls, crypto/x509 et net/http du binaire de
+#   `caddy:2-alpine`. Même base, même binaire recompilé (stade `caddy-build`)
+#   que le conteneur `app` — un seul binaire Caddy dans tout le dépôt.
+#   Aucun fichier copié : `infra/caddy/Caddyfile`, `/data` et `/config` sont
+#   montés par `docker-compose.yml`, comme avant.
+#   Modules : `infra/caddy/Caddyfile` n'emploie que des directives de
+#   `modules/standard` (reverse_proxy + transport fastcgi, encode zstd/gzip,
+#   header, handle, rewrite, root, tls internal, ACME HTTP par défaut,
+#   trusted_proxies static) — aucun plugin (pas de DNS-01).
+#   Placé AVANT `prod-nginx` : le dernier stade (cible par défaut) ne change pas.
+# -----------------------------------------------------------------------------
+FROM caddy:2-alpine AS caddy-bordure
+RUN apk --no-cache upgrade
+COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
 
 # -----------------------------------------------------------------------------
 # 5) prod-nginx : ancien target nginx, conservé pour rollback

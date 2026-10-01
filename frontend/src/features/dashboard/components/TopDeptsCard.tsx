@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardEyebrow, EmptyState, cn } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardEyebrow, EmptyState, QueryErrorState, cn } from '@/components/ui';
 import { api } from '@/lib/api';
 
 interface CoverageCell {
@@ -12,8 +12,9 @@ interface CoverageCell {
 
 export function TopDeptsCard() {
   // Réutilise l'endpoint /coverage déjà disponible (CoveragePage).
-  // Si l'endpoint renvoie 404/500 ou rien, on tombe sur EmptyState.
-  const { data, isLoading } = useQuery({
+  // P0-3 — un échec affiche l'erreur (dans la carte seule, pas toute la page) ;
+  // l'état vide est réservé à une réponse réussie sans département.
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['dashboard-top-depts'],
     queryFn: async () => {
       const r = await api.get<{ cells: CoverageCell[] }>('/coverage', { params: { level: 'department' } });
@@ -45,10 +46,12 @@ export function TopDeptsCard() {
             <li key={i} className="h-9 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
           ))}
         </ul>
+      ) : error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="les départements les plus couverts" onRetry={() => void refetch()} />
       ) : top.length === 0 ? (
         <EmptyState
           title="Aucun département couvert"
-          description="Lance un scrape pour commencer à couvrir la France."
+          description="Aucune zone couverte pour l’instant."
           icon="🗺️"
         />
       ) : (

@@ -5,6 +5,7 @@ import { Button, Input } from '@/components/ui';
 import { AuthShell } from './LoginPage';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { messageErreurAuth } from './messagesErreur';
 
 export function MagicLinkPage() {
   const { t } = useTranslation();
@@ -18,9 +19,11 @@ export function MagicLinkPage() {
     try {
       await api.post('/auth/magic-link', { email });
       setSent(true);
-      toast.success(t('auth.login.magicLink'));
-    } catch {
-      toast.error('Erreur envoi du lien');
+      // Audit UX du 02/10 (P0-5) — le toast de succès affichait le LIBELLÉ DU
+      // BOUTON (« Recevoir un lien magique »). Il dit désormais ce qui s'est passé.
+      toast.success('Lien envoyé. Consultez votre boîte de réception.');
+    } catch (err) {
+      toast.error(messageErreurAuth(err, 'Le lien n’a pas pu être envoyé. Vérifiez l’adresse e-mail, puis réessayez.'));
     } finally {
       setLoading(false);
     }
@@ -29,7 +32,7 @@ export function MagicLinkPage() {
   return (
     <AuthShell
       title={t('auth.login.magicLink')}
-      description="Reçois un lien de connexion par email — pas besoin de mot de passe."
+      description="Recevez un lien de connexion par e-mail, sans mot de passe."
     >
       {sent ? (
         <div className="space-y-3 text-center">
@@ -40,7 +43,7 @@ export function MagicLinkPage() {
             Lien envoyé à <strong>{email}</strong>
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Vérifie ta boîte mail (et les spams). Le lien expire dans 15 minutes.
+            Consultez votre boîte de réception (et les indésirables). Le lien est valable 15 minutes.
           </p>
           <a
             href="/login"
@@ -50,7 +53,7 @@ export function MagicLinkPage() {
           </a>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
               {t('auth.login.email')}

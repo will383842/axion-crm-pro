@@ -7,6 +7,7 @@ import {
   CompaniesTableSkeleton,
   EmptyState,
   PageHeader,
+  QueryErrorState,
   SearchInput,
   StatusPill,
   type StatusTone,
@@ -116,7 +117,7 @@ export function ContactsListPage() {
   // (« seulement certains contacts »). Identifiants VISIBLES seulement.
   const [cochees, setCochees] = useState<Set<number>>(new Set());
 
-  const { data, isLoading, isPlaceholderData } = useQuery<ContactsResponse>({
+  const { data, isLoading, isPlaceholderData, error, refetch } = useQuery<ContactsResponse>({
     queryKey: ['contacts', emailStatus, country, prospection, joignabilite, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({ per_page: '50' });
@@ -220,7 +221,10 @@ export function ContactsListPage() {
         }
       />
 
-      {isLoading || isPlaceholderData ? (
+      {/* P0-3 — une panne n'est jamais « Aucun contact ». */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="la liste des contacts" onRetry={() => void refetch()} />
+      ) : isLoading || isPlaceholderData ? (
         <CompaniesTableSkeleton rows={6} />
       ) : rows.length === 0 ? (
         <EmptyState
@@ -228,8 +232,8 @@ export function ContactsListPage() {
           title="Aucun contact"
           description={
             hasFilter
-              ? 'Aucun contact ne correspond à ces filtres. Réinitialise pour voir plus de résultats.'
-              : "Lance l'enrichissement d'entreprises depuis la liste Entreprises."
+              ? 'Aucun résultat avec ces filtres.'
+              : 'Aucun contact pour l’instant.'
           }
         />
       ) : (

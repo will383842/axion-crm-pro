@@ -30,6 +30,7 @@ import {
   CompteurDeSaisie,
   Input,
   PageHeader,
+  QueryErrorState,
   Spinner,
   StatusPill,
 } from '@/components/ui';
@@ -309,7 +310,7 @@ export function AudienceBuilderPage() {
 
   const onSubmit = handleSubmit(async (form) => {
     if (!aDesCriteres) {
-      toast.error('Ajoute au moins un critère');
+      toast.error('Ajoutez au moins un critère.');
       return;
     }
     try {
@@ -338,7 +339,7 @@ export function AudienceBuilderPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Nouvelle audience"
-        subtitle="Compose un segment dynamique. La preview se met à jour à chaque modification."
+        subtitle="Le nombre de fiches se met à jour à chaque choix."
         breadcrumbs={[
           { label: 'Audiences', to: '/audiences' },
           { label: 'Nouvelle' },
@@ -672,6 +673,10 @@ export function AudienceBuilderPage() {
           {/* Listes manuelles (2026-09-30) */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<ListChecks className="h-4 w-4" />} title="Listes manuelles" />
+            {/* P0-3 — sans ce message, un échec de chargement se lisait « aucune liste ». */}
+            {listes.error !== null && listes.data === undefined ? (
+              <QueryErrorState error={listes.error} contexte="vos listes" onRetry={() => void listes.refetch()} />
+            ) : null}
             <Field label="Membres de ces listes (au moins une)">
               <ChipsMultiSelect
                 options={LISTE_PRESETS}
@@ -744,7 +749,7 @@ export function AudienceBuilderPage() {
               </div>
             ) : (
               <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-800/40 dark:text-slate-400">
-                Ajoute au moins un critère pour voir la preview.
+                Ajoutez au moins un critère pour voir l’aperçu.
               </div>
             )}
 
@@ -810,7 +815,7 @@ export function AudienceBuilderPage() {
               </Button>
               {!canCreate ? (
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Renseigne un nom et au moins un critère pour activer la création.
+                  Donnez un nom et au moins un critère.
                 </p>
               ) : null}
             </div>

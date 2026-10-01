@@ -11,6 +11,7 @@ import {
   EmptyState,
   KpiCard,
   PageHeader,
+  QueryErrorState,
   StatusPill,
   type StatusTone,
   cn,
@@ -53,7 +54,7 @@ const GRID = 'minmax(220px,1.4fr) 110px minmax(180px,1fr) 130px minmax(140px,1fr
 export function AiActRegisterPage() {
   const [selected, setSelected] = useState<AiActEntry | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ai-act-register'],
     queryFn: async () => (await api.get<{ data: AiActEntry[] }>('/ai-act/register')).data,
   });
@@ -116,7 +117,9 @@ export function AiActRegisterPage() {
         />
       </div>
 
-      {isLoading ? (
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="le registre des outils d’IA" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <CompaniesTableSkeleton rows={3} />
       ) : rows.length === 0 ? (
         <EmptyState

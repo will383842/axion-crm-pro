@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { Eye, EyeOff, LogIn, Sparkles } from 'lucide-react';
 import { Button, Card, Input } from '@/components/ui';
-import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import { api, rafraichirCsrf } from '@/lib/api';
+import { estSessionExpiree, messageErreurAuth } from './messagesErreur';
 
 export function AuthShell({
   title,
@@ -41,7 +41,9 @@ export function AuthShell({
         </div>
 
         <Card variant="glass" padding="lg" className="backdrop-blur-md">
-          <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          {/* `id` : cible de l'`aria-labelledby` des formulaires d'authentification
+              (il visait jusqu'ici un « login-title » qui n'existait pas). */}
+          <h1 id="auth-title" className="mb-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
             {title}
           </h1>
           {description ? (
@@ -64,31 +66,49 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
+  // Audit UX du 02/10 (P0-6) — l'échec s'affiche SOUS le formulaire, jamais en
+  // toast. Constat en prod : un toast « Une erreur est survenue » apparaissait
+  // à l'ouverture de /login sans que l'utilisateur ait rien fait. Le seul code
+  // capable de le produire était le `catch` ci-dessous : une soumission avait
+  // donc eu lieu sans geste (envoi automatique d'un gestionnaire de mots de
+  // passe, ou premier POST refusé en 419 sur un jeton CSRF périmé). Désormais :
+  //  - aucun toast sur cet écran ;
+  //  - un 419 redemande le jeton CSRF et rejoue la connexion UNE fois, en silence ;
+  //  - chaque échec a son message (identifiants, verrou, trop d'essais, panne).
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  function connecter() {
+    return api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password, remember });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setErreur(null);
     try {
-      const { data } = await api.post<{ requires_2fa?: boolean }>('/auth/login', {
-        email,
-        password,
-        remember,
-      });
-      if (data.requires_2fa) {
-        navigate({ to: '/2fa' });
-      } else {
-        navigate({ to: '/' });
+      let reponse: Awaited<ReturnType<typeof connecter>>;
+      try {
+        reponse = await connecter();
+      } catch (premier) {
+        if (!estSessionExpiree(premier)) throw premier;
+        await rafraichirCsrf();
+        reponse = await connecter();
       }
-    } catch {
-      toast.error(t('common.error'));
+      if (reponse.data.requires_2fa) {
+        void navigate({ to: '/2fa' });
+      } else {
+        void navigate({ to: '/' });
+      }
+    } catch (err) {
+      setErreur(messageErreurAuth(err, 'Adresse e-mail ou mot de passe incorrect.'));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <AuthShell title={t('auth.login.title')} description="Connecte-toi à ton workspace Axion CRM Pro.">
-      <form onSubmit={onSubmit} aria-labelledby="login-title" className="space-y-4">
+    <AuthShell title={t('auth.login.title')} description="Accédez à votre CRM.">
+      <form onSubmit={(e) => void onSubmit(e)} aria-labelledby="auth-title" className="space-y-4">
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
             {t('auth.login.email')}
@@ -137,6 +157,15 @@ export function LoginPage() {
           />
           <span>Se souvenir de moi</span>
         </label>
+
+        {erreur !== null ? (
+          <p
+            role="alert"
+            className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40"
+          >
+            {erreur}
+          </p>
+        ) : null}
 
         <Button
           type="submit"

@@ -27,6 +27,7 @@ import {
   CompteurDeSaisie,
   Input,
   PageHeader,
+  QueryErrorState,
   SegmentedControl,
   StatusPill,
 } from '@/components/ui';
@@ -118,8 +119,9 @@ export function CampaignWizardPage() {
   const referentialZones = useMemo(() => getReferentialZones(zoneType), [zoneType]);
 
   // Données coverage (entreprises déjà scrappées) — mergées en option pour afficher
-  // le nombre d'entreprises connues par zone. Si l'endpoint plante ou est vide, fallback silencieux.
-  const { data: coverageData } = useQuery({
+  // le nombre d'entreprises connues par zone. P0-3 — si l'endpoint plante, l'échec
+  // est DIT à l'étape « Zones » (sinon chaque zone afficherait un faux « 0 »).
+  const coverageQuery = useQuery({
     queryKey: ['coverage-wizard', zoneType],
     queryFn: async () => {
       const r = await api.get<{ cells: CoverageCell[] }>('/coverage', { params: { level: zoneType } });
@@ -128,6 +130,8 @@ export function CampaignWizardPage() {
     staleTime: 60_000,
     retry: false,
   });
+  const coverageData = coverageQuery.data;
+  const coverageEchec = coverageQuery.error !== null && coverageData === undefined;
   const coverageMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of coverageData ?? []) m.set(c.code, c.total ?? 0);
@@ -259,7 +263,7 @@ export function CampaignWizardPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Nouvelle campagne"
-        subtitle="Configure ta campagne en 4 étapes : identité, zones, sources, budget."
+        subtitle="Quatre étapes : nom, zones, sources, limites."
         breadcrumbs={[
           { label: 'Collectes', to: '/campaigns' },
           { label: 'Nouvelle' },
@@ -286,6 +290,8 @@ export function CampaignWizardPage() {
             toggleZone={toggleZone}
             removeZone={removeZone}
             estimatedCompanies={estimatedCompanies}
+            coverageError={coverageEchec ? coverageQuery.error : null}
+            onRetryCoverage={() => void coverageQuery.refetch()}
           />
         ) : null}
         {step === 3 ? (
@@ -474,6 +480,7 @@ function StepIdentity({
 function StepZones({
   zoneType, setZoneType, zoneSearch, setZoneSearch,
   filteredCells, selectedZones, toggleZone, removeZone, estimatedCompanies,
+  coverageError, onRetryCoverage,
 }: {
   zoneType: ZoneType; setZoneType: (v: ZoneType) => void;
   zoneSearch: string; setZoneSearch: (v: string) => void;
@@ -482,10 +489,19 @@ function StepZones({
   toggleZone: (c: CoverageCell) => void;
   removeZone: (z: CampaignZone) => void;
   estimatedCompanies: number;
+  coverageError: unknown;
+  onRetryCoverage: () => void;
 }) {
   return (
     <div className="space-y-5">
-      <SectionHeading title="Zones cibles" hint="Choisis les départements, régions ou villes à scraper." />
+      <SectionHeading title="Zones cibles" hint="Choisissez les zones à couvrir." />
+      {coverageError !== null ? (
+        <QueryErrorState
+          error={coverageError}
+          contexte="le nombre d’entreprises déjà connues par zone"
+          onRetry={onRetryCoverage}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl

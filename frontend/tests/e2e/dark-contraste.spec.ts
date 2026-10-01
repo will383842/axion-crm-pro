@@ -427,11 +427,11 @@ test("la description d'EmptyState est lisible en mode sombre (mesuree a 2,39:1 l
 
   // `EmptyState` est utilise 27 fois dans le produit ; `/companies` avec une
   // liste vide est le chemin le plus court pour l'atteindre reellement.
-  const description = page.getByText('Lance un scraping depuis la carte de couverture');
+  const description = page.getByText('Aucune entreprise pour l’instant');
   await expect(description).toBeVisible();
 
   const { mesures } = await balayer(page);
-  const mesure = mesures.find((m) => m.texte.startsWith('Lance un scraping depuis la carte'));
+  const mesure = mesures.find((m) => m.texte.startsWith('Aucune entreprise pour'));
   expect(mesure, "la description d'EmptyState n'a pas ete mesuree : la garde ne prouve rien").toBeDefined();
   expect(
     mesure?.ratio,

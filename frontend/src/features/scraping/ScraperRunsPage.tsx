@@ -15,6 +15,7 @@ import {
   mapStatusToTone,
   Modal,
   PageHeader,
+  QueryErrorState,
   SearchInput,
   Skeleton,
   StatusPill,
@@ -248,7 +249,7 @@ function exportCsv(runs: Run[]) {
 export function ScraperRunsPage() {
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['scraper-runs'],
     queryFn: async () => (await api.get<ApiList>('/scraper-runs?per_page=50')).data,
     /**
@@ -450,8 +451,10 @@ export function ScraperRunsPage() {
         }
       />
 
-      {/* Table */}
-      {isLoading ? (
+      {/* Table — P0-3 : une panne n'est jamais une liste vide. */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="l’historique des collectes" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <RunsTableSkeleton />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -459,8 +462,8 @@ export function ScraperRunsPage() {
           title={search || filter !== 'all' ? 'Aucun run ne correspond' : 'Aucun run pour l’instant'}
           description={
             search || filter !== 'all'
-              ? 'Essaie un autre filtre ou réinitialise la recherche.'
-              : 'Lance ton premier scrape depuis la page Couverture France.'
+              ? 'Aucun résultat avec ces filtres.'
+              : 'Aucune collecte en cours.'
           }
           action={
             search || filter !== 'all' ? (

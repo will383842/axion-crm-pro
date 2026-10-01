@@ -11,7 +11,7 @@ test.describe('Auth flow', () => {
 
   test('magic link page shows email input', async ({ page }) => {
     await page.goto('/magic-link');
-    await expect(page.getByRole('heading', { name: /lien magique/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /lien de connexion/i })).toBeVisible();
   });
 
   test('2FA page shows 6-digit input', async ({ page }) => {

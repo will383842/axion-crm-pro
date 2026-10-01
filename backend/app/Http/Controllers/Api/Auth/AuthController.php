@@ -88,9 +88,17 @@ class AuthController extends ApiController
             return response()->json(['error' => 'unauthenticated'], 401);
         }
 
+        // Audit UX 02/10 (P0-2) — l'en-tête affichait « Mon workspace » ou
+        // « Workspace a1b2c3 » faute de connaître le NOM de l'espace. On le
+        // renvoie ici (id + nom seulement) ; `null` quand le compte n'a pas
+        // d'espace courant (ou que celui-ci a disparu).
+        $courant = $user->currentWorkspace;
+        $espace = $courant === null ? null : ['id' => $courant->id, 'name' => $courant->name];
+
         return $this->ok([
             'user' => $user->only(['id', 'email', 'name', 'locale', 'timezone', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
             'roles' => $user->getRoleNames(),
+            'workspace' => $espace,
         ]);
     }
 

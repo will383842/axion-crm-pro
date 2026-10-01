@@ -165,6 +165,14 @@ test('F36-001 — lancer une campagne est refuse pour DROIT, et non pour forme',
         'La requete est refusee pour sa FORME et non pour le DROIT : avec un corps valide, '
         . 'ce compte lancerait la campagne.',
     );
+    // Depuis `lang/fr/validation.php` (audit UX 02/10), la règle `required`
+    // se lit en français : la garde ci-dessus ne verrait plus une erreur de
+    // FORME traduite. On cherche donc aussi le texte français.
+    $this->assertStringNotContainsString(
+        'est obligatoire',
+        (string) $r->getContent(),
+        'La requete est refusee pour sa FORME (message traduit) et non pour le DROIT.',
+    );
 });
 
 test('F36-001 — TEMOIN : un OPERATEUR a bien le droit de lancer une campagne', function () {

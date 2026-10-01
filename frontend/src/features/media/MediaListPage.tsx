@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput, cn } from "@/components/ui";
+import { Button, Card, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchInput, cn } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAntiRebond } from "@/hooks/useAntiRebond";
 import { toast } from "sonner";
@@ -173,7 +173,7 @@ export function MediaListPage() {
     }
   }
 
-  const { data, isLoading } = useQuery<MediaResponse>({
+  const { data, isLoading, error, refetch } = useQuery<MediaResponse>({
     queryKey: ["media", page, filtreInterroge],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), per_page: "100", ...filterParams(filtreInterroge) });
@@ -275,7 +275,10 @@ export function MediaListPage() {
         ) : null}
       </div>
 
-      {isLoading ? (
+      {/* P0-3 — une panne n'est jamais une liste vide. */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="la liste des médias" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
       ) : rows.length === 0 ? (
         <EmptyState
@@ -284,7 +287,7 @@ export function MediaListPage() {
           description={
             hasActiveFilter
               ? "Aucun média ne correspond à ces filtres."
-              : "Lance l'extraction des médias (media:extract-from-companies) pour peupler la base."
+              : "Aucun média pour l’instant."
           }
         />
       ) : (

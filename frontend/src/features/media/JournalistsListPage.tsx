@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, EmptyState, KpiCard, PageHeader, SearchInput } from "@/components/ui";
+import { Button, Card, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchInput } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { toast } from "sonner";
@@ -58,7 +58,7 @@ export function JournalistsListPage() {
     }
   }
 
-  const { data, isLoading } = useQuery<JournalistsResponse>({
+  const { data, isLoading, error, refetch } = useQuery<JournalistsResponse>({
     queryKey: ["journalists", page, rechercheDifferee],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -107,7 +107,10 @@ export function JournalistsListPage() {
         <SearchInput label="Rechercher un journaliste par nom" value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher par nom…" className="w-72" />
       </div>
 
-      {isLoading ? (
+      {/* P0-3 — une panne n'est jamais une liste vide. */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="la liste des journalistes" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
       ) : rows.length === 0 ? (
         <EmptyState

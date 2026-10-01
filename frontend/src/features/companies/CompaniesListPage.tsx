@@ -9,6 +9,7 @@ import {
   EmptyState,
   KpiCard,
   PageHeader,
+  QueryErrorState,
   SearchInput,
   Toolbar,
   cn,
@@ -260,7 +261,7 @@ export function CompaniesListPage() {
     }
   }
 
-  const { data, isLoading } = useQuery<CompaniesResponse>({
+  const { data, isLoading, error, refetch } = useQuery<CompaniesResponse>({
     // ⚠️ `filtreInterroge`, PAS `filter` : c'est ici que se joue G42-010. La
     // clé porte la valeur DIFFÉRÉE, donc elle ne change pas à chaque touche.
     queryKey: ["companies", page, filtreInterroge],
@@ -634,7 +635,10 @@ export function CompaniesListPage() {
         }
       />
 
-      {isLoading ? (
+      {/* P0-3 — une panne n'est jamais « Aucune entreprise ». */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="la liste des entreprises" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <CompaniesTableSkeleton />
       ) : rows.length === 0 ? (
         <EmptyState
@@ -642,15 +646,15 @@ export function CompaniesListPage() {
           title="Aucune entreprise"
           description={
             hasActiveFilter
-              ? "Aucune entreprise ne correspond à ces filtres. Réinitialise pour voir plus de résultats."
-              : "Lance un scraping depuis la carte de couverture France pour découvrir des entreprises."
+              ? "Aucun résultat avec ces filtres."
+              : "Aucune entreprise pour l’instant. La carte de France permet d’en récupérer."
           }
           action={
             <Link
               to="/coverage"
               className="inline-flex h-9 items-center justify-center rounded-lg bg-gradient-to-b from-slate-900 to-slate-800 px-4 text-sm font-medium text-white"
             >
-              Aller à la couverture →
+              Voir la carte
             </Link>
           }
         />

@@ -6,6 +6,7 @@ import {
   CompaniesTableSkeleton,
   EmptyState,
   PageHeader,
+  QueryErrorState,
   StatusPill,
   type StatusTone,
   cn,
@@ -56,13 +57,15 @@ export function ProxyProvidersPage() {
         subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone."
       />
 
-      {list.isLoading ? (
+      {list.error !== null && list.data === undefined ? (
+        <QueryErrorState error={list.error} contexte="les fournisseurs de proxies" onRetry={() => void list.refetch()} />
+      ) : list.isLoading ? (
         <CompaniesTableSkeleton rows={4} />
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<Globe className="h-10 w-10" />}
           title="Aucun fournisseur configuré"
-          description="Configure WEBSHARE_API_KEY ou IPROYAL_USERNAME dans .env serveur pour activer les proxies."
+          description="Aucun fournisseur de proxies n’est configuré sur le serveur."
           action={
             <Button variant="secondary" iconLeft={<Activity className="h-3.5 w-3.5" />}>
               Voir la documentation

@@ -83,7 +83,7 @@ describe('AudienceBuilderPage — rendu', () => {
     // Sans nom, on ne peut pas créer — et l'écran DIT pourquoi.
     expect(screen.getByRole('button', { name: /Créer l'audience/ })).toBeDisabled();
     expect(
-      screen.getByText('Renseigne un nom et au moins un critère pour activer la création.'),
+      screen.getByText('Donnez un nom et au moins un critère.'),
     ).toBeVisible();
   });
 

@@ -18,6 +18,16 @@ export async function ensureCsrf(): Promise<void> {
   csrfFetched = true;
 }
 
+/**
+ * Redemande le cookie CSRF même s'il a déjà été obtenu. Sert après un 419 :
+ * le jeton mémorisé par `ensureCsrf` est périmé (session expirée ou
+ * renouvelée), et le redemander une fois suffit le plus souvent.
+ */
+export async function rafraichirCsrf(): Promise<void> {
+  csrfFetched = false;
+  await ensureCsrf();
+}
+
 api.interceptors.request.use(async (config) => {
   if (['post', 'put', 'patch', 'delete'].includes((config.method ?? '').toLowerCase())) {
     await ensureCsrf();

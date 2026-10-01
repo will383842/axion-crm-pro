@@ -28,8 +28,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   if (input.companiesTotal === 0) {
     out.push({
       id: 'first-scrape',
-      title: 'Lance ton premier scrape',
-      description: 'Choisis un département sur la carte France et démarre la collecte.',
+      title: 'Récupérer des entreprises',
+      description: 'Choisissez un département sur la carte de France.',
       href: '/coverage',
       tone: 'sky',
       icon: '🚀',
@@ -37,8 +37,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   } else if (input.scraperRuns24h === 0) {
     out.push({
       id: 'resume-coverage',
-      title: 'Reprends ton dernier zone',
-      description: 'Aucun scrape lancé sur les dernières 24h — relance la couverture.',
+      title: 'Reprendre la collecte',
+      description: 'Aucune collecte depuis 24 heures.',
       href: '/coverage',
       tone: 'violet',
       icon: '🔄',
@@ -48,8 +48,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   if (input.qualityAvgScore > 0 && input.qualityAvgScore < 70) {
     out.push({
       id: 'enrich-quality',
-      title: 'Améliore la qualité',
-      description: `Score moyen ${input.qualityAvgScore}/100 — enrichis tes fiches "basique".`,
+      title: 'Compléter les fiches incomplètes',
+      description: `Qualité moyenne : ${input.qualityAvgScore}/100.`,
       href: '/companies?quality_badge=basique',
       tone: 'amber',
       icon: '✨',
@@ -60,8 +60,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   if (input.companiesTotal > 0) {
     out.push({
       id: 'browse-companies',
-      title: 'Explore tes entreprises',
-      description: `${input.companiesTotal.toLocaleString('fr-FR')} fiches collectées — filtre, segmente, exporte.`,
+      title: 'Voir vos entreprises',
+      description: `${input.companiesTotal.toLocaleString('fr-FR')} fiches.`,
       href: '/companies',
       tone: 'emerald',
       icon: '🏢',
@@ -72,8 +72,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   if (out.length === 0) {
     out.push({
       id: 'discover-coverage',
-      title: 'Découvre la carte France',
-      description: 'Visualise la couverture en régions, départements et villes.',
+      title: 'Voir la carte',
+      description: 'Régions, départements et villes couverts.',
       href: '/coverage',
       tone: 'sky',
       icon: '🗺️',
@@ -91,7 +91,7 @@ export function NextActions(props: NextActionsInput) {
       <CardHeader>
         <div className="min-w-0">
           <CardEyebrow>Prochaines étapes</CardEyebrow>
-          <CardTitle>Que veux-tu faire maintenant ?</CardTitle>
+          <CardTitle>Et maintenant ?</CardTitle>
         </div>
       </CardHeader>
 

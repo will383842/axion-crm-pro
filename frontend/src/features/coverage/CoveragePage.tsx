@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 // Deux consequences a garder en tete si l'apparence surprend : la version du
 // systeme ajoute les classes `dark:` (c'est le correctif) et `tabular-nums`
 // sur la valeur (les chiffres ne dansent plus quand le compteur change).
-import { Stat } from '@/components/ui';
+import { QueryErrorState, Stat } from '@/components/ui';
 
 // G42-003 — la carte est chargee A LA DEMANDE, sur ce seul ecran.
 //
@@ -62,7 +62,7 @@ export function CoveragePage() {
   const [level, setLevel] = useState<Level>('department');
   const [selected, setSelected] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['coverage', level],
     queryFn: async () => {
       const r = await api.get<{ cells: Cell[] }>('/coverage', { params: { level } });
@@ -72,6 +72,8 @@ export function CoveragePage() {
   });
 
   const cells = useMemo(() => data ?? [], [data]);
+  // P0-3 — une panne n'est pas une France vide : la carte cède la place à l'erreur.
+  const echec = error !== null && data === undefined;
 
   const stats = useMemo(() => {
     const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
@@ -171,7 +173,7 @@ export function CoveragePage() {
           variant="ghost"
         />
         <div className="ml-auto text-xs text-slate-500">
-          {isLoading ? 'Chargement…' : `${stats.totalAll.toLocaleString('fr-FR')} entreprises au total`}
+          {isLoading ? 'Chargement…' : echec ? '' : `${stats.totalAll.toLocaleString('fr-FR')} entreprises au total`}
         </div>
       </div>
 
@@ -189,6 +191,9 @@ export function CoveragePage() {
           `frontend/tests/styles/jetons-d-ombre.test.ts` refuse desormais toute
           ombre ecrite en valeur brute sous `src/` : seul `var(--shadow-*)` y
           est admis. */}
+      {echec ? (
+        <QueryErrorState error={error} contexte="la couverture de la France" onRetry={() => void refetch()} />
+      ) : (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <div className="rounded-2xl bg-white/80 p-1 shadow-[var(--shadow-card)] ring-1 ring-slate-200/60 backdrop-blur-sm">
           {/* La reserve d'espace fait EXACTEMENT la hauteur de la carte
@@ -231,6 +236,7 @@ export function CoveragePage() {
           <TopList top={stats.top} selected={selected} onSelect={setSelected} />
         </aside>
       </div>
+      )}
     </div>
   );
 }

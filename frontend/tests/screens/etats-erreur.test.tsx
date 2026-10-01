@@ -68,6 +68,12 @@ import { UsersPage } from '@/features/users/UsersPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 // P5-35-012 — le fil d'activité de l'accueil. Un bloc, pas un écran de route.
 import { ActivityFeed } from '@/features/dashboard/components/ActivityFeed';
+// Audit UX du 02/10/2026 (P0-3) — 19 écrans de plus portent `QueryErrorState`.
+// Deux représentants sont gardés ici : la liste la plus consultée (entreprises,
+// dont l'état vide conseillait « Lance un scraping » sous une panne) et un écran
+// de réglage (étiquettes).
+import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
+import { TagsManagerPage } from '@/features/tags/TagsManagerPage';
 
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, getJson, http, HttpResponse, type HttpHandler } from '../msw/handlers';
@@ -201,6 +207,26 @@ const ECRANS: CasEcran[] = [
     // NI un mot accentué. « disponible » n'apparaît nulle part ailleurs, ni dans
     // la carte, ni dans aucun message de `QueryErrorState`.
     texteVide: 'disponible',
+  },
+  {
+    // P0-3 (audit UX 02/10) — sous une panne, l'écran affichait « Aucune
+    // entreprise — Lance un scraping depuis la carte » sur une base de 4,3 M.
+    nom: 'CompaniesListPage',
+    rendre: () => <CompaniesListPage />,
+    path: '/companies',
+    vide: {
+      '/companies': { data: [], meta: { current_page: 1, last_page: 1, per_page: 100, total: 0 } },
+      '/referentiels/geo': { regions: [], departments: [] },
+    },
+    // « Aucune entreprise pour l’instant. » — sans accent ni apostrophe.
+    texteVide: 'Aucune entreprise pour',
+  },
+  {
+    nom: 'TagsManagerPage',
+    rendre: () => <TagsManagerPage />,
+    path: '/tags',
+    vide: { '/tags': { data: [] } },
+    texteVide: 'Aucun tag',
   },
 ];
 

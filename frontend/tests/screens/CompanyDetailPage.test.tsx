@@ -103,6 +103,24 @@ describe('CompanyDetailPage — rendu', () => {
     expect(await screen.findByText('Cette entreprise n\'existe pas ou a été supprimée.')).toBeVisible();
     expect(screen.queryByText('Chargement de la fiche entreprise…')).not.toBeInTheDocument();
   });
+
+  /**
+   * Audit UX du 02/10/2026 (P0-3) — l'écran titrait « 404 » / « Entreprise
+   * introuvable » pour TOUTE erreur, y compris une panne serveur : on croyait
+   * la fiche supprimée alors que le serveur était tombé.
+   */
+  it('panne (500) : état d’erreur avec « Réessayer », JAMAIS « introuvable »', async () => {
+    await renderScreen(<CompanyDetailPage />, {
+      path: PATH,
+      url: URL_VISITEE,
+      landingRoutes: LANDING,
+      handlers: [getStatus('/companies/42', 500)],
+    });
+
+    expect(await screen.findByText('Le serveur est en panne')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible();
+    expect(document.body.textContent).not.toMatch(/introuvable|n'existe pas|404/);
+  });
 });
 
 describe('CompanyDetailPage — parcours', () => {

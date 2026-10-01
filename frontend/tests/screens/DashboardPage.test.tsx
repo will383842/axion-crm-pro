@@ -2,7 +2,7 @@
  * ÉCRAN `/` — `src/features/dashboard/DashboardPage.tsx`.
  *
  * Famille : TABLEAU DE BORD — beaucoup d'appels concurrents (`/auth/me`,
- * `/dashboard/stats`, `/coverage`, `/audit-logs`), période commutable,
+ * `/dashboard/stats`, `/coverage`, `/audit-logs`),
  * rafraîchissement.
  *
  * C'est l'écran où `onUnhandledRequest: 'error'` (tests/setup.ts) sert le
@@ -109,9 +109,8 @@ describe('DashboardPage — rendu', () => {
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
     expect(await screen.findByText('Bonjour Will 👋')).toBeVisible();
 
-    // La période affichée est celle que le SERVEUR renvoie (`period_label`),
-    // pas celle que l'écran suppose.
-    expect(screen.getByText("Vue d'ensemble · derniers 30 jours")).toBeVisible();
+    // Plus de période affichée : aucun chiffre de l'écran n'en dépend.
+    expect(screen.getByText("Vue d'ensemble de votre base")).toBeVisible();
 
     // La qualité moyenne est CALCULÉE : (100×100 + 60×60 + 40×25) / 200 = 73.
     expect(vignette('Qualité moyenne')).toHaveTextContent('73/100');
@@ -163,7 +162,7 @@ describe('DashboardPage — rendu', () => {
         'qui court-circuite `isLoading` dans DashboardPage.tsx.',
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText('Lance ton premier scrape'),
+      screen.queryByText('Votre base est vide'),
       'D25-008 : l’état vide (« aucune entreprise ») s’affiche alors que le serveur ' +
         'n’a pas répondu. GESTE : `isEmpty` ne doit se calculer qu’une fois `isLoading` ' +
         'retombé, donc `isLoading` doit exister.',
@@ -181,7 +180,7 @@ describe('DashboardPage — rendu', () => {
     });
   });
 
-  it('base vide : invite à lancer un premier scrape, sans afficher d’indicateurs faux', async () => {
+  it('base vide : invite à récupérer des entreprises, sans afficher d’indicateurs faux', async () => {
     await renderScreen(<DashboardPage />, {
       path: PATH,
       handlers: [
@@ -195,15 +194,55 @@ describe('DashboardPage — rendu', () => {
       ],
     });
 
-    expect(await screen.findByText('Lance ton premier scrape')).toBeVisible();
+    expect(await screen.findByText('Votre base est vide')).toBeVisible();
     expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Démarrer sur \/coverage/ })).toHaveAttribute(
+    // Un libellé humain, plus d'URL brute (« Démarrer sur /coverage → »).
+    expect(screen.getByRole('link', { name: 'Récupérer des entreprises' })).toHaveAttribute(
       'href',
       '/coverage',
     );
+    // Vouvoiement, sans jargon.
+    expect(document.body.textContent).not.toMatch(/scrape|\/coverage|\bLance\b|\bChoisis\b/);
   });
 
-  it('une carte fille en échec n’emporte PAS le tableau de bord', async () => {
+  /**
+   * P0-1 (audit UX du 02/10) — LE TABLEAU DE BORD MENTAIT : sous une panne de
+   * `/dashboard/stats`, il affichait « Aucune entreprise collectée » sur une
+   * base de 4,3 M de fiches. Une panne doit se DIRE, avec « Réessayer ».
+   */
+  it('P0-1 — /dashboard/stats en panne : état d’erreur, JAMAIS « base vide »', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getStatus('/dashboard/stats', 500), ...socle()],
+    });
+
+    expect(await screen.findByText('Le serveur est en panne')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible();
+    expect(
+      screen.queryByText('Votre base est vide'),
+      'P0-1 : l’état « base vide » s’affiche alors que le serveur a ÉCHOUÉ. ' +
+        'GESTE : dans DashboardPage.tsx, tester `error !== null && data === undefined` ' +
+        'AVANT `isEmpty`, et rendre `QueryErrorState`.',
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
+  });
+
+  it('sans `companies_new_7d` du serveur, « Nouvelles 7j » affiche « — » et n’invente rien', async () => {
+    const sansNouvelles = { ...STATS } as Record<string, unknown>;
+    delete sansNouvelles['companies_new_7d'];
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/dashboard/stats', sansNouvelles), ...socle()],
+    });
+
+    await waitFor(() => {
+      expect(vignette('Nouvelles 7j')).toHaveTextContent('—');
+    });
+    // L'ancien repli `enrichies 24 h × 7` aurait affiché 8 428.
+    expect(vignette('Nouvelles 7j')).not.toHaveTextContent(/8.428/);
+  });
+
+  it('une carte fille en échec n’emporte PAS le tableau de bord, et DIT son échec', async () => {
     // `/coverage` peut répondre 500 sans que les indicateurs principaux soient
     // faux : l'écran doit dégrader la carte, pas la page.
     await renderScreen(<DashboardPage />, {
@@ -215,32 +254,23 @@ describe('DashboardPage — rendu', () => {
       expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
     });
     expect(screen.getByText('Top 5 départements')).toBeVisible();
-    expect(await screen.findByText('Aucun département couvert')).toBeVisible();
+    // P0-3 — la carte montre l'erreur, pas « Aucun département couvert ».
+    await screen.findByText('Le serveur est en panne');
+    const carte = bloc('Top 5 départements', '[role="alert"]');
+    expect(within(carte).getByText('Le serveur est en panne')).toBeVisible();
+    expect(screen.queryByText('Aucun département couvert')).not.toBeInTheDocument();
     expect(screen.queryByText('Isère')).not.toBeInTheDocument();
   });
 });
 
 describe('DashboardPage — parcours', () => {
   /**
-   * 🔴 DÉFAUT DE PRODUIT MESURÉ ICI — le sélecteur de période NE FAIT RIEN.
-   *
-   * `DashboardPage.tsx:78` déclare `queryKey: ['dashboard-stats']` SANS
-   * `period`. Changer de période met l'état React à jour, mais la clé de cache
-   * ne bouge pas : React Query sert la réponse déjà en cache, aucune requête ne
-   * part, et les chiffres restent ceux de 30 jours.
-   *
-   * Mesuré : après un clic sur « 7j », `urls` vaut toujours
-   *   ["https://api.localhost/api/v1/dashboard/stats?period=30d"]
-   * et le sous-titre reste « Vue d'ensemble · derniers 30 jours ».
-   *
-   * Le correctif tient en un mot — `queryKey: ['dashboard-stats', period]` —
-   * mais il touche `src/**`, hors du périmètre de ce lot. Ce test CONSIGNE le
-   * comportement actuel pour qu'il ne passe plus inaperçu : le jour où
-   * quelqu'un corrige la clé, il ROUGIT, et il n'y aura qu'à inverser les deux
-   * assertions ci-dessous (elles sont écrites pour ça).
+   * Le sélecteur 7j / 30j / 90j ne faisait RIEN (période absente de la clé de
+   * cache, et ignorée par le serveur hormis pour un libellé) : il est retiré.
+   * Cette garde rougit s'il revient sans agir — et aucune requête ne porte plus
+   * de `period` que le serveur ignorerait.
    */
-  it('🔴 changer de période ne déclenche AUCUNE requête (clé de cache sans `period`)', async () => {
-    const user = userEvent.setup();
+  it('aucun sélecteur de période factice, et aucune `period` envoyée', async () => {
     const { handler, urls } = recordGet('/dashboard/stats', STATS);
 
     await renderScreen(<DashboardPage />, { path: PATH, handlers: [handler, ...socle()] });
@@ -248,41 +278,10 @@ describe('DashboardPage — parcours', () => {
     await waitFor(() => {
       expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
     });
-    expect(urls).toHaveLength(1);
-    expect(new URL(urls[0] as string).searchParams.get('period')).toBe('30d');
-
-    await user.click(screen.getByRole('tab', { name: '7j' }));
-    // On laisse au réseau le temps de partir — s'il devait partir.
-    await new Promise((resolve) => { setTimeout(resolve, 300); });
-
-    // ATTENDU LE JOUR DU CORRECTIF : une 2e requête avec `period=7d`.
-    // CONSTATÉ AUJOURD'HUI : aucune requête, la période cliquée est ignorée.
-    expect(urls).toHaveLength(1);
-  });
-
-  it('🔴 sans `period_label` du serveur, l’écran AFFIRME une période qu’il n’a pas chargée', async () => {
-    // Conséquence du défaut ci-dessus, et la plus grave : le sous-titre retombe
-    // sur `PERIOD_LABEL[period]`, qui suit l'état React. L'écran annonce donc
-    // « derniers 7 jours » au-dessus de chiffres calculés sur 30 jours.
-    const user = userEvent.setup();
-    const sansLabel = { ...STATS } as Record<string, unknown>;
-    delete sansLabel['period_label'];
-
-    await renderScreen(<DashboardPage />, {
-      path: PATH,
-      handlers: [getJson('/dashboard/stats', sansLabel), ...socle()],
-    });
-
-    await waitFor(() => {
-      expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
-    });
-    expect(screen.getByText("Vue d'ensemble · derniers 30 jours")).toBeVisible();
-
-    await user.click(screen.getByRole('tab', { name: '7j' }));
-
-    // Le libellé change… sans que la moindre donnée ait été rechargée.
-    expect(await screen.findByText("Vue d'ensemble · derniers 7 jours")).toBeVisible();
-    expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
+    expect(screen.queryByRole('tab', { name: '7j' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '30j' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '90j' })).not.toBeInTheDocument();
+    expect(new URL(urls[0] as string).searchParams.has('period')).toBe(false);
   });
 
   it('« Actualiser » redemande les statistiques et l’écran reflète la NOUVELLE valeur', async () => {

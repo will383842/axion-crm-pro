@@ -1,21 +1,37 @@
 /**
- * User menu — Avatar + nom + DropdownMenu (Profil / Paramètres / Déconnexion).
+ * User menu — Avatar + nom + DropdownMenu (Paramètres / Déconnexion).
  *
  * - GET /api/v1/auth/me pour le user info (déjà cache via React Query)
  * - POST /api/v1/auth/logout pour la déconnexion → redirige /login
+ *
+ * Audit UX du 02/10/2026 (P0-2) :
+ *  - le nom affiché retombe sur l'ADRESSE E-MAIL quand le nom est vide — il
+ *    affichait « Utilisateur », qui ne dit pas qui est connecté ;
+ *  - l'entrée « Profil » (qui menait au même écran que « Paramètres ») et
+ *    l'entrée d'identité désactivée pour toujours ont été retirées ; l'adresse
+ *    reste lisible au survol du déclencheur.
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { User as UserIcon, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, LogOut } from 'lucide-react';
 import { Avatar, DropdownMenu, type MenuItem } from '@/components/ui';
 import { api } from '@/lib/api';
 
 interface MeResponse {
   user: {
     id: string;
-    name: string;
-    email: string;
+    name?: string | null;
+    email?: string | null;
   };
+}
+
+/** Nom à afficher : le nom, sinon l'adresse e-mail, sinon « Mon compte ». */
+export function nomAffiche(me: MeResponse | undefined): string {
+  const nom = me?.user?.name?.trim();
+  if (nom) return nom;
+  const email = me?.user?.email?.trim();
+  if (email) return email;
+  return 'Mon compte';
 }
 
 export function UserMenu() {
@@ -29,8 +45,8 @@ export function UserMenu() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const name = data?.user?.name ?? 'Utilisateur';
-  const email = data?.user?.email ?? '';
+  const name = nomAffiche(data);
+  const email = data?.user?.email?.trim() ?? '';
 
   const handleLogout = async () => {
     try {
@@ -43,20 +59,6 @@ export function UserMenu() {
   };
 
   const items: MenuItem[] = [
-    {
-      id: 'identity',
-      label: email || name,
-      icon: <Avatar name={name} size="xs" />,
-      disabled: true,
-      onSelect: () => {},
-    },
-    { id: 'div0', label: '', divider: true },
-    {
-      id: 'profile',
-      label: 'Profil',
-      icon: <UserIcon className="h-4 w-4" />,
-      onSelect: () => void navigate({ to: '/settings' }),
-    },
     {
       id: 'settings',
       label: 'Paramètres',
@@ -87,6 +89,7 @@ export function UserMenu() {
           type="button"
           className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
           aria-label={`Menu utilisateur — ${name}`}
+          title={email || name}
         >
           <Avatar name={name} size="sm" />
           <span className="hidden text-sm font-medium text-sidebar-fg lg:inline">{name}</span>

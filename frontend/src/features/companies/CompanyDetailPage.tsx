@@ -15,11 +15,12 @@ import {
   IconButton,
   PageShell,
   QualityBadge,
+  QueryErrorState,
   SizeCategoryBadge,
   Spinner,
   cn,
 } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, qualifierErreur } from '@/lib/api';
 import { ContactsCard, type ContactItem } from './components/ContactsCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
@@ -68,7 +69,7 @@ export function CompanyDetailPage() {
   const { companyId } = useParams({ strict: false }) as { companyId?: string };
   const [showRaw, setShowRaw] = useState(false);
 
-  const { data: c, isLoading, isError } = useQuery({
+  const { data: c, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['company', companyId],
     queryFn: async () => (await api.get<CompanyDetail>(`/companies/${companyId}`)).data,
     enabled: !!companyId,
@@ -103,11 +104,20 @@ export function CompanyDetailPage() {
       </PageShell>
     );
   }
+  // P0-3 — « Introuvable » seulement sur un VRAI 404. Une panne, un refus de
+  // droits ou un réseau coupé ne prouvent pas que l'entreprise n'existe pas.
+  if (isError && qualifierErreur(error).nature !== 'introuvable') {
+    return (
+      <PageShell title="Fiche entreprise">
+        <QueryErrorState error={error} contexte="la fiche de cette entreprise" onRetry={() => void refetch()} />
+      </PageShell>
+    );
+  }
   if (isError || !c) {
     return (
       <PageShell title="Entreprise introuvable">
         <EmptyState
-          title="404"
+          title="Cette entreprise n’existe plus"
           description="Cette entreprise n'existe pas ou a été supprimée."
         />
       </PageShell>

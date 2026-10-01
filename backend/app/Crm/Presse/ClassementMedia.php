@@ -614,7 +614,7 @@ final class ClassementMedia
         foreach ($themes as $t) {
             $gardes[$t] = $scoreParTheme[$t] ?? 0;
         }
-        $publics = self::publicsDeduits($gardes, $scorePublic, $scores['theme:grand-public'] ?? 0);
+        $publics = self::publicsDeduits($gardes, $scorePublic, $scores['theme:grand-public']);
         if ($format === 'fiction-jeu') {
             $publics = array_values(array_intersect($publics, ['grand-public']));
         }

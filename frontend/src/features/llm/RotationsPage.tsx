@@ -7,6 +7,7 @@ import {
   CompaniesTableSkeleton,
   EmptyState,
   PageHeader,
+  QueryErrorState,
   StatusPill,
   cn,
   TableScroll,
@@ -36,7 +37,7 @@ const DIMENSION_LABELS: Record<Dimension, string> = {
 const ROW_GRID = 'minmax(180px,1fr) 90px 110px 90px 180px';
 
 export function RotationsPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['rotations'],
     queryFn: async () => (await api.get<{ data: Rotation[] }>('/rotations')).data,
   });
@@ -55,13 +56,15 @@ export function RotationsPage() {
         subtitle="5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers."
       />
 
-      {isLoading ? (
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="les rotations" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <CompaniesTableSkeleton rows={5} />
       ) : total === 0 ? (
         <EmptyState
           icon={<Repeat className="h-10 w-10" />}
           title="Aucune rotation configurée"
-          description="Configure des rotations pour fluidifier le scraping et éviter le rate-limiting des providers."
+          description="Aucune rotation n’est configurée sur le serveur."
         />
       ) : (
         <div className="space-y-4">

@@ -230,7 +230,7 @@ export function PasswordResetPage() {
   return (
     <AuthShell
       title="Réinitialiser le mot de passe"
-      description="Saisis l'email associé à ton compte, on t'envoie un lien sécurisé."
+      description="Indiquez votre adresse e-mail : nous vous envoyons un lien."
     >
       {sent ? (
         <div className="space-y-3 text-center">
@@ -241,7 +241,7 @@ export function PasswordResetPage() {
             Un lien a été envoyé à <strong>{email}</strong>
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Vérifie ta boîte mail. Le lien expire dans 60 minutes.
+            Consultez votre boîte de réception. Le lien est valable 60 minutes.
           </p>
           <a
             href="/login"

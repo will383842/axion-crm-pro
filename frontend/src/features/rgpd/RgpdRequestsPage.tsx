@@ -9,6 +9,7 @@ import {
   Input,
   Modal,
   PageHeader,
+  QueryErrorState,
   SegmentedControl,
   StatusPill,
   mapStatusToTone,
@@ -181,7 +182,9 @@ export function RgpdRequestsPage() {
         />
       </div>
 
-      {list.isLoading ? (
+      {list.error !== null && list.data === undefined ? (
+        <QueryErrorState error={list.error} contexte="les demandes RGPD" onRetry={() => void list.refetch()} />
+      ) : list.isLoading ? (
         <CompaniesTableSkeleton rows={5} />
       ) : rows.length === 0 ? (
         <EmptyState

@@ -21,6 +21,7 @@ import {
   KpiCard,
   Modal,
   PageHeader,
+  QueryErrorState,
   Skeleton,
 } from '@/components/ui';
 
@@ -105,7 +106,7 @@ export function TagsManagerPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tags'],
     queryFn: async () => (await api.get<{ data: Tag[] }>('/tags')).data.data,
   });
@@ -197,8 +198,10 @@ export function TagsManagerPage() {
         <KpiCard tone="amber"   label="LLM"        value={counts.llm}    sublabel="proposées par l’IA" />
       </div>
 
-      {/* Body */}
-      {isLoading ? (
+      {/* Body — P0-3 : une panne n'est jamais « Aucun tag ». */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="les étiquettes" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-32 w-full" />
@@ -208,7 +211,7 @@ export function TagsManagerPage() {
         <EmptyState
           icon={<Hash className="h-8 w-8" />}
           title="Aucun tag"
-          description="Crée ton premier tag manuel ou attends que le pipeline d'enrichissement génère les tags auto."
+          description="Aucune étiquette pour l’instant."
           action={
             <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
               Créer un tag

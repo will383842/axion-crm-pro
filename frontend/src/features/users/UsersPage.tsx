@@ -300,7 +300,7 @@ export function UsersPage() {
         <EmptyState
           icon={<UsersIcon className="h-10 w-10" />}
           title="Aucun utilisateur"
-          description="Invite ton premier collaborateur."
+          description="Aucun autre utilisateur pour l’instant."
           action={
             <Button variant="primary" iconLeft={<UserPlus className="h-3.5 w-3.5" />} onClick={() => setOpen(true)}>
               Inviter

@@ -5,7 +5,7 @@
       "email": "Adresse e-mail",
       "password": "Mot de passe",
       "submit": "Se connecter",
-      "magicLink": "Recevoir un lien magique",
+      "magicLink": "Recevoir un lien de connexion",
       "forgot": "Mot de passe oublié ?"
     },
     "twoFactor": {

@@ -466,7 +466,7 @@ export function SettingsPage() {
               </div>
             </CardHeader>
             <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
-              Le thème est synchronisé avec ta préférence système et persisté localement.
+              Le thème suit la préférence de votre système et reste mémorisé sur cet appareil.
             </p>
             <DarkModeToggle />
           </Card>
@@ -479,8 +479,8 @@ export function SettingsPage() {
               </div>
             </CardHeader>
             <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
-              Choisis l’espacement par défaut des lignes dans les listes longues. Le réglage est
-              posé sur le document et conservé d’une session à l’autre.
+              Choisissez l’espacement des lignes dans les listes longues. Le réglage est conservé
+              d’une session à l’autre.
             </p>
             <div className="inline-flex rounded-lg bg-slate-100 p-0.5 dark:bg-slate-800">
               {(['comfortable', 'compact'] as const).map((d) => (

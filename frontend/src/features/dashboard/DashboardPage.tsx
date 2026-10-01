@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import {
   PageHeader,
   LiveBadge,
   KpiCard,
   Button,
-  SegmentedControl,
   Card,
   EmptyState,
+  QueryErrorState,
   Skeleton,
   cn,
 } from '@/components/ui';
@@ -39,19 +40,11 @@ interface MeResponse {
   user: { id: string; name?: string | null; email?: string | null };
 }
 
-type Period = '7d' | '30d' | '90d';
-
-const PERIOD_OPTIONS = [
-  { id: '7d' as const, label: '7j' },
-  { id: '30d' as const, label: '30j' },
-  { id: '90d' as const, label: '90j' },
-];
-
-const PERIOD_LABEL: Record<Period, string> = {
-  '7d': 'derniers 7 jours',
-  '30d': 'derniers 30 jours',
-  '90d': 'derniers 90 jours',
-};
+// P0 (audit UX 02/10) — le sélecteur 7 j / 30 j / 90 j a été RETIRÉ. Il
+// n'agissait sur rien : la période n'était pas dans la clé de cache, et le
+// serveur ne s'en sert que pour un libellé (`libellePeriode`). Les chiffres
+// affichés ne dépendent d'aucune période ; un sélecteur qui ne change rien
+// laisse croire le contraire.
 
 function firstNameFrom(me: MeResponse | undefined): string | null {
   const raw = me?.user?.name?.trim() || me?.user?.email?.split('@')[0]?.trim() || '';
@@ -66,8 +59,6 @@ function computeQualityAvg(qd: DashboardStats['quality_distribution']): number {
 }
 
 export function DashboardPage() {
-  const [period, setPeriod] = useState<Period>('30d');
-
   const { data: me } = useQuery<MeResponse>({
     queryKey: ['auth', 'me'],
     queryFn: async () => (await api.get<MeResponse>('/auth/me')).data,
@@ -75,9 +66,9 @@ export function DashboardPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ['dashboard-stats'],
-    queryFn: async () => (await api.get<DashboardStats>('/dashboard/stats', { params: { period } })).data,
+    queryFn: async () => (await api.get<DashboardStats>('/dashboard/stats')).data,
     refetchInterval: 30_000,
     // D25-008 — PAS de `placeholderData` ici, et c'est délibéré. Un
     // `placeholderData` met `isPending` à faux dès le premier rendu ; `isLoading`
@@ -103,23 +94,20 @@ export function DashboardPage() {
 
   const qualityAvg = useMemo(() => computeQualityAvg(stats.quality_distribution), [stats.quality_distribution]);
   const firstName = firstNameFrom(me);
-  const isEmpty = !isLoading && stats.companies_total === 0;
+  // P0-1 — une panne n'est PAS une base vide. L'état vide n'existe que sur un
+  // vrai 0 venu d'une réponse RÉUSSIE ; un échec affiche l'erreur.
+  const echec = error !== null && data === undefined;
+  const isEmpty = data !== undefined && data.companies_total === 0;
 
   return (
     <div className="px-6 py-6">
       <PageHeader
         eyebrow={firstName ? `Bonjour ${firstName} 👋` : 'Bienvenue'}
         title="Tableau de bord"
-        subtitle={`Vue d'ensemble · ${stats.period_label ?? PERIOD_LABEL[period]}`}
+        subtitle="Vue d'ensemble de votre base"
         actions={
           <>
             <LiveBadge label="En direct" refreshLabel="actualisé toutes les 30s" />
-            <SegmentedControl
-              size="sm"
-              options={PERIOD_OPTIONS}
-              value={period}
-              onChange={(v) => setPeriod(v)}
-            />
             <Button
               variant="secondary"
               size="sm"
@@ -135,19 +123,21 @@ export function DashboardPage() {
 
       {isLoading ? (
         <DashboardSkeleton />
+      ) : echec ? (
+        <QueryErrorState error={error} contexte="les chiffres du tableau de bord" onRetry={() => void refetch()} />
       ) : isEmpty ? (
         <Card padding="lg">
           <EmptyState
-            title="Lance ton premier scrape"
-            description="Aucune entreprise collectée pour l'instant. Choisis un département sur la carte France et démarre la couverture en un clic."
+            title="Votre base est vide"
+            description="Aucune entreprise pour l’instant. Choisissez un département sur la carte de France pour en récupérer."
             icon="🚀"
             action={
-              <a
-                href="/coverage"
+              <Link
+                to="/coverage"
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-slate-900 to-slate-800 px-5 text-sm font-semibold text-white shadow-sm transition hover:from-slate-800 hover:to-slate-700 dark:from-white dark:to-slate-100 dark:text-slate-900"
               >
-                Démarrer sur /coverage →
-              </a>
+                Récupérer des entreprises
+              </Link>
             }
           />
         </Card>
@@ -169,7 +159,6 @@ export function DashboardPage() {
                     },
                   }
                 : {})}
-              progress={stats.companies_total > 0 ? Math.min(100, Math.round((stats.companies_total / 50_000) * 100)) : 2}
             />
             <KpiCard
               tone="violet"
@@ -189,7 +178,9 @@ export function DashboardPage() {
             <KpiCard
               tone="emerald"
               label="Nouvelles 7j"
-              value={(stats.companies_new_7d ?? stats.companies_enriched_24h * 7).toLocaleString('fr-FR')}
+              // Pas de valeur inventée (l'ancien repli `enrichies 24 h × 7`) :
+              // sans chiffre du serveur, on l'écrit.
+              value={typeof stats.companies_new_7d === 'number' ? stats.companies_new_7d.toLocaleString('fr-FR') : '—'}
               sublabel="Découvertes sur 7 jours"
               {...(typeof stats.new_7d_trend_pct === 'number'
                 ? {

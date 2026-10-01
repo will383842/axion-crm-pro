@@ -122,7 +122,7 @@ export function GlobalSearch() {
           <Command.List className="max-h-96 overflow-y-auto p-2">
             {search.length < 2 && (
               <Command.Empty className="py-8 text-center text-sm text-slate-500">
-                Tape au moins 2 caractères pour rechercher.
+                Saisissez au moins 2 caractères.
               </Command.Empty>
             )}
 

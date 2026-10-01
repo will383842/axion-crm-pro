@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, MailCheck, Archive, MapPin } from 'lucide-react';
-import { Card, KpiCard, PageHeader } from '@/components/ui';
+import { Card, KpiCard, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
 
 interface ObservabilitySummary {
@@ -25,7 +25,7 @@ interface ObservabilitySummary {
  * Data via /api/v1/observability/summary, queries directes Postgres (<100ms).
  */
 export function ObservabilityPage() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['observability', 'summary'],
     queryFn: async () => {
       const res = await api.get<{ data: ObservabilitySummary }>('/observability/summary');
@@ -37,12 +37,16 @@ export function ObservabilityPage() {
   if (isLoading) {
     return <div className="p-6 text-sm text-slate-500">Chargement de l'observabilité…</div>;
   }
-  if (error || !data) {
+  if (error !== null && data === undefined) {
+    // P0-3 — le composant d'erreur partagé : nature de l'échec + « Réessayer ».
     return (
-      <div className="p-6 text-sm text-rose-600">
-        Impossible de charger les métriques d'observabilité.
+      <div className="p-6">
+        <QueryErrorState error={error} contexte="la santé du système" onRetry={() => void refetch()} />
       </div>
     );
+  }
+  if (!data) {
+    return null;
   }
 
   const totalArchived = Object.values(data.archive_reasons).reduce((a, b) => a + b, 0);

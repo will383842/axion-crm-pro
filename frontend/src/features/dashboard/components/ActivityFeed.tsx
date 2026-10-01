@@ -128,7 +128,7 @@ export function ActivityFeed() {
       ) : items.length === 0 ? (
         <EmptyState
           title="Activité bientôt disponible"
-          description="Les actions de ton équipe (scrapes, enrichissements, exports) apparaîtront ici."
+          description="Vos dernières actions apparaîtront ici."
           icon="📋"
         />
       ) : (

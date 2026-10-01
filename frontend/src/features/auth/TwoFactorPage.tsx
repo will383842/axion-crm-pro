@@ -252,7 +252,7 @@ export function TwoFactorPage() {
   return (
     <AuthShell
       title={t('auth.twoFactor.title')}
-      description="Saisis le code à 6 chiffres généré par ton authenticator."
+      description="Saisissez le code à 6 chiffres affiché par votre application d’authentification."
     >
       <form onSubmit={(e) => void verifierCode(e)} className="space-y-4">
         {champCode}

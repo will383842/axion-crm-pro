@@ -24,6 +24,7 @@ import {
   KpiCard,
   LiveBadge,
   PageHeader,
+  QueryErrorState,
   Skeleton,
   StatusPill,
   Tabs,
@@ -67,7 +68,7 @@ export function CampaignsListPage() {
   // lettre s'affiche sans attendre. Seule la requete patiente.
   const rechercheDifferee = useAntiRebond(search);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['campaigns', { search: rechercheDifferee }],
     queryFn: async () =>
       (await api.get<CampaignsListResponse>('/campaigns', {
@@ -149,7 +150,7 @@ export function CampaignsListPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Collectes"
-        subtitle="Lance et supervise des campagnes multi-sources avec budgets et auto-pause anti-blacklist."
+        subtitle="Vos collectes d’entreprises."
         badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={
           <Button
@@ -184,8 +185,10 @@ export function CampaignsListPage() {
         </div>
       </div>
 
-      {/* Body */}
-      {isLoading ? (
+      {/* Body — P0-3 : une panne n'est jamais une liste vide. */}
+      {error !== null && data === undefined ? (
+        <QueryErrorState error={error} contexte="les collectes" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <ListSkeleton />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -193,8 +196,8 @@ export function CampaignsListPage() {
           title={search || filter !== 'all' ? 'Aucune campagne ne correspond' : 'Aucune campagne pour l’instant'}
           description={
             search || filter !== 'all'
-              ? 'Essaie un autre filtre ou réinitialise la recherche.'
-              : 'Lance ta première campagne en 3 clics : zones cibles, sources, budget.'
+              ? 'Aucun résultat avec ces filtres.'
+              : 'Aucune collecte pour l’instant.'
           }
           action={
             search || filter !== 'all' ? (

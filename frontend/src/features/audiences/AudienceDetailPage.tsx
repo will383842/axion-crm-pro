@@ -220,7 +220,7 @@ export function AudienceDetailPage() {
               loading={refreshMutation.isPending}
               onClick={() => refreshMutation.mutate()}
             >
-              Refresh
+              Mettre à jour
             </Button>
             <Button
               variant="ghost"
@@ -334,7 +334,7 @@ function MembersTab({
   if (members.length === 0) {
     return (
       <Card padding="lg" className="text-center text-sm text-slate-500 dark:text-slate-400">
-        Aucun membre pour l'instant. Lance un refresh pour matérialiser le segment.
+        Aucun membre pour l'instant. Cliquez sur « Mettre à jour » pour calculer la liste.
       </Card>
     );
   }

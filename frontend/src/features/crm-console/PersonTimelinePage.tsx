@@ -13,8 +13,8 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
-import { Card, CardTitle, EmptyState, PageHeader, StatusPill } from '@/components/ui';
-import { api } from '@/lib/api';
+import { Card, CardTitle, EmptyState, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
+import { api, qualifierErreur } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { TimelineResponse } from './types';
 
@@ -43,6 +43,14 @@ function PersonTimelineContent() {
   }
 
   const data = timeline.data;
+  // P0-3 — une panne n'est pas une fiche introuvable : seul un 404 l'est.
+  if (data === undefined && timeline.error !== null && qualifierErreur(timeline.error).nature !== 'introuvable') {
+    return (
+      <div className="px-6 py-6">
+        <QueryErrorState error={timeline.error} contexte="l’historique de cette personne" onRetry={() => void timeline.refetch()} />
+      </div>
+    );
+  }
   if (data === undefined) {
     return (
       <div className="px-6 py-6">

@@ -17,7 +17,7 @@ import userEvent from '@testing-library/user-event';
 
 import { LoginPage } from '@/features/auth/LoginPage';
 import { renderScreen, type RenderScreenOptions } from '../helpers/renderScreen';
-import { postJson, postStatus, recordPost } from '../msw/handlers';
+import { API_ORIGIN, apiUrl, http, HttpResponse, postJson, postStatus, recordPost } from '../msw/handlers';
 
 const OPTIONS: RenderScreenOptions = {
   path: '/login',
@@ -45,10 +45,10 @@ describe('LoginPage — rendu', () => {
     expect(screen.getByLabelText('Mot de passe')).toHaveAttribute('type', 'password');
   });
 
-  it('propose les deux échappatoires (lien magique, mot de passe oublié)', async () => {
+  it('propose les deux échappatoires (lien de connexion, mot de passe oublié)', async () => {
     await renderScreen(<LoginPage />, OPTIONS);
 
-    expect(screen.getByRole('link', { name: 'Recevoir un lien magique' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Recevoir un lien de connexion' })).toHaveAttribute(
       'href',
       '/magic-link',
     );
@@ -141,5 +141,125 @@ describe('LoginPage — parcours', () => {
     expect(view.router.state.location.pathname).toBe('/login');
     // Et surtout : pas de redirection sauvage de l'intercepteur.
     expect(screen.queryByTestId('landing')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Audit UX du 02/10/2026 (P0-6) — LES ÉCHECS DE CONNEXION SE DISTINGUENT.
+ *
+ * Avant : « Une erreur est survenue. » en toast pour TOUT échec, et parfois la
+ * clé brute `auth.failed` du serveur. Un toast apparaissait même à l'ouverture
+ * de /login sans geste de l'utilisateur. Ces gardes rougissent si :
+ *  - une clé de traduction brute arrive à l'écran ;
+ *  - 422 / 429 / 419 / 5xx / réseau coupé donnent le même message ;
+ *  - un message d'erreur s'affiche sans soumission ;
+ *  - un 419 (jeton CSRF périmé) n'est pas rejoué une fois en silence.
+ */
+describe('LoginPage — messages d’échec', () => {
+  async function soumettre(): Promise<void> {
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Adresse e-mail'), 'will@axion-ia.com');
+    await user.type(screen.getByLabelText('Mot de passe'), 'faux-mot-de-passe');
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+  }
+
+  it('à l’ouverture, AUCUN message d’erreur ni alerte (rien sans geste)', async () => {
+    await renderScreen(<LoginPage />, OPTIONS);
+    // Laisser passer les effets et requêtes éventuelles du montage.
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Une erreur est survenue');
+  });
+
+  it('422 avec la CLÉ BRUTE `auth.failed` : message clair, jamais la clé', async () => {
+    await renderScreen(<LoginPage />, {
+      ...OPTIONS,
+      handlers: [postStatus('/auth/login', 422, { message: 'auth.failed', errors: { email: ['auth.failed'] } })],
+    });
+    await soumettre();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Adresse e-mail ou mot de passe incorrect.');
+    expect(document.body.textContent).not.toContain('auth.failed');
+    expect(document.body.textContent).not.toContain('Une erreur est survenue');
+  });
+
+  it('422 avec un message français du serveur : il est affiché tel quel', async () => {
+    await renderScreen(<LoginPage />, {
+      ...OPTIONS,
+      handlers: [
+        postStatus('/auth/login', 422, {
+          message: 'Trop d’essais. Réessayez dans 42 secondes.',
+          errors: { email: ['Trop d’essais. Réessayez dans 42 secondes.'] },
+        }),
+      ],
+    });
+    await soumettre();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Réessayez dans 42 secondes.');
+  });
+
+  it('429 : « trop d’essais », avec le délai annoncé par Retry-After', async () => {
+    await renderScreen(<LoginPage />, {
+      ...OPTIONS,
+      handlers: [
+        http.post(apiUrl('/auth/login'), () =>
+          HttpResponse.json({ message: 'Too Many Attempts.' }, { status: 429, headers: { 'Retry-After': '37' } }),
+        ),
+      ],
+    });
+    await soumettre();
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte).toHaveTextContent('Trop d’essais');
+    expect(alerte).toHaveTextContent('37 secondes');
+    expect(alerte).not.toHaveTextContent('Too Many Attempts');
+  });
+
+  it('panne serveur (500) : le dit, sans parler d’identifiants', async () => {
+    await renderScreen(<LoginPage />, { ...OPTIONS, handlers: [postStatus('/auth/login', 500)] });
+    await soumettre();
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte).toHaveTextContent('Le serveur a rencontré un problème');
+    expect(alerte).not.toHaveTextContent('mot de passe incorrect');
+  });
+
+  it('419 : redemande le jeton CSRF et rejoue la connexion UNE fois, en silence', async () => {
+    let appels = 0;
+    let cookies = 0;
+    const view = await renderScreen(<LoginPage />, {
+      ...OPTIONS,
+      handlers: [
+        http.get(`${API_ORIGIN}/sanctum/csrf-cookie`, () => {
+          cookies += 1;
+          return new HttpResponse(null, { status: 204 });
+        }),
+        http.post(apiUrl('/auth/login'), () => {
+          appels += 1;
+          return appels === 1
+            ? HttpResponse.json({ message: 'CSRF token mismatch.' }, { status: 419 })
+            : HttpResponse.json({ requires_2fa: false });
+        }),
+      ],
+    });
+    await soumettre();
+
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe('/');
+    });
+    expect(appels).toBe(2);
+    // Le cookie a bien été REDEMANDÉ entre les deux essais.
+    expect(cookies).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('419 deux fois de suite : « session expirée, rechargez la page »', async () => {
+    await renderScreen(<LoginPage />, {
+      ...OPTIONS,
+      handlers: [postStatus('/auth/login', 419, { message: 'CSRF token mismatch.' })],
+    });
+    await soumettre();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Votre session a expiré. Rechargez la page');
   });
 });

@@ -20,6 +20,7 @@ import {
   EmptyState,
   KpiCard,
   PageHeader,
+  QueryErrorState,
   Skeleton,
   StatusPill,
   type MenuItem,
@@ -65,13 +66,15 @@ export function AudiencesListPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['audiences'],
     queryFn: async () => (await api.get<AudiencesListResponse>('/audiences')).data,
     refetchInterval: 30_000,
   });
 
   const audiences = useMemo<EmailAudience[]>(() => data?.data ?? [], [data]);
+  // P0-3 — une panne n'est pas une liste vide : sans `data`, l'échec s'affiche.
+  const echec = error !== null && data === undefined;
 
   const totals = useMemo(() => {
     let active = 0;
@@ -117,21 +120,23 @@ export function AudiencesListPage() {
         }
       />
 
-      {/* KPIs */}
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+      {/* KPIs — masqués en cas d'échec : des zéros y seraient inventés. */}
+      {echec ? null : <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiCard tone="sky"     label="Total audiences" value={totals.all}     sublabel="segments configurés" />
         <KpiCard tone="emerald" label="Actives"         value={totals.active}  sublabel="exécutées au refresh auto" />
         <KpiCard tone="violet"  label="Membres cumul"   value={totals.members.toLocaleString('fr-FR')} sublabel="entreprises × audiences" />
-      </div>
+      </div>}
 
       {/* Body */}
-      {isLoading ? (
+      {echec ? (
+        <QueryErrorState error={error} contexte="les audiences" onRetry={() => void refetch()} />
+      ) : isLoading ? (
         <ListSkeleton />
       ) : audiences.length === 0 ? (
         <EmptyState
           icon={<Users2 className="h-8 w-8" />}
           title="Aucune audience pour l'instant"
-          description="Crée ton premier segment dynamique : filtre par département, taille, secteur, statut prospect…"
+          description="Créez une audience pour cibler des entreprises par département, taille ou secteur."
           action={
             <Button
               variant="primary"

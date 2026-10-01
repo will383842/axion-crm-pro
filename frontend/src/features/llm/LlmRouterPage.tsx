@@ -10,6 +10,7 @@ import {
   EmptyState,
   KpiCard,
   PageHeader,
+  QueryErrorState,
   StatusPill,
   Tabs,
   type TabItem,
@@ -93,7 +94,9 @@ export function LlmRouterPage() {
       </div>
 
       {tab === 'use_cases' && (
-        useCases.isLoading ? (
+        useCases.error !== null && useCases.data === undefined ? (
+          <QueryErrorState error={useCases.error} contexte="les moteurs d’IA" onRetry={() => void useCases.refetch()} />
+        ) : useCases.isLoading ? (
           <CompaniesTableSkeleton rows={5} />
         ) : useCasesData.length === 0 ? (
           <EmptyState
@@ -185,7 +188,9 @@ export function LlmRouterPage() {
       )}
 
       {tab === 'prompts' && (
-        useCases.isLoading ? (
+        useCases.error !== null && useCases.data === undefined ? (
+          <QueryErrorState error={useCases.error} contexte="les consignes des moteurs d’IA" onRetry={() => void useCases.refetch()} />
+        ) : useCases.isLoading ? (
           <CompaniesTableSkeleton rows={5} />
         ) : useCasesData.length === 0 ? (
           <EmptyState
@@ -220,7 +225,9 @@ export function LlmRouterPage() {
       )}
 
       {tab === 'usage' && (
-        usage.isLoading ? (
+        usage.error !== null && usage.data === undefined ? (
+          <QueryErrorState error={usage.error} contexte="la consommation des moteurs d’IA" onRetry={() => void usage.refetch()} />
+        ) : usage.isLoading ? (
           <CompaniesTableSkeleton rows={5} />
         ) : (
           <div className="space-y-4">

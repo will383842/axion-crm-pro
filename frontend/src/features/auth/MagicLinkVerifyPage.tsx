@@ -23,8 +23,8 @@ const LONGUEUR_JETON = 64;
 
 export function MagicLinkVerifyPage() {
   const navigate = useNavigate();
-  const recherche = useSearch({ strict: false });
-  const token = typeof recherche.token === 'string' ? recherche.token : '';
+  const recherche: Record<string, unknown> = useSearch({ strict: false });
+  const token = typeof recherche['token'] === 'string' ? recherche['token'] : '';
   const [echec, setEchec] = useState(false);
   const envoye = useRef(false);
 

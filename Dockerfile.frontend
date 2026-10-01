@@ -56,6 +56,48 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 # -----------------------------------------------------------------------------
+# 3 bis) caddy-build : le binaire Caddy RECOMPILE avec un Go et des
+#   dependances corriges (2026-10-01).
+#
+# `caddy:2-alpine` (republie le 2026-09-23) embarque TOUJOURS Caddy v2.11.4
+# compile avec Go 1.26.3 et golang.org/x/crypto 0.52, x/net 0.55, x/text 0.37,
+# grpc 1.81 : 17 HIGH (Trivy, `usr/bin/caddy`). Aucun tag plus recent n'existe
+# (v2.11.4 est la derniere version publiee). Un binaire Go embarque ses
+# dependances : seul un Caddy recompile les corrige — c'est ce que fait ce
+# stade, exactement comme `xcaddy` (module `main` minimal + `go get`), mais
+# SANS remplacement (`replace`) : les versions corrigees sont les vraies
+# versions requises, donc celles que lit Trivy dans le binaire.
+#
+# Versions = celles exigees par les avis (Go >= 1.26.6, x/crypto >= 0.55.0,
+# x/net >= 0.56.0, x/text >= 0.39.0, grpc >= 1.83.2), toutes epinglees.
+# Au reexamen : si une image `caddy:2-alpine` recompilee corrige ces avis,
+# ce stade peut disparaitre (et le `COPY --from=caddy-build` avec lui).
+# -----------------------------------------------------------------------------
+FROM golang:1.26.8-alpine AS caddy-build
+ARG CADDY_VERSION=v2.11.4
+WORKDIR /src/caddy
+ENV CGO_ENABLED=0 GOFLAGS=-trimpath
+RUN printf '%s\n' \
+        'package main' \
+        '' \
+        'import (' \
+        '    caddycmd "github.com/caddyserver/caddy/v2/cmd"' \
+        '    _ "github.com/caddyserver/caddy/v2/modules/standard"' \
+        ')' \
+        '' \
+        'func main() { caddycmd.Main() }' > main.go \
+    && go mod init caddy \
+    && go get \
+        github.com/caddyserver/caddy/v2@${CADDY_VERSION} \
+        golang.org/x/crypto@v0.55.0 \
+        golang.org/x/net@v0.56.0 \
+        golang.org/x/text@v0.39.0 \
+        google.golang.org/grpc@v1.83.2 \
+    && go mod tidy \
+    && go build -ldflags '-s -w' -o /usr/bin/caddy . \
+    && /usr/bin/caddy version
+
+# -----------------------------------------------------------------------------
 # 4) prod : Caddy 2 alpine sert dist/ sur :5173 (SPA fallback)
 #   Image minimale, zéro Node en runtime, garde le port 5173 attendu par Caddy.
 # -----------------------------------------------------------------------------
@@ -66,10 +108,11 @@ FROM caddy:2-alpine AS prod
 # de l'image : c-ares (usage après libération), curl et libcurl (transfert de
 # fichier erroné sur SMB, fuite de cookie entre hôtes).
 #
-# ⚠️ Ceci ne corrige PAS les 14 HIGH du binaire Caddy lui-même (bibliothèque
-# standard Go, golang.org/x/net, grpc) : seul un Caddy reconstruit en amont
-# les résout. Voir `.trivyignore`.
+# Le binaire Caddy de l'image, lui, est REMPLACE par celui du stade
+# `caddy-build` (recompile avec un Go et des dependances corriges) : les HIGH
+# de `usr/bin/caddy` ne relevent pas d'`apk upgrade`.
 RUN apk --no-cache upgrade
+COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
 WORKDIR /srv/app
 COPY --from=builder /srv/app/dist /srv/app/dist
 COPY frontend/Caddyfile.app /etc/caddy/Caddyfile

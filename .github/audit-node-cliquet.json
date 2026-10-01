@@ -53,14 +53,20 @@
     "depot ET de retirer les deux entrees (matrice + ce releve) dans le MEME",
     "changement : un lot releve sans lockfile ferait rougir le job pour rien."
   ],
+  "_resserrage_workers_2026_10_01": [
+    "Resserre le 2026-10-01 (chore/dependances-securite) : axios 1.19.0 -> 1.20.0,",
+    "undici 7.29.0 -> 7.30.0, brace-expansion 1.1.18 -> 1.1.21 et 5.0.9 -> 5.0.12.",
+    "`pnpm audit` sur workers/pnpm-lock.yaml rend « No known vulnerabilities found » :",
+    "high=0, critical=0 (etait 10/1, puis 13/0 mesure en CI le jour meme)."
+  ],
   "lots": {
     "frontend": {
       "high": 18,
       "critical": 1
     },
     "workers": {
-      "high": 10,
-      "critical": 1
+      "high": 0,
+      "critical": 0
     },
     "poc/05_dedup_performance": {
       "high": 0,

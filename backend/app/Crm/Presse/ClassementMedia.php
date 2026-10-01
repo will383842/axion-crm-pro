@@ -76,6 +76,12 @@ use Illuminate\Support\Str;
  *     corps de page (mot du public, ou sujet principal au seuil dans le nom /
  *     le titre). Égalités : règle déterministe, voir `publicsDeduits`.
  *
+ * Règles v5 (2026-10-01) : les règles de score ne changent pas ; seule la
+ * PAGE LUE change — uniquement un site VÉRIFIÉ (`SiteMedia`, posé par
+ * `crm:presse:verifier-sites`), sinon classement au nom seul. Le verdict
+ * « média possible », qui n'est rendu que sur une page lue, suit. La montée
+ * de version fait relire toutes les fiches.
+ *
  * Thèmes (plusieurs possibles) : `ia-tech`, `economie-entreprise`,
  * `pme-entrepreneurs`, `rh-management`, `metiers-secteurs`, `regional`,
  * `grand-public` — mots-clés dans `THEMES_MOTS`.
@@ -151,7 +157,7 @@ use Illuminate\Support\Str;
 final class ClassementMedia
 {
     /** Version des règles : la monter fait relire toutes les fiches au passage suivant. */
-    public const VERSION = 4;
+    public const VERSION = 5;
 
     /** Clé de `companies.metadata` qui garde le classement. */
     public const CLE = 'classement_media';

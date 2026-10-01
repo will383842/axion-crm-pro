@@ -49,8 +49,9 @@ use Psr\Http\Message\ResponseInterface;
  *   Une page refusée pour ces raisons est `illisible` : la fiche est classée
  *   par son nom et MARQUÉE, donc sautée à la relance — jamais relue en boucle.
  *
- * Rien n'est gardé : la page est réduite en mémoire à quatre zones de texte
- * (`extraire`) que `ClassementMedia` réduit à son tour à des étiquettes. Aucun
+ * Rien n'est gardé : la page est réduite en mémoire à quelques zones de texte
+ * (`extraire`) que `ClassementMedia` réduit à son tour à des étiquettes, et
+ * `SiteMedia` à un oui / non (le site porte-t-il le nom du média ?). Aucun
  * texte, aucune adresse, aucun nom ne sort de cette classe vers la base.
  */
 final class LecturePageAccueil
@@ -76,7 +77,10 @@ final class LecturePageAccueil
     private const MORCEAU_DECOMPRESSION = 1024;
 
     /** Bornes des zones gardées en mémoire (caractères). */
-    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000];
+    /** Mots hors liens au moins pour qu'un <article> compte comme preuve de média. */
+    public const MOTS_ARTICLE = 8;
+
+    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000, 'identite' => 2000, 'corps' => 12000];
 
     public const STATUT_LU = 'site';
 
@@ -169,7 +173,7 @@ final class LecturePageAccueil
      * Lit les URL données (dédoublonnées), sorties de `cible()`.
      *
      * @param  list<string>  $cibles
-     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}}>
+     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}>
      */
     public function lire(array $cibles): array
     {
@@ -232,7 +236,11 @@ final class LecturePageAccueil
                 } elseif ($p['code'] < 200 || $p['code'] >= 300) {
                     $resultats[$cible] = self::echec(self::STATUT_INJOIGNABLE);
                 } else {
-                    $resultats[$cible] = ['statut' => self::STATUT_LU] + self::extraire($p['corps']);
+                    // `code` (2xx ici) et `finale` (l'URL d'arrivée après les
+                    // redirections) : `SiteMedia` exige que l'arrivée soit le
+                    // même domaine que l'adresse essayée.
+                    $resultats[$cible] = ['statut' => self::STATUT_LU] + self::extraire($p['corps'])
+                        + ['code' => $p['code'], 'finale' => $p['url'] ?? $cible];
                 }
             }
             $attente = $attenteMs;
@@ -248,7 +256,7 @@ final class LecturePageAccueil
      * gros, type refusé, encodage inconnu) ou `injoignable`.
      *
      * @param  list<string>  $urls
-     * @return array<int, array{statut: string, code: int, corps: string}>
+     * @return array<int, array{statut: string, code: int, corps: string, url?: string}>
      */
     private function recuperer(array $urls, int $max, bool $html): array
     {
@@ -330,7 +338,7 @@ final class LecturePageAccueil
                     $corps = self::corps($r->toPsrResponse(), $max);
                     $sorties[$i] = $corps === null
                         ? ['statut' => self::STATUT_ILLISIBLE, 'code' => 0, 'corps' => '']
-                        : ['statut' => self::STATUT_LU, 'code' => $r->status(), 'corps' => $corps];
+                        : ['statut' => self::STATUT_LU, 'code' => $r->status(), 'corps' => $corps, 'url' => $l['url']];
                 }
                 if ($id !== null) {
                     FluxBorne::liberer($id);
@@ -424,7 +432,7 @@ final class LecturePageAccueil
         return $sortie;
     }
 
-    /** @return array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}} */
+    /** @return array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}} */
     private static function echec(string $statut): array
     {
         return ['statut' => $statut, 'zones' => [], 'structure' => ['articles' => 0, 'dates' => 0]];
@@ -450,9 +458,9 @@ final class LecturePageAccueil
         $delais = [];
         $courant = -1;
         $dansAgents = false;
-        foreach (preg_split('/
-||
-/', $contenu) ?: [] as $ligne) {
+        // Fins de ligne CRLF, CR seul ou LF seul (échappements PCRE : jamais
+        // d'octet CR brut dans le source, qu'un outil d'édition perdrait).
+        foreach (preg_split('/\r\n|\r|\n/', $contenu) ?: [] as $ligne) {
             $ligne = trim((string) preg_replace('/#.*$/', '', $ligne));
             $deuxPoints = strpos($ligne, ':');
             if ($ligne === '' || $deuxPoints === false) {
@@ -525,10 +533,11 @@ final class LecturePageAccueil
     }
 
     /**
-     * Réduit une page HTML aux zones lues par `ClassementMedia` et à deux
-     * compteurs de structure. Rien d'autre n'est gardé.
+     * Réduit une page HTML aux zones lues par `ClassementMedia` (titre, menu,
+     * texte), à la zone `identite` lue par `SiteMedia` et à deux compteurs de
+     * structure. Rien d'autre n'est gardé.
      *
-     * @return array{zones: array<string, string>, structure: array{articles: int, dates: int}}
+     * @return array{zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}}
      */
     public static function extraire(string $html): array
     {
@@ -554,6 +563,15 @@ final class LecturePageAccueil
                 . sprintf($minuscule, 'property') . " = 'og:site_name']/@content", 6),
             self::textes($xp, '//h1', 5),
         );
+        // L'IDENTITÉ de la page (`SiteMedia::correspond`) : ce que le site dit
+        // de lui-même — titre, og:site_name, og:title, h1 ; jamais la méta
+        // description, qui peut citer n'importe quoi.
+        $identite = array_merge(
+            self::textes($xp, '//title', 2),
+            self::textes($xp, '//meta[' . sprintf($minuscule, 'property') . " = 'og:site_name' or "
+                . sprintf($minuscule, 'property') . " = 'og:title']/@content", 4),
+            self::textes($xp, '//h1', 5),
+        );
         $menu = array_merge(
             self::textes($xp, "//nav//a | //header//a | //*[@role='navigation']//a", 80),
             self::textes($xp, '//h2', 30),
@@ -563,24 +581,70 @@ final class LecturePageAccueil
             self::textes($xp, '//h3', 30),
         );
 
-        $joint = implode(' ', $texte);
-        $dates = (int) preg_match_all(
-            '/\b\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/iu',
-            $joint,
-        );
-        $time = $xp->query('//time');
+        // Le CORPS HORS LIENS (`SiteMedia::preuveMedia`) : le texte des
+        // paragraphes sans celui de leurs liens — une page de parking peut
+        // aligner cent liens sponsorisés « Actualités », elle n'écrit rien.
+        $corps = [];
+        $paragraphes = $xp->query('//p');
+        foreach ($paragraphes === false ? [] : $paragraphes as $p) {
+            if (count($corps) >= 40) {
+                break;
+            }
+            if (! $p instanceof \DOMNode) {
+                continue;
+            }
+            $morceaux = $xp->query('.//text()[not(ancestor::a)]', $p);
+            $t = '';
+            foreach ($morceaux === false ? [] : $morceaux as $n) {
+                $t .= ' ' . $n->nodeValue;
+            }
+            $t = trim((string) preg_replace('/\s+/u', ' ', $t));
+            if ($t !== '') {
+                $corps[] = mb_substr($t, 0, 400);
+            }
+        }
 
+        $motifDate = '/\b\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/iu';
+        $dates = (int) preg_match_all($motifDate, implode(' ', $texte));
+        $time = $xp->query('//time');
         $articles = $xp->query('//article');
+
+        // Structure HORS LIENS (`SiteMedia::preuveMedia`) : des dates écrites
+        // hors liens (« Offre 01/10/2026 » en lien ne compte pas) et des
+        // <article> qui portent au moins `MOTS_ARTICLE` mots hors liens.
+        $timeHorsLiens = $xp->query('//time[not(ancestor::a)]');
+        $datesTexte = max(
+            (int) preg_match_all($motifDate, implode(' ', $corps)),
+            $timeHorsLiens === false ? 0 : $timeHorsLiens->length,
+        );
+        $articlesTexte = 0;
+        foreach ($articles === false ? [] : $articles as $article) {
+            if (! $article instanceof \DOMNode) {
+                continue;
+            }
+            $morceaux = $xp->query('.//text()[not(ancestor::a)]', $article);
+            $t = '';
+            foreach ($morceaux === false ? [] : $morceaux as $n) {
+                $t .= ' ' . $n->nodeValue;
+            }
+            if (count(preg_split('/[^\p{L}\p{N}]+/u', $t, -1, PREG_SPLIT_NO_EMPTY) ?: []) >= self::MOTS_ARTICLE) {
+                $articlesTexte++;
+            }
+        }
 
         return [
             'zones' => [
                 'titre' => mb_substr(implode(' . ', $titre), 0, self::BORNES['titre']),
                 'menu' => mb_substr(implode(' . ', $menu), 0, self::BORNES['menu']),
                 'texte' => mb_substr(implode(' . ', $texte), 0, self::BORNES['texte']),
+                'identite' => mb_substr(implode(' . ', $identite), 0, self::BORNES['identite']),
+                'corps' => mb_substr(implode(' . ', $corps), 0, self::BORNES['corps']),
             ],
             'structure' => [
                 'articles' => $articles === false ? 0 : $articles->length,
                 'dates' => max($dates, $time === false ? 0 : $time->length),
+                'articles_texte' => $articlesTexte,
+                'dates_texte' => $datesTexte,
             ],
         ];
     }

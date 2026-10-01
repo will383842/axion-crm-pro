@@ -125,7 +125,7 @@ test('extraction : titre, meta, h1 en zone titre ; menu et h2 ; paragraphes ; co
         ->and($l['zones']['menu'])->toContain('ZZ Lien', 'ZZ Deux')
         ->and($l['zones']['texte'])->toContain('ZZ paragraphe')
         ->and(implode(' ', $l['zones']))->not->toContain('ne pas lire')
-        ->and($l['structure'])->toBe(['articles' => 2, 'dates' => 2]);
+        ->and($l['structure'])->toMatchArray(['articles' => 2, 'dates' => 2]);
 });
 
 test('URL lue : chemin GARDE, fragment retire, ports 80/443 seulement', function () {

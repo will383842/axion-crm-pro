@@ -575,7 +575,7 @@ class CrmPresseImporter extends Command
         if ($parAncre !== null && $parAncre->deleted_at !== null) {
             throw new InvalidArgumentException('fiche_a_la_corbeille');
         }
-        $fiche = $parAncre?->id ?? $this->rapprocher($l)?->id;
+        $fiche = $parAncre !== null ? $parAncre->id : $this->rapprocher($l)?->id;
         if ($fiche === null) {
             throw new InvalidArgumentException('fiche_non_importee');
         }

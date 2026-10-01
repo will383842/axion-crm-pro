@@ -77,6 +77,9 @@ final class LecturePageAccueil
     private const MORCEAU_DECOMPRESSION = 1024;
 
     /** Bornes des zones gardées en mémoire (caractères). */
+    /** Mots hors liens au moins pour qu'un <article> compte comme preuve de média. */
+    public const MOTS_ARTICLE = 8;
+
     private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000, 'identite' => 2000, 'corps' => 12000];
 
     public const STATUT_LU = 'site';
@@ -170,7 +173,7 @@ final class LecturePageAccueil
      * Lit les URL données (dédoublonnées), sorties de `cible()`.
      *
      * @param  list<string>  $cibles
-     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}>
+     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}>
      */
     public function lire(array $cibles): array
     {
@@ -429,7 +432,7 @@ final class LecturePageAccueil
         return $sortie;
     }
 
-    /** @return array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}} */
+    /** @return array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}} */
     private static function echec(string $statut): array
     {
         return ['statut' => $statut, 'zones' => [], 'structure' => ['articles' => 0, 'dates' => 0]];
@@ -534,7 +537,7 @@ final class LecturePageAccueil
      * texte), à la zone `identite` lue par `SiteMedia` et à deux compteurs de
      * structure. Rien d'autre n'est gardé.
      *
-     * @return array{zones: array<string, string>, structure: array{articles: int, dates: int}}
+     * @return array{zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}}
      */
     public static function extraire(string $html): array
     {
@@ -601,14 +604,33 @@ final class LecturePageAccueil
             }
         }
 
-        $joint = implode(' ', $texte);
-        $dates = (int) preg_match_all(
-            '/\b\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/iu',
-            $joint,
-        );
+        $motifDate = '/\b\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/iu';
+        $dates = (int) preg_match_all($motifDate, implode(' ', $texte));
         $time = $xp->query('//time');
-
         $articles = $xp->query('//article');
+
+        // Structure HORS LIENS (`SiteMedia::preuveMedia`) : des dates écrites
+        // hors liens (« Offre 01/10/2026 » en lien ne compte pas) et des
+        // <article> qui portent au moins `MOTS_ARTICLE` mots hors liens.
+        $timeHorsLiens = $xp->query('//time[not(ancestor::a)]');
+        $datesTexte = max(
+            (int) preg_match_all($motifDate, implode(' ', $corps)),
+            $timeHorsLiens === false ? 0 : $timeHorsLiens->length,
+        );
+        $articlesTexte = 0;
+        foreach ($articles === false ? [] : $articles as $article) {
+            if (! $article instanceof \DOMNode) {
+                continue;
+            }
+            $morceaux = $xp->query('.//text()[not(ancestor::a)]', $article);
+            $t = '';
+            foreach ($morceaux === false ? [] : $morceaux as $n) {
+                $t .= ' ' . $n->nodeValue;
+            }
+            if (count(preg_split('/[^\p{L}\p{N}]+/u', $t, -1, PREG_SPLIT_NO_EMPTY) ?: []) >= self::MOTS_ARTICLE) {
+                $articlesTexte++;
+            }
+        }
 
         return [
             'zones' => [
@@ -621,6 +643,8 @@ final class LecturePageAccueil
             'structure' => [
                 'articles' => $articles === false ? 0 : $articles->length,
                 'dates' => max($dates, $time === false ? 0 : $time->length),
+                'articles_texte' => $articlesTexte,
+                'dates_texte' => $datesTexte,
             ],
         ];
     }

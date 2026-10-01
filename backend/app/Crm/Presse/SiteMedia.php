@@ -237,6 +237,10 @@ final class SiteMedia
         'actualite', 'actu', 'redaction', 'abonnement', 'abonnez', 'abonner', 'article', 'journal', 'journaux',
         'magazine', 'hebdomadaire', 'quotidien', 'mensuel', 'edition', 'emission', 'podcast', 'replay',
         'journaliste', 'newsletter', 'rubrique', 'reportage', 'chronique', 'a la une',
+        // radio, télévision, presse (relecture A09) : un lecteur « écoutez en
+        // direct » n'a souvent aucun paragraphe
+        'radio', 'direct', 'en direct', 'ecoutez', 'ecouter', 'chaine', 'tv', 'tele', 'television', 'info',
+        'presse', 'revue', 'numero', 'programme', 'antenne', 'grille',
     ];
 
     /** Suffixes publics à deux niveaux (domaine enregistrable sur trois étiquettes). */
@@ -311,7 +315,10 @@ final class SiteMedia
     /** Minuscules, sans accent, ponctuation → espace, entouré d'espaces. */
     public static function normaliser(string $texte): string
     {
-        $t = Str::ascii(mb_strtolower(html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        // Apostrophes (droite, courbes, modificateur) et élision : « l’actualité »
+        // donne « l actualite » — jamais « lactualite ».
+        $texte = str_replace(["'", '’', '‘', 'ʼ', '`', '´'], ' ', html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $t = Str::ascii(mb_strtolower($texte));
 
         return ' ' . trim((string) preg_replace('/[^a-z0-9]+/', ' ', $t)) . ' ';
     }
@@ -509,14 +516,20 @@ final class SiteMedia
 
     /**
      * PREUVE DE MÉDIA hors liens, exigée pour tout `verifie` : un indice de
-     * média (`indiceMedia`), ou au moins 3 <article>, ou au moins 3 dates.
+     * média (`indiceMedia`), ou au moins 3 <article> portant chacun au moins
+     * `LecturePageAccueil::MOTS_ARTICLE` mots HORS LIENS (`articles_texte`),
+     * ou au moins 3 dates écrites HORS LIENS (`dates_texte` : texte des
+     * paragraphes sans leurs liens, <time> hors <a>). Les compteurs bruts
+     * (`articles`, `dates`, liens compris) ne prouvent rien ici : trois
+     * liens « Offre 01/10/2026 » ou trois <article> vides autour de liens
+     * sponsorisés ne font pas un média.
      *
      * @param  array<string, string>  $zones
-     * @param  array{articles: int, dates: int}  $structure
+     * @param  array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}  $structure
      */
     public static function preuveMedia(array $zones, array $structure): bool
     {
-        return self::indiceMedia($zones) || $structure['articles'] >= 3 || $structure['dates'] >= 3;
+        return self::indiceMedia($zones) || ($structure['articles_texte'] ?? 0) >= 3 || ($structure['dates_texte'] ?? 0) >= 3;
     }
 
     /**
@@ -586,7 +599,7 @@ final class SiteMedia
      * puis `correspond()` et la preuve de média hors liens (`preuveMedia`).
      *
      * @param  list<string>  $noms
-     * @param  array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}  $lu
+     * @param  array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}  $lu
      * @return array{0: string, 1: string, 2: ?string} [statut, url, motif]
      */
     public static function juger(array $noms, string $cible, array $lu): array

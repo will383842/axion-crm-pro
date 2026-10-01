@@ -106,7 +106,7 @@ class CrmPresseClasserMedias extends Command
 
     private string $workspaceId = '';
 
-    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}> */
+    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}> */
     private array $cacheHotes = [];
 
     private const CACHE_MAX = 5000;

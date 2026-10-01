@@ -249,9 +249,9 @@ test('preuve de media HORS LIENS exigee pour tout verifie : « site en construct
     expect($construction[0])->toBe(SiteMedia::A_CONFIRMER)
         ->and(SiteMedia::juger(['VOSGES MATIN'], 'https://www.vosges-matin.fr/', $sponsorises)[0])->toBe(SiteMedia::A_CONFIRMER)
         // la structure suffit : 3 <article> ou 3 dates
-        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 3, 'dates' => 0]))->toBeTrue()
-        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 0, 'dates' => 3]))->toBeTrue()
-        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 2, 'dates' => 2]))->toBeFalse();
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 3, 'dates' => 0, 'articles_texte' => 3, 'dates_texte' => 0]))->toBeTrue()
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 0, 'dates' => 3, 'articles_texte' => 0, 'dates_texte' => 3]))->toBeTrue()
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 9, 'dates' => 9, 'articles_texte' => 2, 'dates_texte' => 2]))->toBeFalse();
 });
 
 test('temoins : les vrais medias, pages realistes, restent verifies', function () {
@@ -267,7 +267,7 @@ test('temoins : les vrais medias, pages realistes, restent verifies', function (
     }
     // et une page sans indice lexical, mais structurée (articles datés), aussi
     $structuree = smrLu('Le Progrès', 'Lyon, Rhône, Loire.');
-    $structuree['structure'] = ['articles' => 12, 'dates' => 12];
+    $structuree['structure'] = ['articles' => 12, 'dates' => 12, 'articles_texte' => 12, 'dates_texte' => 12];
     expect(SiteMedia::juger(['LE PROGRES'], 'https://www.leprogres.fr/', $structuree)[0])->toBe(SiteMedia::VERIFIE);
 });
 
@@ -279,4 +279,51 @@ test('zone corps : texte des paragraphes SANS celui de leurs liens', function ()
         ->and($l['zones']['corps'])->not->toContain('ZZ lien sponsorisé')
         ->and($l['zones']['corps'])->not->toContain('ZZ que des liens')
         ->and($l['zones']['texte'])->toContain('ZZ lien sponsorisé');
+});
+
+// ── Quatrième relecture A09 de #273 ────────────────────────────────────────
+
+test('dates : seules celles ecrites HORS LIENS prouvent un media (« Offre 01/10/2026 » en lien ne compte pas)', function () {
+    $liens = LecturePageAccueil::extraire('<html><body>'
+        . str_repeat('<p><a href="#">Offre 01/10/2026</a></p>', 3)
+        . str_repeat('<a href="#"><time>1 octobre 2026</time></a>', 3) . '</body></html>');
+    $ecrites = LecturePageAccueil::extraire('<html><body>'
+        . str_repeat('<p>Publié le 01/10/2026 par la rédaction</p>', 3) . '</body></html>');
+
+    expect($liens['structure']['dates'])->toBeGreaterThanOrEqual(3) // compteur brut (classement) inchangé
+        ->and($liens['structure']['dates_texte'])->toBe(0)
+        ->and(SiteMedia::preuveMedia(['identite' => 'ZZ'], $liens['structure']))->toBeFalse()
+        ->and($ecrites['structure']['dates_texte'])->toBe(3)
+        ->and(SiteMedia::preuveMedia(['identite' => 'ZZ'], $ecrites['structure']))->toBeTrue();
+});
+
+test('articles : un <article> ne compte que s il porte du texte HORS liens', function () {
+    $vides = LecturePageAccueil::extraire('<html><body>'
+        . str_repeat('<article><a href="#">Assurance auto pas chère crédit immobilier billets avion hôtel</a></article>', 3) . '</body></html>');
+    $pleins = LecturePageAccueil::extraire('<html><body>'
+        . str_repeat('<article><h3>ZZ brève</h3><p>Le conseil municipal a voté hier soir le budget de la ville.</p></article>', 3) . '</body></html>');
+
+    expect($vides['structure']['articles'])->toBe(3)
+        ->and($vides['structure']['articles_texte'])->toBe(0)
+        ->and(SiteMedia::preuveMedia(['identite' => 'ZZ'], $vides['structure']))->toBeFalse()
+        ->and($pleins['structure']['articles_texte'])->toBe(3)
+        ->and(SiteMedia::preuveMedia(['identite' => 'ZZ'], $pleins['structure']))->toBeTrue();
+});
+
+test('radio : « Radio Zorglub — ecoutez en direct », lecteur sans paragraphe → verifie', function () {
+    $lu = ['statut' => 'site', 'code' => 200]
+        + LecturePageAccueil::extraire('<html><head><title>Radio Zorglub — écoutez en direct</title></head><body><div id="lecteur"></div></body></html>');
+
+    expect(SiteMedia::juger(['RADIO ZORGLUB'], 'https://www.radiozorglub.test/', $lu)[0])->toBe(SiteMedia::VERIFIE)
+        ->and(SiteMedia::indiceMedia(['identite' => 'Chaîne TV — la grille des programmes']))->toBeTrue()
+        ->and(SiteMedia::indiceMedia(['identite' => 'Nos forfaits et tarifs']))->toBeFalse();
+});
+
+test('apostrophes et elision : « Toute l’actualite » / « l actualite » declenchent l indice', function () {
+    expect(SiteMedia::normaliser('Toute l’actualité'))->toBe(' toute l actualite ')
+        ->and(SiteMedia::normaliser("L'ACTUALITÉ"))->toBe(' l actualite ')
+        ->and(SiteMedia::indiceMedia(['identite' => 'Toute l’actualité de la Zorglubie']))->toBeTrue()
+        ->and(SiteMedia::indiceMedia(['identite' => "Toute l'actualité"]))->toBeTrue()
+        ->and(SiteMedia::indiceMedia(['identite' => 'Toute l‘actualité']))->toBeTrue()
+        ->and(SiteMedia::indiceMedia(['corps' => 'toute l actualite']))->toBeTrue();
 });

@@ -104,7 +104,7 @@ class CrmPresseVerifierSites extends Command
      */
     private array $hotes = [];
 
-    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}> */
+    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}> */
     private array $cache = [];
 
     public function handle(): int

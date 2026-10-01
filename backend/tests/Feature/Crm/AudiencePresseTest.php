@@ -18,6 +18,7 @@ use App\Crm\Campagnes\ReglageDestinataires;
 use App\Crm\Campagnes\ResolveurDestinataires;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\FichesProtegees;
+use App\Crm\Presse\ClassementMedia;
 use App\Http\Controllers\Api\AudiencesController;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\EmailAudience;
@@ -283,4 +284,45 @@ test('A09 — la normalisation SQL des adresses est celle de PHP (espaces, tabul
     ]);
 
     expect($parSql)->toBeTrue()->and($parPhp)->toBeTrue();
+});
+
+test('🔴 filtre « Secteur couvert » : l’étiquette posée par le classement est celle que le filtre vise (BTP oui, commerce de détail non)', function () {
+    $btp = apFiche($this->ws, ['email_generic' => 'redaction@zz-p5.example.invalid'], [FichesProtegees::TAG_PRESSE]);
+    $commerce = apFiche($this->ws, ['email_generic' => 'redaction@zz-p6.example.invalid'], [FichesProtegees::TAG_PRESSE]);
+    // Les étiquettes viennent du PRODUCTEUR réel (`ClassementMedia::desirees`), pas d'un slug recopié.
+    $classement = static fn (string $secteur): array => ['v' => 4, 'themes' => ['metiers-secteurs'], 'secteurs' => [$secteur], 'publics' => [], 'format' => null];
+    $slugBtp = array_values(array_filter(array_keys(ClassementMedia::desirees($btp, $classement('btp'), true, false)), static fn (string $s): bool => str_starts_with($s, ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR)));
+    $slugCommerce = array_values(array_filter(array_keys(ClassementMedia::desirees($commerce, $classement('commerce_detail'), true, false)), static fn (string $s): bool => str_starts_with($s, ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR)));
+    foreach ([[$btp, $slugBtp], [$commerce, $slugCommerce]] as [$id, $slugs]) {
+        foreach ($slugs as $slug) {
+            $tag = DB::table('tags')->insertGetId(['workspace_id' => $this->ws, 'slug' => $slug, 'name' => $slug, 'category' => 'intent',
+                'kind' => 'auto', 'rules' => '{}', 'is_locked' => true, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $this->ws,
+                'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+        }
+    }
+
+    // Le code que le front envoie : `media-sujet:secteur-` + code du référentiel généré.
+    $vise = ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR . 'btp';
+    expect($slugBtp)->toBe([$vise])
+        ->and(array_key_exists('btp', ClassementMedia::secteursCouverts()))->toBeTrue()
+        ->and(apIds($this->service, $this->ws, ['all' => [
+            ['field' => 'segment', 'op' => 'eq', 'value' => 'presse'],
+            ['field' => 'tags', 'op' => 'contains_any', 'value' => [$vise]],
+        ]]))->toBe([$btp]);
+    // Témoin : le commerce de détail est bien étiqueté, et visé par son propre code.
+    expect(apIds($this->service, $this->ws, ['all' => [
+        ['field' => 'segment', 'op' => 'eq', 'value' => 'presse'],
+        ['field' => 'tags', 'op' => 'contains_any', 'value' => [ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR . 'commerce-detail']],
+    ]]))->toBe([$commerce]);
+});
+
+test('🔴 filtre « Secteur couvert » : une valeur hostile ne vise personne et n’injecte rien (liaison de paramètres)', function () {
+    $hostile = ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR . "btp') OR 1=1 --";
+    expect(apIds($this->service, $this->ws, ['all' => [
+        ['field' => 'segment', 'op' => 'eq', 'value' => 'presse'],
+        ['field' => 'tags', 'op' => 'contains_any', 'value' => [$hostile]],
+    ]]))->toBe([]);
+    // Témoin : le même critère sur une étiquette existante vise bien des fiches.
+    expect(apIds($this->service, $this->ws, AP_CRITERES))->not->toBe([]);
 });

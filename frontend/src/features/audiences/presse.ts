@@ -19,10 +19,12 @@ import {
   FORMATS_MEDIA,
   PREFIXE_ETIQUETTE_FORMAT_MEDIA,
   PREFIXE_ETIQUETTE_PUBLIC_MEDIA,
+  PREFIXE_ETIQUETTE_SECTEUR_MEDIA,
   PREFIXE_ETIQUETTE_THEME_MEDIA,
   PREFIXE_ETIQUETTE_TYPE_MEDIA,
   PREFIXE_ETIQUETTE_ZONE_MEDIA,
   PUBLICS_MEDIA,
+  SECTEURS_MEDIA,
   THEMES_MEDIA,
   TYPES_MEDIA,
   ZONES_MEDIA,
@@ -39,6 +41,9 @@ export const ZONE_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> 
 export const THEME_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(THEMES_MEDIA);
 export const PUBLIC_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(PUBLICS_MEDIA);
 export const FORMAT_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(FORMATS_MEDIA);
+// Secteur couvert par une presse professionnelle : étiquette `media-sujet:secteur-<code>`
+// (liste fermée, celle des secteurs que le classement sait reconnaître).
+export const SECTEUR_MEDIA_PRESETS: ReadonlyArray<{ code: string; label: string }> = enPresets(SECTEURS_MEDIA);
 
 export function slugTypeMedia(code: string): string {
   return `${PREFIXE_ETIQUETTE_TYPE_MEDIA}${code}`;
@@ -51,13 +56,18 @@ export function slugZoneMedia(code: string): string {
 /**
  * Les conditions « presse » du bloc `all` : un type parmi ceux choisis ET une
  * zone parmi celles choisies ET (s'ils sont choisis) un thème, un public, un
- * format parmi ceux choisis — une condition par critère, donc un ET entre
+ * format, un secteur couvert parmi ceux choisis — une condition par critère, donc un ET entre
  * critères et un OU à l'intérieur de chacun.
  */
 export function criteresMedias(
   types: readonly string[],
   zones: readonly string[],
-  classement: { themes?: readonly string[]; publics?: readonly string[]; formats?: readonly string[] } = {},
+  classement: {
+    themes?: readonly string[];
+    publics?: readonly string[];
+    formats?: readonly string[];
+    secteurs?: readonly string[];
+  } = {},
 ): AudienceCondition[] {
   const conditions: AudienceCondition[] = [];
   const ajouter = (codes: readonly string[] | undefined, prefixe: string) => {
@@ -70,6 +80,7 @@ export function criteresMedias(
   ajouter(classement.themes, PREFIXE_ETIQUETTE_THEME_MEDIA);
   ajouter(classement.publics, PREFIXE_ETIQUETTE_PUBLIC_MEDIA);
   ajouter(classement.formats, PREFIXE_ETIQUETTE_FORMAT_MEDIA);
+  ajouter(classement.secteurs, PREFIXE_ETIQUETTE_SECTEUR_MEDIA);
   return conditions;
 }
 

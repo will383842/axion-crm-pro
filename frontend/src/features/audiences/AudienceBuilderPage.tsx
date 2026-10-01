@@ -51,6 +51,7 @@ import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
 import {
   FORMAT_MEDIA_PRESETS,
   PUBLIC_MEDIA_PRESETS,
+  SECTEUR_MEDIA_PRESETS,
   THEME_MEDIA_PRESETS,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
@@ -184,6 +185,7 @@ export function AudienceBuilderPage() {
   const [themesMedia, setThemesMedia] = useState<string[]>([]);
   const [publicsMedia, setPublicsMedia] = useState<string[]>([]);
   const [formatsMedia, setFormatsMedia] = useState<string[]>([]);
+  const [secteursMedia, setSecteursMedia] = useState<string[]>([]);
   const [exclNatures, setExclNatures] = useState<string[]>([]);
   const [exclTypesMedia, setExclTypesMedia] = useState<string[]>([]);
   // Audience presse (01/10/2026) : la presse, et seulement elle.
@@ -207,7 +209,12 @@ export function AudienceBuilderPage() {
       .split(/[,\s]+/)
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
-    const medias = criteresMedias(typesMedia, zonesMedia, { themes: themesMedia, publics: publicsMedia, formats: formatsMedia });
+    const medias = criteresMedias(typesMedia, zonesMedia, {
+      themes: themesMedia,
+      publics: publicsMedia,
+      formats: formatsMedia,
+      secteurs: secteursMedia,
+    });
     if (audiencePresse) {
       return criteresAudiencePresse({ departements: departments, regions, etiquettes: tagList }, medias, exclTypesMedia);
     }
@@ -230,7 +237,7 @@ export function AudienceBuilderPage() {
   }, [
     departments, regions, sizes, sectors, natures, metiers, statuses, qualityMin, hasEmail, tagsInput,
     relationsVisees, relationsExclues, etapesVisees, etapesExclues, pays, joignabilitesVisees, joignabilitesExclues,
-    typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
+    typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, secteursMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
     audiencePresse,
   ]);
   const aDesCriteres = aUnCriterePositif(criteria);
@@ -548,6 +555,15 @@ export function AudienceBuilderPage() {
                 selected={themesMedia}
                 onChange={setThemesMedia}
                 placeholder="Tous thèmes"
+                masquerCode
+              />
+            </Field>
+            <Field label="Secteur couvert">
+              <ChipsMultiSelect
+                options={SECTEUR_MEDIA_PRESETS}
+                selected={secteursMedia}
+                onChange={setSecteursMedia}
+                placeholder="Tous secteurs"
                 masquerCode
               />
             </Field>

@@ -239,6 +239,36 @@ final class ClassementMedia
 
     public const PREFIXE_SECTEUR = 'secteur-';
 
+    /** Préfixe complet de l'étiquette « secteur couvert » : `media-sujet:secteur-<code>`. */
+    public const PREFIXE_ETIQUETTE_SECTEUR = 'media-sujet:' . self::PREFIXE_SECTEUR;
+
+    /**
+     * Les secteurs qu'une presse professionnelle peut COUVRIR (liste fermée) :
+     * ceux de `Taxonomy::SECTEURS` qui ont des mots-clés ici, dans l'ordre du
+     * référentiel. Code = la clé du secteur, `_` devenu `-` (le suffixe de
+     * l'étiquette posée par `desirees()`) => libellé du référentiel. Le
+     * constructeur d'audiences en tire son filtre « Secteur couvert ».
+     *
+     * @return array<string, string>
+     */
+    public static function secteursCouverts(): array
+    {
+        $liste = [];
+        foreach (Taxonomy::SECTEURS as $cle => $libelle) {
+            if (isset(self::SECTEURS_MOTS[$cle])) {
+                $liste[self::codeSecteur($cle)] = $libelle;
+            }
+        }
+
+        return $liste;
+    }
+
+    /** Le code d'étiquette d'un secteur : sa clé, `_` devenu `-`. */
+    public static function codeSecteur(string $cle): string
+    {
+        return str_replace('_', '-', $cle);
+    }
+
     /**
      * Mots-clés des thèmes (forme normalisée : minuscules, sans accent, la
      * ponctuation devient espace) => poids. 3 : sans ambiguïté ; 2 : fort ;
@@ -963,7 +993,7 @@ final class ClassementMedia
         }
         foreach (self::chaines($classement['secteurs'] ?? null) as $secteur) {
             if (isset(self::SECTEURS_MOTS[$secteur], Taxonomy::SECTEURS[$secteur])) {
-                $tags['media-sujet:' . self::PREFIXE_SECTEUR . str_replace('_', '-', $secteur)] = [
+                $tags[self::PREFIXE_ETIQUETTE_SECTEUR . self::codeSecteur($secteur)] = [
                     'name' => 'Secteur couvert : ' . Taxonomy::SECTEURS[$secteur],
                     'category' => Taxonomy::TAG_NAMESPACES['media-sujet'],
                 ];

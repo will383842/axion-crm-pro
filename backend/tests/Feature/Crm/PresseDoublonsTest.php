@@ -184,6 +184,15 @@ test('🔴 une fiche à SIREN (l éditeur) et un homonyme sans SIREN : file « �
     DB::table('companies')->where('id', $editeur)->update(['relation_type' => 'presse_media']);
     $provisoire = pddFiche($seul);
 
+    // Le motif strict forcé hors de la commande : re-jugé, refusé.
+    expect(fn () => WorkspaceContext::run($this->espace, fn (): int => app(FusionFiches::class)->fusionner(
+        $this->espace,
+        $provisoire,
+        $editeur,
+        Rapprochement::PRESSE_MEME_TITRE,
+        FusionFiches::MODE_AUTO,
+    )))->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_pas_stricte']);
+
     $r = pddDoublons(['--appliquer' => true]);
 
     $flag = DB::table('duplicate_flags')->first();
@@ -196,14 +205,14 @@ test('🔴 une fiche à SIREN (l éditeur) et un homonyme sans SIREN : file « �
         ->and(DB::table('fusions_fiches')->count())->toBe(0)
         ->and(DB::table('companies')->where('id', $provisoire)->value('deleted_at'))->toBeNull();
 
-    // Le motif strict forcé à la main de la commande : re-jugé, refusé.
+    // Une fois en file, la paire est tenue par un humain : refusée d'office aussi.
     expect(fn () => WorkspaceContext::run($this->espace, fn (): int => app(FusionFiches::class)->fusionner(
         $this->espace,
         $provisoire,
         $editeur,
         Rapprochement::PRESSE_MEME_TITRE,
         FusionFiches::MODE_AUTO,
-    )))->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_pas_stricte']);
+    )))->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_decision_humaine']);
 
     // Repasser ne redépose pas la paire.
     $r2 = pddDoublons(['--appliquer' => true]);

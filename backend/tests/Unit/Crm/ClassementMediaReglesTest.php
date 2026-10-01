@@ -192,32 +192,89 @@ test('toute valeur du classement a sa famille gouvernee et sa categorie', functi
 
 // ── Règles v3 (échantillon de production du 2026-10-01) ────────────────────
 
-test('v3 — generaliste : regional + au moins trois autres themes → regional / grand public seulement, public grand-public', function () {
-    $c = cmrClasser([
-        'nom' => 'ZZ LE DAUPHINE FICTIF',
-        'menu' => 'Économie . Entreprises . Emploi . Management . Ressources humaines . Numérique . Intelligence artificielle . Sport . Météo . Faits divers',
-        'texte' => 'Les dirigeants et décideurs.',
-    ]);
+test('v4 — DOMINANCE sur les scores reels : LE DAUPHINE LIBERE → regional + grand public, public grand-public', function () {
+    // Thèmes retenus par la v3 en production, et leurs scores réels.
+    $retenus = ['economie-entreprise' => 22, 'rh-management' => 9, 'regional' => 63, 'grand-public' => 74];
+    $gardes = ClassementMedia::dominants($retenus);
 
-    expect($c['themes'])->toEqualCanonicalizing(['regional', 'grand-public'])
-        ->and($c['publics'])->toBe(['grand-public']);
-
-    // Un thème présent dans le NOM ou le TITRE reste.
-    $titre = cmrClasser([
-        'nom' => 'ZZ LE DAUPHINE FICTIF',
-        'titre' => 'ZZ Dauphiné — économie',
-        'menu' => 'Économie . Entreprises . Emploi . Management . Ressources humaines . Numérique . Intelligence artificielle . Sport . Météo',
-    ]);
-    expect($titre['themes'])->toEqualCanonicalizing(['regional', 'grand-public', 'economie-entreprise'])
-        ->and($titre['publics'])->toBe(['grand-public']);
+    expect($gardes)->toBe(['regional', 'grand-public'])
+        ->and(ClassementMedia::publicsDeduits(array_intersect_key($retenus, array_flip($gardes)), ['dirigeants' => 6, 'pros-secteur' => 0, 'grand-public' => 2], 74))
+        ->toBe(['grand-public']);
 });
 
-test('v3 — les deux mots distincts viennent HORS du corps de page : un public lu dans le seul corps n est pas pose', function () {
-    $c = cmrClasser(['titre' => 'ZZ Revue fictive', 'menu' => 'Économie . Entreprises', 'texte' => 'Pour les dirigeants, décideurs et chefs d entreprise.']);
+test('v4 — DOMINANCE sur les scores reels : ECO DE L AIN → economie, PME, regional, public dirigeants', function () {
+    $retenus = ['economie-entreprise' => 37, 'pme-entrepreneurs' => 24, 'regional' => 26, 'grand-public' => 12, 'metiers-secteurs' => 2];
+    $gardes = ClassementMedia::dominants($retenus, ['economie-entreprise' => true]);
 
-    expect($c['themes'])->toBe(['economie-entreprise'])
-        ->and($c['publics'])->not->toContain('dirigeants');
-    expect(ClassementMedia::analyse(['texte' => ClassementMedia::normaliser('économie bourse')], ClassementMedia::THEMES_MOTS['economie-entreprise'])['mots'])->toBe(0);
+    expect($gardes)->toBe(['economie-entreprise', 'pme-entrepreneurs', 'regional'])
+        ->and(ClassementMedia::publicsDeduits(array_intersect_key($retenus, array_flip($gardes)), ['dirigeants' => 9, 'pros-secteur' => 4, 'grand-public' => 2], 12))
+        ->toBe(['dirigeants']);
+    // Dans le NOM, un thème faible reste (exception à la dominance).
+    expect(ClassementMedia::dominants(['grand-public' => 74, 'economie-entreprise' => 10], ['economie-entreprise' => true]))
+        ->toBe(['grand-public', 'economie-entreprise']);
+});
+
+test('v4 — pages simulees : quotidien regional, hebdo eco local, Les Echos, Capital, radio locale, 01net', function () {
+    $dauphine = cmrClasser([
+        'nom' => 'ZZ LE DAUPHINE LIBERE FICTIF',
+        // La méta description d'un généraliste énumère ses rubriques : « économie » y est, sans faire un média éco.
+        'titre' => 'ZZ Le Dauphiné Libéré — actualités Isère, Savoie, Drôme : faits divers, sport, météo, économie',
+        'menu' => 'Isère . Savoie . Haute-Savoie . Grenoble . Annecy . Faits divers . Sport . Football . Rugby . Météo . People . Cinéma . Économie . Emploi . Management',
+        'texte' => 'Les entreprises de la région.',
+    ], ['presse_quotidien'], diffusion: ['régional']);
+    expect($dauphine['themes'])->toBe(['regional', 'grand-public'])
+        ->and($dauphine['publics'])->toBe(['grand-public']);
+
+    $ecoAin = cmrClasser([
+        'nom' => "ZZ ECO DE L'AIN FICTIF",
+        'titre' => "ZZ L'Éco de l'Ain — l'hebdomadaire économique régional : l'actualité locale des entreprises",
+        'menu' => 'Entreprises . PME . Entrepreneurs . Création d entreprise . Emploi . Management . Infos locales . Votre département . Agenda . Sport',
+        'texte' => 'Le journal des dirigeants et des chefs d entreprise.',
+    ], ['presse_hebdo'], diffusion: ['départemental']);
+    expect($ecoAin['themes'])->toEqualCanonicalizing(['economie-entreprise', 'pme-entrepreneurs', 'regional'])
+        ->and($ecoAin['publics'])->toBe(['dirigeants']);
+
+    $echos = cmrClasser([
+        'nom' => 'ZZ LES ECHOS FICTIFS',
+        'titre' => 'ZZ Les Echos — actualité économique, financière et boursière',
+        'menu' => 'Économie . Finance . Marchés . Bourse . Entreprises . Politique . Monde . Tech . Patrimoine',
+    ], ['presse_quotidien']);
+    expect($echos['themes'])->toBe(['economie-entreprise'])
+        ->and($echos['publics'])->toBe(['dirigeants']);
+
+    $capital = cmrClasser([
+        'nom' => 'ZZ CAPITAL FICTIF',
+        'titre' => 'ZZ Capital — économie, argent, placements, entreprises et décideurs',
+        'menu' => 'Économie . Bourse . Immobilier . Placements . Entreprises . Emploi . Consommation',
+    ], ['presse_mensuel']);
+    expect($capital['themes'])->toBe(['economie-entreprise'])
+        ->and($capital['publics'])->toBe(['dirigeants']);
+
+    $radio = cmrClasser(['nom' => 'ZZ RADIO FICTIVE DU LAC', 'titre' => 'ZZ Radio du Lac', 'menu' => 'Infos locales . Agenda . Podcasts . Musique'], ['radio'], diffusion: ['local']);
+    expect($radio['themes'])->toBe(['regional'])
+        ->and($radio['publics'])->not->toContain('dirigeants');
+
+    $tech = cmrClasser([
+        'nom' => 'ZZ 01NET FICTIF',
+        'titre' => 'ZZ 01net — actualité high-tech, tests et bons plans',
+        'menu' => 'Tech . Smartphones . Informatique . Jeux vidéo . Intelligence artificielle . Cybersécurité',
+    ], ['portail_web']);
+    expect($tech['themes'])->toBe(['ia-tech'])
+        ->and($tech['publics'])->not->toContain('dirigeants');
+});
+
+test('v4 — public : dirigeants jamais si le grand public domine, ni si le theme principal n est pas eco / PME / RH', function () {
+    expect(ClassementMedia::publicsDeduits(['economie-entreprise' => 20, 'grand-public' => 30], ['dirigeants' => 9, 'grand-public' => 0], 30))->toBe(['grand-public'])
+        ->and(ClassementMedia::publicsDeduits(['ia-tech' => 30, 'economie-entreprise' => 20], ['dirigeants' => 9, 'grand-public' => 0], 0))->toBe([])
+        ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 30], ['dirigeants' => 2, 'grand-public' => 2], 0))->toBe([])
+        ->and(ClassementMedia::publicsDeduits(['metiers-secteurs' => 20], ['pros-secteur' => 5, 'grand-public' => 0], 0))->toBe(['pros-secteur'])
+        ->and(ClassementMedia::publicsDeduits([], ['dirigeants' => 9], 0))->toBe([]);
+});
+
+test('v3 — les deux mots distincts viennent HORS du corps de page', function () {
+    expect(cmrClasser(['titre' => 'ZZ Revue fictive', 'menu' => 'Économie . Entreprises'])['themes'])->toBe(['economie-entreprise'])
+        ->and(ClassementMedia::analyse(['texte' => ClassementMedia::normaliser('économie bourse')], ClassementMedia::THEMES_MOTS['economie-entreprise'])['mots'])->toBe(0)
+        ->and(ClassementMedia::analyse(['menu' => ClassementMedia::normaliser('économie bourse')], ClassementMedia::THEMES_MOTS['economie-entreprise'])['mots'])->toBe(2);
 });
 
 test('v3 — ia-tech exige un mot specifique : impression numerique ou informatique ne suffisent pas', function () {

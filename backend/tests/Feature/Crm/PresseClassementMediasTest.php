@@ -537,7 +537,7 @@ test('v5 : seul un site VERIFIE est lu — un site devine non verifie ou non con
     $verifie = pcmPresse($this->espace, 'https://eco-pme.test');
     $devine = pcmPresse($this->espace, 'https://devine.test', 'ZZ EDITIONS FICTIVES BIS');
     $nonConforme = pcmIncertaine($this->espace, 'https://redac.test');
-    DB::table('companies')->where('id', $devine)->update(['metadata' => null]);
+    DB::table('companies')->where('id', $devine)->update(['metadata' => '{}']);
     DB::update(
         "UPDATE companies SET metadata = jsonb_set(metadata, '{site_media,statut}', '\"non-conforme\"') WHERE id = ?",
         [$nonConforme],

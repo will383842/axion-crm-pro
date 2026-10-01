@@ -4,6 +4,7 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TwoFactorPage } from '@/features/auth/TwoFactorPage';
 import { MagicLinkPage } from '@/features/auth/MagicLinkPage';
+import { MagicLinkVerifyPage } from '@/features/auth/MagicLinkVerifyPage';
 import { PasswordResetPage } from '@/features/auth/PasswordResetPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
@@ -109,6 +110,7 @@ const layoutRoute = createRoute({
 const loginRoute = createRoute({ getParentRoute: () => rootRoute, path: '/login', component: LoginPage });
 const twoFactorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/2fa', component: TwoFactorPage });
 const magicLinkRoute = createRoute({ getParentRoute: () => rootRoute, path: '/magic-link', component: MagicLinkPage });
+const magicLinkVerifyRoute = createRoute({ getParentRoute: () => rootRoute, path: '/magic-link/verify', component: MagicLinkVerifyPage });
 const passwordResetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/password-reset', component: PasswordResetPage });
 
 const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/', component: DashboardPage });
@@ -295,6 +297,7 @@ export const routeTree = rootRoute.addChildren([
   loginRoute,
   twoFactorRoute,
   magicLinkRoute,
+  magicLinkVerifyRoute,
   passwordResetRoute,
   layoutRoute.addChildren([
     dashboardRoute,

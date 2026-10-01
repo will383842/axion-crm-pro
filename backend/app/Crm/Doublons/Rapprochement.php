@@ -50,6 +50,24 @@ final class Rapprochement
     public const PRESSE_TITRE_EDITEUR = 'presse_titre_editeur';
 
     /**
+     * Doublons de la presse (2026-10-01, `crm:presse:doublons`) : deux fiches
+     * du même titre, sans SIREN, même famille et même type, départements et
+     * adresses compatibles (`DoublonsPresse::juger`). Le SEUL motif qui
+     * fusionne une fiche de presse sans un humain — et `FusionFiches` le
+     * RE-VÉRIFIE sur les données du moment (`DoublonsPresse::paireStricte`).
+     * Pas dans `MOTIFS_CERTAINS` : `crm:doublons:fusionner` ne le traite pas.
+     */
+    public const PRESSE_MEME_TITRE = 'presse_meme_titre';
+
+    /**
+     * Deux fiches de presse au même titre qui ne sont PAS un cas strict (une
+     * fiche à SIREN — journal et éditeur —, deux SIREN, adresses
+     * contradictoires, émission et chaîne…) : file « Doublons à vérifier »,
+     * jamais fusionnées sans un humain.
+     */
+    public const PRESSE_HOMONYME = 'presse_homonyme';
+
+    /**
      * Motif => [score, libellé]. Le score va dans `duplicate_flags.similarity`
      * (NUMERIC(4,3)) : il ordonne la file, il ne décide rien.
      *
@@ -63,6 +81,8 @@ final class Rapprochement
         self::NOM_CP => [0.85, 'Même nom et même code postal, sites différents ou absents (fiche sans SIREN et fiche avec SIREN)'],
         self::SANS_SIREN_NOM => [0.8, 'Deux fiches sans SIREN au même nom, même code postal ou même site'],
         self::PRESSE_TITRE_EDITEUR => [0.7, 'Titre de presse et fiche de son éditeur (SIREN du registre du titre) : à vérifier, jamais fusionné sans vous'],
+        self::PRESSE_MEME_TITRE => [0.95, 'Même titre de presse, sans SIREN, même type, départements et adresses compatibles : fusionné automatiquement (annulable)'],
+        self::PRESSE_HOMONYME => [0.65, 'Deux fiches de presse au même titre (fiche à SIREN, adresses ou types différents) : à vérifier, jamais fusionné sans vous'],
     ];
 
     /** Les seuls motifs qui peuvent autoriser une fusion sans relecture. */

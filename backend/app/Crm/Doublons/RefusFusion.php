@@ -26,6 +26,8 @@ final class RefusFusion extends RuntimeException
         'personnes_homonymes_en_conflit' => 'Deux personnes homonymes, une sur chaque fiche, ont des coordonnées différentes : à régler à la main d\'abord.',
         'protection_perdue' => "La fiche gardée n'hériterait pas de la protection de la fiche absorbée.",
         'erreur_base' => 'La base a refusé une écriture : rien n\'a été fait.',
+        'presse_pas_stricte' => 'Ces deux fiches de presse ne sont plus un doublon strict sur les données du moment (SIREN, type, département, adresses, relation saisie à la main) : la paire va dans la file de vérification.',
+        'presse_decision_humaine' => 'Cette paire de presse est déjà dans la file de vérification, a été écartée, ou une fusion entre les deux a été annulée : elle ne se fusionne jamais automatiquement.',
         'presse_verification_humaine' => 'Une fiche de presse ne se fusionne jamais automatiquement : la paire reste dans la file de vérification.',
         'journaliste_homonyme_sur_la_fiche_gardee' => 'Un journaliste de la fiche absorbée a un homonyme (hors presse) sur la fiche gardée : ses coordonnées y seraient recopiées sans la marque presse. À régler à la main d\'abord.',
         'fusion_introuvable' => 'Fusion introuvable dans cet espace.',

@@ -18,6 +18,7 @@ use App\Crm\FichesProtegees;
 use App\Crm\Presse\ClassementMedia;
 use App\Crm\Presse\LecturePageAccueil;
 use App\Crm\Presse\MediaIncertain;
+use App\Crm\Presse\SiteMedia;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use Database\Seeders\ScrapingSourcesSeeder;
@@ -56,8 +57,25 @@ function pcmPresse(string $espace, ?string $site, string $nom = 'ZZ EDITIONS FIC
         'created_at' => now(), 'updated_at' => now(),
     ]);
     pcmMedia($espace, $id, $type, 'cppap', $media + ['name' => $nom]);
+    pcmVerifie($id, $media['website'] ?? $site);
 
     return $id;
+}
+
+/**
+ * v5 : le classement ne lit QUE le site vérifié (`metadata.site_media`, posé
+ * par `crm:presse:verifier-sites`) — les fixtures le marquent vérifié.
+ */
+function pcmVerifie(int $id, ?string $site): void
+{
+    $url = LecturePageAccueil::cible($site);
+    if ($url === null) {
+        return;
+    }
+    DB::update(
+        "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('site_media', ?::jsonb) WHERE id = ?",
+        [json_encode(['statut' => SiteMedia::VERIFIE, 'url' => $url, 'v' => SiteMedia::VERSION, 'le' => '2026-10-01']), $id],
+    );
 }
 
 /** Une fiche « média possible » : NAF 63.12Z, seule ligne `naf-extract`, prospect. */
@@ -74,6 +92,7 @@ function pcmIncertaine(string $espace, ?string $site): int
         'created_at' => now(), 'updated_at' => now(),
     ]);
     pcmMedia($espace, $id, 'portail_web', 'naf-extract', ['name' => 'ZZ SOCIETE FICTIVE']);
+    pcmVerifie($id, $site);
 
     return $id;
 }
@@ -512,4 +531,27 @@ test('un classement LU SUR LE SITE n est pas remplace par un classement au nom s
         ->and(pcmCompteur($r['sortie'], 'lus_sur_site_gardes'))->toBe(1)
         ->and(pcmCompteur($r['sortie'], 'classements_ecrits'))->toBe(0)
         ->and(pcmClassement($id))->toEqual($avant);
+});
+
+test('v5 : seul un site VERIFIE est lu — un site devine non verifie ou non conforme donne un classement au nom seul (verdict compris)', function () {
+    $verifie = pcmPresse($this->espace, 'https://eco-pme.test');
+    $devine = pcmPresse($this->espace, 'https://devine.test', 'ZZ EDITIONS FICTIVES BIS');
+    $nonConforme = pcmIncertaine($this->espace, 'https://redac.test');
+    DB::table('companies')->where('id', $devine)->update(['metadata' => '{}']);
+    DB::update(
+        "UPDATE companies SET metadata = jsonb_set(metadata, '{site_media,statut}', '\"non-conforme\"') WHERE id = ?",
+        [$nonConforme],
+    );
+    $page = pcmPage('ZZ Économie et PME — le magazine des dirigeants', ['Économie', 'PME', 'Entrepreneurs', 'Dirigeants'], [], '<p>Rédaction, abonnez-vous, à la une</p>');
+    pcmReseau(['eco-pme.test' => ['page' => $page], 'devine.test' => ['page' => $page], 'redac.test' => ['page' => $page]]);
+
+    $r = pcmClasser(['--appliquer' => true]);
+
+    Http::assertNotSent(fn (Request $q): bool => str_contains($q->url(), 'devine.test') || str_contains($q->url(), 'redac.test'));
+    expect(ClassementMedia::VERSION)->toBe(5)
+        ->and(pcmClassement($verifie)['lecture'])->toBe('site')
+        ->and(pcmClassement($devine)['lecture'])->toBe('nom')
+        ->and(pcmClassement($nonConforme)['lecture'])->toBe('nom')
+        ->and(pcmClassement($nonConforme)['verdict'])->toBe('a-verifier')
+        ->and(pcmCompteur($r['sortie'], 'sites_non_verifies'))->toBe(2);
 });

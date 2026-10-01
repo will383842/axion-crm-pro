@@ -152,7 +152,7 @@ final class AdressePresseFiable
             }
         }
 
-        $meta = DB::table('companies')->where('id', $companyId)->value('metadata');
+        $meta = DB::table('companies')->where('id', $companyId)->whereNull('deleted_at')->value('metadata');
         $meta = is_string($meta) ? json_decode($meta, true) : $meta;
         $liste = is_array($meta) && is_array($meta[self::CLE_EMAILS_LISTE] ?? null) ? $meta[self::CLE_EMAILS_LISTE] : [];
         foreach ($liste as $e) {

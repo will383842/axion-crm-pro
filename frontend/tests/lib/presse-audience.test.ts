@@ -10,9 +10,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CRITERE_AUDIENCE_PRESSE,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
   avecExclusions,
+  criteresAudiencePresse,
   criteresMedias,
   exclusions,
   slugTypeMedia,
@@ -52,5 +54,19 @@ describe('critères de presse', () => {
     const slugs = [...TYPES_MEDIA.map((t) => slugTypeMedia(t.code)), ...ZONES_MEDIA.map((z) => slugZoneMedia(z.code))];
     expect(new Set(slugs).size).toBe(slugs.length);
     for (const s of slugs) expect(s).toMatch(/^media-(type|zone):[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+
+  it('audience presse : le critère presse en tête, la géographie et les critères médias — sans critère de prospection', () => {
+    const medias = criteresMedias([], [], { themes: ['economie-entreprise'] });
+    expect(criteresAudiencePresse({ departements: ['69'], regions: [], etiquettes: [] }, medias, ['production'])).toEqual({
+      all: [
+        CRITERE_AUDIENCE_PRESSE,
+        { field: 'department_code', op: 'in', value: ['69'] },
+        ...medias,
+      ],
+      not: [{ field: 'tags', op: 'contains_any', value: ['media-type:production'] }],
+    });
+    expect(CRITERE_AUDIENCE_PRESSE).toEqual({ field: 'segment', op: 'eq', value: 'presse' });
+    expect(criteresAudiencePresse({ departements: [], regions: [], etiquettes: [] }, [], [])).toEqual({ all: [CRITERE_AUDIENCE_PRESSE] });
   });
 });

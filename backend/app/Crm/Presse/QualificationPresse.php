@@ -287,15 +287,15 @@ final class QualificationPresse
     /**
      * La fiche porte-t-elle le tag d'un segment de campagne OUVERT autre que la
      * presse (un groupe de presse qui organise des salons) ? Ses journalistes
-     * y restent exclus des envois (`GardePresse::conditionContactsSql`) : on
+     * y restent exclus des envois de CE segment (`GardePresse::conditionContactsSql`) : on
      * le compte pour le dire.
      *
-     * @param  list<string>  $ouverts
+     * @param  list<string>|null  $ouverts  null = `Segments::ouverts()` (configuration)
      */
-    public static function porteUnSegmentOuvert(int $companyId, array $ouverts = Segments::OUVERTS): bool
+    public static function porteUnSegmentOuvert(int $companyId, ?array $ouverts = null): bool
     {
         $tags = [];
-        foreach ($ouverts as $segment) {
+        foreach ($ouverts ?? Segments::ouverts() as $segment) {
             if ($segment !== Segments::PRESSE) {
                 $tags[] = Segments::tag($segment);
             }

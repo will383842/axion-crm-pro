@@ -1,7 +1,7 @@
 # =============================================================================
 # BASELINE PHPStan — dette figée le 2026-08-13, dégonflée le 2026-08-18
 # =============================================================================
-# ÉTAT COURANT (2026-08-18) : 187 entrées / 204 erreurs, niveau 8.
+# ÉTAT COURANT (2026-08-18) : 186 entrées / 201 erreurs, niveau 8.
 # Ces deux nombres sont FIGÉS dans un test Pest — cf.
 # tests/Unit/PhpstanBaselineNeGrossitPasTest.php. Ils ne peuvent que DÉCROÎTRE ;
 # quand tu les fais baisser, mets à jour le test dans le MÊME commit.
@@ -42,6 +42,10 @@
 #     secteur) au profit du référentiel unique (`App\Crm\Referentiels`) : leurs
 #     trois entrées `classConstant.phpDocType` disparaissent → 190 → 187 entrées,
 #     207 → 204 erreurs.
+#   - 2026-10-01 (audience presse) : la boucle des membres de `refresh()` passe
+#     dans `AudienceBuilderService::lignesMembres`, typée ; les trois
+#     `Model::$id` non résolus disparaissent → 187 → 186 entrées, 204 → 201
+#     erreurs.
 #
 # Piège à connaître : déclarer une colonne JSONB castée `array` rend « toujours
 # vrai » les `is_array()` défensifs qui la lisent, et PHPStan le signale. Trois
@@ -689,12 +693,6 @@ parameters:
 			message: '#^Access to an undefined property App\\Models\\EmailAudience\:\:\$criteria\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Services/Audiences/AudienceBuilderService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
 			path: app/Services/Audiences/AudienceBuilderService.php
 
 		-

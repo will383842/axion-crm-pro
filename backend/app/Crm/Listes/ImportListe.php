@@ -378,7 +378,7 @@ final class ImportListe
             }
         }
 
-        // La presse n'entre dans aucune liste tant que son segment est fermé
+        // La presse n'entre dans aucune liste (segment ouvert ou non)
         // (`GardePresse`) : `ListesManuelles::ajouter()` la refusera. On le
         // compte DÈS L'ANALYSE à blanc, pour que l'écran l'annonce avant
         // l'import — sans rien retirer des clés (le refus reste au seul

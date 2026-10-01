@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
@@ -64,13 +65,31 @@ use Illuminate\Support\Facades\DB;
  *    pertinence absente) : le filtre REFUSE quand il ne sait pas — il retient
  *    une liste de pertinences, il n'en exclut pas une.
  *
+ * Segment `presse` (ouvert le 01/10/2026, `crm.segments_ouverts`) — en plus
+ * de tout ce qui précède, une adresse ne part que si sa PROVENANCE est fiable
+ * (`AdressePresseFiable`) :
+ *  - journaliste : seulement avec la porte `email_redaction`
+ *    (`ecartees_journaliste_sans_acces` sinon) ; un journaliste opposé ou à la
+ *    corbeille côté `journalists` écarte l'adresse (`ecartees_journaliste_retire`) ;
+ *  - seules la boîte générique de la fiche et ses personnes de la PRESSE
+ *    sont candidates : jamais un autre contact (GOFAB, organisateur…) ;
+ *  - adresse de la fiche : importée d'une liste presse, portée par une ligne
+ *    `media` d'une source presse au site non deviné, ou fiche sans site deviné,
+ *    ou site VÉRIFIÉ (`companies.metadata.site_media.statut` `verifie` ou
+ *    `trouve-verifie`, chantier des sites de médias #273). Une adresse
+ *    tirée d'un site deviné non vérifié ne part JAMAIS (`ecartees_site_devine`) ;
+ *  - une fiche « média possible » (`media-possible:*`, restée prospect) n'est
+ *    jamais traitée comme presse (`ecartees_media_possible`).
+ * Chaque ligne dit la `provenance` retenue. Les journalistes ne partent QUE
+ * par ce segment : les autres les écartent toujours (`GardePresse`).
+ *
  * `crm:campagne:retours` retrouve ensuite
  * TOUTES les fiches de l'adresse : aucune ne reste « non informée ».
  */
 class CrmCampagneDestinataires extends Command
 {
     protected $signature = 'crm:campagne:destinataires
-                            {segment : Segment visé (liste fermée, cf. App\Crm\Campagnes\Segments)}
+                            {segment : Segment visé (liste fermée, ouverture par crm.segments_ouverts, cf. App\Crm\Campagnes\Segments)}
                             {sortie : Fichier JSONL à écrire, HORS du dépôt}
                             {--non-informes : Seulement les adresses dont aucune fiche n\'a reçu de premier message (first_info_at)}
                             {--avec-pertinence-faible : Segment federations : réintégrer les organismes de pertinence faible (écartés par défaut)}
@@ -92,11 +111,13 @@ class CrmCampagneDestinataires extends Command
     public function handle(): int
     {
         $segment = (string) $this->argument('segment');
-        if (! in_array($segment, Segments::OUVERTS, true)) {
-            $this->error("Segment fermé ou inconnu : « {$segment} ». Ouverts : " . implode(', ', Segments::OUVERTS) . '.');
+        if (! Segments::ouvert($segment)) {
+            $ouverts = Segments::ouverts();
+            $this->error("Segment fermé ou inconnu : « {$segment} ». Ouverts : " . ($ouverts === [] ? 'aucun' : implode(', ', $ouverts)) . '.');
 
             return self::FAILURE;
         }
+        $presse = $segment === Segments::PRESSE;
 
         $chemin = (string) $this->argument('sortie');
         $dossier = realpath(dirname($chemin));
@@ -133,15 +154,28 @@ class CrmCampagneDestinataires extends Command
         }
         $famillesExclues = $avecSyndicats ? [] : Taxonomy::FEDERATION_FAMILLES_HORS_CAMPAGNE;
 
+        /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
             'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
+        if ($presse) {
+            // Compteurs propres au segment presse (`AdressePresseFiable`).
+            $bilan += array_fill_keys([
+                'ecartees_media_possible', 'ecartees_site_devine', 'ecartees_journaliste_sans_acces', 'ecartees_journaliste_retire',
+            ], 0);
+        }
 
         /** @var array<string, list<array<string, mixed>>> $parAdresse */
         $parAdresse = [];
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $pertinences, $famillesExclues, &$parAdresse, &$bilan): void {
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $segment, $presse, $pertinences, $famillesExclues, &$parAdresse, &$bilan): void {
             foreach ($this->fiches($workspaceId, $segment) as $org) {
+                if ($presse && (bool) $org->media_possible) {
+                    // Restée prospect : jamais traitée comme presse.
+                    $bilan['ecartees_media_possible']++;
+
+                    continue;
+                }
                 if ($segment === Segments::FEDERATIONS) {
                     if (! in_array($org->pertinence, $pertinences, true)) {
                         $bilan[$org->pertinence === null ? 'ecartees_sans_classement' : 'ecartees_pertinence_faible']++;
@@ -157,7 +191,7 @@ class CrmCampagneDestinataires extends Command
                 $bilan['fiches']++;
                 $evenement = $this->prochainEvenement($workspaceId, (int) $org->id);
                 $federation = $segment === Segments::FEDERATIONS ? $this->federation($workspaceId, $org) : null;
-                foreach ($this->adresses($workspaceId, $org) as $a) {
+                foreach ($this->adresses($workspaceId, $org, $presse) as $a) {
                     $a['organisation'] = (string) $org->denomination;
                     $a['organisation_id'] = (int) $org->id;
                     $a['evenement'] = $evenement;
@@ -180,6 +214,24 @@ class CrmCampagneDestinataires extends Command
             $bilan['adresses_distinctes']++;
             $email = (string) $email;
 
+            if ($presse) {
+                // La PROVENANCE d'abord (`AdressePresseFiable`) : aucun
+                // journaliste retiré derrière l'adresse, et au moins une
+                // occurrence de provenance fiable.
+                if (array_filter($occurrences, static fn (array $o): bool => ($o['journaliste_retire'] ?? false) === true) !== []) {
+                    $bilan['ecartees_journaliste_retire']++;
+
+                    continue;
+                }
+                $fiables = array_values(array_filter($occurrences, static fn (array $o): bool => ($o['provenance_fiable'] ?? false) === true));
+                if ($fiables === []) {
+                    $sansAcces = array_filter($occurrences, static fn (array $o): bool => ($o['provenance'] ?? null) === AdressePresseFiable::JOURNALISTE_SANS_ACCES) !== [];
+                    $bilan[$sansAcces ? 'ecartees_journaliste_sans_acces' : 'ecartees_site_devine']++;
+
+                    continue;
+                }
+            }
+
             // La règle de #253, écrite UNE fois (`EligibiliteAdresse`) : elle
             // est partagée avec l'aperçu des destinataires d'une audience.
             $motif = EligibiliteAdresse::motif($email, $occurrences, (bool) $this->option('non-informes'));
@@ -192,6 +244,12 @@ class CrmCampagneDestinataires extends Command
                 $bilan['ecartees_adresse_partagee']++;
 
                 continue;
+            }
+
+            // Segment presse : seules les occurrences de provenance fiable
+            // portent la ligne.
+            if ($presse) {
+                $occurrences = array_values(array_filter($occurrences, static fn (array $o): bool => ($o['provenance_fiable'] ?? false) === true));
             }
 
             // La personne nommée d'abord (message plus personnel), sinon la boîte.
@@ -227,6 +285,9 @@ class CrmCampagneDestinataires extends Command
             ];
             if ($segment === Segments::FEDERATIONS) {
                 $ligne['federation'] = $premiere['federation'];
+            }
+            if ($presse) {
+                $ligne['provenance'] = $premiere['provenance'];
             }
             $lignes[] = $ligne;
         }
@@ -279,6 +340,7 @@ class CrmCampagneDestinataires extends Command
     private function fiches(string $workspaceId, string $segment): iterable
     {
         $tag = Segments::tag($segment);
+        $presse = $segment === Segments::PRESSE;
 
         return DB::table('companies')
             ->leftJoin('federations', 'federations.company_id', '=', 'companies.id')
@@ -292,11 +354,20 @@ class CrmCampagneDestinataires extends Command
                     ->where('tags.slug', $tag);
             })
             ->orderBy('companies.id')
-            ->get([
+            ->select([
                 'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
-            ]);
+            ])
+            // Segment presse : ce qui juge la provenance des adresses de la
+            // fiche (`AdressePresseFiable`), et le « média possible ».
+            ->when($presse, static fn ($q) => $q->selectRaw(
+                AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
+                . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie, '
+                . 'EXISTS (SELECT 1 FROM company_tag mp_ct JOIN tags mp_t ON mp_t.id = mp_ct.tag_id'
+                . " WHERE mp_ct.company_id = companies.id AND mp_t.slug LIKE 'media-possible:%') AS media_possible",
+            ))
+            ->get();
     }
 
     /**
@@ -333,17 +404,28 @@ class CrmCampagneDestinataires extends Command
      * ne le sait pas — jamais deviné. `verification` : le statut posé par
      * `crm:emails:verifier` pour CETTE adresse (`VerificationEmail::statutDe`).
      *
-     * @return list<array{crm_ref: string, email: string, type: string, nature_adresse: ?string, domaine_verifie_le: ?string, prenom: ?string, nom: ?string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool}>
+     * Segment presse (`$presse`) : chaque adresse porte aussi sa `provenance`
+     * (`AdressePresseFiable::juger`), `provenance_fiable` et
+     * `journaliste_retire` ; les personnes de la presse y sont lues (tout
+     * autre segment les écarte).
+     *
+     * @return list<array<string, mixed>>
      */
-    private function adresses(string $workspaceId, \stdClass $org): array
+    private function adresses(string $workspaceId, \stdClass $org, bool $presse = false): array
     {
         $adresses = [];
+        $fiche = $presse ? [
+            'site_devine' => (bool) $org->site_devine,
+            'site_verifie' => (bool) $org->site_verifie,
+            'emails_surs' => AdressePresseFiable::emailsSurs((int) $org->id),
+        ] : null;
         if (is_string($org->email_generic) && trim($org->email_generic) !== '') {
             $signals = json_decode(is_string($org->signals ?? null) ? $org->signals : '{}', true);
             $verification = is_array($signals) && is_array($signals['email_generic_verification'] ?? null)
                 ? $signals['email_generic_verification']
                 : [];
-            $adresses[] = [
+            $plus = $fiche !== null ? $this->provenance((string) $org->email_generic, $fiche, false, null, false) : [];
+            $adresses[] = $plus + [
                 'crm_ref' => 'organisation:' . $org->id,
                 'email' => $org->email_generic,
                 'type' => 'generique',
@@ -363,15 +445,31 @@ class CrmCampagneDestinataires extends Command
             ->whereNull('deleted_at')
             ->whereNotNull('email')
             // Les journalistes ne partent JAMAIS par un autre segment que le
-            // leur, fermé tant que Will ne l'ouvre pas — même quand la fiche
-            // porte aussi le tag de ce segment-ci (`GardePresse`).
-            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
+            // leur — même quand la fiche porte aussi le tag de ce segment-ci
+            // (`GardePresse`).
+            ->when(! $presse, static fn ($q) => $q->whereRaw(GardePresse::conditionContactsSql('contacts')))
+            // Segment presse : seules les personnes de la presse — jamais un
+            // autre contact de la fiche (GOFAB, organisateur, prospection),
+            // même règle que l'audience presse (relecture A09).
+            ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
             ->orderBy('id')
-            ->get(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at']);
+            ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at'])
+            ->when($presse, static fn ($q) => $q->selectRaw(
+                GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
+                // Le journaliste source opposé ou à la corbeille : l'adresse ne part pas.
+                . "EXISTS (SELECT 1 FROM journalists jr WHERE contacts.external_ref = 'journaliste:' || jr.id"
+                . ' AND (jr.opt_out OR jr.deleted_at IS NOT NULL)) AS journaliste_retire',
+            ))
+            ->get();
 
         foreach ($contacts as $c) {
             $meta = json_decode(is_string($c->metadata) ? $c->metadata : '{}', true);
-            $adresses[] = [
+            $plus = [];
+            if ($fiche !== null) {
+                $acces = is_array($meta) && is_string($meta['acces'] ?? null) ? $meta['acces'] : null;
+                $plus = $this->provenance((string) $c->email, $fiche, (bool) $c->est_presse, $acces, (bool) $c->journaliste_retire);
+            }
+            $adresses[] = $plus + [
                 'crm_ref' => 'contact:' . $c->id,
                 'email' => (string) $c->email,
                 'type' => 'personne',
@@ -388,6 +486,17 @@ class CrmCampagneDestinataires extends Command
         }
 
         return $adresses;
+    }
+
+    /**
+     * @param  array{site_devine: bool, site_verifie: bool, emails_surs: array<string, string>}  $fiche
+     * @return array{provenance: string, provenance_fiable: bool, journaliste_retire: bool}
+     */
+    private function provenance(string $email, array $fiche, bool $estPresse, ?string $acces, bool $retire): array
+    {
+        [$fiable, $provenance] = AdressePresseFiable::juger($email, $fiche + ['presse' => $estPresse, 'acces' => $acces]);
+
+        return ['provenance' => $provenance, 'provenance_fiable' => $fiable, 'journaliste_retire' => $retire];
     }
 
     /** @return array{id: int, nom: string, date_debut: ?string, date_fin: ?string, recurrence: ?string, ville: ?string, lien: ?string}|null */

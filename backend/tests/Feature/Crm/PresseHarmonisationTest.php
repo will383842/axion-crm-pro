@@ -542,13 +542,26 @@ test('--compteurs-seulement : que des nombres, ni nom, ni adresse, ni identifian
 
 // ── Campagnes ─────────────────────────────────────────────────────────────
 
-test('le segment presse est DEFINI mais FERME : la liste de campagne le refuse tant que Will ne l ouvre pas', function () {
+test('le segment presse est OUVERT par defaut (decision du 01/10/2026) ; refermé par la configuration, la liste de campagne le refuse', function () {
     expect(Segments::tag(Segments::PRESSE))->toBe(FichesProtegees::TAG_PRESSE)
-        ->and(Segments::OUVERTS)->not->toContain(Segments::PRESSE);
+        ->and(Segments::ouverts())->toContain(Segments::PRESSE);
 
     $sortie = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zz-presse-' . Str::random(6) . '.jsonl';
+    expect(Artisan::call('crm:campagne:destinataires', ['segment' => Segments::PRESSE, 'sortie' => $sortie]))->toBe(0)
+        ->and(is_file($sortie))->toBeTrue();
+    @unlink($sortie);
+
+    // Refermer sans déployer de code : `CRM_SEGMENTS_OUVERTS`.
+    config(['crm.segments_ouverts' => 'organisateurs-evenements,federations']);
+    expect(Segments::ouverts())->toBe([Segments::ORGANISATEURS_EVENEMENTS, Segments::FEDERATIONS]);
     $code = Artisan::call('crm:campagne:destinataires', ['segment' => Segments::PRESSE, 'sortie' => $sortie]);
     expect($code)->toBe(1)
         ->and(Artisan::output())->toContain('Segment fermé ou inconnu')
         ->and(is_file($sortie))->toBeFalse();
+
+    // Une valeur inconnue ne peut que FERMER ; `aucun` ferme tout.
+    config(['crm.segments_ouverts' => 'presse, prospects-insee']);
+    expect(Segments::ouverts())->toBe([Segments::PRESSE]);
+    config(['crm.segments_ouverts' => Segments::AUCUN]);
+    expect(Segments::ouverts())->toBe([]);
 });

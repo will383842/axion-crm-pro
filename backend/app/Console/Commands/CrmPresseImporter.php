@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Presse\EtiquettesMedia;
@@ -119,7 +120,8 @@ class CrmPresseImporter extends Command
                             {--dry-run : Tout parcourir paquet par paquet, annuler chaque paquet, et afficher le bilan}
                             {--limite= : Ne traiter que les N premières lignes (import par étapes)}
                             {--paquet=500 : Lignes validées par transaction : borne les verrous tenus}
-                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}';
+                            {--compteurs-seulement : N\'afficher que des nombres (journaux publics des workflows)}
+                            {--provenance-seulement : Rattrapage : sur des lignes DÉJÀ importées, ne poser QUE la provenance « liste presse » des adresses de rédaction (rien d\'autre n\'est écrit)}';
 
     protected $description = 'Importe une liste de diffusion presse (médias et journalistes) dans les fiches et contacts.';
 
@@ -205,7 +207,7 @@ class CrmPresseImporter extends Command
             'lignes', 'rejetees', 'paquets',
             'fiches_creees', 'fiches_rattachees', 'titres_rapproches', 'medias_crees', 'medias_completes', 'medias_inchanges',
             'natures_posees', 'natures_conservees', 'relations_posees', 'relations_conservees',
-            'emails_redaction_non_poses',
+            'emails_redaction_non_poses', 'provenances_liste_retenues',
             'journalistes_lus', 'journalistes_opposes', 'journalistes_homonymes_autre_adresse', 'journalistes_sur_fiche_d_un_segment_ouvert', 'emails_journalistes_retenus_par_acces', 'contacts_crees', 'contacts_completes', 'personnes_sans_changement',
             'personnes_ecartees', 'personnes_opposees', 'personnes_retirees_ignorees', 'emails_refuses_mx',
             'chaines_de_fusion_tronquees',
@@ -368,6 +370,9 @@ class CrmPresseImporter extends Command
     private function importerLigne(string $ligne): array
     {
         $l = $this->lire($ligne);
+        if ((bool) $this->option('provenance-seulement')) {
+            return $this->provenanceSeulement($l);
+        }
         $delta = [];
 
         $trouvee = $this->parAncre($l, corbeilleComprise: true)->first(['id', 'deleted_at']);
@@ -513,6 +518,20 @@ class CrmPresseImporter extends Command
             $delta[$cle] = ($delta[$cle] ?? 0) + $n;
         }
         $delta[$this->ecrireMedia($companyId, $l, $emailRedaction)] = 1;
+        if ($emailRedaction !== null) {
+            // La PROVENANCE de l'adresse de rédaction : une liste presse. Le
+            // segment presse ne fait partir que des adresses de provenance
+            // fiable (`AdressePresseFiable`) ; celle-ci l'est même si la fiche
+            // porte par ailleurs un site deviné.
+            // Un rejeu ORDINAIRE la pose aussi, mais il rejoue toute la
+            // ligne : il peut compléter un champ vide de la ligne `media`,
+            // requalifier la fiche ou ses étiquettes si elles ont changé
+            // depuis. Pour ne poser QUE la provenance, sans rien toucher
+            // d'autre : `--provenance-seulement` (`provenanceSeulement()`).
+            if (AdressePresseFiable::retenirEmailListe($companyId, $emailRedaction) > 0) {
+                $delta['provenances_liste_retenues'] = 1;
+            }
+        }
 
         if ($j !== null) {
             $contactId = QualificationPresse::contactDe($companyId, $j['prenom'], $j['nom'], $j['email']);
@@ -532,6 +551,47 @@ class CrmPresseImporter extends Command
         QualificationPresse::etiqueter($companyId);
 
         return $delta;
+    }
+
+    /**
+     * RATTRAPAGE de la provenance (`--provenance-seulement`, relecture A09) :
+     * une ligne DÉJÀ importée — sa fiche retrouvée par son ancre, ou par le
+     * même rapprochement que l'import — ne reçoit QUE la trace « liste presse »
+     * de son adresse de rédaction (`companies.metadata.emails_liste_presse`).
+     * Ni ingestion, ni ligne `media`, ni contact, ni qualification, ni
+     * étiquette : rien d'autre n'est lu en écriture. Une ligne sans fiche est
+     * rejetée (`fiche_non_importee`) — ce rattrapage ne crée rien. L'adresse
+     * passe les mêmes filtres qu'à l'import (boîte pro, ni opposée ni
+     * supprimée).
+     *
+     * @param  array<string, mixed>  $l
+     * @return array<string, int>
+     */
+    private function provenanceSeulement(array $l): array
+    {
+        // Comme l'import ordinaire : une ancre qui désigne une fiche À LA
+        // CORBEILLE rejette la ligne — jamais de repli sur le rapprochement.
+        $parAncre = $this->parAncre($l, corbeilleComprise: true)->first(['id', 'deleted_at']);
+        if ($parAncre !== null && $parAncre->deleted_at !== null) {
+            throw new InvalidArgumentException('fiche_a_la_corbeille');
+        }
+        $fiche = $parAncre !== null ? $parAncre->id : $this->rapprocher($l)?->id;
+        if ($fiche === null) {
+            throw new InvalidArgumentException('fiche_non_importee');
+        }
+        $fiche = (int) $fiche;
+        if (! QualificationPresse::estFichePresse($fiche)) {
+            throw new InvalidArgumentException('fiche_existante_hors_presse');
+        }
+        $email = is_string($l['email_redaction'] ?? null) ? $l['email_redaction'] : null;
+        if ($email === null) {
+            return [];
+        }
+        if (NatureEmail::de($email) !== 'pro' || ! EligibiliteCampagne::peutRecevoir($email)) {
+            return ['emails_redaction_non_poses' => 1];
+        }
+
+        return AdressePresseFiable::retenirEmailListe($fiche, $email) > 0 ? ['provenances_liste_retenues' => 1] : [];
     }
 
     /**

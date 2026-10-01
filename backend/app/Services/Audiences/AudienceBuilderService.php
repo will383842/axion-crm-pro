@@ -2,7 +2,9 @@
 
 namespace App\Services\Audiences;
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\GardePresse;
+use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
 use App\Crm\Listes\ListesManuelles;
 use App\Jobs\RefreshAudienceChunkJob;
@@ -45,7 +47,25 @@ class AudienceBuilderService
         // 2026-09-30 — membres d'une LISTE MANUELLE (`in` / `not_in`, valeur =
         // identifiants de listes) : « membres de la liste X », « sauf liste Y ».
         self::CHAMP_LISTE_MANUELLE,
+        // 2026-10-01 — « audience presse » (`segment eq presse`, bloc `all`).
+        self::CHAMP_SEGMENT,
     ];
+
+    /**
+     * L'AUDIENCE PRESSE (ouverture de la presse, décision de Will du
+     * 01/10/2026) : `{"field": "segment", "op": "eq", "value": "presse"}`,
+     * dans le bloc `all` seulement.
+     *
+     * Une audience qui le porte vise la presse harmonisée — et SEULEMENT
+     * elle (tag `FichesProtegees::TAG_PRESSE`, jamais une fiche « média
+     * possible ») ; les autres critères (type, zone, thème, public, format de
+     * média, département…) l'affinent. Ses membres, son aperçu, ses comptes et
+     * ses destinataires ne retiennent QUE des adresses de provenance fiable
+     * (`AdressePresseFiable`). Une audience SANS ce critère n'aspire jamais
+     * la presse (`GardePresse`). Segment presse fermé
+     * (`crm.segments_ouverts`) : le critère est REFUSÉ.
+     */
+    public const CHAMP_SEGMENT = 'segment';
 
     /**
      * Le critère « membre d'une liste manuelle » (2026-09-30).
@@ -82,11 +102,17 @@ class AudienceBuilderService
     private const BATCH_CHUNK_SIZE = 5000;
 
     /**
-     * @return array{companies: int, contacts: int}
+     * Pour une audience presse, `presse_ecartees` : les adresses écartées par
+     * leur provenance (`AdressePresseFiable::MOTIFS`).
+     *
+     * @return array{companies: int, contacts: int, presse_ecartees?: array<string, int>}
      */
     public function preview(string $workspaceId, array $criteria): array
     {
         $query = $this->buildQuery($workspaceId, $criteria);
+        if (self::estAudiencePresse($criteria)) {
+            return $this->previewPresse($query);
+        }
 
         $companies = $query->count();
         // Sprint H8 — contacts contactables (valid|catchall|unknown) + comptage
@@ -112,6 +138,174 @@ class AudienceBuilderService
             'companies' => $companies,
             'contacts' => $contacts + $companyOnlyEmails,
         ];
+    }
+
+    /**
+     * L'aperçu d'une audience presse : seules les adresses de provenance
+     * fiable comptent, comme au rafraîchissement (`lignesMembres`).
+     *
+     * `presse_ecartees` a la MÊME définition que celle de
+     * `ResolveurDestinataires` (relecture A09) : parmi les adresses
+     * CANDIDATES — la boîte générique de chaque fiche et l'adresse de chaque
+     * personne de la presse (vivante) —, les adresses DISTINCTES (normalisées)
+     * écartées par leur provenance, jugées sur toutes leurs occurrences : un
+     * journaliste retiré derrière elle l'écarte ; sinon une occurrence fiable
+     * suffit ; sinon `journaliste_sans_acces` si une personne de la presse la
+     * porte, `site_devine` autrement.
+     *
+     * @param  Builder<Company>  $query
+     * @return array{companies: int, contacts: int, presse_ecartees: array<string, int>}
+     */
+    private function previewPresse(Builder $query): array
+    {
+        $companies = (clone $query)->count();
+        $ids = (clone $query)->select('companies.id');
+
+        // Les membres, comme `lignesMembres` : personnes de la presse fiables
+        // et joignables, sinon la boîte générique fiable de la fiche.
+        $personnes = DB::table('contacts as ct')
+            ->join('companies as c', 'c.id', '=', 'ct.company_id')
+            ->whereIn('ct.company_id', $ids)
+            ->whereNull('ct.deleted_at')
+            ->whereNotNull('ct.email')
+            ->whereIn('ct.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+            ->whereRaw(GardePresse::estContactPresseSql('ct'))
+            ->whereRaw(AdressePresseFiable::contactFiableSql('ct', 'c.id', 'c'))
+            ->count();
+        $generiques = DB::table('companies as c')
+            ->whereIn('c.id', (clone $query)->select('companies.id'))
+            ->whereNull('c.deleted_at')
+            ->whereNotNull('c.email_generic')
+            ->whereRaw(AdressePresseFiable::generiqueFiableSql('c.id', 'c'))
+            ->whereRaw('NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = c.id AND ct.deleted_at IS NULL AND ct.email IS NOT NULL'
+                . " AND ct.email_status IN ('" . implode("','", TriageAutoService::CONTACTABLE_EMAIL_STATUSES) . "')"
+                . ' AND ' . GardePresse::estContactPresseSql('ct')
+                . ' AND ' . AdressePresseFiable::contactFiableSql('ct', 'c.id', 'c') . ')')
+            ->count();
+
+        // Les écartées : adresses distinctes, verdict sur toutes leurs occurrences.
+        $idsSql = (clone $query)->select('companies.id');
+        $occGeneriques = DB::table('companies as c')
+            ->whereIn('c.id', $idsSql)
+            ->whereNull('c.deleted_at')
+            ->whereNotNull('c.email_generic')
+            ->selectRaw(AdressePresseFiable::cleSql('c.email_generic') . ' AS adresse, CASE WHEN '
+                . AdressePresseFiable::generiqueFiableSql('c.id', 'c') . " THEN NULL ELSE '" . AdressePresseFiable::SITE_DEVINE . "' END AS motif");
+        $occPersonnes = DB::table('contacts as ct')
+            ->join('companies as c', 'c.id', '=', 'ct.company_id')
+            ->whereIn('ct.company_id', (clone $query)->select('companies.id'))
+            ->whereNull('ct.deleted_at')
+            ->whereNotNull('ct.email')
+            ->whereRaw(GardePresse::estContactPresseSql('ct'))
+            ->selectRaw(AdressePresseFiable::cleSql('ct.email') . ' AS adresse, '
+                . AdressePresseFiable::motifContactSql('ct', 'c.id', 'c') . ' AS motif');
+        $retire = AdressePresseFiable::JOURNALISTE_RETIRE;
+        $sansAcces = AdressePresseFiable::JOURNALISTE_SANS_ACCES;
+        $parAdresse = DB::query()
+            ->fromSub($occGeneriques->unionAll($occPersonnes), 'occ')
+            ->where('occ.adresse', '<>', '')
+            ->groupBy('occ.adresse')
+            ->selectRaw("CASE WHEN bool_or(occ.motif = '{$retire}') THEN '{$retire}'"
+                . ' WHEN bool_or(occ.motif IS NULL) THEN NULL'
+                . " WHEN bool_or(occ.motif = '{$sansAcces}') THEN '{$sansAcces}'"
+                . " ELSE '" . AdressePresseFiable::SITE_DEVINE . "' END AS verdict");
+        $comptes = DB::query()->fromSub($parAdresse, 'v')->whereNotNull('v.verdict')
+            ->groupBy('v.verdict')->selectRaw('v.verdict, COUNT(*) AS n')->pluck('n', 'verdict')->all();
+        $ecartees = [];
+        foreach (AdressePresseFiable::MOTIFS as $m) {
+            $ecartees[$m] = (int) ($comptes[$m] ?? 0);
+        }
+
+        return [
+            'companies' => $companies,
+            'contacts' => $personnes + $generiques,
+            'presse_ecartees' => $ecartees,
+        ];
+    }
+
+    /**
+     * Les lignes `audience_members` de ces fiches — UNE définition, partagée
+     * par `refresh()` et `RefreshAudienceChunkJob`.
+     *
+     * Audience ordinaire : les contacts joignables (jamais un journaliste,
+     * `GardePresse`), sinon une ligne « fiche » (adresse générique).
+     * Audience presse : les seules PERSONNES DE LA PRESSE de provenance fiable
+     * (`AdressePresseFiable`) — jamais un autre contact de la fiche (GOFAB,
+     * organisateur, prospection), même quand la fiche porte aussi un autre
+     * tag protégé —, sinon une ligne « fiche » SEULEMENT si son adresse
+     * générique est fiable — une fiche sans adresse fiable n'entre pas.
+     *
+     * (La lecture `DB::table('contacts')` ci-dessous est celle qui vivait dans
+     * `RefreshAudienceChunkJob` jusqu'au 2026-10-01.)
+     *
+     * @param  array<int>  $companyIds
+     * @return list<array{audience_id: int, company_id: int, contact_id: int|null, workspace_id: string, added_at: mixed}>
+     */
+    public function lignesMembres(EmailAudience $audience, array $companyIds): array
+    {
+        if ($companyIds === []) {
+            return [];
+        }
+        $criteres = $audience->getAttribute('criteria');
+        $presse = self::estAudiencePresse(is_array($criteres) ? $criteres : []);
+
+        $contacts = DB::table('contacts')
+            ->whereIn('contacts.company_id', $companyIds)
+            ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
+        $generiquesFiables = [];
+        if ($presse) {
+            // Relecture A09 : dans une audience presse, SEULES les personnes de
+            // la presse entrent — jamais un contact GOFAB, organisateur ou de
+            // prospection d'une fiche presse qui porte aussi un autre tag
+            // protégé (la protection générale est levée pour CETTE fiche, pas
+            // pour toutes ses personnes).
+            $contacts->join('companies as apf_c', 'apf_c.id', '=', 'contacts.company_id')
+                ->whereNull('contacts.deleted_at')
+                ->whereNotNull('contacts.email')
+                ->whereRaw(GardePresse::estContactPresseSql('contacts'))
+                ->whereRaw(AdressePresseFiable::contactFiableSql('contacts', 'apf_c.id', 'apf_c'));
+            $generiquesFiables = DB::table('companies as apf_c')
+                ->whereIn('apf_c.id', $companyIds)
+                ->whereNotNull('apf_c.email_generic')
+                ->whereRaw(AdressePresseFiable::generiqueFiableSql('apf_c.id', 'apf_c'))
+                ->pluck('apf_c.id')
+                ->map(static fn ($id): int => (int) $id)
+                ->flip()
+                ->all();
+        } else {
+            $contacts->whereRaw(GardePresse::conditionContactsSql('contacts'));
+        }
+        $parFiche = $contacts->select('contacts.id', 'contacts.company_id')->get()->groupBy('company_id');
+
+        $rows = [];
+        foreach ($companyIds as $companyId) {
+            $siens = $parFiche->get($companyId, collect());
+            if ($siens->isEmpty()) {
+                if ($presse && ! isset($generiquesFiables[$companyId])) {
+                    continue;
+                }
+                $rows[] = [
+                    'audience_id' => (int) $audience->id,
+                    'company_id' => (int) $companyId,
+                    'contact_id' => null,
+                    'workspace_id' => (string) $audience->workspace_id,
+                    'added_at' => now(),
+                ];
+
+                continue;
+            }
+            foreach ($siens as $contact) {
+                $rows[] = [
+                    'audience_id' => (int) $audience->id,
+                    'company_id' => (int) $companyId,
+                    'contact_id' => (int) $contact->id,
+                    'workspace_id' => (string) $audience->workspace_id,
+                    'added_at' => now(),
+                ];
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -142,42 +336,10 @@ class AudienceBuilderService
 
         $total = 0;
         $query->chunkById(self::REFRESH_CHUNK_SIZE, function ($companies) use ($audience, &$total) {
-            $rows = [];
-            $companyIds = $companies->pluck('id')->all();
-
-            // Sprint H8 — élargissement aux contacts contactables (valid|catchall|unknown).
-            // Si aucun contact contactable mais email_generic présent → company-only entry.
-            $contactsByCompany = DB::table('contacts')
-                ->whereIn('company_id', $companyIds)
-                ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
-                ->whereRaw(GardePresse::conditionContactsSql('contacts'))
-                ->select('id', 'company_id')
-                ->get()
-                ->groupBy('company_id');
-
-            foreach ($companies as $company) {
-                $contacts = $contactsByCompany->get($company->id, collect());
-                if ($contacts->isEmpty()) {
-                    // Company-level entry (utile si email_generic présent)
-                    $rows[] = [
-                        'audience_id' => $audience->id,
-                        'company_id' => $company->id,
-                        'contact_id' => null,
-                        'workspace_id' => $audience->workspace_id,
-                        'added_at' => now(),
-                    ];
-                } else {
-                    foreach ($contacts as $contact) {
-                        $rows[] = [
-                            'audience_id' => $audience->id,
-                            'company_id' => $company->id,
-                            'contact_id' => $contact->id,
-                            'workspace_id' => $audience->workspace_id,
-                            'added_at' => now(),
-                        ];
-                    }
-                }
-            }
+            $companyIds = array_map(static fn ($id): int => (int) $id, $companies->pluck('id')->all());
+            // Une seule définition des membres (`lignesMembres`), partagée
+            // avec `RefreshAudienceChunkJob`.
+            $rows = $this->lignesMembres($audience, $companyIds);
             if (! empty($rows)) {
                 DB::table('audience_members')->insertOrIgnore($rows);
                 $total += count($rows);
@@ -271,8 +433,8 @@ class AudienceBuilderService
      */
     public function evaluateForCompany(Company $company): array
     {
-        // La presse harmonisée n'entre dans aucune audience tant que Will n'a
-        // pas ouvert son segment (`GardePresse`), quel que soit le chemin.
+        // La presse harmonisée n'entre dans aucune audience : elle ne part que
+        // par son segment (`GardePresse`), quel que soit le chemin.
         if (! GardePresse::admissible((int) $company->id)) {
             return [];
         }
@@ -360,7 +522,7 @@ class AudienceBuilderService
                 if (! is_array($cond)) {
                     throw CritereAudienceInvalide::parce($ou . ' n est pas une condition');
                 }
-                self::validerCondition($ou, $cond);
+                self::validerCondition($ou, $cond, $bloc);
             }
         }
     }
@@ -370,7 +532,7 @@ class AudienceBuilderService
      *
      * @throws CritereAudienceInvalide
      */
-    private static function validerCondition(string $ou, array $cond): void
+    private static function validerCondition(string $ou, array $cond, string $bloc = 'all'): void
     {
         $field = $cond['field'] ?? null;
         $op = $cond['op'] ?? null;
@@ -410,6 +572,21 @@ class AudienceBuilderService
                 throw CritereAudienceInvalide::parce(
                     $ou . ' : liste_manuelle exige de 1 a ' . ListesManuelles::MAX_LISTES_PAR_CRITERE
                     . ' identifiants de listes distincts (entiers positifs)',
+                );
+            }
+        }
+
+        // L'audience presse : `segment eq presse`, dans `all` seulement, et
+        // seulement si le segment presse est ouvert (`crm.segments_ouverts`).
+        if ($field === self::CHAMP_SEGMENT) {
+            if ($bloc !== 'all' || $op !== 'eq' || $value !== Segments::PRESSE) {
+                throw CritereAudienceInvalide::parce(
+                    $ou . ' : le champ segment n admet que segment eq "' . Segments::PRESSE . '" dans le bloc all',
+                );
+            }
+            if (! Segments::ouvert(Segments::PRESSE)) {
+                throw CritereAudienceInvalide::parce(
+                    $ou . ' : le segment presse est ferme (crm.segments_ouverts) — audience presse refusee',
                 );
             }
         }
@@ -461,20 +638,28 @@ class AudienceBuilderService
         // générale où le triage les aurait rangées (`ready_for_outreach`).
         // Seule porte : être membre d'une liste manuelle EXIGÉE (bloc `all`),
         // c'est-à-dire choisie à la main (cf. `CHAMP_LISTE_MANUELLE`).
-        if ($listes['exigees'] === []) {
+        if (self::estAudiencePresse($criteria)) {
+            // AUDIENCE PRESSE : la presse harmonisée, et SEULEMENT elle (le
+            // critère `segment` pose le tag, `buildPositive`) — jamais une
+            // fiche « média possible », restée prospect. C'est la seule porte
+            // par laquelle une fiche de presse entre dans une audience.
+            $query->whereRaw('NOT EXISTS (SELECT 1 FROM company_tag mp_ct JOIN tags mp_t ON mp_t.id = mp_ct.tag_id'
+                . " WHERE mp_ct.company_id = companies.id AND mp_t.slug LIKE 'media-possible:%')");
+        } elseif ($listes['exigees'] === []) {
             FichesProtegees::exclure($query);
+            GardePresse::exclure($query);
         } else {
             $exigees = $listes['exigees'];
             $query->where(function (Builder $q) use ($exigees): void {
                 FichesProtegees::exclure($q);
                 $q->orWhereIn('companies.id', ListesManuelles::organisationsMembres($exigees));
             });
+            // Et la presse harmonisée, par SA garde (`GardePresse`), HORS de
+            // la porte ci-dessus : être membre d'une liste manuelle exigée
+            // lève la protection générale, JAMAIS celle de la presse (qui
+            // n'entre que par une audience presse ou son segment).
+            GardePresse::exclure($query);
         }
-        // Et la presse harmonisée, par SA garde (`GardePresse`), HORS de la
-        // porte ci-dessus : être membre d'une liste manuelle exigée lève la
-        // protection générale, JAMAIS celle de la presse (fermée tant que Will
-        // n'a pas ouvert `Segments::PRESSE`).
-        GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];
         if (is_array($all)) {
@@ -535,6 +720,28 @@ class AudienceBuilderService
         }
 
         return ['toutes' => array_values($toutes), 'exigees' => array_values($exigees)];
+    }
+
+    /**
+     * L'audience porte-t-elle le critère « audience presse »
+     * (`segment eq presse` dans le bloc `all`) ?
+     *
+     * @param  array<mixed>  $criteria
+     */
+    public static function estAudiencePresse(array $criteria): bool
+    {
+        $all = $criteria['all'] ?? [];
+        if (! is_array($all)) {
+            return false;
+        }
+        foreach ($all as $cond) {
+            if (is_array($cond) && ($cond['field'] ?? null) === self::CHAMP_SEGMENT
+                && ($cond['op'] ?? null) === 'eq' && ($cond['value'] ?? null) === Segments::PRESSE) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function applyCondition($query, array $cond, string $combinator): void
@@ -617,7 +824,7 @@ class AudienceBuilderService
     {
         // `tags` et `has_email` ne sont pas des colonnes : leurs prédicats sont
         // bâtis sur EXISTS, qui vaut toujours TRUE ou FALSE, jamais UNKNOWN.
-        $isRealColumn = ! in_array($field, ['tags', 'has_email', self::CHAMP_LISTE_MANUELLE], true);
+        $isRealColumn = ! in_array($field, ['tags', 'has_email', self::CHAMP_LISTE_MANUELLE, self::CHAMP_SEGMENT], true);
 
         if ($isRealColumn && in_array($op, self::NULL_SENSITIVE_OPS, true)) {
             return function ($q) use ($positive, $field) {
@@ -673,6 +880,24 @@ class AudienceBuilderService
                 } else {
                     $q->whereNotIn('companies.id', ListesManuelles::organisationsMembres($ids));
                 }
+            };
+        }
+
+        // Audience presse : les fiches qui portent le tag de la presse
+        // harmonisée. Jamais UNKNOWN (EXISTS).
+        if ($field === self::CHAMP_SEGMENT) {
+            if ($op !== 'eq' || $value !== Segments::PRESSE) {
+                return null;
+            }
+
+            return function ($q) {
+                $q->whereExists(function ($sub): void {
+                    $sub->selectRaw('1')
+                        ->from('company_tag as sg_ct')
+                        ->join('tags as sg_t', 'sg_t.id', '=', 'sg_ct.tag_id')
+                        ->whereColumn('sg_ct.company_id', 'companies.id')
+                        ->where('sg_t.slug', FichesProtegees::TAG_PRESSE);
+                });
             };
         }
 
@@ -852,6 +1077,10 @@ class AudienceBuilderService
             $membre = ListesManuelles::organisationEstMembre((int) $company->id, $ids);
 
             return $op === 'in' ? $membre : ! $membre;
+        }
+        if ($field === self::CHAMP_SEGMENT) {
+            return $op === 'eq' && $value === Segments::PRESSE
+                && in_array(FichesProtegees::TAG_PRESSE, $company->tags->pluck('slug')->all(), true);
         }
         if ($field === 'has_email') {
             // Sprint H8 — élargi : tout email contactable OU email_generic

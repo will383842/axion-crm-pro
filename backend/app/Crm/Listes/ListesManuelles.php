@@ -3,7 +3,6 @@
 namespace App\Crm\Listes;
 
 use App\Crm\Campagnes\GardePresse;
-use App\Crm\Campagnes\Segments;
 use App\Models\ListeManuelle;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +22,9 @@ use Illuminate\Support\Facades\DB;
  * reste, et un nouvel ajout la réactive. Rien n'est jamais supprimé ici — ni
  * la fiche, ni la ligne d'appartenance.
  *
- * 🔴 LA PRESSE N'ENTRE DANS AUCUNE LISTE tant que le segment presse est fermé
- * (`GardePresse`, condition de fusion de #266 posée par Will) :
+ * 🔴 LA PRESSE N'ENTRE DANS AUCUNE LISTE, segment presse ouvert ou fermé
+ * (`GardePresse`, condition de fusion de #266 posée par Will, MAINTENUE à
+ * l'ouverture de la presse le 01/10/2026) :
  *
  *  - À L'ENTRÉE : `ajouter()` (cocher une fiche, importer un fichier) REFUSE
  *    une fiche de presse (tag `FichesProtegees::TAG_PRESSE`), une personne de
@@ -42,8 +42,13 @@ use Illuminate\Support\Facades\DB;
  *    (`GardePresse::conditionContactsSql`). Un journaliste coché ne fait donc
  *    pas non plus entrer son organisation.
  *
- * Ouvrir la presse (ajouter `Segments::PRESSE` à `Segments::OUVERTS`) lève les
- * deux d'un coup : ces conditions valent alors `TRUE`.
+ * Choix du 01/10/2026, à l'ouverture de la presse : une liste manuelle
+ * continue de REFUSER un journaliste. La presse a ses portes à elle — le
+ * segment presse et l'audience presse (critère `segment eq presse`) —, les
+ * seules qui jugent la PROVENANCE de chaque adresse (`AdressePresseFiable`) ;
+ * une liste manuelle ouverte à la presse ferait entrer, par une audience
+ * ordinaire, des adresses tirées d'un site deviné. Ouvrir ou fermer le
+ * segment ne change donc rien ici.
  */
 final class ListesManuelles
 {
@@ -74,7 +79,7 @@ final class ListesManuelles
             ->whereIn('lmm_o.liste_id', $listeIds)
             ->whereNull('lmm_o.retire_le')
             ->whereNotNull('lmm_o.company_id')
-            // La presse n'est membre de rien tant que son segment est fermé.
+            // La presse n'est membre d'aucune liste (segment ouvert ou non).
             ->whereRaw(GardePresse::conditionSql('lmm_o.company_id'));
 
         $parPersonne = DB::table('listes_manuelles_membres as lmm_p')
@@ -172,7 +177,7 @@ final class ListesManuelles
      * Ajoute des fiches à une liste. Seules les fiches VIVANTES de l'espace de
      * la liste sont retenues ; les autres identifiants sont comptés
      * `introuvables` — jamais créés, jamais devinés. Les fiches et personnes
-     * de la presse sont REFUSÉES tant que le segment presse est fermé, et
+     * de la presse sont REFUSÉES (segment presse ouvert ou non), et
      * comptées `presse_refusees` (cf. l'en-tête de la classe).
      *
      * @param  list<int>  $companyIds
@@ -262,31 +267,27 @@ final class ListesManuelles
 
     /**
      * Les fiches et personnes qui PEUVENT entrer dans une liste : sans la
-     * presse tant que son segment est fermé — fiche de presse (par fiche),
+     * presse, segment ouvert ou fermé — fiche de presse (par fiche),
      * personne de la presse (par personne) ou personne rattachée à une fiche
      * de presse. Ne fait que lire ; ne supprime rien.
      *
      * @param  list<int>  $companyIds
      * @param  list<int>  $contactIds
-     * @param  list<string>  $ouverts  réservé aux tests (les deux états de la garde)
      * @return array{0: list<int>, 1: list<int>}
      */
-    public static function sansPresse(array $companyIds, array $contactIds, array $ouverts = Segments::OUVERTS): array
+    public static function sansPresse(array $companyIds, array $contactIds): array
     {
-        if (GardePresse::ouverte($ouverts)) {
-            return [$companyIds, $contactIds];
-        }
         $companies = $companyIds === [] ? [] : self::entiers(DB::table('companies')
             ->whereNull('deleted_at')
             ->whereIn('id', $companyIds)
-            ->whereRaw(GardePresse::conditionSql('companies.id', $ouverts))
+            ->whereRaw(GardePresse::conditionSql('companies.id'))
             ->pluck('id')
             ->all());
         $contacts = $contactIds === [] ? [] : self::entiers(DB::table('contacts')
             ->whereNull('deleted_at')
             ->whereIn('id', $contactIds)
-            ->whereRaw(GardePresse::conditionContactsSql('contacts', $ouverts))
-            ->whereRaw('(contacts.company_id IS NULL OR ' . GardePresse::conditionSql('contacts.company_id', $ouverts) . ')')
+            ->whereRaw(GardePresse::conditionContactsSql('contacts'))
+            ->whereRaw('(contacts.company_id IS NULL OR ' . GardePresse::conditionSql('contacts.company_id') . ')')
             ->pluck('id')
             ->all());
 

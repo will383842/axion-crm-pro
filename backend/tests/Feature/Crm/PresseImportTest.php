@@ -392,3 +392,77 @@ test('source DECLARATIVE : une fiche existante hors presse est rejetee intacte ;
         // Fiche créée par la ligne : presse.
         ->and(DB::table('companies')->where('foreign_id', 'presse:zz:nouveau')->value('relation_type'))->toBe('presse_media');
 });
+
+test('🔴 rattrapage : rejouer un fichier DÉJÀ importé pose la provenance « liste presse » des adresses de rédaction, sans rien créer d autre', function () {
+    $lignes = [piLigne(), piLigne(['identifiant' => 'presse:zz:hebdo-2', 'nom' => 'ZZ Hebdo fictif', 'type' => 'presse_hebdo',
+        'site' => null, 'email_redaction' => 'redaction@zz-hebdo.example.invalid', 'journaliste' => null])];
+    piImporter($lignes);
+    // L'état des fiches importées AVANT la règle de provenance : pas de trace.
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse'");
+    $volumes = piVolumes();
+
+    $r = piImporter($lignes);
+
+    $listes = DB::table('companies')->whereIn('foreign_id', ['presse:zz:quotidien-1', 'presse:zz:hebdo-2'])->orderBy('foreign_id')
+        ->pluck('metadata')->map(static fn ($m): mixed => json_decode((string) $m, true)['emails_liste_presse'] ?? null)->all();
+    expect($r['code'])->toBe(0)
+        ->and($listes)->toBe([['redaction@zz-hebdo.example.invalid'], ['redaction@zz-quotidien.example.invalid']])
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(2)
+        ->and(piVolumes())->toBe($volumes)
+        ->and(piCompteur($r['sortie'], 'fiches_creees'))->toBe(0)
+        ->and(piCompteur($r['sortie'], 'contacts_crees'))->toBe(0);
+
+    // Idempotent : un troisième passage ne pose plus rien.
+    $r3 = piImporter($lignes);
+    expect(piCompteur($r3['sortie'], 'provenances_liste_retenues'))->toBe(0)
+        ->and(piVolumes())->toBe($volumes);
+});
+
+test('🔴 A09 — --provenance-seulement : ne pose QUE la provenance « liste presse », ne modifie rien d autre, ne crée rien', function () {
+    $lignes = [piLigne()];
+    piImporter($lignes);
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse'");
+    // Un trou que le rejeu ORDINAIRE comblerait : le rattrapage, non.
+    DB::table('media')->update(['phone' => null]);
+    $instantane = static fn (): array => [
+        'companies' => DB::table('companies')->orderBy('id')->get()->map(static function ($c): array {
+            $c = (array) $c;
+            $meta = json_decode((string) $c['metadata'], true);
+            unset($meta['emails_liste_presse'], $c['metadata']);
+
+            return $c + ['meta' => $meta];
+        })->all(),
+        'media' => DB::table('media')->orderBy('id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'contacts' => DB::table('contacts')->orderBy('id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'company_tag' => DB::table('company_tag')->orderBy('company_id')->orderBy('tag_id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'volumes' => piVolumes(),
+    ];
+    $avant = $instantane();
+
+    $r = piImporter([...$lignes, piLigne(['identifiant' => 'presse:zz:jamais-importe', 'nom' => 'ZZ Jamais importe'])], ['--provenance-seulement' => true]);
+
+    $meta = json_decode((string) DB::table('companies')->where('foreign_id', 'presse:zz:quotidien-1')->value('metadata'), true);
+    expect($r['code'])->toBe(0)
+        ->and($meta['emails_liste_presse'] ?? null)->toBe(['redaction@zz-quotidien.example.invalid'])
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(1)
+        ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
+        ->and($instantane())->toBe($avant);
+});
+
+test('🔴 A09 — --provenance-seulement : une ancre qui désigne une fiche À LA CORBEILLE rejette la ligne, sans repli sur le rapprochement', function () {
+    piImporter([piLigne()]);
+    $fiche = (int) DB::table('companies')->where('foreign_id', 'presse:zz:quotidien-1')->value('id');
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse', deleted_at = now() WHERE id = ?", [$fiche]);
+    $volumes = piVolumes();
+
+    $r = piImporter([piLigne()], ['--provenance-seulement' => true]);
+
+    $meta = json_decode((string) DB::table('companies')->where('id', $fiche)->value('metadata'), true);
+    // Toutes les lignes rejetées : la commande échoue (règle commune de l'import).
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('fiche_a_la_corbeille')
+        ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(0)
+        ->and($meta['emails_liste_presse'] ?? null)->toBeNull()
+        ->and(piVolumes())->toBe($volumes);
+});

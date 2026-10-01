@@ -273,12 +273,13 @@ test('B10-016-PORTEE TEMOIN — le catalogue repond et le balayage du code voit 
 /**
  * TEMOIN NEGATIF. Le classement « aveugle / consciente » repose entierement
  * sur le retrait des commentaires. On verifie sur un cas connu que la prose
- * n'est PAS comptee : `RefreshAudienceChunkJob.php` cite `DB::table('contacts')`
- * dans un commentaire (ligne 47 le 2026-08-21) et l'appelle pour de vrai plus
- * bas. Le balayage doit voir le second et pas le premier.
+ * n'est PAS comptee : `AudienceBuilderService.php` cite `DB::table('contacts')`
+ * dans un commentaire (`lignesMembres`, depuis le 2026-10-01 : la lecture de
+ * `RefreshAudienceChunkJob.php`, témoin d'origine, y a été déplacée) et
+ * l'appelle pour de vrai. Le balayage doit voir le second et pas le premier.
  */
 test('B10-016-PORTEE TEMOIN NEGATIF — une occurrence citee en commentaire n est pas comptee', function () {
-    $chemin = app_path('Jobs/RefreshAudienceChunkJob.php');
+    $chemin = app_path('Services/Audiences/AudienceBuilderService.php');
     expect(file_exists($chemin))->toBeTrue();
 
     $source = file_get_contents($chemin);
@@ -290,8 +291,8 @@ test('B10-016-PORTEE TEMOIN NEGATIF — une occurrence citee en commentaire n es
             b10pBalayerAppelsConstructeur(['contacts'])['conscientes'],
             b10pBalayerAppelsConstructeur(['contacts'])['ecritures'],
         ),
-        fn (array $e): bool => str_ends_with(dirname($e['site']), 'app/Jobs')
-            && str_contains($e['site'], 'RefreshAudienceChunkJob.php'),
+        fn (array $e): bool => str_ends_with(dirname($e['site']), 'app/Services/Audiences')
+            && str_contains($e['site'], 'AudienceBuilderService.php'),
     );
 
     // Le fichier contient l'occurrence en prose ET l'appel reel : le balayage

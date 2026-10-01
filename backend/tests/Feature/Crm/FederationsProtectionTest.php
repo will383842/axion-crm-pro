@@ -91,14 +91,14 @@ function fedpContact(string $espace, int $companyId, string $nom, int $ageEnAnne
 
 test('le tag des federations est protege, et chaque segment designe son tag par son NOM', function () {
     expect(FichesProtegees::TAGS)->toContain(FichesProtegees::TAG_FEDERATIONS, FichesProtegees::TAG_ORGANISATEURS)
-        ->and(Segments::OUVERTS)->toContain(Segments::FEDERATIONS)
+        ->and(Segments::ouverts())->toContain(Segments::FEDERATIONS)
         ->and(Segments::tag(Segments::FEDERATIONS))->toBe('src:scraping-federations-2026')
         ->and(Segments::tag(Segments::ORGANISATEURS_EVENEMENTS))->toBe('src:scraping-evenements-pro')
         ->and(Segments::tagOrganisateurs())->toBe('src:scraping-evenements-pro');
 
     // Un segment ouvert ne vise QUE des fiches protégées : sa levée de
     // protection est la décision explicite que `FichesProtegees` exige.
-    foreach (Segments::OUVERTS as $segment) {
+    foreach (Segments::CONNUS as $segment) {
         expect(FichesProtegees::TAGS)->toContain(Segments::tag($segment));
     }
 });

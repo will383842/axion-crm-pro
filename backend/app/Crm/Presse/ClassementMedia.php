@@ -58,8 +58,10 @@ use Illuminate\Support\Str;
  * Règles v4 (relance de production du 2026-10-01 : un quotidien régional
  * sortait « économie + RH », un hebdomadaire économique perdait ses
  * dirigeants) — la règle « généraliste » de la v3 est REMPLACÉE par :
- *   - DOMINANCE RELATIVE : parmi les thèmes retenus, on ne garde que ceux dont
- *     le score atteint 40 % (`DOMINANCE_MIN`) de celui du thème PRINCIPAL, ou
+ *   - DOMINANCE RELATIVE : parmi les thèmes retenus, on ne garde que les
+ *     SUJETS dont le score atteint 40 % (`DOMINANCE_MIN_DIXIEMES`) de celui du
+ *     sujet PRINCIPAL — `regional` est une ZONE, hors du calcul, gardé dès
+ *     qu'il est retenu —, ou
  *     qui sont dans le NOM du média (la raison sociale, le nom du titre, de
  *     l'émission — pas la méta description, qui énumère les rubriques d'un
  *     généraliste). Presse professionnelle et secteur : idem, en plus du
@@ -69,7 +71,10 @@ use Illuminate\Support\Str;
  *     thème grand public, et que le score du public dirigeants dépasse celui
  *     du public grand public ; `pros-secteur`, de même, si ce thème principal
  *     est la presse professionnelle ; `grand-public` si le thème grand public
- *     est le thème PRINCIPAL ; sinon `inconnu`.
+ *     est le sujet PRINCIPAL (égalité comprise) ou si le seul thème est
+ *     `regional` ; sinon `inconnu`. `dirigeants` exige aussi un signal hors
+ *     corps de page (mot du public, ou sujet principal au seuil dans le nom /
+ *     le titre). Égalités : règle déterministe, voir `publicsDeduits`.
  *
  * Thèmes (plusieurs possibles) : `ia-tech`, `economie-entreprise`,
  * `pme-entrepreneurs`, `rh-management`, `metiers-secteurs`, `regional`,
@@ -213,6 +218,9 @@ final class ClassementMedia
 
     /** Dominance relative (v4), en dixièmes : un thème gardé pèse au moins 4/10 du principal. */
     public const DOMINANCE_MIN_DIXIEMES = 4;
+
+    /** `regional` est une ZONE de couverture, pas un sujet (v4). */
+    public const THEME_ZONE = 'regional';
 
     /** Thème principal (hors couverture) qui ouvre le public `dirigeants`. */
     public const THEMES_DIRIGEANTS = ['economie-entreprise', 'pme-entrepreneurs', 'rh-management'];
@@ -498,6 +506,7 @@ final class ClassementMedia
         $themes = [];
         $scoreParTheme = [];
         $nomParTheme = [];
+        $scoreFortParTheme = [];
         foreach (self::THEMES_MOTS as $theme => $mots) {
             $a = self::analyse($z, $mots);
             if ($theme === 'regional' && self::zoneLocale($zonesDiffusion)) {
@@ -518,6 +527,7 @@ final class ClassementMedia
             $themes[] = $theme;
             $scoreParTheme[$theme] = $a['score'];
             $nomParTheme[$theme] = $a['nom'];
+            $scoreFortParTheme[$theme] = self::analyse(['nom' => $z['nom'], 'titre' => $z['titre']], $mots)['score'];
         }
         // Presse PROFESSIONNELLE et secteur : signal FORT exigé, dans le nom
         // ou le titre (« le journal du BTP », « la revue des professionnels »).
@@ -546,15 +556,17 @@ final class ClassementMedia
 
         // ── Dominance relative (v4) ─────────────────────────────────────────
         // Un quotidien régional a une rubrique économie, emploi, numérique :
-        // ces thèmes passent le seuil mais pèsent peu à côté du régional / grand
-        // public. On ne garde que les thèmes à 40 % au moins du PRINCIPAL, ou
-        // présents dans le NOM du média.
+        // ces thèmes passent le seuil mais pèsent peu à côté du grand public.
+        // On ne garde que les SUJETS à 40 % au moins du sujet PRINCIPAL, ou
+        // présents dans le NOM du média. `regional` est une ZONE, pas un sujet :
+        // il n'entre ni dans le principal ni dans le test, et reste dès qu'il
+        // est retenu.
         if ($themes !== []) {
             $retenus = [];
             foreach ($themes as $t) {
                 $retenus[$t] = $scoreParTheme[$t] ?? 0;
             }
-            $principal = max($retenus);
+            $principal = self::principalSujet($retenus);
             $themes = self::dominants($retenus, $nomParTheme);
             $secteurs = in_array('metiers-secteurs', $themes, true)
                 ? array_values(array_filter(
@@ -597,7 +609,8 @@ final class ClassementMedia
         //     économie, PME ou RH, son score atteint celui du thème grand public,
         //     et le public dirigeants l'emporte sur le public grand public ;
         //   - `pros-secteur` : de même, avec la presse professionnelle ;
-        //   - `grand-public` : le thème grand public est le thème PRINCIPAL ;
+        //   - `grand-public` : le thème grand public est le sujet PRINCIPAL (à
+        //     égalité compris), ou le seul thème est `regional` ;
         //   - sinon `inconnu`.
         $scorePublic = [];
         foreach (self::PUBLICS_MOTS as $public => $mots) {
@@ -614,7 +627,8 @@ final class ClassementMedia
         foreach ($themes as $t) {
             $gardes[$t] = $scoreParTheme[$t] ?? 0;
         }
-        $publics = self::publicsDeduits($gardes, $scorePublic, $scores['theme:grand-public']);
+        $publicDirigeantsHorsCorps = self::analyse($z, self::PUBLICS_MOTS['dirigeants'])['mots'] > 0;
+        $publics = self::publicsDeduits($gardes, $scorePublic, $scores['theme:grand-public'], $scoreFortParTheme, $publicDirigeantsHorsCorps);
         if ($format === 'fiction-jeu') {
             $publics = array_values(array_intersect($publics, ['grand-public']));
         }
@@ -736,8 +750,9 @@ final class ClassementMedia
 
     /**
      * Dominance relative (v4) : parmi les thèmes RETENUS (seuil et signal sûr
-     * déjà passés), ceux dont le score atteint `DOMINANCE_MIN_DIXIEMES`/10 du
-     * principal, ou qui sont dans le NOM du média.
+     * déjà passés), les SUJETS dont le score atteint `DOMINANCE_MIN_DIXIEMES`/10
+     * du sujet principal, ou qui sont dans le NOM du média. `regional` est une
+     * ZONE : il ne compte pas dans le principal et il est toujours gardé.
      *
      * @param  array<string, int>  $retenus  thème => score
      * @param  array<string, bool>  $dansNom  thème => trouvé dans le nom
@@ -745,18 +760,27 @@ final class ClassementMedia
      */
     public static function dominants(array $retenus, array $dansNom = []): array
     {
-        if ($retenus === []) {
-            return [];
-        }
-        $principal = max($retenus);
+        $principal = self::principalSujet($retenus);
         $gardes = [];
         foreach ($retenus as $theme => $score) {
-            if (self::domine($score, $principal) || ($dansNom[$theme] ?? false)) {
+            if ($theme === self::THEME_ZONE || self::domine($score, $principal) || ($dansNom[$theme] ?? false)) {
                 $gardes[] = $theme;
             }
         }
 
         return $gardes;
+    }
+
+    /**
+     * Le score du sujet principal : le plus grand, `regional` exclu (0 si aucun).
+     *
+     * @param  array<string, int>  $retenus
+     */
+    public static function principalSujet(array $retenus): int
+    {
+        unset($retenus[self::THEME_ZONE]);
+
+        return $retenus === [] ? 0 : max($retenus);
     }
 
     /** Le score atteint-il 40 % du principal ? */
@@ -768,25 +792,55 @@ final class ClassementMedia
     /**
      * Le public DÉDUIT des thèmes gardés (v4) — voir la règle en tête.
      *
+     * ÉGALITÉS (règle déterministe) : l'ordre des scores donnés ne compte
+     * jamais.
+     *   - `grand-public` est posé dès que le thème grand public ATTEINT le plus
+     *     grand score des sujets (égalité comprise) : il n'est jamais perdu à
+     *     égalité ;
+     *   - le sujet principal hors couverture est le plus grand score ; à
+     *     égalité, un thème de `THEMES_DIRIGEANTS` passe devant, puis l'ordre
+     *     du référentiel (`Taxonomy::MEDIA_THEMES_CLASSES`).
+     * Un public grand public et dirigeants peuvent donc coexister à égalité.
+     *
+     * `dirigeants` exige en plus un signal hors du corps de page : un mot du
+     * public dirigeants hors corps (`$publicDirigeantsHorsCorps`), OU un sujet
+     * principal FORT — score au seuil dans le nom ou le titre
+     * (`$scoreFortParTheme` ; absent : le score complet fait foi).
+     *
      * @param  array<string, int>  $gardes  thèmes gardés => score
      * @param  array<string, int>  $scorePublic  public => score (mots + bonus)
      * @param  int  $scoreThemeGrandPublic  score du thème grand public, gardé ou non
+     * @param  array<string, int>  $scoreFortParTheme  thème => score dans le nom et le titre
      * @return list<string>
      */
-    public static function publicsDeduits(array $gardes, array $scorePublic, int $scoreThemeGrandPublic): array
-    {
-        $principalGlobal = self::premierMaximum($gardes);
-        $principalPro = self::premierMaximum(array_diff_key($gardes, array_flip(self::THEMES_COUVERTURE)));
+    public static function publicsDeduits(
+        array $gardes,
+        array $scorePublic,
+        int $scoreThemeGrandPublic,
+        array $scoreFortParTheme = [],
+        bool $publicDirigeantsHorsCorps = false,
+    ): array {
+        $sujets = $gardes;
+        unset($sujets[self::THEME_ZONE]);
+        $principalPro = self::premierMaximum(array_diff_key($sujets, array_flip(self::THEMES_COUVERTURE)));
         $grandPublic = $scorePublic['grand-public'] ?? 0;
         $publics = [];
-        if ($principalPro !== null && $gardes[$principalPro] >= $scoreThemeGrandPublic) {
-            if (in_array($principalPro, self::THEMES_DIRIGEANTS, true) && ($scorePublic['dirigeants'] ?? 0) > $grandPublic) {
+        if ($principalPro !== null && $sujets[$principalPro] >= $scoreThemeGrandPublic) {
+            $fort = ($scoreFortParTheme[$principalPro] ?? $sujets[$principalPro]) >= self::SEUIL;
+            if (in_array($principalPro, self::THEMES_DIRIGEANTS, true)
+                && ($scorePublic['dirigeants'] ?? 0) > $grandPublic
+                && ($publicDirigeantsHorsCorps || $fort)) {
                 $publics[] = 'dirigeants';
             } elseif ($principalPro === 'metiers-secteurs' && ($scorePublic['pros-secteur'] ?? 0) > $grandPublic) {
                 $publics[] = 'pros-secteur';
             }
         }
-        if ($principalGlobal === 'grand-public') {
+        if (isset($sujets['grand-public']) && $sujets['grand-public'] >= max($sujets)) {
+            $publics[] = 'grand-public';
+        }
+        // Un média dont la seule couverture est LOCALE (une radio, un journal de
+        // ville) s'adresse au grand public, sauf signal contraire.
+        if ($publics === [] && $sujets === [] && isset($gardes[self::THEME_ZONE])) {
             $publics[] = 'grand-public';
         }
 
@@ -794,22 +848,25 @@ final class ClassementMedia
     }
 
     /**
-     * La clé du plus grand score (la première à égalité), ou null si vide.
+     * La clé du plus grand score, ou null si vide. À ÉGALITÉ : un thème de
+     * `THEMES_DIRIGEANTS` d'abord, puis l'ordre du référentiel
+     * (`Taxonomy::MEDIA_THEMES_CLASSES`) — jamais l'ordre de l'entrée.
      *
      * @param  array<string, int>  $scores
      */
     private static function premierMaximum(array $scores): ?string
     {
-        $cle = null;
-        $max = -1;
-        foreach ($scores as $k => $v) {
-            if ($v > $max) {
-                $max = $v;
-                $cle = $k;
-            }
+        if ($scores === []) {
+            return null;
         }
+        $ordre = array_flip(array_keys(Taxonomy::MEDIA_THEMES_CLASSES));
+        $cles = array_keys($scores);
+        usort($cles, static function (string $a, string $b) use ($scores, $ordre): int {
+            return [$scores[$b], (int) in_array($b, self::THEMES_DIRIGEANTS, true), -($ordre[$b] ?? 99)]
+                <=> [$scores[$a], (int) in_array($a, self::THEMES_DIRIGEANTS, true), -($ordre[$a] ?? 99)];
+        });
 
-        return $cle;
+        return $cles[0];
     }
 
     /**

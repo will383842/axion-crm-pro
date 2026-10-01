@@ -252,7 +252,8 @@ test('v4 — pages simulees : quotidien regional, hebdo eco local, Les Echos, Ca
 
     $radio = cmrClasser(['nom' => 'ZZ RADIO FICTIVE DU LAC', 'titre' => 'ZZ Radio du Lac', 'menu' => 'Infos locales . Agenda . Podcasts . Musique'], ['radio'], diffusion: ['local']);
     expect($radio['themes'])->toBe(['regional'])
-        ->and($radio['publics'])->not->toContain('dirigeants');
+        // Un média local s'adresse au grand public, sauf signal contraire.
+        ->and($radio['publics'])->toBe(['grand-public']);
 
     $tech = cmrClasser([
         'nom' => 'ZZ 01NET FICTIF',
@@ -269,6 +270,46 @@ test('v4 — public : dirigeants jamais si le grand public domine, ni si le them
         ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 30], ['dirigeants' => 2, 'grand-public' => 2], 0))->toBe([])
         ->and(ClassementMedia::publicsDeduits(['metiers-secteurs' => 20], ['pros-secteur' => 5, 'grand-public' => 0], 0))->toBe(['pros-secteur'])
         ->and(ClassementMedia::publicsDeduits([], ['dirigeants' => 9], 0))->toBe([]);
+});
+
+test('v4 — regional est une ZONE : hors du calcul de dominance, garde des qu il est retenu', function () {
+    // Hebdo économique local SANS « éco » dans le nom : le régional pèse plus que l'éco.
+    $retenus = ['regional' => 63, 'economie-entreprise' => 22, 'pme-entrepreneurs' => 15, 'grand-public' => 8];
+    $gardes = ClassementMedia::dominants($retenus);
+
+    expect($gardes)->toEqualCanonicalizing(['economie-entreprise', 'pme-entrepreneurs', 'regional'])
+        ->and(ClassementMedia::principalSujet($retenus))->toBe(22)
+        ->and(ClassementMedia::publicsDeduits(array_intersect_key($retenus, array_flip($gardes)), ['dirigeants' => 9, 'pros-secteur' => 0, 'grand-public' => 2], 8))
+        ->toBe(['dirigeants']);
+    // Le Dauphiné ne bouge pas.
+    $dauphine = ['economie-entreprise' => 22, 'rh-management' => 9, 'regional' => 63, 'grand-public' => 74];
+    expect(ClassementMedia::dominants($dauphine))->toBe(['regional', 'grand-public']);
+    // Seul, le régional reste.
+    expect(ClassementMedia::dominants(['regional' => 5]))->toBe(['regional']);
+});
+
+test('v4 — egalites : regle deterministe, grand-public jamais perdu, l ordre de l entree ne compte pas', function () {
+    $publics = ['dirigeants' => 5, 'pros-secteur' => 0, 'grand-public' => 0];
+    expect(ClassementMedia::publicsDeduits(['grand-public' => 20, 'economie-entreprise' => 20], $publics, 20))->toBe(['dirigeants', 'grand-public'])
+        ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 20, 'grand-public' => 20], $publics, 20))->toBe(['dirigeants', 'grand-public'])
+        // Sujets pros à égalité : un thème « dirigeants » passe devant, quel que soit l'ordre.
+        ->and(ClassementMedia::publicsDeduits(['ia-tech' => 20, 'economie-entreprise' => 20], $publics, 0))->toBe(['dirigeants'])
+        ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 20, 'ia-tech' => 20], $publics, 0))->toBe(['dirigeants'])
+        // Grand public à égalité avec le régional : le régional n'est pas un sujet.
+        ->and(ClassementMedia::publicsDeduits(['regional' => 30, 'grand-public' => 10], $publics, 10))->toBe(['grand-public']);
+});
+
+test('v4 — dirigeants exige un signal HORS corps : un public lu dans le seul corps de page n est pas pose', function () {
+    $c = cmrClasser(['titre' => 'ZZ Revue fictive', 'menu' => 'Économie . Entreprises', 'texte' => 'Pour les dirigeants, décideurs et chefs d entreprise.']);
+    expect($c['themes'])->toBe(['economie-entreprise'])
+        ->and($c['publics'])->not->toContain('dirigeants');
+
+    $publics = ['dirigeants' => 4, 'pros-secteur' => 0, 'grand-public' => 0];
+    expect(ClassementMedia::publicsDeduits(['economie-entreprise' => 10], $publics, 0, ['economie-entreprise' => 0], false))->toBe([])
+        // Sujet principal FORT (au seuil dans le nom ou le titre) : posé.
+        ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 10], $publics, 0, ['economie-entreprise' => 9], false))->toBe(['dirigeants'])
+        // Un mot du public dirigeants hors corps : posé.
+        ->and(ClassementMedia::publicsDeduits(['economie-entreprise' => 10], $publics, 0, ['economie-entreprise' => 0], true))->toBe(['dirigeants']);
 });
 
 test('v3 — les deux mots distincts viennent HORS du corps de page', function () {

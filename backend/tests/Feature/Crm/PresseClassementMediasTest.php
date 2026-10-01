@@ -406,9 +406,12 @@ test('lecture : une page n est lue qu UNE fois, robots.txt une fois par domaine,
         '/emission' => Http::response(pcmPage('ZZ', ['Accueil']), 200, ['Content-Type' => 'text/html']),
     ]]]);
     $attentes = [];
-    app()->bind(LecturePageAccueil::class, fn () => new LecturePageAccueil(4, 6, 0, function (int $ms) use (&$attentes): void {
-        $attentes[] = $ms;
-    }));
+    // Une fonction fléchée capturerait `$attentes` PAR VALEUR : fermeture classique.
+    app()->bind(LecturePageAccueil::class, function () use (&$attentes): LecturePageAccueil {
+        return new LecturePageAccueil(4, 6, 0, function (int $ms) use (&$attentes): void {
+            $attentes[] = $ms;
+        });
+    });
 
     $r = pcmClasser(['--appliquer' => true]);
 

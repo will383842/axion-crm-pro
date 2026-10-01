@@ -458,7 +458,9 @@ test('🔴 A09 — --provenance-seulement : une ancre qui désigne une fiche À 
     $r = piImporter([piLigne()], ['--provenance-seulement' => true]);
 
     $meta = json_decode((string) DB::table('companies')->where('id', $fiche)->value('metadata'), true);
-    expect($r['code'])->toBe(0)
+    // Toutes les lignes rejetées : la commande échoue (règle commune de l'import).
+    expect($r['code'])->toBe(1)
+        ->and($r['sortie'])->toContain('fiche_a_la_corbeille')
         ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
         ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(0)
         ->and($meta['emails_liste_presse'] ?? null)->toBeNull()

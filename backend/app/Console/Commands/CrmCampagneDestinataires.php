@@ -73,7 +73,8 @@ use Illuminate\Support\Facades\DB;
  *    corbeille côté `journalists` écarte l'adresse (`ecartees_journaliste_retire`) ;
  *  - adresse de la fiche : importée d'une liste presse, portée par une ligne
  *    `media` d'une source presse au site non deviné, ou fiche sans site deviné,
- *    ou site VÉRIFIÉ (`companies.metadata.site_verifie = true`). Une adresse
+ *    ou site VÉRIFIÉ (`companies.metadata.site_media.statut` `verifie` ou
+ *    `trouve-verifie`, chantier des sites de médias #273). Une adresse
  *    tirée d'un site deviné non vérifié ne part JAMAIS (`ecartees_site_devine`) ;
  *  - une fiche « média possible » (`media-possible:*`, restée prospect) n'est
  *    jamais traitée comme presse (`ecartees_media_possible`).

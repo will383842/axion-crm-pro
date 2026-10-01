@@ -32,9 +32,10 @@ use Illuminate\Support\Facades\DB;
  *     deviné lui-même (`media:generate-redaction-emails` fabrique
  *     `redaction@<domaine du site>` : sur un site deviné, c'est la même
  *     erreur) ;
- *  4. `site_verifie` — la fiche porte le marqueur de vérification
- *     `companies.metadata.site_verifie = true` (posé par la lecture du site,
- *     autre chantier) ;
+ *  4. `site_verifie` — le site de la fiche a été VÉRIFIÉ par la lecture du
+ *     site : `companies.metadata.site_media.statut` vaut `verifie` ou
+ *     `trouve-verifie` (marqueur de #273, `App\Crm\Presse\SiteMedia` ; à
+ *     brancher sur `SiteMedia::conditionSql` une fois #273 sur main) ;
  *  5. `site_fiable` — aucun site deviné sur la fiche : ni
  *     `companies.website_method` `guess%`, ni une ligne `media` vivante de la
  *     fiche au site deviné (`media.website_method` `guess%` — ses adresses
@@ -51,8 +52,11 @@ use Illuminate\Support\Facades\DB;
  */
 final class AdressePresseFiable
 {
-    /** Le marqueur de vérification du site, dans `companies.metadata` (booléen `true`). */
-    public const MARQUEUR_SITE_VERIFIE = 'site_verifie';
+    /** Le marqueur de vérification du site, dans `companies.metadata` (posé par #273). */
+    public const MARQUEUR_SITE_VERIFIE = 'site_media';
+
+    /** Les statuts de `metadata.site_media.statut` qui valent « site vérifié » (#273). @var list<string> */
+    public const STATUTS_SITE_VERIFIE = ['verifie', 'trouve-verifie'];
 
     /** Les adresses de rédaction importées d'une liste presse, dans `companies.metadata`. */
     public const CLE_EMAILS_LISTE = 'emails_liste_presse';
@@ -124,7 +128,8 @@ final class AdressePresseFiable
     /** SQL : la fiche porte le marqueur « site vérifié ». */
     public static function siteVerifieSql(string $aliasFiche = 'companies'): string
     {
-        return "(COALESCE({$aliasFiche}.metadata->'" . self::MARQUEUR_SITE_VERIFIE . "', 'false'::jsonb) = 'true'::jsonb)";
+        return "(({$aliasFiche}.metadata -> '" . self::MARQUEUR_SITE_VERIFIE . "' ->> 'statut') IN ('"
+            . implode("','", self::STATUTS_SITE_VERIFIE) . "'))";
     }
 
     /**

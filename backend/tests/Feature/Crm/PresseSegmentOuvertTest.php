@@ -8,7 +8,7 @@
  * est fiable : journaliste avec la porte `email_redaction`, adresse de
  * rédaction importée d'une liste presse, adresse d'une ligne `media` d'une
  * source presse au site non deviné, fiche sans site deviné, ou site vérifié
- * (`companies.metadata.site_verifie = true`). Une adresse tirée d'un site
+ * (`companies.metadata.site_media.statut`, #273). Une adresse tirée d'un site
  * DEVINÉ non vérifié ne part jamais. Et la presse n'entre par AUCUN autre
  * chemin : une audience de prospection ne l'aspire pas.
  *
@@ -123,7 +123,11 @@ test('🔴 une adresse tirée d un site DEVINÉ non vérifié n est JAMAIS desti
     $devinee = psoFiche($this->espace, ['website' => 'https://zz-bijou.example.invalid', 'website_method' => 'guess',
         'email_generic' => 'contact@zz-bijou.example.invalid']);
     psoFiche($this->espace, ['website' => 'https://zz-autre.example.invalid', 'website_method' => 'guess2',
-        'email_generic' => 'info@zz-autre.example.invalid', 'metadata' => json_encode([AdressePresseFiable::MARQUEUR_SITE_VERIFIE => true])]);
+        'email_generic' => 'info@zz-autre.example.invalid',
+        'metadata' => json_encode([AdressePresseFiable::MARQUEUR_SITE_VERIFIE => ['statut' => AdressePresseFiable::STATUTS_SITE_VERIFIE[1]]])]);
+    // Témoin : un statut qui n'est PAS une vérification ne lève rien.
+    psoFiche($this->espace, ['website_method' => 'guess', 'email_generic' => 'info@zz-nonverifie.example.invalid',
+        'metadata' => json_encode([AdressePresseFiable::MARQUEUR_SITE_VERIFIE => ['statut' => 'a-verifier']])]);
     psoFiche($this->espace, ['website' => 'https://zz-journal.example.invalid', 'email_generic' => 'redaction@zz-journal.example.invalid']);
     // Le site deviné d'une LIGNE MEDIA de la fiche contamine aussi (ses
     // adresses ont pu être recopiées par l'harmonisation).
@@ -137,7 +141,8 @@ test('🔴 une adresse tirée d un site DEVINÉ non vérifié n est JAMAIS desti
         ->and($r['lignes'])->not->toHaveKey('contact@zz-radio.example.invalid')
         ->and($r['lignes']['info@zz-autre.example.invalid'] ?? null)->toBe(AdressePresseFiable::SITE_VERIFIE)
         ->and($r['lignes']['redaction@zz-journal.example.invalid'] ?? null)->toBe(AdressePresseFiable::SITE_FIABLE)
-        ->and($r['bilan']['ecartees_site_devine'])->toBe(2)
+        ->and($r['lignes'])->not->toHaveKey('info@zz-nonverifie.example.invalid')
+        ->and($r['bilan']['ecartees_site_devine'])->toBe(3)
         // Rien n'est supprimé.
         ->and(DB::table('companies')->where('id', $devinee)->value('email_generic'))->toBe('contact@zz-bijou.example.invalid');
 });

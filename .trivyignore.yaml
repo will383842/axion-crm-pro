@@ -13,7 +13,7 @@
 #
 # - binaire Caddy : `Dockerfile.frontend` recompile désormais Caddy v2.11.4
 #   (stade `caddy-build`) avec Go 1.26.8 et golang.org/x/crypto 0.55.0,
-#   x/net 0.56.0, x/text 0.39.0, grpc 1.83.2 — les versions exigées par les
+#   x/net 0.58.0, x/text 0.41.0, grpc 1.83.2 — au moins les versions exigées par les
 #   avis. `caddy:2-alpine`, lui, embarque toujours Go 1.26.3 (aucun tag
 #   corrigé publié au 2026-10-01) ;
 # - c-ares (CVE-2026-33630) : corrigé par la base Alpine 3.23.6 de

@@ -69,7 +69,8 @@ RUN pnpm build
 # versions requises, donc celles que lit Trivy dans le binaire.
 #
 # Versions = celles exigees par les avis (Go >= 1.26.6, x/crypto >= 0.55.0,
-# x/net >= 0.56.0, x/text >= 0.39.0, grpc >= 1.83.2), toutes epinglees.
+# x/net >= 0.56.0, x/text >= 0.39.0, grpc >= 1.83.2), toutes epinglees ;
+# x/net 0.58.0 et x/text 0.41.0 car grpc 1.83.2 et x/crypto 0.55.0 les exigent.
 # Au reexamen : si une image `caddy:2-alpine` recompilee corrige ces avis,
 # ce stade peut disparaitre (et le `COPY --from=caddy-build` avec lui).
 # -----------------------------------------------------------------------------
@@ -90,8 +91,8 @@ RUN printf '%s\n' \
     && go get \
         github.com/caddyserver/caddy/v2@${CADDY_VERSION} \
         golang.org/x/crypto@v0.55.0 \
-        golang.org/x/net@v0.56.0 \
-        golang.org/x/text@v0.39.0 \
+        golang.org/x/net@v0.58.0 \
+        golang.org/x/text@v0.41.0 \
         google.golang.org/grpc@v1.83.2 \
     && go mod tidy \
     && go build -ldflags '-s -w' -o /usr/bin/caddy . \

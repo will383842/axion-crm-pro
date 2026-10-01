@@ -362,3 +362,30 @@ export type CleFormatMedia = (typeof FORMATS_MEDIA)[number]['code'];
 export const PREFIXE_ETIQUETTE_THEME_MEDIA = "media-sujet:";
 export const PREFIXE_ETIQUETTE_PUBLIC_MEDIA = "media-public:";
 export const PREFIXE_ETIQUETTE_FORMAT_MEDIA = "media-format:";
+
+/** Secteurs couverts par une presse professionnelle — étiquette automatique `media-sujet:secteur-<code>`. */
+export const SECTEURS_MEDIA = [
+  { code: "agriculture", libelle: "Agriculture, sylviculture, pêche" },
+  { code: "agroalimentaire", libelle: "Agroalimentaire et boissons" },
+  { code: "industrie", libelle: "Industrie" },
+  { code: "energie", libelle: "Énergie" },
+  { code: "btp", libelle: "Bâtiment et travaux publics" },
+  { code: "automobile", libelle: "Automobile (commerce et réparation)" },
+  { code: "commerce-detail", libelle: "Commerce de détail" },
+  { code: "transport-logistique", libelle: "Transport et logistique" },
+  { code: "hebergement-tourisme", libelle: "Hébergement et tourisme" },
+  { code: "restauration", libelle: "Restauration" },
+  { code: "banque-finance", libelle: "Banque et finance" },
+  { code: "assurance", libelle: "Assurance" },
+  { code: "immobilier", libelle: "Immobilier" },
+  { code: "droit", libelle: "Droit" },
+  { code: "comptabilite-audit", libelle: "Comptabilité et audit" },
+  { code: "marketing-publicite", libelle: "Marketing, publicité, études" },
+  { code: "enseignement-formation", libelle: "Enseignement et formation" },
+  { code: "sante", libelle: "Santé humaine et vétérinaire" },
+] as const satisfies readonly EntreeReferentiel[];
+
+export type CleSecteurMedia = (typeof SECTEURS_MEDIA)[number]['code'];
+
+/** Préfixe de l'étiquette « secteur couvert » d'un média. */
+export const PREFIXE_ETIQUETTE_SECTEUR_MEDIA = "media-sujet:secteur-";

@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CRITERE_AUDIENCE_PRESSE,
+  SECTEUR_MEDIA_PRESETS,
   TYPE_MEDIA_PRESETS,
   ZONE_MEDIA_PRESETS,
   avecExclusions,
@@ -20,7 +21,7 @@ import {
   slugTypeMedia,
   slugZoneMedia,
 } from '@/features/audiences/presse';
-import { TYPES_MEDIA, ZONES_MEDIA } from '@/lib/referentiels.generated';
+import { SECTEURS_MEDIA, TYPES_MEDIA, ZONES_MEDIA } from '@/lib/referentiels.generated';
 
 describe('critères de presse', () => {
   it('rien de choisi : aucune condition, ni dans `all`, ni dans `not`', () => {
@@ -68,5 +69,24 @@ describe('critères de presse', () => {
     });
     expect(CRITERE_AUDIENCE_PRESSE).toEqual({ field: 'segment', op: 'eq', value: 'presse' });
     expect(criteresAudiencePresse({ departements: [], regions: [], etiquettes: [] }, [], [])).toEqual({ all: [CRITERE_AUDIENCE_PRESSE] });
+  });
+
+  it('secteur couvert : UNE condition de plus (un ET avec le thème), sur l’étiquette `media-sujet:secteur-<code>`', () => {
+    expect(criteresMedias([], [], { themes: ['metiers-secteurs'], secteurs: ['btp', 'commerce-detail'] })).toEqual([
+      { field: 'tags', op: 'contains_any', value: ['media-sujet:metiers-secteurs'] },
+      { field: 'tags', op: 'contains_any', value: ['media-sujet:secteur-btp', 'media-sujet:secteur-commerce-detail'] },
+    ]);
+    // Rien de choisi : aucune condition (jamais une liste vide).
+    expect(criteresMedias([], [], { secteurs: [] })).toEqual([]);
+  });
+
+  it('la liste « Secteur couvert » est FERMÉE : celle du référentiel généré, libellés en clair, slugs sûrs', () => {
+    expect(SECTEUR_MEDIA_PRESETS.map((p) => p.code)).toEqual(SECTEURS_MEDIA.map((s) => s.code));
+    expect(SECTEUR_MEDIA_PRESETS.length).toBeGreaterThan(0);
+    for (const p of SECTEUR_MEDIA_PRESETS) {
+      expect(p.code).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(p.label).not.toBe(p.code);
+    }
+    expect(SECTEUR_MEDIA_PRESETS.find((p) => p.code === 'btp')?.label).toBe('Bâtiment et travaux publics');
   });
 });

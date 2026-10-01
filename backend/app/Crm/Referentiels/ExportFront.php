@@ -3,6 +3,7 @@
 namespace App\Crm\Referentiels;
 
 use App\Crm\Joignabilite\Joignabilite;
+use App\Crm\Presse\ClassementMedia;
 use App\Crm\Relations\RelationsProspection;
 use App\Crm\Taxonomy;
 
@@ -70,6 +71,10 @@ final class ExportFront
                 . "export const PREFIXE_ETIQUETTE_THEME_MEDIA = \"media-sujet:\";\n"
                 . "export const PREFIXE_ETIQUETTE_PUBLIC_MEDIA = \"media-public:\";\n"
                 . "export const PREFIXE_ETIQUETTE_FORMAT_MEDIA = \"media-format:\";\n",
+            // Secteur couvert par une presse professionnelle (2026-10-01) — `media-sujet:secteur-<code>`.
+            self::liste('SECTEURS_MEDIA', 'CleSecteurMedia', ClassementMedia::secteursCouverts(), 'Secteurs couverts par une presse professionnelle — étiquette automatique `media-sujet:secteur-<code>`.'),
+            "/** Préfixe de l'étiquette « secteur couvert » d'un média. */\n"
+                . 'export const PREFIXE_ETIQUETTE_SECTEUR_MEDIA = ' . self::chaine(ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR) . ";\n",
         ];
 
         return <<<'TS'

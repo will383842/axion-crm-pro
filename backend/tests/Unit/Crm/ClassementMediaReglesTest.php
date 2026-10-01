@@ -347,3 +347,23 @@ test('v3 — media possible : AUCUN theme ni public tant que le verdict n est pa
     expect($media['verdict'])->toBe('semble-media')
         ->and($media['themes'])->toContain('ia-tech');
 });
+
+test('filtre « Secteur couvert » : liste FERMEE = secteurs du referentiel que le classement sait reconnaitre, codes surs', function () {
+    $couverts = ClassementMedia::secteursCouverts();
+    $attendus = [];
+    foreach (array_keys(Taxonomy::SECTEURS) as $cle) {
+        if (isset(ClassementMedia::SECTEURS_MOTS[$cle])) {
+            $attendus[] = str_replace('_', '-', $cle);
+        }
+    }
+
+    expect(array_keys($couverts))->toBe($attendus)
+        ->and($couverts)->not->toBe([])
+        ->and($couverts['commerce-detail'] ?? null)->toBe(Taxonomy::SECTEURS['commerce_detail'])
+        // Les mots-cles hors referentiel (`dirigeants`, `tech`) ne deviennent jamais un secteur filtrable.
+        ->and(array_key_exists('dirigeants', $couverts))->toBeFalse()
+        ->and(ClassementMedia::PREFIXE_ETIQUETTE_SECTEUR)->toBe('media-sujet:secteur-');
+    foreach (array_keys($couverts) as $code) {
+        expect($code)->toMatch('/^[a-z0-9]+(-[a-z0-9]+)*$/');
+    }
+});

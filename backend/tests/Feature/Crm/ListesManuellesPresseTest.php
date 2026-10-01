@@ -1,10 +1,12 @@
 <?php
 
 /**
- * LISTES MANUELLES ET CHOIX DES DESTINATAIRES — LA PRESSE RESTE FERMÉE
- * (condition de fusion de #266 posée par Will, 2026-09-30).
+ * LISTES MANUELLES ET CHOIX DES DESTINATAIRES — LA PRESSE N'Y ENTRE PAS
+ * (condition de fusion de #266 posée par Will, 2026-09-30, MAINTENUE à
+ * l'ouverture de la presse le 01/10/2026 : la presse n'a qu'une porte,
+ * `crm:campagne:destinataires presse`).
  *
- * Tant que `Segments::PRESSE` n'est pas dans `Segments::OUVERTS`, aucune fiche
+ * Segment presse ouvert (défaut) ou fermé, aucune fiche
  * de presse (tag `FichesProtegees::TAG_PRESSE`, garde PAR FICHE) ni aucune
  * personne de la presse (journaliste harmonisé `journaliste:<id>` ou source
  * `presse-2026`, garde PAR CONTACT) ne peut entrer dans une liste manuelle,
@@ -149,13 +151,15 @@ test('🔴 ajouter : fiche de presse, journaliste et personne d une fiche de pre
         ->and(DB::table('contacts')->count())->toBe($personnes);
 });
 
-test('sansPresse : les deux états de la garde (fermée, puis ouverte)', function () {
+test('sansPresse : la presse est refusée, segment presse OUVERT (défaut) comme FERMÉ', function () {
+    expect(Segments::ouvert(Segments::PRESSE))->toBeTrue();
     [$orgs, $pers] = ListesManuelles::sansPresse([$this->journal, $this->salon], [$this->journaliste, $this->standard, $this->pigiste, $this->temoin]);
     expect($orgs)->toBe([$this->salon])->and($pers)->toBe([$this->temoin]);
 
-    $ouverts = [...Segments::OUVERTS, Segments::PRESSE];
-    [$orgs, $pers] = ListesManuelles::sansPresse([$this->journal, $this->salon], [$this->journaliste, $this->temoin], $ouverts);
-    expect($orgs)->toBe([$this->journal, $this->salon])->and($pers)->toBe([$this->journaliste, $this->temoin]);
+    config(['crm.segments_ouverts' => 'organisateurs-evenements,federations']);
+    expect(Segments::ouvert(Segments::PRESSE))->toBeFalse();
+    [$orgs, $pers] = ListesManuelles::sansPresse([$this->journal, $this->salon], [$this->journaliste, $this->temoin]);
+    expect($orgs)->toBe([$this->salon])->and($pers)->toBe([$this->temoin]);
 });
 
 test('🔴 import : une ligne rapprochée de la presse est annoncée à blanc et refusée à l import ; le témoin entre', function () {
@@ -180,7 +184,7 @@ test('🔴 API : un journaliste seul est REFUSÉ (422, message clair) ; un geste
 
     $refus = $this->postJson("/api/v1/listes-manuelles/{$liste}/membres", ['contact_ids' => [$this->journaliste]])
         ->assertStatus(422)->assertJsonPath('data.presse_refusees', 1);
-    expect((string) $refus->json('message'))->toContain('segment presse est fermé')->toContain('Rien n\'a été ajouté')
+    expect((string) $refus->json('message'))->toContain('ne partent que par le segment presse')->toContain('Rien n\'a été ajouté')
         ->and(DB::table('listes_manuelles_membres')->where('liste_id', $liste)->count())->toBe(0);
 
     $mixte = $this->postJson("/api/v1/listes-manuelles/{$liste}/membres", ['company_ids' => [$this->journal], 'contact_ids' => [$this->temoin]])
@@ -328,6 +332,6 @@ test('🔴 API : presse + identifiants introuvables, rien d écrit → 422 avec 
 
     $refus = $this->postJson("/api/v1/listes-manuelles/{$liste}/membres", ['company_ids' => [$this->journal, 987654321], 'contact_ids' => [987654322]])
         ->assertStatus(422)->assertJsonPath('data.presse_refusees', 1)->assertJsonPath('data.introuvables', 2);
-    expect((string) $refus->json('message'))->toContain('segment presse est fermé')->toContain('introuvables')->toContain('Rien n\'a été ajouté')
+    expect((string) $refus->json('message'))->toContain('ne partent que par le segment presse')->toContain('introuvables')->toContain('Rien n\'a été ajouté')
         ->and(DB::table('listes_manuelles_membres')->where('liste_id', $liste)->count())->toBe(0);
 });

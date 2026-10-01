@@ -101,7 +101,7 @@ class RefreshAudienceChunkJob implements ShouldQueue
             $contactRows = DB::table('contacts')
                 ->whereIn('company_id', $companyIds)
                 ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
-                // Jamais un journaliste tant que le segment presse est fermé.
+                // Jamais un journaliste dans une audience (`GardePresse`).
                 ->whereRaw(GardePresse::conditionContactsSql('contacts'))
                 ->select('id', 'company_id')
                 ->get();

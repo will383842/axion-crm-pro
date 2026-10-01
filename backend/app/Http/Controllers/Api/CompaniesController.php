@@ -244,7 +244,7 @@ class CompaniesController extends ApiController
         $chargeContacts = static function (Relation $relation): void {
             EligibiliteCampagne::exclureOpposes($relation->getQuery(), 'contacts.email');
             // Les personnes de la presse ne sortent que par l'export presse
-            // dédié, tant que le segment presse est fermé (`GardePresse`).
+            // dédié, segment presse ouvert ou non (`GardePresse`).
             GardePresse::exclureContacts($relation->getQuery(), 'contacts');
         };
 

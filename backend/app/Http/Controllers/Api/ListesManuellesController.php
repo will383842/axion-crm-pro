@@ -31,8 +31,8 @@ use InvalidArgumentException;
  * un membre retiré garde sa ligne (`retire_le`), et une fiche n'est jamais
  * touchée par une liste.
  *
- * La presse (`GardePresse`) n'entre dans aucune liste tant que son segment est
- * fermé : l'ajout la REFUSE en le disant (`presse_refusees` + message), et une
+ * La presse (`GardePresse`) n'entre dans aucune liste, son segment ouvert ou
+ * non (elle n'a qu'une porte : `crm:campagne:destinataires presse`) : l'ajout la REFUSE en le disant (`presse_refusees` + message), et une
  * ligne écrite avant qu'une fiche ne devienne presse n'est plus ni lue, ni
  * comptée, ni montrée avec ses adresses (`membres`, effectifs, `contient`).
  * Une fiche ou une personne à la corbeille non plus : l'écran compte ce que
@@ -43,7 +43,7 @@ class ListesManuellesController extends ApiController
     use VerrouOptimiste;
 
     /** Le refus d'une fiche de presse, dit à l'écran (vouvoiement). */
-    public const MESSAGE_PRESSE = 'Les médias et les journalistes ne peuvent pas être ajoutés à une liste tant que le segment presse est fermé : '
+    public const MESSAGE_PRESSE = 'Les médias et les journalistes ne peuvent pas être ajoutés à une liste : ils ne partent que par le segment presse : '
         . 'la ou les fiches de presse désignées n\'ont pas été ajoutées (elles restent intactes dans le CRM).';
 
     /**
@@ -305,7 +305,7 @@ class ListesManuellesController extends ApiController
 
     /**
      * Les lignes d'appartenance LISIBLES, comme le résolveur les lit : sans la
-     * presse tant que son segment est fermé, par fiche
+     * presse (segment ouvert ou non), par fiche
      * (`coalesce(m.company_id, ct.company_id)`) ET par personne ; sans fiche
      * ni personne à la corbeille. La requête doit joindre `contacts as ct` sur
      * `m.contact_id`.

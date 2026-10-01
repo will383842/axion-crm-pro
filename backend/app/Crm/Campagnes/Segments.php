@@ -6,7 +6,8 @@ use App\Crm\FichesProtegees;
 use InvalidArgumentException;
 
 /**
- * LES SEGMENTS QU'UNE CAMPAGNE PEUT VISER — liste FERMÉE (2026-09-27).
+ * LES SEGMENTS QU'UNE CAMPAGNE PEUT VISER — liste FERMÉE (2026-09-27) :
+ * le CRM n'extrait que les segments qu'il CONNAÎT (`CONNUS`).
  *
  * Un seul mécanisme d'extraction pour tout le CRM, mais chaque catégorie de
  * contacts s'ouvre par une DÉCISION de Will, jamais par défaut :
@@ -26,18 +27,25 @@ use InvalidArgumentException;
  *    (`--avec-syndicats-salaries`) : art. 9.2.e — coordonnées rendues
  *    manifestement publiques par les responsables syndicaux, message lié à
  *    leur fonction. Une fiche sans classement connu n'est jamais visée.
- *  - `presse` (2026-09-30) : les médias et journalistes harmonisés
- *    (`crm:presse:harmoniser`, `crm:presse:importer`), désignés par leur tag de
- *    provenance protégé. DÉFINI mais FERMÉ : il n'est pas dans `OUVERTS` tant
- *    que Will ne l'ouvre pas (autre usage que la prospection, chauffe d'IP,
- *    porte d'accès `journalists.acces` à respecter). L'ouvrir = l'ajouter à
- *    `OUVERTS`, rien d'autre. Tant qu'il est fermé,
- *    `GardePresse` écarte ces fiches de TOUTE audience, quel que soit le
- *    chemin (y compris un chemin qui lèverait la protection générale).
+ *  - `presse` : OUVERT (décision de Will du 01/10/2026 ; défini le 30/09) —
+ *    les médias et journalistes harmonisés (`crm:presse:harmoniser`,
+ *    `crm:presse:importer`), désignés par leur tag de provenance protégé.
+ *    Une seule porte : `crm:campagne:destinataires presse`. Et, dans ce
+ *    segment, une adresse ne part que si sa PROVENANCE est fiable
+ *    (`AdressePresseFiable` : jamais une adresse tirée d'un site DEVINÉ non
+ *    vérifié, jamais un journaliste sans la porte `email_redaction`).
+ *    Ouvrir la presse ne la fait entrer dans AUCUN autre chemin : audiences,
+ *    listes manuelles, export, waterfall, autres segments l'écartent
+ *    toujours (`GardePresse`) — un journaliste n'entre que par SON segment.
  *  - prospects INSEE : FERMÉS tant que Will ne les ouvre pas (volume, chauffe
  *    d'IP).
  *  - vivier candidats, personnes de la lettre : JAMAIS — les premiers ne sont
  *    pas des prospects, les seconds partent du site sur leur propre liste.
+ *
+ * L'OUVERTURE se règle sans déployer de code : `config('crm.segments_ouverts')`
+ * (`CRM_SEGMENTS_OUVERTS`, liste séparée par des virgules ; absente ou vide =
+ * `OUVERTS_PAR_DEFAUT`, `aucun` = tout fermé). Refermer la presse :
+ * `CRM_SEGMENTS_OUVERTS=organisateurs-evenements,federations`.
  *
  * Aucune ligne de ce fichier n'envoie quoi que ce soit : le CRM PRÉPARE la
  * liste et ENREGISTRE les retours ; l'envoi appartient à l'outil de Will.
@@ -48,11 +56,46 @@ final class Segments
 
     public const FEDERATIONS = 'federations';
 
-    /** Médias et journalistes — défini, FERMÉ (hors `OUVERTS`) : décision de Will. */
+    /** Médias et journalistes — OUVERT par défaut (décision de Will du 01/10/2026). */
     public const PRESSE = 'presse';
 
-    /** @var list<string> */
-    public const OUVERTS = [self::ORGANISATEURS_EVENEMENTS, self::FEDERATIONS];
+    /** Tous les segments que le CRM sait extraire. @var list<string> */
+    public const CONNUS = [self::ORGANISATEURS_EVENEMENTS, self::FEDERATIONS, self::PRESSE];
+
+    /** Ouverts quand `crm.segments_ouverts` n'est pas réglé. @var list<string> */
+    public const OUVERTS_PAR_DEFAUT = self::CONNUS;
+
+    /** Valeur de `crm.segments_ouverts` qui ferme TOUS les segments. */
+    public const AUCUN = 'aucun';
+
+    /**
+     * Les segments OUVERTS, lus dans la configuration (`crm.segments_ouverts`).
+     *
+     * Une valeur inconnue est ignorée : une faute de frappe ne peut que
+     * FERMER, jamais ouvrir un segment que le CRM ne connaît pas.
+     *
+     * @return list<string>
+     */
+    public static function ouverts(): array
+    {
+        $brut = config('crm.segments_ouverts');
+        if (is_array($brut)) {
+            $valeurs = array_map(static fn ($v): string => is_string($v) ? trim($v) : '', $brut);
+        } else {
+            $texte = is_string($brut) ? trim($brut) : '';
+            if ($texte === '') {
+                return self::OUVERTS_PAR_DEFAUT;
+            }
+            $valeurs = array_map('trim', explode(',', $texte));
+        }
+
+        return array_values(array_filter(self::CONNUS, static fn (string $s): bool => in_array($s, $valeurs, true)));
+    }
+
+    public static function ouvert(string $segment): bool
+    {
+        return in_array($segment, self::ouverts(), true);
+    }
 
     /**
      * Le tag qui désigne les fiches d'un segment — désigné par son NOM.

@@ -281,8 +281,8 @@ class AudiencesController extends ApiController
             ->leftJoin('companies as c', 'c.id', '=', 'am.company_id')
             ->leftJoin('contacts as ct', 'ct.id', '=', 'am.contact_id')
             ->where('am.audience_id', $audience->id)
-            // La presse n'est lisible dans AUCUNE audience tant que Will n'a pas
-            // ouvert son segment (`GardePresse`, relecture sécurité de #264) :
+            // La presse n'est lisible dans AUCUNE audience : elle ne part que
+            // par son segment (`GardePresse`, relecture sécurité de #264) :
             // un membre inscrit avant l'harmonisation reste dans
             // `audience_members` jusqu'au prochain rafraîchissement — il ne
             // s'affiche plus d'ici là. Par fiche ET par contact, comme

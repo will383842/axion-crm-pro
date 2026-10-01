@@ -401,6 +401,22 @@ return [
     ],
 
     /*
+    | Segments de campagne OUVERTS (`App\Crm\Campagnes\Segments::ouverts()`).
+    |
+    | Liste séparée par des virgules ; une valeur inconnue est IGNORÉE (jamais
+    | « tout ouvrir »). Absente ou vide : les trois segments connus sont
+    | ouverts — `presse` l'est depuis la décision de Will du 01/10/2026.
+    | REFERMER la presse sans déployer de code :
+    |   CRM_SEGMENTS_OUVERTS=organisateurs-evenements,federations
+    | puis vider le cache de configuration (`php artisan config:clear` ou
+    | redémarrage du conteneur). `aucun` ferme tout. Fermer un segment ne fait que refuser
+    | `crm:campagne:destinataires <segment>` : la presse n'entre de toute façon
+    | dans AUCUN autre chemin (audiences, listes, export, waterfall —
+    | `GardePresse`), ouverte ou non.
+    */
+    'segments_ouverts' => env('CRM_SEGMENTS_OUVERTS', ''),
+
+    /*
     | Vérification des e-mails — `crm:emails:verifier` (2026-09-29).
     |
     | Syntaxe, jetables, webmails, type, partage, et « le domaine reçoit-il du

@@ -271,8 +271,8 @@ class AudienceBuilderService
      */
     public function evaluateForCompany(Company $company): array
     {
-        // La presse harmonisée n'entre dans aucune audience tant que Will n'a
-        // pas ouvert son segment (`GardePresse`), quel que soit le chemin.
+        // La presse harmonisée n'entre dans aucune audience : elle ne part que
+        // par son segment (`GardePresse`), quel que soit le chemin.
         if (! GardePresse::admissible((int) $company->id)) {
             return [];
         }
@@ -472,8 +472,8 @@ class AudienceBuilderService
         }
         // Et la presse harmonisée, par SA garde (`GardePresse`), HORS de la
         // porte ci-dessus : être membre d'une liste manuelle exigée lève la
-        // protection générale, JAMAIS celle de la presse (fermée tant que Will
-        // n'a pas ouvert `Segments::PRESSE`).
+        // protection générale, JAMAIS celle de la presse (qui ne part que par
+        // son segment, `crm:campagne:destinataires presse`).
         GardePresse::exclure($query);
 
         $all = $criteria['all'] ?? [];

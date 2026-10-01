@@ -84,7 +84,7 @@ final class FichesProtegees
      * permanent de Will : ne JAMAIS rien purger. Même régime que les
      * fédérations : ni purge, ni enrichissement automatique, ni reclassement,
      * ni audience générale — la presse ne part en campagne que par son
-     * segment (`Segments::PRESSE`), FERMÉ tant que Will ne l'ouvre pas.
+     * segment (`Segments::PRESSE`, ouvert le 01/10/2026 — `crm.segments_ouverts`).
      */
     public const TAG_PRESSE = 'src:scraping-presse-2026';
 

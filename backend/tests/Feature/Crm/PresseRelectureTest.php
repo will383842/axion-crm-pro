@@ -161,7 +161,9 @@ test('BLOQUANT — une fiche organisateur ET presse : son journaliste email_reda
     // La même règle à la porte commune des campagnes (`EligibiliteCampagne`).
     $eligibles = EligibiliteCampagne::appliquerContacts(Contact::query()->where('company_id', $fiche))->pluck('email')->all();
     expect($eligibles)->toContain('tim.orga@zz-groupe.example.invalid')->not->toContain('zoe.journaliste@zz-groupe.example.invalid')
-        ->and(GardePresse::conditionContactsSql('c', [...Segments::OUVERTS, Segments::PRESSE]))->toBe('TRUE');
+        // Le segment presse est OUVERT : la garde par contact tient quand même.
+        ->and(GardePresse::ouverte())->toBeTrue()
+        ->and(GardePresse::conditionContactsSql('c'))->not->toBe('TRUE');
 });
 
 test('R1 — une suppression TECHNIQUE d un contact ne touche pas le journaliste ; un EFFACEMENT, si', function () {

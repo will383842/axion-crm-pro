@@ -400,7 +400,7 @@ function ImportFichier({ listeId, onImporte }: { listeId: number; onImporte: () 
             {(bilan.presse_refusees ?? 0) > 0 ? (
               <li>
                 {bilan.presse_refusees ?? 0} fiche(s) de presse refusée(s) : les médias et les journalistes n’entrent dans
-                aucune liste tant que le segment presse est fermé
+                aucune liste : ils ne partent que par le segment presse
               </li>
             ) : null}
             {bilan.doublons_dans_le_fichier > 0 ? <li>{bilan.doublons_dans_le_fichier} doublon(s) dans le fichier, comptés une fois</li> : null}

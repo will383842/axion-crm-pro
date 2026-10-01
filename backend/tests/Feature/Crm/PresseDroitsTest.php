@@ -14,7 +14,6 @@
  */
 
 use App\Crm\Campagnes\GardePresse;
-use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Models\Company;
@@ -184,9 +183,9 @@ test('une opposition inscrite dans opt_out atteint le journaliste : par l adress
         ->and(DB::table('journalists')->where('id', $temoin)->value('opt_out'))->toBeFalse();
 });
 
-// ── La presse hors de toute audience tant que le segment est fermé ─────────
+// ── La presse hors de toute audience, segment presse ouvert ou fermé ───────
 
-test('GardePresse : une fiche de presse n entre dans aucune audience tant que le segment est ferme, par AUCUN chemin', function () {
+test('GardePresse : une fiche de presse n entre dans aucune audience, segment presse OUVERT ou FERME, par AUCUN chemin', function () {
     [$fiche] = pdHarmonise($this->espace);
     $ordinaire = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $this->espace, 'siren' => '900000555', 'denomination' => 'ZZ ORDINAIRE',
@@ -196,18 +195,24 @@ test('GardePresse : une fiche de presse n entre dans aucune audience tant que le
 
     // La garde seule, sans la protection générale : c'est ce que tout chemin
     // qui lève `FichesProtegees` (listes exigées, #266) doit encore appliquer.
-    $ferme = DB::table('companies')->whereIn('id', [$fiche, $ordinaire]);
-    GardePresse::exclure($ferme);
+    // Segment presse OUVERT (défaut depuis le 01/10/2026) : la garde tient.
+    expect(GardePresse::ouverte())->toBeTrue();
     $ouvert = DB::table('companies')->whereIn('id', [$fiche, $ordinaire]);
-    GardePresse::exclure($ouvert, 'companies.id', [...Segments::OUVERTS, Segments::PRESSE]);
+    GardePresse::exclure($ouvert);
     $brut = DB::table('companies as c')->whereIn('c.id', [$fiche, $ordinaire])->whereRaw(GardePresse::conditionSql('c.id'));
-
-    expect($ferme->pluck('id')->map(fn ($v) => (int) $v)->all())->toBe([$ordinaire])
-        ->and($ouvert->pluck('id')->map(fn ($v) => (int) $v)->sort()->values()->all())->toBe(collect([$fiche, $ordinaire])->sort()->values()->all())
+    expect($ouvert->pluck('id')->map(fn ($v) => (int) $v)->all())->toBe([$ordinaire])
         ->and($brut->pluck('c.id')->map(fn ($v) => (int) $v)->all())->toBe([$ordinaire])
         ->and(GardePresse::admissible($fiche))->toBeFalse()
-        ->and(GardePresse::admissible($fiche, [...Segments::OUVERTS, Segments::PRESSE]))->toBeTrue()
         ->and(GardePresse::admissible($ordinaire))->toBeTrue();
+
+    // Segment presse FERMÉ par la configuration : la garde tient aussi.
+    config(['crm.segments_ouverts' => 'organisateurs-evenements,federations']);
+    expect(GardePresse::ouverte())->toBeFalse();
+    $ferme = DB::table('companies')->whereIn('id', [$fiche, $ordinaire]);
+    GardePresse::exclure($ferme);
+    expect($ferme->pluck('id')->map(fn ($v) => (int) $v)->all())->toBe([$ordinaire])
+        ->and(GardePresse::admissible($fiche))->toBeFalse();
+    config(['crm.segments_ouverts' => '']);
 
     // Le chemin EN MÉMOIRE (waterfall) n'applique pas la protection générale :
     // c'est la garde qui ferme.

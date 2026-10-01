@@ -118,7 +118,7 @@ final class ResolveurDestinataires
                     ->whereIn('company_id', $ids)
                     ->whereNotNull('email')
                     // Une personne de la presse n'est JAMAIS une adresse
-                    // candidate tant que le segment presse est fermé — même sur
+                    // candidate d'une audience (segment presse ouvert ou non) — même sur
                     // une fiche non-presse, même cochée dans une liste exigée
                     // (garde PAR CONTACT, `GardePresse`). La fiche de presse,
                     // elle, est déjà écartée par `buildPublicQuery`.

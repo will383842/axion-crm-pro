@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Personnes\NatureEmail;
 use App\Crm\Presse\EtiquettesMedia;
@@ -513,6 +514,13 @@ class CrmPresseImporter extends Command
             $delta[$cle] = ($delta[$cle] ?? 0) + $n;
         }
         $delta[$this->ecrireMedia($companyId, $l, $emailRedaction)] = 1;
+        if ($emailRedaction !== null) {
+            // La PROVENANCE de l'adresse de rédaction : une liste presse. Le
+            // segment presse ne fait partir que des adresses de provenance
+            // fiable (`AdressePresseFiable`) ; celle-ci l'est même si la fiche
+            // porte par ailleurs un site deviné.
+            AdressePresseFiable::retenirEmailListe($companyId, $emailRedaction);
+        }
 
         if ($j !== null) {
             $contactId = QualificationPresse::contactDe($companyId, $j['prenom'], $j['nom'], $j['email']);

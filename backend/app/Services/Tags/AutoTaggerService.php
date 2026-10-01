@@ -219,7 +219,7 @@ class AutoTaggerService
         if ($lignesMedia !== []) {
             $metadata = array_key_exists('metadata', $company->getAttributes())
                 ? $company->metadata
-                : json_decode((string) DB::table('companies')->where('id', $company->id)->value('metadata'), true);
+                : json_decode((string) DB::table('companies')->where('id', $company->id)->whereNull('deleted_at')->value('metadata'), true);
             $classement = ClassementMedia::desirees(
                 (int) $company->id,
                 is_array($metadata) ? ($metadata[ClassementMedia::CLE] ?? null) : null,

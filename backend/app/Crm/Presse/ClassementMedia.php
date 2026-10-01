@@ -41,7 +41,20 @@ use Illuminate\Support\Str;
  *
  * Une valeur est retenue si son score atteint `SEUIL` (4) ET si le signal est
  * SÛR (`retenu()`) : au moins un mot dans le NOM ou le TITRE (titre, meta, h1),
- * ou au moins DEUX mots-clés distincts. Un seul mot de menu (« Immobilier »,
+ * ou au moins DEUX mots-clés distincts HORS du corps de page (nom, titre,
+ * menu — v3 : le corps n'est plus compté).
+ *
+ * Règles v3 (échantillon de production du 2026-10-01) :
+ *   - `ia-tech` exige un mot SPÉCIFIQUE hors corps (`IA_TECH_SPECIFIQUES` :
+ *     IA, intelligence artificielle, tech, startup…) ou deux mots tech hors
+ *     corps — « impression numérique », « informatique » seuls ne suffisent pas ;
+ *   - GÉNÉRALISTE : régional ou grand public retenu ET au moins trois autres
+ *     thèmes → seuls régional / grand public restent (plus un thème présent
+ *     dans le nom ou le titre), public `grand-public`, jamais `dirigeants` ;
+ *   - format TV seulement si TOUTES les lignes média de la fiche sont TV ;
+ *   - « média possible » : aucun thème ni public tant que le verdict n'est pas
+ *     `semble-media`.
+ * Un seul mot de menu (« Immobilier »,
  * « Management ») ne classe jamais ; un mot faible (poids 1) seul dans le
  * titre non plus. Sans aucune valeur retenue : `inconnu`. On n'invente RIEN.
  *
@@ -120,7 +133,7 @@ use Illuminate\Support\Str;
 final class ClassementMedia
 {
     /** Version des règles : la monter fait relire toutes les fiches au passage suivant. */
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     /** Clé de `companies.metadata` qui garde le classement. */
     public const CLE = 'classement_media';
@@ -169,6 +182,25 @@ final class ClassementMedia
     /** Types `media.media_type` qui reçoivent un format. */
     public const TYPES_TV = ['tv', 'tv_emission'];
 
+    /**
+     * Mots SPÉCIFIQUES de `ia-tech` (v3) : un seul d'entre eux, hors corps de
+     * page, suffit. Les autres (« numérique », « informatique », « digital »,
+     * « web », « data »…) sont trop larges — une imprimerie numérique, un
+     * groupement informatique — et ne comptent qu'à DEUX au moins, hors corps.
+     *
+     * @var list<string>
+     */
+    public const IA_TECH_SPECIFIQUES = [
+        'intelligence artificielle', 'ia', 'ia generative', 'chatgpt', 'tech', 'high tech',
+        'cybersecurite', 'transformation digitale', 'transformation numerique', 'geek', 'startup', 'start up',
+    ];
+
+    /** Thèmes d'un média GÉNÉRALISTE (règle v3). */
+    public const THEMES_GENERALISTES = ['regional', 'grand-public'];
+
+    /** Au-delà de ce nombre d'autres thèmes, un média régional / grand public est généraliste. */
+    public const AUTRES_THEMES_GENERALISTE = 3;
+
     /** Thèmes qu'un format `fiction-jeu` ne garde pas. */
     private const THEMES_GARDES_PAR_FICTION = ['grand-public', 'regional'];
 
@@ -191,6 +223,7 @@ final class ClassementMedia
             'informatique' => 2, 'cybersecurite' => 3, 'logiciel' => 1, 'data' => 1, 'cloud' => 2,
             'innovation' => 1, 'geek' => 2, 'transformation digitale' => 3, 'transformation numerique' => 3,
             'objets connectes' => 2, 'robotique' => 2, 'telecom' => 2, 'web' => 1,
+            'startup' => 1, 'start up' => 1,
         ],
         'economie-entreprise' => [
             'economie' => 3, 'eco' => 2, 'economique' => 2, 'entreprise' => 2, 'business' => 2,
@@ -447,16 +480,26 @@ final class ClassementMedia
         // au moins deux mots distincts. Un seul mot de menu (« Immobilier »,
         // « Management ») ne classe jamais.
         $themes = [];
+        $fortParTheme = [];
         foreach (self::THEMES_MOTS as $theme => $mots) {
             $a = self::analyse($z, $mots);
             if ($theme === 'regional' && self::zoneLocale($zonesDiffusion)) {
                 // Zone de diffusion donnée par la SOURCE : une donnée, signal sûr.
-                $a = ['score' => $a['score'] + self::SEUIL, 'mots' => $a['mots'] + 1, 'fort' => true];
+                $a = ['score' => $a['score'] + self::SEUIL, 'mots' => $a['mots'] + 1, 'tous' => $a['tous'] + 1, 'fort' => true];
             }
             $scores['theme:' . $theme] = $a['score'];
-            if (self::retenu($a)) {
-                $themes[] = $theme;
+            if (! self::retenu($a)) {
+                continue;
             }
+            // ia-tech : un mot SPÉCIFIQUE hors corps, ou deux mots tech hors corps.
+            if ($theme === 'ia-tech' && $a['mots'] < 2) {
+                $specifiques = array_intersect_key($mots, array_flip(self::IA_TECH_SPECIFIQUES));
+                if (self::analyse(['nom' => $z['nom'], 'titre' => $z['titre'], 'menu' => $z['menu']], $specifiques)['score'] === 0) {
+                    continue;
+                }
+            }
+            $themes[] = $theme;
+            $fortParTheme[$theme] = $a['fort'];
         }
         // Presse PROFESSIONNELLE et secteur : signal FORT exigé, dans le nom
         // ou le titre (« le journal du BTP », « la revue des professionnels »).
@@ -475,13 +518,34 @@ final class ClassementMedia
         $scores['theme:metiers-secteurs'] = $metiers['score'];
         if ($secteurs !== [] || ($metiers['score'] >= self::SEUIL && $metiers['fort'])) {
             $themes[] = 'metiers-secteurs';
+            $fortParTheme['metiers-secteurs'] = true;
+        }
+
+        // ── Généraliste (v3) ───────────────────────────────────────────────
+        // Un quotidien régional ou un média grand public a des rubriques de
+        // TOUT : économie, emploi, numérique… Si un thème régional / grand
+        // public est retenu ET au moins trois autres, c'est un généraliste :
+        // on ne garde que régional / grand public, plus un autre thème
+        // SEULEMENT s'il est dans le NOM ou le TITRE.
+        $generaliste = array_intersect($themes, self::THEMES_GENERALISTES) !== []
+            && count(array_diff($themes, self::THEMES_GENERALISTES)) >= self::AUTRES_THEMES_GENERALISTE;
+        if ($generaliste) {
+            $themes = array_values(array_filter(
+                $themes,
+                static fn (string $t): bool => in_array($t, self::THEMES_GENERALISTES, true) || ($fortParTheme[$t] ?? false),
+            ));
+            if (! in_array('metiers-secteurs', $themes, true)) {
+                $secteurs = [];
+            }
         }
 
         // ── Format (télévision seulement) ──────────────────────────────────
         // `fiction-jeu` ne se lit que dans le NOM ou le TITRE : le menu d'une
         // chaîne généraliste (Séries, Films, Jeux) ne dit rien de l'émission.
         $format = null;
-        if (array_intersect($typesMedia, self::TYPES_TV) !== []) {
+        // v3 : seulement si TOUTES les lignes média de la fiche sont de la
+        // télévision — une ligne TV égarée sur une boutique ne fait pas un format.
+        if ($typesMedia !== [] && array_diff($typesMedia, self::TYPES_TV) === []) {
             $parFormat = [];
             $surs = [];
             foreach (self::FORMATS_MOTS as $f => $mots) {
@@ -524,6 +588,10 @@ final class ClassementMedia
                 $publics[] = $public;
             }
         }
+        // Un généraliste s'adresse au grand public, jamais aux seuls dirigeants.
+        if ($generaliste) {
+            $publics = ['grand-public'];
+        }
 
         // ── Verdict « média possible » ────────────────────────────────────
         // La structure (articles, dates) ne suffit jamais seule : un blog
@@ -544,7 +612,7 @@ final class ClassementMedia
                 $pas = self::score($z, self::VERDICT_PAS_MEDIA_MOTS, false);
                 $scores['verdict:media'] = $media;
                 $scores['verdict:pas-media'] = $pas;
-                if ($lexical['mots'] > 0 && $media >= self::SEUIL_VERDICT && $media >= 2 * $pas) {
+                if ($lexical['tous'] > 0 && $media >= self::SEUIL_VERDICT && $media >= 2 * $pas) {
                     $verdict = self::VERDICT_MEDIA;
                 } elseif ($pas >= self::SEUIL_VERDICT && $pas >= 2 * $media) {
                     $verdict = self::VERDICT_PAS_MEDIA;
@@ -553,6 +621,22 @@ final class ClassementMedia
         }
 
         ksort($scores);
+
+        // v3 : un « média possible » qui ne SEMBLE pas un média n'a pas de
+        // ligne éditoriale — aucun thème, aucun public, aucun format (même pas
+        // `inconnu`), tant que le verdict n'est pas `semble-media`.
+        if ($incertain && $verdict !== self::VERDICT_MEDIA) {
+            return [
+                'v' => self::VERSION,
+                'lecture' => $lecture,
+                'themes' => [],
+                'secteurs' => [],
+                'publics' => [],
+                'format' => null,
+                'verdict' => $verdict,
+                'scores' => array_filter($scores, static fn (int $s): bool => $s > 0),
+            ];
+        }
 
         return [
             'v' => self::VERSION,
@@ -579,16 +663,18 @@ final class ClassementMedia
 
     /**
      * Score, nombre de mots-clés DISTINCTS trouvés, et signal FORT (un mot
-     * trouvé dans le nom ou le titre).
+     * trouvé dans le nom ou le titre). `mots` ne compte que les mots trouvés
+     * HORS du corps de page (nom, titre, menu) ; `tous` les compte partout.
      *
      * @param  array<string, string>  $zones
      * @param  array<string, int>  $mots
-     * @return array{score: int, mots: int, fort: bool}
+     * @return array{score: int, mots: int, tous: int, fort: bool}
      */
     public static function analyse(array $zones, array $mots, bool $plafonnerTexte = true): array
     {
         $total = 0;
         $trouves = [];
+        $horsCorps = [];
         $fort = false;
         foreach (self::POIDS_ZONES as $zone => $poidsZone) {
             $texte = $zones[$zone] ?? '';
@@ -600,6 +686,9 @@ final class ClassementMedia
                 if (self::contient($texte, $mot)) {
                     $s += $poids * $poidsZone;
                     $trouves[$mot] = true;
+                    if ($zone !== 'texte') {
+                        $horsCorps[$mot] = true;
+                    }
                     if (in_array($zone, self::ZONES_FORTES, true)) {
                         $fort = true;
                     }
@@ -611,14 +700,14 @@ final class ClassementMedia
             $total += $s;
         }
 
-        return ['score' => $total, 'mots' => count($trouves), 'fort' => $fort];
+        return ['score' => $total, 'mots' => count($horsCorps), 'tous' => count($trouves), 'fort' => $fort];
     }
 
     /**
      * Une valeur est-elle retenue ? Seuil atteint ET signal sûr : fort (nom,
-     * titre) ou au moins deux mots-clés distincts.
+     * titre) ou au moins deux mots-clés distincts HORS du corps de page.
      *
-     * @param  array{score: int, mots: int, fort: bool}  $analyse
+     * @param  array{score: int, mots: int, tous: int, fort: bool}  $analyse
      */
     public static function retenu(array $analyse): bool
     {

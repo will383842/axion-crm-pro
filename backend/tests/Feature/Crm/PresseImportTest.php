@@ -417,3 +417,34 @@ test('🔴 rattrapage : rejouer un fichier DÉJÀ importé pose la provenance «
     expect(piCompteur($r3['sortie'], 'provenances_liste_retenues'))->toBe(0)
         ->and(piVolumes())->toBe($volumes);
 });
+
+test('🔴 A09 — --provenance-seulement : ne pose QUE la provenance « liste presse », ne modifie rien d autre, ne crée rien', function () {
+    $lignes = [piLigne()];
+    piImporter($lignes);
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse'");
+    // Un trou que le rejeu ORDINAIRE comblerait : le rattrapage, non.
+    DB::table('media')->update(['phone' => null]);
+    $instantane = static fn (): array => [
+        'companies' => DB::table('companies')->orderBy('id')->get()->map(static function ($c): array {
+            $c = (array) $c;
+            $meta = json_decode((string) $c['metadata'], true);
+            unset($meta['emails_liste_presse'], $c['metadata']);
+
+            return $c + ['meta' => $meta];
+        })->all(),
+        'media' => DB::table('media')->orderBy('id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'contacts' => DB::table('contacts')->orderBy('id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'company_tag' => DB::table('company_tag')->orderBy('company_id')->orderBy('tag_id')->get()->map(static fn ($m): array => (array) $m)->all(),
+        'volumes' => piVolumes(),
+    ];
+    $avant = $instantane();
+
+    $r = piImporter([...$lignes, piLigne(['identifiant' => 'presse:zz:jamais-importe', 'nom' => 'ZZ Jamais importe'])], ['--provenance-seulement' => true]);
+
+    $meta = json_decode((string) DB::table('companies')->where('foreign_id', 'presse:zz:quotidien-1')->value('metadata'), true);
+    expect($r['code'])->toBe(0)
+        ->and($meta['emails_liste_presse'] ?? null)->toBe(['redaction@zz-quotidien.example.invalid'])
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(1)
+        ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
+        ->and($instantane())->toBe($avant);
+});

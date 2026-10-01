@@ -13,15 +13,23 @@
  * Chaque cas porte un TÉMOIN. Fixtures FICTIVES (dépôt public).
  */
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\ReglageDestinataires;
 use App\Crm\Campagnes\ResolveurDestinataires;
+use App\Crm\Emails\QualificationEmail;
 use App\Crm\FichesProtegees;
+use App\Http\Controllers\Api\AudiencesController;
+use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\EmailAudience;
+use App\Models\User;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Audiences\CritereAudienceInvalide;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
@@ -54,7 +62,11 @@ beforeEach(function () {
     $this->max = apContact($this->ws, $this->p1, 'max@zz-p1.example.invalid', journaliste: true, acces: 'linkedin_direct');
     $this->info = apContact($this->ws, $this->p1, 'info@zz-p1-devine.example.invalid');
     // P2 : presse éco, site jamais deviné — sa boîte générique part.
-    $this->p2 = apFiche($this->ws, ['email_generic' => 'redaction@zz-p2.example.invalid'], [FichesProtegees::TAG_PRESSE, AP_ECO]);
+    // P2 : presse éco, site jamais deviné — sa boîte générique part. Elle
+    // porte AUSSI le tag des organisateurs (GOFAB…) et un contact organisateur
+    // à l'adresse fiable : il n'entre JAMAIS dans une audience presse (A09).
+    $this->p2 = apFiche($this->ws, ['email_generic' => 'redaction@zz-p2.example.invalid'], [FichesProtegees::TAG_PRESSE, FichesProtegees::TAG_ORGANISATEURS, AP_ECO]);
+    $this->orga = apContact($this->ws, $this->p2, 'orga@zz-p2.example.invalid');
     // Témoins : presse SPORT, presse éco « média possible », fiche ordinaire éco.
     $this->p3 = apFiche($this->ws, ['email_generic' => 'redaction@zz-p3.example.invalid'], [FichesProtegees::TAG_PRESSE, 'media-sujet:sport']);
     $this->p4 = apFiche($this->ws, ['email_generic' => 'redaction@zz-p4.example.invalid'], [FichesProtegees::TAG_PRESSE, AP_ECO, 'media-possible:a-verifier']);
@@ -152,8 +164,14 @@ test('🔴 destinataires de l audience presse : adresses fiables seulement, moti
     sort($emails);
 
     expect($emails)->toBe(['redaction@zz-p2.example.invalid', 'zoe@zz-p1.example.invalid'])
-        ->and($r['exclues']['site_devine'])->toBe(2)
-        ->and($r['exclues']['journaliste_sans_acces'])->toBe(1);
+        ->and($r['exclues']['site_devine'])->toBe(1)
+        ->and($r['exclues']['journaliste_sans_acces'])->toBe(1)
+        // Même définition que l'aperçu (relecture A09), quel que soit le réglage.
+        ->and($r['presse_ecartees'])->toBe($this->service->preview($this->ws, AP_CRITERES)['presse_ecartees']);
+    foreach ([ReglageDestinataires::PERSONNE_SINON_GENERIQUE, ReglageDestinataires::GENERIQUE, ReglageDestinataires::NOMINATIVES] as $mode) {
+        $autre = app(ResolveurDestinataires::class)->resoudre($this->ws, AP_CRITERES, ReglageDestinataires::depuisTableau(['mode' => $mode]), null);
+        expect($autre['presse_ecartees'])->toBe($r['presse_ecartees']);
+    }
 });
 
 test('🔴 segment presse FERMÉ par la configuration : le critère est refusé, partout', function () {
@@ -174,4 +192,95 @@ test('le critère presse n existe que sous la forme segment eq presse, dans le b
     ] as $criteres) {
         expect(fn () => AudienceBuilderService::validerCriteres($criteres))->toThrow(CritereAudienceInvalide::class);
     }
+});
+
+/** @return list<array{0: int, 1: int|null}> */
+function apMembres(int $audience): array
+{
+    $m = DB::table('audience_members')->where('audience_id', $audience)
+        ->orderBy('company_id')->orderBy('contact_id')->get(['company_id', 'contact_id'])
+        ->map(static fn ($x): array => [(int) $x->company_id, $x->contact_id === null ? null : (int) $x->contact_id])->all();
+
+    return array_values($m);
+}
+
+test('🔴 A09 — fiche presse ET organisateurs : son contact organisateur n entre JAMAIS (membres, aperçu, destinataires, liste de campagne)', function () {
+    $audience = EmailAudience::create([
+        'workspace_id' => $this->ws, 'name' => 'ZZ presse', 'criteria' => AP_CRITERES, 'is_active' => true, 'auto_refresh' => false,
+    ]);
+    $this->service->refresh($audience);
+    $contacts = array_filter(array_column(apMembres((int) $audience->id), 1));
+    ResolveurDnsSimule::toutVerifier();
+    $r = app(ResolveurDestinataires::class)->resoudre($this->ws, AP_CRITERES, ReglageDestinataires::depuisTableau(['mode' => ReglageDestinataires::LES_DEUX]), null);
+    $emails = array_map(static fn (array $l): string => (string) $l['email'], $r['lignes']);
+
+    expect($contacts)->not->toContain($this->orga)->not->toContain($this->info)
+        ->and($emails)->not->toContain('orga@zz-p2.example.invalid')->not->toContain('info@zz-p1-devine.example.invalid');
+
+    // La liste de campagne du segment presse : même règle.
+    $sortie = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zz-ap-' . Str::random(8) . '.jsonl';
+    Artisan::call('crm:campagne:destinataires', ['segment' => 'presse', 'sortie' => $sortie]);
+    $liste = (string) @file_get_contents($sortie);
+    @unlink($sortie);
+    expect($liste)->toContain('zoe@zz-p1.example.invalid')
+        ->not->toContain('orga@zz-p2.example.invalid')->not->toContain('info@zz-p1-devine.example.invalid');
+});
+
+test('RefreshAudienceChunkJob (audiences > 5 000 fiches) : sur une audience presse, les mêmes membres que refresh()', function () {
+    $audience = EmailAudience::create([
+        'workspace_id' => $this->ws, 'name' => 'ZZ presse chunk', 'criteria' => AP_CRITERES, 'is_active' => true, 'auto_refresh' => false,
+    ]);
+    (new RefreshAudienceChunkJob(audienceId: (int) $audience->id, offset: 0, limit: 100))
+        ->pourEspace($this->ws)
+        ->handle($this->service);
+    $parJob = apMembres((int) $audience->id);
+    $this->service->refresh($audience);
+    $attendu = [[$this->p1, $this->zoe], [$this->p2, null]];
+    usort($attendu, static fn ($a, $b) => $a[0] <=> $b[0]);
+
+    expect($parJob)->toBe($attendu)->and(apMembres((int) $audience->id))->toBe($attendu);
+});
+
+test('A09 — membres d une audience presse : affichés segment ouvert, REFUSÉS (422, message clair) segment fermé', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $user = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'op-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ op',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->ws, 'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($this->ws);
+    $user->assignRole('operator');
+    $this->actingAs($user);
+    $audience = EmailAudience::create([
+        'workspace_id' => $this->ws, 'name' => 'ZZ presse membres', 'criteria' => AP_CRITERES, 'is_active' => true, 'auto_refresh' => false,
+    ]);
+    $this->service->refresh($audience);
+
+    $this->getJson("/api/v1/audiences/{$audience->id}/members")->assertOk();
+
+    config(['crm.segments_ouverts' => 'organisateurs-evenements,federations']);
+    $this->getJson("/api/v1/audiences/{$audience->id}/members")
+        ->assertStatus(422)->assertJsonPath('message', AudiencesController::MESSAGE_PRESSE_FERMEE);
+    $this->postJson('/api/v1/audiences/preview', ['criteria' => AP_CRITERES])->assertStatus(422);
+});
+
+test('A09 — la normalisation SQL des adresses est celle de PHP (espaces, tabulations, fins de ligne, casse)', function () {
+    foreach (["  Zoe@ZZ-Titre.example.invalid\t", "\nX@Y.example.invalid \r", "\x0Bz@z.example.invalid", 'deja@propre.example.invalid'] as $brut) {
+        $sql = (string) DB::selectOne('SELECT ' . AdressePresseFiable::cleSql('CAST(? AS text)') . ' AS cle', [$brut])->cle;
+        expect($sql)->toBe(QualificationEmail::normaliser($brut));
+    }
+
+    // Une fiche au site DEVINÉ dont la boîte générique (espace final) est
+    // portée, à la casse et aux espaces près, par une source presse : fiable
+    // en SQL comme en PHP.
+    $fiche = apFiche($this->ws, ['website_method' => 'guess', 'email_generic' => 'redaction@zz-espace.example.invalid '], [FichesProtegees::TAG_PRESSE]);
+    DB::table('media')->insert(['workspace_id' => $this->ws, 'company_id' => $fiche, 'name' => 'ZZ titre', 'media_type' => 'presse_quotidien',
+        'media_family' => 'editorial', 'source' => 'cppap', 'enrich_status' => 'pending', 'email' => "  Redaction@ZZ-Espace.example.invalid\t",
+        'created_at' => now(), 'updated_at' => now()]);
+    $parSql = DB::table('companies as c')->where('c.id', $fiche)->whereRaw(AdressePresseFiable::generiqueFiableSql('c.id', 'c'))->exists();
+    [$parPhp] = AdressePresseFiable::juger('redaction@zz-espace.example.invalid ', [
+        'presse' => false, 'acces' => null, 'site_verifie' => false, 'site_devine' => true,
+        'emails_surs' => AdressePresseFiable::emailsSurs($fiche),
+    ]);
+
+    expect($parSql)->toBeTrue()->and($parPhp)->toBeTrue();
 });

@@ -19,6 +19,7 @@ use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
+use App\Crm\Presse\SiteMedia;
 use App\Models\Contact;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Support\EligibiliteCampagne;
@@ -124,10 +125,10 @@ test('🔴 une adresse tirée d un site DEVINÉ non vérifié n est JAMAIS desti
         'email_generic' => 'contact@zz-bijou.example.invalid']);
     psoFiche($this->espace, ['website' => 'https://zz-autre.example.invalid', 'website_method' => 'guess2',
         'email_generic' => 'info@zz-autre.example.invalid',
-        'metadata' => json_encode([AdressePresseFiable::MARQUEUR_SITE_VERIFIE => ['statut' => AdressePresseFiable::STATUTS_SITE_VERIFIE[1]]])]);
+        'metadata' => json_encode([SiteMedia::CLE => ['statut' => SiteMedia::TROUVE_VERIFIE]])]);
     // Témoin : un statut qui n'est PAS une vérification ne lève rien.
     psoFiche($this->espace, ['website_method' => 'guess', 'email_generic' => 'info@zz-nonverifie.example.invalid',
-        'metadata' => json_encode([AdressePresseFiable::MARQUEUR_SITE_VERIFIE => ['statut' => 'a-verifier']])]);
+        'metadata' => json_encode([SiteMedia::CLE => ['statut' => SiteMedia::A_CONFIRMER]])]);
     psoFiche($this->espace, ['website' => 'https://zz-journal.example.invalid', 'email_generic' => 'redaction@zz-journal.example.invalid']);
     // Le site deviné d'une LIGNE MEDIA de la fiche contamine aussi (ses
     // adresses ont pu être recopiées par l'harmonisation).

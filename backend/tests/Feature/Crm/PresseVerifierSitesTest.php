@@ -14,6 +14,7 @@
  * « ZZ » / « Zorglub », SIREN en 9xxxxxxxx.
  */
 
+use App\Crm\Presse\LecturePageAccueil;
 use App\Crm\Presse\SiteMedia;
 use Database\Seeders\ScrapingSourcesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -313,4 +314,99 @@ test('--depuis-id et --limite bornent les fiches verifiees', function () {
     expect(pvsMarqueur($un))->toBeNull()
         ->and(pvsMarqueur($deux)['statut'])->toBe(SiteMedia::SANS_SITE)
         ->and(pvsMarqueur($trois))->toBeNull();
+});
+
+// ── Bug de production du 2026-10-01 : « http:///robots.txt » arrêtait tout ──
+
+test('un Location INVALIDE (hote vide) sur robots.txt ou la page ne leve plus : fiche marquee, le lot continue', function () {
+    $robots = pvsFiche($this->espace, 'https://robots-casse.test', 'ZZ ALPHA ROMEO');
+    $page = pvsFiche($this->espace, 'https://page-casse.test', 'ZZ BRAVO TANGO');
+    $vide = pvsFiche($this->espace, 'https://location-vide.test', 'ZZ CHARLIE MIKE');
+    $sain = pvsFiche($this->espace, 'https://echo-zorglubs.test', "ZZ L'ÉCHO DES ZORGLUBS");
+    Http::fake([
+        'https://robots-casse.test/robots.txt' => Http::response('', 301, ['Location' => 'http:///robots.txt']),
+        'https://page-casse.test/robots.txt' => Http::response('', 404),
+        'https://page-casse.test/' => Http::response('', 302, ['Location' => 'http:///']),
+        'https://location-vide.test/robots.txt' => Http::response('', 404),
+        'https://location-vide.test/' => Http::response('', 301, ['Location' => '']),
+        'https://echo-zorglubs.test/robots.txt' => Http::response('', 404),
+        'https://echo-zorglubs.test/' => Http::response(pvsPage("L'Écho des Zorglubs", 'La rédaction'), 200, ['Content-Type' => 'text/html']),
+        '*' => Http::response('', 404),
+    ]);
+
+    $r = pvsLancer(['--appliquer' => true, '--sans-recherche' => true]);
+
+    expect($r['code'])->toBe(0)
+        ->and($r['sortie'])->not->toContain('INTERROMPU')
+        ->and(pvsMarqueur($robots)['statut'])->toBe(SiteMedia::ROBOTS_INTERDIT) // robots.txt illisible : prudence
+        ->and(pvsMarqueur($page)['statut'])->toBe(SiteMedia::ILLISIBLE)
+        ->and(pvsMarqueur($vide)['statut'])->toBe(SiteMedia::INJOIGNABLE)
+        ->and(pvsMarqueur($sain)['statut'])->toBe(SiteMedia::VERIFIE);
+    Http::assertNotSent(fn (Request $q): bool => str_starts_with($q->url(), 'http:///'));
+});
+
+test('hote vide ou invalide : aucune requete, pas meme robots.txt, statut illisible', function () {
+    Http::fake(['*' => Http::response('', 404)]);
+
+    $lu = (new LecturePageAccueil(1, 1, 0))->lire(['http:///robots.txt', 'https:///', 'https://-/', 'https://zz.test:8080/']);
+
+    Http::assertNothingSent();
+    foreach ($lu as $resultat) {
+        expect($resultat['statut'])->toBe(LecturePageAccueil::STATUT_ILLISIBLE);
+    }
+    expect($lu)->toHaveCount(4)
+        ->and(LecturePageAccueil::urlValide('https://zz.test/a'))->toBeTrue()
+        ->and(LecturePageAccueil::urlValide('http:///robots.txt'))->toBeFalse()
+        ->and(LecturePageAccueil::resoudre('https://zz.test/a', 'http:///robots.txt'))->toBeNull()
+        ->and(LecturePageAccueil::resoudre('https://zz.test/a', 'ftp://zz.test/'))->toBeNull()
+        ->and(LecturePageAccueil::resoudre('https://zz.test/a', '/b'))->toBe('https://zz.test/b');
+});
+
+test('slug vide : un nom sans lettres ni chiffres ne donne AUCUN candidat', function () {
+    expect(SiteMedia::candidats(['---'], 4))->toBe([])
+        ->and(SiteMedia::candidats(["' . ' ' -"], 4))->toBe([])
+        ->and(SiteMedia::candidats(['É'], 4))->toBe([])
+        ->and(SiteMedia::candidats([''], 4))->toBe([]);
+
+    $id = pvsFiche($this->espace, null, '---');
+    pvsReseau([]);
+    $r = pvsLancer(['--appliquer' => true]);
+
+    Http::assertNothingSent();
+    expect($r['code'])->toBe(0)
+        ->and(pvsMarqueur($id)['statut'])->toBe(SiteMedia::SANS_SITE);
+});
+
+test('une EXCEPTION de lecture ne leve jamais vers le lot : relecture une a une, sinon fiche marquee erreur', function () {
+    $un = pvsFiche($this->espace, 'https://echo-zorglubs.test', "ZZ L'ÉCHO DES ZORGLUBS");
+    pvsReseau(['echo-zorglubs.test' => pvsPage("L'Écho des Zorglubs", 'La rédaction')]);
+
+    // 1. la lecture groupée lève UNE fois : la relecture une à une sauve la fiche.
+    $appels = 0;
+    app()->bind(LecturePageAccueil::class, function () use (&$appels): LecturePageAccueil {
+        return new LecturePageAccueil(4, 6, 0, function (int $ms) use (&$appels): void {
+            if ($appels++ === 0) {
+                throw new RuntimeException('panne simulée');
+            }
+        });
+    });
+    $r = pvsLancer(['--appliquer' => true, '--sans-recherche' => true]);
+    expect($r['code'])->toBe(0)
+        ->and(pvsMarqueur($un)['statut'])->toBe(SiteMedia::VERIFIE);
+
+    // 2. la lecture lève TOUJOURS : fiche marquée `erreur`, compteur, le lot finit.
+    $deux = pvsFiche($this->espace, 'https://echo-zorglubs.test/deux', "ZZ L'ÉCHO DES ZORGLUBS");
+    $trois = pvsFiche($this->espace, null, 'ZZ SANS SITE');
+    app()->bind(LecturePageAccueil::class, fn (): LecturePageAccueil => new LecturePageAccueil(4, 6, 0, function (int $ms): void {
+        throw new RuntimeException('panne simulée');
+    }));
+    $r = pvsLancer(['--appliquer' => true, '--sans-recherche' => true]);
+
+    expect($r['code'])->toBe(0)
+        ->and($r['sortie'])->not->toContain('INTERROMPU')
+        ->and($r['sortie'])->not->toContain('panne simulée')
+        ->and(pvsMarqueur($deux))->toMatchArray(['statut' => SiteMedia::ERREUR, 'motif' => SiteMedia::MOTIF_EXCEPTION_LECTURE])
+        ->and(pvsMarqueur($trois)['statut'])->toBe(SiteMedia::SANS_SITE)
+        ->and((int) preg_match('/\|\s*erreurs_lecture\s*\|\s*1\s*\|/', $r['sortie']))->toBe(1)
+        ->and((int) preg_match('/\|\s*erreurs\s*\|\s*1\s*\|/', $r['sortie']))->toBe(1);
 });

@@ -94,7 +94,11 @@ class CrmPresseVerifierSites extends Command
 
     private string $workspaceId = '';
 
-    /** Hôte → [nombre de fiches dont c'est le site, une de ces fiches]. @var array<string, array{0: int, 1: int}> */
+    /**
+     * Hôte → [nombre de fiches dont c'est le site, une de ces fiches].
+     *
+     * @var array<string, array{0: int, 1: int}>
+     */
     private array $hotes = [];
 
     /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}}> */

@@ -202,7 +202,7 @@ describe('DashboardPage — rendu', () => {
       '/coverage',
     );
     // Vouvoiement, sans jargon.
-    expect(document.body.textContent).not.toMatch(/scrape|\/coverage|Lance|Choisis/);
+    expect(document.body.textContent).not.toMatch(/scrape|\/coverage|\bLance\b|\bChoisis\b/);
   });
 
   /**
@@ -255,6 +255,7 @@ describe('DashboardPage — rendu', () => {
     });
     expect(screen.getByText('Top 5 départements')).toBeVisible();
     // P0-3 — la carte montre l'erreur, pas « Aucun département couvert ».
+    await screen.findByText('Le serveur est en panne');
     const carte = bloc('Top 5 départements', '[role="alert"]');
     expect(within(carte).getByText('Le serveur est en panne')).toBeVisible();
     expect(screen.queryByText('Aucun département couvert')).not.toBeInTheDocument();

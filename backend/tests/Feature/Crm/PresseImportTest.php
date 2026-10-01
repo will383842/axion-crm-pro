@@ -448,3 +448,19 @@ test('🔴 A09 — --provenance-seulement : ne pose QUE la provenance « liste p
         ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
         ->and($instantane())->toBe($avant);
 });
+
+test('🔴 A09 — --provenance-seulement : une ancre qui désigne une fiche À LA CORBEILLE rejette la ligne, sans repli sur le rapprochement', function () {
+    piImporter([piLigne()]);
+    $fiche = (int) DB::table('companies')->where('foreign_id', 'presse:zz:quotidien-1')->value('id');
+    DB::statement("UPDATE companies SET metadata = metadata - 'emails_liste_presse', deleted_at = now() WHERE id = ?", [$fiche]);
+    $volumes = piVolumes();
+
+    $r = piImporter([piLigne()], ['--provenance-seulement' => true]);
+
+    $meta = json_decode((string) DB::table('companies')->where('id', $fiche)->value('metadata'), true);
+    expect($r['code'])->toBe(0)
+        ->and(piCompteur($r['sortie'], 'rejetees'))->toBe(1)
+        ->and(piCompteur($r['sortie'], 'provenances_liste_retenues'))->toBe(0)
+        ->and($meta['emails_liste_presse'] ?? null)->toBeNull()
+        ->and(piVolumes())->toBe($volumes);
+});

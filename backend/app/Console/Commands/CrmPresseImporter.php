@@ -569,7 +569,13 @@ class CrmPresseImporter extends Command
      */
     private function provenanceSeulement(array $l): array
     {
-        $fiche = $this->parAncre($l)->value('id') ?? $this->rapprocher($l)?->id;
+        // Comme l'import ordinaire : une ancre qui désigne une fiche À LA
+        // CORBEILLE rejette la ligne — jamais de repli sur le rapprochement.
+        $parAncre = $this->parAncre($l, corbeilleComprise: true)->first(['id', 'deleted_at']);
+        if ($parAncre !== null && $parAncre->deleted_at !== null) {
+            throw new InvalidArgumentException('fiche_a_la_corbeille');
+        }
+        $fiche = $parAncre?->id ?? $this->rapprocher($l)?->id;
         if ($fiche === null) {
             throw new InvalidArgumentException('fiche_non_importee');
         }

@@ -221,3 +221,45 @@ test('une requête SANS session reçoit un refus explicite, jamais une 500', fun
         expect($reponse->json('message'))->toContain("jeton d'API");
     }
 });
+
+/**
+ * Audit UX du 02/10 (P0-6) — L'ÉCRAN AFFICHAIT `auth.failed`.
+ *
+ * Le dépôt n'avait AUCUN dossier `lang/` : avec `app.locale = fr` et
+ * `fallback_locale = fr`, Laravel ne trouvait aucune traduction et renvoyait la
+ * CLÉ brute, que le front montrait telle quelle. Ces gardes rougissent si le
+ * fichier `lang/fr/auth.php` disparaît ou si la locale cesse d'être le français.
+ */
+test('un mot de passe faux renvoie un message FRANÇAIS, jamais la clé brute auth.failed', function () {
+    $user = makeUser();
+    $reponse = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'WrongPassword999!',
+    ])->assertStatus(422);
+
+    $message = (string) $reponse->json('errors.email.0');
+    expect($message)->not->toBe('auth.failed');
+    expect($message)->toBe('Adresse e-mail ou mot de passe incorrect.');
+});
+
+test('les clés de connexion utilisées par le code sont toutes traduites en français', function () {
+    expect(app()->getLocale())->toBe('fr');
+    foreach (['auth.failed', 'auth.throttle', 'auth.locked', 'auth.password'] as $cle) {
+        expect(__($cle))->not->toBe($cle);
+    }
+    expect(__('auth.throttle', ['seconds' => 42]))->toContain('42 secondes');
+});
+
+/**
+ * Audit UX du 02/10 (P0-2) — l'en-tête affichait « Mon workspace » faute de
+ * connaître le nom de l'espace : `/auth/me` le renvoie désormais.
+ */
+test('GET /auth/me renvoie le NOM de l espace courant', function () {
+    $user = makeUser();
+
+    $this->actingAs($user)
+        ->getJson('/api/v1/auth/me')
+        ->assertOk()
+        ->assertJsonPath('workspace.name', 'Test WS')
+        ->assertJsonPath('workspace.id', $user->current_workspace_id);
+});

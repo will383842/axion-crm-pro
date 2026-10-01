@@ -64,10 +64,12 @@ declare(strict_types=1);
  * l'entrée `larastan.noEnvCallsOutsideOfConfig` qui gelait cette recopie
  * disparaît avec elle), puis le 2026-09-28 (190/208 → 187/204 — chantier
  * « référentiels » : les trois tables recopiées d'`AutoClassifierService`
- * disparaissent avec leurs trois entrées). Ne peuvent que DÉCROÎTRE.
+ * disparaissent avec leurs trois entrées), puis le 2026-10-01 (187/204 →
+ * 186/201 — audience presse : les membres sont calculés par
+ * `AudienceBuilderService::lignesMembres`, typée). Ne peuvent que DÉCROÎTRE.
  */
-const BASELINE_MAX_ENTREES = 187;
-const BASELINE_MAX_ERREURS = 204;
+const BASELINE_MAX_ENTREES = 186;
+const BASELINE_MAX_ERREURS = 201;
 
 /**
  * Chemins sur lesquels aucune entrée de baseline n'est tolérée.

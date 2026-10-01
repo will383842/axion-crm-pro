@@ -253,6 +253,8 @@ test('verdict media possible dans les DEUX sens — relation, nature, protection
         ->and(pcmSlugs($media))->toContain('media-possible:semble-media')
         ->and(pcmSlugs($media))->not->toContain(MediaIncertain::ETIQUETTE)
         ->and(pcmSlugs($agence))->toContain('media-possible:semble-pas-media')
+        // v3 : un non-média n'a pas de ligne éditoriale — aucun sujet, aucun public.
+        ->and(array_values(array_filter(pcmSlugs($agence), static fn (string $t): bool => str_starts_with($t, 'media-sujet:') || str_starts_with($t, 'media-public:') || str_starts_with($t, 'media-format:'))))->toBe([])
         ->and(pcmCompteur($r['sortie'], 'verdict:semble-media'))->toBe(1);
     $apres = DB::table('companies')->whereIn('id', [$media, $agence])->orderBy('id')
         ->get(['id', 'relation_type', 'entity_nature', 'relation_saisie_manuelle_at'])->toArray();

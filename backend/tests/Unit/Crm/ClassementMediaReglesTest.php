@@ -189,3 +189,63 @@ test('toute valeur du classement a sa famille gouvernee et sa categorie', functi
         ->and(array_diff(array_merge(array_keys(ClassementMedia::PUBLICS_MOTS), ['inconnu']), array_keys(Taxonomy::MEDIA_PUBLICS)))->toBe([])
         ->and(array_diff(array_merge(array_keys(ClassementMedia::FORMATS_MOTS), ['inconnu']), array_keys(Taxonomy::MEDIA_FORMATS)))->toBe([]);
 });
+
+// ── Règles v3 (échantillon de production du 2026-10-01) ────────────────────
+
+test('v3 — generaliste : regional + au moins trois autres themes → regional / grand public seulement, public grand-public', function () {
+    $c = cmrClasser([
+        'nom' => 'ZZ LE DAUPHINE FICTIF',
+        'menu' => 'Économie . Entreprises . Emploi . Management . Ressources humaines . Numérique . Intelligence artificielle . Sport . Météo . Faits divers',
+        'texte' => 'Les dirigeants et décideurs.',
+    ]);
+
+    expect($c['themes'])->toEqualCanonicalizing(['regional', 'grand-public'])
+        ->and($c['publics'])->toBe(['grand-public']);
+
+    // Un thème présent dans le NOM ou le TITRE reste.
+    $titre = cmrClasser([
+        'nom' => 'ZZ LE DAUPHINE FICTIF',
+        'titre' => 'ZZ Dauphiné — économie',
+        'menu' => 'Économie . Entreprises . Emploi . Management . Ressources humaines . Numérique . Intelligence artificielle . Sport . Météo',
+    ]);
+    expect($titre['themes'])->toEqualCanonicalizing(['regional', 'grand-public', 'economie-entreprise'])
+        ->and($titre['publics'])->toBe(['grand-public']);
+});
+
+test('v3 — les deux mots distincts viennent HORS du corps de page : un public lu dans le seul corps n est pas pose', function () {
+    $c = cmrClasser(['titre' => 'ZZ Revue fictive', 'menu' => 'Économie . Entreprises', 'texte' => 'Pour les dirigeants, décideurs et chefs d entreprise.']);
+
+    expect($c['themes'])->toBe(['economie-entreprise'])
+        ->and($c['publics'])->not->toContain('dirigeants');
+    expect(ClassementMedia::analyse(['texte' => ClassementMedia::normaliser('économie bourse')], ClassementMedia::THEMES_MOTS['economie-entreprise'])['mots'])->toBe(0);
+});
+
+test('v3 — ia-tech exige un mot specifique : impression numerique ou informatique ne suffisent pas', function () {
+    expect(cmrClasser(['nom' => 'ZZ IMAG IMPRESSION NUMERIQUE'])['themes'])->toBe(['inconnu'])
+        ->and(cmrClasser(['nom' => 'ZZ GROUPEMENT DE COMMUNICATION INFORMATIQUE'])['themes'])->toBe(['inconnu'])
+        ->and(cmrClasser(['titre' => 'ZZ Le numérique'])['themes'])->toBe(['inconnu'])
+        ->and(cmrClasser(['nom' => 'ZZ IA MOTIVATEUR'])['themes'])->toBe(['ia-tech'])
+        ->and(cmrClasser(['titre' => 'ZZ Le magazine de l intelligence artificielle'])['themes'])->toContain('ia-tech')
+        // Deux mots tech hors corps : retenu.
+        ->and(cmrClasser(['menu' => 'Numérique . Cloud . Data'])['themes'])->toBe(['ia-tech']);
+});
+
+test('v3 — format TV seulement si TOUTES les lignes media de la fiche sont de la television', function () {
+    expect(cmrClasser(['nom' => 'ZZ High-Tech, le magazine geek'], ['tv_emission'])['format'])->toBe('tech')
+        ->and(cmrClasser(['nom' => 'ZZ High-Tech, le magazine geek'], ['presse_mensuel', 'tv_emission'])['format'])->toBeNull()
+        ->and(cmrClasser(['nom' => 'ZZ High-Tech, le magazine geek'], [])['format'])->toBeNull();
+});
+
+test('v3 — media possible : AUCUN theme ni public tant que le verdict n est pas semble-media', function () {
+    $pas = cmrClasser(['nom' => 'ZZ IA CONSEIL', 'titre' => 'ZZ IA Conseil — agence web', 'menu' => 'Nos services . Devis . Dirigeants . Professionnels'], ['portail_web'], true);
+    $flou = cmrClasser(['titre' => 'ZZ', 'menu' => 'Économie . Entreprises'], ['portail_web'], true);
+    $media = cmrClasser(['nom' => 'ZZ IA CONSEIL', 'menu' => 'À la une . Abonnez-vous . Rubriques', 'texte' => 'La rédaction.'], ['portail_web'], true);
+
+    expect($pas['verdict'])->toBe('semble-pas-media')
+        ->and([$pas['themes'], $pas['secteurs'], $pas['publics'], $pas['format']])->toBe([[], [], [], null])
+        ->and($flou['verdict'])->toBe('a-verifier')
+        ->and([$flou['themes'], $flou['publics']])->toBe([[], []]);
+    // Un média possible qui SEMBLE un média garde sa ligne éditoriale.
+    expect($media['verdict'])->toBe('semble-media')
+        ->and($media['themes'])->toContain('ia-tech');
+});

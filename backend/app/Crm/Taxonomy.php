@@ -107,6 +107,61 @@ final class Taxonomy
     ];
 
     /**
+     * CLASSEMENT DES MÉDIAS (chantier F, 2026-10-01) — thème lu sur la page
+     * d'accueil du média (ou, sans site, dans son nom) par
+     * `App\Crm\Presse\ClassementMedia` : `media-sujet:<valeur>`, plusieurs
+     * possibles. `inconnu` : aucun signal suffisant — on n'invente rien.
+     *
+     * Namespace DISTINCT de `media-theme:` (relecture A09 de #270) : celui-ci
+     * reste le thème éditorial DONNÉ PAR LA SOURCE (`EtiquettesMedia`, slug
+     * libre) ; les deux ne peuvent plus se confondre sous un même slug.
+     *
+     * Le secteur couvert par une presse professionnelle s'ajoute en
+     * `media-sujet:secteur-<clé de SECTEURS>` (`ClassementMedia::SECTEURS`).
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_THEMES_CLASSES = [
+        'ia-tech' => 'IA et technologie',
+        'economie-entreprise' => 'Économie et entreprise',
+        'pme-entrepreneurs' => 'PME et entrepreneurs',
+        'rh-management' => 'RH et management',
+        'metiers-secteurs' => 'Métiers et secteurs (presse professionnelle)',
+        'regional' => 'Régional et local',
+        'grand-public' => 'Grand public',
+        'inconnu' => 'Thème inconnu',
+    ];
+
+    /**
+     * PUBLIC visé par un média — `media-public:<valeur>`, plusieurs possibles
+     * (`ClassementMedia`). `inconnu` : aucun signal suffisant.
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_PUBLICS = [
+        'dirigeants' => 'Dirigeants et décideurs',
+        'pros-secteur' => 'Professionnels d\'un secteur',
+        'grand-public' => 'Grand public',
+        'inconnu' => 'Public inconnu',
+    ];
+
+    /**
+     * FORMAT d'une chaîne ou d'une émission de TÉLÉVISION —
+     * `media-format:<valeur>`, une seule (`ClassementMedia`). `fiction-jeu`
+     * est rangé pour être EXCLU : une fiction ou un jeu n'invite pas d'expert.
+     *
+     * @var array<string, string>
+     */
+    public const MEDIA_FORMATS = [
+        'magazine-eco' => 'Magazine économique',
+        'talk-show' => 'Talk-show, débat',
+        'jt-info' => 'Journal télévisé, information',
+        'tech' => 'Émission tech',
+        'fiction-jeu' => 'Fiction ou jeu (non utile)',
+        'inconnu' => 'Format inconnu',
+    ];
+
+    /**
      * Valeurs de `BUSINESS_RELATION_TYPES` qu'AUCUN événement du canal
      * site → CRM ne peut produire : elles n'existent que par la saisie manuelle
      * en console.
@@ -491,6 +546,13 @@ final class Taxonomy
         // NAF 63.12Z / 58.19Z (`App\Crm\Presse\MediaIncertain`) — dérivée,
         // posée et retirée par la synchro automatique ; à vérifier (chantier F).
         'media-possible' => 'custom',
+        // Classement des médias (chantier F, 2026-10-01) : sujets, public visé
+        // et format TV, DÉRIVÉS du classement gardé dans
+        // `companies.metadata.classement_media` (`App\Crm\Presse\ClassementMedia`),
+        // posés et retirés par la même synchro automatique.
+        'media-sujet' => 'custom',
+        'media-public' => 'custom',
+        'media-format' => 'custom',
     ];
 
     /**

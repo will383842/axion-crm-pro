@@ -70,6 +70,20 @@ class SsrfGuard
         '198.18.0.0/15',
         '224.0.0.0/4',
         '240.0.0.0/4',
+        // IPv6 (relecture A09 de #270) : ces plages n'étaient PAS couvertes —
+        // `ipInDenyCidr` sautait toute plage de longueur différente de l'IP, et
+        // un enregistrement AAAA `::1`, `fd00::1` ou `fe80::1` passait la garde.
+        '::/96',          // non spécifiée, boucle locale ::1, IPv4-compatible (obsolète)
+        '64:ff9b::/96',   // NAT64 : encapsule une IPv4 quelconque
+        '64:ff9b:1::/48', // NAT64 local
+        '100::/64',       // rejet (discard)
+        '2001::/32',      // Teredo : encapsule une IPv4
+        '2001:db8::/32',  // documentation
+        '2002::/16',      // 6to4 : encapsule une IPv4
+        'fc00::/7',       // adresses uniques locales (ULA)
+        'fe80::/10',      // lien local
+        'fec0::/10',      // site local (obsolète)
+        'ff00::/8',       // multicast
     ];
 
     public static function enabled(): bool
@@ -203,24 +217,55 @@ class SsrfGuard
      */
     public static function check(string $url): array
     {
+        $v = self::verifier($url);
+
+        return ['ok' => $v['ok'], 'reason' => $v['reason']];
+    }
+
+    /**
+     * Comme `check()`, et rend en plus l'IP VÉRIFIÉE à laquelle se connecter
+     * (null : adresse littérale, hôte non résolu toléré sur le banc, ou garde
+     * désactivée), pour l'ÉPINGLER sur la connexion (`optionsEpinglage`) : sans
+     * épinglage, curl résout le nom une seconde fois et un DNS hostile peut
+     * répondre autre chose entre la vérification et la connexion (rebinding).
+     *
+     * `$portsPermis` non vide : tout autre port (explicite ou implicite) est
+     * refusé — la lecture de sites ne vise que 80 et 443.
+     *
+     * @param  list<int>  $portsPermis
+     * @return array{ok: bool, reason: ?string, ip: ?string}
+     */
+    public static function verifier(string $url, array $portsPermis = []): array
+    {
         if (! self::enabled()) {
-            return ['ok' => true, 'reason' => null];
+            return ['ok' => true, 'reason' => null, 'ip' => null];
         }
 
         $parts = parse_url($url);
         if ($parts === false || empty($parts['host']) || ! in_array($parts['scheme'] ?? '', ['http', 'https'], true)) {
-            return ['ok' => false, 'reason' => 'invalid_url'];
+            return ['ok' => false, 'reason' => 'invalid_url', 'ip' => null];
         }
 
-        $host = strtolower($parts['host']);
+        if ($portsPermis !== []) {
+            $port = $parts['port'] ?? ($parts['scheme'] === 'https' ? 443 : 80);
+            if (! in_array($port, $portsPermis, true)) {
+                return ['ok' => false, 'reason' => "deny_port:{$port}", 'ip' => null];
+            }
+        }
+
+        // `http://[::1]/` : parse_url rend l'hôte AVEC ses crochets, que ni la
+        // liste ni filter_var ne reconnaissaient (l'hôte partait alors en
+        // résolution DNS, et le banc tolère un hôte qui ne résout pas).
+        $host = strtolower(trim($parts['host'], '[]'));
 
         if (in_array($host, self::DENY_HOSTS, true)) {
-            return ['ok' => false, 'reason' => "deny_host:{$host}"];
+            return ['ok' => false, 'reason' => "deny_host:{$host}", 'ip' => null];
         }
 
-        // Résoudre toutes les IPs A + AAAA et vérifier chacune
+        // Résoudre toutes les IPs A + AAAA et vérifier CHACUNE
+        $litterale = filter_var($host, FILTER_VALIDATE_IP) !== false;
         $ips = [];
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
+        if ($litterale) {
             $ips[] = $host;
         } else {
             $a = @dns_get_record($host, DNS_A);
@@ -241,17 +286,40 @@ class SsrfGuard
             // Hôte qui ne résout pas : fail-closed en production, toléré sur le
             // banc de test (cf. requireDnsResolution() et sa mesure).
             return self::requireDnsResolution()
-                ? ['ok' => false, 'reason' => 'dns_no_records']
-                : ['ok' => true, 'reason' => null];
+                ? ['ok' => false, 'reason' => 'dns_no_records', 'ip' => null]
+                : ['ok' => true, 'reason' => null, 'ip' => null];
         }
 
         foreach ($ips as $ip) {
             if (self::ipInDenyCidr($ip)) {
-                return ['ok' => false, 'reason' => "deny_cidr:{$ip}"];
+                return ['ok' => false, 'reason' => "deny_cidr:{$ip}", 'ip' => null];
             }
         }
 
-        return ['ok' => true, 'reason' => null];
+        return ['ok' => true, 'reason' => null, 'ip' => $litterale ? null : $ips[0]];
+    }
+
+    /**
+     * Options de requête qui ÉPINGLENT la connexion sur l'IP vérifiée par
+     * `verifier()` (CURLOPT_RESOLVE) : curl ne résout plus le nom lui-même.
+     * Vide si rien n'est à épingler.
+     *
+     * @return array<string, mixed>
+     */
+    public static function optionsEpinglage(string $url, ?string $ip): array
+    {
+        $hote = parse_url($url, PHP_URL_HOST);
+        if ($ip === null || ! is_string($hote) || $hote === '' || ! defined('CURLOPT_RESOLVE')) {
+            return [];
+        }
+        $schema = parse_url($url, PHP_URL_SCHEME);
+        $port = parse_url($url, PHP_URL_PORT);
+        if (! is_int($port)) {
+            $port = $schema === 'https' ? 443 : 80;
+        }
+        $adresse = str_contains($ip, ':') ? '[' . $ip . ']' : $ip;
+
+        return ['curl' => [CURLOPT_RESOLVE => [strtolower($hote) . ':' . $port . ':' . $adresse]]];
     }
 
     public static function ensure(string $url): void
@@ -267,6 +335,14 @@ class SsrfGuard
         $packedIp = @inet_pton($ip);
         if ($packedIp === false) {
             return true; // fail-closed
+        }
+        // IPv6 « mappée IPv4 » (::ffff:a.b.c.d) : c'est l'IPv4 qui est jointe,
+        // on lui applique donc les règles IPv4 (`::ffff:169.254.169.254` est
+        // le service de métadonnées).
+        if (strlen($packedIp) === 16 && substr($packedIp, 0, 12) === str_repeat(chr(0), 10) . chr(255) . chr(255)) {
+            $ipv4 = inet_ntop(substr($packedIp, 12));
+
+            return $ipv4 === false || self::ipInDenyCidr($ipv4);
         }
 
         foreach (self::DENY_CIDR as $cidr) {

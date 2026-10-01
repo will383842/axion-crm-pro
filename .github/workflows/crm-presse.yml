@@ -14,6 +14,13 @@ name: CRM — Presse harmonisée (prod, à la main)
 # Rien n'est jamais supprimé (ordre permanent de Will) : la commande est
 # additive, idempotente, et reprend là où elle s'est arrêtée si on la relance.
 #
+# Classement des médias (chantier F, 2026-10-01) : `crm:presse:classer-medias`
+# lit la page d'accueil de chaque média (robots.txt respecté, concurrence 4,
+# 1 s par domaine) et pose thèmes / public / format TV / verdict « média
+# possible ». Ordre conseillé : `classer-a-blanc` sur 200 (limite par défaut),
+# puis `classer` sur un échantillon (limite 500), puis `classer` sans limite
+# (limite 0) — reprenable : une fiche déjà classée est sautée.
+#
 # L'import d'une liste de diffusion (`crm:presse:importer`) ne passe PAS par
 # ce workflow : son fichier vit hors du dépôt, sur le serveur.
 
@@ -27,6 +34,12 @@ on:
         options:
           - harmoniser-a-blanc
           - harmoniser
+          - classer-a-blanc
+          - classer
+      limite:
+        description: "Classement : nombre de fiches au plus (0 = toutes)"
+        type: string
+        default: "200"
 
 permissions:
   contents: read
@@ -49,11 +62,17 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           MODE: ${{ inputs.mode }}
+          LIMITE: ${{ inputs.limite }}
         run: |
           set -euo pipefail
+          if ! [[ "$LIMITE" =~ ^[0-9]+$ ]]; then echo "::error::limite invalide"; exit 1; fi
+          OPT_LIMITE=""
+          if [ "$LIMITE" != "0" ]; then OPT_LIMITE="--limite=$LIMITE"; fi
           case "$MODE" in
             harmoniser-a-blanc) CMD="crm:presse:harmoniser --dry-run" ;;
             harmoniser)         CMD="crm:presse:harmoniser" ;;
+            classer-a-blanc)    CMD="crm:presse:classer-medias --dry-run $OPT_LIMITE" ;;
+            classer)            CMD="crm:presse:classer-medias --appliquer $OPT_LIMITE" ;;
             *) echo "::error::mode inconnu : $MODE"; exit 1 ;;
           esac
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF

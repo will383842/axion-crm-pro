@@ -2,8 +2,12 @@
 
 namespace App\Crm\Doublons;
 
+use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\Presse\ClassementMedia;
+use App\Crm\Presse\DoublonsPresse;
+use App\Crm\Presse\SiteMedia;
 use App\Services\Audit\AuditHashChain;
 use App\Support\TotalListe;
 use Illuminate\Database\QueryException;
@@ -27,7 +31,9 @@ use stdClass;
  *     corbeille, une paire déjà traitée, deux fédérations, un lien de réseau
  *     entre les deux, des homonymes aux coordonnées contradictoires, et, en
  *     mode automatique, une preuve qui n'est plus certaine sur les données du
- *     moment, ou qui ne désigne plus UNE seule fiche (`preuve_ambigue`) ;
+ *     moment, ou qui ne désigne plus UNE seule fiche (`preuve_ambigue`) ; une
+ *     fiche de presse ne passe en automatique que par le motif
+ *     `presse_meme_titre`, re-jugé ici (`DoublonsPresse::paireStricte`) ;
  *  3. RATTACHE à la fiche gardée tout ce qui pointe vers la fiche absorbée —
  *     `REFERENCES` (clés étrangères) et `REFERENCES_SANS_CLE` (références
  *     polymorphes) ; la garde « GARDE DE COUVERTURE » de `DoublonsFusionTest`
@@ -37,7 +43,9 @@ use stdClass;
  *     démarches, historique métier (`business_events`), affaires, audiences,
  *     collectes, médias, journalistes, praticiens, personnes de la lettre ;
  *  4. recopie sur la fiche gardée les coordonnées qu'elle n'a pas (adresse
- *     générique, téléphone, site, LinkedIn, date d'information art. 14) ;
+ *     générique, téléphone, site, LinkedIn, date d'information art. 14) et
+ *     les métadonnées de la presse (`CLES_METADONNEES` : site vérifié,
+ *     classement, adresses de liste presse) ;
  *  5. met la fiche absorbée à la CORBEILLE (jamais `DELETE`) ;
  *  6. écrit le journal (`fusions_fiches`) : chaque identifiant déplacé, chaque
  *     colonne recopiée ; l'EMPREINTE SALÉE de chaque valeur recopiée est posée
@@ -120,6 +128,20 @@ final class FusionFiches
 
     /** Coordonnées de la fiche recopiées sur la fiche gardée QUAND ELLE NE LES A PAS. */
     public const CHAMPS_FICHE = ['email_generic', 'phone', 'website', 'linkedin_url', 'first_info_at'];
+
+    /**
+     * Métadonnées de la presse (`companies.metadata`) reportées sur la fiche
+     * gardée (2026-10-01, doublons de la presse) :
+     *  - `site_media` (site vérifié) et `classement_media` (classement par la
+     *    page d'accueil) : recopiés ENTIERS quand la fiche gardée n'en a pas ;
+     *  - `emails_liste_presse` (provenance « liste presse » des adresses de
+     *    rédaction) : les adresses que la fiche gardée n'a pas y sont ajoutées.
+     * Le journal ne garde AUCUNE valeur : la clé recopiée, ou les RANGS des
+     * adresses ajoutées dans la liste de la fiche absorbée (qui reste
+     * inchangée à la corbeille). L'annulation relit la fiche absorbée : elle
+     * retire une valeur recopiée seulement si elle n'a pas bougé depuis.
+     */
+    public const CLES_METADONNEES = [SiteMedia::CLE, ClassementMedia::CLE, AdressePresseFiable::CLE_EMAILS_LISTE];
 
     /** Coordonnées d'une personne recopiées sur son homonyme de la fiche gardée. */
     private const CHAMPS_PERSONNE = ['email', 'email_status', 'phone', 'linkedin_url'];
@@ -408,21 +430,32 @@ final class FusionFiches
         if ($flagId !== null) {
             $this->verrouillerPaire($ws, $flagId, $gardeId, $absorbeeId);
         }
-        // Harmonisation de la presse (relecture de #264) : une fiche de
-        // presse n'est JAMAIS fusionnée sans un humain.
-        if ($mode === self::MODE_AUTO && ($this->estFichePresse($ws, $gardeId) || $this->estFichePresse($ws, $absorbeeId))) {
-            throw new RefusFusion('presse_verification_humaine');
-        }
-        if ($mode === self::MODE_AUTO && ! Rapprochement::preuveCertaine(
-            $motif,
-            self::pourPreuve($garde),
-            self::pourPreuve($absorbee),
-            $this->vientDUneCollecte(self::texte($absorbee->discovery_source)),
-        )) {
-            throw new RefusFusion('preuve_insuffisante');
-        }
-        if ($mode === self::MODE_AUTO && $this->autreCandidatCertain($ws, $motif, $gardeId, $absorbee)) {
-            throw new RefusFusion('preuve_ambigue');
+        if ($mode === self::MODE_AUTO && $motif === Rapprochement::PRESSE_MEME_TITRE) {
+            // Doublons de la presse (`crm:presse:doublons`) : le SEUL chemin
+            // automatique d'une fiche de presse — le cas strict, RE-JUGÉ ici
+            // sur les données du moment, les deux fiches verrouillées (aucun
+            // SIREN, même type, départements et adresses compatibles, aucune
+            // relation saisie à la main).
+            if (! DoublonsPresse::paireStricte($ws, $gardeId, $absorbeeId)) {
+                throw new RefusFusion('presse_pas_stricte');
+            }
+        } else {
+            // Harmonisation de la presse (relecture de #264) : une fiche de
+            // presse n'est JAMAIS fusionnée sans un humain, hors cas strict.
+            if ($mode === self::MODE_AUTO && ($this->estFichePresse($ws, $gardeId) || $this->estFichePresse($ws, $absorbeeId))) {
+                throw new RefusFusion('presse_verification_humaine');
+            }
+            if ($mode === self::MODE_AUTO && ! Rapprochement::preuveCertaine(
+                $motif,
+                self::pourPreuve($garde),
+                self::pourPreuve($absorbee),
+                $this->vientDUneCollecte(self::texte($absorbee->discovery_source)),
+            )) {
+                throw new RefusFusion('preuve_insuffisante');
+            }
+            if ($mode === self::MODE_AUTO && $this->autreCandidatCertain($ws, $motif, $gardeId, $absorbee)) {
+                throw new RefusFusion('preuve_ambigue');
+            }
         }
         $this->refuserLiensDeReseau($ws, $gardeId, $absorbeeId);
         $jumeaux = $this->jumeaux($ws, $gardeId, $absorbeeId);
@@ -561,6 +594,9 @@ final class FusionFiches
             }
         }
 
+        // ── Reporter les métadonnées de la presse ───────────────────────────
+        $metadonnees = $this->reporterMetadonnees($ws, $gardeId, $absorbeeId, $garde->metadata, $absorbee->metadata);
+
         // ── La corbeille, jamais plus loin ──────────────────────────────────
         $corbeille = DB::selectOne(
             'UPDATE companies SET deleted_at = now() WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL RETURNING deleted_at',
@@ -585,7 +621,7 @@ final class FusionFiches
                 'deplacements' => $deplacements,
                 'champs' => $champs,
                 'jumeaux' => $jumeauxJournal,
-            ], JSON_THROW_ON_ERROR),
+            ] + ($metadonnees === [] ? [] : ['metadonnees' => $metadonnees]), JSON_THROW_ON_ERROR),
             'absorbee_supprimee_le' => $corbeille->deleted_at,
             'fait_par' => $userId,
             'operateur' => $operateur,
@@ -604,6 +640,7 @@ final class FusionFiches
         $this->auditer($ws, $userId, $operateur, 'FUSION_FICHES', [
             'fusion' => $fusionId, 'garde' => $gardeId, 'absorbee' => $absorbeeId, 'motif' => $motif, 'mode' => $mode,
             'deplacements' => $deplacements, 'champs' => array_keys($champs), 'jumeaux' => count($jumeauxJournal),
+            'metadonnees' => array_keys($metadonnees),
         ], "fusion {$fusionId} : fiche {$absorbeeId} dans {$gardeId}");
 
         return $fusionId;
@@ -613,7 +650,7 @@ final class FusionFiches
     private function verrouillerFiches(string $ws, int $a, int $b): array
     {
         $cols = implode(', ', array_merge(
-            ['id', 'siren', 'country_code', 'foreign_id', 'denomination_normalized', 'postcode', 'website', 'discovery_source', 'deleted_at'],
+            ['id', 'siren', 'country_code', 'foreign_id', 'denomination_normalized', 'postcode', 'website', 'discovery_source', 'deleted_at', 'metadata'],
             array_diff(self::CHAMPS_FICHE, ['website']),
         ));
         $lignes = DB::select(
@@ -939,6 +976,15 @@ final class FusionFiches
             }
         }
 
+        $this->defaireMetadonnees(
+            $ws,
+            $gardeId,
+            $absorbeeId,
+            $absorbee->metadata,
+            is_array($journal['metadonnees'] ?? null) ? $journal['metadonnees'] : [],
+            $bilan,
+        );
+
         if ($fusion->flag_id !== null) {
             // La paire revient dans la file — et n'en repartira jamais seule :
             // la fusion automatique écarte toute paire dont une fusion a été
@@ -956,6 +1002,143 @@ final class FusionFiches
         $this->auditer($ws, null, $operateur, 'FUSION_FICHES_ANNULEE', ['fusion' => $fusionId, 'bilan' => $bilan], "annulation de la fusion {$fusionId}");
 
         return $bilan;
+    }
+
+    // ── Les métadonnées de la presse ────────────────────────────────────────
+
+    /**
+     * Reporte sur la fiche gardée les métadonnées de la presse de la fiche
+     * absorbée (`CLES_METADONNEES`). Rend le journal : la clé recopiée
+     * (`recopiee`), ou les rangs des adresses ajoutées — jamais une valeur.
+     *
+     * @return array<string, mixed>
+     */
+    private function reporterMetadonnees(string $ws, int $gardeId, int $absorbeeId, mixed $metaGarde, mixed $metaAbsorbee): array
+    {
+        $g = self::objetJson($metaGarde);
+        $a = self::objetJson($metaAbsorbee);
+        // Une métadonnée qui n'est pas un objet JSON : on n'y touche pas.
+        if ($g === null || $a === null || $a === []) {
+            return [];
+        }
+        $journal = [];
+        foreach ([SiteMedia::CLE, ClassementMedia::CLE] as $cle) {
+            if (array_key_exists($cle, $g) || ($a[$cle] ?? null) === null) {
+                continue;
+            }
+            // Recopiée par la base, octet pour octet (un objet vide reste un objet).
+            $n = DB::update(
+                "UPDATE companies g SET metadata = jsonb_set(COALESCE(g.metadata, '{}'::jsonb), ARRAY[?]::text[], a.metadata -> ?)
+                 FROM companies a
+                 WHERE g.workspace_id = ? AND g.id = ? AND a.workspace_id = ? AND a.id = ?
+                   AND jsonb_typeof(COALESCE(g.metadata, '{}'::jsonb)) = 'object'
+                   AND NOT jsonb_exists(COALESCE(g.metadata, '{}'::jsonb), ?)",
+                [$cle, $cle, $ws, $gardeId, $ws, $absorbeeId, $cle],
+            );
+            if ($n === 1) {
+                $journal[$cle] = 'recopiee';
+            }
+        }
+
+        $cle = AdressePresseFiable::CLE_EMAILS_LISTE;
+        $listeA = is_array($a[$cle] ?? null) ? array_values($a[$cle]) : [];
+        $listeG = is_array($g[$cle] ?? null) ? array_values($g[$cle]) : [];
+        $rangs = [];
+        foreach ($listeA as $rang => $e) {
+            if (is_string($e) && $e !== '' && ! in_array($e, $listeG, true)) {
+                $listeG[] = $e;
+                $rangs[] = $rang;
+            }
+        }
+        if ($rangs !== []) {
+            $n = DB::update(
+                "UPDATE companies SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), ARRAY[?]::text[], ?::jsonb)
+                 WHERE workspace_id = ? AND id = ? AND jsonb_typeof(COALESCE(metadata, '{}'::jsonb)) = 'object'",
+                [$cle, json_encode($listeG, JSON_THROW_ON_ERROR), $ws, $gardeId],
+            );
+            if ($n === 1) {
+                $journal[$cle] = ['rangs' => $rangs, 'cle_creee' => ! array_key_exists($cle, $g)];
+            }
+        }
+
+        return $journal;
+    }
+
+    /**
+     * Retire de la fiche gardée ce que la fusion y a reporté — seulement si
+     * la valeur n'a pas bougé depuis (comparée à celle de la fiche absorbée,
+     * restée telle quelle à la corbeille).
+     *
+     * @param  array<string, mixed>  $journal
+     * @param  array<string, int>  $bilan
+     */
+    private function defaireMetadonnees(string $ws, int $gardeId, int $absorbeeId, mixed $metaAbsorbee, array $journal, array &$bilan): void
+    {
+        foreach ([SiteMedia::CLE, ClassementMedia::CLE] as $cle) {
+            if (($journal[$cle] ?? null) !== 'recopiee') {
+                continue;
+            }
+            $n = DB::update(
+                'UPDATE companies g SET metadata = g.metadata - ?
+                 FROM companies a
+                 WHERE g.workspace_id = ? AND g.id = ? AND a.workspace_id = ? AND a.id = ?
+                   AND (g.metadata -> ?) = (a.metadata -> ?)',
+                [$cle, $ws, $gardeId, $ws, $absorbeeId, $cle, $cle],
+            );
+            $bilan[$n > 0 ? 'champs_remis' : 'champs_modifies_depuis']++;
+        }
+
+        $cle = AdressePresseFiable::CLE_EMAILS_LISTE;
+        $entree = $journal[$cle] ?? null;
+        if (! is_array($entree)) {
+            return;
+        }
+        $a = self::objetJson($metaAbsorbee) ?? [];
+        $listeA = is_array($a[$cle] ?? null) ? array_values($a[$cle]) : [];
+        $actuelle = DB::selectOne('SELECT metadata FROM companies WHERE workspace_id = ? AND id = ?', [$ws, $gardeId]);
+        $g = self::objetJson($actuelle instanceof stdClass ? $actuelle->metadata : null) ?? [];
+        $listeG = is_array($g[$cle] ?? null) ? array_values($g[$cle]) : [];
+        foreach (self::liste($entree['rangs'] ?? []) as $rang) {
+            $e = $listeA[$rang] ?? null;
+            $position = is_string($e) ? array_search($e, $listeG, true) : false;
+            if ($position === false) {
+                $bilan['champs_modifies_depuis']++;
+
+                continue;
+            }
+            array_splice($listeG, (int) $position, 1);
+            $bilan['champs_remis']++;
+        }
+        if ($listeG === [] && ($entree['cle_creee'] ?? false) === true) {
+            DB::update('UPDATE companies SET metadata = metadata - ? WHERE workspace_id = ? AND id = ?', [$cle, $ws, $gardeId]);
+        } else {
+            DB::update(
+                "UPDATE companies SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), ARRAY[?]::text[], ?::jsonb) WHERE workspace_id = ? AND id = ?",
+                [$cle, json_encode($listeG, JSON_THROW_ON_ERROR), $ws, $gardeId],
+            );
+        }
+    }
+
+    /**
+     * Une colonne `metadata` lue en base : un objet JSON (tableau associatif,
+     * vide si NULL), ou null si ce n'en est pas un.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function objetJson(mixed $v): ?array
+    {
+        if ($v === null) {
+            return [];
+        }
+        $d = is_string($v) ? json_decode($v, true) : $v;
+        if ($d instanceof stdClass) {
+            $d = (array) $d;
+        }
+        if (! is_array($d) || ($d !== [] && array_is_list($d))) {
+            return null;
+        }
+
+        return $d;
     }
 
     // ── Outils ──────────────────────────────────────────────────────────────

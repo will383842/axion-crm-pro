@@ -597,9 +597,11 @@ class CrmPresseImporter extends Command
     /**
      * Le titre de cette ligne existe-t-il déjà en base, sans SIREN ? Même nom
      * normalisé, même type, département compatible (égal, ou inconnu d'un
-     * côté). Une seule fiche : on la rejoint. Plusieurs fiches, ou un titre
-     * pas encore harmonisé (sans fiche) : DOUTE — la ligne est rejetée et
-     * comptée, jamais une fiche parallèle.
+     * côté). Une seule fiche : on la rejoint. Plusieurs fiches dont UNE seule
+     * au même département exactement : celle-là. Sinon plusieurs fiches, ou
+     * un titre pas encore harmonisé (sans fiche) : DOUTE — la ligne est
+     * rejetée et comptée, jamais une fiche parallèle (`crm:presse:doublons`
+     * réduit ces doutes en fusionnant les vrais doublons).
      *
      * @param  array<string, mixed>  $l
      */
@@ -611,7 +613,7 @@ class CrmPresseImporter extends Command
             ->when($l['departement'] !== null, static fn ($q) => $q->where(
                 static fn ($d) => $d->whereNull('department_code')->orWhere('department_code', $l['departement']),
             ))
-            ->get(['id', 'company_id']);
+            ->get(['id', 'company_id', 'department_code']);
         if ($candidats->isEmpty()) {
             return null;
         }
@@ -619,6 +621,18 @@ class CrmPresseImporter extends Command
             throw new InvalidArgumentException('titre_existant_non_harmonise');
         }
         $fiches = $candidats->pluck('company_id')->map(static fn ($v): int => (int) $v)->unique()->values();
+        if ($fiches->count() > 1 && $l['departement'] !== null) {
+            // Plusieurs fiches, dont UNE seule porte le titre dans le MÊME
+            // département (l'édition de la ligne) : c'est elle. Les autres
+            // n'ont pas de département sur ce titre — un doute qui ne pèse pas
+            // face à une correspondance exacte (doublons de la presse, 01/10).
+            $exactes = $candidats
+                ->filter(static fn (\stdClass $c): bool => strtoupper(trim((string) $c->department_code)) === $l['departement'])
+                ->pluck('company_id')->map(static fn ($v): int => (int) $v)->unique()->values();
+            if ($exactes->count() === 1) {
+                $fiches = $exactes;
+            }
+        }
         if ($fiches->count() > 1) {
             throw new InvalidArgumentException('rapprochement_ambigu');
         }

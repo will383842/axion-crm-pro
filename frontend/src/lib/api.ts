@@ -49,7 +49,13 @@ api.interceptors.response.use(
     // `err.response` continuent de fonctionner à l'identique.
     const rejet = erreur ?? (error instanceof Error ? error : new Error(String(error)));
 
-    if (status === 401 && !window.location.pathname.startsWith('/login')) {
+    // Les pages d'authentification (`/login`, `/magic-link…`, `/password-reset`)
+    // gèrent elles-mêmes leur 401 : un lien magique expiré doit afficher
+    // « Lien invalide ou expiré », pas renvoyer sans un mot vers /login.
+    const pageAuth = ['/login', '/magic-link', '/password-reset'].some((p) =>
+      window.location.pathname.startsWith(p),
+    );
+    if (status === 401 && !pageAuth) {
       window.location.assign('/login');
       return Promise.reject(rejet);
     }

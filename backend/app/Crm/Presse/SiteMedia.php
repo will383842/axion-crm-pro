@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 /**
  * LE SITE D'UN MÉDIA EST-IL LE SIEN ? — une seule définition (constat en
- * production du 2026-10-01).
+ * production du 2026-10-01 ; durci après la relecture A09 de #273).
  *
  * `companies.website_method` vaut `guess` (≈ 563 000 fiches) ou `guess2`
  * (≈ 261 000) : des sites DEVINÉS depuis le nom, souvent faux (« PARIS LIVE »
@@ -20,52 +20,79 @@ use Illuminate\Support\Str;
  * ── LE MARQUEUR (à réutiliser) ───────────────────────────────────────────
  *
  * `companies.metadata.site_media` = {statut, url, motif?, le, v} — AUCUN
- * texte de la page, aucun nom, aucune adresse :
+ * texte de la page, aucun nom :
  *   - `verifie`          le site existant (media.website, à défaut
  *                        companies.website) porte le nom du média ;
  *   - `trouve-verifie`   un site TROUVÉ (candidat tiré du nom ou d'une source
  *                        ouverte) porte le nom du média ;
- *   - `non-conforme`     le site existant ne porte pas le nom (motif : `nom`,
- *                        `domaine-partage`, `liste-noire`,
- *                        `sans-mot-distinctif`) et rien n'a été trouvé ;
- *   - `injoignable`, `robots-interdit`, `illisible` : le site existant n'a pas
- *                        pu être lu (il n'est PAS vérifié pour autant) ;
+ *   - `a-confirmer`      le nom (un seul mot distinctif) correspond, mais la
+ *                        page n'a aucun indice de média : NON fiable ;
+ *   - `non-conforme`     motif `nom`, `domaine-partage`, `liste-noire`,
+ *                        `sans-mot-distinctif`, `redirection` (arrivée sur un
+ *                        autre domaine) ou `parking` (domaine à vendre) ;
+ *   - `injoignable` (dont toute réponse non 2xx), `robots-interdit`,
+ *     `illisible` : pas lu, donc PAS vérifié ;
  *   - `sans-site`        aucun site, rien trouvé.
  * Un site n'est FIABLE que si `statut` ∈ `STATUTS_VERIFIES` (`verifie`,
- * `trouve-verifie`) : `estVerifie()` / `conditionSql()`. `url` est alors
- * l'URL vérifiée (celle qu'il faut lire), même si `media.website` est faux —
- * on ne l'efface jamais (ordre permanent de Will : marquer, pas supprimer).
+ * `trouve-verifie`) : `estVerifie()` / `conditionSql()` / `urlVerifiee()`.
+ * `url` est alors l'URL vérifiée (celle qu'il faut lire), même si
+ * `media.website` est faux — on ne l'efface jamais (marquer, pas supprimer).
+ *
+ * ── LA PAGE N'EST JUGÉE QUE SI ───────────────────────────────────────────
+ *
+ *   - la réponse est 2xx (une 404 personnalisée qui reprend l'hôte n'est pas
+ *     un site) ;
+ *   - l'URL d'ARRIVÉE, après redirections, est sur le même domaine
+ *     enregistrable que l'adresse essayée (`domaineEnregistrable`) et n'est
+ *     pas un parkeur (`HOTES_PARKING` : sedo, dan.com, afternic, bodis…) ;
+ *   - la page n'est pas une page de PARKING (`estParking` : « domaine à
+ *     vendre », « for sale », « this domain », noms de parkeurs…).
  *
  * ── LA RÈGLE DE CORRESPONDANCE (`correspond()`) ──────────────────────────
  *
  * Mots DISTINCTIFS du nom (`motsDistinctifs`) : minuscules sans accent,
  * ponctuation → espace ; hors `MOTS_VIDES` (le, la, de…) et `MOTS_GENERIQUES`
  * (editions, media, presse, journal, sas, sarl, paris, france, radio, tv…) ;
- * 3 caractères au moins (ou 2 avec un chiffre : « m6 ») ; six au plus.
+ * 3 caractères au moins (ou 2 avec un chiffre : « m6 ») ; six au plus. Une
+ * MARQUE À CHIFFRE garde son bloc : un mot générique suivi d'un nombre
+ * (« France 3 », « France 24 ») donne le mot distinctif `france 3`.
  *
  * IDENTITÉ de la page : <title>, og:site_name, og:title, <h1> (zone
- * `identite` de `LecturePageAccueil::extraire`) — pas la méta description,
- * qui peut citer n'importe quoi. Un mot y est TROUVÉ en mot entier (pluriel
- * en s/x admis). Un mot est aussi trouvé dans l'ADRESSE (étiquette du domaine
- * sans `www.` ni extension, ou chemin de l'URL) : en sous-chaîne s'il a 4
- * lettres au moins, sinon comme début, fin ou segment.
+ * `identite`) — pas la méta description. On en RETIRE d'abord toute forme de
+ * l'hôte essayé et de l'hôte d'arrivée (`sansHote`) : l'hôte exact (avec ou
+ * sans `www.`), l'étiquette à tirets (`le-progres`), l'étiquette accolée d'un
+ * hôte à tirets (`leprogres` pour `le-progres.fr`), et l'hôte points/tirets
+ * changés en espaces (`le progres fr`). Une page qui ne fait que recopier son
+ * adresse (« euronews.fr », « le-progres.fr — domaine à vendre ») ne prouve
+ * donc rien. (L'étiquette d'un seul mot, « Libération » pour liberation.fr,
+ * n'est pas retirée : c'est le nom même du titre.)
+ *
+ * Un mot est TROUVÉ dans la page en mot entier (pluriel s/x admis), ou comme
+ * DÉBUT d'un mot collé (« bfm » dans « BFMTV ») s'il a 3 caractères au moins
+ * ET se lit aussi dans l'adresse. Il est trouvé dans l'ADRESSE (étiquette du
+ * domaine, chemin) en sous-chaîne s'il a 4 caractères au moins, sinon comme
+ * début, fin ou segment.
  *
  *   n = nombre de mots distinctifs, p = mots trouvés dans la PAGE,
  *   t = mots trouvés dans la page OU dans l'adresse.
  *   - n = 0 : jamais conforme (`sans-mot-distinctif`) ;
- *   - p = 0 : jamais conforme — l'adresse seule ne prouve rien (un candidat
- *     tiré du nom contient toujours le nom) ;
- *   - n = 1 : le mot est dans la page ET dans l'adresse ;
+ *   - p = 0 : jamais conforme — l'adresse seule ne prouve rien ;
+ *   - n = 1 : le mot est dans la page ET dans l'adresse ; de plus, la page
+ *     doit porter un INDICE DE MÉDIA (`indiceMedia` : actualité, rédaction,
+ *     abonnement, articles…), sinon `a-confirmer` (« LA MONTAGNE » →
+ *     lamontagne.fr d'une station de ski) ;
  *   - n = 2 : t = 2 ;
  *   - n ≥ 3 : t ≥ ⌈2n/3⌉.
  * Le nom est essayé sous chacune de ses formes (dénomination de la fiche, nom
  * de chaque ligne `media`) : une seule qui passe suffit.
  *
+ * Limites connues (faux NÉGATIFS, sûrs) : « FRANCE INFO », « RADIO FRANCE »
+ * (que des mots génériques, sans chiffre) restent `sans-mot-distinctif` ;
+ * « FRANCE 3 ALSACE » sur …/grand-est est refusé ; « M6 » sur 6play.fr aussi.
+ *
  * DOMAINE PARTAGÉ : une adresse SANS chemin dont l'hôte est le site de plus
  * de `PARTAGE_MAX` fiches est non conforme D'OFFICE (sans lecture), sauf si
- * les mots distinctifs, accolés, se lisent dans l'étiquette du domaine
- * (`leprogres.fr` partagé par les éditions du Progrès). Une adresse avec un
- * chemin (`france.tv/france-5/emission/`) est lue normalement.
+ * les mots distinctifs, accolés, se lisent dans l'étiquette du domaine.
  *
  * LISTE NOIRE (`estGenerique()`) : domaines génériques (paris.fr, france.fr,
  * media.fr…), plateformes et annuaires — jamais le site d'un média.
@@ -81,6 +108,8 @@ final class SiteMedia
 
     public const TROUVE_VERIFIE = 'trouve-verifie';
 
+    public const A_CONFIRMER = 'a-confirmer';
+
     public const NON_CONFORME = 'non-conforme';
 
     public const INJOIGNABLE = 'injoignable';
@@ -95,7 +124,10 @@ final class SiteMedia
     public const STATUTS_VERIFIES = [self::VERIFIE, self::TROUVE_VERIFIE];
 
     /** @var list<string> */
-    public const STATUTS = [self::VERIFIE, self::TROUVE_VERIFIE, self::NON_CONFORME, self::INJOIGNABLE, self::ROBOTS_INTERDIT, self::ILLISIBLE, self::SANS_SITE];
+    public const STATUTS = [
+        self::VERIFIE, self::TROUVE_VERIFIE, self::A_CONFIRMER, self::NON_CONFORME, self::INJOIGNABLE,
+        self::ROBOTS_INTERDIT, self::ILLISIBLE, self::SANS_SITE,
+    ];
 
     public const MOTIF_NOM = 'nom';
 
@@ -104,6 +136,10 @@ final class SiteMedia
     public const MOTIF_LISTE_NOIRE = 'liste-noire';
 
     public const MOTIF_SANS_MOT = 'sans-mot-distinctif';
+
+    public const MOTIF_REDIRECTION = 'redirection';
+
+    public const MOTIF_PARKING = 'parking';
 
     /** Au-delà de ce nombre de fiches, un domaine est « partagé ». */
     public const PARTAGE_MAX = 3;
@@ -146,6 +182,34 @@ final class SiteMedia
         'societe.com', 'pappers.fr', 'verif.com', 'infogreffe.fr', 'manageo.fr', 'annuaire-entreprises.data.gouv.fr',
         'wordpress.com', 'blogspot.com', 'over-blog.com',
     ];
+
+    /** Parkeurs et places de marché de domaines : une arrivée chez eux = parking. */
+    public const HOTES_PARKING = [
+        'sedo.com', 'sedoparking.com', 'dan.com', 'afternic.com', 'bodis.com', 'parkingcrew.net', 'hugedomains.com',
+        'godaddy.com', 'above.com', 'undeveloped.com', 'domainmarket.com', 'buydomains.com', 'parklogic.com',
+        'namecheap.com', 'atom.com', 'squadhelp.com', 'domainlore.co.uk', 'efty.com', 'brandbucket.com',
+    ];
+
+    /** Signes FORTS de parking, cherchés dans toute la page (texte normalisé). */
+    public const PARKING_FORTS = [
+        'sedo', 'sedoparking', 'afternic', 'bodis', 'parkingcrew', 'hugedomains', 'dan com', 'godaddy',
+        'domain is for sale', 'domain for sale', 'buy this domain', 'this domain', 'domain parking', 'parked',
+        'parked domain', 'domaine a vendre', 'nom de domaine a vendre', 'ce nom de domaine', 'ce domaine est',
+        'domaine parke', 'parking de domaine', 'acheter ce domaine',
+    ];
+
+    /** Signes de parking cherchés dans le TITRE seulement (titre, h1, méta). */
+    public const PARKING_TITRE = ['a vendre', 'for sale', 'ce domaine', 'nom de domaine', 'domain name'];
+
+    /** Indices de MÉDIA (mot entier, pluriel admis). */
+    public const INDICES_MEDIA = [
+        'actualite', 'actu', 'redaction', 'abonnement', 'abonnez', 'abonner', 'article', 'journal', 'journaux',
+        'magazine', 'hebdomadaire', 'quotidien', 'mensuel', 'edition', 'emission', 'podcast', 'replay',
+        'journaliste', 'newsletter', 'rubrique', 'reportage', 'chronique', 'a la une',
+    ];
+
+    /** Suffixes publics à deux niveaux (domaine enregistrable sur trois étiquettes). */
+    private const SUFFIXES_DOUBLES = ['co.uk', 'org.uk', 'com.fr', 'asso.fr', 'gouv.fr', 'com.au', 'co.jp', 'com.br'];
 
     /** Formes juridiques retirées d'un nom avant d'en tirer un domaine candidat. */
     private const FORMES_JURIDIQUES = ['sas', 'sasu', 'sarl', 'eurl', 'sa', 'sci', 'scop', 'snc', 'selarl', 'ste'];
@@ -205,7 +269,15 @@ final class SiteMedia
     public static function motsDistinctifs(string $nom): array
     {
         $mots = [];
-        foreach (explode(' ', trim(self::normaliser($nom))) as $mot) {
+        $liste = explode(' ', trim(self::normaliser($nom)));
+        foreach ($liste as $i => $mot) {
+            $suivant = $liste[$i + 1] ?? '';
+            // Marque à chiffre : « france 3 », « france 24 » — le bloc entier.
+            if (in_array($mot, self::MOTS_GENERIQUES, true) && preg_match('/^\d{1,3}$/', $suivant) === 1) {
+                $mots[$mot . ' ' . $suivant] = true;
+
+                continue;
+            }
             $assez = strlen($mot) >= 3 || (strlen($mot) === 2 && preg_match('/\d/', $mot) === 1);
             if ($assez && ! ctype_digit($mot) && ! in_array($mot, self::MOTS_VIDES, true)
                 && ! in_array($mot, self::MOTS_GENERIQUES, true)) {
@@ -228,12 +300,37 @@ final class SiteMedia
     /** L'étiquette du domaine : l'hôte sans `www.` ni extension, sans points ni tirets (`le-progres.fr` → `leprogres`). */
     public static function etiquette(string $hote): string
     {
+        return (string) preg_replace('/[^a-z0-9]/', '', self::sansExtension($hote));
+    }
+
+    /** L'hôte sans `www.` ni extension, tirets et points gardés (`le-progres.fr` → `le-progres`). */
+    private static function sansExtension(string $hote): string
+    {
         $parts = explode('.', (string) preg_replace('/^www\./', '', strtolower($hote)));
         if (count($parts) > 1) {
             array_pop($parts);
         }
 
-        return (string) preg_replace('/[^a-z0-9]/', '', implode('', $parts));
+        return implode('.', $parts);
+    }
+
+    /** Le domaine ENREGISTRABLE d'un hôte (`www.edition.leprogres.fr` → `leprogres.fr`). */
+    public static function domaineEnregistrable(string $hote): string
+    {
+        $parts = explode('.', (string) preg_replace('/^www\./', '', strtolower(rtrim($hote, '.'))));
+        $n = count($parts);
+        if ($n <= 2) {
+            return implode('.', $parts);
+        }
+        $garde = in_array($parts[$n - 2] . '.' . $parts[$n - 1], self::SUFFIXES_DOUBLES, true) ? 3 : 2;
+
+        return implode('.', array_slice($parts, -$garde));
+    }
+
+    /** L'hôte est-il celui d'un parkeur / d'une place de marché de domaines ? */
+    public static function estHoteParking(string $hote): bool
+    {
+        return in_array(self::domaineEnregistrable($hote), self::HOTES_PARKING, true);
     }
 
     /** Le domaine est-il générique (liste noire, plateforme, annuaire, administration) ? */
@@ -261,18 +358,101 @@ final class SiteMedia
     }
 
     /**
+     * L'identité de la page, NORMALISÉE, privée de toute forme des hôtes
+     * donnés : une page qui recopie son adresse ne prouve rien.
+     *
+     * @param  list<string>  $hotes
+     */
+    public static function sansHote(string $identite, array $hotes): string
+    {
+        $brutes = [];
+        $normalisees = [];
+        foreach ($hotes as $hote) {
+            $hote = (string) preg_replace('/^www\./', '', strtolower(trim($hote)));
+            if ($hote === '') {
+                continue;
+            }
+            $brutes[] = 'www.' . $hote;
+            $brutes[] = $hote;
+            $label = self::sansExtension($hote);
+            if (str_contains($label, '-') || str_contains($label, '.')) {
+                $brutes[] = $label;
+            }
+            if (str_contains($hote, '-')) {
+                $brutes[] = self::etiquette($hote);
+            }
+            $normalisees[] = self::normaliser($hote);
+        }
+        usort($brutes, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        $texte = str_ireplace($brutes, ' ', html_entity_decode($identite, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $page = self::normaliser($texte);
+        foreach ($normalisees as $forme) {
+            if (trim($forme) === '') {
+                continue;
+            }
+            while (str_contains($page, $forme)) {
+                $page = str_replace($forme, ' ', $page);
+            }
+        }
+
+        return $page;
+    }
+
+    /**
+     * La page est-elle une page de PARKING (domaine à vendre) ?
+     *
+     * @param  array<string, string>  $zones  zones de `LecturePageAccueil::extraire`
+     */
+    public static function estParking(array $zones): bool
+    {
+        $titre = self::normaliser(($zones['identite'] ?? '') . ' . ' . ($zones['titre'] ?? ''));
+        $tout = self::normaliser($titre . ' . ' . ($zones['menu'] ?? '') . ' . ' . ($zones['texte'] ?? ''));
+        foreach (self::PARKING_FORTS as $signe) {
+            if (str_contains($tout, ' ' . $signe . ' ')) {
+                return true;
+            }
+        }
+        foreach (self::PARKING_TITRE as $signe) {
+            if (str_contains($titre, ' ' . $signe . ' ')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * La page porte-t-elle un indice de MÉDIA ?
+     *
+     * @param  array<string, string>  $zones
+     */
+    public static function indiceMedia(array $zones): bool
+    {
+        $tout = self::normaliser(implode(' . ', $zones));
+        foreach (self::INDICES_MEDIA as $mot) {
+            if (ClassementMedia::contient($tout, $mot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Le nom (sous l'une de ses formes) correspond-il à la page lue à cette
-     * adresse ? Voir la règle en tête de classe.
+     * adresse ? Voir la règle en tête de classe. `n` : nombre de mots
+     * distinctifs de la forme qui a passé (0 sinon).
      *
      * @param  list<string>  $noms  formes du nom (dénomination, noms des lignes `media`)
      * @param  string  $identite  zone `identite` de la page (texte brut)
-     * @param  string  $url  adresse lue (sortie de `LecturePageAccueil::cible`)
-     * @return array{ok: bool, motif: ?string}
+     * @param  string  $url  adresse essayée (sortie de `LecturePageAccueil::cible`)
+     * @param  list<string>  $autresHotes  hôtes à retirer aussi de la page (hôte d'arrivée)
+     * @return array{ok: bool, motif: ?string, n: int}
      */
-    public static function correspond(array $noms, string $identite, string $url): array
+    public static function correspond(array $noms, string $identite, string $url, array $autresHotes = []): array
     {
-        $page = self::normaliser($identite);
         $hote = (string) parse_url($url, PHP_URL_HOST);
+        $page = self::sansHote($identite, array_merge([$hote], $autresHotes));
         $etiquette = self::etiquette($hote);
         $chemin = trim(self::normaliser((string) (parse_url($url, PHP_URL_PATH) ?? '')));
         $segments = array_merge(
@@ -294,8 +474,11 @@ final class SiteMedia
             $t = 0;
             $dansAdresse = 0;
             foreach ($mots as $mot) {
-                $dansPage = ClassementMedia::contient($page, $mot);
-                $adresse = self::dansAdresse($mot, $etiquette, $cheminCompact, $segments);
+                $adresse = self::dansAdresse(str_replace(' ', '', $mot), $etiquette, $cheminCompact, $segments);
+                $dansPage = ClassementMedia::contient($page, $mot)
+                    // « bfm » dans « BFMTV » : début d'un mot collé, ET dans l'adresse.
+                    || ($adresse && strlen($mot) >= 3 && ! str_contains($mot, ' ')
+                        && preg_match('/ ' . preg_quote($mot, '/') . '[a-z0-9]+ /', $page) === 1);
                 $p += $dansPage ? 1 : 0;
                 $t += ($dansPage || $adresse) ? 1 : 0;
                 $dansAdresse += $adresse ? 1 : 0;
@@ -309,11 +492,48 @@ final class SiteMedia
                 default => $t >= (int) ceil(2 * $n / 3),
             };
             if ($ok) {
-                return ['ok' => true, 'motif' => null];
+                return ['ok' => true, 'motif' => null, 'n' => $n];
             }
         }
 
-        return ['ok' => false, 'motif' => $auMoinsUnMot ? self::MOTIF_NOM : self::MOTIF_SANS_MOT];
+        return ['ok' => false, 'motif' => $auMoinsUnMot ? self::MOTIF_NOM : self::MOTIF_SANS_MOT, 'n' => 0];
+    }
+
+    /**
+     * Le jugement COMPLET d'une page lue à l'adresse `$cible` : code 2xx,
+     * arrivée sur le même domaine et hors parkeur, pas de page de parking,
+     * puis `correspond()` et, pour un seul mot distinctif, l'indice de média.
+     *
+     * @param  list<string>  $noms
+     * @param  array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}  $lu
+     * @return array{0: string, 1: string, 2: ?string} [statut, url, motif]
+     */
+    public static function juger(array $noms, string $cible, array $lu): array
+    {
+        $code = $lu['code'] ?? 0;
+        if ($code < 200 || $code >= 300) {
+            return [self::INJOIGNABLE, $cible, null];
+        }
+        $hote = (string) parse_url($cible, PHP_URL_HOST);
+        $arrivee = (string) parse_url($lu['finale'] ?? $cible, PHP_URL_HOST);
+        if ($arrivee === '' || self::estHoteParking($arrivee)) {
+            return [self::NON_CONFORME, $cible, self::MOTIF_PARKING];
+        }
+        if (self::domaineEnregistrable($arrivee) !== self::domaineEnregistrable($hote)) {
+            return [self::NON_CONFORME, $cible, self::MOTIF_REDIRECTION];
+        }
+        if (self::estParking($lu['zones'])) {
+            return [self::NON_CONFORME, $cible, self::MOTIF_PARKING];
+        }
+        $r = self::correspond($noms, (string) ($lu['zones']['identite'] ?? ''), $cible, [$arrivee]);
+        if (! $r['ok']) {
+            return [self::NON_CONFORME, $cible, $r['motif']];
+        }
+        if ($r['n'] === 1 && ! self::indiceMedia($lu['zones'])) {
+            return [self::A_CONFIRMER, $cible, null];
+        }
+
+        return [self::VERIFIE, $cible, null];
     }
 
     /**
@@ -327,7 +547,7 @@ final class SiteMedia
         $etiquette = self::etiquette($hote);
         foreach ($noms as $nom) {
             $mots = self::motsDistinctifs($nom);
-            if ($mots !== [] && str_contains($etiquette, implode('', $mots))) {
+            if ($mots !== [] && str_contains($etiquette, str_replace(' ', '', implode('', $mots)))) {
                 return false;
             }
         }
@@ -354,8 +574,9 @@ final class SiteMedia
      * Des adresses CANDIDATES tirées du nom, sans service payant : le nom
      * réduit à ses mots (formes juridiques retirées) ; en `.fr` d'abord puis
      * `.com` ; mots accolés d'abord puis avec des tirets ; avec puis sans
-     * l'article de tête (le, la, les, l'). Jamais un domaine générique ; étiquette de 4 à 63
-     * caractères ; au plus `$max`.
+     * l'article de tête (le, la, les, l'). Jamais un domaine générique ;
+     * étiquette de 4 à 63 caractères (2 si elle contient un chiffre : m6.fr) ;
+     * au plus `$max`.
      *
      * @param  list<string>  $noms
      * @return list<string> URL `https://hôte/`
@@ -389,7 +610,8 @@ final class SiteMedia
         $sortie = [];
         foreach (array_keys($hotes) as $hote) {
             $etiquette = substr($hote, 0, (int) strrpos($hote, '.'));
-            if (strlen($etiquette) < 4 || strlen($etiquette) > 63 || preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $etiquette) !== 1
+            $longueurMin = preg_match('/\d/', $etiquette) === 1 ? 2 : 4;
+            if (strlen($etiquette) < $longueurMin || strlen($etiquette) > 63 || preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $etiquette) !== 1
                 || in_array($etiquette, self::MOTS_GENERIQUES, true) || self::estGenerique($hote)) {
                 continue;
             }

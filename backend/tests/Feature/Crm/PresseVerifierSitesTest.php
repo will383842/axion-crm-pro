@@ -190,7 +190,7 @@ test('un candidat deja site d une AUTRE fiche n est jamais pris', function () {
 test('essai a blanc PAR DEFAUT : les sites sont lus, RIEN n est ecrit', function () {
     $verifie = pvsFiche($this->espace, 'https://echo-zorglubs.test', "ZZ L'ÉCHO DES ZORGLUBS");
     $trouve = pvsFiche($this->espace, null, 'LE ZORGLUB ZZ');
-    pvsReseau(['echo-zorglubs.test' => pvsPage("L'Écho des Zorglubs"), 'zorglubzz.fr' => pvsPage('Le Zorglub ZZ')]);
+    pvsReseau(['echo-zorglubs.test' => pvsPage("L'Écho des Zorglubs"), 'zorglubzz.fr' => pvsPage('Le Zorglub ZZ — hebdomadaire')]);
 
     $r = pvsLancer();
 
@@ -215,4 +215,102 @@ test('idempotente : une fiche deja verifiee n est pas relue ; --reverifier relit
     $r = pvsLancer(['--appliquer' => true, '--reverifier' => true]);
     expect(pvsMarqueur($id))->toBe($avant)
         ->and((int) preg_match('/\|\s*marqueurs_inchanges\s*\|\s*1\s*\|/', $r['sortie']))->toBe(1);
+});
+
+// ── Relecture A09 de #273 ──────────────────────────────────────────────────
+
+test('une 404 personnalisee qui reprend le nom n est PAS un site verifie', function () {
+    $id = pvsFiche($this->espace, 'https://zorglubzz.fr', 'LE ZORGLUB ZZ');
+    Http::fake([
+        'https://zorglubzz.fr/robots.txt' => Http::response('', 404),
+        'https://zorglubzz.fr/' => Http::response(pvsPage('zorglubzz.fr — Le Zorglub ZZ, hebdomadaire : page introuvable'), 404, ['Content-Type' => 'text/html']),
+        '*' => Http::response('', 404),
+    ]);
+
+    pvsLancer(['--appliquer' => true, '--sans-recherche' => true]);
+
+    expect(pvsMarqueur($id)['statut'])->toBe(SiteMedia::INJOIGNABLE)
+        ->and(SiteMedia::estVerifie($id))->toBeFalse();
+});
+
+test('un candidat qui REDIRIGE vers un autre domaine ou un parkeur n est jamais pris ni ecrit', function () {
+    $id = pvsFiche($this->espace, null, 'LE ZORGLUB ZZ');
+    $page = Http::response(pvsPage('Le Zorglub ZZ — hebdomadaire'), 200, ['Content-Type' => 'text/html']);
+    Http::fake([
+        'https://lezorglubzz.fr/robots.txt' => Http::response('', 404),
+        'https://lezorglubzz.fr/' => Http::response('', 301, ['Location' => 'https://sedoparking.com/lezorglubzz.fr']),
+        'https://sedoparking.com/*' => $page,
+        'https://zorglubzz.fr/robots.txt' => Http::response('', 404),
+        'https://zorglubzz.fr/' => Http::response('', 302, ['Location' => 'https://autre-media-zz.test/']),
+        'https://autre-media-zz.test/*' => $page,
+        '*' => Http::response('', 404),
+    ]);
+
+    $r = pvsLancer(['--appliquer' => true]);
+
+    Http::assertSent(fn (Request $q): bool => str_starts_with($q->url(), 'https://autre-media-zz.test/'));
+    expect(pvsMarqueur($id)['statut'])->toBe(SiteMedia::SANS_SITE)
+        ->and(DB::table('media')->where('company_id', $id)->value('website'))->toBeNull()
+        ->and((int) preg_match('/\|\s*sites_trouves\s*\|\s*0\s*\|/', $r['sortie']))->toBe(1);
+});
+
+test('une page de PARKING qui recopie l adresse n est jamais prise (« zorglubzz.fr — domaine a vendre »)', function () {
+    $id = pvsFiche($this->espace, null, 'LE ZORGLUB ZZ');
+    pvsReseau([
+        'lezorglubzz.fr' => pvsPage('lezorglubzz.fr'),
+        'zorglubzz.fr' => pvsPage('zorglubzz.fr — domaine à vendre', 'Le Zorglub ZZ hebdomadaire'),
+    ]);
+
+    pvsLancer(['--appliquer' => true]);
+
+    expect(pvsMarqueur($id)['statut'])->toBe(SiteMedia::SANS_SITE)
+        ->and(DB::table('media')->where('company_id', $id)->value('website'))->toBeNull();
+});
+
+test('un seul mot distinctif sans indice de media : a-confirmer, jamais fiable ni ecrit', function () {
+    $existant = pvsFiche($this->espace, 'https://zorglub-station.test', 'LA ZORGLUB');
+    $cherche = pvsFiche($this->espace, null, 'LE ZORGLUB ZZ');
+    pvsReseau([
+        'zorglub-station.test' => pvsPage('La Zorglub — station de ski', 'Forfaits, pistes'),
+        'zorglubzz.fr' => pvsPage('Le Zorglub ZZ', 'Nos chambres, nos tarifs'),
+    ]);
+
+    pvsLancer(['--appliquer' => true]);
+
+    expect(pvsMarqueur($existant)['statut'])->toBe(SiteMedia::A_CONFIRMER)
+        ->and(SiteMedia::estVerifie($existant))->toBeFalse()
+        ->and(pvsMarqueur($cherche)['statut'])->toBe(SiteMedia::SANS_SITE)
+        ->and(DB::table('media')->where('company_id', $cherche)->value('website'))->toBeNull();
+});
+
+test('homonymes : jamais le site d une ligne media d un AUTRE espace', function () {
+    $autre = (string) Str::uuid();
+    DB::table('workspaces')->insert([
+        'id' => $autre, 'slug' => 'zz-autre-espace', 'name' => 'ZZ autre', 'settings' => '{}',
+        'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('media')->insert([
+        'workspace_id' => $autre, 'company_id' => null, 'name' => 'LE ZORGLUB ZZ', 'website' => 'https://homonyme-zz.test/',
+        'media_type' => 'presse_mensuel', 'media_family' => 'editorial', 'source' => 'wikidata',
+        'enrich_status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    pvsFiche($this->espace, null, 'LE ZORGLUB ZZ');
+    pvsReseau(['homonyme-zz.test' => pvsPage('Le Zorglub ZZ — hebdomadaire')]);
+
+    pvsLancer(['--appliquer' => true]);
+
+    Http::assertNotSent(fn (Request $q): bool => str_contains($q->url(), 'homonyme-zz.test'));
+});
+
+test('--depuis-id et --limite bornent les fiches verifiees', function () {
+    $un = pvsFiche($this->espace, null, 'ZZ ALPHA ROMEO');
+    $deux = pvsFiche($this->espace, null, 'ZZ BRAVO TANGO');
+    $trois = pvsFiche($this->espace, null, 'ZZ CHARLIE MIKE');
+    pvsReseau([]);
+
+    pvsLancer(['--appliquer' => true, '--sans-recherche' => true, '--depuis-id' => (string) $deux, '--limite' => '1']);
+
+    expect(pvsMarqueur($un))->toBeNull()
+        ->and(pvsMarqueur($deux)['statut'])->toBe(SiteMedia::SANS_SITE)
+        ->and(pvsMarqueur($trois))->toBeNull();
 });

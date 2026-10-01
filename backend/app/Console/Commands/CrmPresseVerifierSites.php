@@ -33,7 +33,10 @@ use Throwable;
  *      correspondance → `non-conforme` d'office, sans lecture ; sinon la page
  *      est lue par `LecturePageAccueil` (mêmes protections que le
  *      classement : robots.txt, SSRF, délai par domaine, flux borné) et
- *      `SiteMedia::correspond()` tranche : `verifie` ou `non-conforme`.
+ *      `SiteMedia::juger()` tranche (réponse 2xx, arrivée sur le même
+ *      domaine hors parkeur, pas de page de parking, nom, indice de média
+ *      pour un nom à un seul mot) : `verifie`, `a-confirmer` (non fiable)
+ *      ou `non-conforme`.
  *      Illisible, injoignable, robots.txt qui interdit : marqué tel quel, et
  *      le site n'est PAS vérifié.
  *   2. TROUVER, pour une fiche sans site ou au site non conforme (sauf
@@ -101,7 +104,7 @@ class CrmPresseVerifierSites extends Command
      */
     private array $hotes = [];
 
-    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}}> */
+    /** @var array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}> */
     private array $cache = [];
 
     public function handle(): int
@@ -153,7 +156,7 @@ class CrmPresseVerifierSites extends Command
 
         $this->cache = [];
         $this->bilan = array_fill_keys([
-            'fiches_lues', 'paquets', 'sites_existants', 'sites_verifies', 'non_conformes_nom', 'non_conformes_partage',
+            'fiches_lues', 'paquets', 'sites_existants', 'sites_verifies', 'a_confirmer', 'non_conformes_nom', 'non_conformes_partage', 'non_conformes_redirection', 'non_conformes_parking',
             'non_conformes_liste_noire', 'non_conformes_sans_mot', 'sites_injoignables', 'robots_interdits',
             'sites_illisibles', 'sans_site', 'recherches', 'candidats_essayes', 'sites_trouves',
             'medias_site_ecrit', 'marqueurs_ecrits', 'marqueurs_inchanges',
@@ -424,9 +427,9 @@ class CrmPresseVerifierSites extends Command
         $statut = $lu['statut'] ?? LecturePageAccueil::STATUT_INJOIGNABLE;
 
         if ($statut === LecturePageAccueil::STATUT_LU && $lu !== null) {
-            $r = SiteMedia::correspond($noms, (string) ($lu['zones']['identite'] ?? ''), $cible);
-
-            return $r['ok'] ? [SiteMedia::VERIFIE, $cible, null] : [SiteMedia::NON_CONFORME, $cible, $r['motif']];
+            // Code 2xx, arrivée sur le même domaine, pas de parking, nom,
+            // indice de média : une seule définition (`SiteMedia::juger`).
+            return SiteMedia::juger($noms, $cible, $lu);
         }
 
         return match ($statut) {
@@ -472,6 +475,7 @@ class CrmPresseVerifierSites extends Command
         }
         $sortie = [];
         foreach (DB::table('media')
+            ->where('workspace_id', $this->workspaceId)
             ->whereNull('deleted_at')
             ->where('source', '<>', MediaIncertain::SOURCE_NAF)
             ->whereNotNull('website')
@@ -500,10 +504,13 @@ class CrmPresseVerifierSites extends Command
         [$statut, $url, $motif] = $f->decision ?? [SiteMedia::SANS_SITE, null, null];
         $compteur = match ($statut) {
             SiteMedia::VERIFIE => 'sites_verifies',
+            SiteMedia::A_CONFIRMER => 'a_confirmer',
             SiteMedia::NON_CONFORME => 'non_conformes_' . match ($motif) {
                 SiteMedia::MOTIF_PARTAGE => 'partage',
                 SiteMedia::MOTIF_LISTE_NOIRE => 'liste_noire',
                 SiteMedia::MOTIF_SANS_MOT => 'sans_mot',
+                SiteMedia::MOTIF_REDIRECTION => 'redirection',
+                SiteMedia::MOTIF_PARKING => 'parking',
                 default => 'nom',
             },
             SiteMedia::INJOIGNABLE => 'sites_injoignables',

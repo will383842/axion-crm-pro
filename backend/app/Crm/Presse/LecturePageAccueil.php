@@ -170,7 +170,7 @@ final class LecturePageAccueil
      * Lit les URL données (dédoublonnées), sorties de `cible()`.
      *
      * @param  list<string>  $cibles
-     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}}>
+     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}>
      */
     public function lire(array $cibles): array
     {
@@ -233,7 +233,11 @@ final class LecturePageAccueil
                 } elseif ($p['code'] < 200 || $p['code'] >= 300) {
                     $resultats[$cible] = self::echec(self::STATUT_INJOIGNABLE);
                 } else {
-                    $resultats[$cible] = ['statut' => self::STATUT_LU] + self::extraire($p['corps']);
+                    // `code` (2xx ici) et `finale` (l'URL d'arrivée après les
+                    // redirections) : `SiteMedia` exige que l'arrivée soit le
+                    // même domaine que l'adresse essayée.
+                    $resultats[$cible] = ['statut' => self::STATUT_LU] + self::extraire($p['corps'])
+                        + ['code' => $p['code'], 'finale' => $p['url'] ?? $cible];
                 }
             }
             $attente = $attenteMs;
@@ -249,7 +253,7 @@ final class LecturePageAccueil
      * gros, type refusé, encodage inconnu) ou `injoignable`.
      *
      * @param  list<string>  $urls
-     * @return array<int, array{statut: string, code: int, corps: string}>
+     * @return array<int, array{statut: string, code: int, corps: string, url?: string}>
      */
     private function recuperer(array $urls, int $max, bool $html): array
     {
@@ -331,7 +335,7 @@ final class LecturePageAccueil
                     $corps = self::corps($r->toPsrResponse(), $max);
                     $sorties[$i] = $corps === null
                         ? ['statut' => self::STATUT_ILLISIBLE, 'code' => 0, 'corps' => '']
-                        : ['statut' => self::STATUT_LU, 'code' => $r->status(), 'corps' => $corps];
+                        : ['statut' => self::STATUT_LU, 'code' => $r->status(), 'corps' => $corps, 'url' => $l['url']];
                 }
                 if ($id !== null) {
                     FluxBorne::liberer($id);
@@ -451,10 +455,9 @@ final class LecturePageAccueil
         $delais = [];
         $courant = -1;
         $dansAgents = false;
-        foreach (preg_split('/
-|
-|
-/', $contenu) ?: [] as $ligne) {
+        // Fins de ligne CRLF, CR seul ou LF seul (échappements PCRE : jamais
+        // d'octet CR brut dans le source, qu'un outil d'édition perdrait).
+        foreach (preg_split('/\r\n|\r|\n/', $contenu) ?: [] as $ligne) {
             $ligne = trim((string) preg_replace('/#.*$/', '', $ligne));
             $deuxPoints = strpos($ligne, ':');
             if ($ligne === '' || $deuxPoints === false) {

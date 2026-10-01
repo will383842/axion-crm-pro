@@ -77,7 +77,7 @@ final class LecturePageAccueil
     private const MORCEAU_DECOMPRESSION = 1024;
 
     /** Bornes des zones gardées en mémoire (caractères). */
-    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000, 'identite' => 2000];
+    private const BORNES = ['titre' => 4000, 'menu' => 8000, 'texte' => 20000, 'identite' => 2000, 'corps' => 12000];
 
     public const STATUT_LU = 'site';
 
@@ -578,6 +578,26 @@ final class LecturePageAccueil
             self::textes($xp, '//h3', 30),
         );
 
+        // Le CORPS HORS LIENS (`SiteMedia::preuveMedia`) : le texte des
+        // paragraphes sans celui de leurs liens — une page de parking peut
+        // aligner cent liens sponsorisés « Actualités », elle n'écrit rien.
+        $corps = [];
+        $paragraphes = $xp->query('//p');
+        foreach ($paragraphes === false ? [] : $paragraphes as $p) {
+            if (count($corps) >= 40) {
+                break;
+            }
+            $morceaux = $xp->query('.//text()[not(ancestor::a)]', $p);
+            $t = '';
+            foreach ($morceaux === false ? [] : $morceaux as $n) {
+                $t .= ' ' . $n->nodeValue;
+            }
+            $t = trim((string) preg_replace('/\s+/u', ' ', $t));
+            if ($t !== '') {
+                $corps[] = mb_substr($t, 0, 400);
+            }
+        }
+
         $joint = implode(' ', $texte);
         $dates = (int) preg_match_all(
             '/\b\d{1,2}(?:er)?\s+(?:janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/iu',
@@ -593,6 +613,7 @@ final class LecturePageAccueil
                 'menu' => mb_substr(implode(' . ', $menu), 0, self::BORNES['menu']),
                 'texte' => mb_substr(implode(' . ', $texte), 0, self::BORNES['texte']),
                 'identite' => mb_substr(implode(' . ', $identite), 0, self::BORNES['identite']),
+                'corps' => mb_substr(implode(' . ', $corps), 0, self::BORNES['corps']),
             ],
             'structure' => [
                 'articles' => $articles === false ? 0 : $articles->length,

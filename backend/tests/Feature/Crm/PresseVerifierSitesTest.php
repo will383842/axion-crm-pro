@@ -100,7 +100,7 @@ function pvsMarqueur(int $id): ?array
 
 test('site CONFORME accepte : verifie, URL gardee, rien d autre ecrit — aucune donnee nominative', function () {
     $id = pvsFiche($this->espace, 'https://echo-zorglubs.test', "ZZ L'ÉCHO DES ZORGLUBS");
-    pvsReseau(['echo-zorglubs.test' => pvsPage("L'Écho des Zorglubs — par Zorglub Fictivus", 'Contact : zorglub.fictivus@echo-zorglubs.test, 06 00 00 00 00')]);
+    pvsReseau(['echo-zorglubs.test' => pvsPage("L'Écho des Zorglubs — par Zorglub Fictivus", 'La rédaction — contact : zorglub.fictivus@echo-zorglubs.test, 06 00 00 00 00')]);
 
     $r = pvsLancer(['--appliquer' => true]);
 

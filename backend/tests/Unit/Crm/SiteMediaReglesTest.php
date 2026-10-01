@@ -91,7 +91,7 @@ function smrLu(string $identite, string $texte = '', int $code = 200, ?string $f
 {
     return [
         'statut' => 'site',
-        'zones' => ['titre' => $identite, 'menu' => '', 'texte' => $texte, 'identite' => $identite],
+        'zones' => ['titre' => $identite, 'menu' => '', 'texte' => $texte, 'identite' => $identite, 'corps' => $texte],
         'structure' => ['articles' => 0, 'dates' => 0],
         'code' => $code,
     ] + ($finale === null ? [] : ['finale' => $finale]);
@@ -146,8 +146,9 @@ test('un seul mot distinctif (LA MONTAGNE) : sans indice de media, a-confirmer (
         ->and(in_array(SiteMedia::A_CONFIRMER, SiteMedia::STATUTS_VERIFIES, true))->toBeFalse()
         ->and(SiteMedia::urlVerifiee(['statut' => SiteMedia::A_CONFIRMER, 'url' => 'https://lamontagne.test/']))->toBeNull()
         ->and($media[0])->toBe(SiteMedia::VERIFIE)
-        // deux mots distinctifs : l'indice n'est pas exigé
-        ->and(SiteMedia::juger(['ZZ ALPHA BETA'], 'https://zz.test/', smrLu('Alpha Beta'))[0])->toBe(SiteMedia::VERIFIE);
+        // deux mots distinctifs : la preuve de média est exigée aussi (v. relecture A09)
+        ->and(SiteMedia::juger(['ZZ ALPHA BETA'], 'https://zz.test/', smrLu('Alpha Beta'))[0])->toBe(SiteMedia::A_CONFIRMER)
+        ->and(SiteMedia::juger(['ZZ ALPHA BETA'], 'https://zz.test/', smrLu('Alpha Beta', 'La rédaction'))[0])->toBe(SiteMedia::VERIFIE);
 });
 
 test('marques : BFM dans BFMTV (et dans l adresse), FRANCE 3 / FRANCE 24 en bloc, candidat m6.fr', function () {
@@ -214,4 +215,68 @@ test('domaine enregistrable : suffixes doubles et hebergeurs partages', function
     // une redirection d'un site hébergé vers un AUTRE site du même hébergeur est refusée
     expect(SiteMedia::juger(['EURONEWS'], 'https://euronews.wixsite.com/', smrLu('Euronews', 'actualités', 200, 'https://autre.wixsite.com/')))
         ->toBe([SiteMedia::NON_CONFORME, 'https://euronews.wixsite.com/', SiteMedia::MOTIF_REDIRECTION]);
+});
+
+// ── Troisième relecture A09 de #273 ────────────────────────────────────────
+
+/** Une page de parking LONGUE : phrases de parkeur + plus de 120 mots de liens sponsorisés. */
+function smrParkingLong(string $titre): array
+{
+    $liens = str_repeat('Related links: Assurance auto, Credit immobilier, Billets avion, Hotel pas cher. ', 15);
+
+    return smrLu($titre, 'This domain may be for sale. Buy this domain on GoDaddy. Sedo parking. ' . $liens);
+}
+
+test('parking LONG a etiquette nue (deux mots et un mot) : non conforme — phrases de parkeur lues dans tout le corps', function () {
+    expect(SiteMedia::juger(['VOSGES MATIN'], 'https://www.vosges-matin.fr/', smrParkingLong('vosges-matin')))
+        ->toBe([SiteMedia::NON_CONFORME, 'https://www.vosges-matin.fr/', SiteMedia::MOTIF_PARKING])
+        ->and(SiteMedia::juger(['ZORGLUBIA'], 'https://zorglubia.fr/', smrParkingLong('zorglubia')))
+        ->toBe([SiteMedia::NON_CONFORME, 'https://zorglubia.fr/', SiteMedia::MOTIF_PARKING])
+        // même avec des <article> : une phrase de parkeur reste un parking
+        ->and(SiteMedia::estParking(smrParkingLong('vosges-matin')['zones'], 5))->toBeTrue();
+});
+
+test('parking COURT au niveau du jugement : non conforme', function () {
+    expect(SiteMedia::juger(['LE VIGNERON ZZ'], 'https://levigneronzz.test/', smrLu('Le Vigneron ZZ', 'Ce domaine est à vendre. GoDaddy.')))
+        ->toBe([SiteMedia::NON_CONFORME, 'https://levigneronzz.test/', SiteMedia::MOTIF_PARKING]);
+});
+
+test('preuve de media HORS LIENS exigee pour tout verifie : « site en construction », liens sponsorises seuls → a-confirmer', function () {
+    $construction = SiteMedia::juger(['VOSGES MATIN'], 'https://www.vosges-matin.fr/', smrLu('vosges-matin', 'Site en construction'));
+    $sponsorises = smrLu('vosges-matin');
+    $sponsorises['zones']['menu'] = str_repeat('Actualités Rédaction Abonnement Articles ', 40);
+    $sponsorises['zones']['texte'] = str_repeat('Actualités sponsorisées ', 40); // texte des liens, absent de `corps`
+    expect($construction[0])->toBe(SiteMedia::A_CONFIRMER)
+        ->and(SiteMedia::juger(['VOSGES MATIN'], 'https://www.vosges-matin.fr/', $sponsorises)[0])->toBe(SiteMedia::A_CONFIRMER)
+        // la structure suffit : 3 <article> ou 3 dates
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 3, 'dates' => 0]))->toBeTrue()
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 0, 'dates' => 3]))->toBeTrue()
+        ->and(SiteMedia::preuveMedia(['identite' => 'Vosges Matin'], ['articles' => 2, 'dates' => 2]))->toBeFalse();
+});
+
+test('temoins : les vrais medias, pages realistes, restent verifies', function () {
+    $temoins = [
+        [['OUEST FRANCE'], 'https://www.ouest-france.fr/', "Ouest-France : toute l'actualité en continu", 'Bretagne, Normandie, Pays de la Loire.'],
+        [['LE PROGRES'], 'https://www.leprogres.fr/', 'Le Progrès : info et actu Lyon, Rhône, Loire', 'Abonnez-vous.'],
+        [['EURONEWS'], 'https://fr.euronews.com/', 'Euronews : actualités internationales', 'En direct.'],
+        [["L'ECO DE L'AIN"], 'https://www.eco-ain.fr/', "L'Éco de l'Ain — l'actualité économique de l'Ain", 'Entreprises.'],
+        [['BFM TV'], 'https://www.bfmtv.com/', 'BFMTV — Actualités en continu', 'Politique, économie, international.'],
+    ];
+    foreach ($temoins as [$noms, $url, $titre, $texte]) {
+        expect(SiteMedia::juger($noms, $url, smrLu($titre, $texte))[0])->toBe(SiteMedia::VERIFIE);
+    }
+    // et une page sans indice lexical, mais structurée (articles datés), aussi
+    $structuree = smrLu('Le Progrès', 'Lyon, Rhône, Loire.');
+    $structuree['structure'] = ['articles' => 12, 'dates' => 12];
+    expect(SiteMedia::juger(['LE PROGRES'], 'https://www.leprogres.fr/', $structuree)[0])->toBe(SiteMedia::VERIFIE);
+});
+
+test('zone corps : texte des paragraphes SANS celui de leurs liens', function () {
+    $l = LecturePageAccueil::extraire('<html><head><title>ZZ</title></head><body>'
+        . '<p>ZZ texte propre <a href="#">ZZ lien sponsorisé</a> suite</p><p><a href="#">ZZ que des liens</a></p></body></html>');
+
+    expect($l['zones']['corps'])->toContain('ZZ texte propre', 'suite')
+        ->and($l['zones']['corps'])->not->toContain('ZZ lien sponsorisé')
+        ->and($l['zones']['corps'])->not->toContain('ZZ que des liens')
+        ->and($l['zones']['texte'])->toContain('ZZ lien sponsorisé');
 });

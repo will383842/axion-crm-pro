@@ -25,8 +25,8 @@ use Illuminate\Support\Str;
  *                        companies.website) porte le nom du média ;
  *   - `trouve-verifie`   un site TROUVÉ (candidat tiré du nom ou d'une source
  *                        ouverte) porte le nom du média ;
- *   - `a-confirmer`      le nom (un seul mot distinctif) correspond, mais la
- *                        page n'a aucun indice de média : NON fiable ;
+ *   - `a-confirmer`      le nom correspond, mais la page n'a aucune preuve de
+ *                        média hors liens (`preuveMedia`) : NON fiable ;
  *   - `non-conforme`     motif `nom`, `domaine-partage`, `liste-noire`,
  *                        `sans-mot-distinctif`, `redirection` (arrivée sur un
  *                        autre domaine) ou `parking` (domaine à vendre) ;
@@ -67,10 +67,13 @@ use Illuminate\Support\Str;
  * n'est pas retirée : c'est le nom même du titre ; le parking est arrêté par
  * `estParking`, la réponse 2xx et l'hôte d'arrivée.
  *
- * PARKING (`estParking`) : signaux cherchés dans le titre (title, h1, méta,
- * og) ; dans le CORPS seulement si la page est courte (moins de
- * `PARKING_CORPS_MAX_MOTS` mots, moins de 3 <article>) — « ce domaine est »,
- * « GoDaddy » dans les paragraphes d'un vrai média ne le rejettent pas.
+ * PARKING (`estParking`) : tous les signaux dans le titre (title, h1, méta,
+ * og) ; les PHRASES de parkeur (`PARKING_FORTS` : « this domain may be for
+ * sale », « buy this domain », « sedo parking », afternic…) dans TOUT le
+ * corps, quelle que soit sa longueur ; les signaux AMBIGUS
+ * (`PARKING_AMBIGUS` : « ce domaine est », « domaine à vendre », « parked »,
+ * « godaddy ») dans le corps d'une page COURTE seulement (moins de
+ * `PARKING_CORPS_MAX_MOTS` mots, moins de 3 <article>).
  *
  * DOMAINE ENREGISTRABLE : deux dernières étiquettes, trois sous un suffixe
  * double (`SUFFIXES_DOUBLES` : co.uk, tm.fr, com.au…) ; sur un hébergeur
@@ -87,14 +90,18 @@ use Illuminate\Support\Str;
  *   t = mots trouvés dans la page OU dans l'adresse.
  *   - n = 0 : jamais conforme (`sans-mot-distinctif`) ;
  *   - p = 0 : jamais conforme — l'adresse seule ne prouve rien ;
- *   - n = 1 : le mot est dans la page ET dans l'adresse ; de plus, la page
- *     doit porter un INDICE DE MÉDIA (`indiceMedia` : actualité, rédaction,
- *     abonnement, articles…), sinon `a-confirmer` (« LA MONTAGNE » →
- *     lamontagne.fr d'une station de ski) ;
+ *   - n = 1 : le mot est dans la page ET dans l'adresse ;
  *   - n = 2 : t = 2 ;
  *   - n ≥ 3 : t ≥ ⌈2n/3⌉.
  * Le nom est essayé sous chacune de ses formes (dénomination de la fiche, nom
  * de chaque ligne `media`) : une seule qui passe suffit.
+ *
+ * PREUVE DE MÉDIA (`preuveMedia`), exigée pour TOUT `verifie` /
+ * `trouve-verifie`, HORS LIENS : un indice de média (actualité, rédaction,
+ * abonnement, article…) dans le titre / h1 / méta / og ou dans le texte des
+ * paragraphes sans leurs liens (zone `corps`), ou au moins 3 <article>, ou au
+ * moins 3 dates. Sinon `a-confirmer` (« LA MONTAGNE » → station de ski ; page
+ * « site en construction » ; parking à liens sponsorisés).
  *
  * Limites connues (faux NÉGATIFS, sûrs) : « FRANCE INFO », « RADIO FRANCE »
  * (que des mots génériques, sans chiffre) restent `sans-mot-distinctif` ;
@@ -200,12 +207,26 @@ final class SiteMedia
         'namecheap.com', 'atom.com', 'squadhelp.com', 'domainlore.co.uk', 'efty.com', 'brandbucket.com',
     ];
 
-    /** Signes FORTS de parking, cherchés dans toute la page (texte normalisé). */
+    /**
+     * Signes FORTS de parking — des PHRASES de parkeur et des noms de
+     * parkeurs, qu'aucun vrai média n'écrit sur sa page d'accueil : cherchés
+     * dans TOUTE la page, quelle que soit sa longueur.
+     */
     public const PARKING_FORTS = [
-        'sedo', 'sedoparking', 'afternic', 'bodis', 'parkingcrew', 'hugedomains', 'dan com', 'godaddy',
-        'domain is for sale', 'domain for sale', 'buy this domain', 'this domain', 'domain parking', 'parked',
-        'parked domain', 'domaine a vendre', 'nom de domaine a vendre', 'ce nom de domaine', 'ce domaine est',
-        'domaine parke', 'parking de domaine', 'acheter ce domaine',
+        'sedoparking', 'sedo parking', 'sedo domain parking', 'afternic', 'bodis', 'parkingcrew', 'hugedomains',
+        'domain is for sale', 'domain may be for sale', 'this domain may be for sale', 'domain for sale',
+        'buy this domain', 'buy this domain name', 'make an offer on this domain', 'this domain is parked',
+        'domain parking', 'parked free', 'parked domain', 'nom de domaine a vendre', 'ce nom de domaine est a vendre',
+        'acheter ce domaine', 'acheter ce nom de domaine', 'domaine parke', 'parking de domaine',
+    ];
+
+    /**
+     * Signes AMBIGUS (un vrai média peut les écrire : « ce domaine est classé
+     * grand cru », « GoDaddy rachète… ») : cherchés seulement dans le titre et
+     * dans le corps d'une page COURTE sans articles.
+     */
+    public const PARKING_AMBIGUS = [
+        'sedo', 'godaddy', 'dan com', 'parked', 'this domain', 'ce domaine est', 'domaine a vendre', 'ce nom de domaine',
     ];
 
     /** Signes de parking cherchés dans le TITRE seulement (titre, h1, méta). */
@@ -441,19 +462,23 @@ final class SiteMedia
     public static function estParking(array $zones, int $articles = 0): bool
     {
         $titre = self::normaliser(($zones['identite'] ?? '') . ' . ' . ($zones['titre'] ?? ''));
-        foreach (array_merge(self::PARKING_FORTS, self::PARKING_TITRE) as $signe) {
+        foreach (array_merge(self::PARKING_FORTS, self::PARKING_AMBIGUS, self::PARKING_TITRE) as $signe) {
             if (str_contains($titre, ' ' . $signe . ' ')) {
                 return true;
             }
         }
-        // Le CORPS n'est lu que sur une page COURTE sans articles (une page de
-        // parking) : « ce domaine est », « GoDaddy », « domaine à vendre »
-        // dans les paragraphes d'un vrai média ne le rejettent pas.
-        $corps = self::normaliser(($zones['menu'] ?? '') . ' . ' . ($zones['texte'] ?? ''));
+        // Corps complet (liens compris) : les phrases FORTES partout…
+        $corps = self::normaliser(($zones['menu'] ?? '') . ' . ' . ($zones['texte'] ?? '') . ' . ' . ($zones['corps'] ?? ''));
+        foreach (self::PARKING_FORTS as $signe) {
+            if (str_contains($corps, ' ' . $signe . ' ')) {
+                return true;
+            }
+        }
+        // … les AMBIGUS seulement sur une page COURTE sans articles.
         if ($articles >= 3 || str_word_count(trim($corps)) >= self::PARKING_CORPS_MAX_MOTS) {
             return false;
         }
-        foreach (self::PARKING_FORTS as $signe) {
+        foreach (self::PARKING_AMBIGUS as $signe) {
             if (str_contains($corps, ' ' . $signe . ' ')) {
                 return true;
             }
@@ -469,7 +494,10 @@ final class SiteMedia
      */
     public static function indiceMedia(array $zones): bool
     {
-        $tout = self::normaliser(implode(' . ', $zones));
+        // HORS LIENS : titre, h1, méta, og, et le corps des paragraphes sans
+        // le texte de leurs liens (`corps`) — jamais le menu ni des liens
+        // sponsorisés « Actualités ».
+        $tout = self::normaliser(($zones['identite'] ?? '') . ' . ' . ($zones['titre'] ?? '') . ' . ' . ($zones['corps'] ?? ''));
         foreach (self::INDICES_MEDIA as $mot) {
             if (ClassementMedia::contient($tout, $mot)) {
                 return true;
@@ -477,6 +505,18 @@ final class SiteMedia
         }
 
         return false;
+    }
+
+    /**
+     * PREUVE DE MÉDIA hors liens, exigée pour tout `verifie` : un indice de
+     * média (`indiceMedia`), ou au moins 3 <article>, ou au moins 3 dates.
+     *
+     * @param  array<string, string>  $zones
+     * @param  array{articles: int, dates: int}  $structure
+     */
+    public static function preuveMedia(array $zones, array $structure): bool
+    {
+        return self::indiceMedia($zones) || $structure['articles'] >= 3 || $structure['dates'] >= 3;
     }
 
     /**
@@ -543,7 +583,7 @@ final class SiteMedia
     /**
      * Le jugement COMPLET d'une page lue à l'adresse `$cible` : code 2xx,
      * arrivée sur le même domaine et hors parkeur, pas de page de parking,
-     * puis `correspond()` et, pour un seul mot distinctif, l'indice de média.
+     * puis `correspond()` et la preuve de média hors liens (`preuveMedia`).
      *
      * @param  list<string>  $noms
      * @param  array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int}, code?: int, finale?: string}  $lu
@@ -570,7 +610,7 @@ final class SiteMedia
         if (! $r['ok']) {
             return [self::NON_CONFORME, $cible, $r['motif']];
         }
-        if ($r['n'] === 1 && ! self::indiceMedia($lu['zones'])) {
+        if (! self::preuveMedia($lu['zones'], $lu['structure'])) {
             return [self::A_CONFIRMER, $cible, null];
         }
 

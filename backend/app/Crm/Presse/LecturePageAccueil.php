@@ -160,6 +160,46 @@ final class LecturePageAccueil
         return $schema . '://' . $hote . (is_int($port) ? ':' . $port : '');
     }
 
+    /**
+     * L'URL est-elle lisible : schéma http(s), hôte NON VIDE fait de lettres,
+     * chiffres, points et tirets (au moins un point), port 80 / 443, et
+     * acceptée par Guzzle ? Sinon aucune requête n'est faite.
+     */
+    public static function urlValide(string $url): bool
+    {
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return false;
+        }
+        $hote = strtolower((string) ($parts['host'] ?? ''));
+        if (! in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+            || $hote === '' || ! str_contains($hote, '.') || preg_match('/^[a-z0-9.-]+$/', $hote) !== 1
+            || (isset($parts['port']) && ! in_array($parts['port'], self::PORTS, true))) {
+            return false;
+        }
+        try {
+            return (new Uri($url))->getHost() !== '';
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * L'URL d'un saut de redirection (`Location` résolu sur l'URL courante),
+     * ou null si elle est invalide (hôte vide, schéma ou port refusé,
+     * `Location` illisible) — jamais d'exception.
+     */
+    public static function resoudre(string $base, string $location): ?string
+    {
+        try {
+            $suivante = (string) UriResolver::resolve(new Uri($base), new Uri(trim($location)));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::urlValide($suivante) ? $suivante : null;
+    }
+
     /** Le chemin (et la requête) qu'évalue robots.txt pour une URL. */
     public static function cheminRobots(string $url): string
     {
@@ -178,11 +218,17 @@ final class LecturePageAccueil
     public function lire(array $cibles): array
     {
         $parOrigine = [];
+        $resultats = [];
         foreach (array_values(array_unique($cibles)) as $cible) {
+            // Hôte vide ou invalide : rien n'est demandé, pas même robots.txt.
+            if (! self::urlValide($cible)) {
+                $resultats[$cible] = self::echec(self::STATUT_ILLISIBLE);
+
+                continue;
+            }
             $parOrigine[self::origine($cible)][] = $cible;
         }
         $origines = array_keys($parOrigine);
-        $resultats = [];
 
         // ── 1. robots.txt, une requête par origine ─────────────────────────
         $debut = hrtime(true);
@@ -329,8 +375,17 @@ final class LecturePageAccueil
                     if ($sauts[$i] >= self::REDIRECTIONS_MAX) {
                         $sorties[$i] = ['statut' => self::STATUT_INJOIGNABLE, 'code' => 0, 'corps' => ''];
                     } else {
-                        $sauts[$i]++;
-                        $suivantes[$i] = (string) UriResolver::resolve(new Uri($l['url']), new Uri($r->header('Location')));
+                        // Un serveur peut renvoyer un `Location` INVALIDE
+                        // (« http:///robots.txt », hôte vide) : `new Uri()`
+                        // lève alors une exception qui arrêtait tout le lot
+                        // (production, 2026-10-01). Saut refusé = illisible.
+                        $suivante = self::resoudre($l['url'], $r->header('Location'));
+                        if ($suivante === null) {
+                            $sorties[$i] = ['statut' => self::STATUT_ILLISIBLE, 'code' => 0, 'corps' => ''];
+                        } else {
+                            $sauts[$i]++;
+                            $suivantes[$i] = $suivante;
+                        }
                     }
                 } elseif (! self::entetesAcceptables($r->toPsrResponse(), $max, $html)) {
                     $sorties[$i] = ['statut' => self::STATUT_ILLISIBLE, 'code' => 0, 'corps' => ''];

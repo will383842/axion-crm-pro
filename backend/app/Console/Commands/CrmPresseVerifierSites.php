@@ -92,6 +92,9 @@ class CrmPresseVerifierSites extends Command
 
     private const CACHE_MAX = 5000;
 
+    /** Statut, dans le cache de lecture, d'une adresse dont la lecture a levé. */
+    private const STATUT_ERREUR = 'erreur';
+
     /** @var array<string, int> */
     private array $bilan = [];
 
@@ -159,7 +162,7 @@ class CrmPresseVerifierSites extends Command
             'fiches_lues', 'paquets', 'sites_existants', 'sites_verifies', 'a_confirmer', 'non_conformes_nom', 'non_conformes_partage', 'non_conformes_redirection', 'non_conformes_parking',
             'non_conformes_liste_noire', 'non_conformes_sans_mot', 'sites_injoignables', 'robots_interdits',
             'sites_illisibles', 'sans_site', 'recherches', 'candidats_essayes', 'sites_trouves',
-            'medias_site_ecrit', 'marqueurs_ecrits', 'marqueurs_inchanges',
+            'medias_site_ecrit', 'marqueurs_ecrits', 'marqueurs_inchanges', 'erreurs', 'erreurs_lecture', 'erreurs_candidats',
         ], 0);
 
         $dernier = null;
@@ -332,12 +335,16 @@ class CrmPresseVerifierSites extends Command
                 $aLire[] = $f->existante;
             }
         }
-        $this->lire($aLire, $lecteur);
+        $this->lire($aLire, $lecteur, $delta);
         foreach ($fiches as $f) {
             if ($f->existante === null || $f->decision !== null) {
                 continue;
             }
-            $f->decision = $this->juger($f->noms, $f->existante);
+            try {
+                $f->decision = $this->juger($f->noms, $f->existante);
+            } catch (Throwable $e) {
+                $f->decision = $this->erreur($f, SiteMedia::MOTIF_EXCEPTION_JUGEMENT, $e, $f->existante);
+            }
         }
 
         // 2. TROUVER un site aux fiches sans site ou au site non conforme.
@@ -350,43 +357,33 @@ class CrmPresseVerifierSites extends Command
                     continue;
                 }
                 $this->compter($delta, 'recherches');
-                $exclu = $f->existante !== null ? SiteMedia::hote($f->existante) : null;
-                $vus = [];
-                $sources = [];
-                foreach ($f->noms as $nom) {
-                    foreach ($homonymes[mb_strtolower($nom)] ?? [] as $url) {
-                        $sources[] = $url;
-                    }
-                }
-                foreach (array_merge($sources, SiteMedia::candidats($f->noms, $maxCandidats)) as $url) {
-                    $cible = LecturePageAccueil::cible($url);
-                    $hote = $cible === null ? null : SiteMedia::hote($cible);
-                    if ($cible === null || $hote === null || isset($vus[$hote]) || $hote === $exclu
-                        || SiteMedia::estGenerique($hote) || $this->prisParUneAutre($hote, (int) $f->id)) {
-                        continue;
-                    }
-                    $vus[$hote] = true;
-                    $f->candidats[] = $cible;
-                    $aLire[] = $cible;
-                    if (count($f->candidats) >= $maxCandidats) {
-                        break;
-                    }
+                try {
+                    $this->preparerCandidats($f, $homonymes, $maxCandidats, $aLire);
+                } catch (Throwable $e) {
+                    $f->candidats = [];
+                    $f->decision = $this->erreur($f, SiteMedia::MOTIF_EXCEPTION_JUGEMENT, $e, $f->existante);
                 }
             }
-            $this->lire($aLire, $lecteur);
+            $this->lire($aLire, $lecteur, $delta);
             foreach ($fiches as $f) {
                 foreach ($f->candidats as $cible) {
                     $this->compter($delta, 'candidats_essayes');
-                    $hote = (string) SiteMedia::hote($cible);
-                    if ($this->prisParUneAutre($hote, (int) $f->id)) {
-                        continue;
-                    }
-                    if ($this->juger($f->noms, $cible)[0] === SiteMedia::VERIFIE) {
-                        $f->decision = [SiteMedia::TROUVE_VERIFIE, $cible, null];
-                        // Réservé : une autre fiche ne peut plus le prendre.
-                        $this->hotes[$hote] = [($this->hotes[$hote][0] ?? 0) + 1, (int) $f->id];
-                        $this->compter($delta, 'sites_trouves');
-                        break;
+                    try {
+                        $hote = (string) SiteMedia::hote($cible);
+                        if ($this->prisParUneAutre($hote, (int) $f->id)) {
+                            continue;
+                        }
+                        if ($this->juger($f->noms, $cible)[0] === SiteMedia::VERIFIE) {
+                            $f->decision = [SiteMedia::TROUVE_VERIFIE, $cible, null];
+                            // Réservé : une autre fiche ne peut plus le prendre.
+                            $this->hotes[$hote] = [($this->hotes[$hote][0] ?? 0) + 1, (int) $f->id];
+                            $this->compter($delta, 'sites_trouves');
+                            break;
+                        }
+                    } catch (Throwable $e) {
+                        // Un candidat qui lève : écarté, les suivants sont essayés.
+                        $this->compter($delta, 'erreurs_candidats');
+                        Log::warning('crm:presse:verifier-sites candidat en erreur', ['fiche' => (int) $f->id, 'exception' => $e::class]);
                     }
                 }
             }
@@ -397,7 +394,23 @@ class CrmPresseVerifierSites extends Command
         try {
             DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
             foreach ($fiches as $f) {
-                $this->ecrire($f, $delta);
+                // Point de sauvegarde par fiche : une écriture qui lève est
+                // annulée SEULE, la fiche est marquée `erreur`, le lot continue.
+                try {
+                    DB::transaction(function () use ($f, &$delta): void {
+                        $this->ecrire($f, $delta);
+                    });
+                } catch (Throwable $e) {
+                    $f->decision = $this->erreur($f, SiteMedia::MOTIF_EXCEPTION_ECRITURE, $e, null);
+                    try {
+                        DB::transaction(function () use ($f, &$delta): void {
+                            $this->ecrire($f, $delta);
+                        });
+                    } catch (Throwable) {
+                        // Même le marqueur échoue : compté, rien d'autre.
+                        $this->compter($delta, 'erreurs');
+                    }
+                }
             }
             if ($appliquer) {
                 DB::commit();
@@ -433,14 +446,22 @@ class CrmPresseVerifierSites extends Command
         }
 
         return match ($statut) {
+            self::STATUT_ERREUR => [SiteMedia::ERREUR, $cible, SiteMedia::MOTIF_EXCEPTION_LECTURE],
             LecturePageAccueil::STATUT_ROBOTS => [SiteMedia::ROBOTS_INTERDIT, $cible, null],
             LecturePageAccueil::STATUT_ILLISIBLE => [SiteMedia::ILLISIBLE, $cible, null],
             default => [SiteMedia::INJOIGNABLE, $cible, null],
         };
     }
 
-    /** @param  list<string>  $cibles */
-    private function lire(array $cibles, LecturePageAccueil $lecteur): void
+    /**
+     * Lit les adresses du paquet. Si la lecture groupée lève, chaque adresse
+     * est relue SEULE ; celle qui lève encore est marquée `erreur` dans le
+     * cache — jamais d'exception vers le lot.
+     *
+     * @param  list<string>  $cibles
+     * @param  array<string, int>  $delta
+     */
+    private function lire(array $cibles, LecturePageAccueil $lecteur, array &$delta): void
     {
         $nouvelles = array_values(array_filter(array_unique($cibles), fn (string $c): bool => ! isset($this->cache[$c])));
         if ($nouvelles === []) {
@@ -449,7 +470,69 @@ class CrmPresseVerifierSites extends Command
         if (count($this->cache) > self::CACHE_MAX) {
             $this->cache = [];
         }
-        $this->cache = $lecteur->lire($nouvelles) + $this->cache;
+        try {
+            $this->cache = $lecteur->lire($nouvelles) + $this->cache;
+
+            return;
+        } catch (Throwable $e) {
+            Log::warning('crm:presse:verifier-sites lecture groupée en erreur, relecture une à une', ['exception' => $e::class]);
+        }
+        foreach ($nouvelles as $cible) {
+            try {
+                $this->cache = $lecteur->lire([$cible]) + $this->cache;
+            } catch (Throwable $e) {
+                $this->compter($delta, 'erreurs_lecture');
+                Log::warning('crm:presse:verifier-sites adresse en erreur', ['exception' => $e::class]);
+                $this->cache[$cible] = ['statut' => self::STATUT_ERREUR, 'zones' => [], 'structure' => ['articles' => 0, 'dates' => 0]];
+            }
+        }
+    }
+
+    /**
+     * La décision `erreur` d'une fiche (motif court, aucune donnée de la page)
+     * ; l'exception n'est journalisée que par sa CLASSE et l'identifiant.
+     *
+     * @return array{0: string, 1: ?string, 2: string}
+     */
+    private function erreur(stdClass $f, string $motif, Throwable $e, ?string $url): array
+    {
+        Log::warning('crm:presse:verifier-sites fiche en erreur', ['fiche' => (int) $f->id, 'motif' => $motif, 'exception' => $e::class]);
+
+        return [SiteMedia::ERREUR, $url, $motif];
+    }
+
+    /**
+     * Les candidats d'une fiche : homonymes de sources ouvertes, puis
+     * adresses tirées du nom ; ajoutés à `$aLire`.
+     *
+     * @param  array<string, list<string>>  $homonymes
+     * @param  list<string>  $aLire
+     */
+    private function preparerCandidats(stdClass $f, array $homonymes, int $maxCandidats, array &$aLire): void
+    {
+        $exclu = $f->existante !== null ? SiteMedia::hote($f->existante) : null;
+        $vus = [];
+        $sources = [];
+        foreach ($f->noms as $nom) {
+            foreach ($homonymes[mb_strtolower($nom)] ?? [] as $url) {
+                $sources[] = $url;
+            }
+        }
+        foreach (array_merge($sources, SiteMedia::candidats($f->noms, $maxCandidats)) as $url) {
+            $cible = LecturePageAccueil::cible($url);
+            $hote = $cible === null ? null : SiteMedia::hote($cible);
+            if ($cible === null || $hote === null || isset($vus[$hote]) || $hote === $exclu
+                || ! LecturePageAccueil::urlValide($cible)
+                || SiteMedia::estGenerique($hote) || $this->prisParUneAutre($hote, (int) $f->id)) {
+                continue;
+            }
+            $vus[$hote] = true;
+            $f->candidats[] = $cible;
+            $aLire[] = $cible;
+            if (count($f->candidats) >= $maxCandidats) {
+                break;
+            }
+        }
     }
 
     /**
@@ -498,8 +581,23 @@ class CrmPresseVerifierSites extends Command
         return $connu !== null && ($connu[0] > 1 || $connu[1] !== $companyId);
     }
 
-    /** @param  array<string, int>  $delta */
+    /**
+     * Écrit la décision d'une fiche. Les compteurs ne sont versés dans
+     * `$delta` qu'une fois TOUT écrit : une écriture qui lève ne compte pas.
+     *
+     * @param  array<string, int>  $delta
+     */
     private function ecrire(stdClass $f, array &$delta): void
+    {
+        $local = [];
+        $this->ecrireFiche($f, $local);
+        foreach ($local as $cle => $n) {
+            $this->compter($delta, $cle, $n);
+        }
+    }
+
+    /** @param  array<string, int>  $delta */
+    private function ecrireFiche(stdClass $f, array &$delta): void
     {
         [$statut, $url, $motif] = $f->decision ?? [SiteMedia::SANS_SITE, null, null];
         $compteur = match ($statut) {
@@ -517,6 +615,7 @@ class CrmPresseVerifierSites extends Command
             SiteMedia::ROBOTS_INTERDIT => 'robots_interdits',
             SiteMedia::ILLISIBLE => 'sites_illisibles',
             SiteMedia::SANS_SITE => 'sans_site',
+            SiteMedia::ERREUR => 'erreurs',
             default => null,
         };
         if ($compteur !== null) {

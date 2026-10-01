@@ -32,7 +32,10 @@ use Illuminate\Support\Str;
  *                        autre domaine) ou `parking` (domaine à vendre) ;
  *   - `injoignable` (dont toute réponse non 2xx), `robots-interdit`,
  *     `illisible` : pas lu, donc PAS vérifié ;
- *   - `sans-site`        aucun site, rien trouvé.
+ *   - `sans-site`        aucun site, rien trouvé ;
+ *   - `erreur`           une exception sur CETTE fiche (motif
+ *                        `exception-lecture|jugement|ecriture`) : marquée,
+ *                        le lot continue ; à revoir avec --reverifier.
  * Un site n'est FIABLE que si `statut` ∈ `STATUTS_VERIFIES` (`verifie`,
  * `trouve-verifie`) : `estVerifie()` / `conditionSql()` / `urlVerifiee()`.
  * `url` est alors l'URL vérifiée (celle qu'il faut lire), même si
@@ -137,13 +140,16 @@ final class SiteMedia
 
     public const SANS_SITE = 'sans-site';
 
+    /** Une exception sur CETTE fiche (lecture, jugement, écriture) : marquée, le lot continue. */
+    public const ERREUR = 'erreur';
+
     /** @var list<string> */
     public const STATUTS_VERIFIES = [self::VERIFIE, self::TROUVE_VERIFIE];
 
     /** @var list<string> */
     public const STATUTS = [
         self::VERIFIE, self::TROUVE_VERIFIE, self::A_CONFIRMER, self::NON_CONFORME, self::INJOIGNABLE,
-        self::ROBOTS_INTERDIT, self::ILLISIBLE, self::SANS_SITE,
+        self::ROBOTS_INTERDIT, self::ILLISIBLE, self::SANS_SITE, self::ERREUR,
     ];
 
     public const MOTIF_NOM = 'nom';
@@ -157,6 +163,12 @@ final class SiteMedia
     public const MOTIF_REDIRECTION = 'redirection';
 
     public const MOTIF_PARKING = 'parking';
+
+    public const MOTIF_EXCEPTION_LECTURE = 'exception-lecture';
+
+    public const MOTIF_EXCEPTION_JUGEMENT = 'exception-jugement';
+
+    public const MOTIF_EXCEPTION_ECRITURE = 'exception-ecriture';
 
     /** Au-delà de ce nombre de fiches, un domaine est « partagé ». */
     public const PARTAGE_MAX = 3;

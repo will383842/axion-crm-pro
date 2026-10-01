@@ -120,6 +120,26 @@ docker compose up -d --no-deps postgres redis
 # `restart` et NON `up -d --no-deps caddy` : `up -d` ne recrée que si la
 # CONFIGURATION a changé. Ici elle n'a pas bougé — c'est l'adresse de l'amont.
 # `up -d` serait un no-op, et la panne resterait entière.
+#
+# 2026-10-01 — Caddy est une image CONSTRUITE (cible `caddy-bordure` de
+# `Dockerfile.frontend` : binaire Caddy recompilé, Go et modules corrigés).
+# `build` puis `up -d` la reconstruisent et recréent le conteneur si l'image a
+# changé (no-op sinon). Coupure de quelques secondes à la recréation.
+#
+# 🔴 Le `restart` joue QUOI QU'IL ARRIVE (sinon : API en 502, panne du
+# 2026-08-21). Construction séparée : si elle échoue, rien n'est recréé,
+# l'ANCIEN conteneur reste en place ; l'échec est noté et le job échoue à la
+# FIN du script, après migrations et vérifications, avec un message clair.
+#
+# `extra_hosts` est RETIRÉ de l'overlay prod (2026-10-01) : la recréation ne
+# met PAS la préproduction `staging.*` en ligne (elle reste en 502, non
+# protégée). L'ouvrir est une décision à part — cf. docker-compose.prod.yml.
+CADDY_ECHEC=""
+if ! docker compose build caddy; then
+  CADDY_ECHEC="construction de l'image caddy-bordure"
+elif ! docker compose up -d --no-deps caddy; then
+  CADDY_ECHEC="recreation du conteneur caddy"
+fi
 docker compose restart caddy
 
 # Migration BLOQUANTE (plus de `|| true`). `--database=pgsql_owner` : les

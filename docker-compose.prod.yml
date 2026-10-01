@@ -186,9 +186,22 @@ services:
   # `up -d --force-recreate --no-deps caddy` explicite, une fois. C'est le même
   # piège que celui qui a laissé Postgres publié malgré un correctif déployé
   # (journal §7).
-  caddy:
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
+  #
+  # ⛔ 2026-10-01 — `extra_hosts` RETIRÉ, VOLONTAIREMENT (PR #277).
+  # Le conteneur `axion-crm-caddy` n'a jamais été recréé depuis le 2026-08-19 :
+  # ce réglage n'a donc JAMAIS été actif, et `staging.*` répond 502 en
+  # production (mesuré le 2026-10-01 : `staging.axion-crm-pro.com` → 502,
+  # `staging-api.axion-crm-pro.com/up` → 502). Or le proxy de bordure est
+  # désormais une image CONSTRUITE, que le déploiement RECRÉE : laissé ici,
+  # `extra_hosts` aurait pris effet à la fusion et MIS EN LIGNE la préproduction
+  # — sans authentification (les blocs `staging.*` de `infra/caddy/Caddyfile`
+  # n'ont ni `basic_auth` ni filtre d'adresse IP). Personne ne l'a décidé.
+  #
+  # Ouvrir la préproduction est une DÉCISION À PART : la protéger d'abord
+  # (basic_auth ou liste d'adresses dans les blocs `staging.*`), puis remettre :
+  #   caddy:
+  #     extra_hosts:
+  #       - 'host.docker.internal:host-gateway'
 
 volumes:
   # `storage/` est le seul dossier que l'application ÉCRIT. Sans ce volume, les

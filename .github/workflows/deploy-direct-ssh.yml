@@ -432,7 +432,33 @@ jobs:
           #
           # Le cout est de deux ou trois secondes de coupure, a un moment ou le
           # deploiement coupe deja.
-          echo "::group::redemarrage de Caddy (il doit re-resoudre l'adresse d'api)"
+          #
+          # 2026-10-01 — Caddy est desormais une image CONSTRUITE (cible
+          # `caddy-bordure` de Dockerfile.frontend, binaire recompile). Il faut
+          # donc d'abord la (re)construire et RECREER le conteneur quand l'image
+          # change : `up -d --build` le fait (no-op si l'image est identique),
+          # puis le `restart` ci-dessous garde son role (re-resoudre l'amont).
+          # Premiere application : recreation, coupure de quelques secondes,
+          # acceptee. (`extra_hosts` a ete RETIRE de l'overlay prod : la
+          # recreation ne met PAS la preproduction en ligne, cf.
+          # docker-compose.prod.yml.)
+          #
+          # 🔴 LE `restart` S'EXECUTE QUOI QU'IL ARRIVE. `api` vient d'etre
+          # recree : sans `restart`, Caddy garde l'ancienne adresse et l'API
+          # rend 502 (panne du 2026-08-21). Sous `set -e`, un echec de build
+          # sauterait le `restart` — d'ou :
+          #   - CONSTRUCTION SEPAREE (`build`) : si elle echoue, rien n'est
+          #     recree, l'ANCIEN conteneur reste en place ;
+          #   - l'echec est NOTE, le `restart` joue quand meme, et le job
+          #     echoue a la FIN du script, message clair (le reste du
+          #     deploiement — migrations, verifications — a tourne).
+          echo "::group::reconstruction + redemarrage de Caddy (binaire corrige, re-resolution d'api)"
+          CADDY_ECHEC=""
+          if ! docker compose build caddy; then
+            CADDY_ECHEC="construction de l'image caddy-bordure"
+          elif ! docker compose up -d --no-deps caddy; then
+            CADDY_ECHEC="recreation du conteneur caddy"
+          fi
           docker compose restart caddy
           echo "::endgroup::"
           echo "::endgroup::"
@@ -544,6 +570,13 @@ jobs:
           fi
           echo "Aucune migration en attente."
           echo "::endgroup::"
+
+          # Echec de Caddy NOTE plus haut (le `restart` a joue quand meme) :
+          # le job echoue ICI, apres toutes les autres etapes.
+          if [ -n "$CADDY_ECHEC" ]; then
+            echo "::error::Caddy : echec de la ${CADDY_ECHEC}. L'ancien conteneur est reste en place et a ete redemarre (l'API repond), mais le binaire Caddy corrige n'est PAS deploye."
+            exit 1
+          fi
 
           # Sentinelle : prouve que le script distant est allé jusqu'au bout,
           # donc que les vérifications ci-dessus ont VRAIMENT tourné.

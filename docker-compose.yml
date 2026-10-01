@@ -389,7 +389,17 @@ services:
   # CÔTÉS : redéclarer les services ici ET remettre la ligne dans la matrice
   # `build-and-push` de `.github/workflows/deploy-staging.yml`.
   caddy:
-    image: caddy:2-alpine
+    # 2026-10-01 — n'est plus l'image TIRÉE `caddy:2-alpine` : son binaire
+    # (Caddy v2.11.4, Go 1.26.3) porte des CVE HIGH sur crypto/tls,
+    # crypto/x509 et net/http, sur le chemin exposé (80/443, TLS en frontal).
+    # Construite ici, cible `caddy-bordure` de `Dockerfile.frontend` : même
+    # base Alpine, binaire RECOMPILÉ (stade `caddy-build`). Le déploiement la
+    # reconstruit et recrée le conteneur (`deploy-direct-ssh.yml`) ; le scan
+    # Trivy bloquant la couvre (`security.yml`, entrée `caddy-bordure`).
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: caddy-bordure
     container_name: axion-crm-caddy
     # Plafond du journal Docker — constat F39-011. Voir l ancre `x-journal`
     # en tete de fichier : 10 Mio x 5 = 50 Mio par conteneur, jamais plus.

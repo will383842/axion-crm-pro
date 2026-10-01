@@ -194,12 +194,19 @@ jobs:
             dockerfile: Dockerfile.laravel
           - image: app
             dockerfile: Dockerfile.frontend
+          # 2026-10-01 — le proxy de BORDURE `axion-crm-caddy` (80/443, TLS) est
+          # désormais CONSTRUIT (cible `caddy-bordure`, binaire Caddy recompilé) :
+          # il passe donc sous la garde BLOQUANTE, et sort de l'inventaire
+          # non bloquant `trivy-images-tirees` ci-dessous.
+          - image: caddy-bordure
+            dockerfile: Dockerfile.frontend
+            target: caddy-bordure
           - image: worker
             dockerfile: Dockerfile.worker
     steps:
       - uses: actions/checkout@v4
       - name: Build ${{ matrix.image }}
-        run: docker build -t axion-crm/${{ matrix.image }}:scan -f ${{ matrix.dockerfile }} --target prod .
+        run: docker build -t axion-crm/${{ matrix.image }}:scan -f ${{ matrix.dockerfile }} --target ${{ matrix.target || 'prod' }} .
       # 1) SARIF pour l'onglet Security : l'INVENTAIRE COMPLET, y compris ce qui
       #    n'a pas encore de correctif. Non bloquant — c'est la mémoire, pas la
       #    garde. Épinglé sur une version : `@master` fait dépendre la sécurité
@@ -292,6 +299,10 @@ jobs:
   # republie — bloquer les PR en attendant ne ferait qu'un rouge permanent. Ce
   # que ce job apporte, c'est de SAVOIR : l'inventaire remonte dans l'onglet
   # Security, et le jour où l'amont corrige, on le voit.
+  #
+  # 2026-10-01 — `caddy-bordure` a QUITTÉ cette liste : le proxy de bordure
+  # est désormais construit (binaire Caddy recompilé) et scanné par la garde
+  # bloquante du job `trivy` ci-dessus. Reste ici ce qu'on tire tel quel.
   trivy-images-tirees:
     name: Scan images tirées (inventaire)
     runs-on: ubuntu-24.04
@@ -300,7 +311,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { nom: caddy-bordure, ref: 'caddy:2-alpine' }
           - { nom: redis, ref: 'redis:7.2-alpine' }
     steps:
       - uses: actions/checkout@v4

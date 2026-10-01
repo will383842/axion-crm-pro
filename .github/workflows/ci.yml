@@ -301,9 +301,17 @@ jobs:
   caddyfile-valide:
     name: Le Caddyfile est-il valide ?
     runs-on: ubuntu-24.04
-    timeout-minutes: 20  # F38-008 — plafond anti-gel (une image Caddy tirée, une validation)
+    timeout-minutes: 20  # F38-008 — plafond anti-gel (le binaire Caddy recompilé, puis les validations)
     steps:
       - uses: actions/checkout@v4
+
+      # 2026-10-01 — on valide avec le binaire QUI TOURNE, pas avec celui de
+      # `caddy:2-alpine` : les deux conteneurs (`app` et la bordure) portent
+      # désormais le Caddy RECOMPILÉ du stade `caddy-build` de
+      # Dockerfile.frontend. La cible `caddy-bordure` contient exactement ce
+      # binaire, sans le build Node : c’est l’image de validation.
+      - name: Construire le Caddy recompilé (cible caddy-bordure)
+        run: docker build -t axion-crm/caddy-ci:valide -f Dockerfile.frontend --target caddy-bordure .
 
       # ── POURQUOI CE JOB EXISTE ────────────────────────────────────────────
       # `infra/caddy/Caddyfile` est le SEUL point d'entrée du site : un unique
@@ -344,7 +352,7 @@ jobs:
           printf 'exemple.test {\n    reverse_proxy api:80 {\n        header_up X-Real-IP {remote_host}\n' \
             > /tmp/caddy-faux/Caddyfile
 
-          sortie="$(docker run --rm -v /tmp/caddy-faux:/etc/caddy:ro caddy:2-alpine \
+          sortie="$(docker run --rm -v /tmp/caddy-faux:/etc/caddy:ro axion-crm/caddy-ci:valide \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1)"
           code=$?
 
@@ -369,7 +377,7 @@ jobs:
       - name: Le Caddyfile du dépôt est-il valide ?
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" caddy:2-alpine \
+          docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" axion-crm/caddy-ci:valide \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le Caddyfile est valide, Caddy démarrera dessus."
 
@@ -396,7 +404,7 @@ jobs:
           set -euo pipefail
           test -f frontend/Caddyfile.app  # un fichier absent rendrait l'étape muette
           docker run --rm \
-            -v "$PWD/frontend/Caddyfile.app:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
+            -v "$PWD/frontend/Caddyfile.app:/etc/caddy/Caddyfile:ro" axion-crm/caddy-ci:valide \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le SPA démarrera : son Caddy interne est valide."
 

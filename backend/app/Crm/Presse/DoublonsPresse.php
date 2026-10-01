@@ -32,8 +32,8 @@ use stdClass;
  *       journal n'est JAMAIS fusionné d'office avec la fiche de son éditeur) ;
  *     - les deux ont la relation `presse_media` ;
  *     - aucune relation saisie à la main (`relation_saisie_manuelle_at`) ;
- *     - départements compatibles : le même, ou au moins une sans département
- *       (et aucune n'en porte plusieurs pour cette clé) ;
+ *     - le MÊME département, ou toutes deux sans département (un titre sans
+ *       département n'absorbe jamais une édition : relecture A09 de #276) ;
  *     - le MÊME type exact (une émission n'est pas sa chaîne) ;
  *     - aucune adresse contradictoire : si les deux en ont (adresse générique
  *       de la fiche, adresse de rédaction des lignes `media` de la clé), ce
@@ -124,7 +124,9 @@ final class DoublonsPresse
         if (! $a['presse'] || ! $b['presse'] || $a['manuelle'] || $b['manuelle']) {
             return self::A_VERIFIER;
         }
-        if (count($da) > 1 || count($db) > 1) {
+        // Mêmes départements, ou tous deux sans : un titre sans département
+        // (national ?) n'absorbe jamais une édition sans un humain.
+        if (count($da) > 1 || count($db) > 1 || $da !== $db) {
             return self::A_VERIFIER;
         }
         if (count($a['types']) !== 1 || $a['types'] !== $b['types']) {

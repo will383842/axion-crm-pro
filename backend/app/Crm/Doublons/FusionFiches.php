@@ -436,6 +436,12 @@ final class FusionFiches
             // sur les données du moment, les deux fiches verrouillées (aucun
             // SIREN, même type, départements et adresses compatibles, aucune
             // relation saisie à la main).
+            // Une paire qu'un humain tient ou a tranchée — dans la file (en
+            // attente, « pas des doublons ») ou dont une fusion a été annulée —
+            // ne repart JAMAIS d'office (relecture A09 de #276).
+            if ($flagId !== null || $this->paireConnueDUnHumain($ws, $gardeId, $absorbeeId)) {
+                throw new RefusFusion('presse_decision_humaine');
+            }
             if (! DoublonsPresse::paireStricte($ws, $gardeId, $absorbeeId)) {
                 throw new RefusFusion('presse_pas_stricte');
             }
@@ -1002,6 +1008,24 @@ final class FusionFiches
         $this->auditer($ws, null, $operateur, 'FUSION_FICHES_ANNULEE', ['fusion' => $fusionId, 'bilan' => $bilan], "annulation de la fusion {$fusionId}");
 
         return $bilan;
+    }
+
+    /**
+     * La paire a-t-elle déjà une ligne dans la file (quel que soit son état :
+     * en attente, écartée, fusionnée), ou une fusion entre les deux (annulée
+     * comprise), dans un sens ou dans l'autre ?
+     */
+    private function paireConnueDUnHumain(string $ws, int $a, int $b): bool
+    {
+        $r = DB::selectOne(
+            "SELECT EXISTS (SELECT 1 FROM duplicate_flags pc_d WHERE pc_d.workspace_id = ? AND pc_d.entity_type = 'company'
+                              AND ((pc_d.entity_a_id = ? AND pc_d.entity_b_id = ?) OR (pc_d.entity_a_id = ? AND pc_d.entity_b_id = ?)))
+                 OR EXISTS (SELECT 1 FROM fusions_fiches pc_f WHERE pc_f.workspace_id = ?
+                              AND ((pc_f.garde_id = ? AND pc_f.absorbee_id = ?) OR (pc_f.garde_id = ? AND pc_f.absorbee_id = ?))) AS connue",
+            [$ws, $a, $b, $b, $a, $ws, $a, $b, $b, $a],
+        );
+
+        return $r instanceof stdClass && (bool) $r->connue;
     }
 
     // ── Les métadonnées de la presse ────────────────────────────────────────

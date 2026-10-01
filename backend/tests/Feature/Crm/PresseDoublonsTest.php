@@ -139,7 +139,16 @@ test('🔴 la fusion est ANNULABLE : la fiche absorbée sort de la corbeille et 
         ->and(pddFiche($a))->toBe($garde)
         ->and(DB::table('fusions_fiches')->where('id', $fusion)->value('annulee_at'))->not->toBeNull();
 
-    // Défaite par un humain : jamais reprise seule — la paire va dans la file.
+    // Défaite par un humain : FusionFiches la refuse d'elle-même…
+    expect(fn () => WorkspaceContext::run($this->espace, fn (): int => app(FusionFiches::class)->fusionner(
+        $this->espace,
+        $garde,
+        $absorbee,
+        Rapprochement::PRESSE_MEME_TITRE,
+        FusionFiches::MODE_AUTO,
+    )))->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_decision_humaine']);
+
+    // … et la commande ne la reprend jamais seule : la paire va dans la file.
     $r = pddDoublons(['--appliquer' => true]);
     expect(pddCompteur($r['sortie'], 'fusionnees'))->toBe(0)
         ->and(pddCompteur($r['sortie'], 'fusions_annulees_non_reprises'))->toBe(1)
@@ -333,4 +342,105 @@ test('🔴 import : plusieurs fiches, UNE seule au même département exactement
     expect(pddCompteur($r['sortie'], 'titres_rapproches'))->toBe(1)
         ->and($r['sortie'])->toContain('rapprochement_ambigu : 1')
         ->and(DB::table('contacts')->where('company_id', pddFiche($exacte))->where('last_name', 'ZZLOCAL')->exists())->toBeTrue();
+});
+
+test('🔴 A09 — chaîne de TROIS fiches (kit presse, Wikidata, ARCOM) : toutes fusionnées vers la plus fiable', function () {
+    $kit = pddMedia($this->espace, ['name' => 'ZZ Chaîne Triple', 'source' => 'press-kit']);
+    $wiki = pddMedia($this->espace, ['name' => 'ZZ Chaîne Triple', 'source' => 'wikidata']);
+    $arcom = pddMedia($this->espace, ['name' => 'ZZ Chaîne Triple', 'source' => 'arcom']);
+    Artisan::call('crm:presse:harmoniser');
+    $garde = pddFiche($arcom);
+
+    $r = pddDoublons(['--appliquer' => true]);
+
+    expect(pddCompteur($r['sortie'], 'fusionnees'))->toBe(2)
+        ->and(DB::table('fusions_fiches')->where('garde_id', $garde)->count())->toBe(2)
+        ->and(pddFiche($kit))->toBe($garde)
+        ->and(pddFiche($wiki))->toBe($garde)
+        ->and(DB::table('companies')->where('id', $garde)->value('deleted_at'))->toBeNull()
+        ->and(DB::table('duplicate_flags')->count())->toBe(0);
+});
+
+test('🔴 A09 — une paire ÉCARTÉE par un humain (« pas des doublons ») n est ni fusionnée ni reproposée ; même forcée, FusionFiches refuse', function () {
+    $a = pddMedia($this->espace, ['name' => 'ZZ Chaîne Écartée', 'source' => 'arcom']);
+    $b = pddMedia($this->espace, ['name' => 'ZZ Chaîne Écartée', 'source' => 'press-kit']);
+    Artisan::call('crm:presse:harmoniser');
+    [$garde, $autre] = [pddFiche($a), pddFiche($b)];
+    DB::table('duplicate_flags')->insert(['workspace_id' => $this->espace, 'entity_type' => 'company', 'entity_a_id' => $autre, 'entity_b_id' => $garde,
+        'similarity' => 0.65, 'motif' => Rapprochement::PRESSE_HOMONYME, 'fusion_auto' => false, 'detected_at' => now(),
+        'reviewed_at' => now(), 'resolution' => 'keep_both']);
+
+    $r = pddDoublons(['--appliquer' => true]);
+
+    expect(pddCompteur($r['sortie'], 'fusionnees'))->toBe(0)
+        ->and(pddCompteur($r['sortie'], 'ecartees_par_un_humain'))->toBe(1)
+        ->and(DB::table('duplicate_flags')->count())->toBe(1)
+        ->and(DB::table('fusions_fiches')->count())->toBe(0)
+        ->and(DB::table('companies')->where('id', $autre)->value('deleted_at'))->toBeNull();
+    expect(fn () => WorkspaceContext::run($this->espace, fn (): int => app(FusionFiches::class)->fusionner(
+        $this->espace,
+        $garde,
+        $autre,
+        Rapprochement::PRESSE_MEME_TITRE,
+        FusionFiches::MODE_AUTO,
+    )))->toThrow(RefusFusion::class, RefusFusion::MESSAGES['presse_decision_humaine']);
+});
+
+test('🔴 A09 — une paire DÉJÀ EN FILE (en attente d un humain) n est jamais fusionnée d office ; le TÉMOIN hors file l est', function () {
+    $a = pddMedia($this->espace, ['name' => 'ZZ Chaîne En File', 'source' => 'arcom']);
+    $b = pddMedia($this->espace, ['name' => 'ZZ Chaîne En File', 'source' => 'press-kit']);
+    $w = pddMedia($this->espace, ['name' => 'ZZ Chaîne En File', 'source' => 'wikidata']);
+    Artisan::call('crm:presse:harmoniser');
+    [$garde, $temoin, $enFile] = [pddFiche($a), pddFiche($b), pddFiche($w)];
+    DB::table('duplicate_flags')->insert(['workspace_id' => $this->espace, 'entity_type' => 'company', 'entity_a_id' => $garde, 'entity_b_id' => $enFile,
+        'similarity' => 0.65, 'motif' => Rapprochement::PRESSE_HOMONYME, 'fusion_auto' => false, 'detected_at' => now()]);
+
+    $r = pddDoublons(['--appliquer' => true]);
+
+    expect(pddCompteur($r['sortie'], 'fusionnees'))->toBe(1)
+        ->and(pddCompteur($r['sortie'], 'deja_en_file'))->toBe(1)
+        ->and(DB::table('companies')->where('id', $temoin)->value('deleted_at'))->not->toBeNull()
+        ->and(DB::table('companies')->where('id', $enFile)->value('deleted_at'))->toBeNull()
+        ->and(DB::table('duplicate_flags')->whereNull('reviewed_at')->count())->toBe(1);
+
+    // Nouveau passage : toujours pas.
+    pddDoublons(['--appliquer' => true]);
+    expect(DB::table('companies')->where('id', $enFile)->value('deleted_at'))->toBeNull()
+        ->and(DB::table('fusions_fiches')->where('absorbee_id', $enFile)->exists())->toBeFalse();
+});
+
+test('🔴 A09 — une fiche SANS département face à deux éditions (31, 81) : jamais fusionnée, en file face à CHACUNE', function () {
+    $e31 = pddMedia($this->espace, ['name' => 'ZZ Courrier', 'media_type' => 'presse_quotidien', 'department_code' => '31', 'source' => 'press-kit']);
+    $e81 = pddMedia($this->espace, ['name' => 'ZZ Courrier', 'media_type' => 'presse_quotidien', 'department_code' => '81', 'source' => 'press-kit']);
+    $national = pddMedia($this->espace, ['name' => 'ZZ Courrier', 'media_type' => 'presse_quotidien', 'source' => 'arcom']);
+    Artisan::call('crm:presse:harmoniser');
+    DB::table('companies')->where('id', pddFiche($national))->update(['department_code' => null]);
+
+    $r = pddDoublons(['--appliquer' => true]);
+
+    $sans = pddFiche($national);
+    $ids = DB::table('duplicate_flags')->where('motif', Rapprochement::PRESSE_HOMONYME)->get()
+        ->flatMap(static fn ($f): array => [(int) $f->entity_a_id, (int) $f->entity_b_id]);
+    expect(pddCompteur($r['sortie'], 'fusionnees'))->toBe(0)
+        ->and(DB::table('fusions_fiches')->count())->toBe(0)
+        ->and(DB::table('duplicate_flags')->count())->toBe(2)
+        ->and($ids->filter(static fn (int $id): bool => $id === $sans)->count())->toBe(2)
+        ->and($ids->contains(pddFiche($e31)))->toBeTrue()
+        ->and($ids->contains(pddFiche($e81)))->toBeTrue();
+});
+
+test('🔴 A09 — import : la seule fiche au département exact porte un SIREN (éditeur) : jamais choisie, la ligne reste ambiguë', function () {
+    $editeur = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000772', 'denomination' => 'ZZ GROUPE EDITION',
+        'entity_nature' => 'media', 'relation_type' => 'presse_media', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    pddMedia($this->espace, ['name' => 'ZZ Édition Siren', 'media_type' => 'presse_quotidien', 'department_code' => '31', 'company_id' => $editeur]);
+    pddMedia($this->espace, ['name' => 'ZZ Édition Siren', 'media_type' => 'presse_quotidien', 'source' => 'press-kit']);
+    Artisan::call('crm:presse:harmoniser');
+    DB::table('companies')->where('id', $editeur)->update(['relation_type' => 'presse_media']);
+
+    $r = pddImporter([['identifiant' => 'presse:zz:edition-siren', 'nom' => 'ZZ Édition Siren', 'type' => 'presse_quotidien', 'departement' => '31']]);
+
+    expect($r['sortie'])->toContain('rapprochement_ambigu : 1')
+        ->and(DB::table('companies')->where('foreign_id', 'presse:zz:edition-siren')->exists())->toBeFalse();
 });

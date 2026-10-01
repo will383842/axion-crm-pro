@@ -18,9 +18,9 @@ function dpjProfil(array $valeurs = []): array
     ], $valeurs);
 }
 
-test('TÉMOIN — deux fiches sans SIREN, même type, sans département ni adresse : stricte', function () {
+test('TÉMOIN — deux fiches sans SIREN, même type, même département (ou aucun) et même adresse : stricte', function () {
     expect(DoublonsPresse::juger(dpjProfil(), dpjProfil(['id' => 2])))->toBe(DoublonsPresse::STRICTE)
-        ->and(DoublonsPresse::juger(dpjProfil(['departements' => ['31']]), dpjProfil(['id' => 2])))->toBe(DoublonsPresse::STRICTE)
+        ->and(DoublonsPresse::juger(dpjProfil(['departements' => ['31']]), dpjProfil(['id' => 2, 'departements' => ['31']])))->toBe(DoublonsPresse::STRICTE)
         ->and(DoublonsPresse::juger(dpjProfil(['departements' => ['31'], 'emails' => ['r@zz.example.invalid']]), dpjProfil(['id' => 2, 'departements' => ['31'], 'emails' => ['r@zz.example.invalid']])))->toBe(DoublonsPresse::STRICTE);
 });
 
@@ -38,6 +38,8 @@ test('une seule différence suffit à passer « à vérifier »', function (arra
     'fiche hors presse' => [[], ['presse' => false]],
     'émission et chaîne' => [['types' => ['tv']], ['types' => ['tv_emission']]],
     'adresses contradictoires' => [['emails' => ['a@zz.example.invalid']], ['emails' => ['b@zz.example.invalid']]],
+    'un titre sans département face à une édition' => [['departements' => []], ['departements' => ['31']]],
+    'une édition face à un titre sans département' => [['departements' => ['31']], ['departements' => []]],
     'plusieurs départements sur une fiche' => [['departements' => ['31', '81']], ['departements' => ['81']]],
 ]);
 

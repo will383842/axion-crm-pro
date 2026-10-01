@@ -26,7 +26,7 @@ use Throwable;
  *
  *  - FUSIONNE (par `FusionFiches` : annulable, journalisée, la fiche absorbée
  *    à la corbeille, jamais supprimée) les cas STRICTS seulement — deux fiches
- *    sans SIREN, même titre, même type, départements et adresses compatibles,
+ *    sans SIREN, même titre, même type, même département (ou aucun), adresses compatibles,
  *    aucune relation saisie à la main (`DoublonsPresse::juger`, re-jugé par
  *    `FusionFiches` dans la transaction) ;
  *  - laisse les ÉDITIONS (même titre, départements différents) telles quelles ;
@@ -34,15 +34,17 @@ use Throwable;
  *    `presse_homonyme`) — dont tout journal face à la fiche de son ÉDITEUR
  *    (SIREN) : décision de Will, jamais de fusion automatique.
  *
- * Une paire déjà écartée par un humain (« ce ne sont pas des doublons ») ou
- * dont une fusion a été annulée n'est jamais fusionnée ni redéposée.
+ * Une paire qui a DÉJÀ une ligne dans la file (en attente, écartée par un
+ * humain — « ce ne sont pas des doublons » — ou fusionnée), ou dont une
+ * fusion a été annulée, n'est JAMAIS fusionnée automatiquement : elle reste
+ * (ou retourne) dans la file. `FusionFiches` le refuse aussi de lui-même.
  *
  * ── Le groupe et la fiche gardée ─────────────────────────────────────────
  * Un groupe = les fiches vivantes `presse_media` qui portent une ligne `media`
- * vivante de même nom normalisé et de même famille de type. S'il y a
- * plusieurs départements, chaque département forme son sous-groupe (les
- * éditions) ; une fiche sans département n'est alors rattachée à aucune
- * édition d'office : elle va dans la file face à chacune. Dans un sous-groupe,
+ * vivante de même nom normalisé et de même famille de type. Chaque
+ * département forme son sous-groupe (les éditions), les fiches sans
+ * département le leur ; une fiche sans département n'est jamais fusionnée
+ * d'office avec une édition : la paire va dans la file. Dans un sous-groupe,
  * la fiche gardée est la meilleure fiche sans SIREN (`DoublonsPresse::
  * meilleure`) ; chaque autre fiche est jugée face à elle.
  *
@@ -210,38 +212,38 @@ class CrmPresseDoublons extends Command
             return;
         }
 
-        // Les éditions : un sous-groupe par département quand il y en a
-        // plusieurs ; une fiche sans département (ou à plusieurs) n'est
-        // rattachée d'office à aucune.
-        $parDepartement = [];
+        // Un sous-groupe par département exact, un pour les fiches SANS
+        // département : seules les fiches d'un même sous-groupe peuvent être
+        // fusionnées. Entre sous-groupes : deux départements différents = deux
+        // éditions (rien) ; sans département face à un département = la file
+        // (un titre sans département n'absorbe jamais une édition). Une fiche
+        // à plusieurs départements n'appartient à aucun : la file face à chacun.
+        $sousGroupes = [];
         $flottantes = [];
         foreach ($profils as $p) {
-            if (count($p['departements']) === 1) {
-                $parDepartement[$p['departements'][0]][] = $p;
+            $n = count($p['departements']);
+            if ($n <= 1) {
+                $sousGroupes[$n === 1 ? 'd:' . $p['departements'][0] : 'sans'][] = $p;
             } else {
                 $flottantes[] = $p;
             }
         }
-        if (count($parDepartement) <= 1) {
-            $this->traiterSousGroupe($fusion, array_values($profils));
-
-            return;
-        }
         $gardes = [];
-        foreach ($parDepartement as $sousGroupe) {
+        foreach ($sousGroupes as $sousGroupe) {
             $gardes[] = $this->traiterSousGroupe($fusion, $sousGroupe);
         }
-        // Entre éditions : jamais un doublon.
-        $n = count($gardes);
-        $this->bilan['editions_distinctes'] += intdiv($n * ($n - 1), 2);
-        foreach ($flottantes as $f) {
-            foreach ($gardes as $garde) {
-                if (DoublonsPresse::juger($garde, $f) === DoublonsPresse::EDITIONS) {
+        $autres = array_merge($gardes, $flottantes);
+        foreach ($gardes as $i => $garde) {
+            foreach ($autres as $j => $autre) {
+                if ($j <= $i) {
+                    continue;
+                }
+                if (DoublonsPresse::juger($garde, $autre) === DoublonsPresse::EDITIONS) {
                     $this->bilan['editions_distinctes']++;
 
                     continue;
                 }
-                $this->deposer($garde, $f);
+                $this->deposer($garde, $autre);
             }
         }
     }
@@ -295,6 +297,14 @@ class CrmPresseDoublons extends Command
 
                 continue;
             }
+            if ($etat['en_file']) {
+                // Déjà dans la file (en attente d'un humain, ou jugée) : un
+                // humain la tient, elle n'est JAMAIS fusionnée d'office
+                // (relecture A09 de #276).
+                $this->bilan['deja_en_file']++;
+
+                continue;
+            }
             try {
                 $fusion->fusionner(
                     $this->ws,
@@ -302,7 +312,7 @@ class CrmPresseDoublons extends Command
                     $autre['id'],
                     Rapprochement::PRESSE_MEME_TITRE,
                     FusionFiches::MODE_AUTO,
-                    $etat['flag'],
+                    null,
                     null,
                     $this->operateur,
                     $this->aBlanc,
@@ -352,8 +362,8 @@ class CrmPresseDoublons extends Command
     }
 
     /**
-     * @return array{ecartee: bool, fusion_annulee: bool, flag: ?int} la paire
-     *                                                                écartée par un humain, une fusion déjà annulée, la paire en attente dans la file
+     * @return array{ecartee: bool, fusion_annulee: bool, en_file: bool} la paire
+     *                                                                   écartée par un humain, une fusion déjà annulée, la paire en attente dans la file
      */
     private function etatPaire(int $a, int $b): array
     {
@@ -367,7 +377,7 @@ class CrmPresseDoublons extends Command
         return [
             'ecartee' => $flag !== null && $flag->resolution === 'keep_both',
             'fusion_annulee' => $fusionAnnulee,
-            'flag' => $flag !== null && $flag->reviewed_at === null ? (int) $flag->id : null,
+            'en_file' => $flag !== null,
         ];
     }
 

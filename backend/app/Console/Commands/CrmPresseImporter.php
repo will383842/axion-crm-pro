@@ -598,7 +598,7 @@ class CrmPresseImporter extends Command
      * Le titre de cette ligne existe-t-il déjà en base, sans SIREN ? Même nom
      * normalisé, même type, département compatible (égal, ou inconnu d'un
      * côté). Une seule fiche : on la rejoint. Plusieurs fiches dont UNE seule
-     * au même département exactement : celle-là. Sinon plusieurs fiches, ou
+     * au même département exactement, fiche de presse SANS SIREN : celle-là. Sinon plusieurs fiches, ou
      * un titre pas encore harmonisé (sans fiche) : DOUTE — la ligne est
      * rejetée et comptée, jamais une fiche parallèle (`crm:presse:doublons`
      * réduit ces doutes en fusionnant les vrais doublons).
@@ -629,6 +629,12 @@ class CrmPresseImporter extends Command
             $exactes = $candidats
                 ->filter(static fn (\stdClass $c): bool => strtoupper(trim((string) $c->department_code)) === $l['departement'])
                 ->pluck('company_id')->map(static fn ($v): int => (int) $v)->unique()->values();
+            // Seulement une fiche de presse SANS SIREN : une fiche à SIREN
+            // (éditeur) n'est jamais choisie ainsi — le doute reste (A09 #276).
+            $exactes = $exactes->isEmpty() ? $exactes : DB::table('companies')->where('workspace_id', $this->workspaceId)
+                ->whereIn('id', $exactes->all())->whereNull('deleted_at')->whereNull('siren')
+                ->where('relation_type', QualificationPresse::RELATION)
+                ->pluck('id')->map(static fn ($v): int => (int) $v)->values();
             if ($exactes->count() === 1) {
                 $fiches = $exactes;
             }

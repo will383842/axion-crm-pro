@@ -185,7 +185,7 @@ export function MediaDetailPage() {
               {data.email_confidence ? (
                 <span
                   className={cn(
-                    "ml-2 rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                    "ml-2 rounded px-1.5 py-0.5 text-xs font-semibold",
                     data.email_confidence === "A"
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                       : data.email_confidence === "B"
@@ -215,7 +215,7 @@ export function MediaDetailPage() {
         {data.journalists && data.journalists.length > 0 ? (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-[11px] uppercase text-slate-500 dark:border-slate-800">
+              <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800">
                 <th className="py-2 text-left">Nom</th>
                 <th className="py-2 text-left">Rôle</th>
                 <th className="py-2 text-left">Rubrique</th>
@@ -228,7 +228,7 @@ export function MediaDetailPage() {
                   <td className="py-2">{[j.first_name, j.last_name].filter(Boolean).join(" ") || "—"}</td>
                   <td className="py-2 text-slate-500">{j.role || "—"}</td>
                   <td className="py-2 text-slate-500">{j.beat || "—"}</td>
-                  <td className="py-2 text-slate-500">{j.opt_out ? "opt-out" : j.email || "—"}</td>
+                  <td className="py-2 text-slate-500">{j.opt_out ? "opposé aux envois" : j.email || "—"}</td>
                 </tr>
               ))}
             </tbody>

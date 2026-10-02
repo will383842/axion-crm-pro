@@ -100,7 +100,7 @@ export function JournalistsListPage() {
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard tone="sky" label="Total" value={total.toLocaleString("fr-FR")} sublabel={`Page ${page}`} />
         <KpiCard tone="violet" label="Avec email" value={`${rows.filter((j) => j.email).length}`} sublabel="sur la page" />
-        <KpiCard tone="amber" label="Opt-out" value={`${rows.filter((j) => j.opt_out).length}`} sublabel="opposition RGPD" />
+        <KpiCard tone="amber" label="Opposés" value={`${rows.filter((j) => j.opt_out).length}`} sublabel="opposition RGPD" />
       </div>
 
       <div className="mb-4 flex items-center gap-2">
@@ -116,14 +116,14 @@ export function JournalistsListPage() {
         <EmptyState
           icon="🎙️"
           title="Aucun journaliste"
-          description="La base des journalistes se remplira quand l'extraction des rédactions (Phase 3, RGPD-encadrée) sera lancée."
+          description="Aucun journaliste pour ces filtres."
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold tracking-wider text-slate-600 uppercase dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold tracking-wider text-slate-600 uppercase dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                   <th className="px-4 py-3 text-left">Nom</th>
                   <th className="px-4 py-3 text-left">Média</th>
                   <th className="px-4 py-3 text-left">Rôle</th>
@@ -146,7 +146,7 @@ export function JournalistsListPage() {
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.media?.name ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.role ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.beat ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.opt_out ? "opt-out" : j.email ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{j.opt_out ? "opposé aux envois" : j.email ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

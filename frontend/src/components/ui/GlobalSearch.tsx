@@ -113,7 +113,7 @@ export function GlobalSearch() {
               autoFocus
               value={search}
               onValueChange={setSearch}
-              placeholder="Rechercher entreprise, contact, tag…"
+              placeholder="Rechercher une entreprise, un contact, une étiquette…"
               className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-slate-400"
             />
             <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700">Esc</kbd>
@@ -165,7 +165,7 @@ export function GlobalSearch() {
             )}
 
             {data?.tags && data.tags.length > 0 && (
-              <Command.Group heading="Tags" className="mt-2 text-xs uppercase text-slate-500">
+              <Command.Group heading="Étiquettes" className="mt-2 text-xs uppercase text-slate-500">
                 {data.tags.map((t) => (
                   <Command.Item
                     key={t.id}

@@ -179,7 +179,7 @@ function PersonneDetailContent() {
                   {abonnement.desabonne_at !== null && <div>Désabonné le {formatDate(abonnement.desabonne_at)}</div>}
                 </>
               )}
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-xs text-slate-400">
                 Copie du consentement : la preuve (texte, horodatage, double confirmation) reste sur le site.
               </p>
             </div>
@@ -264,9 +264,9 @@ function PersonneDetailContent() {
           </Card>
 
           <Card>
-            <CardTitle>Timeline</CardTitle>
+            <CardTitle>Historique</CardTitle>
             {timeline.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Aucun touchpoint enregistré.</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Aucun échange enregistré.</p>
             ) : (
               <ol className="mt-3 flex flex-col gap-3">
                 {timeline.map((entry) => (

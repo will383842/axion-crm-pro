@@ -156,7 +156,7 @@ export function CompanyDetailPage() {
               {c.priority ? (
                 <>
                   <Dot />
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     Priorité {c.priority}
                   </span>
                 </>
@@ -250,8 +250,8 @@ export function CompanyDetailPage() {
               aria-expanded={showRaw}
             >
               <div>
-                <CardEyebrow>Debug</CardEyebrow>
-                <CardTitle>Données brutes (signals)</CardTitle>
+                <CardEyebrow>Technique</CardEyebrow>
+                <CardTitle>Données brutes</CardTitle>
               </div>
               <svg
                 viewBox="0 0 20 20"
@@ -328,7 +328,7 @@ export function CompanyDetailPage() {
 function Item({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className={wide ? 'col-span-2' : ''}>
-      <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </dt>
       <dd className="mt-1 text-slate-900 dark:text-white">{children}</dd>

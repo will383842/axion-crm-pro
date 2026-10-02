@@ -127,7 +127,7 @@ function PersonnesContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Contacts newsletter"
+        title="Abonnés newsletter"
         subtitle="Abonnés à la newsletter et demandeurs du guide, sans entreprise. Ils rejoignent le hub de contacts une fois rattachés."
       />
 
@@ -220,11 +220,11 @@ function PersonnesContent() {
                           {NATURE_EMAIL_LABELS[p.email_nature]}
                         </span>
                         {p.rattachee ? (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                             Rattachée · {p.entreprise ?? 'entreprise'}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                             À rattacher
                           </span>
                         )}

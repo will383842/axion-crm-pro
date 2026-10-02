@@ -47,7 +47,7 @@ import { WorkspaceSelector } from './WorkspaceSelector';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 
-interface NavItem {
+export interface NavItem {
   to: string;
   label: string;
   icon: ReactNode;
@@ -55,129 +55,147 @@ interface NavItem {
   locked?: boolean;
 }
 
-interface NavSection {
+export interface NavSection {
   id: string;
   title: string;
   items: NavItem[];
+  /** Section sans en-tête, toujours dépliée (le tableau de bord seul). */
+  sansTitre?: boolean;
 }
 
 /**
- * Étape 0, ligne 3 bis (F17) — la barre RANGÉE, avant d'y ajouter le moindre
- * écran du chantier « CRM cible » (cahier des charges §23.3).
+ * Lot 2 UX (audit du 02/10/2026, P1-1 et P1-2) — la barre RÉORGANISÉE.
  *
- * Ce qui a changé et pourquoi :
- *  - neuf sections → six, dans l'ordre de la journée : Aujourd'hui · Contacts ·
- *    Collecte · Pilotage · Conformité · Réglages. « Conformité » reste un
- *    groupe à part tant que « Réglages » n'a pas de sous-groupes (cible :
- *    « Données et conformité », étape 2) ;
- *  - une SEULE entrée « Contacts » : le hub `/console/contacts` quand la
- *    console v2 est ouverte, l'ancienne liste `/contacts` sinon — jamais les
- *    deux (voir `sectionContacts`) ;
- *  - « Campagnes » → « Collectes », « Runs de scraping » → « Journaux de
- *    collecte » : le mot « campagne » est réservé aux e-mails à venir (L7),
- *    la collision aurait été garantie ;
- *  - plus AUCUNE entrée verrouillée (🔒) : « Templates email », « Envois
- *    email », « E-mails à froid », « Prospection LinkedIn » menaient à un
- *    cadenas ou à un bouchon 501. Un menu ne promet pas ce qui n'existe pas ;
- *    les routes `/cold-email` et `/linkedin` restent joignables par URL ;
- *  - l'outillage de collecte (LLM router, proxies, rotations, Roumanie) quitte
- *    le premier niveau ; « Data » devient « Contacts » ; « Audiences »
- *    (constructeur de segments) descend sous Pilotage.
+ * Avant : 27 entrées, dont ONZE sous « Contacts » (contacts, entreprises,
+ * presse, événements, fédérations, doublons…) et six outils de développeur
+ * au premier niveau (« LLM Router », « Proxies », « Rotations »,
+ * « Observabilité », « Registre AI Act », « Journaux d'audit »).
+ *
+ * Après : le tableau de bord seul en tête, SIX sections claires dans l'ordre
+ * de la journée, puis une section « Technique » en dernier :
+ *  - À traiter : ce qui attend une décision (doublons, rattachements) ;
+ *  - Ma base   : entreprises, contacts, abonnés, candidats ;
+ *  - Presse    : médias, journalistes, communiqués ;
+ *  - Réseaux   : fédérations et ordres, événements ;
+ *  - Ciblage   : audiences, listes, carte, collectes ;
+ *  - Réglages  : paramètres, utilisateurs, étiquettes, demandes RGPD ;
+ *  - Technique : REPLIÉE par défaut (l'accordéon ne l'ouvre que si la page
+ *    courante en fait partie, ou sur un clic). Tout y est renommé en
+ *    français ; les routes, elles, ne changent pas.
+ *
+ * Un libellé = un mot partout : le menu, le titre de la page et le fil
+ * d'Ariane (`AutoBreadcrumbs.tsx`) disent la même chose — garde
+ * `tests/components/navigation-cible.test.tsx`.
  *
  * Les `data-tour` de la visite guidée sont préservés (nav-dashboard,
- * nav-companies, nav-settings, nav-campaigns) — la visite est refaite une fois
- * sur cette barre (OnboardingTour.tsx).
+ * nav-companies, nav-settings, nav-campaigns).
  */
-const SECTIONS_APRES_CONTACTS: NavSection[] = [
-  {
-    id: 'collecte',
-    title: 'Collecte',
+const icone = (I: typeof LayoutDashboard) => <I className="h-4 w-4" />;
+
+const SECTION_ACCUEIL: NavSection = {
+  id: 'accueil',
+  title: 'Accueil',
+  sansTitre: true,
+  items: [{ to: '/', label: 'Tableau de bord', icon: icone(LayoutDashboard), dataTour: 'nav-dashboard' }],
+};
+
+/**
+ * « À traiter » et « Ma base » sont construites au RUNTIME : elles dépendent
+ * du drapeau `console_v2` (le hub `/console/contacts` ou l'ancienne liste
+ * `/contacts` — jamais les deux) et de l'univers « vivier » : une entrée qui
+ * mène à un 403 n'a pas à exister (conception §2.2).
+ */
+function sectionATraiter(features: ConsoleFeatures): NavSection {
+  return {
+    id: 'a-traiter',
+    title: 'À traiter',
     items: [
-      { to: '/coverage', label: 'Couverture France', icon: <MapIcon className="h-4 w-4" /> },
-      { to: '/campaigns', label: 'Collectes', icon: <Megaphone className="h-4 w-4" />, dataTour: 'nav-campaigns' },
-      { to: '/scraper-runs', label: 'Journaux de collecte', icon: <Activity className="h-4 w-4" /> },
-      { to: '/international/roumanie', label: 'Roumanie', icon: <Globe className="h-4 w-4" /> },
+      { to: '/doublons', label: 'Doublons à vérifier', icon: icone(CopyCheck) },
+      ...(features.console_v2
+        ? [{ to: '/console/arbitrage', label: 'Personnes à rattacher', icon: icone(Scale) }]
+        : []),
+    ],
+  };
+}
+
+function sectionMaBase(features: ConsoleFeatures): NavSection {
+  const items: NavItem[] = [
+    { to: '/companies', label: 'Entreprises', icon: icone(Building2), dataTour: 'nav-companies' },
+  ];
+  if (features.console_v2) {
+    items.push(
+      { to: '/console/contacts', label: 'Contacts', icon: icone(Users2) },
+      { to: '/console/lettre-et-guide', label: 'Abonnés newsletter', icon: icone(Mail) },
+    );
+    if (features.universes.vivier) {
+      items.push({ to: '/console/vivier', label: 'Candidats', icon: icone(GraduationCap) });
+    }
+  } else {
+    items.push({ to: '/contacts', label: 'Contacts', icon: icone(UsersIcon) });
+  }
+  return { id: 'ma-base', title: 'Ma base', items };
+}
+
+const SECTIONS_FIXES: NavSection[] = [
+  {
+    id: 'presse',
+    title: 'Presse',
+    items: [
+      { to: '/media', label: 'Médias', icon: icone(Newspaper) },
+      { to: '/journalists', label: 'Journalistes', icon: icone(Mic) },
+      { to: '/presse/envois', label: 'Communiqués envoyés', icon: icone(Send) },
     ],
   },
   {
-    id: 'pilotage',
-    title: 'Pilotage',
+    id: 'reseaux',
+    title: 'Réseaux',
     items: [
-      { to: '/audiences', label: 'Audiences (segments)', icon: <Users2 className="h-4 w-4" /> },
-      // 2026-09-30 — des fiches choisies à la main, critère d'audience.
-      { to: '/listes', label: 'Listes manuelles', icon: <ListChecks className="h-4 w-4" /> },
-      { to: '/admin/observability', label: 'Observabilité', icon: <Activity className="h-4 w-4" /> },
+      { to: '/federations', label: 'Fédérations et ordres', icon: icone(Landmark) },
+      { to: '/evenements', label: 'Événements', icon: icone(CalendarDays) },
     ],
   },
   {
-    id: 'conformite',
-    title: 'Conformité',
+    id: 'ciblage',
+    title: 'Ciblage',
     items: [
-      { to: '/rgpd/requests', label: 'Requêtes RGPD', icon: <ShieldCheck className="h-4 w-4" /> },
-      { to: '/rgpd/ai-act', label: 'Registre AI Act', icon: <FileText className="h-4 w-4" /> },
-      { to: '/audit-logs', label: 'Journaux d’audit', icon: <ScrollText className="h-4 w-4" /> },
+      { to: '/audiences', label: 'Audiences', icon: icone(Users2) },
+      { to: '/listes', label: 'Listes', icon: icone(ListChecks) },
+      { to: '/coverage', label: 'Carte de France', icon: icone(MapIcon) },
+      { to: '/campaigns', label: 'Collectes', icon: icone(Megaphone), dataTour: 'nav-campaigns' },
     ],
   },
   {
     id: 'reglages',
     title: 'Réglages',
     items: [
-      { to: '/users', label: 'Utilisateurs', icon: <UserCog className="h-4 w-4" /> },
-      { to: '/settings', label: 'Paramètres', icon: <SettingsIcon className="h-4 w-4" />, dataTour: 'nav-settings' },
-      { to: '/tags', label: 'Tags', icon: <Hash className="h-4 w-4" /> },
-      { to: '/llm/router', label: 'LLM Router', icon: <Bot className="h-4 w-4" /> },
-      { to: '/llm/proxy-providers', label: 'Proxies', icon: <Network className="h-4 w-4" /> },
-      { to: '/llm/rotations', label: 'Rotations', icon: <RotateCw className="h-4 w-4" /> },
+      { to: '/settings', label: 'Paramètres', icon: icone(SettingsIcon), dataTour: 'nav-settings' },
+      { to: '/users', label: 'Utilisateurs', icon: icone(UserCog) },
+      { to: '/tags', label: 'Étiquettes', icon: icone(Hash) },
+      { to: '/rgpd/requests', label: 'Demandes RGPD', icon: icone(ShieldCheck) },
+    ],
+  },
+  {
+    id: 'technique',
+    title: 'Technique',
+    items: [
+      { to: '/scraper-runs', label: 'Historique des collectes', icon: icone(Activity) },
+      { to: '/admin/observability', label: 'Santé du système', icon: icone(Activity) },
+      { to: '/llm/router', label: 'Moteurs d’IA', icon: icone(Bot) },
+      { to: '/llm/proxy-providers', label: 'Serveurs relais', icon: icone(Network) },
+      { to: '/llm/rotations', label: 'Rotation des accès', icon: icone(RotateCw) },
+      { to: '/rgpd/ai-act', label: 'Registre de l’IA', icon: icone(FileText) },
+      { to: '/audit-logs', label: 'Journal des actions', icon: icone(ScrollText) },
+      { to: '/international/roumanie', label: 'Roumanie', icon: icone(Globe) },
     ],
   },
 ];
 
-const SECTION_AUJOURDHUI: NavSection = {
-  id: 'aujourdhui',
-  title: "Aujourd'hui",
-  items: [
-    { to: '/', label: 'Tableau de bord', icon: <LayoutDashboard className="h-4 w-4" />, dataTour: 'nav-dashboard' },
-  ],
-};
+/** Identifiant de la section repliée par défaut — lu par la garde. */
+export const SECTION_TECHNIQUE = 'technique';
 
-/**
- * Section « Contacts » — construite au RUNTIME, comme l'ancienne « Console CRM ».
- *
- * Une seule entrée « Contacts » : le hub de la console v2 si l'API annonce le
- * drapeau ouvert, l'ancienne liste `/contacts` sinon. « Vivier candidats »
- * n'apparaît que si l'utilisateur est membre de cet univers : une entrée de
- * navigation qui mène à un 403 n'a pas à exister — l'étanchéité se LIT dans la
- * navigation, elle ne se découvre pas au clic (conception §2.2).
- */
-function sectionContacts(features: ConsoleFeatures): NavSection {
-  const items: NavItem[] = features.console_v2
-    ? [
-        { to: '/console/contacts', label: 'Contacts', icon: <Users2 className="h-4 w-4" /> },
-        ...(features.universes.vivier
-          ? [{ to: '/console/vivier', label: 'Vivier candidats', icon: <GraduationCap className="h-4 w-4" /> }]
-          : []),
-        { to: '/console/arbitrage', label: 'À arbitrer', icon: <Scale className="h-4 w-4" /> },
-        // Lot L4-C — les personnes de la lettre et du guide, sans entreprise.
-        { to: '/console/lettre-et-guide', label: 'Contacts newsletter', icon: <Mail className="h-4 w-4" /> },
-      ]
-    : [{ to: '/contacts', label: 'Contacts', icon: <UsersIcon className="h-4 w-4" /> }];
-
-  items.push(
-    { to: '/companies', label: 'Entreprises', icon: <Building2 className="h-4 w-4" />, dataTour: 'nav-companies' },
-    { to: '/journalists', label: 'Journalistes', icon: <Mic className="h-4 w-4" /> },
-    { to: '/media', label: 'Médias (presse)', icon: <Newspaper className="h-4 w-4" /> },
-    // Après les deux fiches, et non avant : le registre se lit une fois qu'on
-    // sait de qui il parle. Il ne consigne rien — la saisie reste sur la fiche.
-    { to: '/presse/envois', label: 'Communiqués envoyés', icon: <Send className="h-4 w-4" /> },
-    // 2026-09-27 — événements professionnels, organisateurs et relances.
-    { to: '/evenements', label: 'Événements', icon: <CalendarDays className="h-4 w-4" /> },
-    // 2026-09-29 — fédérations, ordres, chambres, syndicats (chantier 3).
-    { to: '/federations', label: 'Fédérations', icon: <Landmark className="h-4 w-4" /> },
-    // 2026-09-30 — chantier 5 : paires de fiches à fusionner ou à écarter.
-    { to: '/doublons', label: 'Doublons à vérifier', icon: <CopyCheck className="h-4 w-4" /> },
-  );
-
-  return { id: 'contacts', title: 'Contacts', items };
+/** L'arborescence complète du menu, pour l'écran et pour les gardes. */
+export function sectionsDeNavigation(features: ConsoleFeatures): NavSection[] {
+  return [SECTION_ACCUEIL, sectionATraiter(features), sectionMaBase(features), ...SECTIONS_FIXES];
 }
 
 export interface SidebarProps {
@@ -198,7 +216,7 @@ export interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: SidebarProps) {
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
-  const sections = [SECTION_AUJOURDHUI, sectionContacts(features), ...SECTIONS_APRES_CONTACTS];
+  const sections = sectionsDeNavigation(features);
 
   // UNE seule section ouverte à la fois : ouvrir la suivante referme la
   // précédente. Sur neuf sections (avant l'étape 0) dépliées en permanence, la navigation
@@ -308,7 +326,7 @@ function NavSectionBlock({
   // Barre réduite : il n'y a plus de titre sur lequel cliquer, et masquer les
   // icônes ne laisserait rien du tout. On affiche donc tout — l'accordéon n'a
   // de sens que quand les libellés sont là.
-  const deplie = collapsed || ouverte;
+  const deplie = collapsed || ouverte || section.sansTitre === true;
   const idListe = `nav-section-${section.id}`;
 
   return (
@@ -327,7 +345,7 @@ function NavSectionBlock({
         `aria-labelledby` pointerait alors vers un identifiant inexistant — une
         région sans nom.
       */}
-      {!collapsed && (
+      {!collapsed && section.sansTitre !== true && (
         <div className="mb-1">
           <button
             type="button"
@@ -335,7 +353,7 @@ function NavSectionBlock({
             aria-expanded={ouverte}
             aria-controls={idListe}
             className={cn(
-              'flex w-full items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition',
+              'flex w-full items-center gap-1 rounded-md px-2 py-1 text-[13px] font-semibold uppercase tracking-wide transition',
               'text-sidebar-fg-muted hover:bg-white/10 hover:text-white',
             )}
           >

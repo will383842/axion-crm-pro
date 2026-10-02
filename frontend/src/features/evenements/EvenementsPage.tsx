@@ -458,7 +458,7 @@ export function EvenementsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Événements professionnels"
+        title="Événements"
         subtitle="Salons, clubs d'affaires, ateliers CCI : où aller, qui contacter pour proposer une intervention, qui relancer."
       />
 

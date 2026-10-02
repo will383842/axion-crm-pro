@@ -124,7 +124,7 @@ describe('D25-003 — la file d’arbitrage ne conclut rien sur ce qu’elle n�
 
     // La requete est EN VOL : le titre est rendu, le sous-titre ne doit porter
     // aucun nombre — surtout pas « 0 evenement(s) ».
-    await screen.findByRole('heading', { name: /Rapprochements a arbitrer|Rapprochements à arbitrer/ });
+    await screen.findByRole('heading', { name: /Personnes à rattacher/ });
     expect(texteEcran()).not.toMatch(/\d+\s+\S*nement\(s\)/);
     expect(texteEcran()).not.toContain(CONCLUSION_METIER);
 

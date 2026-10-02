@@ -226,7 +226,7 @@ const ECRANS: CasEcran[] = [
     rendre: () => <TagsManagerPage />,
     path: '/tags',
     vide: { '/tags': { data: [] } },
-    texteVide: 'Aucun tag',
+    texteVide: 'Aucune étiquette',
   },
 ];
 

@@ -18,7 +18,7 @@ import {
   Settings as SettingsIcon, ListChecks, Building2, Clock,
   Gauge, Timer, Copy,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   Button,
   Card,
@@ -50,7 +50,7 @@ const TABS: Array<TabItem<DetailTab>> = [
   { id: 'live',    label: 'Suivi temps réel', icon: <Activity className="h-3.5 w-3.5" /> },
   { id: 'sources', label: 'Sources',          icon: <Database className="h-3.5 w-3.5" /> },
   { id: 'zones',   label: 'Zones',            icon: <MapIcon className="h-3.5 w-3.5" /> },
-  { id: 'runs',    label: 'Runs',             icon: <ListChecks className="h-3.5 w-3.5" /> },
+  { id: 'runs',    label: 'Passages',             icon: <ListChecks className="h-3.5 w-3.5" /> },
   { id: 'config',  label: 'Configuration',    icon: <SettingsIcon className="h-3.5 w-3.5" /> },
 ];
 
@@ -109,22 +109,22 @@ export function CampaignDetailPage() {
 
   const pauseMutation = useMutation({
     mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/pause`)).data,
-    onSuccess: () => { toast.success('Campagne mise en pause'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
+    onSuccess: () => { toast.success('Collecte mise en pause'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
   });
   const resumeMutation = useMutation({
     mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/resume`)).data,
-    onSuccess: () => { toast.success('Campagne reprise'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
+    onSuccess: () => { toast.success('Collecte reprise'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
   });
   const cancelMutation = useMutation({
     mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/cancel`)).data,
-    onSuccess: () => { toast.success('Campagne annulée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
+    onSuccess: () => { toast.success('Collecte annulée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
   });
   const startMutation = useMutation({
     mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/start`)).data,
-    onSuccess: () => { toast.success('Campagne lancée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
+    onSuccess: () => { toast.success('Collecte lancée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Démarrage impossible'),
   });
 
@@ -159,9 +159,9 @@ export function CampaignDetailPage() {
     return (
       <div className="px-6 py-6">
         <EmptyState
-          title="Adresse de campagne invalide"
-          description={`L’adresse ne contient pas d’identifiant de campagne lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
-          action={<Link to="/campaigns"><Button variant="secondary" size="sm">Retour aux campagnes</Button></Link>}
+          title="Adresse de collecte invalide"
+          description={`L’adresse ne contient pas d’identifiant de collecte lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
+          action={<Link to="/campaigns"><Button variant="secondary" size="sm">Retour aux collectes</Button></Link>}
         />
       </div>
     );
@@ -169,7 +169,7 @@ export function CampaignDetailPage() {
   if (echecLecture) {
     return (
       <div className="px-6 py-6">
-        <QueryErrorState error={error} contexte="cette campagne" onRetry={() => void refetch()} />
+        <QueryErrorState error={error} contexte="cette collecte" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -181,7 +181,7 @@ export function CampaignDetailPage() {
   if (!campaign) {
     return (
       <div className="px-6 py-6">
-        <ReponseVideState contexte="cette campagne" onRetry={() => void refetch()} />
+        <ReponseVideState contexte="cette collecte" onRetry={() => void refetch()} />
       </div>
     );
   }
@@ -216,11 +216,11 @@ export function CampaignDetailPage() {
               {STATUS_LABEL[campaign.status]}
             </StatusPill>
             {isPaused && campaign.paused_reason ? (
-              <span className="text-[11px] text-amber-700 dark:text-amber-300">
+              <span className="text-xs text-amber-700 dark:text-amber-300">
                 · {PAUSED_REASON_LABEL[campaign.paused_reason] ?? campaign.paused_reason}
               </span>
             ) : null}
-            {isLive ? <LiveBadge label="Live" refreshLabel="actualisé 5s" /> : null}
+            {isLive ? <LiveBadge label="En direct" refreshLabel="mis à jour toutes les 5 s" /> : null}
           </div>
         }
         title={campaign.name}
@@ -317,7 +317,7 @@ export function CampaignDetailPage() {
         />
         <KpiCard
           tone="violet"
-          label="Runs"
+          label="Passages"
           value={`${campaign.runs_completed}/${campaign.runs_total}`}
           sublabel={`${Math.round((campaign.runs_completed / Math.max(1, campaign.runs_total)) * 100)}% terminés`}
           progress={Math.round((campaign.runs_completed / Math.max(1, campaign.runs_total)) * 100)}
@@ -333,7 +333,7 @@ export function CampaignDetailPage() {
           tone="sky"
           label={isCompleted ? 'Terminée' : 'ETA fin'}
           value={isCompleted ? '—' : etaMin >= 60 ? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m` : `${etaMin}m`}
-          sublabel={isCompleted ? 'campagne close' : 'estimation'}
+          sublabel={isCompleted ? 'collecte close' : 'estimation'}
           icon={<Timer className="h-4 w-4" />}
         />
       </div>
@@ -372,7 +372,7 @@ function TabLiveTimeline({ events }: { events: CampaignStatsResponse['last_event
   if (events.length === 0) {
     return (
       <Card padding="lg" className="text-center text-sm text-slate-500 dark:text-slate-400">
-        Aucun événement pour l’instant. La campagne va générer des runs dans quelques secondes.
+        Aucun événement pour l’instant. Les premiers passages arrivent dans quelques secondes.
       </Card>
     );
   }
@@ -400,9 +400,9 @@ function TabLiveTimeline({ events }: { events: CampaignStatsResponse['last_event
                   <span className="font-medium text-slate-700 dark:text-slate-300">{ev.source}</span>
                   <Link
                     to="/scraper-runs"
-                    className="ml-auto text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white"
+                    className="ml-auto text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white"
                   >
-                    Run #{ev.id} →
+                    Passage n° {ev.id} →
                   </Link>
                 </div>
                 {ev.error ? (
@@ -426,11 +426,11 @@ function TabSources({ campaign, perSource }: { campaign: Campaign; perSource: Ca
   return (
     <Card padding="none" className="overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+        <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
             <th className="px-4 py-2 text-left">Source</th>
             <th className="px-4 py-2 text-left">Statut</th>
-            <th className="px-4 py-2 text-right">Runs</th>
+            <th className="px-4 py-2 text-right">Passages</th>
             <th className="px-4 py-2 text-right">Succès</th>
             <th className="px-4 py-2 text-right">Échecs</th>
             <th className="px-4 py-2 text-right">Entreprises</th>
@@ -473,7 +473,7 @@ function TabZones({ campaign }: { campaign: Campaign }) {
   return (
     <Card padding="none" className="overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+        <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
             <th className="px-4 py-2 text-left">Type</th>
             <th className="px-4 py-2 text-left">Code</th>
@@ -503,14 +503,14 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
   if (runs.length === 0) {
     return (
       <Card padding="lg" className="text-center text-sm text-slate-500 dark:text-slate-400">
-        Aucun run généré pour cette campagne.
+        Aucun passage pour cette collecte.
       </Card>
     );
   }
   return (
     <Card padding="none" className="overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+        <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
             <th className="px-4 py-2 text-left">#</th>
             <th className="px-4 py-2 text-left">Source</th>
@@ -562,7 +562,7 @@ function TabConfig({ campaign, onDuplicate }: { campaign: Campaign; onDuplicate:
   return (
     <Card padding="md" className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Configuration de la campagne</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Configuration de la collecte</h3>
         <Button variant="secondary" size="sm" iconLeft={<Copy className="h-3.5 w-3.5" />} onClick={onDuplicate}>
           Dupliquer
         </Button>
@@ -588,7 +588,7 @@ function TabConfig({ campaign, onDuplicate }: { campaign: Campaign; onDuplicate:
 function Definition({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-800/40 dark:ring-slate-800">
-      <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</dt>
       <dd className="mt-0.5 break-words text-sm font-medium text-slate-900 dark:text-white">{value}</dd>
     </div>
   );
@@ -612,10 +612,7 @@ function formatRelative(iso: string): string {
   return `il y a ${d}j`;
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

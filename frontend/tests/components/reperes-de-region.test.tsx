@@ -67,10 +67,10 @@ describe('D28-012 — la barre latérale', () => {
   it('offre un repère de région nommé par groupe, à la place des titres retirés', () => {
     afficherBarre();
 
-    // Les six groupes de l'étape 0 (F17), énumérés d'après
+    // Les groupes du lot 2 UX (accueil + six sections + Technique), énumérés d'après
     // `src/components/layout/Sidebar.tsx` : si l'un disparaît de la barre, cette
     // garde le dit au lieu de compter à l'aveugle.
-    for (const groupe of ["Aujourd'hui", 'Contacts', 'Collecte', 'Pilotage', 'Conformité', 'Réglages']) {
+    for (const groupe of ['Accueil', 'À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Réglages', 'Technique']) {
       const repere = screen.queryByRole('navigation', { name: groupe });
       expect(
         repere !== null,

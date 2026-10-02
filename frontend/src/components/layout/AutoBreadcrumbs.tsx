@@ -32,23 +32,45 @@ import { Breadcrumbs, type Crumb } from '@/components/ui';
  * sort se décide avec celui des routes (A-005), pas dans cette table.
  */
 const LABELS: Record<string, string> = {
+  // Lot 2 UX (02/10/2026) — mêmes mots que la barre latérale, partout.
   '/': 'Tableau de bord',
+  // À traiter
+  '/doublons': 'Doublons à vérifier',
+  '/console/arbitrage': 'Personnes à rattacher',
+  // Ma base
   '/companies': 'Entreprises',
   '/contacts': 'Contacts',
-  '/coverage': 'Couverture France',
-  '/scraper-runs': 'Journaux de collecte',
-  '/llm': 'LLM',
-  '/llm/router': 'Router',
-  '/llm/proxy-providers': 'Proxies',
-  '/llm/rotations': 'Rotations',
-  '/rgpd': 'RGPD',
-  '/rgpd/requests': 'Requêtes',
-  '/rgpd/ai-act': 'Registre AI Act',
-  '/audit-logs': 'Journaux d’audit',
-  '/users': 'Utilisateurs',
-  '/settings': 'Paramètres',
+  '/console/contacts': 'Contacts',
+  '/console/lettre-et-guide': 'Abonnés newsletter',
+  '/console/vivier': 'Candidats',
+  // Presse
+  '/media': 'Médias',
+  '/journalists': 'Journalistes',
+  '/presse/envois': 'Communiqués envoyés',
+  // Réseaux
+  '/federations': 'Fédérations et ordres',
+  '/evenements': 'Événements',
+  // Ciblage
+  '/audiences': 'Audiences',
+  '/audiences/new': 'Nouvelle audience',
+  '/listes': 'Listes',
+  '/coverage': 'Carte de France',
   '/campaigns': 'Collectes',
   '/campaigns/new': 'Nouvelle collecte',
+  // Réglages
+  '/settings': 'Paramètres',
+  '/users': 'Utilisateurs',
+  '/tags': 'Étiquettes',
+  '/rgpd/requests': 'Demandes RGPD',
+  // Technique
+  '/scraper-runs': 'Historique des collectes',
+  '/admin/observability': 'Santé du système',
+  '/llm/router': 'Moteurs d’IA',
+  '/llm/proxy-providers': 'Serveurs relais',
+  '/llm/rotations': 'Rotation des accès',
+  '/rgpd/ai-act': 'Registre de l’IA',
+  '/audit-logs': 'Journal des actions',
+  '/international/roumanie': 'Roumanie',
   // 2026-08-23 — §8.2 de `10_NAVIGATION-CIBLE.md` : ces deux adresses ne
   // montent plus d'écran, elles redirigent vers `/pas-encore-livre?lot=L7`.
   // Leur libellé RESTE : le fil d'Ariane peut être rendu pendant le temps très
@@ -57,39 +79,38 @@ const LABELS: Record<string, string> = {
   '/cold-email': 'E-mails à froid',
   '/linkedin': 'Prospection LinkedIn',
   '/pas-encore-livre': 'Pas encore livré',
+  // Anciennes adresses (F7) : elles redirigent, mais restent des routes.
   '/crm': 'Contacts',
   '/analytics': 'Tableau de bord',
-  // D23-006 — les dix routes qui parlaient anglais, plus les segments
-  // intermédiaires (`/admin`, `/international`, `/console`) : ils n'ont pas
-  // d'écran à eux mais apparaissent quand même dans le fil.
-  '/media': 'Médias (presse)',
-  '/journalists': 'Journalistes',
-  '/tags': 'Tags',
-  '/audiences': 'Audiences (segments)',
-  '/audiences/new': 'Nouvelle audience',
-  '/admin': 'Administration',
-  '/admin/observability': 'Observabilité',
-  '/international': 'International',
-  '/international/roumanie': 'Roumanie',
-  '/evenements': 'Événements',
-  '/federations': 'Fédérations',
-  '/doublons': 'Doublons à vérifier',
-  // 2026-09-30 — listes manuelles (fiches choisies à la main).
-  '/listes': 'Listes manuelles',
-  '/console': 'Console CRM',
-  '/console/contacts': 'Contacts',
-  '/console/vivier': 'Vivier candidats',
-  '/console/arbitrage': 'À arbitrer',
-  '/console/personnes': 'Personnes',
-  '/console/lettre-et-guide': 'Contacts newsletter',
-  // 2026-08-26 — registre des envois presse. `/presse` est un segment
-  // INTERMÉDIAIRE : aucun écran ne lui répond, mais il s'affiche dans le fil
-  // avant `/presse/envois`. Sans libellé, le fil montrait « presse » en brut.
-  // C'est la garde D23-006 qui l'a vu, et elle a nommé le geste à faire.
-  '/presse': 'Relations presse',
-  '/presse/envois': 'Envois de communiqués',
-  // F7 — `/crm` et `/analytics` retirés du routeur : plus de libellé à mapper.
 };
+
+/**
+ * Lot 2 UX (audit du 02/10/2026, P1-3) — les segments INTERMÉDIAIRES qui n'ont
+ * AUCUN écran : `/llm`, `/rgpd`, `/admin`, `/international`, `/console`,
+ * `/presse`, `/console/personnes`.
+ *
+ * Ils avaient un libellé (« LLM », « Console CRM », « Relations presse »…),
+ * et c'est ce libellé qui les rendait CLIQUABLES (`hasRoute = Boolean(LABELS[acc])`)
+ * — vers des routes qui n'existent pas : un clic sur « Console CRM » menait à
+ * la page introuvable. Ils sont désormais OMIS du fil : « Accueil › Contacts »
+ * plutôt que « Accueil › Console CRM › Contacts ». Un mot qui ne mène nulle
+ * part et ne nomme aucun écran n'apprend rien à qui lit le fil.
+ *
+ * Garde : `tests/components/fil-d-ariane.test.tsx` exige que chaque segment
+ * intermédiaire soit soit une route réelle (libellé), soit déclaré ici.
+ */
+const SEGMENTS_SANS_ECRAN: ReadonlySet<string> = new Set([
+  '/llm',
+  '/rgpd',
+  '/admin',
+  '/international',
+  '/console',
+  '/console/personnes',
+  '/presse',
+]);
+
+/** Exposé pour la garde : segments omis du fil. */
+export const SEGMENTS_OMIS: ReadonlySet<string> = SEGMENTS_SANS_ECRAN;
 
 /** Table exposée pour la garde D23-006. Lecture seule : jamais mutée. */
 export const LIBELLES_DE_CHEMIN: Readonly<Record<string, string>> = LABELS;
@@ -109,10 +130,10 @@ export function libelleDeChemin(pathname: string): string {
 }
 
 function humanize(segment: string): string {
-  // UUID-like → ID tronqué
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return `#${segment.slice(0, 8)}`;
-  // numeric ID
-  if (/^\d+$/.test(segment)) return `#${segment}`;
+  // Un identifiant (UUID ou nombre) ne nomme rien pour qui lit le fil :
+  // « #a1b2c3d4 » était affiché tel quel. On dit ce que c'est — une fiche.
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return 'Fiche';
+  if (/^\d+$/.test(segment)) return 'Fiche';
   return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
 }
 
@@ -129,9 +150,11 @@ export function AutoBreadcrumbs() {
   let acc = '';
   segments.forEach((seg, idx) => {
     acc += `/${seg}`;
-    const label = LABELS[acc] ?? humanize(seg);
     const isLast = idx === segments.length - 1;
-    // Intermediate route may not match a route (e.g. /llm alone) → no link
+    // Segment sans écran : omis (voir `SEGMENTS_SANS_ECRAN`).
+    if (!isLast && SEGMENTS_SANS_ECRAN.has(acc)) return;
+    const label = LABELS[acc] ?? humanize(seg);
+    // Seul un chemin de la table est une route réelle : lui seul devient un lien.
     const hasRoute = Boolean(LABELS[acc]);
     crumbs.push({
       label,

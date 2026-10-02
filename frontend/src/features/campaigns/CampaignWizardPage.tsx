@@ -19,7 +19,7 @@ import {
   Database, Briefcase, Lock, Info,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   Button,
   Card,
@@ -83,7 +83,7 @@ const DISCOVERY_SOURCES: DiscoverySource[] = [
   {
     id: 'france_travail',
     label: 'France Travail',
-    description: 'Entreprises qui recrutent dans la zone — signal intent fort',
+    description: 'Entreprises qui recrutent dans la zone : signe d’un besoin',
     status: 'api_key',
     activable: true,
     icon: Briefcase,
@@ -91,8 +91,8 @@ const DISCOVERY_SOURCES: DiscoverySource[] = [
 ];
 
 const SOURCE_STATUS_LABEL: Record<DiscoverySourceStatus, string> = {
-  api_key: 'API key requise',
-  proxies_required: 'Proxies requis',
+  api_key: 'Clé d’accès requise',
+  proxies_required: 'Serveurs relais requis',
 };
 
 const SOURCE_STATUS_TONE: Record<DiscoverySourceStatus, 'success' | 'warning' | 'info'> = {
@@ -212,7 +212,7 @@ export function CampaignWizardPage() {
     const payload = buildPayload();
     try {
       const c = await createMutation.mutateAsync(payload);
-      toast.success('Campagne créée en brouillon');
+      toast.success('Collecte créée en brouillon');
       void navigate({ to: '/campaigns/$campaignId', params: { campaignId: String(c.id) } });
     } catch (err) {
       toast.error(extractApiMessage(err) ?? 'Création impossible');
@@ -225,9 +225,9 @@ export function CampaignWizardPage() {
       const c = await createMutation.mutateAsync(payload);
       if (scheduleMode === 'now') {
         await startMutation.mutateAsync(c.id);
-        toast.success('Campagne lancée');
+        toast.success('Collecte lancée');
       } else {
-        toast.success('Campagne créée et planifiée');
+        toast.success('Collecte créée et planifiée');
       }
       void navigate({ to: '/campaigns/$campaignId', params: { campaignId: String(c.id) } });
     } catch (err) {
@@ -262,7 +262,7 @@ export function CampaignWizardPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Nouvelle campagne"
+        title="Nouvelle collecte"
         subtitle="Quatre étapes : nom, zones, sources, limites."
         breadcrumbs={[
           { label: 'Collectes', to: '/campaigns' },
@@ -382,7 +382,7 @@ function Stepper({ step }: { step: Step }) {
           <li key={it.id} className="flex items-center gap-2">
             <span
               className={cn(
-                'inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ring-1',
+                'inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-1',
                 done
                   ? 'bg-emerald-500 text-white ring-emerald-500'
                   : active
@@ -420,11 +420,11 @@ function StepIdentity({
 }) {
   return (
     <div className="space-y-5">
-      <SectionHeading title="Identité" hint="Nom et description visibles dans la liste des campagnes." />
+      <SectionHeading title="Identité" hint="Nom et description visibles dans la liste des collectes." />
       {/* D26-010 — `maxLength` tronque un collage sans rien dire. Le compteur
           n'apparaît qu'aux abords de la borne (cf. `CompteurDeSaisie`) et
           bascule au rouge quand la limite est atteinte : la coupure se VOIT. */}
-      <Field label="Nom de la campagne" required>
+      <Field label="Nom de la collecte" required>
         <Input
           placeholder="Ex : Prospection PME Paris IT — semaine 21"
           value={name}
@@ -464,8 +464,8 @@ function StepIdentity({
               min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
               onChange={(e) => setScheduledAt(e.target.value)}
             />
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Démarrage automatique à la date choisie (cron toutes les minutes).
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Démarrage automatique à la date choisie.
             </p>
           </div>
         ) : null}
@@ -540,7 +540,7 @@ function StepZones({
                 key={`${z.type}-${z.code}`}
                 type="button"
                 onClick={() => removeZone(z)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/40"
+                className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/40"
               >
                 <span>{z.label ?? z.code}</span>
                 <X className="h-3 w-3" />
@@ -550,7 +550,7 @@ function StepZones({
         </Card>
       ) : null}
 
-      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span>
           {filteredCells.length} {zoneType === 'department' ? 'département' : zoneType === 'region' ? 'région' : 'ville'}{filteredCells.length > 1 ? 's' : ''}
           {zoneSearch ? <> pour « <span className="font-medium text-slate-700 dark:text-slate-300">{zoneSearch}</span> »</> : null}
@@ -580,11 +580,11 @@ function StepZones({
                 )}
               >
                 <span className="min-w-0 truncate">
-                  <span className="font-mono text-[11px] opacity-70">{cell.code}</span>{' '}
+                  <span className="font-mono text-xs opacity-70">{cell.code}</span>{' '}
                   <span className="font-medium">{cell.name}</span>
                 </span>
                 <span className={cn(
-                  'shrink-0 text-[10px] tabular-nums',
+                  'shrink-0 text-xs tabular-nums',
                   selected ? 'text-white/80' : 'text-slate-400',
                 )}>
                   {cell.total ? `~${cell.total}` : ''}
@@ -665,7 +665,7 @@ function StepSources({
               </div>
               <StatusPill tone={SOURCE_STATUS_TONE[src.status]}>{SOURCE_STATUS_LABEL[src.status]}</StatusPill>
               {disabled && src.unavailableHint ? (
-                <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <div className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                   <Lock className="h-3 w-3" aria-hidden />
                   <span>{src.unavailableHint}</span>
                 </div>
@@ -686,21 +686,21 @@ function StepSources({
             <li><strong>Annuaire Entreprises</strong> — CA, bilans, dirigeants (gratuit)</li>
             <li><strong>BODACC</strong> — signaux légaux : création, redressement (gratuit)</li>
             <li><strong>BAN géocodage</strong> — coordonnées GPS précises (gratuit)</li>
-            <li><strong>Mentions légales scrape</strong> — email + téléphone publics (18 URLs explorées par site)</li>
-            <li><strong>Google Places API</strong> — téléphone, horaires, note Google (~$0 grâce au crédit $200/mois)</li>
-            <li><strong>LLM Mistral</strong> — classification, priorité, tags intent</li>
+            <li><strong>Mentions légales des sites</strong> — e-mail et téléphone publics (18 pages lues par site)</li>
+            <li><strong>Google Places</strong> — téléphone, horaires, note Google (~$0 grâce au crédit $200/mois)</li>
+            <li><strong>IA Mistral</strong> — classement, priorité, étiquettes d’intérêt</li>
           </ul>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">Pas besoin d'activer ces sources ici — elles tournent en background.</p>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Pas besoin d'activer ces sources ici : elles tournent toutes seules.</p>
         </div>
       </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
         <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
         <p>
-          <strong className="font-semibold text-slate-700 dark:text-slate-300">Sources Phase B (à venir).</strong>{' '}
-          Google Maps + Pages Jaunes seront disponibles après configuration d'un proxy résidentiel
-          (Webshare ~$30/mois) — utile uniquement pour scraper les TPE/artisans peu référencés INSEE.
-          INSEE Sirene couvre déjà &gt;99% du périmètre B2B FR.
+          <strong className="font-semibold text-slate-700 dark:text-slate-300">Sources à venir.</strong>{' '}
+          Google Maps et Pages Jaunes demandent un serveur relais payant (Webshare, ~30 $/mois) :
+          utile seulement pour les très petites entreprises peu présentes à l’INSEE. La base INSEE
+          couvre déjà plus de 99 % des entreprises françaises.
         </p>
       </div>
     </div>
@@ -766,7 +766,7 @@ function StepBudget({
             onChange={(e) => setMaxRpm(Number(e.target.value))}
             className="w-full accent-sky-600"
           />
-          <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
             Plus c’est bas, moins de risque de blacklist source (Google Maps, Pages Jaunes).
           </p>
         </div>
@@ -804,7 +804,7 @@ function StepBudget({
               <div key={s} className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_120px_120px]">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{meta?.label ?? s}</span>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-slate-500">RPM</label>
+                  <label className="text-xs uppercase tracking-wider text-slate-500">RPM</label>
                   <Input
                     type="number"
                     // Le `<label>` ci-dessus n'est rattaché à rien (ni `htmlFor`
@@ -825,7 +825,7 @@ function StepBudget({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-slate-500">Daily quota</label>
+                  <label className="text-xs uppercase tracking-wider text-slate-500">Daily quota</label>
                   <Input
                     type="number"
                     aria-label={`Quota quotidien — ${meta?.label ?? s}`}
@@ -946,15 +946,12 @@ function NumberField({
           onChange(Math.max(min, Math.min(max, v)));
         }}
       />
-      {hint ? <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p> : null}
     </div>
   );
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

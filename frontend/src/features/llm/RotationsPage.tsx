@@ -27,11 +27,11 @@ interface Rotation {
 }
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
-  proxy: 'Proxy',
+  proxy: 'Serveur relais',
   user_agent: 'User-agent',
   target: 'Cible',
   search_engine: 'Moteur de recherche',
-  llm: 'Fournisseur LLM',
+  llm: 'Fournisseur d’IA',
 };
 
 const ROW_GRID = 'minmax(180px,1fr) 90px 110px 90px 180px';
@@ -52,8 +52,8 @@ export function RotationsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Rotations"
-        subtitle="5 dimensions de rotation : proxies + user-agents + targets + moteurs de recherche + LLM providers."
+        title="Rotation des accès"
+        subtitle="Les accès qui tournent pour ne pas être bloqué : serveurs relais, navigateurs, moteurs de recherche, fournisseurs d’IA."
       />
 
       {error !== null && data === undefined ? (
@@ -93,7 +93,7 @@ export function RotationsPage() {
                     <div
                       role="row"
                       className={cn(
-                        'grid items-center gap-3 bg-slate-50/60 px-5 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-600',
+                        'grid items-center gap-3 bg-slate-50/60 px-5 py-2 text-xs font-semibold uppercase tracking-wider text-slate-600',
                         'dark:bg-slate-900/40 dark:text-slate-400',
                       )}
                       style={{ gridTemplateColumns: ROW_GRID }}
@@ -119,7 +119,7 @@ export function RotationsPage() {
                           </div>
                           <div>
                             <StatusPill tone={r.enabled ? 'success' : 'neutral'}>
-                              {r.enabled ? 'ON' : 'OFF'}
+                              {r.enabled ? 'Actif' : 'Arrêté'}
                             </StatusPill>
                           </div>
                           <div className="text-xs text-slate-500">

@@ -46,7 +46,7 @@ export function ContactsCard({ contacts }: { contacts: ContactItem[] }) {
                   <div className="flex items-center gap-2">
                     <div className="truncate text-sm font-medium text-slate-900 dark:text-white">{fullName}</div>
                     {ct.email_score != null ? (
-                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {ct.email_score}
                       </span>
                     ) : null}

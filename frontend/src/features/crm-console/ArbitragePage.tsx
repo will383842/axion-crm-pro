@@ -111,7 +111,7 @@ function ArbitrageContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Rapprochements à arbitrer"
+        title="Personnes à rattacher"
         subtitle={
           total === undefined
             ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'

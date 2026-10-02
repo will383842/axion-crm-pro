@@ -71,50 +71,50 @@ function estOuverte(titre: string): boolean {
   return annonceeOuverte;
 }
 
-// Étape 0, ligne 3 bis (F17) : « Entreprises » vit désormais dans le groupe
-// « Contacts » (id `contacts`) — l'ancien groupe « Data » n'existe plus.
+// Lot 2 UX (2026-10-02) : « Entreprises » vit dans le groupe « Ma base »
+// (id `ma-base`) ; « Pilotage » est devenu « Ciblage ».
 describe('Barre latérale — accordéon', () => {
   it('ouvre la section de la PAGE COURANTE à l’arrivée', () => {
     afficher('/companies');
 
     // Arriver sur « Entreprises » avec sa section repliée donnerait
     // l'impression d'avoir quitté l'application.
-    expect(estOuverte('Contacts')).toBe(true);
+    expect(estOuverte('Ma base')).toBe(true);
   });
 
   it('ouvrir une section referme la précédente', async () => {
     const user = userEvent.setup();
     afficher('/companies');
 
-    expect(estOuverte('Contacts')).toBe(true);
+    expect(estOuverte('Ma base')).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: /Pilotage/i }));
+    await user.click(screen.getByRole('button', { name: /Ciblage/i }));
 
     // ⬇️ C'est la règle demandée : une seule à la fois.
-    expect(estOuverte('Pilotage')).toBe(true);
-    expect(estOuverte('Contacts')).toBe(false);
+    expect(estOuverte('Ciblage')).toBe(true);
+    expect(estOuverte('Ma base')).toBe(false);
   });
 
   it('recliquer sur la section ouverte la referme', async () => {
     const user = userEvent.setup();
     afficher('/companies');
 
-    await user.click(screen.getByRole('button', { name: /^Contacts$/ }));
+    await user.click(screen.getByRole('button', { name: /^Ma base$/ }));
 
     // Aucune section n'est alors ouverte : refermer doit rester possible,
     // sinon le repli n'est pas un vrai repli.
-    expect(estOuverte('Contacts')).toBe(false);
+    expect(estOuverte('Ma base')).toBe(false);
   });
 
   it('les entrées d’une section fermée ne sont pas atteignables au clavier', async () => {
     const user = userEvent.setup();
     afficher('/companies');
 
-    await user.click(screen.getByRole('button', { name: /Pilotage/i }));
+    await user.click(screen.getByRole('button', { name: /Ciblage/i }));
 
     // `hidden` retire du flux ET de l'ordre de tabulation : une entrée
     // invisible mais focusable est un piège pour la navigation au clavier.
-    const listeContacts = document.getElementById('nav-section-contacts');
+    const listeContacts = document.getElementById('nav-section-ma-base');
     expect(listeContacts).not.toBeNull();
     expect(listeContacts?.className).toContain('hidden');
   });
@@ -122,7 +122,7 @@ describe('Barre latérale — accordéon', () => {
   it('la section ouverte affiche bien ses entrées', () => {
     const { container } = afficher('/companies');
 
-    const listeContacts = container.querySelector('#nav-section-contacts');
+    const listeContacts = container.querySelector('#nav-section-ma-base');
     expect(listeContacts).not.toBeNull();
     expect(listeContacts?.className).not.toContain('hidden');
     expect(within(listeContacts as HTMLElement).getByText('Entreprises')).toBeInTheDocument();

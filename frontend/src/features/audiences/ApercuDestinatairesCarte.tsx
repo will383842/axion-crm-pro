@@ -26,7 +26,7 @@ export function ApercuDestinatairesCarte({ apercu }: { apercu: ApercuDestinatair
       </ul>
       {exclues.length > 0 ? (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Exclues ({apercu.exclues_total.toLocaleString('fr-FR')})
           </div>
           <ul className="text-xs text-slate-600 dark:text-slate-300">
@@ -40,7 +40,7 @@ export function ApercuDestinatairesCarte({ apercu }: { apercu: ApercuDestinatair
       ) : null}
       {ecartees.length > 0 ? (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Écartées par le réglage ({apercu.ecartees_total.toLocaleString('fr-FR')})
           </div>
           <ul className="text-xs text-slate-600 dark:text-slate-300">
@@ -54,7 +54,7 @@ export function ApercuDestinatairesCarte({ apercu }: { apercu: ApercuDestinatair
       ) : null}
       {apercu.lignes.length > 0 ? (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Échantillon</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Échantillon</div>
           <ul className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
             {apercu.lignes.map((l) => (
               <li key={l.crm_ref + (l.email ?? '')} className="py-1">
@@ -77,7 +77,7 @@ export function ApercuDestinatairesCarte({ apercu }: { apercu: ApercuDestinatair
 function Chiffre({ libelle, valeur }: { libelle: string; valeur: number }) {
   return (
     <div className="rounded-lg bg-white p-2 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{libelle}</div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{libelle}</div>
       <div className="text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{valeur.toLocaleString('fr-FR')}</div>
     </div>
   );

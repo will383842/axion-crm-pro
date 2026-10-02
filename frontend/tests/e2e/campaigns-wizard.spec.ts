@@ -16,7 +16,7 @@ test.describe('Campaigns wizard (Sprint H4)', () => {
     await page.goto('/campaigns/new');
 
     // Étape 1 — nom de campagne
-    await expect(page.getByText(/Nouvelle campagne|Wizard/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Nouvelle collecte|Wizard/i)).toBeVisible({ timeout: 10_000 });
     const nameInput = page.getByLabel(/Nom|Intitulé/i).first();
     if (await nameInput.isVisible()) {
       await nameInput.fill('E2E test campaign');

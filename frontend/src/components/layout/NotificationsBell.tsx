@@ -152,7 +152,7 @@ export function NotificationsBell() {
           // Le laisser lisible deux fois ferait annoncer « 3 Notifications 3 non lues ».
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-4 text-white"
+            className="absolute -right-0.5 -top-0.5 inline-flex min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-semibold leading-4 text-white"
           >
             {nonLues > 9 ? '9+' : nonLues}
           </span>
@@ -211,7 +211,7 @@ export function NotificationsBell() {
                         <span className="text-sm font-medium text-slate-900 dark:text-white">
                           {ligne.title}
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] text-slate-400">
+                        <span className="shrink-0 font-mono text-xs text-slate-400">
                           {formaterDate(ligne.created_at)}
                         </span>
                       </div>
@@ -258,7 +258,7 @@ export function NotificationsBell() {
             rendent 501 : plutôt qu'un bouton qui échoue en silence, on écrit
             que le geste n'existe pas encore. Voir l'en-tête de fichier.
           */}
-          <p className="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500 dark:border-slate-800">
+          <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500 dark:border-slate-800">
             Marquer une notification comme lue n’est pas encore disponible sur ce serveur.
           </p>
         </div>

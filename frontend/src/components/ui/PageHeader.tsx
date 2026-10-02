@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, eyebrow, badge, actions, breadcrum
         {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} className="mb-2" /> : null}
         {badge ? <div className="mb-2">{badge}</div> : null}
         {eyebrow ? (
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{eyebrow}</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{eyebrow}</div>
         ) : null}
         <h1
           className={cn(
@@ -51,7 +51,7 @@ export function PageHeader({ title, subtitle, eyebrow, badge, actions, breadcrum
 /** Petit badge "live" avec dot pulsé — pratique pour pages temps-réel. */
 export function LiveBadge({ label = 'En direct', refreshLabel }: { label?: string; refreshLabel?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900/50">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900/50">
       <span className="h-1.5 w-1.5 rounded-full bg-sky-500 axion-pulse-dot" />
       {label}
       {refreshLabel ? <span className="text-sky-600/70 dark:text-sky-300/70">· {refreshLabel}</span> : null}

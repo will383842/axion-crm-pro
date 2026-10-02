@@ -69,7 +69,7 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="sidebar"]',
     placement: 'right',
-    content: "La barre latérale suit votre journée : Aujourd'hui, Contacts, Collecte, Pilotage, Conformité, Réglages. Un mot par notion, toujours au même endroit.",
+    content: 'La barre latérale suit votre journée : À traiter, Ma base, Presse, Réseaux, Ciblage, Réglages. Les outils techniques sont rangés tout en bas, repliés.',
   },
   {
     target: '[data-tour="global-search"]',
@@ -85,17 +85,12 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="nav-companies"]',
     placement: 'right',
-    content: 'Cliquez ici pour parcourir vos entreprises enrichies. Vous pouvez en créer manuellement ou laisser les scrapers les remplir.',
+    content: 'Toutes vos entreprises, avec leurs contacts et leurs informations publiques.',
   },
   {
     target: '[data-tour="nav-dashboard"]',
     placement: 'right',
-    content: 'Le dashboard affiche vos KPIs : entreprises totales, contacts valides, taux de succès des scrapers.',
-  },
-  {
-    target: '[data-tour="dark-mode"]',
-    placement: 'bottom',
-    content: 'Mode clair/sombre — la préférence est sauvegardée localement.',
+    content: 'Le tableau de bord résume votre base : entreprises, contacts joignables, activité récente.',
   },
   {
     target: '[data-tour="nav-settings"]',

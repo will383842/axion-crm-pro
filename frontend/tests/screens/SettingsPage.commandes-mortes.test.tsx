@@ -189,7 +189,7 @@ describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat
 describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', () => {
   it('TEMOIN — les liens d’observabilite sont toujours la', async () => {
     await monter();
-    await ouvrirOnglet(/Observabilit/);
+    await ouvrirOnglet(/Suivi technique/);
 
     await waitFor(() => {
       expect(texteEcran()).toContain('Grafana');
@@ -199,7 +199,7 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
 
   it('le champ « DSN Sentry » a disparu, et l’ecran dit ou se regle vraiment le DSN', async () => {
     await monter();
-    await ouvrirOnglet(/Observabilit/);
+    await ouvrirOnglet(/Suivi technique/);
 
     await waitFor(() => {
       expect(texteEcran()).toContain('Grafana');
@@ -219,7 +219,7 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
 describe('D26-003 · Apparence — la densite agit et survit', () => {
   it('TEMOIN — au depart, la densite est « confortable »', async () => {
     await monter();
-    await ouvrirOnglet(/Apparence/);
+    await ouvrirOnglet(/Affichage/);
 
     await waitFor(() => {
       expect(document.documentElement.getAttribute('data-density')).toBe('comfortable');
@@ -228,7 +228,7 @@ describe('D26-003 · Apparence — la densite agit et survit', () => {
 
   it('choisir « Compacte » ecrit sur le document ET persiste', async () => {
     await monter();
-    await ouvrirOnglet(/Apparence/);
+    await ouvrirOnglet(/Affichage/);
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: /Compacte/ }));

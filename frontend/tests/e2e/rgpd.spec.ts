@@ -6,7 +6,7 @@ test.describe('RGPD', () => {
       route.fulfill({ json: { data: [], total: 0 } }),
     );
     await page.goto('/rgpd/requests');
-    await expect(page.getByRole('heading', { name: /requêtes RGPD/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Demandes RGPD/i })).toBeVisible();
   });
 
   test('ai-act register page renders', async ({ page }) => {
@@ -14,7 +14,7 @@ test.describe('RGPD', () => {
       route.fulfill({ json: { data: [] } }),
     );
     await page.goto('/rgpd/ai-act');
-    await expect(page.getByRole('heading', { name: /AI Act/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Registre de l.IA/i })).toBeVisible();
   });
 
   test('audit logs page renders', async ({ page }) => {
@@ -22,6 +22,6 @@ test.describe('RGPD', () => {
       route.fulfill({ json: { data: [] } }),
     );
     await page.goto('/audit-logs');
-    await expect(page.getByRole('heading', { name: /Journaux d.audit/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Journal des actions/i })).toBeVisible();
   });
 });

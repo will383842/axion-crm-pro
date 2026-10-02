@@ -42,7 +42,7 @@ export function ReglageDestinatairesChamps({
             />
             <span>
               {m.libelle}
-              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{m.aide}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">{m.aide}</span>
             </span>
           </label>
         ))}
@@ -52,7 +52,7 @@ export function ReglageDestinatairesChamps({
         <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
           Fonctions des personnes (facultatif)
         </div>
-        <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+        <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
           Seules les personnes dont la fonction contient l’un de ces mots (accents et majuscules ignorés).
         </p>
         <div className="mb-2 flex flex-wrap gap-1.5">
@@ -67,7 +67,7 @@ export function ReglageDestinatairesChamps({
                   active ? onChange({ ...valeur, fonctions: valeur.fonctions.filter((x) => x !== f) }) : ajouterFonction(f)
                 }
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition',
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition',
                   active
                     ? 'bg-sky-500 text-white ring-1 ring-sky-600'
                     : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
@@ -86,7 +86,7 @@ export function ReglageDestinatairesChamps({
                 type="button"
                 aria-pressed
                 onClick={() => onChange({ ...valeur, fonctions: valeur.fonctions.filter((x) => x !== f) })}
-                className="inline-flex items-center gap-1 rounded-full bg-sky-500 px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-sky-600"
+                className="inline-flex items-center gap-1 rounded-full bg-sky-500 px-2.5 py-1 text-xs font-medium text-white ring-1 ring-sky-600"
               >
                 {f}
                 <X className="h-3 w-3" />

@@ -51,7 +51,7 @@ export function ListesManuellesPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Listes manuelles"
+        title="Listes"
         subtitle="Des fiches choisies à la main, sous un nom — pour viser (ou exclure) exactement ces organisations et ces personnes dans une audience."
       />
 
@@ -123,7 +123,7 @@ export function ListesManuellesPage() {
       ) : (
         <Card padding="none" className="overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
               <tr>
                 <th className="px-4 py-2.5">Liste</th>
                 <th className="px-4 py-2.5">Organisations</th>

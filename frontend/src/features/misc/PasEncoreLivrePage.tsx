@@ -22,7 +22,7 @@ import { PageShell } from '@/components/ui/PageShell';
 /** Les lots que cet écran sait nommer. Un lot inconnu reste affiché tel quel. */
 const LOTS: Record<string, { titre: string; explication: string }> = {
   L7: {
-    titre: 'Prospection sortante (cold email, LinkedIn)',
+    titre: 'Prospection sortante (e-mails, LinkedIn)',
     explication:
       "Ce lot est hors du périmètre engagé. Les écrans qui l'esquissaient ont été retirés le 23 août 2026 : ils avaient l'apparence d'une fonctionnalité livrée.",
   },

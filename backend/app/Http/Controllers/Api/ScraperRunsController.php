@@ -174,7 +174,7 @@ class ScraperRunsController extends ApiController
         if (! in_array($run->status, ['failed', 'cancelled'], true)) {
             return response()->json([
                 'error' => 'invalid_state',
-                'message' => "Impossible de relancer un run au statut '{$run->status}'.",
+                'message' => "Impossible de relancer cette collecte dans son état actuel ('{$run->status}').",
                 'status' => $run->status,
             ], 422);
         }

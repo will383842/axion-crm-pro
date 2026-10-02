@@ -145,7 +145,7 @@ export function FederationsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Fédérations et organisations professionnelles"
+        title="Fédérations et ordres"
         subtitle="Fédérations, ordres, chambres, syndicats, associations de métiers : qui représente qui, où, et où en est le partenariat."
       />
 

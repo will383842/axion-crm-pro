@@ -159,7 +159,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // On journalise, puis on laisse le rendu par défaut répondre.
         $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
             if ($e->getStatusCode() === 419 && $request->is('api/v1/auth/login')) {
-                AuthService::journaliserEchec('session_absente_419', (string) $request->input('email', ''), $request);
+                AuthService::journaliserEchec('session_absente_419', $request);
             }
 
             return null;

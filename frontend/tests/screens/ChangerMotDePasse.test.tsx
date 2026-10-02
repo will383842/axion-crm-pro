@@ -23,7 +23,6 @@ function etat(requis: boolean) {
     email: 'contact@axion-ia.com',
     mot_de_passe_actuel_requis: requis,
     minutes_restantes_sans_ancien: requis ? null : 25,
-    a_un_mot_de_passe: true,
   });
 }
 

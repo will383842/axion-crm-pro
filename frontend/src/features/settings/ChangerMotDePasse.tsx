@@ -22,7 +22,6 @@ interface EtatChangement {
   email: string;
   mot_de_passe_actuel_requis: boolean;
   minutes_restantes_sans_ancien: number | null;
-  a_un_mot_de_passe: boolean;
 }
 
 interface CorpsRefus {

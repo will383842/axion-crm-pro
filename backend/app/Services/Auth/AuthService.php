@@ -70,7 +70,7 @@ class AuthService
     {
         $throttleKey = "login:{$request->ip()}:" . strtolower($email);
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            self::journaliserEchec('limite_essais', $email, $request);
+            self::journaliserEchec('limite_essais', $request);
             throw ValidationException::withMessages([
                 'email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($throttleKey)]),
             ]);
@@ -88,7 +88,7 @@ class AuthService
             $verrou = ValidationException::withMessages([
                 'email' => __('auth.locked', ['until' => $user->locked_until->toIso8601String()]),
             ]);
-            self::journaliserEchec('verrouille', $email, $request, $user);
+            self::journaliserEchec('verrouille', $request, $user);
             throw $verrou;
         }
 
@@ -109,7 +109,6 @@ class AuthService
             }
             self::journaliserEchec(
                 $user ? 'mot_de_passe' : 'compte_inconnu',
-                $email,
                 $request,
                 $user,
                 $user && ! $user->password_hash ? ['aucun_mot_de_passe_defini' => true] : [],
@@ -169,16 +168,20 @@ class AuthService
      * d'essais ou une session absente. Une ligne `info` par échec, sans le mot
      * de passe ni son hachage — jamais.
      *
+     * 🔴 NI L'ADRESSE TAPÉE (revue sécurité A09, PR #283) : un mot de passe
+     * collé par erreur dans le champ e-mail finirait en clair dans les journaux,
+     * et une adresse inconnue est une donnée personnelle d'un tiers. Seuls la
+     * catégorie et l'`user_id` d'un compte EXISTANT sont écrits.
+     *
      * Causes : `compte_inconnu`, `mot_de_passe`, `verrouille`, `limite_essais`,
      * `session_absente_419` (posée par `AuthController` et le rendu des 419).
      *
      * @param  array<string, mixed>  $extra
      */
-    public static function journaliserEchec(string $cause, string $email, Request $request, ?User $user = null, array $extra = []): void
+    public static function journaliserEchec(string $cause, Request $request, ?User $user = null, array $extra = []): void
     {
         Log::info('auth.login.echec', [
             'cause' => $cause,
-            'email' => strtolower(trim($email)),
             'user_id' => $user?->id,
             'ip' => $request->ip(),
             'failed_login_count' => $user?->failed_login_count,

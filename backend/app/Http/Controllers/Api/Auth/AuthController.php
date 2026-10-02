@@ -42,7 +42,7 @@ class AuthController extends ApiController
         // la vérité est « cette requête ne peut pas aboutir ainsi ». On répond
         // donc explicitement, sans rien affaiblir de la protection.
         if (! $request->hasSession()) {
-            AuthService::journaliserEchec('session_absente_419', (string) $request->input('email', ''), $request);
+            AuthService::journaliserEchec('session_absente_419', $request);
 
             return response()->json([
                 'error' => 'session_requise',

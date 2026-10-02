@@ -93,7 +93,6 @@ class PasswordChangeController extends ApiController
             'email' => $user->email,
             'mot_de_passe_actuel_requis' => $minutes === null,
             'minutes_restantes_sans_ancien' => $minutes,
-            'a_un_mot_de_passe' => $user->password_hash !== null && $user->password_hash !== '',
         ]);
     }
 

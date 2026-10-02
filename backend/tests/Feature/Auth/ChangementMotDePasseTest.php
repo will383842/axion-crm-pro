@@ -303,9 +303,14 @@ test('chaque echec de connexion est journalise avec sa cause, JAMAIS le mot de p
     Log::shouldHaveReceived('info')->withArgs(function ($message, $contexte = []) use (&$causes) {
         if ($message === 'auth.login.echec') {
             $causes[] = $contexte['cause'] ?? null;
-            $brut = json_encode($contexte);
-            expect($brut)->not->toContain('MauvaisMotDePasse');
+            $brut = (string) json_encode($contexte);
+            expect($brut)->not->toContain(CMDP_FAUX);
             expect($brut)->not->toContain('$2y$');
+            // Revue sécurité A09 : JAMAIS l'adresse tapée (mot de passe collé
+            // dans le champ e-mail, donnée d'un tiers). Catégorie + user_id.
+            expect($brut)->not->toContain('cmdp.test');
+            expect($brut)->not->toContain('cmdp');
+            expect(array_key_exists('email', (array) $contexte))->toBeFalse();
         }
 
         return true;
@@ -334,4 +339,48 @@ test('le changement reussi est journalise sans valeur', function () {
         return true;
     });
     expect($vu)->toBeTrue();
+});
+
+test('les journaux de reinitialisation portent l user_id, JAMAIS l adresse', function () {
+    $u = cmdpCompte('reset-journal@cmdp.test');
+    $jeton = Str::random(64);
+    DB::table('password_reset_tokens')->updateOrInsert(
+        ['email' => $u->email],
+        ['token' => hash('sha256', $jeton), 'created_at' => now()],
+    );
+    Log::spy();
+
+    test()->postJson('/api/v1/auth/password/reset', [
+        'email' => $u->email,
+        'token' => $jeton,
+        'password' => CMDP_NOUVEAU,
+        'password_confirmation' => CMDP_NOUVEAU,
+    ])->assertOk();
+
+    $vu = false;
+    Log::shouldHaveReceived('info')->withArgs(function ($message, $contexte = []) use (&$vu, $u) {
+        if ($message === 'password_reset.effectue') {
+            $vu = true;
+            expect($contexte['user_id'] ?? null)->toBe($u->id);
+            expect((string) json_encode($contexte))->not->toContain('cmdp.test');
+        }
+
+        return true;
+    });
+    expect($vu)->toBeTrue();
+});
+
+test('le cookie « se souvenir » du lien magique vit 30 jours au plus', function () {
+    expect((int) config('auth.guards.web.remember'))->toBe(43200);
+
+    $u = cmdpCompte('souvenir-borne@cmdp.test');
+    $r = cmdpConnexionParLien($u);
+
+    $souvenir = collect($r->baseResponse->headers->getCookies())
+        ->first(fn ($c) => str_starts_with($c->getName(), 'remember_web_'));
+    expect($souvenir)->not->toBeNull();
+
+    // Sans borne, Laravel le pose pour 400 jours.
+    expect($souvenir->getExpiresTime())->toBeLessThanOrEqual(now()->addDays(30)->addMinutes(5)->getTimestamp());
+    expect($souvenir->getExpiresTime())->toBeGreaterThan(now()->addDays(29)->getTimestamp());
 });

@@ -50,6 +50,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement('DROP INDEX IF EXISTS ' . self::NOM);
+        DB::statement("SET lock_timeout = '30s'");
+        try {
+            DB::statement('DROP INDEX CONCURRENTLY IF EXISTS ' . self::NOM);
+        } finally {
+            DB::statement('RESET lock_timeout');
+        }
     }
 };

@@ -20,7 +20,7 @@ use Spatie\QueryBuilder\Sorts\Sort;
  * l'ordre attendu d'un annuaire.
  *
  * ⚠️ L'EXPRESSION EST AUSSI CELLE DE L'INDEX
- * `idx_media_tri_nom` (migration `2026_10_02_000020_media_tri_nom_index`).
+ * `idx_media_tri_nom` (migration `2026_10_02_000030_media_tri_nom_index`).
  * Changer l'une sans l'autre ne casse rien à l'écran mais fait perdre l'index :
  * le planificateur ne reconnaît qu'une expression IDENTIQUE.
  */

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, useMemo, type ReactNode } from "rea
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Building2 } from "lucide-react";
 import {
   Button,
   Card,
@@ -336,7 +337,7 @@ export function CompaniesListPage() {
   const panneauOuvert = plusDeFiltres || cachesActifs > 0;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Entreprises"
         subtitle={
@@ -612,7 +613,7 @@ export function CompaniesListPage() {
         <CompaniesTableSkeleton />
       ) : rows.length === 0 ? (
         <EmptyState
-          icon="🏢"
+          icon={<Building2 />}
           title="Aucune entreprise"
           description={
             hasActiveFilter

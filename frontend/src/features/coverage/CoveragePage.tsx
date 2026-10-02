@@ -183,7 +183,7 @@ export function CoveragePage() {
   }
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6">
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <PageHeader
         title="Carte de France"
         subtitle="Cliquez sur un département pour voir ses entreprises"

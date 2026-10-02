@@ -12,7 +12,11 @@
  * déjà quand on lui demande `metier=1`.
  */
 
-const EVENEMENTS: Record<string, string> = {
+/** Phrase d'un code de traitement inconnu (jamais masqué). */
+export const AUTRE_OPERATION = 'Autre opération';
+
+/** Codes écrits par le serveur dans `audit_logs.event_type`, en phrases. */
+export const EVENEMENTS: Record<string, string> = {
   IMPORT_PRESSE: 'Import de la liste presse',
   IMPORT_EVENEMENTS: 'Import des événements',
   IMPORT_FEDERATIONS: 'Import des fédérations',
@@ -28,6 +32,13 @@ const EVENEMENTS: Record<string, string> = {
   RELATIONS_IMPORT_FIN: 'Import des relations terminé',
   GDPR_ERASURE_BISYSTEM: 'Effacement de données personnelles (site et CRM)',
   GDPR_PURGE_VIVIER: 'Purge du vivier de candidats (RGPD)',
+  GDPR_ERASURE: 'Effacement de données personnelles',
+  GDPR_PURGE_PERSONNES: 'Effacement RGPD de personnes',
+  GDPR_PURGE_BUSINESS: 'Effacement RGPD de prospects',
+  MOT_DE_PASSE_MODIFIE: 'Mot de passe modifié',
+  FUSION_FICHES_ANNULEE: 'Fusion de fiches annulée',
+  FUSION_DOUBLONS_FIN: 'Fusion des doublons terminée',
+  RECLASSEMENT_ETIQUETTES_SUPPRIMEES: 'Étiquettes retirées après reclassement',
   'company.enriched': 'Fiche enrichie',
   'audience.refreshed': 'Audience recalculée',
   'audience.refresh.failed': 'Échec du recalcul d’une audience',
@@ -71,12 +82,6 @@ const VERBES: Record<string, string> = {
   DELETE: 'Suppression',
 };
 
-/** « RECLASSEMENT_REFERENTIELS » → « Reclassement referentiels ». */
-function enPhrase(brut: string): string {
-  const t = brut.replace(/[._-]+/g, ' ').trim().toLowerCase();
-  return t === '' ? 'Événement' : t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 /**
  * La phrase d'une ligne du journal, ou `null` si la ligne n'est pas un
  * événement à montrer (progression d'un traitement en lot).
@@ -95,6 +100,10 @@ export function libelleActivite(eventType?: string | null, path?: string | null)
     return VERBES[type] ? `${VERBES[type]} dans la console` : 'Action dans la console';
   }
 
-  if (type === '') return 'Événement';
-  return enPhrase(type);
+  // Un code INCONNU du dictionnaire ne s'affiche plus déguisé en phrase
+  // (« Nouvel evenement », sans accents), mais il ne disparaît pas non plus :
+  // un événement ne doit jamais sortir du fil sans bruit. La garde
+  // `tests/lib/activite-codes-serveur.test.ts` exige une phrase pour chaque
+  // code que le serveur écrit.
+  return AUTRE_OPERATION;
 }

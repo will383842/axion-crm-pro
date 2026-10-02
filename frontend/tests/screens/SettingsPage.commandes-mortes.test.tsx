@@ -37,6 +37,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { ReglagesTechniques } from '@/features/settings/ReglagesTechniques';
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, getJson, http, HttpResponse } from '../msw/handlers';
 
@@ -61,6 +62,11 @@ function texteEcran(): string {
 
 async function monter(handlers = [getJson('/workspace', WORKSPACE)]): Promise<void> {
   await renderScreen(<SettingsPage />, { path: '/settings', handlers });
+}
+
+/** P1-12 — intégrations et suivi technique vivent dans `ReglagesTechniques`. */
+async function monterTechnique(): Promise<void> {
+  await renderScreen(<ReglagesTechniques />, { path: '/admin/observability' });
 }
 
 async function ouvrirOnglet(nom: RegExp): Promise<void> {
@@ -134,8 +140,7 @@ describe('D26-003 · Workspace — un enregistrement qui echoue doit le DIRE', (
 
 describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat affirme', () => {
   it('TEMOIN — l’onglet reste informatif : les integrations sont toujours listees', async () => {
-    await monter();
-    await ouvrirOnglet(/Integrations|Intégrations/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('INSEE Sirene');
@@ -145,8 +150,7 @@ describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat
   });
 
   it('les 14 boutons sans gestionnaire ont disparu', async () => {
-    await monter();
-    await ouvrirOnglet(/Integrations|Intégrations/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('INSEE Sirene');
@@ -156,8 +160,7 @@ describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat
   });
 
   it('le faux secret « sk-••••• » n’est plus revele par personne', async () => {
-    await monter();
-    await ouvrirOnglet(/Integrations|Intégrations/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('INSEE Sirene');
@@ -169,8 +172,7 @@ describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat
   });
 
   it('l’ecran n’affirme plus « Configure » : il dit qu’il NE PEUT PAS savoir', async () => {
-    await monter();
-    await ouvrirOnglet(/Integrations|Intégrations/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('INSEE Sirene');
@@ -188,8 +190,7 @@ describe('D26-003 · Integrations — ni bouton mort, ni secret invente, ni etat
 
 describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', () => {
   it('TEMOIN — les liens d’observabilite sont toujours la', async () => {
-    await monter();
-    await ouvrirOnglet(/Suivi technique/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('Horizon');
@@ -198,8 +199,7 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
   });
 
   it('lot 4 (audit P1-4) — plus aucun lien vers http://localhost', async () => {
-    await monter();
-    await ouvrirOnglet(/Suivi technique/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('Horizon');
@@ -210,8 +210,7 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
   });
 
   it('le champ « DSN Sentry » a disparu, et l’ecran dit ou se regle vraiment le DSN', async () => {
-    await monter();
-    await ouvrirOnglet(/Suivi technique/);
+    await monterTechnique();
 
     await waitFor(() => {
       expect(texteEcran()).toContain('Horizon');
@@ -260,5 +259,42 @@ describe('D26-003 · Apparence — la densite agit et survit', () => {
     await waitFor(() => {
       expect(document.documentElement.getAttribute('data-density')).toBe('compact');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. P1-12 (audit UX du 2026-10-02) — des Paramètres pour un humain
+// ---------------------------------------------------------------------------
+
+describe('P1-12 · Paramètres pour un humain', () => {
+  it('quatre onglets : Mon entreprise, Mon compte, Utilisateurs, Affichage', async () => {
+    await monter();
+    const onglets = (await screen.findAllByRole('tab')).map((t) => t.textContent?.trim());
+    expect(onglets).toEqual(['Mon entreprise', 'Mon compte', 'Utilisateurs', 'Affichage']);
+  });
+
+  it('plus de nom de variable, de prix en dollars, de « Phase B », de Sentry ni de Horizon', async () => {
+    await monter();
+    await screen.findByLabelText(/Nom/);
+    for (const nom of [/Mon entreprise/, /Mon compte/, /Utilisateurs/, /Affichage/]) {
+      await ouvrirOnglet(nom);
+      const texte = texteEcran();
+      expect(texte).not.toMatch(/_API_KEY|\$|Phase B|Sentry|DSN|SDK|Horizon|Telescope|Slug/);
+    }
+  });
+
+  it('l’onglet « Utilisateurs » mène à la gestion des utilisateurs', async () => {
+    await monter();
+    await ouvrirOnglet(/Utilisateurs/);
+    expect(await screen.findByRole('link', { name: /Gérer les utilisateurs/ })).toHaveAttribute('href', '/users');
+  });
+
+  it('rien n’est perdu : les réglages techniques gardent intégrations, Sentry et Horizon', async () => {
+    await monterTechnique();
+    const texte = texteEcran();
+    expect(texte).toContain('Réglages techniques');
+    expect(texte).toContain('INSEE_API_KEY');
+    expect(texte).toContain('Suivi des erreurs');
+    expect(texte).toContain('Horizon');
   });
 });

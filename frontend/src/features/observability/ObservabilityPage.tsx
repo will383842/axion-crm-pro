@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, AlertTriangle, MailCheck, Archive, MapPin } from 'lucide-react';
 import { Card, KpiCard, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
+import { ReglagesTechniques } from '@/features/settings/ReglagesTechniques';
 
 interface ObservabilitySummary {
   waterfall_errors_24h: number;
@@ -25,6 +26,17 @@ interface ObservabilitySummary {
  * Data via /api/v1/observability/summary, queries directes Postgres (<100ms).
  */
 export function ObservabilityPage() {
+  // P1-12 — les réglages techniques quittent les Paramètres et vivent ici,
+  // sous « Technique ». Ils s'affichent même si le résumé ne se charge pas.
+  return (
+    <div className="space-y-10">
+      <SanteDuSysteme />
+      <ReglagesTechniques />
+    </div>
+  );
+}
+
+function SanteDuSysteme() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['observability', 'summary'],
     queryFn: async () => {
@@ -35,12 +47,12 @@ export function ObservabilityPage() {
   });
 
   if (isLoading) {
-    return <div className="p-6 text-sm text-slate-500">Chargement de l'observabilité…</div>;
+    return <div className="text-sm text-slate-500">Chargement de la santé du système…</div>;
   }
   if (error !== null && data === undefined) {
     // P0-3 — le composant d'erreur partagé : nature de l'échec + « Réessayer ».
     return (
-      <div className="p-6">
+      <div>
         <QueryErrorState error={error} contexte="la santé du système" onRetry={() => void refetch()} />
       </div>
     );
@@ -52,7 +64,7 @@ export function ObservabilityPage() {
   const totalArchived = Object.values(data.archive_reasons).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <PageHeader
         title="Santé du système"
         subtitle="Les traitements automatiques tournent-ils bien ? Quotas, archivages, erreurs."

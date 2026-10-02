@@ -128,6 +128,8 @@ export function libelleDeChemin(pathname: string): string {
   const direct = LABELS[pathname];
   if (direct !== undefined) return direct;
   const segments = pathname.split('/').filter(Boolean);
+  const parent = `/${segments.slice(0, -1).join('/')}`;
+  if (segments.length > 1 && (LABELS[parent] !== undefined || SEGMENTS_SANS_ECRAN.has(parent))) return 'Fiche';
   return humanize(segments[segments.length - 1] ?? '');
 }
 
@@ -136,6 +138,8 @@ function humanize(segment: string): string {
   // « #a1b2c3d4 » était affiché tel quel. On dit ce que c'est — une fiche.
   if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment)) return 'Fiche';
   if (/^\d+$/.test(segment)) return 'Fiche';
+  // Clé de personne (empreinte hexadécimale de l'adresse) : même chose.
+  if (/^[0-9a-f]{16,}$/i.test(segment)) return 'Fiche';
   return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
 }
 
@@ -155,7 +159,11 @@ export function AutoBreadcrumbs() {
     const isLast = idx === segments.length - 1;
     // Segment sans écran : omis (voir `SEGMENTS_SANS_ECRAN`).
     if (!isLast && SEGMENTS_SANS_ECRAN.has(acc)) return;
-    const label = LABELS[acc] ?? humanize(seg);
+    // Sous un écran de liste, un segment sans libellé est l'identifiant d'une
+    // fiche (`/media/$mediaId`, `/console/personnes/$personKey`…) : « Fiche ».
+    const parent = acc.slice(0, acc.length - seg.length - 1);
+    const sousUneListe = LABELS[parent] !== undefined || SEGMENTS_SANS_ECRAN.has(parent);
+    const label = LABELS[acc] ?? (sousUneListe ? 'Fiche' : humanize(seg));
     // Seul un chemin de la table est une route réelle : lui seul devient un lien.
     const hasRoute = Boolean(LABELS[acc]);
     crumbs.push({

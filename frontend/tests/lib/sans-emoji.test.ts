@@ -21,10 +21,6 @@ import { textesDuModule } from '../helpers/tutoiement';
  * plus d'émoji fait ROUGIR la garde (exception morte) : on la retire alors.
  */
 const EXCEPTIONS: Record<string, string> = {
-  'features/companies/CompaniesListPage.tsx':
-    'pastilles 🟢🟡🔴 du filtre qualité et état vide 🏢 — fichier en cours de modification dans une autre PR, à reprendre après sa fusion',
-  'features/dashboard/components/NextActions.tsx':
-    'icônes des actions suggérées — fichier en cours de modification dans une autre PR, à reprendre après sa fusion',
   'features/coverage/FranceCoverageMap.tsx':
     'messages de diagnostic de la carte écrits en console du navigateur, jamais affichés à l’écran',
 };

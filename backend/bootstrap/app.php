@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureCrmConsoleV2;
 use App\Http\Middleware\EnsureTwoFactorPassed;
 use App\Http\Middleware\LimiteDureeRequetesSql;
 use App\Http\Middleware\SetCurrentWorkspace;
+use App\Services\Auth\AuthService;
 use App\Support\DelaiRequeteSql;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Middleware\PermissionMiddleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -150,6 +152,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn ($request, $e) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // (F) DIAGNOSTIC — un 419 sur la CONNEXION (jeton CSRF absent ou périmé,
+        // session non transmise) n'atteint jamais le contrôleur : sans cette
+        // ligne, l'échec ne laissait aucune trace (constat prod du 2026-10-02).
+        // On journalise, puis on laisse le rendu par défaut répondre.
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+            if ($e->getStatusCode() === 419 && $request->is('api/v1/auth/login')) {
+                AuthService::journaliserEchec('session_absente_419', (string) $request->input('email', ''), $request);
+            }
+
+            return null;
+        });
 
         // (E) UNE REQUETE TROP LONGUE N'EST PAS UNE PANNE. Le filet (D) annule
         // la requete SQL (SQLSTATE 57014) : on le dit a l'ecran, en francais,

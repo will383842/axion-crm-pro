@@ -174,6 +174,9 @@ class PasswordResetController extends ApiController
             DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
         }
 
+        // Diagnostic (constat prod du 2026-10-02) : QUI et QUAND, jamais la valeur.
+        \Log::info('password_reset.effectue', ['user_id' => $user->id, 'email' => $email]);
+
         return $this->ok(['reset' => true]);
     }
 }

@@ -60,8 +60,25 @@ class MagicLinkController extends ApiController
             return response()->json(['error' => 'invalid_or_expired_token'], 401);
         }
 
-        Auth::login($user);
+        // 🔴 « SE SOUVENIR » — constat prod du 2026-10-02. `Auth::login($user)`
+        // sans second argument : la session mourait avec `session.lifetime`, et
+        // le propriétaire, qui n'entrait plus QUE par lien, devait redemander un
+        // courriel toutes les deux heures. Le lien prouve la possession de la
+        // boîte aux lettres : c'est au moins aussi fort qu'un mot de passe, qui
+        // obtient « se souvenir » d'une simple case cochée.
+        Auth::login($user, true);
         $request->session()->regenerate();
+
+        // Même trace qu'une connexion par mot de passe (`AuthService::attemptLogin`).
+        $user->forceFill([
+            'last_login_at' => now(),
+            'last_login_ip' => $request->ip(),
+            'last_login_user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ])->save();
+
+        // Pendant 30 minutes, cette session peut changer le mot de passe sans
+        // l'ancien (cf. `PasswordChangeController`).
+        PasswordChangeController::marquerSessionParLien($request);
 
         return $this->ok([
             'user' => $user->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at']),

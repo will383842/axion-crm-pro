@@ -5,7 +5,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Eye, EyeOff, LogIn, Sparkles } from 'lucide-react';
 import { Button, Card, Input } from '@/components/ui';
 import { api, rafraichirCsrf } from '@/lib/api';
-import { estSessionExpiree, messageErreurAuth } from './messagesErreur';
+import { estIdentifiantsIncorrects, estSessionExpiree, messageErreurAuth } from './messagesErreur';
 
 export function AuthShell({
   title,
@@ -76,6 +76,10 @@ export function LoginPage() {
   //  - un 419 redemande le jeton CSRF et rejoue la connexion UNE fois, en silence ;
   //  - chaque échec a son message (identifiants, verrou, trop d'essais, panne).
   const [erreur, setErreur] = useState<string | null>(null);
+  // Constat prod du 2026-10-02 : un gestionnaire de mots de passe pré-remplit
+  // parfois l'ANCIEN mot de passe après une réinitialisation. L'aide n'apparaît
+  // qu'après un refus « identifiants incorrects », jamais d'emblée.
+  const [aideNavigateur, setAideNavigateur] = useState(false);
 
   function connecter() {
     return api.post<{ requires_2fa?: boolean }>('/auth/login', { email, password, remember });
@@ -101,6 +105,7 @@ export function LoginPage() {
       }
     } catch (err) {
       setErreur(messageErreurAuth(err, 'Adresse e-mail ou mot de passe incorrect.'));
+      setAideNavigateur(estIdentifiantsIncorrects(err));
     } finally {
       setLoading(false);
     }
@@ -146,6 +151,11 @@ export function LoginPage() {
               </button>
             }
           />
+          {aideNavigateur ? (
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+              Le navigateur a peut-être rempli un ancien mot de passe&nbsp;: effacez-le et retapez-le.
+            </span>
+          ) : null}
         </label>
 
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">

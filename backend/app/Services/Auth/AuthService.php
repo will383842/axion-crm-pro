@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -69,6 +70,7 @@ class AuthService
     {
         $throttleKey = "login:{$request->ip()}:" . strtolower($email);
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            self::journaliserEchec('limite_essais', $email, $request);
             throw ValidationException::withMessages([
                 'email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($throttleKey)]),
             ]);
@@ -83,9 +85,11 @@ class AuthService
         // compteur d'échecs continuait de monter. Le verrou doit couper avant.
         if ($user && $user->locked_until && $user->locked_until->isFuture()) {
             RateLimiter::hit($throttleKey, 60);
-            throw ValidationException::withMessages([
+            $verrou = ValidationException::withMessages([
                 'email' => __('auth.locked', ['until' => $user->locked_until->toIso8601String()]),
             ]);
+            self::journaliserEchec('verrouille', $email, $request, $user);
+            throw $verrou;
         }
 
         // Verrou expiré : on repart de zéro, sans quoi la 11ᵉ tentative reverrouille
@@ -103,6 +107,13 @@ class AuthService
             if ($user) {
                 $this->enregistrerEchec($user);
             }
+            self::journaliserEchec(
+                $user ? 'mot_de_passe' : 'compte_inconnu',
+                $email,
+                $request,
+                $user,
+                $user && ! $user->password_hash ? ['aucun_mot_de_passe_defini' => true] : [],
+            );
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
         }
 
@@ -146,6 +157,32 @@ class AuthService
         }
 
         $user->save();
+    }
+
+    /**
+     * DIAGNOSTIC — chaque échec de connexion, avec sa cause CATÉGORISÉE.
+     *
+     * Constat prod du 2026-10-02 : le propriétaire ne parvenait plus à se
+     * connecter après une réinitialisation RÉUSSIE, et les journaux ne disaient
+     * rien — impossible de distinguer un mot de passe faux (gestionnaire du
+     * navigateur qui pré-remplit l'ancien), un compte verrouillé, un plafond
+     * d'essais ou une session absente. Une ligne `info` par échec, sans le mot
+     * de passe ni son hachage — jamais.
+     *
+     * Causes : `compte_inconnu`, `mot_de_passe`, `verrouille`, `limite_essais`,
+     * `session_absente_419` (posée par `AuthController` et le rendu des 419).
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public static function journaliserEchec(string $cause, string $email, Request $request, ?User $user = null, array $extra = []): void
+    {
+        Log::info('auth.login.echec', [
+            'cause' => $cause,
+            'email' => strtolower(trim($email)),
+            'user_id' => $user?->id,
+            'ip' => $request->ip(),
+            'failed_login_count' => $user?->failed_login_count,
+        ] + $extra);
     }
 
     public function logout(Request $request): void

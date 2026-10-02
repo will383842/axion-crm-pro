@@ -59,6 +59,7 @@ import {
   Palette,
   Plug,
   Settings as SettingsIcon,
+  KeyRound,
 } from 'lucide-react';
 import {
   Button,
@@ -78,6 +79,7 @@ import {
 import { api, qualifierErreur } from '@/lib/api';
 import { appliquerDensite, lireDensite, type Densite } from '@/lib/densite';
 import { toast } from 'sonner';
+import { ChangerMotDePasse } from './ChangerMotDePasse';
 
 interface Workspace {
   id: string;
@@ -87,7 +89,7 @@ interface Workspace {
   settings: Record<string, unknown>;
 }
 
-type TabKey = 'workspace' | 'integrations' | 'observability' | 'appearance';
+type TabKey = 'workspace' | 'compte' | 'integrations' | 'observability' | 'appearance';
 
 /**
  * ⚠️ `role` et NON `status`. Le champ s'appelait `status: 'configured' | …` et
@@ -140,6 +142,7 @@ const OBSERVABILITY_LINKS: Array<{ name: string; url: string; description: strin
 
 const TABS: Array<TabItem<TabKey>> = [
   { id: 'workspace', label: 'Workspace', icon: <Briefcase className="h-3.5 w-3.5" /> },
+  { id: 'compte', label: 'Mon compte', icon: <KeyRound className="h-3.5 w-3.5" /> },
   { id: 'integrations', label: 'Intégrations', icon: <Plug className="h-3.5 w-3.5" /> },
   { id: 'observability', label: 'Observabilité', icon: <Activity className="h-3.5 w-3.5" /> },
   { id: 'appearance', label: 'Apparence', icon: <Palette className="h-3.5 w-3.5" /> },
@@ -271,7 +274,7 @@ export function SettingsPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Paramètres"
-        subtitle="Workspace, intégrations, observabilité, apparence."
+        subtitle="Workspace, mon compte, intégrations, observabilité, apparence."
         actions={
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <SettingsIcon className="h-3.5 w-3.5" /> Workspace : {ws.data?.name ?? '…'}
@@ -357,6 +360,8 @@ export function SettingsPage() {
           )}
         </Card>
       )}
+
+      {tab === 'compte' && <ChangerMotDePasse />}
 
       {tab === 'integrations' && (
         <div className="space-y-3">

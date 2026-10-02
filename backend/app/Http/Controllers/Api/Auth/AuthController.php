@@ -42,6 +42,8 @@ class AuthController extends ApiController
         // la vérité est « cette requête ne peut pas aboutir ainsi ». On répond
         // donc explicitement, sans rien affaiblir de la protection.
         if (! $request->hasSession()) {
+            AuthService::journaliserEchec('session_absente_419', (string) $request->input('email', ''), $request);
+
             return response()->json([
                 'error' => 'session_requise',
                 'message' => "Cette route ouvre une session : la requête doit provenir d'un domaine stateful (en-tête Origin ou Referer). Pour un accès machine, utilisez un jeton d'API.",

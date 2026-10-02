@@ -2,7 +2,11 @@
 
 return [
     'driver' => env('SESSION_DRIVER', 'redis'),
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    // 12 h par défaut (était 120 min) — constat prod du 2026-10-02 : le
+    // propriétaire, entré par lien magique, était déconnecté toutes les deux
+    // heures. Une journée de travail tient désormais dans une session ; le
+    // « se souvenir de moi » prend le relais au-delà.
+    'lifetime' => (int) env('SESSION_LIFETIME', 720),
     'expire_on_close' => false,
     'encrypt' => true,
     'files' => storage_path('framework/sessions'),

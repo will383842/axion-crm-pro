@@ -148,13 +148,22 @@ return new class extends Migration
                     v_haut := left(v_bas, -1) || chr(v_dernier + 1);
                 END IF;
 
+                -- ⚠️ L'intervalle citext SERT L'INDEX, il ne suffit pas à dire
+                -- « commence par » : citext compare en minuscules, donc pour une
+                -- saisie finie par « @ » la borne « …A » devient « …a », et
+                -- l'intervalle avale `[ \ ] ^ _` et l'accent grave (« paul@ »
+                -- rendait `paul_durand@…` ; 286 faux pour « contact@ » en prod,
+                -- relecture de confirmation de la #294). D'où la REVÉRIFICATION
+                -- exacte, non indexée, sur les seules lignes lues : préfixe en
+                -- minuscules, jokers échappés (échappement `\`, celui de LIKE).
                 RETURN QUERY EXECUTE
                     'SELECT c.id FROM public.contacts c WHERE c.workspace_id = $1 AND c.deleted_at IS NULL'
                     || ' AND c.email >= $2::public.citext AND ($3::text IS NULL OR c.email < $3::public.citext)'
+                    || ' AND lower(c.email::text) LIKE $6'
                     || ' AND NOT (coalesce(c.last_name, '''') ILIKE (''%'' || $4 || ''%'')'
                     || '          OR coalesce(c.first_name, '''') ILIKE (''%'' || $4 || ''%''))'
                     || ' ORDER BY c.email, c.id LIMIT $5'
-                    USING p_workspace, v_bas, v_haut, v_motif, v_limite - v_rendus;
+                    USING p_workspace, v_bas, v_haut, v_motif, v_limite - v_rendus, lower(v_motif) || '%';
             END
             $fn$;
             REVOKE EXECUTE ON FUNCTION public.contacts_recherche_ids(UUID, TEXT, INT) FROM PUBLIC;

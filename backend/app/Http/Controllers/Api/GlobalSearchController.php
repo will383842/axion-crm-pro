@@ -158,7 +158,10 @@ class GlobalSearchController extends ApiController
                 [$parNom, $indice] = RechercheEntreprisesParNom::identifiants($espace, $terme, '', self::PLAFOND);
                 $ids = array_slice(array_unique(array_merge($ids, $parNom)), 0, self::PLAFOND);
                 if ($ids === []) {
-                    $this->indiceEntreprises = $indice;
+                    // Une saisie de chiffres qui ne trouve rien parle de SIREN,
+                    // pas de « lettres du nom ».
+                    $enChiffres = $chiffres !== '' && ctype_digit($chiffres);
+                    $this->indiceEntreprises = $enChiffres ? ($indice !== null ? 'siren_inconnu' : null) : $indice;
                 }
             }
 

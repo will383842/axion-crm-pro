@@ -26,6 +26,18 @@ describe('GlobalSearch — indice de la recherche d’entreprises', () => {
     expect(screen.getByText(/Aucun résultat pour « SARL »/)).toBeVisible();
   });
 
+  it('deux chiffres sans SIREN trouvé : la phrase parle de SIREN, pas de lettres', async () => {
+    await renderScreen(<GlobalSearch />, {
+      handlers: [getJson('/search', { companies: [], contacts: [], tags: [], indice_entreprises: 'siren_inconnu' })],
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Recherche globale' }));
+    await userEvent.type(screen.getByRole('combobox'), '12');
+
+    expect(await screen.findByText('Aucune entreprise ne commence par ce numéro de SIREN.')).toBeVisible();
+    expect(screen.queryByText(/lettres/)).not.toBeInTheDocument();
+  });
+
   it('TÉMOIN : sans indice, aucune phrase ajoutée', async () => {
     await renderScreen(<GlobalSearch />, {
       handlers: [getJson('/search', { companies: [], contacts: [], tags: [], indice_entreprises: null })],

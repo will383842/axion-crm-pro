@@ -61,7 +61,11 @@ function rgrEspace(string $prefixeSiren): array
     }
 
     $contacts = [];
-    foreach (['bernadette' => ['Jeanne', 'Zzbernadette', 'jeanne.zz@example.invalid'], 'autre' => ['Paul', 'Zzautre', 'paul.zz@example.invalid']] as $cle => [$prenom, $nom, $email]) {
+    foreach (['bernadette' => ['Jeanne', 'Zzbernadette', 'jeanne.zz@example.invalid'], 'autre' => ['Paul', 'Zzautre', 'paul.zz@example.invalid'],
+        // « paul@ » : la première COMMENCE par « paul@ », la seconde non
+        // (« _ » est dans l'intervalle citext de « paul@ », pas dans le préfixe).
+        'paul_arobase' => ['Xavier', 'Zzpremier', 'paul@x.example.invalid'],
+        'paul_souligne' => ['Yves', 'Zzsecond', 'paul_durand@x.example.invalid']] as $cle => [$prenom, $nom, $email]) {
         $contacts[$cle] = (int) $owner->table('contacts')->insertGetId([
             'workspace_id' => $id, 'company_id' => $entreprises['a'], 'first_name' => $prenom, 'last_name' => $nom,
             'email' => $email, 'created_at' => now(), 'updated_at' => now(),
@@ -136,6 +140,9 @@ test('sous axion_app : SIREN (égalité, préfixe) et personnes (nom, prénom, d
         expect(rgrContacts($a['id'], 'jeanne'))->toBe([$a['contacts']['bernadette']]);
         expect(rgrContacts($a['id'], 'paul.zz'))->toBe([$a['contacts']['autre']]);
         expect(rgrContacts($a['id'], 'PAUL.ZZ@'))->toBe([$a['contacts']['autre']]);
+        // Saisie finie par « @ » : la REVÉRIFICATION exacte écarte
+        // `paul_durand@…`, que l'intervalle citext laissait passer.
+        expect(rgrContacts($a['id'], 'paul@'))->toBe([$a['contacts']['paul_arobase']]);
         // Sous 3 caractères : rien.
         expect(rgrContacts($a['id'], 'zz'))->toBe([]);
 
@@ -269,6 +276,7 @@ test('la palette ne réémet JAMAIS de LIKE direct sur companies ou contacts (ro
     // Des chiffres qui ne sont pas un début de SIREN existant : le NOM est cherché aussi.
     $nomEnChiffres = $this->actingAs($user)->getJson('/api/v1/search?q=1664')->assertOk();
     $sarl = $this->actingAs($user)->getJson('/api/v1/search?q=SARL')->assertOk();
+    $deuxChiffres = $this->actingAs($user)->getJson('/api/v1/search?q=12')->assertOk();
 
     // TÉMOINS : les familles trouvent bien.
     expect(collect($parNom->json('companies'))->pluck('id')->all())->toBe([$entreprise])
@@ -279,7 +287,10 @@ test('la palette ne réémet JAMAIS de LIKE direct sur companies ou contacts (ro
         ->and($parNom->json('indice_entreprises'))->toBeNull()
         // « SARL » seul : aucune entreprise cherchée, et la réponse dit pourquoi.
         ->and($sarl->json('companies'))->toBe([])
-        ->and($sarl->json('indice_entreprises'))->toBe('mots_vides');
+        ->and($sarl->json('indice_entreprises'))->toBe('mots_vides')
+        // Deux chiffres sans SIREN trouvé : l'indice parle de SIREN.
+        ->and($deuxChiffres->json('companies'))->toBe([])
+        ->and($deuxChiffres->json('indice_entreprises'))->toBe('siren_inconnu');
 
     $sql = collect($requetes);
     expect($sql->contains(fn (string $s): bool => str_contains($s, 'entreprises_choix_ids')))->toBeTrue()

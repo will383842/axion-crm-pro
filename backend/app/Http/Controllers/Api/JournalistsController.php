@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Crm\Presse\LienJournalisteContact;
+use App\Crm\Presse\PersonneReelle;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreJournalistRequest;
 use App\Http\Requests\UpdateJournalistRequest;
@@ -51,6 +52,8 @@ class JournalistsController extends ApiController
                 ->allowedIncludes(...['media'])
                 ->allowedSorts(...['last_name', 'created_at'])
                 ->defaultSort('last_name')
+                ->select('journalists.*')
+                ->selectRaw(PersonneReelle::conditionSql('journalists') . ' AS personne_reelle')
                 ->paginate($perPage);
 
             return $this->ok([
@@ -67,6 +70,9 @@ class JournalistsController extends ApiController
                     'per_page' => $page->perPage(),
                     'current_page' => $page->currentPage(),
                     'last_page' => $page->lastPage(),
+                    // Lot 3 — indicateurs sur TOUTE la sélection (l'écran
+                    // affichait « Avec email : N sur la page »).
+                    'stats' => $this->statistiques(),
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -127,7 +133,51 @@ class JournalistsController extends ApiController
                         ? $query->whereNotNull('email')
                         : $query->whereNull('email');
                 }),
+                // Lot 3 (2026-10-02) — par DÉFAUT, seules les personnes
+                // identifiées (`PersonneReelle`) : les noms d'émissions et de
+                // chaînes importés comme « présentateurs » ou « producteurs »
+                // (« Divers (feuilleton) », « France 3 ») ne sont plus comptés
+                // ni montrés comme journalistes. Rien n'est supprimé :
+                // `filter[personne_reelle]=false` liste les lignes écartées,
+                // `=tous` liste tout.
+                AllowedFilter::callback('personne_reelle', function ($query, $value) {
+                    if ($value === 'tous') {
+                        return;
+                    }
+                    filter_var($value, FILTER_VALIDATE_BOOLEAN)
+                        ? $query->whereRaw(PersonneReelle::conditionSql('journalists'))
+                        : $query->whereRaw('NOT ' . PersonneReelle::conditionSql('journalists'));
+                })->default(true),
             ]);
+    }
+
+    /**
+     * Les compteurs de l'écran, sur l'ensemble filtré (mêmes filtres que la
+     * liste, filtre « personne réelle » compris) + le nombre de lignes
+     * écartées comme non-personnes. Table de ~1 300 lignes : calcul direct.
+     *
+     * @return array{total: int, avec_email: int, opt_out: int, ecartees: int}
+     */
+    private function statistiques(): array
+    {
+        $filtree = $this->buildFilteredQuery()->getEloquentBuilder()->toBase();
+        $ligne = (clone $filtree)->selectRaw(
+            'count(*) AS total, count(journalists.email) AS avec_email, count(*) FILTER (WHERE journalists.opt_out) AS opt_out',
+        )->first();
+
+        $espace = $this->espaceCourantOuNull();
+        $ecartees = $espace === null ? 0 : (int) DB::table('journalists')
+            ->where('workspace_id', $espace)
+            ->whereNull('deleted_at')
+            ->whereRaw('NOT ' . PersonneReelle::conditionSql('journalists'))
+            ->count();
+
+        return [
+            'total' => (int) ($ligne->total ?? 0),
+            'avec_email' => (int) ($ligne->avec_email ?? 0),
+            'opt_out' => (int) ($ligne->opt_out ?? 0),
+            'ecartees' => $ecartees,
+        ];
     }
 
     public function export(Request $r): StreamedResponse

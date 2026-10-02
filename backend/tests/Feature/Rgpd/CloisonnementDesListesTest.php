@@ -198,6 +198,10 @@ test('P6-API-001 — GET /journalists ne rend PAS les journalistes d un autre es
     foreach ([[$espaceA, 'Alpha Secret'], [$espaceB, 'Beta A Moi']] as [$ws, $nom]) {
         DB::table('journalists')->insert([
             'workspace_id' => $ws,
+            // Lot 3 : la liste ne montre par défaut que des PERSONNES
+            // identifiées (prénom + nom, cf. `PersonneReelle`). Sans prénom,
+            // le témoin de B disparaîtrait de la liste par défaut.
+            'first_name' => 'Zoe',
             'last_name' => $nom,
             // `email` est une donnee personnelle : c'est elle qui fait la gravite
             // de la fuite, pas le nom. On la pose donc, et on la cherche.

@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchI
 import { api } from "@/lib/api";
 import { useAntiRebond } from "@/hooks/useAntiRebond";
 import { toast } from "sonner";
+import { misAJour } from "@/lib/fraicheur";
 
 export interface MediaItem {
   id: number;
@@ -25,6 +26,19 @@ export interface MediaItem {
   cppap_number: string | null;
   arcom_id: string | null;
   enrich_status: string | null;
+  /** Lot 3 — l'URL VÉRIFIÉE (`crm:presse:verifier-sites`), sinon null. */
+  site_verifie?: string | null;
+  /** Lot 3 — statut du contrôle du site (`verifie`, `a-confirmer`, `non-conforme`…). */
+  site_statut?: string | null;
+}
+
+/** Réponse de `GET /media/stats` : indicateurs sur TOUTE la sélection filtrée. */
+interface MediaStats {
+  total: number;
+  avec_site_fiable: number;
+  avec_email: number;
+  top_type: { media_type: string; n: number } | null;
+  computed_at?: string | null;
 }
 
 interface MediaResponse {
@@ -55,16 +69,22 @@ const PERIODICITY_OPTIONS = [
   { value: "trimestriel", label: "Trimestriel" },
 ];
 
+// Lot 3 — « site fiable » = site VÉRIFIÉ, pas une colonne remplie : beaucoup
+// de sites avaient été DEVINÉS depuis le nom (« agence.com », « paris.fr »).
 const SITE_OPTIONS = [
   { value: "", label: "Site : tous" },
-  { value: "true", label: "Avec site web" },
-  { value: "false", label: "Sans site web" },
+  { value: "true", label: "Avec site vérifié" },
+  { value: "false", label: "Sans site vérifié" },
 ];
 
+// Lot 3 — par DÉFAUT, les médias seulement : les ≈ 25 000 sociétés de
+// production audiovisuelle (`production_audiovisuelle`) étaient mêlées aux
+// médias et s'affichaient en premier. Elles restent accessibles ici.
+export const FAMILLE_PAR_DEFAUT = "editorial";
 const FAMILY_OPTIONS = [
-  { value: "", label: "Toutes familles" },
-  { value: "editorial", label: "📝 Rédactionnel" },
-  { value: "audiovisual_production", label: "🎥 Production audiovisuelle" },
+  { value: "editorial", label: "📝 Médias" },
+  { value: "audiovisual_production", label: "🎥 Sociétés de production" },
+  { value: "tous", label: "Médias et sociétés de production" },
 ];
 
 const EMAIL_OPTIONS = [
@@ -95,7 +115,7 @@ interface Filter {
 const EMPTY_FILTER: Filter = {
   search: "",
   media_type: "",
-  media_family: "",
+  media_family: FAMILLE_PAR_DEFAUT,
   periodicity: "",
   department_code: "",
   region_code: "",
@@ -142,11 +162,11 @@ export function MediaListPage() {
     return {
       ...(source.search ? { "filter[name]": source.search } : {}),
       ...(source.media_type ? { "filter[media_type]": source.media_type } : {}),
-      ...(source.media_family ? { "filter[media_family]": source.media_family } : {}),
+      ...(source.media_family && source.media_family !== "tous" ? { "filter[media_family]": source.media_family } : {}),
       ...(source.periodicity ? { "filter[periodicity]": source.periodicity } : {}),
       ...(source.department_code ? { "filter[department_code]": source.department_code } : {}),
       ...(source.region_code ? { "filter[region_code]": source.region_code } : {}),
-      ...(source.has_website ? { "filter[has_website]": source.has_website } : {}),
+      ...(source.has_website ? { "filter[site_fiable]": source.has_website } : {}),
       ...(source.has_email ? { "filter[has_email]": source.has_email } : {}),
       ...(source.email_confidence ? { "filter[email_confidence]": source.email_confidence } : {}),
     };
@@ -187,22 +207,26 @@ export function MediaListPage() {
   const total = data?.meta.total ?? 0;
   const lastPage = data?.meta.last_page ?? 1;
 
+  // Lot 3 — indicateurs sur TOUTE la sélection (serveur), plus sur la page.
+  const { data: stats } = useQuery<MediaStats>({
+    queryKey: ["media-stats", filtreInterroge],
+    queryFn: async () => {
+      const params = new URLSearchParams(filterParams(filtreInterroge));
+      return (await api.get<MediaStats>(`/media/stats?${params.toString()}`)).data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   const kpis = useMemo(() => {
-    const count = rows.length;
-    const withSite = rows.filter((m) => m.website).length;
-    const withEmail = rows.filter((m) => m.email).length;
-    const byType = rows.reduce<Record<string, number>>((acc, m) => {
-      const k = m.media_type ?? "inconnu";
-      acc[k] = (acc[k] ?? 0) + 1;
-      return acc;
-    }, {});
-    const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+    if (stats === undefined || stats.total === 0) {
+      return { sitePct: null, emailPct: null, topType: "—", topTypeN: 0 };
+    }
     return {
-      sitePct: count > 0 ? Math.round((withSite / count) * 100) : 0,
-      emailPct: count > 0 ? Math.round((withEmail / count) * 100) : 0,
-      topType: topType ? typeLabel(topType[0]) : "—",
+      sitePct: Math.round((stats.avec_site_fiable / stats.total) * 100),
+      emailPct: Math.round((stats.avec_email / stats.total) * 100),
+      topType: stats.top_type ? typeLabel(stats.top_type.media_type) : "—",
+      topTypeN: stats.top_type?.n ?? 0,
     };
-  }, [rows]);
+  }, [stats]);
 
   const setFilterAndReset = (next: Partial<Filter>) => {
     setFilter((f) => ({ ...f, ...next }));
@@ -211,7 +235,7 @@ export function MediaListPage() {
   const hasActiveFilter =
     filter.search ||
     filter.media_type ||
-    filter.media_family ||
+    filter.media_family !== FAMILLE_PAR_DEFAUT ||
     filter.periodicity ||
     filter.department_code ||
     filter.region_code ||
@@ -241,9 +265,30 @@ export function MediaListPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard tone="sky" label="Total" value={total.toLocaleString("fr-FR")} sublabel={`Page ${page} · ${rows.length} affichés`} />
-        <KpiCard tone="violet" label="Avec site web" value={`${kpis.sitePct}%`} sublabel="de la page" progress={kpis.sitePct} />
-        <KpiCard tone="emerald" label="Avec email" value={`${kpis.emailPct}%`} sublabel="email rédaction" progress={kpis.emailPct} />
-        <KpiCard tone="amber" label="Top type" value={kpis.topType} sublabel="de la page" />
+        <KpiCard
+          tone="violet"
+          label="Avec site vérifié"
+          value={kpis.sitePct === null ? "—" : `${kpis.sitePct}%`}
+          sublabel={stats ? `${stats.avec_site_fiable.toLocaleString("fr-FR")} sur ${stats.total.toLocaleString("fr-FR")}` : "calcul en cours"}
+          {...(kpis.sitePct !== null ? { progress: kpis.sitePct } : {})}
+        />
+        <KpiCard
+          tone="emerald"
+          label="Avec email"
+          value={kpis.emailPct === null ? "—" : `${kpis.emailPct}%`}
+          sublabel={stats ? `${stats.avec_email.toLocaleString("fr-FR")} sur ${stats.total.toLocaleString("fr-FR")}` : "calcul en cours"}
+          {...(kpis.emailPct !== null ? { progress: kpis.emailPct } : {})}
+        />
+        <KpiCard
+          tone="amber"
+          label="Type le plus fréquent"
+          value={kpis.topType}
+          sublabel={
+            kpis.topTypeN > 0
+              ? [`${kpis.topTypeN.toLocaleString("fr-FR")} médias`, misAJour(stats?.computed_at)].filter(Boolean).join(" · ")
+              : "—"
+          }
+        />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -318,13 +363,7 @@ export function MediaListPage() {
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.department_code ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{m.city ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      {m.website ? (
-                        <a href={m.website} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
-                          {m.website.replace(/^https?:\/\//, "").slice(0, 28)}
-                        </a>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
+                      <SiteMedia media={m} />
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 dark:text-slate-400">{m.email ?? "—"}</td>
                     <td className="px-4 py-2.5">
@@ -390,4 +429,28 @@ function Select({
       ))}
     </select>
   );
+}
+
+/**
+ * Lot 3 — le site d'un média n'est montré comme LIEN que s'il est VÉRIFIÉ.
+ * Un site non vérifié (deviné depuis le nom, jamais contrôlé, ou contrôlé et
+ * non conforme) reste visible, grisé et marqué « non vérifié » — rien n'est
+ * effacé.
+ */
+export function SiteMedia({ media }: { media: Pick<MediaItem, "website" | "site_verifie"> }) {
+  if (media.site_verifie) {
+    return (
+      <a href={media.site_verifie} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+        {media.site_verifie.replace(/^https?:\/\//, "").slice(0, 28)}
+      </a>
+    );
+  }
+  if (media.website) {
+    return (
+      <span className="text-xs text-slate-400" title="Site deviné ou non confirmé : à vérifier avant usage">
+        <span className="line-through">{media.website.replace(/^https?:\/\//, "").slice(0, 24)}</span> · non vérifié
+      </span>
+    );
+  }
+  return <span className="text-slate-400">—</span>;
 }

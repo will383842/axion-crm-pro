@@ -177,6 +177,8 @@ Route::prefix('v1')->group(function () {
         // Il n'avait simplement jamais ete etendu aux routes unitaires.
         Route::post('/companies', [CompaniesController::class, 'store'])
             ->middleware('permission:companies.create');
+        // Lot 3 : indicateurs sur toute la base — AVANT /companies/{company}.
+        Route::get('/companies/stats', [CompaniesController::class, 'stats']);
         Route::get('/companies/{company}', [CompaniesController::class, 'show']);
         Route::put('/companies/{company}', [CompaniesController::class, 'update'])
             ->middleware('permission:companies.update');
@@ -243,6 +245,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/media', [MediaController::class, 'index']);
         Route::get('/media/export', [MediaController::class, 'export'])
             ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
+        // Lot 3 : indicateurs sur toute la sélection — AVANT /media/{media}.
+        Route::get('/media/stats', [MediaController::class, 'stats']);
         Route::get('/media/{media}', [MediaController::class, 'show']);
         // Consignation d'un geste presse sur une RÉDACTION (et non sur une
         // personne) : Le Mémorial de l'Isère se joint à `redaction@…`, sans
@@ -463,6 +467,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/campaigns/{campaign}/resume', [ScrapingCampaignsController::class, 'resume'])
             ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/campaigns/{campaign}/cancel', [ScrapingCampaignsController::class, 'cancel'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        // Lot 3 : archiver = masquer de la vue par défaut, sans rien supprimer.
+        Route::post('/campaigns/{campaign}/archive', [ScrapingCampaignsController::class, 'archive'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/campaigns/{campaign}/unarchive', [ScrapingCampaignsController::class, 'unarchive'])
             ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::get('/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
             ->middleware('throttle:scraper-list');

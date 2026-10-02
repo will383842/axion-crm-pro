@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
@@ -18,6 +17,7 @@ import { SizeDistributionChart } from './components/SizeDistributionChart';
 import { TopDeptsCard } from './components/TopDeptsCard';
 import { ActivityFeed } from './components/ActivityFeed';
 import { NextActions } from './components/NextActions';
+import { etatQualite } from './qualite';
 
 interface DashboardStats {
   companies_total: number;
@@ -33,6 +33,10 @@ interface DashboardStats {
   enriched_24h_trend_pct?: number;
   new_7d_trend_pct?: number;
   quality_trend_pct?: number;
+  /** Moyenne RÉELLE de `quality_score` (serveur) ; null = inconnue. */
+  quality_avg?: number | null;
+  /** Part estimée (%) des scores périmés ; au-delà du seuil : « calcul en attente ». */
+  quality_a_recalculer_pct?: number | null;
   period_label?: string;
   /** Heure du calcul (UTC) : les chiffres sont servis depuis un cache court. */
   computed_at?: string;
@@ -69,12 +73,6 @@ function firstNameFrom(me: MeResponse | undefined): string | null {
   return raw.split(/\s+/)[0] ?? null;
 }
 
-function computeQualityAvg(qd: DashboardStats['quality_distribution']): number {
-  const total = qd.complete + qd.partielle + qd.basique;
-  if (total === 0) return 0;
-  return Math.round(((qd.complete * 100) + (qd.partielle * 60) + (qd.basique * 25)) / total);
-}
-
 export function DashboardPage() {
   const { data: me } = useQuery<MeResponse>({
     queryKey: ['auth', 'me'],
@@ -109,7 +107,8 @@ export function DashboardPage() {
     size_distribution: {},
   };
 
-  const qualityAvg = useMemo(() => computeQualityAvg(stats.quality_distribution), [stats.quality_distribution]);
+  const qualite = etatQualite(stats);
+  const qualityAvg = qualite.etat === 'ok' ? qualite.moyenne : 0;
   const firstName = firstNameFrom(me);
   // P0-1 — une panne n'est PAS une base vide. L'état vide n'existe que sur un
   // vrai 0 venu d'une réponse RÉUSSIE ; un échec affiche l'erreur.
@@ -213,10 +212,16 @@ export function DashboardPage() {
             <KpiCard
               tone="amber"
               label="Qualité moyenne"
-              value={`${qualityAvg}/100`}
-              sublabel="Score pondéré qualité"
-              progress={qualityAvg}
-              {...(typeof stats.quality_trend_pct === 'number'
+              value={qualite.etat === 'ok' ? `${qualite.moyenne}/100` : '—'}
+              sublabel={
+                qualite.etat === 'ok'
+                  ? 'Score de qualité moyen des fiches'
+                  : qualite.etat === 'en_attente'
+                    ? `Calcul en attente (≈ ${qualite.pctARecalculer} % des fiches à recalculer)`
+                    : 'Chiffre non disponible'
+              }
+              {...(qualite.etat === 'ok' ? { progress: qualite.moyenne } : {})}
+              {...(qualite.etat === 'ok' && typeof stats.quality_trend_pct === 'number'
                 ? {
                     trend: {
                       value: Math.abs(stats.quality_trend_pct),
@@ -231,7 +236,7 @@ export function DashboardPage() {
           {/* 2 cols : gauche 2/3, droite 1/3 */}
           <section className="mt-6 grid gap-4 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
-              <QualityDistributionBar data={stats.quality_distribution} />
+              <QualityDistributionBar data={stats.quality_distribution} qualite={qualite} />
               <SizeDistributionChart data={stats.size_distribution} />
               <TopDeptsCard />
             </div>

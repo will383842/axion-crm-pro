@@ -103,6 +103,12 @@ class CompanyTagsBulkController extends ApiController
             ? $this->poser($idsAutorises, $tagId, (string) $workspaceId)
             : $this->retirer($idsAutorises, $tagId);
 
+        // Lot 3 : les comptes par étiquette sont en cache ; un étiquetage les
+        // change, on les oublie.
+        if ($modifiees > 0) {
+            TagsController::oublierComptes((string) $workspaceId);
+        }
+
         return $this->ok([
             'modifiees' => $modifiees,
             // Le nombre d'ignorées est RENDU, pas tu : une action de masse qui

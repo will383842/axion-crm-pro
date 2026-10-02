@@ -35,6 +35,8 @@ const STATS = {
   scraper_runs_24h: 12,
   llm_cost_eur_month: 41.5,
   quality_distribution: { complete: 100, partielle: 60, basique: 40 },
+  quality_avg: 62,
+  quality_a_recalculer_pct: 2,
   size_distribution: { tpe: 900, pme: 300 },
   companies_new_7d: 5_400,
   period_label: 'derniers 30 jours',
@@ -112,14 +114,15 @@ describe('DashboardPage — rendu', () => {
     // Plus de période affichée : aucun chiffre de l'écran n'en dépend.
     expect(screen.getByText("Vue d'ensemble de votre base")).toBeVisible();
 
-    // La qualité moyenne est CALCULÉE : (100×100 + 60×60 + 40×25) / 200 = 73.
-    expect(vignette('Qualité moyenne')).toHaveTextContent('73/100');
+    // Lot 3 — la moyenne vient du SERVEUR (moyenne réelle de quality_score),
+    // plus d'une pondération 100 / 60 / 25 inventée à l'écran.
+    expect(vignette('Qualité moyenne')).toHaveTextContent('62/100');
 
     // Les cartes filles ont bien reçu leurs propres réponses.
     expect(await screen.findByText('Isère')).toBeVisible();
-    // L'action est humanisée et collée à l'auteur (« Will · Company Enriched ») :
+    // Lot 3 — l'action est traduite en phrase (« Will · Fiche enrichie ») :
     // on interroge donc un fragment, pas un nœud entier.
-    expect(await screen.findByText(/Company Enriched/)).toBeVisible();
+    expect(await screen.findByText(/Fiche enrichie/)).toBeVisible();
   });
 
   /**
@@ -342,5 +345,44 @@ describe('DashboardPage — parcours', () => {
     // L'Isère (12 000) passe devant le Rhône (9 000) ; Paris (0) est ÉCARTÉ —
     // un département à zéro n'est pas un « top ».
     expect(noms).toEqual(['Isère', 'Rhône']);
+  });
+});
+
+describe('DashboardPage — qualité (lot 3 : jamais un 0 trompeur)', () => {
+  it('scores majoritairement périmés : « — » et « calcul en attente », ni moyenne ni barres', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          quality_distribution: { complete: 0, partielle: 273_281, basique: 4_072_988 },
+          quality_avg: 10,
+          quality_a_recalculer_pct: 79,
+        }),
+        ...socle(),
+      ],
+    });
+
+    await waitFor(() => {
+      expect(vignette('Qualité moyenne')).toHaveTextContent('—');
+    });
+    expect(vignette('Qualité moyenne')).toHaveTextContent(/Calcul en attente/);
+    expect(vignette('Qualité moyenne')).not.toHaveTextContent('10/100');
+    expect(screen.getByTestId('qualite-indisponible')).toHaveTextContent(/pas encore calculé/);
+  });
+
+  it('serveur sans moyenne (null) : « — », jamais 0/100', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', { ...STATS, quality_avg: null, quality_a_recalculer_pct: null }),
+        ...socle(),
+      ],
+    });
+
+    await waitFor(() => {
+      expect(vignette('Qualité moyenne')).toHaveTextContent('—');
+    });
+    expect(vignette('Qualité moyenne')).not.toHaveTextContent('0/100');
   });
 });

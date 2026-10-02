@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Resources\TagResource;
 use App\Models\Tag;
+use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +17,64 @@ use Illuminate\Support\Str;
 class TagsController extends ApiController
 {
     use VerrouOptimiste;
+
+    /** Borne de la liste (854 étiquettes en production le 2026-10-02). */
+    public const LIMITE_LISTE = 5000;
+
+    public static function cleComptes(string $espace): string
+    {
+        return 'crm:tags:comptes:v2:' . $espace;
+    }
+
+    /**
+     * Nombre de fiches par étiquette de l'espace, mis en cache : frais 10 min,
+     * servi périmé jusqu'à 1 jour pendant qu'UN recalcul part après la
+     * réponse (`Cache::flexible`, même mécanique que `CompteursHub`).
+     *
+     * @return array{comptes: array<string, int>, computed_at: ?string}
+     */
+    public static function comptesParEtiquette(string $espace): array
+    {
+        /** @var mixed $charge */
+        $charge = Cache::flexible(self::cleComptes($espace), [600, 86400], static function () use ($espace): array {
+            return WorkspaceContext::run($espace, static function () use ($espace): array {
+                $comptes = DB::table('company_tag as ct')
+                    ->join('tags as t', 't.id', '=', 'ct.tag_id')
+                    ->where('t.workspace_id', $espace)
+                    ->groupBy('ct.tag_id')
+                    ->selectRaw('ct.tag_id, count(*) AS c')
+                    ->pluck('c', 'tag_id')
+                    ->mapWithKeys(static fn ($c, $id): array => [(string) $id => (int) $c])
+                    ->all();
+
+                return ['comptes' => $comptes, 'computed_at' => now()->utc()->toIso8601ZuluString()];
+            });
+        }, lock: ['seconds' => 60]);
+
+        if (! is_array($charge) || ! is_array($charge['comptes'] ?? null)) {
+            return ['comptes' => [], 'computed_at' => null];
+        }
+
+        // Valeur relue du cache (`mixed`) : on la remet en forme, typée.
+        $comptes = [];
+        foreach ($charge['comptes'] as $id => $n) {
+            $comptes[(string) $id] = (int) $n;
+        }
+
+        return [
+            'comptes' => $comptes,
+            'computed_at' => is_string($charge['computed_at'] ?? null) ? $charge['computed_at'] : null,
+        ];
+    }
+
+    /**
+     * Oublie les comptes de l'espace : appelé après un étiquetage en masse,
+     * pour que la page Étiquettes ne montre pas un compte périmé de 10 min.
+     */
+    public static function oublierComptes(string $espace): void
+    {
+        Cache::forget(self::cleComptes($espace));
+    }
 
     /**
      * @OA\Get(path="/tags", tags={"Tags"}, summary="Liste des tags du workspace",
@@ -42,15 +102,18 @@ class TagsController extends ApiController
             }
 
             // Ajoute count companies par tag (left join optimisé)
-            $tags = $q->limit(500)->get();
-            $tagIds = $tags->pluck('id')->all();
-            $counts = empty($tagIds)
-                ? collect()
-                : DB::table('company_tag')
-                    ->whereIn('tag_id', $tagIds)
-                    ->select('tag_id', DB::raw('COUNT(*) as c'))
-                    ->groupBy('tag_id')
-                    ->pluck('c', 'tag_id');
+            // Lot 3 (2026-10-02) — « liste tronquée à 500, 3,6 s ».
+            //  - la borne passe à LIMITE_LISTE : la production porte 854
+            //    étiquettes, la page en montrait 500 sans le dire ;
+            //  - le nombre de fiches par étiquette compte `company_tag`
+            //    (20,8 M de lignes, ≈ 7 s à froid sous le rôle applicatif) :
+            //    il est servi depuis un cache par espace (`comptesParEtiquette`),
+            //    recalculé APRÈS la réponse quand il a plus de 10 min.
+            $tags = $q->limit(self::LIMITE_LISTE)->get();
+            $comptes = $workspaceId
+                ? self::comptesParEtiquette((string) $workspaceId)
+                : ['comptes' => [], 'computed_at' => null];
+            $counts = collect($comptes['comptes']);
 
             return $this->ok([
                 'data' => TagResource::collection($tags->map(function ($t) use ($counts) {
@@ -60,10 +123,15 @@ class TagsController extends ApiController
                     // (Model::__set délègue à setAttribute) — parce que
                     // l'affectation directe est vue par PHPStan comme l'écriture
                     // d'une propriété de comptage de relation, en lecture seule.
-                    $t->setAttribute('companies_count', $counts->get($t->id, 0));
+                    $t->setAttribute('companies_count', (int) $counts->get((string) $t->id, 0));
 
                     return $t;
                 })),
+                'meta' => [
+                    'total' => $tags->count(),
+                    'tronquee' => $tags->count() >= self::LIMITE_LISTE,
+                    'comptes_calcules_le' => $comptes['computed_at'],
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('tags.index failed', ['exception' => $e->getMessage()]);

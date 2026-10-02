@@ -11,6 +11,13 @@ use Illuminate\Support\Facades\Schema;
 
 class AuditLogsController extends ApiController
 {
+    /** Routes journalisées qui ne sont pas des événements métier (cf. `metier`). */
+    public const CHEMINS_HORS_METIER = [
+        'api/v1/auth/login',
+        'api/v1/auth/logout',
+        'api/internal/site-sync',
+    ];
+
     public function __construct(private readonly AuditHashChain $chain) {}
 
     /**
@@ -50,8 +57,22 @@ class AuditLogsController extends ApiController
                     fn ($q) => $q->where('workspace_id', $espaceCourant),
                     fn ($q) => $q->whereRaw('1 = 0'),
                 )
+                // Lot 3 (2026-10-02) — `metier=1` : l'accueil ne veut que les
+                // ÉVÉNEMENTS. Les lignes de progression des traitements en lot
+                // (`…_LOT`, `…_PAQUET` : 13 888 sur 14 306 en production), les
+                // ouvertures de session et la synchronisation périodique du site
+                // noyaient les 5 lignes du fil « Activité récente ».
+                ->when($r->boolean('metier'), function ($q): void {
+                    $q->whereRaw("event_type !~ '_(LOT|PAQUET)$'")
+                        ->where(function ($q): void {
+                            $q->whereNull('path')->orWhereNotIn('path', self::CHEMINS_HORS_METIER);
+                        })
+                        ->where(function ($q): void {
+                            $q->whereNull('path')->orWhere('path', 'not like', 'api/v1/auth/magic-link%');
+                        });
+                })
                 ->orderByDesc('id')
-                ->paginate(50);
+                ->paginate(min(100, max(1, (int) $r->query('limit', $r->query('per_page', 50)))));
 
             return $this->ok([
                 'data' => $page->items(),

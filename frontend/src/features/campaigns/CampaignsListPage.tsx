@@ -58,6 +58,9 @@ export function CampaignsListPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
+  // Lot 3 — les collectes archivées (tests, anciennes) sont masquées par
+  // défaut ; rien n'est supprimé, une case les fait réapparaître.
+  const [voirArchivees, setVoirArchivees] = useState(false);
   // G42-010 — anti-rebond de 300 ms AVANT la requete.
   //
   // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
@@ -69,10 +72,10 @@ export function CampaignsListPage() {
   const rechercheDifferee = useAntiRebond(search);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['campaigns', { search: rechercheDifferee }],
+    queryKey: ['campaigns', { search: rechercheDifferee, voirArchivees }],
     queryFn: async () =>
       (await api.get<CampaignsListResponse>('/campaigns', {
-        params: { per_page: 50, search: rechercheDifferee || undefined },
+        params: { per_page: 50, search: rechercheDifferee || undefined, archivees: voirArchivees ? 'tous' : undefined },
       })).data,
     /**
      * G41-012 — la scrutation SUSPEND, elle ne disparaît pas.
@@ -134,6 +137,15 @@ export function CampaignsListPage() {
     onSuccess: () => { toast.success('Collecte annulée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
   });
+  const archiveMutation = useMutation({
+    mutationFn: async ({ id, archiver }: { id: number; archiver: boolean }) =>
+      (await api.post<Campaign>(`/campaigns/${id}/${archiver ? 'archive' : 'unarchive'}`)).data,
+    onSuccess: (_d, v) => {
+      toast.success(v.archiver ? 'Collecte archivée (masquée de la liste)' : 'Collecte désarchivée');
+      void qc.invalidateQueries({ queryKey: ['campaigns'] });
+    },
+    onError: (e) => toast.error(extractApiMessage(e) ?? 'Archivage impossible'),
+  });
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => api.delete(`/campaigns/${id}`),
     onSuccess: () => { toast.success('Collecte supprimée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
@@ -175,6 +187,15 @@ export function CampaignsListPage() {
       {/* Filters + search */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Tabs items={tabs} value={filter} onChange={setFilter} variant="pills" />
+        <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={voirArchivees}
+            onChange={(e) => setVoirArchivees(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          Afficher les collectes archivées
+        </label>
         <div className="ml-auto w-full max-w-xs">
           <Input
             iconLeft={<Search className="h-4 w-4" />}
@@ -226,6 +247,7 @@ export function CampaignsListPage() {
               onResume={() => resumeMutation.mutate(c.id)}
               onCancel={() => cancelMutation.mutate(c.id)}
               onDelete={() => deleteMutation.mutate(c.id)}
+              onArchive={(archiver) => archiveMutation.mutate({ id: c.id, archiver })}
             />
           ))}
         </div>
@@ -243,12 +265,14 @@ function CampaignCard({
   onResume,
   onCancel,
   onDelete,
+  onArchive,
 }: {
   campaign: Campaign;
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onArchive: (archiver: boolean) => void;
 }) {
   const tone = statusToTone(campaign.status);
   const isLive = campaign.status === 'running';
@@ -268,6 +292,11 @@ function CampaignCard({
   }
   if (campaign.can_cancel) {
     menuItems.push({ id: 'cancel', label: 'Annuler', destructive: true, onSelect: onCancel });
+  }
+  if (campaign.archived_at) {
+    menuItems.push({ id: 'unarchive', label: 'Désarchiver', onSelect: () => onArchive(false) });
+  } else if (['draft', 'completed', 'cancelled', 'failed'].includes(campaign.status)) {
+    menuItems.push({ id: 'archive', label: 'Archiver (masquer de la liste)', onSelect: () => onArchive(true) });
   }
   if (campaign.status === 'draft') {
     menuItems.push({ id: 'div', divider: true, label: '' });
@@ -305,6 +334,9 @@ function CampaignCard({
 
       <div className="flex items-center gap-2">
         <StatusPill tone={tone} pulse={isLive}>{STATUS_LABEL[campaign.status]}</StatusPill>
+        {campaign.archived_at ? (
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">· archivée</span>
+        ) : null}
         {isPaused && campaign.paused_reason ? (
           <span className="text-xs text-slate-500 dark:text-slate-400">
             · {PAUSED_REASON_LABEL[campaign.paused_reason] ?? campaign.paused_reason}

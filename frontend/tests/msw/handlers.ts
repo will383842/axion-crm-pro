@@ -214,6 +214,11 @@ export const defaultHandlers: HttpHandler[] = [
   // Corps NEUTRES : aucune liste, aucun destinataire. Un test qui porte SUR
   // ces écrans empile ses propres réponses au-dessus.
   getJson('/listes-manuelles', { data: [] }),
+  // Lot 3 (2026-10-02) — les indicateurs des listes Entreprises et Médias
+  // viennent d'un appel À PART (toute la base, mis en cache). Corps NEUTRES :
+  // « calcul en cours ». Un test qui porte sur ces chiffres empile les siens.
+  getJson('/companies/stats', { total: null, enrichies_pct: null, top_taille: null, top_secteur: null }),
+  getJson('/media/stats', { total: 0, avec_site_fiable: 0, avec_email: 0, top_type: null }),
   postJson('/audiences/apercu-destinataires', {
     data: {
       reglage: { mode: 'personne_sinon_generique', fonctions: [], personnes_listees: false, avec_adresses_partagees: false },

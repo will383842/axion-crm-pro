@@ -13,6 +13,7 @@ use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Services\Triage\TriageAutoService;
 use App\Support\AuditLogger;
+use App\Support\WorkspaceContext;
 use Illuminate\Bus\Batch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Bus;
@@ -405,23 +406,30 @@ class AudienceBuilderService
             ->onQueue('audiences-refresh')
             ->allowFailures()
             ->finally(function (Batch $batch) use ($audience) {
-                $audience->refresh();
-                $audience->update([
-                    'refreshed_at' => now(),
-                    'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),
-                ]);
-                AuditLogger::log(
-                    $batch->hasFailures() ? 'audience.refresh.failed' : 'audience.refreshed',
-                    [
-                        'workspace_id' => $audience->workspace_id,
-                        'resource_type' => 'audience',
-                        'resource_id' => (string) $audience->id,
-                        'member_count' => $audience->member_count,
-                        'name' => $audience->name,
-                        'batch_id' => $batch->id,
-                        'failed_jobs' => $batch->failedJobs,
-                    ],
-                );
+                // Lot 3 (2026-10-02) : ce rappel tourne dans un worker, APRÈS le
+                // dernier lot, sans contexte d'espace. Sous la RLS forcée de
+                // `email_audiences`, la mise à jour ci-dessous touchait ZÉRO
+                // ligne : `refreshed_at` restait NULL (« jamais ») alors que les
+                // membres étaient bien recalculés. On pose le contexte.
+                WorkspaceContext::run((string) $audience->workspace_id, function () use ($batch, $audience): void {
+                    $audience->refresh();
+                    $audience->update([
+                        'refreshed_at' => now(),
+                        'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),
+                    ]);
+                    AuditLogger::log(
+                        $batch->hasFailures() ? 'audience.refresh.failed' : 'audience.refreshed',
+                        [
+                            'workspace_id' => $audience->workspace_id,
+                            'resource_type' => 'audience',
+                            'resource_id' => (string) $audience->id,
+                            'member_count' => $audience->member_count,
+                            'name' => $audience->name,
+                            'batch_id' => $batch->id,
+                            'failed_jobs' => $batch->failedJobs,
+                        ],
+                    );
+                });
             })
             ->dispatch();
     }

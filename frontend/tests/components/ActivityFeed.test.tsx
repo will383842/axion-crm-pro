@@ -75,6 +75,33 @@ describe('ActivityFeed', () => {
     // La seule assertion qui compte : le rendu ne jette pas. Un champ absent ne
     // doit jamais pouvoir effacer l'application.
     expect(() => render(<ActivityFeed />, { wrapper: enveloppe })).not.toThrow();
-    expect(await screen.findByText(/Evenement/i)).toBeTruthy();
+    expect(await screen.findByText(/Événement/i)).toBeTruthy();
+  });
+});
+
+describe('ActivityFeed — des phrases, pas des lignes techniques (lot 3)', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it('traduit les requêtes et les traitements en phrases, masque la progression des lots, demande metier=1', async () => {
+    const t = new Date().toISOString();
+    mockGet.mockResolvedValue({
+      data: {
+        data: [
+          { id: '1', event_type: 'POST', path: 'api/v1/auth/password/reset', status_code: 200, created_at: t },
+          { id: '2', event_type: 'IMPORT_PRESSE', path: 'artisan crm:presse:importer', created_at: t },
+          { id: '3', event_type: 'JOIGNABILITE_LOT', path: 'artisan crm:joignabilite:calculer — ids 1-1000', created_at: t },
+        ],
+      },
+    });
+
+    const { ActivityFeed } = await import('@/features/dashboard/components/ActivityFeed');
+    render(<ActivityFeed />, { wrapper: enveloppe });
+
+    expect(await screen.findByText(/Mot de passe réinitialisé/)).toBeTruthy();
+    expect(screen.getByText(/Import de la liste presse/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/api\/v1|artisan|JOIGNABILITE|POST/);
+    expect(mockGet).toHaveBeenCalledWith('/audit-logs', { params: { limit: 10, metier: 1 } });
   });
 });

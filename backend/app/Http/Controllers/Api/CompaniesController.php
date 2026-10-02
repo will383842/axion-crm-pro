@@ -10,14 +10,17 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
+use App\Support\DelaiRequeteSql;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\TotalListe;
+use App\Support\WorkspaceContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -120,7 +123,13 @@ class CompaniesController extends ApiController
             // pres (60 s de fraicheur). Cf. `App\Support\TotalListe`.
             $page = $query->paginate(
                 $perPage,
-                ['*'],
+                // Lot 3 (2026-10-02) — « Entreprises : ~10 s de rendu, 345 Ko
+                // pour 100 lignes ». La liste rendait chaque fiche ENTIÈRE,
+                // `signals` et `metadata` (JSON de plusieurs Ko) compris, que
+                // l'écran n'affiche pas. `vue=liste` ne rend que les colonnes
+                // de la grille. Sans ce paramètre, la réponse est inchangée
+                // (les autres appelants de `/companies` ne bougent pas).
+                $r->query('vue') === 'liste' ? self::COLONNES_LISTE : ['*'],
                 'page',
                 null,
                 // `toBase()` et non `getEloquentBuilder()` : un comptage
@@ -179,6 +188,104 @@ class CompaniesController extends ApiController
      *
      * @return QueryBuilder<Company>
      */
+    /** Les colonnes de la grille Entreprises (`CompanyRow.tsx`), cf. `index`. */
+    public const COLONNES_LISTE = [
+        'id', 'workspace_id', 'siren', 'denomination', 'naf', 'size_category', 'effectif_range',
+        'city', 'postcode', 'department_code', 'quality_score', 'priority', 'enriched_at',
+        'discovery_source', 'prospection_status',
+    ];
+
+    public static function cleStats(string $espace): string
+    {
+        return 'crm:companies:stats:v1:' . $espace;
+    }
+
+    /**
+     * Lot 3 (2026-10-02) — les indicateurs de l'écran Entreprises, sur TOUTE
+     * la base de l'espace.
+     *
+     * Avant : « Enrichies 100 % », « Top taille », « Top NAF » étaient
+     * calculés sur les 100 lignes AFFICHÉES (triées par score : toutes
+     * enrichies), posés à côté d'un total de 4,3 M. Désormais :
+     *   - `enrichies_pct` : ESTIMATION sur un échantillon de 1 % des fiches
+     *     (`TABLESAMPLE SYSTEM`, ≈ 1 s) — l'écran l'écrit « ≈ » ;
+     *   - `top_taille`, `top_secteur` : décomptes exacts (index par taille et
+     *     par secteur) ;
+     * le tout mis en cache 30 min par espace (recalcul APRÈS la réponse
+     * au-delà), ces balayages coûtant quelques secondes sur 4,3 M de fiches.
+     * Ce sont des chiffres de TOUTE la base : l'écran le dit quand un filtre
+     * est actif.
+     */
+    public function stats(): JsonResponse
+    {
+        $vide = ['total' => null, 'enrichies_pct' => null, 'top_taille' => null, 'top_secteur' => null, 'computed_at' => null];
+        $espace = $this->espaceCourantOuNull();
+        if ($espace === null || $espace === '' || ! Schema::hasTable('companies')) {
+            return $this->ok($vide);
+        }
+
+        /** @var mixed $charge */
+        $charge = Cache::flexible(
+            self::cleStats($espace),
+            [1800, 86400],
+            fn (): array => DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => $this->calculerStats($espace))),
+            lock: ['seconds' => 120],
+        );
+
+        return $this->ok(is_array($charge) ? $charge : $vide);
+    }
+
+    /** @return array<string, mixed> */
+    private function calculerStats(string $espace): array
+    {
+        $echantillon = DB::selectOne(
+            'SELECT count(*) AS n, count(enriched_at) AS e FROM companies TABLESAMPLE SYSTEM (1)
+              WHERE workspace_id = ? AND deleted_at IS NULL',
+            [$espace],
+        );
+        // Petite base : l'échantillon de 1 % ne dit rien, on compte tout.
+        if ((int) $echantillon->n < 500) {
+            $echantillon = DB::selectOne(
+                'SELECT count(*) AS n, count(enriched_at) AS e FROM companies WHERE workspace_id = ? AND deleted_at IS NULL',
+                [$espace],
+            );
+        }
+        $n = (int) $echantillon->n;
+
+        // Relecture A09 de #284 : la part est calculée sur TOUTES les fiches,
+        // valeur absente comprise (groupe `null`), et non « parmi les fiches
+        // renseignées » — sinon « 93 % » se lirait comme 93 % de la base.
+        $repartition = static fn (string $colonne): array => DB::table('companies')
+            ->where('workspace_id', $espace)
+            ->whereNull('deleted_at')
+            ->groupBy($colonne)
+            ->selectRaw("{$colonne} AS code, count(*) AS n")
+            ->orderByDesc('n')
+            ->get()
+            ->map(static fn ($l): array => ['code' => $l->code === null ? null : (string) $l->code, 'n' => (int) $l->n])
+            ->all();
+
+        $tailles = $repartition('size_category');
+        $secteurs = $repartition('sector_main');
+        $total = array_sum(array_column($tailles, 'n'));
+        $top = static function (array $lignes, int $total): ?array {
+            // La valeur la plus fréquente parmi les fiches RENSEIGNÉES, mais sa
+            // part rapportée à TOUTES les fiches.
+            $renseignees = array_values(array_filter($lignes, static fn (array $l): bool => $l['code'] !== null));
+            $premier = $renseignees[0] ?? null;
+
+            return $premier === null ? null : $premier + ['pct' => $total > 0 ? (int) round(100 * $premier['n'] / $total) : 0];
+        };
+
+        return [
+            'total' => $total,
+            'enrichies_pct' => $n === 0 ? null : (int) round(100 * (int) $echantillon->e / $n),
+            'top_taille' => $top($tailles, $total),
+            'top_secteur' => $top($secteurs, $total),
+            'computed_at' => now()->utc()->toIso8601ZuluString(),
+        ];
+    }
+
     private function buildFilteredQuery(): QueryBuilder
     {
         // Liste PARTAGÉE avec la console v2 (lot L6) : deux listes jumelles

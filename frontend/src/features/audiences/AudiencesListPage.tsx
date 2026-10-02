@@ -241,7 +241,14 @@ function AudienceCard({
 
       <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <Clock className="h-3 w-3" />
-        Dernière mise à jour : <span className="font-medium text-slate-700 dark:text-slate-300">{formatRelative(audience.refreshed_at)}</span>
+        {/* Lot 3 — la date de la dernière mise à jour des membres (automatique chaque nuit à 4 h). */}
+        Dernière mise à jour :{' '}
+        <span
+          className="font-medium text-slate-700 dark:text-slate-300"
+          title={audience.refreshed_at ? new Date(audience.refreshed_at).toLocaleString('fr-FR') : undefined}
+        >
+          {audience.refreshed_at ? formatRelative(audience.refreshed_at) : 'pas encore faite'}
+        </span>
       </div>
 
       <div className="mt-1 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">

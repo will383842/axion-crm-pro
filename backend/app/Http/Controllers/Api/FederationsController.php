@@ -6,6 +6,7 @@ use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Taxonomy;
 use App\Support\MasquageCoordonnees;
+use App\Support\TotalListe;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,12 @@ class FederationsController extends ApiController
         $requete = $this->base($workspaceId);
         $this->filtrer($requete, $filtres);
 
-        $total = (clone $requete)->count();
+        // Lot 3 (2026-10-02) — « /federations : 5,4 s ». Le décompte joint
+        // 36 241 fédérations à leurs fiches `companies` une par une (1,3 s à
+        // chaud, plusieurs secondes à froid) ; la page, elle, en lit 50. Le
+        // total est servi depuis le cache de `TotalListe`, comme la liste
+        // Entreprises.
+        $total = TotalListe::pour($requete, $workspaceId);
         $parPage = (int) ($filtres['per_page'] ?? 50);
         $page = (int) ($filtres['page'] ?? 1);
 

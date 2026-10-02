@@ -258,8 +258,14 @@ export function AudienceDetailPage() {
         <KpiCard
           tone="violet"
           label="Dernière mise à jour"
-          value={formatRelative(audience.refreshed_at)}
-          sublabel={audience.refreshed_at ? new Date(audience.refreshed_at).toLocaleString('fr-FR') : '—'}
+          value={audience.refreshed_at ? formatRelative(audience.refreshed_at) : 'Pas encore faite'}
+          sublabel={
+            audience.refreshed_at
+              ? new Date(audience.refreshed_at).toLocaleString('fr-FR')
+              : audience.auto_refresh
+                ? 'mise à jour automatique chaque nuit à 4 h'
+                : '—'
+          }
         />
         <KpiCard
           tone={audience.is_active ? 'emerald' : 'slate'}

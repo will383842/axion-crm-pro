@@ -12,10 +12,61 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class CoverageController extends ApiController
 {
+    /** La vue est rafraîchie toutes les heures : 10 min de cache suffisent. */
+    public const CACHE_SECONDES = 600;
+
+    /**
+     * Le code département d'une cellule, depuis son code postal.
+     *
+     * La vue porte `dept_code = LEFT(postcode, 2)`, ce qui est faux pour la
+     * Corse (`20…` → `2A`/`2B`) et l'outre-mer (`97…` → `971`…`976`) : ces
+     * 212 245 fiches ne rejoignaient aucun département et disparaissaient de
+     * la carte. Corse : codes postaux 200xx-201xx = Corse-du-Sud (2A), 202xx
+     * à 206xx = Haute-Corse (2B).
+     */
+    public const DEPARTEMENT_SQL = "CASE
+            WHEN cm.postcode LIKE '97%' THEN LEFT(cm.postcode, 3)
+            WHEN cm.postcode LIKE '20%' THEN CASE WHEN cm.postcode < '20200' THEN '2A' ELSE '2B' END
+            ELSE cm.dept_code END";
+
+    /**
+     * `Schema::hasTable()` ne voit pas les vues matérialisées (cf. `index`).
+     */
+    public static function matriceExiste(): bool
+    {
+        try {
+            $ligne = DB::selectOne("SELECT to_regclass('coverage_matrix_cells') IS NOT NULL AS existe");
+
+            return (bool) ($ligne->existe ?? false);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * `SUM()` rend un `numeric`, que PDO livre en CHAÎNE : côté écran,
+     * `s + c.total` aurait CONCATÉNÉ les totaux. On rend des entiers.
+     *
+     * @param  array<int, object>  $lignes
+     * @return array<int, array<string, mixed>>
+     */
+    private static function entiers(array $lignes): array
+    {
+        return array_map(static function (object $l): array {
+            $l = (array) $l;
+            foreach (['total', 'complete', 'partial', 'population'] as $champ) {
+                if (array_key_exists($champ, $l) && $l[$champ] !== null) {
+                    $l[$champ] = (int) $l[$champ];
+                }
+            }
+
+            return $l;
+        }, $lignes);
+    }
+
     public function __construct(
         private readonly ZoneRotator $rotator,
         private readonly DeduplicationService $dedup,
@@ -38,44 +89,58 @@ class CoverageController extends ApiController
 
         $level = $r->query('level', 'department');
 
-        // Sprint 18.9 — defensive : si la table n'existe pas encore (env fraîche),
-        // on retourne une liste vide plutôt que 500.
-        if (! Schema::hasTable('coverage_matrix_cells')) {
+        // 🔴 2026-10-02 — LA CARTE AFFICHAIT 0 % SUR 4,3 M D'ENTREPRISES.
+        //
+        // Le garde était `Schema::hasTable('coverage_matrix_cells')`. Or
+        // `coverage_matrix_cells` est une VUE MATÉRIALISÉE, et `hasTable()` de
+        // Laravel 12 ne regarde que `pg_class.relkind IN ('r','p')` : il rend
+        // FAUX pour une vue matérialisée (`relkind = 'm'`), même peuplée. La
+        // route répondait donc toujours `{"level":"department","cells":[]}`
+        // (33 octets, mesuré en production), alors que la vue portait
+        // 1 082 282 cellules pour 4 346 269 fiches. `existe()` interroge
+        // `to_regclass`, qui voit tous les genres de relation.
+        if (! self::matriceExiste()) {
             return $this->ok(['level' => $level, 'cells' => []]);
         }
 
-        $cacheKey = "coverage:{$workspaceId}:{$level}";
+        $cacheKey = "coverage:v2:{$workspaceId}:{$level}";
 
         try {
-            $cells = Cache::remember($cacheKey, 60, function () use ($workspaceId, $level) {
-                return match ($level) {
-                    'region' => DB::select(<<<'SQL'
+            // La vue est rafraîchie toutes les heures (`coverage:refresh-matrix`) :
+            // la recalculer à chaque affichage (≈ 400 ms) n'apporte rien.
+            $cells = Cache::remember($cacheKey, self::CACHE_SECONDES, function () use ($workspaceId, $level) {
+                $dept = self::DEPARTEMENT_SQL;
+
+                $lignes = match ($level) {
+                    'region' => DB::select(<<<SQL
                         SELECT d.region_code AS code, r.name AS name,
-                               SUM(cm.company_count) AS total,
-                               SUM(cm.complete_count) AS complete,
-                               SUM(cm.partial_count)  AS partial
-                        FROM coverage_matrix_cells cm
-                        JOIN departments d ON d.code = cm.dept_code
+                               SUM(x.company_count) AS total,
+                               SUM(x.complete_count) AS complete,
+                               SUM(x.partial_count)  AS partial
+                        FROM (SELECT {$dept} AS dept, cm.company_count, cm.complete_count, cm.partial_count
+                              FROM coverage_matrix_cells cm WHERE cm.workspace_id = ?) x
+                        JOIN departments d ON d.code = x.dept
                         JOIN regions r ON r.code = d.region_code
-                        WHERE cm.workspace_id = ?
                         GROUP BY d.region_code, r.name
                         ORDER BY total DESC NULLS LAST
                     SQL, [$workspaceId]),
 
                     'city' => $this->queryCityCells($workspaceId),
 
-                    default => DB::select(<<<'SQL'
-                        SELECT cm.dept_code AS code, d.name AS name, d.region_code,
-                               SUM(cm.company_count) AS total,
-                               SUM(cm.complete_count) AS complete,
-                               SUM(cm.partial_count)  AS partial
-                        FROM coverage_matrix_cells cm
-                        JOIN departments d ON d.code = cm.dept_code
-                        WHERE cm.workspace_id = ?
-                        GROUP BY cm.dept_code, d.name, d.region_code
+                    default => DB::select(<<<SQL
+                        SELECT x.dept AS code, d.name AS name, d.region_code,
+                               SUM(x.company_count) AS total,
+                               SUM(x.complete_count) AS complete,
+                               SUM(x.partial_count)  AS partial
+                        FROM (SELECT {$dept} AS dept, cm.company_count, cm.complete_count, cm.partial_count
+                              FROM coverage_matrix_cells cm WHERE cm.workspace_id = ?) x
+                        JOIN departments d ON d.code = x.dept
+                        GROUP BY x.dept, d.name, d.region_code
                         ORDER BY total DESC NULLS LAST
                     SQL, [$workspaceId]),
                 };
+
+                return self::entiers($lignes);
             });
         } catch (\Throwable $e) {
             // Sprint 18.9 — log + fallback empty plutôt que 500 (RLS denied, PostGIS missing, etc.)
@@ -89,7 +154,15 @@ class CoverageController extends ApiController
             return $this->ok(['level' => $level, 'cells' => [], 'degraded' => true]);
         }
 
-        return $this->ok(['level' => $level, 'cells' => $cells]);
+        // Relecture A09 de #284 : « dont N au score ≥ 50 » suit la même règle
+        // que l'accueil. La part de scores périmés vient du calcul de l'accueil
+        // (déjà en cache) ; inconnue → null, et l'écran ne montre pas le chiffre.
+        $accueil = Cache::get(DashboardController::cle((string) $workspaceId));
+        $perimes = is_array($accueil) && is_numeric($accueil['quality_a_recalculer_pct'] ?? null)
+            ? (float) $accueil['quality_a_recalculer_pct']
+            : null;
+
+        return $this->ok(['level' => $level, 'cells' => $cells, 'quality_a_recalculer_pct' => $perimes]);
     }
 
     /**

@@ -225,7 +225,7 @@ test('les listes de mots du serveur et de l écran sont IDENTIQUES', function ()
     expect($ecran['articles_retires'])->toBe(ChoixEntrepriseController::ARTICLES_RETIRES)
         ->and($ecran['mots_generiques'])->toBe(ChoixEntrepriseController::MOTS_GENERIQUES)
         ->and($ecran['mots_lus'])->toBe(ChoixEntrepriseController::MOTS_LUS)
-        ->and($ecran['mot_minimal'])->toBe(3);
+        ->and($ecran['mot_minimal'])->toBe(ChoixEntrepriseController::MOT_MINIMAL);
 
     // (a) est EXACTEMENT ce que `normalize_name` retire en base : chaque
     // article suivi d'un espace disparaît, et rien d'autre.

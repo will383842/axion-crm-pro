@@ -60,7 +60,7 @@ class ChoixEntrepriseController extends ConsoleController
     private const PLAFOND = 10;
 
     /** Longueur minimale d'un mot APRÈS normalisation (cf. en-tête). */
-    private const MOT_MINIMAL = 3;
+    public const MOT_MINIMAL = 3;
 
     /**
      * DEUX NOTIONS, ET LES CONFONDRE A COÛTÉ DEUX RELECTURES (PR #287).
@@ -171,9 +171,14 @@ class ChoixEntrepriseController extends ConsoleController
             $requete->where('postcode', $codePostal);
         }
 
-        // Les noms qui COMMENCENT par le premier mot tapé d'abord, puis les plus
+        // D'abord les noms qui contiennent TOUS les mots tapés : un mot peut
+        // être accepté par la VILLE (« france » de Fort-de-France), et sans ce
+        // critère « Air France » rendait AIR 24 / AIR CLIM devant AIR FRANCE.
+        // Puis les noms qui COMMENCENT par le premier mot tapé, puis les plus
         // courts : « Société Générale » avant « Banque Société Générale … ».
+        $tousDansLeNom = implode(' AND ', array_fill(0, count($filtres), 'companies.denomination_normalized ILIKE ?'));
         $lignes = $requete
+            ->orderByRaw('(' . $tousDansLeNom . ') DESC', array_map(static fn (string $mot): string => '%' . $mot . '%', $filtres))
             ->orderByRaw('(companies.denomination_normalized ILIKE ?) DESC', [$filtres[0] . '%'])
             ->orderByRaw('length(companies.denomination_normalized)')
             ->orderBy('companies.denomination_normalized')

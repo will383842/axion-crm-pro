@@ -125,14 +125,15 @@ class ChoixEntrepriseController extends ConsoleController
 
         // Les noms qui COMMENCENT par le premier mot d'abord, puis les plus
         // courts : « Martin » avant « Boulangerie des frères Martin et fils ».
-        return $requete
+        $lignes = $requete
             ->orderByRaw('(companies.denomination_normalized ILIKE ?) DESC', [$mots[0] . '%'])
             ->orderByRaw('length(companies.denomination_normalized)')
             ->orderBy('companies.denomination_normalized')
             ->limit(self::PLAFOND)
             ->get()
-            ->values()
             ->all();
+
+        return array_values($lignes);
     }
 
     private function parNom(string $workspaceId, string $saisie, string $codePostal): JsonResponse

@@ -29,6 +29,12 @@ use Spatie\QueryBuilder\Sorts\Sort;
  * ⚠️ L'index `idx_media_tri_nom` est construit à partir de `expression()` :
  * une seule source pour l'ORDER BY et pour l'index. Le planificateur ne
  * reconnaît qu'une expression IDENTIQUE.
+ *
+ * ⚠️ CHANGER LE CORPS DE `cle_tri_nom` OU `TriNomMedia::expression()` IMPOSE
+ * une NOUVELLE fonction / un NOUVEL index (ou un REINDEX) : `IF NOT EXISTS` ne
+ * reconstruit pas un index existant, et le test de parité ne voit pas une
+ * production déjà migrée. REINDEX aussi à chaque montée de version majeure de
+ * PostgreSQL (les règles d'`unaccent` peuvent changer).
  */
 final class TriNomMedia implements Sort
 {

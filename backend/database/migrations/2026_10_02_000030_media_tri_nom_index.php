@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Schema;
  * (détail et raisons dans `App\Support\TriNomMedia`). La fonction est déclarée
  * IMMUTABLE pour être indexable — `unaccent` ne l'est pas à cause de son
  * dictionnaire configurable ; on lui passe donc le dictionnaire EXPLICITEMENT
- * (`public.unaccent`), comme le fait déjà `normalize_name`. Tout est qualifié
+ * (`public.unaccent`) — `normalize_name`, elle, appelle `unaccent(text)` sans
+ * dictionnaire explicite. Tout est qualifié
  * et le `search_path` est fixé : une restauration par `pg_dump` (search_path
  * vide) la résout (cf. `2026_08_16_200000_fixer_search_path_des_fonctions`).
  *
@@ -26,6 +27,12 @@ use Illuminate\Support\Facades\Schema;
  * laissé INVALIDE par une construction interrompue est retiré puis reconstruit
  * (patron de `2026_10_01_000024` / `2026_10_01_000041`). Noms vérifiés libres
  * le 2026-10-02.
+ *
+ * ⚠️ CHANGER LE CORPS DE `cle_tri_nom` OU `TriNomMedia::expression()` IMPOSE
+ * une NOUVELLE fonction / un NOUVEL index (ou un REINDEX) : `IF NOT EXISTS` ne
+ * reconstruit pas un index existant, et le test de parité ne voit pas une
+ * production déjà migrée. REINDEX aussi à chaque montée de version majeure de
+ * PostgreSQL (les règles d'`unaccent` peuvent changer).
  */
 return new class extends Migration
 {
@@ -39,8 +46,8 @@ return new class extends Migration
             return;
         }
 
-        DB::statement(<<<'SQL'
-            CREATE OR REPLACE FUNCTION public.cle_tri_nom(input TEXT) RETURNS TEXT
+        DB::statement('CREATE OR REPLACE FUNCTION public.' . TriNomMedia::FONCTION . <<<'SQL'
+            (input TEXT) RETURNS TEXT
             LANGUAGE sql IMMUTABLE PARALLEL SAFE
             SET search_path = public, pg_catalog
             AS $$
@@ -76,6 +83,6 @@ return new class extends Migration
         } finally {
             DB::statement('RESET lock_timeout');
         }
-        DB::statement('DROP FUNCTION IF EXISTS public.cle_tri_nom(TEXT)');
+        DB::statement('DROP FUNCTION IF EXISTS public.' . TriNomMedia::FONCTION . '(TEXT)');
     }
 };

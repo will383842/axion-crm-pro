@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Support\MasquageCoordonnees;
+use App\Support\RechercheEntreprisesParNom;
+use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,84 +88,117 @@ class GlobalSearchController extends ApiController
         // Le masquage porte sur la charge ENTIERE, pas sur `contacts` seul :
         // une famille de resultats ajoutee demain sera couverte sans qu'on ait
         // a y penser.
-        return response()->json(MasquageCoordonnees::masquerTableauSiRequis([
+        // Le contexte d'espace est posé EXPLICITEMENT : les fonctions de
+        // recherche (SECURITY DEFINER) ne rendent rien si l'espace demandé
+        // n'est pas celui de la connexion.
+        return WorkspaceContext::run($espace, fn (): JsonResponse => response()->json(MasquageCoordonnees::masquerTableauSiRequis([
             'companies' => $this->chercherEntreprises($espace, $terme),
             'contacts' => $this->chercherPersonnes($espace, $terme),
             'tags' => $this->chercherEtiquettes($espace, $terme),
-        ]));
+        ])));
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * 🔴 SOUS LA RLS, AUCUN `ILIKE` / `LIKE '%x%'` DIRECT (prod, 2026-10-03).
+     *
+     * Sous `axion_app` (RLS forcée), `ILIKE` n'est pas « leakproof » : Postgres
+     * ne peut l'évaluer qu'APRÈS le filtre de la politique, et aucun index ne
+     * sert. Mesuré : `companies` en Parallel Seq Scan 3,9 à 4,7 s, `contacts`
+     * ~1,25 s, À CHAQUE FRAPPE. Les IDENTIFIANTS viennent donc de fonctions
+     * SECURITY DEFINER cloisonnées à l'espace du contexte (migrations
+     * `2026_10_02_000050` et `2026_10_03_000010`), et les lignes sont RELUES
+     * ici sous la RLS — double garde.
+     *
+     *   - que des chiffres : SIREN, égalité sur 9 chiffres, préfixe sinon ;
+     *   - sinon : la recherche par nom du sélecteur « Entreprise » (#287),
+     *     mots significatifs d'au moins 3 lettres.
+     *
+     * @return list<array<string, mixed>>
+     */
     private function chercherEntreprises(string $espace, string $terme): array
     {
         return $this->sur('companies', function () use ($espace, $terme): array {
-            // `(array) $ligne` rend, pour l'analyse statique, un `array` sans
-            // clefs ni valeurs typees, et `->all()` un `array<int, ...>` et non
-            // une `list`. `sur()` promet pourtant
-            // `list<array<string, mixed>>` a ses appelants. On NOMME donc le
-            // resultat au lieu de laisser la promesse non tenue : sans cela,
-            // tout ce qui consomme la recherche globale travaille sur un type
-            // que personne ne verifie.
-            /** @var list<array<string, mixed>> $lignes */
-            $lignes = DB::table('companies')
-                ->where('workspace_id', $espace)
-                ->whereNull('deleted_at')
-                ->where(function ($q) use ($terme) {
-                    // 🔑 `denomination_normalized`, PAS `denomination`.
-                    //
-                    // C'est une colonne GENERATED ALWAYS AS
-                    // (normalize_name(denomination)) STORED, maintenue par
-                    // Postgres, et elle porte l'index trigrammes
-                    // `idx_companies_denomination_trgm` DEPUIS LE 2026-05-16.
-                    //
-                    // Mesure sur 150 000 lignes :
-                    //   sur `denomination` ......... Seq Scan,    24,6 ms
-                    //   sur `denomination_normalized` Bitmap Index, 1,2 ms
-                    //
-                    // Vingt fois plus rapide, et l'ecart croit avec le volume.
-                    // On gagne en prime l'insensibilite aux accents et a la
-                    // casse, que `normalize_name()` applique deja.
-                    $q->whereRaw('denomination_normalized ILIKE ?', [$this->motif($terme)])
-                        ->orWhere('siren', 'LIKE', $this->motif($terme));
-                })
-                ->orderBy('denomination')
-                ->limit(self::PLAFOND)
-                ->get(['id', 'siren', 'denomination'])
-                ->map(fn ($l) => (array) $l)
-                ->all();
+            $chiffres = preg_replace('/[\s.\-]/u', '', $terme) ?? '';
 
-            return $lignes;
+            if ($chiffres !== '' && ctype_digit($chiffres)) {
+                // Un SIRET (14 chiffres) commence par son SIREN.
+                $debut = strlen($chiffres) === 14 ? substr($chiffres, 0, 9) : $chiffres;
+                $ids = strlen($debut) <= 9 ? $this->identifiants(
+                    'SELECT t.id FROM public.entreprises_siren_ids(?::uuid, ?, ?) WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
+                    [$espace, $debut, self::PLAFOND],
+                ) : [];
+            } else {
+                [$ids] = RechercheEntreprisesParNom::identifiants($espace, $terme, '', self::PLAFOND);
+            }
+
+            return $this->relire('companies', $espace, $ids, ['id', 'siren', 'denomination']);
         });
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Personnes : nom et prénom par les index trigrammes, e-mail par PRÉFIXE
+     * (intervalle sur `idx_contacts_email`). La sous-chaîne d'e-mail (« @domaine ») n'a
+     * aucun index : elle n'est plus cherchée — c'était un parcours complet de
+     * 1,3 M de lignes à chaque frappe. Moins de 3 caractères : rien.
+     *
+     * @return list<array<string, mixed>>
+     */
     private function chercherPersonnes(string $espace, string $terme): array
     {
         return $this->sur('contacts', function () use ($espace, $terme): array {
-            // `(array) $ligne` rend, pour l'analyse statique, un `array` sans
-            // clefs ni valeurs typees, et `->all()` un `array<int, ...>` et non
-            // une `list`. `sur()` promet pourtant
-            // `list<array<string, mixed>>` a ses appelants. On NOMME donc le
-            // resultat au lieu de laisser la promesse non tenue : sans cela,
-            // tout ce qui consomme la recherche globale travaille sur un type
-            // que personne ne verifie.
-            /** @var list<array<string, mixed>> $lignes */
-            $lignes = DB::table('contacts')
-                ->where('workspace_id', $espace)
-                ->whereNull('deleted_at')
-                ->where(function ($q) use ($terme) {
-                    $q->where('last_name', 'ILIKE', $this->motif($terme))
-                        ->orWhere('first_name', 'ILIKE', $this->motif($terme))
-                        ->orWhere('email', 'ILIKE', $this->motif($terme));
-                })
-                ->orderBy('last_name')
-                ->limit(self::PLAFOND)
-                ->get(['id', 'first_name', 'last_name', 'email', 'company_id'])
-                ->map(fn ($l) => (array) $l)
-                ->all();
+            $ids = $this->identifiants(
+                'SELECT t.id FROM public.contacts_recherche_ids(?::uuid, ?, ?) WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
+                // Saisie BRUTE : la fonction neutralise elle-même les jokers.
+                [$espace, $terme, self::PLAFOND],
+            );
 
-            return $lignes;
+            return $this->relire('contacts', $espace, $ids, ['id', 'first_name', 'last_name', 'email', 'company_id']);
         });
+    }
+
+    /**
+     * @param  list<mixed>  $liaisons
+     * @return list<int>
+     */
+    private function identifiants(string $sql, array $liaisons): array
+    {
+        $ids = array_map(
+            static fn ($l): int => (int) (is_object($l) ? ($l->id ?? 0) : 0),
+            DB::select($sql, $liaisons),
+        );
+
+        return array_slice($ids, 0, self::PLAFOND);
+    }
+
+    /**
+     * Relit SOUS LA RLS les lignes dont une fonction a rendu les identifiants,
+     * dans l'ordre rendu.
+     *
+     * @param  list<int>  $ids
+     * @param  list<string>  $colonnes
+     * @return list<array<string, mixed>>
+     */
+    private function relire(string $table, string $espace, array $ids, array $colonnes): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $parId = [];
+        foreach (DB::table($table)->where('workspace_id', $espace)->whereNull('deleted_at')->whereIn('id', $ids)->get($colonnes) as $ligne) {
+            /** @var array<string, mixed> $tableau */
+            $tableau = (array) $ligne;
+            $parId[(int) ($tableau['id'] ?? 0)] = $tableau;
+        }
+
+        $lignes = [];
+        foreach ($ids as $id) {
+            if (isset($parId[$id])) {
+                $lignes[] = $parId[$id];
+            }
+        }
+
+        return $lignes;
     }
 
     /** @return list<array<string, mixed>> */

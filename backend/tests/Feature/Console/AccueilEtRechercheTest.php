@@ -214,19 +214,23 @@ test('P6-UI-002 — /search ne rend RIEN d un autre espace de travail', function
     [, $espaceA] = compteAccueil('ALPHA');
     [$b, $espaceB] = compteAccueil('BETA');
 
-    entrepriseAccueil($espaceA, 'Secret Alpha SARL');
-    entrepriseAccueil($espaceB, 'Public Beta SARL');
+    // Un mot PRÉSENT DANS LES DEUX noms. Ce n'est plus « SARL » : depuis la
+    // correction sous RLS (2026-10-03), la palette partage la recherche par nom
+    // du sélecteur « Entreprise », qui ne part jamais d'une forme juridique
+    // seule (« sarl » : > 20 s en production).
+    entrepriseAccueil($espaceA, 'Secret Alpha Zephyrin');
+    entrepriseAccueil($espaceB, 'Public Beta Zephyrin');
 
-    $reponse = $this->actingAs($b)->getJson('/api/v1/search?q=SARL');
+    $reponse = $this->actingAs($b)->getJson('/api/v1/search?q=Zephyrin');
     $reponse->assertOk();
 
     $noms = collect($reponse->json('companies'))->pluck('denomination')->all();
 
     // TEMOIN INTEGRE : B doit voir la sienne, sinon on ne prouverait que la
     // panne de la route.
-    $this->assertContains('Public Beta SARL', $noms);
+    $this->assertContains('Public Beta Zephyrin', $noms);
     $this->assertNotContains(
-        'Secret Alpha SARL',
+        'Secret Alpha Zephyrin',
         $noms,
         "La recherche globale rend une fiche d'un AUTRE espace. Une palette de recherche "
         . 'est le pire endroit ou fuir : elle balaie tout, sur une saisie libre.',

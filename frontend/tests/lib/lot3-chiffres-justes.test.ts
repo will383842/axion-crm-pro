@@ -31,10 +31,10 @@ describe('activité récente : des phrases, pas des lignes techniques', () => {
   it('ne montre jamais une route ni un verbe HTTP, même inconnus', () => {
     const phrase = libelleActivite('PATCH', 'api/v1/quelque-chose/12');
     expect(phrase).toBe('Modification dans la console');
-    // Un code de traitement inconnu est une ligne technique : masquée.
-    expect(libelleActivite('NOUVEL_EVENEMENT', null)).toBeNull();
-    expect(libelleActivite('crm.sync.retry', 'artisan crm:sync')).toBeNull();
-    expect(libelleActivite('', null)).toBeNull();
+    // Un code inconnu n'est ni déguisé en phrase, ni masqué sans bruit.
+    expect(libelleActivite('NOUVEL_EVENEMENT', null)).toBe('Autre opération');
+    expect(libelleActivite('crm.sync.retry', 'artisan crm:sync')).toBe('Autre opération');
+    expect(libelleActivite('', null)).toBe('Autre opération');
   });
 });
 

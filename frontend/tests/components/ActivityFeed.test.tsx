@@ -38,7 +38,7 @@ const LIGNE_REELLE_DE_L_API = {
   id: '0193f0c2-1111-7000-8000-000000000001',
   workspace_id: '0193f0c2-2222-7000-8000-000000000002',
   user_id: '0193f0c2-3333-7000-8000-000000000003',
-  event_type: 'auth.login',
+  event_type: 'POST',
   path: '/api/v1/auth/login',
   status_code: 200,
   ip: '203.0.113.7',
@@ -60,7 +60,7 @@ describe('ActivityFeed', () => {
     const { ActivityFeed } = await import('@/features/dashboard/components/ActivityFeed');
     render(<ActivityFeed />, { wrapper: enveloppe });
 
-    // Le `event_type` est rendu en phrase, pas ignoré (ni « Auth Login »).
+    // Le middleware écrit le VERBE HTTP et la route : rendu en phrase.
     expect(await screen.findByText(/Connexion/)).toBeTruthy();
   });
 
@@ -75,8 +75,8 @@ describe('ActivityFeed', () => {
     // La seule assertion qui compte : le rendu ne jette pas. Un champ absent ne
     // doit jamais pouvoir effacer l'application.
     expect(() => render(<ActivityFeed />, { wrapper: enveloppe })).not.toThrow();
-    // Une ligne sans type ne dit rien : elle est masquée, le fil est vide.
-    expect(await screen.findByText(/Activité bientôt disponible/)).toBeTruthy();
+    // Une ligne sans type ne disparaît pas sans bruit : « Autre opération ».
+    expect(await screen.findByText(/Autre opération/)).toBeTruthy();
   });
 });
 

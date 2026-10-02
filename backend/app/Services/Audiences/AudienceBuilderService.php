@@ -93,6 +93,9 @@ class AudienceBuilderService
 
     private const REFRESH_CHUNK_SIZE = 500;
 
+    /** 1 000 lignes × 5 colonnes = 5 000 paramètres, loin des 65 535 de Postgres. */
+    public const MEMBRES_PAR_INSERTION = 1000;
+
     /**
      * Sprint H5 — Au delà de ce seuil, on bascule en Bus::batch parallèle
      * (10 workers Horizon supervisor audiences-refresh). En dessous, refresh
@@ -239,6 +242,30 @@ class AudienceBuilderService
     }
 
     /**
+     * Lignes de `audience_members` insérées par tranches de
+     * `MEMBRES_PAR_INSERTION` (2026-10-02).
+     *
+     * Postgres refuse une requête de plus de 65 535 paramètres, et chaque
+     * ligne en porte cinq : au-delà de 13 107 lignes, un seul
+     * `insertOrIgnore` échoue. Un lot de 5 000 fiches en produit une par
+     * PERSONNE — mesuré en production : 13 375 lignes (66 875 paramètres)
+     * pour l'audience 1 à l'offset 195 000, 13 472 pour l'audience 3 à
+     * l'offset 125 000. Ces deux lots échouaient à chaque essai ; pire, la
+     * capture Sentry de l'exception sérialisait les 66 875 paramètres de
+     * chaque cadre de la pile et tuait le worker (mémoire épuisée), si bien
+     * que le lot n'était jamais marqué en échec et que le rappel `finally`
+     * n'arrivait pas.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public function insererMembres(array $rows): void
+    {
+        foreach (array_chunk($rows, self::MEMBRES_PAR_INSERTION) as $tranche) {
+            DB::table('audience_members')->insertOrIgnore($tranche);
+        }
+    }
+
+    /**
      * Les lignes `audience_members` de ces fiches — UNE définition, partagée
      * par `refresh()` et `RefreshAudienceChunkJob`.
      *
@@ -364,10 +391,7 @@ class AudienceBuilderService
                 $companyIds = array_map(static fn ($id): int => (int) $id, $companies->pluck('id')->all());
                 // Une seule définition des membres (`lignesMembres`), partagée
                 // avec `RefreshAudienceChunkJob`.
-                $rows = $this->lignesMembres($audience, $companyIds);
-                if (! empty($rows)) {
-                    DB::table('audience_members')->insertOrIgnore($rows);
-                }
+                $this->insererMembres($this->lignesMembres($audience, $companyIds));
             });
 
             $audience->update([

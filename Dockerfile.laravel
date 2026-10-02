@@ -119,6 +119,15 @@ ENV APP_ENV=production APP_DEBUG=false
 # fichier qui va avec.
 RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/zz-opcache-prod.ini \
     && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-opcache-prod.ini
+# Les piles d'exceptions ne portent PAS les arguments des fonctions (valeur
+# de `php.ini-production`, que l'image n'installe pas — mesuré : 0 en prod le
+# 2026-10-02). Sans cela, Sentry sérialise chaque argument de chaque cadre :
+# une erreur SQL sur un `insertOrIgnore` de 66 875 paramètres a épuisé les
+# 128 Mo du worker Horizon PENDANT la capture (AbstractSerializer.php:113),
+# tuant le job sans qu'il soit jamais marqué en échec. Ces arguments sont
+# aussi des données personnelles (adresses, noms) : rien à faire dans une
+# pile envoyée à un tiers (`send_default_pii` est déjà à false).
+RUN echo "zend.exception_ignore_args=On" > /usr/local/etc/php/conf.d/zz-exceptions-prod.ini
 COPY --from=builder /var/www/html /var/www/html
 COPY infra/docker/entrypoint-prod.sh /usr/local/bin/entrypoint-prod
 # Pool php-fpm — le fichier porte la mesure qui le justifie.

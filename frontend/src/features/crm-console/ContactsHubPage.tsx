@@ -91,33 +91,49 @@ function ContactsHubContent() {
     return suivant;
   };
 
+  // 2026-10-02 — « la page Contacts ne charge jamais ». Deux règles :
+  //
+  //  1. `signal` transmis à axios : quitter la page (ou changer de filtre)
+  //     ANNULE la requête en vol. React Query n'annule que si le `queryFn`
+  //     consomme le signal ; sans lui, chaque visite laissait une requête de
+  //     plus de 100 s tourner côté serveur, et elles s'empilaient.
+  //  2. Liste et compteurs se chargent et ÉCHOUENT indépendamment : des
+  //     compteurs lents ou en panne ne doivent ni retarder ni masquer les
+  //     lignes (cf. le rendu plus bas).
   const counts = useQuery<CountsResponse>({
     queryKey: ['crm', 'contacts-hub', 'counts'],
-    queryFn: async () => (await api.get<CountsResponse>('/crm/contacts-hub/counts')).data,
+    queryFn: async ({ signal }) =>
+      (await api.get<CountsResponse>('/crm/contacts-hub/counts', { signal })).data,
   });
 
   const list = useQuery<CursorResponse<HubCompany>>({
     queryKey: ['crm', 'contacts-hub', tab, temperature, rechercheDifferee, country, prospection],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams({ temperature, per_page: '50' });
       if (tab !== 'tous') params.set('relation_type', tab);
       if (rechercheDifferee.trim().length > 0) params.set('q', rechercheDifferee.trim());
       if (country) params.set('filter[country_code]', country);
       if (prospection) params.set('filter[prospection_status]', prospection);
-      return (await api.get<CursorResponse<HubCompany>>(`/crm/contacts-hub?${params.toString()}`)).data;
+      return (
+        await api.get<CursorResponse<HubCompany>>(`/crm/contacts-hub?${params.toString()}`, { signal })
+      ).data;
     },
     placeholderData: (previous) => previous,
   });
 
   const byType = counts.data?.by_relation_type ?? {};
   const byStage = counts.data?.by_lifecycle_stage ?? {};
+  // Tant que les compteurs ne sont pas là, on n'affiche PAS « 0 » : ce serait
+  // affirmer une base vide. Pastille absente, vignette « … ».
+  const compteursLus = counts.data !== undefined;
+  const valeurKpi = (n: number | undefined): number | string => (compteursLus ? (n ?? 0) : '…');
 
   const tabs: Array<TabItem<TabId>> = [
-    { id: 'tous', label: 'Tous', count: counts.data?.total ?? 0 },
+    { id: 'tous', label: 'Tous', ...(compteursLus ? { count: counts.data?.total ?? 0 } : {}) },
     ...RELATION_TYPES.map((type) => ({
       id: type,
       label: RELATION_TYPE_LABELS[type],
-      count: byType[type] ?? 0,
+      ...(compteursLus ? { count: byType[type] ?? 0 } : {}),
     })),
   ];
 
@@ -140,9 +156,15 @@ function ContactsHubContent() {
    * réussie quand un rafraîchissement échoue — on n'efface jamais des lignes
    * que l'opérateur avait déjà sous les yeux.
    */
+  //
+  // 2026-10-02 — chaque requête porte SON échec. Avant, un échec des compteurs
+  // remplaçait TOUT l'écran, lignes comprises : des compteurs lents (≈ 20 s à
+  // froid sur 4,3 M de fiches) ou en panne rendaient la liste inaccessible.
+  // Désormais : compteurs en échec → vignettes retirées (jamais de « 0 »
+  // mensonger), une ligne le dit ; liste en échec → l'erreur à la place des
+  // lignes seulement.
   const echecListe = list.error !== null && list.data === undefined;
   const echecCompteurs = counts.error !== null && counts.data === undefined;
-  const echec = echecListe || echecCompteurs;
 
   return (
     <div className="px-6 py-6">
@@ -151,25 +173,23 @@ function ContactsHubContent() {
         subtitle={`${tab === 'tous' ? 'Tous les types' : RELATION_TYPE_LABELS[tab]} — ${temperatureLabel}`}
       />
 
-      {echec ? (
-        <QueryErrorState
-          error={echecListe ? list.error : counts.error}
-          contexte="la liste des fiches"
-          onRetry={() => {
-            void list.refetch();
-            void counts.refetch();
-          }}
-        />
+      {echecCompteurs ? (
+        <p className="mb-6 text-xs text-slate-500 dark:text-slate-400" role="status">
+          Compteurs indisponibles pour le moment — la liste reste consultable.{' '}
+          <button type="button" className="underline" onClick={() => void counts.refetch()}>
+            Recharger les compteurs
+          </button>
+        </p>
       ) : (
-        <>
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Clients" value={byType['client'] ?? 0} tone="emerald" />
-        <KpiCard label="Prospects" value={byType['prospect'] ?? 0} tone="sky" />
-        <KpiCard label="Opportunités" value={byStage['opportunite'] ?? 0} tone="violet" />
-        {/* La base froide est un STOCK, pas une file : ton neutre, jamais de
-            pastille rouge (conception §2.3). */}
-        <KpiCard label="Dormants" value={byStage['dormant'] ?? 0} tone="slate" />
-      </div>
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="Clients" value={valeurKpi(byType['client'])} tone="emerald" />
+          <KpiCard label="Prospects" value={valeurKpi(byType['prospect'])} tone="sky" />
+          <KpiCard label="Opportunités" value={valeurKpi(byStage['opportunite'])} tone="violet" />
+          {/* La base froide est un STOCK, pas une file : ton neutre, jamais de
+              pastille rouge (conception §2.3). */}
+          <KpiCard label="Dormants" value={valeurKpi(byStage['dormant'])} tone="slate" />
+        </div>
+      )}
 
       <Tabs items={tabs} value={tab} onChange={setTab} className="mb-4" />
 
@@ -232,6 +252,13 @@ function ContactsHubContent() {
       />
 
       <div className="mt-4">
+        {echecListe ? (
+          <QueryErrorState
+            error={list.error}
+            contexte="la liste des fiches"
+            onRetry={() => void list.refetch()}
+          />
+        ) : null}
         {/* `isLoading` NE SUFFIT PAS ici : `placeholderData` garde les lignes de
             la vue précédente pendant le chargement de la suivante, donc React
             Query considère qu'il y a déjà des données et `isLoading` reste faux.
@@ -241,7 +268,7 @@ function ContactsHubContent() {
             suivante — soit un mensonge de plusieurs secondes sur une base de
             4,29 M de fiches. `isPlaceholderData` est vrai exactement pendant ce
             créneau : c'est lui qui doit déclencher le squelette. */}
-        {list.isLoading || list.isPlaceholderData ? (
+        {echecListe ? null : list.isLoading || list.isPlaceholderData ? (
           <ConsoleListSkeleton />
         ) : rows.length === 0 ? (
           <EmptyState
@@ -344,8 +371,6 @@ function ContactsHubContent() {
           </Card>
         )}
       </div>
-        </>
-      )}
     </div>
   );
 }

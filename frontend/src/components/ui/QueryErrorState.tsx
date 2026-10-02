@@ -128,6 +128,17 @@ const MESSAGES: Record<NatureErreurApi, Message> = {
     reessayable: true,
     ton: 'rouge',
   },
+  trop_longue: {
+    // 503 `requete_trop_longue` : le serveur a coupé une requête SQL au-delà
+    // de 15 s (filet posé le 2026-10-02). Ni refus, ni panne : le geste est de
+    // resserrer la recherche.
+    titre: 'La recherche prend trop de temps',
+    description: (contexte) =>
+      `Le chargement de ${contexte} a été interrompu au bout de 15 secondes pour ne pas bloquer le serveur. Affinez les filtres (type, pays, recherche), puis réessayez.`,
+    icone: <AlertTriangle className={CLASSE_ICONE} />,
+    reessayable: true,
+    ton: 'ambre',
+  },
   reseau: {
     // Sous-chaîne cherchée par la garde : « injoignable ».
     titre: 'Serveur injoignable',

@@ -135,6 +135,7 @@ export type NatureErreurApi =
   | 'introuvable'
   | 'requete'
   | 'panne'
+  | 'trop_longue'
   | 'reseau'
   | 'inconnue';
 
@@ -176,8 +177,12 @@ export function qualifierErreur(error: unknown): ErreurQualifiee {
   if (reponse === undefined) return { nature: 'reseau', status: null, code: null };
 
   const brut = reponse.data?.error;
+  // 2026-10-02 — le serveur borne désormais chaque requête SQL d'écran à 15 s
+  // et répond 503 `requete_trop_longue` au-delà. Ce n'est PAS une panne : le
+  // geste attendu est d'affiner les filtres, pas de « signaler » un incident.
+  const tropLongue = reponse.status === 503 && brut === 'requete_trop_longue';
   return {
-    nature: natureDuStatut(reponse.status),
+    nature: tropLongue ? 'trop_longue' : natureDuStatut(reponse.status),
     status: reponse.status,
     // Une chaîne vide n'est pas un code : on la ramène à `null` pour qu'un
     // appelant puisse écrire `if (code === null)` sans piège.

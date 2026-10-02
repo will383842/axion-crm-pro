@@ -201,7 +201,7 @@ test('la vue par defaut n emet plus de OR EXISTS : elle enumere les actives en U
 
     $sql = strtolower(perfHubSql($this, '/api/v1/crm/contacts-hub'));
 
-    expect($sql)->not->toContain(' or exists', "Retour du OR + EXISTS non indexable (prod : > 100 s).\n\n{$sql}");
+    $this->assertStringNotContainsString(' or exists', $sql, "Retour du OR + EXISTS non indexable (prod : > 100 s).\n\n{$sql}");
     expect($sql)->not->toContain('<> \'nouveau\'');
     expect($sql)->not->toContain('!= \'nouveau\'');
     expect($sql)->toContain(' union ');
@@ -218,7 +218,7 @@ test('le plan de la vue par defaut n a plus de sous-plan correle', function () {
     // Le défaut avait une signature exacte : `Filter: (… OR (hashed SubPlan N))`
     // sur le parcours de l'index de tri. Un `IN (… UNION …)` devient une
     // semi-jointure, sans sous-plan.
-    expect($plan)->not->toContain('SubPlan', "Sous-plan corrélé dans le plan de l'écran d'accueil.\n\n{$plan}");
+    $this->assertStringNotContainsString('SubPlan', $plan, "Sous-plan corrélé dans le plan de l'écran d'accueil.\n\n{$plan}");
 });
 
 // ── 3. PROJECTION ───────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
+import { MESSAGE_MOTS_VIDES, MESSAGE_NUMERO, MESSAGE_TROP_COURT } from '@/features/crm-console/ChoixEntreprise';
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, dynamicGet, getJson, http, HttpResponse, recordPost, type HttpHandler } from '../msw/handlers';
 
@@ -67,13 +68,13 @@ function choixHandler() {
   });
 }
 
-async function monter(handlers: HttpHandler[] = []) {
+async function monter(handlers: HttpHandler[] = [], file: unknown = FILE) {
   await renderScreen(<ArbitragePage />, {
     path: '/console/arbitrage',
     consoleFeatures: 'open',
-    handlers: [getJson('/crm/arbitrage', FILE), ...handlers],
+    handlers: [getJson('/crm/arbitrage', file), ...handlers],
   });
-  return screen.findByRole('combobox', { name: 'Entreprise' });
+  return (await screen.findAllByRole('combobox', { name: 'Entreprise' }))[0] as HTMLElement;
 }
 
 /**
@@ -156,25 +157,38 @@ describe('ChoixEntreprise — rattacher en cherchant l’entreprise', () => {
     expect(post.bodies).toHaveLength(0);
   });
 
-  it('aucune requête sous 2 caractères, ni sur un numéro incomplet ; un SIREN complet part', async () => {
+  it('même seuil que le serveur : aucune requête sous 3 lettres, ni sur des mots vides, ni sur un numéro incomplet', async () => {
     const choix = choixHandler();
     const champ = await monter([choix.handler]);
 
-    await userEvent.type(champ, 'm');
+    await userEvent.type(champ, 'ma');
     await attendre(600);
     expect(tapees(choix.urls)).toHaveLength(0);
-    expect(screen.getByText('Tapez au moins 2 caractères.')).toBeInTheDocument();
+    expect(screen.getByText(MESSAGE_TROP_COURT)).toBeInTheDocument();
 
+    // Articles et formes juridiques seuls : rien ne part.
+    await userEvent.clear(champ);
+    await userEvent.type(champ, 'SARL les');
+    await attendre(600);
+    expect(tapees(choix.urls)).toHaveLength(0);
+    expect(screen.getByText(MESSAGE_MOTS_VIDES)).toBeInTheDocument();
+
+    // TÉMOIN : un mot du nom ajouté → la requête part.
+    await userEvent.type(champ, ' martin');
+    await waitFor(() => expect(tapees(choix.urls)).toHaveLength(1));
+    expect(tapees(choix.urls)[0]?.searchParams.get('q')).toBe('SARL les martin');
+
+    await userEvent.clear(champ);
     await userEvent.clear(champ);
     await userEvent.type(champ, '552 100');
     await attendre(600);
-    expect(tapees(choix.urls)).toHaveLength(0);
-    expect(screen.getByText('Un SIREN compte 9 chiffres, un SIRET 14 chiffres.')).toBeInTheDocument();
+    expect(tapees(choix.urls)).toHaveLength(1);
+    expect(screen.getByText(MESSAGE_NUMERO)).toBeInTheDocument();
 
     // TÉMOIN : le même champ, numéro complet → une requête.
     await userEvent.type(champ, ' 554');
-    await waitFor(() => expect(tapees(choix.urls)).toHaveLength(1));
-    expect(tapees(choix.urls)[0]?.searchParams.get('q')).toBe('552 100 554');
+    await waitFor(() => expect(tapees(choix.urls)).toHaveLength(2));
+    expect(tapees(choix.urls)[1]?.searchParams.get('q')).toBe('552 100 554');
   });
 
   it('erreur : une recherche trop large et une panne se disent en français, sans liste vide trompeuse', async () => {
@@ -187,7 +201,7 @@ describe('ChoixEntreprise — rattacher en cherchant l’entreprise', () => {
       ),
     ]);
 
-    await userEvent.type(champ, 'sarl');
+    await userEvent.type(champ, 'boulangerie');
     expect(
       await screen.findByText('La recherche est trop large : ajoutez un mot du nom, la ville ou le code postal.'),
     ).toBeVisible();
@@ -204,6 +218,57 @@ describe('ChoixEntreprise — rattacher en cherchant l’entreprise', () => {
     expect(
       await screen.findByText('Aucune entreprise trouvée. Essayez le SIREN, ou ajoutez la ville ou le code postal.'),
     ).toBeVisible();
+  });
+
+  it('un résultat PÉRIMÉ n’est jamais affiché : l’ancienne frappe qui répond après la nouvelle est ignorée', async () => {
+    let liberer!: () => void;
+    const porte = new Promise<void>((resolve) => {
+      liberer = resolve;
+    });
+    const champ = await monter([
+      http.get(apiUrl('/crm/entreprises/choix'), async ({ request }) => {
+        const q = new URL(request.url).searchParams.get('q') ?? '';
+        if (q === 'garage') {
+          // L'ancienne frappe : sa réponse n'arrive qu'après la nouvelle.
+          await porte;
+          return HttpResponse.json({ data: [{ ...MARTIN_PARIS, id: 9001, denomination: 'Garage Périmé' }], indice: null });
+        }
+        return HttpResponse.json({ data: q.includes('central') ? [{ ...MARTIN_LYON, id: 9002, denomination: 'Garage Central' }] : [], indice: null });
+      }),
+    ]);
+
+    await userEvent.type(champ, 'garage');
+    await attendre(450); // la requête « garage » est partie, et reste en vol
+    await userEvent.type(champ, ' central');
+    expect(await screen.findByRole('option', { name: /Garage Central/ })).toBeVisible();
+
+    liberer();
+    await attendre(300);
+    expect(screen.queryByText('Garage Périmé')).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Garage Central/ })).toBeVisible();
+  });
+
+  it('suggestions : un nom reçu qui commence par « Les » est bien proposé ; des mots vides seuls ne lancent rien', async () => {
+    const choix = dynamicGet('/crm/entreprises/choix', () => ({
+      data: [{ ...MARTIN_LYON, id: 3003, denomination: 'Les Jardins du Lac', code_postal: '74000', ville: 'Annecy' }],
+      indice: null,
+    }));
+    const ligne = (denomination: string, id: number) => ({
+      ...LIGNE,
+      activity_id: id,
+      pending_match: { ...LIGNE.pending_match, denomination, postcode: '74000' },
+    });
+    await monter([choix.handler], { data: [ligne('Les Jardins du Lac', 51), ligne('SARL', 52)], meta: { total: 2, per_page: 50 } });
+
+    const [jardins, sarl] = screen.getAllByRole('combobox', { name: 'Entreprise' });
+    await userEvent.click(jardins as HTMLElement);
+    const liste = await screen.findByRole('listbox', { name: 'Suggestions d’entreprises' });
+    expect(await within(liste).findByRole('option', { name: /Les Jardins du Lac/ })).toBeVisible();
+    expect(new URL(choix.urls[0] as string).searchParams.get('q')).toBe('Les Jardins du Lac');
+
+    await userEvent.click(sarl as HTMLElement);
+    await attendre(400);
+    expect(choix.urls).toHaveLength(1);
   });
 
   it('suggestions : à l’ouverture du champ vide, le nom et le code postal reçus sont proposés', async () => {

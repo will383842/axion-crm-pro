@@ -121,7 +121,7 @@ describe('PersonneDetailPage — rattacher', () => {
     const bouton = screen.getByRole('button', { name: 'Rattacher à cette entreprise' });
     // Lot 13 : on CHERCHE l'entreprise (nom, ville, SIREN) au lieu de taper
     // son identifiant interne ; c'est l'identifiant de l'option choisie qui part.
-    await userEvent.type(screen.getByRole('combobox', { name: 'Entreprise' }), 'zz entreprise');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Entreprise' }), 'zz entreprise test');
     await userEvent.click(await screen.findByRole('option', { name: /ZZ Entreprise Test/ }));
     // Sans nom de famille : le bouton reste désactivé.
     expect(bouton).toBeDisabled();

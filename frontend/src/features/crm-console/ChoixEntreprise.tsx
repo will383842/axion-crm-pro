@@ -9,11 +9,14 @@
  *
  * ── Ce qui part au serveur, et quand ───────────────────────────────────────
  *  - après 300 ms de calme (`useAntiRebond`), jamais à chaque touche ;
- *  - au moins 2 caractères ; un numéro (que des chiffres) ne part que COMPLET
+ *  - au moins un mot significatif de 3 lettres (articles et formes juridiques
+ *    comme « SARL » ne comptent pas — même règle que le serveur) ; un numéro
+ *    (que des chiffres) ne part que COMPLET
  *    (9 chiffres pour un SIREN, 14 pour un SIRET) : une recherche partielle
  *    sur un numéro n'est servie par aucun index côté serveur ;
- *  - une requête périmée est annulée : React Query transmet un `signal` à
- *    axios, et abandonne la requête dont la clé n'est plus regardée.
+ *  - une requête périmée est annulée CÔTÉ NAVIGATEUR (React Query transmet un
+ *    `signal` à axios) — le serveur, lui, va au bout, borné à 8 s — et son
+ *    résultat n'est jamais affiché : seule compte la clé de la saisie en cours.
  *
  * ── Suggestions ────────────────────────────────────────────────────────────
  * Quand le parent connaît déjà un nom d'entreprise (et un code postal), on les
@@ -43,7 +46,7 @@ export interface EntrepriseChoisie {
 
 interface ReponseChoix {
   data: EntrepriseChoisie[];
-  indice: 'trop_court' | 'numero_incomplet' | null;
+  indice: 'trop_court' | 'mots_vides' | 'numero_incomplet' | null;
 }
 
 export interface SuggestionEntreprise {
@@ -69,19 +72,58 @@ function seulementDesChiffres(saisie: string): string | null {
 }
 
 /**
+ * Mots ignorés par la recherche — JUMEAU de `ChoixEntrepriseController::MOTS_VIDES`
+ * (backend), sous la même forme normalisée (minuscules, sans accent). L'écran
+ * s'en sert pour ne pas envoyer une requête que le serveur refuserait ; le
+ * serveur reste l'autorité.
+ */
+const MOTS_VIDES = new Set([
+  'le', 'la', 'les', 'l', 'de', 'du', 'des', 'd', 'et', 'au', 'aux', 'en',
+  'sur', 'sous', 'par', 'pour', 'chez', 'un', 'une', 'a', 'the', 'and',
+  'sarl', 'sas', 'sasu', 'sa', 'eurl', 'sci', 'snc', 'scop', 'scp', 'scm',
+  'sel', 'selarl', 'selas', 'ei', 'eirl', 'gie', 'gaec', 'earl', 'scea',
+  'association', 'asso',
+  'societe', 'ste', 'ets', 'etablissement', 'etablissements', 'cie',
+  'compagnie', 'groupe', 'france', 'entreprise', 'entreprises',
+]);
+
+/** Le seuil, le même que le serveur : 3 lettres ou chiffres dans un mot significatif. */
+const MOT_MINIMAL = 3;
+
+export const MESSAGE_TROP_COURT = 'Tapez au moins 3 lettres du nom de l’entreprise.';
+export const MESSAGE_MOTS_VIDES =
+  'Ajoutez un mot du nom de l’entreprise : « SARL », « les » ou « société » seuls ne suffisent pas.';
+export const MESSAGE_NUMERO = 'Un SIREN compte 9 chiffres, un SIRET 14 chiffres.';
+
+function normaliserMot(mot: string): string {
+  return mot.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/**
  * La saisie mérite-t-elle une requête ? `null` = oui ; sinon, la phrase à
- * afficher à la place.
+ * afficher à la place. Mêmes règles que le serveur : un code postal glissé
+ * dans la saisie ne compte pas comme un mot du nom.
  */
 function raisonDeNePasChercher(saisie: string): string | null {
   const texte = saisie.trim();
   if (texte === '') return null;
   const chiffres = seulementDesChiffres(texte);
   if (chiffres !== null) {
-    return chiffres.length === 9 || chiffres.length === 14
-      ? null
-      : 'Un SIREN compte 9 chiffres, un SIRET 14 chiffres.';
+    return chiffres.length === 9 || chiffres.length === 14 ? null : MESSAGE_NUMERO;
   }
-  return texte.length < 2 ? 'Tapez au moins 2 caractères.' : null;
+  const mots = texte
+    .split(/[\s,;'’]+/)
+    .filter((m) => m !== '' && !/^\d{5}$/.test(m))
+    .map(normaliserMot);
+  let motsVides = 0;
+  for (const mot of mots) {
+    if (MOTS_VIDES.has(mot)) {
+      motsVides += 1;
+      continue;
+    }
+    if ((mot.match(/[\p{L}\p{N}]/gu) ?? []).length >= MOT_MINIMAL) return null;
+  }
+  return motsVides > 0 ? MESSAGE_MOTS_VIDES : MESSAGE_TROP_COURT;
 }
 
 function formatSiren(siren: string | null): string | null {
@@ -136,7 +178,7 @@ export function ChoixEntreprise({ valeur, onChange, suggestion, erreur, disabled
 
   const nomSuggere = suggestion?.nom?.trim() ?? '';
   const cpSuggere = suggestion?.codePostal?.trim() ?? null;
-  const montreSuggestions = ouvert && saisie.trim() === '' && nomSuggere.length >= 2;
+  const montreSuggestions = ouvert && saisie.trim() === '' && nomSuggere !== '' && raisonDeNePasChercher(nomSuggere) === null;
 
   const suggestions = useQuery<ReponseChoix>({
     queryKey: ['crm', 'choix-entreprise', 'suggestions', nomSuggere, cpSuggere],
@@ -163,8 +205,9 @@ export function ChoixEntreprise({ valeur, onChange, suggestion, erreur, disabled
     if (empechementVisible !== null) etat = empechementVisible;
     else if (enAttente || (recherche.isFetching && recherche.data === undefined)) etat = 'Recherche en cours…';
     else if (recherche.isError) etat = messageErreur(recherche.error);
-    else if (recherche.data?.indice === 'trop_court') etat = 'Tapez au moins 3 lettres du nom de l’entreprise.';
-    else if (recherche.data?.indice === 'numero_incomplet') etat = 'Un SIREN compte 9 chiffres, un SIRET 14 chiffres.';
+    else if (recherche.data?.indice === 'trop_court') etat = MESSAGE_TROP_COURT;
+    else if (recherche.data?.indice === 'mots_vides') etat = MESSAGE_MOTS_VIDES;
+    else if (recherche.data?.indice === 'numero_incomplet') etat = MESSAGE_NUMERO;
     else if (recherche.data !== undefined && options.length === 0) {
       etat = 'Aucune entreprise trouvée. Essayez le SIREN, ou ajoutez la ville ou le code postal.';
     }

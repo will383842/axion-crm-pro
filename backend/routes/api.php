@@ -526,8 +526,11 @@ Route::prefix('v1')->group(function () {
             // (nom, ville, code postal, SIREN, SIRET) au lieu de taper son
             // identifiant interne. Plafond court : une recherche trop large
             // est annulée et l'écran demande de préciser.
+            // `throttle:60,1` (par compte) : appelé à la frappe par conception,
+            // un mot courant pouvant tenir 8 s, des rafales parallèles
+            // affameraient les autres écrans (relecture sécurité de la #287).
             Route::get('/entreprises/choix', [ChoixEntrepriseController::class, 'index'])
-                ->middleware('delai-sql:8');
+                ->middleware(['throttle:60,1', 'delai-sql:8']);
 
             // `/arbitrage/{activityId}/…` : les segments fixes précèdent, aucun
             // conflit possible avec un identifiant numérique.

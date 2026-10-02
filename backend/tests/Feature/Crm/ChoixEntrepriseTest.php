@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\DelaiRequeteSql;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -150,14 +151,87 @@ test('pas de balayage : mot trop court, article seul ou joker ne cherchent rien'
     lot13Entreprise($this->workspace->id, '900000031', 'Alpha');
     lot13Entreprise($this->workspace->id, '900000032', 'Bêta');
 
-    foreach (['', 'a', 'al', 'la', 'le de', '%', '%%%', '__'] as $saisie) {
+    foreach (['', 'a', 'al', '%', '%%%', '__'] as $saisie) {
         $this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode($saisie))->assertOk()
             ->assertJsonCount(0, 'data')
             ->assertJsonPath('indice', 'trop_court');
     }
 
+    // Que des mots vides : aucune requête, et l'écran dira « ajoutez un mot du nom ».
+    foreach (['la', 'le de', 'les', 'SARL', 'sas les', 'Société'] as $saisie) {
+        $this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode($saisie))->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('indice', 'mots_vides');
+    }
+
     // TÉMOIN : trois lettres suffisent.
     $this->getJson('/api/v1/crm/entreprises/choix?q=alp')->assertOk()->assertJsonCount(1, 'data');
+});
+
+test('MOTS VIDES : « les jardins du lac » et « SARL Martin » trouvent la fiche (relecture A09 de la #287)', function () {
+    // `normalize_name` stocke « Les Jardins du Lac » en `jardins lac` : le mot
+    // « les », normalisé seul, restait `les` et l'affinage l'exigeait dans le
+    // nom — la fiche exacte était introuvable.
+    $jardins = lot13Entreprise($this->workspace->id, '900000051', 'Les Jardins du Lac', ['postcode' => '74000', 'city_name' => 'Annecy']);
+    $martin = lot13Entreprise($this->workspace->id, '900000052', 'SARL Martin');
+    lot13Entreprise($this->workspace->id, '900000053', 'SARL Durand');
+
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('les jardins du lac'))->assertOk()))
+        ->toBe([$jardins]);
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Les Jardins'))->assertOk()))
+        ->toBe([$jardins]);
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('SARL Martin'))->assertOk()))
+        ->toBe([$martin]);
+    // « d'annecy » : l'apostrophe sépare, « d » est un mot vide, « annecy » la ville.
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode("les jardins d'annecy"))->assertOk()))
+        ->toBe([$jardins]);
+
+    // Les SUGGESTIONS de la file d'arbitrage passent le nom reçu tel quel,
+    // avec son code postal : un nom qui commence par « Les » doit sortir.
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Les Jardins du Lac') . '&code_postal=74000')->assertOk()))
+        ->toBe([$jardins]);
+});
+
+test('saisie mal formée : 422 propre, jamais 500', function () {
+    $this->getJson('/api/v1/crm/entreprises/choix?q[]=x')->assertStatus(422);
+    $this->getJson('/api/v1/crm/entreprises/choix?q=' . str_repeat('a', 201))->assertStatus(422);
+    $this->getJson('/api/v1/crm/entreprises/choix?q=martin&code_postal[]=1')->assertStatus(422);
+    $this->getJson('/api/v1/crm/entreprises/choix?q=martin&code_postal=' . str_repeat('1', 11))->assertStatus(422);
+
+    // TÉMOIN : une saisie normale passe.
+    $this->getJson('/api/v1/crm/entreprises/choix?q=martin&code_postal=69003')->assertOk();
+});
+
+test('limitation de débit : au-delà de 60 recherches par minute, 429', function () {
+    for ($i = 0; $i < 60; $i++) {
+        $this->getJson('/api/v1/crm/entreprises/choix?q=a')->assertOk();
+    }
+
+    $this->getJson('/api/v1/crm/entreprises/choix?q=a')->assertStatus(429);
+});
+
+test('le délai de 8 s est RÉELLEMENT en vigueur pendant la recherche, pas seulement déclaré', function () {
+    lot13Entreprise($this->workspace->id, '900000061', 'Délai Mesuré');
+
+    // On lit le délai sur la connexion AU MOMENT où la requête des fiches
+    // s'exécute : un ordre de middlewares inversé (le filet global de 15 s
+    // posé après) ferait lire 15000 ici.
+    $mesures = [];
+    $enLecture = false;
+    DB::listen(function ($requete) use (&$mesures, &$enLecture): void {
+        if ($enLecture || ! str_contains($requete->sql, 'from "companies"')) {
+            return;
+        }
+        $enLecture = true;
+        $mesures[] = DelaiRequeteSql::courantMs();
+        $enLecture = false;
+    });
+
+    $this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('delai mesure'))->assertOk()->assertJsonCount(1, 'data');
+    $this->getJson('/api/v1/crm/entreprises/choix?q=552100554')->assertOk();
+
+    expect($mesures)->toHaveCount(2);
+    expect($mesures)->each->toBe(8000);
 });
 
 test('une fiche supprimée n est pas proposée', function () {

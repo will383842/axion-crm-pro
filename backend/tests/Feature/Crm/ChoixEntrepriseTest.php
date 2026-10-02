@@ -151,7 +151,7 @@ test('pas de balayage : mot trop court, article seul ou joker ne cherchent rien'
     lot13Entreprise($this->workspace->id, '900000031', 'Alpha');
     lot13Entreprise($this->workspace->id, '900000032', 'Bêta');
 
-    foreach (['', 'a', 'al', '%', '%%%', '__'] as $saisie) {
+    foreach (['', 'b', 'al', '%', '%%%', '__'] as $saisie) {
         $this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode($saisie))->assertOk()
             ->assertJsonCount(0, 'data')
             ->assertJsonPath('indice', 'trop_court');

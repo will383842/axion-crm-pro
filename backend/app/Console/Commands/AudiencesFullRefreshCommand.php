@@ -37,7 +37,9 @@ class AudiencesFullRefreshCommand extends Command
 
     public function handle(AudienceBuilderService $builder): int
     {
-        $espaces = DB::table('workspaces')->orderBy('id')->pluck('id')->map(static fn ($id): string => (string) $id);
+        // Les espaces à la corbeille n'ont plus d'audience à tenir à jour.
+        $espaces = DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id')
+            ->map(static fn ($id): string => (string) $id);
         if ($ws = $this->option('workspace')) {
             $espaces = $espaces->filter(static fn (string $id): bool => $id === (string) $ws);
         }

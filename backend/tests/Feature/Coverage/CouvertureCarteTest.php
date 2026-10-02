@@ -84,7 +84,8 @@ test('la carte rend les vrais totaux par departement, Corse et outre-mer compris
     $cellules = collect($this->actingAs($user)->getJson('/api/v1/coverage?level=department')
         ->assertOk()->json('cells'))->keyBy('code');
 
-    expect($cellules->keys()->sort()->values()->all())->toBe(['2A', '2B', '38', '974'])
+    // `keyBy` fait de « 38 » une clé ENTIÈRE (PHP) : on compare en chaînes.
+    expect($cellules->keys()->map(fn ($k): string => (string) $k)->sort()->values()->all())->toBe(['2A', '2B', '38', '974'])
         ->and($cellules['38']['total'])->toBe(2)
         ->and($cellules['2A']['total'])->toBe(1)
         ->and($cellules['2B']['total'])->toBe(1)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Console\ScoresPerimes;
 use App\Crm\Taxonomy;
 use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;
@@ -92,6 +93,11 @@ class DashboardController extends ApiController
 
         return response()->json(array_merge($this->gabaritVide(), $charge, [
             'period_label' => $this->libellePeriode($r->query('period')),
+            // UNE seule valeur pour l'accueil et la carte de France (relecture
+            // A09 de #291) : deux échantillons distincts, dans deux caches,
+            // pouvaient dire « calcul en attente » ici et afficher le score
+            // là-bas. On lit le cache partagé, jamais une copie figée ici.
+            'quality_a_recalculer_pct' => ScoresPerimes::enCache($espace),
         ]));
     }
 
@@ -154,8 +160,9 @@ class DashboardController extends ApiController
      *
      * `quality_a_recalculer_pct` : sur un échantillon de 0,1 % des fiches,
      * la part dont le score stocké diffère du barème
-     * (`company_quality_score_calcul`). Mesure du 2026-10-02 : ≈ 79 % — la
-     * reprise `crm:recalculer-quality-score` n'a jamais été jouée. Tant que
+     * (`company_quality_score_calcul`). Elle n'est PAS calculée ici : `stats()`
+     * la lit dans le cache partagé `App\Crm\Console\ScoresPerimes::enCache`.
+     * Mesure du 2026-10-02 matin : ≈ 79 % ; reprise terminée le soir → 0. Tant que
      * cette part est forte, l'écran DIT « calcul en attente » au lieu d'une
      * moyenne fausse. `null` = estimation impossible (fonction absente).
      *
@@ -190,36 +197,6 @@ class DashboardController extends ApiController
             Log::warning('dashboard: qualite indisponible', ['exception' => $e->getMessage()]);
 
             return $resultat;
-        }
-
-        // Sous PostgreSQL, une requête en échec AVORTE la transaction en cours
-        // (25P02) : on vérifie que le barème existe avant de l'appeler.
-        $bareme = DB::selectOne("SELECT count(*) AS n FROM pg_proc WHERE proname = 'company_quality_score_calcul'");
-        if ((int) ($bareme->n ?? 0) === 0) {
-            return $resultat;
-        }
-
-        try {
-            $echantillon = DB::selectOne(
-                'SELECT count(*) AS n,
-                        count(*) FILTER (WHERE c.quality_score IS DISTINCT FROM company_quality_score_calcul(c)) AS ecarts
-                   FROM companies c TABLESAMPLE SYSTEM (0.1)
-                  WHERE c.workspace_id = ? AND c.deleted_at IS NULL',
-                [$espace],
-            );
-            // Trop petit échantillon (petite base) : on compare TOUT.
-            if ((int) $echantillon->n < 200) {
-                $echantillon = DB::selectOne(
-                    'SELECT count(*) AS n,
-                            count(*) FILTER (WHERE c.quality_score IS DISTINCT FROM company_quality_score_calcul(c)) AS ecarts
-                       FROM (SELECT * FROM companies WHERE workspace_id = ? AND deleted_at IS NULL LIMIT 5000) c',
-                    [$espace],
-                );
-            }
-            $n = (int) $echantillon->n;
-            $resultat['quality_a_recalculer_pct'] = $n === 0 ? 0.0 : round(100 * (int) $echantillon->ecarts / $n, 1);
-        } catch (\Throwable $e) {
-            Log::warning('dashboard: estimation des scores perimes indisponible', ['exception' => $e->getMessage()]);
         }
 
         return $resultat;

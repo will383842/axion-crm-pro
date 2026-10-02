@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Console\ScoresPerimes;
 use App\Jobs\EnrichCompanyJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\Company;
@@ -155,12 +156,12 @@ class CoverageController extends ApiController
         }
 
         // Relecture A09 de #284 : « dont N au score ≥ 50 » suit la même règle
-        // que l'accueil. La part de scores périmés vient du calcul de l'accueil
-        // (déjà en cache) ; inconnue → null, et l'écran ne montre pas le chiffre.
-        $accueil = Cache::get(DashboardController::cle((string) $workspaceId));
-        $perimes = is_array($accueil) && is_numeric($accueil['quality_a_recalculer_pct'] ?? null)
-            ? (float) $accueil['quality_a_recalculer_pct']
-            : null;
+        // que l'accueil. 🔴 2026-10-02 : la carte relisait le cache de
+        // l'ACCUEIL, absent dès que l'accueil n'avait pas été ouvert depuis
+        // 30 min → « calcul en attente » sans fin, même après la reprise
+        // complète des scores. Elle a désormais sa propre estimation, en cache
+        // court (`ScoresPerimes`) ; inconnue → null, l'écran ne montre rien.
+        $perimes = ScoresPerimes::enCache((string) $workspaceId);
 
         return $this->ok(['level' => $level, 'cells' => $cells, 'quality_a_recalculer_pct' => $perimes]);
     }

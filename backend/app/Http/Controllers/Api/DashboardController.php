@@ -66,7 +66,7 @@ class DashboardController extends ApiController
 
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v2:' . $espace;
+        return 'crm:dashboard:stats:v3:' . $espace;
     }
 
     public function stats(Request $r): JsonResponse

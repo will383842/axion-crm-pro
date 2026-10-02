@@ -2,9 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use Illuminate\Support\Facades\Cache;
-use App\Support\WorkspaceContext;
-use App\Support\DelaiRequeteSql;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
@@ -13,14 +10,17 @@ use App\Models\Company;
 use App\Services\Email\EmailConfidenceService;
 use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
+use App\Support\DelaiRequeteSql;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\TotalListe;
+use App\Support\WorkspaceContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;

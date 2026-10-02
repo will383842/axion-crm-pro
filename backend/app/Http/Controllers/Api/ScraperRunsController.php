@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Support\TotalListe;
 use App\Events\ScraperRunCancelled;
 use App\Jobs\DispatchScrapeJob;
 use App\Jobs\LaunchZoneScrapingJob;
 use App\Models\ScraperRun;
+use App\Support\TotalListe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

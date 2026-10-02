@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Support\TotalListe;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
 use App\Crm\Taxonomy;
 use App\Support\MasquageCoordonnees;
+use App\Support\TotalListe;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

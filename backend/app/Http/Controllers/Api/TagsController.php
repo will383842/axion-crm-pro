@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Support\WorkspaceContext;
-use Illuminate\Support\Facades\Cache;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Resources\TagResource;
 use App\Models\Tag;
+use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;

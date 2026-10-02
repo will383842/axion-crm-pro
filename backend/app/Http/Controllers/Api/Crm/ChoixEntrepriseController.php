@@ -155,13 +155,19 @@ class ChoixEntrepriseController extends ConsoleController
         // (SECURITY DEFINER, cloisonnée à l'espace du contexte, cf. migration
         // `2026_10_02_000050`), dans l'ordre de la #287, puis RELUS ici sous la
         // RLS — double garde.
+        // `WITH ORDINALITY … ORDER BY` : l'ordre rendu par la fonction est
+        // l'ordre affiché ; on ne s'en remet pas à l'ordre implicite du SELECT.
         $ids = array_map(
             static fn ($l): int => (int) (is_object($l) ? ($l->id ?? 0) : 0),
             DB::select(
-                'SELECT id FROM public.entreprises_choix_ids(?::uuid, ?::text[], ?::text[], ?, ?) AS t(id)',
+                'SELECT t.id FROM public.entreprises_choix_ids(?::uuid, ?::text[], ?::text[], ?, ?)'
+                . ' WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
                 [$workspaceId, self::tableauPg($entrees), self::tableauPg($filtres), $codePostal, self::PLAFOND],
             ),
         );
+        // La fonction plafonne déjà ; on ne lui fait pas confiance pour la
+        // taille de la liste affichée.
+        $ids = array_slice($ids, 0, self::PLAFOND);
 
         if ($ids === []) {
             return [];

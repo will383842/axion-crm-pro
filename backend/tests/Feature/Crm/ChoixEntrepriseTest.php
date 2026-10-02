@@ -291,6 +291,43 @@ test('le délai de 8 s est RÉELLEMENT en vigueur pendant la recherche, pas seul
     expect($mesures)->each->toBe(8000);
 });
 
+test('#292 — la recherche par nom passe par entreprises_choix_ids, jamais par un ILIKE direct sous la RLS', function () {
+    lot13Entreprise($this->workspace->id, '900000091', 'ZZ VOIE INDEXEE');
+
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes): void {
+        $requetes[] = $q->sql;
+    });
+
+    $this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('voie indexee'))->assertOk()->assertJsonCount(1, 'data');
+
+    // Sous `axion_app`, un ILIKE sur `companies` ne peut pas utiliser l'index
+    // trigrammes (prod, 2026-10-02 : 503 sur toute recherche par nom). Le
+    // contrôleur ne doit donc JAMAIS l'émettre lui-même.
+    expect(collect($requetes)->contains(fn (string $sql): bool => str_contains($sql, 'entreprises_choix_ids')))->toBeTrue();
+    $ilikeDirect = collect($requetes)->filter(
+        fn (string $sql): bool => str_contains($sql, 'from "companies"') && stripos($sql, 'ilike') !== false,
+    );
+    expect($ilikeDirect->all())->toBe([]);
+});
+
+test('#292 — au plus 10 lignes, et les noms qui portent tous les mots (passe 1) d abord', function () {
+    $complets = [];
+    foreach (['A', 'B', 'C'] as $l) {
+        $complets[] = lot13Entreprise($this->workspace->id, '90000010' . ord($l) % 10, 'ZZPAS LYON ' . $l);
+    }
+    $parVille = [];
+    for ($i = 0; $i < 12; $i++) {
+        $parVille[] = lot13Entreprise($this->workspace->id, sprintf('9000002%02d', $i), 'ZZPAS ATELIER ' . $i, ['city_name' => 'Lyon']);
+    }
+
+    $ids = lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('zzpas lyon'))->assertOk());
+
+    expect($ids)->toHaveCount(10);
+    expect(array_slice($ids, 0, 3))->toEqualCanonicalizing($complets);
+    expect(array_diff(array_slice($ids, 3), $parVille))->toBe([]);
+});
+
 test('une fiche supprimée n est pas proposée', function () {
     lot13Entreprise($this->workspace->id, '900000041', 'Fantôme Disparu', ['deleted_at' => now()]);
 

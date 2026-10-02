@@ -197,7 +197,7 @@ describe('Carte de France — aucun clic dangereux', () => {
     const { lancements, enrichissements } = await monter();
 
     await userEvent.click(screen.getByRole('button', { name: 'Régions' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'zone 84' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Auvergne-Rhône-Alpes/ }));
 
     expect(await screen.findByText(/choisissez le niveau « Départements »/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
@@ -210,6 +210,25 @@ describe('Carte de France — aucun clic dangereux', () => {
     expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
     expect(lancements).toEqual([]);
     expect(enrichissements).toEqual([]);
+  });
+
+  it('la carte reçoit toujours les départements, et un clic y désigne un département', async () => {
+    await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Régions' }));
+    await screen.findByRole('button', { name: /Auvergne-Rhône-Alpes/ });
+    // Au niveau Régions, la carte colore toujours par DÉPARTEMENT : le code
+    // 84 de la région n'y est jamais passé.
+    expect(await screen.findByRole('button', { name: 'zone 69' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 84' }));
+
+    // Le clic a sélectionné le Vaucluse (84) au niveau Départements, pas la région.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Récupérer 100 entreprises de ce département' }),
+    );
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByText('Département : Vaucluse (84)')).toBeInTheDocument();
   });
 
   it('le panneau mène à la liste des entreprises du département', async () => {

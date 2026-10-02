@@ -98,6 +98,23 @@ export function CoveragePage() {
   });
 
   const cells = useMemo(() => data?.cells ?? [], [data]);
+
+  // La carte ne dessine QUE des départements. Aux niveaux Régions et Villes,
+  // les codes des cellules (« 84 » = Auvergne-Rhône-Alpes) ne sont pas des
+  // codes de département : les lui passer colorerait la mauvaise zone (le
+  // Vaucluse). La carte reçoit donc toujours les cellules DÉPARTEMENTALES —
+  // la même requête, en cache, quand le niveau affiché est déjà celui-là.
+  const departements = useQuery({
+    queryKey: ['coverage', 'department'],
+    queryFn: async () =>
+      (await api.get<{ cells: Cell[] }>('/coverage', { params: { level: 'department' } })).data,
+    enabled: level !== 'department',
+    staleTime: 60_000,
+  });
+  const cellulesCarte = useMemo(
+    () => (level === 'department' ? cells : departements.data?.cells ?? []),
+    [level, cells, departements.data],
+  );
   const scoreVisible = scoreAffichable(data?.quality_a_recalculer_pct);
   // P0-3 — une panne n'est pas une France vide : la carte cède la place à l'erreur.
   const echec = error !== null && data === undefined;
@@ -253,7 +270,15 @@ export function CoveragePage() {
             }
           >
             {/* Un clic SÉLECTIONNE, il ne lance jamais rien (lot 4). */}
-            <FranceCoverageMap cells={cells} onZoneClick={setSelected} />
+            {/* La carte ne montre que des départements : un clic y désigne
+                TOUJOURS un département, quel que soit le niveau de la liste. */}
+            <FranceCoverageMap
+              cells={cellulesCarte}
+              onZoneClick={(code) => {
+                setLevel('department');
+                setSelected(code);
+              }}
+            />
           </Suspense>
         </div>
 

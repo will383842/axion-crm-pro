@@ -16,7 +16,9 @@ test.describe('Campaigns wizard (Sprint H4)', () => {
     await page.goto('/campaigns/new');
 
     // Étape 1 — nom de campagne
-    await expect(page.getByText(/Nouvelle collecte|Wizard/i)).toBeVisible({ timeout: 10_000 });
+    // Lot 2 UX : « Nouvelle collecte » est AUSSI le dernier segment du fil
+    // d'Ariane — on vise le titre de la page, pas un texte ambigu.
+    await expect(page.getByRole('heading', { level: 1, name: /Nouvelle collecte/i })).toBeVisible({ timeout: 10_000 });
     const nameInput = page.getByLabel(/Nom|Intitulé/i).first();
     if (await nameInput.isVisible()) {
       await nameInput.fill('E2E test campaign');

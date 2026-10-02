@@ -8,9 +8,8 @@ import fr from '@/locales/fr.json';
  * La console a un seul utilisateur, francophone. L'ancien détecteur lisait la
  * langue du navigateur : un navigateur réglé en anglais basculait l'interface
  * sur un dictionnaire anglais de quelques libellés, au milieu d'écrans écrits
- * en dur en français. Il n'y a plus ni détecteur, ni ressource anglaise
- * chargée ; `src/locales/en.json` reste sur disque pour la garde de parité du
- * dictionnaire, il n'est plus importé.
+ * en dur en français. Il n'y a plus ni détecteur, ni dictionnaire anglais :
+ * une seule langue.
  */
 i18n.use(initReactI18next).init({
   lng: 'fr',

@@ -12,6 +12,7 @@
  */
 
 use App\Models\User;
+use App\Support\TriNomMedia;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -70,10 +71,56 @@ test('medias : un nom qui commence par un signe se range a sa premiere lettre', 
     expect($inverse)->toBe(array_reverse($noms));
 });
 
-test('medias : l index du tri porte la meme expression que le tri', function () {
-    $definition = DB::table('pg_indexes')->where('indexname', 'idx_media_tri_nom')->value('indexdef');
+test('medias : accents, casse et signes de tete ignores ; chiffres en tete (avis A09)', function () {
+    // Production en locale C : `[:alnum:]` n'y connaît que l'ASCII. Retirer les
+    // signes AVANT les accents rangeait « École » à « cole » et « À la folie »
+    // à L ; et sans `lower`, « zoom » passait après « Zébra ».
+    foreach (['zoom', 'Zébra', '+ Plus Radio', 'Émissions éco', '20 Minutes', 'École des Loisirs', 'À la folie'] as $nom) {
+        triMedia($this->espace, $nom);
+    }
 
-    expect($definition)->not->toBeNull()
-        ->and($definition)->toContain('regexp_replace')
-        ->and($definition)->toContain('workspace_id');
+    $noms = collect($this->getJson('/api/v1/media?per_page=100')->assertOk()->json('data'))->pluck('name')->all();
+
+    expect($noms)->toBe([
+        '20 Minutes',
+        'À la folie',
+        'École des Loisirs',
+        'Émissions éco',
+        '+ Plus Radio',
+        'Zébra',
+        'zoom',
+    ]);
+});
+
+test('medias : la cle de tri, en SQL, ignore accents, casse et signes de tete', function () {
+    $cle = fn (string $nom): string => (string) DB::selectOne('SELECT ' . TriNomMedia::expression('?::text') . ' AS c', [$nom])->c;
+
+    expect($cle('École des Loisirs'))->toBe('ecole des loisirs')
+        ->and($cle('"ÉTHIQUE & SANTÉ"'))->toBe('ethique & sante"')
+        ->and($cle('+ Plus Radio'))->toBe('plus radio')
+        ->and($cle('20 Minutes'))->toBe('20 minutes');
+});
+
+test('medias : l index porte EXACTEMENT l expression du tri, et le planificateur s en sert', function () {
+    $reel = DB::selectOne(
+        "SELECT pg_get_indexdef(c.oid, 2, true) AS expr FROM pg_class c WHERE c.relname = 'idx_media_tri_nom'",
+    );
+    expect($reel)->not->toBeNull();
+
+    // L'attendu est DÉPARSÉ par Postgres à partir de la constante PHP : même
+    // normalisation (transtypages, parenthèses) que l'index réel.
+    DB::statement('CREATE TEMP TABLE tri_temoin (LIKE media)');
+    DB::statement('CREATE INDEX tri_temoin_idx ON tri_temoin (workspace_id, (' . TriNomMedia::expression('name') . '))');
+    $attendu = DB::selectOne(
+        "SELECT pg_get_indexdef(c.oid, 2, true) AS expr FROM pg_class c WHERE c.relname = 'tri_temoin_idx'",
+    );
+    expect($reel->expr)->toBe($attendu->expr);
+
+    DB::statement('SET LOCAL enable_seqscan = off');
+    DB::statement('SET LOCAL enable_sort = off');
+    $plan = collect(DB::select(
+        'EXPLAIN SELECT id FROM media WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY ' . TriNomMedia::expression('media.name') . ' LIMIT 100',
+        [$this->espace],
+    ))->map(fn ($l) => implode(' ', (array) $l))->implode("\n");
+    expect($plan)->toContain('idx_media_tri_nom');
 });

@@ -1,23 +1,31 @@
 <?php
 
+use App\Support\TriNomMedia;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * MÉDIAS — l'index qui sert le tri par nom « lisible » (2026-10-02).
+ * MÉDIAS — la clé et l'index du tri par nom « lisible » (2026-10-02).
  *
- * La liste des médias est triée par défaut sur le nom SANS ses signes de tête
- * (`App\Support\TriNomMedia::EXPRESSION`) : « + Plus » se range à P, plus en
- * tête de liste. Cet index porte EXACTEMENT cette expression, précédée de
- * l'espace de travail (toute lecture de `MediaController` filtre dessus) ;
- * la liste paginée (100 lignes) se lit alors dans l'ordre de l'index au lieu
- * de trier toute la table.
+ * `cle_tri_nom(texte)` : sans accents, sans signes de tête, en minuscules
+ * (détail et raisons dans `App\Support\TriNomMedia`). La fonction est déclarée
+ * IMMUTABLE pour être indexable — `unaccent` ne l'est pas à cause de son
+ * dictionnaire configurable ; on lui passe donc le dictionnaire EXPLICITEMENT
+ * (`public.unaccent`), comme le fait déjà `normalize_name`. Tout est qualifié
+ * et le `search_path` est fixé : une restauration par `pg_dump` (search_path
+ * vide) la résout (cf. `2026_08_16_200000_fixer_search_path_des_fonctions`).
  *
- * Coût : un index seul, aucune réécriture de table (≈ 56 000 lignes).
- * `CONCURRENTLY`, hors transaction : aucune écriture bloquée. Un index laissé
- * INVALIDE par une construction interrompue est retiré puis reconstruit
- * (patron de `2026_10_01_000041`). Nom vérifié libre le 2026-10-02.
+ * L'index `idx_media_tri_nom` est construit depuis `TriNomMedia::expression()`,
+ * la même source que l'ORDER BY, précédé de l'espace de travail (toute lecture
+ * de `MediaController` filtre dessus). La page de 100 lignes se lit alors dans
+ * l'ordre de l'index au lieu de trier la table.
+ *
+ * Coût : une fonction et un index, aucune réécriture de table (≈ 56 000
+ * lignes). `CONCURRENTLY`, hors transaction : aucune écriture bloquée. Un index
+ * laissé INVALIDE par une construction interrompue est retiré puis reconstruit
+ * (patron de `2026_10_01_000024` / `2026_10_01_000041`). Noms vérifiés libres
+ * le 2026-10-02.
  */
 return new class extends Migration
 {
@@ -25,13 +33,25 @@ return new class extends Migration
 
     public const NOM = 'idx_media_tri_nom';
 
-    public const DEFINITION = "media (workspace_id, (regexp_replace(name, '^[^[:alnum:]]+', ''))) WHERE deleted_at IS NULL";
-
     public function up(): void
     {
         if (! Schema::hasTable('media')) {
             return;
         }
+
+        DB::statement(<<<'SQL'
+            CREATE OR REPLACE FUNCTION public.cle_tri_nom(input TEXT) RETURNS TEXT
+            LANGUAGE sql IMMUTABLE PARALLEL SAFE
+            SET search_path = public, pg_catalog
+            AS $$
+              SELECT lower(regexp_replace(
+                public.unaccent('public.unaccent'::regdictionary, coalesce(input, '')),
+                '^[^[:alnum:]]+', ''
+              ))
+            $$
+        SQL);
+
+        $definition = 'media (workspace_id, (' . TriNomMedia::expression('name') . ')) WHERE deleted_at IS NULL';
 
         DB::statement("SET lock_timeout = '30s'");
         try {
@@ -42,7 +62,7 @@ return new class extends Migration
             if ($invalide !== null && (bool) $invalide->invalide) {
                 DB::statement('DROP INDEX CONCURRENTLY IF EXISTS ' . self::NOM);
             }
-            DB::statement('CREATE INDEX CONCURRENTLY IF NOT EXISTS ' . self::NOM . ' ON ' . self::DEFINITION);
+            DB::statement('CREATE INDEX CONCURRENTLY IF NOT EXISTS ' . self::NOM . ' ON ' . $definition);
         } finally {
             DB::statement('RESET lock_timeout');
         }
@@ -56,5 +76,6 @@ return new class extends Migration
         } finally {
             DB::statement('RESET lock_timeout');
         }
+        DB::statement('DROP FUNCTION IF EXISTS public.cle_tri_nom(TEXT)');
     }
 };

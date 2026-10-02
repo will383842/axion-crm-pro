@@ -390,6 +390,14 @@ function OngletOrganisateurs() {
           <p className="mb-3 text-sm text-slate-600">
             {total} organisateur{total > 1 ? "s" : ""}
           </p>
+          {rows.length === 0 ? (
+            // Finitions P2 — l'état vide est un bloc `EmptyState`, comme partout.
+            <EmptyState
+              icon={<CalendarDays />}
+              title="Aucun organisateur"
+              description="Aucun organisateur pour cette nature."
+            />
+          ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs text-slate-500 uppercase">
@@ -434,16 +442,10 @@ function OngletOrganisateurs() {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                      Aucun organisateur pour cette nature.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
+          )}
           <Pagination page={page} total={total} onPage={setPage} />
         </>
       )}

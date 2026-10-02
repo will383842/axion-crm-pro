@@ -52,10 +52,9 @@ describe('Mode clair forcé — aucun sélecteur nulle part', () => {
     expect(lire('components/layout/Header.tsx')).not.toContain('dark-mode');
   });
 
-  it('la visite guidée n’a plus d’étape « mode clair/sombre »', () => {
-    const visite = lire('components/OnboardingTour.tsx');
-    expect(visite).not.toContain('data-tour="dark-mode"');
-    expect(visite).not.toMatch(/sombre/i);
+  it('la visite guidée n’existe plus (elle avait une étape « mode clair/sombre »)', () => {
+    expect(existsSync(path.join(SRC, 'components/OnboardingTour.tsx'))).toBe(false);
+    expect(lire('app/RootLayout.tsx')).not.toContain('OnboardingTour');
   });
 
   it('les Paramètres ne proposent plus de thème : onglet « Affichage », densité seule', async () => {

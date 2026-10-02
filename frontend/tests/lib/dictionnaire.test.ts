@@ -97,21 +97,13 @@ describe('D29-003 — dictionnaire de traduction', () => {
         'produit est traduit alors qu’il écrit ses libellés en dur — c’était le ' +
         'cas des sept libellés de navigation, face à une `Sidebar.tsx` entièrement ' +
         'en dur. GESTE : soit brancher réellement le libellé sur `t()`, soit ' +
-        'retirer la clé de `src/locales/fr.json` ET `en.json`. Pas la moitié des ' +
-        'deux.',
+        'retirer la clé de `src/locales/fr.json`.',
     ).toBe(0);
   });
 
-  it('garde la parité exacte entre fr et en', () => {
-    const fr = aplatir(lireDictionnaire('fr')).sort();
-    const en = aplatir(lireDictionnaire('en')).sort();
-
-    expect(
-      en,
-      'D29-003 : les deux dictionnaires ont divergé. Une clé présente d’un seul ' +
-        'côté se rend comme la clé BRUTE dans l’autre langue (« common.error » à ' +
-        'l’écran). GESTE : ajouter ou retirer la clé des DEUX fichiers de ' +
-        '`src/locales/`.',
-    ).toEqual(fr);
+  // Finitions P2 (2026-10-02) — la console n'a plus qu'UNE langue : la règle
+  // de parité fr/en est retirée avec `en.json`. On garde que ce soit vrai.
+  it('ne porte qu’un dictionnaire, le français', () => {
+    expect(readdirSync(path.join(dossierSrc, 'locales'))).toEqual(['fr.json']);
   });
 });

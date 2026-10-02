@@ -58,12 +58,6 @@ if (!rootEl) throw new Error('Missing #root element');
 // À réactiver Sprint 19 quand on aura ajouté une vraie protection abort dans FranceCoverageMap.
 const strictModeEnv = import.meta.env['VITE_STRICT_MODE'];
 const Wrapper = strictModeEnv === 'true' ? StrictMode : Fragment;
-// (directives `eslint-disable no-console` retirées : la règle n'est pas activée,
-// ESLint les signalait comme inutilisées — commentaires uniquement, aucun effet
-// sur le code exécuté.)
-console.log('[Boot] VITE_STRICT_MODE=', strictModeEnv, '→ wrapper=', Wrapper === StrictMode ? 'StrictMode' : 'Fragment');
-console.log('[Boot] MODE=', import.meta.env.MODE, 'PROD=', import.meta.env.PROD, 'DEV=', import.meta.env.DEV);
-
 createRoot(rootEl).render(
   <Wrapper>
     <AppRoot router={router} queryClient={queryClient} />

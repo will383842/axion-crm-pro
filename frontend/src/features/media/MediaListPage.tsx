@@ -1,3 +1,4 @@
+import { Newspaper } from 'lucide-react';
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -48,16 +49,16 @@ interface MediaResponse {
 
 export const MEDIA_TYPE_OPTIONS = [
   { value: "", label: "Tous types" },
-  { value: "presse_journal", label: "📰 Journal" },
-  { value: "presse_revue", label: "📓 Revue / périodique" },
-  { value: "presse_autre", label: "🗞️ Autre presse" },
-  { value: "radio", label: "📻 Radio" },
-  { value: "tv", label: "📺 Télévision" },
-  { value: "tv_emission", label: "🎬 Émission TV" },
-  { value: "agence_presse", label: "🛰️ Agence de presse" },
-  { value: "portail_web", label: "🌐 Portail / site info" },
-  { value: "blog", label: "✍️ Blog" },
-  { value: "production_audiovisuelle", label: "🎥 Production audiovisuelle" },
+  { value: "presse_journal", label: "Journal" },
+  { value: "presse_revue", label: "Revue / périodique" },
+  { value: "presse_autre", label: "Autre presse" },
+  { value: "radio", label: "Radio" },
+  { value: "tv", label: "Télévision" },
+  { value: "tv_emission", label: "Émission de télévision" },
+  { value: "agence_presse", label: "Agence de presse" },
+  { value: "portail_web", label: "Portail / site d’information" },
+  { value: "blog", label: "Blog" },
+  { value: "production_audiovisuelle", label: "Production audiovisuelle" },
 ];
 
 const PERIODICITY_OPTIONS = [
@@ -82,8 +83,8 @@ const SITE_OPTIONS = [
 // médias et s'affichaient en premier. Elles restent accessibles ici.
 export const FAMILLE_PAR_DEFAUT = "editorial";
 const FAMILY_OPTIONS = [
-  { value: "editorial", label: "📝 Médias" },
-  { value: "audiovisual_production", label: "🎥 Sociétés de production" },
+  { value: "editorial", label: "Médias" },
+  { value: "audiovisual_production", label: "Sociétés de production" },
   { value: "tous", label: "Médias et sociétés de production" },
 ];
 
@@ -244,7 +245,7 @@ export function MediaListPage() {
     filter.email_confidence;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Médias"
         subtitle={
@@ -327,7 +328,7 @@ export function MediaListPage() {
         <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
       ) : rows.length === 0 ? (
         <EmptyState
-          icon="📰"
+          icon={<Newspaper />}
           title="Aucun média"
           description={
             hasActiveFilter

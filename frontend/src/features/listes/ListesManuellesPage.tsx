@@ -49,7 +49,7 @@ export function ListesManuellesPage() {
   const lignes = listes.data ?? [];
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Listes"
         subtitle="Des fiches choisies à la main, sous un nom — pour viser (ou exclure) exactement ces organisations et ces personnes dans une audience."

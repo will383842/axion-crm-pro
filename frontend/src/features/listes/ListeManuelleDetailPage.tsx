@@ -99,7 +99,7 @@ export function ListeManuelleDetailPage() {
 
   if (!lisible) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState title="Adresse de liste invalide" description="Le lien est probablement tronqué." />
       </div>
     );
@@ -113,7 +113,7 @@ export function ListeManuelleDetailPage() {
   }
   if (liste.error !== null || liste.data === undefined) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <QueryErrorState error={liste.error} contexte="cette liste" onRetry={() => void liste.refetch()} />
       </div>
     );
@@ -134,7 +134,7 @@ export function ListeManuelleDetailPage() {
   };
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         breadcrumbs={[{ label: 'Listes', to: '/listes' }, { label: l.nom }]}
         title={l.nom}

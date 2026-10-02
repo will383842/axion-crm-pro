@@ -1,3 +1,4 @@
+import { Map as MapIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardEyebrow, EmptyState, QueryErrorState, cn } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -52,7 +53,7 @@ export function TopDeptsCard() {
         <EmptyState
           title="Aucun département couvert"
           description="Aucune zone couverte pour l’instant."
-          icon="🗺️"
+          icon={<MapIcon />}
         />
       ) : (
         <ul className="space-y-2">

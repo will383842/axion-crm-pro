@@ -159,7 +159,7 @@ export function CampaignsListPage() {
   }));
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Collectes"
         subtitle="Vos collectes d’entreprises."

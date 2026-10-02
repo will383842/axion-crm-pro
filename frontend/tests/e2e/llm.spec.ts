@@ -79,16 +79,20 @@ test.describe('Phase 2 pages (stubs)', () => {
   // comportement retire volontairement. On verifie desormais la redirection —
   // et on la verifie sur l'URL D'ARRIVEE, pas sur l'absence d'un texte : un
   // `toHaveCount(0)` passerait aussi bien sur une page blanche ou une erreur.
-  test('/cold-email mene a l ecran « pas encore livre », lot L7', async ({ page }) => {
+  // Finitions P2 (2026-10-02) — l'ecran « pas encore livre » ne parle plus du
+  // chantier : il renvoie au tableau de bord avec un message court.
+  test('/cold-email renvoie au tableau de bord avec « Cette fonction n existe pas encore »', async ({ page }) => {
     await page.goto('/cold-email');
-    await expect(page).toHaveURL(/pas-encore-livre/);
-    await expect(page).toHaveURL(/lot=L7/);
+    await expect(page.getByText('Cette fonction n’existe pas encore.')).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
   });
 
-  test('/linkedin mene a l ecran « pas encore livre », lot L7', async ({ page }) => {
+  // Finitions P2 (2026-10-02) — l'ecran « pas encore livre » ne parle plus du
+  // chantier : il renvoie au tableau de bord avec un message court.
+  test('/linkedin renvoie au tableau de bord avec « Cette fonction n existe pas encore »', async ({ page }) => {
     await page.goto('/linkedin');
-    await expect(page).toHaveURL(/pas-encore-livre/);
-    await expect(page).toHaveURL(/lot=L7/);
+    await expect(page.getByText('Cette fonction n’existe pas encore.')).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test('/crm mene desormais a /contacts, et non plus au 404 hors gabarit', async ({ page }) => {

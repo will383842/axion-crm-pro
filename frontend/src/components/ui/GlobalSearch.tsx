@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { usePiegeFocus } from './useFocusTrap';
+import { Search as IconeRecherche } from 'lucide-react';
+import { libelleRaccourciRecherche } from '@/lib/raccourci';
 
 interface SearchResults {
   companies: { id: number; siren: string; denomination?: string|null }[];
@@ -16,6 +18,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
+  const raccourci = libelleRaccourciRecherche();
 
   // Keyboard shortcut Cmd+K / Ctrl+K
   useEffect(() => {
@@ -89,9 +92,9 @@ export function GlobalSearch() {
         className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-500 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800"
         aria-label="Recherche globale"
       >
-        <span>🔍</span>
+        <IconeRecherche className="h-4 w-4" aria-hidden />
         <span>Rechercher</span>
-        <kbd className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 dark:bg-slate-700">⌘K</kbd>
+        <kbd className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600 dark:bg-slate-700">{raccourci}</kbd>
       </button>
     );
   }
@@ -108,7 +111,7 @@ export function GlobalSearch() {
       <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl dark:bg-slate-800" onClick={(e) => e.stopPropagation()}>
         <Command className="rounded-xl" shouldFilter={false}>
           <div className="flex items-center border-b border-slate-200 px-4 dark:border-slate-700">
-            <span className="mr-2 text-slate-400">🔍</span>
+            <IconeRecherche className="mr-2 h-4 w-4 text-slate-400" aria-hidden />
             <Command.Input
               autoFocus
               value={search}
@@ -116,7 +119,7 @@ export function GlobalSearch() {
               placeholder="Rechercher une entreprise, un contact, une étiquette…"
               className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-slate-400"
             />
-            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700">Esc</kbd>
+            <kbd className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700">Échap</kbd>
           </div>
 
           <Command.List className="max-h-96 overflow-y-auto p-2">
@@ -181,7 +184,7 @@ export function GlobalSearch() {
           </Command.List>
 
           <div className="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-slate-700">
-            <span>⌘K pour ouvrir / fermer</span>
+            <span>{raccourci} pour ouvrir / fermer</span>
             <span>↑↓ naviguer · ↵ ouvrir</span>
           </div>
         </Command>

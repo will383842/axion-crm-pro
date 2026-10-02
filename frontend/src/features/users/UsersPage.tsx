@@ -256,7 +256,7 @@ export function UsersPage() {
   const echec = error !== null && data === undefined;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Utilisateurs"
         subtitle="Qui a accès à votre CRM, et avec quels droits."

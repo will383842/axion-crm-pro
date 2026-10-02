@@ -260,7 +260,7 @@ export function CampaignWizardPage() {
   }
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Nouvelle collecte"
         subtitle="Quatre étapes : nom, zones, sources, limites."

@@ -215,10 +215,9 @@ export async function renderScreen(
     queryClient = createTestQueryClient(),
   } = options;
 
-  // ⚠️ `LanguageDetector` lit `navigator.language`, que jsdom fixe à `en-US` :
-  // sans cette ligne, les écrans se rendent en ANGLAIS et tous les libellés
-  // attendus sont faux — un rouge qui n'a rien à voir avec l'écran. Le produit
-  // est français (fr = `fallbackLng`), on épingle donc le français.
+  // La langue est FIXÉE à `fr` dans `src/lib/i18n.ts` (plus de détecteur
+  // depuis les finitions P2). Cette ligne reste un filet : un test qui
+  // changerait la langue ne doit pas contaminer le suivant.
   if (i18n.language !== 'fr') await i18n.changeLanguage('fr');
 
   if (handlers.length > 0) server.use(...handlers);

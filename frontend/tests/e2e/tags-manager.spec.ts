@@ -22,6 +22,6 @@ test.describe('Tags manager (Sprint H4)', () => {
 
     await expect(page).toHaveURL(/\/tags/);
     // Au minimum un tag rendu (smoke = page se charge + affiche au moins une catégorie)
-    await expect(page.getByText(/sect|géo|custom/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/sect|géo|custom|personnalis/i).first()).toBeVisible({ timeout: 10_000 });
   });
 });

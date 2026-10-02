@@ -1,3 +1,4 @@
+import { Building2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
@@ -117,9 +118,9 @@ export function DashboardPage() {
   const miseAJour = fraicheur(data?.computed_at);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
-        eyebrow={firstName ? `Bonjour ${firstName} 👋` : 'Bienvenue'}
+        eyebrow={firstName ? `Bonjour ${firstName}` : 'Bienvenue'}
         title="Tableau de bord"
         subtitle={miseAJour === null ? "Vue d'ensemble de votre base" : `Vue d'ensemble de votre base · ${miseAJour}`}
         actions={
@@ -147,7 +148,7 @@ export function DashboardPage() {
           <EmptyState
             title="Votre base est vide"
             description="Aucune entreprise pour l’instant. Choisissez un département sur la carte de France pour en récupérer."
-            icon="🚀"
+            icon={<Building2 />}
             action={
               <Link
                 to="/coverage"

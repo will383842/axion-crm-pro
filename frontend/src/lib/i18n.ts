@@ -1,20 +1,24 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 import fr from '@/locales/fr.json';
-import en from '@/locales/en.json';
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources: {
-      fr: { translation: fr },
-      en: { translation: en },
-    },
-    fallbackLng: 'fr',
-    interpolation: { escapeValue: false },
-    detection: { order: ['localStorage', 'navigator'], caches: ['localStorage'] },
-  });
+/**
+ * Langue FIXÉE au français (finitions P2, audit UX du 2026-10-02).
+ *
+ * La console a un seul utilisateur, francophone. L'ancien détecteur lisait la
+ * langue du navigateur : un navigateur réglé en anglais basculait l'interface
+ * sur un dictionnaire anglais de quelques libellés, au milieu d'écrans écrits
+ * en dur en français. Il n'y a plus ni détecteur, ni dictionnaire anglais :
+ * une seule langue.
+ */
+i18n.use(initReactI18next).init({
+  lng: 'fr',
+  fallbackLng: 'fr',
+  supportedLngs: ['fr'],
+  resources: {
+    fr: { translation: fr },
+  },
+  interpolation: { escapeValue: false },
+});
 
 export default i18n;

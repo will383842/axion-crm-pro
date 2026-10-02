@@ -140,7 +140,7 @@ export function ContactsListPage() {
   const hasFilter = Boolean(emailStatus || country || prospection || joignabilite || search);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Contacts"
         subtitle={

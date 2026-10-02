@@ -104,7 +104,7 @@ export function AudiencesListPage() {
   });
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Audiences"
         subtitle="Segments dynamiques d'entreprises et contacts, prêts pour campagne email."

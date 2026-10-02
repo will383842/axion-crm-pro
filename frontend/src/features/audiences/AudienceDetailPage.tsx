@@ -167,7 +167,7 @@ export function AudienceDetailPage() {
 
   if (!idLisible) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState
           title="Adresse d’audience invalide"
           description={`L’adresse ne contient pas d’identifiant d’audience lisible (« ${String(audienceId ?? '')} »). Le lien est probablement tronqué.`}
@@ -178,7 +178,7 @@ export function AudienceDetailPage() {
   }
   if (echecLecture) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <QueryErrorState error={error} contexte="cette audience" onRetry={() => void refetch()} />
       </div>
     );
@@ -188,14 +188,14 @@ export function AudienceDetailPage() {
   }
   if (!audience) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ReponseVideState contexte="cette audience" onRetry={() => void refetch()} />
       </div>
     );
   }
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         breadcrumbs={[
           { label: 'Audiences', to: '/audiences' },

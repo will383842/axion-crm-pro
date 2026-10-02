@@ -156,7 +156,7 @@ export function RgpdRequestsPage() {
   }, [list.data, typeFilter]);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Demandes RGPD"
         subtitle="Articles 15-22 : accès / portabilité / suppression / rectification / opposition."

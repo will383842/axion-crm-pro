@@ -12,6 +12,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { CalendarDays } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 
@@ -90,6 +92,16 @@ function Select(props: {
 }
 
 function TableEvenements({ rows }: { rows: EvenementResume[] }) {
+  // Finitions P2 — l'état vide est un bloc `EmptyState`, comme partout.
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        icon={<CalendarDays />}
+        title="Aucun événement"
+        description="Aucun événement ne correspond à ces filtres."
+      />
+    );
+  }
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="min-w-full text-sm">
@@ -165,13 +177,6 @@ function TableEvenements({ rows }: { rows: EvenementResume[] }) {
               </td>
             </tr>
           ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
-                Aucun événement pour ces filtres.
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>
@@ -385,6 +390,14 @@ function OngletOrganisateurs() {
           <p className="mb-3 text-sm text-slate-600">
             {total} organisateur{total > 1 ? "s" : ""}
           </p>
+          {rows.length === 0 ? (
+            // Finitions P2 — l'état vide est un bloc `EmptyState`, comme partout.
+            <EmptyState
+              icon={<CalendarDays />}
+              title="Aucun organisateur"
+              description="Aucun organisateur pour cette nature."
+            />
+          ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs text-slate-500 uppercase">
@@ -429,16 +442,10 @@ function OngletOrganisateurs() {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                      Aucun organisateur pour cette nature.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
+          )}
           <Pagination page={page} total={total} onPage={setPage} />
         </>
       )}
@@ -456,7 +463,7 @@ export function EvenementsPage() {
   const [onglet, setOnglet] = useState<Onglet>("evenements");
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Événements"
         subtitle="Salons, clubs d'affaires, ateliers CCI : où aller, qui contacter pour proposer une intervention, qui relancer."

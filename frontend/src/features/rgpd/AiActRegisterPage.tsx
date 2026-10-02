@@ -78,7 +78,7 @@ export function AiActRegisterPage() {
   }, [rows]);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Registre de l’IA"
         subtitle="Conformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés."

@@ -167,7 +167,7 @@ function ContactsHubContent() {
   const echecCompteurs = counts.error !== null && counts.data === undefined;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Contacts"
         subtitle={`${tab === 'tous' ? 'Tous les types' : RELATION_TYPE_LABELS[tab]} — ${temperatureLabel}`}

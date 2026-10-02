@@ -1,3 +1,4 @@
+import { AlertTriangle, Send } from 'lucide-react';
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -61,7 +62,7 @@ export function EnvoisPressePage() {
   const naturesFiltrables = KINDS.filter((k) => k.value.startsWith("press_"));
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Communiqués envoyés"
         subtitle="Ce qui est parti à la presse, à qui, et quand — envois, relances, réponses et retombées."
@@ -95,13 +96,13 @@ export function EnvoisPressePage() {
         </div>
       ) : isError ? (
         <EmptyState
-          icon="⚠️"
+          icon={<AlertTriangle />}
           title="Registre indisponible"
           description="Le registre des envois n'a pas pu être chargé."
         />
       ) : !data || data.data.length === 0 ? (
         <EmptyState
-          icon="📨"
+          icon={<Send />}
           title="Aucun envoi consigné"
           description="Les envois se consignent depuis la fiche d'une rédaction ou d'un journaliste. Ils apparaîtront ici."
         />

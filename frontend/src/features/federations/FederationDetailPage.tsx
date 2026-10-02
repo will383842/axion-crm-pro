@@ -182,14 +182,14 @@ export function FederationDetailPage() {
     },
   });
 
-  if (isLoading) return <p className="px-6 py-6 text-sm text-slate-500">Chargement…</p>;
-  if (isError || !f) return <p className="px-6 py-6 text-sm text-red-600">Organisme introuvable.</p>;
+  if (isLoading) return <p className="text-sm text-slate-500">Chargement…</p>;
+  if (isError || !f) return <p className="text-sm text-red-600">Organisme introuvable.</p>;
 
   // La racine d'abord : « FFB › FFB Auvergne-Rhône-Alpes › (cette fiche) ».
   const chaine = [...f.ascendants].reverse();
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <p className="mb-2 text-sm">
         <Link to="/federations" className="text-sky-700 hover:underline">
           ← Toutes les fédérations

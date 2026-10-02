@@ -12,6 +12,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { Landmark } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pastille } from "@/features/evenements/Pastille";
 import { api } from "@/lib/api";
@@ -143,7 +145,7 @@ export function FederationsPage() {
   const pages = Math.max(1, Math.ceil(total / PAR_PAGE));
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Fédérations et ordres"
         subtitle="Fédérations, ordres, chambres, syndicats, associations de métiers : qui représente qui, où, et où en est le partenariat."
@@ -226,6 +228,14 @@ export function FederationsPage() {
           <p className="mb-3 text-sm text-slate-600">
             {total} organisme{total > 1 ? "s" : ""}
           </p>
+          {rows.length === 0 ? (
+            // Finitions P2 — l'état vide est un bloc `EmptyState`, comme partout.
+            <EmptyState
+              icon={<Landmark />}
+              title="Aucun organisme"
+              description="Aucun organisme ne correspond à ces filtres."
+            />
+          ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs text-slate-500 uppercase">
@@ -296,16 +306,10 @@ export function FederationsPage() {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="px-3 py-6 text-center text-slate-500">
-                      Aucun organisme pour ces filtres.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
+          )}
           <div className="mt-4 flex items-center gap-2">
             <button
               type="button"

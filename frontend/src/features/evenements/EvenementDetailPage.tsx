@@ -131,12 +131,12 @@ export function EvenementDetailPage() {
     },
   });
 
-  if (isLoading) return <p className="px-6 py-6 text-sm text-slate-500">Chargement…</p>;
+  if (isLoading) return <p className="text-sm text-slate-500">Chargement…</p>;
   if (isError || !e)
-    return <p className="px-6 py-6 text-sm text-red-600">Événement introuvable.</p>;
+    return <p className="text-sm text-red-600">Événement introuvable.</p>;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <p className="mb-2 text-sm">
         <Link to="/evenements" className="text-sky-700 hover:underline">
           ← Tous les événements

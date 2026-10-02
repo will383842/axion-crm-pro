@@ -157,7 +157,7 @@ export function CampaignDetailPage() {
 
   if (!idLisible) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState
           title="Adresse de collecte invalide"
           description={`L’adresse ne contient pas d’identifiant de collecte lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
@@ -168,7 +168,7 @@ export function CampaignDetailPage() {
   }
   if (echecLecture) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <QueryErrorState error={error} contexte="cette collecte" onRetry={() => void refetch()} />
       </div>
     );
@@ -180,7 +180,7 @@ export function CampaignDetailPage() {
   }
   if (!campaign) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ReponseVideState contexte="cette collecte" onRetry={() => void refetch()} />
       </div>
     );
@@ -204,7 +204,7 @@ export function CampaignDetailPage() {
     : campaign.remaining_minutes;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         breadcrumbs={[
           { label: 'Collectes', to: '/campaigns' },

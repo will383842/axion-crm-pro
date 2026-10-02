@@ -106,8 +106,8 @@ export const JOIGNABILITE_OPTIONS: OptionReferentiel[] = optionsReferentiel(JOIG
  */
 export const ELIGIBILITE_OPTIONS: OptionReferentiel[] = [
   { value: '', label: 'Prêtes ou non' },
-  { value: '1', label: '✅ Prêtes pour une campagne' },
-  { value: '0', label: '⏳ Reste à enrichir' },
+  { value: '1', label: 'Prêtes pour une campagne' },
+  { value: '0', label: 'Reste à enrichir' },
 ];
 
 /**

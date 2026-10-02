@@ -381,7 +381,7 @@ export function ScraperRunsPage() {
   ];
 
   return (
-    <div className="px-6 py-6" data-testid="scraper-runs-page">
+    <div data-testid="scraper-runs-page">
       <PageHeader
         title="Historique des collectes"
         subtitle="Chaque passage de collecte, en direct : en cours, terminés, en échec."
@@ -532,7 +532,7 @@ export function ScraperRunsPage() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage <= 1}
                 >
-                  ◀ Précédent
+                  ‹ Précédent
                 </Button>
                 <Button
                   variant="ghost"
@@ -540,7 +540,7 @@ export function ScraperRunsPage() {
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage >= totalPages}
                 >
-                  Suivant ▶
+                  Suivant ›
                 </Button>
               </div>
             </div>

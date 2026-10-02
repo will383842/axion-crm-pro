@@ -125,7 +125,7 @@ function PersonnesContent() {
     setFiltres((f) => ({ ...f, [cle]: e.target.value }));
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Newsletter et guide"
         subtitle="Abonnés à la newsletter et demandeurs du guide, sans entreprise. Ils rejoignent le hub de contacts une fois rattachés."

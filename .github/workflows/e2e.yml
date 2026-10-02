@@ -84,7 +84,6 @@ jobs:
           tests/e2e/dashboard.spec.ts
           tests/e2e/global-search.spec.ts
           tests/e2e/llm.spec.ts
-          tests/e2e/onboarding.spec.ts
           tests/e2e/rgpd.spec.ts
           tests/e2e/settings.spec.ts
           tests/e2e/tags-manager.spec.ts

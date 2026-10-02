@@ -120,7 +120,7 @@ function CandidatesContent() {
   const echec = echecListe || echecCompteurs;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Candidats"
         subtitle="Univers étanche — base légale et durées de conservation distinctes de la base commerciale."

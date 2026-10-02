@@ -336,7 +336,7 @@ export function AudienceBuilderPage() {
   const canCreate = watchedName.trim().length > 0 && aDesCriteres;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Nouvelle audience"
         subtitle="Le nombre de fiches se met à jour à chaque choix."

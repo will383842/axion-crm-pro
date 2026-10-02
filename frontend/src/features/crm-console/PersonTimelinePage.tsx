@@ -36,7 +36,7 @@ function PersonTimelineContent() {
 
   if (timeline.isLoading) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ConsoleListSkeleton rows={6} />
       </div>
     );
@@ -46,14 +46,14 @@ function PersonTimelineContent() {
   // P0-3 — une panne n'est pas une fiche introuvable : seul un 404 l'est.
   if (data === undefined && timeline.error !== null && qualifierErreur(timeline.error).nature !== 'introuvable') {
     return (
-      <div className="px-6 py-6">
+      <div>
         <QueryErrorState error={timeline.error} contexte="l’historique de cette personne" onRetry={() => void timeline.refetch()} />
       </div>
     );
   }
   if (data === undefined) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState title="Fiche introuvable" description="Cette personne n’existe dans aucun univers accessible." />
       </div>
     );
@@ -66,7 +66,7 @@ function PersonTimelineContent() {
       : [identity.first_name, identity.last_name].filter(Boolean).join(' ') || 'Personne';
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader title={displayName} subtitle="Tout ce qui concerne cette personne." />
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">

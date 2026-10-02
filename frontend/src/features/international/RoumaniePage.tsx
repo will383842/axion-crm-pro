@@ -107,7 +107,7 @@ export function RoumaniePage() {
   const total = data?.meta?.total ?? rows.length;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Entreprises en Roumanie"
         subtitle="Entreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor."

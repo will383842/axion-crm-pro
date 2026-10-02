@@ -129,7 +129,7 @@ export function CompanyDetailPage() {
   const addressLine = [c.address, c.postcode, c.city].filter(Boolean).join(', ') || '—';
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <Breadcrumbs
         items={[
           { label: 'Entreprises', to: '/companies' },

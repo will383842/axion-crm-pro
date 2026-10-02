@@ -89,7 +89,7 @@ export function AuditLogsPage() {
   }, [list.data, severityFilter, search]);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Journal des actions"
         subtitle="Qui a fait quoi, et quand. Rien ne peut y être effacé."

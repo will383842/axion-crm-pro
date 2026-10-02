@@ -15,7 +15,7 @@ export interface PageShellProps {
  */
 export function PageShell({ title, subtitle, actions, children }: PageShellProps) {
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader title={title} subtitle={subtitle} actions={actions} gradient={false} />
       <section>{children}</section>
     </div>

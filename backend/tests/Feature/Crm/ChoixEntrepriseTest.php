@@ -239,6 +239,16 @@ test('les listes de mots du serveur et de l écran sont IDENTIQUES', function ()
     }
 });
 
+test('TRI : un nom qui contient TOUS les mots tapés passe devant un mot accepté par la ville (« Air France »)', function () {
+    // Sans ce critère, « air clim » (plus court) passait devant « air france » :
+    // « france » était accepté par la ville de Fort-de-France.
+    $clim = lot13Entreprise($this->workspace->id, '900000081', 'AIR CLIM', ['postcode' => '97200', 'city_name' => 'Fort-de-France']);
+    $airFrance = lot13Entreprise($this->workspace->id, '420495178', 'AIR FRANCE');
+
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Air France'))->assertOk()))
+        ->toBe([$airFrance, $clim]);
+});
+
 test('saisie mal formée : 422 propre, jamais 500', function () {
     $this->getJson('/api/v1/crm/entreprises/choix?q[]=x')->assertStatus(422);
     $this->getJson('/api/v1/crm/entreprises/choix?q=' . str_repeat('a', 201))->assertStatus(422);

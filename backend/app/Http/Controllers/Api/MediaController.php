@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Presse\SiteMedia;
 use App\Models\Media;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
+use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -39,7 +42,13 @@ class MediaController extends ApiController
             $page = $this->buildFilteredQuery()
                 ->allowedSorts(...['name', 'enriched_at', 'created_at', 'media_type'])
                 ->defaultSort('name')
+                // Lot 3 — le marqueur `site_media` de la fiche liée : la liste ne
+                // montre plus que des sites VÉRIFIÉS (cf. `avecSiteVerifie`).
+                ->select('media.*')
+                ->selectRaw("(SELECT c.metadata -> '" . SiteMedia::CLE . "' FROM companies c WHERE c.id = media.company_id) AS site_media_marqueur")
                 ->paginate($perPage);
+
+            $lignes = array_map(fn (Media $m): Media => self::avecSiteVerifie($m), $page->items());
 
             return $this->ok([
                 // 🔴 SITE JUMEAU de B12-002 / F36-006. `media.email` est
@@ -47,7 +56,7 @@ class MediaController extends ApiController
                 // masque depuis le correctif : deux colonnes de meme nature,
                 // une seule couverte. C'est le motif A-011 dans sa forme la
                 // plus pure.
-                'data' => MasquageCoordonnees::masquerSiRequis($page->items()),
+                'data' => MasquageCoordonnees::masquerSiRequis($lignes),
                 'meta' => [
                     'total' => $page->total(),
                     'per_page' => $page->perPage(),
@@ -145,7 +154,92 @@ class MediaController extends ApiController
                         ? $query->whereNotNull('email')
                         : $query->whereNull('email');
                 }),
+                // Lot 3 — « site fiable » = site VÉRIFIÉ par
+                // `crm:presse:verifier-sites` (`SiteMedia::STATUTS_VERIFIES`),
+                // et non une colonne `website` remplie : beaucoup sont des
+                // sites DEVINÉS depuis le nom (« agence.com », « paris.fr »).
+                AllowedFilter::callback('site_fiable', function ($query, $value) {
+                    $existe = fn ($sq) => $sq->selectRaw('1')->from('companies as c')
+                        ->whereColumn('c.id', 'media.company_id')
+                        ->whereRaw(SiteMedia::conditionSql('c'));
+                    filter_var($value, FILTER_VALIDATE_BOOLEAN)
+                        ? $query->whereExists($existe)
+                        : $query->whereNotExists($existe);
+                }),
             ]);
+    }
+
+    /**
+     * Le site à AFFICHER d'un média : seulement s'il est vérifié.
+     *
+     * Audit visuel du 2026-10-02 : la liste montrait `media.website` tel
+     * quel, donc des sites devinés et faux (« agence.com »). Désormais :
+     *   - `site_verifie` : l'URL vérifiée (`SiteMedia::urlVerifiee`), ou null ;
+     *   - `site_statut`  : le statut du marqueur (`verifie`, `a-confirmer`,
+     *     `non-conforme`…), null si jamais vérifié ;
+     *   - `website` reste rendu (rien n'est effacé) : l'écran le marque
+     *     « non vérifié ».
+     */
+    public static function avecSiteVerifie(Media $m): Media
+    {
+        $brut = $m->getAttribute('site_media_marqueur');
+        $marqueur = is_string($brut) ? json_decode($brut, true) : $brut;
+        $m->offsetUnset('site_media_marqueur');
+        $m->setAttribute('site_verifie', SiteMedia::urlVerifiee($marqueur));
+        $m->setAttribute(
+            'site_statut',
+            is_array($marqueur) && is_string($marqueur['statut'] ?? null) ? $marqueur['statut'] : null,
+        );
+
+        return $m;
+    }
+
+    /**
+     * Lot 3 — les indicateurs de l'écran Médias, sur TOUTE la sélection.
+     *
+     * Avant : « Avec site web 23 % » et « Top type » étaient calculés sur les
+     * 100 lignes AFFICHÉES, présentés à côté du total. Ils portent désormais
+     * sur l'ensemble filtré (mêmes filtres que la liste), servis depuis un
+     * cache de 10 min par espace et par filtre : le décompte des sites
+     * vérifiés lit le marqueur de chaque fiche liée (≈ 8 s à froid sur 31 000
+     * médias en production).
+     */
+    public function stats(Request $r): JsonResponse
+    {
+        $vide = ['total' => 0, 'avec_site_fiable' => 0, 'avec_email' => 0, 'top_type' => null];
+        $espace = $this->espaceCourantOuNull();
+        if ($espace === null || $espace === '' || ! Schema::hasTable('media')) {
+            return $this->ok($vide);
+        }
+
+        $filtres = $r->query('filter', []);
+        $cle = 'crm:media:stats:v1:' . $espace . ':' . md5((string) json_encode(is_array($filtres) ? $filtres : []));
+        // Le filtre est lu de la requête COURANTE : on construit la requête
+        // ICI, pas dans la fermeture — le recalcul différé de `flexible`
+        // tourne après la réponse.
+        $base = $this->buildFilteredQuery()->getEloquentBuilder()->toBase();
+
+        /** @var mixed $charge */
+        $charge = Cache::flexible($cle, [600, 86400], function () use ($espace, $base): array {
+            return WorkspaceContext::run($espace, function () use ($base): array {
+                $ligne = (clone $base)->selectRaw(
+                    'count(*) AS total, count(media.email) AS avec_email, count(*) FILTER (WHERE EXISTS ('
+                    . 'SELECT 1 FROM companies c WHERE c.id = media.company_id AND ' . SiteMedia::conditionSql('c')
+                    . ')) AS avec_site_fiable',
+                )->first();
+                $top = (clone $base)->selectRaw('media.media_type, count(*) AS n')
+                    ->groupBy('media.media_type')->orderByDesc('n')->first();
+
+                return [
+                    'total' => (int) ($ligne->total ?? 0),
+                    'avec_site_fiable' => (int) ($ligne->avec_site_fiable ?? 0),
+                    'avec_email' => (int) ($ligne->avec_email ?? 0),
+                    'top_type' => $top === null ? null : ['media_type' => $top->media_type, 'n' => (int) $top->n],
+                ];
+            });
+        }, lock: ['seconds' => 60]);
+
+        return $this->ok(is_array($charge) ? $charge : $vide);
     }
 
     public function export(Request $r): StreamedResponse

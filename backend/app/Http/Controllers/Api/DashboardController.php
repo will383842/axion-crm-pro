@@ -66,7 +66,7 @@ class DashboardController extends ApiController
 
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v1:' . $espace;
+        return 'crm:dashboard:stats:v2:' . $espace;
     }
 
     public function stats(Request $r): JsonResponse
@@ -124,14 +124,99 @@ class DashboardController extends ApiController
             'scraper_runs_24h' => $this->compter('scraper_runs', $espace, function ($q) {
                 $q->where('created_at', '>=', now()->subDay());
             }),
-            'quality_distribution' => $this->repartition('companies', $espace, 'quality_tier', [
-                'complete' => 0, 'partielle' => 0, 'basique' => 0,
-            ]),
+            // 🔴 2026-10-02 : « Qualité moyenne 0/100 » sur 4,3 M de fiches.
+            // La répartition lisait la colonne `quality_tier`, qui N'EXISTE
+            // PAS (la colonne générée s'appelle `quality_badge`) : le garde
+            // `hasColumn` rendait le gabarit à zéro, et l'écran en tirait une
+            // moyenne de 0. On lit désormais `quality_score` lui-même.
+            ...$this->qualite($espace),
             // Les tailles du référentiel unique (`Taxonomy::TAILLES`), plus
             // aucune liste recopiée ici.
             'size_distribution' => $this->repartition('companies', $espace, 'size_category', self::taillesAZero()),
             'computed_at' => now()->utc()->toIso8601ZuluString(),
         ]));
+    }
+
+    /**
+     * La qualité des fiches : répartition, moyenne RÉELLE, et part estimée
+     * des scores PÉRIMÉS.
+     *
+     * Les seuils sont ceux de la colonne générée `quality_badge` (≥ 90
+     * complète, ≥ 50 partielle, sinon basique). Un seul passage, servi par
+     * l'index `idx_companies_workspace_score` (≈ 4 s sur la production,
+     * dans le calcul différé de `stats()`).
+     *
+     * `quality_a_recalculer_pct` : sur un échantillon de 0,1 % des fiches,
+     * la part dont le score stocké diffère du barème
+     * (`company_quality_score_calcul`). Mesure du 2026-10-02 : ≈ 79 % — la
+     * reprise `crm:recalculer-quality-score` n'a jamais été jouée. Tant que
+     * cette part est forte, l'écran DIT « calcul en attente » au lieu d'une
+     * moyenne fausse. `null` = estimation impossible (fonction absente).
+     *
+     * @return array<string, mixed>
+     */
+    private function qualite(string $espace): array
+    {
+        $resultat = [
+            'quality_distribution' => ['complete' => 0, 'partielle' => 0, 'basique' => 0],
+            'quality_avg' => null,
+            'quality_scored' => null,
+            'quality_a_recalculer_pct' => null,
+        ];
+
+        try {
+            $l = DB::selectOne(
+                'SELECT count(*) FILTER (WHERE quality_score >= 90) AS complete,
+                        count(*) FILTER (WHERE quality_score >= 50 AND quality_score < 90) AS partielle,
+                        count(*) FILTER (WHERE quality_score < 50) AS basique,
+                        count(*) FILTER (WHERE quality_score > 0) AS notees,
+                        round(avg(quality_score)) AS moyenne
+                   FROM companies
+                  WHERE workspace_id = ? AND deleted_at IS NULL',
+                [$espace],
+            );
+            $resultat['quality_distribution'] = [
+                'complete' => (int) $l->complete, 'partielle' => (int) $l->partielle, 'basique' => (int) $l->basique,
+            ];
+            $resultat['quality_avg'] = $l->moyenne === null ? null : (int) $l->moyenne;
+            $resultat['quality_scored'] = (int) $l->notees;
+        } catch (\Throwable $e) {
+            Log::warning('dashboard: qualite indisponible', ['exception' => $e->getMessage()]);
+
+            return $resultat;
+        }
+
+        // Sous PostgreSQL, une requête en échec AVORTE la transaction en cours
+        // (25P02) : on vérifie que le barème existe avant de l'appeler.
+        $bareme = DB::selectOne("SELECT count(*) AS n FROM pg_proc WHERE proname = 'company_quality_score_calcul'");
+        if ((int) ($bareme->n ?? 0) === 0) {
+            return $resultat;
+        }
+
+        try {
+            $echantillon = DB::selectOne(
+                'SELECT count(*) AS n,
+                        count(*) FILTER (WHERE c.quality_score IS DISTINCT FROM company_quality_score_calcul(c)) AS ecarts
+                   FROM companies c TABLESAMPLE SYSTEM (0.1)
+                  WHERE c.workspace_id = ? AND c.deleted_at IS NULL',
+                [$espace],
+            );
+            // Trop petit échantillon (petite base) : on compare TOUT.
+            if ((int) $echantillon->n < 200) {
+                $echantillon = DB::selectOne(
+                    'SELECT count(*) AS n,
+                            count(*) FILTER (WHERE c.quality_score IS DISTINCT FROM company_quality_score_calcul(c)) AS ecarts
+                       FROM (SELECT * FROM companies WHERE workspace_id = ? AND deleted_at IS NULL LIMIT 5000) c',
+                    [$espace],
+                );
+            }
+            $n = (int) $echantillon->n;
+            $resultat['quality_a_recalculer_pct'] = $n === 0 ? 0.0 : round(100 * (int) $echantillon->ecarts / $n, 1);
+        } catch (\Throwable $e) {
+            Log::warning('dashboard: estimation des scores perimes indisponible', ['exception' => $e->getMessage()]);
+        }
+
+        return $resultat;
     }
 
     /**
@@ -152,6 +237,10 @@ class DashboardController extends ApiController
             'scraper_runs_24h' => 0,
             'llm_cost_eur_month' => 0,
             'quality_distribution' => ['complete' => 0, 'partielle' => 0, 'basique' => 0],
+            // `null` = pas de moyenne connue : l'écran écrit « — », jamais 0.
+            'quality_avg' => null,
+            'quality_scored' => null,
+            'quality_a_recalculer_pct' => null,
             'size_distribution' => self::taillesAZero(),
         ];
     }

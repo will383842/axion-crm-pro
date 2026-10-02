@@ -82,6 +82,8 @@ export interface PerSourceLimit {
 }
 
 export interface Campaign {
+  /** Lot 3 : collecte masquée de la vue par défaut (rien n'est supprimé). */
+  archived_at?: string | null;
   id: number;
   workspace_id: string;
   created_by: string;

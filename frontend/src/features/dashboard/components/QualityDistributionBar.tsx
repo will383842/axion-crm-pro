@@ -1,4 +1,5 @@
 import { Card, CardHeader, CardTitle, CardEyebrow, cn } from '@/components/ui';
+import type { EtatQualite } from '../qualite';
 
 export interface QualityDistribution {
   complete: number;
@@ -33,14 +34,32 @@ const SEGMENTS = [
   },
 ];
 
-export function QualityDistributionBar({ data }: { data: QualityDistribution }) {
+export function QualityDistributionBar({ data, qualite }: { data: QualityDistribution; qualite: EtatQualite }) {
   const total = (data.complete ?? 0) + (data.partielle ?? 0) + (data.basique ?? 0);
   const safeTotal = total || 1;
 
-  // Score moyen pondéré : complete = 100, partielle = 60, basique = 25
-  const avgScore = total === 0
-    ? 0
-    : Math.round(((data.complete * 100) + (data.partielle * 60) + (data.basique * 25)) / total);
+  // Lot 3 (2026-10-02) — plus de « moyenne » pondérée inventée à l'écran
+  // (100 / 60 / 25) : la moyenne vient du serveur. Tant que les scores sont
+  // majoritairement périmés, ou qu'aucun chiffre n'est connu, le bloc le DIT
+  // au lieu d'afficher des barres et un 0 trompeurs.
+  if (qualite.etat !== 'ok' || total === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="min-w-0">
+            <CardEyebrow>Qualité</CardEyebrow>
+            <CardTitle>Distribution qualité des fiches</CardTitle>
+          </div>
+        </CardHeader>
+        <p className="text-sm text-slate-600 dark:text-slate-300" data-testid="qualite-indisponible">
+          {qualite.etat === 'en_attente'
+            ? `Score de qualité pas encore calculé : environ ${qualite.pctARecalculer} % des fiches attendent leur calcul. La répartition s’affichera une fois le calcul terminé.`
+            : 'Score de qualité non disponible pour le moment.'}
+        </p>
+      </Card>
+    );
+  }
+  const avgScore = qualite.moyenne;
 
   return (
     <Card>

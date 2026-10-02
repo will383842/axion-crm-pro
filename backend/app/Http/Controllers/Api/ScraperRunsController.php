@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\TotalListe;
 use App\Events\ScraperRunCancelled;
 use App\Jobs\DispatchScrapeJob;
 use App\Jobs\LaunchZoneScrapingJob;
@@ -34,7 +35,16 @@ class ScraperRunsController extends ApiController
             if ($workspaceId !== null) {
                 $query->where('workspace_id', $workspaceId);
             }
-            $page = $query->paginate(25);
+            // Lot 3 (2026-10-02) — « journaux de collecte : 6,6 s ». La page
+            // (25 lignes, index `idx_runs_workspace_started`) coûte 5 ms ; le
+            // `count(*)` de la pagination parcourt 7,6 M d'entrées d'index
+            // (5,2 s mesurées sous le rôle applicatif). Le total est servi
+            // depuis le cache de `TotalListe` (60 s frais, 15 min périmé).
+            $parPage = min(100, max(1, (int) $r->query('per_page', 25)));
+            $total = $workspaceId !== null
+                ? TotalListe::pour($query->toBase(), (string) $workspaceId)
+                : null;
+            $page = $query->paginate($parPage, ['*'], 'page', null, $total);
 
             return $this->ok([
                 'data' => $page->items(),

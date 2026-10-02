@@ -21,6 +21,8 @@ class ScrapingCampaignResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'status' => $this->status,
+            // Lot 3 : collecte masquée de la vue par défaut (rien n'est supprimé).
+            'archived_at' => $this->archived_at,
             'sources' => $this->sources ?? [],
             'zones' => $this->zones ?? [],
 

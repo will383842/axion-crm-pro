@@ -64,6 +64,7 @@ class ScrapingCampaign extends Model
             'started_at' => 'datetime',
             'paused_at' => 'datetime',
             'finished_at' => 'datetime',
+            'archived_at' => 'datetime',
             'max_companies' => 'int',
             'max_duration_minutes' => 'int',
             'max_requests_per_minute' => 'int',

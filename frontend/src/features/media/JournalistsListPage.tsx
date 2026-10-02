@@ -16,16 +16,36 @@ interface JournalistItem {
   phone: string | null;
   opt_out: boolean;
   media?: { id: number; name: string } | null;
+  /** Lot 3 — prénom + nom plausibles (et non un nom d'émission ou de chaîne). */
+  personne_reelle?: boolean;
 }
 
 interface JournalistsResponse {
   data: JournalistItem[];
-  meta: { total: number; last_page: number };
+  meta: {
+    total: number;
+    last_page: number;
+    /** Lot 3 — compteurs sur TOUTE la sélection (plus « sur la page »). */
+    stats?: { total: number; avec_email: number; opt_out: number; ecartees: number };
+  };
 }
+
+/**
+ * Lot 3 (2026-10-02) — la liste contenait des noms d'émissions et de chaînes
+ * importés comme « présentateurs » ou « producteurs » (« Divers
+ * (feuilleton) », « France 3 »). Par défaut : les personnes identifiées
+ * seulement. Les lignes écartées restent en base, consultables ici.
+ */
+const PERSONNES_OPTIONS = [
+  { value: "true", label: "Personnes identifiées" },
+  { value: "false", label: "À vérifier (émissions, chaînes, noms mal découpés)" },
+  { value: "tous", label: "Toutes les lignes" },
+];
 
 export function JournalistsListPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [personnes, setPersonnes] = useState("true");
   // G42-010 — anti-rebond de 300 ms AVANT la requete.
   //
   // Mesure du 2026-08-20 sur `/companies`, meme cablage (voir
@@ -40,7 +60,10 @@ export function JournalistsListPage() {
   async function exportCsv() {
     setExporting(true);
     try {
-      const params = new URLSearchParams(search ? { "filter[last_name]": search } : {});
+      const params = new URLSearchParams({
+        "filter[personne_reelle]": personnes,
+        ...(search ? { "filter[last_name]": search } : {}),
+      });
       const r = await api.get<Blob>(`/journalists/export?${params.toString()}`, { responseType: "blob" });
       const url = URL.createObjectURL(r.data);
       const a = document.createElement("a");
@@ -59,12 +82,13 @@ export function JournalistsListPage() {
   }
 
   const { data, isLoading, error, refetch } = useQuery<JournalistsResponse>({
-    queryKey: ["journalists", page, rechercheDifferee],
+    queryKey: ["journalists", page, rechercheDifferee, personnes],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         per_page: "100",
         include: "media",
+        "filter[personne_reelle]": personnes,
         ...(rechercheDifferee ? { "filter[last_name]": rechercheDifferee } : {}),
       });
       const r = await api.get<JournalistsResponse>(`/journalists?${params.toString()}`);
@@ -76,6 +100,7 @@ export function JournalistsListPage() {
   const rows = useMemo(() => data?.data ?? [], [data]);
   const total = data?.meta.total ?? 0;
   const lastPage = data?.meta.last_page ?? 1;
+  const stats = data?.meta.stats;
 
   return (
     <div className="px-6 py-6">
@@ -99,12 +124,36 @@ export function JournalistsListPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard tone="sky" label="Total" value={total.toLocaleString("fr-FR")} sublabel={`Page ${page}`} />
-        <KpiCard tone="violet" label="Avec email" value={`${rows.filter((j) => j.email).length}`} sublabel="sur la page" />
-        <KpiCard tone="amber" label="Opt-out" value={`${rows.filter((j) => j.opt_out).length}`} sublabel="opposition RGPD" />
+        <KpiCard
+          tone="violet"
+          label="Avec email"
+          value={stats ? stats.avec_email.toLocaleString("fr-FR") : "—"}
+          sublabel={stats ? `sur ${stats.total.toLocaleString("fr-FR")}` : "non disponible"}
+        />
+        <KpiCard
+          tone="amber"
+          label="Opposition (RGPD)"
+          value={stats ? stats.opt_out.toLocaleString("fr-FR") : "—"}
+          sublabel={
+            stats && stats.ecartees > 0
+              ? `${stats.ecartees.toLocaleString("fr-FR")} ligne(s) à vérifier, non comptées`
+              : "personnes opposées"
+          }
+        />
       </div>
 
       <div className="mb-4 flex items-center gap-2">
         <SearchInput label="Rechercher un journaliste par nom" value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Rechercher par nom…" className="w-72" />
+        <select
+          value={personnes}
+          onChange={(e) => { setPersonnes(e.target.value); setPage(1); }}
+          aria-label="Type de lignes"
+          className="h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+        >
+          {PERSONNES_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* P0-3 — une panne n'est jamais une liste vide. */}

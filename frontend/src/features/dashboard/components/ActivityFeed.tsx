@@ -9,6 +9,7 @@ import {
   QueryErrorState,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { libelleActivite } from '../activite';
 
 /**
  * Les champs REELS renvoyes par GET /api/v1/audit-logs.
@@ -43,16 +44,6 @@ interface AuditLogsResponse {
   data: AuditLog[];
 }
 
-/**
- * Rend lisible un type d'evenement. Tolere l'absence de valeur : un champ
- * manquant ne doit JAMAIS pouvoir effacer l'application - c'est exactement ce
- * qui arrivait (A-015).
- */
-function humanizeAction(a?: string | null): string {
-  if (typeof a !== 'string' || a === '') return 'Evenement';
-  return a.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 function timeAgo(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -81,9 +72,16 @@ export function ActivityFeed() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dashboard-activity'],
     queryFn: async () => {
-      const r = await api.get<AuditLogsResponse | AuditLog[]>('/audit-logs', { params: { limit: 5 } });
+      // Lot 3 — `metier=1` : le serveur écarte les lignes de progression des
+      // traitements en lot (« JOIGNABILITE_LOT », des milliers) ; on en
+      // demande un peu plus que 5 pour en garder 5 une fois traduites.
+      const r = await api.get<AuditLogsResponse | AuditLog[]>('/audit-logs', { params: { limit: 10, metier: 1 } });
       const payload = r.data as { data?: AuditLog[] };
-      return (Array.isArray(r.data) ? (r.data as AuditLog[]) : (payload.data ?? [])).slice(0, 5);
+      const lignes = Array.isArray(r.data) ? (r.data as AuditLog[]) : (payload.data ?? []);
+      return lignes
+        .map((log) => ({ log, phrase: libelleActivite(log.event_type ?? log.action, log.path) }))
+        .filter((x): x is { log: AuditLog; phrase: string } => x.phrase !== null)
+        .slice(0, 5);
     },
     staleTime: 30_000,
     retry: false,
@@ -133,7 +131,7 @@ export function ActivityFeed() {
         />
       ) : (
         <ul className="relative space-y-3 pl-1">
-          {items.map((log, idx) => {
+          {items.map(({ log, phrase }, idx) => {
             const isLast = idx === items.length - 1;
             const name = log.actor_name ?? log.actor_email ?? 'Système';
             return (
@@ -149,12 +147,10 @@ export function ActivityFeed() {
                 <div className="min-w-0 flex-1 pt-0.5">
                   <p className="truncate text-xs text-slate-800 dark:text-slate-200">
                     <span className="font-medium">{name}</span>
-                    <span className="text-slate-500 dark:text-slate-400"> · {humanizeAction(log.event_type ?? log.action)}</span>
+                    <span className="text-slate-500 dark:text-slate-400"> · {phrase}</span>
                   </p>
-                  {log.path ? (
-                    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
-                      {log.path}{log.status_code ? ` · ${log.status_code}` : ''}
-                    </p>
+                  {typeof log.status_code === 'number' && log.status_code >= 400 ? (
+                    <p className="truncate text-[11px] text-rose-600 dark:text-rose-400">Échec</p>
                   ) : null}
                   <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>
                 </div>

@@ -27,9 +27,8 @@ import {
   NATURE_OPTIONS,
   SECTEUR_OPTIONS,
   TAILLE_OPTIONS,
-  libelleReferentiel,
 } from "@/lib/prospection-referentiels";
-import { TAILLES } from "@/lib/referentiels.generated";
+import { indicateursEntreprises, type StatsBase } from "./indicateurs";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
@@ -270,6 +269,8 @@ export function CompaniesListPage() {
       const params = new URLSearchParams({
         page: String(page),
         per_page: "100",
+        // Lot 3 — seulement les colonnes de la grille (345 Ko → ~30 Ko / 100 lignes).
+        vue: "liste",
         ...(f.size ? { "filter[size_category]": f.size } : {}),
         ...(f.effectif ? { "filter[effectif]": f.effectif } : {}),
         ...(f.priority ? { "filter[priority]": f.priority } : {}),
@@ -313,40 +314,15 @@ export function CompaniesListPage() {
     overscan: 8,
   });
 
-  // KPI derivations (sample on the current page only — backend should expose
-  // aggregated stats for full accuracy, but page-level values give a useful
-  // signal in the meantime).
-  const kpis = useMemo(() => {
-    const list = rows;
-    const count = list.length;
-    const enriched = list.filter((c) => c.enriched_at).length;
-    const enrichedPct = count > 0 ? Math.round((enriched / count) * 100) : 0;
-
-    const bySize = list.reduce<Record<string, number>>((acc, c) => {
-      const k = c.size_category ?? "inconnue";
-      acc[k] = (acc[k] ?? 0) + 1;
-      return acc;
-    }, {});
-    const topSize = Object.entries(bySize).sort((a, b) => b[1] - a[1])[0];
-    const topSizeLabel = topSize ? (libelleReferentiel(TAILLES, topSize[0]) ?? topSize[0]) : "—";
-    const topSizePct = topSize && count > 0 ? Math.round((topSize[1] / count) * 100) : 0;
-
-    const byNaf = list.reduce<Record<string, number>>((acc, c) => {
-      if (!c.naf) return acc;
-      acc[c.naf] = (acc[c.naf] ?? 0) + 1;
-      return acc;
-    }, {});
-    const topNaf = Object.entries(byNaf).sort((a, b) => b[1] - a[1])[0];
-
-    return {
-      total: total ?? count,
-      enrichedPct,
-      topSizeLabel,
-      topSizePct,
-      topNaf: topNaf ? topNaf[0] : "—",
-      topNafCount: topNaf ? topNaf[1] : 0,
-    };
-  }, [rows, total]);
+  // Lot 3 (2026-10-02) — les indicateurs portent sur TOUTE la base (serveur,
+  // `/companies/stats`, mis en cache), plus sur les 100 lignes affichées :
+  // « Enrichies 100 % » venait d'une page triée par score, toute enrichie.
+  const { data: statsBase } = useQuery({
+    queryKey: ["companies-stats"],
+    queryFn: async () => (await api.get<StatsBase>("/companies/stats")).data,
+    staleTime: 5 * 60 * 1000,
+  });
+  const kpis = useMemo(() => indicateursEntreprises(statsBase), [statsBase]);
 
   const setFilterAndReset = (next: Partial<Filter>) => {
     setFilter((f) => ({ ...f, ...next }));
@@ -442,22 +418,22 @@ export function CompaniesListPage() {
         <KpiCard
           tone="violet"
           label="Enrichies"
-          value={`${kpis.enrichedPct}%`}
-          sublabel="dont email + téléphone vérifiés"
-          progress={kpis.enrichedPct}
+          value={kpis.enrichies}
+          sublabel={hasActiveFilter ? `${kpis.enrichiesSous} · toute la base, hors filtres` : kpis.enrichiesSous}
+          {...(kpis.enrichiesPct !== null ? { progress: kpis.enrichiesPct } : {})}
         />
         <KpiCard
           tone="emerald"
-          label="Top taille"
-          value={kpis.topSizeLabel}
-          sublabel={`${kpis.topSizePct}% de l'échantillon`}
-          progress={kpis.topSizePct}
+          label="Taille la plus fréquente"
+          value={kpis.taille}
+          sublabel={hasActiveFilter ? `${kpis.tailleSous} · toute la base` : kpis.tailleSous}
+          {...(kpis.taillePct !== null ? { progress: kpis.taillePct } : {})}
         />
         <KpiCard
           tone="amber"
-          label="Top NAF"
-          value={kpis.topNaf}
-          sublabel={kpis.topNafCount ? `${kpis.topNafCount} sociétés` : "—"}
+          label="Secteur le plus fréquent"
+          value={kpis.secteur}
+          sublabel={hasActiveFilter ? `${kpis.secteurSous} · toute la base` : kpis.secteurSous}
         />
       </div>
 

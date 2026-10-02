@@ -75,6 +75,17 @@ class ScrapingCampaignsController extends ApiController
             if ($status = $r->query('status')) {
                 $query->where('status', $status);
             }
+            // Lot 3 — les collectes ARCHIVÉES (collectes de test, anciennes)
+            // sont masquées de la vue par défaut ; `archivees=1` les montre
+            // seules, `archivees=tous` montre tout. Rien n'est supprimé.
+            if (Schema::hasColumn('scraping_campaigns', 'archived_at')) {
+                $archivees = (string) $r->query('archivees', '0');
+                if ($archivees === '1' || $archivees === 'true') {
+                    $query->whereNotNull('archived_at');
+                } elseif ($archivees !== 'tous') {
+                    $query->whereNull('archived_at');
+                }
+            }
             if ($search = $r->query('search')) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'ILIKE', "%{$search}%")
@@ -320,6 +331,42 @@ class ScrapingCampaignsController extends ApiController
      * @OA\Post(path="/campaigns/{id}/cancel", tags={"Campaigns"}, summary="Annule une campagne",
      *     security={{"sanctumCookie":{}}})
      */
+    /**
+     * Lot 3 — ARCHIVER une collecte : la masquer de la vue par défaut, sans
+     * rien supprimer (ni la collecte, ni ses fiches, ni ses journaux). Refusé
+     * sur une collecte en cours, en pause ou programmée : on n'escamote pas
+     * un travail vivant.
+     */
+    public function archive(ScrapingCampaign $campaign): JsonResponse
+    {
+        if (! $this->belongsToCurrentWorkspace($campaign)) {
+            abort(404);
+        }
+        if (! in_array($campaign->status, ['draft', 'completed', 'cancelled', 'failed'], true)) {
+            return response()->json([
+                'error' => 'invalid_state',
+                'message' => "Impossible d'archiver une collecte au statut '{$campaign->status}' : arrêtez-la d'abord.",
+                'status' => $campaign->status,
+            ], 422);
+        }
+
+        DB::table('scraping_campaigns')->where('id', $campaign->id)->update(['archived_at' => now()]);
+
+        return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
+    }
+
+    /** Lot 3 — remettre une collecte archivée dans la vue par défaut. */
+    public function unarchive(ScrapingCampaign $campaign): JsonResponse
+    {
+        if (! $this->belongsToCurrentWorkspace($campaign)) {
+            abort(404);
+        }
+
+        DB::table('scraping_campaigns')->where('id', $campaign->id)->update(['archived_at' => null]);
+
+        return $this->ok(new ScrapingCampaignResource($campaign->fresh()));
+    }
+
     public function cancel(ScrapingCampaign $campaign): JsonResponse
     {
         if (! $this->belongsToCurrentWorkspace($campaign)) {

@@ -37,13 +37,13 @@ import { QueryErrorState, Stat } from '@/components/ui';
 // (`verbatimModuleSyntax`), il ne recree aucune arete.
 import type { CoverageMode } from './FranceCoverageMap';
 
+import { statsCouverture, type Cell, type Level } from './statsCouverture';
+
 const FranceCoverageMap = lazy(async () => ({
   default: (await import('./FranceCoverageMap')).FranceCoverageMap,
 }));
 
-interface Cell { code: string; name: string; total: number; complete?: number; partial?: number; lat?: number; lon?: number }
 
-type Level = 'region' | 'department' | 'city';
 
 const MODES: Array<{ id: CoverageMode; label: string; hint: string }> = [
   { id: 'visu',   label: 'Visualisation', hint: 'Lecture seule' },
@@ -75,15 +75,7 @@ export function CoveragePage() {
   // P0-3 — une panne n'est pas une France vide : la carte cède la place à l'erreur.
   const echec = error !== null && data === undefined;
 
-  const stats = useMemo(() => {
-    const totalAll = cells.reduce((s, c) => s + (c.total ?? 0), 0);
-    const completeAll = cells.reduce((s, c) => s + (c.complete ?? 0), 0);
-    const covered = cells.filter((c) => (c.total ?? 0) > 0).length;
-    const denom = level === 'department' ? 96 : level === 'region' ? 13 : Math.max(cells.length, 1);
-    const pct = denom ? Math.round((covered / denom) * 100) : 0;
-    const top = [...cells].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)).slice(0, 8);
-    return { totalAll, completeAll, covered, denom, pct, top };
-  }, [cells, level]);
+  const stats = useMemo(() => statsCouverture(cells, level), [cells, level]);
 
   const selectedCell = selected ? cells.find((c) => c.code === selected) ?? null : null;
 
@@ -147,7 +139,7 @@ export function CoveragePage() {
         <KpiCard
           label="Entreprises trouvées"
           value={stats.totalAll.toLocaleString('fr-FR')}
-          sublabel={`${stats.completeAll.toLocaleString('fr-FR')} complètes`}
+          sublabel={`dont ${stats.withScore.toLocaleString('fr-FR')} au score de qualité ≥ 50`}
           tone="violet"
         />
         <KpiCard
@@ -363,7 +355,7 @@ function SelectionCard({
 
       <div className="grid grid-cols-2 gap-2">
         <Stat label="Entreprises" value={(cell.total ?? 0).toLocaleString('fr-FR')} />
-        <Stat label="Complètes"   value={(cell.complete ?? 0).toLocaleString('fr-FR')} />
+        <Stat label="Score ≥ 50"  value={(Number(cell.complete ?? 0) + Number(cell.partial ?? 0)).toLocaleString('fr-FR')} />
       </div>
 
       <div className="mt-4 flex flex-col gap-2">

@@ -109,7 +109,7 @@ describe('DashboardPage — rendu', () => {
     expect(vignette('Nouvelles 7j')).toHaveTextContent(/5.400/);
 
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
-    expect(await screen.findByText('Bonjour Will 👋')).toBeVisible();
+    expect(await screen.findByText('Bonjour Will')).toBeVisible();
 
     // Plus de période affichée : aucun chiffre de l'écran n'en dépend.
     expect(screen.getByText("Vue d'ensemble de votre base")).toBeVisible();

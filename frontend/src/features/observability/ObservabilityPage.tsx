@@ -70,7 +70,7 @@ export function ObservabilityPage() {
           value={`${data.google_places_quota.used} / ${data.google_places_quota.soft_limit}`}
           sublabel={
             data.google_places_quota.pending_companies > 5000
-              ? `⚠ ${data.google_places_quota.pending_companies} fiches en attente : le quota est peut-être trop bas.`
+              ? `${data.google_places_quota.pending_companies} fiches en attente : le quota est peut-être trop bas.`
               : data.google_places_quota.pending_companies > 0
               ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (reprise le 1er du mois)`
               : `${data.google_places_quota.percent}% utilisé · smart skip actif`

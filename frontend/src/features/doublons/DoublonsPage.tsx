@@ -16,6 +16,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { CheckCircle2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 
@@ -142,7 +144,7 @@ export function DoublonsPage() {
   const adresses = Object.entries(data?.meta.adresses_partagees ?? {});
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Doublons à vérifier"
         subtitle="Des fiches qui se ressemblent. Fusionner met la fiche de droite à la corbeille (jamais supprimée) et rattache tout à celle de gauche ; la fusion reste annulable."
@@ -179,7 +181,11 @@ export function DoublonsPage() {
         <p className="text-sm text-red-600">La file des doublons n'a pas pu être chargée.</p>
       )}
       {!isLoading && !isError && rows.length === 0 && (
-        <p className="text-sm text-slate-500">Aucun doublon à vérifier.</p>
+        <EmptyState
+          icon={<CheckCircle2 className="text-emerald-600" />}
+          title="Aucun doublon à vérifier"
+          description="Tout est en ordre : aucune paire de fiches n’attend votre décision."
+        />
       )}
 
       <ul className="flex flex-col gap-3">

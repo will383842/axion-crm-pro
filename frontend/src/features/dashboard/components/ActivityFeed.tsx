@@ -1,3 +1,4 @@
+import { ClipboardList } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Card,
@@ -127,7 +128,7 @@ export function ActivityFeed() {
         <EmptyState
           title="Activité bientôt disponible"
           description="Vos dernières actions apparaîtront ici."
-          icon="📋"
+          icon={<ClipboardList />}
         />
       ) : (
         <ul className="relative space-y-3 pl-1">

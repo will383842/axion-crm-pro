@@ -31,7 +31,7 @@ export function ContactsRoute() {
 
   if (isPending) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ConsoleListSkeleton rows={4} />
       </div>
     );

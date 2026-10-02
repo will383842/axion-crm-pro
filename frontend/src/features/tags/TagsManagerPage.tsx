@@ -184,7 +184,7 @@ export function TagsManagerPage() {
   };
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Étiquettes"
         subtitle="Pour classer les entreprises : zone, secteur, taille, intérêt, et les vôtres."
@@ -199,9 +199,9 @@ export function TagsManagerPage() {
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard tone="sky"     label="Total" value={counts.total}  sublabel="tous axes confondus" />
-        <KpiCard tone="emerald" label="Auto"       value={counts.auto}   sublabel="géo, secteur, taille" />
-        <KpiCard tone="violet"  label="Manuel"     value={counts.manual} sublabel="créés par l'équipe" />
-        <KpiCard tone="amber"   label="IA"        value={counts.llm}    sublabel="proposées par l’IA" />
+        <KpiCard tone="emerald" label="Automatiques" value={counts.auto} sublabel="géographie, secteur, taille" />
+        <KpiCard tone="violet"  label="Personnalisées" value={counts.manual} sublabel="créées à la main" />
+        <KpiCard tone="amber"   label="Proposées par l’IA" value={counts.llm} sublabel="suggérées automatiquement" />
       </div>
 
       {/* Body — P0-3 : une panne n'est jamais « Aucun tag ». */}

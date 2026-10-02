@@ -26,7 +26,7 @@ export function ConsoleGate({
   // de page. Fermé par défaut, muet tant qu'on ne sait pas.
   if (isPending) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ConsoleListSkeleton rows={4} />
       </div>
     );
@@ -52,7 +52,7 @@ export function ConsoleGate({
   // un mensonge par une régression.
   if (error !== null && data === undefined) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <QueryErrorState
           error={error}
           contexte="l’état de la console CRM v2"
@@ -64,7 +64,7 @@ export function ConsoleGate({
 
   if (!features.console_v2) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState
           title="Console non activée"
           description="La console CRM v2 n'est pas ouverte sur ce serveur."
@@ -75,7 +75,7 @@ export function ConsoleGate({
 
   if (requiresVivier && !features.universes.vivier) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <EmptyState
           title="Univers vivier candidats non accessible"
           description="L'accès au vivier suppose d'être membre de cet univers. Demandez à un administrateur de vous y rattacher."

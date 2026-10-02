@@ -1,3 +1,4 @@
+import { Mic } from 'lucide-react';
 import { Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card, EmptyState, PageHeader, Spinner, StatusPill } from "@/components/ui";
@@ -110,8 +111,8 @@ export function JournalistDetailPage() {
   }
   if (isError || !data) {
     return (
-      <div className="px-6 py-6">
-        <EmptyState icon="🎙️" title="Contact introuvable" description="Cette fiche n'existe pas ou a été supprimée." />
+      <div>
+        <EmptyState icon={<Mic />} title="Contact introuvable" description="Cette fiche n'existe pas ou a été supprimée." />
       </div>
     );
   }
@@ -135,7 +136,7 @@ export function JournalistDetailPage() {
   ];
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title={nom}
         subtitle={

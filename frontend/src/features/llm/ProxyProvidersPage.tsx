@@ -51,7 +51,7 @@ export function ProxyProvidersPage() {
   const rows = list.data?.data ?? [];
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Serveurs relais"
         subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone."

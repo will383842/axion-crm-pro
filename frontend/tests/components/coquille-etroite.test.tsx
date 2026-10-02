@@ -56,7 +56,6 @@ vi.mock('@/components/layout/Sidebar', () => ({
   ),
 }));
 
-vi.mock('@/components/OnboardingTour', () => ({ OnboardingTour: () => null }));
 
 const { RootLayout } = await import('@/app/RootLayout');
 

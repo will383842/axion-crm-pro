@@ -1,3 +1,4 @@
+import { Newspaper } from 'lucide-react';
 import { useParams, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Card, EmptyState, Spinner, cn } from "@/components/ui";
@@ -75,8 +76,8 @@ export function MediaDetailPage() {
   }
   if (isError || !reponse?.data) {
     return (
-      <div className="px-6 py-6">
-        <EmptyState icon="📰" title="Média introuvable" description="Ce média n'existe pas ou a été supprimé." />
+      <div>
+        <EmptyState icon={<Newspaper />} title="Média introuvable" description="Ce média n'existe pas ou a été supprimé." />
       </div>
     );
   }
@@ -109,7 +110,7 @@ export function MediaDetailPage() {
   ];
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <div className="mb-4 text-sm text-slate-500">
         <Link to="/media" className="hover:text-slate-900 dark:hover:text-white">
           Médias

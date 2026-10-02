@@ -50,7 +50,7 @@ export function RotationsPage() {
   const total = (data?.data ?? []).length;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Rotation des accès"
         subtitle="Les accès qui tournent pour ne pas être bloqué : serveurs relais, navigateurs, moteurs de recherche, fournisseurs d’IA."

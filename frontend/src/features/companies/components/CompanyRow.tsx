@@ -90,7 +90,7 @@ export function CompanyRow({
             {c.postcode ? <span className="ml-1 text-slate-400">({c.postcode})</span> : null}
             {c.effectif_range ? (
               <span className="ml-2 font-medium text-brand-600 dark:text-brand-400">
-                · 👥 {effectifLabel(c.effectif_range)}
+                · {effectifLabel(c.effectif_range)}
               </span>
             ) : null}
           </div>

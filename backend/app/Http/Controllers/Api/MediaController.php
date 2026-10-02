@@ -7,6 +7,7 @@ use App\Models\Media;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
+use App\Support\TriNomMedia;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -40,8 +42,11 @@ class MediaController extends ApiController
 
         try {
             $page = $this->buildFilteredQuery()
-                ->allowedSorts(...['name', 'enriched_at', 'created_at', 'media_type'])
-                ->defaultSort('name')
+                // Finitions P2 — « + Plus » ou « "Le Journal" » ne remontent
+                // plus en tête : le nom est trié sans ses signes de tête
+                // (index `idx_media_tri_nom`, voir `TriNomMedia`).
+                ->allowedSorts(AllowedSort::custom('name', new TriNomMedia()), 'enriched_at', 'created_at', 'media_type')
+                ->defaultSort(AllowedSort::custom('name', new TriNomMedia()))
                 // Lot 3 — le marqueur `site_media` de la fiche liée : la liste ne
                 // montre plus que des sites VÉRIFIÉS (cf. `avecSiteVerifie`).
                 ->select('media.*')

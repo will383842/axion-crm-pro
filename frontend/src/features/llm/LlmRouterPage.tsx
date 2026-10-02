@@ -83,7 +83,7 @@ export function LlmRouterPage() {
   }, [useCasesData.length]);
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Moteurs d’IA"
         subtitle="Quelle IA sert à quoi, avec quelle solution de secours et pour quel coût."

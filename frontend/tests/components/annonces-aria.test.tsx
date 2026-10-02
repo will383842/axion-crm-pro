@@ -38,7 +38,6 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/lib/echo', () => ({ subscribeWorkspaceNotifications: () => () => {} }));
 vi.mock('@/components/layout/Header', () => ({ Header: () => <div /> }));
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div /> }));
-vi.mock('@/components/OnboardingTour', () => ({ OnboardingTour: () => null }));
 
 const { RootLayout } = await import('@/app/RootLayout');
 const { CompaniesTableSkeleton } = await import('@/components/ui/Skeleton');

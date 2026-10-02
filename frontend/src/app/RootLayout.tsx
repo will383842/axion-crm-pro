@@ -4,10 +4,11 @@
  * Coquille de TOUTES les pages admin. Style Linear/Notion 2026.
  *
  *  - Sidebar 260 px (collapse 64 px) avec sections groupées + workspace selector.
- *  - Header sticky : breadcrumbs auto + search + notifications + dark mode + user menu.
+ *  - Header sticky : breadcrumbs auto + search + notifications + user menu.
  *  - Mobile : sidebar passe en Drawer, search devient IconButton + Modal.
- *  - OnboardingTour préservé (data-tour="sidebar", "nav-dashboard", "nav-companies",
- *    "nav-settings", "global-search", "dark-mode").
+ *  - Plus de visite guidée (finitions P2) : l'utilisateur est unique et connaît
+ *    l'outil ; l'ancienne visite parlait de double authentification et visait
+ *    des entrées de menu repliées.
  *
  * Sous-composants dans `@/components/layout/`.
  */
@@ -15,7 +16,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer, GlobalSearch, Modal } from '@/components/ui';
-import { OnboardingTour } from '@/components/OnboardingTour';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { libelleDeChemin } from '@/components/layout/AutoBreadcrumbs';
@@ -184,7 +184,6 @@ export function RootLayout() {
         <GlobalSearch />
       </Modal>
 
-      <OnboardingTour />
     </div>
   );
 }

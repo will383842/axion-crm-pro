@@ -1,3 +1,4 @@
+import { Mic } from 'lucide-react';
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -103,7 +104,7 @@ export function JournalistsListPage() {
   const stats = data?.meta.stats;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Journalistes"
         subtitle={
@@ -173,7 +174,7 @@ export function JournalistsListPage() {
         <Card className="p-10 text-center text-sm text-slate-500">Chargement…</Card>
       ) : rows.length === 0 ? (
         <EmptyState
-          icon="🎙️"
+          icon={<Mic />}
           title="Aucun journaliste"
           description="Aucun journaliste pour ces filtres."
         />

@@ -92,7 +92,7 @@ describe('D25-003 — la file d’arbitrage ne conclut rien sur ce qu’elle n�
     await monter(getJson('/crm/arbitrage', FILE_VIDE));
 
     await waitFor(() => {
-      expect(texteEcran()).toContain('Rien');
+      expect(texteEcran()).toContain('Aucune personne à rattacher');
     });
     // Le coeur du constat : « il n'y a rien dans cette file » est un fait ;
     // « tous les evenements ont trouve leur entreprise » est une conclusion sur
@@ -111,7 +111,7 @@ describe('D25-003 — la file d’arbitrage ne conclut rien sur ce qu’elle n�
       expect(texteEcran()).toContain('serveur est en panne');
     });
     expect(texteEcran()).not.toContain(CONCLUSION_METIER);
-    expect(texteEcran()).not.toContain('Rien');
+    expect(texteEcran()).not.toContain('Aucune personne à rattacher');
   });
 
   it('PENDANT LE CHARGEMENT : aucun chiffre n’est annonce avant d’avoir lu', async () => {

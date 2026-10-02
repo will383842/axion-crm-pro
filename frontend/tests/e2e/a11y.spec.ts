@@ -59,12 +59,10 @@ const SOCLE: ReadonlyArray<{ regle: string; url: string; noeudsMax: number; pour
     url: '*',
     noeudsMax: 1,
     pourquoi:
-      '2 fautifs mesures au 2026-08-20 : le bouton de theme de `DarkModeToggle.tsx:44` '
-      + "(`px-2 py-1` -> 22,9 x 24 px) et le bouton « Afficher le mot de passe » de "
-      + '`LoginPage.tsx` (`p-0.5` -> 20 x 20 px). Minimum WCAG 2.2 AA : 24 x 24 px. '
-      + '⚠️ D28-015 ferme le PREMIER des deux le 2026-08-22 (`min-h-6 min-w-6` pose sur '
-      + 'le bouton de theme) : il ne reste que `LoginPage.tsx`, hors du perimetre de ce '
-      + "lot. Le plafond n'est pas abaisse ici — le socle ne se retracte pas tout seul "
+      'Le bouton « Afficher le mot de passe » de `LoginPage.tsx` (`p-0.5` -> 20 x 20 px), '
+      + 'minimum WCAG 2.2 AA : 24 x 24 px. (Le second fautif mesure le 2026-08-20, un '
+      + 'bouton du selecteur de theme, a disparu avec le mode sombre — lot 2 UX.) '
+      + "Le plafond n'est pas abaisse — le socle ne se retracte pas tout seul "
       + '(cf. avertissement ci-dessus : `target-size` depend de la fonte du runner).',
   },
   // ── Le tableau virtualise des entreprises ────────────────────────────────
@@ -154,10 +152,15 @@ async function simulerApi(page: Page, charge: unknown): Promise<void> {
   await page.route('**/api/v1/**', (route) => route.fulfill({ json: charge }));
 }
 
-async function poserTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.addInitScript((t) => {
-    window.localStorage.setItem('axion-theme', t);
-  }, theme);
+/**
+ * Simule un navigateur qui avait choisi « sombre » AVANT le retrait du mode
+ * sombre (lot 2 UX) : la cle `axion-theme` reste en stockage local. Sert au
+ * seul test « CONSTAT » : cette ancienne preference ne doit plus rien produire.
+ */
+async function poserAnciennePreferenceSombre(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('axion-theme', 'dark');
+  });
 }
 
 interface Ecran {
@@ -218,7 +221,6 @@ for (const ecran of ECRANS) {
   for (const theme of themes) {
     test(`${ecran.url} (${theme}) — aucune violation critical/serious hors socle`, async ({ page }) => {
       await simulerApi(page, ecran.charge);
-      await poserTheme(page, theme);
       await page.goto(ecran.url);
 
       // Verrou 1 — l'ecran attendu est bien celui qui est rendu.
@@ -294,7 +296,7 @@ test("CONSTAT — le mode sombre n'existe plus : une preference « dark » ancie
   await simulerApi(page, LISTE_VIDE);
   // Un navigateur qui avait choisi « sombre » avant le lot 2 UX garde cette
   // valeur en stockage local : elle ne doit plus rien produire.
-  await poserTheme(page, 'dark');
+  await poserAnciennePreferenceSombre(page);
   await page.goto('/companies');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 

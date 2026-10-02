@@ -109,7 +109,7 @@ export function RoumaniePage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Roumanie"
+        title="Entreprises en Roumanie"
         subtitle="Entreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor."
       />
 

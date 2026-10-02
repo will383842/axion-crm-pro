@@ -71,16 +71,19 @@ export interface NavSection {
  * au premier niveau (« LLM Router », « Proxies », « Rotations »,
  * « Observabilité », « Registre AI Act », « Journaux d'audit »).
  *
- * Après : le tableau de bord seul en tête, SIX sections claires dans l'ordre
+ * Après : le tableau de bord seul en tête, des sections claires dans l'ordre
  * de la journée, puis une section « Technique » en dernier :
- *  - À traiter : ce qui attend une décision (doublons, rattachements) ;
- *  - Ma base   : entreprises, contacts, abonnés, candidats ;
- *  - Presse    : médias, journalistes, communiqués ;
- *  - Réseaux   : fédérations et ordres, événements ;
- *  - Ciblage   : audiences, listes, carte, collectes ;
- *  - Réglages  : paramètres, utilisateurs, étiquettes, demandes RGPD ;
- *  - Technique : REPLIÉE par défaut (l'accordéon ne l'ouvre que si la page
- *    courante en fait partie, ou sur un clic). Tout y est renommé en
+ *  - À traiter         : ce qui attend une décision (doublons, rattachements) ;
+ *  - Ma base           : entreprises, contacts, newsletter et guide,
+ *                        candidats, entreprises en Roumanie ;
+ *  - Presse            : médias, journalistes, communiqués ;
+ *  - Réseaux           : fédérations et ordres, événements ;
+ *  - Ciblage           : audiences, listes (CHOISIR à qui s'adresser) ;
+ *  - Alimenter la base : collectes, carte de France (FAIRE ENTRER des
+ *                        entreprises — un autre geste que cibler, revue A09) ;
+ *  - Réglages          : paramètres, utilisateurs, étiquettes, demandes RGPD ;
+ *  - Technique         : REPLIÉE par défaut (l'accordéon ne l'ouvre que si la
+ *    page courante en fait partie, ou sur un clic). Tout y est renommé en
  *    français ; les routes, elles, ne changent pas.
  *
  * Un libellé = un mot partout : le menu, le titre de la page et le fil
@@ -125,7 +128,8 @@ function sectionMaBase(features: ConsoleFeatures): NavSection {
   if (features.console_v2) {
     items.push(
       { to: '/console/contacts', label: 'Contacts', icon: icone(Users2) },
-      { to: '/console/lettre-et-guide', label: 'Abonnés newsletter', icon: icone(Mail) },
+      // La page porte les abonnés de la lettre ET les demandeurs du guide.
+      { to: '/console/lettre-et-guide', label: 'Newsletter et guide', icon: icone(Mail) },
     );
     if (features.universes.vivier) {
       items.push({ to: '/console/vivier', label: 'Candidats', icon: icone(GraduationCap) });
@@ -133,6 +137,7 @@ function sectionMaBase(features: ConsoleFeatures): NavSection {
   } else {
     items.push({ to: '/contacts', label: 'Contacts', icon: icone(UsersIcon) });
   }
+  items.push({ to: '/international/roumanie', label: 'Entreprises en Roumanie', icon: icone(Globe) });
   return { id: 'ma-base', title: 'Ma base', items };
 }
 
@@ -160,8 +165,14 @@ const SECTIONS_FIXES: NavSection[] = [
     items: [
       { to: '/audiences', label: 'Audiences', icon: icone(Users2) },
       { to: '/listes', label: 'Listes', icon: icone(ListChecks) },
-      { to: '/coverage', label: 'Carte de France', icon: icone(MapIcon) },
+    ],
+  },
+  {
+    id: 'alimenter',
+    title: 'Alimenter la base',
+    items: [
       { to: '/campaigns', label: 'Collectes', icon: icone(Megaphone), dataTour: 'nav-campaigns' },
+      { to: '/coverage', label: 'Carte de France', icon: icone(MapIcon) },
     ],
   },
   {
@@ -185,7 +196,6 @@ const SECTIONS_FIXES: NavSection[] = [
       { to: '/llm/rotations', label: 'Rotation des accès', icon: icone(RotateCw) },
       { to: '/rgpd/ai-act', label: 'Registre de l’IA', icon: icone(FileText) },
       { to: '/audit-logs', label: 'Journal des actions', icon: icone(ScrollText) },
-      { to: '/international/roumanie', label: 'Roumanie', icon: icone(Globe) },
     ],
   },
 ];

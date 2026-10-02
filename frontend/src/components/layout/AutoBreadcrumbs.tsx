@@ -41,7 +41,7 @@ const LABELS: Record<string, string> = {
   '/companies': 'Entreprises',
   '/contacts': 'Contacts',
   '/console/contacts': 'Contacts',
-  '/console/lettre-et-guide': 'Abonnés newsletter',
+  '/console/lettre-et-guide': 'Newsletter et guide',
   '/console/vivier': 'Candidats',
   // Presse
   '/media': 'Médias',
@@ -54,9 +54,10 @@ const LABELS: Record<string, string> = {
   '/audiences': 'Audiences',
   '/audiences/new': 'Nouvelle audience',
   '/listes': 'Listes',
-  '/coverage': 'Carte de France',
+  // Alimenter la base
   '/campaigns': 'Collectes',
   '/campaigns/new': 'Nouvelle collecte',
+  '/coverage': 'Carte de France',
   // Réglages
   '/settings': 'Paramètres',
   '/users': 'Utilisateurs',
@@ -70,7 +71,8 @@ const LABELS: Record<string, string> = {
   '/llm/rotations': 'Rotation des accès',
   '/rgpd/ai-act': 'Registre de l’IA',
   '/audit-logs': 'Journal des actions',
-  '/international/roumanie': 'Roumanie',
+  // Ma base (rangée là après la revue A09)
+  '/international/roumanie': 'Entreprises en Roumanie',
   // 2026-08-23 — §8.2 de `10_NAVIGATION-CIBLE.md` : ces deux adresses ne
   // montent plus d'écran, elles redirigent vers `/pas-encore-livre?lot=L7`.
   // Leur libellé RESTE : le fil d'Ariane peut être rendu pendant le temps très

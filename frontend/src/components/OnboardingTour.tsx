@@ -69,7 +69,7 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="sidebar"]',
     placement: 'right',
-    content: 'La barre latérale suit votre journée : À traiter, Ma base, Presse, Réseaux, Ciblage, Réglages. Les outils techniques sont rangés tout en bas, repliés.',
+    content: 'La barre latérale suit votre journée : À traiter, Ma base, Presse, Réseaux, Ciblage, Alimenter la base, Réglages. Les outils techniques sont rangés tout en bas, repliés.',
   },
   {
     target: '[data-tour="global-search"]',

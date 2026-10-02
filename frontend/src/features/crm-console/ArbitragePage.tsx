@@ -145,7 +145,7 @@ function ArbitrageContent() {
           et qui nomme sa propre limite.
         */
         <EmptyState
-          title="Rien à arbitrer"
+          title="Aucune personne à rattacher"
           description={
             'Aucun événement n’attend d’arbitrage dans cette file. ' +
             'Cet écran ne voit que ce que l’ingestion y dépose : il ne dit rien ' +

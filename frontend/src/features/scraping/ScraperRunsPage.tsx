@@ -346,7 +346,7 @@ export function ScraperRunsPage() {
       return resp.data;
     },
     onSuccess: (run) => {
-      toast.success(`Collecte n° ${run.id} annulée`);
+      toast.success(`Passage n° ${run.id} annulé`);
       void qc.invalidateQueries({ queryKey: ['scraper-runs'] });
       setConfirmCancel(null);
     },
@@ -362,7 +362,7 @@ export function ScraperRunsPage() {
       return { sourceId: id, newRun: resp.data };
     },
     onSuccess: ({ sourceId, newRun }) => {
-      toast.success(`Collecte n° ${sourceId} relancée`, { description: `Nouvelle collecte n° ${newRun.id}` });
+      toast.success(`Passage n° ${sourceId} relancé`, { description: `Nouveau passage n° ${newRun.id}` });
       void qc.invalidateQueries({ queryKey: ['scraper-runs'] });
     },
     onError: (err: unknown) => {
@@ -384,7 +384,7 @@ export function ScraperRunsPage() {
     <div className="px-6 py-6" data-testid="scraper-runs-page">
       <PageHeader
         title="Historique des collectes"
-        subtitle="Chaque collecte d’entreprises, en direct : en cours, terminées, en échec."
+        subtitle="Chaque passage de collecte, en direct : en cours, terminés, en échec."
         badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={
           <>
@@ -408,7 +408,7 @@ export function ScraperRunsPage() {
           tone="sky"
           label="Total"
           value={counts.all}
-          sublabel="collectes sur la période"
+          sublabel="passages sur la période"
         />
         <KpiCard
           tone="violet"
@@ -439,7 +439,7 @@ export function ScraperRunsPage() {
       <Toolbar
         left={
           <SearchInput
-            label="Rechercher une collecte par source, département ou identifiant"
+            label="Rechercher un passage par source, département ou numéro"
             value={search}
             onChange={handleSearch}
             placeholder="Rechercher source, dept, id…"
@@ -447,7 +447,7 @@ export function ScraperRunsPage() {
         }
         right={
           <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-            {filtered.length} collecte{filtered.length > 1 ? 's' : ''}
+            {filtered.length} passage{filtered.length > 1 ? 's' : ''}
           </span>
         }
       />
@@ -460,11 +460,11 @@ export function ScraperRunsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<IconRocket />}
-          title={search || filter !== 'all' ? 'Aucune collecte ne correspond' : 'Aucune collecte pour l’instant'}
+          title={search || filter !== 'all' ? 'Aucun passage ne correspond' : 'Aucun passage pour l’instant'}
           description={
             search || filter !== 'all'
               ? 'Aucun résultat avec ces filtres.'
-              : 'Aucune collecte enregistrée pour l’instant.'
+              : 'Aucun passage de collecte enregistré pour l’instant.'
           }
           action={
             search || filter !== 'all' ? (
@@ -523,7 +523,7 @@ export function ScraperRunsPage() {
               <span>
                 Page {currentPage} / {totalPages}
                 <span className="mx-2 text-slate-300 dark:text-slate-700">·</span>
-                {filtered.length} collectes
+                {filtered.length} passages
               </span>
               <div className="flex items-center gap-1">
                 <Button
@@ -552,7 +552,7 @@ export function ScraperRunsPage() {
       <Drawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `Collecte n° ${selected.id}` : ''}
+        title={selected ? `Passage n° ${selected.id}` : ''}
         width="lg"
       >
         {selected ? <RunDrawerContent run={selected} /> : null}
@@ -562,8 +562,8 @@ export function ScraperRunsPage() {
       <Modal
         open={!!confirmCancel}
         onClose={() => setConfirmCancel(null)}
-        title="Annuler cette collecte ?"
-        description={confirmCancel ? `Collecte n° ${confirmCancel.id} · source ${confirmCancel.source}. Les traitements en cours seront interrompus.` : ''}
+        title="Annuler ce passage ?"
+        description={confirmCancel ? `Passage n° ${confirmCancel.id} · source ${confirmCancel.source}. Les traitements en cours seront interrompus.` : ''}
         size="sm"
         footer={
           <>
@@ -576,7 +576,7 @@ export function ScraperRunsPage() {
               onClick={() => confirmCancel && cancelMutation.mutate(confirmCancel.id)}
               data-testid="scraper-runs-cancel-confirm"
             >
-              Annuler la collecte
+              Annuler le passage
             </Button>
           </>
         }
@@ -612,7 +612,7 @@ function buildMenuItems(args: {
     items.push({ id: 'div', divider: true, label: '' });
   }
   if (cancellable) {
-    items.push({ id: 'cancel', label: 'Annuler la collecte', destructive: true, onSelect: onAskCancel });
+    items.push({ id: 'cancel', label: 'Annuler le passage', destructive: true, onSelect: onAskCancel });
   }
   if (retryable) {
     items.push({ id: 'retry', label: 'Relancer', onSelect: onRetry });
@@ -688,7 +688,7 @@ function RunRow({
         {cancellable ? (
           <Tooltip content="Annuler">
             <IconButton
-              label="Annuler la collecte"
+              label="Annuler le passage"
               size="sm"
               variant="ghost"
               onClick={onAskCancel}
@@ -700,7 +700,7 @@ function RunRow({
         ) : retryable ? (
           <Tooltip content="Relancer">
             <IconButton
-              label="Relancer la collecte"
+              label="Relancer le passage"
               size="sm"
               variant="ghost"
               onClick={onRetry}

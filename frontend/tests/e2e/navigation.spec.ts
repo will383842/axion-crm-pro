@@ -65,8 +65,8 @@ test.describe('Navigation smoke', () => {
   });
 
   // Lot 2 UX (2026-10-02) — la barre RÉORGANISÉE : le tableau de bord seul en
-  // tête, six sections (À traiter, Ma base, Presse, Réseaux, Ciblage,
-  // Réglages) et une section « Technique » repliée, en dernier.
+  // tête, les sections (À traiter, Ma base, Presse, Réseaux, Ciblage,
+  // Alimenter la base, Réglages) et une section « Technique » repliée, en dernier.
   test('sidebar : entreprises et contacts sous « Ma base »', async ({ page }) => {
     await page.goto('/');
     await ouvrir(page, 'Ma base');
@@ -87,9 +87,16 @@ test.describe('Navigation smoke', () => {
     await expect(page.getByRole('heading', { name: 'Médias' })).toBeVisible();
   });
 
-  test('sidebar : carte de France et collectes sous « Ciblage »', async ({ page }) => {
+  test('sidebar : audiences et listes sous « Ciblage »', async ({ page }) => {
     await page.goto('/');
     await ouvrir(page, 'Ciblage');
+    await expect(page.getByRole('link', { name: 'Audiences' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Listes' })).toBeVisible();
+  });
+
+  test('sidebar : carte de France et collectes sous « Alimenter la base »', async ({ page }) => {
+    await page.goto('/');
+    await ouvrir(page, 'Alimenter la base');
     await expect(page.getByRole('link', { name: 'Carte de France' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Collectes' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Campagnes' })).toHaveCount(0);
@@ -116,9 +123,9 @@ test.describe('Navigation smoke', () => {
     await expect(page.getByRole('link', { name: 'Demandes RGPD' })).toBeVisible();
   });
 
-  test('sidebar : rangée (lot 2 UX) — six sections + Technique, aucun cadenas', async ({ page }) => {
+  test('sidebar : rangée (lot 2 UX) — sections + Technique, aucun cadenas', async ({ page }) => {
     await page.goto('/');
-    const sections = ['À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Réglages', 'Technique'];
+    const sections = ['À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Alimenter la base', 'Réglages', 'Technique'];
     for (const titre of sections) {
       await expect(page.getByRole('button', { name: titre, exact: true })).toBeVisible();
     }

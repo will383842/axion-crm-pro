@@ -62,7 +62,7 @@ function afficherBarre(chemin: string) {
 }
 
 describe('Navigation cible — arborescence', () => {
-  it('tableau de bord, six sections dans l’ordre de la journée, puis Technique en dernier', () => {
+  it('tableau de bord, les sections dans l’ordre de la journée, puis Technique en dernier', () => {
     const titres = sectionsDeNavigation(TOUT_OUVERT).map((s) => s.title);
     expect(titres).toEqual([
       'Accueil',
@@ -71,10 +71,19 @@ describe('Navigation cible — arborescence', () => {
       'Presse',
       'Réseaux',
       'Ciblage',
+      'Alimenter la base',
       'Réglages',
       'Technique',
     ]);
     expect(sectionsDeNavigation(TOUT_OUVERT).at(-1)?.id).toBe(SECTION_TECHNIQUE);
+  });
+
+  it('Ciblage = choisir à qui s’adresser ; Alimenter la base = faire entrer des entreprises (revue A09)', () => {
+    const sections = sectionsDeNavigation(TOUT_OUVERT);
+    const chemins = (id: string) => sections.find((s) => s.id === id)?.items.map((i) => i.to);
+    expect(chemins('ciblage')).toEqual(['/audiences', '/listes']);
+    expect(chemins('alimenter')).toEqual(['/campaigns', '/coverage']);
+    expect(chemins('ma-base')).toContain('/international/roumanie');
   });
 
   it('aucune section de travail ne dépasse cinq entrées (fini les onze sous « Contacts »)', () => {

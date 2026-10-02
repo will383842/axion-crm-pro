@@ -127,7 +127,7 @@ function PersonnesContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Abonnés newsletter"
+        title="Newsletter et guide"
         subtitle="Abonnés à la newsletter et demandeurs du guide, sans entreprise. Ils rejoignent le hub de contacts une fois rattachés."
       />
 

@@ -70,7 +70,7 @@ describe('D28-012 — la barre latérale', () => {
     // Les groupes du lot 2 UX (accueil + six sections + Technique), énumérés d'après
     // `src/components/layout/Sidebar.tsx` : si l'un disparaît de la barre, cette
     // garde le dit au lieu de compter à l'aveugle.
-    for (const groupe of ['Accueil', 'À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Réglages', 'Technique']) {
+    for (const groupe of ['Accueil', 'À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Alimenter la base', 'Réglages', 'Technique']) {
       const repere = screen.queryByRole('navigation', { name: groupe });
       expect(
         repere !== null,

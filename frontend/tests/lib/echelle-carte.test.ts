@@ -22,6 +22,17 @@ function totauxRealistes(): number[] {
   return Array.from({ length: n }, (_, i) => Math.round(min * (max / min) ** (i / (n - 1))));
 }
 
+/** Totaux par département relevés en production le 2026-10-02 (lecture seule). */
+const TOTAUX_PROD = [
+  9, 17, 42, 3496, 3509, 5351, 5734, 5844, 6042, 7146, 7203, 7316, 7540, 7642, 8152, 9450, 9576, 9590, 9701, 9960,
+  10052, 10744, 10940, 10976, 11681, 12138, 12307, 12581, 12788, 13100, 13121, 13408, 13488, 13932, 14012, 14740,
+  14806, 14870, 15854, 16041, 16221, 16452, 16472, 16645, 17354, 18112, 18904, 19270, 19569, 20473, 20505, 21967,
+  23823, 24229, 25115, 25721, 26296, 26589, 27000, 27529, 27960, 29209, 29848, 30516, 30845, 32051, 33218, 33864,
+  33980, 34406, 35747, 36359, 36386, 36734, 40402, 40520, 41200, 46110, 46844, 48622, 48857, 49683, 50422, 55253,
+  55529, 57018, 64799, 73553, 73672, 74377, 80443, 82698, 83990, 86583, 92545, 94645, 95677, 106360, 117042,
+  119010, 142585, 153306, 160892, 173857, 615507,
+];
+
 /** La couleur que la carte donnera à un total, d'après l'échelle. */
 function couleurDe(echelle: ReturnType<typeof echelleRelative>, total: number): string {
   if (total < 1) return COULEUR_VIDE;
@@ -42,6 +53,15 @@ describe('echelleRelative', () => {
 
     expect(utilisees.size).toBeGreaterThanOrEqual(4);
     expect(utilisees.has(COULEUR_VIDE)).toBe(false);
+  });
+
+  it('totaux mesurés en production le 02/10 (105 zones, de 9 à 615 507) : cinq teintes', () => {
+    const echelle = echelleRelative(TOTAUX_PROD);
+    const utilisees = new Set(TOTAUX_PROD.map((t) => couleurDe(echelle, t)));
+
+    expect(echelle.seuils).toEqual([1, 10000, 15000, 30000, 50000]);
+    expect(utilisees.size).toBe(5);
+    expect(echelle.legende.map((l) => lisible(l.libelle))).toEqual(['0', '9', '10 000', '15 000', '30 000', '50 000 +']);
   });
 
   it('seuils croissants, arrondis lisibles, légende tirée des mêmes seuils', () => {
@@ -87,8 +107,9 @@ describe('echelleRelative', () => {
 });
 
 describe('arrondiLisible / nombreLisible', () => {
-  it('arrondit vers le bas à un chiffre significatif', () => {
+  it('arrondit vers le bas à un nombre rond', () => {
     expect(arrondiLisible(3412)).toBe(3000);
+    expect(arrondiLisible(16472)).toBe(15000);
     expect(arrondiLisible(23870)).toBe(20000);
     expect(arrondiLisible(615507)).toBe(600000);
     expect(arrondiLisible(0)).toBe(1);

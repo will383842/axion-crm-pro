@@ -34,14 +34,25 @@ export interface EchelleCarte {
   legende: ClasseLegende[];
 }
 
+/** Les « jolis » chiffres de tête : 1, 1,5, 2, 2,5, 3, 4… 9. */
+const CHIFFRES_RONDS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9] as const;
+
 /**
- * Arrondi vers le bas à un seul chiffre significatif : 3 412 → 3 000,
+ * Arrondi vers le bas à un nombre rond : 3 412 → 3 000, 16 472 → 15 000,
  * 23 870 → 20 000, 615 507 → 600 000. Lisible d'un coup d'œil.
+ *
+ * Un seul chiffre significatif ne suffit pas : mesuré sur la production,
+ * 10 744 et 16 472 tombaient tous deux à 10 000 et la carte perdait une teinte.
  */
 export function arrondiLisible(valeur: number): number {
   if (!Number.isFinite(valeur) || valeur < 1) return 1;
   const puissance = 10 ** Math.floor(Math.log10(valeur));
-  return Math.max(1, Math.floor(valeur / puissance) * puissance);
+  const tete = valeur / puissance;
+  let rond: number = CHIFFRES_RONDS[0];
+  for (const c of CHIFFRES_RONDS) {
+    if (c <= tete) rond = c;
+  }
+  return Math.max(1, Math.floor(rond * puissance));
 }
 
 /** « 5 000 », avec une espace insécable (jamais coupée en fin de ligne). */

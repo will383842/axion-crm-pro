@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Console\ScoresPerimes;
 use App\Crm\Taxonomy;
 use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;

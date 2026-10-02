@@ -144,6 +144,12 @@ return [
         ],
     ],
 
+    // Délai maximal d'une requête SQL lancée par une requête HTTP de l'API, en
+    // millisecondes (`0` = aucune limite). Cf. `App\Support\DelaiRequeteSql` :
+    // prod 2026-10-02, `statement_timeout = 0`, une liste à plus de 100 s et des
+    // requêtes empilées. Ne s'applique NI aux commandes artisan NI aux files.
+    'statement_timeout_web_ms' => (int) env('DB_STATEMENT_TIMEOUT_WEB_MS', 15000),
+
     'migrations' => [
         'table' => 'migrations',
         'update_date_on_publish' => true,

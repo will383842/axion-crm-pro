@@ -149,7 +149,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/companies/export', [CompaniesController::class, 'export'])
             // §2.10 : un export emporte 4,29 M de fiches nominatives hors du
             // système. Le throttle limitait la CADENCE, pas le DROIT.
-            ->middleware(['throttle:scraper-list', 'permission:data.export']);
+            ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
         // 🔴 CES ROUTES N'EXIGEAIENT AUCUNE PERMISSION. Mesure le 2026-08-19
         // (audit 360, F36-003, S0) : un compte `viewer` - « lecture seule » -
         // creait, modifiait et SUPPRIMAIT DEFINITIVEMENT entreprises et
@@ -229,7 +229,7 @@ Route::prefix('v1')->group(function () {
         // /media/export DOIT précéder /media/{media} (sinon "export" pris pour un id).
         Route::get('/media', [MediaController::class, 'index']);
         Route::get('/media/export', [MediaController::class, 'export'])
-            ->middleware(['throttle:scraper-list', 'permission:data.export']);
+            ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
         Route::get('/media/{media}', [MediaController::class, 'show']);
         // Consignation d'un geste presse sur une RÉDACTION (et non sur une
         // personne) : Le Mémorial de l'Isère se joint à `redaction@…`, sans
@@ -244,7 +244,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/journalists', [JournalistsController::class, 'index']);
         Route::get('/journalists/export', [JournalistsController::class, 'export'])
-            ->middleware(['throttle:scraper-list', 'permission:data.export']);
+            ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
         // Création / modification manuelles (2026-08-25). Jusqu'ici la table
         // n'était alimentée QUE par le scraping : aucun contact presse ne
         // pouvait être ajouté à la main, ce qui rendait la base inutilisable
@@ -485,7 +485,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/personnes', [PersonnesController::class, 'index']);
             Route::get('/personnes/counts', [PersonnesController::class, 'counts']);
             Route::get('/personnes/export', [PersonnesController::class, 'export'])
-                ->middleware(['throttle:scraper-list', 'permission:data.export']);
+                ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

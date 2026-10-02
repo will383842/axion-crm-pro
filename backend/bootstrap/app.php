@@ -4,7 +4,10 @@ use App\Http\Middleware\AuditHashChainLogger;
 use App\Http\Middleware\EnforceFirstLoginSetup;
 use App\Http\Middleware\EnsureCrmConsoleV2;
 use App\Http\Middleware\EnsureTwoFactorPassed;
+use App\Http\Middleware\LimiteDureeRequetesSql;
 use App\Http\Middleware\SetCurrentWorkspace;
+use App\Support\DelaiRequeteSql;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -94,7 +97,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // apres l'authentification, avant le binding.
         //
         // Verrouille par tests/Unit/Http/ContexteWorkspaceAvantBindingTest.php.
+        //
+        // (D) FILET DE SECURITE : aucune requete SQL d'ecran au-dela de 15 s
+        // (constat prod 2026-10-02 : `statement_timeout = 0`, liste Contacts a
+        // plus de 100 s, requetes empilees). EN TETE du groupe : il ne lit ni
+        // l'utilisateur ni l'espace, et doit couvrir les requetes de session et
+        // d'authentification elles-memes. Cf. `App\Support\DelaiRequeteSql`,
+        // garde : tests/Feature/Infra/DelaiRequetesWebTest.php.
         $middleware->api(
+            prepend: [LimiteDureeRequetesSql::class],
             remove: [SubstituteBindings::class],
             append: [
                 SetCurrentWorkspace::class,
@@ -114,6 +125,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => AuditHashChainLogger::class,
             // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
             'crm-console' => EnsureCrmConsoleV2::class,
+            // Delai SQL elargi pour une route qui en a besoin (exports en flux) :
+            // `delai-sql:300`, en secondes.
+            'delai-sql' => LimiteDureeRequetesSql::class,
             // §2.10 du plan — les exports de données sont réservés aux
             // détenteurs de la permission `data.export` (owner, admin,
             // opérateur ; PAS viewer). Sans cette garde, n'importe quel compte
@@ -136,4 +150,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn ($request, $e) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // (E) UNE REQUETE TROP LONGUE N'EST PAS UNE PANNE. Le filet (D) annule
+        // la requete SQL (SQLSTATE 57014) : on le dit a l'ecran, en francais,
+        // en 503 — pas un 500 « le serveur est casse ». L'exception reste
+        // journalisee (`report` par defaut) : un depassement est un signal.
+        $exceptions->render(function (QueryException $e, Request $request) {
+            if (! DelaiRequeteSql::estDepassement($e)) {
+                return null;
+            }
+
+            return response()->json([
+                'error' => 'requete_trop_longue',
+                'message' => DelaiRequeteSql::MESSAGE,
+            ], 503);
+        });
     })->create();

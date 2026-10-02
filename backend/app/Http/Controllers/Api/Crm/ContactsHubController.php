@@ -47,6 +47,27 @@ class ContactsHubController extends ConsoleController
         'denomination' => 'denomination',
     ];
 
+    /**
+     * Colonnes LUES pour la liste — plus de `select *`.
+     *
+     * Mesure prod du 2026-10-02 : une ligne de `companies` pèse 1 071 octets
+     * (`signals`, `metadata`, `field_origins` en JSON…) dont la liste n'affiche
+     * rien. `present()` lit ces colonnes-ci et rien d'autre ; les colonnes de
+     * TRI y figurent toutes, car la pagination par curseur relit leur valeur
+     * sur la dernière ligne de la page pour encoder le curseur suivant.
+     *
+     * ⚠️ Ajouter un champ à `present()` impose de l'ajouter ici : sinon il
+     * sortira `null` sans erreur. Garde : `ContactsHubPerformanceTest`.
+     *
+     * @var list<string>
+     */
+    public const COLONNES_LISTE = [
+        'id', 'workspace_id', 'siren', 'denomination', 'relation_type',
+        'lifecycle_stage', 'legal_basis', 'city_name', 'city', 'department_code',
+        'size_category', 'email_generic', 'quality_score', 'created_at',
+        'updated_at', 'deleted_at',
+    ];
+
     public function index(Request $request): JsonResponse
     {
         $workspaceId = $this->businessWorkspace($request);
@@ -112,6 +133,7 @@ class ContactsHubController extends ConsoleController
     private function buildQuery(string $workspaceId, array $validated): QueryBuilder
     {
         $base = Company::query()
+            ->select(array_map(static fn (string $c): string => 'companies.' . $c, self::COLONNES_LISTE))
             ->whereNull('deleted_at')
             // Scope EXPLICITE, en plus de la RLS : la défense en profondeur du
             // lot L0 vaut pour les deux couches, pas pour l'une OU l'autre.
@@ -263,28 +285,67 @@ class ContactsHubController extends ConsoleController
                 ->whereIn('company_tag.tag_id', $etiquettesHumaines);
         };
 
-        // AUCUNE étiquette de provenance humaine dans ce workspace : la
-        // condition est alors constante, et on l'ÉCRIT plutôt que de faire
-        // évaluer 4,29 M de fois un `EXISTS` dont on sait qu'il est faux.
-        // Mesuré : 0,39 ms au lieu de 80 ms.
-        if ($etiquettesHumaines === []) {
-            $query->where(
-                'lifecycle_stage',
-                $mode === 'froids' ? '=' : '!=',
-                'nouveau',
-            );
-
-            return;
-        }
+        // Les étapes « au-delà de nouveau », en LISTE FERMÉE plutôt qu'en
+        // `!= 'nouveau'` : un `<>` ne se sert d'aucun index B-tree, une liste
+        // `IN (…)` se sert de `idx_companies_workspace_lifecycle_stage`.
+        // Strictement équivalent : la contrainte CHECK
+        // `companies_lifecycle_stage_check` ferme la colonne sur cette même
+        // taxonomie, et `NULL` est exclu des deux formes.
+        $etapesActives = array_values(array_diff(Taxonomy::BUSINESS_LIFECYCLE_STAGES, ['nouveau']));
 
         if ($mode === 'froids') {
-            $query->where('lifecycle_stage', 'nouveau')->whereNotExists($hasHumanSource);
+            // La masse froide, c'est 4,3 M de fiches sur 4,3 M : le parcours
+            // de `idx_companies_ws_stage_updated_id` trouve ses 50 lignes tout
+            // de suite (mesuré en prod : 28 ms).
+            $query->where('lifecycle_stage', 'nouveau');
+            if ($etiquettesHumaines !== []) {
+                $query->whereNotExists($hasHumanSource);
+            }
 
             return;
         }
 
-        $query->where(function (Builder $q) use ($hasHumanSource): void {
-            $q->where('lifecycle_stage', '!=', 'nouveau')->orWhereExists($hasHumanSource);
+        // ── 2026-10-02 : « la page Contacts ne charge jamais » ──────────────
+        //
+        // La forme précédente :
+        //
+        //     lifecycle_stage <> 'nouveau' OR EXISTS (… company_tag …)
+        //     ORDER BY updated_at DESC, id DESC LIMIT 51
+        //
+        // 🔴 Un OU entre une colonne et un sous-select corrélé ne se sert
+        // d'AUCUN index. Postgres parcourt alors `idx_companies_ws_updated_id`
+        // dans l'ordre du tri en testant chaque fiche, en pariant sur la
+        // moitié des lignes (estimation 2 173 603). En réalité UNE fiche sur
+        // 4 346 269 est active : il parcourt TOUT l'index, et relit le tas
+        // ligne à ligne. Mesuré en prod : plus de 100 s, sans limite de
+        // durée, une requête de plus à chaque visite.
+        //
+        // ✅ Les actives sont PEU NOMBREUSES par définition (activité humaine) :
+        // on les énumère d'abord — deux branches indexées en UNION — puis on
+        // trie ce petit ensemble. Mesuré en prod (EXPLAIN ANALYZE, jit off) :
+        // 2,7 ms.
+        //
+        //   branche 1 : étape au-delà de « nouveau »
+        //               → `idx_companies_workspace_lifecycle_stage`
+        //   branche 2 : provenance humaine
+        //               → `idx_company_tag_tag` (Index Only Scan)
+        //
+        // Ne PAS revenir à un `OR` : la garde
+        // `ContactsHubPerformanceTest` rougit.
+        $query->whereIn('companies.id', function (\Illuminate\Database\Query\Builder $sub) use ($workspaceId, $etapesActives, $etiquettesHumaines): void {
+            $sub->from('companies as actives')
+                ->select('actives.id')
+                ->where('actives.workspace_id', $workspaceId)
+                ->whereNull('actives.deleted_at')
+                ->whereIn('actives.lifecycle_stage', $etapesActives);
+
+            if ($etiquettesHumaines !== []) {
+                $sub->union(
+                    DB::table('company_tag')
+                        ->select('company_tag.company_id')
+                        ->whereIn('company_tag.tag_id', $etiquettesHumaines),
+                );
+            }
         });
     }
 

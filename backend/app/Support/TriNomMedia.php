@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Spatie\QueryBuilder\Sorts\Sort;
 
 /**
@@ -27,7 +28,7 @@ final class TriNomMedia implements Sort
 {
     public const EXPRESSION = "regexp_replace(media.name, '^[^[:alnum:]]+', '')";
 
-    /** @param  Builder<\Illuminate\Database\Eloquent\Model>  $query */
+    /** @param  Builder<Model>  $query */
     public function __invoke(Builder $query, bool $descending, string $property): void
     {
         $sens = $descending ? 'DESC' : 'ASC';

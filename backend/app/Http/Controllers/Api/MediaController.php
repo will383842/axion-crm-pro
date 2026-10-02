@@ -45,8 +45,8 @@ class MediaController extends ApiController
                 // Finitions P2 — « + Plus » ou « "Le Journal" » ne remontent
                 // plus en tête : le nom est trié sans ses signes de tête
                 // (index `idx_media_tri_nom`, voir `TriNomMedia`).
-                ->allowedSorts(AllowedSort::custom('name', new TriNomMedia()), 'enriched_at', 'created_at', 'media_type')
-                ->defaultSort(AllowedSort::custom('name', new TriNomMedia()))
+                ->allowedSorts(AllowedSort::custom('name', new TriNomMedia), 'enriched_at', 'created_at', 'media_type')
+                ->defaultSort(AllowedSort::custom('name', new TriNomMedia))
                 // Lot 3 — le marqueur `site_media` de la fiche liée : la liste ne
                 // montre plus que des sites VÉRIFIÉS (cf. `avecSiteVerifie`).
                 ->select('media.*')

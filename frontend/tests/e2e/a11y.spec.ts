@@ -171,9 +171,9 @@ interface Ecran {
 }
 
 const ECRANS: readonly Ecran[] = [
-  // « Sign in » : le titre de /login est en ANGLAIS dans un produit francais.
-  // Constat releve, non repare ici (composant hors perimetre).
-  { url: '/login', titre: 'Sign in', repere: 'Sign in', charge: LISTE_VIDE },
+  // Finitions P2 : la langue est FIXEE a `fr` (plus de detecteur). Le
+  // navigateur de test, en anglais, affichait jusque-la « Sign in ».
+  { url: '/login', titre: 'Connexion', repere: 'Se connecter', charge: LISTE_VIDE },
   { url: '/companies', titre: 'Entreprises', repere: 'Inconnue', charge: UNE_ENTREPRISE },
   // Lot 2 UX : « Couverture France » est devenu « Carte de France » (menu,
   // titre et fil d'Ariane disent le meme mot).

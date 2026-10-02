@@ -156,7 +156,7 @@ class GlobalSearchController extends ApiController
             // Les SIREN trouvés passent d'abord.
             if (count($ids) < self::PLAFOND) {
                 [$parNom, $indice] = RechercheEntreprisesParNom::identifiants($espace, $terme, '', self::PLAFOND);
-                $ids = array_values(array_slice(array_unique(array_merge($ids, $parNom)), 0, self::PLAFOND));
+                $ids = array_slice(array_unique(array_merge($ids, $parNom)), 0, self::PLAFOND);
                 if ($ids === []) {
                     $this->indiceEntreprises = $indice;
                 }

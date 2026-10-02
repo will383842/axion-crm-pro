@@ -18,7 +18,7 @@
  * remplacée par une liste de boutons qui appelle le MÊME `onZoneClick`.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 
@@ -74,6 +74,21 @@ async function monter() {
 }
 
 const ENRICHIR = 'Enrichir (emails · téléphones · dirigeants)';
+
+/**
+ * Deux clics dans le MÊME instant, avant tout nouveau rendu : `act` ne rend
+ * qu'à sa sortie, donc le bouton n'est pas encore désactivé et `isPending`
+ * est encore faux au second clic. Seul le verrou immédiat (`useRef`) arrête
+ * le doublon — `userEvent.dblClick` laisse React rendre entre les deux clics
+ * et ne le prouvait pas.
+ */
+async function deuxClicsMemeInstant(bouton: HTMLElement): Promise<void> {
+  await act(async () => {
+    bouton.click();
+    bouton.click();
+    await Promise.resolve();
+  });
+}
 
 describe('Carte de France — aucun clic dangereux', () => {
   it('affiche l’en-tête du système avec le bon titre', async () => {
@@ -131,7 +146,7 @@ describe('Carte de France — aucun clic dangereux', () => {
     const dialogue = await screen.findByRole('dialog');
     const confirmer = within(dialogue).getByRole('button', { name: 'Confirmer' });
 
-    await userEvent.dblClick(confirmer);
+    await deuxClicsMemeInstant(confirmer);
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(lancements).toEqual([{ department: '69', limit: 100, enrich: false }]);
@@ -147,6 +162,8 @@ describe('Carte de France — aucun clic dangereux', () => {
     expect(within(dialogue).getByText('Enrichir les fiches de ce département ?')).toBeInTheDocument();
     expect(within(dialogue).getByText('Département : Rhône (69)')).toBeInTheDocument();
     expect(within(dialogue).getByText(/services extérieurs/)).toBeInTheDocument();
+    // Le volume annoncé est celui de la carte (1 200 pour le Rhône)…
+    expect(within(dialogue).getByText(/au plus 1\s200 fiches/)).toBeInTheDocument();
     const annuler = within(dialogue).getByRole('button', { name: 'Annuler' });
     await waitFor(() => expect(annuler).toHaveFocus());
     await new Promise((r) => setTimeout(r, 100));
@@ -164,10 +181,13 @@ describe('Carte de France — aucun clic dangereux', () => {
     await userEvent.click(await screen.findByRole('button', { name: ENRICHIR }));
     const dialogue = await screen.findByRole('dialog');
 
-    await userEvent.dblClick(within(dialogue).getByRole('button', { name: 'Confirmer' }));
+    expect(within(dialogue).getByText(/au plus 1\s200 fiches/)).toBeInTheDocument();
+
+    await deuxClicsMemeInstant(within(dialogue).getByRole('button', { name: 'Confirmer' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(enrichissements).toEqual([{ department: '69', limit: 50000 }]);
+    // … et c'est CE nombre qui part comme plafond : « au plus 1 200 » est vrai.
+    expect(enrichissements).toEqual([{ department: '69', limit: 1200 }]);
     expect(lancements).toEqual([]);
   });
 

@@ -68,8 +68,14 @@ interface DemandeConfirmation {
   total: number;
 }
 
+/**
+ * Le volume ANNONCÉ dans la confirmation, et le `limit` ENVOYÉ : c'est le même
+ * nombre, pour que « au plus N fiches » soit vrai. Le total de la carte et le
+ * filtre du serveur (département) ne se comptent pas pareil : sans ce plafond
+ * explicite, le serveur pouvait traiter plus que le chiffre annoncé.
+ */
 function volumeEnrichissement(total: number): number {
-  return Math.min(Math.max(total, 0), PLAFOND_ENRICHISSEMENT);
+  return Math.max(1, Math.min(total, PLAFOND_ENRICHISSEMENT));
 }
 
 const LEVELS: Array<{ id: Level; label: string }> = [
@@ -116,7 +122,7 @@ export function CoveragePage() {
       }
       const r = await api.post<{ queued?: number }>('/coverage/enrich', {
         department: demande.code,
-        limit: PLAFOND_ENRICHISSEMENT,
+        limit: volumeEnrichissement(demande.total),
       });
       return { demande, enFile: r.data?.queued ?? 0 };
     },
@@ -301,10 +307,10 @@ export function CoveragePage() {
         {aConfirmer?.action === 'enrichir' ? (
           <p className="text-sm text-slate-600">
             L’enrichissement va compléter au plus{' '}
-            {volumeEnrichissement(aConfirmer.total).toLocaleString('fr-FR')} entreprises de ce
-            département déjà récupérées et pas encore complétées (plafond :{' '}
-            {PLAFOND_ENRICHISSEMENT.toLocaleString('fr-FR')}). Il interroge des services extérieurs
-            pour trouver les e-mails, téléphones et dirigeants. Il se poursuit en arrière-plan.
+            {volumeEnrichissement(aConfirmer.total).toLocaleString('fr-FR')} fiches de ce
+            département déjà récupérées et pas encore complétées. Il interroge des services
+            extérieurs pour trouver les e-mails, téléphones et dirigeants. Il se poursuit en
+            arrière-plan.
           </p>
         ) : (
           <p className="text-sm text-slate-600">

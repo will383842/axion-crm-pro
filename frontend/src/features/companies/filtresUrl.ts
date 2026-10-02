@@ -158,6 +158,17 @@ const REGLES: Record<keyof Filter, Regle> = {
 const CLES = Object.keys(EMPTY_FILTER) as Array<keyof Filter>;
 
 /**
+ * Le code NAF RÉELLEMENT appliqué, ou `''`. Seule fonction qui en décide, pour
+ * la requête, l'export ET l'adresse : une valeur que l'adresse refuserait
+ * n'est pas envoyée non plus — sinon le filtre appliqué disparaîtrait au
+ * rechargement de la page.
+ */
+export function nafApplicable(valeur: string): string {
+  const normalise = normaliserNaf(valeur);
+  return normalise !== '' && REGLES.naf(normalise) ? normalise : '';
+}
+
+/**
  * Anciens noms de paramètres encore portés par des liens ou des favoris.
  * `quality_badge` : le nom de la colonne en base, employé par le lien du
  * tableau de bord jusqu'au 2026-10-02 ; le filtre s'appelle `quality`.
@@ -190,7 +201,7 @@ export function validerRechercheEntreprises(brut: Record<string, unknown>): Rech
       cle === 'department_code' && /^\d$/.test(texte)
         ? `0${texte}`
         : cle === 'naf'
-          ? normaliserNaf(texte)
+          ? nafApplicable(texte)
           : texte;
     if (normalise === '') return;
     if (REGLES[cle](normalise)) sortie[cle] = normalise;

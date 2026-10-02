@@ -40,7 +40,7 @@ import {
   PROSPECTION_TABS,
   QUALITY_OPTIONS,
   filtreDepuisRecherche,
-  normaliserNaf,
+  nafApplicable,
   rechercheDepuisFiltre,
   type Filter,
 } from "./filtresUrl";
@@ -164,10 +164,10 @@ export function CompaniesListPage() {
   const nafDiffere = useAntiRebond(filter.naf);
   const tagDiffere = useAntiRebond(filter.tag);
   const filtreInterroge = useMemo<Filter>(() => {
-    // NAF : la même normalisation que l'adresse (`normaliserNaf`), sinon la
-    // liste filtrerait sur « 68 31Z » quand l'adresse garderait « 6831Z ».
-    if (filter === filtreImpose) return { ...filter, naf: normaliserNaf(filter.naf) };
-    return { ...filter, search: rechercheDifferee, naf: normaliserNaf(nafDiffere), tag: tagDiffere };
+    // NAF : `nafApplicable` décide pour la requête, l'export ET l'adresse —
+    // jamais un filtre appliqué qui disparaîtrait au rechargement.
+    if (filter === filtreImpose) return { ...filter, naf: nafApplicable(filter.naf) };
+    return { ...filter, search: rechercheDifferee, naf: nafApplicable(nafDiffere), tag: tagDiffere };
   }, [filter, filtreImpose, rechercheDifferee, nafDiffere, tagDiffere]);
 
   // ── Adresse ⇄ filtres ────────────────────────────────────────────────
@@ -208,7 +208,7 @@ export function CompaniesListPage() {
       ...(filter.effectif ? { "filter[effectif]": filter.effectif } : {}),
       ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
       ...(filter.search ? { "filter[denomination]": filter.search } : {}),
-      ...(normaliserNaf(filter.naf) ? { "filter[naf]": normaliserNaf(filter.naf) } : {}),
+      ...(nafApplicable(filter.naf) ? { "filter[naf]": nafApplicable(filter.naf) } : {}),
       ...(filter.quality ? { "filter[quality]": filter.quality } : {}),
       ...(filter.prospection_status
         ? { "filter[prospection_status]": filter.prospection_status }

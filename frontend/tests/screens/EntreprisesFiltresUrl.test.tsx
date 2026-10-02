@@ -23,6 +23,7 @@ import type { RouterHistory } from '@tanstack/react-router';
 
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import {
+  nafApplicable,
   rechercheDepuisFiltre,
   validerRechercheEntreprises,
   EMPTY_FILTER,
@@ -83,8 +84,11 @@ describe('validerRechercheEntreprises — l’adresse n’est pas sûre', () => 
     expect(validerRechercheEntreprises({ naf: "68'; DROP" })).toEqual({});
   });
 
-  it('normalise le code NAF (espaces retirés, majuscules)', () => {
+  it('normalise le code NAF (espaces retirés, majuscules) et refuse le reste', () => {
     expect(validerRechercheEntreprises({ naf: '68.31 z' })).toEqual({ naf: '68.31Z' });
+    expect(nafApplicable('68 31z')).toBe('6831Z');
+    expect(nafApplicable('68,31Z')).toBe('');
+    expect(validerRechercheEntreprises({ naf: '68,31Z' })).toEqual({});
   });
 
   it('accepte l’ancien nom `quality_badge` des liens existants', () => {
@@ -228,5 +232,18 @@ describe('écran Entreprises — filtres lus depuis l’adresse', () => {
       expect(derniere).toContain('filter[naf]=68.31Z');
     });
     await waitFor(() => expect(vue.router.state.location.search).toEqual({ naf: '68.31Z' }));
+  });
+
+  it('code NAF refusé par l’adresse : il n’est pas envoyé au serveur non plus', async () => {
+    const { vue, compagnies } = await monter('/companies');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Plus de filtres (13)' }));
+    await userEvent.type(screen.getByLabelText('Code NAF'), '68,31Z');
+    // Au-delà de l'anti-rebond : la valeur aurait eu le temps de partir.
+    await new Promise((r) => setTimeout(r, 600));
+
+    const toutes = compagnies.urls.map((u) => decodeURIComponent(u));
+    expect(toutes.filter((u) => u.includes('filter[naf]'))).toEqual([]);
+    expect(vue.router.state.location.search).toEqual({});
   });
 });

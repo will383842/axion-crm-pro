@@ -51,7 +51,20 @@ class TagsController extends ApiController
             });
         }, lock: ['seconds' => 60]);
 
-        return is_array($charge) && is_array($charge['comptes'] ?? null) ? $charge : ['comptes' => [], 'computed_at' => null];
+        if (! is_array($charge) || ! is_array($charge['comptes'] ?? null)) {
+            return ['comptes' => [], 'computed_at' => null];
+        }
+
+        // Valeur relue du cache (`mixed`) : on la remet en forme, typée.
+        $comptes = [];
+        foreach ($charge['comptes'] as $id => $n) {
+            $comptes[(string) $id] = (int) $n;
+        }
+
+        return [
+            'comptes' => $comptes,
+            'computed_at' => is_string($charge['computed_at'] ?? null) ? $charge['computed_at'] : null,
+        ];
     }
 
     /**

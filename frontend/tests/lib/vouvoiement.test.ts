@@ -15,7 +15,10 @@
  * l'inversion « -tu » / « -toi », et les impératifs de 2e personne courants en
  * tête de phrase (Lance, Choisis, Crée, Ajoute, Saisis, Vérifie, Reçois,
  * Essaie, Tape, Invite, Configure, Renseigne, Compose, Explore, Découvre,
- * Améliore, Reprends, Visualise, Réinitialise, Clique…).
+ * Améliore, Reprends, Visualise, Réinitialise, Clique, Fais, Modifie,
+ * Supprime, Envoie, Exporte, Importe, Regarde…) ; les mêmes en MINUSCULE en
+ * tête de phrase ou après « puis / ensuite / alors » ; « Active » et « Copie »
+ * seulement suivis d'un complément (ce sont aussi un adjectif et un nom).
  *
  * ═══ EXCEPTIONS ═══
  *
@@ -67,6 +70,21 @@ describe('Détecteur de tutoiement — témoins', () => {
     'Reçois un lien de connexion par email.',
     'Explore tes entreprises',
     'Tape au moins 2 caractères pour rechercher.',
+    // Élargissement du 02/10 : impératifs ajoutés, et formes en MINUSCULE en
+    // tête de phrase ou après « puis » — elles passaient toutes.
+    'Fais une sauvegarde avant.',
+    'Modifie la fiche.',
+    'Supprime les doublons.',
+    'Envoie le communiqué.',
+    'Exporte la liste.',
+    'Importe un fichier.',
+    'Regarde la carte.',
+    'Active les relances.',
+    'Copie le lien.',
+    'Ouvre la fiche, puis lance la collecte.',
+    'Fiche enregistrée. modifie-la si besoin.',
+    'choisis une zone sur la carte',
+    'copie-le dans le presse-papiers',
   ])('repère « %s »', (texte) => {
     expect(motifTutoiement(texte)).not.toBeNull();
   });
@@ -81,6 +99,14 @@ describe('Détecteur de tutoiement — témoins', () => {
     'Saint-Étienne',
     'Récupérer des entreprises',
     'Inviter quelqu’un',
+    // Noms, adjectifs et participes — à ne PAS confondre avec un ordre.
+    'Active',
+    'Copie du consentement : la preuve reste sur le site.',
+    'la relance du jour',
+    'Contacts vérifiés et enrichis',
+    'Fiches choisies à la main',
+    'active',
+    'Supprimer',
   ])('ne confond pas « %s » avec un tutoiement', (texte) => {
     expect(motifTutoiement(texte)).toBeNull();
   });

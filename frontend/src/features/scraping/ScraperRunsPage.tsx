@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   Button,
   Card,
@@ -345,7 +346,7 @@ export function ScraperRunsPage() {
       return resp.data;
     },
     onSuccess: (run) => {
-      toast.success(`Run #${run.id} annulé`);
+      toast.success(`Collecte n° ${run.id} annulée`);
       void qc.invalidateQueries({ queryKey: ['scraper-runs'] });
       setConfirmCancel(null);
     },
@@ -361,7 +362,7 @@ export function ScraperRunsPage() {
       return { sourceId: id, newRun: resp.data };
     },
     onSuccess: ({ sourceId, newRun }) => {
-      toast.success(`Run #${sourceId} relancé`, { description: `Nouveau run #${newRun.id}` });
+      toast.success(`Collecte n° ${sourceId} relancée`, { description: `Nouvelle collecte n° ${newRun.id}` });
       void qc.invalidateQueries({ queryKey: ['scraper-runs'] });
     },
     onError: (err: unknown) => {
@@ -382,8 +383,8 @@ export function ScraperRunsPage() {
   return (
     <div className="px-6 py-6" data-testid="scraper-runs-page">
       <PageHeader
-        title="Journaux de collecte"
-        subtitle="Monitoring des jobs de scraping en temps réel."
+        title="Historique des collectes"
+        subtitle="Chaque collecte d’entreprises, en direct : en cours, terminées, en échec."
         badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
         actions={
           <>
@@ -407,7 +408,7 @@ export function ScraperRunsPage() {
           tone="sky"
           label="Total"
           value={counts.all}
-          sublabel="runs sur la fenêtre"
+          sublabel="collectes sur la période"
         />
         <KpiCard
           tone="violet"
@@ -446,7 +447,7 @@ export function ScraperRunsPage() {
         }
         right={
           <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-            {filtered.length} run{filtered.length > 1 ? 's' : ''}
+            {filtered.length} collecte{filtered.length > 1 ? 's' : ''}
           </span>
         }
       />
@@ -459,11 +460,11 @@ export function ScraperRunsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<IconRocket />}
-          title={search || filter !== 'all' ? 'Aucun run ne correspond' : 'Aucun run pour l’instant'}
+          title={search || filter !== 'all' ? 'Aucune collecte ne correspond' : 'Aucune collecte pour l’instant'}
           description={
             search || filter !== 'all'
               ? 'Aucun résultat avec ces filtres.'
-              : 'Aucune collecte en cours.'
+              : 'Aucune collecte enregistrée pour l’instant.'
           }
           action={
             search || filter !== 'all' ? (
@@ -471,9 +472,13 @@ export function ScraperRunsPage() {
                 Réinitialiser
               </Button>
             ) : (
-              <a href="/coverage">
-                <Button variant="primary" size="md">Lancer un scrape</Button>
-              </a>
+              // Un seul élément interactif (audit P1-4 : plus de bouton dans un lien).
+              <Link
+                to="/coverage"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+              >
+                Récupérer des entreprises
+              </Link>
             )
           }
         />
@@ -485,7 +490,7 @@ export function ScraperRunsPage() {
           <TableScroll template={RUNS_GRID}>
           {/* Header (sticky) */}
           <div
-            className="sticky top-0 z-10 grid gap-3 border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400"
+            className="sticky top-0 z-10 grid gap-3 border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400"
             style={{ gridTemplateColumns: RUNS_GRID }}
           >
             <div>ID</div>
@@ -518,7 +523,7 @@ export function ScraperRunsPage() {
               <span>
                 Page {currentPage} / {totalPages}
                 <span className="mx-2 text-slate-300 dark:text-slate-700">·</span>
-                {filtered.length} runs
+                {filtered.length} collectes
               </span>
               <div className="flex items-center gap-1">
                 <Button
@@ -547,7 +552,7 @@ export function ScraperRunsPage() {
       <Drawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `Run #${selected.id}` : ''}
+        title={selected ? `Collecte n° ${selected.id}` : ''}
         width="lg"
       >
         {selected ? <RunDrawerContent run={selected} /> : null}
@@ -557,8 +562,8 @@ export function ScraperRunsPage() {
       <Modal
         open={!!confirmCancel}
         onClose={() => setConfirmCancel(null)}
-        title="Annuler ce run ?"
-        description={confirmCancel ? `Run #${confirmCancel.id} · source ${confirmCancel.source}. Les jobs en cours seront interrompus.` : ''}
+        title="Annuler cette collecte ?"
+        description={confirmCancel ? `Collecte n° ${confirmCancel.id} · source ${confirmCancel.source}. Les traitements en cours seront interrompus.` : ''}
         size="sm"
         footer={
           <>
@@ -571,7 +576,7 @@ export function ScraperRunsPage() {
               onClick={() => confirmCancel && cancelMutation.mutate(confirmCancel.id)}
               data-testid="scraper-runs-cancel-confirm"
             >
-              Annuler le run
+              Annuler la collecte
             </Button>
           </>
         }
@@ -607,7 +612,7 @@ function buildMenuItems(args: {
     items.push({ id: 'div', divider: true, label: '' });
   }
   if (cancellable) {
-    items.push({ id: 'cancel', label: 'Annuler le run', destructive: true, onSelect: onAskCancel });
+    items.push({ id: 'cancel', label: 'Annuler la collecte', destructive: true, onSelect: onAskCancel });
   }
   if (retryable) {
     items.push({ id: 'retry', label: 'Relancer', onSelect: onRetry });
@@ -683,7 +688,7 @@ function RunRow({
         {cancellable ? (
           <Tooltip content="Annuler">
             <IconButton
-              label="Annuler le run"
+              label="Annuler la collecte"
               size="sm"
               variant="ghost"
               onClick={onAskCancel}
@@ -695,7 +700,7 @@ function RunRow({
         ) : retryable ? (
           <Tooltip content="Relancer">
             <IconButton
-              label="Relancer le run"
+              label="Relancer la collecte"
               size="sm"
               variant="ghost"
               onClick={onRetry}
@@ -737,7 +742,7 @@ function RunDrawerContent({ run }: { run: Run }) {
       </div>
 
       <div>
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Source · Zone
         </div>
         <div className="mt-1 text-base font-medium text-slate-900 dark:text-white">
@@ -758,7 +763,7 @@ function RunDrawerContent({ run }: { run: Run }) {
 
       {run.error ? (
         <div className="rounded-lg bg-rose-50 p-3 ring-1 ring-rose-200 dark:bg-rose-950/40 dark:ring-rose-900/50">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+          <div className="text-xs font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
             Erreur
           </div>
           <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-rose-800 dark:text-rose-200">
@@ -769,10 +774,10 @@ function RunDrawerContent({ run }: { run: Run }) {
 
       {Object.keys(payload).length > 0 ? (
         <details className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800/40 dark:ring-slate-800">
-          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Payload de la requête
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Données envoyées
           </summary>
-          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 dark:text-slate-300">
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-slate-700 dark:text-slate-300">
             {JSON.stringify(payload, null, 2)}
           </pre>
         </details>
@@ -780,10 +785,10 @@ function RunDrawerContent({ run }: { run: Run }) {
 
       {Object.keys(response).length > 0 ? (
         <details className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800/40 dark:ring-slate-800">
-          <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Payload de la réponse
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Données reçues
           </summary>
-          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-slate-700 dark:text-slate-300">
+          <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-slate-700 dark:text-slate-300">
             {JSON.stringify(response, null, 2)}
           </pre>
         </details>
@@ -795,9 +800,9 @@ function RunDrawerContent({ run }: { run: Run }) {
 function DataItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100 dark:bg-slate-800/40 dark:ring-slate-800">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-0.5 truncate font-medium text-slate-900 dark:text-white" title={value}>{value}</div>
-      {hint ? <div className="text-[11px] text-slate-500 dark:text-slate-400">{hint}</div> : null}
+      {hint ? <div className="text-xs text-slate-500 dark:text-slate-400">{hint}</div> : null}
     </div>
   );
 }
@@ -831,10 +836,7 @@ function RunsTableSkeleton() {
 // ---------------------------------------------------------------------------
 // Helpers (axios error → string)
 // ---------------------------------------------------------------------------
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

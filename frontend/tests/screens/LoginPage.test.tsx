@@ -225,17 +225,25 @@ describe('LoginPage — messages d’échec', () => {
   });
 
   it('419 : redemande le jeton CSRF et rejoue la connexion UNE fois, en silence', async () => {
+    // Le JOURNAL ordonné des requêtes, et non un simple compteur de cookies :
+    // `ensureCsrf` mémorise le jeton au niveau du MODULE. Selon les tests
+    // passés avant celui-ci, le premier POST demande ou non le cookie — un
+    // « au moins un cookie » passait donc aussi quand le 419 ne redemandait
+    // RIEN (le cookie compté était celui d'avant le premier essai). Ce qu'on
+    // prouve désormais, quel que soit l'ordre : un cookie est redemandé ENTRE
+    // le 419 et le second essai.
+    const journal: string[] = [];
     let appels = 0;
-    let cookies = 0;
     const view = await renderScreen(<LoginPage />, {
       ...OPTIONS,
       handlers: [
         http.get(`${API_ORIGIN}/sanctum/csrf-cookie`, () => {
-          cookies += 1;
+          journal.push('cookie');
           return new HttpResponse(null, { status: 204 });
         }),
         http.post(apiUrl('/auth/login'), () => {
           appels += 1;
+          journal.push(`login-${appels}`);
           return appels === 1
             ? HttpResponse.json({ message: 'CSRF token mismatch.' }, { status: 419 })
             : HttpResponse.json({ requires_2fa: false });
@@ -248,8 +256,12 @@ describe('LoginPage — messages d’échec', () => {
       expect(view.router.state.location.pathname).toBe('/');
     });
     expect(appels).toBe(2);
+    const premier = journal.indexOf('login-1');
+    const second = journal.indexOf('login-2');
+    expect(premier).toBeGreaterThanOrEqual(0);
+    expect(second).toBeGreaterThan(premier);
     // Le cookie a bien été REDEMANDÉ entre les deux essais.
-    expect(cookies).toBeGreaterThanOrEqual(1);
+    expect(journal.slice(premier + 1, second)).toContain('cookie');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 

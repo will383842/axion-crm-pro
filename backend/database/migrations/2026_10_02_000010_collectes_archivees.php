@@ -46,6 +46,12 @@ return new class extends Migration
         SQL);
     }
 
+    /**
+     * Retour arrière : retire la colonne `archived_at`. Aucune donnée métier
+     * n'est perdue — la colonne ne porte QUE le masquage ; les collectes,
+     * leurs fiches et leurs journaux ne sont jamais touchés par `up()`. Les
+     * collectes archivées redeviennent simplement visibles dans la liste.
+     */
     public function down(): void
     {
         if (Schema::hasTable('scraping_campaigns')) {

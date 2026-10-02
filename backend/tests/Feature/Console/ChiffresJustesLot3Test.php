@@ -153,15 +153,20 @@ test('entreprises : /companies/stats compte TOUTE la base, pas la page', functio
         l3Entreprise($this->espace, ['size_category' => 'tpe', 'sector_main' => 'btp', 'enriched_at' => now()]);
     }
     l3Entreprise($this->espace, ['size_category' => 'pme', 'sector_main' => 'btp']);
+    // Une fiche SANS taille ni secteur : la part se calcule sur TOUTES les
+    // fiches (relecture A09), pas parmi les seules fiches renseignées.
+    l3Entreprise($this->espace);
 
     $s = $this->getJson('/api/v1/companies/stats')->assertOk();
 
-    expect($s->json('total'))->toBe(4)
-        ->and($s->json('enrichies_pct'))->toBe(75)
+    expect($s->json('total'))->toBe(5)
+        ->and($s->json('enrichies_pct'))->toBe(60)
         ->and($s->json('top_taille.code'))->toBe('tpe')
-        ->and($s->json('top_taille.pct'))->toBe(75)
+        ->and($s->json('top_taille.pct'))->toBe(60)
         ->and($s->json('top_secteur.code'))->toBe('btp')
-        ->and($s->json('top_secteur.n'))->toBe(4);
+        ->and($s->json('top_secteur.n'))->toBe(4)
+        ->and($s->json('top_secteur.pct'))->toBe(80)
+        ->and($s->json('computed_at'))->not->toBeNull();
 
     // Servi depuis le cache : le second appel ne relit pas la base.
     expect(l3Requetes(fn () => $this->getJson('/api/v1/companies/stats')->assertOk(), '/from "companies"/i'))->toBe(0);
@@ -235,18 +240,26 @@ test('journalistes : les noms d emissions et de chaines ne sont ni montres ni co
     $j('Journaliste', 'éco local');
     $j(null, 'Quotidien');
     $j('Centre des monuments', 'nationaux');
+    // Relecture A09 : un nom mal découpé est une vraie personne (nom coupé
+    // avant « ( » / « + ») ; « France » n'est écarté que devant une chaîne.
+    $j('Yann', 'Zzboursier (+ Autre Zznom');
+    $j('Inès', 'Zzroux (et alternants)');
+    $j('France', 'Inter');
+    $j('France', 'Zzdupont');
 
     $r = $this->getJson('/api/v1/journalists?per_page=100')->assertOk();
     $noms = collect($r->json('data'))->map(fn (array $l): string => trim(($l['first_name'] ?? '') . ' ' . $l['last_name']))->sort()->values()->all();
 
-    expect($noms)->toBe(['Xavier de Zzmoulins', 'Zoé Zzmartin'])
-        ->and($r->json('meta.total'))->toBe(2)
-        ->and($r->json('meta.stats'))->toBe(['total' => 2, 'avec_email' => 1, 'opt_out' => 0, 'ecartees' => 5]);
+    expect($noms)->toBe([
+        'France Zzdupont', 'Inès Zzroux (et alternants)', 'Xavier de Zzmoulins', 'Yann Zzboursier (+ Autre Zznom', 'Zoé Zzmartin',
+    ])
+        ->and($r->json('meta.total'))->toBe(5)
+        ->and($r->json('meta.stats'))->toBe(['total' => 5, 'avec_email' => 1, 'opt_out' => 0, 'ecartees' => 6]);
 
     // Rien n'est supprimé : les lignes écartées restent consultables.
-    expect($this->getJson('/api/v1/journalists?filter[personne_reelle]=false')->json('meta.total'))->toBe(5)
-        ->and($this->getJson('/api/v1/journalists?filter[personne_reelle]=tous')->json('meta.total'))->toBe(7)
-        ->and(DB::table('journalists')->where('workspace_id', $this->espace)->whereNull('deleted_at')->count())->toBe(7);
+    expect($this->getJson('/api/v1/journalists?filter[personne_reelle]=false')->json('meta.total'))->toBe(6)
+        ->and($this->getJson('/api/v1/journalists?filter[personne_reelle]=tous')->json('meta.total'))->toBe(11)
+        ->and(DB::table('journalists')->where('workspace_id', $this->espace)->whereNull('deleted_at')->count())->toBe(11);
 });
 
 // ── 6. Collectes : archiver, jamais supprimer ──────────────────────────────
@@ -306,7 +319,13 @@ test('etiquettes : plus de troncature a 500, et les comptes par etiquette sont s
     expect(count($r->json('data')))->toBe(501)
         ->and(collect($r->json('data'))->firstWhere('id', $tag)['companies_count'])->toBe(1);
 
-    expect(l3Requetes(fn () => $this->getJson('/api/v1/tags')->assertOk(), '/from "company_tag"/i'))->toBe(0);
+    expect(l3Requetes(fn () => $this->getJson('/api/v1/tags')->assertOk(), '/from "company_tag"/i'))->toBe(0)
+        ->and($r->json('meta.comptes_calcules_le'))->not->toBeNull();
+
+    // Un étiquetage en masse oublie les comptes : le compte suivant est juste.
+    $autre = l3Entreprise($this->espace);
+    $this->postJson('/api/v1/companies/tags/bulk', ['ids' => [$autre], 'tag' => 'zz-l3-1', 'action' => 'add'])->assertOk();
+    expect(collect($this->getJson('/api/v1/tags')->json('data'))->firstWhere('id', $tag)['companies_count'])->toBe(2);
 });
 
 test('journaux de collecte et federations : le total n est pas recompte a chaque affichage', function () {

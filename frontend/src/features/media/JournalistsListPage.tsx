@@ -116,9 +116,19 @@ export function JournalistsListPage() {
           </>
         }
         actions={
-          <Button variant="secondary" size="md" onClick={() => void exportCsv()} disabled={exporting}>
-            {exporting ? "Export…" : "Exporter CSV"}
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button variant="secondary" size="md" onClick={() => void exportCsv()} disabled={exporting}>
+              {exporting ? "Export…" : "Exporter CSV"}
+            </Button>
+            {/* Relecture A09 : l'export suit la sélection affichée. */}
+            <span className="text-xs text-slate-500" data-testid="export-journalistes-portee">
+              {personnes === "true"
+                ? "L’export contient les personnes identifiées, sans les lignes « à vérifier »."
+                : personnes === "false"
+                  ? "L’export contient uniquement les lignes « à vérifier »."
+                  : "L’export contient toutes les lignes."}
+            </span>
+          </div>
         }
       />
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { libelleActivite } from '@/features/dashboard/activite';
 import { etatQualite } from '@/features/dashboard/qualite';
-import { statsCouverture } from '@/features/coverage/statsCouverture';
+import { scoreAffichable, statsCouverture } from '@/features/coverage/statsCouverture';
+import { misAJour } from '@/lib/fraicheur';
 import { indicateursEntreprises } from '@/features/companies/indicateurs';
 
 /**
@@ -84,5 +85,34 @@ describe('entreprises : vignettes de toute la base', () => {
     expect(k.enrichiesSous).toMatch(/estimation/);
     expect(k.taille).not.toBe('tpe');
     expect(k.secteur).toBe('Bâtiment et travaux publics');
+  });
+});
+
+describe('relecture A09 de #284', () => {
+  it('carte : « dont N au score ≥ 50 » masqué tant que les scores sont périmés ou inconnus', () => {
+    expect(scoreAffichable(79)).toBe(false);
+    expect(scoreAffichable(null)).toBe(false);
+    expect(scoreAffichable(undefined)).toBe(false);
+    expect(scoreAffichable(2)).toBe(true);
+  });
+
+  it('chiffres en cache : « mis à jour il y a N min »', () => {
+    const t0 = Date.parse('2026-10-02T10:00:00Z');
+    expect(misAJour('2026-10-02T09:53:00Z', t0)).toBe('mis à jour il y a 7 min');
+    expect(misAJour('2026-10-02T07:00:00Z', t0)).toBe('mis à jour il y a 3 h');
+    expect(misAJour(null, t0)).toBeNull();
+  });
+
+  it('entreprises : la part est dite « de toutes les fiches »', () => {
+    const k = indicateursEntreprises({
+      total: 10,
+      enrichies_pct: 50,
+      top_taille: { code: 'tpe', n: 6, pct: 60 },
+      top_secteur: { code: 'btp', n: 4, pct: 40 },
+      computed_at: new Date().toISOString(),
+    });
+    expect(k.tailleSous).toBe('60 % de toutes les fiches');
+    expect(k.secteurSous).toMatch(/40 % de toutes les fiches/);
+    expect(k.fraicheur).toMatch(/mis à jour/);
   });
 });

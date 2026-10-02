@@ -154,7 +154,15 @@ class CoverageController extends ApiController
             return $this->ok(['level' => $level, 'cells' => [], 'degraded' => true]);
         }
 
-        return $this->ok(['level' => $level, 'cells' => $cells]);
+        // Relecture A09 de #284 : « dont N au score ≥ 50 » suit la même règle
+        // que l'accueil. La part de scores périmés vient du calcul de l'accueil
+        // (déjà en cache) ; inconnue → null, et l'écran ne montre pas le chiffre.
+        $accueil = Cache::get(DashboardController::cle((string) $workspaceId));
+        $perimes = is_array($accueil) && is_numeric($accueil['quality_a_recalculer_pct'] ?? null)
+            ? (float) $accueil['quality_a_recalculer_pct']
+            : null;
+
+        return $this->ok(['level' => $level, 'cells' => $cells, 'quality_a_recalculer_pct' => $perimes]);
     }
 
     /**

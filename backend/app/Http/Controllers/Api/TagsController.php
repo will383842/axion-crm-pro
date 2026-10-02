@@ -23,7 +23,7 @@ class TagsController extends ApiController
 
     public static function cleComptes(string $espace): string
     {
-        return 'crm:tags:comptes:v1:' . $espace;
+        return 'crm:tags:comptes:v2:' . $espace;
     }
 
     /**
@@ -31,14 +31,14 @@ class TagsController extends ApiController
      * servi périmé jusqu'à 1 jour pendant qu'UN recalcul part après la
      * réponse (`Cache::flexible`, même mécanique que `CompteursHub`).
      *
-     * @return array<string, int> id d'étiquette → nombre de fiches
+     * @return array{comptes: array<string, int>, computed_at: ?string}
      */
     public static function comptesParEtiquette(string $espace): array
     {
         /** @var mixed $charge */
         $charge = Cache::flexible(self::cleComptes($espace), [600, 86400], static function () use ($espace): array {
             return WorkspaceContext::run($espace, static function () use ($espace): array {
-                return DB::table('company_tag as ct')
+                $comptes = DB::table('company_tag as ct')
                     ->join('tags as t', 't.id', '=', 'ct.tag_id')
                     ->where('t.workspace_id', $espace)
                     ->groupBy('ct.tag_id')
@@ -46,10 +46,21 @@ class TagsController extends ApiController
                     ->pluck('c', 'tag_id')
                     ->mapWithKeys(static fn ($c, $id): array => [(string) $id => (int) $c])
                     ->all();
+
+                return ['comptes' => $comptes, 'computed_at' => now()->utc()->toIso8601ZuluString()];
             });
         }, lock: ['seconds' => 60]);
 
-        return is_array($charge) ? $charge : [];
+        return is_array($charge) && is_array($charge['comptes'] ?? null) ? $charge : ['comptes' => [], 'computed_at' => null];
+    }
+
+    /**
+     * Oublie les comptes de l'espace : appelé après un étiquetage en masse,
+     * pour que la page Étiquettes ne montre pas un compte périmé de 10 min.
+     */
+    public static function oublierComptes(string $espace): void
+    {
+        Cache::forget(self::cleComptes($espace));
     }
 
     /**
@@ -86,9 +97,10 @@ class TagsController extends ApiController
             //    il est servi depuis un cache par espace (`comptesParEtiquette`),
             //    recalculé APRÈS la réponse quand il a plus de 10 min.
             $tags = $q->limit(self::LIMITE_LISTE)->get();
-            $counts = $workspaceId
-                ? collect(self::comptesParEtiquette((string) $workspaceId))
-                : collect();
+            $comptes = $workspaceId
+                ? self::comptesParEtiquette((string) $workspaceId)
+                : ['comptes' => [], 'computed_at' => null];
+            $counts = collect($comptes['comptes']);
 
             return $this->ok([
                 'data' => TagResource::collection($tags->map(function ($t) use ($counts) {
@@ -102,7 +114,11 @@ class TagsController extends ApiController
 
                     return $t;
                 })),
-                'meta' => ['total' => $tags->count(), 'tronquee' => $tags->count() >= self::LIMITE_LISTE],
+                'meta' => [
+                    'total' => $tags->count(),
+                    'tronquee' => $tags->count() >= self::LIMITE_LISTE,
+                    'comptes_calcules_le' => $comptes['computed_at'],
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('tags.index failed', ['exception' => $e->getMessage()]);

@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Hash, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { misAJour } from '@/lib/fraicheur';
 import { api } from '@/lib/api';
 import {
   Button,
@@ -108,10 +109,14 @@ export function TagsManagerPage() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['tags'],
-    queryFn: async () => (await api.get<{ data: Tag[] }>('/tags')).data.data,
+    // Lot 3 — la réponse entière : `meta.comptes_calcules_le` date les
+    // comptes par étiquette (servis depuis un cache serveur).
+    queryFn: async () =>
+      (await api.get<{ data: Tag[]; meta?: { comptes_calcules_le?: string | null } }>('/tags')).data,
   });
 
-  const tags = useMemo<Tag[]>(() => data ?? [], [data]);
+  const tags = useMemo<Tag[]>(() => data?.data ?? [], [data]);
+  const comptesMisAJour = misAJour(data?.meta?.comptes_calcules_le ?? null);
 
   const counts = useMemo(() => {
     return {
@@ -188,6 +193,7 @@ export function TagsManagerPage() {
             Nouveau tag
           </Button>
         }
+        {...(comptesMisAJour ? { badge: <span className="text-xs text-slate-500">Nombre de fiches {comptesMisAJour}</span> } : {})}
       />
 
       {/* KPIs */}

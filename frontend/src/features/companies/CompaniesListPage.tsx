@@ -419,7 +419,7 @@ export function CompaniesListPage() {
           tone="violet"
           label="Enrichies"
           value={kpis.enrichies}
-          sublabel={hasActiveFilter ? `${kpis.enrichiesSous} · toute la base, hors filtres` : kpis.enrichiesSous}
+          sublabel={[kpis.enrichiesSous, hasActiveFilter ? 'toute la base, hors filtres' : null, kpis.fraicheur].filter(Boolean).join(' · ')}
           {...(kpis.enrichiesPct !== null ? { progress: kpis.enrichiesPct } : {})}
         />
         <KpiCard

@@ -221,7 +221,7 @@ export function DashboardPage() {
                     : 'Chiffre non disponible'
               }
               {...(qualite.etat === 'ok' ? { progress: qualite.moyenne } : {})}
-              {...(typeof stats.quality_trend_pct === 'number'
+              {...(qualite.etat === 'ok' && typeof stats.quality_trend_pct === 'number'
                 ? {
                     trend: {
                       value: Math.abs(stats.quality_trend_pct),

@@ -470,9 +470,9 @@ Route::prefix('v1')->group(function () {
             ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         // Lot 3 : archiver = masquer de la vue par défaut, sans rien supprimer.
         Route::post('/campaigns/{campaign}/archive', [ScrapingCampaignsController::class, 'archive'])
-            ->middleware('permission:scraping.run');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::post('/campaigns/{campaign}/unarchive', [ScrapingCampaignsController::class, 'unarchive'])
-            ->middleware('permission:scraping.run');
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
         Route::get('/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
             ->middleware('throttle:scraper-list');
 

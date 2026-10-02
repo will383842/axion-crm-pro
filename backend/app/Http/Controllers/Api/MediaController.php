@@ -235,6 +235,9 @@ class MediaController extends ApiController
                     'avec_site_fiable' => (int) ($ligne->avec_site_fiable ?? 0),
                     'avec_email' => (int) ($ligne->avec_email ?? 0),
                     'top_type' => $top === null ? null : ['media_type' => $top->media_type, 'n' => (int) $top->n],
+                    // L'écran écrit « mis à jour il y a N min » : un chiffre en
+                    // cache ne se présente pas comme instantané.
+                    'computed_at' => now()->utc()->toIso8601ZuluString(),
                 ];
             });
         }, lock: ['seconds' => 60]);

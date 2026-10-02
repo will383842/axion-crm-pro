@@ -37,7 +37,7 @@ import { QueryErrorState, Stat } from '@/components/ui';
 // (`verbatimModuleSyntax`), il ne recree aucune arete.
 import type { CoverageMode } from './FranceCoverageMap';
 
-import { statsCouverture, type Cell, type Level } from './statsCouverture';
+import { scoreAffichable, statsCouverture, type Cell, type Level } from './statsCouverture';
 
 const FranceCoverageMap = lazy(async () => ({
   default: (await import('./FranceCoverageMap')).FranceCoverageMap,
@@ -65,13 +65,14 @@ export function CoveragePage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['coverage', level],
     queryFn: async () => {
-      const r = await api.get<{ cells: Cell[] }>('/coverage', { params: { level } });
-      return r.data.cells;
+      const r = await api.get<{ cells: Cell[]; quality_a_recalculer_pct?: number | null }>('/coverage', { params: { level } });
+      return r.data;
     },
     refetchInterval: 60_000,
   });
 
-  const cells = useMemo(() => data ?? [], [data]);
+  const cells = useMemo(() => data?.cells ?? [], [data]);
+  const scoreVisible = scoreAffichable(data?.quality_a_recalculer_pct);
   // P0-3 — une panne n'est pas une France vide : la carte cède la place à l'erreur.
   const echec = error !== null && data === undefined;
 
@@ -139,7 +140,11 @@ export function CoveragePage() {
         <KpiCard
           label="Entreprises trouvées"
           value={stats.totalAll.toLocaleString('fr-FR')}
-          sublabel={`dont ${stats.withScore.toLocaleString('fr-FR')} au score de qualité ≥ 50`}
+          sublabel={
+            scoreVisible
+              ? `dont ${stats.withScore.toLocaleString('fr-FR')} au score de qualité ≥ 50`
+              : 'score de qualité : calcul en attente'
+          }
           tone="violet"
         />
         <KpiCard
@@ -216,6 +221,7 @@ export function CoveragePage() {
           {selectedCell ? (
             <SelectionCard
               cell={selectedCell}
+              scoreVisible={scoreVisible}
               mode={mode}
               onRecuperer={() => void recuperer(selectedCell.code)}
               onEnrichir={() => void enrichir(selectedCell.code)}
@@ -322,12 +328,14 @@ function KpiCard({
 
 function SelectionCard({
   cell,
+  scoreVisible,
   mode,
   onRecuperer,
   onEnrichir,
   onClose,
 }: {
   cell: Cell;
+  scoreVisible: boolean;
   mode: CoverageMode;
   onRecuperer: () => void;
   onEnrichir: () => void;
@@ -355,7 +363,10 @@ function SelectionCard({
 
       <div className="grid grid-cols-2 gap-2">
         <Stat label="Entreprises" value={(cell.total ?? 0).toLocaleString('fr-FR')} />
-        <Stat label="Score ≥ 50"  value={(Number(cell.complete ?? 0) + Number(cell.partial ?? 0)).toLocaleString('fr-FR')} />
+        <Stat
+          label="Score ≥ 50"
+          value={scoreVisible ? (Number(cell.complete ?? 0) + Number(cell.partial ?? 0)).toLocaleString('fr-FR') : 'calcul en attente'}
+        />
       </div>
 
       <div className="mt-4 flex flex-col gap-2">

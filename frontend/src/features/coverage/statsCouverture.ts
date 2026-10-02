@@ -1,3 +1,5 @@
+import { SEUIL_PERIMES_PCT } from '@/features/dashboard/qualite';
+
 export interface Cell {
   code: string;
   name: string;
@@ -9,6 +11,15 @@ export interface Cell {
 }
 
 export type Level = 'region' | 'department' | 'city';
+
+/**
+ * « dont N au score ≥ 50 » suit la règle de l'accueil (relecture A09 de
+ * #284) : tant que la part des scores PÉRIMÉS est forte — ou inconnue — le
+ * chiffre n'est pas montré.
+ */
+export function scoreAffichable(qualityARecalculerPct: number | null | undefined): boolean {
+  return typeof qualityARecalculerPct === 'number' && qualityARecalculerPct <= SEUIL_PERIMES_PCT;
+}
 
 /**
  * Nombre de zones de référence par niveau : 101 départements (métropole,

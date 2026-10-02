@@ -103,3 +103,15 @@ test('le niveau region agrege les memes cellules', function () {
 
     expect($cellules['94']['total'])->toBe(2);
 });
+
+test('la carte porte l etat des scores de l accueil : inconnu tant que l accueil n a pas calcule', function () {
+    [$user, $espace] = l3CouvertureConsole();
+    l3Fiche($espace, '38000');
+    DB::statement('REFRESH MATERIALIZED VIEW coverage_matrix_cells');
+
+    // Inconnu : l'écran n'affiche pas « dont N au score ≥ 50 » (relecture A09).
+    expect($this->actingAs($user)->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))->toBeNull();
+
+    $this->getJson('/api/v1/dashboard/stats')->assertOk();
+    expect($this->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))->not->toBeNull();
+});

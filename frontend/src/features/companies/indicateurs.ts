@@ -1,5 +1,6 @@
 import { libelleReferentiel } from '@/lib/prospection-referentiels';
 import { SECTEURS, TAILLES } from '@/lib/referentiels.generated';
+import { misAJour } from '@/lib/fraicheur';
 
 /**
  * Réponse de `GET /companies/stats` (lot 3, 2026-10-02) : des chiffres de
@@ -23,6 +24,8 @@ export interface IndicateursEntreprises {
   taillePct: number | null;
   secteur: string;
   secteurSous: string;
+  /** « mis à jour il y a N min » (chiffres en cache côté serveur). */
+  fraicheur: string | null;
 }
 
 /**
@@ -40,9 +43,11 @@ export function indicateursEntreprises(s: StatsBase | undefined): IndicateursEnt
     enrichiesSous: enrichiesPct === null ? 'calcul en cours' : 'des fiches (estimation sur 1 % de la base)',
     enrichiesPct,
     taille: taille ? (libelleReferentiel(TAILLES, taille.code) ?? taille.code) : '—',
-    tailleSous: taille ? `${taille.pct} % des fiches` : 'calcul en cours',
+    // `pct` est rapporté à TOUTES les fiches (serveur), valeur absente comprise.
+    tailleSous: taille ? `${taille.pct} % de toutes les fiches` : 'calcul en cours',
     taillePct: taille ? taille.pct : null,
     secteur: secteur ? (libelleReferentiel(SECTEURS, secteur.code) ?? secteur.code) : '—',
-    secteurSous: secteur ? `${secteur.n.toLocaleString('fr-FR')} fiches (${secteur.pct} %)` : 'calcul en cours',
+    secteurSous: secteur ? `${secteur.n.toLocaleString('fr-FR')} fiches (${secteur.pct} % de toutes les fiches)` : 'calcul en cours',
+    fraicheur: misAJour(s?.computed_at ?? null),
   };
 }

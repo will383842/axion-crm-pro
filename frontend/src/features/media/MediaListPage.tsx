@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchI
 import { api } from "@/lib/api";
 import { useAntiRebond } from "@/hooks/useAntiRebond";
 import { toast } from "sonner";
+import { misAJour } from "@/lib/fraicheur";
 
 export interface MediaItem {
   id: number;
@@ -37,6 +38,7 @@ interface MediaStats {
   avec_site_fiable: number;
   avec_email: number;
   top_type: { media_type: string; n: number } | null;
+  computed_at?: string | null;
 }
 
 interface MediaResponse {
@@ -281,7 +283,11 @@ export function MediaListPage() {
           tone="amber"
           label="Type le plus fréquent"
           value={kpis.topType}
-          sublabel={kpis.topTypeN > 0 ? `${kpis.topTypeN.toLocaleString("fr-FR")} médias` : "—"}
+          sublabel={
+            kpis.topTypeN > 0
+              ? [`${kpis.topTypeN.toLocaleString("fr-FR")} médias`, misAJour(stats?.computed_at)].filter(Boolean).join(" · ")
+              : "—"
+          }
         />
       </div>
 

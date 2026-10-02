@@ -24,21 +24,29 @@ namespace App\Crm\Presse;
  *
  * ── LA RÈGLE (rien n'est supprimé, rien n'est réécrit) ──────────────────
  *
+ * Le NOM est d'abord lu COUPÉ avant le premier « ( », « + », « " » ou « « »,
+ * parenthèse fermante retirée : « Nom (+ Autre Nom » → « Nom », « Nom) » →
+ * « Nom », « Nom (et alternants) » → « Nom » (relecture A09 de #284 : ces
+ * noms mal découpés sont de vraies personnes). « Divers (feuilleton) » donne
+ * un nom VIDE, donc écarté.
+ *
  * Une ligne est une PERSONNE IDENTIFIÉE si :
- *   1. prénom ET nom sont renseignés ;
+ *   1. prénom ET nom (coupé) sont renseignés ;
  *   2. le nom complet ne contient ni chiffre, ni parenthèse, ni `+ : " « » / & @`
- *      (« France 3 », « Roux (et alternants) ») ;
+ *      (« France 3 ») ;
  *   3. le premier mot du prénom n'est pas un mot de LIBELLÉ (`MOTS_LIBELLE` :
- *      divers, journaliste, production, france, arte, radio, le, la…) ;
+ *      divers, journaliste, production, arte, radio, le, la…) ; « France »
+ *      n'est écarté que suivi d'une CHAÎNE connue (`CHAINES_FRANCE` : Inter,
+ *      Bleu, Culture, Télévisions…) — « France » est aussi un prénom ;
  *   4. le nom complet ne contient aucun mot d'INSTITUTION (`MOTS_INSTITUTION` :
  *      centre, national, télévision, société, production, feuilleton…) ;
  *   5. le nom commence par une MAJUSCULE, ou par une particule (de, d', du, le,
  *      van…) : « éco local », « nationaux », « romande » sont écartés,
  *      « de Xxx », « d'Xxx » gardés.
  *
- * Mesure en production : 1 229 personnes identifiées, 28 lignes écartées —
- * dont 7 vraies personnes au nom mal découpé (« Prénom Nom (+ Autre
- * Nom »). Faux négatifs assumés : une ligne écartée reste en base,
+ * Mesure en production (2026-10-02) : 1 237 personnes identifiées sur 1 257,
+ * 20 lignes écartées (émissions, chaînes, organisations, noms sans prénom).
+ * Faux négatifs assumés : une ligne écartée reste en base,
  * consultable via le filtre « À vérifier » ; elle n'est simplement plus
  * COMPTÉE ni MONTRÉE comme journaliste par défaut.
  *
@@ -51,7 +59,7 @@ final class PersonneReelle
     /** @var list<string> */
     public const MOTS_LIBELLE = [
         'divers', 'diverses', 'journaliste', 'journalistes', 'production', 'productions', 'magazine',
-        'le', 'la', 'les', 'l', 'centre', 'radio', 'télévision', 'television', 'france', 'arte',
+        'le', 'la', 'les', 'l', 'centre', 'radio', 'télévision', 'television', 'arte',
         'équipe', 'Équipe', 'equipe', 'rédaction', 'redaction', 'service', 'collectif', 'invité',
         'invités', 'invites', 'chroniqueurs', 'plusieurs', 'présentateur', 'présentatrice',
         'animateur', 'animatrice', 'tf1', 'm6', 'bfm', 'bfmtv', 'rtl', 'europe', 'canal', 'tv',
@@ -67,6 +75,12 @@ final class PersonneReelle
         'alternants',
     ];
 
+    /** « France » + l'un de ces noms = une chaîne, pas une personne. */
+    public const CHAINES_FRANCE = [
+        'inter', 'bleu', 'culture', 'info', 'musique', 'ô', 'Ô', 'o', 'tv', '2', '3', '4', '5', '24',
+        'télévisions', 'Télévisions', 'televisions', 'télévision', 'Télévision', 'television', 'médias', 'Médias',
+    ];
+
     /** Particules admises en tête d'un nom en minuscule. */
     private const PARTICULES = 'de|du|des|d\'\'|d’|le|la|van|von|da|di|del|della|ben|el|al|af|zu|dos|das';
 
@@ -79,13 +93,16 @@ final class PersonneReelle
         $libelles = implode(',', array_map(static fn (string $m): string => "'" . str_replace("'", "''", $m) . "'", self::MOTS_LIBELLE));
         $institutions = implode('|', self::MOTS_INSTITUTION);
         $prenom = "btrim(coalesce({$alias}.first_name, ''))";
-        $nom = "btrim(coalesce({$alias}.last_name, ''))";
+        $chaines = implode(',', array_map(static fn (string $m): string => "'" . $m . "'", self::CHAINES_FRANCE));
+        // Le nom COUPÉ avant « ( + " « », parenthèse/guillemet fermants retirés.
+        $nom = "btrim(regexp_replace(regexp_replace(coalesce({$alias}.last_name, ''), '[[:space:]]*[(+\"«].*$', ''), '[)»]', '', 'g'))";
 
         return '(' . implode(' AND ', [
             "{$prenom} <> ''",
             "{$nom} <> ''",
             "({$prenom} || ' ' || {$nom}) !~ '[0-9()+:\"«»/&@]'",
             "lower(split_part({$prenom}, ' ', 1)) NOT IN ({$libelles})",
+            "NOT (lower(split_part({$prenom}, ' ', 1)) = 'france' AND lower({$nom}) IN ({$chaines}))",
             "lower({$prenom} || ' ' || {$nom}) !~ '(^|[^[:alpha:]])({$institutions})([^[:alpha:]]|$)'",
             "{$nom} ~ '^([A-ZÀ-ÖØ-Þ]|(" . self::PARTICULES . ")([[:space:]]|[A-ZÀ-ÖØ-Þ]))'",
         ]) . ')';

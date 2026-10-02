@@ -252,22 +252,27 @@ class CompaniesController extends ApiController
         }
         $n = (int) $echantillon->n;
 
+        // Relecture A09 de #284 : la part est calculée sur TOUTES les fiches,
+        // valeur absente comprise (groupe `null`), et non « parmi les fiches
+        // renseignées » — sinon « 93 % » se lirait comme 93 % de la base.
         $repartition = static fn (string $colonne): array => DB::table('companies')
             ->where('workspace_id', $espace)
             ->whereNull('deleted_at')
-            ->whereNotNull($colonne)
             ->groupBy($colonne)
             ->selectRaw("{$colonne} AS code, count(*) AS n")
             ->orderByDesc('n')
             ->get()
-            ->map(static fn ($l): array => ['code' => (string) $l->code, 'n' => (int) $l->n])
+            ->map(static fn ($l): array => ['code' => $l->code === null ? null : (string) $l->code, 'n' => (int) $l->n])
             ->all();
 
         $tailles = $repartition('size_category');
         $secteurs = $repartition('sector_main');
         $total = array_sum(array_column($tailles, 'n'));
         $top = static function (array $lignes, int $total): ?array {
-            $premier = $lignes[0] ?? null;
+            // La valeur la plus fréquente parmi les fiches RENSEIGNÉES, mais sa
+            // part rapportée à TOUTES les fiches.
+            $renseignees = array_values(array_filter($lignes, static fn (array $l): bool => $l['code'] !== null));
+            $premier = $renseignees[0] ?? null;
 
             return $premier === null ? null : $premier + ['pct' => $total > 0 ? (int) round(100 * $premier['n'] / $total) : 0];
         };
@@ -276,7 +281,7 @@ class CompaniesController extends ApiController
             'total' => $total,
             'enrichies_pct' => $n === 0 ? null : (int) round(100 * (int) $echantillon->e / $n),
             'top_taille' => $top($tailles, $total),
-            'top_secteur' => $top($secteurs, array_sum(array_column($secteurs, 'n'))),
+            'top_secteur' => $top($secteurs, $total),
             'computed_at' => now()->utc()->toIso8601ZuluString(),
         ];
     }

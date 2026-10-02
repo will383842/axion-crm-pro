@@ -455,4 +455,14 @@ return [
         'purger_domaines_apres_jours' => (int) env('CRM_EMAILS_PURGER_DOMAINES_APRES_JOURS', 180),
     ],
 
+    /*
+    | Rafraîchissement des audiences (`AudienceBuilderService::refresh`).
+    | Au-delà de `seuil_lot` fiches, le recalcul part en `Bus::batch` (file
+    | `audiences-refresh`, table `job_batches`) par lots de `taille_lot`.
+    */
+    'audiences' => [
+        'seuil_lot' => (int) env('CRM_AUDIENCES_SEUIL_LOT', 5000),
+        'taille_lot' => (int) env('CRM_AUDIENCES_TAILLE_LOT', 5000),
+    ],
+
 ];

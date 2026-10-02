@@ -66,7 +66,7 @@ class DashboardController extends ApiController
 
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v2:' . $espace;
+        return 'crm:dashboard:stats:v3:' . $espace;
     }
 
     public function stats(Request $r): JsonResponse
@@ -111,8 +111,14 @@ class DashboardController extends ApiController
     {
         return DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => [
             'companies_total' => $this->compter('companies', $espace),
+            // 🔴 2026-10-02 : « Enrichies 24h » = 1 671 720. On comptait
+            // `updated_at` : TOUTE modification d'une fiche (ici un recalcul
+            // massif du score qualité) passait pour un enrichissement. Seul
+            // `enriched_at` dit qu'une fiche a été enrichie ; l'index partiel
+            // `idx_companies_ws_enriched_at` (2026_10_02_000020) sert ce
+            // comptage sans relire les 4,35 M de fiches.
             'companies_enriched_24h' => $this->compter('companies', $espace, function ($q) {
-                $q->where('updated_at', '>=', now()->subDay());
+                $q->whereNotNull('enriched_at')->where('enriched_at', '>=', now()->subDay());
             }),
             'contacts_qualified' => $this->compter('contacts', $espace, function ($q) {
                 // « Qualifiée » = joignable. C'est la définition que le hub

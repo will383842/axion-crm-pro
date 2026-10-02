@@ -28,6 +28,8 @@ const EVENEMENTS: Record<string, string> = {
   RELATIONS_IMPORT_FIN: 'Import des relations terminé',
   GDPR_ERASURE_BISYSTEM: 'Effacement de données personnelles (site et CRM)',
   GDPR_PURGE_VIVIER: 'Purge du vivier de candidats (RGPD)',
+  'auth.login': 'Connexion',
+  'auth.logout': 'Déconnexion',
   'company.enriched': 'Fiche enrichie',
   'audience.refreshed': 'Audience recalculée',
   'audience.refresh.failed': 'Échec du recalcul d’une audience',

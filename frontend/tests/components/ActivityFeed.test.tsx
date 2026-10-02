@@ -60,8 +60,8 @@ describe('ActivityFeed', () => {
     const { ActivityFeed } = await import('@/features/dashboard/components/ActivityFeed');
     render(<ActivityFeed />, { wrapper: enveloppe });
 
-    // Le `event_type` est rendu lisible, pas ignoré.
-    expect(await screen.findByText(/Auth Login/i)).toBeTruthy();
+    // Le `event_type` est rendu en phrase, pas ignoré (ni « Auth Login »).
+    expect(await screen.findByText(/Connexion/)).toBeTruthy();
   });
 
   it("survit à une ligne dont TOUS les champs optionnels manquent", async () => {
@@ -75,7 +75,8 @@ describe('ActivityFeed', () => {
     // La seule assertion qui compte : le rendu ne jette pas. Un champ absent ne
     // doit jamais pouvoir effacer l'application.
     expect(() => render(<ActivityFeed />, { wrapper: enveloppe })).not.toThrow();
-    expect(await screen.findByText(/Événement/i)).toBeTruthy();
+    // Une ligne sans type ne dit rien : elle est masquée, le fil est vide.
+    expect(await screen.findByText(/Activité bientôt disponible/)).toBeTruthy();
   });
 });
 

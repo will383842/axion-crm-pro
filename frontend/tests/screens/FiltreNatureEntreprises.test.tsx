@@ -58,7 +58,10 @@ async function monter() {
     handlers: [compagnies.handler, getJson('/referentiels/geo', GEO)],
   });
   await waitFor(() => expect(compagnies.urls.length).toBeGreaterThanOrEqual(1));
-  const filtre = await screen.findByLabelText("Filtre nature d'entité");
+  // Lot 4 — « Nature » est un filtre secondaire, replié derrière ce bouton,
+  // et son étiquette est désormais VISIBLE.
+  await userEvent.click(await screen.findByRole('button', { name: /Plus de filtres/ }));
+  const filtre = await screen.findByLabelText('Nature');
   const valeurs = within(filtre)
     .getAllByRole('option')
     .map((o) => (o as HTMLOptionElement).value);

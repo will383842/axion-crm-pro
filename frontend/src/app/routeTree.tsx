@@ -9,6 +9,7 @@ import { PasswordResetPage } from '@/features/auth/PasswordResetPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import { CompanyDetailPage } from '@/features/companies/CompanyDetailPage';
+import { validerRechercheEntreprises } from '@/features/companies/filtresUrl';
 import { RoumaniePage } from '@/features/international/RoumaniePage';
 import { EvenementsPage } from '@/features/evenements/EvenementsPage';
 import { EvenementDetailPage } from '@/features/evenements/EvenementDetailPage';
@@ -114,7 +115,15 @@ const magicLinkVerifyRoute = createRoute({ getParentRoute: () => rootRoute, path
 const passwordResetRoute = createRoute({ getParentRoute: () => rootRoute, path: '/password-reset', component: PasswordResetPage });
 
 const dashboardRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/', component: DashboardPage });
-const companiesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies', component: CompaniesListPage });
+// Lot 4 (audit UX 2026-10-02, P1-4) — les filtres de la liste vivent dans
+// l'adresse : un lien du tableau de bord arrive filtré, un rechargement les
+// garde. Chaque paramètre est vérifié (`filtresUrl.ts`) : l'URL n'est pas sûre.
+const companiesRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/companies',
+  component: CompaniesListPage,
+  validateSearch: validerRechercheEntreprises,
+});
 const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
 const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsRoute });
 const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/international/roumanie', component: RoumaniePage });

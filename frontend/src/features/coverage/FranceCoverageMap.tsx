@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-export type CoverageMode = 'visu' | 'search' | 'action';
-
 /**
  * G42-011 — en deçà de ce déplacement (pixels écran), l'infobulle de survol
  * n'est pas repositionnée : l'œil ne verrait pas la différence, et chaque
@@ -63,11 +61,9 @@ const LOG: (...args: unknown[]) => void = import.meta.env.DEV
 
 export function FranceCoverageMap({
   cells,
-  mode,
   onZoneClick,
 }: {
   cells: Cell[];
-  mode: CoverageMode;
   onZoneClick?: (code: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +80,7 @@ export function FranceCoverageMap({
   }, [onZoneClick]);
 
   useEffect(() => {
-    LOG('useEffect:init — container=', containerRef.current, 'cells.length=', cells.length, 'mode=', mode);
+    LOG('useEffect:init — container=', containerRef.current, 'cells.length=', cells.length);
     LOG('env VITE_STRICT_MODE=', import.meta.env['VITE_STRICT_MODE'], 'VITE_MAPLIBRE_TILES_URL=', TILES_URL);
     if (!containerRef.current) {
       LOG('useEffect:abort — no container ref');
@@ -377,10 +373,6 @@ export function FranceCoverageMap({
       map.setFeatureState({ source: 'departements', id: f.id }, { total });
     }
   }, [cells]);
-
-  // mode prop n'est plus utilisé dans le JSX (déplacé en KPI/segmented control parent)
-  // mais on le garde dans la signature pour rétro-compat.
-  void mode;
 
   return (
     <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-50/30">

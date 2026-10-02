@@ -1,6 +1,6 @@
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useId, useRef, useState, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Button,
@@ -11,7 +11,6 @@ import {
   PageHeader,
   QueryErrorState,
   SearchInput,
-  Toolbar,
   cn,
   TableScroll,
 } from "@/components/ui";
@@ -32,6 +31,18 @@ import { indicateursEntreprises, type StatsBase } from "./indicateurs";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
+import {
+  EMPTY_FILTER,
+  LONGUEUR_MAX_ETIQUETTE,
+  LONGUEUR_MAX_NAF,
+  LONGUEUR_MAX_RECHERCHE,
+  PRIORITY_OPTIONS,
+  PROSPECTION_TABS,
+  QUALITY_OPTIONS,
+  filtreDepuisRecherche,
+  rechercheDepuisFiltre,
+  type Filter,
+} from "./filtresUrl";
 import { Pagination } from "./components/Pagination";
 import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
 
@@ -57,71 +68,8 @@ const GRID = COMPANY_ROW_GRID;
 // ici (« artisan », « grande_entreprise », 15 secteurs d'une seule des deux
 // listes du serveur) ont disparu le 2026-09-28.
 
-const QUALITY_OPTIONS = [
-  { value: "", label: "Toutes qualités" },
-  { value: "complete", label: "🟢 Complète (≥ 90)" },
-  { value: "partielle", label: "🟡 Partielle (50-89)" },
-  { value: "basique", label: "🔴 Basique (< 50)" },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: "", label: "Toutes priorités" },
-  { value: "haute", label: "Haute" },
-  { value: "moyenne", label: "Moyenne" },
-  { value: "basse", label: "Basse" },
-  { value: "gelee", label: "Gelée" },
-];
-
-const PROSPECTION_TABS = [
-  { value: "", label: "Tous" },
-  { value: "ready_for_outreach", label: "Prospectables" },
-  { value: "partial_email", label: "Partiels" },
-  { value: "pending", label: "À compléter" },
-  { value: "archived_no_email", label: "Archivés" },
-];
-
-interface Filter {
-  size: string;
-  effectif: string;
-  priority: string;
-  search: string;
-  naf: string;
-  quality: string;
-  // Sprint Pipeline 360°
-  prospection_status: string;
-  department_code: string;
-  region_code: string;
-  sector_main: string;
-  country_code: string;
-  best_email_confidence: string;
-  eligible_campagne: string;
-  entity_nature: string;
-  joignabilite: string;
-  tag: string;
-  cree_apres: string;
-  cree_avant: string;
-}
-
-const EMPTY_FILTER: Filter = {
-  size: "",
-  effectif: "",
-  priority: "",
-  search: "",
-  naf: "",
-  quality: "",
-  prospection_status: "",
-  department_code: "",
-  region_code: "",
-  sector_main: "",
-  country_code: "",
-  best_email_confidence: "",
-  eligible_campagne: "",
-  entity_nature: "",
-  joignabilite: "",
-  tag: "",
-  cree_apres: "",
-  cree_avant: "",
-};
+// Qualité, priorité, onglets de prospection, état des filtres et lecture de
+// l'adresse : `./filtresUrl.ts` (lot 4, 2026-10-02).
 
 export function CompaniesListPage() {
   // Référentiel géographique servi par l'API : 102 départements et 18 régions
@@ -179,9 +127,22 @@ export function CompaniesListPage() {
   const optionsRegions = versOptions(geo.data?.regions ?? [], "Toutes régions");
   const optionsDepartements = versOptions(geo.data?.departments ?? [], "Tous départements");
 
+  // Lot 4 — l'état des filtres NAÎT de l'adresse (`?quality=basique`,
+  // `?department_code=69`…), revalidée ici même si la route l'a déjà fait :
+  // l'écran ne suppose rien de qui l'a monté.
+  const navigate = useNavigate();
+  const rechercheUrl = useSearch({ strict: false });
+  const filtreUrl = useMemo(
+    () => filtreDepuisRecherche(rechercheUrl as Record<string, unknown>),
+    [rechercheUrl],
+  );
+  const cleUrl = JSON.stringify(filtreUrl);
+
   const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
+  const [filter, setFilter] = useState<Filter>(filtreUrl);
   const [exporting, setExporting] = useState(false);
+  const [plusDeFiltres, setPlusDeFiltres] = useState(false);
+  const idPanneau = useId();
 
   // G42-010 — les TROIS champs de SAISIE LIBRE sont différés de 300 ms avant
   // d'atteindre la requête. Les listes déroulantes et les dates NE LE SONT
@@ -200,6 +161,31 @@ export function CompaniesListPage() {
     () => ({ ...filter, search: rechercheDifferee, naf: nafDiffere, tag: tagDiffere }),
     [filter, rechercheDifferee, nafDiffere, tagDiffere],
   );
+
+  // ── Adresse ⇄ filtres ────────────────────────────────────────────────
+  // `derniereCleConnue` est la version des filtres que l'adresse porte (ou va
+  // porter). Elle évite la boucle : l'écran écrit l'adresse, l'adresse change,
+  // l'écran ne la relit PAS comme un ordre venu d'ailleurs.
+  const derniereCleConnue = useRef(cleUrl);
+
+  // Filtres → adresse. On écrit la valeur DIFFÉRÉE (300 ms pour les saisies
+  // libres) et en remplacement : pas une entrée d'historique par lettre.
+  useEffect(() => {
+    const recherche = rechercheDepuisFiltre(filtreInterroge);
+    const cle = JSON.stringify(filtreDepuisRecherche(recherche));
+    if (cle === derniereCleConnue.current) return;
+    derniereCleConnue.current = cle;
+    void navigate({ to: "/companies", search: recherche, replace: true });
+  }, [filtreInterroge, navigate]);
+
+  // Adresse → filtres, quand elle change d'AILLEURS (lien du tableau de bord
+  // ou du menu suivi alors que l'écran est déjà ouvert).
+  useEffect(() => {
+    if (cleUrl === derniereCleConnue.current) return;
+    derniereCleConnue.current = cleUrl;
+    setFilter(filtreUrl);
+    setPage(1);
+  }, [cleUrl, filtreUrl]);
 
   // Construit les mêmes params de filtre que la liste (hors pagination).
   //
@@ -329,46 +315,16 @@ export function CompaniesListPage() {
     setPage(1);
   };
 
-  const hasActiveFilter =
-    filter.search ||
-    filter.size ||
-    filter.effectif ||
-    filter.priority ||
-    filter.naf ||
-    filter.quality ||
-    filter.prospection_status ||
-    filter.department_code ||
-    filter.region_code ||
-    filter.sector_main ||
-    filter.country_code ||
-    filter.best_email_confidence ||
-    filter.eligible_campagne ||
-    filter.tag ||
-    filter.cree_apres ||
-    filter.cree_avant ||
-    filter.entity_nature ||
-    filter.joignabilite;
-
-  const activeFilterCount = [
-    filter.search,
-    filter.size,
-    filter.effectif,
-    filter.priority,
-    filter.naf,
-    filter.quality,
-    filter.prospection_status,
-    filter.department_code,
-    filter.region_code,
-    filter.sector_main,
-    filter.country_code,
-    filter.best_email_confidence,
-    filter.eligible_campagne,
-    filter.tag,
-    filter.cree_apres,
-    filter.cree_avant,
-    filter.entity_nature,
-    filter.joignabilite,
-  ].filter(Boolean).length;
+  // Lot 4 (audit P2-4/5) — quatre filtres principaux toujours visibles ; les
+  // autres derrière « Plus de filtres ». Les onglets de prospection comptent
+  // comme un filtre actif (« Effacer les filtres » les remet sur « Tous »).
+  const clesActives = (Object.keys(filter) as Array<keyof Filter>).filter((k) => filter[k] !== "");
+  const activeFilterCount = clesActives.length;
+  const hasActiveFilter = activeFilterCount > 0;
+  const cachesActifs = clesActives.filter((k) => FILTRES_SECONDAIRES.includes(k)).length;
+  // Un filtre caché actif garde le panneau ouvert : on ne filtre jamais en
+  // cachant le réglage qui explique la liste.
+  const panneauOuvert = plusDeFiltres || cachesActifs > 0;
 
   return (
     <div className="px-6 py-6">
@@ -384,9 +340,6 @@ export function CompaniesListPage() {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="md" iconLeft={<UploadIcon />}>
-              Importer
-            </Button>
             <Button
               variant="secondary"
               size="md"
@@ -458,40 +411,99 @@ export function CompaniesListPage() {
         })}
       </div>
 
-      {/* Toolbar */}
-      <Toolbar
-        left={
-          <>
+      {/* Filtres — quatre principaux, les autres repliés (lot 4). */}
+      <div className="mb-4 rounded-xl bg-white/70 p-3 ring-1 ring-slate-200/60">
+        <div className="flex flex-wrap items-end gap-3">
+          <Champ label="Recherche" htmlFor={null}>
             <SearchInput
               label="Rechercher une entreprise"
               value={filter.search}
-              onChange={(v) => setFilterAndReset({ search: v })}
+              onChange={(v) => setFilterAndReset({ search: v.slice(0, LONGUEUR_MAX_RECHERCHE) })}
               placeholder="Rechercher une entreprise…"
               className="w-72"
             />
+          </Champ>
+          {/* Liste plutôt que saisie libre : taper « 075 » ou « 7 5 » rendait
+              une liste vide qui se lit comme « aucun résultat », sans jamais
+              dire que le code était faux. */}
+          <FilterSelect
+            label="Département"
+            value={filter.department_code}
+            onChange={(v) => setFilterAndReset({ department_code: v })}
+            options={optionsDepartements}
+          />
+          <FilterSelect
+            label="Taille"
+            value={filter.size}
+            onChange={(v) => setFilterAndReset({ size: v })}
+            options={TAILLE_OPTIONS}
+          />
+          <FilterSelect
+            label="Secteur d’activité"
+            value={filter.sector_main}
+            onChange={(v) => setFilterAndReset({ sector_main: v })}
+            options={SECTEUR_OPTIONS}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="md"
+              aria-expanded={panneauOuvert}
+              aria-controls={idPanneau}
+              disabled={cachesActifs > 0}
+              onClick={() => setPlusDeFiltres((o) => !o)}
+            >
+              {panneauOuvert && cachesActifs === 0
+                ? "Moins de filtres"
+                : `Plus de filtres (${FILTRES_SECONDAIRES.length})`}
+              {cachesActifs > 0
+                ? ` · ${cachesActifs} actif${cachesActifs > 1 ? "s" : ""}`
+                : ""}
+            </Button>
+            {hasActiveFilter ? (
+              <>
+                <span className="text-xs text-slate-500">
+                  {activeFilterCount} filtre{activeFilterCount > 1 ? "s" : ""} actif
+                  {activeFilterCount > 1 ? "s" : ""}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setFilter(EMPTY_FILTER);
+                    setPlusDeFiltres(false);
+                    setPage(1);
+                  }}
+                >
+                  Effacer les filtres
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        {panneauOuvert ? (
+          <div
+            id={idPanneau}
+            className="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3"
+          >
             <FilterSelect
-              value={filter.size}
-              onChange={(v) => setFilterAndReset({ size: v })}
-              options={TAILLE_OPTIONS}
-              ariaLabel="Filtre taille"
-            />
-            <FilterSelect
+              label="Effectif"
               value={filter.effectif}
               onChange={(v) => setFilterAndReset({ effectif: v })}
               options={EFFECTIF_OPTIONS}
-              ariaLabel="Filtre effectif (nombre de salariés)"
             />
             <FilterSelect
-              value={filter.sector_main}
-              onChange={(v) => setFilterAndReset({ sector_main: v })}
-              options={SECTEUR_OPTIONS}
-              ariaLabel="Filtre secteur"
+              label="Région"
+              value={filter.region_code}
+              onChange={(v) => setFilterAndReset({ region_code: v })}
+              options={optionsRegions}
             />
             <FilterSelect
+              label="Pays d’immatriculation"
               value={filter.country_code}
               onChange={(v) => setFilterAndReset({ country_code: v })}
               options={COUNTRY_OPTIONS}
-              ariaLabel="Filtre pays d'immatriculation"
             />
             {/* « Prêt pour une campagne » : la définition CALCULÉE
                 (`EligibiliteCampagne` côté serveur), pas un bac figé — une
@@ -500,115 +512,88 @@ export function CompaniesListPage() {
                 du site (165 587 fiches), c'est par là qu'une campagne
                 commence, pas par les 255 290 d'un bloc. */}
             <FilterSelect
+              label="Prêtes pour une campagne"
               value={filter.eligible_campagne}
               onChange={(v) => setFilterAndReset({ eligible_campagne: v })}
               options={ELIGIBILITE_OPTIONS}
-              ariaLabel="Filtre prêt pour une campagne"
             />
             <FilterSelect
+              label="Qualité de l’adresse e-mail"
               value={filter.best_email_confidence}
               onChange={(v) => setFilterAndReset({ best_email_confidence: v })}
               options={CONFIANCE_EMAIL_OPTIONS}
-              ariaLabel="Filtre qualité de l'adresse e-mail"
             />
             <FilterSelect
+              label="Nature"
               value={filter.entity_nature}
               onChange={(v) => setFilterAndReset({ entity_nature: v })}
               options={NATURE_OPTIONS}
-              ariaLabel="Filtre nature d'entité"
             />
             <FilterSelect
+              label="Joignabilité"
               value={filter.joignabilite}
               onChange={(v) => setFilterAndReset({ joignabilite: v })}
               options={JOIGNABILITE_OPTIONS}
-              ariaLabel="Filtre joignabilité"
             />
             <FilterSelect
+              label="Qualité de la fiche"
               value={filter.quality}
               onChange={(v) => setFilterAndReset({ quality: v })}
               options={QUALITY_OPTIONS}
-              ariaLabel="Filtre qualité"
             />
             <FilterSelect
+              label="Priorité"
               value={filter.priority}
               onChange={(v) => setFilterAndReset({ priority: v })}
               options={PRIORITY_OPTIONS}
-              ariaLabel="Filtre priorité"
             />
-            {/* Liste plutôt que saisie libre : taper « 075 » ou « 7 5 » rendait
-                une liste vide qui se lit comme « aucun résultat », sans jamais
-                dire que le code était faux. */}
-            <FilterSelect
-              value={filter.department_code}
-              onChange={(v) => setFilterAndReset({ department_code: v })}
-              options={optionsDepartements}
-              ariaLabel="Filtre département"
-            />
-            {/* `region_code` était DÉCLARÉ dans l'état sans aucun contrôle :
-                un filtre qu'on ne peut pas régler est du code mort. */}
-            <FilterSelect
-              value={filter.region_code}
-              onChange={(v) => setFilterAndReset({ region_code: v })}
-              options={optionsRegions}
-              ariaLabel="Filtre région"
-            />
-            <input
-              type="text"
-              value={filter.naf}
-              onChange={(e) => setFilterAndReset({ naf: e.target.value })}
-              placeholder="Code NAF…"
-              aria-label="Filtre NAF"
-              className="h-9 w-28 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-            />
+            <Champ label="Code NAF" htmlFor={`${idPanneau}-naf`}>
+              <input
+                id={`${idPanneau}-naf`}
+                type="text"
+                value={filter.naf}
+                maxLength={LONGUEUR_MAX_NAF}
+                onChange={(e) => setFilterAndReset({ naf: e.target.value })}
+                placeholder="68.31Z"
+                className="h-9 w-28 rounded-lg bg-white px-3 font-mono text-sm text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none"
+              />
+            </Champ>
             {/* Retrouver un SEGMENT constitué (campagne, import, sélection) :
                 l'API l'acceptait déjà, rien ne permettait de le demander. */}
-            <input
-              type="text"
-              value={filter.tag}
-              onChange={(e) => setFilterAndReset({ tag: e.target.value })}
-              placeholder="Étiquette (implantation-ro…)"
-              aria-label="Filtre étiquette"
-              className="h-9 w-44 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-            />
+            <Champ label="Étiquette" htmlFor={`${idPanneau}-etiquette`}>
+              <input
+                id={`${idPanneau}-etiquette`}
+                type="text"
+                value={filter.tag}
+                maxLength={LONGUEUR_MAX_ETIQUETTE}
+                onChange={(e) => setFilterAndReset({ tag: e.target.value })}
+                placeholder="implantation-ro…"
+                className="h-9 w-44 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none"
+              />
+            </Champ>
             {/* « Ce qui est arrivé depuis lundi » — la question la plus
                 fréquente, impossible à poser jusqu'ici. */}
-            <input
-              type="date"
-              value={filter.cree_apres}
-              onChange={(e) => setFilterAndReset({ cree_apres: e.target.value })}
-              aria-label="Fiches créées après le"
-              className="h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-            />
-            <input
-              type="date"
-              value={filter.cree_avant}
-              onChange={(e) => setFilterAndReset({ cree_avant: e.target.value })}
-              aria-label="Fiches créées avant le"
-              className="h-9 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-            />
-          </>
-        }
-        right={
-          hasActiveFilter ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">
-                {activeFilterCount} filtre{activeFilterCount > 1 ? "s" : ""} actif
-                {activeFilterCount > 1 ? "s" : ""}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setFilter(EMPTY_FILTER);
-                  setPage(1);
-                }}
-              >
-                Réinitialiser
-              </Button>
-            </div>
-          ) : null
-        }
-      />
+            <Champ label="Fiches créées après le" htmlFor={`${idPanneau}-apres`}>
+              <input
+                id={`${idPanneau}-apres`}
+                type="date"
+                value={filter.cree_apres}
+                onChange={(e) => setFilterAndReset({ cree_apres: e.target.value })}
+                className="h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none"
+              />
+            </Champ>
+            <Champ label="Fiches créées avant le" htmlFor={`${idPanneau}-avant`}>
+              <input
+                id={`${idPanneau}-avant`}
+                type="date"
+                value={filter.cree_avant}
+                onChange={(e) => setFilterAndReset({ cree_avant: e.target.value })}
+                className="h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none"
+              />
+            </Champ>
+          </div>
+        ) : null}
+      </div>
 
       {/* P0-3 — une panne n'est jamais « Aucune entreprise ». */}
       {error !== null && data === undefined ? (
@@ -761,45 +746,80 @@ export function CompaniesListPage() {
   );
 }
 
-function FilterSelect({
-  value,
-  onChange,
-  options,
-  ariaLabel,
+/**
+ * Les filtres rangés derrière « Plus de filtres » : leur nombre s'affiche sur
+ * le bouton, et un seul d'entre eux actif garde le panneau ouvert.
+ */
+const FILTRES_SECONDAIRES: ReadonlyArray<keyof Filter> = [
+  "effectif",
+  "region_code",
+  "country_code",
+  "eligible_campagne",
+  "best_email_confidence",
+  "entity_nature",
+  "joignabilite",
+  "quality",
+  "priority",
+  "naf",
+  "tag",
+  "cree_apres",
+  "cree_avant",
+];
+
+/** Un champ de filtre avec son étiquette VISIBLE au-dessus (audit P2-4). */
+function Champ({
+  label,
+  htmlFor,
+  children,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  options: Array<{ value: string; label: string }>;
-  ariaLabel: string;
+  label: string;
+  /** `null` quand le champ porte déjà sa propre étiquette (la recherche). */
+  htmlFor: string | null;
+  children: ReactNode;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={ariaLabel}
-      className="h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className="flex flex-col gap-1">
+      {htmlFor === null ? (
+        <span aria-hidden className="text-xs font-medium text-slate-600">
+          {label}
+        </span>
+      ) : (
+        <label htmlFor={htmlFor} className="text-xs font-medium text-slate-600">
+          {label}
+        </label>
+      )}
+      {children}
+    </div>
   );
 }
 
-function UploadIcon() {
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  const id = useId();
   return (
-    <svg
-      viewBox="0 0 20 20"
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden
-    >
-      <path d="M10 14V4M5 9l5-5 5 5M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <Champ label={label} htmlFor={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 max-w-[16rem] rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Champ>
   );
 }
 

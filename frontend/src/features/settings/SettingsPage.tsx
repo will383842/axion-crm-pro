@@ -67,7 +67,6 @@ import {
   CardEyebrow,
   CardHeader,
   CardTitle,
-  DarkModeToggle,
   Input,
   PageHeader,
   QueryErrorState,
@@ -109,18 +108,18 @@ interface Integration {
 const INTEGRATIONS: Integration[] = [
   { name: 'INSEE Sirene', env: 'INSEE_API_KEY', description: 'Base entreprises + données légales (gratuit, 500 req/min)', role: 'requise' },
   { name: 'France Travail', env: 'FRANCE_TRAVAIL_CLIENT_ID', description: 'Offres d\'emploi + intentions de recrutement (gratuit)', role: 'requise' },
-  { name: 'Mistral AI', env: 'MISTRAL_API_KEY', description: 'LLM principal classification entreprises (FR souverain, ~5€/mois)', role: 'requise' },
-  { name: 'Anthropic Claude', env: 'ANTHROPIC_API_KEY', description: 'LLM premium pour use cases stratégiques (optionnel)', role: 'optionnelle' },
+  { name: 'Mistral AI', env: 'MISTRAL_API_KEY', description: 'IA principale : classe les entreprises par activité (hébergée en France, ~5 €/mois)', role: 'requise' },
+  { name: 'Anthropic Claude', env: 'ANTHROPIC_API_KEY', description: 'IA d’appoint pour les tâches les plus délicates (optionnelle)', role: 'optionnelle' },
   // Sprint H9 + H12 — Google Places API officielle (enrichissement auto, garde-fou quota)
-  { name: 'Google Places API', env: 'GOOGLE_PLACES_API_KEY', description: 'Enrichissement auto téléphone/horaires/site/note Google (gratuit ≤12K/mois via crédit $200, garde-fou quota actif)', role: 'optionnelle' },
-  { name: 'Webshare proxies', env: 'WEBSHARE_USERNAME', description: 'Proxies résidentiels pour Pages Jaunes (~$30/mois, Phase B optionnelle)', role: 'phase-b' },
-  { name: '2captcha', env: 'TWOCAPTCHA_API_KEY', description: 'Résolution captcha (Phase B, uniquement si scraping Google direct)', role: 'phase-b' },
+  { name: 'Google Places', env: 'GOOGLE_PLACES_API_KEY', description: 'Complète téléphone, horaires, site et note Google (gratuit jusqu’à 12 000 fiches par mois, plafond surveillé)', role: 'optionnelle' },
+  { name: 'Webshare (serveurs relais)', env: 'WEBSHARE_USERNAME', description: 'Serveurs relais pour consulter les Pages Jaunes (~30 $/mois, plus tard)', role: 'phase-b' },
+  { name: '2captcha', env: 'TWOCAPTCHA_API_KEY', description: 'Résolution des tests anti-robots (plus tard, seulement pour Google)', role: 'phase-b' },
 ];
 
 const LIBELLE_ROLE: Record<Integration['role'], string> = {
   requise: 'Requise',
   optionnelle: 'Optionnelle',
-  'phase-b': 'Phase B',
+  'phase-b': 'Plus tard',
 };
 
 const TON_ROLE: Record<Integration['role'], 'success' | 'info' | 'warning'> = {
@@ -131,21 +130,23 @@ const TON_ROLE: Record<Integration['role'], 'success' | 'info' | 'warning'> = {
 
 const OBSERVABILITY_LINKS: Array<{ name: string; url: string; description: string }> = [
   { name: 'Prometheus', url: 'http://localhost:9090', description: 'Métriques + alertes' },
-  { name: 'Grafana', url: 'http://localhost:3000', description: 'Dashboards visuels' },
-  { name: 'Loki logs', url: 'http://localhost:3100', description: 'Agrégateur de logs' },
+  { name: 'Grafana', url: 'http://localhost:3000', description: 'Tableaux visuels' },
+  { name: 'Loki', url: 'http://localhost:3100', description: 'Journaux du serveur' },
   { name: 'Tempo traces', url: 'http://localhost:3200', description: 'Traces distribuées' },
   { name: 'GlitchTip errors', url: 'http://localhost:8080', description: 'Errors Sentry-compatible' },
   { name: 'Uptime Kuma', url: 'http://localhost:3001', description: 'Probes uptime' },
-  { name: 'Horizon', url: '/horizon', description: 'Workers queue Laravel' },
-  { name: 'Telescope', url: '/telescope', description: 'Debug local uniquement' },
+  { name: 'Horizon', url: '/horizon', description: 'Traitements en file d’attente' },
+  { name: 'Telescope', url: '/telescope', description: 'Diagnostic, en local seulement' },
 ];
 
 const TABS: Array<TabItem<TabKey>> = [
-  { id: 'workspace', label: 'Workspace', icon: <Briefcase className="h-3.5 w-3.5" /> },
+  { id: 'workspace', label: 'Mon entreprise', icon: <Briefcase className="h-3.5 w-3.5" /> },
   { id: 'compte', label: 'Mon compte', icon: <KeyRound className="h-3.5 w-3.5" /> },
   { id: 'integrations', label: 'Intégrations', icon: <Plug className="h-3.5 w-3.5" /> },
-  { id: 'observability', label: 'Observabilité', icon: <Activity className="h-3.5 w-3.5" /> },
-  { id: 'appearance', label: 'Apparence', icon: <Palette className="h-3.5 w-3.5" /> },
+  { id: 'observability', label: 'Suivi technique', icon: <Activity className="h-3.5 w-3.5" /> },
+  // Lot 2 UX — « Apparence » devient « Affichage » : il n'y reste que la
+  // densité des listes (plus de mode sombre, décision permanente).
+  { id: 'appearance', label: 'Affichage', icon: <Palette className="h-3.5 w-3.5" /> },
 ];
 
 /** Le message que le serveur a réellement écrit, ou `null`. Aucune invention. */
@@ -228,7 +229,7 @@ export function SettingsPage() {
     onMutate: () => setEchecEnregistrement(null),
     onSuccess: () => {
       setEchecEnregistrement(null);
-      toast.success('Workspace mis à jour');
+      toast.success('Réglages enregistrés');
       qc.invalidateQueries({ queryKey: ['workspace'] });
     },
     onError: (err) => {
@@ -274,10 +275,10 @@ export function SettingsPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Paramètres"
-        subtitle="Workspace, mon compte, intégrations, observabilité, apparence."
+        subtitle="Votre entreprise, votre compte et l’affichage."
         actions={
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <SettingsIcon className="h-3.5 w-3.5" /> Workspace : {ws.data?.name ?? '…'}
+            <SettingsIcon className="h-3.5 w-3.5" /> {ws.data?.name ?? '…'}
           </span>
         }
       />
@@ -290,8 +291,8 @@ export function SettingsPage() {
         <Card>
           <CardHeader>
             <div>
-              <CardEyebrow>Workspace</CardEyebrow>
-              <CardTitle className="mt-1 text-base">Identité et limites</CardTitle>
+              <CardEyebrow>Mon entreprise</CardEyebrow>
+              <CardTitle className="mt-1 text-base">Nom et budget</CardTitle>
             </div>
           </CardHeader>
           {echecLecture ? (
@@ -317,16 +318,11 @@ export function SettingsPage() {
                   <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Nom</span>
                   <Input name="name" defaultValue={ws.data.name} required />
                 </label>
+                {/* Lot 2 UX — l'« adresse courte » interne (slug) n'est plus
+                    affichée : non modifiable, elle n'apprenait rien. */}
                 <label className="block text-sm">
                   <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
-                    Slug (URL)
-                  </span>
-                  <Input name="slug" defaultValue={ws.data.slug} disabled />
-                  <span className="mt-1 block text-xs text-slate-500">Non modifiable</span>
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
-                    Plafond LLM mensuel (€)
+                    Budget IA mensuel (€)
                   </span>
                   <Input
                     name="cost_cap_eur"
@@ -335,7 +331,7 @@ export function SettingsPage() {
                     defaultValue={String(ws.data.cost_cap_eur)}
                   />
                   <span className="mt-1 block text-xs text-slate-500">
-                    Kill-switch automatique LLM quand atteint
+                    L’IA s’arrête d’elle-même quand le budget est atteint.
                   </span>
                 </label>
               </div>
@@ -453,7 +449,7 @@ export function SettingsPage() {
                     <ExternalLink className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-slate-700 dark:group-hover:text-slate-200" />
                   </div>
                   <p className="text-xs text-slate-500">{link.description}</p>
-                  <p className="mt-2 truncate font-mono text-[11px] text-slate-400">{link.url}</p>
+                  <p className="mt-2 truncate font-mono text-xs text-slate-400">{link.url}</p>
                 </a>
               ))}
             </div>
@@ -463,19 +459,6 @@ export function SettingsPage() {
 
       {tab === 'appearance' && (
         <div className="grid gap-3 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardEyebrow>Thème</CardEyebrow>
-                <CardTitle className="mt-1 text-base">Mode clair / sombre</CardTitle>
-              </div>
-            </CardHeader>
-            <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">
-              Le thème suit la préférence de votre système et reste mémorisé sur cet appareil.
-            </p>
-            <DarkModeToggle />
-          </Card>
-
           <Card>
             <CardHeader>
               <div>

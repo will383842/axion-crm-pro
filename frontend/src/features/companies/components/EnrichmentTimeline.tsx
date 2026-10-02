@@ -19,8 +19,8 @@ export function deriveTimelineFromSignals(signals?: Record<string, unknown> | nu
     { key: 'insee', label: 'INSEE Sirene' },
     { key: 'ban', label: 'Base Adresse Nationale' },
     { key: 'france_travail', label: 'France Travail' },
-    { key: 'mistral', label: 'Mistral (NAF→libellé)' },
-    { key: 'website', label: 'Crawl site web' },
+    { key: 'mistral', label: 'IA Mistral (activité en clair)' },
+    { key: 'website', label: 'Lecture du site web' },
     { key: 'linkedin', label: 'LinkedIn' },
   ];
   const steps: TimelineStep[] = [];
@@ -41,7 +41,7 @@ export function EnrichmentTimeline({ steps }: { steps: TimelineStep[] }) {
   return (
     <Card padding="md">
       <CardHeader>
-        <CardTitle>Pipeline d'enrichissement</CardTitle>
+        <CardTitle>Sources consultées</CardTitle>
       </CardHeader>
       {steps.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">

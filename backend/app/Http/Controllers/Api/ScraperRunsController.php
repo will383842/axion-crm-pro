@@ -172,9 +172,18 @@ class ScraperRunsController extends ApiController
         }
 
         if (! in_array($run->status, ['failed', 'cancelled'], true)) {
+            // Le statut est TRADUIT : l'écran affiche ce message tel quel, et
+            // « 'running' » n'est pas un mot que le propriétaire a à lire.
+            $etat = match ($run->status) {
+                'pending' => 'en attente',
+                'running' => 'en cours',
+                'success', 'completed' => 'terminé',
+                default => 'dans un état inattendu',
+            };
+
             return response()->json([
                 'error' => 'invalid_state',
-                'message' => "Impossible de relancer un run au statut '{$run->status}'.",
+                'message' => "Impossible de relancer ce passage : il est {$etat}. Seul un passage en échec ou annulé se relance.",
                 'status' => $run->status,
             ], 422);
         }

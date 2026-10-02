@@ -152,11 +152,11 @@ export function ActivityFeed() {
                     <span className="text-slate-500 dark:text-slate-400"> · {humanizeAction(log.event_type ?? log.action)}</span>
                   </p>
                   {log.path ? (
-                    <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                       {log.path}{log.status_code ? ` · ${log.status_code}` : ''}
                     </p>
                   ) : null}
-                  <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>
+                  <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>
                 </div>
               </li>
             );

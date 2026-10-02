@@ -37,7 +37,7 @@ export function Tabs<T extends string>({
               {t.icon}
               {t.label}
               {typeof t.count === 'number' ? (
-                <span className={cn('ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', active ? 'bg-white/20' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200')}>
+                <span className={cn('ml-1 rounded-full px-1.5 py-0.5 text-xs font-semibold', active ? 'bg-white/20' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200')}>
                   {t.count}
                 </span>
               ) : null}
@@ -68,7 +68,7 @@ export function Tabs<T extends string>({
             {t.icon}
             {t.label}
             {typeof t.count === 'number' ? (
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {t.count}
               </span>
             ) : null}

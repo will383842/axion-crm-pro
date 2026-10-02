@@ -80,7 +80,7 @@ export function AiActRegisterPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Registre AI Act"
+        title="Registre de l’IA"
         subtitle="Conformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés."
       />
 
@@ -125,7 +125,7 @@ export function AiActRegisterPage() {
         <EmptyState
           icon={<Bot className="h-10 w-10" />}
           title="Aucun système IA enregistré"
-          description="Le LLM Router devrait apparaître ici après seed initial (AiActRegisterSeeder)."
+          description="Les outils d’IA apparaissent ici une fois le serveur installé."
         />
       ) : (
         <Card padding="none" className="overflow-hidden">
@@ -136,7 +136,7 @@ export function AiActRegisterPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
             style={{ gridTemplateColumns: GRID }}
@@ -175,7 +175,7 @@ export function AiActRegisterPage() {
                   <div className="truncate text-slate-700 dark:text-slate-200">
                     {e.provider ?? '—'}
                   </div>
-                  <div className="truncate font-mono text-[11px] text-slate-500">
+                  <div className="truncate font-mono text-xs text-slate-500">
                     {e.model ?? '—'}
                   </div>
                 </div>

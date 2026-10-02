@@ -53,7 +53,7 @@ export function ProxyProvidersPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Fournisseurs de proxies"
+        title="Serveurs relais"
         subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone."
       />
 
@@ -65,7 +65,7 @@ export function ProxyProvidersPage() {
         <EmptyState
           icon={<Globe className="h-10 w-10" />}
           title="Aucun fournisseur configuré"
-          description="Aucun fournisseur de proxies n’est configuré sur le serveur."
+          description="Aucun fournisseur de serveurs relais n’est configuré sur le serveur."
           action={
             <Button variant="secondary" iconLeft={<Activity className="h-3.5 w-3.5" />}>
               Voir la documentation
@@ -81,7 +81,7 @@ export function ProxyProvidersPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
             style={{ gridTemplateColumns: GRID }}
@@ -117,7 +117,7 @@ export function ProxyProvidersPage() {
                     '—'
                   )}
                   {p.last_health_check_at ? (
-                    <span className="ml-1 text-[11px] text-slate-400">
+                    <span className="ml-1 text-xs text-slate-400">
                       {new Date(p.last_health_check_at).toLocaleString('fr-FR')}
                     </span>
                   ) : null}

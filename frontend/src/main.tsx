@@ -14,12 +14,15 @@ import { initSentry } from './lib/sentry';
 // un reglage d'apparence qui n'existe que dans l'ecran qui le regle n'en est
 // pas un.
 import { appliquerDensite, lireDensite } from './lib/densite';
+// Lot 2 UX — pas de mode sombre : la console est forcee en clair a l'amorcage.
+import { forcerThemeClair } from './lib/theme';
 import './styles/index.css';
 import './lib/i18n';
 
 // Sprint 18.8 — Sentry init (compatible GlitchTip self-hosted, no-op si pas de DSN)
 initSentry();
 
+forcerThemeClair();
 appliquerDensite(lireDensite());
 
 const queryClient = new QueryClient({

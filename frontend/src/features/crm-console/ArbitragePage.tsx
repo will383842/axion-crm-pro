@@ -111,7 +111,7 @@ function ArbitrageContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Rapprochements à arbitrer"
+        title="Personnes à rattacher"
         subtitle={
           total === undefined
             ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'
@@ -145,7 +145,7 @@ function ArbitrageContent() {
           et qui nomme sa propre limite.
         */
         <EmptyState
-          title="Rien à arbitrer"
+          title="Aucune personne à rattacher"
           description={
             'Aucun événement n’attend d’arbitrage dans cette file. ' +
             'Cet écran ne voit que ce que l’ingestion y dépose : il ne dit rien ' +

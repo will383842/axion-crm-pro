@@ -55,7 +55,7 @@ export function Tooltip({
           id={id}
           role="tooltip"
           className={cn(
-            'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg ring-1 ring-white/10',
+            'pointer-events-none absolute z-50 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-lg ring-1 ring-white/10',
             'axion-fade-in',
             pos[side],
           )}

@@ -15,7 +15,7 @@ export function Stat({
 }) {
   return (
     <div className={cn('rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-800/60 dark:ring-slate-800', className)}>
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {icon}
         {label}
       </div>

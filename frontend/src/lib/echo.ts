@@ -113,9 +113,9 @@ export function subscribeWorkspaceNotifications(workspaceId: string): () => void
 
   channel.listen('.scrape-job.completed', (event: { status: string; companies_created: number }) => {
     if (event.status === 'success') {
-      toast.success(`Scrape terminé : ${event.companies_created} nouvelles entreprises`);
+      toast.success(`Collecte terminée : ${event.companies_created} nouvelles entreprises`);
     } else if (event.status === 'failed') {
-      toast.error('Scrape échoué');
+      toast.error('La collecte a échoué');
     }
   });
 

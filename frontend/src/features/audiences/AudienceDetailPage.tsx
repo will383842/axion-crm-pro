@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import {
   RefreshCw, Edit, Trash2, Users2, Zap, Mail, Building, Send,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import { libelleReferentiel } from '@/lib/prospection-referentiels';
 import { SECTEURS, TAILLES } from '@/lib/referentiels.generated';
 import {
@@ -135,7 +135,7 @@ export function AudienceDetailPage() {
       void qc.invalidateQueries({ queryKey: ['audience', id] });
       void qc.invalidateQueries({ queryKey: ['audience-members', id] });
     },
-    onError: (e) => toast.error(extractApiMessage(e) ?? 'Refresh impossible'),
+    onError: (e) => toast.error(extractApiMessage(e) ?? 'Mise à jour impossible'),
   });
 
   const deleteMutation = useMutation({
@@ -208,7 +208,7 @@ export function AudienceDetailPage() {
             <StatusPill tone={audience.is_active ? 'success' : 'neutral'} pulse={audience.is_active}>
               {audience.is_active ? 'Active' : 'Inactive'}
             </StatusPill>
-            {audience.auto_refresh ? <StatusPill tone="info">Auto-refresh</StatusPill> : null}
+            {audience.auto_refresh ? <StatusPill tone="info">Mise à jour auto</StatusPill> : null}
           </div>
         }
         actions={
@@ -257,7 +257,7 @@ export function AudienceDetailPage() {
         />
         <KpiCard
           tone="violet"
-          label="Dernière refresh"
+          label="Dernière mise à jour"
           value={formatRelative(audience.refreshed_at)}
           sublabel={audience.refreshed_at ? new Date(audience.refreshed_at).toLocaleString('fr-FR') : '—'}
         />
@@ -265,13 +265,13 @@ export function AudienceDetailPage() {
           tone={audience.is_active ? 'emerald' : 'slate'}
           label="Statut"
           value={audience.is_active ? 'Active' : 'Inactive'}
-          sublabel={audience.is_active ? 'incluse dans refresh batch' : 'exclue du refresh'}
+          sublabel={audience.is_active ? 'mise à jour chaque nuit' : 'jamais mise à jour seule'}
         />
         <KpiCard
           tone={audience.auto_refresh ? 'amber' : 'slate'}
-          label="Auto-refresh"
-          value={audience.auto_refresh ? 'ON' : 'OFF'}
-          sublabel={audience.auto_refresh ? 'refresh planifié quotidien' : 'manuel uniquement'}
+          label="Mise à jour auto"
+          value={audience.auto_refresh ? 'Oui' : 'Non'}
+          sublabel={audience.auto_refresh ? 'chaque jour' : 'à la main seulement'}
         />
       </div>
 
@@ -342,7 +342,7 @@ function MembersTab({
     <Card padding="none" className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
             <tr>
               <th className="px-4 py-2.5">Entreprise</th>
               <th className="px-4 py-2.5">Dépt</th>
@@ -388,7 +388,7 @@ function MembersTab({
         </table>
       </div>
       {members.length >= 100 ? (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-center text-[11px] text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
           Affichage des 100 premiers membres. Le segment complet contient potentiellement plus.
         </div>
       ) : null}
@@ -464,7 +464,7 @@ function CriteriaTab({ audience }: { audience: EmailAudience }) {
     <div className="space-y-3">
       <Card padding="md">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Critères (JSON brut)</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Critères (format technique)</h3>
           <Button
             variant="secondary"
             size="sm"
@@ -491,20 +491,12 @@ function CampaignPlaceholderTab() {
       <div className="flex flex-col items-start gap-3">
         <div className="flex items-center gap-2">
           <Send className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Bientôt — envoi de campagne email</h3>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Bientôt : l’envoi d’e-mails</h3>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          L'envoi de campagnes cold email sur cette audience sera disponible dans un prochain sprint
-          (intégration Resend / Mailjet + tracking ouverture + relances automatiques).
+          L’envoi d’e-mails à cette audience arrivera plus tard, avec le suivi des ouvertures
+          et les relances automatiques.
         </p>
-        <a
-          href="https://github.com/will383842/axion-crm-pro/blob/main/_docs/PROSPECTION-PIPELINE.md"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
-        >
-          Voir roadmap pipeline →
-        </a>
       </div>
     </Card>
   );
@@ -524,10 +516,7 @@ function formatRelative(iso: string | null): string {
   return date.toLocaleDateString('fr-FR');
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

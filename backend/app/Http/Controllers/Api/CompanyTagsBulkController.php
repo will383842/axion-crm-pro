@@ -68,7 +68,7 @@ class CompanyTagsBulkController extends ApiController
             // le segment introuvable, sans le moindre message.
             return $this->ok([
                 'error' => 'tag_inconnu',
-                'message' => "Ce tag n'existe pas dans cet univers. Créez-le d'abord.",
+                'message' => "Cette étiquette n'existe pas dans cet univers. Créez-la d'abord.",
             ], 422);
         }
 
@@ -77,7 +77,7 @@ class CompanyTagsBulkController extends ApiController
         if ((bool) $tag->is_locked) {
             return $this->ok([
                 'error' => 'tag_verrouille',
-                'message' => "Ce tag est verrouillé : il décrit une PROVENANCE constatée, pas une étiquette qu'on pose.",
+                'message' => "Cette étiquette est verrouillée : elle décrit une PROVENANCE constatée, pas une étiquette qu'on pose.",
             ], 422);
         }
 

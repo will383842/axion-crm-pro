@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Users2, Plus, RefreshCw, Power, Trash2, MoreVertical, Clock,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   Button,
   Card,
@@ -89,7 +89,7 @@ export function AudiencesListPage() {
   const refreshMutation = useMutation({
     mutationFn: async (id: number) => (await api.post<{ data: EmailAudience }>(`/audiences/${id}/refresh`)).data,
     onSuccess: () => { toast.success('Audience rafraîchie'); void qc.invalidateQueries({ queryKey: ['audiences'] }); },
-    onError: (e) => toast.error(extractApiMessage(e) ?? 'Refresh impossible'),
+    onError: (e) => toast.error(extractApiMessage(e) ?? 'Mise à jour impossible'),
   });
   const toggleMutation = useMutation({
     mutationFn: async (a: EmailAudience) =>
@@ -123,7 +123,7 @@ export function AudiencesListPage() {
       {/* KPIs — masqués en cas d'échec : des zéros y seraient inventés. */}
       {echec ? null : <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiCard tone="sky"     label="Total audiences" value={totals.all}     sublabel="segments configurés" />
-        <KpiCard tone="emerald" label="Actives"         value={totals.active}  sublabel="exécutées au refresh auto" />
+        <KpiCard tone="emerald" label="Actives"         value={totals.active}  sublabel="mises à jour chaque nuit" />
         <KpiCard tone="violet"  label="Membres cumul"   value={totals.members.toLocaleString('fr-FR')} sublabel="entreprises × audiences" />
       </div>}
 
@@ -224,13 +224,13 @@ function AudienceCard({
           {audience.is_active ? 'Active' : 'Inactive'}
         </StatusPill>
         {audience.auto_refresh ? (
-          <StatusPill tone="info">Auto-refresh</StatusPill>
+          <StatusPill tone="info">Mise à jour auto</StatusPill>
         ) : null}
       </div>
 
       {/* Member count chip */}
       <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-800/60 dark:ring-slate-800">
-        <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
           <Users2 className="h-3 w-3" />
           Membres
         </div>
@@ -239,9 +239,9 @@ function AudienceCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <Clock className="h-3 w-3" />
-        Dernière refresh : <span className="font-medium text-slate-700 dark:text-slate-300">{formatRelative(audience.refreshed_at)}</span>
+        Dernière mise à jour : <span className="font-medium text-slate-700 dark:text-slate-300">{formatRelative(audience.refreshed_at)}</span>
       </div>
 
       <div className="mt-1 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -251,7 +251,7 @@ function AudienceCard({
           iconLeft={<RefreshCw className="h-3.5 w-3.5" />}
           onClick={onRefresh}
         >
-          Refresh
+          Actualiser
         </Button>
         <Link
           to="/audiences/$audienceId"
@@ -294,10 +294,7 @@ function ListSkeleton() {
   );
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

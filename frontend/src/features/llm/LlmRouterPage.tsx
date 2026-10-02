@@ -85,8 +85,8 @@ export function LlmRouterPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="LLM Router"
-        subtitle="9 use cases × 5 providers + fallback chain + cost tracking + idempotency cache 24h."
+        title="Moteurs d’IA"
+        subtitle="Quelle IA sert à quoi, avec quelle solution de secours et pour quel coût."
       />
 
       <div className="mb-6">
@@ -102,7 +102,7 @@ export function LlmRouterPage() {
           <EmptyState
             icon={<Bot className="h-10 w-10" />}
             title="Aucun cas d'usage configuré"
-            description="Les cas d'usage LLM sont initialisés au déploiement (LlmUseCaseSeeder)."
+            description="Les usages de l’IA sont créés à l’installation du serveur."
           />
         ) : (
           <Card padding="none" className="overflow-hidden">
@@ -113,7 +113,7 @@ export function LlmRouterPage() {
             <div
               role="row"
               className={cn(
-                'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+                'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
                 'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
               )}
               style={{ gridTemplateColumns: USE_CASES_GRID }}
@@ -146,7 +146,7 @@ export function LlmRouterPage() {
                   <div className="text-right tabular-nums">{u.cost_cap_eur}</div>
                   <div>
                     <StatusPill tone={u.enabled ? 'success' : 'neutral'}>
-                      {u.enabled ? 'ON' : 'OFF'}
+                      {u.enabled ? 'Actif' : 'Arrêté'}
                     </StatusPill>
                   </div>
                 </div>
@@ -170,7 +170,7 @@ export function LlmRouterPage() {
               </CardHeader>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Clé API</span>
+                  <span className="text-slate-500">Clé d’accès</span>
                   <code className="rounded bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800">
                     ••••••••
                   </code>
@@ -240,13 +240,13 @@ export function LlmRouterPage() {
               />
               <KpiCard
                 tone="sky"
-                label="Tokens in 24h"
+                label="Texte envoyé (24 h)"
                 value={(usage.data?.tokens_in ?? 0).toLocaleString('fr-FR')}
                 sublabel="estimé"
               />
               <KpiCard
                 tone="emerald"
-                label="Tokens out 24h"
+                label="Texte reçu (24 h)"
                 value={(usage.data?.tokens_out ?? 0).toLocaleString('fr-FR')}
                 sublabel="estimé"
               />

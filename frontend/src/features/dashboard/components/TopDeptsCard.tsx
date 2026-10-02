@@ -69,7 +69,7 @@ export function TopDeptsCard() {
                 </span>
 
                 {/* Code dépt en chip mono */}
-                <span className="inline-flex h-6 min-w-[2rem] items-center justify-center rounded-md bg-slate-100 px-1.5 font-mono text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+                <span className="inline-flex h-6 min-w-[2rem] items-center justify-center rounded-md bg-slate-100 px-1.5 font-mono text-xs font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
                   {cell.code}
                 </span>
 

@@ -72,7 +72,7 @@ export function KpiCard({ label, value, sublabel, tone = 'slate', progress, icon
       )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider', t.chip)}>
+        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider', t.chip)}>
           {label}
         </span>
         {icon ? <span className="text-slate-400 dark:text-slate-500">{icon}</span> : null}

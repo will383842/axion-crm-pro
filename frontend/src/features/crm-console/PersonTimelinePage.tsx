@@ -67,7 +67,7 @@ function PersonTimelineContent() {
 
   return (
     <div className="px-6 py-6">
-      <PageHeader title={displayName} subtitle="Fiche 360° — tous les touchpoints connus de cette personne." />
+      <PageHeader title={displayName} subtitle="Tout ce qui concerne cette personne." />
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="flex flex-col gap-4">
@@ -112,7 +112,7 @@ function PersonTimelineContent() {
         </div>
 
         <Card>
-          <CardTitle>Timeline</CardTitle>
+          <CardTitle>Historique</CardTitle>
           {/* D25-011 — `data.data` vient d'une reponse d'API que rien ne valide
               a l'execution : sans `?.`, une clef absente jette et emporte tout
               l'ecran (timeline ET l'encart « univers » au-dessus). On accepte
@@ -120,14 +120,14 @@ function PersonTimelineContent() {
               facon pas distinguer les deux, et un ecran blanc est pire.
               Mesure du 2026-08-22. */}
           {(data.data?.length ?? 0) === 0 ? (
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Aucun touchpoint enregistré.</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Aucun échange enregistré.</p>
           ) : (
             <ol className="mt-3 flex flex-col gap-3">
               {data.data.map((entry) => (
                 <li key={`${entry.universe}-${entry.id}`} className="border-l-2 border-slate-200 pl-3 dark:border-slate-700">
                   <div className="text-xs text-slate-400">{entry.occurred_at ?? '—'}</div>
                   <div className="text-sm text-slate-900 dark:text-white">{entry.title ?? entry.kind}</div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-xs text-slate-400">
                     {entry.universe === 'vivier' ? 'Vivier' : 'Business'}
                     {entry.external_ref !== null && <> · {entry.external_ref}</>}
                   </div>

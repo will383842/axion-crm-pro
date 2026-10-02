@@ -9,8 +9,9 @@
  *
  * ⚠️ CE QUE CES GARDES NE PROUVENT PAS : elles ne mesurent AUCUN contraste et
  * AUCUN pixel. Elles prouvent seulement que les déclarations dont l'absence a
- * causé D28-005 et D28-016 sont présentes. La mesure au pixel reste le travail
- * de `tests/e2e/dark-contraste.spec.ts`.
+ * causé D28-005 et D28-016 sont présentes. (La mesure au pixel du mode sombre,
+ * `dark-contraste.spec.ts`, a été retirée avec le mode sombre lui-même — lot 2
+ * UX du 02/10/2026.)
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';

@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { LIBELLES_DE_CHEMIN, libelleDeChemin } from '@/components/layout/AutoBreadcrumbs';
+import { LIBELLES_DE_CHEMIN, SEGMENTS_OMIS, libelleDeChemin } from '@/components/layout/AutoBreadcrumbs';
 
 const racine = path.dirname(fileURLToPath(import.meta.url));
 const sourceArbre = readFileSync(path.resolve(racine, '../../src/app/routeTree.tsx'), 'utf8');
@@ -67,7 +67,9 @@ describe('D23-006 — table des libellés du fil d’Ariane', () => {
 
   it('donne un libellé français à CHAQUE route de la coquille', () => {
     const sansLibelle = [...new Set(cheminsDeLaCoquille().map(prefixeStatique))]
-      .filter((chemin) => LIBELLES_DE_CHEMIN[chemin] === undefined);
+      // Un préfixe déclaré SANS ÉCRAN (`/console/personnes` devant l'identifiant
+      // d'une fiche) est omis du fil : il n'a pas de libellé à porter.
+      .filter((chemin) => LIBELLES_DE_CHEMIN[chemin] === undefined && !SEGMENTS_OMIS.has(chemin));
 
     expect(
       sansLibelle.length,
@@ -92,7 +94,12 @@ describe('D23-006 — table des libellés du fil d’Ariane', () => {
         intermediaires.add(acc);
       }
     }
-    const orphelins = [...intermediaires].filter((c) => LIBELLES_DE_CHEMIN[c] === undefined);
+    // Lot 2 UX : un segment intermédiaire SANS écran (`/llm`, `/console`…)
+    // n'a plus de libellé — il est omis du fil (un libellé le rendait
+    // cliquable vers une page introuvable). Il doit alors être DÉCLARÉ omis.
+    const orphelins = [...intermediaires].filter(
+      (c) => LIBELLES_DE_CHEMIN[c] === undefined && !SEGMENTS_OMIS.has(c),
+    );
 
     expect(
       orphelins.length,
@@ -104,9 +111,33 @@ describe('D23-006 — table des libellés du fil d’Ariane', () => {
   });
 
   it('libelleDeChemin rend le libellé de la table, pas le segment brut', () => {
-    expect(libelleDeChemin('/admin/observability')).toBe('Observabilité');
-    expect(libelleDeChemin('/console/vivier')).toBe('Vivier candidats');
-    // Un identifiant reste un identifiant : c'est le comportement voulu.
-    expect(libelleDeChemin('/companies/42')).toBe('#42');
+    expect(libelleDeChemin('/admin/observability')).toBe('Santé du système');
+    expect(libelleDeChemin('/console/vivier')).toBe('Candidats');
+    // Un identifiant ne nomme rien : le fil dit « Fiche », plus « #42 ».
+    expect(libelleDeChemin('/companies/42')).toBe('Fiche');
+  });
+
+  it('aucun segment omis n’est une vraie route (sinon il manquerait au fil)', () => {
+    // Chemins déclarés EXACTEMENT comme route — pas les préfixes statiques :
+    // `/console/personnes` n'existe que devant `$personKey`, sans écran à lui.
+    const exactes = new Set(cheminsDeLaCoquille());
+    const fautifs = [...SEGMENTS_OMIS].filter((c) => exactes.has(c) || LIBELLES_DE_CHEMIN[c] !== undefined);
+    expect(
+      fautifs,
+      'Lot 2 UX : un segment déclaré « sans écran » est en fait une route (ou a un ' +
+        'libellé). GESTE : le retirer de `SEGMENTS_SANS_ECRAN` dans ' +
+        '`src/components/layout/AutoBreadcrumbs.tsx`.',
+    ).toEqual([]);
+  });
+
+  it('aucun libellé ne vise un chemin qui n’est pas une route (pas de lien mort)', () => {
+    // Un chemin de la table devient un LIEN quand il est intermédiaire. S'il
+    // n'est pas une route, le lien mène à la page introuvable — le défaut
+    // P1-3 de l'audit (« Console CRM », « Relations presse », « LLM »).
+    const routes = new Set(cheminsDeLaCoquille());
+    // Redirections conservées par signet (voir le commentaire de la table).
+    const redirections = new Set(['/cold-email', '/linkedin', '/pas-encore-livre']);
+    const morts = Object.keys(LIBELLES_DE_CHEMIN).filter((c) => !routes.has(c) && !redirections.has(c));
+    expect(morts, 'Libellé de fil d’Ariane sans route : lien mort garanti.').toEqual([]);
   });
 });

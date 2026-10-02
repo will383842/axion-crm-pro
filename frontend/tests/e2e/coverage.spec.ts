@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Coverage map', () => {
   test('coverage page renders map and mode buttons', async ({ page }) => {
     await page.goto('/coverage');
-    await expect(page.getByRole('heading', { name: /couverture France/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Carte de France/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Visu$/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Recherche$/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Action$/ })).toBeVisible();

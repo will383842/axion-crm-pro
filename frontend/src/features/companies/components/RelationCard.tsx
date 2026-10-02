@@ -74,7 +74,7 @@ export function RelationCard({ companyId, relationType, lifecycleStage, saisieMa
       </CardHeader>
       <div className="space-y-3 text-sm">
         <label className="block">
-          <span className="mb-1 inline-block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <span className="mb-1 inline-block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Type de relation
           </span>
           <select
@@ -89,7 +89,7 @@ export function RelationCard({ companyId, relationType, lifecycleStage, saisieMa
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 inline-block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <span className="mb-1 inline-block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Étape
           </span>
           <select
@@ -103,7 +103,7 @@ export function RelationCard({ companyId, relationType, lifecycleStage, saisieMa
             ))}
           </select>
         </label>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {saisieManuelleLe
             ? `Posée à la main le ${new Date(saisieManuelleLe).toLocaleString('fr-FR')} : l’import ne la modifiera plus.`
             : 'Jamais posée à la main : l’import du site peut la faire progresser, jamais reculer.'}
@@ -119,7 +119,7 @@ export function RelationCard({ companyId, relationType, lifecycleStage, saisieMa
           Enregistrer
         </Button>
         <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Joignabilité
           </span>
           <div className="mt-1 text-slate-900 dark:text-white">{libelleJoignabilite}</div>

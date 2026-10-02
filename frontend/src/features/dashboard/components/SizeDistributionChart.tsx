@@ -33,7 +33,7 @@ export function SizeDistributionChart({ data }: { data: SizeDistribution }) {
           <CardTitle>Distribution par catégorie</CardTitle>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Total classé
           </div>
           <div className="text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
@@ -51,7 +51,7 @@ export function SizeDistributionChart({ data }: { data: SizeDistribution }) {
           return (
             <div key={b.key} className="group flex flex-1 flex-col items-center gap-1.5">
               <div
-                className="w-full text-center text-[10px] font-semibold tabular-nums text-slate-600 transition-opacity dark:text-slate-400"
+                className="w-full text-center text-xs font-semibold tabular-nums text-slate-600 transition-opacity dark:text-slate-400"
                 aria-hidden
               >
                 {v.toLocaleString('fr-FR')}
@@ -76,7 +76,7 @@ export function SizeDistributionChart({ data }: { data: SizeDistribution }) {
       {/* Labels axe X */}
       <div className="mt-2 flex gap-3 px-1">
         {BUCKETS.map((b) => (
-          <div key={b.key} className="flex-1 text-center text-[11px] font-medium text-slate-600 dark:text-slate-400">
+          <div key={b.key} className="flex-1 text-center text-xs font-medium text-slate-600 dark:text-slate-400">
             {b.label}
           </div>
         ))}

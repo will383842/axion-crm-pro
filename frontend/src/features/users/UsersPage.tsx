@@ -32,8 +32,8 @@ interface UserRow {
 const ROLE_OPTIONS = [
   { value: 'viewer', label: 'Lecteur (lecture seule)' },
   { value: 'operator', label: 'Opérateur (édition)' },
-  { value: 'admin', label: 'Admin (gestion équipe)' },
-  { value: 'owner', label: 'Propriétaire (owner)' },
+  { value: 'admin', label: 'Administrateur (gère l’équipe)' },
+  { value: 'owner', label: 'Propriétaire' },
 ];
 
 // 🔴 X39-038 — SIXIEME COLONNE : les actions. Les routes `PUT /users/{user}` et
@@ -107,7 +107,7 @@ function roleToneFor(role: string) {
 function roleLabelFor(role: string): string {
   const map: Record<string, string> = {
     owner: 'Propriétaire',
-    admin: 'Admin',
+    admin: 'Administrateur',
     operator: 'Opérateur',
     viewer: 'Lecteur',
   };
@@ -259,7 +259,7 @@ export function UsersPage() {
     <div className="px-6 py-6">
       <PageHeader
         title="Utilisateurs"
-        subtitle="4 rôles RBAC : owner / admin / operator / viewer (Spatie Permission teams)."
+        subtitle="Qui a accès à votre CRM, et avec quels droits."
         // 🔴 X39-028 — le bouton disparait quand le serveur a REFUSE la vue.
         //
         // Mesure du 2026-08-23 : un compte `viewer` lisait « Vous n'avez pas
@@ -316,7 +316,7 @@ export function UsersPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
             style={{ gridTemplateColumns: GRID }}

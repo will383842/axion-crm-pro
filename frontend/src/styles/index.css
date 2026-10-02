@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-/* Dark mode via class strategy (toggle DarkModeToggle.tsx) */
+/* Mode sombre par classe `.dark` — JAMAIS posée depuis le lot 2 UX (02/10/2026) :
+   la console est forcée en clair (`src/lib/theme.ts`). Les règles restent, inertes. */
 @variant dark (&:where(.dark, .dark *));
 
 /* Axion CRM Pro — design tokens (cf. spec/24_frontend_design_system.md) */
@@ -135,7 +136,7 @@ body {
    sont repliees explicitement plus bas ; sans elles, le survol perdrait tout
    effet en sombre.
 
-   Garde : `tests/e2e/dark-contraste.spec.ts` (mesure le RATIO, pas la classe). */
+   (Garde e2e `dark-contraste.spec.ts` retirée avec le mode sombre, lot 2 UX.) */
 
 .dark .bg-white:not([class*="dark:bg-"]) { background-color: oklch(0.20 0.01 250); }
 .dark .bg-slate-50:not([class*="dark:bg-"]) { background-color: oklch(0.17 0.01 250); }

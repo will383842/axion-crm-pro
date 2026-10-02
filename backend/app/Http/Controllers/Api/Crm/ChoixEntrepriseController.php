@@ -147,46 +147,53 @@ class ChoixEntrepriseController extends ConsoleController
      */
     private function chercherParNom(string $workspaceId, array $entrees, array $filtres, string $codePostal): array
     {
-        $requete = $this->base($workspaceId);
+        // 🔴 SOUS LA RLS, L'INDEX TRIGRAMMES N'EST PAS UTILISABLE (prod,
+        // 2026-10-02 : toute recherche par nom en 503). `ILIKE` n'est pas
+        // « leakproof » : sous `axion_app`, Postgres ne peut l'évaluer qu'APRÈS
+        // le filtre de la politique, donc en parcourant 4,3 M de lignes. Les
+        // IDENTIFIANTS sont donc cherchés par `entreprises_choix_ids`
+        // (SECURITY DEFINER, cloisonnée à l'espace du contexte, cf. migration
+        // `2026_10_02_000020`), dans l'ordre de la #287, puis RELUS ici sous la
+        // RLS — double garde.
+        $ids = array_map(
+            static fn ($l): int => (int) (is_object($l) ? ($l->id ?? 0) : 0),
+            DB::select(
+                'SELECT id FROM public.entreprises_choix_ids(?::uuid, ?::text[], ?::text[], ?, ?) AS t(id)',
+                [$workspaceId, self::tableauPg($entrees), self::tableauPg($filtres), $codePostal, self::PLAFOND],
+            ),
+        );
 
-        // Point d'entrée indexé (trigrammes) : un mot SIGNIFICATIF au moins
-        // dans le nom — jamais un article ni un mot générique. Un OU plutôt
-        // qu'un seul mot : dans « lac annecy », le mot le plus long est la
-        // VILLE, et l'exiger dans le nom perdrait « Les Jardins du Lac ».
-        $requete->where(function ($groupe) use ($entrees): void {
-            foreach ($entrees as $mot) {
-                $groupe->orWhereRaw('companies.denomination_normalized ILIKE ?', ['%' . $mot . '%']);
+        if ($ids === []) {
+            return [];
+        }
+
+        $parId = [];
+        foreach ($this->base($workspaceId)->whereIn('companies.id', $ids)->get() as $ligne) {
+            $parId[(int) $ligne->id] = $ligne;
+        }
+
+        $lignes = [];
+        foreach ($ids as $id) {
+            if (isset($parId[$id])) {
+                $lignes[] = $parId[$id];
             }
-        });
-
-        // Filtrage : CHAQUE mot tapé (générique compris) dans le nom ou la ville.
-        foreach ($filtres as $mot) {
-            $requete->where(function ($groupe) use ($mot): void {
-                $groupe->whereRaw('companies.denomination_normalized ILIKE ?', ['%' . $mot . '%'])
-                    ->orWhereRaw("normalize_name(coalesce(companies.city_name, companies.city, '')) ILIKE ?", ['%' . $mot . '%']);
-            });
         }
 
-        if ($codePostal !== '') {
-            $requete->where('postcode', $codePostal);
-        }
+        return $lignes;
+    }
 
-        // D'abord les noms qui contiennent TOUS les mots tapés : un mot peut
-        // être accepté par la VILLE (« france » de Fort-de-France), et sans ce
-        // critère « Air France » rendait AIR 24 / AIR CLIM devant AIR FRANCE.
-        // Puis les noms qui COMMENCENT par le premier mot tapé, puis les plus
-        // courts : « Société Générale » avant « Banque Société Générale … ».
-        $tousDansLeNom = implode(' AND ', array_fill(0, count($filtres), 'companies.denomination_normalized ILIKE ?'));
-        $lignes = $requete
-            ->orderByRaw('(' . $tousDansLeNom . ') DESC', array_map(static fn (string $mot): string => '%' . $mot . '%', $filtres))
-            ->orderByRaw('(companies.denomination_normalized ILIKE ?) DESC', [$filtres[0] . '%'])
-            ->orderByRaw('length(companies.denomination_normalized)')
-            ->orderBy('companies.denomination_normalized')
-            ->limit(self::PLAFOND)
-            ->get()
-            ->all();
-
-        return array_values($lignes);
+    /**
+     * Littéral de tableau Postgres (`{"a","b"}`) : guillemets et barres
+     * obliques inverses échappés — les mots portent déjà l'échappement `LIKE`.
+     *
+     * @param  list<string>  $mots
+     */
+    private static function tableauPg(array $mots): string
+    {
+        return '{' . implode(',', array_map(
+            static fn (string $m): string => '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $m) . '"',
+            $mots,
+        )) . '}';
     }
 
     private function parNom(string $workspaceId, string $saisie, string $codePostal): JsonResponse

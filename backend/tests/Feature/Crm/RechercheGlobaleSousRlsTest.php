@@ -213,10 +213,20 @@ test('e-mail : les bornes en citext font servir idx_contacts_email ; en text, no
         });
     };
 
-    expect($plan('EXPLAIN SELECT c.id FROM contacts c WHERE c.email >= CAST(? AS text)::public.citext AND c.email < CAST(? AS text)::public.citext'))
-        ->toContain('idx_contacts_email');
-    expect($plan('EXPLAIN SELECT c.id FROM contacts c WHERE c.email >= CAST(? AS text) AND c.email < CAST(? AS text)'))
-        ->not->toContain('idx_contacts_email');
+    // On exige l'intervalle en CONDITION D'INDEX (« Index Cond: ((email >= … »),
+    // pas seulement le nom de l'index : avec `enable_seqscan = off`, Postgres
+    // peut relire l'index partiel ENTIER et filtrer ensuite (constaté en CI).
+    $intervalleSurIndex = '/Index Cond: \(\(email >= /';
+
+    $citext = $plan('EXPLAIN SELECT c.id FROM contacts c WHERE c.email >= CAST(? AS text)::public.citext AND c.email < CAST(? AS text)::public.citext');
+    expect($citext)->toContain('idx_contacts_email')
+        ->and(preg_match($intervalleSurIndex, $citext))->toBe(1);
+
+    // TÉMOIN : en `text`, la comparaison devient `(email)::text >= …`, que
+    // l'index ne peut pas servir comme condition.
+    $texte = $plan('EXPLAIN SELECT c.id FROM contacts c WHERE c.email >= CAST(? AS text) AND c.email < CAST(? AS text)');
+    expect(preg_match($intervalleSurIndex, $texte))->toBe(0)
+        ->and($texte)->toContain('(email)::text >=');
 });
 
 test('la palette ne réémet JAMAIS de LIKE direct sur companies ou contacts (rougit si l ILIKE revient)', function () {

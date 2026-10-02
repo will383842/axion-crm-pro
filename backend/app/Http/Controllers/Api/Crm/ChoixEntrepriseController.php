@@ -153,7 +153,7 @@ class ChoixEntrepriseController extends ConsoleController
         // le filtre de la politique, donc en parcourant 4,3 M de lignes. Les
         // IDENTIFIANTS sont donc cherchés par `entreprises_choix_ids`
         // (SECURITY DEFINER, cloisonnée à l'espace du contexte, cf. migration
-        // `2026_10_02_000020`), dans l'ordre de la #287, puis RELUS ici sous la
+        // `2026_10_02_000050`), dans l'ordre de la #287, puis RELUS ici sous la
         // RLS — double garde.
         $ids = array_map(
             static fn ($l): int => (int) (is_object($l) ? ($l->id ?? 0) : 0),

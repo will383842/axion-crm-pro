@@ -105,9 +105,15 @@ class RefreshAudienceChunkJob implements ShouldQueue
             // (`AudienceBuilderService::lignesMembres`) : jamais un
             // journaliste hors d'une audience presse (`GardePresse`), et dans
             // une audience presse, les seules adresses de provenance fiable.
-            $rows = $builder->lignesMembres($audience, array_map(static fn ($id): int => (int) $id, $companyIds));
-
-            DB::table('audience_members')->insertOrIgnore($rows);
+            // Insertion par tranches (`insererMembres`) : un lot de 5 000 fiches
+            // peut dépasser 13 107 personnes, donc les 65 535 paramètres
+            // qu'accepte Postgres pour une seule requête. Les tranches d'un
+            // même lot forment UNE transaction : un job tué entre deux
+            // tranches puis relancé ne laisse rien à moitié — les lignes
+            // « fiche sans contact » (`contact_id` NULL) échappent à
+            // l'unicité, elles seraient sinon insérées deux fois.
+            $lignes = $builder->lignesMembres($audience, array_map(static fn ($id): int => (int) $id, $companyIds));
+            DB::transaction(static fn () => $builder->insererMembres($lignes));
         } catch (\Throwable $e) {
             WaterfallSentry::capture(null, 'audience-refresh-chunk', $e);
             throw $e;  // re-throw pour que Horizon mark failed + retry

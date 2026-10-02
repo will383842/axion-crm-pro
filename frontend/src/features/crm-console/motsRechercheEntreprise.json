@@ -1,0 +1,12 @@
+{
+  "articles_retires": ["de", "du", "la", "le", "les", "d", "l"],
+  "mots_generiques": [
+    "des", "et", "au", "aux", "en", "sur", "sous", "par", "pour", "chez", "un", "une", "a", "the", "and",
+    "sarl", "sas", "sasu", "sa", "eurl", "sci", "snc", "scop", "scp", "scm", "sel", "selarl", "selas",
+    "ei", "eirl", "gie", "gaec", "earl", "scea", "association", "asso",
+    "societe", "ste", "ets", "etablissement", "etablissements", "cie", "compagnie", "groupe", "france",
+    "entreprise", "entreprises"
+  ],
+  "mots_lus": 8,
+  "mot_minimal": 3
+}

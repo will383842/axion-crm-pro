@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\Crm\ArbitrageController;
 use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
+use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
@@ -520,6 +521,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/personnes/{personneId}/rattacher', [PersonnesController::class, 'rattacher'])
                 ->whereNumber('personneId')
                 ->middleware('permission:companies.update');
+
+            // Lot 13 — choisir l'entreprise d'un rattachement en la CHERCHANT
+            // (nom, ville, code postal, SIREN, SIRET) au lieu de taper son
+            // identifiant interne. Plafond court : une recherche trop large
+            // est annulée et l'écran demande de préciser.
+            // `throttle:60,1` (par compte) : appelé à la frappe par conception,
+            // un mot courant pouvant tenir 8 s, des rafales parallèles
+            // affameraient les autres écrans (relecture sécurité de la #287).
+            Route::get('/entreprises/choix', [ChoixEntrepriseController::class, 'index'])
+                ->middleware(['throttle:60,1', 'delai-sql:8']);
 
             // `/arbitrage/{activityId}/…` : les segments fixes précèdent, aucun
             // conflit possible avec un identifiant numérique.

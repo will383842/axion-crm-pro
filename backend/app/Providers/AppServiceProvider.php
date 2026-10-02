@@ -11,9 +11,13 @@ use App\Services\Email\EmailConfidenceService;
 use App\Services\Email\HunterEmailVerifier;
 use App\Services\Email\MxEmailValidator;
 use App\Services\Scraping\GooglePlacesClient;
+use App\Support\DelaiRequeteSql;
 use App\Support\RelocalisationPartman;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -98,6 +102,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Un job exécuté EN LIGNE (`sync`) depuis une requête web n'hérite
+        // jamais des 15 s du délai SQL des écrans (cf. `DelaiRequeteSql`).
+        Queue::before(static fn (JobProcessing $e) => DelaiRequeteSql::libererPourJobSync($e->connectionName));
+        Queue::after(static fn (JobProcessed $e) => DelaiRequeteSql::restaurerApresJobSync($e->connectionName));
+        Queue::exceptionOccurred(static fn (JobExceptionOccurred $e) => DelaiRequeteSql::restaurerApresJobSync($e->connectionName));
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }

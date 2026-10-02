@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Taxonomy;
+use App\Support\DelaiRequeteSql;
+use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -43,6 +46,29 @@ use Illuminate\Support\Facades\Schema;
  */
 class DashboardController extends ApiController
 {
+    /**
+     * ── 2026-10-02 : « le tableau de bord met ~10 s » ──────────────────────
+     *
+     * Mesuré en production (EXPLAIN) : `companies_total` parcourt un index de
+     * 4,3 M d'entrées, `contacts_qualified` balaie `contacts` (1,3 M) en
+     * séquentiel, `size_distribution` balaie le tas de `companies` (4 Go).
+     * Recalculés à CHAQUE ouverture de l'accueil, par chaque session.
+     *
+     * Ce sont des ordres de grandeur, pas une comptabilité : on les sert
+     * depuis un cache court, par espace — même mécanique que
+     * `App\Crm\Console\CompteursHub` (`Cache::flexible` : la valeur périmée
+     * est servie tout de suite, UN seul recalcul part après la réponse, sous
+     * verrou borné).
+     */
+    public const FRAIS_SECONDES = 120;
+
+    public const PERIME_SECONDES = 1800;
+
+    public static function cle(string $espace): string
+    {
+        return 'crm:dashboard:stats:v1:' . $espace;
+    }
+
     public function stats(Request $r): JsonResponse
     {
         $espace = $this->espaceCourantOuNull();
@@ -52,7 +78,38 @@ class DashboardController extends ApiController
             return response()->json($this->gabaritVide());
         }
 
-        return response()->json(array_merge($this->gabaritVide(), [
+        /** @var mixed $charge */
+        $charge = Cache::flexible(
+            self::cle($espace),
+            [self::FRAIS_SECONDES, self::PERIME_SECONDES],
+            fn (): array => $this->calculer($espace),
+            lock: ['seconds' => 60],
+        );
+
+        if (! is_array($charge)) {
+            $charge = $this->calculer($espace);
+        }
+
+        return response()->json(array_merge($this->gabaritVide(), $charge, [
+            'period_label' => $this->libellePeriode($r->query('period')),
+        ]));
+    }
+
+    /**
+     * Le calcul, sans cache.
+     *
+     * - `WorkspaceContext::run` : le recalcul différé de `Cache::flexible`
+     *   tourne APRÈS la réponse, quand `SetCurrentWorkspace` a retiré la
+     *   variable de session de la RLS — sans contexte, il compterait zéro et
+     *   le mettrait en cache (cf. `CompteursHub::calculer`).
+     * - `DelaiRequeteSql::etendu` : ces balayages dépassent les 15 s accordés
+     *   aux écrans ; ils ne bloquent plus l'écran, ils ont droit à plus.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculer(string $espace): array
+    {
+        return DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => [
             'companies_total' => $this->compter('companies', $espace),
             'companies_enriched_24h' => $this->compter('companies', $espace, function ($q) {
                 $q->where('updated_at', '>=', now()->subDay());
@@ -73,7 +130,7 @@ class DashboardController extends ApiController
             // Les tailles du référentiel unique (`Taxonomy::TAILLES`), plus
             // aucune liste recopiée ici.
             'size_distribution' => $this->repartition('companies', $espace, 'size_category', self::taillesAZero()),
-            'period_label' => $this->libellePeriode($r->query('period')),
+            'computed_at' => now()->utc()->toIso8601ZuluString(),
         ]));
     }
 

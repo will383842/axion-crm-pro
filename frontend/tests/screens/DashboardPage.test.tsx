@@ -134,6 +134,16 @@ describe('DashboardPage — rendu', () => {
    * repli qui met `isPending` à faux) : le squelette disparaîtrait, et les
    * libellés de vignettes apparaîtraient au-dessus de zéros inventés.
    */
+  it('dit l’âge des chiffres servis depuis le cache (`computed_at`)', async () => {
+    const ilYA7Min = new Date(Date.now() - 7 * 60_000 - 5_000).toISOString();
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/dashboard/stats', { ...STATS, computed_at: ilYA7Min }), ...socle()],
+    });
+
+    expect(await screen.findByText(/chiffres mis à jour il y a 7 min/)).toBeVisible();
+  });
+
   it('D25-008 — tant que /dashboard/stats n’a pas répondu, l’écran montre le SQUELETTE, pas des zéros', async () => {
     const { handler, release } = getPending('/dashboard/stats', STATS);
     const vue = await renderScreen(<DashboardPage />, {

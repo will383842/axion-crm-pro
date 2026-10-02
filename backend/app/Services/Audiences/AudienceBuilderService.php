@@ -330,26 +330,36 @@ class AudienceBuilderService
             return;
         }
 
-        DB::transaction(function () use ($audience) {
+        // ── ATOMIQUE (relecture A09 de #282, 2026-10-02) ───────────────────
+        //
+        // Avant : la suppression des anciens membres était validée SEULE, puis
+        // le remplissage partait par lots hors transaction. Une coupure entre
+        // les deux — délai SQL de la requête web, processus tué, erreur sur
+        // un lot — laissait une audience À MOITIÉ remplie, présentée comme
+        // rafraîchie. Désormais suppression, remplissage et compteur forment
+        // UNE transaction : ou la nouvelle composition entière, ou l'ancienne
+        // intacte. Jamais d'audience partielle.
+        //
+        // La route porte `delai-sql:300` ; un dépassement annule tout et
+        // remonte en 503 (cf. `AudiencesController::refresh`).
+        DB::transaction(function () use ($audience, $query): void {
             AudienceMember::where('audience_id', $audience->id)->delete();
-        });
 
-        $total = 0;
-        $query->chunkById(self::REFRESH_CHUNK_SIZE, function ($companies) use ($audience, &$total) {
-            $companyIds = array_map(static fn ($id): int => (int) $id, $companies->pluck('id')->all());
-            // Une seule définition des membres (`lignesMembres`), partagée
-            // avec `RefreshAudienceChunkJob`.
-            $rows = $this->lignesMembres($audience, $companyIds);
-            if (! empty($rows)) {
-                DB::table('audience_members')->insertOrIgnore($rows);
-                $total += count($rows);
-            }
-        });
+            $query->chunkById(self::REFRESH_CHUNK_SIZE, function ($companies) use ($audience) {
+                $companyIds = array_map(static fn ($id): int => (int) $id, $companies->pluck('id')->all());
+                // Une seule définition des membres (`lignesMembres`), partagée
+                // avec `RefreshAudienceChunkJob`.
+                $rows = $this->lignesMembres($audience, $companyIds);
+                if (! empty($rows)) {
+                    DB::table('audience_members')->insertOrIgnore($rows);
+                }
+            });
 
-        $audience->update([
-            'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),
-            'refreshed_at' => now(),
-        ]);
+            $audience->update([
+                'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),
+                'refreshed_at' => now(),
+            ]);
+        });
 
         Log::info('Audience refresh done', ['audience_id' => $audience->id, 'members' => $audience->member_count]);
 

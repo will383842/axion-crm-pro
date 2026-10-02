@@ -34,6 +34,23 @@ interface DashboardStats {
   new_7d_trend_pct?: number;
   quality_trend_pct?: number;
   period_label?: string;
+  /** Heure du calcul (UTC) : les chiffres sont servis depuis un cache court. */
+  computed_at?: string;
+}
+
+/**
+ * « mis à jour il y a N min » — 2026-10-02 : `/dashboard/stats` est servi par
+ * un cache de 2 min (recalcul ≈ 10 s sur 4,3 M de fiches). Un chiffre mis en
+ * cache qui se présente comme instantané est un mensonge d'interface.
+ */
+function fraicheur(computedAt: string | undefined, maintenant: number = Date.now()): string | null {
+  if (computedAt === undefined) return null;
+  const t = Date.parse(computedAt);
+  if (Number.isNaN(t)) return null;
+  const minutes = Math.max(0, Math.floor((maintenant - t) / 60_000));
+  if (minutes < 1) return 'chiffres mis à jour à l’instant';
+  if (minutes < 60) return `chiffres mis à jour il y a ${minutes} min`;
+  return `chiffres mis à jour il y a ${Math.floor(minutes / 60)} h`;
 }
 
 interface MeResponse {
@@ -68,7 +85,7 @@ export function DashboardPage() {
 
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ['dashboard-stats'],
-    queryFn: async () => (await api.get<DashboardStats>('/dashboard/stats')).data,
+    queryFn: async ({ signal }) => (await api.get<DashboardStats>('/dashboard/stats', { signal })).data,
     refetchInterval: 30_000,
     // D25-008 — PAS de `placeholderData` ici, et c'est délibéré. Un
     // `placeholderData` met `isPending` à faux dès le premier rendu ; `isLoading`
@@ -98,13 +115,14 @@ export function DashboardPage() {
   // vrai 0 venu d'une réponse RÉUSSIE ; un échec affiche l'erreur.
   const echec = error !== null && data === undefined;
   const isEmpty = data !== undefined && data.companies_total === 0;
+  const miseAJour = fraicheur(data?.computed_at);
 
   return (
     <div className="px-6 py-6">
       <PageHeader
         eyebrow={firstName ? `Bonjour ${firstName} 👋` : 'Bienvenue'}
         title="Tableau de bord"
-        subtitle="Vue d'ensemble de votre base"
+        subtitle={miseAJour === null ? "Vue d'ensemble de votre base" : `Vue d'ensemble de votre base · ${miseAJour}`}
         actions={
           <>
             <LiveBadge label="En direct" refreshLabel="actualisé toutes les 30s" />

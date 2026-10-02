@@ -3,6 +3,7 @@
 namespace App\Crm\Console;
 
 use App\Crm\Taxonomy;
+use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -145,12 +146,19 @@ final class CompteursHub
         // mettrait en cache « total : 0 » pour une heure — un écran vide, sans
         // erreur nulle part. Le contexte est restauré ensuite, y compris sur
         // exception.
-        $rows = WorkspaceContext::run($workspaceId, static fn () => DB::table('companies')
+        //
+        // `DelaiRequeteSql::etendu` : mesuré à ~20 s à froid en production le
+        // 2026-10-02 (4,3 M de fiches, carte de visibilité à 62 % → relectures
+        // du tas). Ce calcul tourne PENDANT une requête web — synchrone au
+        // premier affichage, différé ensuite — donc sous le délai de 15 s des
+        // écrans : sans élargissement local, il échouerait à chaque fois et
+        // les pastilles ne s'afficheraient plus jamais.
+        $rows = DelaiRequeteSql::etendu(120, static fn () => WorkspaceContext::run($workspaceId, static fn () => DB::table('companies')
             ->selectRaw('relation_type, lifecycle_stage, count(*) AS total')
             ->where('workspace_id', $workspaceId)
             ->whereNull('deleted_at')
             ->groupBy('relation_type', 'lifecycle_stage')
-            ->get());
+            ->get()));
 
         $total = 0;
         foreach ($rows as $row) {

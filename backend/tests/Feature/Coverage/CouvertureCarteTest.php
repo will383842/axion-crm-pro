@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CoverageController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
@@ -104,14 +105,31 @@ test('le niveau region agrege les memes cellules', function () {
     expect($cellules['94']['total'])->toBe(2);
 });
 
-test('la carte porte l etat des scores de l accueil : inconnu tant que l accueil n a pas calcule', function () {
+test('la carte estime elle-meme les scores perimes, sans attendre l ouverture de l accueil', function () {
+    // 🔴 2026-10-02 22 h : reprise des scores TERMINÉE, accueil pas rouvert
+    // depuis 30 min → cache de l'accueil absent → la carte rendait null et
+    // affichait « calcul en attente » sans fin.
     [$user, $espace] = l3CouvertureConsole();
     l3Fiche($espace, '38000');
+    l3Fiche($espace, '38100');
+    DB::statement('UPDATE companies c SET quality_score = company_quality_score_calcul(c) WHERE workspace_id = ?', [$espace]);
     DB::statement('REFRESH MATERIALIZED VIEW coverage_matrix_cells');
 
-    // Inconnu : l'écran n'affiche pas « dont N au score ≥ 50 » (relecture A09).
-    expect($this->actingAs($user)->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))->toBeNull();
+    $pct = $this->actingAs($user)->getJson('/api/v1/coverage?level=department')->assertOk()->json('quality_a_recalculer_pct');
 
-    $this->getJson('/api/v1/dashboard/stats')->assertOk();
-    expect($this->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))->not->toBeNull();
+    expect($pct)->not->toBeNull()
+        ->and((float) $pct)->toBe(0.0)
+        ->and(Cache::has(DashboardController::cle($espace)))->toBeFalse();
+});
+
+test('la carte signale des scores perimes quand ils divergent du bareme', function () {
+    [$user, $espace] = l3CouvertureConsole();
+    l3Fiche($espace, '38000');
+    // `quality_score` n'est pas écouté par le déclencheur du barème : la
+    // valeur reste telle quelle — et diverge du barème.
+    DB::table('companies')->where('workspace_id', $espace)->update(['quality_score' => 97]);
+    DB::statement('REFRESH MATERIALIZED VIEW coverage_matrix_cells');
+
+    expect((float) $this->actingAs($user)->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))
+        ->toBeGreaterThan(0.0);
 });

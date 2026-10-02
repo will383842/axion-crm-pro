@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { appliquerTotaux, SOURCE_DEPARTEMENTS } from './colorationCarte';
+import { echelleRelative, expressionCouleur } from './echelleCarte';
+
+/** L'entrée de l'échelle : le total posé par `appliquerTotaux`, 0 à défaut. */
+const TOTAL_DEPARTEMENT = ['coalesce', ['feature-state', 'total'], 0];
 
 /**
  * G42-011 — en deçà de ce déplacement (pixels écran), l'infobulle de survol
@@ -73,6 +77,11 @@ export function FranceCoverageMap({
   const cellsRef = useRef(cells);
   // Codes colorés au dernier passage : ceux qui disparaissent repassent à 0.
   const codesColores = useRef<Set<string>>(new Set());
+  // Échelle RELATIVE aux volumes affichés (2026-10-02) : avec des seuils fixes
+  // à 2 000, tous les départements (des milliers à 615 507) avaient la même
+  // teinte foncée.
+  const echelle = useMemo(() => echelleRelative(cells.map((c) => c.total)), [cells]);
+  const echelleRef = useRef(echelle);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<{ code: string; name: string; total: number; x: number; y: number } | null>(null);
   useEffect(() => {
@@ -237,15 +246,9 @@ export function FranceCoverageMap({
         type: 'fill',
         source: 'departements',
         paint: {
-          'fill-color': [
-            'interpolate', ['linear'],
-            ['coalesce', ['feature-state', 'total'], 0],
-            0,    '#e2e8f0', // gris clair distinct du fond blanc → visible quand cells vide
-            10,   '#bae6fd',
-            100,  '#38bdf8',
-            500,  '#0284c7',
-            2000, '#075985',
-          ],
+          // Gris clair (distinct du fond blanc) pour 0, puis les classes de
+          // l'échelle relative ; mis à jour quand les cellules changent.
+          'fill-color': expressionCouleur(echelleRef.current, TOTAL_DEPARTEMENT) as never,
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false], 1,
@@ -372,6 +375,15 @@ export function FranceCoverageMap({
     if (colores !== null) codesColores.current = colores;
   }, [cells]);
 
+  // Les seuils suivent les cellules : la couche, si elle existe déjà, reçoit
+  // la nouvelle échelle ; sinon elle la lira à sa création (`echelleRef`).
+  useEffect(() => {
+    echelleRef.current = echelle;
+    const map = mapRef.current;
+    if (!map || !map.getLayer('dept-fill')) return;
+    map.setPaintProperty('dept-fill', 'fill-color', expressionCouleur(echelle, TOTAL_DEPARTEMENT));
+  }, [echelle]);
+
   return (
     <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-50/30">
       <div ref={containerRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} aria-label="Carte de couverture France" role="region" />
@@ -388,16 +400,10 @@ export function FranceCoverageMap({
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {[
-            { color: '#e2e8f0', label: '0' },
-            { color: '#bae6fd', label: '1+' },
-            { color: '#38bdf8', label: '100+' },
-            { color: '#0284c7', label: '500+' },
-            { color: '#075985', label: '2k+' },
-          ].map((i) => (
-            <div key={i.color} className="flex flex-col items-center gap-1">
-              <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.color }} />
-              <span className="text-xs font-medium text-slate-600">{i.label}</span>
+          {echelle.legende.map((i) => (
+            <div key={i.libelle} className="flex flex-col items-center gap-1">
+              <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.couleur }} />
+              <span className="whitespace-nowrap text-xs font-medium text-slate-600">{i.libelle}</span>
             </div>
           ))}
         </div>

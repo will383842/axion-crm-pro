@@ -14,9 +14,9 @@
  *
  * Le réglage devient un ATTRIBUT SUR `<html>` (`data-density`), que
  * `src/styles/index.css` consulte pour resserrer les cellules de tableau, et
- * une entrée de `localStorage` relue à l'amorçage (`main.tsx`). C'est le même
- * patron que le thème (`DarkModeToggle`), qui est justement la seule commande
- * de l'onglet qui marchait.
+ * une entrée de `localStorage` relue à l'amorçage (`main.tsx`). (Le sélecteur
+ * de thème qui suivait ce patron a été retiré : la console est toujours en
+ * clair, voir `theme.ts`.)
  *
  * ⚠️ On écrit l'attribut MÊME pour « comfortable ». Un attribut absent ne se
  * distingue pas d'un module jamais chargé : la garde

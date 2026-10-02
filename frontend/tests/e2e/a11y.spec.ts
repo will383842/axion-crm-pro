@@ -18,7 +18,8 @@
  *
  * ── Ce que cette porte fait maintenant ────────────────────────────────────
  *  · session simulee au niveau reseau + charge utile choisie (vide OU peuplee)
- *  · chaque ecran visite en CLAIR puis en SOMBRE
+ *  · chaque ecran visite en CLAIR — le seul theme : le mode sombre a ete
+ *    retire le 2026-10-02 (lot 2 UX, decision permanente du proprietaire)
  *  · assertion sur `critical` ET `serious`, moins un socle nomme, date et
  *    justifie (§ SOCLE)
  *  · trois verrous anti-« vert sans mesure » : titre de niveau 1 attendu,
@@ -26,13 +27,9 @@
  *
  * ⚠️ CE QU'ELLE NE COUVRE TOUJOURS PAS, explicitement :
  *  · les impacts `moderate` et `minor` (axe en remonte ; ils ne bloquent pas).
- *  · `/login` en mode sombre : cet ecran est monte HORS de la coquille
- *    applicative, `DarkModeToggle` n'y existe pas, `html.dark` n'y est jamais
- *    pose. Le parcours d'authentification n'a pas de mode sombre du tout —
- *    constat pinne par le test « CONSTAT » en bas de fichier.
+ *  · le mode sombre : il n'existe plus (`src/lib/theme.ts` force le clair a
+ *    l'amorcage) — pinne par le test « CONSTAT » en bas de fichier.
  *  · les 33 autres ecrans de route du produit. Quatre ecrans sur 37.
- *  · le contraste fin est mesure separement, en ratio, par
- *    `tests/e2e/dark-contraste.spec.ts`.
  */
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -168,18 +165,18 @@ interface Ecran {
   readonly titre: string;
   readonly repere: string;
   readonly charge: unknown;
-  /** `false` quand l'ecran ne sait pas s'afficher en sombre (cf. /login). */
-  readonly sombre: boolean;
 }
 
 const ECRANS: readonly Ecran[] = [
   // « Sign in » : le titre de /login est en ANGLAIS dans un produit francais.
   // Constat releve, non repare ici (composant hors perimetre).
-  { url: '/login', titre: 'Sign in', repere: 'Sign in', charge: LISTE_VIDE, sombre: false },
-  { url: '/companies', titre: 'Entreprises', repere: 'Inconnue', charge: UNE_ENTREPRISE, sombre: true },
-  { url: '/coverage', titre: 'Couverture France', repere: 'Aucune', charge: LISTE_VIDE, sombre: true },
-  // Sous-chaine SANS lettre accentuee : le titre reel est « Requetes RGPD ».
-  { url: '/rgpd/requests', titre: 'RGPD', repere: 'RGPD', charge: LISTE_VIDE, sombre: true },
+  { url: '/login', titre: 'Sign in', repere: 'Sign in', charge: LISTE_VIDE },
+  { url: '/companies', titre: 'Entreprises', repere: 'Inconnue', charge: UNE_ENTREPRISE },
+  // Lot 2 UX : « Couverture France » est devenu « Carte de France » (menu,
+  // titre et fil d'Ariane disent le meme mot).
+  { url: '/coverage', titre: 'Carte de France', repere: 'Aucune', charge: LISTE_VIDE },
+  // Sous-chaine SANS lettre accentuee : le titre reel est « Demandes RGPD ».
+  { url: '/rgpd/requests', titre: 'RGPD', repere: 'RGPD', charge: LISTE_VIDE },
 ];
 
 interface Bilan {
@@ -215,7 +212,8 @@ function decrire(bilan: Bilan): string {
 }
 
 for (const ecran of ECRANS) {
-  const themes: ReadonlyArray<'light' | 'dark'> = ecran.sombre ? ['light', 'dark'] : ['light'];
+  // Un seul theme : le clair (lot 2 UX — plus de mode sombre).
+  const themes: ReadonlyArray<'light'> = ['light'];
 
   for (const theme of themes) {
     test(`${ecran.url} (${theme}) — aucune violation critical/serious hors socle`, async ({ page }) => {
@@ -228,8 +226,8 @@ for (const ecran of ECRANS) {
       // Verrou 2 — le contenu specifique de l'ecran est la (liste peuplee,
       // etat vide reel…), pas une coquille de chargement.
       await expect(page.getByText(ecran.repere).first()).toBeVisible();
-      // Verrou 3 — le theme demande est bien applique.
-      if (theme === 'dark') await expect(page.locator('html')).toHaveClass(/dark/);
+      // Verrou 3 — le clair est bien applique (jamais de `html.dark`).
+      await expect(page.locator('html')).not.toHaveClass(/dark/);
 
       const bilan = await auditer(page, ecran.url);
 
@@ -292,16 +290,16 @@ test('TEMOIN — une page vide ne produit AUCUNE violation (donc le vert ne prou
   expect(bilan.reglesEvaluees).toBeLessThan(PLANCHER_REGLES_EVALUEES);
 });
 
-test("CONSTAT — /login n'applique jamais le mode sombre (donc la porte ne l'y mesure pas)", async ({ page }) => {
+test("CONSTAT — le mode sombre n'existe plus : une preference « dark » ancienne est ignoree et effacee", async ({ page }) => {
   await simulerApi(page, LISTE_VIDE);
+  // Un navigateur qui avait choisi « sombre » avant le lot 2 UX garde cette
+  // valeur en stockage local : elle ne doit plus rien produire.
   await poserTheme(page, 'dark');
-  await page.goto('/login');
+  await page.goto('/companies');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-  // `DarkModeToggle` est monte dans `RootLayout` ; `/login` vit HORS de cette
-  // coquille. Personne ne pose donc `html.dark` sur le parcours
-  // d'authentification, quelle que soit la preference enregistree.
-  // Si ce test rougit un jour, c'est une BONNE nouvelle : le mode sombre est
-  // arrive sur /login — il faut alors passer `sombre: true` pour cet ecran.
   await expect(page.locator('html')).not.toHaveClass(/dark/);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  // Aucun selecteur de theme a l'ecran.
+  await expect(page.getByRole('button', { name: /theme/i })).toHaveCount(0);
 });

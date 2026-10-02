@@ -56,5 +56,4 @@ export { ReponseVideState, type ReponseVideStateProps } from './ReponseVideState
 export { ErrorBoundary } from './ErrorBoundary';
 export { Skeleton, CompaniesTableSkeleton } from './Skeleton';
 export { FormField } from './FormField';
-export { DarkModeToggle } from './DarkModeToggle';
 export { GlobalSearch } from './GlobalSearch';

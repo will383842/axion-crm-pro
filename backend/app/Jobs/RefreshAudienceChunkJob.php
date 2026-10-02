@@ -84,8 +84,14 @@ class RefreshAudienceChunkJob implements ShouldQueue
             // On utilise une sub-query du builder pour respecter le DSL criteria.
             $companyQuery = $builder->buildPublicQuery($audience->workspace_id, $criteria);
 
+            // ORDER BY obligatoire (2026-10-02) : sans lui, OFFSET/LIMIT ne
+            // découpe pas un ordre STABLE. Les lots tournent en parallèle et
+            // Postgres peut lire la table dans un ordre différent d'une requête
+            // à l'autre (balayages synchronisés, plans parallèles) : des fiches
+            // tombaient dans deux lots, d'autres dans aucun.
             $companyIds = $companyQuery
                 ->select('companies.id')
+                ->reorder('companies.id')
                 ->skip($this->offset)
                 ->take($this->limit)
                 ->pluck('id')

@@ -97,10 +97,24 @@ class AudienceBuilderService
      * Sprint H5 — Au delà de ce seuil, on bascule en Bus::batch parallèle
      * (10 workers Horizon supervisor audiences-refresh). En dessous, refresh
      * inline (fast path, évite overhead batch).
+     *
+     * Valeurs par défaut ; `crm.audiences.seuil_lot` / `crm.audiences.taille_lot`
+     * les remplacent (les tests les abaissent pour jouer le chemin batch avec
+     * trois fiches au lieu de 5 001).
      */
     private const BATCH_THRESHOLD = 5000;
 
     private const BATCH_CHUNK_SIZE = 5000;
+
+    private static function seuilLot(): int
+    {
+        return max(1, (int) config('crm.audiences.seuil_lot', self::BATCH_THRESHOLD));
+    }
+
+    private static function tailleLot(): int
+    {
+        return max(1, (int) config('crm.audiences.taille_lot', self::BATCH_CHUNK_SIZE));
+    }
 
     /**
      * Pour une audience presse, `presse_ecartees` : les adresses écartées par
@@ -325,7 +339,7 @@ class AudienceBuilderService
         $query = $this->buildQuery($audience->workspace_id, $audience->criteria ?? []);
         $total = (clone $query)->count();
 
-        if ($total > self::BATCH_THRESHOLD) {
+        if ($total > self::seuilLot()) {
             $this->refreshViaBatch($audience, $total);
 
             return;
@@ -389,30 +403,56 @@ class AudienceBuilderService
             $audience->update(['refreshed_at' => null, 'member_count' => 0]);
         });
 
-        $chunks = (int) ceil($total / self::BATCH_CHUNK_SIZE);
+        $taille = self::tailleLot();
+        $chunks = (int) ceil($total / $taille);
         $jobs = [];
         for ($i = 0; $i < $chunks; $i++) {
             // B11-002 : `Bus::batch` ne passe pas par `dispatch()`, on pose
             // donc l'espace sur l'instance avant de l'empiler.
             $jobs[] = (new RefreshAudienceChunkJob(
                 audienceId: $audience->id,
-                offset: $i * self::BATCH_CHUNK_SIZE,
-                limit: self::BATCH_CHUNK_SIZE,
+                offset: $i * $taille,
+                limit: $taille,
             ))->pourEspace((string) $audience->workspace_id);
         }
+
+        // ⚠️ Le rappel `finally` ne capture QUE des scalaires (2026-10-02).
+        //
+        // Laravel range ce rappel, sérialisé, dans `job_batches.options`, et
+        // le désérialise à CHAQUE lecture du lot — y compris dans le worker,
+        // AVANT que le moindre contexte d'espace soit posé (`$this->batch()`
+        // en tête de `RefreshAudienceChunkJob::handle`, puis l'enregistrement
+        // du lot terminé, après `handle`). Un modèle capturé (`use
+        // ($audience)`) y est RECHARGÉ depuis la base à ce moment-là : sous
+        // `axion_app` et la RLS forcée de `email_audiences`, sans contexte, la
+        // ligne est invisible, le rechargement échoue, et
+        // `DatabaseBatchRepository::unserialize` avale l'erreur en rendant
+        // des options VIDES. Le rappel disparaissait alors sans bruit :
+        // `refreshed_at` restait NULL et `member_count` à 0 pour toujours.
+        // Un identifiant et un espace ne se rechargent pas : ils passent.
+        $audienceId = (int) $audience->id;
+        $espace = (string) $audience->workspace_id;
 
         Bus::batch($jobs)
             ->name("audience-refresh-{$audience->id}")
             ->onQueue('audiences-refresh')
             ->allowFailures()
-            ->finally(function (Batch $batch) use ($audience) {
+            ->finally(static function (Batch $batch) use ($audienceId, $espace): void {
                 // Lot 3 (2026-10-02) : ce rappel tourne dans un worker, APRÈS le
                 // dernier lot, sans contexte d'espace. Sous la RLS forcée de
                 // `email_audiences`, la mise à jour ci-dessous touchait ZÉRO
                 // ligne : `refreshed_at` restait NULL (« jamais ») alors que les
                 // membres étaient bien recalculés. On pose le contexte.
-                WorkspaceContext::run((string) $audience->workspace_id, function () use ($batch, $audience): void {
-                    $audience->refresh();
+                WorkspaceContext::run($espace, static function () use ($batch, $audienceId): void {
+                    $audience = EmailAudience::find($audienceId);
+                    if ($audience === null) {
+                        Log::warning('Audience refresh via Bus::batch : audience disparue avant la fin du lot', [
+                            'audience_id' => $audienceId,
+                            'batch_id' => $batch->id,
+                        ]);
+
+                        return;
+                    }
                     $audience->update([
                         'refreshed_at' => now(),
                         'member_count' => AudienceMember::where('audience_id', $audience->id)->count(),

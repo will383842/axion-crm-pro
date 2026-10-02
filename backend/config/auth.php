@@ -12,6 +12,10 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+            // Durée du cookie « se souvenir de moi », en MINUTES : 30 jours.
+            // Sans elle, Laravel le pose pour 400 jours (revue sécurité, PR #283)
+            // — or le lien magique pose désormais ce cookie à chaque connexion.
+            'remember' => (int) env('AUTH_REMEMBER_MINUTES', 43200),
         ],
     ],
 

@@ -156,6 +156,17 @@ export function PasswordResetPage() {
           </div>
         ) : (
           <form onSubmit={(e) => void onDefinir(e)} className="space-y-4">
+            {/* Identifiant du compte, invisible : il permet au gestionnaire de
+                mots de passe du navigateur d'ENREGISTRER le nouveau mot de passe
+                sous la bonne adresse, au lieu de garder l'ancien. */}
+            <input
+              type="email"
+              name="username"
+              autoComplete="username"
+              value={lien.email}
+              readOnly
+              hidden
+            />
             {erreur ? (
               <div
                 role="alert"

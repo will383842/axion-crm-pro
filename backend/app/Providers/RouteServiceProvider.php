@@ -26,6 +26,9 @@ class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('login', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
         RateLimiter::for('magic-link', fn (Request $r) => Limit::perMinute(3)->by($r->ip()));
+        // Changement de mot de passe connecté : 5/min PAR COMPTE (l'ancien mot de
+        // passe s'y devine aussi bien qu'à la connexion).
+        RateLimiter::for('password-change', fn (Request $r) => Limit::perMinute(5)->by(optional($r->user())->id ?: $r->ip()));
         RateLimiter::for('internal', fn (Request $r) => Limit::perMinute(600)->by($r->ip()));
 
         // Sprint 19.6 — scraper endpoints (anti-abus + protection quotas externes).

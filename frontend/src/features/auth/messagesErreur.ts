@@ -91,3 +91,18 @@ export function messageErreurAuth(error: unknown, repli: string): string {
 export function estSessionExpiree(error: unknown): boolean {
   return isAxiosError(error) && error.response?.status === 419;
 }
+
+/**
+ * Vrai quand le serveur a répondu « identifiants incorrects » (422, `auth.failed`
+ * ou sa traduction) — et SEULEMENT dans ce cas.
+ *
+ * Constat prod du 2026-10-02 : après une réinitialisation réussie, le
+ * propriétaire échouait encore — le gestionnaire de mots de passe du navigateur
+ * pré-remplissait l'ANCIEN. L'écran affiche alors une aide ciblée ; un verrou,
+ * un plafond d'essais ou une panne n'ont rien à voir avec le navigateur.
+ */
+export function estIdentifiantsIncorrects(error: unknown): boolean {
+  if (!isAxiosError(error) || error.response?.status !== 422) return false;
+  const phrase = premierMessage(error.response.data as CorpsErreur | undefined);
+  return phrase === 'auth.failed' || phrase === CLES_CONNUES['auth.failed'];
+}

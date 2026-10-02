@@ -208,6 +208,9 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         'api/v1/auth/2fa/confirm',
         'api/v1/auth/logout',
         'api/v1/auth/onboarding/complete',
+        // Son propre mot de passe (« Mon compte ») : tout compte doit pouvoir le
+        // changer, quel que soit son rôle — un `viewer` y compris.
+        'api/v1/auth/password/change',
         // Ses propres notifications.
         'api/v1/notifications/read-all',
         'api/v1/notifications/{n}/read',

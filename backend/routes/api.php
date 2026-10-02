@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AudiencesController;
 use App\Http\Controllers\Api\AuditLogsController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\MagicLinkController;
+use App\Http\Controllers\Api\Auth\PasswordChangeController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
@@ -113,6 +114,13 @@ Route::prefix('v1')->group(function () {
         // survecu a un audit de 46 agents -- parce que le mandat exigeait
         // d'ouvrir chaque ecran a la main et que la console ne tourne pas.
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+
+        // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
+        // aucun écran ne le permettait une fois connecté). L'ancien mot de passe
+        // est exigé, sauf session ouverte par lien magique il y a moins de 30 min.
+        Route::get('/auth/password/change', [PasswordChangeController::class, 'status']);
+        Route::post('/auth/password/change', [PasswordChangeController::class, 'change'])
+            ->middleware('throttle:password-change');
         // `/search` est declaree PLUS BAS, sur `GlobalSearchController`. Elle
         // l'etait deja : la closure supprimee ici la MASQUAIT, la premiere route
         // qui correspond l'emportant. Deux implementations vides du meme point

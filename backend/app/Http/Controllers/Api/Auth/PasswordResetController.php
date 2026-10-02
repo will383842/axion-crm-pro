@@ -44,6 +44,8 @@ class PasswordResetController extends ApiController
 
         $email = (string) $request->input('email');
         $token = Str::random(64);
+        // Pour les journaux seulement : on y écrit l'identifiant, jamais l'adresse.
+        $userId = User::query()->where('email', $email)->whereNull('deleted_at')->value('id');
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email' => $email],
@@ -90,12 +92,14 @@ class PasswordResetController extends ApiController
                 // une heure, et les journaux sont lus par plus de monde qu'une
                 // boite aux lettres. On note QUI et QUAND, jamais QUOI.
                 \Log::info('password_reset.envoye', [
-                    'email' => $email,
+                    // `user_id`, jamais l'adresse (revue A09, PR #283) : null
+                    // quand l'adresse ne correspond à aucun compte.
+                    'user_id' => $userId,
                     'mailer' => config('mail.auth_mailer'),
                 ]);
             } catch (\Throwable $e) {
                 \Log::error('password_reset.envoi_echoue', [
-                    'email' => $email,
+                    'user_id' => $userId,
                     'exception' => $e->getMessage(),
                 ]);
                 report($e);
@@ -173,6 +177,9 @@ class PasswordResetController extends ApiController
         if (config('session.driver') === 'database') {
             DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
         }
+
+        // Diagnostic (constat prod du 2026-10-02) : QUI et QUAND, jamais la valeur.
+        \Log::info('password_reset.effectue', ['user_id' => $user->id]);
 
         return $this->ok(['reset' => true]);
     }

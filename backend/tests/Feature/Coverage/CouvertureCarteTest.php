@@ -1,5 +1,6 @@
 <?php
 
+use App\Crm\Console\ScoresPerimes;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Models\User;
@@ -132,4 +133,62 @@ test('la carte signale des scores perimes quand ils divergent du bareme', functi
 
     expect((float) $this->actingAs($user)->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct'))
         ->toBeGreaterThan(0.0);
+});
+
+test('accueil et carte affichent la MEME part de scores perimes', function () {
+    // Relecture A09 de #291 : deux échantillons dans deux caches pouvaient
+    // se contredire de part et d'autre du seuil. Une seule valeur désormais.
+    [$user, $espace] = l3CouvertureConsole();
+    l3Fiche($espace, '38000');
+    l3Fiche($espace, '38100');
+    l3Fiche($espace, '38200');
+    // Une fiche sur trois diverge du barème.
+    DB::statement('UPDATE companies c SET quality_score = company_quality_score_calcul(c) WHERE workspace_id = ?', [$espace]);
+    DB::table('companies')->where('workspace_id', $espace)->where('postcode', '38000')->update(['quality_score' => 97]);
+    DB::statement('REFRESH MATERIALIZED VIEW coverage_matrix_cells');
+
+    $carte = $this->actingAs($user)->getJson('/api/v1/coverage?level=department')->json('quality_a_recalculer_pct');
+    $accueil = $this->getJson('/api/v1/dashboard/stats')->assertOk()->json('quality_a_recalculer_pct');
+
+    expect($carte)->not->toBeNull()
+        ->and((float) $carte)->toBeGreaterThan(0.0)
+        ->and((float) $accueil)->toBe((float) $carte);
+});
+
+test('le cache des scores perimes ne fuit pas d un espace a l autre', function () {
+    // Sur le modèle de CompteursHubTest : une clé sans identifiant d'espace
+    // servirait à B la valeur calculée pour A.
+    [, $a] = l3CouvertureConsole();
+    [, $b] = l3CouvertureConsole();
+    l3Fiche($a, '38000');
+    l3Fiche($b, '38100');
+    DB::statement('UPDATE companies c SET quality_score = company_quality_score_calcul(c) WHERE workspace_id = ?', [$a]);
+    DB::table('companies')->where('workspace_id', $b)->update(['quality_score' => 97]);
+
+    expect(ScoresPerimes::enCache($a))->toBe(0.0)
+        ->and(ScoresPerimes::enCache($b))->toBe(100.0)
+        // Et dans l'autre sens : A garde SA valeur, B la sienne.
+        ->and(ScoresPerimes::enCache($a))->toBe(0.0)
+        ->and(ScoresPerimes::enCache($b))->toBe(100.0)
+        ->and(ScoresPerimes::cle($a))->not->toBe(ScoresPerimes::cle($b));
+});
+
+test('un echec de l estimation n est garde que 30 secondes', function () {
+    // Relecture A09 de #291 : un `null` (erreur, délai) restait en cache
+    // jusqu'à une heure et figeait « calcul en attente ».
+    [, $espace] = l3CouvertureConsole();
+    l3Fiche($espace, '38000');
+    DB::statement('UPDATE companies c SET quality_score = company_quality_score_calcul(c) WHERE workspace_id = ?', [$espace]);
+
+    // Barème momentanément introuvable → estimation impossible.
+    DB::statement('ALTER FUNCTION company_quality_score_calcul(companies) RENAME TO company_quality_score_calcul_absent');
+    expect(ScoresPerimes::enCache($espace))->toBeNull();
+    DB::statement('ALTER FUNCTION company_quality_score_calcul_absent(companies) RENAME TO company_quality_score_calcul');
+
+    // Dans les 30 s, l'échec est encore servi (pas de recalcul en rafale)…
+    expect(ScoresPerimes::enCache($espace))->toBeNull();
+
+    // …au-delà, il a disparu : la valeur réelle revient.
+    $this->travel(ScoresPerimes::ECHEC_SECONDES + 1)->seconds();
+    expect(ScoresPerimes::enCache($espace))->toBe(0.0);
 });

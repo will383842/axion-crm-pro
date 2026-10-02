@@ -35,6 +35,13 @@ final class ScoresPerimes
 
     public const PERIME_SECONDES = 3600;
 
+    /**
+     * Un ÉCHEC (délai dépassé, erreur SQL, barème absent) ne se garde que
+     * 30 s : sinon un incident passager figerait « calcul en attente »
+     * pendant une heure (relecture A09 de #291).
+     */
+    public const ECHEC_SECONDES = 30;
+
     public static function cle(string $espace): string
     {
         return 'crm:qualite:perimes:v1:' . $espace;
@@ -49,19 +56,22 @@ final class ScoresPerimes
         $charge = Cache::flexible(
             self::cle($espace),
             [self::FRAIS_SECONDES, self::PERIME_SECONDES],
-            // Enveloppé dans un tableau : un `null` (barème absent) se met
-            // aussi en cache, au lieu d'être recalculé à chaque affichage.
-            // `WorkspaceContext::run` : le recalcul différé tourne APRÈS la
+            // Enveloppé dans un tableau : `Cache::flexible` ne distingue pas
+            // un `null` d'une clé absente. `WorkspaceContext::run` : le recalcul différé tourne APRÈS la
             // réponse, quand la RLS n'a plus de contexte (cf. CompteursHub).
             static fn (): array => ['pct' => WorkspaceContext::run($espace, static fn (): ?float => self::estimer($espace))],
             lock: ['seconds' => 30],
         );
 
-        if (! is_array($charge) || ! array_key_exists('pct', $charge)) {
-            return null;
+        $pct = is_array($charge) && is_numeric($charge['pct'] ?? null) ? (float) $charge['pct'] : null;
+
+        if ($pct === null) {
+            // L'échec ne reste en cache que `ECHEC_SECONDES` : passé ce
+            // délai, la clé a disparu et l'affichage suivant recalcule.
+            Cache::put(self::cle($espace), ['pct' => null], self::ECHEC_SECONDES);
         }
 
-        return is_numeric($charge['pct']) ? (float) $charge['pct'] : null;
+        return $pct;
     }
 
     /**

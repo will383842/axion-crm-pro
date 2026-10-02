@@ -93,6 +93,11 @@ class DashboardController extends ApiController
 
         return response()->json(array_merge($this->gabaritVide(), $charge, [
             'period_label' => $this->libellePeriode($r->query('period')),
+            // UNE seule valeur pour l'accueil et la carte de France (relecture
+            // A09 de #291) : deux échantillons distincts, dans deux caches,
+            // pouvaient dire « calcul en attente » ici et afficher le score
+            // là-bas. On lit le cache partagé, jamais une copie figée ici.
+            'quality_a_recalculer_pct' => ScoresPerimes::enCache($espace),
         ]));
     }
 
@@ -155,7 +160,8 @@ class DashboardController extends ApiController
      *
      * `quality_a_recalculer_pct` : sur un échantillon de 0,1 % des fiches,
      * la part dont le score stocké diffère du barème
-     * (`company_quality_score_calcul`), via `App\Crm\Console\ScoresPerimes`.
+     * (`company_quality_score_calcul`). Elle n'est PAS calculée ici : `stats()`
+     * la lit dans le cache partagé `App\Crm\Console\ScoresPerimes::enCache`.
      * Mesure du 2026-10-02 matin : ≈ 79 % ; reprise terminée le soir → 0. Tant que
      * cette part est forte, l'écran DIT « calcul en attente » au lieu d'une
      * moyenne fausse. `null` = estimation impossible (fonction absente).
@@ -192,9 +198,6 @@ class DashboardController extends ApiController
 
             return $resultat;
         }
-
-        // Le même calcul que la carte de France (`ScoresPerimes`).
-        $resultat['quality_a_recalculer_pct'] = ScoresPerimes::estimer($espace);
 
         return $resultat;
     }

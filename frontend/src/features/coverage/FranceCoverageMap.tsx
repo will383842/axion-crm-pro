@@ -399,14 +399,16 @@ export function FranceCoverageMap({
         <div className="mb-2 flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        {/* Une case par ligne : les libellés sont des intervalles
+            (« 10 000 à 15 000 »), trop longs pour tenir côte à côte. */}
+        <ul className="flex flex-col gap-1">
           {echelle.legende.map((i) => (
-            <div key={i.libelle} className="flex flex-col items-center gap-1">
-              <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.couleur }} />
+            <li key={i.libelle} className="flex items-center gap-2">
+              <span className="block h-3 w-6 shrink-0 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.couleur }} />
               <span className="whitespace-nowrap text-xs font-medium text-slate-600">{i.libelle}</span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       {/* Tooltip moderne ancré sur le curseur, avec offset intelligent */}

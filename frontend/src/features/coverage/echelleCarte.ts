@@ -23,6 +23,9 @@ export const PALETTE = ['#e0f2fe', '#7dd3fc', '#38bdf8', '#0284c7', '#075985'] a
 export interface ClasseLegende {
   couleur: string;
   libelle: string;
+  /** Intervalle couvert par la case : `min` inclus, `max` exclu (`null` = sans fin). */
+  min: number;
+  max: number | null;
 }
 
 export interface EchelleCarte {
@@ -30,7 +33,7 @@ export interface EchelleCarte {
   seuils: number[];
   /** Une couleur par seuil. */
   couleurs: string[];
-  /** Le gris « 0 », puis une entrée par classe. */
+  /** La case grise « aucune » (0), puis une entrée par classe. */
   legende: ClasseLegende[];
 }
 
@@ -95,13 +98,18 @@ export function echelleRelative(totaux: readonly number[], nbClasses = PALETTE.l
   }
 
   const couleurs = couleursPour(seuils.length);
-  const premierLibelle = positifs.length > 0 ? arrondiLisible(positifs[0]!) : 1;
+  // Libell\u00e9s par INTERVALLE (relecture A09 de #291) : la premi\u00e8re case
+  // couvre de 1 \u00e0 9 999 ; l'intituler par la plus petite valeur (\u00ab 9 \u00bb)
+  // faisait lire \u00ab 9 entreprises \u00bb sur un d\u00e9partement \u00e0 5 351.
   const legende: ClasseLegende[] = [
-    { couleur: COULEUR_VIDE, libelle: '0' },
-    ...seuils.map((seuil, i) => {
-      const borne = i === 0 ? Math.min(premierLibelle, seuils[1] ?? premierLibelle) : seuil;
-      const dernier = i === seuils.length - 1;
-      return { couleur: couleurs[i]!, libelle: `${nombreLisible(borne)}${dernier ? '\u00a0+' : ''}` };
+    { couleur: COULEUR_VIDE, libelle: 'aucune', min: 0, max: 1 },
+    ...seuils.map((seuil, i): ClasseLegende => {
+      const suivant = seuils[i + 1] ?? null;
+      let libelle: string;
+      if (suivant === null) libelle = `${nombreLisible(seuil)} et plus`;
+      else if (i === 0) libelle = `moins de ${nombreLisible(suivant)}`;
+      else libelle = `${nombreLisible(seuil)} \u00e0 ${nombreLisible(suivant)}`;
+      return { couleur: couleurs[i]!, libelle, min: seuil, max: suivant };
     }),
   ];
 

@@ -33,14 +33,29 @@ const TOTAUX_PROD = [
   119010, 142585, 153306, 160892, 173857, 615507,
 ];
 
-/** La couleur que la carte donnera à un total, d'après l'échelle. */
-function couleurDe(echelle: ReturnType<typeof echelleRelative>, total: number): string {
-  if (total < 1) return COULEUR_VIDE;
-  let couleur = COULEUR_VIDE;
-  echelle.seuils.forEach((s, i) => {
-    if (total >= s) couleur = echelle.couleurs[i]!;
-  });
+/**
+ * La couleur que la carte donnera à un total : on ÉVALUE l'expression `step`
+ * réellement produite (sémantique MapLibre : couleur par défaut, puis la
+ * couleur du dernier palier ≤ valeur), au lieu de réimplémenter l'échelle.
+ */
+function evaluerStep(expr: unknown[], valeur: number): string {
+  expect(expr[0]).toBe('step');
+  let couleur = expr[2] as string;
+  for (let i = 3; i < expr.length; i += 2) {
+    if (valeur >= (expr[i] as number)) couleur = expr[i + 1] as string;
+  }
   return couleur;
+}
+
+function couleurDe(echelle: ReturnType<typeof echelleRelative>, total: number): string {
+  return evaluerStep(expressionCouleur(echelle, ['get', 'total']), total);
+}
+
+/** La case de légende dont l'intervalle contient la valeur (une et une seule). */
+function caseDe(echelle: ReturnType<typeof echelleRelative>, valeur: number) {
+  const cases = echelle.legende.filter((c) => valeur >= c.min && (c.max === null || valeur < c.max));
+  expect(cases).toHaveLength(1);
+  return cases[0]!;
 }
 
 const lisible = (s: string) => s.replace(/\u00a0/g, ' ');
@@ -61,7 +76,14 @@ describe('echelleRelative', () => {
 
     expect(echelle.seuils).toEqual([1, 10000, 15000, 30000, 50000]);
     expect(utilisees.size).toBe(5);
-    expect(echelle.legende.map((l) => lisible(l.libelle))).toEqual(['0', '9', '10 000', '15 000', '30 000', '50 000 +']);
+    expect(echelle.legende.map((l) => lisible(l.libelle))).toEqual([
+      'aucune',
+      'moins de 10 000',
+      '10 000 à 15 000',
+      '15 000 à 30 000',
+      '30 000 à 50 000',
+      '50 000 et plus',
+    ]);
   });
 
   it('seuils croissants, arrondis lisibles, légende tirée des mêmes seuils', () => {
@@ -74,13 +96,13 @@ describe('echelleRelative', () => {
     }
     expect(echelle.couleurs).toHaveLength(echelle.seuils.length);
     expect(echelle.legende).toHaveLength(echelle.seuils.length + 1);
-    expect(echelle.legende[0]).toEqual({ couleur: COULEUR_VIDE, libelle: '0' });
-    expect(lisible(echelle.legende[1]!.libelle)).toBe('3 000');
+    expect(echelle.legende[0]).toEqual({ couleur: COULEUR_VIDE, libelle: 'aucune', min: 0, max: 1 });
+    expect(lisible(echelle.legende[1]!.libelle)).toMatch(/^moins de /);
     echelle.seuils.slice(1).forEach((s, i) => {
       expect(echelle.legende[i + 2]!.couleur).toBe(echelle.couleurs[i + 1]);
       expect(lisible(echelle.legende[i + 2]!.libelle)).toContain(lisible(nombreLisible(s)));
     });
-    expect(lisible(echelle.legende.at(-1)!.libelle)).toMatch(/ \+$/);
+    expect(lisible(echelle.legende.at(-1)!.libelle)).toMatch(/ et plus$/);
   });
 
   it('totaux tous égaux : une seule classe, sans planter', () => {
@@ -88,7 +110,7 @@ describe('echelleRelative', () => {
 
     expect(echelle.seuils).toEqual([1]);
     expect(echelle.couleurs).toHaveLength(1);
-    expect(echelle.legende.map((l) => lisible(l.libelle))).toEqual(['0', '5 000 +']);
+    expect(echelle.legende.map((l) => lisible(l.libelle))).toEqual(['aucune', '1 et plus']);
   });
 
   it('liste vide (ou que des zéros) : une seule classe, rien ne plante', () => {
@@ -121,6 +143,22 @@ describe('arrondiLisible / nombreLisible', () => {
 });
 
 describe('expressionCouleur', () => {
+  it('de bout en bout : la couleur calculée par l expression = la couleur de la case de légende qui contient la valeur', () => {
+    for (const totaux of [TOTAUX_PROD, totauxRealistes(), [5000, 5000], []]) {
+      const echelle = echelleRelative(totaux);
+      const expr = expressionCouleur(echelle, ['get', 'total']);
+      for (const v of [0, 1, 9, 5351, 9999, 10000, 12000, 14999, 15000, 29999, 30000, 49999, 50000, 615507]) {
+        expect(evaluerStep(expr, v)).toBe(caseDe(echelle, v).couleur);
+      }
+    }
+    // Lecture humaine, sur les chiffres de la production.
+    const prod = echelleRelative(TOTAUX_PROD);
+    expect(lisible(caseDe(prod, 5351).libelle)).toBe('moins de 10 000');
+    expect(lisible(caseDe(prod, 12000).libelle)).toBe('10 000 à 15 000');
+    expect(lisible(caseDe(prod, 615507).libelle)).toBe('50 000 et plus');
+    expect(caseDe(prod, 0).libelle).toBe('aucune');
+  });
+
   it('gris sous 1, puis une couleur par seuil', () => {
     const echelle = echelleRelative(totauxRealistes());
     const expr = expressionCouleur(echelle, ['get', 'total']);

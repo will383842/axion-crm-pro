@@ -128,8 +128,19 @@ test('sous axion_app : la recherche par nom rend les bonnes fiches, dans l ordre
         // … et viser B en restant dans le contexte de A ne rend RIEN.
         expect(cersChercher($b['id'], ['zzqx'], ['zzqx']))->toBe([]);
 
-        // Sans contexte : rien.
+        // Contexte vidé : rien.
         cersContexte(null);
+        expect(cersChercher($a['id'], ['zzqx'], ['zzqx']))->toBe([]);
+
+        // Contexte JAMAIS posé (connexion neuve, réglage inconnu) : rien.
+        cersApp()->disconnect();
+        $jamais = cersApp()->selectOne("SELECT current_setting('app.current_workspace_id', true) AS v");
+        expect($jamais->v === null || $jamais->v === '')->toBeTrue();
+        expect(cersChercher($a['id'], ['zzqx'], ['zzqx']))->toBe([]);
+
+        // UUID en MAJUSCULES dans le contexte : la comparaison est textuelle,
+        // comme celle de la politique — rien.
+        cersContexte(strtoupper($a['id']));
         expect(cersChercher($a['id'], ['zzqx'], ['zzqx']))->toBe([]);
 
         // TÉMOIN : dans le contexte de B, B trouve ses propres fiches.

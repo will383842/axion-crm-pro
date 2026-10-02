@@ -68,7 +68,7 @@ return new class extends Migration
             LANGUAGE plpgsql
             STABLE
             SECURITY DEFINER
-            SET search_path = public, pg_catalog
+            SET search_path = pg_catalog, public
             AS $fn$
             DECLARE
                 n_e      INT := coalesce(array_length(p_entrees, 1), 0);

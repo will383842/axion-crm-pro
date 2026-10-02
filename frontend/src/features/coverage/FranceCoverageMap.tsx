@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-
-export type CoverageMode = 'visu' | 'search' | 'action';
+import { appliquerTotaux, SOURCE_DEPARTEMENTS } from './colorationCarte';
 
 /**
  * G42-011 — en deçà de ce déplacement (pixels écran), l'infobulle de survol
@@ -63,17 +62,17 @@ const LOG: (...args: unknown[]) => void = import.meta.env.DEV
 
 export function FranceCoverageMap({
   cells,
-  mode,
   onZoneClick,
 }: {
   cells: Cell[];
-  mode: CoverageMode;
   onZoneClick?: (code: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
   const onZoneClickRef = useRef(onZoneClick);
   const cellsRef = useRef(cells);
+  // Codes colorés au dernier passage : ceux qui disparaissent repassent à 0.
+  const codesColores = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<{ code: string; name: string; total: number; x: number; y: number } | null>(null);
   useEffect(() => {
@@ -84,7 +83,7 @@ export function FranceCoverageMap({
   }, [onZoneClick]);
 
   useEffect(() => {
-    LOG('useEffect:init — container=', containerRef.current, 'cells.length=', cells.length, 'mode=', mode);
+    LOG('useEffect:init — container=', containerRef.current, 'cells.length=', cells.length);
     LOG('env VITE_STRICT_MODE=', import.meta.env['VITE_STRICT_MODE'], 'VITE_MAPLIBRE_TILES_URL=', TILES_URL);
     if (!containerRef.current) {
       LOG('useEffect:abort — no container ref');
@@ -200,10 +199,29 @@ export function FranceCoverageMap({
       // perdu — `map.on('error')` (plus bas) reçoit déjà l'erreur de source,
       // avec `status` et `url`, et l'affiche à l'utilisateur.
 
+      // `promoteId: 'code'` (2026-10-02) : l'identifiant d'un département EST
+      // son code (« 01 », « 2A », « 971 »), le même que celui des cellules de
+      // l'API. On le colore donc directement, sans balayer la source — c'est
+      // ce balayage qui laissait toute la carte grise en production.
       map.addSource('departements', {
         type: 'geojson',
         data: geojsonUrl,
-        generateId: true,
+        promoteId: 'code',
+      });
+
+      // Les cellules arrivent souvent AVANT la fin du chargement du GeoJSON :
+      // on colore dès que la source est prête, avec les cellules les plus
+      // récentes. Une seule fois — ensuite, l'effet sur `cells` prend le relais.
+      let sourcePrete = false;
+      map.on('sourcedata', (e) => {
+        if (sourcePrete || cancelled) return;
+        if ((e as { sourceId?: string }).sourceId !== SOURCE_DEPARTEMENTS) return;
+        if (!map.isSourceLoaded(SOURCE_DEPARTEMENTS)) return;
+        const colores = appliquerTotaux(map, cellsRef.current, codesColores.current);
+        if (colores !== null) {
+          sourcePrete = true;
+          codesColores.current = colores;
+        }
       });
 
       // Halo de fond doux derrière les départements (effet "carte premium")
@@ -344,43 +362,15 @@ export function FranceCoverageMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Met à jour feature-state quand cells change
+  // Met à jour la coloration quand les cellules changent. Si la source n'est
+  // pas encore chargée, `appliquerTotaux` ne fait rien et rend `null` : c'est
+  // l'écouteur `sourcedata` (plus haut) qui colorera, avec `cellsRef`.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-
-    // 🔴 G42-011, mesuré le 2026-08-22 : cette boucle appelait
-    // `querySourceFeatures` UNE FOIS PAR CELLULE — soit jusqu'à 101 balayages
-    // complets de la source des départements (et davantage si la maille
-    // descend sous le département), chacun rendant au plus une entité utile.
-    // Une seule passe suffit : on indexe les totaux par code, puis on parcourt
-    // les entités une fois. Même ensemble de `setFeatureState`, même résultat
-    // à l'écran — seul le coût change.
-    //
-    // ⚠️ CE QUE CE CORRECTIF NE RÉPARE PAS : `querySourceFeatures` ne rend que
-    // les entités du VIEWPORT courant. Les départements hors écran ne sont pas
-    // colorés, avant comme après — et le seront au prochain passage de cet
-    // effet, pas au déplacement de la carte. Corriger cela demande un
-    // `promoteId: 'code'` sur la source (adressage direct de l'entité, sans
-    // balayage) et une réapplication sur `sourcedata`, ce qui déplace le moment
-    // où les couleurs apparaissent : c'est un autre geste, à mesurer sur
-    // `tests/e2e/coverage.spec.ts`.
-    const totauxParCode = new Map<string, number>(cells.map((c) => [c.code, c.total]));
-
-    for (const f of map.querySourceFeatures('departements')) {
-      // L'id feature-state vient de `generateId` — on retrouve la cellule par code.
-      if (f.id === undefined) continue;
-      const code = (f.properties ?? {})['code'] as string | undefined;
-      if (code === undefined) continue;
-      const total = totauxParCode.get(code);
-      if (total === undefined) continue;
-      map.setFeatureState({ source: 'departements', id: f.id }, { total });
-    }
+    if (!map) return;
+    const colores = appliquerTotaux(map, cells, codesColores.current);
+    if (colores !== null) codesColores.current = colores;
   }, [cells]);
-
-  // mode prop n'est plus utilisé dans le JSX (déplacé en KPI/segmented control parent)
-  // mais on le garde dans la signature pour rétro-compat.
-  void mode;
 
   return (
     <div className="relative h-[640px] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-sky-50/30">

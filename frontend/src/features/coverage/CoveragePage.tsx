@@ -1,5 +1,6 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -15,7 +16,7 @@ import { toast } from 'sonner';
 // Deux consequences a garder en tete si l'apparence surprend : la version du
 // systeme ajoute les classes `dark:` (c'est le correctif) et `tabular-nums`
 // sur la valeur (les chiffres ne dansent plus quand le compteur change).
-import { QueryErrorState, Stat } from '@/components/ui';
+import { Button, LiveBadge, Modal, PageHeader, QueryErrorState, Stat } from '@/components/ui';
 
 // G42-003 — la carte est chargee A LA DEMANDE, sur ce seul ecran.
 //
@@ -32,10 +33,6 @@ import { QueryErrorState, Stat } from '@/components/ui';
 // code atterrit, pas QUAND il est telecharge. Tant qu'une arete statique y
 // mene, Rollup en fait une dependance statique de l'entree et Vite la
 // prefetche. Seul `import()` coupe l'arete.
-//
-// `type CoverageMode` reste un import de TYPE : il s'efface au build
-// (`verbatimModuleSyntax`), il ne recree aucune arete.
-import type { CoverageMode } from './FranceCoverageMap';
 
 import { scoreAffichable, statsCouverture, type Cell, type Level } from './statsCouverture';
 
@@ -45,11 +42,41 @@ const FranceCoverageMap = lazy(async () => ({
 
 
 
-const MODES: Array<{ id: CoverageMode; label: string; hint: string }> = [
-  { id: 'visu',   label: 'Visualisation', hint: 'Lecture seule' },
-  { id: 'search', label: 'Recherche',     hint: 'Filtre la liste' },
-  { id: 'action', label: 'Action',        hint: 'Un clic lance une collecte' },
-];
+// Lot 4 (audit P1-5, 2026-10-02) — les trois « modes » ont disparu. En mode
+// « Action », un clic sur un département lançait une collecte SUR-LE-CHAMP :
+// une erreur de clic coûtait du quota et des appels externes. Désormais un
+// clic ne fait que SÉLECTIONNER ; la collecte passe par un bouton du panneau,
+// puis par une confirmation qui nomme le département et le volume.
+
+/** Volume d'une collecte lancée depuis la carte. */
+const VOLUME_COLLECTE = 100;
+
+/**
+ * Plafond d'un enrichissement lancé depuis la carte. C'est le plafond par
+ * défaut du serveur (`CoverageController::enrich`, `limit` ≤ 50 000) : on
+ * l'envoie EXPLICITEMENT pour que le chiffre annoncé dans la confirmation
+ * soit celui qui s'applique.
+ */
+const PLAFOND_ENRICHISSEMENT = 50_000;
+
+/** Ce que la confirmation doit faire valider : l'action ET la zone visée. */
+interface DemandeConfirmation {
+  action: 'recuperer' | 'enrichir';
+  code: string;
+  name: string;
+  /** Entreprises déjà en base pour ce département (pour annoncer le volume). */
+  total: number;
+}
+
+/**
+ * Le volume ANNONCÉ dans la confirmation, et le `limit` ENVOYÉ : c'est le même
+ * nombre, pour que « au plus N fiches » soit vrai. Le total de la carte et le
+ * filtre du serveur (département) ne se comptent pas pareil : sans ce plafond
+ * explicite, le serveur pouvait traiter plus que le chiffre annoncé.
+ */
+function volumeEnrichissement(total: number): number {
+  return Math.max(1, Math.min(total, PLAFOND_ENRICHISSEMENT));
+}
 
 const LEVELS: Array<{ id: Level; label: string }> = [
   { id: 'region',     label: 'Régions' },
@@ -58,7 +85,6 @@ const LEVELS: Array<{ id: Level; label: string }> = [
 ];
 
 export function CoveragePage() {
-  const [mode, setMode] = useState<CoverageMode>('visu');
   const [level, setLevel] = useState<Level>('department');
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -72,6 +98,23 @@ export function CoveragePage() {
   });
 
   const cells = useMemo(() => data?.cells ?? [], [data]);
+
+  // La carte ne dessine QUE des départements. Aux niveaux Régions et Villes,
+  // les codes des cellules (« 84 » = Auvergne-Rhône-Alpes) ne sont pas des
+  // codes de département : les lui passer colorerait la mauvaise zone (le
+  // Vaucluse). La carte reçoit donc toujours les cellules DÉPARTEMENTALES —
+  // la même requête, en cache, quand le niveau affiché est déjà celui-là.
+  const departements = useQuery({
+    queryKey: ['coverage', 'department'],
+    queryFn: async () =>
+      (await api.get<{ cells: Cell[] }>('/coverage', { params: { level: 'department' } })).data,
+    enabled: level !== 'department',
+    staleTime: 60_000,
+  });
+  const cellulesCarte = useMemo(
+    () => (level === 'department' ? cells : departements.data?.cells ?? []),
+    [level, cells, departements.data],
+  );
   const scoreVisible = scoreAffichable(data?.quality_a_recalculer_pct);
   // P0-3 — une panne n'est pas une France vide : la carte cède la place à l'erreur.
   const echec = error !== null && data === undefined;
@@ -80,56 +123,76 @@ export function CoveragePage() {
 
   const selectedCell = selected ? cells.find((c) => c.code === selected) ?? null : null;
 
-  // Étape 1 — Récupérer : découverte seule (pas d'enrichissement chaîné).
-  async function recuperer(dept: string) {
-    try {
-      await api.post('/coverage/launch', { department: dept, limit: 100, enrich: false });
-      toast.success(`Récupération lancée · département ${dept}`);
-    } catch {
-      toast.error('Erreur lors de la récupération');
-    }
+  // Étape 1 — Récupérer (découverte seule) et étape 2 — Enrichir (fiches déjà
+  // en base). L'une comme l'autre interroge des services extérieurs : AUCUNE
+  // n'est appelée directement par un clic, seulement par « Confirmer ».
+  const [aConfirmer, setAConfirmer] = useState<DemandeConfirmation | null>(null);
+  const boutonAnnuler = useRef<HTMLButtonElement | null>(null);
+  // Verrou synchrone : `isPending` n'est vrai qu'au rendu SUIVANT, deux clics
+  // dans le même instant passeraient tous les deux sans lui.
+  const envoiEnCours = useRef(false);
+  const lancement = useMutation({
+    mutationFn: async (demande: DemandeConfirmation) => {
+      if (demande.action === 'recuperer') {
+        await api.post('/coverage/launch', { department: demande.code, limit: VOLUME_COLLECTE, enrich: false });
+        return { demande, enFile: null };
+      }
+      const r = await api.post<{ queued?: number }>('/coverage/enrich', {
+        department: demande.code,
+        limit: volumeEnrichissement(demande.total),
+      });
+      return { demande, enFile: r.data?.queued ?? 0 };
+    },
+    onSuccess: ({ demande, enFile }) => {
+      const zone = `${demande.name} (${demande.code})`;
+      if (demande.action === 'recuperer') {
+        toast.success(`Récupération lancée : ${zone}`);
+      } else if (enFile !== null && enFile > 0) {
+        toast.success(`Enrichissement lancé : ${enFile.toLocaleString('fr-FR')} entreprise(s), ${zone}`);
+      } else {
+        toast.success(`Aucune entreprise à enrichir pour ${zone} : récupérez-les d’abord.`);
+      }
+      setAConfirmer(null);
+    },
+    onError: (_erreur, demande) => {
+      toast.error(
+        demande.action === 'recuperer'
+          ? 'La récupération n’a pas pu être lancée. Réessayez dans un instant.'
+          : 'L’enrichissement n’a pas pu être lancé. Réessayez dans un instant.',
+      );
+    },
+    onSettled: () => {
+      envoiEnCours.current = false;
+    },
+  });
+
+  // « Annuler » est le choix par défaut : c'est lui qui reçoit le focus à
+  // l'ouverture, une touche Entrée distraite ne lance rien.
+  useEffect(() => {
+    if (aConfirmer !== null) boutonAnnuler.current?.focus();
+  }, [aConfirmer]);
+
+  function confirmer() {
+    if (aConfirmer === null || envoiEnCours.current || lancement.isPending) return;
+    envoiEnCours.current = true;
+    lancement.mutate(aConfirmer);
   }
 
-  // Étape 2 — Enrichir : enrichit les entreprises DÉJÀ récupérées du département.
-  async function enrichir(dept: string) {
-    try {
-      const r = await api.post<{ queued?: number }>('/coverage/enrich', { department: dept });
-      const n = r.data?.queued ?? 0;
-      toast.success(
-        n > 0
-          ? `Enrichissement lancé · ${n.toLocaleString('fr-FR')} entreprise(s) · département ${dept}`
-          : `Aucune entreprise à enrichir pour le département ${dept} (récupérez-les d'abord).`,
-      );
-    } catch {
-      toast.error("Erreur lors de l'enrichissement");
-    }
+  function demander(action: DemandeConfirmation['action'], cell: Cell) {
+    setAConfirmer({ action, code: cell.code, name: cell.name, total: cell.total ?? 0 });
   }
 
   return (
     <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-slate-50 px-6 py-6">
-      {/* Header */}
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
-            Mis à jour chaque minute
-          </div>
-          <h1 className="bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
-            Carte de France
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Cliquez sur une zone pour voir ses entreprises ou y lancer une collecte.
-          </p>
-        </div>
-        <SegmentedControl
-          options={MODES.map((m) => ({ id: m.id, label: m.label }))}
-          value={mode}
-          onChange={setMode}
-        />
-      </header>
+      <PageHeader
+        title="Carte de France"
+        subtitle="Cliquez sur un département pour voir ses entreprises"
+        badge={<LiveBadge label="Mis à jour chaque minute" />}
+        gradient={false}
+      />
 
       {/* KPI cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
         <KpiCard
           label="Couverture"
           value={`${stats.pct}%`}
@@ -148,12 +211,6 @@ export function CoveragePage() {
           tone="violet"
         />
         <KpiCard
-          label="Mode actif"
-          value={MODES.find((m) => m.id === mode)?.label ?? '—'}
-          sublabel={MODES.find((m) => m.id === mode)?.hint ?? ''}
-          tone="emerald"
-        />
-        <KpiCard
           label="Niveau"
           value={LEVELS.find((l) => l.id === level)?.label ?? '—'}
           sublabel={`${cells.length} zones`}
@@ -166,7 +223,13 @@ export function CoveragePage() {
         <SegmentedControl
           options={LEVELS.map((l) => ({ id: l.id, label: l.label }))}
           value={level}
-          onChange={setLevel}
+          // Changer de niveau efface la sélection : le code 84 désigne une
+          // région au niveau « Régions » et le Vaucluse au niveau
+          // « Départements ». Garder l'un pour l'autre ferait viser la mauvaise zone.
+          onChange={(l) => {
+            setLevel(l);
+            setSelected(null);
+          }}
           variant="ghost"
         />
         <div className="ml-auto text-xs text-slate-500">
@@ -206,12 +269,14 @@ export function CoveragePage() {
               </div>
             }
           >
+            {/* Un clic SÉLECTIONNE, il ne lance jamais rien (lot 4). */}
+            {/* La carte ne montre que des départements : un clic y désigne
+                TOUJOURS un département, quel que soit le niveau de la liste. */}
             <FranceCoverageMap
-              cells={cells}
-              mode={mode}
+              cells={cellulesCarte}
               onZoneClick={(code) => {
+                setLevel('department');
                 setSelected(code);
-                if (mode === 'action') void recuperer(code);
               }}
             />
           </Suspense>
@@ -222,19 +287,64 @@ export function CoveragePage() {
             <SelectionCard
               cell={selectedCell}
               scoreVisible={scoreVisible}
-              mode={mode}
-              onRecuperer={() => void recuperer(selectedCell.code)}
-              onEnrichir={() => void enrichir(selectedCell.code)}
+              estDepartement={level === 'department'}
+              onRecuperer={() => demander('recuperer', selectedCell)}
+              onEnrichir={() => demander('enrichir', selectedCell)}
               onClose={() => setSelected(null)}
             />
           ) : (
-            <HintCard mode={mode} />
+            <HintCard />
           )}
 
           <TopList top={stats.top} selected={selected} onSelect={setSelected} />
         </aside>
       </div>
       )}
+
+      <Modal
+        open={aConfirmer !== null}
+        onClose={() => {
+          if (!lancement.isPending) setAConfirmer(null);
+        }}
+        title={
+          aConfirmer?.action === 'enrichir'
+            ? 'Enrichir les fiches de ce département ?'
+            : `Récupérer ${VOLUME_COLLECTE} entreprises ?`
+        }
+        description={aConfirmer ? `Département : ${aConfirmer.name} (${aConfirmer.code})` : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button
+              ref={boutonAnnuler}
+              variant="secondary"
+              onClick={() => setAConfirmer(null)}
+              disabled={lancement.isPending}
+            >
+              Annuler
+            </Button>
+            <Button onClick={confirmer} disabled={lancement.isPending} loading={lancement.isPending}>
+              {lancement.isPending ? 'Envoi…' : 'Confirmer'}
+            </Button>
+          </>
+        }
+      >
+        {aConfirmer?.action === 'enrichir' ? (
+          <p className="text-sm text-slate-600">
+            L’enrichissement va compléter au plus{' '}
+            {volumeEnrichissement(aConfirmer.total).toLocaleString('fr-FR')} fiches de ce
+            département déjà récupérées et pas encore complétées. Il interroge des services
+            extérieurs pour trouver les e-mails, téléphones et dirigeants. Il se poursuit en
+            arrière-plan.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-600">
+            La collecte va chercher {VOLUME_COLLECTE} entreprises de ce département auprès des
+            services publics d’information sur les entreprises. Elle se poursuit en arrière-plan ;
+            les fiches apparaîtront au fil de l’eau.
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -329,14 +439,15 @@ function KpiCard({
 function SelectionCard({
   cell,
   scoreVisible,
-  mode,
+  estDepartement,
   onRecuperer,
   onEnrichir,
   onClose,
 }: {
   cell: Cell;
   scoreVisible: boolean;
-  mode: CoverageMode;
+  /** La collecte se lance par département : une région ou une ville n'y a pas droit. */
+  estDepartement: boolean;
   onRecuperer: () => void;
   onEnrichir: () => void;
   onClose: () => void;
@@ -369,45 +480,49 @@ function SelectionCard({
         />
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
-        {/* Étape 1 — Récupérer (découverte seule) */}
-        <button
-          onClick={onRecuperer}
-          className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:from-slate-800 hover:to-slate-600 active:scale-[0.98]"
-        >
-          {isCovered ? 'Re-récupérer les entreprises' : 'Récupérer les entreprises'}
-          <svg viewBox="0 0 20 20" className="h-4 w-4 transition group-hover:translate-x-0.5"><path d="M5 10h10m0 0l-4-4m4 4l-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        {/* Étape 2 — Enrichir (emails, téléphones, dirigeants) */}
-        <button
-          onClick={onEnrichir}
-          disabled={!isCovered}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Enrichir (emails · téléphones · dirigeants)
-        </button>
-        <p className="text-center text-xs leading-relaxed text-slate-500">
-          {isCovered
-            ? 'Étape 1 : récupérer les entreprises. Étape 2 : les enrichir (peut être fait plus tard).'
-            : "Récupérez d'abord les entreprises, puis vous pourrez les enrichir."}
+      {estDepartement ? (
+        <div className="mt-4 flex flex-col gap-2">
+          {/* Étape 1 — Récupérer (découverte seule), APRÈS confirmation. */}
+          <Button onClick={onRecuperer}>
+            Récupérer {VOLUME_COLLECTE} entreprises de ce département
+          </Button>
+          {/* Étape 2 — Enrichir (emails, téléphones, dirigeants) */}
+          <button
+            onClick={onEnrichir}
+            disabled={!isCovered}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Enrichir (emails · téléphones · dirigeants)
+          </button>
+          {/* Lot 4 — voir la liste déjà filtrée sur ce département. */}
+          <Link
+            to="/companies"
+            search={{ department_code: cell.code }}
+            className="text-center text-sm font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+          >
+            Voir les entreprises de ce département
+          </Link>
+          <p className="text-center text-xs leading-relaxed text-slate-500">
+            {isCovered
+              ? 'Étape 1 : récupérer les entreprises. Étape 2 : les enrichir (peut être fait plus tard).'
+              : "Récupérez d'abord les entreprises, puis vous pourrez les enrichir."}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-4 text-xs leading-relaxed text-slate-500">
+          Pour récupérer des entreprises, choisissez le niveau « Départements » puis un département.
         </p>
-        {mode === 'search' ? (
-          <p className="text-center text-xs text-slate-500">Le filtre est appliqué à la liste entreprises.</p>
-        ) : null}
-      </div>
+      )}
     </div>
   );
 }
 
-function HintCard({ mode }: { mode: CoverageMode }) {
-  const m = MODES.find((x) => x.id === mode);
+function HintCard() {
   return (
     <div className="rounded-2xl bg-white/60 p-5 ring-1 ring-dashed ring-slate-300/80 backdrop-blur-sm">
       <div className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Aucune sélection</div>
-      <div className="text-sm font-medium text-slate-700">{m?.label} actif</div>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Cliquez sur un département pour voir ses détails
-        {mode === 'action' ? ' — une collecte démarre aussitôt.' : '.'}
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        Cliquez sur un département pour voir ses entreprises.
       </p>
     </div>
   );

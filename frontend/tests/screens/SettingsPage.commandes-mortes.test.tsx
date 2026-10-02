@@ -192,9 +192,21 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
     await ouvrirOnglet(/Suivi technique/);
 
     await waitFor(() => {
-      expect(texteEcran()).toContain('Grafana');
+      expect(texteEcran()).toContain('Horizon');
     });
-    expect(screen.getByRole('link', { name: /Prometheus/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Horizon/ })).toBeInTheDocument();
+  });
+
+  it('lot 4 (audit P1-4) — plus aucun lien vers http://localhost', async () => {
+    await monter();
+    await ouvrirOnglet(/Suivi technique/);
+
+    await waitFor(() => {
+      expect(texteEcran()).toContain('Horizon');
+    });
+    const adresses = screen.getAllByRole('link').map((a) => a.getAttribute('href') ?? '');
+    expect(adresses.filter((h) => h.includes('localhost'))).toEqual([]);
+    expect(texteEcran()).not.toContain('Grafana');
   });
 
   it('le champ « DSN Sentry » a disparu, et l’ecran dit ou se regle vraiment le DSN', async () => {
@@ -202,7 +214,7 @@ describe('D26-003 · Observabilite — plus de champ dont la saisie est jetee', 
     await ouvrirOnglet(/Suivi technique/);
 
     await waitFor(() => {
-      expect(texteEcran()).toContain('Grafana');
+      expect(texteEcran()).toContain('Horizon');
     });
     expect(screen.queryByPlaceholderText(/sentry\.io/)).toBeNull();
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);

@@ -1,0 +1,246 @@
+/**
+ * GARDE — lot 4 (audit UX 2026-10-02, P1-5) : la carte de France ne lance
+ * plus JAMAIS une collecte sur un simple clic.
+ *
+ * Avant : en mode « Action », un clic sur un département appelait
+ * `POST /coverage/launch` immédiatement. Une erreur de clic coûtait du quota
+ * et des appels externes.
+ *
+ * Ce que cette garde tient :
+ *  1. un clic sur un département SÉLECTIONNE (le panneau s'ouvre) et
+ *     n'appelle pas l'API de collecte ;
+ *  2. le bouton du panneau ouvre une confirmation qui nomme le département
+ *     (nom + code) et le volume, avec « Annuler » au focus ;
+ *  3. « Annuler » n'appelle rien ;
+ *  4. « Confirmer » appelle l'API UNE seule fois, même cliqué deux fois.
+ *
+ * La carte réelle (maplibre-gl, WebGL) ne se monte pas sous jsdom : elle est
+ * remplacée par une liste de boutons qui appelle le MÊME `onZoneClick`.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { delay, http, HttpResponse } from 'msw';
+
+import { CoveragePage } from '@/features/coverage/CoveragePage';
+import type { Cell } from '@/features/coverage/statsCouverture';
+import { renderScreen } from '../helpers/renderScreen';
+import { apiUrl, dynamicGet } from '../msw/handlers';
+
+vi.mock('@/features/coverage/FranceCoverageMap', () => ({
+  FranceCoverageMap: ({ cells, onZoneClick }: { cells: Cell[]; onZoneClick?: (code: string) => void }) => (
+    <div>
+      {cells.map((c) => (
+        <button key={c.code} type="button" onClick={() => onZoneClick?.(c.code)}>
+          {`zone ${c.code}`}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+const CELLULES: Cell[] = [
+  { code: '69', name: 'Rhône', total: 1200 },
+  { code: '38', name: 'Isère', total: 0 },
+  { code: '84', name: 'Vaucluse', total: 30 },
+];
+/** Au niveau Régions, le code 84 désigne Auvergne-Rhône-Alpes (cf. le bug corrigé). */
+const REGIONS: Cell[] = [{ code: '84', name: 'Auvergne-Rhône-Alpes', total: 5000 }];
+
+function journal(chemin: string, reponse: unknown) {
+  const corps: unknown[] = [];
+  const handler = http.post(apiUrl(chemin), async ({ request }) => {
+    corps.push(await request.json());
+    // Une réponse un peu lente : le second clic tombe PENDANT l'envoi.
+    await delay(50);
+    return HttpResponse.json(reponse as never);
+  });
+  return { corps, handler };
+}
+
+async function monter() {
+  const lancement = journal('/coverage/launch', { ok: true });
+  const enrichissement = journal('/coverage/enrich', { queued: 12 });
+  const couverture = dynamicGet('/coverage', (_n, url) => ({
+    cells: url.searchParams.get('level') === 'region' ? REGIONS : CELLULES,
+  }));
+  const vue = await renderScreen(<CoveragePage />, {
+    path: '/coverage',
+    handlers: [couverture.handler, lancement.handler, enrichissement.handler],
+    landingRoutes: ['/companies'],
+  });
+  await screen.findByRole('button', { name: 'zone 69' });
+  return { lancements: lancement.corps, enrichissements: enrichissement.corps, vue };
+}
+
+const ENRICHIR = 'Enrichir (emails · téléphones · dirigeants)';
+
+/**
+ * Deux clics dans le MÊME instant, avant tout nouveau rendu : `act` ne rend
+ * qu'à sa sortie, donc le bouton n'est pas encore désactivé et `isPending`
+ * est encore faux au second clic. Seul le verrou immédiat (`useRef`) arrête
+ * le doublon — `userEvent.dblClick` laisse React rendre entre les deux clics
+ * et ne le prouvait pas.
+ */
+async function deuxClicsMemeInstant(bouton: HTMLElement): Promise<void> {
+  await act(async () => {
+    bouton.click();
+    bouton.click();
+    await Promise.resolve();
+  });
+}
+
+describe('Carte de France — aucun clic dangereux', () => {
+  it('affiche l’en-tête du système avec le bon titre', async () => {
+    await monter();
+    expect(screen.getByRole('heading', { level: 1, name: 'Carte de France' })).toBeInTheDocument();
+    expect(screen.getByText('Cliquez sur un département pour voir ses entreprises')).toBeInTheDocument();
+    // Le sélecteur de modes a disparu.
+    expect(screen.queryByRole('button', { name: 'Action' })).toBeNull();
+  });
+
+  it('un clic sur un département ouvre le panneau et n’appelle PAS la collecte', async () => {
+    const { lancements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Récupérer 100 entreprises de ce département' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Sélection')).toBeInTheDocument();
+    // Laisse à un éventuel appel le temps de partir avant de constater qu'il n'est pas parti.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(lancements).toEqual([]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('« Annuler » referme la confirmation sans rien lancer', async () => {
+    const { lancements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Récupérer 100 entreprises de ce département' }),
+    );
+
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByText('Récupérer 100 entreprises ?')).toBeInTheDocument();
+    expect(within(dialogue).getByText('Département : Rhône (69)')).toBeInTheDocument();
+    const annuler = within(dialogue).getByRole('button', { name: 'Annuler' });
+    // « Annuler » est le choix par défaut.
+    await waitFor(() => expect(annuler).toHaveFocus());
+
+    await userEvent.click(annuler);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(lancements).toEqual([]);
+  });
+
+  it('« Confirmer » lance la collecte une seule fois, même cliqué deux fois', async () => {
+    const { lancements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Récupérer 100 entreprises de ce département' }),
+    );
+    const dialogue = await screen.findByRole('dialog');
+    const confirmer = within(dialogue).getByRole('button', { name: 'Confirmer' });
+
+    await deuxClicsMemeInstant(confirmer);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(lancements).toEqual([{ department: '69', limit: 100, enrich: false }]);
+  });
+
+  it('« Enrichir » passe aussi par la confirmation : rien sans « Confirmer »', async () => {
+    const { enrichissements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(await screen.findByRole('button', { name: ENRICHIR }));
+
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByText('Enrichir les fiches de ce département ?')).toBeInTheDocument();
+    expect(within(dialogue).getByText('Département : Rhône (69)')).toBeInTheDocument();
+    expect(within(dialogue).getByText(/services extérieurs/)).toBeInTheDocument();
+    // Le volume annoncé est celui de la carte (1 200 pour le Rhône)…
+    expect(within(dialogue).getByText(/au plus 1\s200 fiches/)).toBeInTheDocument();
+    const annuler = within(dialogue).getByRole('button', { name: 'Annuler' });
+    await waitFor(() => expect(annuler).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(enrichissements).toEqual([]);
+
+    await userEvent.click(annuler);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(enrichissements).toEqual([]);
+  });
+
+  it('« Confirmer » l’enrichissement : un seul envoi, même cliqué deux fois', async () => {
+    const { enrichissements, lancements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(await screen.findByRole('button', { name: ENRICHIR }));
+    const dialogue = await screen.findByRole('dialog');
+
+    expect(within(dialogue).getByText(/au plus 1\s200 fiches/)).toBeInTheDocument();
+
+    await deuxClicsMemeInstant(within(dialogue).getByRole('button', { name: 'Confirmer' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // … et c'est CE nombre qui part comme plafond : « au plus 1 200 » est vrai.
+    expect(enrichissements).toEqual([{ department: '69', limit: 1200 }]);
+    expect(lancements).toEqual([]);
+  });
+
+  it('niveau Régions : aucun bouton de collecte, et changer de niveau efface la sélection', async () => {
+    // Garde du bug 84 : le code de la région Auvergne-Rhône-Alpes partait
+    // comme code de département et lançait la collecte dans le Vaucluse.
+    const { lancements, enrichissements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Régions' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Auvergne-Rhône-Alpes/ }));
+
+    expect(await screen.findByText(/choisissez le niveau « Départements »/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: ENRICHIR })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Voir les entreprises de ce département' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Départements' }));
+
+    expect(await screen.findByText('Aucune sélection')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
+    expect(lancements).toEqual([]);
+    expect(enrichissements).toEqual([]);
+  });
+
+  it('la carte reçoit toujours les départements, et un clic y désigne un département', async () => {
+    await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Régions' }));
+    await screen.findByRole('button', { name: /Auvergne-Rhône-Alpes/ });
+    // Au niveau Régions, la carte colore toujours par DÉPARTEMENT : le code
+    // 84 de la région n'y est jamais passé.
+    expect(await screen.findByRole('button', { name: 'zone 69' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 84' }));
+
+    // Le clic a sélectionné le Vaucluse (84) au niveau Départements, pas la région.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Récupérer 100 entreprises de ce département' }),
+    );
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByText('Département : Vaucluse (84)')).toBeInTheDocument();
+  });
+
+  it('le panneau mène à la liste des entreprises du département', async () => {
+    const { vue } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(
+      await screen.findByRole('link', { name: 'Voir les entreprises de ce département' }),
+    );
+
+    await screen.findByTestId('landing');
+    expect(vue.router.state.location.pathname).toBe('/companies');
+    expect(vue.router.state.location.search).toEqual({ department_code: '69' });
+  });
+});

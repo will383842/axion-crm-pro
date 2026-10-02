@@ -50,7 +50,8 @@ function buildActions(input: NextActionsInput): ActionItem[] {
       id: 'enrich-quality',
       title: 'Compléter les fiches incomplètes',
       description: `Qualité moyenne : ${input.qualityAvgScore}/100.`,
-      href: '/companies?quality_badge=basique',
+      // Lot 4 — `quality` est le nom du filtre lu par `/companies` (validateSearch).
+      href: '/companies?quality=basique',
       tone: 'amber',
       icon: '✨',
     });

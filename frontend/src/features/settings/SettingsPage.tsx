@@ -128,13 +128,10 @@ const TON_ROLE: Record<Integration['role'], 'success' | 'info' | 'warning'> = {
   'phase-b': 'warning',
 };
 
+// Lot 4 (audit P1-4) — les six adresses `http://localhost:…` (Prometheus,
+// Grafana, Loki, Tempo, GlitchTip, Uptime Kuma) ont été retirées : en
+// production elles ne mènent nulle part.
 const OBSERVABILITY_LINKS: Array<{ name: string; url: string; description: string }> = [
-  { name: 'Prometheus', url: 'http://localhost:9090', description: 'Métriques + alertes' },
-  { name: 'Grafana', url: 'http://localhost:3000', description: 'Tableaux visuels' },
-  { name: 'Loki', url: 'http://localhost:3100', description: 'Journaux du serveur' },
-  { name: 'Tempo traces', url: 'http://localhost:3200', description: 'Traces distribuées' },
-  { name: 'GlitchTip errors', url: 'http://localhost:8080', description: 'Errors Sentry-compatible' },
-  { name: 'Uptime Kuma', url: 'http://localhost:3001', description: 'Probes uptime' },
   { name: 'Horizon', url: '/horizon', description: 'Traitements en file d’attente' },
   { name: 'Telescope', url: '/telescope', description: 'Diagnostic, en local seulement' },
 ];
@@ -432,8 +429,7 @@ export function SettingsPage() {
 
           <div>
             <p className="mb-2 text-xs text-slate-500">
-              Adresses de la pile d’observabilité locale (docker-compose). Hors de cette pile,
-              elles ne répondent pas.
+              Outils de suivi des traitements du serveur.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {OBSERVABILITY_LINKS.map((link) => (

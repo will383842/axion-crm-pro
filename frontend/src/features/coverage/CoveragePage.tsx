@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -50,6 +51,27 @@ const FranceCoverageMap = lazy(async () => ({
 /** Volume d'une collecte lancée depuis la carte. */
 const VOLUME_COLLECTE = 100;
 
+/**
+ * Plafond d'un enrichissement lancé depuis la carte. C'est le plafond par
+ * défaut du serveur (`CoverageController::enrich`, `limit` ≤ 50 000) : on
+ * l'envoie EXPLICITEMENT pour que le chiffre annoncé dans la confirmation
+ * soit celui qui s'applique.
+ */
+const PLAFOND_ENRICHISSEMENT = 50_000;
+
+/** Ce que la confirmation doit faire valider : l'action ET la zone visée. */
+interface DemandeConfirmation {
+  action: 'recuperer' | 'enrichir';
+  code: string;
+  name: string;
+  /** Entreprises déjà en base pour ce département (pour annoncer le volume). */
+  total: number;
+}
+
+function volumeEnrichissement(total: number): number {
+  return Math.min(Math.max(total, 0), PLAFOND_ENRICHISSEMENT);
+}
+
 const LEVELS: Array<{ id: Level; label: string }> = [
   { id: 'region',     label: 'Régions' },
   { id: 'department', label: 'Départements' },
@@ -78,21 +100,46 @@ export function CoveragePage() {
 
   const selectedCell = selected ? cells.find((c) => c.code === selected) ?? null : null;
 
-  // Étape 1 — Récupérer : découverte seule (pas d'enrichissement chaîné).
-  // Jamais appelée directement par un clic : seulement par « Confirmer ».
-  const [aConfirmer, setAConfirmer] = useState<{ code: string; name: string } | null>(null);
+  // Étape 1 — Récupérer (découverte seule) et étape 2 — Enrichir (fiches déjà
+  // en base). L'une comme l'autre interroge des services extérieurs : AUCUNE
+  // n'est appelée directement par un clic, seulement par « Confirmer ».
+  const [aConfirmer, setAConfirmer] = useState<DemandeConfirmation | null>(null);
   const boutonAnnuler = useRef<HTMLButtonElement | null>(null);
+  // Verrou synchrone : `isPending` n'est vrai qu'au rendu SUIVANT, deux clics
+  // dans le même instant passeraient tous les deux sans lui.
+  const envoiEnCours = useRef(false);
   const lancement = useMutation({
-    mutationFn: async (dept: { code: string; name: string }) => {
-      await api.post('/coverage/launch', { department: dept.code, limit: VOLUME_COLLECTE, enrich: false });
-      return dept;
+    mutationFn: async (demande: DemandeConfirmation) => {
+      if (demande.action === 'recuperer') {
+        await api.post('/coverage/launch', { department: demande.code, limit: VOLUME_COLLECTE, enrich: false });
+        return { demande, enFile: null };
+      }
+      const r = await api.post<{ queued?: number }>('/coverage/enrich', {
+        department: demande.code,
+        limit: PLAFOND_ENRICHISSEMENT,
+      });
+      return { demande, enFile: r.data?.queued ?? 0 };
     },
-    onSuccess: (dept) => {
-      toast.success(`Récupération lancée : ${dept.name} (${dept.code})`);
+    onSuccess: ({ demande, enFile }) => {
+      const zone = `${demande.name} (${demande.code})`;
+      if (demande.action === 'recuperer') {
+        toast.success(`Récupération lancée : ${zone}`);
+      } else if (enFile !== null && enFile > 0) {
+        toast.success(`Enrichissement lancé : ${enFile.toLocaleString('fr-FR')} entreprise(s), ${zone}`);
+      } else {
+        toast.success(`Aucune entreprise à enrichir pour ${zone} : récupérez-les d’abord.`);
+      }
       setAConfirmer(null);
     },
-    onError: () => {
-      toast.error('La récupération n’a pas pu être lancée. Réessayez dans un instant.');
+    onError: (_erreur, demande) => {
+      toast.error(
+        demande.action === 'recuperer'
+          ? 'La récupération n’a pas pu être lancée. Réessayez dans un instant.'
+          : 'L’enrichissement n’a pas pu être lancé. Réessayez dans un instant.',
+      );
+    },
+    onSettled: () => {
+      envoiEnCours.current = false;
     },
   });
 
@@ -103,23 +150,13 @@ export function CoveragePage() {
   }, [aConfirmer]);
 
   function confirmer() {
-    if (aConfirmer === null || lancement.isPending) return;
+    if (aConfirmer === null || envoiEnCours.current || lancement.isPending) return;
+    envoiEnCours.current = true;
     lancement.mutate(aConfirmer);
   }
 
-  // Étape 2 — Enrichir : enrichit les entreprises DÉJÀ récupérées du département.
-  async function enrichir(dept: string) {
-    try {
-      const r = await api.post<{ queued?: number }>('/coverage/enrich', { department: dept });
-      const n = r.data?.queued ?? 0;
-      toast.success(
-        n > 0
-          ? `Enrichissement lancé · ${n.toLocaleString('fr-FR')} entreprise(s) · département ${dept}`
-          : `Aucune entreprise à enrichir pour le département ${dept} (récupérez-les d'abord).`,
-      );
-    } catch {
-      toast.error("Erreur lors de l'enrichissement");
-    }
+  function demander(action: DemandeConfirmation['action'], cell: Cell) {
+    setAConfirmer({ action, code: cell.code, name: cell.name, total: cell.total ?? 0 });
   }
 
   return (
@@ -220,8 +257,8 @@ export function CoveragePage() {
               cell={selectedCell}
               scoreVisible={scoreVisible}
               estDepartement={level === 'department'}
-              onRecuperer={() => setAConfirmer({ code: selectedCell.code, name: selectedCell.name })}
-              onEnrichir={() => void enrichir(selectedCell.code)}
+              onRecuperer={() => demander('recuperer', selectedCell)}
+              onEnrichir={() => demander('enrichir', selectedCell)}
               onClose={() => setSelected(null)}
             />
           ) : (
@@ -238,7 +275,11 @@ export function CoveragePage() {
         onClose={() => {
           if (!lancement.isPending) setAConfirmer(null);
         }}
-        title={`Récupérer ${VOLUME_COLLECTE} entreprises ?`}
+        title={
+          aConfirmer?.action === 'enrichir'
+            ? 'Enrichir les fiches de ce département ?'
+            : `Récupérer ${VOLUME_COLLECTE} entreprises ?`
+        }
         description={aConfirmer ? `Département : ${aConfirmer.name} (${aConfirmer.code})` : undefined}
         size="sm"
         footer={
@@ -257,11 +298,21 @@ export function CoveragePage() {
           </>
         }
       >
-        <p className="text-sm text-slate-600">
-          La collecte va chercher {VOLUME_COLLECTE} entreprises de ce département auprès des
-          services publics d’information sur les entreprises. Elle se poursuit en arrière-plan ;
-          les fiches apparaîtront au fil de l’eau.
-        </p>
+        {aConfirmer?.action === 'enrichir' ? (
+          <p className="text-sm text-slate-600">
+            L’enrichissement va compléter au plus{' '}
+            {volumeEnrichissement(aConfirmer.total).toLocaleString('fr-FR')} entreprises de ce
+            département déjà récupérées et pas encore complétées (plafond :{' '}
+            {PLAFOND_ENRICHISSEMENT.toLocaleString('fr-FR')}). Il interroge des services extérieurs
+            pour trouver les e-mails, téléphones et dirigeants. Il se poursuit en arrière-plan.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-600">
+            La collecte va chercher {VOLUME_COLLECTE} entreprises de ce département auprès des
+            services publics d’information sur les entreprises. Elle se poursuit en arrière-plan ;
+            les fiches apparaîtront au fil de l’eau.
+          </p>
+        )}
       </Modal>
     </div>
   );
@@ -412,6 +463,14 @@ function SelectionCard({
           >
             Enrichir (emails · téléphones · dirigeants)
           </button>
+          {/* Lot 4 — voir la liste déjà filtrée sur ce département. */}
+          <Link
+            to="/companies"
+            search={{ department_code: cell.code }}
+            className="text-center text-sm font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+          >
+            Voir les entreprises de ce département
+          </Link>
           <p className="text-center text-xs leading-relaxed text-slate-500">
             {isCovered
               ? 'Étape 1 : récupérer les entreprises. Étape 2 : les enrichir (peut être fait plus tard).'

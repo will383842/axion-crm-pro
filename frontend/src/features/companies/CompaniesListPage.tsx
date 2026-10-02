@@ -40,6 +40,7 @@ import {
   PROSPECTION_TABS,
   QUALITY_OPTIONS,
   filtreDepuisRecherche,
+  normaliserNaf,
   rechercheDepuisFiltre,
   type Filter,
 } from "./filtresUrl";
@@ -140,6 +141,11 @@ export function CompaniesListPage() {
 
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(filtreUrl);
+  // Le dernier état IMPOSÉ d'un bloc (adresse, « Effacer les filtres »). Tant
+  // que `filter` est cet objet-là, personne n'a tapé depuis : la requête prend
+  // les valeurs IMMÉDIATES. Sans cela, l'anti-rebond rendait encore 300 ms
+  // l'ancienne recherche (« boul »), qui repartait au serveur et dans l'adresse.
+  const [filtreImpose, setFiltreImpose] = useState<Filter>(filtreUrl);
   const [exporting, setExporting] = useState(false);
   const [plusDeFiltres, setPlusDeFiltres] = useState(false);
   const idPanneau = useId();
@@ -157,10 +163,12 @@ export function CompaniesListPage() {
   const rechercheDifferee = useAntiRebond(filter.search);
   const nafDiffere = useAntiRebond(filter.naf);
   const tagDiffere = useAntiRebond(filter.tag);
-  const filtreInterroge = useMemo<Filter>(
-    () => ({ ...filter, search: rechercheDifferee, naf: nafDiffere, tag: tagDiffere }),
-    [filter, rechercheDifferee, nafDiffere, tagDiffere],
-  );
+  const filtreInterroge = useMemo<Filter>(() => {
+    // NAF : la même normalisation que l'adresse (`normaliserNaf`), sinon la
+    // liste filtrerait sur « 68 31Z » quand l'adresse garderait « 6831Z ».
+    if (filter === filtreImpose) return { ...filter, naf: normaliserNaf(filter.naf) };
+    return { ...filter, search: rechercheDifferee, naf: normaliserNaf(nafDiffere), tag: tagDiffere };
+  }, [filter, filtreImpose, rechercheDifferee, nafDiffere, tagDiffere]);
 
   // ── Adresse ⇄ filtres ────────────────────────────────────────────────
   // `derniereCleConnue` est la version des filtres que l'adresse porte (ou va
@@ -184,6 +192,7 @@ export function CompaniesListPage() {
     if (cleUrl === derniereCleConnue.current) return;
     derniereCleConnue.current = cleUrl;
     setFilter(filtreUrl);
+    setFiltreImpose(filtreUrl);
     setPage(1);
   }, [cleUrl, filtreUrl]);
 
@@ -199,7 +208,7 @@ export function CompaniesListPage() {
       ...(filter.effectif ? { "filter[effectif]": filter.effectif } : {}),
       ...(filter.priority ? { "filter[priority]": filter.priority } : {}),
       ...(filter.search ? { "filter[denomination]": filter.search } : {}),
-      ...(filter.naf ? { "filter[naf]": filter.naf } : {}),
+      ...(normaliserNaf(filter.naf) ? { "filter[naf]": normaliserNaf(filter.naf) } : {}),
       ...(filter.quality ? { "filter[quality]": filter.quality } : {}),
       ...(filter.prospection_status
         ? { "filter[prospection_status]": filter.prospection_status }
@@ -471,6 +480,7 @@ export function CompaniesListPage() {
                   size="md"
                   onClick={() => {
                     setFilter(EMPTY_FILTER);
+                    setFiltreImpose(EMPTY_FILTER);
                     setPlusDeFiltres(false);
                     setPage(1);
                   }}

@@ -25,7 +25,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { CoveragePage } from '@/features/coverage/CoveragePage';
 import type { Cell } from '@/features/coverage/statsCouverture';
 import { renderScreen } from '../helpers/renderScreen';
-import { apiUrl, getJson } from '../msw/handlers';
+import { apiUrl, dynamicGet } from '../msw/handlers';
 
 vi.mock('@/features/coverage/FranceCoverageMap', () => ({
   FranceCoverageMap: ({ cells, onZoneClick }: { cells: Cell[]; onZoneClick?: (code: string) => void }) => (
@@ -42,28 +42,38 @@ vi.mock('@/features/coverage/FranceCoverageMap', () => ({
 const CELLULES: Cell[] = [
   { code: '69', name: 'Rhône', total: 1200 },
   { code: '38', name: 'Isère', total: 0 },
+  { code: '84', name: 'Vaucluse', total: 30 },
 ];
+/** Au niveau Régions, le code 84 désigne Auvergne-Rhône-Alpes (cf. le bug corrigé). */
+const REGIONS: Cell[] = [{ code: '84', name: 'Auvergne-Rhône-Alpes', total: 5000 }];
 
-function monterAvecJournal() {
-  const lancements: unknown[] = [];
-  const handler = http.post(apiUrl('/coverage/launch'), async ({ request }) => {
-    lancements.push(await request.json());
+function journal(chemin: string, reponse: unknown) {
+  const corps: unknown[] = [];
+  const handler = http.post(apiUrl(chemin), async ({ request }) => {
+    corps.push(await request.json());
     // Une réponse un peu lente : le second clic tombe PENDANT l'envoi.
     await delay(50);
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json(reponse as never);
   });
-  return { lancements, handler };
+  return { corps, handler };
 }
 
 async function monter() {
-  const { lancements, handler } = monterAvecJournal();
-  await renderScreen(<CoveragePage />, {
+  const lancement = journal('/coverage/launch', { ok: true });
+  const enrichissement = journal('/coverage/enrich', { queued: 12 });
+  const couverture = dynamicGet('/coverage', (_n, url) => ({
+    cells: url.searchParams.get('level') === 'region' ? REGIONS : CELLULES,
+  }));
+  const vue = await renderScreen(<CoveragePage />, {
     path: '/coverage',
-    handlers: [getJson('/coverage', { cells: CELLULES }), handler],
+    handlers: [couverture.handler, lancement.handler, enrichissement.handler],
+    landingRoutes: ['/companies'],
   });
   await screen.findByRole('button', { name: 'zone 69' });
-  return { lancements };
+  return { lancements: lancement.corps, enrichissements: enrichissement.corps, vue };
 }
+
+const ENRICHIR = 'Enrichir (emails · téléphones · dirigeants)';
 
 describe('Carte de France — aucun clic dangereux', () => {
   it('affiche l’en-tête du système avec le bon titre', async () => {
@@ -125,5 +135,73 @@ describe('Carte de France — aucun clic dangereux', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(lancements).toEqual([{ department: '69', limit: 100, enrich: false }]);
+  });
+
+  it('« Enrichir » passe aussi par la confirmation : rien sans « Confirmer »', async () => {
+    const { enrichissements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(await screen.findByRole('button', { name: ENRICHIR }));
+
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByText('Enrichir les fiches de ce département ?')).toBeInTheDocument();
+    expect(within(dialogue).getByText('Département : Rhône (69)')).toBeInTheDocument();
+    expect(within(dialogue).getByText(/services extérieurs/)).toBeInTheDocument();
+    const annuler = within(dialogue).getByRole('button', { name: 'Annuler' });
+    await waitFor(() => expect(annuler).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(enrichissements).toEqual([]);
+
+    await userEvent.click(annuler);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(enrichissements).toEqual([]);
+  });
+
+  it('« Confirmer » l’enrichissement : un seul envoi, même cliqué deux fois', async () => {
+    const { enrichissements, lancements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(await screen.findByRole('button', { name: ENRICHIR }));
+    const dialogue = await screen.findByRole('dialog');
+
+    await userEvent.dblClick(within(dialogue).getByRole('button', { name: 'Confirmer' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(enrichissements).toEqual([{ department: '69', limit: 50000 }]);
+    expect(lancements).toEqual([]);
+  });
+
+  it('niveau Régions : aucun bouton de collecte, et changer de niveau efface la sélection', async () => {
+    // Garde du bug 84 : le code de la région Auvergne-Rhône-Alpes partait
+    // comme code de département et lançait la collecte dans le Vaucluse.
+    const { lancements, enrichissements } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Régions' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'zone 84' }));
+
+    expect(await screen.findByText(/choisissez le niveau « Départements »/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: ENRICHIR })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Voir les entreprises de ce département' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Départements' }));
+
+    expect(await screen.findByText('Aucune sélection')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Récupérer/ })).toBeNull();
+    expect(lancements).toEqual([]);
+    expect(enrichissements).toEqual([]);
+  });
+
+  it('le panneau mène à la liste des entreprises du département', async () => {
+    const { vue } = await monter();
+
+    await userEvent.click(screen.getByRole('button', { name: 'zone 69' }));
+    await userEvent.click(
+      await screen.findByRole('link', { name: 'Voir les entreprises de ce département' }),
+    );
+
+    await screen.findByTestId('landing');
+    expect(vue.router.state.location.pathname).toBe('/companies');
+    expect(vue.router.state.location.search).toEqual({ department_code: '69' });
   });
 });

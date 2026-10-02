@@ -100,6 +100,17 @@ export const LONGUEUR_MAX_RECHERCHE = 120;
 export const LONGUEUR_MAX_ETIQUETTE = 64;
 export const LONGUEUR_MAX_NAF = 10;
 
+/**
+ * Un code NAF tel que le serveur le compare (`filter[naf]`, égalité stricte
+ * sur `companies.naf`) : sans espaces, en majuscules. « 68 31z » devient
+ * « 6831Z ». Le point n'est NI retiré NI ajouté : la base stocke le code tel
+ * que l'INSEE le fournit (« 68.31Z »), et le deviner changerait la recherche.
+ * Appliquée À LA FOIS à la requête et à l'adresse, pour qu'elles concordent.
+ */
+export function normaliserNaf(valeur: string): string {
+  return valeur.replace(/\s+/g, '').toUpperCase();
+}
+
 type Regle = (valeur: string) => boolean;
 
 function parmi(options: readonly OptionReferentiel[]): Regle {
@@ -175,7 +186,13 @@ export function validerRechercheEntreprises(brut: Record<string, unknown>): Rech
     if (texte === null || texte === '') return;
     // Les départements à un chiffre arrivent en nombre (`?department_code=1`
     // n'a pas de sens, mais `01` devient 1 si on le tape sans guillemets).
-    const normalise = cle === 'department_code' && /^\d$/.test(texte) ? `0${texte}` : texte;
+    const normalise =
+      cle === 'department_code' && /^\d$/.test(texte)
+        ? `0${texte}`
+        : cle === 'naf'
+          ? normaliserNaf(texte)
+          : texte;
+    if (normalise === '') return;
     if (REGLES[cle](normalise)) sortie[cle] = normalise;
   };
   for (const [alias, cle] of Object.entries(ALIAS)) {

@@ -19,6 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { RouterHistory } from '@tanstack/react-router';
 
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import {
@@ -80,6 +81,10 @@ describe('validerRechercheEntreprises — l’adresse n’est pas sûre', () => 
     expect(validerRechercheEntreprises({ tag: 'a\u0000b' })).toEqual({});
     expect(validerRechercheEntreprises({ naf: '68.31Z' })).toEqual({ naf: '68.31Z' });
     expect(validerRechercheEntreprises({ naf: "68'; DROP" })).toEqual({});
+  });
+
+  it('normalise le code NAF (espaces retirés, majuscules)', () => {
+    expect(validerRechercheEntreprises({ naf: '68.31 z' })).toEqual({ naf: '68.31Z' });
   });
 
   it('accepte l’ancien nom `quality_badge` des liens existants', () => {
@@ -149,5 +154,79 @@ describe('écran Entreprises — filtres lus depuis l’adresse', () => {
     expect(screen.queryByRole('button', { name: /Importer/ })).toBeNull();
     // Un seul « Toutes qualités » à l'écran (il y en avait deux).
     expect(screen.getAllByRole('option', { name: 'Toutes qualités' })).toHaveLength(1);
+  });
+
+  it('`?quality_badge=basique` (ancien lien) arrive jusqu’à la requête', async () => {
+    const { premiere } = await monter('/companies?quality_badge=basique');
+    expect(premiere).toContain('filter[quality]=basique');
+  });
+
+  it('se resynchronise quand l’adresse change de l’extérieur', async () => {
+    const { vue, compagnies } = await monter('/companies?department_code=69');
+
+    await vue.router.navigate({ to: '/companies', search: { size: 'pme' } });
+
+    await waitFor(() => expect(screen.getByLabelText('Taille')).toHaveValue('pme'));
+    expect(screen.getByLabelText('Département')).toHaveValue('');
+    await waitFor(() => {
+      const derniere = decodeURIComponent(compagnies.urls[compagnies.urls.length - 1] ?? '');
+      expect(derniere).toContain('filter[size_category]=pme');
+      expect(derniere).not.toContain('filter[department_code]');
+    });
+  });
+
+  it('écrit la recherche dans l’adresse après l’anti-rebond, sans ajouter d’historique', async () => {
+    const { vue } = await monter('/companies');
+    const historique = vue.router.history as RouterHistory;
+    const longueurAvant = historique.length;
+
+    await userEvent.type(await screen.findByPlaceholderText('Rechercher une entreprise…'), 'boulangerie');
+
+    await waitFor(() => {
+      expect(vue.router.state.location.search).toEqual({ search: 'boulangerie' });
+    });
+    // Remplacement, pas une entrée par lettre : « Précédent » quitte l'écran.
+    expect(historique.length).toBe(longueurAvant);
+  });
+
+  it('« Effacer les filtres » ne renvoie JAMAIS l’ancienne recherche', async () => {
+    const { vue, compagnies } = await monter('/companies?department_code=75');
+    const adresses: string[] = [];
+    const historique = vue.router.history as RouterHistory;
+    const desabonner = historique.subscribe(() => {
+      adresses.push(historique.location.search);
+    });
+
+    await userEvent.type(await screen.findByPlaceholderText('Rechercher une entreprise…'), 'boul');
+    await waitFor(() => {
+      const derniere = decodeURIComponent(compagnies.urls[compagnies.urls.length - 1] ?? '');
+      expect(derniere).toContain('filter[denomination]=boul');
+    });
+    const requetesAvant = compagnies.urls.length;
+    const adressesAvant = adresses.length;
+
+    await userEvent.click(screen.getByRole('button', { name: 'Effacer les filtres' }));
+    // Plus que la fenêtre d'anti-rebond (300 ms), pour laisser la valeur périmée se montrer si elle existait.
+    await new Promise((r) => setTimeout(r, 600));
+    desabonner();
+
+    const requetesApres = compagnies.urls.slice(requetesAvant).map((u) => decodeURIComponent(u));
+    expect(requetesApres.length).toBeGreaterThanOrEqual(1);
+    expect(requetesApres.filter((u) => u.includes('boul'))).toEqual([]);
+    expect(adresses.slice(adressesAvant).filter((a) => a.includes('boul'))).toEqual([]);
+    expect(vue.router.state.location.search).toEqual({});
+  });
+
+  it('code NAF tapé avec des espaces : la liste et l’adresse reçoivent la même valeur', async () => {
+    const { vue, compagnies } = await monter('/companies');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Plus de filtres (13)' }));
+    await userEvent.type(screen.getByLabelText('Code NAF'), '68.31 z');
+
+    await waitFor(() => {
+      const derniere = decodeURIComponent(compagnies.urls[compagnies.urls.length - 1] ?? '');
+      expect(derniere).toContain('filter[naf]=68.31Z');
+    });
+    await waitFor(() => expect(vue.router.state.location.search).toEqual({ naf: '68.31Z' }));
   });
 });

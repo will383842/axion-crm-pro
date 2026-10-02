@@ -100,7 +100,7 @@ final class RechercheEntreprisesParNom
 
         // La fonction plafonne déjà ; on ne lui fait pas confiance pour la
         // taille de la liste affichée.
-        return [array_slice($ids, 0, $plafond), null];
+        return [array_values(array_slice($ids, 0, $plafond)), null];
     }
 
     /**

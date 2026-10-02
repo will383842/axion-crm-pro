@@ -167,7 +167,7 @@ class GlobalSearchController extends ApiController
             DB::select($sql, $liaisons),
         );
 
-        return array_slice($ids, 0, self::PLAFOND);
+        return array_values(array_slice($ids, 0, self::PLAFOND));
     }
 
     /**

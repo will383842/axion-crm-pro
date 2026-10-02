@@ -70,28 +70,29 @@ test.describe('Navigation smoke', () => {
   test('sidebar : entreprises et contacts sous « Ma base »', async ({ page }) => {
     await page.goto('/');
     await ouvrir(page, 'Ma base');
-    await expect(page.getByRole('link', { name: 'Entreprises' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Entreprises', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Entreprises en Roumanie' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Contacts', exact: true })).toHaveCount(1);
   });
 
   test('sidebar : médias et journalistes sous « Presse »', async ({ page }) => {
     await page.goto('/');
     await ouvrir(page, 'Presse');
-    await expect(page.getByRole('link', { name: 'Médias' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Médias', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Journalistes' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Communiqués envoyés' })).toBeVisible();
   });
 
   test('page médias : se charge sans erreur', async ({ page }) => {
     await page.goto('/media');
-    await expect(page.getByRole('heading', { name: 'Médias' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Médias', exact: true })).toBeVisible();
   });
 
   test('sidebar : audiences et listes sous « Ciblage »', async ({ page }) => {
     await page.goto('/');
     await ouvrir(page, 'Ciblage');
-    await expect(page.getByRole('link', { name: 'Audiences' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Listes' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Audiences', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Listes', exact: true })).toBeVisible();
   });
 
   test('sidebar : carte de France et collectes sous « Alimenter la base »', async ({ page }) => {

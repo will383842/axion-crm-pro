@@ -12,6 +12,16 @@ interface SearchResults {
   companies: { id: number; siren: string; denomination?: string|null }[];
   contacts: { id: number; first_name?: string|null; last_name: string; email?: string|null; company_id: number }[];
   tags: { id: number; slug: string; name: string }[];
+  /** Pourquoi aucune entreprise n'a été cherchée par son nom (« SARL » seul, mot trop court). */
+  indice_entreprises?: 'mots_vides' | 'trop_court' | 'siren_inconnu' | null;
+}
+
+/** La phrase à afficher quand le serveur n'a pas cherché d'entreprise par son nom. */
+function conseilEntreprises(indice: SearchResults['indice_entreprises']): string | null {
+  if (indice === 'mots_vides') return 'Ajoutez un mot du nom de l’entreprise : « SARL » seul ne suffit pas.';
+  if (indice === 'trop_court') return 'Pour une entreprise, tapez au moins 3 lettres de son nom.';
+  if (indice === 'siren_inconnu') return 'Aucune entreprise ne commence par ce numéro de SIREN.';
+  return null;
 }
 
 export function GlobalSearch() {
@@ -132,7 +142,16 @@ export function GlobalSearch() {
             {search.length >= 2 && (!data?.companies?.length && !data?.contacts?.length && !data?.tags?.length) && (
               <Command.Empty className="py-8 text-center text-sm text-slate-500">
                 Aucun résultat pour « {search} ».
+                {conseilEntreprises(data?.indice_entreprises) !== null && (
+                  <span className="mt-1 block text-xs text-slate-600">{conseilEntreprises(data?.indice_entreprises)}</span>
+                )}
               </Command.Empty>
+            )}
+
+            {search.length >= 2 && !data?.companies?.length && Boolean(data?.contacts?.length || data?.tags?.length) && conseilEntreprises(data?.indice_entreprises) !== null && (
+              <div role="note" className="px-3 py-1 text-xs text-slate-600">
+                {conseilEntreprises(data?.indice_entreprises)}
+              </div>
             )}
 
             {data?.companies && data.companies.length > 0 && (

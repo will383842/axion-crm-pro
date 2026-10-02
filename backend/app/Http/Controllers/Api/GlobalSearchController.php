@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Support\MasquageCoordonnees;
 use App\Support\RechercheEntreprisesParNom;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,12 +42,15 @@ use Illuminate\Support\Facades\Schema;
  *    plafond gèle l'application deux minutes au volume de production. Une
  *    palette qui se déclenche à chaque frappe ne peut pas se le permettre.
  *
- * ⚠️ CE QUE CETTE RECHERCHE N'EST PAS. Elle emploie `ILIKE 'terme%'` — un
- * préfixe, pas une sous-chaîne. `%terme%` ne peut utiliser aucun index B-tree :
- * `G41-003` a mesuré 65 s au volume de production sur exactement ce motif. Une
- * vraie recherche plein texte (trigrammes, `pg_trgm`) est un choix de conception
- * avec sa migration d'index ; elle ne se prend pas au détour d'un correctif.
- * **Le jour où on la voudra, c'est ici qu'il faudra revenir.**
+ * ⚠️ COMMENT ELLE CHERCHE (2026-10-03). Plus aucun `ILIKE` direct sur
+ * `companies` ni `contacts` : sous la RLS forcée, il ne peut utiliser aucun
+ * index (parcours complet à chaque frappe). Les identifiants viennent de
+ * fonctions SECURITY DEFINER cloisonnées (`entreprises_choix_ids`,
+ * `entreprises_siren_ids`, `contacts_recherche_ids`), puis les lignes sont
+ * relues sous la RLS. Entreprises : nom par mots significatifs (trigrammes),
+ * SIREN par égalité ou début de numéro. Personnes : nom et prénom en
+ * sous-chaîne (trigrammes), e-mail par son DÉBUT seulement. Les étiquettes
+ * (petite table) gardent un `ILIKE '%terme%'` direct.
  */
 class GlobalSearchController extends ApiController
 {
@@ -55,6 +59,9 @@ class GlobalSearchController extends ApiController
 
     /** Une palette rend ce qui tient sous les yeux, pas un export. */
     private const PLAFOND = 10;
+
+    /** Renseigné par `chercherEntreprises` quand la recherche par nom n'a pas eu lieu. */
+    private ?string $indiceEntreprises = null;
 
     /**
      * @OA\Get(path="/search", tags={"Workspace"}, summary="Recherche globale ⌘K (companies + contacts + tags)",
@@ -66,7 +73,10 @@ class GlobalSearchController extends ApiController
      */
     public function index(Request $r): JsonResponse
     {
-        $vide = ['companies' => [], 'contacts' => [], 'tags' => []];
+        // Le contrôleur peut être réutilisé d'une requête à l'autre (instance
+        // gardée par la route) : l'indice repart de zéro à chaque recherche.
+        $this->indiceEntreprises = null;
+        $vide = ['companies' => [], 'contacts' => [], 'tags' => [], 'indice_entreprises' => null];
 
         $terme = trim((string) $r->query('q', ''));
         if (mb_strlen($terme) < self::LONGUEUR_MINIMALE) {
@@ -91,11 +101,20 @@ class GlobalSearchController extends ApiController
         // Le contexte d'espace est posé EXPLICITEMENT : les fonctions de
         // recherche (SECURITY DEFINER) ne rendent rien si l'espace demandé
         // n'est pas celui de la connexion.
-        return WorkspaceContext::run($espace, fn (): JsonResponse => response()->json(MasquageCoordonnees::masquerTableauSiRequis([
-            'companies' => $this->chercherEntreprises($espace, $terme),
-            'contacts' => $this->chercherPersonnes($espace, $terme),
-            'tags' => $this->chercherEtiquettes($espace, $terme),
-        ])));
+        return WorkspaceContext::run($espace, function () use ($espace, $terme): JsonResponse {
+            $charge = MasquageCoordonnees::masquerTableauSiRequis([
+                'companies' => $this->chercherEntreprises($espace, $terme),
+                'contacts' => $this->chercherPersonnes($espace, $terme),
+                'tags' => $this->chercherEtiquettes($espace, $terme),
+            ]);
+
+            // Pourquoi AUCUNE entreprise n'a été cherchée par son nom
+            // (`mots_vides` : « SARL » seul ; `trop_court`), pour que la palette
+            // le dise au lieu d'un « aucun résultat » muet. `null` sinon.
+            $charge['indice_entreprises'] = $this->indiceEntreprises;
+
+            return response()->json($charge);
+        });
     }
 
     /**
@@ -120,15 +139,27 @@ class GlobalSearchController extends ApiController
         return $this->sur('companies', function () use ($espace, $terme): array {
             $chiffres = preg_replace('/[\s.\-]/u', '', $terme) ?? '';
 
+            $ids = [];
             if ($chiffres !== '' && ctype_digit($chiffres)) {
                 // Un SIRET (14 chiffres) commence par son SIREN.
                 $debut = strlen($chiffres) === 14 ? substr($chiffres, 0, 9) : $chiffres;
-                $ids = strlen($debut) <= 9 ? $this->identifiants(
-                    'SELECT t.id FROM public.entreprises_siren_ids(?::uuid, ?, ?) WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
-                    [$espace, $debut, self::PLAFOND],
-                ) : [];
-            } else {
-                [$ids] = RechercheEntreprisesParNom::identifiants($espace, $terme, '', self::PLAFOND);
+                if (strlen($debut) >= 2 && strlen($debut) <= 9) {
+                    $ids = $this->identifiants(
+                        'SELECT t.id FROM public.entreprises_siren_ids(?::uuid, ?, ?) WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
+                        [$espace, $debut, self::PLAFOND],
+                    );
+                }
+            }
+
+            // Le NOM est cherché AUSSI pour une saisie chiffrée : une entreprise
+            // peut s'appeler « 1664 », et 10 à 13 chiffres ne sont pas un SIREN.
+            // Les SIREN trouvés passent d'abord.
+            if (count($ids) < self::PLAFOND) {
+                [$parNom, $indice] = RechercheEntreprisesParNom::identifiants($espace, $terme, '', self::PLAFOND);
+                $ids = array_values(array_slice(array_unique(array_merge($ids, $parNom)), 0, self::PLAFOND));
+                if ($ids === []) {
+                    $this->indiceEntreprises = $indice;
+                }
             }
 
             return $this->relire('companies', $espace, $ids, ['id', 'siren', 'denomination']);
@@ -136,10 +167,11 @@ class GlobalSearchController extends ApiController
     }
 
     /**
-     * Personnes : nom et prénom par les index trigrammes, e-mail par PRÉFIXE
-     * (intervalle sur `idx_contacts_email`). La sous-chaîne d'e-mail (« @domaine ») n'a
-     * aucun index : elle n'est plus cherchée — c'était un parcours complet de
-     * 1,3 M de lignes à chaque frappe. Moins de 3 caractères : rien.
+     * Personnes : nom et prénom par les index trigrammes, PUIS début d'e-mail
+     * (intervalle sur `idx_contacts_email`, bornes en citext, dans l'ordre de
+     * l'index). La sous-chaîne d'e-mail (« @domaine ») n'a aucun index : elle
+     * n'est plus cherchée — c'était un parcours complet de 1,3 M de lignes à
+     * chaque frappe. Moins de 3 caractères : rien.
      *
      * @return list<array<string, mixed>>
      */
@@ -230,22 +262,9 @@ class GlobalSearchController extends ApiController
     }
 
     /**
-     * Le motif de recherche : une SOUS-CHAINE, pas un prefixe.
-     *
-     * 🔑 C'est le coeur du sujet, et il a ete tranche explicitement. Une palette
-     * doit trouver « Boulangerie Martin » quand on tape « Martin » : personne ne
-     * saisit le premier mot d'une raison sociale. Un prefixe (`terme%`) serait
-     * plus rapide et ne servirait a rien.
-     *
-     * Mais `ILIKE '%martin%'` **n'utilise aucun index B-tree**, et `G41-003` a
-     * mesure exactement ce motif a **65 secondes** au volume de production.
-     * C'est pourquoi ce correctif est INDISSOCIABLE de sa migration --
-     * `2026_08_20_090000_index_trigrammes_pour_la_palette_de_recherche.php` --
-     * qui pose des index GIN `gin_trgm_ops`, lesquels servent precisement ce
-     * motif.
-     *
-     * **Livrer l'un sans l'autre remplacerait « la palette ne trouve rien » par
-     * « la palette gele l'application a chaque frappe ».**
+     * Le motif de recherche des ÉTIQUETTES (seule famille qui garde un `ILIKE`
+     * direct : la table est minuscule) : une SOUS-CHAINE. Entreprises et
+     * personnes passent par leurs fonctions SECURITY DEFINER (cf. en-tête).
      *
      * Les jokers de la saisie sont echappes AVANT qu'on y colle les notres :
      * sans cela, un `%` tape par l'utilisateur donne `ILIKE '%%%'` et remonte la
@@ -275,8 +294,14 @@ class GlobalSearchController extends ApiController
             // Une palette qui casse ne doit pas emporter les deux autres
             // familles de résultats avec elle. Mais elle le journalise : un
             // silence ici redonnerait exactement le défaut qu'on répare.
+            //
+            // Ni le message ni le SQL : celui d'une `QueryException` porte les
+            // liaisons, donc la SAISIE (un nom, un début d'adresse). La classe
+            // et le code SQLSTATE suffisent à diagnostiquer.
             Log::warning('search: famille indisponible', [
-                'table' => $table, 'exception' => $e->getMessage(),
+                'table' => $table,
+                'exception' => $e::class,
+                'sqlstate' => $e instanceof QueryException ? (string) $e->getCode() : null,
             ]);
 
             return [];

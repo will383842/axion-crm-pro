@@ -24,9 +24,10 @@ use Illuminate\Support\Facades\DB;
  *     sur 9 chiffres, PRÉFIXE sinon, servis par l'index unique
  *     `(workspace_id, siren)` ; jamais `%x%` ;
  *   - personnes : `contacts_recherche_ids` (ci-dessous) — nom et prénom par
- *     les index trigrammes, e-mail par PRÉFIXE (intervalle sur l'index
- *     `idx_contacts_email`, colonne citext) :
- *     la sous-chaîne d'e-mail n'a aucun index, elle n'est plus cherchée.
+ *     les index trigrammes, PUIS début d'e-mail : intervalle sur l'index
+ *     `idx_contacts_email` (bornes castées en citext, comme la colonne),
+ *     parcouru dans l'ordre de l'index avec LIMIT ; la sous-chaîne d'e-mail
+ *     n'a aucun index, elle n'est plus cherchée.
  *
  * Mêmes garanties que `entreprises_choix_ids` : SECURITY DEFINER,
  * `search_path = pg_catalog, public`, EXECUTE retiré à PUBLIC et accordé au
@@ -69,8 +70,10 @@ return new class extends Migration
                         || ' AND c.siren = $2::bpchar ORDER BY c.siren, c.id LIMIT $3'
                         USING p_workspace, p_chiffres, v_limite;
                 ELSE
-                    -- Préfixe : un intervalle [début, début suivant), que l'index
-                    -- unique (workspace_id, siren) sert quelle que soit la collation.
+                    -- Préfixe : un intervalle [début, début suivant), servi par
+                    -- l'index unique (workspace_id, siren). Les bornes (dont ':'
+                    -- après '9') ne sont exactes qu'en collation C — celle de la
+                    -- base de production et de la CI.
                     RETURN QUERY EXECUTE
                         'SELECT c.id FROM public.companies c WHERE c.workspace_id = $1 AND c.deleted_at IS NULL'
                         || ' AND c.siren >= $2::bpchar AND c.siren < $3::bpchar ORDER BY c.siren, c.id LIMIT $4'
@@ -100,6 +103,8 @@ return new class extends Migration
                 v_motif  TEXT;
                 v_bas    TEXT;
                 v_haut   TEXT;
+                v_dernier INT;
+                v_rendus INT;
             BEGIN
                 IF p_workspace IS NULL
                    OR p_workspace::TEXT IS DISTINCT FROM NULLIF(current_setting('app.current_workspace_id', true), '') THEN
@@ -113,19 +118,43 @@ return new class extends Migration
 
                 -- Saisie BRUTE : jokers `LIKE` neutralisés ici, pour le nom.
                 v_motif := replace(replace(replace(p_terme, '\', '\\'), '%', '\%'), '_', '\_');
-                -- E-mail (citext, insensible à la casse) : un INTERVALLE
-                -- [début, début suivant), que `idx_contacts_email` sert ; un
-                -- `LIKE 'x%'` sur citext ne l'utilise pas (mesuré : Seq Scan).
-                v_bas  := lower(p_terme);
-                v_haut := left(v_bas, -1) || chr(ascii(right(v_bas, 1)) + 1);
 
+                -- 1. Nom et prénom : index trigrammes (BitmapOr).
                 RETURN QUERY EXECUTE
                     'SELECT c.id FROM public.contacts c WHERE c.workspace_id = $1 AND c.deleted_at IS NULL AND ('
                     || ' c.last_name ILIKE (''%'' || $2 || ''%'')'
-                    || ' OR c.first_name ILIKE (''%'' || $2 || ''%'')'
-                    || ' OR (c.email >= $3 AND c.email < $4))'
-                    || ' ORDER BY c.last_name, c.id LIMIT $5'
-                    USING p_workspace, v_motif, v_bas, v_haut, v_limite;
+                    || ' OR c.first_name ILIKE (''%'' || $2 || ''%''))'
+                    || ' ORDER BY c.last_name, c.id LIMIT $3'
+                    USING p_workspace, v_motif, v_limite;
+                GET DIAGNOSTICS v_rendus = ROW_COUNT;
+                IF v_rendus >= v_limite THEN
+                    RETURN;
+                END IF;
+
+                -- 2. Début d'e-mail : un INTERVALLE [début, début suivant) sur
+                -- `idx_contacts_email`, parcouru DANS L'ORDRE de l'index (ORDER BY
+                -- email + LIMIT : l'index s'arrête tôt, même pour « contact@ »).
+                -- ⚠️ Les bornes sont castées en `citext`, comme la colonne : en
+                -- `text`, Postgres compare `email::text` et l'index ne sert plus
+                -- (relecture de la #294 : Parallel Seq Scan, ~1,2 s). L'intervalle
+                -- n'est exact qu'en collation C (base de production et CI).
+                v_bas := lower(p_terme);
+                v_dernier := ascii(right(v_bas, 1));
+                -- Pas de caractère « suivant » après U+D7FF ni U+10FFFF : borne
+                -- haute ouverte plutôt qu'une erreur.
+                IF v_dernier IN (55295, 1114111) THEN
+                    v_haut := NULL;
+                ELSE
+                    v_haut := left(v_bas, -1) || chr(v_dernier + 1);
+                END IF;
+
+                RETURN QUERY EXECUTE
+                    'SELECT c.id FROM public.contacts c WHERE c.workspace_id = $1 AND c.deleted_at IS NULL'
+                    || ' AND c.email >= $2::public.citext AND ($3::text IS NULL OR c.email < $3::public.citext)'
+                    || ' AND NOT (coalesce(c.last_name, '''') ILIKE (''%'' || $4 || ''%'')'
+                    || '          OR coalesce(c.first_name, '''') ILIKE (''%'' || $4 || ''%''))'
+                    || ' ORDER BY c.email, c.id LIMIT $5'
+                    USING p_workspace, v_bas, v_haut, v_motif, v_limite - v_rendus;
             END
             $fn$;
             REVOKE EXECUTE ON FUNCTION public.contacts_recherche_ids(UUID, TEXT, INT) FROM PUBLIC;

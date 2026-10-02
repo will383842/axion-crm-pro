@@ -150,9 +150,9 @@ export function ActivityFeed() {
                     <span className="text-slate-500 dark:text-slate-400"> · {phrase}</span>
                   </p>
                   {typeof log.status_code === 'number' && log.status_code >= 400 ? (
-                    <p className="truncate text-[11px] text-rose-600 dark:text-rose-400">Échec</p>
+                    <p className="truncate text-xs text-rose-600 dark:text-rose-400">Échec</p>
                   ) : null}
-                  <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>
+                  <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">{timeAgo(log.created_at)}</p>
                 </div>
               </li>
             );

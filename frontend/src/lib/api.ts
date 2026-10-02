@@ -189,3 +189,36 @@ export function qualifierErreur(error: unknown): ErreurQualifiee {
     code: typeof brut === 'string' && brut.length > 0 ? brut : null,
   };
 }
+
+/**
+ * Lot 2 UX (audit du 02/10/2026) — le message d'erreur du serveur, LISIBLE.
+ *
+ * Huit écrans recopiaient `data.message ?? data.error` et affichaient donc tel
+ * quel un CODE technique quand le serveur n'avait pas écrit de phrase :
+ * « workspace required », « slug already exists », « refresh failed »,
+ * « cannot delete auto/llm tag ». Désormais :
+ *  - une phrase écrite par le serveur (`message`) est rendue telle quelle ;
+ *  - un code connu (`error`) est traduit par `MESSAGES_DES_CODES` ;
+ *  - un code inconnu n'est JAMAIS affiché : on rend `null`, et l'écran
+ *    retombe sur son propre message de repli, en français.
+ */
+export const MESSAGES_DES_CODES: Readonly<Record<string, string>> = {
+  'workspace required': 'Aucun espace actif sur ce compte.',
+  no_workspace: 'Aucun espace actif sur ce compte.',
+  'slug already exists': 'Une étiquette porte déjà ce nom.',
+  'refresh failed': 'La mise à jour a échoué. Réessayez dans un instant.',
+  'cannot update auto/llm tag': 'Les étiquettes automatiques ou proposées par l’IA ne se modifient pas.',
+  'cannot delete auto/llm tag (will be re-created by AutoTagger)':
+    'Les étiquettes automatiques ou proposées par l’IA ne se suppriment pas : elles reviendraient seules.',
+  requete_trop_longue: 'La recherche prend trop de temps. Affinez les filtres.',
+};
+
+export function messageApiLisible(err: unknown): string | null {
+  if (typeof err !== 'object' || err === null) return null;
+  const e = err as { response?: { data?: { message?: unknown; error?: unknown } } };
+  const message = e.response?.data?.message;
+  if (typeof message === 'string' && message.trim() !== '') return message;
+  const code = e.response?.data?.error;
+  if (typeof code === 'string') return MESSAGES_DES_CODES[code] ?? null;
+  return null;
+}

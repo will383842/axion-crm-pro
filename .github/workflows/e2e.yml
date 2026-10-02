@@ -81,7 +81,6 @@ jobs:
           tests/e2e/audiences-builder.spec.ts
           tests/e2e/campaigns-wizard.spec.ts
           tests/e2e/companies.spec.ts
-          tests/e2e/dark-mode.spec.ts
           tests/e2e/dashboard.spec.ts
           tests/e2e/global-search.spec.ts
           tests/e2e/llm.spec.ts

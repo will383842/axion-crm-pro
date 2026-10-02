@@ -76,7 +76,7 @@ const PROSPECTION_TABS = [
   { value: "", label: "Tous" },
   { value: "ready_for_outreach", label: "Prospectables" },
   { value: "partial_email", label: "Partiels" },
-  { value: "pending", label: "Pending" },
+  { value: "pending", label: "À compléter" },
   { value: "archived_no_email", label: "Archivés" },
 ];
 
@@ -376,7 +376,6 @@ export function CompaniesListPage() {
         title="Entreprises"
         subtitle={
           <>
-            Pipeline de prospection ·{" "}
             <span className="font-semibold text-slate-700 tabular-nums dark:text-slate-200">
               {(total ?? 0).toLocaleString("fr-FR")}
             </span>{" "}
@@ -401,7 +400,7 @@ export function CompaniesListPage() {
               to="/coverage"
               className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-slate-900 to-slate-800 px-4 text-sm font-medium text-white shadow-sm hover:from-slate-800 hover:to-slate-700 dark:from-white dark:to-slate-100 dark:text-slate-900"
             >
-              Lancer scraping →
+              Récupérer des entreprises
             </Link>
           </div>
         }
@@ -567,8 +566,8 @@ export function CompaniesListPage() {
               type="text"
               value={filter.tag}
               onChange={(e) => setFilterAndReset({ tag: e.target.value })}
-              placeholder="Tag (implantation-ro…)"
-              aria-label="Filtre tag"
+              placeholder="Étiquette (implantation-ro…)"
+              aria-label="Filtre étiquette"
               className="h-9 w-44 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
             />
             {/* « Ce qui est arrivé depuis lundi » — la question la plus
@@ -647,8 +646,8 @@ export function CompaniesListPage() {
                 type="text"
                 value={tagAction}
                 onChange={(e) => setTagAction(e.target.value)}
-                placeholder="Tag existant (campagne-ro…)"
-                aria-label="Tag à poser ou retirer"
+                placeholder="Étiquette existante (campagne-ro…)"
+                aria-label="Étiquette à poser ou retirer"
                 className="h-8 w-56 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700"
               />
               <Button
@@ -656,7 +655,7 @@ export function CompaniesListPage() {
                 disabled={tagAction.trim() === "" || actionDeMasse.isPending}
                 onClick={() => actionDeMasse.mutate({ tag: tagAction.trim(), action: "add" })}
               >
-                Poser le tag
+                Poser l’étiquette
               </Button>
               <Button
                 size="sm"
@@ -689,7 +688,7 @@ export function CompaniesListPage() {
           <div
             role="row"
             className={cn(
-              "sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold tracking-wider text-slate-600 uppercase backdrop-blur",
+              "sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold tracking-wider text-slate-600 uppercase backdrop-blur",
               "dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400",
             )}
             style={{ gridTemplateColumns: GRID }}

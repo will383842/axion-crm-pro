@@ -152,9 +152,9 @@ const ECRANS: CasEcran[] = [
     path: '/console/arbitrage',
     consoleFeatures: 'open',
     vide: { '/crm/arbitrage': { data: [], meta: { total: 0, per_page: 50 } } },
-    // « Rien à arbitrer ». On ne cherche PAS « arbitrer » : le titre de la page
-    // (« Rapprochements à arbitrer ») le contient aussi et resterait affiché.
-    texteVide: 'Rien',
+    // « Aucune personne à rattacher ». On ne cherche PAS « à rattacher » : le
+    // titre de la page (« Personnes à rattacher ») le contient aussi.
+    texteVide: 'Aucune personne',
     // Le sous-titre annonce « 0 événement(s) reçus sans SIREN ». Sous 403 comme
     // sous 500, ce zéro est inventé : la file n'a JAMAIS été lue.
     compteursMensongers: ['nement(s) re'],
@@ -226,7 +226,7 @@ const ECRANS: CasEcran[] = [
     rendre: () => <TagsManagerPage />,
     path: '/tags',
     vide: { '/tags': { data: [] } },
-    texteVide: 'Aucun tag',
+    texteVide: 'Aucune étiquette',
   },
 ];
 

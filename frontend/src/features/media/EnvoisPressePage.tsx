@@ -109,7 +109,7 @@ export function EnvoisPressePage() {
         <Card padding="none" className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-[11px] uppercase text-slate-500 dark:border-slate-800">
+              <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800">
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Geste</th>
                 <th className="px-4 py-2 text-left">Cible</th>
@@ -147,7 +147,7 @@ export function EnvoisPressePage() {
                     {e.redaction ?? (
                       // Ambre, comme sur la fiche journaliste : un rattachement
                       // en attente est un arbitrage à rendre, pas une absence.
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                         à rattacher
                       </span>
                     )}

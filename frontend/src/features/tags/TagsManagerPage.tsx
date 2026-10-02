@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { Hash, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { misAJour } from '@/lib/fraicheur';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   Button,
   Card,
@@ -51,7 +51,7 @@ const CATEGORIES: ReadonlyArray<{ key: TagCategory; label: string; description: 
   { key: 'sector', label: 'Secteur et métier', description: 'Secteur et métier, depuis le code NAF (auto)' },
   { key: 'size', label: 'Taille', description: 'Effectif (auto)' },
   { key: 'intent', label: 'Provenance et intérêt', description: 'Origine de la fiche (src:) et service demandé (svc:)' },
-  { key: 'custom', label: 'Custom', description: 'Tags manuels' },
+  { key: 'custom', label: 'Personnalisées', description: 'Étiquettes créées à la main' },
 ];
 
 // Catégories AFFICHÉES : les précédentes, plus celle des étiquettes proposées
@@ -140,16 +140,16 @@ export function TagsManagerPage() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['tags'] });
-      toast.success('Tag créé');
+      toast.success('Étiquette créée');
       setModalOpen(false);
     },
     onError: (err: unknown) => {
       const status = extractStatus(err);
       if (status === 409) {
-        toast.error('Slug déjà utilisé');
+        toast.error('Une étiquette porte déjà ce nom');
         return;
       }
-      toast.error(extractApiMessage(err) ?? 'Erreur création tag');
+      toast.error(extractApiMessage(err) ?? 'Création de l’étiquette impossible');
     },
   });
 
@@ -157,12 +157,12 @@ export function TagsManagerPage() {
     mutationFn: async (id: number) => api.delete(`/tags/${id}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['tags'] });
-      toast.success('Tag supprimé');
+      toast.success('Étiquette supprimée');
     },
     onError: (err: unknown) => {
       const status = extractStatus(err);
       if (status === 403) {
-        toast.error('Impossible : tags auto/LLM protégés');
+        toast.error('Impossible : les étiquettes automatiques ou proposées par l’IA sont protégées');
         return;
       }
       toast.error(extractApiMessage(err) ?? 'Suppression impossible');
@@ -186,11 +186,11 @@ export function TagsManagerPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Tags"
-        subtitle="Classification multi-axes des entreprises (géographie, secteur, taille, intent, custom)."
+        title="Étiquettes"
+        subtitle="Pour classer les entreprises : zone, secteur, taille, intérêt, et les vôtres."
         actions={
           <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
-            Nouveau tag
+            Nouvelle étiquette
           </Button>
         }
         {...(comptesMisAJour ? { badge: <span className="text-xs text-slate-500">Nombre de fiches {comptesMisAJour}</span> } : {})}
@@ -198,10 +198,10 @@ export function TagsManagerPage() {
 
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard tone="sky"     label="Total tags" value={counts.total}  sublabel="tous axes confondus" />
+        <KpiCard tone="sky"     label="Total" value={counts.total}  sublabel="tous axes confondus" />
         <KpiCard tone="emerald" label="Auto"       value={counts.auto}   sublabel="géo, secteur, taille" />
         <KpiCard tone="violet"  label="Manuel"     value={counts.manual} sublabel="créés par l'équipe" />
-        <KpiCard tone="amber"   label="LLM"        value={counts.llm}    sublabel="proposées par l’IA" />
+        <KpiCard tone="amber"   label="IA"        value={counts.llm}    sublabel="proposées par l’IA" />
       </div>
 
       {/* Body — P0-3 : une panne n'est jamais « Aucun tag ». */}
@@ -216,11 +216,11 @@ export function TagsManagerPage() {
       ) : tags.length === 0 ? (
         <EmptyState
           icon={<Hash className="h-8 w-8" />}
-          title="Aucun tag"
+          title="Aucune étiquette"
           description="Aucune étiquette pour l’instant."
           action={
             <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
-              Créer un tag
+              Créer une étiquette
             </Button>
           }
         />
@@ -236,7 +236,7 @@ export function TagsManagerPage() {
                     <h3 className="font-medium text-slate-900 dark:text-slate-100">{cat.label}</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{cat.description}</p>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">{items.length} tag{items.length > 1 ? 's' : ''}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{items.length} étiquette{items.length > 1 ? 's' : ''}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {items.map((t) => (
@@ -255,7 +255,7 @@ export function TagsManagerPage() {
       )}
 
       {/* Modal création */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nouveau tag" size="md">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nouvelle étiquette" size="md">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-1">
           <FormField
             label="Nom"
@@ -266,13 +266,8 @@ export function TagsManagerPage() {
             {...form.register('name')}
           />
 
-          <FormField
-            label="Slug (optionnel)"
-            placeholder="vip-client"
-            helpText="Auto-généré depuis le nom si vide. a-z, 0-9, - uniquement."
-            error={form.formState.errors.slug?.message}
-            {...form.register('slug')}
-          />
+          {/* Lot 2 UX — le champ « Slug » n'est plus proposé : l'adresse courte
+              se calcule depuis le nom côté serveur quand elle est vide. */}
 
           <div className="mb-3">
             <label htmlFor="tag-category" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -369,7 +364,7 @@ function TagPill({
           onClick={onDelete}
           disabled={deleting}
           className="opacity-50 transition hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label={`Supprimer le tag ${tag.name}`}
+          aria-label={`Supprimer l’étiquette ${tag.name}`}
         >
           <Trash2 className="h-3 w-3" />
         </button>
@@ -381,12 +376,9 @@ function TagPill({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }
 
 function extractStatus(err: unknown): number | null {

@@ -45,7 +45,7 @@ export function CompteurDeSaisie({ valeur, max, seuil = 0.8, id, className }: Co
       {...(id ? { id } : {})}
       data-compteur-de-saisie
       className={cn(
-        'mt-1 block text-[11px] tabular-nums',
+        'mt-1 block text-xs tabular-nums',
         limiteAtteinte ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400',
         className,
       )}

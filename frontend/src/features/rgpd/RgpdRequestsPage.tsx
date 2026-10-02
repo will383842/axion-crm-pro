@@ -158,7 +158,7 @@ export function RgpdRequestsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Requêtes RGPD"
+        title="Demandes RGPD"
         subtitle="Articles 15-22 : accès / portabilité / suppression / rectification / opposition."
         actions={
           <Button
@@ -189,7 +189,7 @@ export function RgpdRequestsPage() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<ClipboardList className="h-10 w-10" />}
-          title="Aucune requête RGPD"
+          title="Aucune demande RGPD"
           description="Les requêtes apparaitront ici après création par les sujets concernés."
           action={
             <Button
@@ -210,7 +210,7 @@ export function RgpdRequestsPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
             style={{ gridTemplateColumns: GRID }}
@@ -274,7 +274,7 @@ export function RgpdRequestsPage() {
       <Modal
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        title="Nouvelle requête RGPD"
+        title="Nouvelle demande RGPD"
         description="Articles 15-22 RGPD — création manuelle d'une demande au nom d'une personne concernée."
         footer={
           <>
@@ -329,7 +329,7 @@ export function RgpdRequestsPage() {
           setProcessOpen(null);
           setProcessNote('');
         }}
-        title="Traiter la requête"
+        title="Traiter la demande"
         description={
           processOpen ? `${processOpen.type.toUpperCase()} · ${processOpen.subject_email}` : undefined
         }

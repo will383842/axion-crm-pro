@@ -129,7 +129,7 @@ describe('D23-010 — les cibles de la visite dans la barre latérale', () => {
 
   it('ne fait rien, et ne casse rien, sur une cible hors de la barre', () => {
     afficherBarre();
-    // `body`, `[data-tour="dark-mode"]`… : la moitié des étapes ne visent pas la
+    // `body`, `[data-tour="global-search"]`… : la moitié des étapes ne visent pas la
     // barre. La fonction doit les traverser sans effet.
     expect(() => ouvrirSectionDeLaCible('body')).not.toThrow();
     expect(() => ouvrirSectionDeLaCible('[data-tour="global-search"]')).not.toThrow();

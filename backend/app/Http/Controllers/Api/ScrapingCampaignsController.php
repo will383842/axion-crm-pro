@@ -125,7 +125,7 @@ class ScrapingCampaignsController extends ApiController
         $user = $r->user();
 
         if ($workspaceId === null || ! $user) {
-            return response()->json(['error' => 'no_workspace', 'message' => 'Workspace courant requis.'], 422);
+            return response()->json(['error' => 'no_workspace', 'message' => 'Aucun espace actif sur ce compte.'], 422);
         }
 
         $status = isset($validated['scheduled_at']) && $validated['scheduled_at'] !== null

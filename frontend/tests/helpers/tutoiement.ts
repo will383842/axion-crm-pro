@@ -42,7 +42,33 @@ const PRONOMS =
  * 3e personnes ou des noms (« la relance », « une invite »).
  */
 const IMPERATIFS =
-  /(?<![\p{L}\p{N}_-])(?:Lance|Choisis|Crée|Ajoute|Saisis|Vérifie|Reçois|Essaie|Tape|Invite|Configure|Renseigne|Compose|Explore|Découvre|Améliore|Reprends|Visualise|Réinitialise|Clique|Sélectionne|Indique|Attends|Enrichis|Consulte|Utilise|Remplis|Coche|Ouvre|Connecte-toi|Assure-toi|Vérifie-le)(?![\p{L}\p{N}_-])/u;
+  /(?<![\p{L}\p{N}_-])(?:Lance|Choisis|Crée|Ajoute|Saisis|Vérifie|Reçois|Essaie|Tape|Invite|Configure|Renseigne|Compose|Explore|Découvre|Améliore|Reprends|Visualise|Réinitialise|Clique|Sélectionne|Indique|Attends|Enrichis|Consulte|Utilise|Remplis|Coche|Ouvre|Fais|Modifie|Supprime|Envoie|Exporte|Importe|Regarde|Connecte-toi|Assure-toi|Vérifie-le)(?![\p{L}\p{N}_-])/u;
+
+/**
+ * Les mêmes impératifs écrits en MINUSCULE, mais seulement là où une forme
+ * minuscule ne peut être qu'un ordre : en tête de PHRASE (début du texte suivi
+ * d'au moins un autre mot, ou après « . », « ! », « ? », « : », « — »), ou
+ * après « puis », « ensuite », « alors » (« puis lance la collecte »).
+ *
+ * Pourquoi pas partout : en milieu de phrase, ces formes sont aussi des noms
+ * ou des participes (« la relance », « contacts enrichis », « fiches
+ * choisies »), et une chaîne SANS espace (« active », « copie ») est le plus
+ * souvent une valeur technique (statut, clé) et non un texte lu. Avant cet
+ * élargissement, « puis lance la collecte » ou « fais-le » passaient : seule
+ * la majuscule de tête était vue.
+ */
+const IMPERATIFS_MINUSCULES =
+  /(?:^\s*|[.!?:—–]\s+|(?<![\p{L}\p{N}_])(?:puis|ensuite|alors)\s+)(?:lance|choisis|crée|ajoute|saisis|vérifie|reçois|essaie|tape|invite|configure|renseigne|compose|explore|découvre|améliore|reprends|visualise|réinitialise|clique|sélectionne|indique|attends|enrichis|consulte|utilise|remplis|coche|ouvre|fais|modifie|supprime|envoie|exporte|importe|regarde)(?:-(?:le|la|les|moi|nous|en|y))?(?=\s+[\p{L}\p{N}«"'’])/u;
+
+/**
+ * « Active » et « Copie » sont d'abord des ADJECTIFS et des NOMS dans une
+ * interface (« Active » sur une pastille d'état, « Copie du consentement »).
+ * Ils ne comptent comme impératifs que suivis d'un complément d'objet
+ * (« Active les relances », « Copie le lien », « copie-le dans… ») — et, en
+ * minuscule, seulement en tête de phrase, comme les autres.
+ */
+const IMPERATIFS_AMBIGUS =
+  /(?:(?<![\p{L}\p{N}_-])(?:Active|Copie)|(?:^\s*|[.!?:—–]\s+|(?<![\p{L}\p{N}_])(?:puis|ensuite|alors)\s+)(?:active|copie))(?:-(?:le|la|les)(?![\p{L}])|(?=\s+(?:le|la|les|ce|cet|cette|ces|ton|ta|tes|un|une)\s|\s+l['’]))/u;
 
 /** Premier motif trouvé dans `texte`, ou `null`. */
 export function motifTutoiement(texte: string): string | null {
@@ -50,6 +76,10 @@ export function motifTutoiement(texte: string): string | null {
   if (pronom !== null) return pronom[0];
   const imperatif = IMPERATIFS.exec(texte);
   if (imperatif !== null) return imperatif[0];
+  const minuscule = IMPERATIFS_MINUSCULES.exec(texte);
+  if (minuscule !== null) return minuscule[0].trim();
+  const ambigu = IMPERATIFS_AMBIGUS.exec(texte);
+  if (ambigu !== null) return ambigu[0].trim();
   return null;
 }
 

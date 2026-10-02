@@ -256,8 +256,8 @@ const ECRANS: CasEcran[] = [
       '/workspace': WORKSPACE_PLEIN,
     },
     cheminBloquant: '/workspace',
-    // Le plafond LLM : ce que le sablier eternel masquait exactement.
-    temoinPlein: 'Plafond LLM',
+    // Le budget IA (ex-« Plafond LLM ») : ce que le sablier eternel masquait.
+    temoinPlein: 'Budget IA',
     temoinVide: 'vide du serveur',
   },
 ];
@@ -282,7 +282,7 @@ describe('D25-004 — temoin de la sonde', () => {
     document.body.innerHTML = '<p>Chargement…</p>';
     expect(chargementEnCours()).toBe(true);
 
-    document.body.innerHTML = '<p>Plafond LLM mensuel</p>';
+    document.body.innerHTML = '<p>Budget IA mensuel</p>';
     expect(chargementEnCours()).toBe(false);
   });
 });

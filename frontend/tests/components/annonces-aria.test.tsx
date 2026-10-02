@@ -134,7 +134,7 @@ describe('D28-014 — le changement d’écran s’annonce', () => {
           'avec le libellé du fil d’Ariane (`libelleDeChemin`), sinon elle dit ' +
           'un mot d’URL. GESTE : vérifier le `useEffect` sur le chemin dans ' +
           '`src/app/RootLayout.tsx`.',
-      ).toContain('Observabilité');
+      ).toContain('Santé du système');
     });
   });
 });

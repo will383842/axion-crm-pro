@@ -69,7 +69,7 @@ export function QualityDistributionBar({ data, qualite }: { data: QualityDistrib
           <CardTitle>Distribution qualité des fiches</CardTitle>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Score moyen
           </div>
           <div className="text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
@@ -118,7 +118,7 @@ export function QualityDistributionBar({ data, qualite }: { data: QualityDistrib
               </div>
               <div className="text-right tabular-nums">
                 <div className={cn('text-sm font-semibold', seg.text)}>{v.toLocaleString('fr-FR')}</div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">{pct.toFixed(1)}%</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">{pct.toFixed(1)}%</div>
               </div>
             </li>
           );

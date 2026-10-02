@@ -91,8 +91,8 @@ export function AuditLogsPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Journaux d’audit"
-        subtitle="Journal append-only avec chaîne cryptographique SHA-256 vérifiable."
+        title="Journal des actions"
+        subtitle="Qui a fait quoi, et quand. Rien ne peut y être effacé."
         actions={
           <Button
             variant="primary"
@@ -153,8 +153,8 @@ export function AuditLogsPage() {
           title="Aucun journal d'audit"
           description={
             search || severityFilter
-              ? 'Aucun log ne correspond aux filtres actuels.'
-              : 'Les événements sensibles (auth, RGPD, admin) seront tracés ici de manière append-only.'
+              ? 'Aucune action ne correspond à ces filtres.'
+              : 'Les actions sensibles (connexions, RGPD, administration) seront inscrites ici, sans possibilité d’effacement.'
           }
         />
       ) : (
@@ -166,7 +166,7 @@ export function AuditLogsPage() {
           <div
             role="row"
             className={cn(
-              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
+              'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
             style={{ gridTemplateColumns: GRID }}
@@ -196,7 +196,7 @@ export function AuditLogsPage() {
                   <div className="truncate font-medium text-slate-900 dark:text-white">
                     {l.event_type}
                   </div>
-                  <div className="truncate font-mono text-[11px] text-slate-500">
+                  <div className="truncate font-mono text-xs text-slate-500">
                     {l.path ?? '—'}
                   </div>
                   <div className="truncate text-slate-600 dark:text-slate-300">
@@ -208,7 +208,7 @@ export function AuditLogsPage() {
                   <div className="truncate text-xs font-mono text-slate-500">
                     {l.ip ?? '—'}
                   </div>
-                  <div className="truncate font-mono text-[11px] text-slate-400">
+                  <div className="truncate font-mono text-xs text-slate-400">
                     {l.current_hash.slice(0, 12)}…
                   </div>
                 </button>
@@ -222,48 +222,48 @@ export function AuditLogsPage() {
       <Drawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title="Détails du log"
+        title="Détail de l’action"
         width="lg"
       >
         {selected ? (
           <div className="space-y-3 text-sm">
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Quand</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Quand</div>
                 <div>{new Date(selected.created_at).toLocaleString('fr-FR')}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Événement</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Événement</div>
                 <div className="font-medium">{selected.event_type}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Chemin</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Chemin</div>
                 <div className="font-mono text-xs">{selected.path ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Statut</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Statut</div>
                 <div className="font-mono text-xs">{selected.status_code ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Acteur</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Acteur</div>
                 <div>{selected.actor ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">Cible</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Cible</div>
                 <div>{selected.target ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">IP</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">IP</div>
                 <div className="font-mono text-xs">{selected.ip ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-semibold uppercase text-slate-500">User agent</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">User agent</div>
                 <div className="truncate text-xs">{selected.user_agent ?? '—'}</div>
               </div>
             </div>
 
             <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
+              <div className="mb-1 text-xs font-semibold uppercase text-slate-500">
                 Chaîne d'empreintes
               </div>
               <div className="rounded-lg bg-slate-50 p-3 text-xs font-mono dark:bg-slate-800/60">
@@ -278,8 +278,8 @@ export function AuditLogsPage() {
             </div>
 
             <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase text-slate-500">
-                Payload (brut)
+              <div className="mb-1 text-xs font-semibold uppercase text-slate-500">
+                Données techniques
               </div>
               <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
                 {JSON.stringify(selected.payload ?? selected, null, 2)}

@@ -393,9 +393,9 @@ export function FranceCoverageMap({
           une valeur qui ne correspondait a AUCUN des trois jetons d'ombre —
           personne ne l'avait decidee, elle avait simplement ete recopiee de
           travers. */}
-      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-[11px] shadow-[var(--shadow-popover)] ring-1 ring-slate-200/60 backdrop-blur-md">
+      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/85 px-4 py-3 text-xs shadow-[var(--shadow-popover)] ring-1 ring-slate-200/60 backdrop-blur-md">
         <div className="mb-2 flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Entreprises</span>
         </div>
         <div className="flex items-center gap-1.5">
           {[
@@ -407,7 +407,7 @@ export function FranceCoverageMap({
           ].map((i) => (
             <div key={i.color} className="flex flex-col items-center gap-1">
               <span className="block h-3 w-7 rounded-md ring-1 ring-slate-200/60" style={{ backgroundColor: i.color }} />
-              <span className="text-[10px] font-medium text-slate-600">{i.label}</span>
+              <span className="text-xs font-medium text-slate-600">{i.label}</span>
             </div>
           ))}
         </div>
@@ -420,10 +420,10 @@ export function FranceCoverageMap({
           style={{ left: Math.min(hover.x + 14, 900), top: Math.min(hover.y + 14, 540) }}
         >
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-200">{hover.code}</span>
+            <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-xs text-slate-200">{hover.code}</span>
             <span className="font-semibold tracking-tight">{hover.name}</span>
           </div>
-          <div className="mt-1 text-[11px] text-slate-300">
+          <div className="mt-1 text-xs text-slate-300">
             {hover.total > 0 ? (
               <>
                 <span className="font-semibold text-white">{hover.total.toLocaleString('fr-FR')}</span> entreprises

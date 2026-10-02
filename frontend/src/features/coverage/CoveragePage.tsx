@@ -48,7 +48,7 @@ const FranceCoverageMap = lazy(async () => ({
 const MODES: Array<{ id: CoverageMode; label: string; hint: string }> = [
   { id: 'visu',   label: 'Visualisation', hint: 'Lecture seule' },
   { id: 'search', label: 'Recherche',     hint: 'Filtre la liste' },
-  { id: 'action', label: 'Action',        hint: 'Clic = lance scrape' },
+  { id: 'action', label: 'Action',        hint: 'Un clic lance une collecte' },
 ];
 
 const LEVELS: Array<{ id: Level; label: string }> = [
@@ -110,15 +110,15 @@ export function CoveragePage() {
       {/* Header */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-200">
+          <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
-            Live · refresh 60s
+            Mis à jour chaque minute
           </div>
           <h1 className="bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
-            Couverture France
+            Carte de France
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Carte interactive de votre prospection · sélectionnez une zone pour la détailler ou lancer un scrape ciblé.
+            Cliquez sur une zone pour voir ses entreprises ou y lancer une collecte.
           </p>
         </div>
         <SegmentedControl
@@ -309,7 +309,7 @@ function KpiCard({
   const t = TONE_MAP[tone];
   return (
     <div className={`group relative overflow-hidden rounded-2xl bg-white/80 p-4 ring-1 ${t.ring} shadow-[var(--shadow-card)] backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] ${t.glow}`}>
-      <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${t.chip}`}>
+      <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${t.chip}`}>
         {label}
       </div>
       <div className="text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
@@ -346,7 +346,7 @@ function SelectionCard({
     <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Sélection</div>
+          <div className="text-xs font-medium uppercase tracking-wider text-slate-500">Sélection</div>
           <div className="mt-0.5 flex items-center gap-2">
             <span className="rounded-md bg-slate-900 px-1.5 py-0.5 font-mono text-xs text-white">{cell.code}</span>
             <span className="text-lg font-semibold tracking-tight text-slate-900">{cell.name}</span>
@@ -403,11 +403,11 @@ function HintCard({ mode }: { mode: CoverageMode }) {
   const m = MODES.find((x) => x.id === mode);
   return (
     <div className="rounded-2xl bg-white/60 p-5 ring-1 ring-dashed ring-slate-300/80 backdrop-blur-sm">
-      <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">Aucune sélection</div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-500">Aucune sélection</div>
       <div className="text-sm font-medium text-slate-700">{m?.label} actif</div>
       <p className="mt-2 text-xs leading-relaxed text-slate-500">
         Cliquez sur un département pour voir ses détails
-        {mode === 'action' ? ' — un scrape sera lancé immédiatement.' : '.'}
+        {mode === 'action' ? ' — une collecte démarre aussitôt.' : '.'}
       </p>
     </div>
   );
@@ -427,12 +427,12 @@ function TopList({
     <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-slate-200/60 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-900">Top zones</div>
-        <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Triées · entreprises</div>
+        <div className="text-xs font-medium uppercase tracking-wider text-slate-400">Triées · entreprises</div>
       </div>
       {!hasData ? (
         <div className="rounded-xl bg-slate-50 p-4 text-center">
           <div className="mb-1 text-sm font-medium text-slate-600">Aucune donnée pour l'instant</div>
-          <p className="text-xs text-slate-500">Lancez un premier scrape pour voir les zones se remplir.</p>
+          <p className="text-xs text-slate-500">Les zones se remplissent après une première collecte.</p>
         </div>
       ) : (
         <ul className="space-y-1.5">
@@ -448,7 +448,7 @@ function TopList({
                   ].join(' ')}
                 >
                   <div className="flex items-center gap-2">
-                    <span className={['rounded-md px-1.5 py-0.5 font-mono text-[10px]', active ? 'bg-white/10' : 'bg-slate-100 text-slate-600'].join(' ')}>
+                    <span className={['rounded-md px-1.5 py-0.5 font-mono text-xs', active ? 'bg-white/10' : 'bg-slate-100 text-slate-600'].join(' ')}>
                       {c.code}
                     </span>
                     <span className={active ? 'text-sm font-medium' : 'text-sm text-slate-700'}>{c.name}</span>

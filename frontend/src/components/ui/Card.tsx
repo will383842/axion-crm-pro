@@ -41,7 +41,7 @@ export function CardTitle({ className, children }: { className?: string; childre
 
 export function CardEyebrow({ className, children }: { className?: string; children?: ReactNode }) {
   return (
-    <div className={cn('text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400', className)}>
+    <div className={cn('text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400', className)}>
       {children}
     </div>
   );

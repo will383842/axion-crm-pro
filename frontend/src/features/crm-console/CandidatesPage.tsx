@@ -122,7 +122,7 @@ function CandidatesContent() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Vivier candidats"
+        title="Candidats"
         subtitle="Univers étanche — base légale et durées de conservation distinctes de la base commerciale."
       />
 
@@ -193,7 +193,7 @@ function CandidatesContent() {
                       {CANDIDATE_STAGE_LABELS[candidate.lifecycle_stage]}
                     </span>
                     {candidate.opt_out && (
-                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                         Opposition
                       </span>
                     )}
@@ -216,7 +216,7 @@ function CandidatesContent() {
                       {candidate.tags.slice(0, 4).map((slug) => (
                         <span
                           key={slug}
-                          className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                         >
                           {tagLabel(slug)}
                         </span>

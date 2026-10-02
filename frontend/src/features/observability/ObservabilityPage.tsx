@@ -54,8 +54,8 @@ export function ObservabilityPage() {
   return (
     <div className="space-y-6 p-6">
       <PageHeader
-        title="Observabilité"
-        subtitle="Santé pipeline waterfall, quota Hunter, archivages, échecs audience refresh."
+        title="Santé du système"
+        subtitle="Les traitements automatiques tournent-ils bien ? Quotas, archivages, erreurs."
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -70,9 +70,9 @@ export function ObservabilityPage() {
           value={`${data.google_places_quota.used} / ${data.google_places_quota.soft_limit}`}
           sublabel={
             data.google_places_quota.pending_companies > 5000
-              ? `⚠ Backlog ${data.google_places_quota.pending_companies} en attente — augmente le quota ?`
+              ? `⚠ ${data.google_places_quota.pending_companies} fiches en attente : le quota est peut-être trop bas.`
               : data.google_places_quota.pending_companies > 0
-              ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (cron 1er du mois)`
+              ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (reprise le 1er du mois)`
               : `${data.google_places_quota.percent}% utilisé · smart skip actif`
           }
           progress={data.google_places_quota.percent}
@@ -102,7 +102,7 @@ export function ObservabilityPage() {
           tone="slate"
         />
         <KpiCard
-          label="Échecs audience refresh (7j)"
+          label="Audiences non mises à jour (7 j)"
           value={data.audience_failures_7d}
           icon={<Activity className="size-4" />}
           tone={data.audience_failures_7d > 0 ? 'amber' : 'emerald'}

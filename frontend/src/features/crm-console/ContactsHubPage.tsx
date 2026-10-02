@@ -355,13 +355,13 @@ function ContactsHubContent() {
                       {company.tags.slice(0, 3).map((slug) => (
                         <span
                           key={slug}
-                          className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                         >
                           {tagLabel(slug)}
                         </span>
                       ))}
                       {(company.tags?.length ?? 0) > 3 && (
-                        <span className="text-[11px] text-slate-400">+{(company.tags?.length ?? 0) - 3}</span>
+                        <span className="text-xs text-slate-400">+{(company.tags?.length ?? 0) - 3}</span>
                       )}
                     </div>
                   )}

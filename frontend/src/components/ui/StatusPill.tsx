@@ -23,7 +23,7 @@ const TONES: Record<StatusTone, { bg: string; text: string; dot: string }> = {
 export function StatusPill({ tone = 'neutral', pulse, children, className }: StatusPillProps) {
   const t = TONES[tone];
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium', t.bg, t.text, className)}>
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium', t.bg, t.text, className)}>
       <span className={cn('inline-block h-1.5 w-1.5 rounded-full', t.dot, pulse && 'axion-pulse-dot')} aria-hidden />
       {children}
     </span>

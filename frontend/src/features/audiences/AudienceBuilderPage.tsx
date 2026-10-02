@@ -14,7 +14,7 @@ import {
   ChevronLeft, Sparkles, X, MapPin, Building, Tag, Mail, Users2, Layers, ListChecks, Send,
   Newspaper, Ban,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import {
   JOIGNABILITES,
   NATURES,
@@ -119,7 +119,7 @@ const SECTOR_PRESETS = enPresets(SECTEURS);
 const NATURE_PRESETS = enPresets(NATURES);
 
 const STATUS_PRESETS: Array<{ code: string; label: string }> = [
-  { code: 'pending',              label: 'Pending' },
+  { code: 'pending',              label: 'À compléter' },
   { code: 'ready_for_outreach',   label: 'Prêt outreach' },
   { code: 'partial_email',        label: 'Email partiel' },
   { code: 'archived_no_email',    label: 'Archivé sans email' },
@@ -436,7 +436,7 @@ export function AudienceBuilderPage() {
               />
             </Field>
             <Field label="Types de relation EXCLUS">
-              <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
                 Clients, partenaires, presse, fournisseurs et investisseurs sont exclus par défaut d’une prospection, décochez pour les inclure.
               </p>
               <ChipsMultiSelect
@@ -527,7 +527,7 @@ export function AudienceBuilderPage() {
               />
               Audience presse
             </label>
-            <p id="aide-audience-presse" className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p id="aide-audience-presse" className="text-xs text-slate-500 dark:text-slate-400">
               {audiencePresse
                 ? 'Cette audience vise uniquement la presse : seuls la géographie, les étiquettes et les critères ci-dessous s’appliquent. Seules les adresses de provenance fiable sont retenues (jamais une adresse tirée d’un site deviné).'
                 : 'Sans cette case, aucune fiche de presse n’entre dans l’audience : ces critères visent alors les fiches de média non protégées (production audiovisuelle…).'}
@@ -654,7 +654,7 @@ export function AudienceBuilderPage() {
                 onChange={(e) => setQualityMin(Number(e.target.value))}
                 className="w-full accent-sky-600"
               />
-              <div className="flex justify-between text-[10px] text-slate-400">
+              <div className="flex justify-between text-xs text-slate-400">
                 <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
               </div>
             </Field>
@@ -709,8 +709,8 @@ export function AudienceBuilderPage() {
 
           {/* Tags */}
           <Card padding="md" className="space-y-4">
-            <SectionHeading icon={<Tag className="h-4 w-4" />} title="Tags personnalisés" />
-            <Field label="Slugs séparés par virgule ou espace (contains_any)">
+            <SectionHeading icon={<Tag className="h-4 w-4" />} title="Étiquettes personnalisées" />
+            <Field label="Étiquettes, séparées par une virgule ou une espace">
               <Input
                 placeholder="ex : decisionnaire, growth, fintech"
                 value={tagsInput}
@@ -725,7 +725,7 @@ export function AudienceBuilderPage() {
           <Card padding="md" variant="glass" className="space-y-4 border border-sky-200/60 dark:border-sky-900/40">
             <div className="flex items-center gap-2">
               <Users2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Preview live</h2>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Aperçu en direct</h2>
               {previewLoading ? <Spinner size="sm" /> : null}
             </div>
 
@@ -759,7 +759,7 @@ export function AudienceBuilderPage() {
               </div>
             ) : apercuDest !== null ? (
               <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
-                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Destinataires (rien n’est envoyé)
                 </div>
                 <ApercuDestinatairesCarte apercu={apercuDest} />
@@ -769,12 +769,12 @@ export function AudienceBuilderPage() {
             {/* Recap critères */}
             {conditionsRecap.length > 0 ? (
               <div className="space-y-1.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Critères ({conditionsRecap.length})
                 </div>
                 <ul className="space-y-1">
                   {conditionsRecap.map(({ bloc, c }, i) => (
-                    <li key={i} className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
+                    <li key={i} className="rounded-md bg-slate-50 px-2 py-1 text-xs font-mono text-slate-600 dark:bg-slate-800/60 dark:text-slate-400">
                       <span className="text-slate-400">{bloc}</span>{' '}
                       <span className="text-slate-900 dark:text-white">{c.field}</span>{' '}
                       <span className="text-slate-400">{c.op}</span>{' '}
@@ -814,7 +814,7 @@ export function AudienceBuilderPage() {
                 Annuler
               </Button>
               {!canCreate ? (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Donnez un nom et au moins un critère.
                 </p>
               ) : null}
@@ -862,7 +862,7 @@ function ChipsMultiSelect({
   return (
     <div className="space-y-2">
       {selected.length === 0 && placeholder ? (
-        <div className="text-[11px] italic text-slate-400">{placeholder}</div>
+        <div className="text-xs italic text-slate-400">{placeholder}</div>
       ) : null}
       {filtre !== undefined ? (
         <Input
@@ -881,13 +881,13 @@ function ChipsMultiSelect({
               type="button"
               onClick={() => toggle(opt.code)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition',
                 active
                   ? 'bg-sky-500 text-white ring-1 ring-sky-600 shadow-sm'
                   : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700',
               )}
             >
-              {masquerCode || opt.code.startsWith('__') ? null : <span className="font-mono text-[10px] opacity-70">{opt.code}</span>}
+              {masquerCode || opt.code.startsWith('__') ? null : <span className="font-mono text-xs opacity-70">{opt.code}</span>}
               <span>{opt.label}</span>
               {active ? <X className="h-3 w-3" /> : null}
             </button>
@@ -907,7 +907,7 @@ function PreviewStat({ label, value, tone }: { label: string; value: number; ton
     : 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300';
   return (
     <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider', chip)}>
+      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider', chip)}>
         {label}
       </span>
       <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
@@ -944,7 +944,7 @@ function Field({
       </span>
       {children}
       {error ? (
-        <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400">
+        <span className="mt-1 inline-flex items-center gap-1 text-xs text-rose-600 dark:text-rose-400">
           <StatusPill tone="danger">{error}</StatusPill>
         </span>
       ) : null}
@@ -952,10 +952,7 @@ function Field({
   );
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

@@ -64,52 +64,56 @@ test.describe('Navigation smoke', () => {
     await expect(page.getByRole('link', { name: /Tableau de bord/i })).toBeVisible();
   });
 
-  test('sidebar : entreprises link', async ({ page }) => {
+  // Lot 2 UX (2026-10-02) — la barre RÉORGANISÉE : le tableau de bord seul en
+  // tête, les sections (À traiter, Ma base, Presse, Réseaux, Ciblage,
+  // Alimenter la base, Réglages) et une section « Technique » repliée, en dernier.
+  test('sidebar : entreprises et contacts sous « Ma base »', async ({ page }) => {
     await page.goto('/');
-    await ouvrir(page, 'Contacts');
-    await expect(page.getByRole('link', { name: 'Entreprises' })).toBeVisible();
+    await ouvrir(page, 'Ma base');
+    await expect(page.getByRole('link', { name: 'Entreprises', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Entreprises en Roumanie' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Contacts', exact: true })).toHaveCount(1);
   });
 
-  test('sidebar : contacts link', async ({ page }) => {
+  test('sidebar : médias et journalistes sous « Presse »', async ({ page }) => {
     await page.goto('/');
-    await ouvrir(page, 'Contacts');
-    await expect(page.getByRole('link', { name: 'Contacts' })).toBeVisible();
-  });
-
-  test('sidebar : médias link', async ({ page }) => {
-    await page.goto('/');
-    await ouvrir(page, 'Contacts');
-    await expect(page.getByRole('link', { name: 'Médias (presse)' })).toBeVisible();
-  });
-
-  test('sidebar : journalistes link', async ({ page }) => {
-    await page.goto('/');
-    await ouvrir(page, 'Contacts');
+    await ouvrir(page, 'Presse');
+    await expect(page.getByRole('link', { name: 'Médias', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Journalistes' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Communiqués envoyés' })).toBeVisible();
   });
 
   test('page médias : se charge sans erreur', async ({ page }) => {
     await page.goto('/media');
-    await expect(page.getByRole('heading', { name: 'Médias' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Médias', exact: true })).toBeVisible();
   });
 
-  test('sidebar : couverture France link', async ({ page }) => {
+  test('sidebar : audiences et listes sous « Ciblage »', async ({ page }) => {
     await page.goto('/');
-    await ouvrir(page, 'Collecte');
-    await expect(page.getByRole('link', { name: /Couverture France/ })).toBeVisible();
+    await ouvrir(page, 'Ciblage');
+    await expect(page.getByRole('link', { name: 'Audiences', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Listes', exact: true })).toBeVisible();
   });
 
-  test('sidebar : LLM Router sous Réglages', async ({ page }) => {
+  test('sidebar : carte de France et collectes sous « Alimenter la base »', async ({ page }) => {
     await page.goto('/');
-    await ouvrir(page, 'Réglages');
-    await expect(page.getByRole('link', { name: 'LLM Router' })).toBeVisible();
+    await ouvrir(page, 'Alimenter la base');
+    await expect(page.getByRole('link', { name: 'Carte de France' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Collectes' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Campagnes' })).toHaveCount(0);
   });
 
-  test('sidebar : Conformité', async ({ page }) => {
+  test('sidebar : « Technique » est REPLIÉE à l’arrivée, et parle français', async ({ page }) => {
     await page.goto('/');
-    await ouvrir(page, 'Conformité');
-    await expect(page.getByRole('link', { name: 'Requêtes RGPD' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Registre AI Act' })).toBeVisible();
+    const technique = page.getByRole('button', { name: 'Technique', exact: true });
+    await expect(technique).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('link', { name: 'Moteurs d’IA' })).toBeHidden();
+    await ouvrir(page, 'Technique');
+    await expect(page.getByRole('link', { name: 'Moteurs d’IA' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Serveurs relais' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Santé du système' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'LLM Router' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Proxies' })).toHaveCount(0);
   });
 
   test('sidebar : Réglages', async ({ page }) => {
@@ -117,31 +121,22 @@ test.describe('Navigation smoke', () => {
     await ouvrir(page, 'Réglages');
     await expect(page.getByRole('link', { name: 'Utilisateurs' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Paramètres' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Demandes RGPD' })).toBeVisible();
   });
 
-  test('sidebar : rangée (étape 0, F17) — six groupes, une seule entrée Contacts, aucun cadenas', async ({ page }) => {
+  test('sidebar : rangée (lot 2 UX) — sections + Technique, aucun cadenas', async ({ page }) => {
     await page.goto('/');
-    // Les six groupes, dans l'ordre de la journée.
-    for (const titre of ["Aujourd'hui", 'Contacts', 'Collecte', 'Pilotage', 'Conformité', 'Réglages']) {
-      await expect(page.getByRole('button', { name: titre })).toBeVisible();
+    const sections = ['À traiter', 'Ma base', 'Presse', 'Réseaux', 'Ciblage', 'Alimenter la base', 'Réglages', 'Technique'];
+    for (const titre of sections) {
+      await expect(page.getByRole('button', { name: titre, exact: true })).toBeVisible();
     }
-    // Les mots réservés aux e-mails (L7) ne désignent plus la collecte.
-    await ouvrir(page, 'Collecte');
-    await expect(page.getByRole('link', { name: 'Collectes' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Journaux de collecte' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Campagnes' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Runs de scraping' })).toHaveCount(0);
-    // Une seule entrée « Contacts » (le hub ou l'ancienne liste, jamais les deux),
-    // et aucun cadenas nulle part — on ouvre chaque section pour en être sûr.
-    for (const titre of ["Aujourd'hui", 'Contacts', 'Collecte', 'Pilotage', 'Conformité', 'Réglages']) {
+    for (const titre of sections) {
       await ouvrir(page, titre);
       await expect(page.locator('[aria-label="Bientôt disponible"]')).toHaveCount(0);
       for (const retire of ['Templates email', 'Envois email', 'E-mails à froid', 'Prospection LinkedIn', 'Pipeline CRM', 'Analytique']) {
         await expect(page.getByRole('link', { name: retire })).toHaveCount(0);
       }
     }
-    await ouvrir(page, 'Contacts');
-    await expect(page.getByRole('link', { name: 'Contacts', exact: true })).toHaveCount(1);
   });
 
   test('header : recherche globale visible', async ({ page }) => {
@@ -150,9 +145,11 @@ test.describe('Navigation smoke', () => {
     await expect(page.locator('[data-tour="global-search"]')).toBeVisible();
   });
 
-  test('header : dark mode toggle', async ({ page }) => {
+  test('header : AUCUN sélecteur de thème (pas de mode sombre)', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('[data-tour="dark-mode"]')).toBeVisible();
+    await expect(page.locator('[data-tour="dark-mode"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /theme/i })).toHaveCount(0);
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 
   test('skip-link a11y présent', async ({ page }) => {

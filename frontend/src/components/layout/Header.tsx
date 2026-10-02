@@ -1,14 +1,14 @@
 /**
  * Header sticky — Axion CRM Pro 2026
  *
- * Layout : [hamburger mobile] Breadcrumbs | [Search desktop / IconButton mobile] [Bell] [DarkMode] [UserMenu]
+ * Layout : [hamburger mobile] Breadcrumbs | [Search desktop / IconButton mobile] [Bell] [UserMenu]
  *
  * Important :
- *  - `data-tour="global-search"` et `data-tour="dark-mode"` préservés (onboarding Joyride).
- *  - GlobalSearch + DarkModeToggle réutilisés tels quels.
+ *  - `data-tour="global-search"` préservé (onboarding Joyride).
+ *  - GlobalSearch réutilisé tel quel. Plus de sélecteur de thème (lot 2 UX).
  */
 import { Menu, Search as SearchIcon } from 'lucide-react';
-import { DarkModeToggle, GlobalSearch, IconButton } from '@/components/ui';
+import { GlobalSearch, IconButton } from '@/components/ui';
 import { AutoBreadcrumbs } from './AutoBreadcrumbs';
 import { NotificationsBell } from './NotificationsBell';
 import { UserMenu } from './UserMenu';
@@ -70,10 +70,8 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
       */}
       <NotificationsBell />
 
-      {/* Dark mode */}
-      <div data-tour="dark-mode">
-        <DarkModeToggle />
-      </div>
+      {/* Lot 2 UX — le sélecteur clair/sombre est RETIRÉ : pas de mode sombre
+          sur la console (décision permanente). Voir `src/lib/theme.ts`. */}
 
       {/* User menu */}
       <UserMenu />

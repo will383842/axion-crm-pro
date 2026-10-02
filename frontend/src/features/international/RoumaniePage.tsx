@@ -47,7 +47,7 @@ const STATUS_TABS: NatureTab[] = [
   { value: '', label: 'Tous' },
   { value: 'ready_for_outreach', label: 'Prospectables' },
   { value: 'partial_email', label: 'Partiels' },
-  { value: 'pending', label: 'Pending' },
+  { value: 'pending', label: 'À compléter' },
   { value: 'archived_no_email', label: 'Archivés' },
 ];
 
@@ -109,7 +109,7 @@ export function RoumaniePage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        title="Présence française — Roumanie"
+        title="Entreprises en Roumanie"
         subtitle="Entreprises françaises implantées, entités locales et organismes francophones. Collecte : annuaire public CCIFER + DG Trésor."
       />
 

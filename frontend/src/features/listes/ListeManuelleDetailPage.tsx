@@ -136,7 +136,7 @@ export function ListeManuelleDetailPage() {
   return (
     <div className="px-6 py-6">
       <PageHeader
-        breadcrumbs={[{ label: 'Listes manuelles', to: '/listes' }, { label: l.nom }]}
+        breadcrumbs={[{ label: 'Listes', to: '/listes' }, { label: l.nom }]}
         title={l.nom}
         subtitle={`${l.organisations.toLocaleString('fr-FR')} organisation(s) · ${l.personnes.toLocaleString('fr-FR')} personne(s)`}
         actions={
@@ -234,7 +234,7 @@ export function ListeManuelleDetailPage() {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
               <tr>
                 <th className="w-10 px-4 py-2.5">
                   <input

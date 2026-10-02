@@ -76,7 +76,7 @@ describe('AudienceBuilderPage — rendu', () => {
     await renderScreen(<AudienceBuilderPage />, { path: PATH, landingRoutes: LANDING });
 
     expect(screen.getByRole('heading', { name: 'Nouvelle audience' })).toBeVisible();
-    for (const titre of ['Informations', 'Géographie', 'Taille et secteur', 'Qualité et statut', 'Tags personnalisés']) {
+    for (const titre of ['Informations', 'Géographie', 'Taille et secteur', 'Qualité et statut', 'Étiquettes personnalisées']) {
       expect(screen.getByRole('heading', { name: titre })).toBeVisible();
     }
 

@@ -12,7 +12,7 @@ import {
   Megaphone, Plus, Pause, Play, X, Search,
   Building2, Clock, Map as MapIcon, MoreVertical,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import {
   Button,
@@ -124,17 +124,17 @@ export function CampaignsListPage() {
 
   const pauseMutation = useMutation({
     mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/pause`)).data,
-    onSuccess: () => { toast.success('Campagne mise en pause'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
+    onSuccess: () => { toast.success('Collecte mise en pause'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
   });
   const resumeMutation = useMutation({
     mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/resume`)).data,
-    onSuccess: () => { toast.success('Campagne reprise'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
+    onSuccess: () => { toast.success('Collecte reprise'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
   });
   const cancelMutation = useMutation({
     mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/cancel`)).data,
-    onSuccess: () => { toast.success('Campagne annulée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
+    onSuccess: () => { toast.success('Collecte annulée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
   });
   const archiveMutation = useMutation({
@@ -148,7 +148,7 @@ export function CampaignsListPage() {
   });
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => api.delete(`/campaigns/${id}`),
-    onSuccess: () => { toast.success('Campagne supprimée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
+    onSuccess: () => { toast.success('Collecte supprimée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
   });
 
@@ -171,17 +171,17 @@ export function CampaignsListPage() {
             iconLeft={<Plus className="h-4 w-4" />}
             onClick={() => { void navigate({ to: '/campaigns/new' }); }}
           >
-            Nouvelle campagne
+            Nouvelle collecte
           </Button>
         }
       />
 
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard tone="sky"     label="Total"               value={counts.all}      sublabel="campagnes" />
+        <KpiCard tone="sky"     label="Total"               value={counts.all}      sublabel="collectes" />
         <KpiCard tone="violet"  label="En cours"            value={counts.running}  sublabel={counts.paused ? `+ ${counts.paused} en pause` : 'en exécution'} />
         <KpiCard tone="emerald" label="Terminées"           value={counts.completed} sublabel="succès complets" />
-        <KpiCard tone="amber"   label="Entreprises créées"  value={totalCompanies.toLocaleString('fr-FR')} sublabel="cumul toutes campagnes" />
+        <KpiCard tone="amber"   label="Entreprises créées"  value={totalCompanies.toLocaleString('fr-FR')} sublabel="cumul toutes collectes" />
       </div>
 
       {/* Filters + search */}
@@ -214,7 +214,7 @@ export function CampaignsListPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Megaphone className="h-8 w-8" />}
-          title={search || filter !== 'all' ? 'Aucune campagne ne correspond' : 'Aucune campagne pour l’instant'}
+          title={search || filter !== 'all' ? 'Aucune collecte ne correspond' : 'Aucune collecte pour l’instant'}
           description={
             search || filter !== 'all'
               ? 'Aucun résultat avec ces filtres.'
@@ -232,7 +232,7 @@ export function CampaignsListPage() {
                 iconLeft={<Plus className="h-4 w-4" />}
                 onClick={() => { void navigate({ to: '/campaigns/new' }); }}
               >
-                Créer une campagne
+                Créer une collecte
               </Button>
             )
           }
@@ -335,10 +335,10 @@ function CampaignCard({
       <div className="flex items-center gap-2">
         <StatusPill tone={tone} pulse={isLive}>{STATUS_LABEL[campaign.status]}</StatusPill>
         {campaign.archived_at ? (
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">· archivée</span>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">· archivée</span>
         ) : null}
         {isPaused && campaign.paused_reason ? (
-          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             · {PAUSED_REASON_LABEL[campaign.paused_reason] ?? campaign.paused_reason}
           </span>
         ) : null}
@@ -351,14 +351,14 @@ function CampaignCard({
           return (
             <span
               key={s}
-              className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
             >
               {meta?.label ?? s}
             </span>
           );
         })}
         {moreSources > 0 ? (
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">+ {moreSources}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">+ {moreSources}</span>
         ) : null}
       </div>
 
@@ -368,13 +368,13 @@ function CampaignCard({
         {(campaign.zones ?? []).slice(0, 6).map((z, i) => (
           <span
             key={`${z.type}-${z.code}-${i}`}
-            className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+            className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
           >
             {z.type === 'department' ? 'Dépt' : z.type === 'region' ? 'Rég' : 'Ville'} {z.code}
           </span>
         ))}
         {(campaign.zones?.length ?? 0) > 6 ? (
-          <span className="text-[10px] text-slate-500">+ {(campaign.zones?.length ?? 0) - 6}</span>
+          <span className="text-xs text-slate-500">+ {(campaign.zones?.length ?? 0) - 6}</span>
         ) : null}
       </div>
 
@@ -462,10 +462,7 @@ function ListSkeleton() {
   );
 }
 
+/** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null) {
-    const e = err as { response?: { data?: { message?: string; error?: string } } };
-    return e.response?.data?.message ?? e.response?.data?.error ?? null;
-  }
-  return null;
+  return messageApiLisible(err);
 }

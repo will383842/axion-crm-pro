@@ -177,10 +177,10 @@ export const ALL_SOURCES: Array<{
   description: string;
   status: 'free' | 'proxies' | 'api_key';
 }> = [
-  { id: 'insee',          label: 'INSEE Sirene',     description: 'Base officielle entreprises FR (gratuite + API key)', status: 'api_key' },
-  { id: 'google_maps',    label: 'Google Maps',      description: 'Fiches établissement geo-locale (proxies requis)',     status: 'proxies' },
-  { id: 'pages_jaunes',   label: 'Pages Jaunes',     description: 'Annuaire pro FR (proxies recommandés)',                status: 'proxies' },
-  { id: 'france_travail', label: 'France Travail',   description: 'Offres d’emploi (API key gratuite)',              status: 'api_key' },
+  { id: 'insee',          label: 'INSEE Sirene',     description: 'Base officielle des entreprises françaises (gratuite, avec clé d’accès)', status: 'api_key' },
+  { id: 'google_maps',    label: 'Google Maps',      description: 'Fiches d’établissement localisées (serveurs relais requis)',     status: 'proxies' },
+  { id: 'pages_jaunes',   label: 'Pages Jaunes',     description: 'Annuaire professionnel français (serveurs relais conseillés)',                status: 'proxies' },
+  { id: 'france_travail', label: 'France Travail',   description: 'Offres d’emploi (clé d’accès gratuite)',              status: 'api_key' },
   { id: 'annuaire',       label: 'Annuaire entreprises', description: 'annuaire-entreprises.data.gouv.fr (gratuit)',     status: 'free' },
   { id: 'bodacc',         label: 'BODACC',           description: 'Annonces légales (gratuit)',                       status: 'free' },
   { id: 'ban',            label: 'BAN géocodage', description: 'Base Adresse Nationale (gratuit)',                     status: 'free' },

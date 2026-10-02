@@ -17,7 +17,7 @@ function Bar({ label, value }: { label: string; value: number }) {
   const tone = pct >= 80 ? 'from-emerald-500 to-teal-600' : pct >= 50 ? 'from-amber-500 to-orange-600' : 'from-rose-500 to-pink-600';
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+      <div className="mb-1 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <span className="uppercase tracking-wider">{label}</span>
         <span className="tabular-nums font-semibold text-slate-700 dark:text-slate-300">{pct}%</span>
       </div>

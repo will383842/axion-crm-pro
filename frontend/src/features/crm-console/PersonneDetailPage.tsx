@@ -107,7 +107,7 @@ function PersonneDetailContent() {
 
   if (fiche.isLoading) {
     return (
-      <div className="px-6 py-6">
+      <div>
         <ConsoleListSkeleton rows={6} />
       </div>
     );
@@ -115,7 +115,7 @@ function PersonneDetailContent() {
 
   if (fiche.data === undefined) {
     return (
-      <div className="px-6 py-6">
+      <div>
         {fiche.error !== null ? (
           <QueryErrorState error={fiche.error} contexte="la fiche de la personne" onRetry={() => void fiche.refetch()} />
         ) : (
@@ -132,7 +132,7 @@ function PersonneDetailContent() {
   const baseLegale = (code: string | null | undefined) => (code ? (BASE_LEGALE_LABELS[code] ?? code) : '—');
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title={nomAffiche}
         subtitle={`${SOURCE_PERSONNE_LABELS[personne.premiere_source] ?? personne.premiere_source} · arrivée le ${formatDate(personne.premiere_source_at)}`}

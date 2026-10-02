@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import { Link } from '@tanstack/react-router';
+import { Building2, Map as MapIcon, RefreshCw, Rocket, Sparkles } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardEyebrow, cn } from '@/components/ui';
 
 export interface NextActionsInput {
@@ -10,9 +13,12 @@ interface ActionItem {
   id: string;
   title: string;
   description: string;
-  href: string;
+  /** Écran visé : un `<Link>` du routeur, plus un `<a href>` qui rechargeait toute l'application. */
+  to: '/coverage' | '/companies';
+  /** Filtre de la liste des entreprises (lu par `validateSearch`). */
+  quality?: 'basique';
   tone: 'sky' | 'violet' | 'emerald' | 'amber';
-  icon: string;
+  icon: ReactNode;
 }
 
 const TONE: Record<ActionItem['tone'], { bg: string; chip: string; arrow: string }> = {
@@ -30,18 +36,18 @@ function buildActions(input: NextActionsInput): ActionItem[] {
       id: 'first-scrape',
       title: 'Récupérer des entreprises',
       description: 'Choisissez un département sur la carte de France.',
-      href: '/coverage',
+      to: '/coverage',
       tone: 'sky',
-      icon: '🚀',
+      icon: <Rocket className="h-4 w-4" />,
     });
   } else if (input.scraperRuns24h === 0) {
     out.push({
       id: 'resume-coverage',
       title: 'Reprendre la collecte',
       description: 'Aucune collecte depuis 24 heures.',
-      href: '/coverage',
+      to: '/coverage',
       tone: 'violet',
-      icon: '🔄',
+      icon: <RefreshCw className="h-4 w-4" />,
     });
   }
 
@@ -51,9 +57,10 @@ function buildActions(input: NextActionsInput): ActionItem[] {
       title: 'Compléter les fiches incomplètes',
       description: `Qualité moyenne : ${input.qualityAvgScore}/100.`,
       // Lot 4 — `quality` est le nom du filtre lu par `/companies` (validateSearch).
-      href: '/companies?quality=basique',
+      to: '/companies',
+      quality: 'basique',
       tone: 'amber',
-      icon: '✨',
+      icon: <Sparkles className="h-4 w-4" />,
     });
   }
 
@@ -63,9 +70,9 @@ function buildActions(input: NextActionsInput): ActionItem[] {
       id: 'browse-companies',
       title: 'Voir vos entreprises',
       description: `${input.companiesTotal.toLocaleString('fr-FR')} fiches.`,
-      href: '/companies',
+      to: '/companies',
       tone: 'emerald',
-      icon: '🏢',
+      icon: <Building2 className="h-4 w-4" />,
     });
   }
 
@@ -75,9 +82,9 @@ function buildActions(input: NextActionsInput): ActionItem[] {
       id: 'discover-coverage',
       title: 'Voir la carte',
       description: 'Régions, départements et villes couverts.',
-      href: '/coverage',
+      to: '/coverage',
       tone: 'sky',
-      icon: '🗺️',
+      icon: <MapIcon className="h-4 w-4" />,
     });
   }
 
@@ -101,14 +108,15 @@ export function NextActions(props: NextActionsInput) {
           const t = TONE[a.tone];
           return (
             <li key={a.id}>
-              <a
-                href={a.href}
+              <Link
+                to={a.to}
+                {...(a.quality ? { search: { quality: a.quality } } : {})}
                 className={cn(
                   'group relative flex items-start gap-3 overflow-hidden rounded-xl bg-gradient-to-br p-3 ring-1 ring-slate-200/70 transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] dark:ring-slate-800',
                   t.bg,
                 )}
               >
-                <span className={cn('inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base', t.chip)}>
+                <span aria-hidden className={cn('inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base', t.chip)}>
                   {a.icon}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -127,7 +135,7 @@ export function NextActions(props: NextActionsInput) {
                     {a.description}
                   </p>
                 </div>
-              </a>
+              </Link>
             </li>
           );
         })}

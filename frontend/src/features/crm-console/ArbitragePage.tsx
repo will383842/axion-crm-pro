@@ -113,7 +113,7 @@ function ArbitrageContent() {
   const total = list.data?.meta.total;
 
   return (
-    <div className="px-6 py-6">
+    <div>
       <PageHeader
         title="Personnes à rattacher"
         subtitle={

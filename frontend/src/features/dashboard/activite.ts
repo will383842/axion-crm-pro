@@ -71,12 +71,6 @@ const VERBES: Record<string, string> = {
   DELETE: 'Suppression',
 };
 
-/** « RECLASSEMENT_REFERENTIELS » → « Reclassement referentiels ». */
-function enPhrase(brut: string): string {
-  const t = brut.replace(/[._-]+/g, ' ').trim().toLowerCase();
-  return t === '' ? 'Événement' : t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 /**
  * La phrase d'une ligne du journal, ou `null` si la ligne n'est pas un
  * événement à montrer (progression d'un traitement en lot).
@@ -95,6 +89,10 @@ export function libelleActivite(eventType?: string | null, path?: string | null)
     return VERBES[type] ? `${VERBES[type]} dans la console` : 'Action dans la console';
   }
 
-  if (type === '') return 'Événement';
-  return enPhrase(type);
+  // Lot P1 suite (2026-10-03) — un code de traitement INCONNU du dictionnaire
+  // (« RECLASSEMENT_REFERENTIELS », « crm.sync.retry »…) ne s'affiche plus
+  // déguisé en phrase (« Reclassement referentiels », sans accents) : c'est
+  // une ligne technique, on la masque. Pour la montrer, l'ajouter à
+  // `EVENEMENTS` avec une vraie phrase.
+  return null;
 }

@@ -81,6 +81,23 @@ final class DelaiRequeteSql
      * compris sur exception. Ne RÉDUIT jamais un délai : si la connexion est
      * déjà sans limite (commande artisan), elle le reste.
      *
+     * ⚠️ PAS DE TRANSACTION, À DESSEIN, ET CE QUE ÇA IMPLIQUE (relecture A09) :
+     *
+     *   - `SET` (de session) et non `SET LOCAL` : `SET LOCAL` exige une
+     *     transaction et durerait jusqu'à la fin de la transaction ENGLOBANTE,
+     *     pas jusqu'à la fin de `$calcul` — appelé dans une transaction plus
+     *     large, il élargirait le délai de tout le reste de celle-ci. Le `SET`
+     *     est, lui, restauré explicitement dans le `finally`.
+     *   - Appelé DANS une transaction : si `$calcul` y échoue, la transaction
+     *     est avortée et la restauration échoue à son tour ; c'est sans
+     *     danger — l'annulation de la transaction annule aussi le `SET` fait
+     *     en son sein (Postgres rétablit la valeur d'avant), et le délai web
+     *     d'origine revient.
+     *   - L'élargissement ne vaut QUE pour la connexion courante et la durée
+     *     de `$calcul`. Ce n'est pas un contournement de sécurité : il ne
+     *     donne accès à aucune donnée de plus, il ne sert qu'aux calculs
+     *     MIS EN CACHE dont le recalcul tourne pendant une requête web.
+     *
      * @template T
      *
      * @param  callable(): T  $calcul
@@ -100,6 +117,59 @@ final class DelaiRequeteSql
             return $calcul();
         } finally {
             self::poser($avant);
+        }
+    }
+
+    /**
+     * Délais mis de côté pendant un job exécuté EN LIGNE (connexion `sync`).
+     *
+     * @var list<int|null>
+     */
+    private static array $pileJobsSync = [];
+
+    /**
+     * Un job `sync` lancé par une requête web s'exécute DANS cette requête,
+     * donc sous ses 15 s. Or un job est un traitement de fond : il ne doit
+     * jamais hériter du délai d'un écran. Vérifié en prod le 2026-10-02 :
+     * `QUEUE_CONNECTION=redis` (les jobs tournent dans Horizon, connexion sans
+     * limite) — ce garde couvre le repli `sync` (poste local, tests, panne de
+     * Redis basculée à la main). Les autres connexions ne sont pas touchées.
+     */
+    public static function libererPourJobSync(?string $connexionFile): void
+    {
+        if ($connexionFile !== 'sync') {
+            return;
+        }
+
+        try {
+            $avant = self::courantMs();
+            if ($avant !== null && $avant !== 0) {
+                self::poser(0);
+            }
+        } catch (\Throwable) {
+            $avant = null;
+        }
+
+        self::$pileJobsSync[] = $avant;
+    }
+
+    /** Rend à la requête web son délai, une fois le job `sync` terminé. */
+    public static function restaurerApresJobSync(?string $connexionFile): void
+    {
+        if ($connexionFile !== 'sync' || self::$pileJobsSync === []) {
+            return;
+        }
+
+        $avant = array_pop(self::$pileJobsSync);
+        if ($avant === null || $avant === 0) {
+            return;
+        }
+
+        try {
+            self::poser($avant);
+        } catch (\Throwable) {
+            // Transaction avortée par le job : la requête web échouera de
+            // toute façon, rien à restaurer.
         }
     }
 

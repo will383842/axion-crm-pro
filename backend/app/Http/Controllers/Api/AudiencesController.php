@@ -12,6 +12,7 @@ use App\Http\Resources\EmailAudienceResource;
 use App\Models\EmailAudience;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Audiences\CritereAudienceInvalide;
+use App\Support\DelaiRequeteSql;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -169,9 +170,19 @@ class AudiencesController extends ApiController
             // Dit en clair (audience presse refusée quand le segment est fermé…).
             return $this->ok(['message' => 'Critères refusés : ' . $e->getMessage()], 422);
         } catch (\Throwable $e) {
+            // Relecture A09 de #282 : un échec rendait 200 « 0 entreprise, 0
+            // contact » — un aperçu MENSONGER, indiscernable d'une audience
+            // vide. Le dépassement du délai SQL remonte en 503 « trop long »
+            // (gestionnaire global) ; toute autre erreur est dite comme telle.
+            if (DelaiRequeteSql::estDepassement($e)) {
+                throw $e;
+            }
             Log::warning('audiences.preview failed', ['error' => $e->getMessage()]);
 
-            return $this->ok(['companies' => 0, 'contacts' => 0, 'error' => 'preview_failed']);
+            return $this->ok([
+                'error' => 'preview_failed',
+                'message' => 'Aperçu indisponible : le calcul a échoué. Réessayez ; si cela persiste, signalez-le.',
+            ], 500);
         }
 
         return $this->ok($result);
@@ -243,6 +254,13 @@ class AudiencesController extends ApiController
         } catch (CritereAudienceInvalide $e) {
             return $this->ok(['message' => 'Critères refusés : ' . $e->getMessage()], 422);
         } catch (\RuntimeException $e) {
+            // ⚠️ `QueryException` EST une `RuntimeException` (via
+            // `PDOException`) : sans ce garde, un dépassement du délai SQL
+            // sortait en 422 avec le texte SQL brut. Il remonte en 503.
+            if (DelaiRequeteSql::estDepassement($e)) {
+                throw $e;
+            }
+
             return $this->ok(['message' => $e->getMessage()], 422);
         }
 
@@ -291,6 +309,12 @@ class AudiencesController extends ApiController
         try {
             $this->builder->refresh($audience);
         } catch (\Throwable $e) {
+            // Un dépassement du délai SQL (comptage ou remplissage) remonte en
+            // 503 propre ; la transaction du rafraîchissement a déjà rendu
+            // l'ancienne composition intacte.
+            if (DelaiRequeteSql::estDepassement($e)) {
+                throw $e;
+            }
             Log::error('audiences.refresh failed', ['id' => $audience->id, 'error' => $e->getMessage()]);
 
             return $this->ok(['error' => 'refresh failed'], 500);

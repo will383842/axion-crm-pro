@@ -84,8 +84,13 @@ Route::prefix('v1')->group(function () {
     // 7 jours, et un jeton inconnu rend 404 — jamais 401, qui révélerait
     // l'existence de la ressource. Throttle posé : un secret ne se devine pas,
     // mais on ne laisse pas non plus marteler la porte.
+    // Délai SQL par route (cf. `App\Support\DelaiRequeteSql`) : 300 s pour
+    // les traitements de fond lancés par un écran (exports, rafraîchissements,
+    // imports, actions de masse, synchro machine) — une coupure y laisserait
+    // un travail à moitié fait ; 120 s pour les aperçus et comptages qu'un
+    // opérateur attend ; 30 s pour la recherche globale ; 15 s partout ailleurs.
     Route::get('/rgpd/export/{token}', [RgpdRequestsController::class, 'export'])
-        ->middleware('throttle:magic-link');
+        ->middleware(['throttle:magic-link', 'delai-sql:300']);
 
     // --- Routes protégées -------------------------------------------------
     Route::middleware(['auth:sanctum', 'workspace', 'first-login'])->group(function () {
@@ -330,7 +335,7 @@ Route::prefix('v1')->group(function () {
         // `companies.update` exigée — un compte en lecture seule ne modifie
         // rien, et le throttle limite la cadence, pas le droit.
         Route::post('/companies/tags/bulk', CompanyTagsBulkController::class)
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:300']);
         // Les vues sauvegardees sont des filtres SUR les entreprises : elles
         // suivent donc les droits de `companies`. La destruction reste reservee
         // a l'administration, comme partout ailleurs (« operator = CRUD sans
@@ -348,21 +353,22 @@ Route::prefix('v1')->group(function () {
         // Audiences (Sprint Pipeline 360°)
         Route::get('/audiences', [AudiencesController::class, 'index']);
         Route::post('/audiences', [AudiencesController::class, 'store'])
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:300']);
         Route::post('/audiences/preview', [AudiencesController::class, 'preview'])
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:120']);
         Route::get('/audiences/{audience}', [AudiencesController::class, 'show']);
         Route::put('/audiences/{audience}', [AudiencesController::class, 'update'])
             ->middleware('permission:companies.update');
         Route::delete('/audiences/{audience}', [AudiencesController::class, 'destroy'])
             ->middleware('permission:companies.delete');
         Route::post('/audiences/{audience}/refresh', [AudiencesController::class, 'refresh'])
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:300']);
         Route::get('/audiences/{audience}/members', [AudiencesController::class, 'members']);
         // 2026-09-30 — à qui l'audience écrirait (aperçu chiffré, rien n'est envoyé).
-        Route::get('/audiences/{audience}/destinataires', [AudiencesController::class, 'destinataires']);
+        Route::get('/audiences/{audience}/destinataires', [AudiencesController::class, 'destinataires'])
+            ->middleware('delai-sql:120');
         Route::post('/audiences/apercu-destinataires', [AudiencesController::class, 'apercuDestinataires'])
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:120']);
 
         // Listes manuelles (2026-09-30) : des fiches choisies à la main, sous un
         // nom. Lecture : droits des fiches ; écriture : `companies.update` ;
@@ -387,9 +393,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/listes-manuelles/{liste}/membres/retirer', [ListesManuellesController::class, 'retirerMembres'])
             ->middleware('permission:companies.update');
         Route::post('/listes-manuelles/{liste}/import', [ListesManuellesController::class, 'importer'])
-            ->middleware('permission:companies.update');
+            ->middleware(['permission:companies.update', 'delai-sql:300']);
 
-        Route::get('/search', [GlobalSearchController::class, 'index']);
+        Route::get('/search', [GlobalSearchController::class, 'index'])->middleware('delai-sql:30');
         Route::get('/notifications', [NotificationsController::class, 'index']);
         Route::post('/notifications/{n}/read', [NotificationsController::class, 'markRead']);
         Route::post('/notifications/read-all', [NotificationsController::class, 'markAllRead']);
@@ -483,7 +489,7 @@ Route::prefix('v1')->group(function () {
             // Lot L4-C — « Personnes (lettre et guide) ». Les segments fixes
             // (`counts`, `export`) précèdent `{id}`, contraint aux chiffres.
             Route::get('/personnes', [PersonnesController::class, 'index']);
-            Route::get('/personnes/counts', [PersonnesController::class, 'counts']);
+            Route::get('/personnes/counts', [PersonnesController::class, 'counts'])->middleware('delai-sql:120');
             Route::get('/personnes/export', [PersonnesController::class, 'export'])
                 ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
@@ -508,7 +514,7 @@ Route::prefix('v1')->group(function () {
                 ->whereNumber('activityId')
                 ->middleware('permission:companies.update');
 
-            Route::post('/bulk', BulkController::class);
+            Route::post('/bulk', BulkController::class)->middleware('delai-sql:300');
         });
 
         // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------
@@ -550,13 +556,13 @@ Route::prefix('internal')->group(function () {
     // passe par la même classe — mais le prochain canal machine-à-machine se
     // copie sur `HmacSignature`, pas sur un contrôleur.
     Route::post('/site-sync', [SiteSyncController::class, 'store'])
-        ->middleware('throttle:internal')
+        ->middleware(['throttle:internal', 'delai-sql:300'])
         ->name('internal.site-sync');
 
     // Lot L4 — volet RGPD du même canal : art. 15/17 en une action sur les
     // deux systèmes. Même HMAC, même drapeau (503 tant que fermé).
     Route::post('/site-sync/gdpr', [SiteGdprController::class, 'store'])
-        ->middleware('throttle:internal')
+        ->middleware(['throttle:internal', 'delai-sql:300'])
         ->name('internal.site-sync.gdpr');
 
     // Étape 0, ligne 3 ter (F18) — rebonds et plaintes du service d'envoi

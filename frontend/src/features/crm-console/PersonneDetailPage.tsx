@@ -13,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
+import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
   BASE_LEGALE_LABELS,
@@ -80,14 +81,15 @@ function PersonneDetailContent() {
     onError: () => toast.error('Tâche introuvable ou déjà terminée.'),
   });
 
-  const [companyId, setCompanyId] = useState('');
+  const [entrepriseChoisie, setEntrepriseChoisie] = useState<EntrepriseChoisie | null>(null);
+  const [erreurEntreprise, setErreurEntreprise] = useState<string | null>(null);
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
   const rattacher = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (companyId: number) =>
       (
         await api.post<{ contact_created: boolean }>(`/crm/personnes/${personneId}/rattacher`, {
-          company_id: Number.parseInt(companyId, 10),
+          company_id: companyId,
           ...(prenom.trim() !== '' ? { first_name: prenom.trim() } : {}),
           ...(nom.trim() !== '' ? { last_name: nom.trim() } : {}),
         })
@@ -96,8 +98,11 @@ function PersonneDetailContent() {
       toast.success(data.contact_created ? 'Rattachée — fiche contact créée.' : 'Rattachée à une fiche contact existante.');
       rafraichir();
     },
-    onError: () =>
-      toast.error('Rattachement impossible : identifiant d’entreprise et nom de famille requis, et adresse prospectable.'),
+    onError: (err) =>
+      toast.error(
+        messageApiLisible(err) ??
+          'Rattachement impossible : choisissez l’entreprise dans la liste et indiquez le nom de famille.',
+      ),
   });
 
   if (fiche.isLoading) {
@@ -122,8 +127,8 @@ function PersonneDetailContent() {
 
   const { personne, abonnement, entreprise, taches, timeline } = fiche.data;
   const nomAffiche = [personne.first_name, personne.last_name].filter(Boolean).join(' ') || personne.email || 'Personne';
-  const parsedCompanyId = Number.parseInt(companyId, 10);
   const nomConnu = (personne.last_name ?? '') !== '';
+  const nomManquant = !nomConnu && nom.trim() === '';
   const baseLegale = (code: string | null | undefined) => (code ? (BASE_LEGALE_LABELS[code] ?? code) : '—');
 
   return (
@@ -201,12 +206,14 @@ function PersonneDetailContent() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Non rattachée. Une fois rattachée, elle rejoint le hub de contacts et les audiences.
                 </p>
-                <Input
-                  value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
-                  placeholder="Identifiant d’entreprise, ex. 1842"
-                  inputMode="numeric"
-                  aria-label="Identifiant d’entreprise"
+                <ChoixEntreprise
+                  valeur={entrepriseChoisie}
+                  onChange={(choix) => {
+                    setEntrepriseChoisie(choix);
+                    if (choix !== null) setErreurEntreprise(null);
+                  }}
+                  erreur={erreurEntreprise}
+                  disabled={rattacher.isPending}
                 />
                 {!nomConnu && (
                   <>
@@ -217,8 +224,14 @@ function PersonneDetailContent() {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={rattacher.isPending || Number.isNaN(parsedCompanyId) || (!nomConnu && nom.trim() === '')}
-                  onClick={() => rattacher.mutate()}
+                  disabled={rattacher.isPending || nomManquant}
+                  onClick={() => {
+                    if (entrepriseChoisie === null) {
+                      setErreurEntreprise('Choisissez une entreprise dans la liste.');
+                      return;
+                    }
+                    rattacher.mutate(entrepriseChoisie.id);
+                  }}
                 >
                   Rattacher à cette entreprise
                 </Button>

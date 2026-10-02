@@ -103,19 +103,26 @@ describe('PersonneDetailPage — rattacher', () => {
   it('extrait l’identifiant de l’URL, et exige un nom de famille avant de rattacher', async () => {
     const { handler, urls } = recordGet('/crm/personnes/12', fiche());
     const post = recordPost<{ company_id: number; last_name?: string }>('/crm/personnes/12/rattacher', { contact_created: true });
+    const choix = getJson('/crm/entreprises/choix', {
+      data: [{ id: 1842, denomination: 'ZZ Entreprise Test', siren: '552100554', siret: null, code_postal: '69003', ville: 'Lyon' }],
+      indice: null,
+    });
 
     await renderScreen(<PersonneDetailPage />, {
       path: '/console/lettre-et-guide/$personneId',
       url: '/console/lettre-et-guide/12',
       consoleFeatures: 'open',
-      handlers: [handler, post.handler],
+      handlers: [handler, post.handler, choix],
     });
 
     expect(await screen.findByText('Guide IA entreprise téléchargé')).toBeVisible();
     expect(new URL(urls[0] as string).pathname).toBe('/api/v1/crm/personnes/12');
 
     const bouton = screen.getByRole('button', { name: 'Rattacher à cette entreprise' });
-    await userEvent.type(screen.getByLabelText('Identifiant d’entreprise'), '1842');
+    // Lot 13 : on CHERCHE l'entreprise (nom, ville, SIREN) au lieu de taper
+    // son identifiant interne ; c'est l'identifiant de l'option choisie qui part.
+    await userEvent.type(screen.getByRole('combobox', { name: 'Entreprise' }), 'zz entreprise');
+    await userEvent.click(await screen.findByRole('option', { name: /ZZ Entreprise Test/ }));
     // Sans nom de famille : le bouton reste désactivé.
     expect(bouton).toBeDisabled();
 

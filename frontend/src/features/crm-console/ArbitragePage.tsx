@@ -16,7 +16,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button, Card, EmptyState, Input, PageHeader, QueryErrorState } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, messageApiLisible } from '@/lib/api';
+import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
 
@@ -56,7 +57,10 @@ function ArbitrageContent() {
       );
       invalidate();
     },
-    onError: () => toast.error('Rattachement impossible : vérifiez l’identifiant d’entreprise.'),
+    // Le serveur dit POURQUOI (« Cet événement est déjà rattaché. »,
+    // « Entreprise introuvable… ») : on le rend, plutôt que d'inventer une cause.
+    onError: (err) =>
+      toast.error(messageApiLisible(err) ?? 'Rattachement impossible. Choisissez à nouveau l’entreprise, puis réessayez.'),
   });
 
   const dismiss = useMutation({
@@ -180,11 +184,19 @@ function ArbitrageCard({
   onDismiss: (reason: string) => void;
   busy: boolean;
 }) {
-  const [companyId, setCompanyId] = useState('');
+  const [entreprise, setEntreprise] = useState<EntrepriseChoisie | null>(null);
+  const [erreurEntreprise, setErreurEntreprise] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
   const match = row.pending_match;
-  const parsedCompanyId = Number.parseInt(companyId, 10);
+
+  const rattacher = () => {
+    if (entreprise === null) {
+      setErreurEntreprise('Choisissez une entreprise dans la liste.');
+      return;
+    }
+    onAttach(entreprise.id);
+  };
 
   return (
     <Card>
@@ -202,22 +214,18 @@ function ArbitrageCard({
       </dl>
 
       <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
-          Identifiant d’entreprise
-          <Input
-            value={companyId}
-            onChange={(event) => setCompanyId(event.target.value)}
-            placeholder="ex. 1842"
-            className="w-40"
-            inputMode="numeric"
-          />
-        </label>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={busy || Number.isNaN(parsedCompanyId)}
-          onClick={() => onAttach(parsedCompanyId)}
-        >
+        <ChoixEntreprise
+          className="w-full sm:w-80"
+          valeur={entreprise}
+          onChange={(choix) => {
+            setEntreprise(choix);
+            if (choix !== null) setErreurEntreprise(null);
+          }}
+          suggestion={{ nom: match.denomination, codePostal: match.postcode }}
+          erreur={erreurEntreprise}
+          disabled={busy}
+        />
+        <Button variant="primary" size="sm" disabled={busy} onClick={rattacher}>
           Rattacher
         </Button>
 

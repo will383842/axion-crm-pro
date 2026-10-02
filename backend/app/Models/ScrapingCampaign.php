@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $started_at
  * @property ?Carbon $paused_at
  * @property ?Carbon $finished_at
+ * @property ?Carbon $archived_at collecte masquée de la vue par défaut (lot 3, rien n'est supprimé)
  * @property ?string $paused_reason
  */
 class ScrapingCampaign extends Model

@@ -63,7 +63,7 @@ class AudiencesFullRefreshCommand extends Command
                     try {
                         $builder->refresh($audience);
                         $ok++;
-                        $this->line(" ✓ #{$audience->id} {$audience->name} → {$audience->fresh()?->member_count} membres");
+                        $this->line(" ✓ #{$audience->id} {$audience->name} → {$audience->fresh()->member_count} membres");
                     } catch (\Throwable $e) {
                         $failed++;
                         $this->error(" ✗ #{$audience->id} {$audience->name} : {$e->getMessage()}");

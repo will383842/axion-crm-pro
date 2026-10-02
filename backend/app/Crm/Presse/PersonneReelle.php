@@ -19,8 +19,8 @@ namespace App\Crm\Presse;
  *     fait un prénom + nom en coupant au dernier espace ;
  *   - `press-kit` / rôle « présentateur » : la colonne « présentateur » d'un
  *     dossier de presse est un texte libre — « Divers (feuilleton) »,
- *     « Journaliste éco local », « Pascal Praud (Ven : Julien Pasquet) »,
- *     ou vide (« Quotidien », « Nagui » sans prénom).
+ *     « Journaliste éco local », « Prénom Nom (Ven : Autre Nom) »,
+ *     ou vide (un titre d'émission, ou un nom de scène sans prénom).
  *
  * ── LA RÈGLE (rien n'est supprimé, rien n'est réécrit) ──────────────────
  *
@@ -34,11 +34,11 @@ namespace App\Crm\Presse;
  *      centre, national, télévision, société, production, feuilleton…) ;
  *   5. le nom commence par une MAJUSCULE, ou par une particule (de, d', du, le,
  *      van…) : « éco local », « nationaux », « romande » sont écartés,
- *      « de Malherbe », « d'Arvor » gardés.
+ *      « de Xxx », « d'Xxx » gardés.
  *
  * Mesure en production : 1 229 personnes identifiées, 28 lignes écartées —
- * dont 7 vraies personnes au nom mal découpé (« David Pujadas (+ Ruth
- * Elkrief »). Faux négatifs assumés : une ligne écartée reste en base,
+ * dont 7 vraies personnes au nom mal découpé (« Prénom Nom (+ Autre
+ * Nom »). Faux négatifs assumés : une ligne écartée reste en base,
  * consultable via le filtre « À vérifier » ; elle n'est simplement plus
  * COMPTÉE ni MONTRÉE comme journaliste par défaut.
  *

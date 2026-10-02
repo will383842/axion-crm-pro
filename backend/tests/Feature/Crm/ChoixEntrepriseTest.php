@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\DelaiRequeteSql;
@@ -190,6 +191,52 @@ test('MOTS VIDES : « les jardins du lac » et « SARL Martin » trouvent la fic
     // avec son code postal : un nom qui commence par « Les » doit sortir.
     expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Les Jardins du Lac') . '&code_postal=74000')->assertOk()))
         ->toBe([$jardins]);
+});
+
+test('MOTS GÉNÉRIQUES : jamais point d entrée, mais EXIGÉS s ils sont tapés (relecture de confirmation de la #287)', function () {
+    // `normalize_name` CONSERVE « societe » : stockée `societe generale`.
+    // Retirer « société » du filtrage rendait « LA GENERALE » (stockée
+    // `generale`, l'article retiré) avant — et à la place de — la bonne fiche.
+    $sg = lot13Entreprise($this->workspace->id, '552120222', 'SOCIETE GENERALE');
+    $laGenerale = lot13Entreprise($this->workspace->id, '900000071', 'LA GENERALE');
+    $seb = lot13Entreprise($this->workspace->id, '300349636', 'GROUPE SEB');
+    lot13Entreprise($this->workspace->id, '900000072', 'SEB Conseil');
+    $zz = lot13Entreprise($this->workspace->id, '900000073', 'ZZ Entreprise Test');
+
+    $ids = lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Société Générale'))->assertOk());
+    expect($ids)->toBe([$sg]);
+    expect($ids)->not->toContain($laGenerale);
+
+    // TÉMOIN : « générale » seule rend bien les deux — c'est « société » qui départage.
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=generale')->assertOk()))
+        ->toEqualCanonicalizing([$sg, $laGenerale]);
+
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('Groupe SEB'))->assertOk()))->toBe([$seb]);
+    expect(lot13Ids($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('zz entreprise test'))->assertOk()))->toBe([$zz]);
+});
+
+test('les listes de mots du serveur et de l écran sont IDENTIQUES', function () {
+    $chemin = base_path('../frontend/src/features/crm-console/motsRechercheEntreprise.json');
+    expect(is_file($chemin))->toBeTrue();
+
+    /** @var array{articles_retires: list<string>, mots_generiques: list<string>, mots_lus: int, mot_minimal: int} $ecran */
+    $ecran = json_decode((string) file_get_contents($chemin), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($ecran['articles_retires'])->toBe(ChoixEntrepriseController::ARTICLES_RETIRES)
+        ->and($ecran['mots_generiques'])->toBe(ChoixEntrepriseController::MOTS_GENERIQUES)
+        ->and($ecran['mots_lus'])->toBe(ChoixEntrepriseController::MOTS_LUS)
+        ->and($ecran['mot_minimal'])->toBe(3);
+
+    // (a) est EXACTEMENT ce que `normalize_name` retire en base : chaque
+    // article suivi d'un espace disparaît, et rien d'autre.
+    foreach (ChoixEntrepriseController::ARTICLES_RETIRES as $article) {
+        $ligne = DB::selectOne('SELECT normalize_name(?) AS n', [$article . ' martin']);
+        expect($ligne->n)->toBe('martin');
+    }
+    foreach (ChoixEntrepriseController::MOTS_GENERIQUES as $generique) {
+        $ligne = DB::selectOne('SELECT normalize_name(?) AS n', [$generique . ' martin']);
+        expect($ligne->n)->toBe($generique . ' martin');
+    }
 });
 
 test('saisie mal formée : 422 propre, jamais 500', function () {

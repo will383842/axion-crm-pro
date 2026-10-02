@@ -41,7 +41,8 @@ use Illuminate\Support\Facades\DB;
  *
  *   - pas de `LIKE '%…%'` sur le SIREN (aucun index ne le sert) : un SIREN se
  *     tape en entier ;
- *   - pas de mot vide (articles, formes juridiques, cf. `MOTS_VIDES`) ;
+ *   - jamais d'article ni de mot générique comme point d'entrée (cf.
+ *     `ARTICLES_RETIRES` et `MOTS_GENERIQUES`) ;
  *   - pas de mot de moins de 3 lettres APRÈS normalisation :
  *     un trigramme ne s'extrait pas d'un mot de deux lettres, la condition
  *     relirait l'index entier ;
@@ -62,42 +63,38 @@ class ChoixEntrepriseController extends ConsoleController
     private const MOT_MINIMAL = 3;
 
     /**
-     * MOTS VIDES — ignorés, ni point d'entrée ni affinage.
+     * DEUX NOTIONS, ET LES CONFONDRE A COÛTÉ DEUX RELECTURES (PR #287).
      *
-     * 🔴 Relecture A09 de la PR #287 : « les jardins du lac » ne trouvait PAS
-     * « Les Jardins du Lac ». `normalize_name` (migration
-     * `2026_05_16_000001_create_extensions_and_helpers`) ne retire un article
-     * (`de|du|la|le|les|d|l`) que SUIVI D'UN ESPACE : stockée, la raison
-     * sociale devient `jardins lac`, mais le mot « les » normalisé SEUL reste
-     * `les` — et l'affinage exigeait que chaque mot figure dans le nom. Pire,
-     * `%les%` servait de point d'entrée et pouvait faire tomber la recherche
-     * en 503.
+     * (a) ARTICLES_RETIRES — EXACTEMENT les mots que `normalize_name` retire en
+     *     base (migration `2026_05_16_000001_create_extensions_and_helpers`,
+     *     motif `\m(de|du|la|le|les|d|l)\M\s+`). Ils n'existent pas dans le nom
+     *     stocké (« Les Jardins du Lac » → `jardins lac`) : on les ignore
+     *     PARTOUT, point d'entrée et filtrage. Normalisé SEUL, « les » restait
+     *     `les`, et « les jardins du lac » ne trouvait rien.
      *
-     * On écarte donc explicitement, sous leur forme normalisée (minuscules,
-     * sans accent) :
-     *   - les articles de `normalize_name`, et les autres petits mots qu'elle
-     *     ne retire pas (`des`, `et`, `au`, `aux`, `en`, `sur`…) ;
-     *   - les formes juridiques et mots génériques (« SARL Martin » : `sarl`
-     *     est dans des centaines de milliers de raisons sociales et n'aide
-     *     pas à en choisir une ; mesuré > 20 s en production).
+     * (b) MOTS_GENERIQUES — formes juridiques, petits mots et termes courants
+     *     que `normalize_name` CONSERVE (« Société Générale » → `societe
+     *     generale`). Ils ne servent JAMAIS de point d'entrée trigramme (trop
+     *     fréquents : `sarl` > 20 s en production) mais restent EXIGÉS au
+     *     filtrage quand on les a tapés. Les retirer aussi du filtrage rendait
+     *     10 × « LA GENERALE » pour « Société Générale », sans elle.
      *
-     * ⚠️ Liste JUMELLE de `MOTS_VIDES` dans
-     * `frontend/src/features/crm-console/ChoixEntreprise.tsx` : l'écran s'en
-     * sert pour ne pas envoyer une requête que le serveur refuserait. Le
-     * serveur reste l'autorité.
+     * ⚠️ Ces deux listes sont aussi celles de l'écran, qui les lit dans
+     * `frontend/src/features/crm-console/motsRechercheEntreprise.json`. Un test
+     * Pest compare les deux : une liste modifiée d'un seul côté rougit.
      */
-    public const MOTS_VIDES = [
-        // Articles et petits mots
-        'le', 'la', 'les', 'l', 'de', 'du', 'des', 'd', 'et', 'au', 'aux', 'en',
-        'sur', 'sous', 'par', 'pour', 'chez', 'un', 'une', 'a', 'à', 'the', 'and',
-        // Formes juridiques
-        'sarl', 'sas', 'sasu', 'sa', 'eurl', 'sci', 'snc', 'scop', 'scp', 'scm',
-        'sel', 'selarl', 'selas', 'ei', 'eirl', 'gie', 'gaec', 'earl', 'scea',
-        'association', 'asso',
-        // Mots génériques
-        'societe', 'ste', 'ets', 'etablissement', 'etablissements', 'cie',
-        'compagnie', 'groupe', 'france', 'entreprise', 'entreprises',
+    public const ARTICLES_RETIRES = ['de', 'du', 'la', 'le', 'les', 'd', 'l'];
+
+    public const MOTS_GENERIQUES = [
+        'des', 'et', 'au', 'aux', 'en', 'sur', 'sous', 'par', 'pour', 'chez', 'un', 'une', 'a', 'the', 'and',
+        'sarl', 'sas', 'sasu', 'sa', 'eurl', 'sci', 'snc', 'scop', 'scp', 'scm', 'sel', 'selarl', 'selas',
+        'ei', 'eirl', 'gie', 'gaec', 'earl', 'scea', 'association', 'asso',
+        'societe', 'ste', 'ets', 'etablissement', 'etablissements', 'cie', 'compagnie', 'groupe', 'france',
+        'entreprise', 'entreprises',
     ];
+
+    /** Mots lus dans la saisie, au plus (le même plafond que l'écran). */
+    public const MOTS_LUS = 8;
 
     public function index(Request $request): JsonResponse
     {
@@ -144,22 +141,26 @@ class ChoixEntrepriseController extends ConsoleController
     }
 
     /**
-     * @param  non-empty-list<string>  $mots  normalisés et échappés
+     * @param  non-empty-list<string>  $entrees  les mots SIGNIFICATIFS, normalisés et échappés
+     * @param  non-empty-list<string>  $filtres  tous les mots tapés (hors articles), dans l'ordre
      * @return list<\stdClass>
      */
-    private function chercherParNom(string $workspaceId, array $mots, string $codePostal): array
+    private function chercherParNom(string $workspaceId, array $entrees, array $filtres, string $codePostal): array
     {
         $requete = $this->base($workspaceId);
 
-        // Point d'entrée indexé : au moins un mot dans le nom.
-        $requete->where(function ($groupe) use ($mots): void {
-            foreach ($mots as $mot) {
+        // Point d'entrée indexé (trigrammes) : un mot SIGNIFICATIF au moins
+        // dans le nom — jamais un article ni un mot générique. Un OU plutôt
+        // qu'un seul mot : dans « lac annecy », le mot le plus long est la
+        // VILLE, et l'exiger dans le nom perdrait « Les Jardins du Lac ».
+        $requete->where(function ($groupe) use ($entrees): void {
+            foreach ($entrees as $mot) {
                 $groupe->orWhereRaw('companies.denomination_normalized ILIKE ?', ['%' . $mot . '%']);
             }
         });
 
-        // Affinage : CHAQUE mot dans le nom ou dans la ville.
-        foreach ($mots as $mot) {
+        // Filtrage : CHAQUE mot tapé (générique compris) dans le nom ou la ville.
+        foreach ($filtres as $mot) {
             $requete->where(function ($groupe) use ($mot): void {
                 $groupe->whereRaw('companies.denomination_normalized ILIKE ?', ['%' . $mot . '%'])
                     ->orWhereRaw("normalize_name(coalesce(companies.city_name, companies.city, '')) ILIKE ?", ['%' . $mot . '%']);
@@ -170,10 +171,10 @@ class ChoixEntrepriseController extends ConsoleController
             $requete->where('postcode', $codePostal);
         }
 
-        // Les noms qui COMMENCENT par le premier mot d'abord, puis les plus
-        // courts : « Martin » avant « Boulangerie des frères Martin et fils ».
+        // Les noms qui COMMENCENT par le premier mot tapé d'abord, puis les plus
+        // courts : « Société Générale » avant « Banque Société Générale … ».
         $lignes = $requete
-            ->orderByRaw('(companies.denomination_normalized ILIKE ?) DESC', [$mots[0] . '%'])
+            ->orderByRaw('(companies.denomination_normalized ILIKE ?) DESC', [$filtres[0] . '%'])
             ->orderByRaw('length(companies.denomination_normalized)')
             ->orderBy('companies.denomination_normalized')
             ->limit(self::PLAFOND)
@@ -185,7 +186,7 @@ class ChoixEntrepriseController extends ConsoleController
 
     private function parNom(string $workspaceId, string $saisie, string $codePostal): JsonResponse
     {
-        // L'apostrophe sépare aussi : « l'atelier » → « l » (mot vide) et « atelier ».
+        // L'apostrophe sépare aussi : « l'atelier » → « l » (article) et « atelier ».
         $morceaux = preg_split("/[\s,;'’]+/u", $saisie, -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         $mots = [];
@@ -199,62 +200,76 @@ class ChoixEntrepriseController extends ConsoleController
             $mots[] = $morceau;
         }
 
-        [$mots, $seulementDesMotsVides] = $this->normaliser(array_slice($mots, 0, 8));
+        [$entrees, $filtres, $nonSignificatifs] = $this->analyser(array_slice($mots, 0, self::MOTS_LUS));
 
-        if ($mots === []) {
+        if ($entrees === [] || $filtres === []) {
             // Aucune requête : rien de significatif à chercher.
-            return $this->ok(['data' => [], 'indice' => $seulementDesMotsVides ? 'mots_vides' : 'trop_court']);
+            return $this->ok(['data' => [], 'indice' => $nonSignificatifs ? 'mots_vides' : 'trop_court']);
         }
 
-        // Au plus 5 mots significatifs dans la requête.
-        $mots = array_slice($mots, 0, 5);
-
         return $this->ok([
-            'data' => $this->projeter($this->chercherParNom($workspaceId, $mots, $codePostal)),
+            'data' => $this->projeter($this->chercherParNom($workspaceId, $entrees, $filtres, $codePostal)),
             'indice' => null,
         ]);
     }
 
     /**
      * Normalise les mots par la MÊME fonction SQL que la colonne
-     * (`normalize_name` : minuscules, accents et articles retirés) — la
-     * réimplémenter en PHP divergerait au premier changement de la fonction
-     * (cf. `RechercheDenomination`). Échappe ensuite les jokers `LIKE` : un `%`
+     * (`normalize_name` : minuscules, accents retirés) — la réimplémenter en
+     * PHP divergerait au premier changement de la fonction (cf.
+     * `RechercheDenomination`). Échappe ensuite les jokers `LIKE` : un `%`
      * tapé ne doit pas rendre la table entière.
      *
-     * Rend aussi si la saisie ne portait QUE des mots vides (« SARL », « les »)
-     * — pour dire à l'écran « ajoutez un mot du nom », pas « trop court ».
+     * Rend : les mots d'ENTRÉE (significatifs : ni article, ni mot générique,
+     * au moins 3 lettres ou chiffres), les mots à
+     * FILTRER (tous, hors articles retirés en base et hors pure ponctuation),
+     * et si la saisie ne portait que des articles ou mots génériques — pour
+     * dire « ajoutez un mot du nom », pas « trop court ».
      *
      * @param  list<string>  $mots
-     * @return array{0: list<string>, 1: bool}
+     * @return array{0: list<string>, 1: list<string>, 2: bool}
      */
-    private function normaliser(array $mots): array
+    private function analyser(array $mots): array
     {
-        if ($mots === []) {
-            return [[], false];
-        }
+        $entrees = [];
+        $filtres = [];
+        $nonSignificatifs = 0;
 
-        $normalises = [];
-        $motsVides = 0;
         foreach ($mots as $mot) {
             $ligne = DB::selectOne('SELECT normalize_name(?) AS n', [$mot]);
             $n = trim(is_object($ligne) && is_string($ligne->n ?? null) ? $ligne->n : '');
-            if (in_array($n, self::MOTS_VIDES, true)) {
-                $motsVides++;
+
+            if (in_array($n, self::ARTICLES_RETIRES, true)) {
+                $nonSignificatifs++;
 
                 continue;
             }
+
             // On compte les LETTRES ET CHIFFRES, pas les caractères : « %%% »
             // ferait trois caractères et ne désignerait rien.
-            if (preg_match_all('/[\p{L}\p{N}]/u', $n) < self::MOT_MINIMAL) {
+            $lettres = preg_match_all('/[\p{L}\p{N}]/u', $n);
+            if ($lettres === 0 || $lettres === false) {
                 continue;
             }
-            $normalises[] = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $n);
+
+            $echappe = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $n);
+            $filtres[] = $echappe;
+
+            if (in_array($n, self::MOTS_GENERIQUES, true)) {
+                $nonSignificatifs++;
+
+                continue;
+            }
+
+            if ($lettres >= self::MOT_MINIMAL) {
+                $entrees[] = $echappe;
+            }
         }
 
-        $normalises = array_values(array_unique($normalises));
+        $entrees = array_values(array_unique($entrees));
+        $filtres = array_values(array_unique($filtres));
 
-        return [$normalises, $normalises === [] && $motsVides > 0];
+        return [$entrees, $filtres, $entrees === [] && $nonSignificatifs > 0];
     }
 
     private function base(string $workspaceId): Builder

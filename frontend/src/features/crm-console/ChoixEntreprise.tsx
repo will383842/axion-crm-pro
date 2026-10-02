@@ -34,6 +34,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, qualifierErreur } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { cn } from '@/components/ui/cn';
+import motsRecherche from './motsRechercheEntreprise.json';
 
 export interface EntrepriseChoisie {
   id: number;
@@ -72,23 +73,20 @@ function seulementDesChiffres(saisie: string): string | null {
 }
 
 /**
- * Mots ignorés par la recherche — JUMEAU de `ChoixEntrepriseController::MOTS_VIDES`
- * (backend), sous la même forme normalisée (minuscules, sans accent). L'écran
- * s'en sert pour ne pas envoyer une requête que le serveur refuserait ; le
- * serveur reste l'autorité.
+ * Les deux listes de mots, LUES DANS LE MÊME FICHIER que celui qu'un test Pest
+ * compare aux constantes du serveur (`ChoixEntrepriseController`) :
+ *  - `articles_retires` : retirés par `normalize_name` en base, ignorés partout ;
+ *  - `mots_generiques` : jamais point d'entrée, mais exigés s'ils sont tapés.
+ * L'écran s'en sert pour ne pas envoyer une requête que le serveur refuserait ;
+ * le serveur reste l'autorité.
  */
-const MOTS_VIDES = new Set([
-  'le', 'la', 'les', 'l', 'de', 'du', 'des', 'd', 'et', 'au', 'aux', 'en',
-  'sur', 'sous', 'par', 'pour', 'chez', 'un', 'une', 'a', 'the', 'and',
-  'sarl', 'sas', 'sasu', 'sa', 'eurl', 'sci', 'snc', 'scop', 'scp', 'scm',
-  'sel', 'selarl', 'selas', 'ei', 'eirl', 'gie', 'gaec', 'earl', 'scea',
-  'association', 'asso',
-  'societe', 'ste', 'ets', 'etablissement', 'etablissements', 'cie',
-  'compagnie', 'groupe', 'france', 'entreprise', 'entreprises',
-]);
+const ARTICLES_RETIRES = new Set(motsRecherche.articles_retires);
+const MOTS_GENERIQUES = new Set(motsRecherche.mots_generiques);
 
 /** Le seuil, le même que le serveur : 3 lettres ou chiffres dans un mot significatif. */
-const MOT_MINIMAL = 3;
+const MOT_MINIMAL = motsRecherche.mot_minimal;
+/** Mots lus dans la saisie, au plus — le même plafond que le serveur. */
+const MOTS_LUS = motsRecherche.mots_lus;
 
 export const MESSAGE_TROP_COURT = 'Tapez au moins 3 lettres du nom de l’entreprise.';
 export const MESSAGE_MOTS_VIDES =
@@ -114,10 +112,11 @@ function raisonDeNePasChercher(saisie: string): string | null {
   const mots = texte
     .split(/[\s,;'’]+/)
     .filter((m) => m !== '' && !/^\d{5}$/.test(m))
+    .slice(0, MOTS_LUS)
     .map(normaliserMot);
   let motsVides = 0;
   for (const mot of mots) {
-    if (MOTS_VIDES.has(mot)) {
+    if (ARTICLES_RETIRES.has(mot) || MOTS_GENERIQUES.has(mot)) {
       motsVides += 1;
       continue;
     }

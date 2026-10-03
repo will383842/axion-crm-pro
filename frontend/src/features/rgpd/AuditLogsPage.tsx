@@ -181,7 +181,7 @@ export function AuditLogsPage() {
             <div>Événement</div>
             <div>Écran ou action</div>
             <div>Acteur</div>
-            <div>Sévérité</div>
+            <div>Gravité</div>
             <div>Adresse IP</div>
             <div>Empreinte</div>
           </div>

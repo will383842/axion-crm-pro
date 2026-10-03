@@ -137,13 +137,13 @@ describe('PersonTimelinePage — rendu', () => {
       ],
     });
 
-    expect(await screen.findByText('Existe aussi dans l’autre base')).toBeVisible();
+    expect(await screen.findByText('Existe dans l’autre base')).toBeVisible();
 
     // Le vivier ne dit PAS « Fiche présente » — cette pastille-là est réservée
     // à un univers auquel on a droit, et elle s'accompagne d'une identité.
     // « Candidats » apparaît aussi dans la timeline (source d'une entrée) :
     // on part de la pastille pour retrouver SA ligne.
-    const ligneVivier = screen.getByText('Existe aussi dans l’autre base').closest('li');
+    const ligneVivier = screen.getByText('Existe dans l’autre base').closest('li');
     expect(ligneVivier).not.toBeNull();
     expect(ligneVivier).toHaveTextContent('Candidats');
     expect(ligneVivier).not.toHaveTextContent('Fiche présente');

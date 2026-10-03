@@ -29,6 +29,7 @@ import {
 } from '@/components/ui';
 import type { EmailAudience } from './AudiencesListPage';
 import { criteresLisibles } from './criteres-lisibles';
+import type { ListeManuelle } from '@/features/listes/listes';
 import {
   REGLAGE_PAR_DEFAUT,
   reglageVersApi,
@@ -458,13 +459,20 @@ function DestinatairesTab({ audience }: { audience: EmailAudience }) {
 // Tab — Critères
 // ---------------------------------------------------------------------------
 function CriteriaTab({ audience }: { audience: EmailAudience }) {
-  const lignes = criteresLisibles(audience.criteria);
+  // Les noms des listes manuelles, SI l'écran de création les a déjà chargés :
+  // lecture du cache seulement, aucun appel ajouté (sinon « une liste manuelle »).
+  const qc = useQueryClient();
+  const listes = qc.getQueryData<ListeManuelle[]>(['listes-manuelles']) ?? [];
+  const lignes = criteresLisibles(
+    audience.criteria,
+    Object.fromEntries(listes.map((l) => [l.id, l.nom])),
+  );
   return (
     <div className="space-y-3">
       <Card padding="md">
         <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Critères de l’audience</h3>
         {lignes.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Aucun critère : toutes les fiches sont retenues.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Aucun critère : toutes les fiches sont retenues, sauf les fiches protégées et la presse.</p>
         ) : (
           <ul className="space-y-1.5" aria-label="Critères de l’audience">
             {lignes.map((l, i) => (

@@ -499,6 +499,24 @@ function TabZones({ campaign }: { campaign: Campaign }) {
 // ---------------------------------------------------------------------------
 // TAB Runs
 // ---------------------------------------------------------------------------
+/** Statut d'un passage en clair ; un statut inconnu devient « Autre », jamais le code brut. */
+const STATUTS_PASSAGE: Readonly<Record<string, string>> = {
+  pending: 'En attente',
+  queued: 'En attente',
+  running: 'En cours',
+  paused: 'En pause',
+  success: 'Terminée',
+  completed: 'Terminée',
+  failed: 'Échouée',
+  cancelled: 'Annulée',
+  canceled: 'Annulée',
+};
+
+export function libelleStatutPassage(statut: string | null | undefined): string {
+  if (statut === null || statut === undefined || !Object.hasOwn(STATUTS_PASSAGE, statut)) return 'Autre';
+  return STATUTS_PASSAGE[statut] ?? 'Autre';
+}
+
 function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
   if (runs.length === 0) {
     return (
@@ -537,7 +555,7 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
                   }
                   pulse={r.status === 'running'}
                 >
-                  {r.status}
+                  {libelleStatutPassage(r.status)}
                 </StatusPill>
               </td>
               <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">

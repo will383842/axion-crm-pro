@@ -159,7 +159,7 @@ function UniverseLine({
         <StatusPill tone="success">Fiche présente</StatusPill>
       ) : (
         // Un booléen, et rien d'autre : ni nom, ni étape, ni activité.
-        <StatusPill tone="info">Existe aussi dans l’autre base</StatusPill>
+        <StatusPill tone="info">Existe dans l’autre base</StatusPill>
       )}
     </li>
   );

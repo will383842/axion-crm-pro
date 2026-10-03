@@ -145,7 +145,7 @@ function SanteDuSysteme() {
         <CardSection title="50 derniers événements">
           <div className="max-h-[480px] overflow-y-auto text-sm">
             {data.recent_events.length === 0 ? (
-              <div className="text-slate-500">Aucun event récent.</div>
+              <div className="text-slate-500">Aucun événement récent.</div>
             ) : (
               <table className="w-full">
                 <thead className="sticky top-0 bg-white text-xs uppercase text-slate-500 dark:bg-slate-900">

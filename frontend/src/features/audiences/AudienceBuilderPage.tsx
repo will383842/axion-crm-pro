@@ -120,9 +120,9 @@ const NATURE_PRESETS = enPresets(NATURES);
 
 const STATUS_PRESETS: Array<{ code: string; label: string }> = [
   { code: 'pending',              label: 'À compléter' },
-  { code: 'ready_for_outreach',   label: 'Prêt outreach' },
-  { code: 'partial_email',        label: 'Email partiel' },
-  { code: 'archived_no_email',    label: 'Archivé sans email' },
+  { code: 'ready_for_outreach',   label: 'Prêt pour la prospection' },
+  { code: 'partial_email',        label: 'E-mail partiel' },
+  { code: 'archived_no_email',    label: 'Archivé sans e-mail' },
 ];
 
 // ---------------------------------------------------------------------------

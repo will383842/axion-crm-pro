@@ -77,8 +77,8 @@ export function ConsoleGate({
     return (
       <div>
         <EmptyState
-          title="Univers vivier candidats non accessible"
-          description="L'accès au vivier suppose d'être membre de cet univers. Demandez à un administrateur de vous y rattacher."
+          title="La base des candidats n’est pas accessible avec votre compte."
+          description="Demandez à un administrateur de vous y donner accès."
         />
       </div>
     );

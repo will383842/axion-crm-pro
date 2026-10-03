@@ -49,6 +49,8 @@ export function CompanyRow({
 }: CompanyRowProps) {
   const c = company;
   const name = c.denomination ?? c.siren;
+  // Un code NAF vide (« ») se lit comme une absence : « — », jamais une case blanche.
+  const naf = c.naf?.trim() ?? '';
 
   return (
     <div
@@ -104,9 +106,9 @@ export function CompanyRow({
           Un code sans division connue reste affiché tel quel plutôt que vide. */}
       <div
         className="truncate text-xs text-slate-700 dark:text-slate-300"
-        title={c.naf ? `Code d’activité : ${c.naf}` : undefined}
+        title={naf === '' ? undefined : `Code d’activité : ${naf}`}
       >
-        {libelleNaf(c.naf) ?? c.naf ?? '—'}
+        {libelleNaf(c.naf) ?? (naf === '' ? '—' : naf)}
       </div>
 
       <div><SizeCategoryBadge size={c.size_category} /></div>

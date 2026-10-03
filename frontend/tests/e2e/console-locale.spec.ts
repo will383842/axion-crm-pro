@@ -396,7 +396,7 @@ test.describe('Console CRM Pro — vérification locale de bout en bout', () => 
       await expect(
         body,
         "ConsoleGate refuse le vivier : le compte n'est pas membre non révoqué du workspace vivier-candidats.",
-      ).not.toContainText('Univers vivier candidats non accessible');
+      ).not.toContainText('La base des candidats n’est pas accessible avec votre compte.');
 
       await page.screenshot({ path: path.join(CAPTURES, screen.shot), fullPage: true });
 

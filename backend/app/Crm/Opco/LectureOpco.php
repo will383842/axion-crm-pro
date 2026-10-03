@@ -54,9 +54,13 @@ final class LectureOpco
         if ($source !== 'siro') {
             return 'source : saisie';
         }
-        $mois = $releveLe !== null
-            ? CarbonImmutable::parse($releveLe)->locale('fr')->isoFormat('MMMM YYYY')
-            : 'mois inconnu';
+        $mois = 'mois inconnu';
+        if ($releveLe !== null) {
+            // `locale()` est typé `static|string` : vérifié avant le formatage.
+            $date = CarbonImmutable::parse($releveLe);
+            $fr = $date->locale('fr');
+            $mois = ($fr instanceof CarbonImmutable ? $fr : $date)->isoFormat('MMMM YYYY');
+        }
 
         return "source : France compétences (DSN de {$mois})";
     }

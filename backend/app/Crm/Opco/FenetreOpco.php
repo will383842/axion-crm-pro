@@ -21,7 +21,10 @@ final class FenetreOpco
     public static function refus(CarbonInterface $instant): ?string
     {
         $t = CarbonImmutable::instance($instant)->setTimezone(self::FUSEAU);
-        $quand = $t->locale('fr')->isoFormat('dddd D MMMM YYYY à HH:mm');
+        // `locale()` est typé `static|string` : l'instance française est
+        // vérifiée avant d'être formatée (PHPStan).
+        $fr = $t->locale('fr');
+        $quand = ($fr instanceof CarbonImmutable ? $fr : $t)->isoFormat('dddd D MMMM YYYY à HH:mm');
 
         if ($t->day <= 3) {
             return "Refusé : jamais les 1er, 2 et 3 du mois (nous sommes le {$quand}, heure de Paris).";

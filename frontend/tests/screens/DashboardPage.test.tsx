@@ -21,10 +21,11 @@
 import { describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { dynamicGet, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
+import { apiUrl, dynamicGet, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
 
 const PATH = '/';
 
@@ -384,5 +385,66 @@ describe('DashboardPage — qualité (lot 3 : jamais un 0 trompeur)', () => {
       expect(vignette('Qualité moyenne')).toHaveTextContent('—');
     });
     expect(vignette('Qualité moyenne')).not.toHaveTextContent('0/100');
+  });
+});
+
+describe('DashboardPage — P0-1 lot 1 : sans espace, et compteurs indisponibles', () => {
+  it('409 no_workspace : un état clair, ni chiffres ni « base vide » ni « panne »', async () => {
+    const { handler, urls } = (() => {
+      const vus: string[] = [];
+      return {
+        handler: http.get(apiUrl('/dashboard/stats'), ({ request }) => {
+          vus.push(request.url);
+          return HttpResponse.json(
+            { error: 'no_workspace', message: "Aucun espace de travail n'est rattaché à votre compte." },
+            { status: 409 },
+          );
+        }),
+        urls: vus,
+      };
+    })();
+
+    await renderScreen(<DashboardPage />, { path: PATH, handlers: [handler, ...socle()] });
+
+    expect(await screen.findByText('Aucun espace de travail')).toBeVisible();
+    expect(
+      screen.getByText('Aucun espace de travail n’est rattaché à votre compte. Contactez l’administrateur.'),
+    ).toBeVisible();
+    expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
+    expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument();
+    expect(urls).toHaveLength(1);
+  });
+
+  it('un compteur null s’affiche « — » avec son infobulle, jamais 0', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          companies_total: null,
+          companies_enriched_24h: null,
+          contacts_qualified: null,
+          scraper_runs_24h: null,
+        }),
+        ...socle(),
+      ],
+    });
+
+    await waitFor(() => {
+      expect(vignette('Total entreprises')).toHaveTextContent('—');
+    });
+    // Un null n'est PAS une base vide.
+    expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
+    expect(vignette('Total entreprises')).not.toHaveTextContent(/0/);
+    expect(vignette('Enrichies 24h')).toHaveTextContent('—');
+    expect(vignette('Enrichies 24h')).not.toHaveTextContent(/0/);
+    // Témoin : les chiffres connus restent affichés.
+    expect(vignette('Nouvelles 7j')).toHaveTextContent(/5.400/);
+
+    const tiret = within(vignette('Total entreprises')).getByTestId('chiffre-indisponible');
+    await user.hover(tiret);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Chiffre indisponible pour le moment');
   });
 });

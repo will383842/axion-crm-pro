@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Console\ScoresPerimes;
+use App\Exceptions\TableauDeBordIncomplet;
 use App\Crm\Taxonomy;
 use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -38,12 +40,16 @@ use Illuminate\Support\Facades\Schema;
  *
  * 1. **Cloisonné, et fail-closed.** Un compteur est plus discret qu'une liste :
  *    il ne montre aucune fiche, mais il en **révèle le nombre**. Sans contexte
- *    d'espace, on rend donc des zéros — jamais le total de tous les clients.
+ *    d'espace, on ne compte donc RIEN — jamais le total de tous les clients.
+ *    Depuis le lot 1 de l'audit UX (2026-10-03, P0-1), on le DIT : HTTP 409
+ *    `no_workspace`. Les zéros qu'on rendait avant faisaient croire à une base
+ *    vide (« Votre base est vide » sur 4,3 M de fiches).
  *
- * 2. **Chaque compteur se défend seul.** Une table absente ou une requête en
- *    erreur ne doit pas emporter l'écran entier : c'est ce qui a produit
- *    `A-015`, où l'accueil s'effaçait dès qu'`audit_logs` portait une ligne. On
- *    renvoie zéro pour CE compteur-là, et on le journalise.
+ * 2. **Chaque compteur se défend seul.** Une requête en erreur ne doit pas
+ *    emporter l'écran entier : c'est ce qui a produit `A-015`, où l'accueil
+ *    s'effaçait dès qu'`audit_logs` portait une ligne. On rend `null` pour CE
+ *    compteur-là (l'écran écrit « — », jamais 0), on le journalise, et le
+ *    résultat partiel n'entre PAS dans le cache (`TableauDeBordIncomplet`).
  */
 class DashboardController extends ApiController
 {
@@ -65,27 +71,58 @@ class DashboardController extends ApiController
 
     public const PERIME_SECONDES = 1800;
 
+    /**
+     * Vrai dès qu'un compteur du calcul en cours est tombé dans son filet.
+     * Remis à faux au début de chaque calcul (le recalcul différé réutilise
+     * cette instance).
+     */
+    private bool $incomplet = false;
+
+    /** Vrai pendant le calcul fait DANS la requête (pas le recalcul différé). */
+    private bool $dansLaRequete = false;
+
+    /**
+     * `v4` (2026-10-03) : un compteur peut désormais valoir `null`
+     * (« indisponible »). Une charge utile ne contient jamais de `null` en
+     * cache — un résultat partiel n'y entre pas — mais la forme du contrat a
+     * changé : la version change avec elle.
+     */
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v3:' . $espace;
+        return 'crm:dashboard:stats:v4:' . $espace;
     }
 
     public function stats(Request $r): JsonResponse
     {
         $espace = $this->espaceCourantOuNull();
 
-        // Sans contexte d'espace : des zéros, jamais le total de tout le monde.
+        // Sans contexte d'espace : on ne compte rien — jamais le total de tout
+        // le monde — et on le DIT. Des zéros faisaient croire à une base vide
+        // (audit UX du 2026-10-02, P0-1). Même forme d'erreur que le reste de
+        // l'API (`error` + `message`) ; `no_workspace` est déjà traduit côté
+        // écran (`MESSAGES_DES_CODES`).
         if ($espace === null) {
-            return response()->json($this->gabaritVide());
+            return response()->json([
+                'error' => 'no_workspace',
+                'message' => "Aucun espace de travail n'est rattaché à votre compte.",
+            ], 409);
         }
 
-        /** @var mixed $charge */
-        $charge = Cache::flexible(
-            self::cle($espace),
-            [self::FRAIS_SECONDES, self::PERIME_SECONDES],
-            fn (): array => $this->calculer($espace),
-            lock: ['seconds' => 60],
-        );
+        $this->dansLaRequete = true;
+        try {
+            /** @var mixed $charge */
+            $charge = Cache::flexible(
+                self::cle($espace),
+                [self::FRAIS_SECONDES, self::PERIME_SECONDES],
+                fn (): array => $this->calculerPourLeCache($espace),
+                lock: ['seconds' => 60],
+            );
+        } catch (TableauDeBordIncomplet $e) {
+            // Servi à l'écran, jamais gardé : la requête suivante retentera.
+            $charge = $e->chiffres;
+        } finally {
+            $this->dansLaRequete = false;
+        }
 
         if (! is_array($charge)) {
             $charge = $this->calculer($espace);
@@ -102,6 +139,35 @@ class DashboardController extends ApiController
     }
 
     /**
+     * Le calcul confié à `Cache::flexible`. Un résultat partiel ne doit jamais
+     * être écrit : la seule façon d'empêcher `flexible` d'écrire ce que rend
+     * le calcul est de lever une exception (même patron que
+     * `ObservabilityController::calculerPourLeCache`, F39-007).
+     *
+     * - Dans la requête : rattrapée par `stats()`, les chiffres sont servis.
+     * - Dans le recalcul différé : journalisée ICI en `warning` — l'espace,
+     *   jamais le SQL ni les valeurs — puis levée vers `rescue()`, qui ne la
+     *   signale pas (`ShouldntReport`). La valeur en cache reste l'ancienne.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculerPourLeCache(string $espace): array
+    {
+        $chiffres = $this->calculer($espace);
+        if (! $this->incomplet) {
+            return $chiffres;
+        }
+
+        if (! $this->dansLaRequete) {
+            Log::warning('dashboard: recalcul différé incomplet, valeur en cache conservée', [
+                'workspace_id' => $espace,
+            ]);
+        }
+
+        throw new TableauDeBordIncomplet($chiffres);
+    }
+
+    /**
      * Le calcul, sans cache.
      *
      * - `WorkspaceContext::run` : le recalcul différé de `Cache::flexible`
@@ -115,6 +181,8 @@ class DashboardController extends ApiController
      */
     private function calculer(string $espace): array
     {
+        $this->incomplet = false;
+
         return DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => [
             'companies_total' => $this->compter('companies', $espace),
             // 🔴 2026-10-02 : « Enrichies 24h » = 1 671 720. On comptait
@@ -194,7 +262,8 @@ class DashboardController extends ApiController
             $resultat['quality_avg'] = $l->moyenne === null ? null : (int) $l->moyenne;
             $resultat['quality_scored'] = (int) $l->notees;
         } catch (\Throwable $e) {
-            Log::warning('dashboard: qualite indisponible', ['exception' => $e->getMessage()]);
+            $this->incomplet = true;
+            Log::warning('dashboard: qualite indisponible', self::panneSansSql($e));
 
             return $resultat;
         }
@@ -234,8 +303,14 @@ class DashboardController extends ApiController
         return array_fill_keys(array_keys(Taxonomy::TAILLES), 0);
     }
 
-    /** Un compteur qui ne peut pas emporter l'écran avec lui. */
-    private function compter(string $table, string $espace, ?callable $affiner = null): int
+    /**
+     * Un compteur qui ne peut pas emporter l'écran avec lui.
+     *
+     * `null` = « je n'ai pas pu compter » (requête en erreur, délai dépassé) :
+     * l'écran écrit « — », jamais 0. Une table ABSENTE reste à 0 : avant la
+     * migration, il n'y a vraiment rien à compter.
+     */
+    private function compter(string $table, string $espace, ?callable $affiner = null): ?int
     {
         if (! Schema::hasTable($table)) {
             return 0;
@@ -255,12 +330,14 @@ class DashboardController extends ApiController
         } catch (\Throwable $e) {
             // Constat A-015 : l'accueil s'effaçait entièrement dès qu'une seule
             // requête échouait. Un compteur en panne vaut mieux qu'un écran
-            // blanc — mais il ne doit pas se taire.
+            // blanc — mais il ne doit pas se taire, ni se faire passer pour un
+            // zéro (audit UX du 2026-10-02, P0-1) : `null`, et pas de cache.
+            $this->incomplet = true;
             Log::warning('dashboard: compteur indisponible', [
-                'table' => $table, 'exception' => $e->getMessage(),
+                'table' => $table, ...self::panneSansSql($e),
             ]);
 
-            return 0;
+            return null;
         }
     }
 
@@ -290,12 +367,29 @@ class DashboardController extends ApiController
                 $gabarit[$cle] = (int) $ligne->n;
             }
         } catch (\Throwable $e) {
+            $this->incomplet = true;
             Log::warning('dashboard: repartition indisponible', [
-                'table' => $table, 'colonne' => $colonne, 'exception' => $e->getMessage(),
+                'table' => $table, 'colonne' => $colonne, ...self::panneSansSql($e),
             ]);
         }
 
         return $gabarit;
+    }
+
+    /**
+     * Ce qu'on journalise d'une panne : sa nature, JAMAIS le texte de la
+     * requête. Le message d'une `QueryException` recopie le SQL et ses valeurs
+     * liées (identifiant d'espace compris) ; la classe et le code SQLSTATE
+     * suffisent à reconnaître un délai dépassé (57014) d'une colonne absente.
+     *
+     * @return array{exception: string, sqlstate: string|null}
+     */
+    private static function panneSansSql(\Throwable $e): array
+    {
+        return [
+            'exception' => $e::class,
+            'sqlstate' => $e instanceof QueryException ? (string) $e->getCode() : null,
+        ];
     }
 
     /**

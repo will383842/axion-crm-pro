@@ -5,7 +5,11 @@ export type KpiTone = 'sky' | 'violet' | 'emerald' | 'amber' | 'rose' | 'slate';
 
 export interface KpiCardProps {
   label: string;
-  value: string | number;
+  /**
+   * Le chiffre affiché. Un nœud React est accepté pour qu'un chiffre
+   * INDISPONIBLE puisse porter son infobulle (« — » du tableau de bord).
+   */
+  value: ReactNode;
   sublabel?: string;
   tone?: KpiTone;
   progress?: number;

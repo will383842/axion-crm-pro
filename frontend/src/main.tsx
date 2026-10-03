@@ -32,7 +32,9 @@ const queryClient = new QueryClient({
       gcTime: 5 * 60_000,
       retry: (count, err) => {
         const status = (err as { response?: { status?: number } } | null)?.response?.status;
-        return status !== 401 && status !== 403 && count < 2;
+        // 409 : le serveur a répondu, et sa réponse ne changera pas en
+        // réessayant (ex. `no_workspace` du tableau de bord, audit UX P0-1).
+        return status !== 401 && status !== 403 && status !== 409 && count < 2;
       },
       refetchOnWindowFocus: false,
     },

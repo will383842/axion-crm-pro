@@ -1,4 +1,4 @@
-import { Building2 } from 'lucide-react';
+import { Building2, FolderX } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
@@ -10,9 +10,10 @@ import {
   EmptyState,
   QueryErrorState,
   Skeleton,
+  Tooltip,
   cn,
 } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, qualifierErreur } from '@/lib/api';
 import { QualityDistributionBar } from './components/QualityDistributionBar';
 import { SizeDistributionChart } from './components/SizeDistributionChart';
 import { TopDeptsCard } from './components/TopDeptsCard';
@@ -20,11 +21,16 @@ import { ActivityFeed } from './components/ActivityFeed';
 import { NextActions } from './components/NextActions';
 import { etatQualite } from './qualite';
 
+/**
+ * Les quatre compteurs valent `null` quand le serveur n'a PAS PU compter
+ * (requête en échec, délai dépassé) : l'écran écrit « — », jamais 0 — audit UX
+ * du 2026-10-02, P0-1.
+ */
 interface DashboardStats {
-  companies_total: number;
-  companies_enriched_24h: number;
-  contacts_qualified: number;
-  scraper_runs_24h: number;
+  companies_total: number | null;
+  companies_enriched_24h: number | null;
+  contacts_qualified: number | null;
+  scraper_runs_24h: number | null;
   llm_cost_eur_month: number;
   quality_distribution: { complete: number; partielle: number; basique: number };
   size_distribution: Record<string, number>;
@@ -58,6 +64,33 @@ function fraicheur(computedAt: string | undefined, maintenant: number = Date.now
   return `chiffres mis à jour il y a ${Math.floor(minutes / 60)} h`;
 }
 
+const CHIFFRE_INDISPONIBLE = 'Chiffre indisponible pour le moment';
+
+/**
+ * Un compteur tel qu'il s'affiche : formaté en français, ou « — » avec son
+ * infobulle quand le serveur n'a pas pu le calculer. Jamais un 0 inventé.
+ */
+function valeurKpi(n: number | null | undefined) {
+  if (typeof n === 'number') return n.toLocaleString('fr-FR');
+  return (
+    <Tooltip content={CHIFFRE_INDISPONIBLE}>
+      <span tabIndex={0} className="cursor-help" data-testid="chiffre-indisponible">
+        —<span className="sr-only"> {CHIFFRE_INDISPONIBLE}</span>
+      </span>
+    </Tooltip>
+  );
+}
+
+/**
+ * 409 `no_workspace` : le compte n'est rattaché à aucun espace de travail. Le
+ * serveur ne compte alors RIEN (cloisonnement) et le dit ; avant, il rendait
+ * des zéros et l'écran annonçait « Votre base est vide ».
+ */
+function estSansEspace(err: unknown): boolean {
+  const q = qualifierErreur(err);
+  return q.status === 409 && q.code === 'no_workspace';
+}
+
 interface MeResponse {
   user: { id: string; name?: string | null; email?: string | null };
 }
@@ -85,7 +118,8 @@ export function DashboardPage() {
   const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async ({ signal }) => (await api.get<DashboardStats>('/dashboard/stats', { signal })).data,
-    refetchInterval: 30_000,
+    // Sans espace de travail, redemander toutes les 30 s ne changera rien.
+    refetchInterval: (query) => (estSansEspace(query.state.error) ? false : 30_000),
     // D25-008 — PAS de `placeholderData` ici, et c'est délibéré. Un
     // `placeholderData` met `isPending` à faux dès le premier rendu ; `isLoading`
     // (= isPending && isFetching) ne vaut alors JAMAIS vrai, et le
@@ -113,6 +147,7 @@ export function DashboardPage() {
   const firstName = firstNameFrom(me);
   // P0-1 — une panne n'est PAS une base vide. L'état vide n'existe que sur un
   // vrai 0 venu d'une réponse RÉUSSIE ; un échec affiche l'erreur.
+  const sansEspace = estSansEspace(error);
   const echec = error !== null && data === undefined;
   const isEmpty = data !== undefined && data.companies_total === 0;
   const miseAJour = fraicheur(data?.computed_at);
@@ -141,6 +176,14 @@ export function DashboardPage() {
 
       {isLoading ? (
         <DashboardSkeleton />
+      ) : sansEspace ? (
+        <Card padding="lg">
+          <EmptyState
+            title="Aucun espace de travail"
+            description="Aucun espace de travail n’est rattaché à votre compte. Contactez l’administrateur."
+            icon={<FolderX />}
+          />
+        </Card>
       ) : echec ? (
         <QueryErrorState error={error} contexte="les chiffres du tableau de bord" onRetry={() => void refetch()} />
       ) : isEmpty ? (
@@ -166,7 +209,7 @@ export function DashboardPage() {
             <KpiCard
               tone="sky"
               label="Total entreprises"
-              value={stats.companies_total.toLocaleString('fr-FR')}
+              value={valeurKpi(stats.companies_total)}
               sublabel="Toutes périodes confondues"
               {...(typeof stats.companies_total_trend_pct === 'number'
                 ? {
@@ -181,7 +224,7 @@ export function DashboardPage() {
             <KpiCard
               tone="violet"
               label="Enrichies 24h"
-              value={stats.companies_enriched_24h.toLocaleString('fr-FR')}
+              value={valeurKpi(stats.companies_enriched_24h)}
               sublabel="Fiches enrichies sur 24h"
               {...(typeof stats.enriched_24h_trend_pct === 'number'
                 ? {
@@ -198,7 +241,7 @@ export function DashboardPage() {
               label="Nouvelles 7j"
               // Pas de valeur inventée (l'ancien repli `enrichies 24 h × 7`) :
               // sans chiffre du serveur, on l'écrit.
-              value={typeof stats.companies_new_7d === 'number' ? stats.companies_new_7d.toLocaleString('fr-FR') : '—'}
+              value={valeurKpi(stats.companies_new_7d)}
               sublabel="Découvertes sur 7 jours"
               {...(typeof stats.new_7d_trend_pct === 'number'
                 ? {

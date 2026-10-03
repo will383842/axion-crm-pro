@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\Referentiels\LibellesNaf;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
@@ -92,6 +93,22 @@ class CompaniesController extends ApiController
                 ->defaultSort('-quality_score')
                 ->where('workspace_id', $workspaceId);
 
+            // Lot 3 (2026-10-02) — « Entreprises : ~10 s de rendu, 345 Ko
+            // pour 100 lignes ». La liste rendait chaque fiche ENTIÈRE,
+            // `signals` et `metadata` (JSON de plusieurs Ko) compris, que
+            // l'écran n'affiche pas. `vue=liste` ne rend que les colonnes
+            // de la grille. Sans ce paramètre, la réponse est inchangée
+            // (les autres appelants de `/companies` ne bougent pas).
+            $colonnes = $r->query('vue') === 'liste' ? self::COLONNES_LISTE : ['*'];
+
+            // Lot N7 (2026-10-03) — `naf_label`, le libellé INSEE de la
+            // sous-classe (« Programmation informatique » pour « 62.01Z »).
+            // Sous-requête scalaire sur la clé primaire de la petite table de
+            // référence : évaluée pour les seules lignes de la page, sans
+            // effet sur le tri, les filtres ni le comptage (cf. LibellesNaf).
+            $query->select(array_map(static fn (string $c): string => 'companies.' . $c, $colonnes))
+                ->selectRaw(LibellesNaf::sqlLibelleSousClasse('companies') . ' AS naf_label');
+
             // 🔴 G41-006 (S1) — LE TOTAL COUTAIT 148 FOIS LA PAGE.
             //
             // `paginate($perPage)` emet TOUJOURS un `select count(*)` complet
@@ -123,13 +140,9 @@ class CompaniesController extends ApiController
             // pres (60 s de fraicheur). Cf. `App\Support\TotalListe`.
             $page = $query->paginate(
                 $perPage,
-                // Lot 3 (2026-10-02) — « Entreprises : ~10 s de rendu, 345 Ko
-                // pour 100 lignes ». La liste rendait chaque fiche ENTIÈRE,
-                // `signals` et `metadata` (JSON de plusieurs Ko) compris, que
-                // l'écran n'affiche pas. `vue=liste` ne rend que les colonnes
-                // de la grille. Sans ce paramètre, la réponse est inchangée
-                // (les autres appelants de `/companies` ne bougent pas).
-                $r->query('vue') === 'liste' ? self::COLONNES_LISTE : ['*'],
+                // Les colonnes sont posées par `select()` ci-dessus : `paginate`
+                // ne les applique que si la requête n'en porte aucune.
+                ['*'],
                 'page',
                 null,
                 // `toBase()` et non `getEloquentBuilder()` : un comptage
@@ -572,6 +585,13 @@ class CompaniesController extends ApiController
         // `masquerSiRequis` descend dans les relations DEJA chargees : la regle
         // ne vit plus dans l'appelant, qui n'a plus a savoir quelles colonnes
         // portent une coordonnee.
+        // Lot N7 — même libellé que la liste, par la même expression SQL.
+        $libelle = DB::selectOne(
+            'SELECT ' . LibellesNaf::sqlLibelleSousClasse('companies') . ' AS naf_label FROM companies WHERE id = ?',
+            [$company->getKey()],
+        );
+        $company->setAttribute('naf_label', $libelle?->naf_label);
+
         return $this->ok(MasquageCoordonnees::masquerSiRequis($company->load($relations)));
     }
 

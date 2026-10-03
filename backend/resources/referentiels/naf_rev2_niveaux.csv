@@ -1,0 +1,997 @@
+niveau,code,parent,libelle
+section,A,,"Agriculture, sylviculture et pêche"
+section,B,,Industries extractives
+section,C,,Industrie manufacturière
+section,D,,"Production et distribution d'électricité, de gaz, de vapeur et d'air conditionné"
+section,E,,"Production et distribution d'eau ; assainissement, gestion des déchets et dépollution"
+section,F,,Construction
+section,G,,Commerce ; réparation d'automobiles et de motocycles
+section,H,,Transports et entreposage
+section,I,,Hébergement et restauration
+section,J,,Information et communication
+section,K,,Activités financières et d'assurance
+section,L,,Activités immobilières
+section,M,,"Activités spécialisées, scientifiques et techniques"
+section,N,,Activités de services administratifs et de soutien
+section,O,,Administration publique
+section,P,,Enseignement
+section,Q,,Santé humaine et action sociale
+section,R,,"Arts, spectacles et activités récréatives"
+section,S,,Autres activités de services
+section,T,,Activités des ménages en tant qu'employeurs ; activités indifférenciées des ménages en tant que producteurs de biens et services pour usage propre
+section,U,,Activités extra-territoriales
+division,01,A,"Culture et production animale, chasse et services annexes"
+division,02,A,Sylviculture et exploitation forestière
+division,03,A,Pêche et aquaculture
+division,05,B,Extraction de houille et de lignite
+division,06,B,Extraction d'hydrocarbures
+division,07,B,Extraction de minerais métalliques
+division,08,B,Autres industries extractives
+division,09,B,Services de soutien aux industries extractives
+division,10,C,Industries alimentaires
+division,11,C,Fabrication de boissons
+division,12,C,Fabrication de produits à base de tabac
+division,13,C,Fabrication de textiles
+division,14,C,Industrie de l'habillement
+division,15,C,Industrie du cuir et de la chaussure
+division,16,C,"Travail du bois et fabrication d'articles en bois et en liège, à l'exception des meubles ; fabrication d'articles en vannerie et sparterie"
+division,17,C,Industrie du papier et du carton
+division,18,C,Imprimerie et reproduction d'enregistrements
+division,19,C,Cokéfaction et raffinage
+division,20,C,Industrie chimique
+division,21,C,Industrie pharmaceutique
+division,22,C,Fabrication de produits en caoutchouc et en plastique
+division,23,C,Fabrication d'autres produits minéraux non métalliques
+division,24,C,Métallurgie
+division,25,C,"Fabrication de produits métalliques, à l'exception des machines et des équipements"
+division,26,C,"Fabrication de produits informatiques, électroniques et optiques"
+division,27,C,Fabrication d'équipements électriques
+division,28,C,Fabrication de machines et équipements n.c.a.
+division,29,C,Industrie automobile
+division,30,C,Fabrication d'autres matériels de transport
+division,31,C,Fabrication de meubles
+division,32,C,Autres industries manufacturières
+division,33,C,Réparation et installation de machines et d'équipements
+division,35,D,"Production et distribution d'électricité, de gaz, de vapeur et d'air conditionné"
+division,36,E,"Captage, traitement et distribution d'eau"
+division,37,E,Collecte et traitement des eaux usées
+division,38,E,"Collecte, traitement et élimination des déchets ; récupération"
+division,39,E,Dépollution et autres services de gestion des déchets
+division,41,F,Construction de bâtiments
+division,42,F,Génie civil
+division,43,F,Travaux de construction spécialisés
+division,45,G,Commerce et réparation d'automobiles et de motocycles
+division,46,G,"Commerce de gros, à l'exception des automobiles et des motocycles"
+division,47,G,"Commerce de détail, à l'exception des automobiles et des motocycles"
+division,49,H,Transports terrestres et transport par conduites
+division,50,H,Transports par eau
+division,51,H,Transports aériens
+division,52,H,Entreposage et services auxiliaires des transports
+division,53,H,Activités de poste et de courrier
+division,55,I,Hébergement
+division,56,I,Restauration
+division,58,J,Édition
+division,59,J,"Production de films cinématographiques, de vidéo et de programmes de télévision ; enregistrement sonore et édition musicale"
+division,60,J,Programmation et diffusion
+division,61,J,Télécommunications
+division,62,J,"Programmation, conseil et autres activités informatiques"
+division,63,J,Services d'information
+division,64,K,"Activités des services financiers, hors assurance et caisses de retraite"
+division,65,K,Assurance
+division,66,K,Activités auxiliaires de services financiers et d'assurance
+division,68,L,Activités immobilières
+division,69,M,Activités juridiques et comptables
+division,70,M,Activités des sièges sociaux ; conseil de gestion
+division,71,M,Activités d'architecture et d'ingénierie ; activités de contrôle et analyses techniques
+division,72,M,Recherche-développement scientifique
+division,73,M,Publicité et études de marché
+division,74,M,"Autres activités spécialisées, scientifiques et techniques"
+division,75,M,Activités vétérinaires
+division,77,N,Activités de location et location-bail
+division,78,N,Activités liées à l'emploi
+division,79,N,"Activités des agences de voyage, voyagistes, services de réservation et activités connexes"
+division,80,N,Enquêtes et sécurité
+division,81,N,Services relatifs aux bâtiments et aménagement paysager
+division,82,N,Activités administratives et autres activités de soutien aux entreprises
+division,84,O,Administration publique et défense ; sécurité sociale obligatoire
+division,85,P,Enseignement
+division,86,Q,Activités pour la santé humaine
+division,87,Q,Hébergement médico-social et social
+division,88,Q,Action sociale sans hébergement
+division,90,R,"Activités créatives, artistiques et de spectacle"
+division,91,R,"Bibliothèques, archives, musées et autres activités culturelles"
+division,92,R,Organisation de jeux de hasard et d'argent
+division,93,R,"Activités sportives, récréatives et de loisirs"
+division,94,S,Activités des organisations associatives
+division,95,S,Réparation d'ordinateurs et de biens personnels et domestiques
+division,96,S,Autres services personnels
+division,97,T,Activités des ménages en tant qu'employeurs de personnel domestique
+division,98,T,Activités indifférenciées des ménages en tant que producteurs de biens et services pour usage propre
+division,99,U,Activités des organisations et organismes extraterritoriaux
+groupe,01.1,01,Cultures non permanentes
+groupe,01.2,01,Cultures permanentes
+groupe,01.3,01,Reproduction de plantes
+groupe,01.4,01,Production animale
+groupe,01.5,01,Culture et élevage associés
+groupe,01.6,01,Activités de soutien à l'agriculture et traitement primaire des récoltes
+groupe,01.7,01,"Chasse, piégeage et services annexes"
+groupe,02.1,02,Sylviculture et autres activités forestières
+groupe,02.2,02,Exploitation forestière
+groupe,02.3,02,Récolte de produits forestiers non ligneux poussant à l'état sauvage
+groupe,02.4,02,Services de soutien à l'exploitation forestière
+groupe,03.1,03,Pêche
+groupe,03.2,03,Aquaculture
+groupe,05.1,05,Extraction de houille
+groupe,05.2,05,Extraction de lignite
+groupe,06.1,06,Extraction de pétrole brut
+groupe,06.2,06,Extraction de gaz naturel
+groupe,07.1,07,Extraction de minerais de fer
+groupe,07.2,07,Extraction de minerais de métaux non ferreux
+groupe,08.1,08,"Extraction de pierres, de sables et d'argiles"
+groupe,08.9,08,Activités extractives n.c.a.
+groupe,09.1,09,Activités de soutien à l'extraction d'hydrocarbures
+groupe,09.9,09,Activités de soutien aux autres industries extractives
+groupe,10.1,10,Transformation et conservation de la viande et préparation de produits à base de viande
+groupe,10.2,10,"Transformation et conservation de poisson, de crustacés et de mollusques"
+groupe,10.3,10,Transformation et conservation de fruits et légumes
+groupe,10.4,10,Fabrication d'huiles et graisses végétales et animales
+groupe,10.5,10,Fabrication de produits laitiers
+groupe,10.6,10,Travail des grains ; fabrication de produits amylacés
+groupe,10.7,10,Fabrication de produits de boulangerie-pâtisserie et de pâtes alimentaires
+groupe,10.8,10,Fabrication d'autres produits alimentaires
+groupe,10.9,10,Fabrication d'aliments pour animaux
+groupe,11.0,11,Fabrication de boissons
+groupe,12.0,12,Fabrication de produits à base de tabac
+groupe,13.1,13,Préparation de fibres textiles et filature
+groupe,13.2,13,Tissage
+groupe,13.3,13,Ennoblissement textile
+groupe,13.9,13,Fabrication d'autres textiles
+groupe,14.1,14,"Fabrication de vêtements, autres qu'en fourrure"
+groupe,14.2,14,Fabrication d'articles en fourrure
+groupe,14.3,14,Fabrication d'articles à mailles
+groupe,15.1,15,"Apprêt et tannage des cuirs ; préparation et teinture des fourrures ; fabrication d'articles de voyage, de maroquinerie et de sellerie"
+groupe,15.2,15,Fabrication de chaussures
+groupe,16.1,16,Sciage et rabotage du bois
+groupe,16.2,16,"Fabrication d'articles en bois, liège, vannerie et sparterie"
+groupe,17.1,17,"Fabrication de pâte à papier, de papier et de carton"
+groupe,17.2,17,Fabrication d'articles en papier ou en carton
+groupe,18.1,18,Imprimerie et services annexes
+groupe,18.2,18,Reproduction d'enregistrements
+groupe,19.1,19,Cokéfaction
+groupe,19.2,19,Raffinage du pétrole
+groupe,20.1,20,"Fabrication de produits chimiques de base, de produits azotés et d'engrais, de matières plastiques de base et de caoutchouc synthétique"
+groupe,20.2,20,Fabrication de pesticides et d'autres produits agrochimiques
+groupe,20.3,20,"Fabrication de peintures, vernis, encres et mastics"
+groupe,20.4,20,"Fabrication de savons, de produits d'entretien et de parfums"
+groupe,20.5,20,Fabrication d'autres produits chimiques
+groupe,20.6,20,Fabrication de fibres artificielles ou synthétiques
+groupe,21.1,21,Fabrication de produits pharmaceutiques de base
+groupe,21.2,21,Fabrication de préparations pharmaceutiques
+groupe,22.1,22,Fabrication de produits en caoutchouc
+groupe,22.2,22,Fabrication de produits en plastique
+groupe,23.1,23,Fabrication de verre et d'articles en verre
+groupe,23.2,23,Fabrication de produits réfractaires
+groupe,23.3,23,Fabrication de matériaux de construction en terre cuite
+groupe,23.4,23,Fabrication d'autres produits en céramique et en porcelaine
+groupe,23.5,23,"Fabrication de ciment, chaux et plâtre"
+groupe,23.6,23,"Fabrication d'ouvrages en béton, en ciment ou en plâtre"
+groupe,23.7,23,"Taille, façonnage et finissage de pierres"
+groupe,23.9,23,Fabrication de produits abrasifs et de produits minéraux non métalliques n.c.a.
+groupe,24.1,24,Sidérurgie
+groupe,24.2,24,"Fabrication de tubes, tuyaux, profilés creux et accessoires correspondants en acier"
+groupe,24.3,24,Fabrication d'autres produits de première transformation de l'acier
+groupe,24.4,24,Production de métaux précieux et d'autres métaux non ferreux
+groupe,24.5,24,Fonderie
+groupe,25.1,25,Fabrication d'éléments en métal pour la construction
+groupe,25.2,25,"Fabrication de réservoirs, citernes et conteneurs métalliques"
+groupe,25.3,25,"Fabrication de générateurs de vapeur, à l'exception des chaudières pour le chauffage central"
+groupe,25.4,25,Fabrication d'armes et de munitions
+groupe,25.5,25,"Forge, emboutissage, estampage ; métallurgie des poudres"
+groupe,25.6,25,Traitement et revêtement des métaux ; usinage
+groupe,25.7,25,"Fabrication de coutellerie, d'outillage et de quincaillerie"
+groupe,25.9,25,Fabrication d'autres ouvrages en métaux
+groupe,26.1,26,Fabrication de composants et cartes électroniques
+groupe,26.2,26,Fabrication d'ordinateurs et d'équipements périphériques
+groupe,26.3,26,Fabrication d'équipements de communication
+groupe,26.4,26,Fabrication de produits électroniques grand public
+groupe,26.5,26,"Fabrication d'instruments et d'appareils de mesure, d'essai et de navigation ; horlogerie"
+groupe,26.6,26,"Fabrication d'équipements d'irradiation médicale, d'équipements électromédicaux et électrothérapeutiques"
+groupe,26.7,26,Fabrication de matériels optique et photographique
+groupe,26.8,26,Fabrication de supports magnétiques et optiques
+groupe,27.1,27,"Fabrication de moteurs, génératrices et transformateurs électriques et de matériel de distribution et de commande électrique"
+groupe,27.2,27,Fabrication de piles et d'accumulateurs électriques
+groupe,27.3,27,Fabrication de fils et câbles et de matériel d'installation électrique
+groupe,27.4,27,Fabrication d'appareils d'éclairage électrique
+groupe,27.5,27,Fabrication d'appareils ménagers
+groupe,27.9,27,Fabrication d'autres matériels électriques
+groupe,28.1,28,Fabrication de machines d'usage général
+groupe,28.2,28,Fabrication d'autres machines d'usage général
+groupe,28.3,28,Fabrication de machines agricoles et forestières
+groupe,28.4,28,Fabrication de machines de formage des métaux et de machines-outils
+groupe,28.9,28,Fabrication d'autres machines d'usage spécifique
+groupe,29.1,29,Construction de véhicules automobiles
+groupe,29.2,29,Fabrication de carrosseries et remorques
+groupe,29.3,29,Fabrication d'équipements automobiles
+groupe,30.1,30,Construction navale
+groupe,30.2,30,Construction de locomotives et d'autre matériel ferroviaire roulant
+groupe,30.3,30,Construction aéronautique et spatiale
+groupe,30.4,30,Construction de véhicules militaires de combat
+groupe,30.9,30,Fabrication de matériels de transport n.c.a.
+groupe,31.0,31,Fabrication de meubles
+groupe,32.1,32,"Fabrication d'articles de joaillerie, bijouterie et articles similaires"
+groupe,32.2,32,Fabrication d'instruments de musique
+groupe,32.3,32,Fabrication d'articles de sport
+groupe,32.4,32,Fabrication de jeux et jouets
+groupe,32.5,32,Fabrication d'instruments et de fournitures à usage médical et dentaire
+groupe,32.9,32,Activités manufacturières n.c.a.
+groupe,33.1,33,"Réparation d'ouvrages en métaux, de machines et d'équipements"
+groupe,33.2,33,Installation de machines et d'équipements industriels
+groupe,35.1,35,"Production, transport et distribution d'électricité"
+groupe,35.2,35,Production et distribution de combustibles gazeux
+groupe,35.3,35,Production et distribution de vapeur et d'air conditionné
+groupe,36.0,36,"Captage, traitement et distribution d'eau"
+groupe,37.0,37,Collecte et traitement des eaux usées
+groupe,38.1,38,Collecte des déchets
+groupe,38.2,38,Traitement et élimination des déchets
+groupe,38.3,38,Récupération
+groupe,39.0,39,Dépollution et autres services de gestion des déchets
+groupe,41.1,41,Promotion immobilière
+groupe,41.2,41,Construction de bâtiments résidentiels et non résidentiels
+groupe,42.1,42,Construction de routes et de voies ferrées
+groupe,42.2,42,Construction de réseaux et de lignes
+groupe,42.9,42,Construction d'autres ouvrages de génie civil
+groupe,43.1,43,Démolition et préparation des sites
+groupe,43.2,43,"Travaux d'installation électrique, plomberie et autres travaux d'installation"
+groupe,43.3,43,Travaux de finition
+groupe,43.9,43,Autres travaux de construction spécialisés
+groupe,45.1,45,Commerce de véhicules automobiles
+groupe,45.2,45,Entretien et réparation de véhicules automobiles
+groupe,45.3,45,Commerce d'équipements automobiles
+groupe,45.4,45,Commerce et réparation de motocycles
+groupe,46.1,46,Intermédiaires du commerce de gros
+groupe,46.2,46,Commerce de gros de produits agricoles bruts et d'animaux vivants
+groupe,46.3,46,"Commerce de gros de produits alimentaires, de boissons et de tabac"
+groupe,46.4,46,Commerce de gros de biens domestiques
+groupe,46.5,46,Commerce de gros d'équipements de l'information et de la communication
+groupe,46.6,46,Commerce de gros d'autres équipements industriels
+groupe,46.7,46,Autres commerces de gros spécialisés
+groupe,46.9,46,Commerce de gros non spécialisé
+groupe,47.1,47,Commerce de détail en magasin non spécialisé
+groupe,47.2,47,Commerce de détail alimentaire en magasin spécialisé
+groupe,47.3,47,Commerce de détail de carburants en magasin spécialisé
+groupe,47.4,47,Commerce de détail d'équipements de l'information et de la communication en magasin spécialisé
+groupe,47.5,47,Commerce de détail d'autres équipements du foyer en magasin spécialisé
+groupe,47.6,47,Commerce de détail de biens culturels et de loisirs en magasin spécialisé
+groupe,47.7,47,Autres commerces de détail en magasin spécialisé
+groupe,47.8,47,Commerce de détail sur éventaires et marchés
+groupe,47.9,47,"Commerce de détail hors magasin, éventaires ou marchés"
+groupe,49.1,49,Transport ferroviaire interurbain de voyageurs
+groupe,49.2,49,Transports ferroviaires de fret
+groupe,49.3,49,Autres transports terrestres de voyageurs
+groupe,49.4,49,Transports routiers de fret et services de déménagement
+groupe,49.5,49,Transports par conduites
+groupe,50.1,50,Transports maritimes et côtiers de passagers
+groupe,50.2,50,Transports maritimes et côtiers de fret
+groupe,50.3,50,Transports fluviaux de passagers
+groupe,50.4,50,Transports fluviaux de fret
+groupe,51.1,51,Transports aériens de passagers
+groupe,51.2,51,Transports aériens de fret et transports spatiaux
+groupe,52.1,52,Entreposage et stockage
+groupe,52.2,52,Services auxiliaires des transports
+groupe,53.1,53,Activités de poste dans le cadre d'une obligation de service universel
+groupe,53.2,53,Autres activités de poste et de courrier
+groupe,55.1,55,Hôtels et hébergement similaire
+groupe,55.2,55,Hébergement touristique et autre hébergement de courte durée
+groupe,55.3,55,Terrains de camping et parcs pour caravanes ou véhicules de loisirs
+groupe,55.9,55,Autres hébergements
+groupe,56.1,56,Restaurants et services de restauration mobile
+groupe,56.2,56,Traiteurs et autres services de restauration
+groupe,56.3,56,Débits de boissons
+groupe,58.1,58,Édition de livres et périodiques et autres activités d'édition
+groupe,58.2,58,Édition de logiciels
+groupe,59.1,59,"Activités cinématographiques, vidéo et de télévision"
+groupe,59.2,59,Enregistrement sonore et édition musicale
+groupe,60.1,60,Édition et diffusion de programmes radio
+groupe,60.2,60,Programmation de télévision et télédiffusion
+groupe,61.1,61,Télécommunications filaires
+groupe,61.2,61,Télécommunications sans fil
+groupe,61.3,61,Télécommunications par satellite
+groupe,61.9,61,Autres activités de télécommunication
+groupe,62.0,62,"Programmation, conseil et autres activités informatiques"
+groupe,63.1,63,"Traitement de données, hébergement et activités connexes ; portails Internet"
+groupe,63.9,63,Autres services d'information
+groupe,64.1,64,Intermédiation monétaire
+groupe,64.2,64,Activités des sociétés holding
+groupe,64.3,64,Fonds de placement et entités financières similaires
+groupe,64.9,64,"Autres activités des services financiers, hors assurance et caisses de retraite"
+groupe,65.1,65,Assurance
+groupe,65.2,65,Réassurance
+groupe,65.3,65,Caisses de retraite
+groupe,66.1,66,"Activités auxiliaires de services financiers, hors assurance et caisses de retraite"
+groupe,66.2,66,Activités auxiliaires d'assurance et de caisses de retraite
+groupe,66.3,66,Gestion de fonds
+groupe,68.1,68,Activités des marchands de biens immobiliers
+groupe,68.2,68,Location et exploitation de biens immobiliers propres ou loués
+groupe,68.3,68,Activités immobilières pour compte de tiers
+groupe,69.1,69,Activités juridiques
+groupe,69.2,69,Activités comptables
+groupe,70.1,70,Activités des sièges sociaux
+groupe,70.2,70,Conseil de gestion
+groupe,71.1,71,Activités d'architecture et d'ingénierie
+groupe,71.2,71,Activités de contrôle et analyses techniques
+groupe,72.1,72,Recherche-développement en sciences physiques et naturelles
+groupe,72.2,72,Recherche-développement en sciences humaines et sociales
+groupe,73.1,73,Publicité
+groupe,73.2,73,Études de marché et sondages
+groupe,74.1,74,Activités spécialisées de design
+groupe,74.2,74,Activités photographiques
+groupe,74.3,74,Traduction et interprétation
+groupe,74.9,74,"Autres activités spécialisées, scientifiques et techniques n.c.a."
+groupe,75.0,75,Activités vétérinaires
+groupe,77.1,77,Location et location-bail de véhicules automobiles
+groupe,77.2,77,Location et location-bail de biens personnels et domestiques
+groupe,77.3,77,"Location et location-bail d'autres machines, équipements et biens"
+groupe,77.4,77,"Location-bail de propriété intellectuelle et de produits similaires, à l'exception des œuvres soumises à copyright"
+groupe,78.1,78,Activités des agences de placement de main-d'œuvre
+groupe,78.2,78,Activités des agences de travail temporaire
+groupe,78.3,78,Autre mise à disposition de ressources humaines
+groupe,79.1,79,Activités des agences de voyage et voyagistes
+groupe,79.9,79,Autres services de réservation et activités connexes
+groupe,80.1,80,Activités de sécurité privée
+groupe,80.2,80,Activités liées aux systèmes de sécurité
+groupe,80.3,80,Activités d'enquête
+groupe,81.1,81,Activités combinées de soutien lié aux bâtiments
+groupe,81.2,81,Activités de nettoyage
+groupe,81.3,81,Services d'aménagement paysager
+groupe,82.1,82,Activités administratives
+groupe,82.2,82,Activités de centres d'appels
+groupe,82.3,82,Organisation de salons professionnels et congrès
+groupe,82.9,82,Activités de soutien aux entreprises n.c.a.
+groupe,84.1,84,"Administration générale, économique et sociale"
+groupe,84.2,84,Services de prérogative publique
+groupe,84.3,84,Sécurité sociale obligatoire
+groupe,85.1,85,Enseignement pré-primaire
+groupe,85.2,85,Enseignement primaire
+groupe,85.3,85,Enseignement secondaire
+groupe,85.4,85,Enseignement supérieur et post-secondaire non supérieur
+groupe,85.5,85,Autres activités d'enseignement
+groupe,85.6,85,Activités de soutien à l'enseignement
+groupe,86.1,86,Activités hospitalières
+groupe,86.2,86,Activité des médecins et des dentistes
+groupe,86.9,86,Autres activités pour la santé humaine
+groupe,87.1,87,Hébergement médicalisé
+groupe,87.2,87,"Hébergement social pour personnes handicapées mentales, malades mentales et toxicomanes"
+groupe,87.3,87,Hébergement social pour personnes âgées ou handicapées physiques
+groupe,87.9,87,Autres activités d'hébergement social
+groupe,88.1,88,Action sociale sans hébergement pour personnes âgées et pour personnes handicapées
+groupe,88.9,88,Autre action sociale sans hébergement
+groupe,90.0,90,"Activités créatives, artistiques et de spectacle"
+groupe,91.0,91,"Bibliothèques, archives, musées et autres activités culturelles"
+groupe,92.0,92,Organisation de jeux de hasard et d'argent
+groupe,93.1,93,Activités liées au sport
+groupe,93.2,93,Activités récréatives et de loisirs
+groupe,94.1,94,"Activités des organisations économiques, patronales et professionnelles"
+groupe,94.2,94,Activités des syndicats de salariés
+groupe,94.9,94,Activités des autres organisations associatives
+groupe,95.1,95,Réparation d'ordinateurs et d'équipements de communication
+groupe,95.2,95,Réparation de biens personnels et domestiques
+groupe,96.0,96,Autres services personnels
+groupe,97.0,97,Activités des ménages en tant qu'employeurs de personnel domestique
+groupe,98.1,98,Activités indifférenciées des ménages en tant que producteurs de biens pour usage propre
+groupe,98.2,98,Activités indifférenciées des ménages en tant que producteurs de services pour usage propre
+groupe,99.0,99,Activités des organisations et organismes extraterritoriaux
+classe,01.11,01.1,"Culture de céréales (à l'exception du riz), de légumineuses et de graines oléagineuses"
+classe,01.12,01.1,Culture du riz
+classe,01.13,01.1,"Culture de légumes, de melons, de racines et de tubercules"
+classe,01.14,01.1,Culture de la canne à sucre
+classe,01.15,01.1,Culture du tabac
+classe,01.16,01.1,Culture de plantes à fibres
+classe,01.19,01.1,Autres cultures non permanentes
+classe,01.21,01.2,Culture de la vigne
+classe,01.22,01.2,Culture de fruits tropicaux et subtropicaux
+classe,01.23,01.2,Culture d'agrumes
+classe,01.24,01.2,Culture de fruits à pépins et à noyau
+classe,01.25,01.2,Culture d'autres fruits d'arbres ou d'arbustes et de fruits à coque
+classe,01.26,01.2,Culture de fruits oléagineux
+classe,01.27,01.2,Culture de plantes à boissons
+classe,01.28,01.2,"Culture de plantes à épices, aromatiques, médicinales et pharmaceutiques"
+classe,01.29,01.2,Autres cultures permanentes
+classe,01.30,01.3,Reproduction de plantes
+classe,01.41,01.4,Élevage de vaches laitières
+classe,01.42,01.4,Élevage d'autres bovins et de buffles
+classe,01.43,01.4,Élevage de chevaux et d'autres équidés
+classe,01.44,01.4,Élevage de chameaux et d'autres camélidés
+classe,01.45,01.4,Élevage d'ovins et de caprins
+classe,01.46,01.4,Élevage de porcins
+classe,01.47,01.4,Élevage de volailles
+classe,01.49,01.4,Élevage d'autres animaux
+classe,01.50,01.5,Culture et élevage associés
+classe,01.61,01.6,Activités de soutien aux cultures
+classe,01.62,01.6,Activités de soutien à la production animale
+classe,01.63,01.6,Traitement primaire des récoltes
+classe,01.64,01.6,Traitement des semences
+classe,01.70,01.7,"Chasse, piégeage et services annexes"
+classe,02.10,02.1,Sylviculture et autres activités forestières
+classe,02.20,02.2,Exploitation forestière
+classe,02.30,02.3,Récolte de produits forestiers non ligneux poussant à l'état sauvage
+classe,02.40,02.4,Services de soutien à l'exploitation forestière
+classe,03.11,03.1,Pêche en mer
+classe,03.12,03.1,Pêche en eau douce
+classe,03.21,03.2,Aquaculture en mer
+classe,03.22,03.2,Aquaculture en eau douce
+classe,05.10,05.1,Extraction de houille
+classe,05.20,05.2,Extraction de lignite
+classe,06.10,06.1,Extraction de pétrole brut
+classe,06.20,06.2,Extraction de gaz naturel
+classe,07.10,07.1,Extraction de minerais de fer
+classe,07.21,07.2,Extraction de minerais d'uranium et de thorium
+classe,07.29,07.2,Extraction d'autres minerais de métaux non ferreux
+classe,08.11,08.1,"Extraction de pierres ornementales et de construction, de calcaire industriel, de gypse, de craie et d'ardoise"
+classe,08.12,08.1,"Exploitation de gravières et sablières, extraction d'argiles et de kaolin"
+classe,08.91,08.9,Extraction des minéraux chimiques et d'engrais minéraux
+classe,08.92,08.9,Extraction de tourbe
+classe,08.93,08.9,Production de sel
+classe,08.99,08.9,Autres activités extractives n.c.a.
+classe,09.10,09.1,Activités de soutien à l'extraction d'hydrocarbures
+classe,09.90,09.9,Activités de soutien aux autres industries extractives
+classe,10.11,10.1,Transformation et conservation de la viande de boucherie
+classe,10.12,10.1,Transformation et conservation de la viande de volaille
+classe,10.13,10.1,Préparation de produits à base de viande
+classe,10.20,10.2,"Transformation et conservation de poisson, de crustacés et de mollusques"
+classe,10.31,10.3,Transformation et conservation de pommes de terre
+classe,10.32,10.3,Préparation de jus de fruits et légumes
+classe,10.39,10.3,Autre transformation et conservation de fruits et légumes
+classe,10.41,10.4,Fabrication d'huiles et graisses
+classe,10.42,10.4,Fabrication de margarine et graisses comestibles similaires
+classe,10.51,10.5,Exploitation de laiteries et fabrication de fromage
+classe,10.52,10.5,Fabrication de glaces et sorbets
+classe,10.61,10.6,Travail des grains
+classe,10.62,10.6,Fabrication de produits amylacés
+classe,10.71,10.7,Fabrication de pain et de pâtisserie fraîche
+classe,10.72,10.7,"Fabrication de biscuits, biscottes et pâtisseries de conservation"
+classe,10.73,10.7,Fabrication de pâtes alimentaires
+classe,10.81,10.8,Fabrication de sucre
+classe,10.82,10.8,"Fabrication de cacao, chocolat et de produits de confiserie"
+classe,10.83,10.8,Transformation du thé et du café
+classe,10.84,10.8,Fabrication de condiments et assaisonnements
+classe,10.85,10.8,Fabrication de plats préparés
+classe,10.86,10.8,Fabrication d'aliments homogénéisés et diététiques
+classe,10.89,10.8,Fabrication d'autres produits alimentaires n.c.a.
+classe,10.91,10.9,Fabrication d'aliments pour animaux de ferme
+classe,10.92,10.9,Fabrication d'aliments pour animaux de compagnie
+classe,11.01,11.0,Production de boissons alcooliques distillées
+classe,11.02,11.0,Production de vin (de raisin)
+classe,11.03,11.0,Fabrication de cidre et de vins de fruits
+classe,11.04,11.0,Production d'autres boissons fermentées non distillées
+classe,11.05,11.0,Fabrication de bière
+classe,11.06,11.0,Fabrication de malt
+classe,11.07,11.0,Industrie des eaux minérales et autres eaux embouteillées et des boissons rafraîchissantes
+classe,12.00,12.0,Fabrication de produits à base de tabac
+classe,13.10,13.1,Préparation de fibres textiles et filature
+classe,13.20,13.2,Tissage
+classe,13.30,13.3,Ennoblissement textile
+classe,13.91,13.9,Fabrication d'étoffes à mailles
+classe,13.92,13.9,"Fabrication d'articles textiles, sauf habillement"
+classe,13.93,13.9,Fabrication de tapis et moquettes
+classe,13.94,13.9,"Fabrication de ficelles, cordes et filets"
+classe,13.95,13.9,"Fabrication de non-tissés, sauf habillement"
+classe,13.96,13.9,Fabrication d'autres textiles techniques et industriels
+classe,13.99,13.9,Fabrication d'autres textiles n.c.a.
+classe,14.11,14.1,Fabrication de vêtements en cuir
+classe,14.12,14.1,Fabrication de vêtements de travail
+classe,14.13,14.1,Fabrication de vêtements de dessus
+classe,14.14,14.1,Fabrication de vêtements de dessous
+classe,14.19,14.1,Fabrication d'autres vêtements et accessoires
+classe,14.20,14.2,Fabrication d'articles en fourrure
+classe,14.31,14.3,Fabrication d'articles chaussants à mailles
+classe,14.39,14.3,Fabrication d'autres articles à mailles
+classe,15.11,15.1,Apprêt et tannage des cuirs ; préparation et teinture des fourrures
+classe,15.12,15.1,"Fabrication d'articles de voyage, de maroquinerie et de sellerie"
+classe,15.20,15.2,Fabrication de chaussures
+classe,16.10,16.1,Sciage et rabotage du bois
+classe,16.21,16.2,Fabrication de placage et de panneaux de bois
+classe,16.22,16.2,Fabrication de parquets assemblés
+classe,16.23,16.2,Fabrication de charpentes et d'autres menuiseries
+classe,16.24,16.2,Fabrication d'emballages en bois
+classe,16.29,16.2,"Fabrication d'objets divers en bois ; fabrication d'objets en liège, vannerie et sparterie"
+classe,17.11,17.1,Fabrication de pâte à papier
+classe,17.12,17.1,Fabrication de papier et de carton
+classe,17.21,17.2,Fabrication de papier et carton ondulés et d'emballages en papier ou en carton
+classe,17.22,17.2,Fabrication d'articles en papier à usage sanitaire ou domestique
+classe,17.23,17.2,Fabrication d'articles de papeterie
+classe,17.24,17.2,Fabrication de papiers peints
+classe,17.29,17.2,Fabrication d'autres articles en papier ou en carton
+classe,18.11,18.1,Imprimerie de journaux
+classe,18.12,18.1,Autre imprimerie (labeur)
+classe,18.13,18.1,Activités de pré-presse
+classe,18.14,18.1,Reliure et activités connexes
+classe,18.20,18.2,Reproduction d'enregistrements
+classe,19.10,19.1,Cokéfaction
+classe,19.20,19.2,Raffinage du pétrole
+classe,20.11,20.1,Fabrication de gaz industriels
+classe,20.12,20.1,Fabrication de colorants et de pigments
+classe,20.13,20.1,Fabrication d'autres produits chimiques inorganiques de base
+classe,20.14,20.1,Fabrication d'autres produits chimiques organiques de base
+classe,20.15,20.1,Fabrication de produits azotés et d'engrais
+classe,20.16,20.1,Fabrication de matières plastiques de base
+classe,20.17,20.1,Fabrication de caoutchouc synthétique
+classe,20.20,20.2,Fabrication de pesticides et d'autres produits agrochimiques
+classe,20.30,20.3,"Fabrication de peintures, vernis, encres et mastics"
+classe,20.41,20.4,"Fabrication de savons, détergents et produits d'entretien"
+classe,20.42,20.4,Fabrication de parfums et de produits pour la toilette
+classe,20.51,20.5,Fabrication de produits explosifs
+classe,20.52,20.5,Fabrication de colles
+classe,20.53,20.5,Fabrication d'huiles essentielles
+classe,20.59,20.5,Fabrication d'autres produits chimiques n.c.a.
+classe,20.60,20.6,Fabrication de fibres artificielles ou synthétiques
+classe,21.10,21.1,Fabrication de produits pharmaceutiques de base
+classe,21.20,21.2,Fabrication de préparations pharmaceutiques
+classe,22.11,22.1,Fabrication et rechapage de pneumatiques
+classe,22.19,22.1,Fabrication d'autres articles en caoutchouc
+classe,22.21,22.2,"Fabrication de plaques, feuilles, tubes et profilés en matières plastiques"
+classe,22.22,22.2,Fabrication d'emballages en matières plastiques
+classe,22.23,22.2,Fabrication d'éléments en matières plastiques pour la construction
+classe,22.29,22.2,Fabrication d'autres articles en matières plastiques
+classe,23.11,23.1,Fabrication de verre plat
+classe,23.12,23.1,Façonnage et transformation du verre plat
+classe,23.13,23.1,Fabrication de verre creux
+classe,23.14,23.1,Fabrication de fibres de verre
+classe,23.19,23.1,"Fabrication et façonnage d'autres articles en verre, y compris verre technique"
+classe,23.20,23.2,Fabrication de produits réfractaires
+classe,23.31,23.3,Fabrication de carreaux en céramique
+classe,23.32,23.3,"Fabrication de briques, tuiles et produits de construction, en terre cuite"
+classe,23.41,23.4,Fabrication d'articles céramiques à usage domestique ou ornemental
+classe,23.42,23.4,Fabrication d'appareils sanitaires en céramique
+classe,23.43,23.4,Fabrication d'isolateurs et pièces isolantes en céramique
+classe,23.44,23.4,Fabrication d'autres produits céramiques à usage technique
+classe,23.49,23.4,Fabrication d'autres produits céramiques
+classe,23.51,23.5,Fabrication de ciment
+classe,23.52,23.5,Fabrication de chaux et plâtre
+classe,23.61,23.6,Fabrication d'éléments en béton pour la construction
+classe,23.62,23.6,Fabrication d'éléments en plâtre pour la construction
+classe,23.63,23.6,Fabrication de béton prêt à l'emploi
+classe,23.64,23.6,Fabrication de mortiers et bétons secs
+classe,23.65,23.6,Fabrication d'ouvrages en fibre-ciment
+classe,23.69,23.6,"Fabrication d'autres ouvrages en béton, en ciment ou en plâtre"
+classe,23.70,23.7,"Taille, façonnage et finissage de pierres"
+classe,23.91,23.9,Fabrication de produits abrasifs
+classe,23.99,23.9,Fabrication d'autres produits minéraux non métalliques n.c.a.
+classe,24.10,24.1,Sidérurgie
+classe,24.20,24.2,"Fabrication de tubes, tuyaux, profilés creux et accessoires correspondants en acier"
+classe,24.31,24.3,Étirage à froid de barres
+classe,24.32,24.3,Laminage à froid de feuillards
+classe,24.33,24.3,Profilage à froid par formage ou pliage
+classe,24.34,24.3,Tréfilage à froid
+classe,24.41,24.4,Production de métaux précieux
+classe,24.42,24.4,Métallurgie de l'aluminium
+classe,24.43,24.4,"Métallurgie du plomb, du zinc ou de l'étain"
+classe,24.44,24.4,Métallurgie du cuivre
+classe,24.45,24.4,Métallurgie des autres métaux non ferreux
+classe,24.46,24.4,Élaboration et transformation de matières nucléaires
+classe,24.51,24.5,Fonderie de fonte
+classe,24.52,24.5,Fonderie d'acier
+classe,24.53,24.5,Fonderie de métaux légers
+classe,24.54,24.5,Fonderie d'autres métaux non ferreux
+classe,25.11,25.1,Fabrication de structures métalliques et de parties de structures
+classe,25.12,25.1,Fabrication de portes et fenêtres en métal
+classe,25.21,25.2,Fabrication de radiateurs et de chaudières pour le chauffage central
+classe,25.29,25.2,"Fabrication d'autres réservoirs, citernes et conteneurs métalliques"
+classe,25.30,25.3,"Fabrication de générateurs de vapeur, à l'exception des chaudières pour le chauffage central"
+classe,25.40,25.4,Fabrication d'armes et de munitions
+classe,25.50,25.5,"Forge, emboutissage, estampage ; métallurgie des poudres"
+classe,25.61,25.6,Traitement et revêtement des métaux
+classe,25.62,25.6,Usinage
+classe,25.71,25.7,Fabrication de coutellerie
+classe,25.72,25.7,Fabrication de serrures et de ferrures
+classe,25.73,25.7,Fabrication d'outillage
+classe,25.91,25.9,Fabrication de fûts et emballages métalliques similaires
+classe,25.92,25.9,Fabrication d'emballages métalliques légers
+classe,25.93,25.9,"Fabrication d'articles en fils métalliques, de chaînes et de ressorts"
+classe,25.94,25.9,Fabrication de vis et de boulons
+classe,25.99,25.9,Fabrication d'autres produits métalliques n.c.a.
+classe,26.11,26.1,Fabrication de composants électroniques
+classe,26.12,26.1,Fabrication de cartes électroniques assemblées
+classe,26.20,26.2,Fabrication d'ordinateurs et d'équipements périphériques
+classe,26.30,26.3,Fabrication d'équipements de communication
+classe,26.40,26.4,Fabrication de produits électroniques grand public
+classe,26.51,26.5,"Fabrication d'instruments et d'appareils de mesure, d'essai et de navigation"
+classe,26.52,26.5,Horlogerie
+classe,26.60,26.6,"Fabrication d'équipements d'irradiation médicale, d'équipements électromédicaux et électrothérapeutiques"
+classe,26.70,26.7,Fabrication de matériels optique et photographique
+classe,26.80,26.8,Fabrication de supports magnétiques et optiques
+classe,27.11,27.1,"Fabrication de moteurs, génératrices et transformateurs électriques"
+classe,27.12,27.1,Fabrication de matériel de distribution et de commande électrique
+classe,27.20,27.2,Fabrication de piles et d'accumulateurs électriques
+classe,27.31,27.3,Fabrication de câbles de fibres optiques
+classe,27.32,27.3,Fabrication d'autres fils et câbles électroniques ou électriques
+classe,27.33,27.3,Fabrication de matériel d'installation électrique
+classe,27.40,27.4,Fabrication d'appareils d'éclairage électrique
+classe,27.51,27.5,Fabrication d'appareils électroménagers
+classe,27.52,27.5,Fabrication d'appareils ménagers non électriques
+classe,27.90,27.9,Fabrication d'autres matériels électriques
+classe,28.11,28.1,"Fabrication de moteurs et turbines, à l'exception des moteurs d'avions et de véhicules"
+classe,28.12,28.1,Fabrication d'équipements hydrauliques et pneumatiques
+classe,28.13,28.1,Fabrication d'autres pompes et compresseurs
+classe,28.14,28.1,Fabrication d'autres articles de robinetterie
+classe,28.15,28.1,Fabrication d'engrenages et d'organes mécaniques de transmission
+classe,28.21,28.2,Fabrication de fours et brûleurs
+classe,28.22,28.2,Fabrication de matériel de levage et de manutention
+classe,28.23,28.2,Fabrication de machines et d'équipements de bureau (à l'exception des ordinateurs et équipements périphériques)
+classe,28.24,28.2,Fabrication d'outillage portatif à moteur incorporé
+classe,28.25,28.2,Fabrication d'équipements aérauliques et frigorifiques industriels
+classe,28.29,28.2,Fabrication de machines diverses d'usage général
+classe,28.30,28.3,Fabrication de machines agricoles et forestières
+classe,28.41,28.4,Fabrication de machines de formage des métaux
+classe,28.49,28.4,Fabrication d'autres machines-outils
+classe,28.91,28.9,Fabrication de machines pour la métallurgie
+classe,28.92,28.9,Fabrication de machines pour l'extraction ou la construction
+classe,28.93,28.9,Fabrication de machines pour l'industrie agro-alimentaire
+classe,28.94,28.9,Fabrication de machines pour les industries textiles
+classe,28.95,28.9,Fabrication de machines pour les industries du papier et du carton
+classe,28.96,28.9,Fabrication de machines pour le travail du caoutchouc ou des plastiques
+classe,28.99,28.9,Fabrication d'autres machines d'usage spécifique n.c.a.
+classe,29.10,29.1,Construction de véhicules automobiles
+classe,29.20,29.2,Fabrication de carrosseries et remorques
+classe,29.31,29.3,Fabrication d'équipements électriques et électroniques automobiles
+classe,29.32,29.3,Fabrication d'autres équipements automobiles
+classe,30.11,30.1,Construction de navires et de structures flottantes
+classe,30.12,30.1,Construction de bateaux de plaisance
+classe,30.20,30.2,Construction de locomotives et d'autre matériel ferroviaire roulant
+classe,30.30,30.3,Construction aéronautique et spatiale
+classe,30.40,30.4,Construction de véhicules militaires de combat
+classe,30.91,30.9,Fabrication de motocycles
+classe,30.92,30.9,Fabrication de bicyclettes et de véhicules pour invalides
+classe,30.99,30.9,Fabrication d'autres équipements de transport n.c.a.
+classe,31.01,31.0,Fabrication de meubles de bureau et de magasin
+classe,31.02,31.0,Fabrication de meubles de cuisine
+classe,31.03,31.0,Fabrication de matelas
+classe,31.09,31.0,Fabrication d'autres meubles
+classe,32.11,32.1,Frappe de monnaie
+classe,32.12,32.1,Fabrication d'articles de joaillerie et bijouterie
+classe,32.13,32.1,Fabrication d'articles de bijouterie fantaisie et articles similaires
+classe,32.20,32.2,Fabrication d'instruments de musique
+classe,32.30,32.3,Fabrication d'articles de sport
+classe,32.40,32.4,Fabrication de jeux et jouets
+classe,32.50,32.5,Fabrication d'instruments et de fournitures à usage médical et dentaire
+classe,32.91,32.9,Fabrication d'articles de brosserie
+classe,32.99,32.9,Autres activités manufacturières n.c.a.
+classe,33.11,33.1,Réparation d'ouvrages en métaux
+classe,33.12,33.1,Réparation de machines et équipements mécaniques
+classe,33.13,33.1,Réparation de matériels électroniques et optiques
+classe,33.14,33.1,Réparation d'équipements électriques
+classe,33.15,33.1,Réparation et maintenance navale
+classe,33.16,33.1,Réparation et maintenance d'aéronefs et d'engins spatiaux
+classe,33.17,33.1,Réparation et maintenance d'autres équipements de transport
+classe,33.19,33.1,Réparation d'autres équipements
+classe,33.20,33.2,Installation de machines et d'équipements industriels
+classe,35.11,35.1,Production d'électricité
+classe,35.12,35.1,Transport d'électricité
+classe,35.13,35.1,Distribution d'électricité
+classe,35.14,35.1,Commerce d'électricité
+classe,35.21,35.2,Production de combustibles gazeux
+classe,35.22,35.2,Distribution de combustibles gazeux par conduites
+classe,35.23,35.2,Commerce de combustibles gazeux par conduites
+classe,35.30,35.3,Production et distribution de vapeur et d'air conditionné
+classe,36.00,36.0,"Captage, traitement et distribution d'eau"
+classe,37.00,37.0,Collecte et traitement des eaux usées
+classe,38.11,38.1,Collecte des déchets non dangereux
+classe,38.12,38.1,Collecte des déchets dangereux
+classe,38.21,38.2,Traitement et élimination des déchets non dangereux
+classe,38.22,38.2,Traitement et élimination des déchets dangereux
+classe,38.31,38.3,Démantèlement d'épaves
+classe,38.32,38.3,Récupération de déchets triés
+classe,39.00,39.0,Dépollution et autres services de gestion des déchets
+classe,41.10,41.1,Promotion immobilière
+classe,41.20,41.2,Construction de bâtiments résidentiels et non résidentiels
+classe,42.11,42.1,Construction de routes et autoroutes
+classe,42.12,42.1,Construction de voies ferrées de surface et souterraines
+classe,42.13,42.1,Construction de ponts et tunnels
+classe,42.21,42.2,Construction de réseaux pour fluides
+classe,42.22,42.2,Construction de réseaux électriques et de télécommunications
+classe,42.91,42.9,Construction d'ouvrages maritimes et fluviaux
+classe,42.99,42.9,Construction d'autres ouvrages de génie civil n.c.a.
+classe,43.11,43.1,Travaux de démolition
+classe,43.12,43.1,Travaux de préparation des sites
+classe,43.13,43.1,Forages et sondages
+classe,43.21,43.2,Installation électrique
+classe,43.22,43.2,Travaux de plomberie et installation de chauffage et de conditionnement d'air
+classe,43.29,43.2,Autres travaux d'installation
+classe,43.31,43.3,Travaux de plâtrerie
+classe,43.32,43.3,Travaux de menuiserie
+classe,43.33,43.3,Travaux de revêtement des sols et des murs
+classe,43.34,43.3,Travaux de peinture et vitrerie
+classe,43.39,43.3,Autres travaux de finition
+classe,43.91,43.9,Travaux de couverture
+classe,43.99,43.9,Autres travaux de construction spécialisés n.c.a.
+classe,45.11,45.1,Commerce de voitures et de véhicules automobiles légers
+classe,45.19,45.1,Commerce d'autres véhicules automobiles
+classe,45.20,45.2,Entretien et réparation de véhicules automobiles
+classe,45.31,45.3,Commerce de gros d'équipements automobiles
+classe,45.32,45.3,Commerce de détail d'équipements automobiles
+classe,45.40,45.4,Commerce et réparation de motocycles
+classe,46.11,46.1,"Intermédiaires du commerce en matières premières agricoles, animaux vivants, matières premières textiles et produits semi-finis"
+classe,46.12,46.1,"Intermédiaires du commerce en combustibles, métaux, minéraux et produits chimiques"
+classe,46.13,46.1,Intermédiaires du commerce en bois et matériaux de construction
+classe,46.14,46.1,"Intermédiaires du commerce en machines, équipements industriels, navires et avions"
+classe,46.15,46.1,"Intermédiaires du commerce en meubles, articles de ménage et quincaillerie"
+classe,46.16,46.1,"Intermédiaires du commerce en textiles, habillement, fourrures, chaussures et articles en cuir"
+classe,46.17,46.1,"Intermédiaires du commerce en denrées, boissons et tabac"
+classe,46.18,46.1,Intermédiaires spécialisés dans le commerce d'autres produits spécifiques
+classe,46.19,46.1,Intermédiaires du commerce en produits divers
+classe,46.21,46.2,"Commerce de gros de céréales, de tabac non manufacturé, de semences et d'aliments pour le bétail"
+classe,46.22,46.2,Commerce de gros de fleurs et plantes
+classe,46.23,46.2,Commerce de gros d'animaux vivants
+classe,46.24,46.2,Commerce de gros de cuirs et peaux
+classe,46.31,46.3,Commerce de gros de fruits et légumes
+classe,46.32,46.3,Commerce de gros de viandes et de produits à base de viande
+classe,46.33,46.3,"Commerce de gros de produits laitiers, œufs, huiles et matières grasses comestibles"
+classe,46.34,46.3,Commerce de gros de boissons
+classe,46.35,46.3,Commerce de gros de produits à base de tabac
+classe,46.36,46.3,"Commerce de gros de sucre, chocolat et confiserie"
+classe,46.37,46.3,"Commerce de gros de café, thé, cacao et épices"
+classe,46.38,46.3,"Commerce de gros d'autres produits alimentaires, y compris poissons, crustacés et mollusques"
+classe,46.39,46.3,"Commerce de gros non spécialisé de denrées, boissons et tabac"
+classe,46.41,46.4,Commerce de gros de textiles
+classe,46.42,46.4,Commerce de gros d'habillement et de chaussures
+classe,46.43,46.4,Commerce de gros d'appareils électroménagers
+classe,46.44,46.4,"Commerce de gros de vaisselle, verrerie et produits d'entretien"
+classe,46.45,46.4,Commerce de gros de parfumerie et de produits de beauté
+classe,46.46,46.4,Commerce de gros de produits pharmaceutiques
+classe,46.47,46.4,"Commerce de gros de meubles, de tapis et d'appareils d'éclairage"
+classe,46.48,46.4,Commerce de gros d'articles d'horlogerie et de bijouterie
+classe,46.49,46.4,Commerce de gros d'autres biens domestiques
+classe,46.51,46.5,"Commerce de gros d'ordinateurs, d'équipements informatiques périphériques et de logiciels"
+classe,46.52,46.5,Commerce de gros de composants et d'équipements électroniques et de télécommunication
+classe,46.61,46.6,Commerce de gros de matériel agricole
+classe,46.62,46.6,Commerce de gros de machines-outils
+classe,46.63,46.6,"Commerce de gros de machines pour l'extraction, la construction et le génie civil"
+classe,46.64,46.6,Commerce de gros de machines pour l'industrie textile et l'habillement
+classe,46.65,46.6,Commerce de gros de mobilier de bureau
+classe,46.66,46.6,Commerce de gros d'autres machines et équipements de bureau
+classe,46.69,46.6,Commerce de gros d'autres machines et équipements
+classe,46.71,46.7,Commerce de gros de combustibles et de produits annexes
+classe,46.72,46.7,Commerce de gros de minerais et métaux
+classe,46.73,46.7,"Commerce de gros de bois, de matériaux de construction et d'appareils sanitaires"
+classe,46.74,46.7,Commerce de gros de quincaillerie et fournitures pour plomberie et chauffage
+classe,46.75,46.7,Commerce de gros de produits chimiques
+classe,46.76,46.7,Commerce de gros d'autres produits intermédiaires
+classe,46.77,46.7,Commerce de gros de déchets et débris
+classe,46.90,46.9,Commerce de gros non spécialisé
+classe,47.11,47.1,Commerce de détail en magasin non spécialisé à prédominance alimentaire
+classe,47.19,47.1,Autre commerce de détail en magasin non spécialisé
+classe,47.21,47.2,Commerce de détail de fruits et légumes en magasin spécialisé
+classe,47.22,47.2,Commerce de détail de viandes et de produits à base de viande en magasin spécialisé
+classe,47.23,47.2,"Commerce de détail de poissons, crustacés et mollusques en magasin spécialisé"
+classe,47.24,47.2,"Commerce de détail de pain, pâtisserie et confiserie en magasin spécialisé"
+classe,47.25,47.2,Commerce de détail de boissons en magasin spécialisé
+classe,47.26,47.2,Commerce de détail de produits à base de tabac en magasin spécialisé
+classe,47.29,47.2,Autres commerces de détail alimentaires en magasin spécialisé
+classe,47.30,47.3,Commerce de détail de carburants en magasin spécialisé
+classe,47.41,47.4,"Commerce de détail d'ordinateurs, d'unités périphériques et de logiciels en magasin spécialisé"
+classe,47.42,47.4,Commerce de détail de matériels de télécommunication en magasin spécialisé
+classe,47.43,47.4,Commerce de détail de matériels audio/vidéo en magasin spécialisé
+classe,47.51,47.5,Commerce de détail de textiles en magasin spécialisé
+classe,47.52,47.5,"Commerce de détail de quincaillerie, peintures et verres en magasin spécialisé"
+classe,47.53,47.5,"Commerce de détail de tapis, moquettes et revêtements de murs et de sols en magasin spécialisé"
+classe,47.54,47.5,Commerce de détail d'appareils électroménagers en magasin spécialisé
+classe,47.59,47.5,"Commerce de détail de meubles, appareils d'éclairage et autres articles de ménage en magasin spécialisé"
+classe,47.61,47.6,Commerce de détail de livres en magasin spécialisé
+classe,47.62,47.6,Commerce de détail de journaux et papeterie en magasin spécialisé
+classe,47.63,47.6,Commerce de détail d'enregistrements musicaux et vidéo en magasin spécialisé
+classe,47.64,47.6,Commerce de détail d'articles de sport en magasin spécialisé
+classe,47.65,47.6,Commerce de détail de jeux et jouets en magasin spécialisé
+classe,47.71,47.7,Commerce de détail d'habillement en magasin spécialisé
+classe,47.72,47.7,Commerce de détail de chaussures et d'articles en cuir en magasin spécialisé
+classe,47.73,47.7,Commerce de détail de produits pharmaceutiques en magasin spécialisé
+classe,47.74,47.7,Commerce de détail d'articles médicaux et orthopédiques en magasin spécialisé
+classe,47.75,47.7,Commerce de détail de parfumerie et de produits de beauté en magasin spécialisé
+classe,47.76,47.7,"Commerce de détail de fleurs, plantes, graines, engrais, animaux de compagnie et aliments pour ces animaux en magasin spécialisé"
+classe,47.77,47.7,Commerce de détail d'articles d'horlogerie et de bijouterie en magasin spécialisé
+classe,47.78,47.7,Autre commerce de détail de biens neufs en magasin spécialisé
+classe,47.79,47.7,Commerce de détail de biens d'occasion en magasin
+classe,47.81,47.8,Commerce de détail alimentaire sur éventaires et marchés
+classe,47.82,47.8,"Commerce de détail de textiles, d'habillement et de chaussures sur éventaires et marchés"
+classe,47.89,47.8,Autres commerces de détail sur éventaires et marchés
+classe,47.91,47.9,Vente à distance
+classe,47.99,47.9,"Autres commerces de détail hors magasin, éventaires ou marchés"
+classe,49.10,49.1,Transport ferroviaire interurbain de voyageurs
+classe,49.20,49.2,Transports ferroviaires de fret
+classe,49.31,49.3,Transports urbains et suburbains de voyageurs
+classe,49.32,49.3,Transports de voyageurs par taxis
+classe,49.39,49.3,Autres transports terrestres de voyageurs n.c.a.
+classe,49.41,49.4,Transports routiers de fret
+classe,49.42,49.4,Services de déménagement
+classe,49.50,49.5,Transports par conduites
+classe,50.10,50.1,Transports maritimes et côtiers de passagers
+classe,50.20,50.2,Transports maritimes et côtiers de fret
+classe,50.30,50.3,Transports fluviaux de passagers
+classe,50.40,50.4,Transports fluviaux de fret
+classe,51.10,51.1,Transports aériens de passagers
+classe,51.21,51.2,Transports aériens de fret
+classe,51.22,51.2,Transports spatiaux
+classe,52.10,52.1,Entreposage et stockage
+classe,52.21,52.2,Services auxiliaires des transports terrestres
+classe,52.22,52.2,Services auxiliaires des transports par eau
+classe,52.23,52.2,Services auxiliaires des transports aériens
+classe,52.24,52.2,Manutention
+classe,52.29,52.2,Autres services auxiliaires des transports
+classe,53.10,53.1,Activités de poste dans le cadre d'une obligation de service universel
+classe,53.20,53.2,Autres activités de poste et de courrier
+classe,55.10,55.1,Hôtels et hébergement similaire
+classe,55.20,55.2,Hébergement touristique et autre hébergement de courte durée
+classe,55.30,55.3,Terrains de camping et parcs pour caravanes ou véhicules de loisirs
+classe,55.90,55.9,Autres hébergements
+classe,56.10,56.1,Restaurants et services de restauration mobile
+classe,56.21,56.2,Services des traiteurs
+classe,56.29,56.2,Autres services de restauration
+classe,56.30,56.3,Débits de boissons
+classe,58.11,58.1,Édition de livres
+classe,58.12,58.1,Édition de répertoires et de fichiers d'adresses
+classe,58.13,58.1,Édition de journaux
+classe,58.14,58.1,Édition de revues et périodiques
+classe,58.19,58.1,Autres activités d'édition
+classe,58.21,58.2,Édition de jeux électroniques
+classe,58.29,58.2,Édition d'autres logiciels
+classe,59.11,59.1,"Production de films cinématographiques, de vidéo et de programmes de télévision"
+classe,59.12,59.1,"Post-production de films cinématographiques, de vidéo et de programmes de télévision"
+classe,59.13,59.1,"Distribution de films cinématographiques, de vidéo et de programmes de télévision"
+classe,59.14,59.1,Projection de films cinématographiques
+classe,59.20,59.2,Enregistrement sonore et édition musicale
+classe,60.10,60.1,Édition et diffusion de programmes radio
+classe,60.20,60.2,Programmation de télévision et télédiffusion
+classe,61.10,61.1,Télécommunications filaires
+classe,61.20,61.2,Télécommunications sans fil
+classe,61.30,61.3,Télécommunications par satellite
+classe,61.90,61.9,Autres activités de télécommunication
+classe,62.01,62.0,Programmation informatique
+classe,62.02,62.0,Conseil informatique
+classe,62.03,62.0,Gestion d'installations informatiques
+classe,62.09,62.0,Autres activités informatiques
+classe,63.11,63.1,"Traitement de données, hébergement et activités connexes"
+classe,63.12,63.1,Portails Internet
+classe,63.91,63.9,Activités des agences de presse
+classe,63.99,63.9,Autres services d'information n.c.a.
+classe,64.11,64.1,Activités de banque centrale
+classe,64.19,64.1,Autres intermédiations monétaires
+classe,64.20,64.2,Activités des sociétés holding
+classe,64.30,64.3,Fonds de placement et entités financières similaires
+classe,64.91,64.9,Crédit-bail
+classe,64.92,64.9,Autre distribution de crédit
+classe,64.99,64.9,"Autres activités des services financiers, hors assurance et caisses de retraite, n.c.a."
+classe,65.11,65.1,Assurance vie
+classe,65.12,65.1,Autres assurances
+classe,65.20,65.2,Réassurance
+classe,65.30,65.3,Caisses de retraite
+classe,66.11,66.1,Administration de marchés financiers
+classe,66.12,66.1,Courtage de valeurs mobilières et de marchandises
+classe,66.19,66.1,"Autres activités auxiliaires de services financiers, hors assurance et caisses de retraite"
+classe,66.21,66.2,Évaluation des risques et dommages
+classe,66.22,66.2,Activités des agents et courtiers d'assurances
+classe,66.29,66.2,Autres activités auxiliaires d'assurance et de caisses de retraite
+classe,66.30,66.3,Gestion de fonds
+classe,68.10,68.1,Activités des marchands de biens immobiliers
+classe,68.20,68.2,Location et exploitation de biens immobiliers propres ou loués
+classe,68.31,68.3,Agences immobilières
+classe,68.32,68.3,Administration de biens immobiliers
+classe,69.10,69.1,Activités juridiques
+classe,69.20,69.2,Activités comptables
+classe,70.10,70.1,Activités des sièges sociaux
+classe,70.21,70.2,Conseil en relations publiques et communication
+classe,70.22,70.2,Conseil pour les affaires et autres conseils de gestion
+classe,71.11,71.1,Activités d'architecture
+classe,71.12,71.1,Activités d'ingénierie
+classe,71.20,71.2,Activités de contrôle et analyses techniques
+classe,72.11,72.1,Recherche-développement en biotechnologie
+classe,72.19,72.1,Recherche-développement en autres sciences physiques et naturelles
+classe,72.20,72.2,Recherche-développement en sciences humaines et sociales
+classe,73.11,73.1,Activités des agences de publicité
+classe,73.12,73.1,Régie publicitaire de médias
+classe,73.20,73.2,Études de marché et sondages
+classe,74.10,74.1,Activités spécialisées de design
+classe,74.20,74.2,Activités photographiques
+classe,74.30,74.3,Traduction et interprétation
+classe,74.90,74.9,"Autres activités spécialisées, scientifiques et techniques n.c.a."
+classe,75.00,75.0,Activités vétérinaires
+classe,77.11,77.1,Location et location-bail de voitures et de véhicules automobiles légers
+classe,77.12,77.1,Location et location-bail de camions
+classe,77.21,77.2,Location et location-bail d'articles de loisirs et de sport
+classe,77.22,77.2,Location de vidéocassettes et disques vidéo
+classe,77.29,77.2,Location et location-bail d'autres biens personnels et domestiques
+classe,77.31,77.3,Location et location-bail de machines et équipements agricoles
+classe,77.32,77.3,Location et location-bail de machines et équipements pour la construction
+classe,77.33,77.3,Location et location-bail de machines de bureau et de matériel informatique
+classe,77.34,77.3,Location et location-bail de matériels de transport par eau
+classe,77.35,77.3,Location et location-bail de matériels de transport aérien
+classe,77.39,77.3,"Location et location-bail d'autres machines, équipements et biens matériels n.c.a."
+classe,77.40,77.4,"Location-bail de propriété intellectuelle et de produits similaires, à l'exception des œuvres soumises à copyright"
+classe,78.10,78.1,Activités des agences de placement de main-d'œuvre
+classe,78.20,78.2,Activités des agences de travail temporaire
+classe,78.30,78.3,Autre mise à disposition de ressources humaines
+classe,79.11,79.1,Activités des agences de voyage
+classe,79.12,79.1,Activités des voyagistes
+classe,79.90,79.9,Autres services de réservation et activités connexes
+classe,80.10,80.1,Activités de sécurité privée
+classe,80.20,80.2,Activités liées aux systèmes de sécurité
+classe,80.30,80.3,Activités d'enquête
+classe,81.10,81.1,Activités combinées de soutien lié aux bâtiments
+classe,81.21,81.2,Nettoyage courant des bâtiments
+classe,81.22,81.2,Autres activités de nettoyage des bâtiments et nettoyage industriel
+classe,81.29,81.2,Autres activités de nettoyage
+classe,81.30,81.3,Services d'aménagement paysager
+classe,82.11,82.1,Services administratifs combinés de bureau
+classe,82.19,82.1,"Photocopie, préparation de documents et autres activités spécialisées de soutien de bureau"
+classe,82.20,82.2,Activités de centres d'appels
+classe,82.30,82.3,Organisation de salons professionnels et congrès
+classe,82.91,82.9,Activités des agences de recouvrement de factures et des sociétés d'information financière sur la clientèle
+classe,82.92,82.9,Activités de conditionnement
+classe,82.99,82.9,Autres activités de soutien aux entreprises n.c.a.
+classe,84.11,84.1,Administration publique générale
+classe,84.12,84.1,"Administration publique (tutelle) de la santé, de la formation, de la culture et des services sociaux, autre que sécurité sociale"
+classe,84.13,84.1,Administration publique (tutelle) des activités économiques
+classe,84.21,84.2,Affaires étrangères
+classe,84.22,84.2,Défense
+classe,84.23,84.2,Justice
+classe,84.24,84.2,Activités d'ordre public et de sécurité
+classe,84.25,84.2,Services du feu et de secours
+classe,84.30,84.3,Sécurité sociale obligatoire
+classe,85.10,85.1,Enseignement pré-primaire
+classe,85.20,85.2,Enseignement primaire
+classe,85.31,85.3,Enseignement secondaire général
+classe,85.32,85.3,Enseignement secondaire technique ou professionnel
+classe,85.41,85.4,Enseignement post-secondaire non supérieur
+classe,85.42,85.4,Enseignement supérieur
+classe,85.51,85.5,Enseignement de disciplines sportives et d'activités de loisirs
+classe,85.52,85.5,Enseignement culturel
+classe,85.53,85.5,Enseignement de la conduite
+classe,85.59,85.5,Enseignements divers
+classe,85.60,85.6,Activités de soutien à l'enseignement
+classe,86.10,86.1,Activités hospitalières
+classe,86.21,86.2,Activité des médecins généralistes
+classe,86.22,86.2,Activité des médecins spécialistes
+classe,86.23,86.2,Pratique dentaire
+classe,86.90,86.9,Autres activités pour la santé humaine
+classe,87.10,87.1,Hébergement médicalisé
+classe,87.20,87.2,"Hébergement social pour personnes handicapées mentales, malades mentales et toxicomanes"
+classe,87.30,87.3,Hébergement social pour personnes âgées ou handicapées physiques
+classe,87.90,87.9,Autres activités d'hébergement social
+classe,88.10,88.1,Action sociale sans hébergement pour personnes âgées et pour personnes handicapées
+classe,88.91,88.9,Action sociale sans hébergement pour jeunes enfants
+classe,88.99,88.9,Autre action sociale sans hébergement n.c.a.
+classe,90.01,90.0,Arts du spectacle vivant
+classe,90.02,90.0,Activités de soutien au spectacle vivant
+classe,90.03,90.0,Création artistique
+classe,90.04,90.0,Gestion de salles de spectacles
+classe,91.01,91.0,Gestion des bibliothèques et des archives
+classe,91.02,91.0,Gestion des musées
+classe,91.03,91.0,Gestion des sites et monuments historiques et des attractions touristiques similaires
+classe,91.04,91.0,Gestion des jardins botaniques et zoologiques et des réserves naturelles
+classe,92.00,92.0,Organisation de jeux de hasard et d'argent
+classe,93.11,93.1,Gestion d'installations sportives
+classe,93.12,93.1,Activités de clubs de sports
+classe,93.13,93.1,Activités des centres de culture physique
+classe,93.19,93.1,Autres activités liées au sport
+classe,93.21,93.2,Activités des parcs d'attractions et parcs à thèmes
+classe,93.29,93.2,Autres activités récréatives et de loisirs
+classe,94.11,94.1,Activités des organisations patronales et consulaires
+classe,94.12,94.1,Activités des organisations professionnelles
+classe,94.20,94.2,Activités des syndicats de salariés
+classe,94.91,94.9,Activités des organisations religieuses
+classe,94.92,94.9,Activités des organisations politiques
+classe,94.99,94.9,Activités des organisations associatives n.c.a.
+classe,95.11,95.1,Réparation d'ordinateurs et d'équipements périphériques
+classe,95.12,95.1,Réparation d'équipements de communication
+classe,95.21,95.2,Réparation de produits électroniques grand public
+classe,95.22,95.2,Réparation d'appareils électroménagers et d'équipements pour la maison et le jardin
+classe,95.23,95.2,Réparation de chaussures et d'articles en cuir
+classe,95.24,95.2,Réparation de meubles et d'équipements du foyer
+classe,95.25,95.2,Réparation d'articles d'horlogerie et de bijouterie
+classe,95.29,95.2,Réparation d'autres biens personnels et domestiques
+classe,96.01,96.0,Blanchisserie-teinturerie
+classe,96.02,96.0,Coiffure et soins de beauté
+classe,96.03,96.0,Services funéraires
+classe,96.04,96.0,Entretien corporel
+classe,96.09,96.0,Autres services personnels n.c.a.
+classe,97.00,97.0,Activités des ménages en tant qu'employeurs de personnel domestique
+classe,98.10,98.1,Activités indifférenciées des ménages en tant que producteurs de biens pour usage propre
+classe,98.20,98.2,Activités indifférenciées des ménages en tant que producteurs de services pour usage propre
+classe,99.00,99.0,Activités des organisations et organismes extraterritoriaux

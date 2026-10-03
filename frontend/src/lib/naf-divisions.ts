@@ -104,3 +104,14 @@ export function libelleNaf(code: string | null | undefined): string | null {
   const division = code.replace(/[^0-9]/g, '').slice(0, 2);
   return DIVISIONS_NAF[division] ?? null;
 }
+
+/**
+ * Le libellé d'activité à afficher : celui de la SOUS-CLASSE fourni par l'API
+ * (`naf_label`, lot N7 — « Programmation informatique » pour « 62.01Z ») s'il
+ * existe, sinon celui de la division (code inconnu de la table de référence,
+ * code de 1993, référentiel pas encore chargé).
+ */
+export function libelleActivite(libelleApi: string | null | undefined, code: string | null | undefined): string | null {
+  const fourni = libelleApi?.trim() ?? '';
+  return fourni !== '' ? fourni : libelleNaf(code);
+}

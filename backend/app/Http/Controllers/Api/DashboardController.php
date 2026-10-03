@@ -89,7 +89,7 @@ class DashboardController extends ApiController
      *
      * `v5` (2026-10-03, nouvel accueil en blocs) : la charge utile gagne
      * `companies_enriched`, `prospects_joignables` et
-     * `prospects_joignables_idf`.
+     * `prospects_joignables_idf` (et leurs `_raison`).
      */
     public static function cle(string $espace): string
     {
@@ -261,8 +261,8 @@ class DashboardController extends ApiController
             // système « Prospects contactables » (e-mail présent, prêt au
             // démarchage, relations établies exclues), et celui de sa
             // déclinaison Île-de-France. Lus, pas recomptés.
-            'prospects_joignables' => $this->membresAudience($espace, self::AUDIENCE_JOIGNABLES),
-            'prospects_joignables_idf' => $this->membresAudience($espace, self::AUDIENCE_JOIGNABLES_IDF),
+            ...$this->membresAudience($espace, self::AUDIENCE_JOIGNABLES, 'prospects_joignables'),
+            ...$this->membresAudience($espace, self::AUDIENCE_JOIGNABLES_IDF, 'prospects_joignables_idf'),
             'contacts_qualified' => $this->compter('contacts', $espace, function ($q) {
                 // « Qualifiée » = joignable. C'est la définition que le hub
                 // emploie déjà ; on ne réinvente pas un second sens ici.
@@ -370,29 +370,49 @@ class DashboardController extends ApiController
             // `null` = inconnu : l'écran écrit « — », jamais 0.
             'companies_enriched' => null,
             'prospects_joignables' => null,
+            'prospects_joignables_raison' => null,
             'prospects_joignables_idf' => null,
+            'prospects_joignables_idf_raison' => null,
         ];
     }
 
+    /** L'audience système n'existe pas dans l'espace (ou a été supprimée). */
+    public const RAISON_INTROUVABLE = 'audience_introuvable';
+
+    /** Elle existe, mais est désactivée ou n'est plus rafraîchie chaque nuit : son chiffre est figé. */
+    public const RAISON_INACTIVE = 'audience_inactive';
+
+    /** Elle n'a jamais été calculée (`member_count` vaut 0 par défaut). */
+    public const RAISON_NON_CALCULEE = 'audience_non_calculee';
+
     /**
      * Le nombre de membres d'une audience système, tel que le dernier
-     * rafraîchissement l'a écrit.
+     * rafraîchissement l'a écrit — sous `{cle}` — et, quand il n'est pas
+     * fiable, la RAISON sous `{cle}_raison`.
      *
-     * `null` — jamais 0 — dans trois cas :
-     *  - l'audience n'existe pas dans cet espace (ou a été supprimée) : rien
-     *    à lire, et ce n'est pas une panne (le résultat peut entrer en cache) ;
-     *  - elle n'a jamais été rafraîchie (`refreshed_at` vide) : son
-     *    `member_count` vaut 0 par défaut, ce qui se lirait « personne » ;
-     *  - la lecture échoue : panne, journalisée, résultat PAS mis en cache.
+     * Le chiffre vaut `null` — jamais 0, jamais un chiffre figé — dans quatre
+     * cas :
+     *  - l'audience n'existe pas (ou plus) : raison `audience_introuvable` ;
+     *  - elle est désactivée (`is_active`) ou n'est plus rafraîchie chaque nuit
+     *    (`auto_refresh`) : son `member_count` est figé à la dernière passe,
+     *    raison `audience_inactive` (relecture exactitude de #302) ;
+     *  - elle n'a jamais été rafraîchie : raison `audience_non_calculee` ;
+     *  - la lecture échoue : panne, journalisée, raison `null` (« indisponible
+     *    pour le moment »), résultat PAS mis en cache.
+     * Les trois premiers cas ne sont pas des pannes : ils entrent en cache.
      *
      * Le nom est la seule clé des audiences système (`updateOrCreate` sur
      * `workspace_id, name` dans le seeder). Si plusieurs portent ce nom, la
      * plus ancienne — celle du seeder — fait foi.
+     *
+     * @return array<string, int|string|null>
      */
-    private function membresAudience(string $espace, string $nom): ?int
+    private function membresAudience(string $espace, string $nom, string $cle): array
     {
+        $resultat = static fn (?int $n, ?string $raison): array => [$cle => $n, $cle . '_raison' => $raison];
+
         if (! Schema::hasTable('email_audiences')) {
-            return null;
+            return $resultat(null, self::RAISON_INTROUVABLE);
         }
 
         try {
@@ -401,19 +421,25 @@ class DashboardController extends ApiController
                 ->where('name', $nom)
                 ->whereNull('deleted_at')
                 ->orderBy('id')
-                ->first(['member_count', 'refreshed_at']);
+                ->first(['member_count', 'refreshed_at', 'is_active', 'auto_refresh']);
         } catch (\Throwable $e) {
             $this->incomplet = true;
             Log::warning('dashboard: audience indisponible', self::panneSansSql($e));
 
-            return null;
+            return $resultat(null, null);
         }
 
-        if ($ligne === null || $ligne->refreshed_at === null) {
-            return null;
+        if ($ligne === null) {
+            return $resultat(null, self::RAISON_INTROUVABLE);
+        }
+        if (! (bool) $ligne->is_active || ! (bool) $ligne->auto_refresh) {
+            return $resultat(null, self::RAISON_INACTIVE);
+        }
+        if ($ligne->refreshed_at === null) {
+            return $resultat(null, self::RAISON_NON_CALCULEE);
         }
 
-        return (int) $ligne->member_count;
+        return $resultat((int) $ligne->member_count, null);
     }
 
     /** @return array<string, int> */

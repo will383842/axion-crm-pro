@@ -11,7 +11,8 @@
  *    Île-de-France », tel que le rafraîchissement nocturne l'a écrit.
  *
  * Ce que ces gardes tiennent : les bons chiffres, cloisonnés par espace ;
- * `null` (jamais 0) pour une audience absente ou jamais rafraîchie ; la clé de
+ * `null` (jamais 0, jamais un chiffre figé) et une raison pour une audience
+ * absente, désactivée ou jamais rafraîchie ; la clé de
  * cache passée en `v5` ; et, sous le RÔLE DE PRODUCTION (`axion_app`), le
  * comptage des fiches enrichies servi par son index partiel.
  *
@@ -119,7 +120,37 @@ test('audience absente, supprimée ou jamais rafraîchie : null, jamais 0', func
 
     expect(array_key_exists('prospects_joignables', $r->json()))->toBeTrue()
         ->and($r->json('prospects_joignables'))->toBeNull()
-        ->and($r->json('prospects_joignables_idf'))->toBeNull();
+        ->and($r->json('prospects_joignables_raison'))->toBe(DashboardController::RAISON_NON_CALCULEE)
+        ->and($r->json('prospects_joignables_idf'))->toBeNull()
+        ->and($r->json('prospects_joignables_idf_raison'))->toBe(DashboardController::RAISON_INTROUVABLE);
+});
+
+test('audience désactivée ou sans rafraîchissement nocturne : pas de chiffre figé, null et la raison', function () {
+    $espace = F::espace('zz-blocs-inactive');
+    $principale = blocsAudience($espace, DashboardController::AUDIENCE_JOIGNABLES, 410, now()->subMonth());
+    DB::table('email_audiences')->where('id', $principale)->update(['is_active' => false]);
+    $idf = blocsAudience($espace, DashboardController::AUDIENCE_JOIGNABLES_IDF, 141, now()->subMonth());
+    DB::table('email_audiences')->where('id', $idf)->update(['auto_refresh' => false]);
+
+    $this->actingAs(blocsCompte($espace));
+    $r = $this->getJson('/api/v1/dashboard/stats')->assertOk();
+
+    expect($r->json('prospects_joignables'))->toBeNull()
+        ->and($r->json('prospects_joignables_raison'))->toBe(DashboardController::RAISON_INACTIVE)
+        ->and($r->json('prospects_joignables_idf'))->toBeNull()
+        ->and($r->json('prospects_joignables_idf_raison'))->toBe(DashboardController::RAISON_INACTIVE);
+});
+
+test('TEMOIN : audience active et rafraîchie, aucune raison', function () {
+    $espace = F::espace('zz-blocs-raison-nulle');
+    blocsAudience($espace, DashboardController::AUDIENCE_JOIGNABLES, 410, now());
+
+    $this->actingAs(blocsCompte($espace));
+    $r = $this->getJson('/api/v1/dashboard/stats')->assertOk();
+
+    expect($r->json('prospects_joignables'))->toBe(410)
+        ->and(array_key_exists('prospects_joignables_raison', $r->json()))->toBeTrue()
+        ->and($r->json('prospects_joignables_raison'))->toBeNull();
 });
 
 test('TEMOIN : une audience rafraîchie qui compte vraiment 0 membre rend 0', function () {
@@ -154,7 +185,9 @@ test('lecture des audiences en panne : null, et le résultat partiel n entre pas
     $this->actingAs(blocsCompte($espace));
     $r = $this->getJson('/api/v1/dashboard/stats')->assertOk();
 
+    // Une panne n'a pas de raison métier : « indisponible pour le moment ».
     expect($r->json('prospects_joignables'))->toBeNull()
+        ->and($r->json('prospects_joignables_raison'))->toBeNull()
         ->and(Cache::has(DashboardController::cle($espace)))->toBeFalse();
 
     $panne = false;

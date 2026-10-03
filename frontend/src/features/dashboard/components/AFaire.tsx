@@ -83,13 +83,18 @@ function ContenuCarte({ icone, ton, libelle, valeur }: ContenuCarteProps) {
  *  - « Événements à relancer » (onglet « Relances à faire » de l'écran
  *    Événements) n'apparaît que si le serveur envoie le chiffre : une image
  *    antérieure ne le calcule pas, et un « — » permanent ferait croire à une
- *    panne passagère. Pendant le chargement, on ne sait pas encore : la carte
+ *    panne passagère. Si le point d'API ÉCHOUE, en revanche, la carte reste
+ *    et dit « — » : une panne n'est pas une absence de fonctionnalité. Pendant le chargement, on ne sait pas encore : la carte
  *    est réservée (squelette) pour que la grille ne saute pas.
  */
 export function AFaire({ consoleOuverte }: { consoleOuverte: boolean }) {
   const { data, isPending } = useCompteursATraiter(consoleOuverte);
-  // Échec (pas de réessai) : chaque compteur devient « — ».
-  const compteurs: CompteursATraiter | undefined = isPending ? undefined : (data ?? { doublons: null, a_rattacher: null });
+  // Échec (pas de réessai) : chaque compteur devient « — », y compris les
+  // relances. Une PANNE ne fait pas disparaître la carte : seule une réponse
+  // RÉUSSIE sans le chiffre (fonctionnalité absente du serveur) la retire.
+  const compteurs: CompteursATraiter | undefined = isPending
+    ? undefined
+    : (data ?? { doublons: null, a_rattacher: null, relances: null });
   const montrerRelances = compteurs === undefined || compteurs.relances !== undefined;
 
   return (

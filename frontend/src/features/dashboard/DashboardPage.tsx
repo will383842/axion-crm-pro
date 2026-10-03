@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Building2, FolderX } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Card, EmptyState, QueryErrorState, Skeleton, cn } from '@/components/ui';
+import { Card, EmptyState, QueryErrorState, Skeleton, Tooltip, cn } from '@/components/ui';
 import { api, qualifierErreur } from '@/lib/api';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import { AFaire } from './components/AFaire';
@@ -33,6 +33,13 @@ interface DashboardStats {
   prospects_joignables?: number | null;
   /** Membres de « Prospects contactables — Île-de-France ». */
   prospects_joignables_idf?: number | null;
+  /**
+   * Pourquoi `prospects_joignables` vaut null quand ce n'est PAS une panne :
+   * audience système introuvable, désactivée (chiffre figé) ou jamais
+   * calculée. `null` + chiffre null = panne (« indisponible pour le moment »).
+   */
+  prospects_joignables_raison?: RaisonAudience | null;
+  prospects_joignables_idf_raison?: RaisonAudience | null;
   /** Moyenne RÉELLE de `quality_score` (serveur) ; null = inconnue. */
   quality_avg?: number | null;
   /** Part estimée (%) des scores périmés ; au-delà du seuil : « calcul en attente ». */
@@ -42,6 +49,29 @@ interface DashboardStats {
 }
 
 const CHIFFRE_INDISPONIBLE = 'Chiffre indisponible pour le moment';
+
+type RaisonAudience = 'audience_introuvable' | 'audience_inactive' | 'audience_non_calculee';
+
+/** Le nom de l'audience système d'où vient « Prospects joignables » (`DashboardController`). */
+export const AUDIENCE_JOIGNABLES = 'Prospects contactables';
+
+/**
+ * La phrase EXACTE qui dit pourquoi le chiffre manque, quand ce n'est pas une
+ * panne (relecture exactitude de #302) : « indisponible pour le moment »
+ * laisserait croire qu'il reviendra seul, alors qu'il faut agir sur l'audience.
+ */
+export function raisonAudience(raison: RaisonAudience | null | undefined): string | null {
+  switch (raison) {
+    case 'audience_introuvable':
+      return `L’audience « ${AUDIENCE_JOIGNABLES} » est introuvable`;
+    case 'audience_inactive':
+      return `L’audience « ${AUDIENCE_JOIGNABLES} » est désactivée`;
+    case 'audience_non_calculee':
+      return `L’audience « ${AUDIENCE_JOIGNABLES} » n’a pas encore été calculée`;
+    default:
+      return null;
+  }
+}
 
 /**
  * « Chiffres mis à jour il y a N min » — `/dashboard/stats` est servi par un
@@ -216,9 +246,14 @@ interface TuileProps {
   sombre?: boolean;
   accent?: boolean;
   testId: string;
+  /**
+   * Quand le chiffre manque pour une raison CONNUE : le « — » porte une
+   * infobulle qui la dit (et les lecteurs d'écran la lisent).
+   */
+  infobulle?: string | null;
 }
 
-function Tuile({ titre, affiche, lu, sousLigne, barre, sombre = false, accent = false, testId }: TuileProps) {
+function Tuile({ titre, affiche, lu, sousLigne, barre, sombre = false, accent = false, testId, infobulle }: TuileProps) {
   return (
     <div
       data-testid={testId}
@@ -229,8 +264,18 @@ function Tuile({ titre, affiche, lu, sousLigne, barre, sombre = false, accent = 
     >
       <h3 className={cn('text-sm font-medium', sombre ? 'text-sidebar-fg' : 'text-slate-500')}>{titre}</h3>
       <p className={cn('text-3xl font-bold tracking-tight tabular-nums', accent && !sombre && affiche !== null && 'text-brand-600')}>
-        <span aria-hidden>{affiche ?? '—'}</span>
-        <span className="sr-only">{lu}</span>
+        {affiche === null && infobulle ? (
+          <Tooltip content={infobulle}>
+            <span tabIndex={0} className="cursor-help" data-testid={`${testId}-raison`}>
+              —<span className="sr-only"> {infobulle}</span>
+            </span>
+          </Tooltip>
+        ) : (
+          <>
+            <span aria-hidden>{affiche ?? '—'}</span>
+            <span className="sr-only">{lu}</span>
+          </>
+        )}
       </p>
       {sousLigne ? <p className={cn('text-xs', sombre ? 'text-sidebar-fg' : 'text-slate-500')}>{sousLigne}</p> : null}
       {barre ? (
@@ -252,7 +297,10 @@ function MaBase({ stats }: { stats: DashboardStats }) {
   const partTpe = tailles === null ? null : part(tailles['tpe'] ?? 0, classees);
 
   const joignables = stats.prospects_joignables ?? null;
-  const joignablesIdf = stats.prospects_joignables_idf ?? null;
+  // La ligne Île-de-France n'apparaît que si son chiffre est fiable : une
+  // audience désactivée, introuvable ou non calculée la masque.
+  const joignablesIdf = stats.prospects_joignables_idf_raison ? null : (stats.prospects_joignables_idf ?? null);
+  const pourquoiPasDeJoignables = joignables === null ? raisonAudience(stats.prospects_joignables_raison) : null;
   const partEnrichies = part(stats.companies_enriched, total);
   const qualite = etatQualite(stats);
 
@@ -279,9 +327,10 @@ function MaBase({ stats }: { stats: DashboardStats }) {
           accent
           affiche={joignables === null ? null : joignables.toLocaleString('fr-FR')}
           lu={joignables === null ? CHIFFRE_INDISPONIBLE : `${joignables.toLocaleString('fr-FR')} prospects joignables`}
+          infobulle={pourquoiPasDeJoignables}
           sousLigne={
             joignables === null
-              ? CHIFFRE_INDISPONIBLE
+              ? (pourquoiPasDeJoignables ?? CHIFFRE_INDISPONIBLE)
               : joignablesIdf !== null
                 ? `dont ${joignablesIdf.toLocaleString('fr-FR')} en Île-de-France`
                 : null

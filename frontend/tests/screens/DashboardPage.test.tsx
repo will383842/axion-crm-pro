@@ -16,6 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { DashboardPage, dateDuJour, nombreCourt } from '@/features/dashboard/DashboardPage';
@@ -237,6 +238,65 @@ describe('DashboardPage — jamais un 0 trompeur', () => {
     expect(tuile('joignables')).not.toHaveTextContent(/Île-de-France/);
   });
 
+  it('audience « Prospects contactables » désactivée : « — » et la raison EXACTE (infobulle), pas « indisponible »', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          prospects_joignables: null,
+          prospects_joignables_raison: 'audience_inactive',
+          prospects_joignables_idf: null,
+          prospects_joignables_idf_raison: 'audience_inactive',
+        }),
+        ...socle(),
+      ],
+    });
+
+    await screen.findByTestId('tuile-joignables');
+    const phrase = 'L’audience « Prospects contactables » est désactivée';
+    expect(tuile('joignables')).toHaveTextContent('—');
+    expect(tuile('joignables')).toHaveTextContent(phrase);
+    expect(tuile('joignables')).not.toHaveTextContent(INDISPONIBLE);
+    expect(tuile('joignables')).not.toHaveTextContent(/Île-de-France/);
+
+    await user.hover(screen.getByTestId('tuile-joignables-raison'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(phrase);
+  });
+
+  it('audience introuvable : la raison le dit', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          prospects_joignables: null,
+          prospects_joignables_raison: 'audience_introuvable',
+        }),
+        ...socle(),
+      ],
+    });
+
+    expect(await screen.findByTestId('tuile-joignables')).toHaveTextContent(
+      'L’audience « Prospects contactables » est introuvable',
+    );
+    expect(tuile('joignables')).not.toHaveTextContent(INDISPONIBLE);
+  });
+
+  it('Île-de-France non fiable (raison posée) : la ligne est masquée, le total reste', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', { ...STATS, prospects_joignables_idf_raison: 'audience_inactive' }),
+        ...socle(),
+      ],
+    });
+
+    expect(await screen.findByTestId('tuile-joignables')).toHaveTextContent(/410.515/);
+    expect(tuile('joignables')).not.toHaveTextContent(/Île-de-France/);
+  });
+
   it('scores majoritairement périmés : « — » et « calcul en attente », pas de moyenne', async () => {
     await renderScreen(<DashboardPage />, {
       path: PATH,
@@ -347,6 +407,14 @@ describe('DashboardPage — « À faire »', () => {
       expect(screen.getByTestId('a-faire-doublons')).toHaveTextContent(INDISPONIBLE);
     });
     expect(screen.getByTestId('a-faire-a-rattacher')).toHaveTextContent('—');
+    // Une PANNE ne retire pas la carte des relances (seule une fonctionnalité
+    // absente du serveur le fait) : elle reste, et dit « — ».
+    expect(screen.getByTestId('a-faire-relances')).toHaveTextContent('—');
+    expect(screen.getByTestId('a-faire-relances')).toHaveTextContent(INDISPONIBLE);
+    expect(screen.getByRole('link', { name: /Événements à relancer : chiffre indisponible/ })).toHaveAttribute(
+      'href',
+      '/evenements?onglet=relances',
+    );
   });
 
   it('serveur sans chiffre de relances : la carte « Événements à relancer » n’existe pas ; 0 se lit « À jour »', async () => {

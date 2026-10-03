@@ -367,6 +367,15 @@ test('traduction FERMÉE des libellés SIRO', function () {
         ->and(Opco::depuisLibelleSiro('OPCO EP'))->toBe('opco_ep')
         ->and(Opco::depuisLibelleSiro("L'OPCOMMERCE"))->toBe('opcommerce')
         ->and(Opco::depuisLibelleSiro('OPCO MOBILITES'))->toBe('mobilites')
+        // Les 12 libellés RÉELS de siro-202606.csv (relevé du 2026-10-04), tous reconnus.
+        ->and(Opco::depuisLibelleSiro('UNIFORMATION COHESION SOCIALE'))->toBe('uniformation')
+        ->and(Opco::depuisLibelleSiro('AFDAS'))->toBe('afdas')
+        ->and(Opco::depuisLibelleSiro('AKTO'))->toBe('akto')
+        ->and(Opco::depuisLibelleSiro('ATLAS'))->toBe('atlas')
+        ->and(Opco::depuisLibelleSiro('CONSTRUCTYS'))->toBe('constructys')
+        ->and(Opco::depuisLibelleSiro('OCAPIAT'))->toBe('ocapiat')
+        ->and(Opco::depuisLibelleSiro('OPCO SANTE'))->toBe('opco_sante')
+        ->and(Opco::depuisLibelleSiro('OPCO2I'))->toBe('opco2i')
         ->and(Opco::depuisLibelleSiro('OPCO IMAGINAIRE'))->toBeNull()
         ->and(Opco::depuisLibelleSiro(''))->toBeNull();
     // Chaque cible de la traduction est dans la liste fermée de la contrainte.

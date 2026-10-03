@@ -97,7 +97,7 @@ export function AFaire({ consoleOuverte }: { consoleOuverte: boolean }) {
       <h2 id="titre-a-faire" className="text-lg font-bold text-slate-900">
         À faire
       </h2>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">
+      <div className="grille-auto gap-4">
         <Link
           to="/doublons"
           className={CLASSE_CARTE}

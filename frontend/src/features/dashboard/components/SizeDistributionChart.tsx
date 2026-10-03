@@ -44,16 +44,16 @@ export function SizeDistributionChart({ data }: { data: SizeDistribution | null 
           {TAILLES.map((t, i) => {
             const v = valeurs[i] ?? 0;
             return (
-              <li key={t.code} className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-3">
-                <span className="truncate text-slate-700">{t.libelle}</span>
-                <span className="h-3 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+              <li key={t.code} className="flex items-center gap-3">
+                <span className="w-[6.5rem] shrink-0 truncate text-slate-700">{t.libelle}</span>
+                <span className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100" aria-hidden>
                   <span
                     className="block h-full rounded-full bg-brand-600"
                     data-testid={`barre-${t.code}`}
                     style={{ width: `${largeurs[i] ?? 0}%` }}
                   />
                 </span>
-                <span className="text-right font-semibold tabular-nums text-slate-900">{v.toLocaleString('fr-FR')}</span>
+                <span className="shrink-0 text-right font-semibold tabular-nums text-slate-900">{v.toLocaleString('fr-FR')}</span>
               </li>
             );
           })}

@@ -188,7 +188,7 @@ export function DashboardPage() {
           ) : data !== undefined ? (
             <>
               <MaBase stats={data} />
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-4">
+              <div className="grille-auto gap-4 [--grille-min:20rem]">
                 <SizeDistributionChart data={data.size_distribution} />
                 <MesAudiences />
               </div>
@@ -264,7 +264,7 @@ function MaBase({ stats }: { stats: DashboardStats }) {
         </h2>
         {miseAJour !== null ? <p className="text-xs text-slate-500">{miseAJour}</p> : null}
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-4">
+      <div className="grille-auto gap-4 [--grille-min:13.5rem]">
         <Tuile
           testId="tuile-entreprises"
           titre="Entreprises"
@@ -326,7 +326,7 @@ function MaBaseSquelette() {
     <div className="flex flex-col gap-8" data-testid="accueil-squelette">
       <div className="flex flex-col gap-3.5">
         <Skeleton className="h-6 w-28" />
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-4">
+        <div className="grille-auto gap-4 [--grille-min:13.5rem]">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-2xl bg-white p-5 ring-1 ring-slate-200/70 shadow-[var(--shadow-card)]">
               <Skeleton className="mb-3 h-4 w-24" />
@@ -336,7 +336,7 @@ function MaBaseSquelette() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] gap-4">
+      <div className="grille-auto gap-4 [--grille-min:20rem]">
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="rounded-2xl bg-white p-6 ring-1 ring-slate-200/70 shadow-[var(--shadow-card)]">
             <Skeleton className="mb-4 h-5 w-32" />

@@ -22,7 +22,11 @@ test.describe('Companies list', () => {
     );
     await page.goto('/companies');
     await expect(page.getByText('Acme Inc')).toBeVisible();
-    await expect(page.getByText('123456789')).toBeVisible();
+    // Audit UX lot 14 (2026-10-03) : le SIREN a quitté la LISTE (il reste sur
+    // la fiche) et la colonne « Activité » dit l'activité en clair — le code
+    // NAF complet passe en infobulle.
+    await expect(page.getByRole('rowgroup').getByText('123456789')).toHaveCount(0);
+    await expect(page.getByRole('rowgroup').getByTitle('Code d’activité : 6201Z')).toBeVisible();
     // P6-UI-008 (2026-08-20) — `getByText('PME')` seul VIOLE le mode strict.
     // Mesure sur le build servi par `vite preview` (chromium 1234) : avec une
     // seule ligne de resultat, 3 elements portent ce texte sur /companies —

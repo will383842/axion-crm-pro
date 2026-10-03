@@ -160,6 +160,53 @@ return [
     ],
 
     /*
+    | N11 — SOCLE DU FUTUR CANAL AXION PARTNERS (aucune route métier).
+    |
+    | `mode` : `off` (défaut) | `essai` | `actif`. En `off`, la seule route du
+    | canal (`POST /api/internal/partners/v1/ping`) répond 404 comme une route
+    | absente. Toute autre valeur fait REFUSER LE DÉMARRAGE
+    | (`App\Providers\CanalPartnersServiceProvider`).
+    |
+    | Secrets SÉPARÉS PAR SENS et par usage, au format `kid1:secret1,kid2:secret2`
+    | (au plus deux clés : l'ancienne et la nouvelle pendant une rotation) :
+    |   - `entrant_secrets` : Partners → CRM (vérifiés par
+    |     `App\Http\Middleware\VerificateurCanalPartners`) — OBLIGATOIRES hors
+    |     `off` ;
+    |   - `sortant_secrets` : CRM → Partners (futur, non utilisé) ;
+    |   - `api3_tokens`     : jeton que le CRM présentera à Partners (futur).
+    | Un `kid` suit `^[a-z0-9-]{1,32}$` et n'est JAMAIS concaténé dans une clé
+    | de configuration : il est cherché dans la liste fermée ci-dessus. Kid et
+    | secret sont rognés ; un secret fait 32 octets dont 12 caractères
+    | distincts, sans virgule (séparateur).
+    |
+    | Signature attendue de Partners :
+    |   X-Partners-Signature = hex(HMAC-SHA256(secret,
+    |                             "<X-Partners-Timestamp>.<Idempotency-Key>.<corps>"))
+    |
+    | `kid_essai` : identifiant de la clé entrante réservée aux essais. Elle
+    | n'est acceptée qu'en mode `essai` ; en `actif`, elle reçoit le même 401
+    | qu'une clé inconnue.
+    |
+    | Valeurs BRUTES (aucune conversion ici) : la validation vit dans
+    | `App\Support\Partners\ConfigurationCanalPartners`.
+    */
+    'partners' => [
+        'mode' => env('CRM_PARTNERS_MODE', 'off'),
+        'entrant_secrets' => env('CRM_PARTNERS_ENTRANT_SECRETS', ''),
+        'sortant_secrets' => env('CRM_PARTNERS_SORTANT_SECRETS', ''),
+        'api3_tokens' => env('CRM_PARTNERS_API3_TOKENS', ''),
+        'kid_essai' => env('CRM_PARTNERS_KID_ESSAI', ''),
+    ],
+
+    /*
+    | Journaux applicatifs : clé HMAC des empreintes d'IP (`App\Support\EmpreinteIp`).
+    | Jamais d'IP en clair au journal. Vide → clé dérivée de APP_KEY.
+    */
+    'journaux' => [
+        'ip_cle' => env('CRM_JOURNAUX_IP_CLE', ''),
+    ],
+
+    /*
     | 🔴 A05-001 (S1) — CLÉ DE RAPPROCHEMENT DES PERSONNES.
     |
     | Mesure du 2026-08-18 en production : 1 319 567 contacts, 410 481 avec

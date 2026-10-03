@@ -49,10 +49,12 @@ use App\Http\Controllers\Api\ScrapingCampaignsController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Http\Controllers\Internal\PartnersPingController;
 use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
 use App\Http\Controllers\Internal\ZeptoMailWebhookController;
+use App\Http\Middleware\VerificateurCanalPartners;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -617,4 +619,17 @@ Route::prefix('internal')->group(function () {
     Route::post('/email/zeptomail', [ZeptoMailWebhookController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.email.zeptomail');
+
+    // Lot N11 — SOCLE du futur canal Axion Partners, FERMÉ par défaut
+    // (`CRM_PARTNERS_MODE=off` → le 404 d'une route absente). Une seule route,
+    // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`, sur
+    // « horodatage.Idempotency-Key.corps »), anti-rejeu, idempotente ; elle
+    // n'écrit que sa ligne d'idempotence. AUCUNE route métier tant que le
+    // contrat n'est pas figé. ⛔ Jamais comme sonde de supervision.
+    // Le tri de priorité de Laravel 12 place le limiteur AVANT le
+    // vérificateur : `throttle:partners` ne limite donc RIEN en `off`
+    // (`RouteServiceProvider`), pour ne poser ni `X-RateLimit-*` ni 429.
+    Route::post('/partners/v1/ping', PartnersPingController::class)
+        ->middleware(['throttle:partners', VerificateurCanalPartners::class])
+        ->name('internal.partners.ping');
 });

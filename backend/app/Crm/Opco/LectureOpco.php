@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * L'IDCC ET L'OPCO D'UNE FICHE, EN LECTURE SEULE (lot O14) — jointure sur
  * `companies_opco`, sous la RLS de l'espace courant. Aucune écriture ici.
+ * La ligne `siro` d'une fiche non diffusible INSEE n'est pas affichée.
  */
 final class LectureOpco
 {
@@ -27,10 +28,19 @@ final class LectureOpco
             self::$tablePresente = true;
         }
 
-        $ligne = DB::table('companies_opco')
-            ->where('workspace_id', $workspaceId)
-            ->where('company_id', $companyId)
-            ->first(['idcc', 'opco', 'opco_gestion', 'source', 'releve_le']);
+        // Une fiche devenue non diffusible INSEE (opposition à la diffusion
+        // Sirene) après son enrichissement n'affiche plus sa ligne `siro` : elle
+        // est masquée à la lecture, jamais supprimée. Une `saisie` reste visible.
+        $ligne = DB::table('companies_opco as co')
+            ->join('companies as c', function ($j): void {
+                $j->on('c.id', '=', 'co.company_id')->on('c.workspace_id', '=', 'co.workspace_id');
+            })
+            ->where('co.workspace_id', $workspaceId)
+            ->where('co.company_id', $companyId)
+            ->where(function ($q): void {
+                $q->whereNull('c.insee_non_diffusible_le')->orWhere('co.source', '<>', 'siro');
+            })
+            ->first(['co.idcc', 'co.opco', 'co.opco_gestion', 'co.source', 'co.releve_le']);
 
         return $ligne === null ? null : self::presenter($ligne);
     }

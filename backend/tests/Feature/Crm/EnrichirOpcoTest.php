@@ -554,6 +554,23 @@ test('RGPD : une fiche NON DIFFUSIBLE (INSEE) n’est jamais enrichie, et elle e
     expect($bilan['exclues_non_diffusibles'])->toBe(1);
 });
 
+test('RGPD : une fiche devenue non diffusible APRÈS son enrichissement n’affiche plus sa ligne siro — rien supprimé', function () {
+    $e = opcoEspace();
+    foreach ([[$e['a'], 'siro', '2026-07-01'], [$e['b'], 'saisie', null]] as [$fiche, $source, $releve]) {
+        DB::table('companies_opco')->insert([
+            'workspace_id' => $e['ws'], 'company_id' => $fiche['id'], 'siret' => $fiche['siret'],
+            'idcc' => '1486', 'opco' => 'atlas', 'opco_gestion' => null, 'source' => $source, 'releve_le' => $releve,
+        ]);
+    }
+    expect(LectureOpco::pourEntreprise($e['a']['id'], $e['ws']))->not->toBeNull();
+
+    DB::table('companies')->whereIn('id', [$e['a']['id'], $e['b']['id']])->update(['insee_non_diffusible_le' => '2026-09-01']);
+
+    expect(LectureOpco::pourEntreprise($e['a']['id'], $e['ws']))->toBeNull()
+        ->and(LectureOpco::pourEntreprise($e['b']['id'], $e['ws'])['source'] ?? null)->toBe('saisie')
+        ->and(DB::table('companies_opco')->where('workspace_id', $e['ws'])->count())->toBe(2);
+});
+
 test('ligne trop longue ou guillemet non fermé : rejetée et comptée, la suite est lue', function () {
     $e = opcoEspace();
     $contenu = "SIRET|IDCC|OPCO_PROPRIETAIRE|OPCO_GESTION\n"

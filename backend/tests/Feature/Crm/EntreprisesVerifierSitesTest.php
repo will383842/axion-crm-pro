@@ -689,7 +689,7 @@ test('curseurs_traitements : le rôle de production ne peut ni DELETE ni TRUNCAT
     $droits = DB::selectOne(
         "SELECT has_table_privilege('axion_app', 'curseurs_traitements', 'DELETE') AS del,
                 has_table_privilege('axion_app', 'curseurs_traitements', 'TRUNCATE') AS tru,
-                has_table_privilege('axion_app', 'curseurs_traitements', 'UPDATE') AS upd"
+                has_table_privilege('axion_app', 'curseurs_traitements', 'UPDATE') AS upd",
     );
     expect((bool) $droits->del)->toBeFalse()
         ->and((bool) $droits->tru)->toBeFalse()

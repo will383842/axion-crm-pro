@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\DB;
  *
  * ── `companies_opco` : une ligne par entreprise et par espace ─────────────
  *  - `siret`         SIRET de l'établissement rapproché (celui de la fiche,
- *                    `companies.siret`, au moment du rapprochement) ;
+ *                    `companies.siret`, au moment du rapprochement) ; NULL
+ *                    possible pour une saisie sur une fiche sans SIRET ;
  *  - `idcc`          code IDCC à quatre chiffres (table SIRO de France
  *                    compétences, `IDCC`) ;
  *  - `opco`          OPCO PROPRIÉTAIRE (`OPCO_PROPRIETAIRE`, il fait foi) ;
@@ -67,7 +68,7 @@ return new class extends Migration
                 id            BIGSERIAL PRIMARY KEY,
                 workspace_id  UUID NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
                 company_id    BIGINT NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
-                siret         CHAR(14) NOT NULL CHECK (siret ~ '^[0-9]{14}$'),
+                siret         CHAR(14) NULL CHECK (siret IS NULL OR siret ~ '^[0-9]{14}$'),
                 idcc          CHAR(4) NULL CHECK (idcc ~ '^[0-9]{4}$'),
                 opco          TEXT NULL CHECK (opco IN ({$liste})),
                 opco_gestion  TEXT NULL CHECK (opco_gestion IN ({$liste})),

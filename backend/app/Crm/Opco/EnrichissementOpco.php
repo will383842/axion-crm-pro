@@ -206,6 +206,12 @@ final class EnrichissementOpco
         }
 
         if (! $this->essai) {
+            // Un passage inachevé sur une ressource REMPLACÉE ne reprendra
+            // jamais : il est clos (`echouee`), pas effacé.
+            if ($inacheve !== null) {
+                DB::table('companies_opco_passages')->where('id', $inacheve->id)->where('workspace_id', $this->workspaceId)
+                    ->update(['statut' => 'echouee', 'erreur' => 'Ressource remplacée par une publication plus récente', 'maj_le' => now()]);
+            }
             $this->passageId = (int) DB::table('companies_opco_passages')->insertGetId([
                 'workspace_id' => $this->workspaceId,
                 'ressource_id' => $ressource['id'],
@@ -303,7 +309,7 @@ final class EnrichissementOpco
     {
         $positions = [];
         foreach ($entete as $i => $nom) {
-            $cle = strtoupper(trim(str_replace("\u{FEFF}", '', (string) $nom), " \t\"'"));
+            $cle = strtoupper(trim(str_replace(["\u{FEFF}", 'é', 'É', 'è', 'È'], ['', 'E', 'E', 'E', 'E'], (string) $nom), " \t\"'"));
             $cle = (string) preg_replace('/[^A-Z0-9]+/', '_', $cle);
             $positions[$cle] ??= $i;
         }

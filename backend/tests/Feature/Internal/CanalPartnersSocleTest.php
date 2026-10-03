@@ -125,10 +125,13 @@ function n11Demarrer(): void
     (new CanalPartnersServiceProvider(app()))->boot();
 }
 
-/** Chemin tel qu'il apparaît dans un corps JSON (barres obliques échappées ou non). */
+/**
+ * Chemin tel que le message du routeur le cite dans le corps JSON (barres
+ * obliques non échappées — constaté en CI). Le témoin vérifie qu'il y figure.
+ */
 function n11CheminJson(string $route): string
 {
-    return substr((string) json_encode(ltrim($route, '/')), 1, -1);
+    return ltrim($route, '/');
 }
 
 /** @return list<string> noms des en-têtes de limitation présents */

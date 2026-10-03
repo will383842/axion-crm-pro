@@ -7,86 +7,101 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
- * Lot N11 — idempotence du canal Partners, par l'en-tête `Idempotency-Key`.
+ * Lot N11 — idempotence du canal Partners, par l'en-tête `Idempotency-Key`
+ * (couvert par la signature, cf. `VerificateurCanalPartners`).
  *
- *   - clé jamais vue → le traitement s'exécute ; la clé, l'empreinte sha256
- *     du corps, la date et le CODE de réponse sont enregistrés DANS LA MÊME
- *     TRANSACTION que le traitement ;
- *   - même clé + même corps → réponse REJOUÉE (code d'origine, corps rendu
- *     par la route à partir de ce code), en-tête `Idempotent-Replayed: true`,
- *     sans réexécuter le traitement ;
+ * L'unicité porte sur (route, clé) : une même clé envoyée à deux routes
+ * différentes désigne deux opérations distinctes.
+ *
+ *   - clé jamais vue sur cette route → le traitement s'exécute ; route, clé,
+ *     empreinte sha256 du corps, date, code de réponse et RÉSUMÉ de réponse
+ *     sont enregistrés DANS LA MÊME TRANSACTION que le traitement ;
+ *   - même clé + même corps → réponse REJOUÉE à l'identique (code et résumé
+ *     d'origine), en-tête `Idempotent-Replayed: true`, sans réexécuter ;
  *   - même clé + corps différent → 409 `{"erreur":"cle_reutilisee"}`.
  *
- * AUCUNE charge ni donnée personnelle n'est stockée : ni le corps, ni la
- * réponse, ni l'adresse de l'appelant. Le corps de la réponse rejouée est donc
- * RECONSTRUIT par la route (`$rendu`) à partir du seul code ; une route
- * métier future qui voudrait rejouer davantage devra le justifier par ADR.
+ * Le RÉSUMÉ (64 caractères au plus) est ce qu'il faut à la route pour
+ * reconstruire sa réponse d'origine — pour le ping, le mode du canal au moment
+ * de la réception. Il ne porte JAMAIS de donnée personnelle ni la charge : ni
+ * le corps, ni la réponse complète, ni l'adresse de l'appelant ne sont stockés.
  *
  * Deux requêtes simultanées sur la même clé : la contrainte d'unicité tranche,
  * la perdante voit sa transaction annulée (traitement compris) puis reçoit la
  * réponse rejouée ou le 409.
- *
- * Appelé APRÈS `VerificateurCanalPartners` : un appelant non authentifié ne
- * peut ni écrire une ligne ni sonder l'existence d'une clé.
  */
 final class IdempotencePartners
 {
-    public const TABLE = 'partners_evenements_recus';
+    public const TABLE = 'partners_idempotence';
 
     public const ENTETE = 'Idempotency-Key';
 
-    /** Clé fournie par l'émetteur (un UUID convient). */
-    public const MOTIF_CLE = '/^[A-Za-z0-9._:-]{8,128}$/';
+    /**
+     * Clé fournie par l'émetteur. Accepte `<uuid>:<type>:<version>` (forme
+     * prévue côté Partners). JAMAIS de point : la clé est signée dans
+     * « horodatage.clé.corps », le point y est le séparateur.
+     */
+    public const MOTIF_CLE = '/^[A-Za-z0-9_:-]{8,128}$/';
+
+    public const RESUME_MAX = 64;
 
     /**
-     * @param  Closure(): int  $traitement  exécute l'opération, rend le code HTTP
-     * @param  Closure(int): array<string, mixed>  $rendu  corps de la réponse pour ce code
+     * @param  Closure(): array{0: int, 1: ?string}  $traitement  exécute l'opération, rend [code HTTP, résumé]
+     * @param  Closure(int, ?string): array<string, mixed>  $rendu  corps de la réponse pour ce code et ce résumé
      */
-    public static function executer(Request $request, Closure $traitement, Closure $rendu): JsonResponse
+    public static function executer(Request $request, string $route, Closure $traitement, Closure $rendu): JsonResponse
     {
         $cle = $request->header(self::ENTETE);
         if (! is_string($cle) || preg_match(self::MOTIF_CLE, $cle) !== 1) {
+            // Défensif : le vérificateur refuse déjà (401) une clé absente ou
+            // hors format, puisqu'elle entre dans la signature.
             return response()->json(['erreur' => 'cle_idempotence_invalide'], 400);
         }
 
         $empreinte = hash('sha256', $request->getContent());
 
-        $deja = self::rejouer($cle, $empreinte, $rendu);
+        $deja = self::rejouer($route, $cle, $empreinte, $rendu);
         if ($deja !== null) {
             return $deja;
         }
 
         try {
-            $code = DB::transaction(function () use ($cle, $empreinte, $traitement): int {
-                $code = $traitement();
+            [$code, $resume] = DB::transaction(function () use ($route, $cle, $empreinte, $traitement): array {
+                [$code, $resume] = $traitement();
+                if ($resume !== null && strlen($resume) > self::RESUME_MAX) {
+                    throw new LogicException('Résumé de réponse trop long pour la table d’idempotence.');
+                }
 
                 DB::table(self::TABLE)->insert([
+                    'route' => $route,
                     'cle_idempotence' => $cle,
                     'empreinte_corps' => $empreinte,
                     'code_reponse' => $code,
+                    'resume_reponse' => $resume,
                     'recu_le' => now(),
                 ]);
 
-                return $code;
+                return [$code, $resume];
             });
         } catch (UniqueConstraintViolationException) {
-            return self::rejouer($cle, $empreinte, $rendu)
+            return self::rejouer($route, $cle, $empreinte, $rendu)
                 ?? response()->json(['erreur' => 'cle_reutilisee'], 409);
         }
 
-        return response()->json($rendu($code), $code);
+        return response()->json($rendu($code, $resume), $code);
     }
 
     /**
-     * @param  Closure(int): array<string, mixed>  $rendu
+     * @param  Closure(int, ?string): array<string, mixed>  $rendu
      */
-    private static function rejouer(string $cle, string $empreinte, Closure $rendu): ?JsonResponse
+    private static function rejouer(string $route, string $cle, string $empreinte, Closure $rendu): ?JsonResponse
     {
         $ligne = DB::table(self::TABLE)
+            ->where('route', $route)
             ->where('cle_idempotence', $cle)
-            ->first(['empreinte_corps', 'code_reponse']);
+            ->first(['empreinte_corps', 'code_reponse', 'resume_reponse']);
 
         if ($ligne === null) {
             return null;
@@ -97,7 +112,8 @@ final class IdempotencePartners
         }
 
         $code = (int) $ligne->code_reponse;
+        $resume = $ligne->resume_reponse === null ? null : (string) $ligne->resume_reponse;
 
-        return response()->json($rendu($code), $code, ['Idempotent-Replayed' => 'true']);
+        return response()->json($rendu($code, $resume), $code, ['Idempotent-Replayed' => 'true']);
     }
 }

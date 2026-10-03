@@ -616,12 +616,15 @@ Route::prefix('internal')->group(function () {
         ->name('internal.email.zeptomail');
 
     // Lot N11 — SOCLE du futur canal Axion Partners, FERMÉ par défaut
-    // (`CRM_PARTNERS_MODE=off` → 404 comme une route absente). Une seule route,
-    // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`),
-    // anti-rejeu, idempotente (`Idempotency-Key`), elle n'écrit que sa ligne
-    // d'idempotence. AUCUNE route métier tant que le contrat n'est pas figé.
-    // Le vérificateur passe AVANT le limiteur : en `off`, rien n'est compté.
+    // (`CRM_PARTNERS_MODE=off` → le 404 d'une route absente). Une seule route,
+    // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`, sur
+    // « horodatage.Idempotency-Key.corps »), anti-rejeu, idempotente ; elle
+    // n'écrit que sa ligne d'idempotence. AUCUNE route métier tant que le
+    // contrat n'est pas figé. ⛔ Jamais comme sonde de supervision.
+    // Le tri de priorité de Laravel 12 place le limiteur AVANT le
+    // vérificateur : `throttle:partners` ne limite donc RIEN en `off`
+    // (`RouteServiceProvider`), pour ne poser ni `X-RateLimit-*` ni 429.
     Route::post('/partners/v1/ping', PartnersPingController::class)
-        ->middleware([VerificateurCanalPartners::class, 'throttle:internal'])
+        ->middleware(['throttle:partners', VerificateurCanalPartners::class])
         ->name('internal.partners.ping');
 });

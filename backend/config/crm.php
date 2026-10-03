@@ -175,7 +175,13 @@ return [
     |   - `sortant_secrets` : CRM → Partners (futur, non utilisé) ;
     |   - `api3_tokens`     : jeton que le CRM présentera à Partners (futur).
     | Un `kid` suit `^[a-z0-9-]{1,32}$` et n'est JAMAIS concaténé dans une clé
-    | de configuration : il est cherché dans la liste fermée ci-dessus.
+    | de configuration : il est cherché dans la liste fermée ci-dessus. Kid et
+    | secret sont rognés ; un secret fait 32 octets dont 12 caractères
+    | distincts, sans virgule (séparateur).
+    |
+    | Signature attendue de Partners :
+    |   X-Partners-Signature = hex(HMAC-SHA256(secret,
+    |                             "<X-Partners-Timestamp>.<Idempotency-Key>.<corps>"))
     |
     | `kid_essai` : identifiant de la clé entrante réservée aux essais. Elle
     | n'est acceptée qu'en mode `essai` ; en `actif`, elle reçoit le même 401

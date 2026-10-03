@@ -19,7 +19,9 @@ use RuntimeException;
  *   - hors `off`, `entrant_secrets` est obligatoire ; chaque liste posée suit
  *     `kid:secret[,kid:secret]` — deux clés au plus (rotation), `kid` au format
  *     fermé `^[a-z0-9-]{1,32}$`, pas de `kid` en double, secret d'au moins
- *     32 octets et sans préfixe de développement (`dev`, `test`, `changeme`…) ;
+ *     32 octets dont 12 caractères distincts, sans préfixe de développement
+ *     (`dev`, `test`, `changeme`…) ; kid et secret sont rognés (`trim`) ; une
+ *     virgule est impossible dans un secret (c'est le séparateur) ;
  *   - `kid_essai`, s'il est posé, doit désigner une clé entrante ; en `actif`,
  *     il doit rester au moins une clé qui ne soit pas la clé d'essai.
  *
@@ -39,6 +41,9 @@ final class ConfigurationCanalPartners
     public const MOTIF_KID = '/^[a-z0-9-]{1,32}$/';
 
     public const LONGUEUR_MIN_SECRET = 32;
+
+    /** Contre `aaaa…` ou `0101…` : un secret long mais pauvre n'en est pas un. */
+    public const CARACTERES_DISTINCTS_MIN = 12;
 
     /** Deux valeurs au plus : l'ancienne et la nouvelle pendant une rotation. */
     public const CLES_MAX = 2;
@@ -177,12 +182,15 @@ final class ConfigurationCanalPartners
         $cles = [];
         foreach (explode(',', $brut) as $position => $entree) {
             $numero = $position + 1;
-            $morceaux = explode(':', trim($entree), 2);
+            $morceaux = explode(':', $entree, 2);
             if (count($morceaux) !== 2) {
                 throw self::refus($variable, "entrée n°{$numero} sans séparateur « : » (attendu kid:secret)");
             }
 
-            [$kid, $secret] = $morceaux;
+            // Chaque moitié est rognée : `kid: secret` garderait sinon un espace
+            // en tête du secret — démarrage accepté, puis 401 silencieux.
+            $kid = trim($morceaux[0]);
+            $secret = trim($morceaux[1]);
             if (preg_match(self::MOTIF_KID, $kid) !== 1) {
                 throw self::refus($variable, "entrée n°{$numero} : identifiant hors format ^[a-z0-9-]{1,32}$");
             }
@@ -194,6 +202,13 @@ final class ConfigurationCanalPartners
                     'secret « %s » trop court (%d octets au moins)',
                     $kid,
                     self::LONGUEUR_MIN_SECRET,
+                ));
+            }
+            if (strlen(count_chars($secret, 3)) < self::CARACTERES_DISTINCTS_MIN) {
+                throw self::refus($variable, sprintf(
+                    'secret « %s » trop pauvre (%d caractères distincts au moins)',
+                    $kid,
+                    self::CARACTERES_DISTINCTS_MIN,
                 ));
             }
             foreach (self::PREFIXES_INTERDITS as $prefixe) {

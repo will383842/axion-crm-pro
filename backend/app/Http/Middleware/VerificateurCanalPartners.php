@@ -5,40 +5,59 @@ namespace App\Http\Middleware;
 use App\Support\FenetreHorodatage;
 use App\Support\HmacSignature;
 use App\Support\Partners\ConfigurationCanalPartners;
+use App\Support\Partners\IdempotencePartners;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
 /**
  * Lot N11 — authentification du futur canal Axion Partners → CRM.
  *
  * Même logique que `App\Support\CanalSigneSite` (patron du dépôt), avec les
- * en-têtes du canal Partners et une clé choisie par identifiant :
+ * en-têtes du canal Partners et une clé choisie par identifiant.
  *
- *   0. mode `off` → 404 au corps VIDE : la route « n'existe pas » (rien
- *      n'est lu, rien n'est calculé, aucune ligne n'est écrite) ;
+ * ── Ce que Partners signe ────────────────────────────────────────────────
+ *
+ *     X-Partners-Signature = hex( HMAC-SHA256( secret, "<horodatage>.<Idempotency-Key>.<corps>" ) )
+ *
+ * La clé d'idempotence EST dans la signature : un intermédiaire qui réécrit
+ * les en-têtes ne peut pas présenter une requête neuve sous la clé d'un
+ * événement déjà reçu (il obtiendrait un rejeu ou un 409 à la place du
+ * traitement). La clé ne contient jamais de point (`IdempotencePartners::MOTIF_CLE`),
+ * le découpage « horodatage . clé . corps » est donc sans ambiguïté. C'est la
+ * forme la plus simple pour l'émetteur : trois valeurs qu'il a déjà en main,
+ * jointes par un point, sans toucher au corps.
+ *
+ * ── Ordre ────────────────────────────────────────────────────────────────
+ *
+ *   0. mode `off` → 404 INDISCERNABLE d'une route absente : la même exception
+ *      que le routeur lève pour une route inconnue, rendue par le même
+ *      gestionnaire. Le limiteur `throttle:partners` (placé AVANT ce
+ *      vérificateur par le tri de priorité de Laravel 12) ne limite rien en
+ *      `off` : ni en-tête `X-RateLimit-*`, ni 429. ⚠️ Le journal d'audit
+ *      chaîné (`AuditHashChainLogger`, groupe `api`) écrit en revanche sa
+ *      ligne générique pour ce POST (statut 404, empreinte, IP), comme pour
+ *      toute requête POST d'une route déclarée ; aucune ligne d'idempotence
+ *      n'est écrite ;
  *   1. `X-Partners-Timestamp` présent, entier, dans la fenêtre — AVANT tout
  *      calcul de signature ;
  *   2. `X-Partners-Kid` au format fermé, cherché dans la liste des clés
  *      entrantes ACCEPTÉES dans ce mode (la clé d'essai ne l'est qu'en
  *      `essai`) ;
- *   3. `X-Partners-Signature` = HMAC-SHA256 de « <horodatage>.<corps> » avec
- *      ce secret (comparaison à temps constant, `HmacSignature`) ;
- *   4. mémoire anti-rejeu partagée (Redis) : une copie exacte d'une requête
- *      déjà acceptée dans la fenêtre est refusée. L'émetteur re-signe chaque
- *      tentative avec un horodatage neuf ; ses reprises légitimes passent, et
- *      l'en-tête `Idempotency-Key` leur rend la réponse d'origine.
+ *   3. `Idempotency-Key` au format fermé (sinon la signature ne peut pas être
+ *      calculée) ;
+ *   4. `X-Partners-Signature` (comparaison à temps constant, `HmacSignature`) ;
+ *   5. mémoire anti-rejeu partagée (Redis) : une copie exacte d'une requête
+ *      déjà acceptée dans la fenêtre est refusée.
  *
- * TOUS les refus d'authentification (1 à 4) rendent le MÊME 401, au corps
- * identique à l'octet (`CORPS_REFUS`) : un appelant ne peut pas distinguer un
- * `kid` inconnu d'une signature fausse, d'un horodatage périmé ou d'un rejeu.
- * La cause exacte n'est écrite qu'au journal (sans corps ni secret).
- *
- * Seule exception : la mémoire anti-rejeu indisponible → 503, que l'émetteur
- * rejoue plus tard ; jamais une acceptation sans contrôle.
+ * TOUS les refus d'authentification (1 à 5) rendent le MÊME 401, au corps
+ * identique à l'octet (`CORPS_REFUS`). La cause n'est écrite qu'au journal.
+ * Seule exception : mémoire anti-rejeu indisponible → 503, jamais une
+ * acceptation sans contrôle.
  */
 final class VerificateurCanalPartners
 {
@@ -50,7 +69,9 @@ final class VerificateurCanalPartners
         $configuration = ConfigurationCanalPartners::depuisConfig();
 
         if (! $configuration->estOuvert()) {
-            return response('', 404);
+            // Mot pour mot l'exception du routeur pour une route inconnue
+            // (`RouteCollection::handleMatchedRoute`) : même rendu, même corps.
+            throw new NotFoundHttpException(sprintf('The route %s could not be found.', $request->path()));
         }
 
         $corps = $request->getContent();
@@ -69,15 +90,19 @@ final class VerificateurCanalPartners
             return self::refus($request, 'identifiant de clé inconnu ou non accepté dans ce mode');
         }
 
-        // 3. Signature.
-        $charge = HmacSignature::signedPayload($horodatage, $corps);
+        // 3. Clé d'idempotence : elle fait partie de ce qui est signé.
+        $cle = self::entete($request, IdempotencePartners::ENTETE);
+        if ($cle === null || preg_match(IdempotencePartners::MOTIF_CLE, $cle) !== 1) {
+            return self::refus($request, 'clé d’idempotence absente ou hors format');
+        }
+
+        // 4. Signature de « <horodatage>.<clé>.<corps> ».
+        $charge = HmacSignature::signedPayload($horodatage, $cle . '.' . $corps);
         if (! HmacSignature::verify($secret, $charge, self::entete($request, 'X-Partners-Signature'))) {
             return self::refus($request, 'signature invalide');
         }
 
-        // 4. Requête déjà vue. Empreinte sur la signature ATTENDUE (une
-        //    variante d'écriture de l'en-tête ne produit pas une empreinte
-        //    neuve) ; jamais le corps.
+        // 5. Requête déjà vue. Empreinte sur la signature ATTENDUE ; jamais le corps.
         $empreinte = hash('sha256', 'partners|' . (string) $kid . '|' . HmacSignature::sign($secret, $charge));
         $ttl = max(1, (int) $horodatage + $fenetre - time() + 1);
 
@@ -85,6 +110,9 @@ final class VerificateurCanalPartners
             $premiereFois = Cache::store((string) config('crm.ingest.replay_store', 'redis'))
                 ->add('canal-partners:vu:' . $empreinte, 1, $ttl);
         } catch (Throwable $e) {
+            // TODO(N11-IP-JOURNAUX) : IP en clair, comme `CanalSigneSite` ; la
+            // règle « IP hachée » sera appliquée aux deux canaux d'un même geste
+            // (réserve sécurité n°5 de la PR #307).
             Log::warning('canal Partners : requête refusée (mémoire anti-rejeu indisponible)', [
                 'ip' => $request->ip(),
                 'exception' => $e::class,
@@ -109,6 +137,8 @@ final class VerificateurCanalPartners
 
     private static function refus(Request $request, string $cause): Response
     {
+        // TODO(N11-IP-JOURNAUX) : voir plus haut — IP en clair, sujet commun
+        // avec `CanalSigneSite`.
         Log::warning("canal Partners : requête refusée ({$cause})", ['ip' => $request->ip()]);
 
         return response(self::CORPS_REFUS, 401, ['Content-Type' => 'application/json']);

@@ -574,10 +574,28 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
 
             return $noeuds;
         };
+        //
+        // Planificateur libre, il peut PRÉFÉRER un index avec le critère :
+        // depuis le motif tiers (sous-requête indexée par personne), le filtre
+        // coûte plus cher, et sur cette table de quelques lignes il devient
+        // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
+        // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
+        // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
         foreach (['on', 'off'] as $balayage) {
             qsApp()->statement('SET enable_seqscan = ' . $balayage);
             try {
-                expect($acces($q))->toBe($acces($sans));
+                $avec = $acces($q);
+                $reference = $acces($sans);
+                if ($balayage === 'off') {
+                    expect($avec)->toBe($reference);
+                } else {
+                    expect(count($avec))->toBe(count($reference));
+                    foreach ($avec as $i => $noeud) {
+                        if (str_starts_with($noeud, 'Seq Scan')) {
+                            expect($reference[$i])->toStartWith('Seq Scan');
+                        }
+                    }
+                }
             } finally {
                 qsApp()->statement('RESET enable_seqscan');
             }

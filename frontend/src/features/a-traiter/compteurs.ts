@@ -8,6 +8,10 @@
  * « Relances à faire » de l'écran Événements. `relances` n'a pas de pastille
  * dans le menu : seul l'accueil le montre.
  *
+ * `propositions` (N13, 03/10/2026) : les « Propositions à valider » (valeurs
+ * venues d'un tiers). Rôle owner seulement : le serveur rend `null` à tout
+ * autre rôle, donc aucune pastille.
+ *
  * Règles d'affichage :
  *  - un compteur `null` (échec, file inexistante dans cet univers) ou absent
  *    n'affiche RIEN — jamais un 0 inventé ;
@@ -18,14 +22,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type CleCompteur = 'doublons' | 'a_rattacher';
+export type CleCompteur = 'doublons' | 'a_rattacher' | 'propositions';
 
 /**
  * `relances` est ABSENT (`undefined`) quand le serveur ne l'envoie pas (image
  * antérieure au nouvel accueil) : l'accueil n'affiche alors pas la carte —
  * ni chiffre inventé, ni fausse panne. `null` = le serveur n'a pas pu compter.
  */
-export type CompteursATraiter = Record<CleCompteur, number | null> & { relances?: number | null };
+export type CompteursATraiter = Record<'doublons' | 'a_rattacher', number | null> & {
+  relances?: number | null;
+  /** Absent d'une image serveur antérieure à N13 ; `null` pour tout rôle autre que owner. */
+  propositions?: number | null;
+};
 
 export const COMPTEURS_A_TRAITER_KEY = ['crm', 'a-traiter', 'compteurs'] as const;
 
@@ -46,6 +54,7 @@ export function normaliserCompteurs(brut: unknown): CompteursATraiter {
     doublons: entierOuNull(objet['doublons']),
     a_rattacher: entierOuNull(objet['a_rattacher']),
     ...('relances' in objet ? { relances: entierOuNull(objet['relances']) } : {}),
+    ...('propositions' in objet ? { propositions: entierOuNull(objet['propositions']) } : {}),
   };
 }
 
@@ -87,6 +96,7 @@ export function texteDePastille(n: number): string {
 export const LIBELLES_COMPTEUR: Record<CleCompteur, (n: number) => string> = {
   doublons: (n) => (n === 1 ? '1 doublon à vérifier' : `${formaterNombre(n)} doublons à vérifier`),
   a_rattacher: (n) => (n === 1 ? '1 personne à rattacher' : `${formaterNombre(n)} personnes à rattacher`),
+  propositions: (n) => (n === 1 ? '1 proposition à valider' : `${formaterNombre(n)} propositions à valider`),
 };
 
 /**

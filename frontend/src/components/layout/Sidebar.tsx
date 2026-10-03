@@ -41,12 +41,14 @@ import {
   Landmark,
   CopyCheck,
   ListChecks,
+  Inbox,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import { PastilleCompteur } from '@/features/a-traiter/PastilleCompteur';
+import { useEstOwner } from '@/features/propositions/useEstOwner';
 import {
   LIBELLES_COMPTEUR,
   libelleTotalATraiter,
@@ -124,7 +126,7 @@ const SECTION_ACCUEIL: NavSection = {
  * `/contacts` — jamais les deux) et de l'univers « vivier » : une entrée qui
  * mène à un 403 n'a pas à exister (conception §2.2).
  */
-function sectionATraiter(features: ConsoleFeatures): NavSection {
+function sectionATraiter(features: ConsoleFeatures, owner: boolean): NavSection {
   return {
     id: 'a-traiter',
     title: 'À traiter',
@@ -132,6 +134,11 @@ function sectionATraiter(features: ConsoleFeatures): NavSection {
       { to: '/doublons', label: 'Doublons à vérifier', icon: icone(CopyCheck), compteur: 'doublons' },
       ...(features.console_v2
         ? [{ to: '/console/arbitrage', label: 'Personnes à rattacher', icon: icone(Scale), compteur: 'a_rattacher' as const }]
+        : []),
+      // N13 (03/10/2026) : réservé au propriétaire — le serveur répond 403 à
+      // tout autre rôle, l'entrée n'a donc pas à exister pour eux.
+      ...(features.console_v2 && owner
+        ? [{ to: '/console/propositions', label: 'Propositions à valider', icon: icone(Inbox), compteur: 'propositions' as const }]
         : []),
     ],
   };
@@ -220,8 +227,8 @@ const SECTIONS_FIXES: NavSection[] = [
 export const SECTION_TECHNIQUE = 'technique';
 
 /** L'arborescence complète du menu, pour l'écran et pour les gardes. */
-export function sectionsDeNavigation(features: ConsoleFeatures): NavSection[] {
-  return [SECTION_ACCUEIL, sectionATraiter(features), sectionMaBase(features), ...SECTIONS_FIXES];
+export function sectionsDeNavigation(features: ConsoleFeatures, owner = false): NavSection[] {
+  return [SECTION_ACCUEIL, sectionATraiter(features, owner), sectionMaBase(features), ...SECTIONS_FIXES];
 }
 
 export interface SidebarProps {
@@ -242,7 +249,8 @@ export interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: SidebarProps) {
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
-  const sections = sectionsDeNavigation(features);
+  const owner = useEstOwner();
+  const sections = sectionsDeNavigation(features, owner);
   // Les pastilles « À traiter » : la route vit derrière le drapeau de la
   // console, on ne la demande donc que console ouverte.
   const { data: compteurs } = useCompteursATraiter(features.console_v2);

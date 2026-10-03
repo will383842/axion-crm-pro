@@ -37,6 +37,7 @@ const LABELS: Record<string, string> = {
   // À traiter
   '/doublons': 'Doublons à vérifier',
   '/console/arbitrage': 'Personnes à rattacher',
+  '/console/propositions': 'Propositions à valider',
   // Ma base
   '/companies': 'Entreprises',
   '/contacts': 'Contacts',

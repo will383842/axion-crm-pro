@@ -98,7 +98,7 @@ annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 
 ---
 
-## Glossaire (56 termes)
+## Glossaire (57 termes)
 
 ### Métier
 
@@ -109,6 +109,7 @@ annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 - **Prospect chaud / tiède / froid / gelé** — Catégorisation contact pour priorisation outreach.
 - **Provenance tiers** — Personne apportée par un tiers du futur canal Axion Partners. Vocabulaire EXACT du contrat : `apporteur`, `commercial`, `societe` (`Taxonomy::FIELD_ORIGINS_TIERS`, table `contacts_provenances_tiers`). Lecture réservée au rôle owner. Exclue des campagnes et des exports tant que `information_tiers_version` (texte de version de l'information art. 14 reçu du tiers, stocké tel quel, ex. `information-article-14/v5`) n'est pas ≥ v5 ; tout autre format vaut « inconnue ». Les personnes apportées sont acquises par Axion-IA : ni échéance ni archivage. Rien ne supprime une provenance (clés étrangères en RESTRICT, rôle applicatif sans DELETE) ; la personne concernée la retrouve dans son export art. 15.
 - **Dernier échange à l'initiative** — `contacts.dernier_echange_initiative_at` : date du dernier geste fait par la personne elle-même (formulaire, demande du guide, rendez-vous, réponse — `Taxonomy::ACTIVITY_KINDS_INITIATIVE_PERSONNE`).
+- **Proposition (tiers)** — Information venue d'un tiers (`apporteur`, `commercial`, `societe`) qui DIFFÈRE d'une valeur déjà présente sur une fiche entreprise ou personne : elle n'écrase jamais la fiche, elle attend dans `propositions_champs` que le propriétaire (rôle owner) l'accepte ou la refuse (écran « Propositions à valider »). Champ vide d'une fiche ordinaire : rempli directement ; champ déclaré par la personne ou fiche protégée : jamais rempli automatiquement. Règle unique : `App\Crm\Propositions\Propositions`. Rien n'y est jamais supprimé.
 
 ### Cibles
 

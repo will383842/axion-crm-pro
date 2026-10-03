@@ -21,8 +21,8 @@
  */
 
 use App\Crm\FichesProtegees;
-use App\Crm\Propositions\Propositions;
 use App\Crm\Propositions\PropositionDejaDecidee;
+use App\Crm\Propositions\Propositions;
 use App\Crm\Taxonomy;
 use App\Models\User;
 use App\Services\Audit\AuditHashChain;
@@ -115,7 +115,8 @@ test('le rôle applicatif ne peut rien supprimer de la file (ni DELETE ni TRUNCA
     expect($existe)->not->toBeNull();
 
     $droit = fn (string $p): bool => (bool) DB::selectOne(
-        'SELECT has_table_privilege(?, ?, ?) AS ok', [$role, 'public.propositions_champs', $p],
+        'SELECT has_table_privilege(?, ?, ?) AS ok',
+        [$role, 'public.propositions_champs', $p],
     )->ok;
     expect($droit('SELECT'))->toBeTrue()
         ->and($droit('INSERT'))->toBeTrue()

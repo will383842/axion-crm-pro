@@ -16,7 +16,14 @@ use Illuminate\Support\Facades\Log;
 /**
  * COMPTEURS « À TRAITER » DU MENU — audit UX du 02/10/2026, lot 8.
  *
- * `GET /v1/crm/a-traiter/compteurs` → `{ doublons: int|null, a_rattacher: int|null }`.
+ * `GET /v1/crm/a-traiter/compteurs` → `{ doublons: int|null, a_rattacher:
+ * int|null, relances: int|null }`.
+ *
+ * `relances` (03/10/2026, nouvel accueil) : les événements dont la date de
+ * relance est arrivée — l'onglet « Relances à faire » de l'écran Événements
+ * (`/evenements?relance=a_faire`), même constructeur
+ * (`FilesATraiter::relancesEvenements`). Il n'a pas de pastille dans le
+ * menu ; l'accueil l'affiche dans son bloc « À faire ».
  *
  * ── TROIS RÈGLES ────────────────────────────────────────────────────────────
  *
@@ -64,7 +71,8 @@ class ATraiterController extends ConsoleController
 
     public static function cle(string $espace): string
     {
-        return 'crm:a-traiter:compteurs:v1:' . $espace;
+        // `v2` (03/10/2026) : la charge utile gagne `relances`.
+        return 'crm:a-traiter:compteurs:v2:' . $espace;
     }
 
     /**
@@ -107,12 +115,13 @@ class ATraiterController extends ConsoleController
         return $this->ok(is_array($charge) ? array_merge(self::inconnus(), $charge) : self::inconnus());
     }
 
-    /** @return array{doublons: int|null, a_rattacher: int|null} */
+    /** @return array{doublons: int|null, a_rattacher: int|null, relances: int|null} */
     private function calculer(string $espace, bool $vivier): array
     {
         return WorkspaceContext::run($espace, fn (): array => [
             'doublons' => $this->compter('doublons', FilesATraiter::doublons(...), $espace),
             'a_rattacher' => $vivier ? null : $this->compter('a_rattacher', FilesATraiter::aRattacher(...), $espace),
+            'relances' => $this->compter('relances', FilesATraiter::relancesEvenements(...), $espace),
         ]);
     }
 
@@ -145,9 +154,9 @@ class ATraiterController extends ConsoleController
         return ['exception' => $e::class, 'sqlstate' => $sqlstate];
     }
 
-    /** @return array{doublons: null, a_rattacher: null} */
+    /** @return array{doublons: null, a_rattacher: null, relances: null} */
     private static function inconnus(): array
     {
-        return ['doublons' => null, 'a_rattacher' => null];
+        return ['doublons' => null, 'a_rattacher' => null, 'relances' => null];
     }
 }

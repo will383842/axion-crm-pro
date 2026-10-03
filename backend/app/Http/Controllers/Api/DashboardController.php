@@ -86,11 +86,25 @@ class DashboardController extends ApiController
      * (« indisponible »). Une charge utile ne contient jamais de `null` en
      * cache — un résultat partiel n'y entre pas — mais la forme du contrat a
      * changé : la version change avec elle.
+     *
+     * `v5` (2026-10-03, nouvel accueil en blocs) : la charge utile gagne
+     * `companies_enriched`, `prospects_joignables` et
+     * `prospects_joignables_idf`.
      */
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v4:' . $espace;
+        return 'crm:dashboard:stats:v5:' . $espace;
     }
+
+    /**
+     * Les audiences SYSTÈME dont l'accueil lit le nombre de membres
+     * (`DefaultAudiencesSeeder`). Le nombre est recalculé chaque nuit par le
+     * rafraîchissement des audiences : l'accueil le lit, il ne le recompte
+     * pas (le recompter, c'est rejouer les critères sur 4,35 M de fiches).
+     */
+    public const AUDIENCE_JOIGNABLES = 'Prospects contactables';
+
+    public const AUDIENCE_JOIGNABLES_IDF = 'Prospects contactables — Île-de-France';
 
     public function stats(Request $r): JsonResponse
     {
@@ -236,6 +250,19 @@ class DashboardController extends ApiController
             'companies_enriched_24h' => $this->compter('companies', $espace, function ($q) {
                 $q->whereNotNull('enriched_at')->where('enriched_at', '>=', now()->subDay());
             }),
+            // « Fiches enrichies » de l'accueil (part du total) : toutes les
+            // fiches vivantes qui portent un `enriched_at`. Même index partiel
+            // `idx_companies_ws_enriched_at` que le compteur sur 24 h — son
+            // prédicat est exactement celui-ci.
+            'companies_enriched' => $this->compter('companies', $espace, function ($q) {
+                $q->whereNotNull('enriched_at');
+            }),
+            // « Prospects joignables » : le nombre de membres de l'audience
+            // système « Prospects contactables » (e-mail présent, prêt au
+            // démarchage, relations établies exclues), et celui de sa
+            // déclinaison Île-de-France. Lus, pas recomptés.
+            'prospects_joignables' => $this->membresAudience($espace, self::AUDIENCE_JOIGNABLES),
+            'prospects_joignables_idf' => $this->membresAudience($espace, self::AUDIENCE_JOIGNABLES_IDF),
             'contacts_qualified' => $this->compter('contacts', $espace, function ($q) {
                 // « Qualifiée » = joignable. C'est la définition que le hub
                 // emploie déjà ; on ne réinvente pas un second sens ici.
@@ -340,7 +367,53 @@ class DashboardController extends ApiController
             'quality_scored' => null,
             'quality_a_recalculer_pct' => null,
             'size_distribution' => self::taillesAZero(),
+            // `null` = inconnu : l'écran écrit « — », jamais 0.
+            'companies_enriched' => null,
+            'prospects_joignables' => null,
+            'prospects_joignables_idf' => null,
         ];
+    }
+
+    /**
+     * Le nombre de membres d'une audience système, tel que le dernier
+     * rafraîchissement l'a écrit.
+     *
+     * `null` — jamais 0 — dans trois cas :
+     *  - l'audience n'existe pas dans cet espace (ou a été supprimée) : rien
+     *    à lire, et ce n'est pas une panne (le résultat peut entrer en cache) ;
+     *  - elle n'a jamais été rafraîchie (`refreshed_at` vide) : son
+     *    `member_count` vaut 0 par défaut, ce qui se lirait « personne » ;
+     *  - la lecture échoue : panne, journalisée, résultat PAS mis en cache.
+     *
+     * Le nom est la seule clé des audiences système (`updateOrCreate` sur
+     * `workspace_id, name` dans le seeder). Si plusieurs portent ce nom, la
+     * plus ancienne — celle du seeder — fait foi.
+     */
+    private function membresAudience(string $espace, string $nom): ?int
+    {
+        if (! Schema::hasTable('email_audiences')) {
+            return null;
+        }
+
+        try {
+            $ligne = DB::table('email_audiences')
+                ->where('workspace_id', $espace)
+                ->where('name', $nom)
+                ->whereNull('deleted_at')
+                ->orderBy('id')
+                ->first(['member_count', 'refreshed_at']);
+        } catch (\Throwable $e) {
+            $this->incomplet = true;
+            Log::warning('dashboard: audience indisponible', self::panneSansSql($e));
+
+            return null;
+        }
+
+        if ($ligne === null || $ligne->refreshed_at === null) {
+            return null;
+        }
+
+        return (int) $ligne->member_count;
     }
 
     /** @return array<string, int> */

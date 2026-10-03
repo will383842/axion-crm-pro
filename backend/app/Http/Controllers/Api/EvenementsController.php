@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Console\FilesATraiter;
 use App\Crm\Taxonomy;
+use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\Company;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Database\Query\Builder;
@@ -51,7 +53,12 @@ class EvenementsController extends ApiController
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . self::PAR_PAGE_MAX],
         ]);
 
-        $requete = DB::table('events')->where('workspace_id', $workspaceId);
+        // « Relances à faire » part du MÊME constructeur que le compteur de
+        // l'accueil (`FilesATraiter::relancesEvenements`) : le chiffre de
+        // l'accueil = le total de cet onglet.
+        $requete = ($filtres['relance'] ?? null) === 'a_faire'
+            ? FilesATraiter::relancesEvenements($workspaceId)
+            : DB::table('events')->where('workspace_id', $workspaceId);
         $this->filtrer($requete, $filtres);
 
         $total = (clone $requete)->count();
@@ -160,6 +167,12 @@ class EvenementsController extends ApiController
             abort(404);
         }
 
+        // La date de relance fait entrer ou sortir l'événement de la file
+        // « Événements à relancer » de l'accueil : son compteur suit l'écran.
+        if (array_key_exists('prochaine_relance_at', $data)) {
+            ATraiterController::oublier($workspaceId);
+        }
+
         return $this->ok($fiche);
     }
 
@@ -206,10 +219,6 @@ class EvenementsController extends ApiController
             $requete->whereRaw('COALESCE(date_fin, date_debut) < ?', [$aujourdhui]);
         } elseif ($periode === 'sans_date') {
             $requete->whereNull('date_debut');
-        }
-
-        if (($filtres['relance'] ?? null) === 'a_faire') {
-            $requete->whereNotNull('prochaine_relance_at')->where('prochaine_relance_at', '<=', now());
         }
 
         $q = trim((string) ($filtres['q'] ?? ''));

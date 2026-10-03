@@ -54,7 +54,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, information_tiers_insuffisante?: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -367,7 +367,7 @@ final class ResolveurDestinataires
             $candidats[] = [
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => null,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'information_tiers_insuffisante' => false, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -412,7 +412,7 @@ final class ResolveurDestinataires
                 'email' => $e, 'classe' => $classe === self::INCONNUE ? self::NOMINATIVE : $classe,
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => $ecartee,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
             ];
         }
 

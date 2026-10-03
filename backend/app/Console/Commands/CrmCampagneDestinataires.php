@@ -444,6 +444,8 @@ class CrmCampagneDestinataires extends Command
                 'perso' => false,
                 'deja_informe' => $org->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                // Une boîte d'organisation n'est pas une personne apportée.
+                'information_tiers_insuffisante' => false,
             ];
         }
 

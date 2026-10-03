@@ -41,7 +41,11 @@ use App\Support\EligibiliteCampagne;
  *                     motif précédent : le drapeau est posé par l'appelant
  *                     sur les personnes qu'il a DÉJÀ lues (une sous-requête
  *                     indexée par personne, `informationInsuffisanteSql`) ;
- *                     une personne sans provenance tiers n'est pas concernée ;
+ *                     une personne sans provenance tiers n'est pas concernée.
+ *                     Ordre convenu avec #311 : EI → `site_non_verifie` →
+ *                     ce motif, tous AVANT `invalide` (une adresse exclue
+ *                     pour deux raisons est comptée sous un motif visible de
+ *                     tous les rôles ; celui-ci n'est servi qu'au owner) ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par

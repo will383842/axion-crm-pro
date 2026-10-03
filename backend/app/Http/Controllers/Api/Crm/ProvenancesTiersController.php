@@ -40,17 +40,18 @@ class ProvenancesTiersController extends ConsoleController
                 ->where('workspace_id', $workspaceId)
                 ->where('contact_id', $contactId)
                 ->orderBy('id')
-                ->get(['id', 'origine', 'reference_externe', 'information_tiers_version', 'information_tiers_at', 'recu_le', 'created_at', 'updated_at'])
+                ->get(['id', 'origine', 'reference_externe', 'information_tiers_version', 'derniere_sequence', 'recu_le', 'created_at', 'updated_at'])
                 ->map(static function (object $l): array {
-                    $version = $l->information_tiers_version === null ? null : (int) $l->information_tiers_version;
+                    $version = $l->information_tiers_version === null ? null : (string) $l->information_tiers_version;
 
                     return [
                         'id' => (int) $l->id,
                         'origine' => (string) $l->origine,
                         'reference_externe' => (string) $l->reference_externe,
                         'information_tiers_version' => $version,
+                        'information_tiers_numero' => ProvenanceTiers::numeroVersion($version),
                         'information_suffisante' => ! ProvenanceTiers::informationInsuffisante($version),
-                        'information_tiers_at' => $l->information_tiers_at,
+                        'derniere_sequence' => $l->derniere_sequence === null ? null : (int) $l->derniere_sequence,
                         'recu_le' => $l->recu_le,
                         'created_at' => $l->created_at,
                         'updated_at' => $l->updated_at,

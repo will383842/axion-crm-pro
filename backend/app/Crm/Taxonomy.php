@@ -346,7 +346,7 @@ final class Taxonomy
      * réduit, 03/10/2026) : elle a rempli un formulaire, demandé le guide,
      * pris un rendez-vous ou répondu. Chacun date
      * `contacts.dernier_echange_initiative_at` (déclencheur posé par la
-     * migration `2026_10_03_000070`, qui recopie CETTE liste). Un geste de
+     * migration `2026_10_03_000080`, qui recopie CETTE liste). Un geste de
      * notre fait (envoi, relance, collecte) n'y entre jamais.
      *
      * @var list<string>

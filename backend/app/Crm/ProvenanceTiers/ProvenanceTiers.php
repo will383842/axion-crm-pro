@@ -4,6 +4,7 @@ namespace App\Crm\ProvenanceTiers;
 
 use App\Crm\Taxonomy;
 use App\Models\User;
+use InvalidArgumentException;
 
 /**
  * PROVENANCE DES INFORMATIONS VENUES DE TIERS (N12, 03/10/2026) — la règle,
@@ -33,23 +34,57 @@ final class ProvenanceTiers
 
     public const VERSION_INFORMATION_MINIMALE = 5;
 
-    /** Vrai quand la version d'information ne suffit pas : inconnue, ou < 5. */
-    public static function informationInsuffisante(?int $version): bool
+    /**
+     * Le texte de version tel que le contrat Partners l'émet
+     * (`VERSION_INFORMATION_ARTICLE_14` = `information-article-14/v5`). La
+     * version est stockée TELLE QUE REÇUE ; seul ce préfixe suivi d'un numéro
+     * est reconnu. Tout autre format vaut « inconnue » : un « 5 » venu d'un
+     * autre texte ne passe pas pour suffisant.
+     */
+    public const PREFIXE_VERSION = 'information-article-14/v';
+
+    /** Le motif reconnu, en PHP (`/u` absent : octets ASCII seulement) et en SQL (POSIX). */
+    private const MOTIF_VERSION_PHP = '#^information-article-14/v([0-9]{1,6})$#D';
+
+    private const MOTIF_VERSION_SQL = '^information-article-14/v([0-9]{1,6})$';
+
+    /** Le numéro d'une version reçue, ou null si elle est absente ou d'un autre format. */
+    public static function numeroVersion(?string $version): ?int
     {
-        return $version === null || $version < self::VERSION_INFORMATION_MINIMALE;
+        if ($version === null || preg_match(self::MOTIF_VERSION_PHP, $version, $m) !== 1) {
+            return null;
+        }
+
+        return (int) $m[1];
+    }
+
+    /** Vrai quand la version d'information ne suffit pas : inconnue, d'un autre format, ou < 5. */
+    public static function informationInsuffisante(?string $version): bool
+    {
+        $numero = self::numeroVersion($version);
+
+        return $numero === null || $numero < self::VERSION_INFORMATION_MINIMALE;
     }
 
     /**
-     * Expression SQL booléenne : la personne `$alias.id` a AU MOINS une
-     * provenance tiers dont l'information est insuffisante. Une seule suffit
-     * — même règle que les occurrences d'une adresse. Lue par l'index
+     * Expression SQL booléenne : la personne désignée par `$alias.$colonne`
+     * (par défaut `contacts.id` ; `personnes.contact_id` pour l'export des
+     * personnes) a AU MOINS une provenance tiers dont l'information est
+     * insuffisante. Une seule suffit — même règle que les occurrences d'une
+     * adresse. Miroir SQL d'`informationInsuffisante()` : `substring()` rend
+     * NULL hors format, donc 0. Lue par l'index
      * `idx_contacts_provenances_tiers_contact`, sous la RLS de l'appelant.
+     *
+     * @throws InvalidArgumentException alias ou colonne hors identifiant simple
      */
-    public static function informationInsuffisanteSql(string $alias): string
+    public static function informationInsuffisanteSql(string $alias, string $colonne = 'id'): string
     {
-        return 'EXISTS (SELECT 1 FROM contacts_provenances_tiers cpt WHERE cpt.contact_id = ' . $alias . '.id'
-            . ' AND (cpt.information_tiers_version IS NULL OR cpt.information_tiers_version < '
-            . self::VERSION_INFORMATION_MINIMALE . '))';
+        self::identifiant($alias);
+        self::identifiant($colonne);
+
+        return 'EXISTS (SELECT 1 FROM contacts_provenances_tiers cpt WHERE cpt.contact_id = ' . $alias . '.' . $colonne
+            . " AND COALESCE(substring(cpt.information_tiers_version FROM '" . self::MOTIF_VERSION_SQL . "')::int, 0) < "
+            . self::VERSION_INFORMATION_MINIMALE . ')';
     }
 
     /** Seul le rôle owner lit la provenance tiers. */
@@ -85,5 +120,19 @@ final class ProvenanceTiers
         }
 
         return (string) json_encode($filtree === [] ? new \stdClass : $filtree, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Un alias ou une colonne concaténé dans du SQL : identifiant simple
+     * seulement (patron `QuarantaineSite::alias`). Les appelants sont internes ;
+     * la garde ferme quand même la porte.
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function identifiant(string $nom): void
+    {
+        if (preg_match('/^[a-z_][a-z0-9_]*$/', $nom) !== 1) {
+            throw new InvalidArgumentException('Identifiant SQL refusé : ' . json_encode($nom));
+        }
     }
 }

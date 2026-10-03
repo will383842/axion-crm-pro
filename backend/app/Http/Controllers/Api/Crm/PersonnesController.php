@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Personnes\Abonnements;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Taxonomy;
 use App\Support\CelluleCsv;
 use App\Support\MasquageCoordonnees;
@@ -423,6 +424,10 @@ class PersonnesController extends ConsoleController
      * par défaut ; avec `inclure_non_prospectables=oui`, elle sort avec
      * « Prospection autorisée » à non et la colonne « Entrepreneur
      * individuel » à oui.
+     *
+     * Provenance tiers (N12) : une personne apportée par un tiers dont
+     * l'information est insuffisante (`ProvenanceTiers`) ne sort JAMAIS,
+     * quelle que soit l'option — c'est une interdiction, pas une préférence.
      */
     public function export(Request $request): StreamedResponse
     {
@@ -461,6 +466,11 @@ class PersonnesController extends ConsoleController
                     // rien à indexer. Sans fiche (LEFT JOIN nul) : rien à exclure.
                     $requete->whereRaw("COALESCE(btrim(companies.legal_form), '') NOT LIKE '1%'");
                 }
+                // 🔴 PROVENANCE TIERS (N12) : la personne apportée sans
+                // information suffisante ne sort JAMAIS — même avec
+                // `inclure_non_prospectables=oui`. Une sous-requête indexée par
+                // personne déjà restreinte à l'espace ; rien n'est effacé.
+                $requete->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('personnes', 'contact_id'));
 
                 // Même plafond que tous les exports du dépôt (G41-007), même
                 // ligne témoin lue en plus pour distinguer « complet » de

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Referentiels\LibellesNaf;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
@@ -366,6 +367,10 @@ class CompaniesController extends ApiController
             // Les personnes de la presse ne sortent que par l'export presse
             // dédié, segment presse ouvert ou non (`GardePresse`).
             GardePresse::exclureContacts($relation->getQuery(), 'contacts');
+            // 🔴 PROVENANCE TIERS (N12) : une personne apportée par un tiers
+            // sans information suffisante ne sort pas — ni son nom, ni son
+            // adresse. Rien n'est effacé en base.
+            $relation->getQuery()->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('contacts'));
         };
 
         // `getEloquentBuilder()` : `buildFilteredQuery()` rend un

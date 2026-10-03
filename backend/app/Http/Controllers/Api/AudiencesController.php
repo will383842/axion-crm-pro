@@ -276,10 +276,16 @@ class AudiencesController extends ApiController
         }
 
         // Provenance tiers (N12) : lecture réservée au rôle owner. Pour tout
-        // autre rôle, le compteur de ce motif n'est pas servi — les adresses
-        // qu'il écarte restent comptées dans `exclues_total`.
+        // autre rôle, le compteur de ce motif n'est pas servi, et il est
+        // RETIRÉ de `exclues_total` : sinon le total moins la somme des autres
+        // motifs le redonnerait. Les adresses écartées ne partent pas pour
+        // autant (`destinataires` est inchangé).
         if (! ProvenanceTiers::lisible() && is_array($resultat['exclues'] ?? null)) {
+            $masque = $resultat['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE] ?? 0;
             unset($resultat['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE]);
+            if (is_int($resultat['exclues_total'] ?? null) && is_int($masque)) {
+                $resultat['exclues_total'] = max(0, $resultat['exclues_total'] - $masque);
+            }
         }
 
         return $this->ok(['data' => $resultat]);

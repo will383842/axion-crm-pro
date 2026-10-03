@@ -7,6 +7,7 @@ use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
 use App\Crm\Listes\ListesManuelles;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Jobs\RefreshAudienceChunkJob;
@@ -63,6 +64,20 @@ class AudienceBuilderService
      * en quarantaine (générique d'une fiche au site deviné non vérifié,
      * personne relevée sur ce site ou sur son domaine). C'est le « joignable »
      * des audiences par défaut et du compteur de l'accueil. `eq` seulement.
+     *
+     * Même règle que l'envoi pour le motif tiers (N12, `ProvenanceTiers`) :
+     * une personne apportée par un tiers dont l'information est insuffisante
+     * ne rend pas sa fiche joignable — elle ne part jamais, elle ne compte
+     * donc pas. Sous-requête par personne, lue par l'index
+     * `idx_contacts_provenances_tiers_contact` ; rien n'est réécrit.
+     *
+     * Écart CONNU avec l'envoi, le même pour les deux motifs (quarantaine et
+     * tiers) : ce critère juge chaque PERSONNE de la fiche, alors
+     * qu'`EligibiliteAdresse` juge la BOÎTE sur toutes ses occurrences. Une
+     * adresse portée par une personne mal informée de la fiche A et par une
+     * personne sans provenance de la fiche B rend B joignable, mais ne part
+     * pas. Le compte peut donc dépasser l'envoi, jamais l'inverse ; à traiter
+     * en une fois pour les deux motifs si cela pèse.
      */
     public const CHAMP_EMAIL_HORS_QUARANTAINE = 'email_hors_quarantaine';
 
@@ -1083,7 +1098,10 @@ class AudienceBuilderService
                         ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                         ->whereNotNull('contacts.email')
                         ->whereNull('contacts.deleted_at')
-                        ->whereRaw('NOT ' . QuarantaineSite::personneSql('contacts', 'companies'));
+                        ->whereRaw('NOT ' . QuarantaineSite::personneSql('contacts', 'companies'))
+                        // Motif tiers (`EligibiliteAdresse`, 0 ter) : jamais
+                        // envoyée, donc jamais comptée joignable.
+                        ->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('contacts'));
                 });
             };
 
@@ -1268,14 +1286,18 @@ class AudienceBuilderService
             if ($op !== 'eq' || ! is_bool($value)) {
                 return false;
             }
-            // Miroir de `buildPositive()` (même règle : `QuarantaineSite`).
+            // Miroir de `buildPositive()` (même règle : `QuarantaineSite`,
+            // puis le motif tiers de `ProvenanceTiers`).
             $nonVerifiee = QuarantaineSite::ficheNonVerifiee($company->website_method, $company->getRawOriginal('metadata'));
             $joignable = trim((string) $company->email_generic) !== '' && ! $nonVerifiee;
             if (! $joignable) {
                 foreach ($company->contacts()->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
-                    ->whereNotNull('email')->get(['email', 'discovery_source']) as $c) {
+                    ->whereNotNull('email')->select(['email', 'discovery_source'])
+                    ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
+                    ->get() as $c) {
                     $source = is_string($c->discovery_source) ? $c->discovery_source : null;
-                    if (! QuarantaineSite::personne($nonVerifiee, $source, (string) $c->email, $company->website)) {
+                    if (! QuarantaineSite::personne($nonVerifiee, $source, (string) $c->email, $company->website)
+                        && ! (bool) $c->getAttribute('information_tiers_insuffisante')) {
                         $joignable = true;
                         break;
                     }

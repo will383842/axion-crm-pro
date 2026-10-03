@@ -32,11 +32,15 @@ use App\Crm\FichesProtegees;
 use App\Crm\ProvenanceTiers\EmpreinteTelephone;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Taxonomy;
+use App\Models\Company;
+use App\Models\EmailAudience;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\ProvenanceTiersServiceProvider;
+use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Rgpd\GdprPortabilityService;
+use Database\Seeders\DefaultAudiencesSeeder;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -675,4 +679,230 @@ test('miroirs PHP et SQL de la règle de version : même verdict sur chaque text
         )->v;
         expect($sql)->toBe(ProvenanceTiers::informationInsuffisante($texte), json_encode($texte));
     }
+});
+
+// ── Ordre des motifs (relecture EXACTITUDE de la fusion #311 / #312) ────────
+//
+// L'ordre EI → `site_non_verifie` → `information_tiers_insuffisante` →
+// `invalide` a été fixé à la main pendant la fusion : ces tests le figent.
+// Une adresse exclue pour deux raisons est comptée sous la PREMIÈRE ; le
+// motif tiers n'étant servi qu'au owner, l'inverser ferait disparaître du
+// compteur des autres rôles une adresse en quarantaine.
+
+test('ordre des motifs : EI, puis site non vérifié, puis tiers, tous avant invalide', function () {
+    $base = ['status' => null, 'verification' => VerificationEmail::VALIDE, 'perso' => false, 'deja_informe' => false];
+    $email = 'zoe@zz-pt-ordre.example.invalid';
+    $motif = static fn (array ...$occ): ?string => EligibiliteAdresse::motif($email, array_map(static fn (array $o): array => $o + $base, $occ));
+
+    expect(array_slice(EligibiliteAdresse::MOTIFS, 0, 4))->toBe([
+        EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE, EligibiliteAdresse::SITE_NON_VERIFIE,
+        EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE, EligibiliteAdresse::INVALIDE,
+    ])
+        // Les trois drapeaux sur la même occurrence, puis répartis sur deux.
+        ->and($motif(['entreprise_individuelle' => true, 'site_non_verifie' => true, 'information_tiers_insuffisante' => true]))
+        ->toBe(EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE)
+        ->and($motif(['information_tiers_insuffisante' => true], ['entreprise_individuelle' => true]))
+        ->toBe(EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE)
+        // (a) site ET tiers : le site gagne, sur une occurrence ou sur deux.
+        ->and($motif(['site_non_verifie' => true, 'information_tiers_insuffisante' => true]))
+        ->toBe(EligibiliteAdresse::SITE_NON_VERIFIE)
+        ->and($motif(['information_tiers_insuffisante' => true], ['site_non_verifie' => true]))
+        ->toBe(EligibiliteAdresse::SITE_NON_VERIFIE)
+        // (b) tiers face à `invalide`, sous ses trois formes : le tiers gagne.
+        ->and($motif(['information_tiers_insuffisante' => true, 'verification' => VerificationEmail::INVALIDE]))
+        ->toBe(EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE)
+        ->and($motif(['information_tiers_insuffisante' => true], ['status' => 'invalid']))
+        ->toBe(EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE)
+        ->and(EligibiliteAdresse::motif('pas-une-adresse', [$base + ['information_tiers_insuffisante' => true]]))
+        ->toBe(EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE)
+        // Le site, lui aussi, passe avant `invalide`.
+        ->and($motif(['site_non_verifie' => true, 'status' => 'disposable']))
+        ->toBe(EligibiliteAdresse::SITE_NON_VERIFIE)
+        // Témoin : sans drapeau, `invalide` reste dit.
+        ->and($motif(['verification' => VerificationEmail::INVALIDE]))->toBe(EligibiliteAdresse::INVALIDE);
+});
+
+/**
+ * Le jeu de bout en bout : trois personnes, chacune exclue pour DEUX raisons
+ * (ou trois), sur des fiches au site deviné non vérifié.
+ *
+ *  - `ei@…`    fiche d'entrepreneur individuel, adresse du domaine deviné, tiers v3 → EI ;
+ *  - `site@…`  adresse du domaine deviné, tiers v3                               → site_non_verifie ;
+ *  - `tiers@…` autre domaine (hors quarantaine), tiers v3, `email_status` invalid → tiers.
+ *
+ * @return array{fiche: int, ei: int}
+ */
+function ptJeuOrdre(string $ws, array $plus = []): array
+{
+    $fiches = [];
+    foreach (['fiche' => '5710', 'ei' => '1000'] as $cle => $forme) {
+        $domaine = 'zz-pt-ordre-' . $cle . '.example.invalid';
+        $fiches[$cle] = F::fiche($ws, 'ZZ Ordre ' . $cle, $plus + [
+            'legal_form' => $forme, 'website' => 'https://www.' . $domaine . '/', 'website_method' => 'guess',
+            'metadata' => '{}', 'email_generic' => null,
+        ]);
+    }
+    $personnes = [
+        ['ei', 'ei@zz-pt-ordre-ei.example.invalid', 'valid'],
+        ['fiche', 'site@zz-pt-ordre-fiche.example.invalid', 'valid'],
+        ['fiche', 'tiers@zz-pt-ailleurs.example.invalid', 'invalid'],
+    ];
+    foreach ($personnes as $i => [$fiche, $email, $statut]) {
+        $id = F::contact($ws, $fiches[$fiche], 'Zoe', 'ZZORDRE' . $i, [
+            'email' => $email, 'email_status' => $statut, 'discovery_source' => 'insee', 'metadata' => ptMetaValide($email),
+        ]);
+        ptProvenance($ws, $id, 'apporteur', 3, 'zz-ref-ordre-' . $i);
+    }
+
+    return $fiches;
+}
+
+test('ordre des motifs de bout en bout : aperçu d une audience, et exclues_total d un rôle non-owner', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+    config(['crm.console_v2' => true, 'crm.ingest.business_workspace' => 'axion-ia']);
+    $ws = Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'axion-ia', 'name' => 'ZZ Axion', 'settings' => []])->id;
+    $cible = F::tag($ws, 'zz-cible-pt-ordre');
+    foreach (ptJeuOrdre($ws) as $fiche) {
+        F::lier($ws, $fiche, $cible);
+    }
+    $criteres = ['all' => [['field' => 'tags', 'op' => 'contains_any', 'value' => ['zz-cible-pt-ordre']]]];
+
+    $r = app(ResolveurDestinataires::class)->resoudre($ws, $criteres, new ReglageDestinataires(ReglageDestinataires::LES_DEUX), null);
+    expect($r['lignes'])->toBe([])
+        ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE])->toBe(1)
+        ->and($r['exclues'][EligibiliteAdresse::SITE_NON_VERIFIE])->toBe(1)
+        ->and($r['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE])->toBe(1)
+        ->and($r['exclues'][EligibiliteAdresse::INVALIDE])->toBe(0);
+
+    // Rôle non-owner : le motif tiers est retiré, mais l'EI et le site restent
+    // comptés — exclues_total vaut 2, pas 0 (les deux adresses ne
+    // disparaissent pas derrière le motif masqué).
+    $apercu = ['criteria' => $criteres, 'destinataires_mode' => ReglageDestinataires::LES_DEUX];
+    $this->actingAs(ptUtilisateur($ws, 'operator'));
+    $donnees = $this->postJson('/api/v1/audiences/apercu-destinataires', $apercu)->assertOk()
+        ->assertJsonPath('data.destinataires', 0)
+        ->assertJsonPath('data.exclues_total', 2)
+        ->assertJsonPath('data.exclues.' . EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE, 1)
+        ->assertJsonPath('data.exclues.' . EligibiliteAdresse::SITE_NON_VERIFIE, 1)
+        ->json('data');
+    expect($donnees['exclues'])->not->toHaveKey(EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE);
+
+    $this->actingAs(ptUtilisateur($ws, 'owner'));
+    $this->postJson('/api/v1/audiences/apercu-destinataires', $apercu)->assertOk()
+        ->assertJsonPath('data.exclues_total', 3)
+        ->assertJsonPath('data.exclues.' . EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE, 1);
+});
+
+test('ordre des motifs de bout en bout : crm:campagne:destinataires compte chaque adresse sous son premier motif', function () {
+    $ws = F::espace('zz-pt-ordre-liste');
+    config(['crm.ingest.business_workspace' => F::slug($ws)]);
+    foreach (ptJeuOrdre($ws) as $fiche) {
+        F::proteger($ws, $fiche, FichesProtegees::TAG_ORGANISATEURS);
+    }
+
+    ResolveurDnsSimule::toutVerifier();
+    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-pt-ordre-');
+    try {
+        Artisan::call('crm:campagne:destinataires', ['segment' => 'organisateurs-evenements', 'sortie' => $fichier]);
+        $sortie = Artisan::output();
+        $lignes = file($fichier, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    } finally {
+        @unlink($fichier);
+    }
+
+    expect($lignes)->toBe([])
+        ->and(F::compteur($sortie, 'ecartees_entreprise_individuelle'))->toBe(1)
+        ->and(F::compteur($sortie, 'ecartees_site_non_verifie'))->toBe(1)
+        ->and(F::compteur($sortie, 'ecartees_information_tiers'))->toBe(1)
+        ->and(F::compteur($sortie, 'ecartees_invalides'))->toBe(0);
+});
+
+// ── « Joignable » des audiences : même règle que l'envoi ────────────────────
+//
+// #311 a retiré les adresses en quarantaine du critère `email_hors_quarantaine`.
+// Le motif tiers suit le même patron : une personne apportée par un tiers sans
+// information suffisante ne rend plus sa fiche « joignable » (SQL du recalcul
+// de 04:00 ET miroir en mémoire). Rien n'est réécrit ni supprimé.
+
+test('joignable : une personne apportée mal informée ne rend pas sa fiche joignable ; v5 et sans provenance, si', function () {
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+    $ws = F::espace('zz-pt-joignable');
+    $fiches = [];
+    foreach (['mal' => 3, 'inconnue' => null, 'bien' => 5, 'sans' => false, 'mixte' => 3] as $cle => $version) {
+        $fiches[$cle] = F::fiche($ws, 'ZZ Joignable ' . $cle, [
+            'website' => 'zz-pt-j-' . $cle . '.example.invalid', 'website_method' => 'brave', 'metadata' => '{}',
+            'email_generic' => null, 'prospection_status' => 'ready_for_outreach',
+        ]);
+        $email = $cle . '@zz-pt-ailleurs.example.invalid';
+        $id = F::contact($ws, $fiches[$cle], 'Zoe', 'ZZJ' . strtoupper($cle), ['email' => $email, 'email_status' => 'valid']);
+        if ($version !== false) {
+            ptProvenance($ws, $id, 'commercial', $version, 'zz-ref-j-' . $cle);
+        }
+    }
+    // « mixte » : une AUTRE personne, sans provenance, la rend joignable.
+    F::contact($ws, $fiches['mixte'], 'Zia', 'ZZJMIXTE2', ['email' => 'zia@zz-pt-ailleurs.example.invalid', 'email_status' => 'valid']);
+    $attendus = [$fiches['bien'], $fiches['sans'], $fiches['mixte']];
+    sort($attendus);
+
+    $builder = app(AudienceBuilderService::class);
+    $critere = ['all' => [['field' => AudienceBuilderService::CHAMP_EMAIL_HORS_QUARANTAINE, 'op' => 'eq', 'value' => true]]];
+    $membres = $builder->buildPublicQuery($ws, $critere)->pluck('id')->map(static fn ($v): int => (int) $v)->sort()->values()->all();
+    expect($membres)->toBe($attendus);
+    $non = $builder->buildPublicQuery($ws, ['all' => [['field' => AudienceBuilderService::CHAMP_EMAIL_HORS_QUARANTAINE, 'op' => 'eq', 'value' => false]]])
+        ->pluck('id')->map(static fn ($v): int => (int) $v)->sort()->values()->all();
+    expect($non)->toBe([$fiches['mal'], $fiches['inconnue']]);
+
+    // Le miroir en mémoire (enrichissement, step12) dit la même chose.
+    $this->seed(DefaultAudiencesSeeder::class);
+    $idJ = (int) EmailAudience::query()->where('workspace_id', $ws)->where('name', 'Prospects contactables')->value('id');
+    foreach ($fiches as $cle => $id) {
+        $dans = in_array($idJ, $builder->evaluateForCompany(Company::query()->findOrFail($id)), true);
+        expect($dans)->toBe(in_array($id, $attendus, true), "miroir en mémoire : {$cle}");
+    }
+
+    // Le recalcul de 04:00 : la fiche mal informée n'est pas comptée ; la
+    // provenance, elle, est intacte (rien n'est réécrit ni supprimé).
+    Artisan::call('audiences:full-refresh');
+    $recalcul = DB::table('audience_members')->where('audience_id', $idJ)->pluck('company_id')
+        ->map(static fn ($v): int => (int) $v)->unique()->sort()->values()->all();
+    expect($recalcul)->toBe($attendus)
+        ->and(DB::table('contacts_provenances_tiers')->count())->toBe(4);
+});
+
+test('joignable, sous axion_app (RLS) : la sous-requête tiers est servie par son index et n ajoute aucun accès à companies', function () {
+    $critere = ['all' => [
+        ['field' => AudienceBuilderService::CHAMP_EMAIL_HORS_QUARANTAINE, 'op' => 'eq', 'value' => true],
+        ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
+    ]];
+    $ws = (string) Str::uuid();
+    $q = app(AudienceBuilderService::class)->buildPublicQuery($ws, $critere);
+    expect($q->toSql())->toContain('contacts_provenances_tiers');
+
+    // Le rôle de production, sous la politique RLS de la table : c'est là que
+    // le recalcul de 04:00 s'exécute (`RefreshAudienceChunkJob::inWorkspace`).
+    // Un EXPLAIN ne lit aucune ligne : l'espace n'a pas besoin d'exister.
+    $app = DB::connection('pgsql_app');
+    try {
+        $role = $app->selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
+        expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
+        $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
+        // Sur une table de test vide, le planificateur libre préfère à bon
+        // droit un balayage : on prouve ici que l'index RESTE utilisable sous
+        // la politique RLS (ses conditions ne l'empêchent pas). Sur la table
+        // pleine, c'est lui que le coût désigne.
+        $app->statement('SET enable_seqscan = off');
+        $plan = implode("\n", array_map(
+            static fn ($l): string => (string) $l->{'QUERY PLAN'},
+            $app->select('EXPLAIN ' . $q->toSql(), $q->getBindings()),
+        ));
+    } finally {
+        $app->statement('RESET enable_seqscan');
+        $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        $app->disconnect();
+    }
+    expect($plan)->toContain('idx_contacts_provenances_tiers_contact')
+        ->and($plan)->not->toContain('Seq Scan on contacts_provenances_tiers')
+        // Un seul accès à `companies`, celui des autres critères.
+        ->and(preg_match_all('/ on companies\b/', $plan))->toBe(1);
 });

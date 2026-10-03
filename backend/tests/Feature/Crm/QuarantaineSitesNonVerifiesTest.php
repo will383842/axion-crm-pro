@@ -487,7 +487,7 @@ function qsApp(): Connection
     return DB::connection('pgsql_app');
 }
 
-/** @return array{id: string, marque: string, devinee: int, fiable: int} */
+/** @return array{id: string, marque: string, devinee: int, fiable: int, tiers: int} */
 function qsEspaceRls(): array
 {
     $owner = qsProprio();
@@ -508,7 +508,26 @@ function qsEspaceRls(): array
         ]);
     }
 
-    return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable']];
+    // Une fiche au site fiable, SANS générique, dont la seule personne est
+    // apportée par un tiers avec une information insuffisante (v3, N12) :
+    // jamais joignable, même sous `axion_app` (relecture de #317).
+    $ids['tiers'] = (int) $owner->table('companies')->insertGetId([
+        'workspace_id' => $id, 'siren' => '95' . random_int(1000000, 9999999), 'denomination' => 'ZZ QS Rls tiers ' . $marque,
+        'website' => 'zz-tiers-' . $marque . '.example.invalid', 'website_method' => 'brave',
+        'email_generic' => null, 'metadata' => '{}', 'quality_score' => 0, 'prospection_status' => 'ready_for_outreach',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $personne = (int) $owner->table('contacts')->insertGetId([
+        'workspace_id' => $id, 'company_id' => $ids['tiers'], 'first_name' => 'Zoe', 'last_name' => 'ZZTIERS',
+        'email' => 'zoe@zz-tiers-' . $marque . '.example.invalid', 'email_status' => 'valid',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $owner->table('contacts_provenances_tiers')->insert([
+        'workspace_id' => $id, 'contact_id' => $personne, 'origine' => 'apporteur', 'reference_externe' => 'zz-ref-rls-' . $marque,
+        'information_tiers_version' => 'information-article-14/v3', 'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
 }
 
 /** @param  array{id: string}  $e */
@@ -517,7 +536,7 @@ function qsNettoyer(array $e): void
     $owner = qsProprio();
     $owner->transaction(function () use ($owner, $e): void {
         // Nettoyage du TEST (données semées ici) — le produit ne supprime rien.
-        foreach (['contacts', 'companies'] as $table) {
+        foreach (['contacts_provenances_tiers', 'contacts', 'companies'] as $table) {
             $owner->table($table)->where('workspace_id', $e['id'])->delete();
         }
         $owner->table('workspaces')->where('id', $e['id'])->delete();
@@ -554,6 +573,13 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         // la sortie : on le rejoue comme le fait chaque chemin de production.
         $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
         expect($membres)->toBe([$a['fiable']]);
+        // Le motif tiers sous la RLS : la fiche dont la seule personne est
+        // apportée mal informée est bien VISIBLE (témoin sans le critère),
+        // mais elle n'est pas joignable.
+        $visibles = WorkspaceContext::run($a['id'], static fn (): array => $builder
+            ->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]])->pluck('id')->map(static fn ($v): int => (int) $v)->all());
+        expect($visibles)->toContain($a['tiers'])
+            ->and($membres)->not->toContain($a['tiers']);
 
         // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
         // n'ajoute AUCUN accès à `companies` et ne change pas son chemin
@@ -574,10 +600,29 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
 
             return $noeuds;
         };
+        //
+        // Planificateur libre, il peut PRÉFÉRER un index avec le critère :
+        // depuis le motif tiers (sous-requête indexée par personne), le filtre
+        // coûte plus cher, et sur cette table de quelques lignes il devient
+        // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
+        // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
+        // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
         foreach (['on', 'off'] as $balayage) {
             qsApp()->statement('SET enable_seqscan = ' . $balayage);
             try {
-                expect($acces($q))->toBe($acces($sans));
+                // Comparés en multiensembles : l'ordre des nœuds du plan
+                // n'est pas une garantie (relecture de #317).
+                $avec = $acces($q);
+                $reference = $acces($sans);
+                sort($avec);
+                sort($reference);
+                $seq = static fn (array $noeuds): int => count(array_filter($noeuds, static fn (string $n): bool => str_starts_with($n, 'Seq Scan')));
+                if ($balayage === 'off') {
+                    expect($avec)->toBe($reference);
+                } else {
+                    expect(count($avec))->toBe(count($reference))
+                        ->and($seq($avec))->toBeLessThanOrEqual($seq($reference));
+                }
             } finally {
                 qsApp()->statement('RESET enable_seqscan');
             }

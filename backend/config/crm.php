@@ -233,6 +233,26 @@ return [
     ],
 
     /*
+    | N12 — PROVENANCE DES INFORMATIONS VENUES DE TIERS (03/10/2026).
+    |
+    | Préparation du futur canal Axion Partners : rien n'est branché.
+    |
+    | `cle_empreinte_telephone` : la clé du HMAC-SHA256 de `opt_out.phone_hash`
+    | (`App\Crm\ProvenanceTiers\EmpreinteTelephone`). Au moins 32 caractères,
+    | générée une fois (`openssl rand -hex 32`) et JAMAIS changée : la changer
+    | rendrait muettes toutes les oppositions déjà enregistrées. Vide par défaut
+    | et JAMAIS dans le dépôt : sans clé, aucune empreinte n'est calculée.
+    |
+    | `actif` : à true, l'application REFUSE DE DÉMARRER sans clé valable
+    | (`ProvenanceTiersServiceProvider`). À false (défaut), rien ne change pour
+    | l'existant.
+    */
+    'provenance_tiers' => [
+        'actif' => env('CRM_PROVENANCE_TIERS_ENABLED', false),
+        'cle_empreinte_telephone' => env('CRM_OPT_OUT_PHONE_HMAC_KEY', ''),
+    ],
+
+    /*
     | L3 — funnel d'ingestion de la COLLECTE (schéma pivot ScrapedRecord).
     |
     | `enabled` : à false (défaut), `POST /internal/scraper-result` n'écrit RIEN

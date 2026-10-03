@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\ReglageDestinataires;
 use App\Crm\Campagnes\ResolveurDestinataires;
 use App\Crm\Campagnes\Segments;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
@@ -271,6 +273,19 @@ class AudiencesController extends ApiController
 
                 return $l;
             }, is_array($resultat['lignes'] ?? null) ? $resultat['lignes'] : []);
+        }
+
+        // Provenance tiers (N12) : lecture réservée au rôle owner. Pour tout
+        // autre rôle, le compteur de ce motif n'est pas servi, et il est
+        // RETIRÉ de `exclues_total` : sinon le total moins la somme des autres
+        // motifs le redonnerait. Les adresses écartées ne partent pas pour
+        // autant (`destinataires` est inchangé).
+        if (! ProvenanceTiers::lisible() && is_array($resultat['exclues'] ?? null)) {
+            $masque = $resultat['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE] ?? 0;
+            unset($resultat['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE]);
+            if (is_int($resultat['exclues_total'] ?? null) && is_int($masque)) {
+                $resultat['exclues_total'] = max(0, $resultat['exclues_total'] - $masque);
+            }
         }
 
         return $this->ok(['data' => $resultat]);

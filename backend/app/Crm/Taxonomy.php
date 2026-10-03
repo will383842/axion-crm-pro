@@ -342,6 +342,49 @@ final class Taxonomy
     ];
 
     /**
+     * Les gestes de la timeline faits À L'INITIATIVE DE LA PERSONNE (N14
+     * réduit, 03/10/2026) : elle a rempli un formulaire, demandé le guide,
+     * pris un rendez-vous ou répondu. Chacun date
+     * `contacts.dernier_echange_initiative_at` (déclencheur posé par la
+     * migration `2026_10_03_000080`, qui recopie CETTE liste). Un geste de
+     * notre fait (envoi, relance, collecte) n'y entre jamais.
+     *
+     * @var list<string>
+     */
+    public const ACTIVITY_KINDS_INITIATIVE_PERSONNE = [
+        'form_submission',
+        'lead_magnet_requested',
+        'calendly_booked',
+        'press_reply',
+    ];
+
+    /**
+     * PROVENANCE D'UNE INFORMATION VENUE D'UN TIERS (N12, 03/10/2026) —
+     * vocabulaire EXACT du contrat Axion Partners, à ne pas traduire ni
+     * renommer : l'information a été apportée par un `apporteur`, un
+     * `commercial` ou une `societe` partenaire.
+     *
+     * Ces valeurs s'ajoutent à celles que `field_origins` connaît déjà
+     * (`declared`, posée par la personne elle-même ; `collected`, posée par la
+     * collecte ; les origines d'import comme `federations-2026`). Elles sont
+     * aussi les SEULES valeurs admises par le CHECK de
+     * `contacts_provenances_tiers.origine` (`Feature\Crm\ProvenanceTiersTest`).
+     *
+     * Une valeur tiers n'est JAMAIS une déclaration : « le DÉCLARÉ gagne »
+     * s'applique contre elle comme contre la collecte. Lecture réservée au
+     * rôle owner (`App\Crm\ProvenanceTiers\ProvenanceTiers`).
+     *
+     * Rien n'écrit encore ces valeurs : le canal Partners n'est pas branché.
+     *
+     * @var list<string>
+     */
+    public const FIELD_ORIGINS_TIERS = [
+        'apporteur',
+        'commercial',
+        'societe',
+    ];
+
+    /**
      * Événements professionnels (table `events`, 2026-09-27) — le type tel que
      * le sourcing le qualifie.
      *

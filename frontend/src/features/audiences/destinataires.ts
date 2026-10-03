@@ -45,6 +45,8 @@ export const FONCTIONS_PROPOSEES = [
 export const MOTIFS_EXCLUSION: Record<string, string> = {
   entreprise_individuelle: 'Entrepreneur individuel (jamais en campagne)',
   site_non_verifie: 'Adresse d’un site deviné non vérifié (en quarantaine)',
+  // Servi au seul rôle owner (provenance tiers, N12).
+  information_tiers_insuffisante: 'Apportée par un tiers, information insuffisante',
   invalide: 'Adresse invalide ou jetable',
   non_verifiee: 'Adresse non vérifiée',
   personnelle: 'Adresse personnelle (gmail…)',

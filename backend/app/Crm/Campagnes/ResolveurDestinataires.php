@@ -6,6 +6,7 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Listes\ListesManuelles;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Models\Company;
@@ -55,7 +56,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, site_non_verifie: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -147,6 +148,9 @@ final class ResolveurDestinataires
                     ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
                     ->orderBy('id')
                     ->select(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at', 'discovery_source'])
+                    // Personne apportée par un tiers sans information
+                    // suffisante (`EligibiliteAdresse`, motif 0 bis).
+                    ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
                     ->when($presse, static fn ($q) => $q->selectRaw(
                         GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
                         . AdressePresseFiable::journalisteRetireSql('contacts') . ' AS journaliste_retire',
@@ -374,7 +378,7 @@ final class ResolveurDestinataires
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
                 'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei,
-                'site_non_verifie' => $nonVerifiee, 'ecartee' => null,
+                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -420,7 +424,7 @@ final class ResolveurDestinataires
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
                 'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei,
-                'site_non_verifie' => $nonVerifiee, 'ecartee' => $ecartee,
+                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
             ];
         }
 
@@ -451,6 +455,7 @@ final class ResolveurDestinataires
                     $e,
                     $site,
                 ),
+                'information_tiers_insuffisante' => (bool) ($c->information_tiers_insuffisante ?? false),
                 'ecartee' => $ecartee,
             ];
         }

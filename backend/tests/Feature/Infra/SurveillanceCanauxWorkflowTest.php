@@ -67,7 +67,9 @@ test('« serveur injoignable » (ssh 255) est une alerte, et l’alerte suit un 
 
     expect($source)->toContain('"$CODE" -eq 255')
         ->and($source)->toContain('controle_impossible')
-        ->and($wf['jobs']['alerte']['if'] ?? null)->toBe('failure()')
+        // Le job d'alerte tourne aussi quand tout est vert : c'est lui qui
+        // ferme les issues rétablies. Jamais sur une exécution annulée.
+        ->and($wf['jobs']['alerte']['if'] ?? null)->toBe('${{ !cancelled() }}')
         ->and($wf['jobs']['alerte']['needs'] ?? null)->toBe(['verifier']);
 });
 
@@ -85,4 +87,39 @@ test('la sortie d’erreur de ssh ne part JAMAIS dans une issue (dépôt public)
 
     expect($alerte)->not->toContain('erreurs.txt')
         ->and($sorties)->not->toContain('erreurs');
+});
+
+test('permissions minimales : le job qui tient la clé SSH n’a AUCUN droit, seul le job d’alerte écrit des issues', function () {
+    $wf = n2Workflow();
+
+    expect($wf['permissions'] ?? null)->toBe(['contents' => 'read'])
+        ->and($wf['jobs']['verifier']['permissions'] ?? null)->toBe([])
+        ->and($wf['jobs']['alerte']['permissions'] ?? null)->toBe(['contents' => 'read', 'issues' => 'write']);
+});
+
+test('RETOUR AU VERT : un type qui n’apparaît plus voit son issue fermée (« rétabli le … »), jamais sur un contrôle impossible', function () {
+    $source = n2WorkflowSource();
+
+    expect($source)->toContain('gh issue close')
+        ->and($source)->toContain('rétabli le')
+        // Sans mesure, on ne sait pas si c'est rétabli : on ne ferme rien.
+        ->and($source)->toContain('MESURE_COMPLETE');
+});
+
+test('ABANDONS : fenêtre de 26 h, et le complément d’issue ne répète pas les lignes déjà signalées', function () {
+    $source = n2WorkflowSource();
+
+    expect($source)->toContain("vars.SURV_CANAUX_FENETRE_ABANDON_MIN || '1560'")
+        ->and($source)->toContain('gave_up_recents_ids')
+        ->and($source)->toContain('<!-- gave_up_ids:');
+});
+
+test('réglages neufs relayés : seuil bad_signature et canaux fermés exprès, validés avant la commande distante', function () {
+    $source = n2WorkflowSource();
+
+    expect($source)->toContain('vars.SURV_CANAUX_SEUIL_BAD_SIGNATURE')
+        ->and($source)->toContain('--seuil-bad-signature=')
+        ->and($source)->toContain('vars.SURV_CANAUX_FERMES_EXPRES')
+        ->and($source)->toContain('--fermes-expres=')
+        ->and($source)->toContain('planificateur_arrete');
 });

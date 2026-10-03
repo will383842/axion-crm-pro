@@ -21,10 +21,11 @@
 import { describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { dynamicGet, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
+import { apiUrl, dynamicGet, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
 
 const PATH = '/';
 
@@ -240,7 +241,10 @@ describe('DashboardPage — rendu', () => {
     expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
   });
 
-  it('sans `companies_new_7d` du serveur, « Nouvelles 7j » affiche « — » et n’invente rien', async () => {
+  it('sans `companies_new_7d` du serveur, la vignette « Nouvelles 7j » n’existe pas (ni chiffre inventé, ni fausse panne)', async () => {
+    // Relecture de #301 : le serveur ne calcule pas ce chiffre. Un « — /
+    // indisponible pour le moment » permanent ferait croire à une panne
+    // passagère ; l'ancien repli `enrichies 24 h × 7` inventait 8 428.
     const sansNouvelles = { ...STATS } as Record<string, unknown>;
     delete sansNouvelles['companies_new_7d'];
     await renderScreen(<DashboardPage />, {
@@ -249,10 +253,10 @@ describe('DashboardPage — rendu', () => {
     });
 
     await waitFor(() => {
-      expect(vignette('Nouvelles 7j')).toHaveTextContent('—');
+      expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
     });
-    // L'ancien repli `enrichies 24 h × 7` aurait affiché 8 428.
-    expect(vignette('Nouvelles 7j')).not.toHaveTextContent(/8.428/);
+    expect(screen.queryByText('Nouvelles 7j')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/8.428/);
   });
 
   it('une carte fille en échec n’emporte PAS le tableau de bord, et DIT son échec', async () => {
@@ -384,5 +388,104 @@ describe('DashboardPage — qualité (lot 3 : jamais un 0 trompeur)', () => {
       expect(vignette('Qualité moyenne')).toHaveTextContent('—');
     });
     expect(vignette('Qualité moyenne')).not.toHaveTextContent('0/100');
+  });
+});
+
+describe('DashboardPage — P0-1 lot 1 : sans espace, et compteurs indisponibles', () => {
+  /** `GET /dashboard/stats` répond 409 avec ce code. */
+  function conflit(code: string, message: string) {
+    return http.get(apiUrl('/dashboard/stats'), () => HttpResponse.json({ error: code, message }, { status: 409 }));
+  }
+
+  // ⚠️ Ces tests tournent avec le client de test (`retry: false`) : ils ne
+  // disent RIEN de la règle de nouvel essai de `main.tsx`. Celle-ci est
+  // testée à part, dans `tests/lib/nouvel-essai.test.ts`.
+  it('409 no_workspace : un état clair, ni chiffres ni « base vide » ni « panne »', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [conflit('no_workspace', "Aucun espace de travail n'est rattaché à votre compte."), ...socle()],
+    });
+
+    expect(await screen.findByText('Aucun espace de travail')).toBeVisible();
+    expect(
+      screen.getByText('Aucun espace de travail n’est rattaché à votre compte. Contactez l’administrateur.'),
+    ).toBeVisible();
+    expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
+    expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument();
+  });
+
+  it('409 workspace_not_selected : un message propre à ce cas', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        conflit(
+          'workspace_not_selected',
+          "Aucun espace de travail n'est sélectionné sur votre compte. Contactez l'administrateur pour qu'il en sélectionne un.",
+        ),
+        ...socle(),
+      ],
+    });
+
+    expect(await screen.findByText('Aucun espace de travail sélectionné')).toBeVisible();
+    expect(screen.getByText(/rattaché à un espace de travail, mais aucun n’est sélectionné/)).toBeVisible();
+    expect(screen.queryByText(/n’est rattaché à votre compte/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Total entreprises')).not.toBeInTheDocument();
+    expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
+  });
+
+  it('répartitions indisponibles (null) : « — » et « Chiffre indisponible pour le moment », jamais des barres à 0', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          quality_distribution: null,
+          quality_avg: null,
+          size_distribution: null,
+        }),
+        ...socle(),
+      ],
+    });
+
+    expect(await screen.findByTestId('qualite-repartition-indisponible')).toHaveTextContent(
+      'Chiffre indisponible pour le moment',
+    );
+    expect(screen.getByTestId('tailles-indisponibles')).toHaveTextContent('Chiffre indisponible pour le moment');
+    // Témoin : les compteurs connus restent affichés.
+    expect(vignette('Total entreprises')).toHaveTextContent(/4.294.898/);
+    expect(screen.queryByText('Complète')).not.toBeInTheDocument();
+  });
+
+  it('un compteur null s’affiche « — » avec son infobulle, jamais 0', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [
+        getJson('/dashboard/stats', {
+          ...STATS,
+          companies_total: null,
+          companies_enriched_24h: null,
+          contacts_qualified: null,
+          scraper_runs_24h: null,
+        }),
+        ...socle(),
+      ],
+    });
+
+    await waitFor(() => {
+      expect(vignette('Total entreprises')).toHaveTextContent('—');
+    });
+    // Un null n'est PAS une base vide.
+    expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
+    expect(vignette('Total entreprises')).not.toHaveTextContent(/\b0\b/);
+    expect(vignette('Enrichies 24h')).toHaveTextContent('—');
+    expect(vignette('Enrichies 24h')).not.toHaveTextContent(/\b0\b/);
+    // Témoin : les chiffres connus restent affichés.
+    expect(vignette('Nouvelles 7j')).toHaveTextContent(/5.400/);
+
+    const tiret = within(vignette('Total entreprises')).getByTestId('chiffre-indisponible');
+    await user.hover(tiret);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Chiffre indisponible pour le moment');
   });
 });

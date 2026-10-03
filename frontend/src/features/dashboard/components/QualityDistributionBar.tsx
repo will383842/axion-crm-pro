@@ -31,7 +31,34 @@ const SEGMENTS = [
   },
 ];
 
-export function QualityDistributionBar({ data, qualite }: { data: QualityDistribution; qualite: EtatQualite }) {
+export function QualityDistributionBar({
+  data,
+  qualite,
+}: {
+  /** `null` = le serveur n'a pas pu calculer la répartition. */
+  data: QualityDistribution | null;
+  qualite: EtatQualite;
+}) {
+  // Répartition indisponible (requête en échec côté serveur) : on le DIT,
+  // jamais trois barres à 0.
+  if (data === null) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="min-w-0">
+            <CardEyebrow>Qualité</CardEyebrow>
+            <CardTitle>Distribution qualité des fiches</CardTitle>
+          </div>
+          <div className="shrink-0 text-2xl font-semibold text-slate-900 dark:text-white" aria-hidden>
+            —
+          </div>
+        </CardHeader>
+        <p className="text-sm text-slate-600 dark:text-slate-300" data-testid="qualite-repartition-indisponible">
+          Chiffre indisponible pour le moment.
+        </p>
+      </Card>
+    );
+  }
   const total = (data.complete ?? 0) + (data.partielle ?? 0) + (data.basique ?? 0);
   const safeTotal = total || 1;
 

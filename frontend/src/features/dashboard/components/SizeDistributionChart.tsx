@@ -42,7 +42,30 @@ function hauteursBarres(valeurs: number[]): number[] {
   );
 }
 
-export function SizeDistributionChart({ data }: { data: SizeDistribution }) {
+/** `data === null` : le serveur n'a pas pu calculer la répartition. */
+export function SizeDistributionChart({ data }: { data: SizeDistribution | null }) {
+  // Pas un graphique de zéros : « — » et la raison, en clair.
+  if (data === null) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="min-w-0">
+            <CardEyebrow>Taille d'entreprise (INSEE)</CardEyebrow>
+            <CardTitle>Distribution par catégorie</CardTitle>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total classé</div>
+            <div className="text-2xl font-semibold tabular-nums text-slate-900" aria-hidden>
+              —
+            </div>
+          </div>
+        </CardHeader>
+        <p className="text-sm text-slate-600" data-testid="tailles-indisponibles">
+          Chiffre indisponible pour le moment.
+        </p>
+      </Card>
+    );
+  }
   const valeurs = BUCKETS.map((b) => data[b.key] ?? 0);
   const hauteurs = hauteursBarres(valeurs);
   const total = valeurs.reduce((s, v) => s + v, 0);

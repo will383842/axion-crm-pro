@@ -4,8 +4,10 @@ import { Building2, Map as MapIcon, RefreshCw, Rocket, Sparkles } from 'lucide-r
 import { Card, CardHeader, CardTitle, CardEyebrow, cn } from '@/components/ui';
 
 export interface NextActionsInput {
-  companiesTotal: number;
-  scraperRuns24h: number;
+  /** `null` = le serveur n'a pas pu compter : aucune action n'en est déduite. */
+  companiesTotal: number | null;
+  /** `null` = le serveur n'a pas pu compter : aucune action n'en est déduite. */
+  scraperRuns24h: number | null;
   qualityAvgScore: number; // 0-100
 }
 
@@ -65,7 +67,7 @@ function buildActions(input: NextActionsInput): ActionItem[] {
   }
 
   // Actions toujours utiles
-  if (input.companiesTotal > 0) {
+  if (typeof input.companiesTotal === 'number' && input.companiesTotal > 0) {
     out.push({
       id: 'browse-companies',
       title: 'Voir vos entreprises',

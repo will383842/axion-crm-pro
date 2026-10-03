@@ -498,6 +498,7 @@ final class EnrichissementOpco
              WHERE companies_opco.source = \'siro\'
              RETURNING company_id',
             $liaisons,
+            false, // une écriture : jamais la connexion de lecture
         );
         $this->bilan['ecrites'] += count($ecrites);
         $this->bilan['ignorees_saisie'] += count($aEcrire) - count($ecrites);

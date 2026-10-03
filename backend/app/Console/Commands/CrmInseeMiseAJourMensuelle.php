@@ -6,6 +6,7 @@ use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
 use App\Services\Insee\HttpInseeClient;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * MISE À JOUR MENSUELLE INSEE (lot N8, 03/10/2026).
@@ -34,6 +35,11 @@ use Illuminate\Console\Command;
  * pause entre pages qui écrivent (`--pause-ms`) bornent le WAL et le
  * gonflement des tables ; un passage plafonné reste `en_cours` et reprend.
  *
+ * MÉMOIRE (incident du 03/10/2026) : le journal des requêtes SQL est coupé
+ * pour cette commande, et une garde arrête PROPREMENT le passage (curseur
+ * mémorisé, reprise au passage suivant) quand l'occupation approche la
+ * limite PHP — `--memoire-max` l'impose en Mo (0 : 60 % de `memory_limit`).
+ *
  * RIEN N'EST JAMAIS SUPPRIMÉ.
  */
 class CrmInseeMiseAJourMensuelle extends Command
@@ -49,7 +55,8 @@ class CrmInseeMiseAJourMensuelle extends Command
         . ' {--departements= : périmètre imposé, ex. 38,69 (défaut : les départements déjà présents dans l espace)}'
         . ' {--delai-ms=2100 : délai minimal entre deux requêtes Sirene (2100 ≈ 30/min, plan public)}'
         . ' {--max-modifications=' . MiseAJourMensuelle::MAX_ECRITURES_DEFAUT . ' : écritures de fiches au plus par passage (0 = sans plafond) ; le passage reprendra ensuite}'
-        . ' {--pause-ms=500 : pause après chaque page Sirene qui a écrit (checkpoints, autovacuum)}';
+        . ' {--pause-ms=500 : pause après chaque page Sirene qui a écrit (checkpoints, autovacuum)}'
+        . ' {--memoire-max=0 : occupation mémoire en Mo au-delà de laquelle le passage s arrête proprement et reprendra (0 = 60 % de memory_limit)}';
 
     protected $description = 'Met à jour les fiches depuis les modifications Sirene (créations, fermetures, non diffusibles, champs) — ne supprime rien.';
 
@@ -86,7 +93,19 @@ class CrmInseeMiseAJourMensuelle extends Command
             $this->warn('ESSAI À BLANC — Sirene est lu, RIEN n\'est écrit (ni fiche, ni journal).');
         }
 
-        $resultat = (new MiseAJourMensuelle($insee))->executer(
+        // Un passage lit des centaines de pages : aucune requête SQL n'est
+        // gardée en mémoire (incident du 03/10/2026).
+        DB::connection()->disableQueryLog();
+        foreach (DB::getConnections() as $connexion) {
+            $connexion->disableQueryLog();
+            $connexion->flushQueryLog();
+        }
+
+        $memoireMax = max(0, (int) $this->option('memoire-max'));
+        $miseAJour = (new MiseAJourMensuelle($insee))
+            ->avecPlafondMemoire($memoireMax > 0 ? $memoireMax * 1024 * 1024 : null);
+
+        $resultat = $miseAJour->executer(
             $workspaceId,
             $depuis,
             $essai,
@@ -124,6 +143,9 @@ class CrmInseeMiseAJourMensuelle extends Command
             $b['valeurs_rejetees'],
             $b['lignes_ignorees'],
         ));
+        if ($resultat['arret_memoire']) {
+            $this->warn('Arrêt PROPRE : mémoire proche de la limite PHP — le curseur est mémorisé, le prochain passage reprendra.');
+        }
         if ($resultat['statut'] !== 'reussie') {
             $this->warn('Passage INACHEVÉ (limite, plafond d écritures ou durée atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
         }

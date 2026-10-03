@@ -93,6 +93,14 @@ use Illuminate\Support\Sleep;
  * ≈ 28 pages par minute au plus ; un `UPDATE … FROM (VALUES …)` par page est
  * une optimisation possible plus tard).
  *
+ * MÉMOIRE CONSTANTE (incident du 03/10/2026 : 128 Mo épuisés après ≈ 6 min
+ * d'un rattrapage à blanc) : une page à la fois, libérée avant la suivante
+ * (`PageSirene`), un bilan fait de compteurs seulement, le journal des
+ * requêtes SQL coupé. GARDE : si l'occupation approche la limite PHP
+ * (`SEUIL_MEMOIRE` de `memory_limit`), le passage s'arrête PROPREMENT après
+ * la page en cours — curseur mémorisé, statut `en_cours`, comme
+ * `--duree-max` — au lieu de mourir.
+ *
  * LIMITE CONNUE (avis R5) : dans le FLUX, seul le statut de l'unité est lu —
  * la voie `/siren` ne porte pas celui du siège. Le statut du siège
  * (`statutDiffusionEtablissement`) est lu pour les fiches de la passe
@@ -168,8 +176,20 @@ final class MiseAJourMensuelle
         'archives_gardees', 'valeurs_rejetees', 'lignes_ignorees',
     ];
 
+    /**
+     * Part de `memory_limit` au-delà de laquelle le passage s'arrête
+     * proprement : la marge restante doit tenir une page Sirene (corps brut
+     * et décodage) et sa transaction.
+     */
+    public const SEUIL_MEMOIRE = 0.6;
+
     /** @var array<string, int> */
     private array $bilan = [];
+
+    /** Plafond mémoire en octets (null : déduit de `memory_limit`, 0 : sans garde). */
+    private ?int $plafondMemoire = null;
+
+    private bool $arretMemoire = false;
 
     /** @var array<string, int> bilan déjà journalisé d'un passage repris */
     private array $bilanAnterieur = [];
@@ -195,6 +215,51 @@ final class MiseAJourMensuelle
     private ?array $departements = null;
 
     public function __construct(private readonly HttpInseeClient $insee) {}
+
+    /**
+     * Impose le plafond mémoire de la garde, en octets (0 : sans garde ;
+     * null : `SEUIL_MEMOIRE` de `memory_limit`).
+     */
+    public function avecPlafondMemoire(?int $octets): static
+    {
+        $this->plafondMemoire = $octets === null ? null : max(0, $octets);
+
+        return $this;
+    }
+
+    /** Le plafond effectif de la garde, en octets (0 : aucune garde, `memory_limit = -1`). */
+    public function plafondMemoire(): int
+    {
+        if ($this->plafondMemoire !== null) {
+            return $this->plafondMemoire;
+        }
+        $limite = self::octets((string) ini_get('memory_limit'));
+
+        return $limite > 0 ? (int) ($limite * self::SEUIL_MEMOIRE) : 0;
+    }
+
+    /** `128M`, `1G`, `-1`… en octets (≤ 0 : sans limite). */
+    public static function octets(string $valeur): int
+    {
+        $valeur = trim($valeur);
+        if ($valeur === '' || ! is_numeric(rtrim($valeur, 'kKmMgG'))) {
+            return 0;
+        }
+        $n = (int) $valeur;
+
+        return match (strtolower(substr($valeur, -1))) {
+            'g' => $n * 1024 * 1024 * 1024,
+            'm' => $n * 1024 * 1024,
+            'k' => $n * 1024,
+            default => $n,
+        };
+    }
+
+    /** Vrai si le dernier `executer()` s'est arrêté sur la garde mémoire. */
+    public function arreteParLaMemoire(): bool
+    {
+        return $this->arretMemoire;
+    }
 
     /**
      * Le jour et l'heure de la planification : le PREMIER jour du mois, à
@@ -262,7 +327,7 @@ final class MiseAJourMensuelle
      * @param  ?list<string>  $departements  périmètre imposé (sinon : les départements présents dans l'espace)
      * @param  int  $maxEcritures  écritures de fiches au plus par passage (0 = sans plafond)
      * @param  int  $pauseMs  pause après chaque page qui a écrit
-     * @return array{statut: string, depuis: string, reprise: bool, bilan: array<string, int>}
+     * @return array{statut: string, depuis: string, reprise: bool, bilan: array<string, int>, arret_memoire: bool}
      */
     public function executer(
         string $workspaceId,
@@ -285,6 +350,7 @@ final class MiseAJourMensuelle
         $this->maxEcritures = max(0, $maxEcritures);
         $this->pauseMs = max(0, $pauseMs);
         $this->dejaTraites = [];
+        $this->arretMemoire = false;
         $this->maintenant = now()->toIso8601String();
 
         return WorkspaceContext::run($workspaceId, function () use ($depuis, $journal): array {
@@ -317,6 +383,7 @@ final class MiseAJourMensuelle
                 'depuis' => $depuisRetenu,
                 'reprise' => $reprise,
                 'bilan' => $this->bilan,
+                'arret_memoire' => $this->arretMemoire,
             ];
         });
     }
@@ -394,7 +461,7 @@ final class MiseAJourMensuelle
         }
 
         foreach ($this->insee->iterateModificationsDepuis($depuis, $curseur) as $page) {
-            $unites = $page['unites'];
+            $unites = $page->unites;
             $ecrituresAvant = $this->ecritures();
             $reste = $this->limite > 0 ? $this->limite - $this->bilan['unites_lues'] : null;
             $partielle = $reste !== null && count($unites) > $reste;
@@ -403,7 +470,11 @@ final class MiseAJourMensuelle
             }
             // Page entière : on reprendra à la SUIVANTE ; page coupée par la
             // limite : on la relira (le traitement est idempotent).
-            $aReprendre = $partielle ? $page['curseur'] : ($page['suivant'] ?? $page['curseur']);
+            $aReprendre = $partielle ? $page->curseur : ($page->suivant ?? $page->curseur);
+            $derniere = $page->suivant === null;
+            // Une page à la fois : plus rien ne la retient après son traitement.
+            $page->liberer();
+            unset($page);
 
             $this->transaction(function () use ($unites, $passageId, $aReprendre): void {
                 // R1 : une unité déjà traitée par la passe prioritaire n'est
@@ -433,7 +504,10 @@ final class MiseAJourMensuelle
                 ));
             }
 
-            if ($page['suivant'] === null && ! $partielle) {
+            unset($unites);
+            gc_collect_cycles();
+
+            if ($derniere && ! $partielle) {
                 return true;
             }
             if ($partielle || $this->arret()) {
@@ -578,7 +652,32 @@ final class MiseAJourMensuelle
     {
         return ($this->limite > 0 && $this->bilan['unites_lues'] >= $this->limite)
             || ($this->maxEcritures > 0 && $this->ecritures() >= $this->maxEcritures)
-            || ($this->echeance !== null && microtime(true) >= $this->echeance);
+            || ($this->echeance !== null && microtime(true) >= $this->echeance)
+            || $this->memoireProcheDeLaLimite();
+    }
+
+    /**
+     * La garde mémoire : au-delà du plafond, le passage s'arrête après la
+     * page en cours (curseur déjà mémorisé), et le dit.
+     */
+    private function memoireProcheDeLaLimite(): bool
+    {
+        $plafond = $this->plafondMemoire();
+        if ($plafond <= 0 || memory_get_usage(true) < $plafond) {
+            return false;
+        }
+        gc_collect_cycles();
+        if (memory_get_usage(true) < $plafond) {
+            return false;
+        }
+        if (! $this->arretMemoire) {
+            $this->arretMemoire = true;
+            Log::warning('[INSEE] mise à jour mensuelle : arrêt propre, mémoire proche de la limite', [
+                'octets' => memory_get_usage(true), 'plafond' => $plafond, 'pages' => $this->bilan['pages'],
+            ]);
+        }
+
+        return true;
     }
 
     /** @param  \Closure(): void  $travail */

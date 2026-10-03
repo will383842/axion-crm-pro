@@ -80,7 +80,7 @@ class CrmEnrichirOpco extends Command
 
         $essai = (bool) $this->option('dry-run');
         if ($essai) {
-            $this->warn('ESSAI À BLANC — la table SIRO est lue, RIEN n\'est écrit (ni companies_opco, ni journal).');
+            $this->warn('ESSAI À BLANC — la table SIRO est lue depuis sa PREMIÈRE ligne (jamais depuis le curseur d\'un passage inachevé), RIEN n\'est écrit (ni companies_opco, ni journal).');
         }
 
         // 3,6 M de lignes : aucune requête SQL n'est gardée en mémoire.
@@ -117,6 +117,10 @@ class CrmEnrichirOpco extends Command
         $this->line(sprintf('  rapprochées : %d (non rapprochées : %d, doublons dans un paquet : %d)', $b['rapprochees'], $b['non_rapprochees'], $b['doublons']));
         $this->line(sprintf('  %s : %d (inchangées : %d)', $essai ? 'à écrire' : 'écrites', $b['ecrites'], $b['inchangees']));
         $this->line(sprintf('  ignorées pour saisie : %d', $b['ignorees_saisie']));
+        $this->line(sprintf('  exclues (non diffusibles INSEE) : %d', $b['exclues_non_diffusibles']));
+        if ($resultat['fiches_sans_siret'] !== null) {
+            $this->line(sprintf('  fiches de l\'espace sans SIRET (jamais rapprochables) : %d', $resultat['fiches_sans_siret']));
+        }
         $this->line(sprintf(
             '  rejetées : SIRET malformé %d · IDCC vide %d · IDCC malformé %d · OPCO inconnu %d · OPCO de gestion inconnu %d · ligne malformée %d',
             $b['rejet_siret_malforme'],
@@ -131,7 +135,9 @@ class CrmEnrichirOpco extends Command
             $this->warn('Mois de DSN introuvable dans la ressource : relancer avec --releve-le=AAAA-MM pour le noter.');
         }
         if ($resultat['statut'] !== 'reussie') {
-            $this->warn('Passage INACHEVÉ (--limite atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
+            $this->warn($essai
+                ? 'ESSAI À BLANC INTERROMPU (--limite atteinte) : bilan PARTIEL des premières lignes seulement — rien n\'est mémorisé.'
+                : 'Passage INACHEVÉ (--limite atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
         }
 
         return self::SUCCESS;

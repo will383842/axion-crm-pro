@@ -12,13 +12,19 @@ use Illuminate\Support\Facades\Schema;
  */
 final class LectureOpco
 {
+    /** La table existe (vu une fois par processus : plus de requête catalogue ensuite). */
+    private static bool $tablePresente = false;
+
     /**
      * @return array{idcc: ?string, opco: ?string, opco_libelle: ?string, opco_gestion: ?string, opco_gestion_libelle: ?string, source: string, releve_le: ?string, mention: string}|null
      */
     public static function pourEntreprise(int $companyId, string $workspaceId): ?array
     {
-        if (! Schema::hasTable('companies_opco')) {
-            return null;
+        if (! self::$tablePresente) {
+            if (! Schema::hasTable('companies_opco')) {
+                return null;
+            }
+            self::$tablePresente = true;
         }
 
         $ligne = DB::table('companies_opco')

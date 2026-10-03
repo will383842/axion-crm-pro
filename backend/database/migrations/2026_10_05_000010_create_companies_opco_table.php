@@ -26,7 +26,9 @@ use Illuminate\Support\Facades\DB;
  *  - `releve_le`     premier jour du mois de la DSN dont la table est issue.
  *
  * ── `companies_opco_passages` : le journal des passages ───────────────────
- *  Une ligne par passage de `crm:enrichir-opco` : la ressource data.gouv lue,
+ *  Une ligne par passage de `crm:enrichir-opco` : la ressource data.gouv lue
+ *  (identifiant, URL et VERSION — somme de contrôle ou `last_modified`
+ *  publiés : un fichier remplacé sous le même identifiant n'est pas repris),
  *  le mois de DSN, le CURSEUR (dernière ligne du fichier entièrement traitée,
  *  reprise après une coupure ou `--limite`) et le bilan chiffré. Patron de
  *  `insee_mises_a_jour`.
@@ -110,6 +112,7 @@ return new class extends Migration
                 workspace_id   UUID NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
                 ressource_id   TEXT NOT NULL,
                 ressource_url  TEXT NOT NULL,
+                ressource_version TEXT NULL,
                 releve_le      DATE NULL,
                 statut         TEXT NOT NULL DEFAULT 'en_cours'
                                CHECK (statut IN ('en_cours', 'reussie', 'echouee')),
@@ -122,6 +125,11 @@ return new class extends Migration
             )
             SQL,
         );
+        // La FK RESTRICT depuis `companies` vérifie `companies_opco` à chaque
+        // DELETE ou changement de `companies.id` : index dédié (table neuve,
+        // vide — coût nul aujourd'hui).
+        DB::statement('CREATE INDEX IF NOT EXISTS idx_companies_opco_company ON companies_opco (company_id)');
+
         DB::statement(
             'CREATE INDEX IF NOT EXISTS idx_companies_opco_passages_espace
              ON companies_opco_passages (workspace_id, statut, id DESC)',

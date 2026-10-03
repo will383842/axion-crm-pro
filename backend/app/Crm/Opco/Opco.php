@@ -40,7 +40,7 @@ final class Opco
         'UNIFORMATION' => 'uniformation',
         'OPCOCOHESIONSOCIALE' => 'uniformation',
         'UNIFORMATIONOPCOCOHESIONSOCIALE' => 'uniformation',
-        // Libellé réel du fichier siro-202606.csv (relevé le 2026-10-04 : 89 274 lignes).
+        // Libellé réel du fichier siro-202606.csv (relevé par le pilote : 89 274 lignes).
         'UNIFORMATIONCOHESIONSOCIALE' => 'uniformation',
         'CONSTRUCTYS' => 'constructys',
         'OPCOCONSTRUCTYS' => 'constructys',

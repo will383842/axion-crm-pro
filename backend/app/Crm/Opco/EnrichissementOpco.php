@@ -28,13 +28,22 @@ use RuntimeException;
  *    (`rejet_idcc_malforme`), OPCO propriétaire vide ou inconnu
  *    (`rejet_opco_inconnu`), OPCO de gestion inconnu
  *    (`rejet_opco_gestion_inconnu`), ligne au mauvais nombre de colonnes
- *    (`rejet_ligne_malformee`) ;
+ *    (`rejet_ligne_malformee`), ligne de plus de `LONGUEUR_MAX_LIGNE`
+ *    octets (`rejet_ligne_malformee` aussi) ;
+ *  - RGPD : une fiche marquée NON DIFFUSIBLE par l'INSEE
+ *    (`companies.insee_non_diffusible_le`, surtout des entrepreneurs
+ *    individuels qui se sont opposés à la diffusion Sirene) n'est JAMAIS
+ *    enrichie : exclue du rapprochement et comptée
+ *    (`exclues_non_diffusibles`) ;
  *  - écriture : `INSERT … ON CONFLICT (workspace_id, company_id) DO UPDATE`
  *    UNIQUEMENT si la ligne existante a `source = 'siro'` — une ligne
  *    `saisie` (posée par une personne) n'est JAMAIS écrasée
  *    (`ignorees_saisie`) ; une ligne déjà identique n'est pas réécrite
  *    (`inchangees`) : deux passages donnent le même état, et le second
- *    n'écrit rien ;
+ *    n'écrit rien. Une ligne n'est réécrite que si SIRET, IDCC, OPCO ou OPCO
+ *    de gestion changent : une publication mensuelle qui confirme les mêmes
+ *    valeurs ne réécrit rien (`releve_le` reste le mois de la DSN d'où la
+ *    valeur a été reportée) ;
  *  - RIEN N'EST JAMAIS SUPPRIMÉ : aucune ligne de ce fichier n'émet de
  *    DELETE (le rôle applicatif n'en a d'ailleurs pas le droit).
  *
@@ -47,11 +56,15 @@ use RuntimeException;
  * entièrement traitée, mémorisé dans `companies_opco_passages` DANS LA MÊME
  * TRANSACTION que les écritures du paquet. Une coupure ou `--limite`
  * laissent le passage `en_cours` : le passage suivant, sur la MÊME
- * ressource, saute les lignes déjà traitées. Une ressource nouvelle (mois de
- * DSN suivant) ouvre un passage nouveau, depuis la première ligne.
+ * ressource, saute les lignes déjà traitées. La MÊME ressource veut dire même
+ * identifiant, même URL ET même version (somme de contrôle ou
+ * `last_modified` publiés) : un fichier remplacé sous le même identifiant
+ * ouvre un passage nouveau, depuis la première ligne — aucune ligne du
+ * nouveau fichier n'est sautée.
  *
- * Un essai à blanc lit tout, compte tout, et n'écrit RIEN (ni
- * `companies_opco`, ni journal).
+ * Un essai à blanc lit TOUT le fichier depuis la première ligne (jamais
+ * depuis le curseur d'un passage inachevé : son bilan est complet), compte
+ * tout, et n'écrit RIEN (ni `companies_opco`, ni journal).
  */
 final class EnrichissementOpco
 {
@@ -62,7 +75,16 @@ final class EnrichissementOpco
         'lues', 'rapprochees', 'ecrites', 'inchangees', 'ignorees_saisie', 'non_rapprochees', 'doublons',
         'rejet_siret_malforme', 'rejet_idcc_vide', 'rejet_idcc_malforme',
         'rejet_opco_inconnu', 'rejet_opco_gestion_inconnu', 'rejet_ligne_malformee',
+        'exclues_non_diffusibles',
     ];
+
+    /**
+     * Longueur maximale d'une ligne du fichier (une ligne SIRO fait moins de
+     * 200 octets). Au-delà, la ligne est rejetée (`rejet_ligne_malformee`) et
+     * sautée par morceaux bornés : un guillemet non fermé ne peut plus faire
+     * lire le reste du fichier comme un seul champ.
+     */
+    public const LONGUEUR_MAX_LIGNE = 4096;
 
     /** Les colonnes attendues dans l'en-tête (`OPCO_GESTION` peut manquer). */
     public const COLONNES = ['SIRET', 'IDCC', 'OPCO_PROPRIETAIRE', 'OPCO_GESTION'];
@@ -97,7 +119,7 @@ final class EnrichissementOpco
      * @param  ?string  $releveLeImpose  AAAA-MM-01 ; null = celui de la ressource
      * @param  int  $limite  lignes de données au plus (0 = sans limite) ; le passage reprendra ensuite
      * @param  ?callable(string): void  $journal  reçoit l'avancement
-     * @return array{statut: string, reprise: bool, curseur: int, ressource: array{id: string, url: string, titre: string, releve_le: ?string}, bilan: array<string, int>}
+     * @return array{statut: string, reprise: bool, curseur: int, ressource: array{id: string, url: string, titre: string, releve_le: ?string, version: ?string}, bilan: array<string, int>, fiches_sans_siret: ?int}
      */
     public function executer(
         string $workspaceId,
@@ -128,6 +150,13 @@ final class EnrichissementOpco
             if ($reprise) {
                 $journal("Reprise du passage inachevé après la ligne {$curseur}.");
             }
+
+            // Essai à blanc : combien de fiches ne pourront JAMAIS être
+            // rapprochées faute de SIRET (un décompte, une fois).
+            $sansSiret = $this->essai
+                ? (int) DB::table('companies')->where('workspace_id', $this->workspaceId)
+                    ->whereNull('deleted_at')->whereNull('siret')->count()
+                : null;
 
             $chemin = tempnam(sys_get_temp_dir(), 'siro-opco-');
             if ($chemin === false) {
@@ -170,6 +199,7 @@ final class EnrichissementOpco
                 'curseur' => $curseur,
                 'ressource' => ['releve_le' => $this->releveLe] + $ressource,
                 'bilan' => $this->bilan,
+                'fiches_sans_siret' => $sansSiret,
             ];
         });
     }
@@ -177,50 +207,58 @@ final class EnrichissementOpco
     /**
      * Le passage à mener : reprise du dernier passage inachevé (`en_cours` ou
      * `echouee`, postérieur à la dernière réussite) s'il porte sur la MÊME
-     * ressource, sinon un nouveau depuis la première ligne. Un essai à blanc
-     * lit le curseur mais n'écrit pas de journal.
+     * ressource (identifiant, URL et version), sinon un nouveau depuis la
+     * première ligne. Un essai à blanc part TOUJOURS de la première ligne et
+     * n'écrit pas de journal.
      *
-     * @param  array{id: string, url: string, titre: string, releve_le: ?string}  $ressource
+     * @param  array{id: string, url: string, titre: string, releve_le: ?string, version: ?string}  $ressource
      * @return array{0: int, 1: bool} [curseur, reprise]
      */
     private function ouvrirPassage(array $ressource): array
     {
+        if ($this->essai) {
+            return [0, false];
+        }
+
         $idReussie = DB::table('companies_opco_passages')
             ->where('workspace_id', $this->workspaceId)->where('statut', 'reussie')->max('id');
 
         $inacheve = DB::table('companies_opco_passages')
             ->where('workspace_id', $this->workspaceId)->whereIn('statut', ['en_cours', 'echouee'])
             ->when($idReussie !== null, static fn ($q) => $q->where('id', '>', $idReussie))
-            ->orderByDesc('id')->first(['id', 'ressource_id', 'releve_le', 'curseur', 'bilan']);
+            ->orderByDesc('id')->first(['id', 'ressource_id', 'ressource_url', 'ressource_version', 'releve_le', 'curseur', 'bilan']);
 
-        if ($inacheve !== null && (string) $inacheve->ressource_id === $ressource['id']) {
+        $memeRessource = $inacheve !== null
+            && (string) $inacheve->ressource_id === $ressource['id']
+            && (string) $inacheve->ressource_url === $ressource['url']
+            && ($inacheve->ressource_version === null ? null : (string) $inacheve->ressource_version) === $ressource['version'];
+
+        if ($inacheve !== null && $memeRessource) {
             $anterieur = json_decode(is_string($inacheve->bilan) ? $inacheve->bilan : '{}', true);
-            if (! $this->essai) {
-                $this->bilanAnterieur = is_array($anterieur) ? array_map('intval', $anterieur) : [];
-                $this->passageId = (int) $inacheve->id;
-                DB::table('companies_opco_passages')->where('id', $this->passageId)->where('workspace_id', $this->workspaceId)
-                    ->update(['statut' => 'en_cours', 'erreur' => null, 'maj_le' => now()]);
-            }
+            $this->bilanAnterieur = is_array($anterieur) ? array_map('intval', $anterieur) : [];
+            $this->passageId = (int) $inacheve->id;
+            DB::table('companies_opco_passages')->where('id', $this->passageId)->where('workspace_id', $this->workspaceId)
+                ->update(['statut' => 'en_cours', 'erreur' => null, 'maj_le' => now()]);
 
             return [(int) $inacheve->curseur, true];
         }
 
-        if (! $this->essai) {
-            // Un passage inachevé sur une ressource REMPLACÉE ne reprendra
-            // jamais : il est clos (`echouee`), pas effacé.
-            if ($inacheve !== null) {
-                DB::table('companies_opco_passages')->where('id', $inacheve->id)->where('workspace_id', $this->workspaceId)
-                    ->update(['statut' => 'echouee', 'erreur' => 'Ressource remplacée par une publication plus récente', 'maj_le' => now()]);
-            }
-            $this->passageId = (int) DB::table('companies_opco_passages')->insertGetId([
-                'workspace_id' => $this->workspaceId,
-                'ressource_id' => $ressource['id'],
-                'ressource_url' => $ressource['url'],
-                'releve_le' => $this->releveLe,
-                'statut' => 'en_cours',
-                'curseur' => 0,
-            ]);
+        // Un passage inachevé sur une ressource REMPLACÉE (autre identifiant,
+        // autre URL ou autre version) ne reprendra jamais : il est clos
+        // (`echouee`), pas effacé.
+        if ($inacheve !== null) {
+            DB::table('companies_opco_passages')->where('id', $inacheve->id)->where('workspace_id', $this->workspaceId)
+                ->update(['statut' => 'echouee', 'erreur' => 'Ressource remplacée par une publication plus récente', 'maj_le' => now()]);
         }
+        $this->passageId = (int) DB::table('companies_opco_passages')->insertGetId([
+            'workspace_id' => $this->workspaceId,
+            'ressource_id' => $ressource['id'],
+            'ressource_url' => $ressource['url'],
+            'ressource_version' => $ressource['version'],
+            'releve_le' => $this->releveLe,
+            'statut' => 'en_cours',
+            'curseur' => 0,
+        ]);
 
         return [0, false];
     }
@@ -238,17 +276,20 @@ final class EnrichissementOpco
         }
 
         try {
-            $entete = fgets($flux);
-            if ($entete === false) {
+            $entete = self::lireLigne($flux);
+            if ($entete === null) {
                 throw new RuntimeException('Fichier SIRO vide : aucun en-tête.');
             }
+            if ($entete === false) {
+                throw new RuntimeException('En-tête SIRO trop long (plus de ' . self::LONGUEUR_MAX_LIGNE . ' octets).');
+            }
             $separateur = self::separateur($entete);
-            $colonnes = self::colonnes(str_getcsv(rtrim($entete, "\r\n"), $separateur, '"', ''));
+            $colonnes = self::colonnes(str_getcsv($entete, $separateur, '"', ''));
 
             $ligne = 0;
             $traitees = 0;
-            while (($valeurs = fgetcsv($flux, 0, $separateur, '"', '')) !== false) {
-                if ($valeurs === [null]) {
+            while (($brute = self::lireLigne($flux)) !== null) {
+                if ($brute === '') {
                     continue; // ligne vide
                 }
                 $ligne++;
@@ -262,7 +303,11 @@ final class EnrichissementOpco
                 }
                 $traitees++;
                 $this->bilan['lues']++;
-                $this->accepter($valeurs, $colonnes);
+                if ($brute === false) {
+                    $this->bilan['rejet_ligne_malformee']++; // ligne trop longue
+                } else {
+                    $this->accepter(str_getcsv($brute, $separateur, '"', ''), $colonnes);
+                }
 
                 if (count($this->paquet) >= self::TAILLE_PAQUET) {
                     $this->vider($ligne);
@@ -277,6 +322,33 @@ final class EnrichissementOpco
         } finally {
             fclose($flux);
         }
+    }
+
+    /**
+     * Lit UNE ligne, sans son fin de ligne, en ne gardant jamais plus de
+     * `LONGUEUR_MAX_LIGNE` octets en mémoire. Rend null à la fin du fichier,
+     * false pour une ligne trop longue (son reste est sauté par morceaux
+     * bornés). Une ligne vaut une ligne physique : un guillemet non fermé ne
+     * déborde pas sur la suivante.
+     *
+     * @param  resource  $flux
+     */
+    public static function lireLigne($flux): string|false|null
+    {
+        $ligne = fgets($flux, self::LONGUEUR_MAX_LIGNE + 1);
+        if ($ligne === false) {
+            return null;
+        }
+        if (! str_ends_with($ligne, "\n") && ! feof($flux)) {
+            // Trop longue : sauter le reste, morceau par morceau.
+            do {
+                $reste = fgets($flux, self::LONGUEUR_MAX_LIGNE + 1);
+            } while ($reste !== false && ! str_ends_with($reste, "\n"));
+
+            return false;
+        }
+
+        return rtrim($ligne, "\r\n");
     }
 
     /**
@@ -315,8 +387,11 @@ final class EnrichissementOpco
         }
         foreach (['SIRET', 'IDCC', 'OPCO_PROPRIETAIRE'] as $obligatoire) {
             if (! isset($positions[$obligatoire])) {
+                // Le contenu lu vient de l'extérieur : tronqué avant d'aller
+                // au journal applicatif.
+                $lu = mb_substr(implode(', ', array_keys($positions)), 0, 60);
                 throw new RuntimeException(
-                    "En-tête SIRO inattendu : colonne {$obligatoire} absente (lu : " . implode(', ', array_keys($positions)) . ').',
+                    "En-tête SIRO inattendu : colonne {$obligatoire} absente (lu : {$lu}).",
                 );
             }
         }
@@ -429,14 +504,19 @@ final class EnrichissementOpco
         $sirens = array_values(array_unique(array_map(static fn (string $s): string => substr($s, 0, 9), $sirets)));
 
         // Par l'index unique (workspace_id, siren), puis le SIRET exact.
-        $fiches = DB::table('companies')
+        $trouvees = DB::table('companies')
             ->where('workspace_id', $this->workspaceId)
             ->whereIn('siren', $sirens)
             ->whereIn('siret', $sirets)
             ->whereNull('deleted_at')
-            ->get(['id', 'siret']);
+            ->get(['id', 'siret', 'insee_non_diffusible_le']);
 
-        $this->bilan['non_rapprochees'] += count($paquet) - $fiches->count();
+        $this->bilan['non_rapprochees'] += count($paquet) - $trouvees->count();
+
+        // RGPD : une fiche NON DIFFUSIBLE (opposition à la diffusion Sirene)
+        // ne reçoit aucune donnée tierce — exclue et comptée.
+        $fiches = $trouvees->filter(static fn (\stdClass $f): bool => $f->insee_non_diffusible_le === null)->values();
+        $this->bilan['exclues_non_diffusibles'] += $trouvees->count() - $fiches->count();
         if ($fiches->isEmpty()) {
             return;
         }
@@ -445,7 +525,7 @@ final class EnrichissementOpco
         $existantes = DB::table('companies_opco')
             ->where('workspace_id', $this->workspaceId)
             ->whereIn('company_id', $fiches->pluck('id')->all())
-            ->get(['company_id', 'source', 'siret', 'idcc', 'opco', 'opco_gestion', 'releve_le'])
+            ->get(['company_id', 'source', 'siret', 'idcc', 'opco', 'opco_gestion'])
             ->keyBy('company_id');
 
         $aEcrire = [];
@@ -462,8 +542,9 @@ final class EnrichissementOpco
                 && (string) $existante->siret === $siret
                 && (string) $existante->idcc === $v['idcc']
                 && $existante->opco === $v['opco']
-                && $existante->opco_gestion === $v['opco_gestion']
-                && ($existante->releve_le === null ? null : substr((string) $existante->releve_le, 0, 10)) === $this->releveLe) {
+                && $existante->opco_gestion === $v['opco_gestion']) {
+                // Mêmes valeurs : rien n'est réécrit, même si la publication
+                // est plus récente (aucune réécriture mensuelle inutile).
                 $this->bilan['inchangees']++;
 
                 continue;

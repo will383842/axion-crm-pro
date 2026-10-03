@@ -288,8 +288,11 @@ test('chaque refus d’authentification rend le MÊME 401, à l’octet près', 
         'signature sur l’URL complète (avec le domaine)' => n11Entetes($corps, N11_KID_PROD, chemin: 'http://localhost' . N11_ROUTE),
         'signature sur le chemin avec ses paramètres' => n11Entetes($corps, N11_KID_PROD, chemin: N11_ROUTE . '?x=1'),
         'horodatage absent' => array_diff_key(n11Entetes($corps, N11_KID_PROD), ['HTTP_X_PARTNERS_TIMESTAMP' => 1]),
-        'horodatage périmé' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant - 301)),
-        'horodatage en avance' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant + 301)),
+        // Marge d'une minute au-delà de la fenêtre (300 s) : les cas sont tous
+        // construits avant d'être envoyés, et l'horloge avance entre-temps ;
+        // « + 301 » retombait dans la fenêtre sur une machine chargée.
+        'horodatage périmé' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant - 360)),
+        'horodatage en avance' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant + 360)),
         'horodatage non entier' => n11Entetes($corps, N11_KID_PROD, null, $maintenant . '.5'),
         'clé d’idempotence absente' => n11Entetes($corps, N11_KID_PROD, cle: null, cleSignee: ''),
         'clé d’idempotence hors format (point)' => n11Entetes($corps, N11_KID_PROD, cle: 'cle.avec.point'),

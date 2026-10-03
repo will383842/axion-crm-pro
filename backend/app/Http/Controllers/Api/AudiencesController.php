@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\ReglageDestinataires;
 use App\Crm\Campagnes\ResolveurDestinataires;
 use App\Crm\Campagnes\Segments;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreEmailAudienceRequest;
 use App\Http\Resources\EmailAudienceResource;
@@ -271,6 +273,13 @@ class AudiencesController extends ApiController
 
                 return $l;
             }, is_array($resultat['lignes'] ?? null) ? $resultat['lignes'] : []);
+        }
+
+        // Provenance tiers (N12) : lecture réservée au rôle owner. Pour tout
+        // autre rôle, le compteur de ce motif n'est pas servi — les adresses
+        // qu'il écarte restent comptées dans `exclues_total`.
+        if (! ProvenanceTiers::lisible() && is_array($resultat['exclues'] ?? null)) {
+            unset($resultat['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE]);
         }
 
         return $this->ok(['data' => $resultat]);

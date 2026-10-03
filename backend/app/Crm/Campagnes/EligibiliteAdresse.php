@@ -33,6 +33,15 @@ use App\Support\EligibiliteCampagne;
  *                     AVANT celui-ci ; une adresse EI de provenance non
  *                     fiable est donc comptée sous sa provenance — exclue
  *                     de toute façon ;
+ *  0 bis. `information_tiers_insuffisante` l'adresse est portée par une
+ *                     personne apportée par un tiers (canal Axion Partners,
+ *                     `contacts_provenances_tiers`) dont la version du texte
+ *                     d'information reçu est inconnue ou < 5
+ *                     (`ProvenanceTiers`, 03/10/2026). Même patron que le
+ *                     motif précédent : le drapeau est posé par l'appelant
+ *                     sur les personnes qu'il a DÉJÀ lues (une sous-requête
+ *                     indexée par personne, `informationInsuffisanteSql`) ;
+ *                     une personne sans provenance tiers n'est pas concernée ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par
@@ -54,6 +63,8 @@ final class EligibiliteAdresse
 {
     public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
 
+    public const INFORMATION_TIERS_INSUFFISANTE = 'information_tiers_insuffisante';
+
     public const INVALIDE = 'invalide';
 
     public const NON_VERIFIEE = 'non_verifiee';
@@ -68,7 +79,7 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::ENTREPRISE_INDIVIDUELLE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::ENTREPRISE_INDIVIDUELLE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
     ];
 
@@ -86,7 +97,7 @@ final class EligibiliteAdresse
 
     /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, information_tiers_insuffisante, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
@@ -94,6 +105,11 @@ final class EligibiliteAdresse
         // la même boîte ne part pas « par » une autre fiche.
         if (self::une($occurrences, static fn (array $o): bool => ($o['entreprise_individuelle'] ?? false) === true)) {
             return self::ENTREPRISE_INDIVIDUELLE;
+        }
+        // Une personne apportée par un tiers sans information suffisante : la
+        // même boîte ne part pas non plus par une autre fiche.
+        if (self::une($occurrences, static fn (array $o): bool => ($o['information_tiers_insuffisante'] ?? false) === true)) {
+            return self::INFORMATION_TIERS_INSUFFISANTE;
         }
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
             || self::une($occurrences, static fn (array $o): bool => in_array($o['status'] ?? null, ['invalid', 'disposable'], true))

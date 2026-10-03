@@ -10,6 +10,7 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -101,6 +102,7 @@ class CrmCampagneDestinataires extends Command
     /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
     private const COMPTEURS_MOTIFS = [
         EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
+        EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE => 'ecartees_information_tiers',
         EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
         EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
         EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
@@ -157,7 +159,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -460,6 +462,9 @@ class CrmCampagneDestinataires extends Command
             ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
             ->orderBy('id')
             ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at'])
+            // Personne apportée par un tiers sans information suffisante
+            // (`EligibiliteAdresse`, motif 0 bis).
+            ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
             ->when($presse, static fn ($q) => $q->selectRaw(
                 GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
                 // Le journaliste source opposé ou à la corbeille : l'adresse ne part pas.
@@ -489,6 +494,7 @@ class CrmCampagneDestinataires extends Command
                 'perso' => is_array($meta) && ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => $c->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                'information_tiers_insuffisante' => (bool) $c->information_tiers_insuffisante,
             ];
         }
 

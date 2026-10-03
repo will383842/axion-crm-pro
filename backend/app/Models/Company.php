@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToWorkspace;
+use App\Models\Concerns\MasqueProvenanceTiers;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -66,6 +67,7 @@ class Company extends Model
 {
     use BelongsToWorkspace;
     use HasFactory;
+    use MasqueProvenanceTiers;
 
     /**
      * 🔴 B10-016 — la table porte `deleted_at` depuis l'origine (migration

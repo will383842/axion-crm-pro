@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
+use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
 use App\Http\Controllers\Api\EvenementsController;
@@ -504,6 +505,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('crm-console')->prefix('crm')->group(function () {
             Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
             Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
+            // N12 (03/10/2026) — provenance tiers d'une personne : rôle owner
+            // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
+            Route::get('/contacts/{contactId}/provenances-tiers', [ProvenancesTiersController::class, 'index'])
+                ->whereNumber('contactId');
 
             Route::get('/candidates', [CandidatesController::class, 'index']);
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);

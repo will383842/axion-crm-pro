@@ -5,11 +5,13 @@ use App\Providers\AuthServiceProvider;
 use App\Providers\CanauxSignesServiceProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\MockServicesProvider;
+use App\Providers\ProvenanceTiersServiceProvider;
 use App\Providers\RouteServiceProvider;
 use App\Providers\TelescopeServiceProvider;
 
 return [
     CanauxSignesServiceProvider::class,
+    ProvenanceTiersServiceProvider::class,
     AppServiceProvider::class,
     AuthServiceProvider::class,
     HorizonServiceProvider::class,

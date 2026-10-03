@@ -28,6 +28,7 @@ use App\Console\Commands\CrmInseeMiseAJourMensuelle;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\FichesProtegees;
 use App\Crm\Insee\MiseAJourMensuelle;
+use App\Services\Insee\HttpInseeClient;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Connection;
@@ -915,7 +916,7 @@ test('R10 et réserve 5 : un 404 qui n est pas Sirene lève ; une réponse trop 
     expect(mamPasser($ws))->toBe(0);
 
     mamSireneNeuf();
-    Http::fake(['*' => Http::response('{}', 200, ['Content-Length' => (string) (\App\Services\Insee\HttpInseeClient::REPONSE_MAX_OCTETS + 1)])]);
+    Http::fake(['*' => Http::response('{}', 200, ['Content-Length' => (string) (HttpInseeClient::REPONSE_MAX_OCTETS + 1)])]);
     expect(fn () => mamPasser($ws))->toThrow(RuntimeException::class, 'trop volumineuse');
 });
 

@@ -739,11 +739,10 @@ final class MiseAJourMensuelle
                     $maj['archive_reason'] = null;
                 }
             }
-            if (! $diffusible) {
-                // Rien n'est recopié d'une unité opposée.
-            } elseif ($protegee) {
+            // Rien n'est recopié d'une unité opposée.
+            if ($diffusible && $protegee) {
                 $this->bilan['protegees_preservees']++;
-            } elseif ($f->deleted_at === null) {
+            } elseif ($diffusible && $f->deleted_at === null) {
                 $champs = $this->champsAMettreAJour($f, $u, $p);
                 if ($champs !== []) {
                     $maj += $champs;

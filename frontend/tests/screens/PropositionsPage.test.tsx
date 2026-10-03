@@ -20,7 +20,7 @@ import { estOwner } from '@/features/propositions/useEstOwner';
 import { sectionsDeNavigation } from '@/components/layout/Sidebar';
 import { normaliserCompteurs, LIBELLES_COMPTEUR } from '@/features/a-traiter/compteurs';
 import { renderScreen } from '../helpers/renderScreen';
-import { getJson, getStatus, recordPost } from '../msw/handlers';
+import { dynamicGet, getJson, getStatus, recordPost } from '../msw/handlers';
 
 const LIGNE = {
   id: 7,
@@ -34,6 +34,10 @@ const LIGNE = {
   valeur_proposee: 'Villeurbanne',
   origine: 'apporteur',
   recue_le: '2026-10-03T09:00:00Z',
+  empreinte: 'zz-empreinte-7',
+  fiche_supprimee: false,
+  fiche_modifiee_depuis: false,
+  champ_declare: false,
 };
 
 const FILE = { data: [LIGNE], meta: { total: 1, per_page: 25, page: 1 } };
@@ -74,8 +78,57 @@ describe('Propositions à valider', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /Accepter :/ }));
     await waitFor(() => expect(accepter.bodies).toHaveLength(1));
+    // L'empreinte de ce qui est affiché part avec l'acceptation : le serveur
+    // refuse d'écrire si la fiche a changé depuis.
+    expect(accepter.bodies[0]).toEqual({ empreinte: 'zz-empreinte-7' });
     await user.click(await screen.findByRole('button', { name: /Refuser :/ }));
     await waitFor(() => expect(refuser.bodies).toHaveLength(1));
+  });
+
+  it('une fiche à la corbeille : dit pourquoi, et ne propose que Refuser', async () => {
+    const ligne = { ...LIGNE, fiche: null, empreinte: null, fiche_supprimee: true };
+    await renderScreen(<PropositionsPage />, {
+      path: '/console/propositions',
+      consoleFeatures: 'open',
+      handlers: [getJson('/crm/propositions', { ...FILE, data: [ligne] })],
+    });
+
+    await waitFor(() => expect(texte()).toContain('Cette fiche est à la corbeille'));
+    expect(screen.queryByRole('button', { name: /Accepter :/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Refuser :/ })).toBeTruthy();
+  });
+
+  it('signale une fiche modifiée depuis la proposition, et un champ déclaré par la personne', async () => {
+    const ligne = { ...LIGNE, fiche_modifiee_depuis: true, champ_declare: true };
+    await renderScreen(<PropositionsPage />, {
+      path: '/console/propositions',
+      consoleFeatures: 'open',
+      handlers: [getJson('/crm/propositions', { ...FILE, data: [ligne] })],
+    });
+
+    await waitFor(() => expect(texte()).toContain('ZZ Boulangerie'));
+    expect(texte()).toContain('La fiche a changé depuis cette proposition');
+    expect(texte()).toContain('Information déclarée par la personne elle-même');
+  });
+
+  it('une page devenue vide après des décisions revient à la dernière page existante', async () => {
+    const lignes = Array.from({ length: 25 }, (_, i) => ({ ...LIGNE, id: 100 + i, fiche: `ZZ Fiche ${i}` }));
+    const file = dynamicGet('/crm/propositions', (_appel, url) =>
+      url.searchParams.get('page') === '2'
+        ? { data: [], meta: { total: 25, per_page: 25, page: 2 } }
+        : { data: lignes, meta: { total: 26, per_page: 25, page: 1 } },
+    );
+    await renderScreen(<PropositionsPage />, {
+      path: '/console/propositions',
+      consoleFeatures: 'open',
+      handlers: [file.handler],
+    });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Page suivante' }));
+    await waitFor(() => expect(file.urls.some((u) => u.includes('page=2'))).toBe(true));
+    await waitFor(() => expect(texte()).toContain('ZZ Fiche 0'));
+    expect(texte()).not.toContain('Aucune proposition à valider');
   });
 
   it('un refus du serveur n’est pas présenté comme une file vide', async () => {

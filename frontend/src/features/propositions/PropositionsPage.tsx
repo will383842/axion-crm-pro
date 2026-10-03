@@ -8,10 +8,12 @@
  * proposée, qui la propose, et deux boutons : Accepter / Refuser.
  *
  * La décision est prise par le serveur (403 pour tout autre rôle) ; cet écran
- * ne fait que la demander. Libellés en français simple, sans jargon ; lisible
+ * ne fait que la demander. « Accepter » envoie l'EMPREINTE de ce qui est
+ * affiché : si la fiche a changé depuis, le serveur n'écrit rien et répond
+ * « rechargez » (relectures #316). Libellés en français simple, sans jargon ; lisible
  * sur téléphone (une carte par ligne, boutons pleine largeur).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button, Card, EmptyState, PageHeader, QueryErrorState } from '@/components/ui';
@@ -33,6 +35,11 @@ export interface Proposition {
   valeur_proposee: string;
   origine: OriginePartenaire;
   recue_le: string | null;
+  /** Empreinte de ce que l'écran montre ; `null` si la fiche est à la corbeille. */
+  empreinte: string | null;
+  fiche_supprimee: boolean;
+  fiche_modifiee_depuis: boolean;
+  champ_declare: boolean;
 }
 
 export interface PropositionsResponse {
@@ -76,8 +83,13 @@ function PropositionsContent() {
   };
 
   const decider = useMutation({
-    mutationFn: async (input: { id: number; choix: 'accepter' | 'refuser' }) =>
-      (await api.post<{ statut: string }>(`/crm/propositions/${input.id}/${input.choix}`)).data,
+    mutationFn: async (input: { id: number; choix: 'accepter' | 'refuser'; empreinte?: string | null }) =>
+      (
+        await api.post<{ statut: string }>(
+          `/crm/propositions/${input.id}/${input.choix}`,
+          input.choix === 'accepter' ? { empreinte: input.empreinte } : undefined,
+        )
+      ).data,
     onSuccess: (_data, input) => {
       toast.success(
         input.choix === 'accepter'
@@ -98,6 +110,14 @@ function PropositionsContent() {
   const total = liste.data?.meta.total;
   const pages = total === undefined ? 1 : Math.max(1, Math.ceil(total / PAR_PAGE));
 
+  // Après des décisions, la page courante peut ne plus exister : on revient à
+  // la dernière page qui a encore des lignes, plutôt que d'afficher une file vide.
+  useEffect(() => {
+    if (total !== undefined && page > pages) {
+      setPage(pages);
+    }
+  }, [total, page, pages]);
+
   return (
     <div>
       <PageHeader
@@ -113,7 +133,7 @@ function PropositionsContent() {
         <QueryErrorState error={liste.error} contexte="les propositions" onRetry={() => void liste.refetch()} />
       ) : liste.isLoading ? (
         <ConsoleListSkeleton rows={4} />
-      ) : lignes.length === 0 ? (
+      ) : lignes.length === 0 && page <= pages ? (
         <EmptyState
           title="Aucune proposition à valider"
           description="Quand un partenaire proposera une information différente de celle d’une fiche, elle apparaîtra ici."
@@ -126,7 +146,7 @@ function PropositionsContent() {
                 <CarteProposition
                   proposition={p}
                   occupe={decider.isPending}
-                  onAccepter={() => decider.mutate({ id: p.id, choix: 'accepter' })}
+                  onAccepter={() => decider.mutate({ id: p.id, choix: 'accepter', empreinte: p.empreinte })}
                   onRefuser={() => decider.mutate({ id: p.id, choix: 'refuser' })}
                 />
               </li>
@@ -171,7 +191,7 @@ function CarteProposition({
             {type} · {LIBELLES_ORIGINE[p.origine] ?? 'Un partenaire'} propose
           </div>
           <div className="mt-0.5 break-words text-sm font-semibold text-slate-900 dark:text-white">
-            {p.fiche ?? 'Fiche introuvable'}
+            {p.fiche_supprimee ? 'Cette fiche est à la corbeille' : (p.fiche ?? 'Fiche introuvable')}
           </div>
           <div className="mt-2 text-sm text-slate-700 dark:text-slate-200">
             <span className="font-medium">{p.libelle_champ}</span>
@@ -189,18 +209,35 @@ function CarteProposition({
               </span>
             </span>
           </div>
+          {p.fiche_supprimee ? (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Elle ne peut plus être modifiée : vous pouvez seulement refuser la proposition.
+            </p>
+          ) : null}
+          {p.fiche_modifiee_depuis ? (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              La fiche a changé depuis cette proposition : la valeur actuelle affichée est celle d’aujourd’hui.
+            </p>
+          ) : null}
+          {p.champ_declare ? (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              Information déclarée par la personne elle-même.
+            </p>
+          ) : null}
         </div>
         <div className="flex gap-2 sm:shrink-0">
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1 sm:flex-none"
-            disabled={occupe}
-            onClick={onAccepter}
-            aria-label={`Accepter : ${p.libelle_champ} de ${p.fiche ?? 'la fiche'}`}
-          >
-            Accepter
-          </Button>
+          {p.fiche_supprimee ? null : (
+            <Button
+              variant="primary"
+              size="sm"
+              className="flex-1 sm:flex-none"
+              disabled={occupe}
+              onClick={onAccepter}
+              aria-label={`Accepter : ${p.libelle_champ} de ${p.fiche ?? 'la fiche'}`}
+            >
+              Accepter
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"

@@ -17,8 +17,8 @@
 use App\Crm\Propositions\PropositionIntrouvable;
 use App\Crm\Propositions\Propositions;
 use App\Models\User;
-use App\Services\Rgpd\GdprErasureService;
 use App\Services\Audit\AuditHashChain;
+use App\Services\Rgpd\GdprErasureService;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
@@ -92,7 +92,7 @@ test('sous axion_app : proposer, refuser, accepter dans l espace visé seulement
 
         // L'espace B ne voit rien, ne décide rien, ne peut pas viser la fiche de A.
         expect(WorkspaceContext::run($b['id'], fn () => DB::table('propositions_champs')->count()))->toBe(0)
-            ->and(fn () => $service->accepter($b['id'], $id, $owner))->toThrow(PropositionIntrouvable::class)
+            ->and(fn () => $service->accepter($b['id'], $id, $owner, 'zz-empreinte'))->toThrow(PropositionIntrouvable::class)
             ->and(fn () => $service->proposer($b['id'], 'entreprise', $a['fiche'], 'city', 'Bron', 'apporteur'))->toThrow(InvalidArgumentException::class);
         // Sans contexte : rien de visible.
         expect(DB::table('propositions_champs')->count())->toBe(0);

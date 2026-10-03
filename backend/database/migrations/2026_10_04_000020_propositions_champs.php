@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  * Préparation du futur canal Partners : rien n'est branché, aucune route
  * publique n'écrit ici. VIDE à la livraison.
  *
- * Migration ADDITIVE : une table, deux déclencheurs. Rien n'est réécrit.
+ * Migration ADDITIVE : une table, deux déclencheurs, une fonction
+ * d'effacement RGPD. Rien n'est réécrit.
  *
  * ── Colonnes ────────────────────────────────────────────────────────────────
  *  - `entite` + `entite_id` : la fiche visée (`entreprise` → `companies`,
@@ -32,6 +33,15 @@ use Illuminate\Support\Facades\DB;
  *    `decidee_par` (compte) et `decidee_le` sont posés avec la décision, et
  *    seulement avec elle (CHECK). `decidee_par` n'a pas de clé étrangère : la
  *    trace d'une décision survit au compte qui l'a prise.
+ *  - `valeur_remplacee` (relectures #316) : la valeur que la fiche portait
+ *    RÉELLEMENT au moment de l'acceptation, celle que la décision a remplacée
+ *    (NULL si le champ était vide). Posée avec la décision, seulement pour
+ *    une acceptation (CHECK).
+ *  - `effacee_le` (RGPD art. 17, relecture sécurité #316) : la date à laquelle
+ *    les valeurs ont été neutralisées (`[effacé]`) par l'effacement d'une
+ *    personne. Une proposition encore en attente passe alors au statut
+ *    `effacee` (sans compte : c'est l'effacement qui la clôt, pas un choix
+ *    sur la valeur).
  *
  * Une même valeur proposée pour un même champ d'une même fiche n'ouvre
  * qu'UNE proposition en attente (index unique partiel) : un message rejoué
@@ -65,20 +75,24 @@ return new class extends Migration
                 champ              TEXT NOT NULL CHECK (champ ~ '^[a-z_]{1,64}$'),
                 valeur_actuelle    TEXT CHECK (valeur_actuelle IS NULL OR length(valeur_actuelle) <= 2000),
                 valeur_proposee    TEXT NOT NULL CHECK (btrim(valeur_proposee) <> '' AND length(valeur_proposee) <= 2000),
+                valeur_remplacee   TEXT,
                 origine            TEXT NOT NULL,
                 reference_externe  TEXT CHECK (reference_externe IS NULL OR (btrim(reference_externe) <> '' AND length(reference_externe) <= 200)),
                 statut             TEXT NOT NULL DEFAULT 'en_attente',
                 decidee_par        UUID,
                 decidee_le         TIMESTAMPTZ,
+                effacee_le         TIMESTAMPTZ,
                 created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
                 CONSTRAINT propositions_champs_entite_check CHECK (entite IN ('entreprise', 'personne')),
                 CONSTRAINT propositions_champs_origine_check CHECK (origine IN ('apporteur', 'commercial', 'societe')),
-                CONSTRAINT propositions_champs_statut_check CHECK (statut IN ('en_attente', 'acceptee', 'refusee')),
+                CONSTRAINT propositions_champs_statut_check CHECK (statut IN ('en_attente', 'acceptee', 'refusee', 'effacee')),
                 CONSTRAINT propositions_champs_decision_check CHECK (
-                    (statut = 'en_attente' AND decidee_par IS NULL AND decidee_le IS NULL)
-                    OR (statut <> 'en_attente' AND decidee_par IS NOT NULL AND decidee_le IS NOT NULL)
-                )
+                    (statut = 'en_attente' AND decidee_par IS NULL AND decidee_le IS NULL AND effacee_le IS NULL)
+                    OR (statut IN ('acceptee', 'refusee') AND decidee_par IS NOT NULL AND decidee_le IS NOT NULL)
+                    OR (statut = 'effacee' AND decidee_par IS NULL AND decidee_le IS NOT NULL AND effacee_le IS NOT NULL)
+                ),
+                CONSTRAINT propositions_champs_remplacee_check CHECK (valeur_remplacee IS NULL OR statut = 'acceptee')
             )
             SQL,
         );
@@ -123,11 +137,45 @@ return new class extends Migration
             -- Une décision prise ne se reprend pas, et une proposition ne change
             -- pas de sens en route : seuls le statut et la décision bougent, une
             -- fois.
+            --
+            -- UNE SEULE EXCEPTION, BORNÉE (RGPD art. 17, relecture sécurité
+            -- #316) : l'effacement d'une personne, décidé par un humain et
+            -- exécuté par `propositions_champs_effacer()` (SECURITY DEFINER,
+            -- appelée seulement par `GdprErasureService`). Elle exige le drapeau
+            -- de transaction posé par cette fonction ET l'identité de son
+            -- propriétaire ; elle ne permet que de NEUTRALISER (`[effacé]`),
+            -- jamais de réécrire une valeur, ni de toucher à la fiche visée, au
+            -- champ, à l'origine ou à la décision.
             CREATE OR REPLACE FUNCTION public.propositions_champs_figee() RETURNS trigger
             LANGUAGE plpgsql
             SET search_path = public, pg_catalog
             AS $$
             BEGIN
+                IF current_setting('axion.propositions_effacement', true) = 'on'
+                   AND current_user = (
+                       SELECT r.rolname FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner
+                        WHERE p.oid = 'public.propositions_champs_effacer(text, text[])'::regprocedure
+                   ) THEN
+                    IF NEW.workspace_id IS DISTINCT FROM OLD.workspace_id
+                       OR NEW.entite IS DISTINCT FROM OLD.entite
+                       OR NEW.entite_id IS DISTINCT FROM OLD.entite_id
+                       OR NEW.champ IS DISTINCT FROM OLD.champ
+                       OR NEW.origine IS DISTINCT FROM OLD.origine
+                       OR NEW.decidee_par IS DISTINCT FROM OLD.decidee_par
+                       OR NEW.created_at IS DISTINCT FROM OLD.created_at
+                       OR NEW.effacee_le IS NULL
+                       OR NOT (NEW.valeur_proposee IS NOT DISTINCT FROM OLD.valeur_proposee OR NEW.valeur_proposee = '[effacé]')
+                       OR NOT (NEW.valeur_actuelle IS NOT DISTINCT FROM OLD.valeur_actuelle OR NEW.valeur_actuelle = '[effacé]')
+                       OR NOT (NEW.valeur_remplacee IS NOT DISTINCT FROM OLD.valeur_remplacee OR NEW.valeur_remplacee = '[effacé]')
+                       OR NOT (NEW.reference_externe IS NOT DISTINCT FROM OLD.reference_externe OR NEW.reference_externe = '[effacé]')
+                       OR NOT (NEW.statut = OLD.statut OR (OLD.statut = 'en_attente' AND NEW.statut = 'effacee'))
+                       OR NOT (NEW.decidee_le IS NOT DISTINCT FROM OLD.decidee_le OR (OLD.statut = 'en_attente' AND NEW.statut = 'effacee')) THEN
+                        RAISE EXCEPTION 'propositions_champs : l effacement ne peut que neutraliser les valeurs'
+                            USING ERRCODE = '23514';
+                    END IF;
+                    RETURN NEW;
+                END IF;
+
                 IF OLD.statut <> 'en_attente' THEN
                     RAISE EXCEPTION 'propositions_champs : la proposition % est déjà décidée', OLD.id
                         USING ERRCODE = '23514';
@@ -140,6 +188,8 @@ return new class extends Migration
                    OR NEW.valeur_proposee IS DISTINCT FROM OLD.valeur_proposee
                    OR NEW.origine IS DISTINCT FROM OLD.origine
                    OR NEW.reference_externe IS DISTINCT FROM OLD.reference_externe
+                   OR NEW.effacee_le IS DISTINCT FROM OLD.effacee_le
+                   OR NEW.statut = 'effacee'
                    OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
                     RAISE EXCEPTION 'propositions_champs : seule la décision d une proposition se modifie'
                         USING ERRCODE = '23514';
@@ -152,6 +202,60 @@ return new class extends Migration
             CREATE TRIGGER propositions_champs_figee
                 BEFORE UPDATE ON propositions_champs
                 FOR EACH ROW EXECUTE FUNCTION public.propositions_champs_figee();
+
+            -- RGPD art. 17 — le SEUL chemin qui touche aux valeurs d'une
+            -- proposition après coup. Appelée UNIQUEMENT par
+            -- `App\Services\Rgpd\GdprErasureService` (effacement décidé par un
+            -- humain). Neutralise (`[effacé]`) les valeurs des propositions qui
+            -- visent les fiches personnes de cette adresse, ou qui portent l'un
+            -- de ses numéros (chiffres seuls, variantes fournies par l'appelant).
+            -- AUCUNE ligne n'est supprimée : la trace de la proposition et de sa
+            -- décision reste, `effacee_le` date la neutralisation, et une
+            -- proposition encore en attente passe au statut `effacee`.
+            -- Tous espaces confondus, comme le reste de l'effacement : la
+            -- fonction s'exécute sous son propriétaire, `row_security = off`
+            -- rend une éventuelle absence de BYPASSRLS bruyante, jamais muette.
+            CREATE OR REPLACE FUNCTION public.propositions_champs_effacer(p_email TEXT, p_telephones TEXT[])
+            RETURNS INTEGER
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            SET search_path = public, pg_catalog
+            SET row_security = off
+            AS $$
+            DECLARE
+                n INTEGER;
+                courriel TEXT := lower(btrim(coalesce(p_email, '')));
+                numeros TEXT[] := coalesce(p_telephones, ARRAY[]::TEXT[]);
+            BEGIN
+                PERFORM set_config('axion.propositions_effacement', 'on', true);
+
+                UPDATE propositions_champs pc SET
+                    valeur_proposee   = '[effacé]',
+                    valeur_actuelle   = CASE WHEN pc.valeur_actuelle IS NULL THEN NULL ELSE '[effacé]' END,
+                    valeur_remplacee  = CASE WHEN pc.valeur_remplacee IS NULL THEN NULL ELSE '[effacé]' END,
+                    reference_externe = CASE WHEN pc.reference_externe IS NULL THEN NULL ELSE '[effacé]' END,
+                    statut            = CASE WHEN pc.statut = 'en_attente' THEN 'effacee' ELSE pc.statut END,
+                    decidee_le        = CASE WHEN pc.statut = 'en_attente' THEN now() ELSE pc.decidee_le END,
+                    effacee_le        = now(),
+                    updated_at        = now()
+                WHERE pc.effacee_le IS NULL
+                  AND (
+                      (courriel <> '' AND pc.entite = 'personne' AND pc.entite_id IN (
+                          SELECT ct.id FROM contacts ct WHERE lower(ct.email::TEXT) = courriel
+                      ))
+                      OR (cardinality(numeros) > 0 AND (
+                          regexp_replace(pc.valeur_proposee, '\D', '', 'g') = ANY (numeros)
+                          OR regexp_replace(coalesce(pc.valeur_actuelle, ''), '\D', '', 'g') = ANY (numeros)
+                          OR regexp_replace(coalesce(pc.valeur_remplacee, ''), '\D', '', 'g') = ANY (numeros)
+                      ))
+                  );
+                GET DIAGNOSTICS n = ROW_COUNT;
+
+                PERFORM set_config('axion.propositions_effacement', 'off', true);
+                RETURN n;
+            END;
+            $$;
+            REVOKE ALL ON FUNCTION public.propositions_champs_effacer(TEXT, TEXT[]) FROM PUBLIC;
             SQL,
         );
 
@@ -170,6 +274,7 @@ return new class extends Migration
             DB::statement('GRANT SELECT, INSERT, UPDATE ON public.propositions_champs TO ' . $role);
             DB::statement('REVOKE DELETE, TRUNCATE ON public.propositions_champs FROM ' . $role);
             DB::statement('GRANT USAGE, SELECT ON SEQUENCE public.propositions_champs_id_seq TO ' . $role);
+            DB::statement('GRANT EXECUTE ON FUNCTION public.propositions_champs_effacer(TEXT, TEXT[]) TO ' . $role);
         }
         DB::statement(
             "COMMENT ON TABLE propositions_champs IS 'N13 — propositions de valeurs venues d''un tiers (apporteur, commercial, societe), en attente de la décision du propriétaire. "
@@ -195,6 +300,7 @@ return new class extends Migration
         }
 
         DB::statement('DROP TABLE IF EXISTS propositions_champs');
+        DB::statement('DROP FUNCTION IF EXISTS public.propositions_champs_effacer(TEXT, TEXT[])');
         DB::statement('DROP FUNCTION IF EXISTS public.propositions_champs_figee()');
         DB::statement('DROP FUNCTION IF EXISTS public.propositions_champs_meme_espace()');
     }

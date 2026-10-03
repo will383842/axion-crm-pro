@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\User;
 use App\Services\Audit\AuditHashChain;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -39,8 +40,25 @@ use stdClass;
  * AUCUNE valeur (ni l'ancienne ni la nouvelle) : seulement le numéro, la
  * fiche et le champ.
  *
+ * ACCEPTER EST UN « COMPARER PUIS ÉCRIRE » (relectures #316) : une
+ * proposition affirme un état (« la fiche disait X, le tiers dit Y »). L'écran
+ * envoie l'EMPREINTE de ce qu'il a montré (`empreinte()` : valeur du champ et
+ * origine de cette valeur) ; si la fiche ne la porte plus, rien n'est écrit
+ * (`FicheModifiee`, 409 « rechargez »). La valeur RÉELLEMENT remplacée est
+ * gardée avec la décision (`valeur_remplacee`). La proposition et la fiche
+ * sont verrouillées dans la même transaction : deux décisions simultanées
+ * (double clic, deux propositions sur un même champ) se suivent, et la
+ * seconde trouve l'état changé.
+ *
  * Rien n'est branché : aucune route publique n'appelle `proposer()`. Le
  * service est prêt pour le futur canal Partners.
+ *
+ * ⚠️ HORS DE CETTE FILE, POUR TOUJOURS : ce que Partners DÉCIDE (« ne pas
+ * démarcher », « occupée jusqu'au », antériorité). Ces règles s'appliquent
+ * telles quelles — Partners décide, le CRM reflète — et ne passent JAMAIS par
+ * une acceptation du propriétaire. Cette file ne porte que des VALEURS de
+ * fiche. Avant de brancher le canal, `CHAMPS` devra correspondre champ par
+ * champ aux clés de `crm-pro.ts` (INT-T68-P).
  */
 final class Propositions
 {
@@ -52,7 +70,10 @@ final class Propositions
     public const ORIGINES = Taxonomy::FIELD_ORIGINS_TIERS;
 
     /** @var list<string> */
-    public const STATUTS = ['en_attente', 'acceptee', 'refusee'];
+    public const STATUTS = ['en_attente', 'acceptee', 'refusee', 'effacee'];
+
+    /** Le marqueur posé par l'effacement RGPD (art. 17) à la place d'une valeur. */
+    public const EFFACE = '[effacé]';
 
     // Résultats de `proposer()`.
     public const IGNOREE = 'ignoree';
@@ -99,6 +120,29 @@ final class Propositions
         ],
     ];
 
+    /**
+     * Champs TOUJOURS proposés, jamais remplis directement, même vides :
+     * `contacts.role` choisit les destinataires des campagnes (filtre
+     * `fonctions` de `ReglageDestinataires`, REQ-CAM-079) — un tiers ne fait
+     * pas entrer ou sortir une personne d'une campagne sans regard humain.
+     *
+     * @var array<string, list<string>>
+     */
+    private const TOUJOURS_PROPOSES = [
+        self::PERSONNE => ['role'],
+    ];
+
+    /** Longueur maximale d'une valeur reçue (le CHECK de la table en borne 2 000). */
+    private const LONGUEUR_MAX = 2000;
+
+    /** @var array<string, int> */
+    private const LONGUEURS_MAX_CHAMP = [
+        'phone' => 40,
+        'postcode' => 10,
+    ];
+
+    private const LONGUEUR_MAX_REFERENCE = 200;
+
     public function __construct(private readonly AuditHashChain $audit) {}
 
     public static function libelleChamp(string $entite, string $champ): string
@@ -133,7 +177,16 @@ final class Propositions
         if ($valeur === '') {
             return self::IGNOREE;
         }
+        // Bornée dès l'entrée : au-delà, le CHECK de la table lèverait une
+        // erreur SQL, et le remplissage écrirait sans borne sur la fiche.
+        $max = self::LONGUEURS_MAX_CHAMP[$champ] ?? self::LONGUEUR_MAX;
+        if (mb_strlen($valeur) > $max) {
+            throw new InvalidArgumentException("Valeur trop longue pour {$champ} (au plus {$max} caractères).");
+        }
         $reference = $referenceExterne === null || trim($referenceExterne) === '' ? null : trim($referenceExterne);
+        if ($reference !== null && mb_strlen($reference) > self::LONGUEUR_MAX_REFERENCE) {
+            throw new InvalidArgumentException('Référence externe trop longue (au plus ' . self::LONGUEUR_MAX_REFERENCE . ' caractères).');
+        }
 
         $resultat = WorkspaceContext::run($workspaceId, fn (): string => DB::transaction(function () use (
             $workspaceId,
@@ -161,7 +214,7 @@ final class Propositions
             }
 
             $origines = self::origines($fiche->field_origins ?? null);
-            if ($actuelle === null && ! $this->protege($entite, $fiche, $champ, $origines)) {
+            if ($actuelle === null && ! in_array($champ, self::TOUJOURS_PROPOSES[$entite] ?? [], true) && ! $this->protege($entite, $fiche, $champ, $origines)) {
                 $origines[$champ] = $origine;
                 DB::table($table)->where('id', $entiteId)->update([
                     $champ => $valeur,
@@ -189,7 +242,7 @@ final class Propositions
         }));
 
         if ($resultat === self::PROPOSEE) {
-            ATraiterController::oublier($workspaceId);
+            self::oublierApresCommit($workspaceId);
         }
 
         return $resultat;
@@ -199,14 +252,17 @@ final class Propositions
      * Le propriétaire accepte : la valeur proposée est écrite sur la fiche,
      * `field_origins` prend l'origine tiers, la décision est tracée.
      *
-     * C'est une décision HUMAINE : elle vaut aussi pour un champ protégé.
+     * C'est une décision HUMAINE : elle vaut aussi pour un champ protégé —
+     * mais seulement sur l'état que l'humain a VU : `$empreinteVue` est
+     * l'`empreinte()` envoyée à l'écran avec la proposition.
      *
      * @throws PropositionIntrouvable
+     * @throws FicheModifiee la fiche ne porte plus ce qui a été affiché
      * @throws PropositionImpossible déjà décidée, ou fiche disparue
      */
-    public function accepter(string $workspaceId, int $propositionId, User $par): void
+    public function accepter(string $workspaceId, int $propositionId, User $par, string $empreinteVue): void
     {
-        $this->decider($workspaceId, $propositionId, $par, 'acceptee');
+        $this->decider($workspaceId, $propositionId, $par, 'acceptee', $empreinteVue);
     }
 
     /**
@@ -220,9 +276,49 @@ final class Propositions
         $this->decider($workspaceId, $propositionId, $par, 'refusee');
     }
 
-    private function decider(string $workspaceId, int $propositionId, User $par, string $statut): void
+    /**
+     * L'empreinte de ce que l'écran montre pour un champ d'une fiche : sa
+     * valeur ET l'origine de cette valeur (un champ devenu « déclaré par la
+     * personne » change l'empreinte, même à valeur égale). HMAC à la clé de
+     * l'application : elle ne laisse pas retrouver un numéro masqué à l'écran.
+     */
+    public static function empreinte(string $entite, stdClass $fiche, string $champ): string
     {
-        WorkspaceContext::run($workspaceId, fn () => DB::transaction(function () use ($workspaceId, $propositionId, $par, $statut): void {
+        $etat = [
+            $entite,
+            (int) $fiche->id,
+            $champ,
+            self::texte($fiche->{$champ} ?? null),
+            self::origines($fiche->field_origins ?? null)[$champ] ?? null,
+        ];
+
+        return hash_hmac('sha256', json_encode($etat, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), (string) config('app.key'));
+    }
+
+    /** Le champ de cette fiche a-t-il été déclaré par la personne elle-même ? */
+    public static function declare(stdClass $fiche, string $champ): bool
+    {
+        return (self::origines($fiche->field_origins ?? null)[$champ] ?? null) === 'declared';
+    }
+
+    /**
+     * La valeur de la fiche n'est plus celle du jour de la proposition (valeur
+     * comparée comme `proposer()` la compare).
+     */
+    public static function modifieeDepuis(stdClass $fiche, string $champ, ?string $valeurAuJourDeLaProposition): bool
+    {
+        $aujourdhui = self::texte($fiche->{$champ} ?? null);
+        $alors = self::texte($valeurAuJourDeLaProposition);
+        if ($aujourdhui === null || $alors === null) {
+            return $aujourdhui !== $alors;
+        }
+
+        return self::comparable($champ, $aujourdhui) !== self::comparable($champ, $alors);
+    }
+
+    private function decider(string $workspaceId, int $propositionId, User $par, string $statut, ?string $empreinteVue = null): void
+    {
+        WorkspaceContext::run($workspaceId, fn () => DB::transaction(function () use ($workspaceId, $propositionId, $par, $statut, $empreinteVue): void {
             $p = DB::table('propositions_champs')
                 ->where('workspace_id', $workspaceId)
                 ->where('id', $propositionId)
@@ -237,6 +333,8 @@ final class Propositions
 
             $entite = (string) $p->entite;
             $champ = (string) $p->champ;
+            $remplacee = null;
+            $originePrecedente = null;
             if ($statut === 'acceptee') {
                 $table = self::TABLES[$entite] ?? throw new PropositionImpossible('Type de fiche inconnu.');
                 if (! array_key_exists($champ, self::CHAMPS[$entite])) {
@@ -251,7 +349,14 @@ final class Propositions
                 if (! $fiche instanceof stdClass) {
                     throw new PropositionImpossible("La fiche visée n'existe plus.");
                 }
+                // Comparer puis écrire, sous le verrou de la fiche : si elle ne
+                // porte plus ce que l'humain a vu, rien n'est écrit.
+                if ($empreinteVue === null || ! hash_equals(self::empreinte($entite, $fiche, $champ), $empreinteVue)) {
+                    throw new FicheModifiee('La fiche a changé depuis l’affichage : rechargez la page avant de décider.');
+                }
+                $remplacee = self::texte($fiche->{$champ} ?? null);
                 $origines = self::origines($fiche->field_origins ?? null);
+                $originePrecedente = isset($origines[$champ]) && is_string($origines[$champ]) ? $origines[$champ] : null;
                 $origines[$champ] = (string) $p->origine;
                 DB::table($table)->where('id', (int) $p->entite_id)->update([
                     $champ => (string) $p->valeur_proposee,
@@ -262,12 +367,17 @@ final class Propositions
 
             DB::table('propositions_champs')->where('id', $propositionId)->update([
                 'statut' => $statut,
+                // La valeur RÉELLEMENT remplacée (owner seul, export art. 15) :
+                // jamais dans le journal d'audit.
+                'valeur_remplacee' => $remplacee,
                 'decidee_par' => (string) $par->id,
                 'decidee_le' => now(),
                 'updated_at' => now(),
             ]);
 
-            // La trace : numéro, fiche, champ, origine — jamais une valeur.
+            // La trace : numéro, fiche, champ, origine — jamais une valeur. À
+            // l'acceptation, l'origine PRÉCÉDENTE du champ (ex. `declared`) :
+            // la fiche, elle, ne la garde pas.
             $details = [
                 'proposition' => $propositionId,
                 'entite' => $entite,
@@ -275,19 +385,33 @@ final class Propositions
                 'champ' => $champ,
                 'origine' => (string) $p->origine,
             ];
+            $chemin = "propositions — n°{$propositionId} {$entite} {$p->entite_id} {$champ}";
+            if ($statut === 'acceptee') {
+                $details['origine_precedente'] = $originePrecedente;
+                $chemin .= ' (origine précédente : ' . ($originePrecedente ?? 'aucune') . ')';
+            }
             $this->audit->record([
                 'workspace_id' => $workspaceId,
                 'user_id' => (string) $par->id,
                 'method' => 'proposition.' . $statut,
-                'path' => "propositions — n°{$propositionId} {$entite} {$p->entite_id} {$champ}",
+                'path' => $chemin,
                 'status' => 200,
                 'ip' => null,
                 'user_agent' => 'propositions',
                 'payload_hash' => hash('sha256', json_encode($details, JSON_THROW_ON_ERROR)),
             ]);
+            self::oublierApresCommit($workspaceId);
         }));
+    }
 
-        ATraiterController::oublier($workspaceId);
+    /**
+     * La pastille du menu est vidée APRÈS le COMMIT — celui de l'appelant si
+     * `proposer()` tourne dans sa transaction (futur canal Partners) : vidée
+     * avant, elle serait recalculée sur l'ancien total.
+     */
+    private static function oublierApresCommit(string $workspaceId): void
+    {
+        DB::afterCommit(static fn () => ATraiterController::oublier($workspaceId));
     }
 
     /** @param  array<string, mixed>  $origines */
@@ -319,9 +443,13 @@ final class Propositions
         return $texte === '' ? null : $texte;
     }
 
-    /** Deux numéros qui ne diffèrent que par leurs séparateurs sont le même numéro. */
+    /**
+     * Deux écritures d'un même numéro (séparateurs, « +33 » ou « 0 ») sont le
+     * même numéro : la forme nationale de `ListeSuppression::variantesTelephone`,
+     * la normalisation déjà partagée par les listes d'opposition.
+     */
     private static function comparable(string $champ, string $valeur): string
     {
-        return $champ === 'phone' ? (string) preg_replace('/[\s.\-()]/u', '', $valeur) : $valeur;
+        return $champ === 'phone' ? (ListeSuppression::variantesTelephone($valeur)[0] ?? $valeur) : $valeur;
     }
 }

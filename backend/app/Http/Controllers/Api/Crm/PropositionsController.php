@@ -23,7 +23,8 @@ use stdClass;
  * `ProvenanceTiers::lisiblePar`).
  *
  * `GET  /v1/crm/propositions`               : la file, paginée, plus anciennes d'abord ;
- * `POST /v1/crm/propositions/{id}/accepter` : écrit la valeur sur la fiche ;
+ * `POST /v1/crm/propositions/{id}/accepter` : écrit la valeur sur la fiche, si
+ *   elle porte encore ce que l'écran a montré (corps : `empreinte`, sinon 409) ;
  * `POST /v1/crm/propositions/{id}/refuser`  : la fiche ne bouge pas.
  *
  * Aucune route ici ne CRÉE de proposition : rien n'est branché au canal
@@ -57,6 +58,13 @@ class PropositionsController extends ConsoleController
                 $actuelle = $fiche === null ? $l->valeur_actuelle : ($fiche->{$champ} ?? null);
                 $data[] = [
                     'id' => (int) $l->id,
+                    // Ce que l'écran montre, en empreinte : accepter la renvoie,
+                    // et refuse d'écrire si la fiche a changé entre-temps.
+                    'empreinte' => $fiche === null ? null : Propositions::empreinte($entite, $fiche, $champ),
+                    // Fiche à la corbeille (ou disparue) : seul « Refuser » a un sens.
+                    'fiche_supprimee' => $fiche === null,
+                    'fiche_modifiee_depuis' => $fiche !== null && Propositions::modifieeDepuis($fiche, $champ, $l->valeur_actuelle === null ? null : (string) $l->valeur_actuelle),
+                    'champ_declare' => $fiche !== null && Propositions::declare($fiche, $champ),
                     'entite' => $entite,
                     'entite_id' => (int) $l->entite_id,
                     'entreprise_id' => $fiche === null ? null : (int) ($entite === Propositions::ENTREPRISE ? $fiche->id : $fiche->company_id),
@@ -82,6 +90,14 @@ class PropositionsController extends ConsoleController
         return $this->decider($request, $id, 'acceptee');
     }
 
+    /** L'empreinte de ce que l'écran a montré (`index`) : obligatoire pour accepter. */
+    private function empreinteVue(Request $request): string
+    {
+        $empreinte = $request->validate(['empreinte' => ['required', 'string', 'max:128']])['empreinte'];
+
+        return is_string($empreinte) ? $empreinte : '';
+    }
+
     public function refuser(Request $request, int $id): JsonResponse
     {
         return $this->decider($request, $id, 'refusee');
@@ -94,7 +110,7 @@ class PropositionsController extends ConsoleController
 
         try {
             if ($statut === 'acceptee') {
-                $this->propositions->accepter($workspaceId, $id, $user);
+                $this->propositions->accepter($workspaceId, $id, $user, $this->empreinteVue($request));
             } else {
                 $this->propositions->refuser($workspaceId, $id, $user);
             }
@@ -131,15 +147,18 @@ class PropositionsController extends ConsoleController
             }
         }
         $colonnes = [
-            Propositions::ENTREPRISE => array_merge(['id'], array_keys(Propositions::CHAMPS[Propositions::ENTREPRISE])),
-            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name'], array_keys(Propositions::CHAMPS[Propositions::PERSONNE])),
+            Propositions::ENTREPRISE => array_merge(['id', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::ENTREPRISE])),
+            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::PERSONNE])),
         ];
         $tables = [Propositions::ENTREPRISE => 'companies', Propositions::PERSONNE => 'contacts'];
 
         $fiches = [];
         foreach ($ids as $entite => $liste) {
+            // Une fiche à la corbeille n'est pas montrée comme vivante : accepter
+            // la refuserait (409), l'écran ne propose alors que « Refuser ».
             $fiches[$entite] = $liste === [] ? [] : DB::table($tables[$entite])
                 ->where('workspace_id', $workspaceId)
+                ->whereNull('deleted_at')
                 ->whereIn('id', array_values(array_unique($liste)))
                 ->get(array_values(array_unique($colonnes[$entite])))
                 ->keyBy('id')

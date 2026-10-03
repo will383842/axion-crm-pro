@@ -323,7 +323,7 @@ test('RGPD art. 15/20 : l export rend les propositions qui concernent la personn
     $owner = prOwner($ws);
     $fiche = F::fiche($ws, 'ZZ Port');
     $email = 'zz.port.' . Str::random(6) . '@example.invalid';
-    $c = F::contact($ws, $fiche, 'Zoe', 'ZZPORT', ['email' => $email, 'title' => 'Gérante']);
+    $c = F::contact($ws, $fiche, 'Zoe', 'ZZPORT', ['email' => $email, 'title' => 'Gérante', 'phone' => '0199000006']);
     $autre = F::contact($ws, $fiche, 'Yan', 'ZZAUTRE', ['email' => 'zz.autre@example.invalid', 'title' => 'Comptable']);
     prService()->proposer($ws, 'personne', $c, 'title', 'Présidente', 'apporteur', 'zz-ref-port');
     $id = prDerniere($ws);
@@ -352,12 +352,14 @@ test('RGPD art. 17 : l effacement NEUTRALISE les propositions de la personne, sa
     $owner = prOwner($ws);
     $fiche = F::fiche($ws, 'ZZ Eff', ['phone' => '0199000001']);
     $email = 'zz.eff.' . Str::random(6) . '@example.invalid';
-    $c = F::contact($ws, $fiche, 'Zoe', 'ZZEFF', ['email' => $email, 'title' => 'Gérante', 'phone' => '0199000008']);
+    $c = F::contact($ws, $fiche, 'Zoe', 'ZZEFF', [
+        'email' => $email, 'title' => 'Gérante', 'phone' => '0199000008', 'linkedin_url' => 'https://zz.example.invalid/zoe-1',
+    ]);
     $autre = F::contact($ws, $fiche, 'Yan', 'ZZGARDE', ['email' => 'zz.garde@example.invalid', 'title' => 'Comptable']);
     prService()->proposer($ws, 'personne', $c, 'title', 'Présidente', 'apporteur', 'zz-ref-eff');
     $acceptee = prDerniere($ws);
     prService()->accepter($ws, $acceptee, $owner, prEmpreinte($acceptee));
-    prService()->proposer($ws, 'personne', $c, 'linkedin_url', 'https://zz.example.invalid/zoe', 'societe');
+    prService()->proposer($ws, 'personne', $c, 'linkedin_url', 'https://zz.example.invalid/zoe-2', 'societe');
     $attente = prDerniere($ws);
     // Son numéro proposé sur la fiche de l'ENTREPRISE : il part aussi.
     prService()->proposer($ws, 'entreprise', $fiche, 'phone', '+33 1 99 00 00 08', 'commercial');
@@ -382,7 +384,7 @@ test('RGPD art. 17 : l effacement NEUTRALISE les propositions de la personne, sa
 
     $e = DB::table('propositions_champs')->where('id', $attente)->first();
     expect($e->valeur_proposee)->toBe('[effacé]')
-        ->and($e->valeur_actuelle)->toBeNull()
+        ->and($e->valeur_actuelle)->toBe('[effacé]')
         ->and($e->statut)->toBe('effacee')
         ->and($e->decidee_le)->not->toBeNull();
 
@@ -401,9 +403,10 @@ test('RGPD art. 17 : hors de la fonction d effacement, personne ne réécrit ni 
     prService()->proposer($ws, 'entreprise', $fiche, 'city', 'Bron', 'societe');
     $id = prDerniere($ws);
 
-    expect(fn () => DB::table('propositions_champs')->where('id', $id)->update([
+    // Dans un point de sauvegarde : l'échec attendu n'avorte pas la transaction du test.
+    expect(fn () => DB::transaction(fn () => DB::table('propositions_champs')->where('id', $id)->update([
         'valeur_proposee' => '[effacé]', 'effacee_le' => now(), 'statut' => 'effacee', 'decidee_le' => now(),
-    ]))->toThrow(QueryException::class);
+    ])))->toThrow(QueryException::class);
     expect(DB::table('propositions_champs')->where('id', $id)->value('valeur_proposee'))->toBe('Bron');
 
     // L'effacement passe par la fonction dédiée, et par elle seule.

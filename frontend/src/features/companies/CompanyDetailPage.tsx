@@ -28,6 +28,10 @@ import { EvenementsCard } from './components/EvenementsCard';
 import { ListesDeLaFiche } from '@/features/listes/ListesDeLaFiche';
 import { RelationCard } from './components/RelationCard';
 import type { LifecycleStage, RelationType } from '@/features/crm-console/types';
+import { libelleCategorieJuridique } from '@/lib/categories-juridiques';
+import { libelleNaf } from '@/lib/naf-divisions';
+import { libelleEffectif } from './effectif';
+import { LibelleEtCode } from './components/LibelleEtCode';
 
 interface CompanyDetail {
   id: number;
@@ -208,12 +212,31 @@ export function CompanyDetailPage() {
             </CardHeader>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
               <Item label="SIREN"><span className="font-mono tabular-nums">{c.siren}</span></Item>
-              <Item label="Forme juridique">{c.legal_form ?? '—'}</Item>
-              <Item label="NAF">
-                <span className="font-mono">{c.naf ?? '—'}</span>
-                {c.naf_label ? <span className="ml-2 text-xs text-slate-500">{c.naf_label}</span> : null}
+              {/* 03/10/2026 — forme juridique, activité et effectif EN CLAIR ; le
+                  code INSEE reste visible en petit (et en infobulle) pour qui
+                  veut le recouper. Un code inconnu s'affiche seul. */}
+              <Item label="Forme juridique">
+                <LibelleEtCode
+                  libelle={libelleCategorieJuridique(c.legal_form)}
+                  code={c.legal_form}
+                  infobulle="Catégorie juridique INSEE"
+                />
               </Item>
-              <Item label="Effectif INSEE">{c.effectif_range ?? '—'}</Item>
+              <Item label="Activité">
+                <LibelleEtCode
+                  libelle={libelleActivite(c.naf_label, c.naf)}
+                  code={c.naf}
+                  infobulle="Code d’activité (NAF)"
+                />
+              </Item>
+              <Item label="Effectif">
+                <LibelleEtCode
+                  libelle={libelleEffectif(c.effectif_range)}
+                  code={c.effectif_range}
+                  infobulle="Tranche d’effectif INSEE"
+                  codeVisible={false}
+                />
+              </Item>
               <Item label="Adresse" wide>{addressLine}</Item>
               <Item label="Site web">
                 {c.website ? (
@@ -334,6 +357,12 @@ function Item({ label, children, wide }: { label: string; children: React.ReactN
       <dd className="mt-1 text-slate-900 dark:text-white">{children}</dd>
     </div>
   );
+}
+
+/** Le libellé NAF fourni par l'API s'il existe, sinon celui de la division (comme la liste). */
+function libelleActivite(libelleApi: string | null | undefined, naf: string | null | undefined): string | null {
+  const fourni = libelleApi?.trim() ?? '';
+  return fourni !== '' ? fourni : libelleNaf(naf);
 }
 
 function Dot() {

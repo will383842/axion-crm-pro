@@ -31,8 +31,15 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('@/lib/api', () => ({ api: { get: () => Promise.resolve({ data: {} }) } }));
 
 const { PastilleCompteur } = await import('@/features/a-traiter/PastilleCompteur');
-const { LIBELLES_COMPTEUR, COMPTEURS_A_TRAITER_KEY, normaliserCompteurs, texteDePastille, formaterNombre } =
-  await import('@/features/a-traiter/compteurs');
+const {
+  LIBELLES_COMPTEUR,
+  COMPTEURS_A_TRAITER_KEY,
+  normaliserCompteurs,
+  texteDePastille,
+  formaterNombre,
+  totalDesCompteurs,
+  libelleTotalATraiter,
+} = await import('@/features/a-traiter/compteurs');
 const { Sidebar } = await import('@/components/layout/Sidebar');
 const { CONSOLE_FEATURES_KEY } = await import('@/features/crm-console/useConsoleFeatures');
 
@@ -114,5 +121,62 @@ describe('Le menu', () => {
     afficher({ doublons: null, a_rattacher: 3 });
     const rattacher = screen.getByRole('link', { name: /Personnes à rattacher/ });
     expect(within(rattacher).getByRole('img', { name: '3 personnes à rattacher' })).toBeInTheDocument();
+  });
+});
+
+describe('Section « À traiter » repliée (03/10/2026)', () => {
+  it('total des compteurs connus ; null ignoré ; rien de connu → null', () => {
+    expect(totalDesCompteurs({ doublons: 275, a_rattacher: 3 }, ['doublons', 'a_rattacher'])).toBe(278);
+    expect(totalDesCompteurs({ doublons: null, a_rattacher: 3 }, ['doublons', 'a_rattacher'])).toBe(3);
+    expect(totalDesCompteurs({ doublons: null, a_rattacher: null }, ['doublons', 'a_rattacher'])).toBeNull();
+    expect(totalDesCompteurs(undefined, ['doublons'])).toBeNull();
+    // Seules les entrées présentes dans la section comptent.
+    expect(totalDesCompteurs({ doublons: 5, a_rattacher: 9 }, ['doublons'])).toBe(5);
+    expect(libelleTotalATraiter(1)).toBe('1 élément à traiter');
+    expect(libelleTotalATraiter(1234)).toMatch(/^1\s234 éléments à traiter$/);
+  });
+
+  function afficherAilleurs(
+    compteurs: { doublons: number | null; a_rattacher: number | null },
+    chemin = '/companies',
+  ) {
+    cheminCourant = chemin;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    client.setQueryData(CONSOLE_FEATURES_KEY, { console_v2: true, universes: { business: true, vivier: false } });
+    client.setQueryData(COMPTEURS_A_TRAITER_KEY, compteurs);
+    return render(
+      <QueryClientProvider client={client}>
+        <Sidebar collapsed={false} onToggleCollapse={() => {}} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('repliée : le titre porte le total (doublons + à rattacher)', () => {
+    afficherAilleurs({ doublons: 275, a_rattacher: 3 });
+    const titre = screen.getByRole('button', { name: /À traiter/ });
+    expect(titre).toHaveAttribute('aria-expanded', 'false');
+    expect(within(titre).getByRole('img', { name: '278 éléments à traiter' })).toHaveTextContent('278');
+  });
+
+  it('repliée, un compteur inconnu est ignoré', () => {
+    afficherAilleurs({ doublons: null, a_rattacher: 4 });
+    const titre = screen.getByRole('button', { name: /À traiter/ });
+    expect(within(titre).getByRole('img', { name: '4 éléments à traiter' })).toBeInTheDocument();
+  });
+
+  it('repliée, rien de connu ou zéro : pas de pastille sur le titre', () => {
+    const { unmount } = afficherAilleurs({ doublons: null, a_rattacher: null });
+    expect(within(screen.getByRole('button', { name: /À traiter/ })).queryByRole('img')).toBeNull();
+    unmount();
+    afficherAilleurs({ doublons: 0, a_rattacher: 0 });
+    expect(within(screen.getByRole('button', { name: /À traiter/ })).queryByRole('img')).toBeNull();
+  });
+
+  it('dépliée : pas de total sur le titre, les pastilles sont sur les entrées', () => {
+    afficherAilleurs({ doublons: 275, a_rattacher: 3 }, '/doublons');
+    const titre = screen.getByRole('button', { name: /À traiter/ });
+    expect(titre).toHaveAttribute('aria-expanded', 'true');
+    expect(within(titre).queryByRole('img')).toBeNull();
+    expect(screen.getByRole('img', { name: '275 doublons à vérifier' })).toBeInTheDocument();
   });
 });

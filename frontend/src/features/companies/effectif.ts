@@ -20,12 +20,24 @@ export const EFFECTIF_OPTIONS = [
   { value: "53", label: "10 000 salariés et +" },
 ];
 
-export const EFFECTIF_LABELS: Record<string, string> = Object.fromEntries(
-  EFFECTIF_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label]),
-);
+// « NN » (unité non employeuse) n'est pas proposé dans le filtre de la liste,
+// mais l'INSEE le renvoie : la fiche doit savoir le dire en clair.
+export const EFFECTIF_LABELS: Record<string, string> = {
+  ...Object.fromEntries(EFFECTIF_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label])),
+  NN: "Non employeuse",
+};
+
+/**
+ * Libellé d'une tranche d'effectif INSEE, ou `null` si le code est vide ou
+ * inconnu — à l'appelant de décider quoi montrer à la place.
+ */
+export function libelleEffectif(code?: string | null): string | null {
+  const normalise = code?.trim().toUpperCase() ?? "";
+  if (normalise === "") return null;
+  return EFFECTIF_LABELS[normalise] ?? null;
+}
 
 /** Libellé lisible d'une tranche d'effectif INSEE (ex. "12" → "20 à 49 salariés"). */
 export function effectifLabel(code?: string | null): string {
-  if (!code) return "—";
-  return EFFECTIF_LABELS[code] ?? "—";
+  return libelleEffectif(code) ?? "—";
 }

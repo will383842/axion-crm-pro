@@ -77,3 +77,27 @@ export const LIBELLES_COMPTEUR: Record<CleCompteur, (n: number) => string> = {
   doublons: (n) => (n === 1 ? '1 doublon à vérifier' : `${formaterNombre(n)} doublons à vérifier`),
   a_rattacher: (n) => (n === 1 ? '1 personne à rattacher' : `${formaterNombre(n)} personnes à rattacher`),
 };
+
+/**
+ * Total d'une section du menu REPLIÉE (03/10/2026) : la somme des compteurs
+ * CONNUS de ses entrées. Un compteur `null` ou absent est ignoré — il ne vaut
+ * pas 0, il ne vaut rien ; si AUCUN n'est connu, le total est `null` (pas de
+ * pastille), jamais un 0 inventé.
+ */
+export function totalDesCompteurs(
+  compteurs: CompteursATraiter | undefined,
+  cles: ReadonlyArray<CleCompteur>,
+): number | null {
+  if (compteurs === undefined) return null;
+  let total: number | null = null;
+  for (const cle of cles) {
+    const valeur = compteurs[cle];
+    if (typeof valeur === 'number') total = (total ?? 0) + valeur;
+  }
+  return total;
+}
+
+/** Ce que dit la pastille du TITRE de section repliée. */
+export function libelleTotalATraiter(n: number): string {
+  return n === 1 ? '1 élément à traiter' : `${formaterNombre(n)} éléments à traiter`;
+}

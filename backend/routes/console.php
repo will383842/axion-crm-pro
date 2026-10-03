@@ -3,11 +3,13 @@
 use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
 use App\Console\Commands\CrmFederationsTrouverSites;
+use App\Console\Commands\CrmInseeMiseAJourMensuelle;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
+use App\Crm\Insee\MiseAJourMensuelle;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -479,4 +481,29 @@ Schedule::command('crm:emails:verifier')
     })
     ->onFailure(function (): void {
         Log::error('[EMAILS] crm:emails:verifier (dimanche 05:00) est sortie en échec — le journal dit le lot annulé et la reprise (--source, --depuis-id).');
+    });
+
+// Lot N8 (2026-10-03) — MISE À JOUR MENSUELLE INSEE : les modifications Sirene
+// depuis la dernière exécution réussie (créations du périmètre, fermetures et
+// non diffusibles MARQUÉS, champs INSEE). Rien n'est jamais supprimé.
+//
+// Une fois par mois : le PREMIER jour, à partir du 4, qui tombe du mardi au
+// samedi (jamais les 1er, 2 et 3), à 09:30 heure de Paris — toujours entre le 4
+// et le 6 (`MiseAJourMensuelle::estJourPlanifie`, qui borne aussi la fenêtre
+// 08:00-19:00). Une expression cron seule ne sait pas le dire : jour du mois
+// ET jour de la semaine s'y combinent en OU.
+//
+// Serveur à 2 CPU : traitement séquentiel, ≈ 30 requêtes Sirene par minute, en
+// arrière-plan. `--duree-max=300` (5 h) rend la main avant 15:00 et sous le
+// verrou de 360 min (B17-002) ; un passage coupé reprend au curseur mémorisé.
+Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-max=300')
+    ->cron('30 9 4-6 * *')
+    ->timezone(MiseAJourMensuelle::FUSEAU)
+    ->between('08:00', '19:00')
+    ->when(fn (): bool => MiseAJourMensuelle::estJourPlanifie(now()))
+    ->withoutOverlapping(360)
+    ->onOneServer()
+    ->runInBackground()
+    ->onFailure(function (): void {
+        Log::error('[INSEE] crm:insee:mise-a-jour-mensuelle est sortie en échec — le passage reste « echouee » dans insee_mises_a_jour, avec son curseur : relancer la commande le reprend.');
     });

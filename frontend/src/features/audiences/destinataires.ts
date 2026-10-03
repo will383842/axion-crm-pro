@@ -43,6 +43,7 @@ export const FONCTIONS_PROPOSEES = [
 ];
 
 export const MOTIFS_EXCLUSION: Record<string, string> = {
+  non_diffusible: 'Opposée à la diffusion INSEE (jamais en campagne)',
   entreprise_individuelle: 'Entrepreneur individuel (jamais en campagne)',
   invalide: 'Adresse invalide ou jetable',
   non_verifiee: 'Adresse non vérifiée',

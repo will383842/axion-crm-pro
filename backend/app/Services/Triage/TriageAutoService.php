@@ -43,6 +43,12 @@ class TriageAutoService
             && $company->archive_reason === 'entreprise_radiee') {
             return ['status' => 'archived_no_email', 'archive_reason' => 'entreprise_radiee'];
         }
+        // Lot N8 — une unité opposée à la diffusion INSEE (posé par
+        // `crm:insee:mise-a-jour-mensuelle`) ne revient JAMAIS en prospection.
+        if ($company->prospection_status === 'archived_no_email'
+            && $company->archive_reason === 'non_diffusible') {
+            return ['status' => 'archived_no_email', 'archive_reason' => 'non_diffusible'];
+        }
 
         // Sprint H8 — un email contactable (valid|catchall|unknown) OU un
         // email_generic suffit pour passer ready_for_outreach.

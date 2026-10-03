@@ -53,7 +53,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -113,7 +113,7 @@ final class ResolveurDestinataires
         /** @var array<string, list<Candidat>> $occurrences */
         $occurrences = [];
 
-        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form'])
+        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form', 'companies.insee_non_diffusible_le'])
             ->when($presse, static fn ($q) => $q->selectRaw(
                 AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
                 . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie',
@@ -354,6 +354,8 @@ final class ResolveurDestinataires
         // Lu sur la fiche DÉJÀ chargée (le lot de l'audience) : aucune
         // condition de plus sur `companies`, rien à indexer.
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($fiche['legal_form'] ?? null);
+        // Lot N8 : fiche marquée « non diffusible » par la mise à jour INSEE.
+        $nd = ($fiche['insee_non_diffusible_le'] ?? null) !== null;
         $candidats = [];
         $vues = [];
 
@@ -363,7 +365,7 @@ final class ResolveurDestinataires
             $candidats[] = [
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => null,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -408,7 +410,7 @@ final class ResolveurDestinataires
                 'email' => $e, 'classe' => $classe === self::INCONNUE ? self::NOMINATIVE : $classe,
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => $ecartee,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'ecartee' => $ecartee,
             ];
         }
 
@@ -433,6 +435,7 @@ final class ResolveurDestinataires
                 'perso' => ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => ($c->first_info_at ?? null) !== null,
                 'entreprise_individuelle' => $ei,
+                'non_diffusible' => $nd,
                 'ecartee' => $ecartee,
             ];
         }

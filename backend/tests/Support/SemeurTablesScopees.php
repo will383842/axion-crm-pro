@@ -109,6 +109,8 @@ final class SemeurTablesScopees
         // 2026-09-30 (chantier 5) : empreintes d'une fusion — APRÈS elle.
         'fusions_empreintes',
         'health_practitioners',
+        // 2026-10-03 (lot N8) : journal des passages de la mise à jour INSEE.
+        'insee_mises_a_jour',
         'invitations',
         'journalists',
         'linkedin_invitations',
@@ -585,6 +587,10 @@ final class SemeurTablesScopees
         $inserer('scraping_campaigns', [
             'created_by' => $user,
             'name' => 'ZZ Collecte ' . $marque,
+        ]);
+
+        $inserer('insee_mises_a_jour', [
+            'depuis' => '2026-07-06',
         ]);
 
         $inserer('strategic_keywords', [

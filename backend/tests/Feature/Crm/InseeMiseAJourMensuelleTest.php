@@ -34,6 +34,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
@@ -390,6 +391,67 @@ test('sans --depuis : rattrapage initial depuis le 2026-07-06, puis depuis la de
     expect($flux[0]['q'])->toContain('[2026-09-08 TO *]');
 });
 
+test('réouverture : une fiche fermée redevenue active est démarquée et revient en prospection', function () {
+    $ws = F::espace('zz-insee-maj');
+    $siren = F::siren();
+    $id = F::fiche($ws, 'ZZ Rouverte', [
+        'siren' => $siren, 'department_code' => '38', 'insee_ferme_le' => '2026-08-01',
+        'prospection_status' => 'archived_no_email', 'archive_reason' => 'entreprise_radiee',
+    ]);
+    mamSirene([mamUnite($siren, ['denominationUniteLegale' => 'ZZ Rouverte'])], []);
+
+    Artisan::call('crm:insee:mise-a-jour-mensuelle', ['--workspace' => $ws, '--depuis' => '2026-07-06', '--delai-ms' => 0]);
+
+    $f = mamFiche($id);
+    expect($f->insee_ferme_le)->toBeNull()
+        ->and($f->archive_reason)->toBeNull()
+        ->and($f->prospection_status)->toBe('pending')
+        ->and(Artisan::output())->toMatch('/réouvertures\s*:\s*1\b/u');
+});
+
+test('sobriété : une fiche INSEE inchangée n est pas réécrite ; un SIREN tiers inconnu de Sirene ne revient pas', function () {
+    $ws = F::espace('zz-insee-maj');
+    $x = F::siren();
+    $y = F::siren();
+    $inchangee = F::fiche($ws, 'ZZ FICTIVE ' . $x, [
+        'siren' => $x, 'department_code' => '38', 'legal_form' => '5710', 'naf' => '62.01Z', 'effectif_range' => '11',
+        'updated_at' => '2026-01-01 00:00:00+01',
+    ]);
+    $inconnue = F::fiche($ws, 'ZZ Tiers inconnue', ['siren' => $y, 'discovery_source' => 'federations-2026', 'department_code' => '38']);
+    mamSirene([mamUnite($x)], []);
+
+    Artisan::call('crm:insee:mise-a-jour-mensuelle', ['--workspace' => $ws, '--depuis' => '2026-07-06', '--delai-ms' => 0]);
+    expect(Artisan::output())->toContain('dont 1 inconnues de Sirene');
+
+    $f = mamFiche($inchangee);
+    expect(substr((string) $f->updated_at, 0, 10))->toBe('2026-01-01')
+        ->and($f->insee_verifiee_le)->toBeNull()
+        ->and(mamFiche($inconnue)->insee_verifiee_le)->not->toBeNull();
+
+    $deja = count(mamRequetes());
+    Artisan::call('crm:insee:mise-a-jour-mensuelle', ['--workspace' => $ws, '--depuis' => '2026-07-06', '--delai-ms' => 0]);
+    foreach (array_slice(mamRequetes(), $deja) as $r) {
+        expect($r['q'] ?? '')->not->toContain('siren:' . $y);
+    }
+});
+
+test('quota : un 429 de Sirene est attendu puis retenté sur le MÊME curseur, sans rien perdre', function () {
+    $ws = F::espace('zz-insee-maj');
+    $siren = F::siren();
+    $id = F::fiche($ws, 'ZZ Quota', ['siren' => $siren, 'department_code' => '38']);
+    Sleep::fake();
+    Http::fakeSequence('api.insee.fr/api-sirene/3.11/siren*')
+        ->push(['fault' => 'Too Many Requests'], 429)
+        ->push(['header' => ['curseur' => '*', 'curseurSuivant' => '*'], 'unitesLegales' => [mamUnite($siren, ['denominationUniteLegale' => 'ZZ QUOTA APRES'])]], 200);
+
+    $code = Artisan::call('crm:insee:mise-a-jour-mensuelle', ['--workspace' => $ws, '--depuis' => '2026-07-06', '--delai-ms' => 0]);
+
+    expect($code)->toBe(0)
+        ->and(mamFiche($id)->denomination)->toBe('ZZ QUOTA APRES')
+        ->and(collect(mamRequetes())->pluck('curseur')->all())->toBe(['*', '*']);
+    Sleep::assertSleptTimes(1);
+});
+
 test('une date --depuis invalide est refusée, sans aucun appel', function () {
     $e = mamEspace();
     Http::fake();
@@ -441,6 +503,62 @@ test('planification : mensuelle, mardi→samedi, jamais les 1er/2/3, 08:00-19:00
 });
 
 // ── Sous le rôle de production (axion_app, RLS forcée) ──────────────────────
+
+/** Le plan d'une requête, sous `axion_app`, sans balayage séquentiel permis. */
+function mamPlan(string $espace, string $sql, array $liaisons): string
+{
+    $app = DB::connection('pgsql_app');
+    $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $espace]);
+    $app->statement('SET enable_seqscan = off');
+    try {
+        $lignes = $app->select('EXPLAIN ' . $sql, $liaisons);
+    } finally {
+        $app->statement('RESET enable_seqscan');
+        $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        $app->disconnect();
+    }
+
+    return implode("\n", array_map(static fn ($l): string => (string) array_values((array) $l)[0], $lignes));
+}
+
+test('index : la passe prioritaire et la lecture par SIREN sont indexées sous axion_app (4,35 M de fiches)', function () {
+    $index = DB::selectOne(
+        'SELECT i.indisvalid AS valide, pg_get_indexdef(i.indexrelid) AS def
+           FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = ?',
+        ['idx_companies_insee_priorite'],
+    );
+    expect($index)->not->toBeNull()
+        ->and((bool) $index->valide)->toBeTrue()
+        ->and($index->def)->toContain('siren IS NOT NULL')
+        ->and($index->def)->toContain("'insee'")
+        ->and($index->def)->toContain('deleted_at IS NULL');
+
+    $espace = (string) Str::uuid();
+    DB::enableQueryLog();
+    MiseAJourMensuelle::fichesPrioritaires($espace, '2026-07-06', 100);
+    $requete = collect(DB::getQueryLog())->last();
+    DB::disableQueryLog();
+    expect(mamPlan($espace, $requete['query'], $requete['bindings']))->toContain('idx_companies_insee_priorite');
+
+    // La lecture par SIREN : sur une table vide, le planificateur choisit au
+    // hasard. On sème donc un volume (fictif) et des statistiques, et on lit
+    // le plan sous le rôle de production DANS la transaction du test.
+    $ws = F::espace('zz-insee-plan');
+    DB::statement(
+        "INSERT INTO companies (workspace_id, siren, denomination, discovery_source, created_at, updated_at)
+         SELECT ?::uuid, lpad((940000000 + g)::text, 9, '0'), 'ZZ Plan ' || g, 'insee', now(), now()
+           FROM generate_series(1, 20000) g",
+        [$ws],
+    );
+    DB::statement('ANALYZE companies');
+    DB::statement('SET LOCAL ROLE axion_app');
+    DB::select('SELECT set_config(?, ?, true)', ['app.current_workspace_id', $ws]);
+    $lignes = DB::select('EXPLAIN SELECT id FROM companies WHERE workspace_id = ? AND siren IN (?, ?)', [$ws, '940000001', '940000002']);
+    DB::statement('RESET ROLE');
+    $parSiren = implode("\n", array_map(static fn ($l): string => (string) array_values((array) $l)[0], $lignes));
+    expect($parSiren)->toContain('companies_workspace_id_siren_key')
+        ->and($parSiren)->not->toContain('Seq Scan');
+});
 
 function mamProprio(): Connection
 {

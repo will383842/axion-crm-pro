@@ -9,6 +9,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 /**
  * INSEE Sirene API V3.11 — `https://api.insee.fr/api-sirene/3.11`.
@@ -28,6 +29,16 @@ use Illuminate\Support\Facades\Http;
 class HttpInseeClient implements InseeClient
 {
     private const BASE_URL = 'https://api.insee.fr/api-sirene/3.11';
+
+    /** Taille d'une page du flux des modifications (maximum Sirene v3.11). */
+    private const PAGE_SIRENE = 1000;
+
+    /** Identifiants par requête groupée (`siren:… OR siren:…`) : URL ≈ 2 Ko. */
+    public const PAR_REQUETE = 100;
+
+    private int $delaiMs = 2100;
+
+    private ?float $derniereRequete = null;
 
     /**
      * ═══════════════════════════════════════════════════════════════════════
@@ -183,67 +194,19 @@ class HttpInseeClient implements InseeClient
 
             if ($hasGeo) {
                 foreach ($data[$resultsKey] ?? [] as $etab) {
-                    // Filtres post-API (Sirene v3.11 les refuse dans q) :
-                    if (! ($etab['etablissementSiege'] ?? false)) {
-                        continue;
-                    }     // sièges seulement
-                    $u = $etab['uniteLegale'] ?? [];
-                    if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') {
-                        continue;
-                    } // actives
-                    // Diffusibles seulement (RGPD) : exclut les « [ND] » — personnes qui
-                    // ont refusé la diffusion publique de leurs données INSEE.
-                    // C19-010 : le test littéral qui vivait ici est devenu
-                    // `estDiffusible()`, pour être porté à l'identique sur les deux
-                    // autres voies. Le comportement de CETTE branche est inchangé.
-                    if (! self::estDiffusible($u)) {
+                    // Le périmètre de l'import (siège, actif, diffusible,
+                    // société 5xxx) : `estDansPerimetreImport()`, partagé
+                    // avec la mise à jour mensuelle (lot N8). Comportement de
+                    // CETTE branche inchangé.
+                    if (! is_array($etab) || ! self::estDansPerimetreImport($etab, $commercialOnly)) {
                         continue;
                     }
-                    // C19-010, RENFORT : l'ÉTABLISSEMENT porte son propre statut de
-                    // diffusion (`statutDiffusionEtablissement`, mêmes valeurs O/P/N).
-                    // Il n'était lu par personne. Même défaut `'O'` : une réponse qui
-                    // ne porte pas le champ reste collectée (témoin dédié).
-                    if (($etab['statutDiffusionEtablissement'] ?? 'O') !== 'O') {
-                        continue;
-                    }
-                    $periodes = $u['periodesUniteLegale'][0] ?? $u;
-                    // SOCIÉTÉS commerciales seulement (cat. jur. 5xxx : SARL, SAS, SA, SNC,
-                    // SCA…). Exclut les entrepreneurs individuels/auto-entrepreneurs (1xxx),
-                    // SCI (65xx), associations (9xxx), administrations (7xxx), etc.
-                    if ($commercialOnly) {
-                        $cj = (string) ($periodes['categorieJuridiqueUniteLegale'] ?? $u['categorieJuridiqueUniteLegale'] ?? '');
-                        if ($cj === '' || $cj[0] !== '5') {
-                            continue;
-                        }
-                    }
-                    $siren = (string) ($etab['siren'] ?? $u['siren'] ?? '');
+                    $siren = (string) ($etab['siren'] ?? (is_array($etab['uniteLegale'] ?? null) ? ($etab['uniteLegale']['siren'] ?? '') : ''));
                     if ($siren === '' || isset($seenSirens[$siren])) {
                         continue;
                     }
                     $seenSirens[$siren] = true;
-                    // Adresse de l'établissement (siège) — dispo dès la récupération INSEE.
-                    $adr = $etab['adresseEtablissement'] ?? [];
-                    $rue = trim(implode(' ', array_filter([
-                        $adr['numeroVoieEtablissement'] ?? '',
-                        $adr['typeVoieEtablissement'] ?? '',
-                        $adr['libelleVoieEtablissement'] ?? '',
-                    ])));
-                    yield new InseeCompanyData(
-                        siren: $siren,
-                        denomination: $periodes['denominationUniteLegale']
-                            ?? trim(($periodes['prenom1UniteLegale'] ?? '') . ' ' . ($periodes['nomUniteLegale'] ?? '')),
-                        naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
-                        legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
-                        effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
-                        address: $rue !== '' ? $rue : null,
-                        postcode: $adr['codePostalEtablissement'] ?? null,
-                        city: $adr['libelleCommuneEtablissement'] ?? null,
-                        insee: $adr['codeCommuneEtablissement'] ?? null,
-                        createdAt: $u['dateCreationUniteLegale'] ?? null,
-                        raw: $etab,
-                        etatAdministratif: $u['etatAdministratifUniteLegale']
-                            ?? $periodes['etatAdministratifUniteLegale'] ?? null,
-                    );
+                    yield self::donneesEtablissement($etab);
                 }
             } else {
                 foreach ($data[$resultsKey] ?? [] as $u) {
@@ -280,6 +243,290 @@ class HttpInseeClient implements InseeClient
                 usleep($delayMs * 1000); // respecte le rate-limit avant la page suivante
             }
         } while (true);
+    }
+
+    /**
+     * LE PÉRIMÈTRE DE L'IMPORT INITIAL (`prospection:collect`), écrit UNE fois
+     * — la collecte par département et la mise à jour mensuelle (lot N8)
+     * créent les MÊMES fiches.
+     *
+     * Un établissement de la voie `/siret` y entre s'il est : le SIÈGE ; d'une
+     * unité ACTIVE (`A`) ; DIFFUSIBLE (unité ET établissement, C19-010) ; et,
+     * par défaut, d'une SOCIÉTÉ commerciale (catégorie juridique 5xxx : SARL,
+     * SAS, SA, SNC, SCA…) — ni entrepreneur individuel (1xxx), ni SCI (65xx),
+     * ni association (9xxx), ni administration (7xxx).
+     *
+     * @param  array<string, mixed>  $etab  un élément de `etablissements`
+     */
+    public static function estDansPerimetreImport(array $etab, bool $commercialOnly = true): bool
+    {
+        // Sièges seulement (Sirene v3.11 refuse ce filtre dans `q`).
+        if (! ($etab['etablissementSiege'] ?? false)) {
+            return false;
+        }
+        $u = is_array($etab['uniteLegale'] ?? null) ? $etab['uniteLegale'] : [];
+        if (($u['etatAdministratifUniteLegale'] ?? null) !== 'A') {
+            return false;
+        }
+        // Diffusibles seulement (RGPD) : exclut les « [ND] » — personnes qui
+        // ont refusé la diffusion publique de leurs données INSEE.
+        if (! self::estDiffusible($u)) {
+            return false;
+        }
+        // C19-010, RENFORT : l'ÉTABLISSEMENT porte son propre statut de
+        // diffusion (`statutDiffusionEtablissement`, mêmes valeurs O/P/N).
+        // Même défaut `'O'` : une réponse qui ne porte pas le champ reste
+        // collectée (témoin dédié).
+        if (($etab['statutDiffusionEtablissement'] ?? 'O') !== 'O') {
+            return false;
+        }
+        if ($commercialOnly) {
+            $periodes = is_array($u['periodesUniteLegale'][0] ?? null) ? $u['periodesUniteLegale'][0] : $u;
+            $cj = (string) ($periodes['categorieJuridiqueUniteLegale'] ?? $u['categorieJuridiqueUniteLegale'] ?? '');
+            if ($cj === '' || $cj[0] !== '5') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Un établissement (siège) de la voie `/siret`, mis en forme pour la
+     * collecte — adresse comprise, disponible dès la récupération INSEE.
+     *
+     * @param  array<string, mixed>  $etab
+     */
+    public static function donneesEtablissement(array $etab): InseeCompanyData
+    {
+        $u = is_array($etab['uniteLegale'] ?? null) ? $etab['uniteLegale'] : [];
+        $periodes = is_array($u['periodesUniteLegale'][0] ?? null) ? $u['periodesUniteLegale'][0] : $u;
+        $adr = is_array($etab['adresseEtablissement'] ?? null) ? $etab['adresseEtablissement'] : [];
+        $rue = trim(implode(' ', array_filter([
+            $adr['numeroVoieEtablissement'] ?? '',
+            $adr['typeVoieEtablissement'] ?? '',
+            $adr['libelleVoieEtablissement'] ?? '',
+        ])));
+
+        return new InseeCompanyData(
+            siren: (string) ($etab['siren'] ?? $u['siren'] ?? ''),
+            denomination: $periodes['denominationUniteLegale']
+                ?? trim(($periodes['prenom1UniteLegale'] ?? '') . ' ' . ($periodes['nomUniteLegale'] ?? '')),
+            naf: $periodes['activitePrincipaleUniteLegale'] ?? null,
+            legalForm: $periodes['categorieJuridiqueUniteLegale'] ?? null,
+            effectifRange: $u['trancheEffectifsUniteLegale'] ?? null,
+            address: $rue !== '' ? $rue : null,
+            postcode: $adr['codePostalEtablissement'] ?? null,
+            city: $adr['libelleCommuneEtablissement'] ?? null,
+            insee: $adr['codeCommuneEtablissement'] ?? null,
+            createdAt: $u['dateCreationUniteLegale'] ?? null,
+            raw: $etab,
+            etatAdministratif: $u['etatAdministratifUniteLegale']
+                ?? $periodes['etatAdministratifUniteLegale'] ?? null,
+        );
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * LOT N8 — LE FLUX DES MODIFICATIONS SIRENE (`crm:insee:mise-a-jour-mensuelle`)
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     * Toutes les unités légales dont `dateDernierTraitementUniteLegale` est
+     * postérieure ou égale à `$depuis` : créations, modifications, fermetures,
+     * passages en non diffusible. AUCUN filtre de diffusion ni d'état : c'est
+     * précisément ce qu'il faut voir pour MARQUER une fiche fermée ou opposée.
+     * Les unités rendues sont BRUTES (les `[ND]` compris) : l'appelant ne doit
+     * jamais en recopier un champ nominatif — `MiseAJourMensuelle` ne lit que
+     * le statut d'une unité non diffusible.
+     *
+     * Pagination par CURSEUR Sirene (`curseur=*`, puis `header.curseurSuivant`
+     * jusqu'à ce qu'il se répète). Chaque page rend son propre curseur : un
+     * appelant qui le mémorise reprend exactement là (reprise après coupure).
+     * Le quota est respecté par `avecDelaiEntreRequetes()` (≈ 30 req/min par
+     * défaut, plan « Accès public »).
+     *
+     * @param  string  $depuis  date AAAA-MM-JJ
+     * @return \Generator<int, array{curseur: string, suivant: ?string, unites: list<array<string, mixed>>}>
+     */
+    public function iterateModificationsDepuis(string $depuis, string $curseur = '*'): \Generator
+    {
+        if (! self::estDateIso($depuis)) {
+            throw new \InvalidArgumentException("Date Sirene invalide : « {$depuis} » (attendu AAAA-MM-JJ).");
+        }
+        $q = 'dateDernierTraitementUniteLegale:[' . $depuis . ' TO *]';
+
+        while (true) {
+            $data = $this->appelSirene('/siren', [
+                'q' => $q,
+                'curseur' => $curseur,
+                'nombre' => self::PAGE_SIRENE,
+                'tri' => 'siren',
+            ]);
+            $unites = array_values(array_filter(
+                is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [],
+                'is_array',
+            ));
+            $suivant = $data['header']['curseurSuivant'] ?? null;
+            // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.
+            $fin = ! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur;
+
+            yield ['curseur' => $curseur, 'suivant' => $fin ? null : $suivant, 'unites' => $unites];
+
+            if ($fin) {
+                return;
+            }
+            $curseur = $suivant;
+        }
+    }
+
+    /**
+     * Les unités légales de SIREN donnés, BRUTES (sans filtre de diffusion ni
+     * d'état, comme le flux ci-dessus) — une requête par paquet de
+     * `PAR_REQUETE` SIREN. Sert la passe prioritaire de la mise à jour
+     * mensuelle (fiches de provenance tiers).
+     *
+     * @param  list<string>  $sirens
+     * @return list<array<string, mixed>>
+     */
+    public function unitesParSiren(array $sirens): array
+    {
+        $unites = [];
+        foreach (array_chunk(self::identifiants($sirens, 9), self::PAR_REQUETE) as $paquet) {
+            $data = $this->appelSirene('/siren', [
+                'q' => implode(' OR ', array_map(static fn (string $s): string => 'siren:' . $s, $paquet)),
+                'nombre' => count($paquet),
+            ]);
+            foreach (is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [] as $u) {
+                if (is_array($u)) {
+                    $unites[] = $u;
+                }
+            }
+        }
+
+        return $unites;
+    }
+
+    /**
+     * Les établissements de SIRET donnés (voie `/siret`, adresse comprise),
+     * indexés par SIRET — une requête par paquet de `PAR_REQUETE`. BRUTS :
+     * l'appelant applique `estDansPerimetreImport()`.
+     *
+     * @param  list<string>  $sirets
+     * @return array<string, array<string, mixed>>
+     */
+    public function etablissementsParSiret(array $sirets): array
+    {
+        $etabs = [];
+        foreach (array_chunk(self::identifiants($sirets, 14), self::PAR_REQUETE) as $paquet) {
+            $data = $this->appelSirene('/siret', [
+                'q' => implode(' OR ', array_map(static fn (string $s): string => 'siret:' . $s, $paquet)),
+                'nombre' => count($paquet),
+            ]);
+            foreach (is_array($data['etablissements'] ?? null) ? $data['etablissements'] : [] as $e) {
+                if (is_array($e) && is_string($e['siret'] ?? null)) {
+                    $etabs[$e['siret']] = $e;
+                }
+            }
+        }
+
+        return $etabs;
+    }
+
+    /**
+     * Délai minimal entre deux requêtes des méthodes du lot N8 (défaut
+     * 2 100 ms ≈ 28 req/min, sous le plafond de 30 du plan « Accès public »).
+     */
+    public function avecDelaiEntreRequetes(int $millisecondes): static
+    {
+        $this->delaiMs = max(0, $millisecondes);
+
+        return $this;
+    }
+
+    /**
+     * Une requête Sirene, quota respecté, 429 et 5xx retentés (BORNÉ), 404 =
+     * « aucun résultat » (Sirene 3.11 répond 404 à une recherche vide).
+     *
+     * @param  array<string, scalar>  $params
+     * @return array<string, mixed>
+     */
+    private function appelSirene(string $chemin, array $params): array
+    {
+        SsrfGuard::ensure(self::BASE_URL);
+        $tentatives = 0;
+
+        while (true) {
+            $this->respecterQuota();
+            $resp = $this->authHttp()
+                ->timeout(30)
+                ->retry(2, 2000, fn ($e) => $e instanceof ConnectionException, throw: false)
+                ->get(self::BASE_URL . $chemin, $params);
+
+            if ($resp->status() === 404) {
+                return [];
+            }
+            if ($resp->status() === 429) {
+                if (++$tentatives > 30) {
+                    throw new \RuntimeException("INSEE 429 persistant sur {$chemin} après 30 tentatives (quota atteint ?).");
+                }
+                Sleep::for(20)->seconds();
+
+                continue;
+            }
+            if ($resp->serverError()) {
+                if (++$tentatives > 8) {
+                    throw new \RuntimeException("INSEE {$resp->status()} persistant sur {$chemin} après 8 tentatives.");
+                }
+                Sleep::for(5)->seconds();
+
+                continue;
+            }
+            if ($resp->failed()) {
+                throw new \RuntimeException(
+                    "INSEE {$resp->status()} sur {$chemin} — " . mb_substr((string) $resp->body(), 0, 500),
+                );
+            }
+            $data = $resp->json();
+
+            return is_array($data) ? $data : [];
+        }
+    }
+
+    private function respecterQuota(): void
+    {
+        if ($this->delaiMs > 0 && $this->derniereRequete !== null) {
+            $resteUs = $this->delaiMs * 1000 - (int) ((microtime(true) - $this->derniereRequete) * 1_000_000);
+            if ($resteUs > 0) {
+                Sleep::usleep($resteUs);
+            }
+        }
+        $this->derniereRequete = microtime(true);
+    }
+
+    /**
+     * @param  list<string>  $valeurs
+     * @return list<string> les identifiants de `$longueur` chiffres, dédoublonnés
+     */
+    private static function identifiants(array $valeurs, int $longueur): array
+    {
+        $propres = [];
+        foreach ($valeurs as $v) {
+            $v = trim($v);
+            if (preg_match('/^\d{' . $longueur . '}$/', $v) === 1) {
+                $propres[$v] = true;
+            }
+        }
+
+        return array_keys($propres);
+    }
+
+    public static function estDateIso(string $date): bool
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) !== 1) {
+            return false;
+        }
+
+        return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
     }
 
     /**

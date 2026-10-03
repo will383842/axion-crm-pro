@@ -215,3 +215,10 @@ test('sous axion_app : le comptage des sites non vérifiés passe par l index pa
     expect($plan)->toContain('idx_companies_site_non_verifie')
         ->and($plan)->not->toContain('Seq Scan');
 });
+
+test('un alias de table qui n est pas un identifiant simple est refusé', function (string $alias) {
+    expect(fn () => SiteFiable::nonVerifieSql($alias))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => SiteFiable::fiableSql($alias))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => SiteFiable::contactIssuSiteNonVerifieSql($alias))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => SiteFiable::emailGeneriqueIssuSiteNonVerifieSql($alias))->toThrow(InvalidArgumentException::class);
+})->with(['injection' => ['c; DROP TABLE companies'], 'vide' => [''], 'point' => ['public.c'], 'majuscule' => ['C'], 'chiffre en tête' => ['1c']]);

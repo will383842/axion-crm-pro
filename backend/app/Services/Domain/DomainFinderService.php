@@ -53,6 +53,24 @@ class DomainFinderService
     /** `website_method` d'un site trouvé sur Pages Jaunes. */
     public const METHODE_PAGES_JAUNES = 'pages-jaunes';
 
+    /** Taille maximale d'un corps HTTP soumis à `verifyBody()` (1,5 Mo). */
+    public const CORPS_MAX_OCTETS = 1_572_864;
+
+    /**
+     * Mots retirés du nom pour la VÉRIFICATION (`verifyBody`) seulement :
+     * formes juridiques, mots de structure et articles. « SELARL ZZ
+     * Martin » doit se reconnaître sur une page titrée « Cabinet ZZ
+     * Martin ». `nameTokens()` (donc `candidateDomains()`) garde sa propre
+     * liste, inchangée.
+     *
+     * @var list<string>
+     */
+    public const MOTS_VIDES_VERIFICATION = [
+        'sarl', 'sarlu', 'sas', 'sasu', 'sa', 'selarl', 'selas', 'eurl', 'snc', 'sci', 'scop', 'scea', 'gaec',
+        'scm', 'sca', 'earl', 'gie', 'sccv', 'ste', 'societe', 'ets', 'etablissements', 'association', 'groupe',
+        'holding', 'au', 'aux', 'en', 'et', 'la', 'le', 'les', 'l', 'de', 'du', 'des', 'd',
+    ];
+
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
     /**
@@ -297,7 +315,7 @@ class DomainFinderService
                     continue;
                 }
                 try {
-                    if ($resp->successful() && $this->verifyBody((string) $resp->body(), $it['c'], $it['tokens'], $it['domain'])) {
+                    if ($resp->successful() && $this->verifyBody(self::tronquer((string) $resp->body()), $it['c'], $it['tokens'], $it['domain'])) {
                         $result[$cid] = $this->canonicalize("https://{$it['domain']}/");
                     }
                 } catch (\Throwable $e) {
@@ -429,7 +447,18 @@ class DomainFinderService
             return null;
         }
 
-        return $resp->successful() ? (string) $resp->body() : null;
+        return $resp->successful() ? self::tronquer((string) $resp->body()) : null;
+    }
+
+    /**
+     * Le corps HTTP borné à `CORPS_MAX_OCTETS` (1,5 Mo), coupé sur une
+     * frontière de caractère : une page d'accueil n'a pas besoin de plus
+     * pour porter son nom, son SIREN ou son adresse, et `verifyBody()`
+     * passe plusieurs expressions régulières sur tout le texte.
+     */
+    public static function tronquer(string $corps): string
+    {
+        return strlen($corps) > self::CORPS_MAX_OCTETS ? mb_strcut($corps, 0, self::CORPS_MAX_OCTETS, 'UTF-8') : $corps;
     }
 
     /**
@@ -452,10 +481,21 @@ class DomainFinderService
      * Un site deviné accepté ici reste NON VÉRIFIÉ (`SiteFiable`) : cette
      * règle ferme le robinet, elle ne vaut pas vérification.
      *
+     * Les mots du nom sont tirés de la dénomination par la MÊME
+     * normalisation que la page (`normaliserMots` : `Str::ascii` puis
+     * minuscules — « CŒUR » et « coeur » se rencontrent), sans les
+     * `MOTS_VIDES_VERIFICATION`. `$tokens` ne sert que si la dénomination
+     * est vide.
+     *
      * @param  list<string>  $tokens  `nameTokens()` du nom
      */
     public function verifyBody(string $rawBody, Company|Media $company, array $tokens, ?string $domaine = null): bool
     {
+        if (! mb_check_encoding($rawBody, 'UTF-8')) {
+            $rawBody = (string) mb_convert_encoding($rawBody, 'UTF-8', 'Windows-1252');
+        }
+        $nom = trim((string) $company->denomination);
+        $mots = $nom !== '' ? $this->motsPourVerification($nom) : $this->motsPourVerification(implode(' ', $tokens));
         $texte = $this->texteVisible($rawBody);
         if (mb_strlen($texte) < 200) {
             return false;
@@ -464,7 +504,7 @@ class DomainFinderService
             return true;
         }
 
-        return $this->nomDansIdentite($rawBody, $tokens, $domaine)
+        return $this->nomDansIdentite($rawBody, $mots, $domaine)
             && $this->contientLieu($texte, $company);
     }
 
@@ -508,6 +548,23 @@ class DomainFinderService
         return trim(html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
+    /**
+     * Les mots d'un nom pour la VÉRIFICATION : `normaliserMots`, sans les
+     * `MOTS_VIDES_VERIFICATION` (mots entiers), deux caractères au moins,
+     * quatre au plus.
+     *
+     * @return list<string>
+     */
+    public function motsPourVerification(string $nom): array
+    {
+        $mots = array_filter(
+            explode(' ', $this->normaliserMots($nom)),
+            static fn (string $m): bool => strlen($m) >= 2 && ! in_array($m, self::MOTS_VIDES_VERIFICATION, true),
+        );
+
+        return array_slice(array_values(array_unique($mots)), 0, 4);
+    }
+
     /** Minuscules, sans accents, tout ce qui n'est ni lettre ni chiffre devient une espace. */
     private function normaliserMots(string $texte): string
     {
@@ -517,10 +574,12 @@ class DomainFinderService
     }
 
     /**
-     * Le SIREN (9 chiffres) figure dans le texte : espaces (dont insécables)
-     * retirés, jamais précédé d'un autre chiffre (un numéro de téléphone
-     * `06 12 34 56 78` contient `612345678`), sauf derrière `FR` + clé de
-     * TVA. Suivi de chiffres : c'est le SIRET, accepté.
+     * Le SIREN (9 chiffres) figure dans le texte, d'un bloc ou ses chiffres
+     * séparés par espaces (dont insécables), points ou tirets (deux au plus
+     * entre deux chiffres) : `941234567`, `941 234 567`, `941.234.567`,
+     * `941-234-567`. Jamais précédé d'un autre chiffre, séparateurs compris
+     * (un numéro de téléphone `06 12 34 56 78` contient `612345678`), sauf
+     * derrière `FR` + clé de TVA. Suivi de chiffres : c'est le SIRET, accepté.
      */
     private function contientSiren(string $texte, string $siren): bool
     {
@@ -528,22 +587,30 @@ class DomainFinderService
         if (strlen($siren) !== 9) {
             return false;
         }
-        $compact = (string) preg_replace('/[\s\x{00A0}\x{202F}]+/u', '', mb_strtolower($texte));
+        $sep = '[\s.\x{00A0}\x{202F}-]';
+        if (preg_match_all('/' . implode($sep . '{0,2}', str_split($siren)) . '/u', $texte, $m, PREG_OFFSET_CAPTURE) < 1) {
+            return false;
+        }
+        foreach ($m[0] as [, $position]) {
+            $avant = (string) preg_replace('/' . $sep . '+$/u', '', substr($texte, 0, (int) $position));
+            if (preg_match('/\d$/', $avant) !== 1 || preg_match('/fr' . $sep . '*\d\d$/iu', $avant) === 1) {
+                return true;
+            }
+        }
 
-        return preg_match('/(?:(?<!\d)|(?<=fr\d\d))' . $siren . '/', $compact) === 1;
+        return false;
     }
 
     /**
-     * TOUS les mots du nom (`nameTokens`) figurent, en mots entiers, dans
+     * TOUS les mots du nom (`motsPourVerification`) figurent, en mots entiers, dans
      * l'identité de la page : <title>, og:site_name, <h1>. Ce qui recopie
      * l'adresse du domaine essayé en est retiré d'abord : une page de
      * parking titrée « boulangerie-martin.fr » ne prouve rien.
      *
-     * @param  list<string>  $tokens
+     * @param  list<string>  $mots
      */
-    private function nomDansIdentite(string $html, array $tokens, ?string $domaine): bool
+    private function nomDansIdentite(string $html, array $mots, ?string $domaine): bool
     {
-        $mots = array_values(array_filter($tokens, static fn (string $t): bool => mb_strlen($t) >= 2));
         if ($mots === []) {
             return false;
         }

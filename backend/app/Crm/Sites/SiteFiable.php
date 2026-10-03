@@ -5,6 +5,7 @@ namespace App\Crm\Sites;
 use App\Crm\Presse\SiteMedia;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * LE SITE D'UNE ENTREPRISE EST-IL VÉRIFIÉ ? — une seule définition (lot N4
@@ -46,7 +47,8 @@ use Illuminate\Support\Facades\DB;
  * plan sous `axion_app` et rougit si c'est le cas.
  *
  * Aucun argument des méthodes SQL n'est une donnée utilisateur (alias de
- * table seulement). Alias internes `sf_*` réservés.
+ * table seulement, gardés par `^[a-z_][a-z0-9_]*$` : exception sinon).
+ * Alias internes `sf_*` réservés.
  */
 final class SiteFiable
 {
@@ -99,6 +101,8 @@ final class SiteFiable
      */
     public static function nonVerifieSql(string $alias = 'companies'): string
     {
+        self::alias($alias);
+
         return "({$alias}.website_method LIKE '" . self::PREFIXE_DEVINE . "%'"
             . " AND COALESCE({$alias}.metadata -> '" . self::CLE . "' ->> 'statut', '') NOT IN (" . self::statutsSql() . '))';
     }
@@ -110,6 +114,8 @@ final class SiteFiable
      */
     public static function fiableSql(string $alias = 'companies'): string
     {
+        self::alias($alias);
+
         return "(COALESCE({$alias}.website_method, '') NOT LIKE '" . self::PREFIXE_DEVINE . "%'"
             . " OR COALESCE({$alias}.metadata -> '" . self::CLE . "' ->> 'statut', '') IN (" . self::statutsSql() . '))';
     }
@@ -124,6 +130,8 @@ final class SiteFiable
      */
     public static function contactIssuSiteNonVerifieSql(string $aliasContact = 'contacts'): string
     {
+        self::alias($aliasContact);
+
         return "({$aliasContact}.discovery_source = 'mentions-legales'"
             . " AND EXISTS (SELECT 1 FROM companies sf_c WHERE sf_c.id = {$aliasContact}.company_id"
             . ' AND ' . self::nonVerifieSql('sf_c') . '))';
@@ -136,6 +144,8 @@ final class SiteFiable
      */
     public static function emailGeneriqueIssuSiteNonVerifieSql(string $alias = 'companies'): string
     {
+        self::alias($alias);
+
         return "({$alias}.email_generic IS NOT NULL AND " . self::nonVerifieSql($alias) . ')';
     }
 
@@ -151,6 +161,19 @@ final class SiteFiable
             ->where('c.workspace_id', $workspaceId)
             ->whereNull('c.deleted_at')
             ->whereRaw(self::nonVerifieSql('c'));
+    }
+
+    /**
+     * Garde : un alias de table est un identifiant SQL simple, jamais une
+     * donnée. Il est interpolé dans le SQL : tout autre texte est refusé.
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function alias(string $alias): void
+    {
+        if (preg_match('/^[a-z_][a-z0-9_]*$/', $alias) !== 1) {
+            throw new InvalidArgumentException('Alias de table refusé : ' . json_encode($alias));
+        }
     }
 
     private static function statutsSql(): string

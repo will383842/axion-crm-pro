@@ -140,3 +140,74 @@ test('findAvecMethode dit par quelle stratégie le site a été trouvé', functi
     expect((new DomainFinderService)->findAvecMethode($entreprise))
         ->toBe(['url' => 'https://zz-annuaire.example.invalid/', 'methode' => DomainFinderService::METHODE_ANNUAIRE]);
 });
+
+// ── Relecture de #305 ──────────────────────────────────────────────────────
+
+test('les formes juridiques et mots de structure ne sont pas exigés dans le titre', function (string $denomination) {
+    $entreprise = vbsEntreprise(['denomination' => $denomination]);
+    $page = vbsPage('<title>ZZ Cabinet Martin</title>', '<p>12 rue des Fleurs, 69100.</p>');
+
+    expect(vbsVerifier($page, $entreprise))->toBeTrue();
+})->with([
+    'SELARL' => ['SELARL ZZ CABINET MARTIN'],
+    'société + ets' => ['SOCIETE ETS ZZ CABINET MARTIN'],
+    'groupe holding' => ['GROUPE ZZ CABINET MARTIN HOLDING'],
+    'SCEA + article' => ['SCEA DU ZZ CABINET MARTIN'],
+    'association aux' => ['ASSOCIATION AUX ZZ CABINET MARTIN'],
+]);
+
+test('la liste de la devinette (nameTokens, donc candidateDomains) est inchangée', function () {
+    $finder = new DomainFinderService;
+
+    expect($finder->nameTokens('SELARL ZZ Martin'))->toBe(['selarl', 'zz', 'martin'])
+        ->and($finder->motsPourVerification('SELARL ZZ Martin'))->toBe(['zz', 'martin']);
+});
+
+test('le SIREN séparé par des points ou des tirets : ACCEPTÉE', function (string $mention) {
+    expect(vbsVerifier(vbsPage('<title>Accueil</title>', "<footer>{$mention}</footer>")))->toBeTrue();
+})->with([
+    'points' => ['SIREN 941.234.567'],
+    'tirets' => ['SIREN 941-234-567'],
+    'SIRET à points' => ['SIRET 941.234.567.00012'],
+]);
+
+test('un SIREN à points ou tirets collé à d autres chiffres ne compte pas', function (string $mention) {
+    expect(vbsVerifier(vbsPage('<title>Accueil</title>', "<p>{$mention}</p>")))->toBeFalse();
+})->with([
+    'téléphone à tirets' => ['Tél. 0-941-234-567'],
+    'téléphone à points' => ['Tél. 09.41.23.45.67'],
+    'chiffres devant' => ['Réf. 12 941.234.567'],
+]);
+
+test('une seule normalisation des deux côtés : « CŒUR » et « coeur » se rencontrent', function () {
+    $page = vbsPage('<title>ZZ Coeur de Pain</title>', '<p>69100</p>');
+    expect(vbsVerifier($page, vbsEntreprise(['denomination' => 'ZZ CŒUR DE PAIN'])))->toBeTrue();
+
+    $page = vbsPage('<title>ZZ CŒUR DE PAIN</title>', '<p>69100</p>');
+    expect(vbsVerifier($page, vbsEntreprise(['denomination' => 'zz coeur de pain'])))->toBeTrue();
+});
+
+test('une page en Windows-1252 est lue', function () {
+    $page = (string) mb_convert_encoding(vbsPage('<title>ZZ Boulangerie Martin</title>', '<p>Située à Villeurbanne.</p>'), 'Windows-1252', 'UTF-8');
+
+    expect(vbsVerifier($page))->toBeTrue();
+});
+
+test('le corps est tronqué à 1,5 Mo, sur une frontière de caractère', function () {
+    $corps = str_repeat('é', DomainFinderService::CORPS_MAX_OCTETS); // 2 octets par caractère
+
+    $tronque = DomainFinderService::tronquer($corps);
+
+    expect(strlen($tronque))->toBeLessThanOrEqual(DomainFinderService::CORPS_MAX_OCTETS)
+        ->and(strlen($tronque))->toBeGreaterThan(DomainFinderService::CORPS_MAX_OCTETS - 2)
+        ->and(mb_check_encoding($tronque, 'UTF-8'))->toBeTrue()
+        ->and(DomainFinderService::tronquer('court'))->toBe('court');
+});
+
+test('la devinette en lot ne lit que les 1,5 premiers Mo du corps', function () {
+    // Le SIREN n'apparaît qu'après 1,5 Mo : il n'est pas lu.
+    $page = vbsPage('<title>Accueil</title>', str_repeat('x', DomainFinderService::CORPS_MAX_OCTETS) . ' SIREN 941234567');
+    Http::fake(['*' => Http::response($page, 200)]);
+
+    expect((new DomainFinderService)->guessDomainsBatch([vbsEntreprise()]))->toBe([4242 => null]);
+});

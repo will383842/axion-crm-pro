@@ -880,7 +880,7 @@ final class MiseAJourMensuelle
             $nic = (string) ($p['nicSiegeUniteLegale'] ?? '');
             // Premier tri sur l'unité (évite une requête `/siret` inutile) ;
             // le périmètre complet est jugé sur le siège.
-            if (($u['statutDiffusionUniteLegale'] ?? 'O') !== 'O'
+            if (! HttpInseeClient::estDiffusible($u)
                 || ($p['etatAdministratifUniteLegale'] ?? null) !== 'A'
                 || $cj === '' || $cj[0] !== '5'
                 || preg_match('/^\d{5}$/', $nic) !== 1) {

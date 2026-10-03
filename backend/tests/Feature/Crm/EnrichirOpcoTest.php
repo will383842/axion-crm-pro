@@ -18,7 +18,14 @@
  *  - libellé d'OPCO inconnu, IDCC vide, SIRET malformé : rejetés et COMPTÉS ;
  *  - `--limite` puis reprise par le curseur ;
  *  - le fichier temporaire supprimé, même sur une erreur ;
- *  - aucune planification ; la fiche entreprise expose l'IDCC et l'OPCO.
+ *  - aucune planification ; la fiche entreprise expose l'IDCC et l'OPCO ;
+ *  - (réserves de #322) une fiche NON DIFFUSIBLE n'est jamais enrichie ; une
+ *    ligne trop longue est rejetée sans avaler la suite ; une ressource
+ *    remplacée sous le même identifiant repart de la ligne 1 ; l'essai à
+ *    blanc lit tout depuis la ligne 1 et dit quand son bilan est partiel ;
+ *    mémoire constante sur 100 000 lignes ; le VRAI `telecharger()` sous
+ *    `Http::fake` : https seul, port 443, hôtes de la liste, redirections
+ *    revérifiées et bornées, volume reçu borné.
  */
 
 use App\Crm\Opco\EnrichissementOpco;
@@ -32,7 +39,11 @@ use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use GuzzleHttp\Psr7\PumpStream;
+use GuzzleHttp\Psr7\Utils;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
@@ -100,6 +111,9 @@ function opcoSource(string $contenu, ?string $releve = 'Table SIRO — DSN de ju
 
         public int $appels = 0;
 
+        /** `last_modified` publié : le changer simule un fichier remplacé. */
+        public string $modifie = '2026-08-10T00:00:00';
+
         public function __construct(private string $contenu, private ?string $titre, private bool $echouer) {}
 
         public function ressourceCourante(): array
@@ -112,7 +126,7 @@ function opcoSource(string $contenu, ?string $releve = 'Table SIRO — DSN de ju
                 'format' => 'csv',
                 'type' => 'main',
                 'url' => 'https://example.invalid/zz-siro.csv',
-                'last_modified' => '2026-08-10T00:00:00',
+                'last_modified' => $this->modifie,
             ]]]);
         }
 
@@ -367,7 +381,7 @@ test('traduction FERMÉE des libellés SIRO', function () {
         ->and(Opco::depuisLibelleSiro('OPCO EP'))->toBe('opco_ep')
         ->and(Opco::depuisLibelleSiro("L'OPCOMMERCE"))->toBe('opcommerce')
         ->and(Opco::depuisLibelleSiro('OPCO MOBILITES'))->toBe('mobilites')
-        // Les 12 libellés RÉELS de siro-202606.csv (relevé du 2026-10-04), tous reconnus.
+        // Les 12 libellés RÉELS de siro-202606.csv (relevés par le pilote), tous reconnus.
         ->and(Opco::depuisLibelleSiro('UNIFORMATION COHESION SOCIALE'))->toBe('uniformation')
         ->and(Opco::depuisLibelleSiro('AFDAS'))->toBe('afdas')
         ->and(Opco::depuisLibelleSiro('AKTO'))->toBe('akto')
@@ -511,4 +525,348 @@ test('GET /companies/{id} expose IDCC et OPCO en lecture seule (null sinon)', fu
     $this->actingAs($user)->getJson('/api/v1/companies/' . $e['b']['id'])
         ->assertOk()
         ->assertJsonPath('opco', null);
+});
+
+
+// ── Réserves de #322 : RGPD, lignes bornées, reprise, essai à blanc ───────
+
+test('RGPD : une fiche NON DIFFUSIBLE (INSEE) n’est jamais enrichie, et elle est comptée', function () {
+    $e = opcoEspace();
+    DB::table('companies')->where('id', $e['b']['id'])->update(['insee_non_diffusible_le' => '2026-09-01']);
+    opcoSource(opcoCsv([
+        [$e['a']['siret'], '1486', 'ATLAS', 'ATLAS'],
+        [$e['b']['siret'], '1486', 'ATLAS', 'ATLAS'],
+    ]));
+
+    [$code, $sortie] = opcoLancer($e['ws']);
+
+    expect($code)->toBe(0)
+        ->and(opcoCompteur($sortie, 'exclues (non diffusibles INSEE)'))->toBe(1)
+        ->and(opcoCompteur($sortie, 'écrites'))->toBe(1)
+        ->and(DB::table('companies_opco')->pluck('company_id')->all())->toBe([$e['a']['id']]);
+    $bilan = json_decode((string) DB::table('companies_opco_passages')->value('bilan'), true);
+    expect($bilan['exclues_non_diffusibles'])->toBe(1);
+});
+
+test('ligne trop longue ou guillemet non fermé : rejetée et comptée, la suite est lue', function () {
+    $e = opcoEspace();
+    $contenu = "SIRET|IDCC|OPCO_PROPRIETAIRE|OPCO_GESTION\n"
+        . $e['a']['siret'] . '|1486|ATLAS|' . str_repeat('X', EnrichissementOpco::LONGUEUR_MAX_LIGNE * 3) . "\n"
+        . '"' . $e['b']['siret'] . "|1486|ATLAS|ATLAS\n"
+        . $e['c']['siret'] . "|2216|OPCOMMERCE|\n";
+    opcoSource($contenu);
+
+    [$code, $sortie] = opcoLancer($e['ws']);
+
+    expect($code)->toBe(0)
+        ->and(opcoCompteur($sortie, 'lues'))->toBe(3)
+        // La ligne trop longue, et celle au guillemet non fermé (un seul
+        // champ : mauvais nombre de colonnes) — la ligne suivante est lue.
+        ->and(opcoCompteur($sortie, 'ligne malformée'))->toBe(2)
+        ->and(DB::table('companies_opco')->pluck('company_id')->all())->toBe([$e['c']['id']]);
+});
+
+test('lecture bornée : une ligne trop longue rend false, jamais plus de LONGUEUR_MAX_LIGNE en mémoire', function () {
+    $flux = fopen('php://temp', 'w+b');
+    fwrite($flux, str_repeat('A', EnrichissementOpco::LONGUEUR_MAX_LIGNE + 10) . "\nB|C\r\n\nD");
+    rewind($flux);
+
+    expect(EnrichissementOpco::lireLigne($flux))->toBeFalse()
+        ->and(EnrichissementOpco::lireLigne($flux))->toBe('B|C')
+        ->and(EnrichissementOpco::lireLigne($flux))->toBe('')
+        ->and(EnrichissementOpco::lireLigne($flux))->toBe('D')
+        ->and(EnrichissementOpco::lireLigne($flux))->toBeNull();
+    fclose($flux);
+});
+
+test('en-tête inattendu : le contenu lu est TRONQUÉ dans le message', function () {
+    $e = opcoEspace();
+    opcoSource('SIRET;' . str_repeat('Z', 500) . "\n" . $e['a']['siret'] . ";1\n");
+
+    [$code, $sortie] = opcoLancer($e['ws']);
+
+    expect($code)->toBe(1)
+        ->and($sortie)->toContain('colonne IDCC absente')
+        ->and($sortie)->not->toContain(str_repeat('Z', 100));
+});
+
+test('ressource REMPLACÉE sous le même identifiant : nouveau passage depuis la ligne 1, l’ancien clos', function () {
+    $e = opcoEspace();
+    $lignes = [
+        [$e['a']['siret'], '1486', 'ATLAS', 'ATLAS'],
+        [$e['b']['siret'], '2216', 'OPCOMMERCE', ''],
+        [$e['c']['siret'], '1517', 'OPCOMMERCE', ''],
+    ];
+    opcoSource(opcoCsv($lignes));
+    opcoLancer($e['ws'], ['--limite' => 1]);
+    expect((int) DB::table('companies_opco_passages')->value('curseur'))->toBe(1);
+
+    // Même identifiant, même URL, fichier republié (autre `last_modified`).
+    $source = opcoSource(opcoCsv($lignes));
+    $source->modifie = '2026-09-10T00:00:00';
+    [$code, $sortie] = opcoLancer($e['ws']);
+
+    expect($code)->toBe(0)
+        ->and($sortie)->not->toContain('Reprise du passage')
+        ->and(opcoCompteur($sortie, 'lues'))->toBe(3);
+    $passages = DB::table('companies_opco_passages')->where('workspace_id', $e['ws'])->orderBy('id')->get();
+    expect($passages)->toHaveCount(2)
+        ->and($passages[0]->statut)->toBe('echouee')
+        ->and($passages[0]->erreur)->toContain('Ressource remplacée')
+        ->and($passages[1]->statut)->toBe('reussie')
+        ->and($passages[1]->ressource_version)->toBe('2026-09-10T00:00:00')
+        ->and(DB::table('companies_opco')->where('workspace_id', $e['ws'])->count())->toBe(3);
+});
+
+test('version de ressource : somme de contrôle publiée, sinon last_modified', function () {
+    $base = ['id' => 'r', 'format' => 'csv', 'url' => 'https://static.data.gouv.fr/r.csv', 'last_modified' => '2026-08-10T00:00:00'];
+
+    expect(SourceSiro::choisirRessource(['resources' => [$base + ['checksum' => ['type' => 'sha1', 'value' => 'abc']]]])['version'])->toBe('sha1:abc')
+        ->and(SourceSiro::choisirRessource(['resources' => [$base]])['version'])->toBe('2026-08-10T00:00:00');
+});
+
+test('--dry-run --limite : bilan PARTIEL annoncé, jamais « curseur mémorisé »', function () {
+    $e = opcoEspace();
+    opcoSource(opcoCsv([
+        [$e['a']['siret'], '1486', 'ATLAS', 'ATLAS'],
+        [$e['b']['siret'], '2216', 'OPCOMMERCE', ''],
+    ]));
+
+    [$code, $sortie] = opcoLancer($e['ws'], ['--dry-run' => true, '--limite' => 1]);
+
+    expect($code)->toBe(0)
+        ->and($sortie)->toContain('bilan PARTIEL')
+        ->and($sortie)->not->toContain('le curseur est mémorisé')
+        ->and(opcoCompteur($sortie, 'lues'))->toBe(1)
+        ->and(DB::table('companies_opco_passages')->count())->toBe(0);
+});
+
+test('--dry-run pendant un passage inachevé : lit TOUT depuis la ligne 1, le passage reste intact', function () {
+    $e = opcoEspace();
+    opcoSource(opcoCsv([
+        [$e['a']['siret'], '1486', 'ATLAS', 'ATLAS'],
+        [$e['b']['siret'], '2216', 'OPCOMMERCE', ''],
+        [$e['c']['siret'], '1517', 'OPCOMMERCE', ''],
+    ]));
+    opcoLancer($e['ws'], ['--limite' => 2]);
+    $avant = (array) DB::table('companies_opco_passages')->first();
+
+    [$code, $sortie] = opcoLancer($e['ws'], ['--dry-run' => true]);
+
+    expect($code)->toBe(0)
+        ->and(opcoCompteur($sortie, 'lues'))->toBe(3)
+        ->and($sortie)->not->toContain('Reprise du passage')
+        ->and(opcoCompteur($sortie, 'fiches de l\'espace sans SIRET (jamais rapprochables)'))->toBe(0)
+        ->and((array) DB::table('companies_opco_passages')->first())->toBe($avant);
+});
+
+test('mêmes valeurs dans une publication plus récente : rien n’est réécrit', function () {
+    $e = opcoEspace();
+    DB::table('companies_opco')->insert([
+        'workspace_id' => $e['ws'], 'company_id' => $e['a']['id'], 'siret' => $e['a']['siret'],
+        'idcc' => '1486', 'opco' => 'atlas', 'opco_gestion' => 'atlas', 'source' => 'siro', 'releve_le' => '2026-06-01',
+    ]);
+    $avant = opcoEtat($e['ws']);
+    opcoSource(opcoCsv([[$e['a']['siret'], '1486', 'ATLAS', 'ATLAS']]));
+
+    [, $sortie] = opcoLancer($e['ws']);
+
+    expect(opcoCompteur($sortie, 'écrites'))->toBe(0)
+        ->and(opcoCompteur($sortie, 'inchangées'))->toBe(1)
+        ->and(opcoEtat($e['ws']))->toBe($avant);
+});
+
+// ── Mémoire constante ─────────────────────────────────────────────────────
+
+test('mémoire constante : 100 000 lignes lues en flux, pic borné, tout compté', function () {
+    $e = opcoEspace();
+    $n = 100000;
+    $source = new class($n, $e['a']['siret']) extends SourceSiro
+    {
+        public function __construct(private int $n, private string $connu) {}
+
+        public function ressourceCourante(): array
+        {
+            return self::choisirRessource(['resources' => [[
+                'id' => 'zz-memoire', 'title' => 'Table SIRO — DSN de juillet 2026', 'format' => 'csv',
+                'url' => 'https://example.invalid/zz-memoire.csv', 'last_modified' => '2026-08-10T00:00:00',
+            ]]]);
+        }
+
+        /** Le fichier est ÉCRIT ligne à ligne : le banc ne garde rien en mémoire. */
+        public function telecharger(string $url, string $chemin): void
+        {
+            $f = fopen($chemin, 'wb');
+            fwrite($f, "SIRET|IDCC|OPCO_PROPRIETAIRE|OPCO_GESTION\n");
+            fwrite($f, $this->connu . "|1486|ATLAS|ATLAS\n");
+            for ($i = 1; $i < $this->n; $i++) {
+                fwrite($f, opcoSiret()['siret'] . "|1486|ATLAS|ATLAS\n");
+            }
+            fclose($f);
+        }
+    };
+    DB::connection()->disableQueryLog();
+
+    gc_collect_cycles();
+    $base = memory_get_usage();
+    memory_reset_peak_usage();
+    $resultat = (new EnrichissementOpco($source))->executer($e['ws']);
+    $pic = memory_get_peak_usage() - $base;
+
+    // Tout garder (100 000 lignes en tableau) coûterait plusieurs dizaines de Mo.
+    expect($resultat['statut'])->toBe('reussie')
+        ->and($resultat['bilan']['lues'])->toBe($n)
+        ->and($resultat['bilan']['rapprochees'])->toBe(1)
+        ->and($resultat['bilan']['non_rapprochees'])->toBe($n - 1)
+        ->and($resultat['curseur'])->toBe($n)
+        ->and($pic)->toBeLessThan(12 * 1024 * 1024);
+});
+
+// ── Le VRAI téléchargement (garde SSRF, hôtes, redirections, taille) ──────
+
+dataset('URL refusées', [
+    'en http' => ['http://static.data.gouv.fr/resources/siro.csv', 'https'],
+    'hôte hors liste' => ['https://example.org/siro.csv', 'hors de la liste'],
+    'IP interne littérale' => ['https://169.254.169.254/latest/meta-data', 'hors de la liste'],
+    'IP de boucle locale' => ['https://127.0.0.1/siro.csv', 'hors de la liste'],
+    'autre port' => ['https://static.data.gouv.fr:8443/siro.csv', 'port 443'],
+    'identifiants dans l’URL' => ['https://moi:secret@static.data.gouv.fr/siro.csv', 'identifiants'],
+    'hôte voisin' => ['https://static.data.gouv.fr.example.org/siro.csv', 'hors de la liste'],
+]);
+
+test('telecharger : URL refusée AVANT toute requête', function (string $url, string $motif) {
+    Http::fake();
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    expect(fn () => (new SourceSiro)->telecharger($url, $chemin))->toThrow(RuntimeException::class, $motif);
+    Http::assertNothingSent();
+    @unlink($chemin);
+})->with('URL refusées');
+
+dataset('redirections refusées', [
+    'vers http' => ['http://static.data.gouv.fr/siro.csv', 'https'],
+    'vers une IP interne' => ['https://10.0.0.5/siro.csv', 'hors de la liste'],
+    'vers le service de métadonnées' => ['http://169.254.169.254/latest/meta-data', 'https'],
+    'vers un autre hôte' => ['https://example.org/siro.csv', 'hors de la liste'],
+    'vers un autre port' => ['https://www.data.gouv.fr:8080/siro.csv', 'port 443'],
+]);
+
+test('telecharger : une redirection est REVÉRIFIÉE et la cible refusée n’est jamais contactée', function (string $cible, string $motif) {
+    $urls = [];
+    Http::fake(function (Request $r) use ($cible, &$urls) {
+        $urls[] = $r->url();
+
+        return Http::response('', 302, ['Location' => $cible]);
+    });
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    expect(fn () => (new SourceSiro)->telecharger('https://www.data.gouv.fr/fr/datasets/r/zz', $chemin))
+        ->toThrow(RuntimeException::class, $motif);
+    expect($urls)->toBe(['https://www.data.gouv.fr/fr/datasets/r/zz']);
+    @unlink($chemin);
+})->with('redirections refusées');
+
+test('telecharger : redirection autorisée suivie (relative comprise), fichier écrit en flux', function () {
+    $urls = [];
+    Http::fake(function (Request $r) use (&$urls) {
+        $urls[] = $r->url();
+
+        return match (count($urls)) {
+            1 => Http::response('', 302, ['Location' => 'https://static.data.gouv.fr/resources/zz/siro.csv']),
+            2 => Http::response('', 301, ['Location' => '/resources/zz/siro-202606.csv']),
+            default => Http::response("SIRET|IDCC|OPCO_PROPRIETAIRE|OPCO_GESTION\n", 200),
+        };
+    });
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    (new SourceSiro)->telecharger('https://www.data.gouv.fr/fr/datasets/r/zz', $chemin);
+
+    expect($urls)->toBe([
+        'https://www.data.gouv.fr/fr/datasets/r/zz',
+        'https://static.data.gouv.fr/resources/zz/siro.csv',
+        'https://static.data.gouv.fr/resources/zz/siro-202606.csv',
+    ])->and(file_get_contents($chemin))->toBe("SIRET|IDCC|OPCO_PROPRIETAIRE|OPCO_GESTION\n");
+    @unlink($chemin);
+});
+
+test('telecharger : au plus 3 redirections', function () {
+    $appels = 0;
+    Http::fake(function () use (&$appels) {
+        $appels++;
+
+        return Http::response('', 302, ['Location' => 'https://static.data.gouv.fr/boucle-' . $appels . '.csv']);
+    });
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    expect(fn () => (new SourceSiro)->telecharger('https://static.data.gouv.fr/depart.csv', $chemin))
+        ->toThrow(RuntimeException::class, 'redirections');
+    expect($appels)->toBe(SourceSiro::MAX_REDIRECTIONS + 1);
+    @unlink($chemin);
+});
+
+/** Une source dont la taille maximale est réduite à 64 octets. */
+function opcoSourcePetite(): SourceSiro
+{
+    return new class extends SourceSiro
+    {
+        protected function tailleMax(): int
+        {
+            return 64;
+        }
+    };
+}
+
+test('telecharger : taille ANNONCÉE au-delà du maximum → refus', function () {
+    Http::fake(fn () => Http::response('court', 200, ['Content-Length' => '65']));
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    expect(fn () => opcoSourcePetite()->telecharger('https://static.data.gouv.fr/siro.csv', $chemin))
+        ->toThrow(RuntimeException::class, 'trop volumineuse');
+    @unlink($chemin);
+});
+
+test('telecharger : SANS Content-Length, le volume REÇU est borné (flux coupé)', function () {
+    $produits = 0;
+    Http::fake(function () use (&$produits) {
+        // Un corps produit à la demande, sans longueur annoncée (« chunked »).
+        return Http::response(new PumpStream(function () use (&$produits) {
+            $produits++;
+
+            return $produits > 1000 ? false : str_repeat('Z', 32);
+        }), 200);
+    });
+    $chemin = tempnam(sys_get_temp_dir(), 'zz-siro-');
+
+    expect(fn () => opcoSourcePetite()->telecharger('https://static.data.gouv.fr/siro.csv', $chemin))
+        ->toThrow(RuntimeException::class, 'trop volumineuse');
+    clearstatcache(true, $chemin);
+    expect((int) filesize($chemin))->toBeLessThanOrEqual(64);
+    @unlink($chemin);
+});
+
+test('copie bornée : coupe dès que le volume reçu dépasse le maximum', function () {
+    $fichier = fopen('php://temp', 'w+b');
+
+    expect(SourceSiro::copierBorne(Utils::streamFor(str_repeat('a', 64)), $fichier, 64))->toBe(64)
+        ->and(fn () => SourceSiro::copierBorne(Utils::streamFor(str_repeat('a', 65)), $fichier, 64))
+        ->toThrow(RuntimeException::class, 'trop volumineuse');
+    fclose($fichier);
+});
+
+test('ressourceCourante : aucune redirection suivie depuis l’API data.gouv', function () {
+    $appels = 0;
+    Http::fake(function () use (&$appels) {
+        $appels++;
+
+        return Http::response('', 302, ['Location' => 'https://example.org/faux-jeu.json']);
+    });
+
+    expect(fn () => (new SourceSiro)->ressourceCourante())->toThrow(RuntimeException::class, 'statut HTTP 302');
+    expect($appels)->toBe(1);
+});
+
+test('ressourceCourante : réponse JSON trop volumineuse refusée', function () {
+    Http::fake(fn () => Http::response('{}', 200, ['Content-Length' => (string) (SourceSiro::TAILLE_MAX_JSON + 1)]));
+
+    expect(fn () => (new SourceSiro)->ressourceCourante())->toThrow(RuntimeException::class, 'trop volumineuse');
 });

@@ -430,8 +430,7 @@ test('L4-C relecture — l’export n’emporte JAMAIS par défaut une personne 
         ->toContain('Entrepreneur individuel');
 
     $tous = $this->get('/api/v1/crm/personnes/export?inclure_non_prospectables=oui')->assertOk()->streamedContent();
-    $ligne = static fn (string $email): array => str_getcsv((string) collect(explode("
-", $tous))
+    $ligne = static fn (string $email): array => str_getcsv((string) collect(explode("\n", $tous))
         ->first(fn (string $l): bool => str_contains($l, $email)));
 
     // Colonne 9 « Prospection autorisée », colonne 13 « Entrepreneur individuel ».

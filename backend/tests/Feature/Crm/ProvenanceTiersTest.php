@@ -870,24 +870,39 @@ test('joignable : une personne apportée mal informée ne rend pas sa fiche joig
         ->and(DB::table('contacts_provenances_tiers')->count())->toBe(4);
 });
 
-test('joignable : le motif tiers est lu par l index de la provenance, jamais en balayant companies', function () {
-    $ws = F::espace('zz-pt-plan');
+test('joignable, sous axion_app (RLS) : la sous-requête tiers est servie par son index et n ajoute aucun accès à companies', function () {
     $critere = ['all' => [
         ['field' => AudienceBuilderService::CHAMP_EMAIL_HORS_QUARANTAINE, 'op' => 'eq', 'value' => true],
         ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
     ]];
+    $ws = (string) Str::uuid();
     $q = app(AudienceBuilderService::class)->buildPublicQuery($ws, $critere);
     expect($q->toSql())->toContain('contacts_provenances_tiers');
 
-    DB::statement('SET enable_seqscan = off');
+    // Le rôle de production, sous la politique RLS de la table : c'est là que
+    // le recalcul de 04:00 s'exécute (`RefreshAudienceChunkJob::inWorkspace`).
+    // Un EXPLAIN ne lit aucune ligne : l'espace n'a pas besoin d'exister.
+    $app = DB::connection('pgsql_app');
     try {
+        $role = $app->selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
+        expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
+        $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
+        // Sur une table de test vide, le planificateur libre préfère à bon
+        // droit un balayage : on prouve ici que l'index RESTE utilisable sous
+        // la politique RLS (ses conditions ne l'empêchent pas). Sur la table
+        // pleine, c'est lui que le coût désigne.
+        $app->statement('SET enable_seqscan = off');
         $plan = implode("\n", array_map(
             static fn ($l): string => (string) $l->{'QUERY PLAN'},
-            DB::select('EXPLAIN ' . $q->toSql(), $q->getBindings()),
+            $app->select('EXPLAIN ' . $q->toSql(), $q->getBindings()),
         ));
     } finally {
-        DB::statement('RESET enable_seqscan');
+        $app->statement('RESET enable_seqscan');
+        $app->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        $app->disconnect();
     }
     expect($plan)->toContain('idx_contacts_provenances_tiers_contact')
-        ->and($plan)->not->toContain('Seq Scan on contacts_provenances_tiers');
+        ->and($plan)->not->toContain('Seq Scan on contacts_provenances_tiers')
+        // Un seul accès à `companies`, celui des autres critères.
+        ->and(preg_match_all('/ on companies\b/', $plan))->toBe(1);
 });

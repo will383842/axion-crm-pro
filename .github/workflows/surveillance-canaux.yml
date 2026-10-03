@@ -131,8 +131,8 @@ jobs:
           # `COMPOSE_FILE` : l'overlay de production, comme le déploiement.
           # `< /dev/null` OBLIGATOIRE : sans lui, `docker compose exec -T` lit
           # le stdin de ssh et peut rester suspendu.
-          # Pas de `-u root` : la commande ne doit rien créer (journal compris)
-          # sous un autre propriétaire que l'application.
+          # Utilisateur par défaut du conteneur (jamais root) : la commande ne doit
+          # rien créer (journal compris) sous un autre propriétaire que l'application.
           mesurer() {
             ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$USER@$HOST" \
               "cd '$PROJECT_PATH' && COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml \

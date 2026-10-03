@@ -60,6 +60,11 @@ class CrmCanauxEtat extends Command
 
     public function handle(): int
     {
+        // L'instance de la commande est réutilisée d'un appel à l'autre dans
+        // un même processus (Artisan::call) : sans cette remise à zéro, les
+        // alertes d'un passage précédent s'ajouteraient au suivant.
+        $this->alertes = [];
+
         $seuilAgeH = max(1, (int) $this->option('seuil-age-h'));
         $fenetreAbandonMin = max(1, (int) $this->option('fenetre-abandon-min'));
         $seuilSilenceH = max(1, (int) $this->option('seuil-silence-h'));

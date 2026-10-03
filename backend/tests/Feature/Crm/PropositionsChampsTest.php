@@ -65,6 +65,15 @@ function pcOrigines(string $table, int $id): array
     return is_array($carte) ? $carte : [];
 }
 
+/** L'empreinte de ce que l'écran montrerait aujourd'hui pour cette proposition. */
+function pcEmpreinte(int $propositionId): string
+{
+    $p = DB::table('propositions_champs')->where('id', $propositionId)->first();
+    $fiche = DB::table($p->entite === 'entreprise' ? 'companies' : 'contacts')->where('id', $p->entite_id)->first();
+
+    return Propositions::empreinte((string) $p->entite, $fiche, (string) $p->champ);
+}
+
 function pcCompte(string $ws, string $role): User
 {
     $user = User::create([
@@ -99,7 +108,7 @@ test('la table est sous RLS forcée, porte workspace_id et n admet que les trois
     );
     expect($colonne->is_nullable)->toBe('NO')
         ->and(Propositions::ORIGINES)->toBe(Taxonomy::FIELD_ORIGINS_TIERS)
-        ->and(Propositions::STATUTS)->toBe(['en_attente', 'acceptee', 'refusee']);
+        ->and(Propositions::STATUTS)->toBe(['en_attente', 'acceptee', 'refusee', 'effacee']);
 
     $ws = F::espace('zz-pc-check');
     $fiche = F::fiche($ws, 'ZZ Check');
@@ -187,9 +196,9 @@ test('valeur VIDE sur une fiche ordinaire : remplissage direct, origine tiers no
     expect(pcService()->proposer($ws, 'entreprise', $fiche, 'phone', '0199000003', 'societe'))->toBe(Propositions::REMPLI)
         ->and(DB::table('companies')->where('id', $fiche)->value('phone'))->toBe('0199000003')
         ->and(pcOrigines('companies', $fiche))->toBe(['phone' => 'societe'])
-        ->and(pcService()->proposer($ws, 'personne', $c, 'role', 'Gérante', 'apporteur'))->toBe(Propositions::REMPLI)
-        ->and(DB::table('contacts')->where('id', $c)->value('role'))->toBe('Gérante')
-        ->and(pcOrigines('contacts', $c))->toBe(['role' => 'apporteur'])
+        ->and(pcService()->proposer($ws, 'personne', $c, 'title', 'Gérante', 'apporteur'))->toBe(Propositions::REMPLI)
+        ->and(DB::table('contacts')->where('id', $c)->value('title'))->toBe('Gérante')
+        ->and(pcOrigines('contacts', $c))->toBe(['title' => 'apporteur'])
         ->and(DB::table('propositions_champs')->count())->toBe(0);
 });
 
@@ -247,7 +256,7 @@ test('ACCEPTER : la valeur est écrite, field_origins prend l origine tiers, la 
     pcService()->proposer($ws, 'entreprise', $fiche, 'phone', '0199000002', 'apporteur');
     $id = (int) DB::table('propositions_champs')->where('workspace_id', $ws)->value('id');
 
-    pcService()->accepter($ws, $id, $owner);
+    pcService()->accepter($ws, $id, $owner, pcEmpreinte($id));
 
     $p = DB::table('propositions_champs')->where('id', $id)->first();
     expect(DB::table('companies')->where('id', $fiche)->value('phone'))->toBe('0199000002')
@@ -282,7 +291,7 @@ test('REFUSER : la fiche reste intacte, seule la décision est tracée', functio
         ->and($this->audits)->toHaveCount(1)
         ->and($this->audits[0]['method'])->toBe('proposition.refusee');
 
-    expect(fn () => pcService()->accepter($ws, $id, $owner))->toThrow(PropositionDejaDecidee::class);
+    expect(fn () => pcService()->accepter($ws, $id, $owner, pcEmpreinte($id)))->toThrow(PropositionDejaDecidee::class);
 });
 
 test('une proposition décidée ne se réécrit plus en base', function () {
@@ -325,9 +334,10 @@ test('API : l owner liste, accepte et refuse', function () {
         ->and($page2->json('data.0.fiche'))->toBe('Zoe ZZAPI');
 
     $ids = DB::table('propositions_champs')->where('workspace_id', $ws)->orderBy('id')->pluck('id')->all();
-    $this->postJson("/api/v1/crm/propositions/{$ids[0]}/accepter")->assertOk()->assertJsonPath('statut', 'acceptee');
+    $this->postJson("/api/v1/crm/propositions/{$ids[0]}/accepter", ['empreinte' => $r->json('data.0.empreinte')])
+        ->assertOk()->assertJsonPath('statut', 'acceptee');
     $this->postJson("/api/v1/crm/propositions/{$ids[1]}/refuser")->assertOk()->assertJsonPath('statut', 'refusee');
-    $this->postJson("/api/v1/crm/propositions/{$ids[1]}/accepter")->assertStatus(409);
+    $this->postJson("/api/v1/crm/propositions/{$ids[1]}/accepter", ['empreinte' => $r->json('data.1.empreinte')])->assertStatus(409);
 
     expect(DB::table('companies')->where('id', $fiche)->value('city'))->toBe('Bron')
         ->and(DB::table('companies')->where('id', $fiche)->value('phone'))->toBe('0199000001')
@@ -343,7 +353,7 @@ test('API : 403 pour tout rôle autre que owner, sur chacune des trois routes', 
 
     $this->actingAs(pcCompte($ws, $role));
     $this->getJson('/api/v1/crm/propositions')->assertForbidden();
-    $this->postJson("/api/v1/crm/propositions/{$id}/accepter")->assertForbidden();
+    $this->postJson("/api/v1/crm/propositions/{$id}/accepter", ['empreinte' => 'x'])->assertForbidden();
     $this->postJson("/api/v1/crm/propositions/{$id}/refuser")->assertForbidden();
 
     expect(DB::table('companies')->where('id', $fiche)->value('city'))->toBe('Lyon')
@@ -360,7 +370,7 @@ test('API : une proposition d un autre espace est introuvable pour l owner', fun
 
     $this->actingAs(pcCompte($a, 'owner'));
     $this->getJson('/api/v1/crm/propositions')->assertOk()->assertJsonPath('meta.total', 0);
-    $this->postJson("/api/v1/crm/propositions/{$id}/accepter")->assertNotFound();
+    $this->postJson("/api/v1/crm/propositions/{$id}/accepter", ['empreinte' => 'x'])->assertNotFound();
     expect(DB::table('companies')->where('id', $ficheB)->value('city'))->toBe('Lyon');
 });
 

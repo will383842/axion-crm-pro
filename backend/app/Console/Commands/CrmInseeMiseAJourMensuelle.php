@@ -95,7 +95,7 @@ class CrmInseeMiseAJourMensuelle extends Command
 
         // Un passage lit des centaines de pages : aucune requête SQL n'est
         // gardée en mémoire (incident du 03/10/2026).
-        DB::connection();
+        DB::connection()->disableQueryLog();
         foreach (DB::getConnections() as $connexion) {
             $connexion->disableQueryLog();
             $connexion->flushQueryLog();

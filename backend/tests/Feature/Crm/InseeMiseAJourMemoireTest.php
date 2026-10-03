@@ -175,9 +175,12 @@ test('garde mémoire : arrêt PROPRE avant la limite, curseur mémorisé, puis r
     // Le plafond tombe pendant la page 1 : le passage s'arrête après elle.
     $maj = (new MiseAJourMensuelle((new HttpInseeClient)->avecDelaiEntreRequetes(0)))->avecPlafondMemoire(0);
     $resultat = $maj->executer(
-        $ws, '2026-07-06', journal: function () use ($maj): void {
+        $ws,
+        '2026-07-06',
+        journal: function () use ($maj): void {
             $maj->avecPlafondMemoire(1);
-        }, pauseMs: 0,
+        },
+        pauseMs: 0,
     );
 
     $passage = DB::table('insee_mises_a_jour')->where('workspace_id', $ws)->first();

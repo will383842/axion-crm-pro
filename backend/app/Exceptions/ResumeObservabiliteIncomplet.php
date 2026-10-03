@@ -2,6 +2,8 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
+
 /**
  * Le résumé de « Santé du système » a été calculé, mais au moins une rubrique
  * est tombée dans son filet (F39-007 : journalisée, valeur neutre rendue).
@@ -12,9 +14,12 @@ namespace App\Exceptions;
  * sert le résumé à l'appelant, sans le garder.
  *
  * Ce n'est pas une panne à remonter : la panne de chaque rubrique est déjà
- * journalisée là où elle s'est produite.
+ * journalisée là où elle s'est produite. D'où `ShouldntReport` : dans le
+ * recalcul différé, Laravel la rattrape par `rescue()` (file des rappels
+ * différés) et la SIGNALERAIT sinon au gestionnaire d'exceptions — une erreur
+ * au journal et dans Sentry toutes les 5 min, pour une panne déjà journalisée.
  */
-final class ResumeObservabiliteIncomplet extends \RuntimeException
+final class ResumeObservabiliteIncomplet extends \RuntimeException implements ShouldntReport
 {
     /** @param  array<string, mixed>  $resume */
     public function __construct(public readonly array $resume)

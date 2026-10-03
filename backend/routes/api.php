@@ -450,9 +450,9 @@ Route::prefix('v1')->group(function () {
 
         // Sprint H4 — Dashboard observabilité (KPI cards + recent events).
         // 2026-10-03 : `delai-sql:20` — aucune requête de la route ne dépasse
-        // 20 s ; le calcul lui-même tient dans un budget TOTAL de 20 s
-        // (`ObservabilityController::BUDGET_MS`), le délai SQL valant par
-        // requête et non pour la route.
+        // 20 s ; le calcul lui-même tient dans un budget d'environ 20 s
+        // (`ObservabilityController::BUDGET_MS`, plancher 500 ms par requête,
+        // au pire ≈ 25 s), le délai SQL valant par requête et non pour la route.
         Route::get('/observability/summary', [ObservabilityController::class, 'summary'])
             ->middleware('delai-sql:20');
 

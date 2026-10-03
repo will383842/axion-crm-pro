@@ -68,10 +68,20 @@ use Illuminate\Support\Facades\Log;
  *    des mesures pendant une heure. Une exception de `countWaterfallErrors24h`
  *    ou `countArchiveReasons` traverse le cache sans s'y écrire et reste un
  *    500, comme le veut F39-007.
- * 3. Le calcul tient dans un BUDGET de {@see self::BUDGET_MS} ms : chaque
- *    requête reçoit comme délai SQL le temps qui reste (plancher 500 ms). Le
- *    délai SQL de Postgres vaut par requête, pas pour la route : sans budget,
- *    huit requêtes à 15 s chacune pourraient tenir l'écran deux minutes.
+ *    Dans le RECALCUL DIFFÉRÉ (valeur périmée, après la réponse), un résumé
+ *    incomplet est journalisé en `warning` (sans SQL ni valeur) et n'écrase
+ *    pas la valeur en cache. L'exception levée pour empêcher l'écriture est
+ *    rattrapée par `rescue()` de Laravel ; elle porte `ShouldntReport`, donc
+ *    ni journal d'erreur ni Sentry toutes les 5 min.
+ * 3. Le calcul tient dans un BUDGET d'environ {@see self::BUDGET_MS} ms :
+ *    chaque requête SQL reçoit comme délai le temps qui reste, avec un
+ *    PLANCHER de 500 ms. Le budget n'est donc pas strict : une fois épuisé,
+ *    chacune des requêtes restantes (dix en tout) a encore droit à 500 ms —
+ *    au pire ≈ 25 s. Le délai SQL de Postgres vaut par requête, pas pour la
+ *    route : sans budget, dix requêtes à 15 s chacune pourraient tenir l'écran
+ *    plus de deux minutes. Le budget ne couvre QUE le SQL : la lecture du
+ *    quota Google Places consommé (`currentMonthUsage()`, dans le cache Redis)
+ *    n'y est pas soumise.
  * 4. La requête Google Places est scopée par espace et reprend MOT POUR MOT le
  *    prédicat de l'index partiel `idx_companies_google_places_en_attente`
  *    (migration `2026_10_03_000050`) — les opérateurs JSON ne sont pas
@@ -84,7 +94,10 @@ class ObservabilityController extends Controller
 
     public const PERIME_SECONDES = 3600;
 
-    /** Budget total du calcul, en millisecondes (toutes requêtes SQL comprises). */
+    /**
+     * Budget du calcul, en millisecondes (requêtes SQL seulement). Pas strict :
+     * plancher de {@see self::PLANCHER_MS} ms par requête une fois épuisé.
+     */
     public const BUDGET_MS = 20000;
 
     /** Délai SQL minimal accordé à une requête quand le budget est presque épuisé. */
@@ -95,6 +108,12 @@ class ObservabilityController extends Controller
 
     /** Une rubrique est-elle tombée dans son filet pendant le calcul en cours ? */
     private bool $incomplet = false;
+
+    /**
+     * Vrai pendant l'appel à `Cache::flexible` de la requête : un calcul lancé
+     * hors de cette fenêtre est le recalcul DIFFÉRÉ d'une valeur périmée.
+     */
+    private bool $dansLaRequete = false;
 
     public static function cle(string $espace): string
     {
@@ -113,24 +132,19 @@ class ObservabilityController extends Controller
             return response()->json(['data' => $this->calculer($workspaceId)]);
         }
 
+        $this->dansLaRequete = true;
         try {
             /** @var mixed $resume */
             $resume = Cache::flexible(
                 self::cle($workspaceId),
                 [self::FRAIS_SECONDES, self::PERIME_SECONDES],
-                function () use ($workspaceId): array {
-                    $resume = $this->calculer($workspaceId);
-                    if ($this->incomplet) {
-                        // Jamais en cache : cf. point 2 de l'en-tête.
-                        throw new ResumeObservabiliteIncomplet($resume);
-                    }
-
-                    return $resume;
-                },
+                fn (): array => $this->calculerPourLeCache($workspaceId),
                 lock: ['seconds' => 60],
             );
         } catch (ResumeObservabiliteIncomplet $e) {
             $resume = $e->resume;
+        } finally {
+            $this->dansLaRequete = false;
         }
 
         if (! is_array($resume)) {
@@ -138,6 +152,35 @@ class ObservabilityController extends Controller
         }
 
         return response()->json(['data' => $resume]);
+    }
+
+    /**
+     * Le calcul confié à `Cache::flexible`. Un résumé incomplet ne doit jamais
+     * être écrit : la seule façon d'empêcher `flexible` d'écrire ce que rend
+     * le calcul est de lever une exception (cf. point 2 de l'en-tête).
+     *
+     * - Dans la requête : rattrapée par `summary()`, le résumé est servi.
+     * - Dans le recalcul différé : journalisée ICI en `warning` — l'espace,
+     *   jamais le SQL ni les valeurs — puis levée vers `rescue()`, qui ne la
+     *   signale pas (`ShouldntReport`). La valeur en cache reste l'ancienne,
+     *   complète ; le recalcul suivant retentera.
+     *
+     * @return array<string, mixed>
+     */
+    private function calculerPourLeCache(string $workspaceId): array
+    {
+        $resume = $this->calculer($workspaceId);
+        if (! $this->incomplet) {
+            return $resume;
+        }
+
+        if (! $this->dansLaRequete) {
+            Log::warning('observability.summary recalcul différé incomplet : valeur en cache conservée', [
+                'workspace_id' => $workspaceId,
+            ]);
+        }
+
+        throw new ResumeObservabiliteIncomplet($resume);
     }
 
     /**
@@ -309,6 +352,7 @@ class ObservabilityController extends Controller
     {
         try {
             $client = app(GooglePlacesClient::class);
+            // Lecture du cache Redis, pas du SQL : hors budget (point 3).
             $used = $client->currentMonthUsage();
             $limit = $client->monthlyQuotaLimit();
             // 2026-10-03 : scopée par espace. Sous la sécurité par espace, le

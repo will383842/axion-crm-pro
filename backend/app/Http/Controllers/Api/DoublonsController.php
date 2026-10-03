@@ -110,7 +110,9 @@ class DoublonsController extends ApiController
             return $this->ok(['error' => $r->raison, 'message' => $r->getMessage()], 409);
         }
 
-        // La pastille « Doublons à vérifier » du menu suit le geste.
+        // La pastille « Doublons à vérifier » du menu suit le geste (au plus
+        // 60 s de retard si un calcul concurrent réécrit l'ancien chiffre,
+        // cf. `ATraiterController`).
         ATraiterController::oublier($ws);
 
         return $this->ok(['fusion_id' => $id]);

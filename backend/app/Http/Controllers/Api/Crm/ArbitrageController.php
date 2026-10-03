@@ -195,7 +195,9 @@ class ArbitrageController extends ConsoleController
             });
         });
 
-        // La pastille « Personnes à rattacher » du menu suit le geste.
+        // La pastille « Personnes à rattacher » du menu suit le geste (au plus
+        // 60 s de retard si un calcul concurrent réécrit l'ancien chiffre,
+        // cf. `ATraiterController`).
         ATraiterController::oublier($workspaceId);
 
         return $reponse;

@@ -6,6 +6,7 @@ use App\Crm\Console\ConsoleAccess;
 use App\Crm\Console\FilesATraiter;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -42,7 +43,15 @@ use Illuminate\Support\Facades\Log;
  *    cache comme le reste : une requête qui vient de dépasser son délai ne
  *    doit pas être relancée à chaque écran. Les gestes qui vident une file
  *    (fusionner, écarter une paire, rattacher, écarter un événement) oublient
- *    ce cache (`oublier()`), pour que la pastille suive l'écran.
+ *    ce cache (`oublier()`), pour que la pastille suive l'écran. Ce n'est
+ *    pas une garantie : un calcul lancé par un autre écran JUSTE AVANT le
+ *    geste peut réécrire l'ancien chiffre après l'oubli — la pastille reste
+ *    alors au plus 60 s sur l'ancien total (durée du cache), jamais plus.
+ *
+ * Les journaux ne portent que la CLASSE de l'exception et son code SQLSTATE :
+ * le message d'une `QueryException` recopie le SQL avec ses valeurs
+ * (identifiants d'espace et de fiches), qui n'ont rien à faire dans un
+ * journal.
  *
  * Chaque compteur tourne dans un point de sauvegarde (`DB::transaction`) :
  * hors transaction (la production), c'est une transaction de lecture sans
@@ -69,7 +78,7 @@ class ATraiterController extends ConsoleController
         try {
             Cache::forget(self::cle($espace));
         } catch (\Throwable $e) {
-            Log::warning('a-traiter: cache non vidé', ['exception' => $e->getMessage()]);
+            Log::warning('a-traiter: cache non vidé', self::contexteErreur($e));
         }
     }
 
@@ -91,7 +100,7 @@ class ATraiterController extends ConsoleController
         } catch (\Throwable $e) {
             // Cache indisponible : on calcule sans lui plutôt que de priver le
             // menu de ses pastilles.
-            Log::warning('a-traiter: cache indisponible', ['exception' => $e->getMessage()]);
+            Log::warning('a-traiter: cache indisponible', self::contexteErreur($e));
             $charge = $calcul();
         }
 
@@ -113,10 +122,27 @@ class ATraiterController extends ConsoleController
         try {
             return DB::transaction(static fn (): int => $file($espace)->count());
         } catch (\Throwable $e) {
-            Log::warning('a-traiter: compteur indisponible', ['compteur' => $nom, 'exception' => $e->getMessage()]);
+            Log::warning('a-traiter: compteur indisponible', ['compteur' => $nom] + self::contexteErreur($e));
 
             return null;
         }
+    }
+
+    /**
+     * Ce qu'on journalise d'un échec : la classe et le SQLSTATE, JAMAIS le
+     * message (il contient le SQL et ses valeurs).
+     *
+     * @return array{exception: class-string, sqlstate: string|null}
+     */
+    private static function contexteErreur(\Throwable $e): array
+    {
+        $sqlstate = null;
+        if ($e instanceof QueryException) {
+            $etat = $e->errorInfo[0] ?? $e->getCode();
+            $sqlstate = is_scalar($etat) && (string) $etat !== '' ? (string) $etat : null;
+        }
+
+        return ['exception' => $e::class, 'sqlstate' => $sqlstate];
     }
 
     /** @return array{doublons: null, a_rattacher: null} */

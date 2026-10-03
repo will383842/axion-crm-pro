@@ -160,6 +160,22 @@ test('écarter une paire ou un événement remet la pastille à jour sans attend
     $this->getJson(CAT_URL)->assertOk()->assertJsonPath('a_rattacher', 1);
 });
 
+test('fusionner une paire ou rattacher un événement remet aussi la pastille à jour', function () {
+    $ws = catEspacePeuple('zz-cat-geste-admin');
+    $this->actingAs(catCompte($ws, 'admin'));
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2]);
+
+    $paire = (int) DB::table('duplicate_flags')->where('workspace_id', $ws)->whereNull('reviewed_at')
+        ->whereNotIn('entity_b_id', DB::table('companies')->whereNotNull('deleted_at')->select('id'))->value('id');
+    $this->postJson("/api/v1/doublons/{$paire}/fusionner")->assertOk();
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('doublons', 1);
+
+    $activite = (int) FilesATraiter::aRattacher($ws)->value('id');
+    $cible = F::fiche($ws, 'ZZ Cible du rattachement');
+    $this->postJson("/api/v1/crm/arbitrage/{$activite}/attach", ['company_id' => $cible])->assertOk();
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('a_rattacher', 1);
+});
+
 test('un compteur en échec vaut null, jamais 0, et n emporte pas l autre', function () {
     $ws = catEspacePeuple('zz-cat-echec');
     $this->actingAs(catCompte($ws));
@@ -247,7 +263,14 @@ test('index idx_activities_a_rattacher présent, valide, et au prédicat de la f
         ->and($index->def)->toContain('(workspace_id, occurred_at, id)')
         ->and($index->def)->toContain('subject_id IS NULL')
         ->and($index->def)->toContain("'pending_match'")
-        ->and($index->def)->toContain("'arbitrage_dismissed'");
+        ->and($index->def)->toContain("'arbitrage_dismissed'")
+        // Le SENS de chaque condition, pas seulement ses mots : un prédicat
+        // inversé (« IS NULL » au lieu de « IS NOT NULL ») indexerait l'inverse
+        // de la file, et le planificateur cesserait de s'en servir.
+        ->and($index->def)->toMatch("/'pending_match'(::text)?\)* IS NOT NULL/")
+        ->and($index->def)->toMatch("/'arbitrage_dismissed'(::text)?\)* IS NULL/")
+        ->and($index->def)->not->toMatch("/'arbitrage_dismissed'(::text)?\)* IS NOT NULL/")
+        ->and($index->def)->not->toMatch('/subject_id IS NOT NULL/');
 });
 
 test('sous axion_app : « Personnes à rattacher » passe par l index partiel, « Doublons » par des index', function () {

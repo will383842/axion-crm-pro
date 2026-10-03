@@ -78,6 +78,7 @@ final class EligibiliteAdresse
     public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
 
     public const SITE_NON_VERIFIE = QuarantaineSite::MOTIF;
+
     public const INFORMATION_TIERS_INSUFFISANTE = 'information_tiers_insuffisante';
 
     public const INVALIDE = 'invalide';

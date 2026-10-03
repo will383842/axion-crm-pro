@@ -44,6 +44,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $email_generic
  * @property ?string $best_email_confidence
  * @property ?string $website
+ * @property ?string $website_method guess|guess2 (devinés, NON VÉRIFIÉS : `App\Crm\Sites\SiteFiable`), brave, annuaire…
  * @property ?float $lat
  * @property ?float $lon
  * @property ?string $address

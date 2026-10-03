@@ -15,9 +15,12 @@ use stdClass;
  * d'une section départementale, c'est écrire une coordonnée FAUSSE sur une
  * fiche protégée. D'où la règle, appliquée à la page d'accueil du site :
  *
- *  1. la vérification commune d'abord (`DomainFinderService::verifyBody()`,
+ *  1. la correspondance permissive d'abord (`DomainFinderService::correspondanceLache()`,
  *     sur la page translittérée) : page non vide, et SIREN, ou deux mots du
- *     nom, ou un mot et la ville ;
+ *     nom, ou un mot et la ville. (Lot N4, 03/10/2026 : `verifyBody()` est
+ *     devenue stricte pour les sites DEVINÉS ; ici, les candidats viennent
+ *     de Brave et l'étape 2 est plus stricte encore — l'ancienne règle,
+ *     conservée sous ce nom, suffit comme premier filtre) ;
  *  2. puis l'IDENTITÉ : le SIREN de l'organisme, OU son nom (ses mots
  *     DISTINCTIFS — « fédération », « nationale », « syndicat »… ne
  *     distinguent personne) ET son sigle. Sans sigle connu, TOUS les mots
@@ -88,11 +91,11 @@ class AppartenanceSite
             'city_name' => $fiche->city_name,
         ]);
 
-        // `verifyBody()` compare des mots SANS accents (`nameTokens()`) à une
+        // `correspondanceLache()` compare des mots SANS accents (`nameTokens()`) à une
         // page lue telle quelle : « fédération » n'y rencontre jamais
         // « federation ». La page lui est donc passée translittérée.
         $translitteree = Str::ascii(html_entity_decode($corps, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        if (! $this->finder->verifyBody($translitteree, $entreprise, $this->finder->nameTokens($nom))) {
+        if (! $this->finder->correspondanceLache($translitteree, $entreprise, $this->finder->nameTokens($nom))) {
             return false;
         }
 

@@ -234,9 +234,13 @@ class WaterfallOrchestrator
             return;  // déjà trouvé en amont
         }
         try {
-            $url = $this->domainFinder->find($company);
-            if ($url) {
-                $company->website = $url;
+            // Lot N4 (03/10/2026) — la MÉTHODE est écrite avec le site : un
+            // site deviné (`guess`) posé sans méthode passait pour fiable
+            // (`SiteFiable`), alors qu'il n'est pas vérifié.
+            $trouve = $this->domainFinder->findAvecMethode($company);
+            if ($trouve !== null) {
+                $company->website = $trouve['url'];
+                $company->website_method = $trouve['methode'];
                 $company->save();
                 $this->recordRun($company, 'domain-finder', 'success');
             }

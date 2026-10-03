@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Support\BattementPlanificateur;
 use App\Support\CanalSigneSite;
 use App\Support\CompteurRefusCanal;
+use App\Support\MemoireAbandonsSignales;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -25,9 +26,12 @@ use Throwable;
  *      → aucune ligne passée `gave_up` dans les `--fenetre-abandon-min`
  *        dernières minutes (état TERMINAL : une opposition qui n'atteindra
  *        jamais le site). 26 h par défaut : un passage horaire sauté par
- *        GitHub ne fait plus disparaître un abandon ; les numéros des lignes
- *        (`gave_up_recents_ids`) permettent au workflow de ne signaler chaque
- *        ligne qu'une fois ;
+ *        GitHub ne fait plus disparaître un abandon. `gave_up_nouveaux`
+ *        compte les lignes pas encore signalées ({@see MemoireAbandonsSignales},
+ *        mémoire CÔTÉ SERVEUR, écrite seulement avec `--memoriser-signales`) :
+ *        le workflow ne complète l'issue qu'avec du neuf. AUCUN numéro de
+ *        ligne ne sort (veto sécurité #310 : ils dévoileraient le volume et
+ *        le rythme des demandes RGPD) ;
  *   2. le site parle-t-il encore ? → au moins une activité
  *      `external_ref LIKE 'site:event:%'` reçue dans les `--seuil-silence-h`
  *      dernières heures ;
@@ -74,7 +78,8 @@ class CrmCanauxEtat extends Command
         {--seuil-bad-signature=1 : Nombre de bad_signature tolérés sur la fenêtre (alerte au-delà)}
         {--fenetre-refus-min=120 : Fenêtre de comptage des refus de signature, en minutes}
         {--seuil-planificateur-min=15 : Âge maximum, en minutes, du dernier battement du planificateur}
-        {--fermes-expres= : Canaux fermés exprès, séparés par des virgules (site-vers-crm, crm-vers-site)}';
+        {--fermes-expres= : Canaux fermés exprès, séparés par des virgules (site-vers-crm, crm-vers-site)}
+        {--memoriser-signales : Retenir (en cache, côté serveur) les abandons comptés comme nouveaux — réservé à la surveillance planifiée}';
 
     /** Les canaux qu'on peut déclarer fermés exprès, et le drapeau qui les ferme. */
     public const CANAUX_FERMABLES = ['site-vers-crm', 'crm-vers-site'];
@@ -110,7 +115,7 @@ class CrmCanauxEtat extends Command
                 'emission_vers_site' => $emission,
             ],
             'canaux_fermes_expres' => $fermesExpres,
-            'file_sortante' => $this->fileSortante($seuilAgeH, $fenetreAbandonMin, $emission, in_array('crm-vers-site', $fermesExpres, true)),
+            'file_sortante' => $this->fileSortante($seuilAgeH, $fenetreAbandonMin, $emission, in_array('crm-vers-site', $fermesExpres, true), (bool) $this->option('memoriser-signales')),
             'reception_site' => $this->receptionSite($seuilSilenceH, $ingestion, in_array('site-vers-crm', $fermesExpres, true)),
             'refus_signature' => $this->refusSignature($seuilRefus, $seuilBadSignature, $fenetreRefusMin),
             'planificateur' => $this->planificateur($seuilPlanificateurMin),
@@ -142,7 +147,7 @@ class CrmCanauxEtat extends Command
     /**
      * @return array<string, mixed>
      */
-    private function fileSortante(int $seuilAgeH, int $fenetreAbandonMin, bool $emission, bool $declareFerme): array
+    private function fileSortante(int $seuilAgeH, int $fenetreAbandonMin, bool $emission, bool $declareFerme, bool $memoriser): array
     {
         // Neutralisation SEULEMENT si le drapeau est réellement fermé.
         $fermeExpres = $declareFerme && ! $emission;
@@ -156,7 +161,7 @@ class CrmCanauxEtat extends Command
             'en_retard' => null,
             'plus_ancienne_en_attente_a' => null,
             'gave_up_recents' => null,
-            'gave_up_recents_ids' => null,
+            'gave_up_nouveaux' => null,
         ];
 
         try {
@@ -181,14 +186,15 @@ class CrmCanauxEtat extends Command
                 ->where('status', 'gave_up')
                 ->where('updated_at', '>=', now()->subMinutes($fenetreAbandonMin))
                 ->count();
-            // Les numéros de ligne (BIGSERIAL, rien de personnel) : le workflow
-            // ne complète l'issue qu'avec les lignes qu'il n'a pas déjà dites.
-            // Plafonnés : l'issue n'a pas à porter un inventaire.
+            // Les numéros de ligne ne servent qu'ICI, à la mémoire des abandons
+            // déjà signalés : ils ne sortent jamais du serveur. Plafonnés, les
+            // PLUS RÉCENTS d'abord : lors d'une panne massive, ce sont les
+            // nouveaux qu'il faut voir.
             $idsAbandons = DB::table('crm_outbound_events')
                 ->where('status', 'gave_up')
                 ->where('updated_at', '>=', now()->subMinutes($fenetreAbandonMin))
-                ->orderBy('id')
-                ->limit(200)
+                ->orderByDesc('id')
+                ->limit(1000)
                 ->pluck('id')
                 ->map(static fn ($id): int => (int) $id)
                 ->all();
@@ -204,7 +210,7 @@ class CrmCanauxEtat extends Command
         $mesure['en_retard'] = $enRetard;
         $mesure['plus_ancienne_en_attente_a'] = self::dateIso($plusAncienne);
         $mesure['gave_up_recents'] = $abandonsRecents;
-        $mesure['gave_up_recents_ids'] = array_values($idsAbandons);
+        $mesure['gave_up_nouveaux'] = MemoireAbandonsSignales::nouveaux(array_values($idsAbandons), $memoriser);
 
         if ($enRetard > 0 && ! $fermeExpres) {
             $this->alerter(

@@ -28,6 +28,33 @@ name: Surveillance des canaux d'échange
 # journal du job est PUBLIC lui aussi (seul son nombre de lignes y figure).
 # Pour la lire, rejouer la commande à la main sur le serveur.
 #
+#   - AUCUN numéro de ligne ne sort du serveur (veto sécurité #310) : les
+#     numéros séquentiels de `crm_outbound_events` dévoileraient le volume et
+#     le rythme des oppositions et effacements. Pour les abandons, la commande
+#     ne rend que des COMPTES (`gave_up_recents`, `gave_up_nouveaux`).
+#   - Le journal de CHAQUE passage, même vert, n'imprime qu'un RÉSUMÉ chiffré
+#     (`RESUME_JOURNAL`), jamais le JSON complet.
+#   - AUCUN ÉTAT n'est lu dans les issues : un tiers sans aucun droit peut y
+#     commenter. Le « déjà signalé » des abandons est tenu côté serveur
+#     (`--memoriser-signales`, cache Redis) ; la minuterie des 24 h ne compte
+#     QUE les commentaires du bot du workflow (`github-actions` tel que `gh`
+#     le rend, `github-actions[bot]` accepté aussi). Un commentaire de tiers
+#     ne repousse donc aucun rappel.
+#   - CHAMPS PUBLICS ASSUMÉS, de même nature que `site_muet` (ils disent l'état
+#     d'un canal, rien de personnel) : `canaux_fermes_expres` et `ferme_expres`
+#     (un canal est coupé exprès) ; `planificateur.dernier_battement_a` (une
+#     issue « planificateur à l'arrêt » annonce publiquement que les tâches
+#     planifiées, purges RGPD comprises, ne tournent plus) ; le compteur
+#     `sans_entete` (volume de POST anonymes reçus).
+#   - RISQUE ASSUMÉ, seuil `bad_signature` : la route est publique. Avec le
+#     seuil à 1, un tiers qui envoie deux POST (horodatage valide, signature
+#     fausse) en 120 min ouvre une issue publique « secret désaligné ? », qui
+#     lui confirme au passage que ses requêtes sont comptées. Le bruit reste
+#     borné (une issue par libellé, un ajout par 24 h). Revers : une VRAIE
+#     désynchronisation du secret peut se noyer dans une issue déjà ouverte
+#     par un tiers — devant une issue `canal-refus-signature`, vérifier
+#     toujours le secret des deux côtés avant de conclure au bruit.
+#
 # ── SEUILS (réglables sans toucher au code) ─────────────────────────────────
 # Ordre de priorité : saisie du lancement manuel > variable du dépôt
 # (Settings → Secrets and variables → Actions → Variables) > défaut ci-dessous.
@@ -42,8 +69,26 @@ name: Surveillance des canaux d'échange
 #                                        un passage sauté faisait disparaître
 #                                        un abandon (état terminal, divergence
 #                                        RGPD). Chaque ligne n'est signalée
-#                                        qu'UNE fois : l'issue porte les numéros
-#                                        déjà dits (`<!-- gave_up_ids: … -->`).
+#                                        qu'UNE fois : la commande mémorise
+#                                        CÔTÉ SERVEUR ce qu'elle a déjà compté
+#                                        et rend `gave_up_nouveaux` (un compte,
+#                                        jamais un numéro). Un `cache:clear`
+#                                        (déploiement) fait re-signaler une fois
+#                                        les lignes encore dans la fenêtre : un
+#                                        doublon, jamais un silence.
+#                                        Revers assumé : la mémoire est écrite
+#                                        par le job `verifier` ; si le job
+#                                        `alerte` échoue ensuite, ces lignes ne
+#                                        seront pas nommées dans l'issue — mais
+#                                        l'alerte, elle, reste levée (et rouge)
+#                                        tout le temps de la fenêtre.
+#                                        ⚠️ Le job `verifier` reste ROUGE à
+#                                        chaque passage tant qu'un abandon est
+#                                        dans la fenêtre (~26 exécutions, et
+#                                        autant de courriels « workflow
+#                                        failed ») : c'est voulu, une divergence
+#                                        RGPD le mérite — ne pas apprendre à
+#                                        ignorer ces rouges.
 #   SURV_CANAUX_SEUIL_SILENCE_H    (48)  silence max du canal site → CRM.
 #                                        ⚠️ Rien dans le code ne documente le
 #                                        volume NORMAL d'événements du site
@@ -168,12 +213,20 @@ jobs:
           for v in "$SEUIL_AGE_H" "$FENETRE_ABANDON_MIN" "$SEUIL_SILENCE_H" "$SEUIL_REFUS" "$SEUIL_BAD_SIGNATURE"; do
             case "$v" in ''|*[!0-9]*) echo "::error::Seuil non entier : '$v'"; exit 1 ;; esac
           done
-          # La liste des canaux fermés exprès aussi : minuscules, tirets,
-          # virgules — rien qui puisse sortir de l'argument distant.
-          FERMES_EXPRES="$(printf '%s' "$FERMES_EXPRES" | tr -d ' ')"
-          case "$FERMES_EXPRES" in *[!a-z,-]*) echo "::error::SURV_CANAUX_FERMES_EXPRES invalide (attendu : site-vers-crm,crm-vers-site)"; exit 1 ;; esac
+          # La liste des canaux fermés exprès aussi : LISTE BLANCHE EXACTE des
+          # noms connus (`CrmCanauxEtat::CANAUX_FERMABLES`), séparés par des
+          # virgules — aucune plage de caractères, donc rien qui dépende de la
+          # locale, et rien qui puisse sortir de l'argument distant.
+          FERMES_EXPRES="${FERMES_EXPRES// /}"
+          RE_FERMES='^((site-vers-crm|crm-vers-site)(,|$))*$'
+          if ! [[ "$FERMES_EXPRES" =~ $RE_FERMES ]]; then
+            echo "::error::SURV_CANAUX_FERMES_EXPRES invalide (attendu : site-vers-crm,crm-vers-site)"; exit 1
+          fi
 
-          OPTIONS="--seuil-age-h=$SEUIL_AGE_H --fenetre-abandon-min=$FENETRE_ABANDON_MIN --seuil-silence-h=$SEUIL_SILENCE_H --seuil-refus=$SEUIL_REFUS --seuil-bad-signature=$SEUIL_BAD_SIGNATURE --fermes-expres=$FERMES_EXPRES"
+          # `--memoriser-signales` : seule la surveillance planifiée retient,
+          # côté serveur, les abandons déjà comptés (une mesure rejouée à la
+          # main ne consomme rien).
+          OPTIONS="--seuil-age-h=$SEUIL_AGE_H --fenetre-abandon-min=$FENETRE_ABANDON_MIN --seuil-silence-h=$SEUIL_SILENCE_H --seuil-refus=$SEUIL_REFUS --seuil-bad-signature=$SEUIL_BAD_SIGNATURE --fermes-expres=$FERMES_EXPRES --memoriser-signales"
 
           # `COMPOSE_FILE` : l'overlay de production, comme le déploiement.
           # `< /dev/null` OBLIGATOIRE : sans lui, `docker compose exec -T` lit
@@ -214,8 +267,16 @@ jobs:
           # Journal PUBLIC (dépôt public) : on n'imprime que le volume.
           echo "Sortie d'erreur : $(wc -l < erreurs.txt 2>/dev/null || echo 0) ligne(s), non affichée(s)."
 
+          # Journal PUBLIC de CHAQUE passage : un résumé chiffré seulement,
+          # jamais le JSON complet (veto sécurité #310).
+          RESUME_JOURNAL='{
+            alertes: [.alertes[]?.type],
+            file_sortante: (.file_sortante // {} | {pending, failed, en_retard, gave_up_recents, gave_up_nouveaux}),
+            reception_site: (.reception_site // {} | {recus_dans_la_fenetre}),
+            refus_signature: (.refus_signature // {} | {total, par_motif})
+          }'
           if [ "$JSON_OK" -eq 0 ]; then
-            jq . etat.json
+            jq "$RESUME_JOURNAL" etat.json
             ALERTES="$(jq -c '.alertes' etat.json)"
           elif [ "$CODE" -eq 255 ]; then
             # ssh sort en 255 quand il n'a pas pu joindre le serveur : surtout
@@ -341,23 +402,16 @@ jobs:
             LIBELLE="canal-$(echo "$TYPE" | tr '_' '-')"
             TITRE="$(titre_de "$TYPE")"
 
-            # Abandons : chaque ligne `gave_up` n'est signalée qu'UNE fois. Les
-            # numéros déjà dits sont lus dans les marqueurs des issues de ce
-            # libellé (ouvertes ou fermées : une issue fermée à la main vaut
-            # « vu »). Les autres types gardent la règle des 24 h.
+            # Abandons : chaque ligne `gave_up` n'est signalée qu'UNE fois. Le
+            # compte des lignes NOUVELLES vient du serveur (`gave_up_nouveaux`,
+            # mémoire tenue côté serveur) : RIEN n'est lu dans les issues, où
+            # un tiers peut écrire (veto sécurité #310). Les autres types
+            # gardent la règle des 24 h.
             NOUVEAUX=''
             if [ "$TYPE" = "file_sortante_abandon" ]; then
-              IDS="$(echo "$ETAT" | jq -c '[.file_sortante.gave_up_recents_ids // [] | .[] | numbers]' 2>/dev/null || echo '[]')"
-              # Chaque maillon tolère le vide (`|| true`) : sous `pipefail`, un
-              # grep sans résultat ferait échouer tout le relevé.
-              DEJA="$( { gh issue list --repo "$DEPOT" --state all --label "$LIBELLE" --limit 20 --json body,comments \
-                           --jq '.[] | .body, (.comments[].body)' 2>/dev/null || true; } \
-                       | { grep -oE '<!-- gave_up_ids: [0-9,]* -->' || true; } \
-                       | { grep -oE '[0-9]+' || true; } \
-                       | jq -sc '.' )"
-              NOUVEAUX="$(jq -nc --argjson i "$IDS" --argjson d "$DEJA" '$i - $d')"
-              if [ "$IDS" != "[]" ] && [ "$NOUVEAUX" = "[]" ]; then
-                echo "Abandons ($TYPE) : toutes les lignes ont déjà été signalées — rien de plus."
+              NOUVEAUX="$(echo "$ETAT" | jq -r '.file_sortante.gave_up_nouveaux // empty | numbers' 2>/dev/null || true)"
+              if [ "$NOUVEAUX" = "0" ]; then
+                echo "Abandons ($TYPE) : aucune ligne nouvelle depuis le dernier signalement — rien de plus."
                 continue
               fi
             fi
@@ -367,9 +421,8 @@ jobs:
             {
               printf '%s\n' "La surveillance horaire des canaux d'échange a levé l'alerte **\`$TYPE\`**." ''
               echo "$ALERTES" | jq -r --arg t "$TYPE" '.[] | select(.type == $t) | "- " + .message'
-              if [ -n "$NOUVEAUX" ] && [ "$NOUVEAUX" != "[]" ]; then
-                echo "- Lignes \`crm_outbound_events\` NOUVELLEMENT abandonnées : $(echo "$NOUVEAUX" | jq -r 'map("n° " + tostring) | join(", ")')."
-                echo "<!-- gave_up_ids: $(echo "$NOUVEAUX" | jq -r 'map(tostring) | join(",")') -->"
+              if [ -n "$NOUVEAUX" ]; then
+                echo "- $NOUVEAUX ligne(s) \`crm_outbound_events\` NOUVELLEMENT abandonnée(s) depuis le dernier signalement (leur détail se lit sur le serveur, jamais ici)."
               fi
               printf '%s\n' '' '## Quoi vérifier, dans cet ordre' ''
               quoi_verifier "$TYPE"
@@ -391,13 +444,18 @@ jobs:
               continue
             fi
 
-            if [ -n "$NOUVEAUX" ] && [ "$NOUVEAUX" != "[]" ]; then
-              echo "Issue #$EXISTANTE ($TYPE) déjà ouverte — ajout des seules lignes nouvellement abandonnées."
+            if [ -n "$NOUVEAUX" ]; then
+              echo "Issue #$EXISTANTE ($TYPE) déjà ouverte — ajout des $NOUVEAUX ligne(s) nouvellement abandonnée(s)."
               gh issue comment "$EXISTANTE" --repo "$DEPOT" --body-file corps.md
               continue
             fi
 
-            DERNIER="$(gh issue view "$EXISTANTE" --repo "$DEPOT" --json createdAt,comments --jq '(.comments | last | .createdAt) // .createdAt')"
+            # Minuterie des 24 h : SEULS les commentaires du bot du workflow
+            # comptent (veto sécurité #310) — sinon un tiers qui commente toutes
+            # les 23 h empêche tout rappel. `gh` rend l'auteur `github-actions`
+            # (GraphQL) ; la forme REST `github-actions[bot]` est acceptée aussi.
+            DERNIER="$(gh issue view "$EXISTANTE" --repo "$DEPOT" --json createdAt,comments \
+              --jq '([.comments[] | select(.author.login == "github-actions" or .author.login == "github-actions[bot]")] | last | .createdAt) // .createdAt')"
             AGE_H=$(( ( $(date -u +%s) - $(date -u -d "$DERNIER" +%s) ) / 3600 ))
             if [ "$AGE_H" -ge 24 ]; then
               echo "Issue #$EXISTANTE ($TYPE) déjà ouverte — ajout de cette occurrence (dernier signe il y a ${AGE_H} h)."

@@ -663,17 +663,21 @@ final class MiseAJourMensuelle
     private function memoireProcheDeLaLimite(): bool
     {
         $plafond = $this->plafondMemoire();
-        if ($plafond <= 0 || memory_get_usage(true) < $plafond) {
+        // Mémoire réellement UTILISÉE (`false`), et non réservée par Zend :
+        // après un pic de décodage, la réserve redescend mal (morcellement)
+        // et arrêterait le passage trop tôt (réserve 4 de #320). Le pic d'une
+        // page, lui, est borné par `HttpInseeClient::REPONSE_MAX_OCTETS`.
+        if ($plafond <= 0 || memory_get_usage(false) < $plafond) {
             return false;
         }
         gc_collect_cycles();
-        if (memory_get_usage(true) < $plafond) {
+        if (memory_get_usage(false) < $plafond) {
             return false;
         }
         if (! $this->arretMemoire) {
             $this->arretMemoire = true;
             Log::warning('[INSEE] mise à jour mensuelle : arrêt propre, mémoire proche de la limite', [
-                'octets' => memory_get_usage(true), 'plafond' => $plafond, 'pages' => $this->bilan['pages'],
+                'octets' => memory_get_usage(false), 'plafond' => $plafond, 'pages' => $this->bilan['pages'],
             ]);
         }
 

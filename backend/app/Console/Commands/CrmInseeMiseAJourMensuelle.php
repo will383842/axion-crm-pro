@@ -46,6 +46,9 @@ class CrmInseeMiseAJourMensuelle extends Command
 {
     public const SIGNATURE_PLANIFIEE = 'crm:insee:mise-a-jour-mensuelle';
 
+    /** Plafond de `--memoire-max` en Mo (1 To) : le calcul en octets reste un entier. */
+    public const MEMOIRE_MAX_MO = 1 << 20;
+
     protected $signature = self::SIGNATURE_PLANIFIEE
         . ' {--depuis= : date AAAA-MM-JJ (défaut : reprise, sinon dernière exécution réussie, sinon ' . MiseAJourMensuelle::DEPUIS_INITIAL . ')}'
         . ' {--dry-run : essai à blanc — lit Sirene et donne le bilan chiffré, n écrit RIEN}'
@@ -101,7 +104,8 @@ class CrmInseeMiseAJourMensuelle extends Command
             $connexion->flushQueryLog();
         }
 
-        $memoireMax = max(0, (int) $this->option('memoire-max'));
+        // Borné à 1 To (réserve 5 de #320) : `* 1024 * 1024` reste un entier.
+        $memoireMax = min(max(0, (int) $this->option('memoire-max')), self::MEMOIRE_MAX_MO);
         $miseAJour = (new MiseAJourMensuelle($insee))
             ->avecPlafondMemoire($memoireMax > 0 ? $memoireMax * 1024 * 1024 : null);
 
@@ -143,11 +147,22 @@ class CrmInseeMiseAJourMensuelle extends Command
             $b['valeurs_rejetees'],
             $b['lignes_ignorees'],
         ));
-        if ($resultat['arret_memoire']) {
-            $this->warn('Arrêt PROPRE : mémoire proche de la limite PHP — le curseur est mémorisé, le prochain passage reprendra.');
-        }
-        if ($resultat['statut'] !== 'reussie') {
-            $this->warn('Passage INACHEVÉ (limite, plafond d écritures ou durée atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
+        // Un essai à blanc n'écrit RIEN, pas même le curseur : interrompu,
+        // son bilan est PARTIEL et l'essai suivant repart du début (réserve 3
+        // de #320).
+        if ($essai && $resultat['statut'] !== 'reussie') {
+            $this->warn(sprintf(
+                'Essai INCOMPLET (%s) : bilan PARTIEL, rien n est mémorisé — relancer avec --limite%s.',
+                $resultat['arret_memoire'] ? 'mémoire proche de la limite PHP' : 'limite, plafond d écritures ou durée atteinte',
+                $resultat['arret_memoire'] ? ' ou un --memoire-max plus haut' : ' ou une --duree-max plus longue',
+            ));
+        } else {
+            if ($resultat['arret_memoire']) {
+                $this->warn('Arrêt PROPRE : mémoire proche de la limite PHP — le curseur est mémorisé, le prochain passage reprendra.');
+            }
+            if ($resultat['statut'] !== 'reussie') {
+                $this->warn('Passage INACHEVÉ (limite, plafond d écritures ou durée atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
+            }
         }
 
         return self::SUCCESS;

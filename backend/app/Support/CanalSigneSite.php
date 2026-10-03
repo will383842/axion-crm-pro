@@ -21,10 +21,18 @@ use Throwable;
  *      tout calcul de signature (absent ou hors fenêtre → 401 `stale_signature`) ;
  *   2. signature `X-Site-Signature` sur « <horodatage>.<corps> »
  *      (→ 401 `bad_signature`) ;
- *   3. mémoire des requêtes déjà vues : une requête signée identique
- *      (même horodatage, même corps) déjà acceptée dans la fenêtre est refusée
- *      (→ 401 `stale_signature`). L'émetteur re-signe chaque tentative avec un
- *      horodatage neuf : seule une copie exacte est concernée.
+ *   3. mémoire des requêtes déjà vues, UNIQUEMENT pour les routes sans
+ *      identifiant d'idempotence (`$memoireRequetes = true`) : une requête
+ *      signée identique (même horodatage, même corps) déjà acceptée dans la
+ *      fenêtre est refusée (→ 401 `stale_signature`). L'émetteur re-signe
+ *      chaque tentative avec un horodatage neuf : seule une copie exacte est
+ *      concernée.
+ *
+ *      `/internal/site-sync` n'en a pas besoin et ne doit PAS l'avoir : chaque
+ *      événement porte un `event_id`, l'ingestion est idempotente, et le site
+ *      peut légitimement émettre deux fois le même message dans la même
+ *      seconde (job d'émission et balayage de la file) ; le second doit
+ *      continuer à recevoir sa réponse 200 `noop_idempotent`.
  *
  * La mémoire ne contient qu'une empreinte sha256 — jamais le corps, jamais une
  * donnée personnelle — et expire avec la fenêtre. Si le magasin est
@@ -36,7 +44,7 @@ final class CanalSigneSite
     /**
      * @return JsonResponse|null null si la requête est authentifiée, sinon la réponse de refus
      */
-    public static function controler(Request $request, string $canal): ?JsonResponse
+    public static function controler(Request $request, string $canal, bool $memoireRequetes): ?JsonResponse
     {
         $body = $request->getContent();
         $timestamp = $request->header('X-Site-Timestamp');
@@ -58,6 +66,10 @@ final class CanalSigneSite
             Log::warning("{$canal} rejeté (signature invalide)", ['ip' => $request->ip()]);
 
             return response()->json(['error' => 'bad_signature'], 401);
+        }
+
+        if (! $memoireRequetes) {
+            return null;
         }
 
         // 3. Requête déjà vue. L'empreinte est calculée sur la signature

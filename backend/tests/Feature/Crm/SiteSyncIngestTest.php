@@ -115,12 +115,7 @@ function siteSyncEvent(array $overrides = []): array
 function siteSyncPost(array $event, ?string $secret = null, ?string $timestamp = null): TestResponse
 {
     $body = json_encode($event, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    // Chaque appel est signé avec un horodatage DISTINCT (dans la fenêtre),
-    // comme le fait l'émetteur du site à chaque tentative : le CRM refuse une
-    // copie exacte d'une requête déjà reçue, et plusieurs appels d'un même test
-    // tombent souvent dans la même seconde.
-    static $decalage = 0;
-    $timestamp ??= (string) (time() - ($decalage++ % 200));
+    $timestamp ??= (string) time();
     $signature = hash_hmac('sha256', $timestamp . '.' . $body, $secret ?? SITE_SYNC_SECRET);
 
     return test()->call(
@@ -452,6 +447,19 @@ test('rejouer le MÊME événement ne crée pas de doublon', function () {
     expect(DB::table('companies')->count())->toBe(1)
         ->and(DB::table('contacts')->count())->toBe(1)
         ->and(DB::table('activities')->count())->toBe(1);
+});
+
+test('le MÊME message signé reçu deux fois dans la même seconde reste idempotent (200, pas de refus)', function () {
+    // Le site peut émettre deux fois exactement le même message (job d'émission
+    // et balayage de la file) : même horodatage, même signature. La route
+    // s'appuie sur l'`event_id`, pas sur une mémoire des requêtes déjà vues.
+    $event = siteSyncEvent();
+    $horodatage = (string) time();
+
+    siteSyncPost($event, timestamp: $horodatage)->assertOk()->assertJsonPath('result.status', 'created');
+    siteSyncPost($event, timestamp: $horodatage)->assertOk()->assertJsonPath('result.status', 'noop_idempotent');
+
+    expect(DB::table('activities')->count())->toBe(1);
 });
 
 test('deux événements distincts de la même personne alimentent UNE fiche', function () {

@@ -22,8 +22,7 @@ use Throwable;
  * d'AUTHENTIFICATION, pas un patron d'ingestion. Ici, on persiste.
  *
  * ORDRE DES CONTRÔLES, volontairement dans cet ordre :
- *   1. authentification (`CanalSigneSite` : horodatage, signature, requête
- *      déjà vue), avant tout, y compris avant le drapeau : un appelant non
+ *   1. authentification (`CanalSigneSite` : horodatage, signature), avant tout, y compris avant le drapeau : un appelant non
  *      authentifié ne doit rien apprendre de l'état du système ;
  *   2. drapeau maître `CRM_INGEST_ENABLED` → 503 tant qu'il est à OFF ;
  *   3. contrat d'entrée strict → 422 ;
@@ -39,9 +38,11 @@ class SiteSyncController extends ApiController
 
     public function store(Request $request): JsonResponse
     {
-        // Horodatage, signature et requête déjà vue : contrôle commun aux
-        // routes signées par le site (`App\Support\CanalSigneSite`).
-        $refus = CanalSigneSite::controler($request, 'site-sync');
+        // Horodatage et signature : contrôle commun aux routes signées par le
+        // site (`App\Support\CanalSigneSite`). Pas de mémoire des requêtes
+        // déjà vues ici : l'idempotence par `event_id` traite les doublons, et
+        // le site peut émettre deux fois le même message dans la même seconde.
+        $refus = CanalSigneSite::controler($request, 'site-sync', memoireRequetes: false);
         if ($refus !== null) {
             return $refus;
         }

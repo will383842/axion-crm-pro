@@ -37,7 +37,13 @@ class SiteGdprController extends ApiController
     {
         // Horodatage, signature et requête déjà vue : contrôle commun aux
         // routes signées par le site (`App\Support\CanalSigneSite`).
-        $refus = CanalSigneSite::controler($request, 'site-sync/gdpr');
+        // La mémoire des requêtes déjà vues est ACTIVE ici : cette route n'a
+        // pas d'identifiant d'idempotence (l'export n'en a aucune).
+        // Conséquence assumée : deux envois identiques dans la même seconde
+        // (double clic côté site) → le second reçoit 401 `stale_signature`.
+        // Le premier a été traité ; un nouvel envoi, re-signé avec un autre
+        // horodatage, passe normalement.
+        $refus = CanalSigneSite::controler($request, 'site-sync/gdpr', memoireRequetes: true);
         if ($refus !== null) {
             return $refus;
         }

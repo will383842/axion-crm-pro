@@ -1,8 +1,10 @@
 <?php
 
 /**
- * CANAUX INTERNES SIGNÉS PAR LE SITE — horodatage requis, requêtes répétées
- * refusées (`/internal/site-sync` et `/internal/site-sync/gdpr`).
+ * CANAUX INTERNES SIGNÉS PAR LE SITE — horodatage requis sur
+ * `/internal/site-sync` et `/internal/site-sync/gdpr` ; requêtes répétées
+ * refusées sur `/internal/site-sync/gdpr` (sans identifiant d'idempotence).
+ * `/internal/site-sync` s'appuie sur l'`event_id` : un doublon exact y passe.
  *
  * Le drapeau `crm.ingest.enabled` est laissé FERMÉ : une requête authentifiée
  * reçoit alors son 503 habituel (`ingest_disabled`), ce qui prouve qu'elle a
@@ -57,6 +59,10 @@ dataset('routes signées par le site', [
     'site-sync/gdpr' => ['/api/internal/site-sync/gdpr', '{"action":"export","person_key":"' . str_repeat('a', 64) . '","email":"zz@example.invalid","scope":"both"}'],
 ]);
 
+dataset('route signée sans idempotence', [
+    'site-sync/gdpr' => ['/api/internal/site-sync/gdpr', '{"action":"export","person_key":"' . str_repeat('a', 64) . '","email":"zz@example.invalid","scope":"both"}'],
+]);
+
 test('TÉMOIN : une requête valide passe l’authentification (503 drapeau fermé, comme avant)', function (string $route, string $corps) {
     appelCanalSigne($route, $corps, entetesSignes($corps))
         ->assertStatus(503)
@@ -70,7 +76,26 @@ test('une requête identique REJOUÉE dans la fenêtre est refusée', function (
     appelCanalSigne($route, $corps, $entetes)
         ->assertStatus(401)
         ->assertJsonPath('error', 'stale_signature');
-})->with('routes signées par le site');
+})->with('route signée sans idempotence');
+
+test('site-sync : un doublon EXACT passe l’authentification (l’idempotence par event_id le traite)', function () {
+    $corps = '{"event_id":"00000000-0000-4000-8000-000000000001","event_type":"form_submission"}';
+    $entetes = entetesSignes($corps);
+
+    appelCanalSigne('/api/internal/site-sync', $corps, $entetes)->assertStatus(503);
+    appelCanalSigne('/api/internal/site-sync', $corps, $entetes)
+        ->assertStatus(503)
+        ->assertJsonPath('error', 'ingest_disabled');
+});
+
+test('site-sync : la mémoire des requêtes n’est pas sollicitée (un magasin en panne n’y change rien)', function () {
+    config(['crm.ingest.replay_store' => 'magasin-inexistant']);
+    $corps = '{"event_id":"00000000-0000-4000-8000-000000000002","event_type":"form_submission"}';
+
+    appelCanalSigne('/api/internal/site-sync', $corps, entetesSignes($corps))
+        ->assertStatus(503)
+        ->assertJsonPath('error', 'ingest_disabled');
+});
 
 test('le rejeu ne se contourne pas en changeant l’écriture de la signature (préfixe sha256=)', function (string $route, string $corps) {
     $horodatage = (string) time();
@@ -79,7 +104,7 @@ test('le rejeu ne se contourne pas en changeant l’écriture de la signature (p
     appelCanalSigne($route, $corps, entetesSignes($corps, $horodatage, 'sha256='))
         ->assertStatus(401)
         ->assertJsonPath('error', 'stale_signature');
-})->with('routes signées par le site');
+})->with('route signée sans idempotence');
 
 test('TÉMOIN : le même corps re-signé avec un autre horodatage passe (nouvelle tentative de l’émetteur)', function (string $route, string $corps) {
     appelCanalSigne($route, $corps, entetesSignes($corps, (string) time()))->assertStatus(503);
@@ -143,4 +168,4 @@ test('mémoire anti-rejeu indisponible : la requête est REFUSÉE, et le journal
                 && ! str_contains(strtolower($serialise), 'select ');
         })
         ->once();
-})->with('routes signées par le site');
+})->with('route signée sans idempotence');

@@ -95,3 +95,57 @@ test('horodatage absent ou non entier : hors fenêtre', function () {
         ->and(HmacSignature::timestampWithinWindow('abc', 300))->toBeFalse()
         ->and(HmacSignature::timestampWithinWindow('12.5', 300))->toBeFalse();
 });
+
+/**
+ * Exécute le contrôle de démarrage comme hors environnement de test, puis
+ * restaure l'environnement réel de l'application.
+ */
+function demarrerCanauxSignesEn(string $environnement): void
+{
+    $avant = app()['env'];
+    app()['env'] = $environnement;
+
+    try {
+        demarrerCanauxSignes();
+    } finally {
+        app()['env'] = $avant;
+    }
+}
+
+test('hors test : démarrage REFUSÉ si la mémoire des requêtes n’utilise pas un magasin redis', function (string $magasin) {
+    config([
+        'crm.ingest.max_clock_skew_seconds' => 300,
+        'crm.ingest.replay_store' => $magasin,
+    ]);
+
+    expect(fn () => demarrerCanauxSignesEn('production'))
+        ->toThrow(RuntimeException::class, 'CRM_INGEST_REPLAY_STORE');
+})->with([
+    'array' => ['array'],
+    'file' => ['file'],
+    'vide' => [''],
+    'inexistant' => ['magasin-inexistant'],
+]);
+
+test('TÉMOIN hors test : le magasin redis démarre', function () {
+    config([
+        'crm.ingest.max_clock_skew_seconds' => 300,
+        'crm.ingest.replay_store' => 'redis',
+        'cache.stores.redis.driver' => 'redis',
+    ]);
+
+    demarrerCanauxSignesEn('production');
+
+    expect(config('crm.ingest.max_clock_skew_seconds'))->toBe(300);
+});
+
+test('en environnement de test, le magasin array reste permis', function () {
+    config([
+        'crm.ingest.max_clock_skew_seconds' => 300,
+        'crm.ingest.replay_store' => 'array',
+    ]);
+
+    demarrerCanauxSignesEn('testing');
+
+    expect(config('crm.ingest.replay_store'))->toBe('array');
+});

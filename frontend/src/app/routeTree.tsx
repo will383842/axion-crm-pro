@@ -62,6 +62,7 @@ import { ObservabilityPage } from '@/features/observability/ObservabilityPage';
 import { ContactsHubPage } from '@/features/crm-console/ContactsHubPage';
 import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
 import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
+import { PropositionsPage } from '@/features/propositions/PropositionsPage';
 import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
 import { PersonnesPage } from '@/features/crm-console/PersonnesPage';
 import { PersonneDetailPage } from '@/features/crm-console/PersonneDetailPage';
@@ -175,6 +176,8 @@ const observabilityRoute = createRoute({ getParentRoute: () => layoutRoute, path
 const consoleContactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/contacts', component: ContactsHubPage });
 const consoleVivierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/vivier', component: CandidatesPage });
 const consoleArbitrageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/arbitrage', component: ArbitragePage });
+// N13 (03/10/2026) — valeurs venues d'un tiers, à accepter ou refuser (owner seul).
+const consolePropositionsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/propositions', component: PropositionsPage });
 const consolePersonRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/console/personnes/$personKey', component: PersonTimelinePage });
 // Lot L4-C — « Personnes (lettre et guide) » : liste et fiche. Chemin distinct
 // de `/console/personnes/$personKey` (fiche 360° tous univers).
@@ -355,6 +358,7 @@ export const routeTree = rootRoute.addChildren([
     consoleContactsRoute,
     consoleVivierRoute,
     consoleArbitrageRoute,
+    consolePropositionsRoute,
     consolePersonRoute,
     consoleLettreGuideRoute,
     consoleLettreGuideDetailRoute,

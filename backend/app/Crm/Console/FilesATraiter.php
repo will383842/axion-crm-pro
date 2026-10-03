@@ -86,4 +86,20 @@ final class FilesATraiter
             ->whereNotNull('prochaine_relance_at')
             ->where('prochaine_relance_at', '<=', now());
     }
+
+    /**
+     * « Propositions à valider » (N13, 03/10/2026) — les valeurs venues d'un
+     * tiers qui différaient de la fiche, en attente de la décision du
+     * propriétaire. Lue par l'écran (`PropositionsController`) et par le
+     * compteur du menu, rôle owner SEULEMENT.
+     *
+     * Index : `idx_propositions_champs_en_attente (workspace_id, id) WHERE
+     * statut = 'en_attente'`.
+     */
+    public static function propositions(string $espace): Builder
+    {
+        return DB::table('propositions_champs')
+            ->where('workspace_id', $espace)
+            ->where('statut', 'en_attente');
+    }
 }

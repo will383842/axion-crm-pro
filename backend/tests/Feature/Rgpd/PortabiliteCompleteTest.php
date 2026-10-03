@@ -212,6 +212,12 @@ const COUVERTES_HORS_INVENTAIRE = [
     // compte. Deuxième démonstration que l'inventaire par colonnes ne voit pas
     // tout.
     'sessions',
+    // N13 (relecture sécurité #316) : `propositions_champs` ne déclare aucune
+    // colonne d'identification — elle se rattache à la personne par
+    // `entite_id`. Ses valeurs (téléphone, fonction, LinkedIn…) ont pourtant
+    // été reçues d'un tiers à son sujet : exportées, et NEUTRALISÉES par
+    // l'effacement (`propositions_champs_effacer`, aucune ligne supprimée).
+    'propositions_champs',
 ];
 
 /**
@@ -246,6 +252,7 @@ function decisionsPortabilite(): array
         // n'entrent donc pas dans cet inventaire.
         'personnes' => true,
         'abonnements' => true, // cf. COUVERTES_HORS_INVENTAIRE
+        'propositions_champs' => true, // cf. COUVERTES_HORS_INVENTAIRE
 
         // ── LES TITULAIRES DE COMPTE, FERMÉS LE 2026-08-21 ───────────────
         //

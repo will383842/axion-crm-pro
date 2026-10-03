@@ -129,7 +129,7 @@ test('la forme de la réponse, et le chiffre du menu = le total de chaque écran
 
     $r = $this->getJson(CAT_URL)->assertOk();
 
-    expect($r->json())->toBe(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
+    expect($r->json())->toBe(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2, 'propositions' => null]);
     expect($r->json('doublons'))->toBe($this->getJson('/api/v1/doublons')->assertOk()->json('meta.total'));
     expect($r->json('a_rattacher'))->toBe($this->getJson('/api/v1/crm/arbitrage')->assertOk()->json('meta.total'));
     expect($r->json('relances'))->toBe($this->getJson('/api/v1/evenements?relance=a_faire')->assertOk()->json('meta.total'));
@@ -142,11 +142,11 @@ test('cloisonnement : un espace ne voit jamais les compteurs d un autre, ni par 
 
     // A d'abord : son résultat part en cache.
     $this->actingAs(catCompte($a));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2, 'propositions' => null]);
 
     // B ensuite : SES chiffres (des entiers, pas null), jamais ceux de A.
     $this->actingAs(catCompte($b));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 1, 'a_rattacher' => 0, 'relances' => 0]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 1, 'a_rattacher' => 0, 'relances' => 0, 'propositions' => null]);
 
     expect(ATraiterController::cle($a))->not->toBe(ATraiterController::cle($b))
         ->and(ATraiterController::cle($a))->toContain($a);
@@ -167,7 +167,7 @@ test('la réponse est mise en cache 60 s par espace', function () {
 test('écarter une paire ou un événement remet la pastille à jour sans attendre le cache', function () {
     $ws = catEspacePeuple('zz-cat-geste');
     $this->actingAs(catCompte($ws, 'operator'));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2, 'propositions' => null]);
 
     $paire = (int) DB::table('duplicate_flags')->where('workspace_id', $ws)->whereNull('reviewed_at')
         ->whereNotIn('entity_b_id', DB::table('companies')->whereNotNull('deleted_at')->select('id'))->value('id');
@@ -182,7 +182,7 @@ test('écarter une paire ou un événement remet la pastille à jour sans attend
 test('fusionner une paire ou rattacher un événement remet aussi la pastille à jour', function () {
     $ws = catEspacePeuple('zz-cat-geste-admin');
     $this->actingAs(catCompte($ws, 'admin'));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2, 'propositions' => null]);
 
     $paire = (int) DB::table('duplicate_flags')->where('workspace_id', $ws)->whereNull('reviewed_at')
         ->whereNotIn('entity_b_id', DB::table('companies')->whereNotNull('deleted_at')->select('id'))->value('id');

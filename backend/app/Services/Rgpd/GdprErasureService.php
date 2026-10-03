@@ -6,6 +6,7 @@ use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
+use App\Support\ListeSuppression;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,23 @@ class GdprErasureService
                 DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
                 self::personnesDe($email)->pluck('person_key')->all(), // lot L4-C
             ))));
+
+            // ── PROPOSITIONS VENUES D'UN TIERS (N13, relecture sécurité #316) ──
+            // Avant la suppression des fiches personnes : c'est par elles que la
+            // fonction retrouve les propositions de la personne. Rien n'y est
+            // supprimé (on garde la trace de la proposition et de sa décision) :
+            // ses valeurs sont NEUTRALISÉES (`[effacé]`). Chemin UNIQUE et
+            // borné : la fonction SECURITY DEFINER dédiée, seule à pouvoir
+            // passer le déclencheur qui fige une proposition — tous espaces
+            // confondus, y compris sous le rôle applicatif (RLS). Ses numéros
+            // PERSONNELS proposés par un tiers sur une autre fiche (celle de son
+            // organisation) le sont aussi ; un standard partagé reste à
+            // l'organisation, comme sur les fiches — relevés ici, avant que ses
+            // fiches personnes ne disparaissent.
+            $deleted['propositions_champs_neutralisees'] = self::neutraliserPropositions(
+                $email,
+                EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom),
+            );
 
             // Lot L4-C — `abonnements` part en cascade avec sa personne ; on
             // le compte à part pour que le bilan dise ce qui a disparu.
@@ -383,6 +401,28 @@ class GdprErasureService
 
             return ['deleted' => $deleted, 'opt_out_added' => true, 'verification' => 'differee', 'personnels' => $personnels];
         });
+    }
+
+    /**
+     * N13 — neutralise (`[effacé]`) les propositions de tiers de cette adresse
+     * et/ou de ces numéros, par la fonction dédiée `propositions_champs_effacer`
+     * (aucune ligne supprimée). Rend le nombre de propositions neutralisées.
+     *
+     * @param  list<string>  $telephones
+     */
+    private static function neutraliserPropositions(string $email, array $telephones): int
+    {
+        $variantes = [];
+        foreach ($telephones as $t) {
+            array_push($variantes, ...ListeSuppression::variantesTelephone($t));
+        }
+        // Des chiffres seulement : le littéral de tableau ne demande aucun échappement.
+        $chiffres = array_values(array_unique(array_filter($variantes, static fn (string $v): bool => ctype_digit($v))));
+
+        return (int) (DB::selectOne(
+            'SELECT public.propositions_champs_effacer(?, ?::text[]) AS n',
+            [$email, '{' . implode(',', $chiffres) . '}'],
+        )->n ?? 0);
     }
 
     /**

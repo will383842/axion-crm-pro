@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\ConsoleAccess;
 use App\Crm\Console\FilesATraiter;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
@@ -17,13 +18,19 @@ use Illuminate\Support\Facades\Log;
  * COMPTEURS « À TRAITER » DU MENU — audit UX du 02/10/2026, lot 8.
  *
  * `GET /v1/crm/a-traiter/compteurs` → `{ doublons: int|null, a_rattacher:
- * int|null, relances: int|null }`.
+ * int|null, relances: int|null, propositions: int|null }`.
  *
  * `relances` (03/10/2026, nouvel accueil) : les événements dont la date de
  * relance est arrivée — l'onglet « Relances à faire » de l'écran Événements
  * (`/evenements?relance=a_faire`), même constructeur
  * (`FilesATraiter::relancesEvenements`). Il n'a pas de pastille dans le
  * menu ; l'accueil l'affiche dans son bloc « À faire ».
+ *
+ * `propositions` (N13, 03/10/2026) : les valeurs venues d'un tiers en attente
+ * de décision (`FilesATraiter::propositions`, écran « Propositions à
+ * valider »). Rôle owner SEULEMENT : le compteur est calculé avec les autres
+ * (le cache est par espace), puis remis à `null` pour tout autre rôle — il ne
+ * leur dit même pas qu'il y a des propositions.
  *
  * ── TROIS RÈGLES ────────────────────────────────────────────────────────────
  *
@@ -71,8 +78,9 @@ class ATraiterController extends ConsoleController
 
     public static function cle(string $espace): string
     {
-        // `v2` (03/10/2026) : la charge utile gagne `relances`.
-        return 'crm:a-traiter:compteurs:v2:' . $espace;
+        // `v2` (03/10/2026) : la charge utile gagne `relances` ; `v3` (N13) :
+        // `propositions`.
+        return 'crm:a-traiter:compteurs:v3:' . $espace;
     }
 
     /**
@@ -112,16 +120,22 @@ class ATraiterController extends ConsoleController
             $charge = $calcul();
         }
 
-        return $this->ok(is_array($charge) ? array_merge(self::inconnus(), $charge) : self::inconnus());
+        $charge = is_array($charge) ? array_merge(self::inconnus(), $charge) : self::inconnus();
+        if (! ProvenanceTiers::lisiblePar($user)) {
+            $charge['propositions'] = null;
+        }
+
+        return $this->ok($charge);
     }
 
-    /** @return array{doublons: int|null, a_rattacher: int|null, relances: int|null} */
+    /** @return array{doublons: int|null, a_rattacher: int|null, relances: int|null, propositions: int|null} */
     private function calculer(string $espace, bool $vivier): array
     {
         return WorkspaceContext::run($espace, fn (): array => [
             'doublons' => $this->compter('doublons', FilesATraiter::doublons(...), $espace),
             'a_rattacher' => $vivier ? null : $this->compter('a_rattacher', FilesATraiter::aRattacher(...), $espace),
             'relances' => $this->compter('relances', FilesATraiter::relancesEvenements(...), $espace),
+            'propositions' => $vivier ? null : $this->compter('propositions', FilesATraiter::propositions(...), $espace),
         ]);
     }
 
@@ -154,9 +168,9 @@ class ATraiterController extends ConsoleController
         return ['exception' => $e::class, 'sqlstate' => $sqlstate];
     }
 
-    /** @return array{doublons: null, a_rattacher: null, relances: null} */
+    /** @return array{doublons: null, a_rattacher: null, relances: null, propositions: null} */
     private static function inconnus(): array
     {
-        return ['doublons' => null, 'a_rattacher' => null, 'relances' => null];
+        return ['doublons' => null, 'a_rattacher' => null, 'relances' => null, 'propositions' => null];
     }
 }

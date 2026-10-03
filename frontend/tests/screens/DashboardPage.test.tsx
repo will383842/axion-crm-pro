@@ -255,7 +255,7 @@ describe('DashboardPage — jamais un 0 trompeur', () => {
     });
 
     await screen.findByTestId('tuile-joignables');
-    const phrase = 'L’audience « Prospects contactables » est désactivée';
+    const phrase = 'L’audience « Prospects contactables » n’est plus mise à jour chaque nuit';
     expect(tuile('joignables')).toHaveTextContent('—');
     expect(tuile('joignables')).toHaveTextContent(phrase);
     expect(tuile('joignables')).not.toHaveTextContent(INDISPONIBLE);

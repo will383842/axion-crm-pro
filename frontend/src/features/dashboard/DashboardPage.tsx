@@ -65,7 +65,7 @@ export function raisonAudience(raison: RaisonAudience | null | undefined): strin
     case 'audience_introuvable':
       return `L’audience « ${AUDIENCE_JOIGNABLES} » est introuvable`;
     case 'audience_inactive':
-      return `L’audience « ${AUDIENCE_JOIGNABLES} » est désactivée`;
+      return `L’audience « ${AUDIENCE_JOIGNABLES} » n’est plus mise à jour chaque nuit`;
     case 'audience_non_calculee':
       return `L’audience « ${AUDIENCE_JOIGNABLES} » n’a pas encore été calculée`;
     default:

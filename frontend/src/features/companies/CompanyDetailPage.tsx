@@ -66,6 +66,19 @@ interface CompanyDetail {
   lifecycle_stage?: LifecycleStage;
   relation_saisie_manuelle_at?: string | null;
   joignabilite?: string | null;
+  // Lot O14 (05/10/2026) — IDCC et OPCO, en lecture seule (`companies_opco`).
+  opco?: CompanyOpco | null;
+}
+
+interface CompanyOpco {
+  idcc: string | null;
+  opco: string | null;
+  opco_libelle: string | null;
+  opco_gestion: string | null;
+  opco_gestion_libelle: string | null;
+  source: 'siro' | 'saisie';
+  releve_le: string | null;
+  mention: string;
 }
 
 export function CompanyDetailPage() {
@@ -237,6 +250,29 @@ export function CompanyDetailPage() {
                   codeVisible={false}
                 />
               </Item>
+              {/* Lot O14 — convention collective et OPCO, en lecture seule. La
+                  mention dit d'où vient la donnée (table SIRET → OPCO de France
+                  compétences, et le mois de la DSN). */}
+              <Item label="Convention collective (IDCC)">
+                {c.opco?.idcc ? <span className="font-mono tabular-nums">{c.opco.idcc}</span> : '—'}
+              </Item>
+              <Item label="OPCO">
+                {c.opco?.opco_libelle ? (
+                  <span>
+                    {c.opco.opco_libelle}
+                    {c.opco.opco_gestion_libelle && c.opco.opco_gestion !== c.opco.opco ? (
+                      <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        (gestion : {c.opco.opco_gestion_libelle})
+                      </span>
+                    ) : null}
+                  </span>
+                ) : '—'}
+              </Item>
+              {c.opco ? (
+                <Item label="Source IDCC / OPCO" wide>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{c.opco.mention}</span>
+                </Item>
+              ) : null}
               <Item label="Adresse" wide>{addressLine}</Item>
               <Item label="Site web">
                 {c.website ? (

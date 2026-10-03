@@ -49,6 +49,8 @@ import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures'
 import { PastilleCompteur } from '@/features/a-traiter/PastilleCompteur';
 import {
   LIBELLES_COMPTEUR,
+  libelleTotalATraiter,
+  totalDesCompteurs,
   useCompteursATraiter,
   type CleCompteur,
   type CompteursATraiter,
@@ -358,6 +360,10 @@ function NavSectionBlock({
   // de sens que quand les libellés sont là.
   const deplie = collapsed || ouverte || section.sansTitre === true;
   const idListe = `nav-section-${section.id}`;
+  // Section repliée : ses pastilles sont cachées avec ses entrées. Le titre
+  // porte alors le TOTAL, pour qu'on voie qu'il y a du travail sans déplier.
+  const clesCompteur = section.items.flatMap((i) => (i.compteur === undefined ? [] : [i.compteur]));
+  const totalReplie = !ouverte && clesCompteur.length > 0 ? totalDesCompteurs(compteurs, clesCompteur) : null;
 
   return (
     <div className="mb-3 last:mb-0">
@@ -392,6 +398,7 @@ function NavSectionBlock({
               className={cn('h-3 w-3 shrink-0 transition-transform duration-150', ouverte && 'rotate-90')}
             />
             <span className="flex-1 truncate text-left">{section.title}</span>
+            <PastilleCompteur nombre={totalReplie} libelle={libelleTotalATraiter} />
           </button>
         </div>
       )}

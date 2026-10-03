@@ -9,6 +9,39 @@ export interface TimelineStep {
 }
 
 /**
+ * Statut d'une source, EN CLAIR (constaté en production le 03/10/2026 :
+ * « Base Adresse Nationale · success »).
+ *
+ * La fiche lit `companies.signals` (voir `deriveTimelineFromSignals`), PAS
+ * les traces de passage des sources. Aujourd'hui, aucun signal ne porte de
+ * champ `status` : seules arrivent les valeurs par défaut posées ci-dessous,
+ * `success` (signal présent) et `pending` (signal vide). La table couvre
+ * malgré tout les autres valeurs plausibles (`failed`, `partial`, `skipped`,
+ * `not_found`…) pour le jour où un signal en portera une. Les synonymes sont
+ * regroupés ; une valeur jamais vue devient « Autre » plutôt que de laisser
+ * passer un mot anglais.
+ */
+const STATUTS_SOURCE: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
+  [['success', 'succeeded', 'completed', 'done', 'ok', 'enriched'], 'Réussi'],
+  [['failed', 'failure', 'error', 'gave_up'], 'Échec'],
+  [['skipped', 'ignored'], 'Ignoré'],
+  [['partial', 'partielle'], 'Partiel'],
+  [['pending', 'queued', 'waiting'], 'En attente'],
+  [['running', 'in_progress', 'processing', 'enriching'], 'En cours'],
+  [['not_found', 'no_result', 'no_results', 'empty'], 'Rien trouvé'],
+  [['rate_limited', 'throttled', 'quota_exceeded'], 'Limite atteinte'],
+  [['cancelled', 'canceled'], 'Annulé'],
+];
+
+export function libelleStatutSource(statut: string | null | undefined): string {
+  const s = (statut ?? '').trim().toLowerCase();
+  for (const [valeurs, libelle] of STATUTS_SOURCE) {
+    if (valeurs.includes(s)) return libelle;
+  }
+  return 'Autre';
+}
+
+/**
  * Derive a timeline from the company's `signals` object when no explicit
  * enrichment_runs is available. Falls back to a small set of well-known
  * sources (INSEE, BAN, France Travail, Mistral) when present.
@@ -67,7 +100,7 @@ export function EnrichmentTimeline({ steps }: { steps: TimelineStep[] }) {
                   <span className="text-sm font-medium text-slate-900 dark:text-white">
                     {s.label ?? s.source}
                   </span>
-                  <StatusPill tone={tone}>{s.status}</StatusPill>
+                  <StatusPill tone={tone}>{libelleStatutSource(s.status)}</StatusPill>
                   {s.at ? (
                     <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
                       {new Date(s.at).toLocaleString('fr-FR')}

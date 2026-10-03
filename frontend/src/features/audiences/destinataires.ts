@@ -43,6 +43,7 @@ export const FONCTIONS_PROPOSEES = [
 ];
 
 export const MOTIFS_EXCLUSION: Record<string, string> = {
+  entreprise_individuelle: 'Entrepreneur individuel (jamais en campagne)',
   invalide: 'Adresse invalide ou jetable',
   non_verifiee: 'Adresse non vérifiée',
   personnelle: 'Adresse personnelle (gmail…)',

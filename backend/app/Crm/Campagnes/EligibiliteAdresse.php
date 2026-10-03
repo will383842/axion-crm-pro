@@ -18,6 +18,14 @@ use App\Support\EligibiliteCampagne;
  * plusieurs fiches ou personnes) : une seule qui l'exige suffit à l'écarter.
  * Premier motif rencontré, dans cet ordre :
  *
+ *  0. `entreprise_individuelle` l'adresse est rattachée à une fiche
+ *                     d'entrepreneur individuel (catégorie juridique INSEE
+ *                     commençant par 1, `companies.legal_form`) : jamais
+ *                     destinataire d'une campagne, quelle que soit la
+ *                     qualité de l'adresse (03/10/2026). Le drapeau est posé
+ *                     par l'appelant sur les fiches qu'il a DÉJÀ lues —
+ *                     aucune requête de plus, aucun balayage de `companies`.
+ *                     Une forme juridique absente ou inconnue n'exclut pas ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par
@@ -37,6 +45,8 @@ use App\Support\EligibiliteCampagne;
  */
 final class EligibiliteAdresse
 {
+    public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
+
     public const INVALIDE = 'invalide';
 
     public const NON_VERIFIEE = 'non_verifiee';
@@ -51,16 +61,33 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::ENTREPRISE_INDIVIDUELLE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
     ];
 
     /**
+     * Vrai pour un entrepreneur individuel : catégorie juridique INSEE dont
+     * le premier chiffre est 1 (1000 entrepreneur individuel, etc.). Une
+     * valeur absente, vide ou qui ne commence pas par 1 (5710 SAS, « SAS »
+     * en clair…) n'est PAS une entreprise individuelle : on n'exclut que ce
+     * qui est su.
+     */
+    public static function estEntrepriseIndividuelle(mixed $formeJuridique): bool
+    {
+        return is_string($formeJuridique) && preg_match('/^1/', trim($formeJuridique)) === 1;
+    }
+
+    /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
+        // Une seule occurrence rattachée à un entrepreneur individuel suffit :
+        // la même boîte ne part pas « par » une autre fiche.
+        if (self::une($occurrences, static fn (array $o): bool => ($o['entreprise_individuelle'] ?? false) === true)) {
+            return self::ENTREPRISE_INDIVIDUELLE;
+        }
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
             || self::une($occurrences, static fn (array $o): bool => in_array($o['status'] ?? null, ['invalid', 'disposable'], true))
             || self::une($occurrences, static fn (array $o): bool => in_array($o['verification'] ?? null, [VerificationEmail::INVALIDE, VerificationEmail::JETABLE], true))) {

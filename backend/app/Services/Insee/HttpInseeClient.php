@@ -31,8 +31,21 @@ class HttpInseeClient implements InseeClient
 {
     private const BASE_URL = 'https://api.insee.fr/api-sirene/3.11';
 
-    /** Taille d'une page du flux des modifications (maximum Sirene v3.11). */
-    private const PAGE_SIRENE = 1000;
+    /**
+     * Taille d'une page du flux des modifications. 500 et non le maximum
+     * Sirene (1000) : incident mémoire du 03/10/2026 (128 Mo épuisés pendant
+     * un rattrapage) — le pic d'une page (corps brut + décodage) est divisé
+     * par deux, pour ≈ 14 000 unités par minute au quota public.
+     */
+    public const PAGE_SIRENE = 500;
+
+    /**
+     * Curseurs du flux mémorisés pour détecter une pagination en boucle
+     * (réserve 3 de #313) : les DERNIERS seulement — la mémoire reste
+     * constante quelle que soit la longueur du flux. Une boucle plus longue
+     * est arrêtée par le plafond de pages (`PAGES_MARGE`, `PAGES_MAX`).
+     */
+    public const CURSEURS_VUS = 64;
 
     /** Identifiants par requête groupée (`siren:… OR siren:…`) : URL ≈ 2 Ko. */
     public const PAR_REQUETE = 100;
@@ -362,8 +375,14 @@ class HttpInseeClient implements InseeClient
      * Le quota est respecté par `avecDelaiEntreRequetes()` (≈ 30 req/min par
      * défaut, plan « Accès public »).
      *
+     * MÉMOIRE CONSTANTE (incident du 03/10/2026) : une seule page vit à la
+     * fois — la réponse décodée est libérée avant le `yield`, la page rendue
+     * est vidée dès la reprise (`PageSirene::liberer`), chaque unité ne garde
+     * que sa période COURANTE (la seule lue par l'appelant) et seuls les
+     * `CURSEURS_VUS` derniers curseurs sont retenus.
+     *
      * @param  string  $depuis  date AAAA-MM-JJ
-     * @return \Generator<int, array{curseur: string, suivant: ?string, unites: list<array<string, mixed>>}>
+     * @return \Generator<int, PageSirene>
      */
     public function iterateModificationsDepuis(string $depuis, string $curseur = '*'): \Generator
     {
@@ -375,8 +394,8 @@ class HttpInseeClient implements InseeClient
         // Un curseur DÉJÀ VU (A→B→A…) ou un nombre de pages au-delà du total
         // annoncé lèvent : le passage reste « echouee », visible, au lieu de
         // boucler — même lancé à la main sans `--duree-max`.
-        /** @var list<string> $vus */
-        $vus = [$curseur];
+        /** @var array<string, true> $vus les `CURSEURS_VUS` derniers, dans l'ordre */
+        $vus = [$curseur => true];
         $plafond = self::PAGES_MAX;
         $pages = 0;
 
@@ -389,31 +408,63 @@ class HttpInseeClient implements InseeClient
                 'curseur' => $curseur,
                 'nombre' => self::PAGE_SIRENE,
                 'tri' => 'siren',
+                // Les champs nuls ne voyagent pas : l'appelant lit tout par
+                // `?? null`, une valeur absente vaut une valeur nulle.
+                'masquerValeursNulles' => 'true',
             ]);
-            $unites = array_values(array_filter(
-                is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [],
-                'is_array',
-            ));
+            $unites = [];
+            foreach (is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [] as $u) {
+                if (is_array($u)) {
+                    $unites[] = self::periodeCouranteSeulement($u);
+                }
+            }
             $suivant = $data['header']['curseurSuivant'] ?? null;
             $total = $data['header']['total'] ?? null;
+            unset($data);
             if ($pages === 1 && is_int($total) && $total >= 0) {
                 $plafond = min(self::PAGES_MAX, intdiv($total, self::PAGE_SIRENE) + 1 + self::PAGES_MARGE);
             }
             // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.
             if (! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur) {
-                yield ['curseur' => $curseur, 'suivant' => null, 'unites' => $unites];
+                yield new PageSirene($curseur, null, $unites);
 
                 return;
             }
-            if (in_array($suivant, $vus, true)) {
+            if (isset($vus[$suivant])) {
                 throw new \RuntimeException('Flux Sirene : curseur déjà vu — arrêt (pagination en boucle).');
             }
-            $vus[] = $suivant;
+            $vus[$suivant] = true;
+            if (count($vus) > self::CURSEURS_VUS) {
+                unset($vus[array_key_first($vus)]);
+            }
 
-            yield ['curseur' => $curseur, 'suivant' => $suivant, 'unites' => $unites];
+            $page = new PageSirene($curseur, $suivant, $unites);
+            unset($unites);
+            yield $page;
+            // Le générateur garde la page rendue jusqu'au `yield` suivant :
+            // on la VIDE avant de lire la suivante (une page à la fois).
+            $page->liberer();
+            unset($page);
 
             $curseur = $suivant;
         }
+    }
+
+    /**
+     * Une unité du flux, réduite à sa période COURANTE (`periodesUniteLegale[0]`,
+     * la seule que lit `MiseAJourMensuelle`) : l'historique complet d'une
+     * unité ancienne compte des dizaines de périodes, inutiles ici.
+     *
+     * @param  array<string, mixed>  $u
+     * @return array<string, mixed>
+     */
+    private static function periodeCouranteSeulement(array $u): array
+    {
+        if (is_array($u['periodesUniteLegale'] ?? null) && count($u['periodesUniteLegale']) > 1) {
+            $u['periodesUniteLegale'] = [$u['periodesUniteLegale'][0] ?? []];
+        }
+
+        return $u;
     }
 
     /**
@@ -435,9 +486,10 @@ class HttpInseeClient implements InseeClient
             ]);
             foreach (is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [] as $u) {
                 if (is_array($u)) {
-                    $unites[] = $u;
+                    $unites[] = self::periodeCouranteSeulement($u);
                 }
             }
+            unset($data);
         }
 
         return $unites;
@@ -464,6 +516,7 @@ class HttpInseeClient implements InseeClient
                     $etabs[$e['siret']] = $e;
                 }
             }
+            unset($data);
         }
 
         return $etabs;
@@ -544,11 +597,17 @@ class HttpInseeClient implements InseeClient
     private function decoder(Response $resp, string $chemin): array
     {
         $annonce = $resp->header('Content-Length');
-        if (($annonce !== '' && is_numeric($annonce) && (int) $annonce > self::REPONSE_MAX_OCTETS)
-            || strlen($resp->body()) > self::REPONSE_MAX_OCTETS) {
+        if ($annonce !== '' && is_numeric($annonce) && (int) $annonce > self::REPONSE_MAX_OCTETS) {
             throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)');
         }
-        $data = json_decode($resp->body(), true);
+        // Le corps est lu UNE fois : chaque `body()` en refait une copie
+        // complète depuis le flux (incident mémoire du 03/10/2026).
+        $corps = $resp->body();
+        if (strlen($corps) > self::REPONSE_MAX_OCTETS) {
+            throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)');
+        }
+        $data = json_decode($corps, true);
+        unset($corps);
 
         return is_array($data) ? $data : [];
     }

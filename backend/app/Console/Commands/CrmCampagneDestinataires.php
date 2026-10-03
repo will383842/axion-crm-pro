@@ -476,7 +476,7 @@ class CrmCampagneDestinataires extends Command
             ->orderBy('id')
             ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at', 'discovery_source'])
             // Personne apportée par un tiers sans information suffisante
-            // (`EligibiliteAdresse`, motif 0 bis).
+            // (`EligibiliteAdresse`, motif 0 ter).
             ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
             ->when($presse, static fn ($q) => $q->selectRaw(
                 GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '

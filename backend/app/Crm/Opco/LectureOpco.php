@@ -32,7 +32,7 @@ final class LectureOpco
     /**
      * @return array{idcc: ?string, opco: ?string, opco_libelle: ?string, opco_gestion: ?string, opco_gestion_libelle: ?string, source: string, releve_le: ?string, mention: string}
      */
-    public static function presenter(object $ligne): array
+    public static function presenter(\stdClass $ligne): array
     {
         $releveLe = $ligne->releve_le !== null ? substr((string) $ligne->releve_le, 0, 10) : null;
 

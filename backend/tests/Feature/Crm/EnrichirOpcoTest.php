@@ -22,6 +22,7 @@
  */
 
 use App\Crm\Opco\EnrichissementOpco;
+use App\Crm\Opco\FenetreOpco;
 use App\Crm\Opco\LectureOpco;
 use App\Crm\Opco\Opco;
 use App\Crm\Opco\SourceSiro;
@@ -202,11 +203,11 @@ test('fenêtre : REFUSE de partir hors du mardi→samedi 08:00-19:00 Paris et le
 })->with('hors fenêtre');
 
 test('fenêtre : 08:00 un samedi et 18:59 un mardi sont acceptés, 19:00 refusé', function () {
-    expect(\App\Crm\Opco\FenetreOpco::refus(CarbonImmutable::parse('2026-10-10 08:00', 'Europe/Paris')))->toBeNull()
-        ->and(\App\Crm\Opco\FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 18:59', 'Europe/Paris')))->toBeNull()
-        ->and(\App\Crm\Opco\FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 19:00', 'Europe/Paris')))->not->toBeNull()
+    expect(FenetreOpco::refus(CarbonImmutable::parse('2026-10-10 08:00', 'Europe/Paris')))->toBeNull()
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 18:59', 'Europe/Paris')))->toBeNull()
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 19:00', 'Europe/Paris')))->not->toBeNull()
         // Un instant UTC est lu à l'heure de Paris (06:30 UTC = 08:30 Paris en octobre).
-        ->and(\App\Crm\Opco\FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 06:30', 'UTC')))->toBeNull();
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 06:30', 'UTC')))->toBeNull();
 });
 
 test('aucune planification : crm:enrichir-opco ne figure pas dans le scheduler', function () {

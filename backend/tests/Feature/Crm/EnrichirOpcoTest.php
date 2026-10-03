@@ -534,7 +534,6 @@ test('GET /companies/{id} expose IDCC et OPCO en lecture seule (null sinon)', fu
         ->assertJsonPath('opco', null);
 });
 
-
 // ── Réserves de #322 : RGPD, lignes bornées, reprise, essai à blanc ───────
 
 test('RGPD : une fiche NON DIFFUSIBLE (INSEE) n’est jamais enrichie, et elle est comptée', function () {
@@ -565,10 +564,10 @@ test('ligne trop longue ou guillemet non fermé : rejetée et comptée, la suite
 
     [$code, $sortie] = opcoLancer($e['ws']);
 
+    // La ligne trop longue, et celle au guillemet non fermé (un seul champ :
+    // mauvais nombre de colonnes) — la ligne suivante est lue.
     expect($code)->toBe(0)
         ->and(opcoCompteur($sortie, 'lues'))->toBe(3)
-        // La ligne trop longue, et celle au guillemet non fermé (un seul
-        // champ : mauvais nombre de colonnes) — la ligne suivante est lue.
         ->and(opcoCompteur($sortie, 'ligne malformée'))->toBe(2)
         ->and(DB::table('companies_opco')->pluck('company_id')->all())->toBe([$e['c']['id']]);
 });

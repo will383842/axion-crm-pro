@@ -29,7 +29,11 @@ interface DashboardStats {
   size_distribution: Record<string, number> | null;
   /** Fiches vivantes qui portent un `enriched_at` (tuile « Fiches enrichies »). */
   companies_enriched?: number | null;
-  /** Membres de l'audience système « Prospects contactables » (recalculés chaque nuit). */
+  /**
+   * Membres de l'audience système « Prospects contactables » (recalculés
+   * chaque nuit) : joignables VÉRIFIÉS seulement — une adresse tirée d'un site
+   * deviné non vérifié est en quarantaine (lot N5) et ne compte pas.
+   */
   prospects_joignables?: number | null;
   /** Membres de « Prospects contactables — Île-de-France ». */
   prospects_joignables_idf?: number | null;
@@ -333,7 +337,7 @@ function MaBase({ stats }: { stats: DashboardStats }) {
               ? (pourquoiPasDeJoignables ?? CHIFFRE_INDISPONIBLE)
               : joignablesIdf !== null
                 ? `dont ${joignablesIdf.toLocaleString('fr-FR')} en Île-de-France`
-                : null
+                : 'hors sites devinés non vérifiés'
           }
         />
         <Tuile

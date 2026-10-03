@@ -90,17 +90,29 @@ final class LecturePageAccueil
 
     public const STATUT_ILLISIBLE = 'illisible';
 
+    /** Origines dont le robots.txt est gardé en mémoire, au plus. */
+    private const ROBOTS_CACHE_MAX = 500;
+
+    /** Un robots.txt plus gros n'est pas gardé (relu au besoin) : mémoire bornée à ~16 Mo. */
+    private const ROBOTS_CACHE_OCTETS = 32_768;
+
     /** @var callable(int): void */
     private $dormir;
 
+    /** @var array<string, array{statut: ?string, contenu: string, delai: float}> origine → robots.txt jugé */
+    private array $robots = [];
+
     /**
      * @param  callable(int): void|null  $dormir  attente en millisecondes (remplaçable en test)
+     * @param  string  $userAgent  User-Agent identifiable envoyé (défaut : `USER_AGENT`) ;
+     *                             robots.txt est toujours évalué pour `AGENT_ROBOTS`
      */
     public function __construct(
         private readonly int $concurrence = 4,
         private readonly int $timeout = 6,
         private readonly int $delaiMs = 1000,
         ?callable $dormir = null,
+        private readonly string $userAgent = self::USER_AGENT,
     ) {
         $this->dormir = $dormir ?? static function (int $ms): void {
             if ($ms > 0) {
@@ -212,10 +224,15 @@ final class LecturePageAccueil
     /**
      * Lit les URL données (dédoublonnées), sorties de `cible()`.
      *
+     * `$avecCorps` : la page lue n'est PAS réduite en zones (`extraire`) ; son
+     * corps décompressé (≤ `CORPS_MAX`) est rendu tel quel sous `corps`, pour
+     * un appelant qui n'en tire qu'un oui / non (SIREN présent ?) et ne le
+     * garde pas (`crm:entreprises:verifier-sites`).
+     *
      * @param  list<string>  $cibles
-     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string}>
+     * @return array<string, array{statut: string, zones: array<string, string>, structure: array{articles: int, dates: int, articles_texte?: int, dates_texte?: int}, code?: int, finale?: string, corps?: string}>
      */
-    public function lire(array $cibles): array
+    public function lire(array $cibles, bool $avecCorps = false): array
     {
         $parOrigine = [];
         $resultats = [];
@@ -231,11 +248,17 @@ final class LecturePageAccueil
         $origines = array_keys($parOrigine);
 
         // ── 1. robots.txt, une requête par origine ─────────────────────────
+        // Gardé en mémoire pour la vie du lecteur (`ROBOTS_CACHE_MAX` origines,
+        // contenus de `ROBOTS_CACHE_OCTETS` au plus) : un second appel sur la
+        // même origine (mentions légales après l'accueil) ne le redemande pas.
         $debut = hrtime(true);
-        $robots = $this->recuperer(array_map(static fn (string $o): string => $o . '/robots.txt', $origines), self::ROBOTS_MAX, false);
-        $attenteMs = $this->delaiMs;
-        $files = [];
-        foreach ($origines as $i => $origine) {
+        $juges = array_intersect_key($this->robots, array_flip($origines));
+        $aDemander = array_values(array_filter($origines, static fn (string $o): bool => ! isset($juges[$o])));
+        $robots = $aDemander === [] ? [] : $this->recuperer(array_map(static fn (string $o): string => $o . '/robots.txt', $aDemander), self::ROBOTS_MAX, false);
+        if (count($this->robots) + count($aDemander) > self::ROBOTS_CACHE_MAX) {
+            $this->robots = [];
+        }
+        foreach ($aDemander as $i => $origine) {
             $r = $robots[$i];
             $statutOrigine = null;
             $contenu = '';
@@ -250,6 +273,15 @@ final class LecturePageAccueil
             if ($delai > self::CRAWL_DELAY_MAX) {
                 $statutOrigine = self::STATUT_ROBOTS;
             }
+            $juges[$origine] = ['statut' => $statutOrigine, 'contenu' => $contenu, 'delai' => $delai];
+            if (strlen($contenu) <= self::ROBOTS_CACHE_OCTETS) {
+                $this->robots[$origine] = $juges[$origine];
+            }
+        }
+        $attenteMs = $this->delaiMs;
+        $files = [];
+        foreach ($origines as $origine) {
+            ['statut' => $statutOrigine, 'contenu' => $contenu, 'delai' => $delai] = $juges[$origine];
             foreach ($parOrigine[$origine] as $cible) {
                 if ($statutOrigine !== null) {
                     $resultats[$cible] = self::echec($statutOrigine);
@@ -285,7 +317,8 @@ final class LecturePageAccueil
                     // `code` (2xx ici) et `finale` (l'URL d'arrivée après les
                     // redirections) : `SiteMedia` exige que l'arrivée soit le
                     // même domaine que l'adresse essayée.
-                    $resultats[$cible] = ['statut' => self::STATUT_LU] + self::extraire($p['corps'])
+                    $resultats[$cible] = ['statut' => self::STATUT_LU]
+                        + ($avecCorps ? self::echec(self::STATUT_LU) + ['corps' => $p['corps']] : self::extraire($p['corps']))
                         + ['code' => $p['code'], 'finale' => $p['url'] ?? $cible];
                 }
             }
@@ -349,7 +382,7 @@ final class LecturePageAccueil
                                 },
                             ] + SsrfGuard::optionsEpinglage($l['url'], $l['ip']))
                             ->withHeaders([
-                                'User-Agent' => self::USER_AGENT,
+                                'User-Agent' => $this->userAgent,
                                 'Accept' => $html ? 'text/html,application/xhtml+xml;q=0.9' : 'text/plain,*/*;q=0.1',
                                 'Accept-Encoding' => 'gzip, deflate',
                             ])

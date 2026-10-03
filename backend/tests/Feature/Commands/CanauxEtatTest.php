@@ -8,7 +8,9 @@
  *   1. le TÉMOIN : canaux sains → aucune alerte, code 0 (une sonde qui crierait
  *      toujours passerait pour une sonde qui marche) ;
  *   2. chaque alerte rougit dans son cas, et SEULEMENT dans son cas
- *      (file bloquée, abandon récent, site muet, refus de signature) ;
+ *      (file bloquée, abandon récent, site muet, refus de signature,
+ *      planificateur arrêté) ; un canal fermé EXPRÈS ne rougit plus, le bruit
+ *      d'Internet (POST sans aucun en-tête) non plus ;
  *   3. les refus de signature de `CanalSigneSite` alimentent bien le compteur
  *      (requêtes HTTP réelles, pas un appel direct) ;
  *   4. une mesure impossible vaut `null` + alerte, JAMAIS zéro ;
@@ -18,7 +20,10 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
+use App\Support\BattementPlanificateur;
 use App\Support\CompteurRefusCanal;
+use Illuminate\Console\Scheduling\CallbackEvent;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -39,6 +44,8 @@ beforeEach(function () {
         'crm.ingest.replay_store' => 'array',
     ]);
     Cache::store('array')->flush();
+    // Le planificateur tourne (sauf dans les tests qui disent le contraire).
+    BattementPlanificateur::battre();
 });
 
 function n2Espace(): string
@@ -145,7 +152,7 @@ test('file sortante BLOQUÉE : une ligne pending/failed plus vieille que le seui
 
 test('ABANDON récent (gave_up) rougit ; un abandon ancien est compté mais ne rougit plus', function () {
     n2Reception(n2Espace(), 1);
-    n2Sortant('gave_up', 10, 300); // abandonné il y a 5 h
+    n2Sortant('gave_up', 40, 30 * 60); // abandonné il y a 30 h (hors fenêtre de 26 h)
 
     $calme = n2Lancer();
     expect($calme['etat']['alertes'])->toBe([])
@@ -158,6 +165,160 @@ test('ABANDON récent (gave_up) rougit ; un abandon ancien est compté mais ne r
         ->and(n2Types($r['etat']))->toBe(['file_sortante_abandon'])
         ->and($r['etat']['file_sortante']['gave_up_recents'])->toBe(1)
         ->and($r['etat']['file_sortante']['gave_up_total'])->toBe(2);
+});
+
+test('ABANDON vu même si GitHub saute des passages : fenêtre de 26 h', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 30, 20 * 60); // abandonné il y a 20 h
+
+    $r = n2Lancer();
+
+    expect($r['code'])->toBe(1)
+        ->and(n2Types($r['etat']))->toBe(['file_sortante_abandon'])
+        ->and($r['etat']['file_sortante']['fenetre_abandon_min'])->toBe(1560);
+});
+
+/** Les numéros (BIGSERIAL) des lignes `gave_up` de la base de test. */
+function n2NumerosAbandons(): array
+{
+    return DB::table('crm_outbound_events')->where('status', 'gave_up')->pluck('id')
+        ->map(static fn ($id): string => (string) $id)->all();
+}
+
+test('ABANDONS — veto sécurité #310 : aucun numéro de ligne ne sort du serveur (ils dévoileraient le volume des demandes RGPD)', function () {
+    n2Reception(n2Espace(), 1);
+    // Des numéros élevés et reconnaissables, pour que la recherche dans la
+    // sortie ne tombe pas par hasard sur un autre nombre.
+    DB::statement("SELECT setval(pg_get_serial_sequence('crm_outbound_events', 'id'), 987650)");
+    n2Sortant('gave_up', 5, 10);
+    n2Sortant('gave_up', 5, 20);
+
+    $r = n2Lancer(['--memoriser-signales' => true]);
+    $sortie = json_encode($r['etat'], JSON_THROW_ON_ERROR);
+
+    expect($r['etat']['file_sortante'])->not->toHaveKey('gave_up_recents_ids')
+        ->and($r['etat']['file_sortante']['gave_up_nouveaux'])->toBe(2);
+    foreach (n2NumerosAbandons() as $numero) {
+        expect($r['brut'])->not->toContain($numero)
+            ->and($sortie)->not->toContain($numero);
+    }
+});
+
+test('ABANDONS — veto sécurité #310 : le « déjà signalé » est tenu CÔTÉ SERVEUR, chaque ligne n’est nouvelle qu’une fois', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+    n2Sortant('gave_up', 5, 20);
+
+    // Un passage de la surveillance : deux lignes nouvelles, mémorisées.
+    $premier = n2Lancer(['--memoriser-signales' => true]);
+    // Le passage suivant : l'alerte reste levée (fenêtre de 26 h), mais rien
+    // de nouveau à signaler.
+    $second = n2Lancer(['--memoriser-signales' => true]);
+    // Une troisième ligne abandonnée : elle seule est nouvelle.
+    n2Sortant('gave_up', 5, 1);
+    $troisieme = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($premier['etat']['file_sortante']['gave_up_nouveaux'])->toBe(2)
+        ->and(n2Types($second['etat']))->toBe(['file_sortante_abandon'])
+        ->and($second['etat']['file_sortante']['gave_up_recents'])->toBe(2)
+        ->and($second['etat']['file_sortante']['gave_up_nouveaux'])->toBe(0)
+        ->and($troisieme['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1);
+});
+
+test('ABANDONS : une mesure rejouée À LA MAIN (sans --memoriser-signales) ne consomme pas les nouveautés de la surveillance', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+
+    $main = n2Lancer();
+    $surveillance = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($main['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1)
+        ->and($surveillance['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1);
+});
+
+test('ABANDONS : mémoire illisible → tout est « nouveau » (un doublon, jamais un silence)', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+    n2Lancer(['--memoriser-signales' => true]);
+
+    // Le magasin par défaut devient injoignable (il porte aussi le battement :
+    // `controle_impossible` s'ajoute, c'est attendu).
+    config(['cache.stores.n2_casse' => ['driver' => 'redis', 'connection' => 'n2-inexistante']]);
+    config(['cache.default' => 'n2_casse']);
+    $r = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($r['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1)
+        ->and(n2Types($r['etat']))->toContain('file_sortante_abandon');
+});
+
+test('CANAL FERMÉ EXPRÈS : site_muet et file_sortante_bloquee neutralisés, le JSON le dit ; gave_up jamais', function () {
+    n2Espace(); // aucune réception
+    n2Sortant('pending', 5); // file bloquée
+    n2Sortant('gave_up', 5, 10);
+    config(['crm.ingest.enabled' => false, 'crm.outbound_enabled' => false]);
+
+    $r = n2Lancer(['--fermes-expres' => 'site-vers-crm,crm-vers-site']);
+
+    expect(n2Types($r['etat']))->toBe(['file_sortante_abandon'])
+        ->and($r['etat']['reception_site']['ferme_expres'])->toBeTrue()
+        ->and($r['etat']['file_sortante']['ferme_expres'])->toBeTrue()
+        ->and($r['etat']['canaux_fermes_expres'])->toBe(['crm-vers-site', 'site-vers-crm']);
+
+    // TÉMOIN : sans la déclaration, les deux alertes reviennent.
+    expect(n2Types(n2Lancer()['etat']))->toBe(['file_sortante_bloquee', 'file_sortante_abandon', 'site_muet']);
+});
+
+test('CANAL déclaré fermé exprès mais drapeau OUVERT : l’alerte reste (une variable oubliée ne masque rien)', function () {
+    n2Espace();
+    config(['crm.ingest.enabled' => true]);
+
+    $r = n2Lancer(['--fermes-expres' => 'site-vers-crm']);
+
+    /** @var list<array{type: string, message: string}> $alertes */
+    $alertes = $r['etat']['alertes'];
+    expect(n2Types($r['etat']))->toBe(['site_muet'])
+        ->and($r['etat']['reception_site']['ferme_expres'])->toBeFalse()
+        ->and($alertes[0]['message'])->toContain('déclaré fermé exprès');
+});
+
+test('PLANIFICATEUR ARRÊTÉ : aucun battement depuis plus de 15 min rougit', function () {
+    n2Reception(n2Espace(), 1);
+
+    expect(n2Lancer()['etat']['alertes'])->toBe([]);
+
+    test()->travel(16)->minutes();
+    $r = n2Lancer();
+    test()->travelBack();
+
+    expect($r['code'])->toBe(1)
+        ->and(n2Types($r['etat']))->toBe(['planificateur_arrete'])
+        ->and($r['etat']['planificateur']['dernier_battement_a'])->toBeString();
+
+    // Jamais battu (cache vidé) : alerte aussi, « jamais » dit en clair.
+    Cache::flush();
+    $jamais = n2Lancer();
+    expect(n2Types($jamais['etat']))->toBe(['planificateur_arrete'])
+        ->and($jamais['etat']['planificateur']['dernier_battement_a'])->toBeNull();
+});
+
+test('le battement est posé par une tâche planifiée CHAQUE MINUTE, qui écrit bien le cache', function () {
+    Cache::flush();
+    // Force le chargement paresseux de `routes/console.php` (même idiome que
+    // VerrousDuPlanificateurTest).
+    Artisan::call('list', ['--format' => 'txt']);
+    $taches = array_values(array_filter(
+        app(Schedule::class)->events(),
+        static fn ($e): bool => $e->description === BattementPlanificateur::NOM_TACHE,
+    ));
+
+    expect($taches)->toHaveCount(1)
+        ->and($taches[0])->toBeInstanceOf(CallbackEvent::class)
+        ->and($taches[0]->expression)->toBe('* * * * *')
+        ->and(BattementPlanificateur::dernier())->toBeNull();
+
+    $taches[0]->run(app());
+
+    expect(BattementPlanificateur::dernier())->toBeInt();
 });
 
 test('SITE MUET : rien reçu dans la fenêtre rougit, avec la date de dernière réception', function () {
@@ -204,23 +365,86 @@ test('les REFUS DE SIGNATURE de CanalSigneSite alimentent le compteur (requêtes
             'HTTP_X_SITE_SIGNATURE' => str_repeat('0', 64),
         ], $corps)->assertStatus(401)->assertJsonPath('error', 'bad_signature');
     }
-    // … et 2 horodatages absents sur le canal RGPD.
+    // … et 2 horodatages périmés (mais présents) sur le canal RGPD.
     for ($i = 0; $i < 2; $i++) {
-        test()->call('POST', '/api/internal/site-sync/gdpr', [], [], [], $entetes, '{}')
-            ->assertStatus(401)->assertJsonPath('error', 'stale_signature');
+        test()->call('POST', '/api/internal/site-sync/gdpr', [], [], [], $entetes + [
+            'HTTP_X_SITE_TIMESTAMP' => (string) (time() - 3600),
+        ], '{}')->assertStatus(401)->assertJsonPath('error', 'stale_signature');
     }
 
-    $r = n2Lancer();
+    $r = n2Lancer(['--seuil-bad-signature' => 10]);
 
     expect($r['etat']['refus_signature']['total'])->toBe(6)
         ->and($r['etat']['refus_signature']['par_motif'])->toBe([
-            'bad_signature' => 4, 'stale_signature' => 2, 'replay_guard_unavailable' => 0,
+            'bad_signature' => 4, 'stale_signature' => 2, 'replay_guard_unavailable' => 0, 'sans_entete' => 0,
         ])
         ->and($r['etat']['refus_signature']['par_canal'])->toBe(['site-sync' => 4, 'site-sync/gdpr' => 2])
         ->and(n2Types($r['etat']))->toBe(['refus_signature']);
 
     // Seuil à 6 : « au-delà » du seuil seulement.
-    expect(n2Lancer(['--seuil-refus' => 6])['etat']['alertes'])->toBe([]);
+    expect(n2Lancer(['--seuil-refus' => 6, '--seuil-bad-signature' => 10])['etat']['alertes'])->toBe([]);
+});
+
+test('BRUIT D’INTERNET : un POST sans AUCUN en-tête est compté à part (sans_entete) et ne rougit pas ; la réponse ne change pas', function () {
+    n2Reception(n2Espace(), 1);
+    $entetes = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'];
+
+    // Un scanner : 20 POST anonymes sur les deux routes publiques.
+    foreach (['/api/internal/site-sync', '/api/internal/site-sync/gdpr'] as $route) {
+        for ($i = 0; $i < 10; $i++) {
+            $reponse = test()->call('POST', $route, [], [], [], $entetes, '{}');
+            // Réponse STRICTEMENT identique à celle d'avant : même code, même corps.
+            $reponse->assertStatus(401);
+            expect($reponse->getContent())->toBe('{"error":"stale_signature"}');
+        }
+    }
+
+    $r = n2Lancer();
+
+    expect($r['code'])->toBe(0)
+        ->and($r['etat']['alertes'])->toBe([])
+        ->and($r['etat']['refus_signature']['total'])->toBe(0)
+        ->and($r['etat']['refus_signature']['par_motif']['sans_entete'])->toBe(20)
+        ->and($r['etat']['refus_signature']['par_motif']['stale_signature'])->toBe(0);
+
+    // TÉMOIN : un horodatage présent mais périmé reste un `stale_signature` compté.
+    test()->call('POST', '/api/internal/site-sync', [], [], [], $entetes + [
+        'HTTP_X_SITE_TIMESTAMP' => (string) (time() - 3600),
+    ], '{}')->assertStatus(401)->assertJsonPath('error', 'stale_signature');
+    // Et une signature seule (sans horodatage) n'est pas « sans en-tête ».
+    test()->call('POST', '/api/internal/site-sync', [], [], [], $entetes + [
+        'HTTP_X_SITE_SIGNATURE' => str_repeat('0', 64),
+    ], '{}')->assertStatus(401)->assertJsonPath('error', 'stale_signature');
+
+    expect(n2Lancer()['etat']['refus_signature']['par_motif']['stale_signature'])->toBe(2);
+});
+
+test('SECRET DÉSALIGNÉ à faible trafic : deux bad_signature sur la fenêtre de 120 min suffisent', function () {
+    n2Reception(n2Espace(), 1);
+
+    // Le backoff du site : une tentative il y a 100 min, la suivante maintenant.
+    test()->travel(-100)->minutes();
+    CompteurRefusCanal::incrementer('site-sync', 'bad_signature');
+    test()->travelBack();
+
+    $une = n2Lancer();
+    expect($une['etat']['alertes'])->toBe([])
+        ->and($une['etat']['refus_signature']['fenetre_min'])->toBe(120)
+        ->and($une['etat']['refus_signature']['par_motif']['bad_signature'])->toBe(1);
+
+    CompteurRefusCanal::incrementer('site-sync', 'bad_signature');
+
+    $r = n2Lancer();
+    expect($r['code'])->toBe(1)
+        ->and(n2Types($r['etat']))->toBe(['refus_signature'])
+        ->and($r['etat']['refus_signature']['seuil_bad_signature'])->toBe(1);
+
+    // Le seuil est un réglage.
+    expect(n2Lancer(['--seuil-bad-signature' => 2])['etat']['alertes'])->toBe([]);
+});
+
+test('le compteur garde ses tranches au moins le temps de la fenêtre de lecture', function () {
+    expect(CompteurRefusCanal::TTL_SECONDES)->toBeGreaterThanOrEqual(120 * 60 + CompteurRefusCanal::TRANCHE_SECONDES);
 });
 
 test('une requête correctement signée n’incrémente RIEN', function () {

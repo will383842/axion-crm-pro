@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Presse\PersonneReelle;
+use App\Crm\Sites\QuarantaineSite;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Http\Requests\StoreJournalistRequest;
 use App\Http\Requests\UpdateJournalistRequest;
@@ -244,6 +245,12 @@ class JournalistsController extends ApiController
             $filtree->getEloquentBuilder(),
             'journalists.email',
         )->with('media');
+        // 🔴 QUARANTAINE (lot N5, `QuarantaineSite::journalisteSql`) : un
+        // journaliste relevé sur le site deviné non vérifié de son média sort
+        // SANS son adresse (rien n'est effacé). Expression de la liste de
+        // sélection : média puis fiche, par clé primaire.
+        $query->select('journalists.*')
+            ->selectRaw(QuarantaineSite::journalisteSql('journalists') . ' AS email_en_quarantaine');
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');
@@ -264,7 +271,7 @@ class JournalistsController extends ApiController
                     $j->last_name,
                     $j->role,
                     $j->beat,
-                    $j->email,
+                    $j->getAttribute('email_en_quarantaine') ? null : $j->email,
                     $j->phone,
                     $j->media?->name,
                     $j->opt_out ? 'oui' : 'non',

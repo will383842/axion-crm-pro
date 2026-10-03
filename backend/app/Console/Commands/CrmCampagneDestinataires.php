@@ -10,6 +10,8 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
+use App\Crm\Sites\QuarantaineSite;
+use App\Crm\Sites\SiteFiable;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -101,6 +103,7 @@ class CrmCampagneDestinataires extends Command
     /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
     private const COMPTEURS_MOTIFS = [
         EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
+        EligibiliteAdresse::SITE_NON_VERIFIE => 'ecartees_site_non_verifie',
         EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
         EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
         EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
@@ -157,7 +160,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -357,10 +360,13 @@ class CrmCampagneDestinataires extends Command
             ->orderBy('companies.id')
             ->select([
                 'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
-                'companies.legal_form',
+                'companies.legal_form', 'companies.website',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
             ])
+            // Quarantaine (lot N5, `QuarantaineSite`) : une expression de la
+            // liste de sélection sur les fiches du segment, pas une condition.
+            ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
             // Segment presse : ce qui juge la provenance des adresses de la
             // fiche (`AdressePresseFiable`), et le « média possible ».
             ->when($presse, static fn ($q) => $q->selectRaw(
@@ -419,6 +425,10 @@ class CrmCampagneDestinataires extends Command
         // Entrepreneur individuel (`EligibiliteAdresse`) : lu sur la fiche
         // déjà chargée, posé sur chacune de ses adresses.
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($org->legal_form ?? null);
+        // Quarantaine (lot N5) : hors presse — le segment presse juge déjà la
+        // provenance (`AdressePresseFiable`).
+        $nonVerifiee = ! $presse && (bool) ($org->site_non_verifie ?? false);
+        $site = is_string($org->website ?? null) ? $org->website : null;
         $fiche = $presse ? [
             'site_devine' => (bool) $org->site_devine,
             'site_verifie' => (bool) $org->site_verifie,
@@ -442,6 +452,7 @@ class CrmCampagneDestinataires extends Command
                 'perso' => false,
                 'deja_informe' => $org->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                'site_non_verifie' => $nonVerifiee,
             ];
         }
 
@@ -459,7 +470,7 @@ class CrmCampagneDestinataires extends Command
             // même règle que l'audience presse (relecture A09).
             ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
             ->orderBy('id')
-            ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at'])
+            ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at', 'discovery_source'])
             ->when($presse, static fn ($q) => $q->selectRaw(
                 GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
                 // Le journaliste source opposé ou à la corbeille : l'adresse ne part pas.
@@ -489,6 +500,12 @@ class CrmCampagneDestinataires extends Command
                 'perso' => is_array($meta) && ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => $c->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                'site_non_verifie' => QuarantaineSite::personne(
+                    $nonVerifiee,
+                    is_string($c->discovery_source ?? null) ? $c->discovery_source : null,
+                    (string) $c->email,
+                    $site,
+                ),
             ];
         }
 

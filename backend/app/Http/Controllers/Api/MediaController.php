@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Presse\SiteMedia;
+use App\Crm\Sites\QuarantaineSite;
 use App\Models\Media;
 use App\Support\EligibiliteCampagne;
 use App\Support\MasquageCoordonnees;
@@ -320,6 +321,12 @@ class MediaController extends ApiController
             $filtree->getEloquentBuilder(),
             'media.email',
         );
+        // 🔴 QUARANTAINE (lot N5, `QuarantaineSite::mediaSql`) : l'adresse
+        // d'un média au site deviné non vérifié ne sort JAMAIS (la ligne sort,
+        // sans l'adresse ; rien n'est effacé). Expression de la liste de
+        // sélection : une lecture de `companies` par clé primaire par ligne.
+        $query->select('media.*')
+            ->selectRaw(QuarantaineSite::mediaSql('media') . ' AS email_en_quarantaine');
 
         return response()->streamDownload(function () use ($query, $header) {
             $out = fopen('php://output', 'w');
@@ -347,8 +354,8 @@ class MediaController extends ApiController
                     $m->city,
                     $m->publisher,
                     $m->website,
-                    $m->email,
-                    $m->email_confidence,
+                    $m->getAttribute('email_en_quarantaine') ? null : $m->email,
+                    $m->getAttribute('email_en_quarantaine') ? null : $m->email_confidence,
                     $m->phone,
                     $m->cppap_number,
                     $m->arcom_id,

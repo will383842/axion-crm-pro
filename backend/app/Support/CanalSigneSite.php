@@ -18,7 +18,10 @@ use Throwable;
  *
  * ORDRE DES CONTRÔLES :
  *   1. horodatage `X-Site-Timestamp` présent, entier, dans la fenêtre — AVANT
- *      tout calcul de signature (absent ou hors fenêtre → 401 `stale_signature`) ;
+ *      tout calcul de signature (absent ou hors fenêtre → 401 `stale_signature`).
+ *      Un POST qui ne porte NI horodatage NI signature reçoit exactement la
+ *      même réponse, mais il est compté à part (`sans_entete`) : c'est le
+ *      bruit d'un scanner, pas un émetteur désaligné ;
  *   2. signature `X-Site-Signature` sur « <horodatage>.<corps> »
  *      (→ 401 `bad_signature`) ;
  *   3. mémoire des requêtes déjà vues, UNIQUEMENT pour les routes sans
@@ -68,7 +71,10 @@ final class CanalSigneSite
         // 1. Horodatage d'abord : sans lui, aucune signature n'est calculée.
         if ($timestamp === null || ! HmacSignature::timestampWithinWindow($timestamp, $fenetre)) {
             Log::warning("{$canal} rejeté (horodatage absent ou hors fenêtre)", ['ip_empreinte' => EmpreinteIp::de($request->ip())]);
-            CompteurRefusCanal::incrementer($canal, 'stale_signature');
+            // La réponse ne dépend PAS de ce tri : seul le compteur distingue
+            // le bruit d'Internet (aucun en-tête du site) d'un vrai refus.
+            $sansEntete = $timestamp === null && ! $request->headers->has('X-Site-Signature');
+            CompteurRefusCanal::incrementer($canal, $sansEntete ? CompteurRefusCanal::MOTIF_SANS_ENTETE : 'stale_signature');
 
             return response()->json(['error' => 'stale_signature'], 401);
         }

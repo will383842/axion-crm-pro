@@ -98,6 +98,7 @@
         <env name="MOCK_FRANCE_TRAVAIL" value="true" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="CRM_INGEST_REPLAY_STORE" value="array" force="true"/>
         <!-- `force="true"` : cf. la note detaillee dans phpunit.xml. Necessaire mais
              PAS suffisant (PHPUnit n'ecrit pas $_SERVER) — c'est
              `tests/bootstrap.php` qui epingle reellement la base. -->

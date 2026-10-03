@@ -176,7 +176,10 @@ function cheminSondeTelescope(): string
  */
 function sondeTelescope(array $environnement): array
 {
-    $commande = 'env -u TELESCOPE_ENABLED -u APP_ENV -u APP_DEBUG';
+    // `CRM_INGEST_REPLAY_STORE` est forcee a `array` par phpunit pour la suite ;
+    // hors environnement de test, le demarrage exige un magasin redis
+    // (`CanauxSignesServiceProvider`). Le processus enfant ne doit pas en heriter.
+    $commande = 'env -u TELESCOPE_ENABLED -u APP_ENV -u APP_DEBUG -u CRM_INGEST_REPLAY_STORE';
     // Cle de forme valide : le demarrage du noyau la reclame. Elle ne chiffre
     // rien ici, la sonde n'ouvre aucune session.
     $environnement += [
@@ -388,7 +391,7 @@ function sondeTelescopeSousConfigCache(array $environnementDuCache, array $envir
         'APP_CONFIG_CACHE' => $cache,
     ];
 
-    $commande = 'cd ' . escapeshellarg(base_path()) . ' && env -u TELESCOPE_ENABLED -u APP_ENV -u APP_DEBUG';
+    $commande = 'cd ' . escapeshellarg(base_path()) . ' && env -u TELESCOPE_ENABLED -u APP_ENV -u APP_DEBUG -u CRM_INGEST_REPLAY_STORE';
     foreach ($environnementDuCache + $base as $cle => $valeur) {
         $commande .= ' ' . escapeshellarg($cle . '=' . $valeur);
     }

@@ -147,9 +147,16 @@ return [
         'personnes_enabled' => env('CRM_INGEST_PERSONNES_ENABLED', false),
         'hmac_secret' => env('SITE_SYNC_HMAC_SECRET', ''),
         'business_workspace' => env('CRM_INGEST_BUSINESS_WORKSPACE', 'axion-ia'),
-        // Fenêtre de tolérance de l'horodatage signé (anti-rejeu). 0 = contrôle
-        // désactivé (le site ne signe pas encore d'horodatage).
-        'max_clock_skew_seconds' => (int) env('CRM_INGEST_MAX_CLOCK_SKEW', 300),
+        // Fenêtre de tolérance de l'horodatage signé, en secondes. Variable
+        // absente → 300. Variable posée → entier de 1 à 3600, sinon
+        // l'application refuse de démarrer (`CanauxSignesServiceProvider`,
+        // `App\Support\FenetreHorodatage`). La valeur brute est gardée ici
+        // SANS conversion : `(int)` changerait une valeur invalide en 0 et
+        // effacerait la différence entre « absente » et « mal posée ».
+        'max_clock_skew_seconds' => env('CRM_INGEST_MAX_CLOCK_SKEW', 300),
+        // Magasin de cache de la mémoire des requêtes signées déjà vues (un
+        // magasin `redis` en production ; `array` dans les tests).
+        'replay_store' => env('CRM_INGEST_REPLAY_STORE', 'redis'),
     ],
 
     /*

@@ -449,6 +449,19 @@ test('rejouer le MÊME événement ne crée pas de doublon', function () {
         ->and(DB::table('activities')->count())->toBe(1);
 });
 
+test('le MÊME message signé reçu deux fois dans la même seconde reste idempotent (200, pas de refus)', function () {
+    // Le site peut émettre deux fois exactement le même message (job d'émission
+    // et balayage de la file) : même horodatage, même signature. La route
+    // s'appuie sur l'`event_id`, pas sur une mémoire des requêtes déjà vues.
+    $event = siteSyncEvent();
+    $horodatage = (string) time();
+
+    siteSyncPost($event, timestamp: $horodatage)->assertOk()->assertJsonPath('result.status', 'created');
+    siteSyncPost($event, timestamp: $horodatage)->assertOk()->assertJsonPath('result.status', 'noop_idempotent');
+
+    expect(DB::table('activities')->count())->toBe(1);
+});
+
 test('deux événements distincts de la même personne alimentent UNE fiche', function () {
     siteSyncPost(siteSyncEvent())->assertOk();
     siteSyncPost(siteSyncEvent([

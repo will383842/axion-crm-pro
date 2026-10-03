@@ -89,6 +89,10 @@ final class SemeurTablesScopees
         'business_events',
         'candidate_tag',
         'company_tag',
+        // 2026-10-05 (lot O14) : IDCC et OPCO d'une entreprise — feuille de
+        // `companies` ; et le journal des passages de `crm:enrichir-opco`.
+        'companies_opco',
+        'companies_opco_passages',
         // 2026-10-03 (N12) : provenance tiers d'une personne — feuille de
         // `contacts`.
         'contacts_provenances_tiers',
@@ -403,6 +407,19 @@ final class SemeurTablesScopees
             'audience_id' => $id['email_audiences'],
             'company_id' => $id['companies'],
             'contact_id' => $id['contacts'],
+        ]);
+
+        $inserer('companies_opco', [
+            'company_id' => $id['companies'],
+            'siret' => '99999999900017',
+            'idcc' => '9999',
+            'opco' => 'atlas',
+            'source' => 'saisie',
+        ]);
+
+        $inserer('companies_opco_passages', [
+            'ressource_id' => 'zz-etancheite',
+            'ressource_url' => 'https://example.invalid/zz.csv',
         ]);
 
         $inserer('contacts_provenances_tiers', [

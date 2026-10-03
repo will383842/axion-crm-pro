@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Console\FilesATraiter;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Doublons\Rapprochement;
 use App\Crm\Doublons\RefusFusion;
 use App\Crm\FichesProtegees;
+use App\Http\Controllers\Api\Crm\ATraiterController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,17 +44,9 @@ class DoublonsController extends ApiController
         $parPage = (int) ($filtres['per_page'] ?? 50);
         $page = (int) ($filtres['page'] ?? 1);
 
-        $base = DB::table('duplicate_flags as d')
-            ->join('companies as ga', 'ga.id', '=', 'd.entity_a_id')
-            ->join('companies as ab', 'ab.id', '=', 'd.entity_b_id')
-            ->where('d.workspace_id', $ws)
-            ->where('d.entity_type', 'company')
-            ->whereNull('d.reviewed_at')
-            ->whereNotNull('d.motif')
-            ->where('ga.workspace_id', $ws)
-            ->where('ab.workspace_id', $ws)
-            ->whereNull('ga.deleted_at')
-            ->whereNull('ab.deleted_at');
+        // La MÊME file que la pastille du menu (`ATraiterController`) : un
+        // seul constructeur, sinon le menu et l'écran finiraient par diverger.
+        $base = FilesATraiter::doublons($ws);
 
         $parMotif = [];
         foreach ((clone $base)->groupBy('d.motif')->select('d.motif', DB::raw('count(*) AS n'))->get() as $l) {
@@ -116,6 +110,11 @@ class DoublonsController extends ApiController
             return $this->ok(['error' => $r->raison, 'message' => $r->getMessage()], 409);
         }
 
+        // La pastille « Doublons à vérifier » du menu suit le geste (au plus
+        // 60 s de retard si un calcul concurrent réécrit l'ancien chiffre,
+        // cf. `ATraiterController`).
+        ATraiterController::oublier($ws);
+
         return $this->ok(['fusion_id' => $id]);
     }
 
@@ -142,6 +141,8 @@ class DoublonsController extends ApiController
         if ($n === 0) {
             return $this->ok(['error' => 'deja_traitee', 'message' => RefusFusion::MESSAGES['deja_traitee']], 409);
         }
+
+        ATraiterController::oublier($ws);
 
         return $this->ok(['ok' => true]);
     }

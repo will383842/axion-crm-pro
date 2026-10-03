@@ -164,6 +164,14 @@ const REGISTRE: ReadonlyArray<{ fichier: string; nombre: number; motif: string }
     nombre: 1,
     motif: 'Carte de couverture, l ecran annonce « Live · refresh 60s ». 60 s.',
   },
+  {
+    fichier: 'src/features/a-traiter/compteurs.ts',
+    nombre: 1,
+    motif:
+      'Pastilles « À traiter » du menu (doublons, personnes a rattacher) : les files '
+      + 'se remplissent par des taches de fond, aucun evenement diffuse. 60 s, '
+      + 'jamais onglet cache, cache serveur de 60 s par espace.',
+  },
 ];
 
 // ── Lecture du depot ──────────────────────────────────────────────────────

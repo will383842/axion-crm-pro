@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\ConsoleAccess;
+use App\Crm\Console\FilesATraiter;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Support\MasquageCoordonnees;
@@ -49,11 +50,8 @@ class ArbitrageController extends ConsoleController
         $perPage = $this->perPage($request);
 
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $perPage): JsonResponse {
-            $query = DB::table('activities')
-                ->where('workspace_id', $workspaceId)
-                ->whereNull('subject_id')
-                ->whereRaw("payload -> 'pending_match' IS NOT NULL")
-                ->whereRaw("payload -> 'arbitrage_dismissed' IS NULL");
+            // La MÊME file que la pastille du menu (`ATraiterController`).
+            $query = FilesATraiter::aRattacher($workspaceId);
 
             $total = (clone $query)->count();
 
@@ -106,7 +104,7 @@ class ArbitrageController extends ConsoleController
         ]);
         $companyId = (int) $validated['company_id'];
 
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $companyId, $request): JsonResponse {
+        $reponse = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $companyId, $request): JsonResponse {
             return DB::transaction(function () use ($workspaceId, $activityId, $companyId, $request): JsonResponse {
                 $activity = $this->lockedActivity($workspaceId, $activityId);
 
@@ -196,6 +194,13 @@ class ArbitrageController extends ConsoleController
                 ]);
             });
         });
+
+        // La pastille « Personnes à rattacher » du menu suit le geste (au plus
+        // 60 s de retard si un calcul concurrent réécrit l'ancien chiffre,
+        // cf. `ATraiterController`).
+        ATraiterController::oublier($workspaceId);
+
+        return $reponse;
     }
 
     /**
@@ -215,7 +220,7 @@ class ArbitrageController extends ConsoleController
         ]);
         $reason = (string) $validated['reason'];
 
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $reason, $request): JsonResponse {
+        $reponse = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $reason, $request): JsonResponse {
             return DB::transaction(function () use ($workspaceId, $activityId, $reason, $request): JsonResponse {
                 $activity = $this->lockedActivity($workspaceId, $activityId);
 
@@ -237,6 +242,10 @@ class ArbitrageController extends ConsoleController
                 return $this->ok(['activity_id' => $activityId, 'dismissed' => true]);
             });
         });
+
+        ATraiterController::oublier($workspaceId);
+
+        return $reponse;
     }
 
     /**

@@ -41,6 +41,7 @@ import type {
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
 import { chargerListes } from '@/features/listes/listes';
+import { PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import {
   REGLAGE_PAR_DEFAUT,
   reglageVersApi,
@@ -118,12 +119,13 @@ const PAYS_OPTIONS: Array<{ code: ChoixPays; label: string }> = [
 const SECTOR_PRESETS = enPresets(SECTEURS);
 const NATURE_PRESETS = enPresets(NATURES);
 
-const STATUS_PRESETS: Array<{ code: string; label: string }> = [
-  { code: 'pending',              label: 'À compléter' },
-  { code: 'ready_for_outreach',   label: 'Prêt pour la prospection' },
-  { code: 'partial_email',        label: 'E-mail partiel' },
-  { code: 'archived_no_email',    label: 'Archivé sans e-mail' },
-];
+// Le référentiel PARTAGÉ (`prospection-referentiels.ts`) : un même statut
+// porte le même libellé ici, dans la liste des contacts, dans le hub et dans
+// le résumé lisible d'une audience. L'option vide (« Tous statuts ») n'a pas
+// de sens dans une liste à cocher.
+const STATUS_PRESETS: Array<{ code: string; label: string }> = PROSPECTION_STATUS_OPTIONS
+  .filter((o) => o.value !== '')
+  .map((o) => ({ code: o.value, label: o.label }));
 
 // ---------------------------------------------------------------------------
 // Form

@@ -46,6 +46,13 @@ import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
+import { PastilleCompteur } from '@/features/a-traiter/PastilleCompteur';
+import {
+  LIBELLES_COMPTEUR,
+  useCompteursATraiter,
+  type CleCompteur,
+  type CompteursATraiter,
+} from '@/features/a-traiter/compteurs';
 
 export interface NavItem {
   to: string;
@@ -53,6 +60,12 @@ export interface NavItem {
   icon: ReactNode;
   dataTour?: string;
   locked?: boolean;
+  /**
+   * Pastille « À traiter » (audit UX lot 8) : le nombre d'éléments en attente
+   * de la file, servi par `/crm/a-traiter/compteurs`. Rien n'est affiché tant
+   * que le compteur est inconnu, en échec ou nul.
+   */
+  compteur?: CleCompteur;
 }
 
 export interface NavSection {
@@ -114,9 +127,9 @@ function sectionATraiter(features: ConsoleFeatures): NavSection {
     id: 'a-traiter',
     title: 'À traiter',
     items: [
-      { to: '/doublons', label: 'Doublons à vérifier', icon: icone(CopyCheck) },
+      { to: '/doublons', label: 'Doublons à vérifier', icon: icone(CopyCheck), compteur: 'doublons' },
       ...(features.console_v2
-        ? [{ to: '/console/arbitrage', label: 'Personnes à rattacher', icon: icone(Scale) }]
+        ? [{ to: '/console/arbitrage', label: 'Personnes à rattacher', icon: icone(Scale), compteur: 'a_rattacher' as const }]
         : []),
     ],
   };
@@ -228,6 +241,9 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
   const sections = sectionsDeNavigation(features);
+  // Les pastilles « À traiter » : la route vit derrière le drapeau de la
+  // console, on ne la demande donc que console ouverte.
+  const { data: compteurs } = useCompteursATraiter(features.console_v2);
 
   // UNE seule section ouverte à la fois : ouvrir la suivante referme la
   // précédente. Sur neuf sections (avant l'étape 0) dépliées en permanence, la navigation
@@ -292,6 +308,7 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
             section={section}
             collapsed={collapsed}
             currentPath={router}
+            compteurs={compteurs}
             ouverte={sectionOuverte === section.id}
             onBasculer={() =>
               setSectionOuverte((actuelle) => (actuelle === section.id ? null : section.id))
@@ -325,12 +342,14 @@ function NavSectionBlock({
   section,
   collapsed,
   currentPath,
+  compteurs,
   ouverte,
   onBasculer,
 }: {
   section: NavSection;
   collapsed: boolean;
   currentPath: string;
+  compteurs: CompteursATraiter | undefined;
   ouverte: boolean;
   onBasculer: () => void;
 }) {
@@ -380,7 +399,12 @@ function NavSectionBlock({
         <ul id={idListe} className={cn('flex flex-col gap-0.5', !deplie && 'hidden')}>
           {section.items.map((item) => (
             <li key={item.to}>
-              <SidebarNavLink item={item} collapsed={collapsed} currentPath={currentPath} />
+              <SidebarNavLink
+                item={item}
+                collapsed={collapsed}
+                currentPath={currentPath}
+                nombre={item.compteur === undefined ? undefined : compteurs?.[item.compteur]}
+              />
             </li>
           ))}
         </ul>
@@ -393,13 +417,16 @@ function SidebarNavLink({
   item,
   collapsed,
   currentPath,
+  nombre,
 }: {
   item: NavItem;
   collapsed: boolean;
   currentPath: string;
+  nombre?: number | null | undefined;
 }) {
   // Active = exact match for '/', startsWith for others
   const active = item.to === '/' ? currentPath === '/' : currentPath === item.to || currentPath.startsWith(`${item.to}/`);
+  const pastille = item.compteur === undefined ? null : LIBELLES_COMPTEUR[item.compteur];
 
   const link = (
     <Link
@@ -415,12 +442,16 @@ function SidebarNavLink({
       )}
       aria-current={active ? 'page' : undefined}
     >
-      <span className={cn('shrink-0', active ? 'text-brand-300' : 'text-sidebar-fg-muted')}>
+      <span className={cn('relative shrink-0', active ? 'text-brand-300' : 'text-sidebar-fg-muted')}>
         {item.icon}
+        {collapsed && pastille !== null && (
+          <PastilleCompteur nombre={nombre} libelle={pastille} enExposant />
+        )}
       </span>
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
+          {pastille !== null && <PastilleCompteur nombre={nombre} libelle={pastille} />}
           {item.locked && (
             <Lock className="h-3 w-3 shrink-0 text-sidebar-fg-muted" aria-label="Bientôt disponible" />
           )}

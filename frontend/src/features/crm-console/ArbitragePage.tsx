@@ -20,6 +20,7 @@ import { api, messageApiLisible } from '@/lib/api';
 import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
+import { COMPTEURS_A_TRAITER_KEY } from '@/features/a-traiter/compteurs';
 
 export function ArbitragePage() {
   return (
@@ -40,6 +41,8 @@ function ArbitrageContent() {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['crm', 'arbitrage'] });
     void queryClient.invalidateQueries({ queryKey: ['crm', 'contacts-hub'] });
+    // La pastille « Personnes à rattacher » du menu suit le geste.
+    void queryClient.invalidateQueries({ queryKey: COMPTEURS_A_TRAITER_KEY });
   };
 
   const attach = useMutation({

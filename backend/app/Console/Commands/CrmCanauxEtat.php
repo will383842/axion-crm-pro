@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Support\BattementPlanificateur;
 use App\Support\CanalSigneSite;
 use App\Support\CompteurRefusCanal;
+use App\Support\MemoireAbandonsSignales;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -18,18 +20,40 @@ use Throwable;
  * (des nombres, des dates, des booléens) — elle finit dans des issues d'un
  * dépôt PUBLIC.
  *
- * Trois questions :
+ * Quatre questions :
  *   1. la file sortante `crm_outbound_events` (CRM → site) avance-t-elle ?
  *      → aucune ligne `pending`/`failed` plus vieille que `--seuil-age-h` ;
  *      → aucune ligne passée `gave_up` dans les `--fenetre-abandon-min`
  *        dernières minutes (état TERMINAL : une opposition qui n'atteindra
- *        jamais le site) ;
+ *        jamais le site). 26 h par défaut : un passage horaire sauté par
+ *        GitHub ne fait plus disparaître un abandon. `gave_up_nouveaux`
+ *        compte les lignes pas encore signalées ({@see MemoireAbandonsSignales},
+ *        mémoire CÔTÉ SERVEUR, écrite seulement avec `--memoriser-signales`) :
+ *        le workflow ne complète l'issue qu'avec du neuf. AUCUN numéro de
+ *        ligne ne sort (veto sécurité #310 : ils dévoileraient le volume et
+ *        le rythme des demandes RGPD) ;
  *   2. le site parle-t-il encore ? → au moins une activité
  *      `external_ref LIKE 'site:event:%'` reçue dans les `--seuil-silence-h`
  *      dernières heures ;
  *   3. les signatures du site sont-elles refusées ? → plus de `--seuil-refus`
  *      refus (`bad_signature`, `stale_signature`, `replay_guard_unavailable`)
- *      sur la dernière heure, lus dans {@see CompteurRefusCanal}.
+ *      sur les `--fenetre-refus-min` dernières minutes (120), OU plus de
+ *      `--seuil-bad-signature` `bad_signature` (1 : alerte dès 2), lus dans
+ *      {@see CompteurRefusCanal}. Un `bad_signature` (horodatage valide,
+ *      signature fausse) ne vient presque jamais d'un tiers : c'est le
+ *      symptôme d'un secret désaligné, que le backoff du site (6 essais en
+ *      31 min, puis ~1/h) rendait invisible une fois sur deux. Les POST sans
+ *      AUCUN en-tête du site (`sans_entete`, bruit d'Internet) sont mesurés
+ *      mais n'alertent jamais ;
+ *   4. le planificateur tourne-t-il ? → un battement {@see BattementPlanificateur}
+ *      de moins de `--seuil-planificateur-min` minutes (15).
+ *
+ * CANAL FERMÉ EXPRÈS. `--fermes-expres=site-vers-crm,crm-vers-site` neutralise
+ * `site_muet` (resp. `file_sortante_bloquee`) pour un canal volontairement
+ * coupé — SEULEMENT si son drapeau (`CRM_INGEST_ENABLED`, resp.
+ * `CRM_OUTBOUND_ENABLED`) est effectivement fermé : une déclaration oubliée
+ * après réouverture ne masque rien. Le JSON le dit (`ferme_expres`).
+ * `file_sortante_abandon` n'est JAMAIS neutralisé (divergence RGPD).
  *
  * ⚠️ SÉCURITÉ PAR ESPACE. `activities` porte une RLS forcée : sous le rôle
  * applicatif de production, une requête sans contexte d'espace rend ZÉRO ligne
@@ -48,10 +72,17 @@ class CrmCanauxEtat extends Command
 {
     protected $signature = 'crm:canaux:etat
         {--seuil-age-h=2 : Âge maximum, en heures, d\'une ligne pending/failed de la file sortante}
-        {--fenetre-abandon-min=90 : Fenêtre, en minutes, dans laquelle un passage en gave_up déclenche l\'alerte}
+        {--fenetre-abandon-min=1560 : Fenêtre, en minutes, dans laquelle un passage en gave_up déclenche l\'alerte (26 h)}
         {--seuil-silence-h=48 : Silence maximum, en heures, du canal site → CRM}
         {--seuil-refus=5 : Nombre de refus de signature tolérés sur la fenêtre (alerte au-delà)}
-        {--fenetre-refus-min=60 : Fenêtre de comptage des refus de signature, en minutes}';
+        {--seuil-bad-signature=1 : Nombre de bad_signature tolérés sur la fenêtre (alerte au-delà)}
+        {--fenetre-refus-min=120 : Fenêtre de comptage des refus de signature, en minutes}
+        {--seuil-planificateur-min=15 : Âge maximum, en minutes, du dernier battement du planificateur}
+        {--fermes-expres= : Canaux fermés exprès, séparés par des virgules (site-vers-crm, crm-vers-site)}
+        {--memoriser-signales : Retenir (en cache, côté serveur) les abandons comptés comme nouveaux — réservé à la surveillance planifiée}';
+
+    /** Les canaux qu'on peut déclarer fermés exprès, et le drapeau qui les ferme. */
+    public const CANAUX_FERMABLES = ['site-vers-crm', 'crm-vers-site'];
 
     protected $description = 'État des canaux CRM ↔ site (file sortante, réception, refus de signature) — lecture seule, sortie JSON';
 
@@ -69,10 +100,13 @@ class CrmCanauxEtat extends Command
         $fenetreAbandonMin = max(1, (int) $this->option('fenetre-abandon-min'));
         $seuilSilenceH = max(1, (int) $this->option('seuil-silence-h'));
         $seuilRefus = max(0, (int) $this->option('seuil-refus'));
+        $seuilBadSignature = max(0, (int) $this->option('seuil-bad-signature'));
         $fenetreRefusMin = max(5, (int) $this->option('fenetre-refus-min'));
+        $seuilPlanificateurMin = max(2, (int) $this->option('seuil-planificateur-min'));
 
         $ingestion = filter_var(config('crm.ingest.enabled', false), FILTER_VALIDATE_BOOLEAN);
         $emission = filter_var(config('crm.outbound_enabled', false), FILTER_VALIDATE_BOOLEAN);
+        $fermesExpres = $this->fermesExpres();
 
         $etat = [
             'genere_a' => now()->toIso8601String(),
@@ -80,9 +114,11 @@ class CrmCanauxEtat extends Command
                 'ingestion_site' => $ingestion,
                 'emission_vers_site' => $emission,
             ],
-            'file_sortante' => $this->fileSortante($seuilAgeH, $fenetreAbandonMin, $emission),
-            'reception_site' => $this->receptionSite($seuilSilenceH, $ingestion),
-            'refus_signature' => $this->refusSignature($seuilRefus, $fenetreRefusMin),
+            'canaux_fermes_expres' => $fermesExpres,
+            'file_sortante' => $this->fileSortante($seuilAgeH, $fenetreAbandonMin, $emission, in_array('crm-vers-site', $fermesExpres, true), (bool) $this->option('memoriser-signales')),
+            'reception_site' => $this->receptionSite($seuilSilenceH, $ingestion, in_array('site-vers-crm', $fermesExpres, true)),
+            'refus_signature' => $this->refusSignature($seuilRefus, $seuilBadSignature, $fenetreRefusMin),
+            'planificateur' => $this->planificateur($seuilPlanificateurMin),
         ];
         $etat['alertes'] = $this->alertes;
 
@@ -92,19 +128,40 @@ class CrmCanauxEtat extends Command
     }
 
     /**
+     * Les canaux déclarés fermés exprès, connus seulement, triés, sans doublon.
+     * Un nom inconnu (faute de frappe) est ignoré : l'alerte reste, donc rien
+     * n'est masqué.
+     *
+     * @return list<string>
+     */
+    private function fermesExpres(): array
+    {
+        $brut = $this->option('fermes-expres');
+        $noms = array_map('trim', explode(',', is_string($brut) ? strtolower($brut) : ''));
+        $connus = array_values(array_unique(array_intersect($noms, self::CANAUX_FERMABLES)));
+        sort($connus);
+
+        return $connus;
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function fileSortante(int $seuilAgeH, int $fenetreAbandonMin, bool $emission): array
+    private function fileSortante(int $seuilAgeH, int $fenetreAbandonMin, bool $emission, bool $declareFerme, bool $memoriser): array
     {
+        // Neutralisation SEULEMENT si le drapeau est réellement fermé.
+        $fermeExpres = $declareFerme && ! $emission;
         $mesure = [
             'seuil_age_h' => $seuilAgeH,
             'fenetre_abandon_min' => $fenetreAbandonMin,
+            'ferme_expres' => $fermeExpres,
             'pending' => null,
             'failed' => null,
             'gave_up_total' => null,
             'en_retard' => null,
             'plus_ancienne_en_attente_a' => null,
             'gave_up_recents' => null,
+            'gave_up_nouveaux' => null,
         ];
 
         try {
@@ -129,6 +186,18 @@ class CrmCanauxEtat extends Command
                 ->where('status', 'gave_up')
                 ->where('updated_at', '>=', now()->subMinutes($fenetreAbandonMin))
                 ->count();
+            // Les numéros de ligne ne servent qu'ICI, à la mémoire des abandons
+            // déjà signalés : ils ne sortent jamais du serveur. Plafonnés, les
+            // PLUS RÉCENTS d'abord : lors d'une panne massive, ce sont les
+            // nouveaux qu'il faut voir.
+            $idsAbandons = DB::table('crm_outbound_events')
+                ->where('status', 'gave_up')
+                ->where('updated_at', '>=', now()->subMinutes($fenetreAbandonMin))
+                ->orderByDesc('id')
+                ->limit(1000)
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
         } catch (Throwable $e) {
             $this->alerter('controle_impossible', 'File sortante illisible (' . $e::class . ').');
 
@@ -141,12 +210,14 @@ class CrmCanauxEtat extends Command
         $mesure['en_retard'] = $enRetard;
         $mesure['plus_ancienne_en_attente_a'] = self::dateIso($plusAncienne);
         $mesure['gave_up_recents'] = $abandonsRecents;
+        $mesure['gave_up_nouveaux'] = MemoireAbandonsSignales::nouveaux(array_values($idsAbandons), $memoriser);
 
-        if ($enRetard > 0) {
+        if ($enRetard > 0 && ! $fermeExpres) {
             $this->alerter(
                 'file_sortante_bloquee',
                 "{$enRetard} événement(s) CRM → site en attente depuis plus de {$seuilAgeH} h (pending/failed)."
-                . ($emission ? '' : ' Émission FERMÉE (CRM_OUTBOUND_ENABLED=false) : les lignes restent en file sans jamais partir.'),
+                . ($emission ? '' : ' Émission FERMÉE (CRM_OUTBOUND_ENABLED=false) : les lignes restent en file sans jamais partir.')
+                . ($declareFerme && $emission ? ' Canal déclaré fermé exprès (SURV_CANAUX_FERMES_EXPRES), mais CRM_OUTBOUND_ENABLED est OUVERT : la déclaration ne vaut plus.' : ''),
             );
         }
         if ($abandonsRecents > 0) {
@@ -162,10 +233,12 @@ class CrmCanauxEtat extends Command
     /**
      * @return array<string, mixed>
      */
-    private function receptionSite(int $seuilSilenceH, bool $ingestion): array
+    private function receptionSite(int $seuilSilenceH, bool $ingestion, bool $declareFerme): array
     {
+        $fermeExpres = $declareFerme && ! $ingestion;
         $mesure = [
             'seuil_silence_h' => $seuilSilenceH,
+            'ferme_expres' => $fermeExpres,
             'recus_dans_la_fenetre' => null,
             'derniere_reception_a' => null,
         ];
@@ -206,11 +279,12 @@ class CrmCanauxEtat extends Command
         $mesure['recus_dans_la_fenetre'] = $recus;
         $mesure['derniere_reception_a'] = $derniere;
 
-        if ($recus === 0) {
+        if ($recus === 0 && ! $fermeExpres) {
             $this->alerter(
                 'site_muet',
                 "Aucun événement reçu du site depuis {$seuilSilenceH} h (dernière réception : " . ($derniere ?? 'jamais') . ').'
-                . ($ingestion ? '' : ' Ingestion FERMÉE (CRM_INGEST_ENABLED=false) : le CRM répond 503 à tout envoi du site.'),
+                . ($ingestion ? '' : ' Ingestion FERMÉE (CRM_INGEST_ENABLED=false) : le CRM répond 503 à tout envoi du site.')
+                . ($declareFerme && $ingestion ? ' Canal déclaré fermé exprès (SURV_CANAUX_FERMES_EXPRES), mais CRM_INGEST_ENABLED est OUVERT : la déclaration ne vaut plus.' : ''),
             );
         }
 
@@ -220,17 +294,52 @@ class CrmCanauxEtat extends Command
     /**
      * @return array<string, mixed>
      */
-    private function refusSignature(int $seuilRefus, int $fenetreRefusMin): array
+    private function refusSignature(int $seuilRefus, int $seuilBadSignature, int $fenetreRefusMin): array
     {
         $lu = CompteurRefusCanal::lire(CanalSigneSite::CANAUX, $fenetreRefusMin);
-        $mesure = ['seuil' => $seuilRefus] + $lu;
+        $mesure = ['seuil' => $seuilRefus, 'seuil_bad_signature' => $seuilBadSignature] + $lu;
+        $mauvaises = $lu['par_motif']['bad_signature'] ?? 0;
 
         if (! $lu['disponible']) {
             $this->alerter('refus_signature', 'Compteur des refus de signature illisible (magasin Redis indisponible ?).');
+        } elseif ($mauvaises > $seuilBadSignature) {
+            $this->alerter(
+                'refus_signature',
+                "{$mauvaises} signature(s) fausse(s) (bad_signature) sur les {$lu['fenetre_min']} dernières minutes (seuil : {$seuilBadSignature}) : secret désaligné ?",
+            );
         } elseif ($lu['total'] > $seuilRefus) {
             $this->alerter(
                 'refus_signature',
                 "{$lu['total']} refus de signature sur les {$lu['fenetre_min']} dernières minutes (seuil : {$seuilRefus}).",
+            );
+        }
+
+        return $mesure;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function planificateur(int $seuilMin): array
+    {
+        $mesure = ['seuil_min' => $seuilMin, 'dernier_battement_a' => null];
+
+        try {
+            $dernier = BattementPlanificateur::dernier();
+        } catch (Throwable $e) {
+            $this->alerter('controle_impossible', 'Battement du planificateur illisible (' . $e::class . ').');
+
+            return $mesure;
+        }
+
+        if ($dernier !== null) {
+            $mesure['dernier_battement_a'] = Carbon::createFromTimestampUTC($dernier)->format('Y-m-d\TH:i:s\Z');
+        }
+
+        if ($dernier === null || now()->getTimestamp() - $dernier > $seuilMin * 60) {
+            $this->alerter(
+                'planificateur_arrete',
+                "Aucun battement du planificateur depuis plus de {$seuilMin} min (dernier : " . ($mesure['dernier_battement_a'] ?? 'jamais, ou plus de 24 h') . ') : `schedule:work` tourne-t-il ?',
             );
         }
 

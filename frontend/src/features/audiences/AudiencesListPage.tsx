@@ -13,6 +13,7 @@ import {
   Users2, Plus, RefreshCw, Power, Trash2, MoreVertical, Clock,
 } from 'lucide-react';
 import { api, messageApiLisible } from '@/lib/api';
+import { AUDIENCES_KEY, chargerAudiences } from './listeAudiences';
 import {
   Button,
   Card,
@@ -55,10 +56,6 @@ export interface EmailAudience {
   destinataires?: ReglageDestinataires;
 }
 
-interface AudiencesListResponse {
-  data: EmailAudience[];
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -67,8 +64,8 @@ export function AudiencesListPage() {
   const qc = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['audiences'],
-    queryFn: async () => (await api.get<AudiencesListResponse>('/audiences')).data,
+    queryKey: AUDIENCES_KEY,
+    queryFn: chargerAudiences,
     refetchInterval: 30_000,
   });
 

@@ -86,11 +86,25 @@ class DashboardController extends ApiController
      * (« indisponible »). Une charge utile ne contient jamais de `null` en
      * cache — un résultat partiel n'y entre pas — mais la forme du contrat a
      * changé : la version change avec elle.
+     *
+     * `v5` (2026-10-03, nouvel accueil en blocs) : la charge utile gagne
+     * `companies_enriched`, `prospects_joignables` et
+     * `prospects_joignables_idf` (et leurs `_raison`).
      */
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v4:' . $espace;
+        return 'crm:dashboard:stats:v5:' . $espace;
     }
+
+    /**
+     * Les audiences SYSTÈME dont l'accueil lit le nombre de membres
+     * (`DefaultAudiencesSeeder`). Le nombre est recalculé chaque nuit par le
+     * rafraîchissement des audiences : l'accueil le lit, il ne le recompte
+     * pas (le recompter, c'est rejouer les critères sur 4,35 M de fiches).
+     */
+    public const AUDIENCE_JOIGNABLES = 'Prospects contactables';
+
+    public const AUDIENCE_JOIGNABLES_IDF = 'Prospects contactables — Île-de-France';
 
     public function stats(Request $r): JsonResponse
     {
@@ -236,6 +250,19 @@ class DashboardController extends ApiController
             'companies_enriched_24h' => $this->compter('companies', $espace, function ($q) {
                 $q->whereNotNull('enriched_at')->where('enriched_at', '>=', now()->subDay());
             }),
+            // « Fiches enrichies » de l'accueil (part du total) : toutes les
+            // fiches vivantes qui portent un `enriched_at`. Même index partiel
+            // `idx_companies_ws_enriched_at` que le compteur sur 24 h — son
+            // prédicat est exactement celui-ci.
+            'companies_enriched' => $this->compter('companies', $espace, function ($q) {
+                $q->whereNotNull('enriched_at');
+            }),
+            // « Prospects joignables » : le nombre de membres de l'audience
+            // système « Prospects contactables » (e-mail présent, prêt au
+            // démarchage, relations établies exclues), et celui de sa
+            // déclinaison Île-de-France. Lus, pas recomptés.
+            ...$this->membresAudience($espace, self::AUDIENCE_JOIGNABLES, 'prospects_joignables'),
+            ...$this->membresAudience($espace, self::AUDIENCE_JOIGNABLES_IDF, 'prospects_joignables_idf'),
             'contacts_qualified' => $this->compter('contacts', $espace, function ($q) {
                 // « Qualifiée » = joignable. C'est la définition que le hub
                 // emploie déjà ; on ne réinvente pas un second sens ici.
@@ -340,7 +367,79 @@ class DashboardController extends ApiController
             'quality_scored' => null,
             'quality_a_recalculer_pct' => null,
             'size_distribution' => self::taillesAZero(),
+            // `null` = inconnu : l'écran écrit « — », jamais 0.
+            'companies_enriched' => null,
+            'prospects_joignables' => null,
+            'prospects_joignables_raison' => null,
+            'prospects_joignables_idf' => null,
+            'prospects_joignables_idf_raison' => null,
         ];
+    }
+
+    /** L'audience système n'existe pas dans l'espace (ou a été supprimée). */
+    public const RAISON_INTROUVABLE = 'audience_introuvable';
+
+    /** Elle existe, mais est désactivée ou n'est plus rafraîchie chaque nuit : son chiffre est figé. */
+    public const RAISON_INACTIVE = 'audience_inactive';
+
+    /** Elle n'a jamais été calculée (`member_count` vaut 0 par défaut). */
+    public const RAISON_NON_CALCULEE = 'audience_non_calculee';
+
+    /**
+     * Le nombre de membres d'une audience système, tel que le dernier
+     * rafraîchissement l'a écrit — sous `{cle}` — et, quand il n'est pas
+     * fiable, la RAISON sous `{cle}_raison`.
+     *
+     * Le chiffre vaut `null` — jamais 0, jamais un chiffre figé — dans quatre
+     * cas :
+     *  - l'audience n'existe pas (ou plus) : raison `audience_introuvable` ;
+     *  - elle est désactivée (`is_active`) ou n'est plus rafraîchie chaque nuit
+     *    (`auto_refresh`) : son `member_count` est figé à la dernière passe,
+     *    raison `audience_inactive` (relecture exactitude de #302) ;
+     *  - elle n'a jamais été rafraîchie : raison `audience_non_calculee` ;
+     *  - la lecture échoue : panne, journalisée, raison `null` (« indisponible
+     *    pour le moment »), résultat PAS mis en cache.
+     * Les trois premiers cas ne sont pas des pannes : ils entrent en cache.
+     *
+     * Le nom est la seule clé des audiences système (`updateOrCreate` sur
+     * `workspace_id, name` dans le seeder). Si plusieurs portent ce nom, la
+     * plus ancienne — celle du seeder — fait foi.
+     *
+     * @return array<string, int|string|null>
+     */
+    private function membresAudience(string $espace, string $nom, string $cle): array
+    {
+        $resultat = static fn (?int $n, ?string $raison): array => [$cle => $n, $cle . '_raison' => $raison];
+
+        if (! Schema::hasTable('email_audiences')) {
+            return $resultat(null, self::RAISON_INTROUVABLE);
+        }
+
+        try {
+            $ligne = DB::table('email_audiences')
+                ->where('workspace_id', $espace)
+                ->where('name', $nom)
+                ->whereNull('deleted_at')
+                ->orderBy('id')
+                ->first(['member_count', 'refreshed_at', 'is_active', 'auto_refresh']);
+        } catch (\Throwable $e) {
+            $this->incomplet = true;
+            Log::warning('dashboard: audience indisponible', self::panneSansSql($e));
+
+            return $resultat(null, null);
+        }
+
+        if ($ligne === null) {
+            return $resultat(null, self::RAISON_INTROUVABLE);
+        }
+        if (! (bool) $ligne->is_active || ! (bool) $ligne->auto_refresh) {
+            return $resultat(null, self::RAISON_INACTIVE);
+        }
+        if ($ligne->refreshed_at === null) {
+            return $resultat(null, self::RAISON_NON_CALCULEE);
+        }
+
+        return $resultat((int) $ligne->member_count, null);
     }
 
     /** @return array<string, int> */

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
+import { COMPTEURS_A_TRAITER_KEY } from "@/features/a-traiter/compteurs";
 
 import type { EvenementResume } from "./EvenementsPage";
 import { Pastille } from "./Pastille";
@@ -119,6 +120,10 @@ export function EvenementDetailPage() {
       qc.setQueryData(["evenement", eventId], fiche);
       void qc.invalidateQueries({ queryKey: ["evenements"] });
       void qc.invalidateQueries({ queryKey: ["evenements-entreprise"] });
+      // La date de relance fait entrer ou sortir l'événement de « Événements à
+      // relancer » (accueil) : le compteur suit, comme après un geste sur les
+      // doublons ou l'arbitrage. Le serveur a déjà oublié son cache.
+      void qc.invalidateQueries({ queryKey: COMPTEURS_A_TRAITER_KEY });
       toast.success("Démarche enregistrée");
     },
     onError: (err: unknown) => {

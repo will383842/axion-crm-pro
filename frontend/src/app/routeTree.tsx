@@ -127,7 +127,15 @@ const companiesRoute = createRoute({
 const companyDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/companies/$companyId', component: CompanyDetailPage });
 const contactsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/contacts', component: ContactsRoute });
 const roumanieRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/international/roumanie', component: RoumaniePage });
-const evenementsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/evenements', component: EvenementsPage });
+// 03/10/2026 — `?onglet=relances` : la carte « Événements à relancer » de
+// l'accueil ouvre directement l'onglet « Relances à faire ».
+const evenementsRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/evenements',
+  component: EvenementsPage,
+  validateSearch: (recherche: Record<string, unknown>): { onglet?: 'organisateurs' | 'relances' } =>
+    recherche.onglet === 'organisateurs' || recherche.onglet === 'relances' ? { onglet: recherche.onglet } : {},
+});
 const evenementDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/evenements/$eventId', component: EvenementDetailPage });
 const federationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/federations', component: FederationsPage });
 const federationDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/federations/$companyId', component: FederationDetailPage });

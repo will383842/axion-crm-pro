@@ -5,13 +5,14 @@
  * (audit UX du 02/10/2026, lot 8).
  *
  * Ce que ces gardes tiennent :
- *  1. la forme : `{ doublons: int|null, a_rattacher: int|null }` ;
- *  2. le chiffre du menu = le total de l'écran (`/doublons`, `/crm/arbitrage`) ;
+ *  1. la forme : `{ doublons: int|null, a_rattacher: int|null, relances: int|null }` ;
+ *  2. le chiffre du menu = le total de l'écran (`/doublons`, `/crm/arbitrage`,
+ *     `/evenements?relance=a_faire`) ;
  *  3. le cloisonnement : un espace ne voit jamais les compteurs d'un autre, ni
  *     par la requête, ni par le cache ;
  *  4. un compteur en échec vaut `null`, JAMAIS 0, et n'emporte pas l'autre ;
  *  5. sans authentification : 401 ; drapeau de la console fermé : 404 ;
- *  6. les deux requêtes utilisent un index SOUS LE RÔLE DE PRODUCTION
+ *  6. les trois requêtes utilisent un index SOUS LE RÔLE DE PRODUCTION
  *     (`axion_app`, sécurité par espace forcée) — sous le propriétaire, tout
  *     paraît rapide (#287, #292, #294).
  *
@@ -29,6 +30,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -83,7 +85,17 @@ function catActivite(string $ws, array $payload, ?int $sujet = null): int
     ]);
 }
 
-/** Un espace peuplé : 2 paires en attente, 2 personnes à rattacher, et du bruit qui ne compte pas. */
+/** Un événement, avec ou sans date de relance. */
+function catEvenement(string $ws, ?Carbon $relance): int
+{
+    return (int) DB::table('events')->insertGetId([
+        'workspace_id' => $ws, 'external_ref' => 'zz-cat-' . Str::random(8), 'nom' => 'ZZ Salon', 'type' => 'salon',
+        'date_debut' => now()->addDays(10)->toDateString(), 'prochaine_relance_at' => $relance,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
+
+/** Un espace peuplé : 2 paires en attente, 2 personnes à rattacher, 2 relances échues, et du bruit qui ne compte pas. */
 function catEspacePeuple(string $prefixe): string
 {
     $ws = F::espace($prefixe);
@@ -102,6 +114,12 @@ function catEspacePeuple(string $prefixe): string
     catActivite($ws, ['pending_match' => ['denomination' => 'ZZ RATTACHÉE']], F::fiche($ws, 'ZZ Cible'));
     catActivite($ws, ['autre' => true]);
 
+    catEvenement($ws, now()->subDays(3));
+    catEvenement($ws, now()->subMinute());
+    // Bruit : une relance à venir, un événement sans relance.
+    catEvenement($ws, now()->addWeek());
+    catEvenement($ws, null);
+
     return $ws;
 }
 
@@ -111,9 +129,10 @@ test('la forme de la réponse, et le chiffre du menu = le total de chaque écran
 
     $r = $this->getJson(CAT_URL)->assertOk();
 
-    expect($r->json())->toBe(['doublons' => 2, 'a_rattacher' => 2]);
+    expect($r->json())->toBe(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
     expect($r->json('doublons'))->toBe($this->getJson('/api/v1/doublons')->assertOk()->json('meta.total'));
     expect($r->json('a_rattacher'))->toBe($this->getJson('/api/v1/crm/arbitrage')->assertOk()->json('meta.total'));
+    expect($r->json('relances'))->toBe($this->getJson('/api/v1/evenements?relance=a_faire')->assertOk()->json('meta.total'));
 });
 
 test('cloisonnement : un espace ne voit jamais les compteurs d un autre, ni par le cache', function () {
@@ -123,11 +142,11 @@ test('cloisonnement : un espace ne voit jamais les compteurs d un autre, ni par 
 
     // A d'abord : son résultat part en cache.
     $this->actingAs(catCompte($a));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
 
     // B ensuite : SES chiffres (des entiers, pas null), jamais ceux de A.
     $this->actingAs(catCompte($b));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 1, 'a_rattacher' => 0]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 1, 'a_rattacher' => 0, 'relances' => 0]);
 
     expect(ATraiterController::cle($a))->not->toBe(ATraiterController::cle($b))
         ->and(ATraiterController::cle($a))->toContain($a);
@@ -148,7 +167,7 @@ test('la réponse est mise en cache 60 s par espace', function () {
 test('écarter une paire ou un événement remet la pastille à jour sans attendre le cache', function () {
     $ws = catEspacePeuple('zz-cat-geste');
     $this->actingAs(catCompte($ws, 'operator'));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
 
     $paire = (int) DB::table('duplicate_flags')->where('workspace_id', $ws)->whereNull('reviewed_at')
         ->whereNotIn('entity_b_id', DB::table('companies')->whereNotNull('deleted_at')->select('id'))->value('id');
@@ -163,7 +182,7 @@ test('écarter une paire ou un événement remet la pastille à jour sans attend
 test('fusionner une paire ou rattacher un événement remet aussi la pastille à jour', function () {
     $ws = catEspacePeuple('zz-cat-geste-admin');
     $this->actingAs(catCompte($ws, 'admin'));
-    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2]);
+    $this->getJson(CAT_URL)->assertOk()->assertExactJson(['doublons' => 2, 'a_rattacher' => 2, 'relances' => 2]);
 
     $paire = (int) DB::table('duplicate_flags')->where('workspace_id', $ws)->whereNull('reviewed_at')
         ->whereNotIn('entity_b_id', DB::table('companies')->whereNotNull('deleted_at')->select('id'))->value('id');
@@ -188,7 +207,32 @@ test('un compteur en échec vaut null, jamais 0, et n emporte pas l autre', func
 
     expect($r->json('doublons'))->toBeNull()
         ->and(array_key_exists('doublons', $r->json()))->toBeTrue()
-        ->and($r->json('a_rattacher'))->toBe(2);
+        ->and($r->json('a_rattacher'))->toBe(2)
+        ->and($r->json('relances'))->toBe(2);
+});
+
+test('poser ou retirer une date de relance remet le compteur à jour sans attendre le cache', function () {
+    $ws = catEspacePeuple('zz-cat-relance');
+    $this->actingAs(catCompte($ws, 'admin'));
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('relances', 2);
+
+    $evenement = catEvenement($ws, null);
+    $this->patchJson("/api/v1/evenements/{$evenement}/demarche", ['prochaine_relance_at' => now()->subDay()->toDateString()])->assertOk();
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('relances', 3);
+
+    $this->patchJson("/api/v1/evenements/{$evenement}/demarche", ['prochaine_relance_at' => null])->assertOk();
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('relances', 2);
+});
+
+test('relances : un événement d un autre espace ne compte jamais', function () {
+    $a = F::espace('zz-cat-rel-a');
+    $b = F::espace('zz-cat-rel-b');
+    catEvenement($a, now()->subDay());
+    catEvenement($b, now()->subDay());
+    catEvenement($b, now()->subDays(2));
+
+    $this->actingAs(catCompte($a));
+    $this->getJson(CAT_URL)->assertOk()->assertJsonPath('relances', 1);
 });
 
 test('univers vivier : pas de file d arbitrage, donc null (pas de pastille), jamais 0', function () {
@@ -273,7 +317,7 @@ test('index idx_activities_a_rattacher présent, valide, et au prédicat de la f
         ->and($index->def)->not->toMatch('/subject_id IS NOT NULL/');
 });
 
-test('sous axion_app : « Personnes à rattacher » passe par l index partiel, « Doublons » par des index', function () {
+test('sous axion_app : « Personnes à rattacher » et « Relances » passent par leur index partiel, « Doublons » par des index', function () {
     $role = catApp()->selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
     expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
 
@@ -285,4 +329,8 @@ test('sous axion_app : « Personnes à rattacher » passe par l index partiel, �
 
     $planDoublons = catPlan($espace, FilesATraiter::doublons($espace));
     expect($planDoublons)->not->toContain('Seq Scan');
+
+    $planRelances = catPlan($espace, FilesATraiter::relancesEvenements($espace));
+    expect($planRelances)->toContain('idx_events_workspace_relance')
+        ->and($planRelances)->not->toContain('Seq Scan');
 });

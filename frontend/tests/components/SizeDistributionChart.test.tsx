@@ -1,55 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { SizeDistributionChart } from '@/features/dashboard/components/SizeDistributionChart';
+import { render, screen, within } from '@testing-library/react';
+import { SizeDistributionChart, largeursBarres } from '@/features/dashboard/components/SizeDistributionChart';
 
 /**
- * « Taille d'entreprise (INSEE) » — constat de production du 2026-10-02 :
- * barres invisibles. La barre portait `height: X%` dans une colonne sans
- * hauteur définie, et les petites catégories tombaient sous 1 % face aux TPE.
+ * « Par taille » — nouvel accueil (maquette validée par Will, 03/10/2026) :
+ * barres HORIZONTALES, largeur = vraie part du total classé, nombre exact au
+ * bout de chaque barre.
  *
  * Chiffres proches de la production (fictifs).
  */
 
-function hauteur(libelle: RegExp): number {
-  const barre = screen.getByRole('img', { name: libelle });
-  return parseFloat(barre.style.height);
+function largeur(code: string): number {
+  return parseFloat(screen.getByTestId(`barre-${code}`).style.width);
 }
 
-describe('SizeDistributionChart', () => {
-  it('la plus haute barre fait toute la zone, les autres sont visibles et ordonnées', () => {
-    render(
-      <SizeDistributionChart data={{ tpe: 4_000_000, pme: 185_000, eti: 75_000, grand_groupe: 28_000 }} />,
-    );
+describe('SizeDistributionChart — « Par taille »', () => {
+  it('chaque taille a sa ligne : libellé, barre proportionnelle, nombre au format français', () => {
+    render(<SizeDistributionChart data={{ tpe: 4_042_240, pme: 185_414, eti: 74_753, grand_groupe: 28_027 }} />);
 
-    const tpe = hauteur(/^TPE/);
-    const pme = hauteur(/^PME/);
-    const eti = hauteur(/^ETI/);
-    const gg = hauteur(/^Grand/i);
+    expect(screen.getByRole('heading', { name: 'Par taille' })).toBeVisible();
+    const lignes = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(lignes).toHaveLength(4);
+    expect(lignes[0]).toHaveTextContent(/TPE/);
+    expect(lignes[0]).toHaveTextContent(/4.042.240/);
+    expect(lignes[3]).toHaveTextContent(/Grand groupe/);
+    expect(lignes[3]).toHaveTextContent(/28.027/);
 
-    expect(tpe).toBe(100);
-    expect(gg).toBeGreaterThanOrEqual(4);
-    expect(tpe).toBeGreaterThan(pme);
-    expect(pme).toBeGreaterThan(eti);
-    expect(eti).toBeGreaterThan(gg);
+    // Linéaire : les TPE font ≈ 93 % ; les autres restent visibles et ordonnées.
+    expect(largeur('tpe')).toBeGreaterThan(92);
+    expect(largeur('tpe')).toBeLessThan(94);
+    expect(largeur('pme')).toBeGreaterThan(largeur('eti'));
+    expect(largeur('eti')).toBeGreaterThan(largeur('grand_groupe'));
+    expect(largeur('grand_groupe')).toBeGreaterThanOrEqual(1);
   });
 
-  it('la barre est dans une zone qui prend toute la hauteur de sa colonne', () => {
+  it('une taille à zéro a une barre vide, mais garde sa ligne et son 0 (un vrai zéro)', () => {
     render(<SizeDistributionChart data={{ tpe: 10, pme: 5, eti: 0, grand_groupe: 0 }} />);
 
-    const barre = screen.getByRole('img', { name: /^TPE/ });
-    const zone = barre.parentElement as HTMLElement;
-    const colonne = zone.parentElement as HTMLElement;
-
-    expect(zone.className).toContain('flex-1');
-    expect(zone.className).toContain('items-end');
-    expect(colonne.className).toContain('h-full');
-    expect(hauteur(/^ETI/)).toBe(0);
+    expect(largeur('eti')).toBe(0);
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')[2]).toHaveTextContent(/ETI\s*0/);
   });
 
-  it('aucune classe de mode sombre dans le graphique lui-même', () => {
-    const { container } = render(<SizeDistributionChart data={{ tpe: 1 }} />);
-    // La carte partagée (`Card`) n'est pas de ce composant ; on lit le graphique.
-    const graphique = container.querySelector('.h-44') as HTMLElement;
-    expect(graphique.innerHTML).not.toContain('dark:');
+  it('répartition indisponible (null) : « Chiffre indisponible pour le moment », jamais des barres à 0', () => {
+    render(<SizeDistributionChart data={null} />);
+
+    expect(screen.getByTestId('tailles-indisponibles')).toHaveTextContent('Chiffre indisponible pour le moment');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('largeursBarres : total nul → tout à 0 ; petite part non nulle → au moins 1 %', () => {
+    expect(largeursBarres([0, 0])).toEqual([0, 0]);
+    expect(largeursBarres([1_000_000, 1])).toEqual([100, 1]);
+  });
+
+  it('aucune classe de mode sombre dans les barres elles-mêmes', () => {
+    render(<SizeDistributionChart data={{ tpe: 1 }} />);
+    // La carte partagée (`Card`) n'est pas de ce composant ; on lit la liste.
+    expect(screen.getByRole('list').innerHTML).not.toContain('dark:');
   });
 });

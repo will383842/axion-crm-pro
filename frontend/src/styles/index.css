@@ -74,6 +74,18 @@
 .axion-slide-in-right{ animation: axion-slide-in-right 280ms cubic-bezier(0.4, 0, 0.2, 1); }
 .axion-pulse-dot     { animation: axion-pulse-dot 2s ease-in-out infinite; }
 
+/* GRILLE QUI S'EMPILE D'ELLE-MÊME (accueil en blocs, 03/10/2026).
+   Autant de colonnes que la largeur en permet, chacune d'au moins
+   `--grille-min` ; sous cette largeur, une seule colonne. `min(100%, …)`
+   garantit qu'une colonne ne dépasse JAMAIS son conteneur : à 390 px tout
+   s'empile, sans défilement horizontal. Ce n'est donc pas un tableau
+   « grille » à enfermer dans `TableScroll` (garde D30-002) : il ne peut pas
+   déborder. */
+.grille-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--grille-min, 15rem)), 1fr));
+}
+
 html, body, #root {
   height: 100%;
 }

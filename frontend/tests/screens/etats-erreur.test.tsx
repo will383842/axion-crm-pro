@@ -43,14 +43,14 @@
  *   - administration (2 écrans) : utilisateurs et journaux d'audit — là où un
  *     403 est le cas NOMINAL pour un opérateur non-admin, donc là où
  *     « Aucun utilisateur » se lit tous les jours.
- *   - accueil (1 bloc) : `ActivityFeed`, constat **P5-35-012** (S3). Mesure du
- *     2026-08-22 : la branche d'erreur et la branche « base vide » y étaient la
- *     MÊME (`isError || items.length === 0`), si bien qu'un 403 sur
- *     `GET /audit-logs` affichait « Activité bientôt disponible » — la promesse
- *     que le CRM commence à travailler, sur l'écran même qu'on ouvre pour
- *     savoir s'il travaille. Ce n'est pas un écran de route : c'est un bloc de
- *     l'accueil, et il est monté seul ici — la garde porte sur SES branches de
- *     rendu, pas sur la composition du tableau de bord.
+ *   - accueil (1 bloc) : « Mes audiences » (`MesAudiences`). Jusqu'au
+ *     03/10/2026, ce bloc était le fil `ActivityFeed`, constat **P5-35-012**
+ *     (S3) : sa branche d'erreur et sa branche vide étaient la MÊME, si bien
+ *     qu'un 403 sur `GET /audit-logs` affichait « Activité bientôt
+ *     disponible ». Le fil a quitté l'accueil (nouvel accueil en blocs,
+ *     maquette validée par Will) ; la garde porte désormais sur le bloc qui
+ *     l'a remplacé — un 403 sur `GET /audiences` ne doit pas se lire « Aucune
+ *     audience ». Ce n'est pas un écran de route : il est monté seul ici.
  * Les écrans restants sont à porter ; le composant partagé est écrit pour ça.
  */
 import { describe, it, expect } from 'vitest';
@@ -66,8 +66,8 @@ import { CandidatesPage } from '@/features/crm-console/CandidatesPage';
 import { ContactsHubPage } from '@/features/crm-console/ContactsHubPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
-// P5-35-012 — le fil d'activité de l'accueil. Un bloc, pas un écran de route.
-import { ActivityFeed } from '@/features/dashboard/components/ActivityFeed';
+// Le bloc « Mes audiences » de l'accueil. Un bloc, pas un écran de route.
+import { MesAudiences } from '@/features/dashboard/components/MesAudiences';
 // Audit UX du 02/10/2026 (P0-3) — 19 écrans de plus portent `QueryErrorState`.
 // Deux représentants sont gardés ici : la liste la plus consultée (entreprises,
 // dont l'état vide conseillait « Lance un scraping » sous une panne) et un écran
@@ -197,16 +197,14 @@ const ECRANS: CasEcran[] = [
     texteVide: 'Aucun journal',
   },
   {
-    // P5-35-012 — le fil d'activité de l'accueil.
-    nom: 'ActivityFeed',
-    rendre: () => <ActivityFeed />,
+    // Le bloc « Mes audiences » de l'accueil (remplace le fil d'activité).
+    nom: 'MesAudiences',
+    rendre: () => <MesAudiences />,
     path: '/',
-    vide: { '/audit-logs': { data: [] } },
-    // « Activité bientôt disponible ». On ne cherche NI « Activit » (le titre de
-    // la carte, « Activité récente », le contient et reste affiché en erreur),
-    // NI un mot accentué. « disponible » n'apparaît nulle part ailleurs, ni dans
-    // la carte, ni dans aucun message de `QueryErrorState`.
-    texteVide: 'disponible',
+    vide: { '/audiences': { data: [] } },
+    // « Aucune audience pour l’instant. » — sans apostrophe ; le titre du bloc
+    // (« Mes audiences ») ne contient pas « Aucune ».
+    texteVide: 'Aucune audience pour',
   },
   {
     // P0-3 (audit UX 02/10) — sous une panne, l'écran affichait « Aucune

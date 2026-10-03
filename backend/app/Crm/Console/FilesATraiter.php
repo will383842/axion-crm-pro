@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  * partent du MÊME constructeur ; l'écran y ajoute ses filtres, son tri et sa
  * page, le compteur se contente de `count()`.
  *
- * Les deux files sont cloisonnées EXPLICITEMENT par espace (`workspace_id =
+ * Les files sont cloisonnées EXPLICITEMENT par espace (`workspace_id =
  * ?`), en plus de la RLS : le filtre explicite est aussi ce qui permet à
  * Postgres d'utiliser l'index — la politique de RLS compare
  * `workspace_id::TEXT`, qu'aucun index ne sert.
@@ -65,5 +65,25 @@ final class FilesATraiter
             ->whereNull('subject_id')
             ->whereRaw("payload -> 'pending_match' IS NOT NULL")
             ->whereRaw("payload -> 'arbitrage_dismissed' IS NULL");
+    }
+
+    /**
+     * « Événements à relancer » (03/10/2026, nouvel accueil) — les événements
+     * dont la date de relance (`prochaine_relance_at`) est arrivée ou passée.
+     * C'est l'onglet « Relances à faire » de l'écran Événements
+     * (`GET /evenements?relance=a_faire`, sans autre filtre) : l'écran part de
+     * ce constructeur, le compteur de l'accueil se contente de `count()`.
+     *
+     * Index : `idx_events_workspace_relance (workspace_id,
+     * prochaine_relance_at) WHERE prochaine_relance_at IS NOT NULL` — la
+     * requête répète `IS NOT NULL` pour que le planificateur reconnaisse
+     * l'index partiel sans avoir à le déduire.
+     */
+    public static function relancesEvenements(string $espace): Builder
+    {
+        return DB::table('events')
+            ->where('workspace_id', $espace)
+            ->whereNotNull('prochaine_relance_at')
+            ->where('prochaine_relance_at', '<=', now());
     }
 }

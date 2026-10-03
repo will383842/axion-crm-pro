@@ -199,6 +199,14 @@ return [
     ],
 
     /*
+    | Journaux applicatifs : clé HMAC des empreintes d'IP (`App\Support\EmpreinteIp`).
+    | Jamais d'IP en clair au journal. Vide → clé dérivée de APP_KEY.
+    */
+    'journaux' => [
+        'ip_cle' => env('CRM_JOURNAUX_IP_CLE', ''),
+    ],
+
+    /*
     | 🔴 A05-001 (S1) — CLÉ DE RAPPROCHEMENT DES PERSONNES.
     |
     | Mesure du 2026-08-18 en production : 1 319 567 contacts, 410 481 avec

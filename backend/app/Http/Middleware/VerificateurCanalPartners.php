@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\EmpreinteIp;
 use App\Support\FenetreHorodatage;
 use App\Support\HmacSignature;
 use App\Support\Partners\ConfigurationCanalPartners;
@@ -55,7 +56,8 @@ use Throwable;
  *      déjà acceptée dans la fenêtre est refusée.
  *
  * TOUS les refus d'authentification (1 à 5) rendent le MÊME 401, au corps
- * identique à l'octet (`CORPS_REFUS`). La cause n'est écrite qu'au journal.
+ * identique à l'octet (`CORPS_REFUS`). La cause n'est écrite qu'au journal,
+ * avec l'empreinte HMAC à clé de l'IP (`EmpreinteIp`), jamais l'IP en clair.
  * Seule exception : mémoire anti-rejeu indisponible → 503, jamais une
  * acceptation sans contrôle.
  */
@@ -110,11 +112,8 @@ final class VerificateurCanalPartners
             $premiereFois = Cache::store((string) config('crm.ingest.replay_store', 'redis'))
                 ->add('canal-partners:vu:' . $empreinte, 1, $ttl);
         } catch (Throwable $e) {
-            // TODO(N11-IP-JOURNAUX) : IP en clair, comme `CanalSigneSite` ; la
-            // règle « IP hachée » sera appliquée aux deux canaux d'un même geste
-            // (réserve sécurité n°5 de la PR #307).
             Log::warning('canal Partners : requête refusée (mémoire anti-rejeu indisponible)', [
-                'ip' => $request->ip(),
+                'ip_empreinte' => EmpreinteIp::de($request->ip()),
                 'exception' => $e::class,
             ]);
 
@@ -137,9 +136,8 @@ final class VerificateurCanalPartners
 
     private static function refus(Request $request, string $cause): Response
     {
-        // TODO(N11-IP-JOURNAUX) : voir plus haut — IP en clair, sujet commun
-        // avec `CanalSigneSite`.
-        Log::warning("canal Partners : requête refusée ({$cause})", ['ip' => $request->ip()]);
+        // Jamais l'IP en clair : empreinte HMAC à clé (`EmpreinteIp`).
+        Log::warning("canal Partners : requête refusée ({$cause})", ['ip_empreinte' => EmpreinteIp::de($request->ip())]);
 
         return response(self::CORPS_REFUS, 401, ['Content-Type' => 'application/json']);
     }

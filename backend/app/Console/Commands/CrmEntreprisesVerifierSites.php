@@ -195,15 +195,18 @@ class CrmEntreprisesVerifierSites extends Command
         $apres = $this->compterFiches();
 
         Log::info('crm.entreprises.verifier_sites', $this->bilan + [
-            'dry_run' => $dryRun, 'audience' => $audience, 'curseur' => $curseur, 'lignes_avant' => $avant, 'lignes_apres' => $apres,
+            'dry_run' => $dryRun, 'audience' => $audience, 'curseur' => $curseur, 'lignes_avant' => $avant['toutes'], 'lignes_apres' => $apres['toutes'],
+            'vivantes_avant' => $avant['vivantes'], 'vivantes_apres' => $apres['vivantes'],
         ]);
         $this->info($dryRun ? '[À BLANC] les sites ont été lus, rien n\'a été écrit (ni marqueur, ni curseur).' : 'Vérification appliquée.');
         $lignes = [];
         foreach (self::LIBELLES as $k => $libelle) {
             $lignes[] = [$libelle, $this->bilan[$k]];
         }
-        $lignes[] = ['lignes avant (fiches de l\'espace)', $avant];
-        $lignes[] = ['lignes après (fiches de l\'espace)', $apres];
+        $lignes[] = ['lignes avant (fiches de l\'espace, corbeille comprise)', $avant['toutes']];
+        $lignes[] = ['lignes après (fiches de l\'espace, corbeille comprise)', $apres['toutes']];
+        $lignes[] = ['fiches vivantes avant', $avant['vivantes']];
+        $lignes[] = ['fiches vivantes après', $apres['vivantes']];
         $this->table(['compteur', 'nombre'], $lignes);
         $this->line("Curseur : fiche {$depart} → fiche {$curseur}" . ($audience !== null ? " (audience {$audience})" : '') . '.');
         if ($arretHeure && $fin !== null) {
@@ -213,11 +216,11 @@ class CrmEntreprisesVerifierSites extends Command
         }
 
         if ($avant !== $apres) {
-            $this->error("Comptage des fiches DIFFÉRENT : {$avant} avant, {$apres} après. Ce traitement ne crée ni ne supprime rien : à examiner.");
+            $this->error("Comptage des fiches DIFFÉRENT : {$avant['toutes']} avant, {$apres['toutes']} après ({$avant['vivantes']} → {$apres['vivantes']} vivantes). Ce traitement ne crée, ne supprime ni ne met à la corbeille rien : à examiner.");
 
             return self::FAILURE;
         }
-        $this->line("Comptage des fiches : identique ({$avant} avant, {$apres} après).");
+        $this->line("Comptage des fiches : identique ({$avant['toutes']} avant, {$apres['toutes']} après ; {$apres['vivantes']} vivantes).");
 
         if ($interruption !== null) {
             $this->error('INTERROMPU : ' . $interruption::class . ". Les paquets validés restent ; reprise au curseur (fiche {$curseur}).");
@@ -244,9 +247,19 @@ class CrmEntreprisesVerifierSites extends Command
         return ! $forcer && $demandee->greaterThan($finFenetre) ? $finFenetre : $demandee;
     }
 
-    private function compterFiches(): int
+    /**
+     * Les fiches de l'espace : TOUTES, corbeille comprise (rien ne doit
+     * disparaître), et les vivantes (rien ne doit partir à la corbeille).
+     *
+     * @return array{toutes: int, vivantes: int}
+     */
+    private function compterFiches(): array
     {
-        return DB::table('companies')->where('workspace_id', $this->workspaceId)->count();
+        $n = DB::table('companies')->where('workspace_id', $this->workspaceId)
+            ->selectRaw('count(*) AS toutes, count(*) FILTER (WHERE deleted_at IS NULL) AS vivantes')
+            ->first();
+
+        return ['toutes' => (int) ($n->toutes ?? 0), 'vivantes' => (int) ($n->vivantes ?? 0)];
     }
 
     /** @param  list<stdClass>  $fiches */

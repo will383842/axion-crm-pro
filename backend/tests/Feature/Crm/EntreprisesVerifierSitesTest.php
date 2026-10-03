@@ -57,8 +57,20 @@ beforeEach(function () {
     Carbon::setTestNow(Carbon::parse(EVS_MARDI, 'Europe/Paris'));
 });
 
+// UN seul `afterEach` par fichier : l'horloge est toujours rendue, et la
+// connexion `axion_app` refermée si un test l'a ouverte.
 afterEach(function () {
     Carbon::setTestNow();
+    if (! array_key_exists('pgsql_app', DB::getConnections())) {
+        return;
+    }
+    try {
+        evsApp()->statement('RESET enable_seqscan');
+        evsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+    } catch (Throwable) {
+        // Connexion déjà perdue.
+    }
+    evsApp()->disconnect();
 });
 
 /** Une fiche au site DEVINÉ (`guess`), comme les 824 000 de la production. */
@@ -351,7 +363,8 @@ test('aucune ligne supprimée : comptage avant = après affiché, fiches vérifi
         ->and(evsMarqueur($corbeille))->toBeNull()
         ->and(evsMarqueur($brave))->toBeNull()
         ->and($r['sortie'])->toMatch('/lignes avant\D+(\d+)\b/u')
-        ->and($r['sortie'])->toContain('identique');
+        ->and($r['sortie'])->toContain('identique')
+        ->and($r['sortie'])->toMatch('/fiches vivantes avant\D+(\d+)/u');
     preg_match('/lignes avant\D+(\d+)/u', $r['sortie'], $a);
     preg_match('/lignes après\D+(\d+)/u', $r['sortie'], $b);
     expect($a[1])->toBe($b[1]);
@@ -435,19 +448,6 @@ function evsApp(): Connection
 {
     return DB::connection('pgsql_app');
 }
-
-afterEach(function () {
-    if (! array_key_exists('pgsql_app', DB::getConnections())) {
-        return;
-    }
-    try {
-        evsApp()->statement('RESET enable_seqscan');
-        evsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-    } catch (Throwable) {
-        // Connexion déjà perdue.
-    }
-    evsApp()->disconnect();
-});
 
 test('sous axion_app : la sélection d un paquet passe par l index partiel ordonné, sans balayage séquentiel', function (bool $audience) {
     $espace = (string) Str::uuid();

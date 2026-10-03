@@ -28,8 +28,19 @@ use Throwable;
  *
  *     ex. « 1759510000.POST /api/internal/partners/v1/ping.<clé>.<corps> »
  *
- * MÉTHODE en majuscules ; chemin = `Request::getPathInfo()`, sans domaine ni
- * paramètres de requête. La méthode et le chemin SONT dans la signature : un
+ * Contrat exact pour l'émetteur :
+ *   - MÉTHODE : la méthode EFFECTIVE (`getMethod()`, après `_method` ou
+ *     `X-HTTP-Method-Override` s'il y en a), en majuscules ;
+ *   - chemin : `Request::getPathInfo()`, c'est-à-dire le chemin EXACTEMENT tel
+ *     qu'envoyé dans la ligne de requête, barre initiale et préfixe `/api`
+ *     compris, SANS décodage ni normalisation (`%70ing` ≠ `ping`, ni `//`, ni
+ *     barre finale), sans domaine ni `?…` ;
+ *   - signature en hexadécimal minuscule (le préfixe `sha256=` est toléré) ;
+ *   - corps de plus de 256 Kio : refusé par le même 401, jamais par un 413
+ *     propre au canal (cf. étape 1).
+ * Un émetteur qui s'en écarte reçoit un 401 : l'échec est toujours fermé.
+ *
+ * La méthode et le chemin SONT dans la signature : un
  * corps signé pour une route ne peut pas être rejoué sur une autre route ou
  * sous une autre méthode pendant la fenêtre (même 401).
  *
@@ -38,7 +49,10 @@ use Throwable;
  * événement déjà reçu (il obtiendrait un rejeu ou un 409 à la place du
  * traitement). Ni la clé (`IdempotencePartners::MOTIF_CLE`), ni l'horodatage
  * (entier) ne contiennent de point ; la méthode et le chemin sont imposés par
- * la requête reçue, pas lus dans la chaîne : le découpage est sans ambiguïté.
+ * la requête reçue, pas lus dans la chaîne. Aucune route du canal ne doit
+ * accepter de point dans son chemin (garde : « aucun point dans les routes
+ * Partners », `CanalPartnersSocleTest`) : le découpage reste alors sans
+ * ambiguïté, même pour une future route à paramètre.
  *
  * ── Ordre ────────────────────────────────────────────────────────────────
  *
@@ -57,7 +71,9 @@ use Throwable;
  *      contourne pas la borne). ⚠️ La pile globale (`ConvertEmptyStringsToNull`
  *      sur une requête JSON) peut avoir déjà lu le corps avant ce vérificateur :
  *      la borne protège le HMAC et tout ce qui suit, pas la lecture elle-même,
- *      que borne `post_max_size` ;
+ *      que borne `post_max_size`. Au-delà de `post_max_size`, le middleware
+ *      global `ValidatePostSize` rend un 413 AVANT ce vérificateur, pour toute
+ *      URL (route absente comprise) : ce n'est pas un oracle du canal ;
  *   2. `X-Partners-Timestamp` présent, entier, dans la fenêtre — AVANT tout
  *      calcul de signature ;
  *   3. `X-Partners-Kid` au format fermé, cherché dans la liste des clés

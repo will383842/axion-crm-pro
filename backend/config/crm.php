@@ -183,8 +183,11 @@ return [
     |   X-Partners-Signature = hex(HMAC-SHA256(secret,
     |     "<X-Partners-Timestamp>.<MÉTHODE> <chemin>.<Idempotency-Key>.<corps brut>"))
     |   ex. "1759510000.POST /api/internal/partners/v1/ping.<clé>.<corps>"
-    |   (méthode en majuscules, chemin sans domaine ni paramètres de requête ;
-    |   corps de plus de 256 Kio refusé avant tout calcul, même 401).
+    |   (méthode EFFECTIVE en majuscules ; chemin exactement tel qu'envoyé,
+    |   barre initiale comprise, sans décodage ni normalisation, sans domaine
+    |   ni paramètres de requête ; hexadécimal minuscule ; corps de plus de
+    |   256 Kio refusé avant tout calcul, même 401). Détail :
+    |   `App\Http\Middleware\VerificateurCanalPartners`.
     |
     | `kid_essai` : identifiant de la clé entrante réservée aux essais. Elle
     | n'est acceptée qu'en mode `essai` ; en `actif`, elle reçoit le même 401

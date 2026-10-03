@@ -630,6 +630,23 @@ test('une seule route sous partners : le ping, en POST, limiteur dédié puis v�
         ->and($route->gatherMiddleware())->not->toContain('throttle:internal');
 });
 
+test('aucun point dans les routes Partners (le point sépare les parties de la chaîne signée)', function () {
+    $routes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($route) => str_contains($route->uri(), 'partners'));
+
+    expect($routes)->not->toBeEmpty();
+    foreach ($routes as $route) {
+        expect($route->uri())->not->toContain('.');
+        // Un paramètre ne doit pas pouvoir capturer un point non plus : une
+        // contrainte `where` explicite est exigée pour chaque paramètre.
+        foreach ($route->parameterNames() as $parametre) {
+            $motif = $route->wheres[$parametre] ?? null;
+            expect($motif)->not->toBeNull("paramètre « {$parametre} » sans contrainte sur {$route->uri()}");
+            expect(preg_match('/^(?:' . $motif . ')$/', 'a.b'))->toBe(0, "le paramètre « {$parametre} » accepte un point");
+        }
+    }
+});
+
 test('la table d’idempotence n’est lue par aucun contrôleur ni aucune route', function () {
     $fichiers = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path()));
     $lecteurs = [];

@@ -3,11 +3,11 @@
 namespace App\Support\Partners;
 
 use Closure;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Throwable;
 
 /**
  * Lot N11 — idempotence du canal Partners, par l'en-tête `Idempotency-Key`
@@ -28,13 +28,25 @@ use LogicException;
  * de la réception. Il ne porte JAMAIS de donnée personnelle ni la charge : ni
  * le corps, ni la réponse complète, ni l'adresse de l'appelant ne sont stockés.
  *
- * Deux requêtes simultanées sur la même clé : la contrainte d'unicité tranche,
- * la perdante voit sa transaction annulée (traitement compris) puis reçoit la
- * réponse rejouée ou le 409.
+ * Deux requêtes simultanées sur la même clé : la contrainte d'unicité tranche
+ * (`INSERT … ON CONFLICT ON CONSTRAINT` nommée, `CONTRAINTE_UNICITE`), la
+ * perdante voit sa transaction annulée (traitement compris) puis reçoit la
+ * réponse rejouée ou le 409. Seule CETTE contrainte mène au rejeu ou au 409 :
+ * une violation d'unicité levée par le traitement lui-même (sur une autre
+ * table) remonte telle quelle, transaction annulée.
+ *
+ * Une réponse 5xx n'est JAMAIS mémorisée : la transaction est annulée
+ * (traitement compris), aucune ligne n'est insérée, et la reprise sous la même
+ * clé RETENTE réellement le traitement. Une 2xx/3xx/4xx est mémorisée et
+ * rejouée. (Le rôle applicatif n'a que SELECT/INSERT : ne rien insérer est la
+ * seule façon de ne pas mémoriser.)
  */
 final class IdempotencePartners
 {
     public const TABLE = 'partners_idempotence';
+
+    /** Nom de l'unicité (route, clé) posée par la migration (vérifié par test). */
+    public const CONTRAINTE_UNICITE = self::TABLE . '_route_cle_idempotence_unique';
 
     public const ENTETE = 'Idempotency-Key';
 
@@ -67,28 +79,40 @@ final class IdempotencePartners
             return $deja;
         }
 
+        DB::beginTransaction();
         try {
-            [$code, $resume] = DB::transaction(function () use ($route, $cle, $empreinte, $traitement): array {
-                [$code, $resume] = $traitement();
-                if ($resume !== null && strlen($resume) > self::RESUME_MAX) {
-                    throw new LogicException('Résumé de réponse trop long pour la table d’idempotence.');
-                }
+            [$code, $resume] = $traitement();
+            if ($resume !== null && strlen($resume) > self::RESUME_MAX) {
+                throw new LogicException('Résumé de réponse trop long pour la table d’idempotence.');
+            }
 
-                DB::table(self::TABLE)->insert([
-                    'route' => $route,
-                    'cle_idempotence' => $cle,
-                    'empreinte_corps' => $empreinte,
-                    'code_reponse' => $code,
-                    'resume_reponse' => $resume,
-                    'recu_le' => now(),
-                ]);
+            // 5xx = erreur côté CRM : rien n'est inséré, la reprise retentera.
+            $inseree = $code >= 500 ? null : DB::affectingStatement(
+                'INSERT INTO ' . self::TABLE . ' (route, cle_idempotence, empreinte_corps, code_reponse, resume_reponse, recu_le) '
+                . 'VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT ON CONSTRAINT ' . self::CONTRAINTE_UNICITE . ' DO NOTHING',
+                [$route, $cle, $empreinte, $code, $resume, now()],
+            );
+        } catch (Throwable $e) {
+            DB::rollBack();
 
-                return [$code, $resume];
-            });
-        } catch (UniqueConstraintViolationException) {
+            throw $e;
+        }
+
+        if ($inseree === null) {
+            DB::rollBack();
+
+            return response()->json($rendu($code, $resume), $code);
+        }
+
+        if ($inseree === 0) {
+            // Course perdue sur (route, clé) : traitement annulé, la gagnante fait foi.
+            DB::rollBack();
+
             return self::rejouer($route, $cle, $empreinte, $rendu)
                 ?? response()->json(['erreur' => 'cle_reutilisee'], 409);
         }
+
+        DB::commit();
 
         return response()->json($rendu($code, $resume), $code);
     }

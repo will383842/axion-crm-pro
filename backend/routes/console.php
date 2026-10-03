@@ -8,6 +8,7 @@ use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
+use App\Support\BattementPlanificateur;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -480,3 +481,12 @@ Schedule::command('crm:emails:verifier')
     ->onFailure(function (): void {
         Log::error('[EMAILS] crm:emails:verifier (dimanche 05:00) est sortie en échec — le journal dit le lot annulé et la reprise (--source, --depuis-id).');
     });
+
+// Avis #308, réserve 5 — BATTEMENT DU PLANIFICATEUR. Chaque minute, un
+// horodatage posé en cache (en processus : ni sous-processus artisan, ni
+// requête SQL, ni verrou) ; `crm:canaux:etat` lève `planificateur_arrete`
+// s'il a plus de 15 minutes. Sans lui, un conteneur `scheduler` mort fait
+// taire toutes les tâches planifiées sans qu'aucune ne le dise.
+Schedule::call(static fn () => BattementPlanificateur::battre())
+    ->name(BattementPlanificateur::NOM_TACHE)
+    ->everyMinute();

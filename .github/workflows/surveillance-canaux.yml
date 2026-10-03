@@ -36,9 +36,14 @@ name: Surveillance des canaux d'échange
 #                                        la file sortante. Le backoff du flush
 #                                        plafonne à 60 min entre deux essais :
 #                                        2 h = au moins deux essais ratés.
-#   SURV_CANAUX_FENETRE_ABANDON_MIN (90) fenêtre où un passage en gave_up
-#                                        alerte. > 60 min pour couvrir une
-#                                        exécution horaire retardée par GitHub.
+#   SURV_CANAUX_FENETRE_ABANDON_MIN (1560) fenêtre où un passage en gave_up
+#                                        alerte : 26 h. GitHub retarde ou SAUTE
+#                                        des passages planifiés ; avec 90 min,
+#                                        un passage sauté faisait disparaître
+#                                        un abandon (état terminal, divergence
+#                                        RGPD). Chaque ligne n'est signalée
+#                                        qu'UNE fois : l'issue porte les numéros
+#                                        déjà dits (`<!-- gave_up_ids: … -->`).
 #   SURV_CANAUX_SEUIL_SILENCE_H    (48)  silence max du canal site → CRM.
 #                                        ⚠️ Rien dans le code ne documente le
 #                                        volume NORMAL d'événements du site
@@ -49,11 +54,38 @@ name: Surveillance des canaux d'échange
 #                                        `reception_site.derniere_reception_a`
 #                                        sur quelques semaines et relever la
 #                                        variable (72 h couvre un week-end).
-#   SURV_CANAUX_SEUIL_REFUS        (5)   refus de signature tolérés par heure.
+#   SURV_CANAUX_SEUIL_REFUS        (5)   refus de signature tolérés sur 120 min.
 #                                        Un émetteur sain n'en produit aucun ;
 #                                        la marge absorbe une dérive d'horloge
-#                                        ponctuelle. Un secret désaligné en
-#                                        produit des dizaines.
+#                                        ponctuelle. Les POST sans AUCUN en-tête
+#                                        du site (scanners : la route est
+#                                        publique) sont comptés à part
+#                                        (`sans_entete`) et n'alertent jamais.
+#   SURV_CANAUX_SEUIL_BAD_SIGNATURE (1)  signatures FAUSSES (horodatage valide)
+#                                        tolérées sur 120 min : alerte dès 2.
+#                                        Un tiers n'en produit presque jamais ;
+#                                        un secret désaligné, si — mais à faible
+#                                        trafic le backoff du site n'en émet
+#                                        que 6 en 31 min puis ~1/h.
+#   SURV_CANAUX_FERMES_EXPRES      ('')  canaux coupés VOLONTAIREMENT, séparés
+#                                        par des virgules : `site-vers-crm`
+#                                        neutralise `site_muet`, `crm-vers-site`
+#                                        neutralise `file_sortante_bloquee` —
+#                                        seulement si le drapeau du canal est
+#                                        réellement fermé (le JSON le dit :
+#                                        `ferme_expres`). Les abandons `gave_up`
+#                                        ne sont jamais neutralisés.
+#
+# ── PLANIFICATEUR ───────────────────────────────────────────────────────────
+# La commande lit aussi le battement posé chaque minute par le planificateur
+# (`BattementPlanificateur`) : plus de 15 min sans battement lève
+# `planificateur_arrete` — un `schedule:work` mort fait taire toutes les
+# tâches planifiées, `crm:flush-outbound` compris, même file vide.
+#
+# ── RETOUR AU VERT ──────────────────────────────────────────────────────────
+# Le job d'alerte tourne à CHAQUE passage : un type qui n'apparaît plus voit
+# son issue fermée (« rétabli le … »). Jamais quand la mesure n'a pas pu se
+# faire (`controle_impossible`) : ne pas savoir n'est pas être rétabli.
 #
 # Ce qui reste hors de portée, en toute honnêteté : si GitHub Actions cesse de
 # déclencher les tâches planifiées, plus personne ne surveille.
@@ -75,7 +107,11 @@ on:
         required: false
         default: ''
       seuil_refus:
-        description: "Refus de signature tolérés sur 1 h. Vide = variable ou 5."
+        description: "Refus de signature tolérés sur 120 min. Vide = variable ou 5."
+        required: false
+        default: ''
+      seuil_bad_signature:
+        description: "Signatures fausses (bad_signature) tolérées sur 120 min. Vide = variable ou 1."
         required: false
         default: ''
 
@@ -93,6 +129,9 @@ jobs:
   verifier:
     name: Les canaux d'échange CRM ↔ site circulent-ils ?
     runs-on: ubuntu-24.04
+    # Le job qui tient la clé SSH n'a besoin d'AUCUN droit sur le dépôt
+    # (pas de checkout) : jeton sans permission.
+    permissions: {}
     timeout-minutes: 15  # F38-008 (SSH + une commande artisan en lecture seule, une reprise)
     steps:
       - name: Setup SSH agent
@@ -117,18 +156,24 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           SEUIL_AGE_H: ${{ github.event.inputs.seuil_age_h || vars.SURV_CANAUX_SEUIL_AGE_H || '2' }}
-          FENETRE_ABANDON_MIN: ${{ vars.SURV_CANAUX_FENETRE_ABANDON_MIN || '90' }}
+          FENETRE_ABANDON_MIN: ${{ vars.SURV_CANAUX_FENETRE_ABANDON_MIN || '1560' }}
           SEUIL_SILENCE_H: ${{ github.event.inputs.seuil_silence_h || vars.SURV_CANAUX_SEUIL_SILENCE_H || '48' }}
           SEUIL_REFUS: ${{ github.event.inputs.seuil_refus || vars.SURV_CANAUX_SEUIL_REFUS || '5' }}
+          SEUIL_BAD_SIGNATURE: ${{ github.event.inputs.seuil_bad_signature || vars.SURV_CANAUX_SEUIL_BAD_SIGNATURE || '1' }}
+          FERMES_EXPRES: ${{ vars.SURV_CANAUX_FERMES_EXPRES || '' }}
         run: |
           set -euo pipefail
 
           # Les seuils partent dans une commande distante : entiers seulement.
-          for v in "$SEUIL_AGE_H" "$FENETRE_ABANDON_MIN" "$SEUIL_SILENCE_H" "$SEUIL_REFUS"; do
+          for v in "$SEUIL_AGE_H" "$FENETRE_ABANDON_MIN" "$SEUIL_SILENCE_H" "$SEUIL_REFUS" "$SEUIL_BAD_SIGNATURE"; do
             case "$v" in ''|*[!0-9]*) echo "::error::Seuil non entier : '$v'"; exit 1 ;; esac
           done
+          # La liste des canaux fermés exprès aussi : minuscules, tirets,
+          # virgules — rien qui puisse sortir de l'argument distant.
+          FERMES_EXPRES="$(printf '%s' "$FERMES_EXPRES" | tr -d ' ')"
+          case "$FERMES_EXPRES" in *[!a-z,-]*) echo "::error::SURV_CANAUX_FERMES_EXPRES invalide (attendu : site-vers-crm,crm-vers-site)"; exit 1 ;; esac
 
-          OPTIONS="--seuil-age-h=$SEUIL_AGE_H --fenetre-abandon-min=$FENETRE_ABANDON_MIN --seuil-silence-h=$SEUIL_SILENCE_H --seuil-refus=$SEUIL_REFUS"
+          OPTIONS="--seuil-age-h=$SEUIL_AGE_H --fenetre-abandon-min=$FENETRE_ABANDON_MIN --seuil-silence-h=$SEUIL_SILENCE_H --seuil-refus=$SEUIL_REFUS --seuil-bad-signature=$SEUIL_BAD_SIGNATURE --fermes-expres=$FERMES_EXPRES"
 
           # `COMPOSE_FILE` : l'overlay de production, comme le déploiement.
           # `< /dev/null` OBLIGATOIRE : sans lui, `docker compose exec -T` lit
@@ -207,31 +252,43 @@ jobs:
       etat: ${{ steps.controle.outputs.etat }}
 
   alerte:
-    name: Ouvrir une issue par type d'alerte
+    name: Ouvrir, compléter ou fermer l'issue de chaque type d'alerte
     runs-on: ubuntu-24.04
     timeout-minutes: 10  # F38-008 (quelques appels à l'API des issues)
     needs: [verifier]
-    if: failure()
+    # À CHAQUE passage, vert compris : c'est ce job qui ferme les issues
+    # rétablies. Jamais sur une exécution annulée.
+    if: ${{ !cancelled() }}
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Ouvrir ou compléter l'issue de chaque type
+      - name: Ouvrir, compléter ou fermer l'issue de chaque type
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEPOT: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ALERTES: ${{ needs.verifier.outputs.alertes }}
           ETAT: ${{ needs.verifier.outputs.etat }}
+          RESULTAT_MESURE: ${{ needs.verifier.result }}
         run: |
           set -euo pipefail
 
           # Le job de mesure a pu échouer AVANT de produire ses sorties (clé
           # SSH absente, runner en panne) : c'est encore un contrôle impossible.
-          if [ -z "${ALERTES:-}" ] || ! echo "$ALERTES" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+          # Une liste VIDE n'est un « tout va bien » que si le job a réussi.
+          if [ -z "${ALERTES:-}" ] || ! echo "$ALERTES" | jq -e 'type == "array"' >/dev/null 2>&1 \
+             || { [ "$ALERTES" = "[]" ] && [ "$RESULTAT_MESURE" != "success" ]; }; then
             ALERTES='[{"type":"controle_impossible","message":"Le job de mesure a échoué sans rendre de résultat. Voir le journal du job."}]'
           fi
           [ -n "${ETAT:-}" ] || ETAT='{}'
+
+          # Une mesure incomplète ne dit pas qu'un problème est rétabli : on ne
+          # ferme une issue QUE si la mesure a pu se faire en entier.
+          MESURE_COMPLETE="$(echo "$ALERTES" | jq -r 'if any(.[]; .type == "controle_impossible") then "non" else "oui" end')"
+
+          # Tous les types connus : ceux dont l'issue peut être fermée.
+          TYPES_CONNUS='file_sortante_bloquee file_sortante_abandon site_muet refus_signature planificateur_arrete controle_impossible'
 
           # Un type = un libellé = UNE issue vivante au plus. Une panne durable
           # ne doit pas ouvrir 24 issues par jour : quand l'issue existe déjà,
@@ -244,6 +301,7 @@ jobs:
               file_sortante_abandon) echo "🔴 Canal CRM → site : des événements ont été abandonnés (gave_up)" ;;
               site_muet)             echo "🟠 Canal site → CRM : plus aucun événement reçu" ;;
               refus_signature)       echo "🔴 Canaux signés : le CRM refuse les signatures du site" ;;
+              planificateur_arrete)  echo "🔴 CRM : le planificateur ne bat plus (tâches planifiées à l'arrêt)" ;;
               controle_impossible)   echo "🔴 Surveillance des canaux : contrôle impossible" ;;
               *)                     echo "🔴 Surveillance des canaux : alerte « $1 »" ;;
             esac
@@ -266,7 +324,12 @@ jobs:
               refus_signature) printf '%s\n' \
                 '1. `bad_signature` : le secret `SITE_SYNC_HMAC_SECRET` est-il identique des deux côtés ? (rotation faite d’un seul côté)' \
                 '2. `stale_signature` : horloge du site ou du serveur dérivée ? fenêtre `CRM_INGEST_MAX_CLOCK_SKEW` ?' \
-                '3. `replay_guard_unavailable` ou compteur illisible : Redis est-il debout ?' ;;
+                '3. `replay_guard_unavailable` ou compteur illisible : Redis est-il debout ?' \
+                '4. Les POST sans aucun en-tête du site (`sans_entete`, scanners) ne comptent pas : seul un émetteur qui signe peut lever cette alerte.' ;;
+              planificateur_arrete) printf '%s\n' \
+                '1. Le conteneur `scheduler` tourne-t-il ? (`docker compose ps scheduler`)' \
+                '2. Son journal : `schedule:work` boucle-t-il, ou une tâche le bloque-t-elle ?' \
+                '3. Redis est-il debout ? (le battement y est écrit chaque minute)' ;;
               *) printf '%s\n' \
                 '1. Le serveur répond-il en SSH ? Le conteneur `api` tourne-t-il ?' \
                 '2. Un déploiement était-il en cours (le conteneur redémarre) ? Si oui, attendre le passage suivant.' \
@@ -278,11 +341,36 @@ jobs:
             LIBELLE="canal-$(echo "$TYPE" | tr '_' '-')"
             TITRE="$(titre_de "$TYPE")"
 
+            # Abandons : chaque ligne `gave_up` n'est signalée qu'UNE fois. Les
+            # numéros déjà dits sont lus dans les marqueurs des issues de ce
+            # libellé (ouvertes ou fermées : une issue fermée à la main vaut
+            # « vu »). Les autres types gardent la règle des 24 h.
+            NOUVEAUX=''
+            if [ "$TYPE" = "file_sortante_abandon" ]; then
+              IDS="$(echo "$ETAT" | jq -c '[.file_sortante.gave_up_recents_ids // [] | .[] | numbers]' 2>/dev/null || echo '[]')"
+              # Chaque maillon tolère le vide (`|| true`) : sous `pipefail`, un
+              # grep sans résultat ferait échouer tout le relevé.
+              DEJA="$( { gh issue list --repo "$DEPOT" --state all --label "$LIBELLE" --limit 20 --json body,comments \
+                           --jq '.[] | .body, (.comments[].body)' 2>/dev/null || true; } \
+                       | { grep -oE '<!-- gave_up_ids: [0-9,]* -->' || true; } \
+                       | { grep -oE '[0-9]+' || true; } \
+                       | jq -sc '.' )"
+              NOUVEAUX="$(jq -nc --argjson i "$IDS" --argjson d "$DEJA" '$i - $d')"
+              if [ "$IDS" != "[]" ] && [ "$NOUVEAUX" = "[]" ]; then
+                echo "Abandons ($TYPE) : toutes les lignes ont déjà été signalées — rien de plus."
+                continue
+              fi
+            fi
+
             # Corps écrit ligne par ligne : une chaîne multiligne indentée
             # deviendrait un bloc de code en markdown.
             {
               printf '%s\n' "La surveillance horaire des canaux d'échange a levé l'alerte **\`$TYPE\`**." ''
               echo "$ALERTES" | jq -r --arg t "$TYPE" '.[] | select(.type == $t) | "- " + .message'
+              if [ -n "$NOUVEAUX" ] && [ "$NOUVEAUX" != "[]" ]; then
+                echo "- Lignes \`crm_outbound_events\` NOUVELLEMENT abandonnées : $(echo "$NOUVEAUX" | jq -r 'map("n° " + tostring) | join(", ")')."
+                echo "<!-- gave_up_ids: $(echo "$NOUVEAUX" | jq -r 'map(tostring) | join(",")') -->"
+              fi
               printf '%s\n' '' '## Quoi vérifier, dans cet ordre' ''
               quoi_verifier "$TYPE"
               printf '%s\n' '' '## Mesure complète (sans donnée personnelle)' '' '```json'
@@ -303,6 +391,12 @@ jobs:
               continue
             fi
 
+            if [ -n "$NOUVEAUX" ] && [ "$NOUVEAUX" != "[]" ]; then
+              echo "Issue #$EXISTANTE ($TYPE) déjà ouverte — ajout des seules lignes nouvellement abandonnées."
+              gh issue comment "$EXISTANTE" --repo "$DEPOT" --body-file corps.md
+              continue
+            fi
+
             DERNIER="$(gh issue view "$EXISTANTE" --repo "$DEPOT" --json createdAt,comments --jq '(.comments | last | .createdAt) // .createdAt')"
             AGE_H=$(( ( $(date -u +%s) - $(date -u -d "$DERNIER" +%s) ) / 3600 ))
             if [ "$AGE_H" -ge 24 ]; then
@@ -311,4 +405,27 @@ jobs:
             else
               echo "Issue #$EXISTANTE ($TYPE) déjà ouverte, complétée il y a ${AGE_H} h — rien de plus (au plus un ajout par 24 h)."
             fi
+          done
+
+          # ── RETOUR AU VERT ─────────────────────────────────────────────────
+          # Un type connu qui n'apparaît plus dans une mesure COMPLÈTE : son
+          # issue ouverte est fermée, avec la date. Sans cela, une issue restée
+          # ouverte masquait la panne suivante du même type.
+          if [ "$MESURE_COMPLETE" != "oui" ]; then
+            echo "Mesure incomplète (controle_impossible) : aucune issue fermée à ce passage."
+            exit 0
+          fi
+          QUAND="$(date -u '+%Y-%m-%d à %H:%M UTC')"
+          for TYPE in $TYPES_CONNUS; do
+            if echo "$ALERTES" | jq -e --arg t "$TYPE" 'any(.[]; .type == $t)' >/dev/null; then
+              continue
+            fi
+            LIBELLE="canal-$(echo "$TYPE" | tr '_' '-')"
+            # Un libellé jamais créé n'a pas d'issue : la liste est vide.
+            OUVERTES="$(gh issue list --repo "$DEPOT" --state open --label "$LIBELLE" --json number --jq '.[].number' 2>/dev/null || true)"
+            for N in $OUVERTES; do
+              echo "Issue #$N ($TYPE) : l'alerte n'apparaît plus — fermeture."
+              gh issue close "$N" --repo "$DEPOT" --reason completed \
+                --comment "✅ Rétabli le $QUAND : la mesure horaire ne lève plus l'alerte \`$TYPE\`. $RUN_URL"
+            done
           done

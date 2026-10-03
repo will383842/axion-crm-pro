@@ -34,7 +34,7 @@ export const EFFECTIF_LABELS: Record<string, string> = {
 export function libelleEffectif(code?: string | null): string | null {
   const normalise = code?.trim().toUpperCase() ?? "";
   if (normalise === "") return null;
-  return Object.hasOwn(EFFECTIF_LABELS, normalise) ? EFFECTIF_LABELS[normalise] : null;
+  return Object.hasOwn(EFFECTIF_LABELS, normalise) ? (EFFECTIF_LABELS[normalise] ?? null) : null;
 }
 
 /** Libellé lisible d'une tranche d'effectif INSEE (ex. "12" → "20 à 49 salariés"). */

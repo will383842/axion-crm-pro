@@ -354,10 +354,12 @@ test('essai à blanc interrompu : bilan PARTIEL annoncé, jamais « curseur mém
         '--workspace' => $ws, '--depuis' => '2026-07-06', '--delai-ms' => 0, '--pause-ms' => 0, '--memoire-max' => 1, '--dry-run' => true,
     ]);
 
+    // `Artisan::output()` VIDE le tampon à la lecture : lu une seule fois.
+    $sortie = Artisan::output();
     expect($code)->toBe(0)
-        ->and(Artisan::output())->toContain('Essai INCOMPLET')
-        ->and(Artisan::output())->toContain('--limite')
-        ->and(Artisan::output())->not->toContain('curseur est mémorisé')
+        ->and($sortie)->toContain('Essai INCOMPLET')
+        ->and($sortie)->toContain('--limite')
+        ->and($sortie)->not->toContain('curseur est mémorisé')
         ->and(DB::table('insee_mises_a_jour')->where('workspace_id', $ws)->count())->toBe(0);
 });
 

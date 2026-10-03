@@ -157,17 +157,16 @@ export function ReglagesTechniques() {
             */}
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Le DSN est lu dans <code className="font-mono text-xs">VITE_SENTRY_DSN</code>{" "}
-            <strong>au moment du build</strong> de l’image (cf.{" "}
-            <code className="font-mono text-xs">Dockerfile.frontend</code>). Il ne se règle pas
+            <strong>au moment du build</strong> de l’image. Il ne se règle pas
             depuis cet écran, et ne le pourrait pas&nbsp;: il est compilé dans le paquet servi au
             navigateur.
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             État de <em>ce</em> build&nbsp;:{" "}
             {import.meta.env["VITE_SENTRY_DSN"] ? (
-              <StatusPill tone="success">DSN présent — le SDK est actif</StatusPill>
+              <StatusPill tone="success">Suivi des erreurs actif</StatusPill>
             ) : (
-              <StatusPill tone="info">aucun DSN — le SDK reste inerte</StatusPill>
+              <StatusPill tone="info">Suivi des erreurs inactif</StatusPill>
             )}
           </p>
         </Card>

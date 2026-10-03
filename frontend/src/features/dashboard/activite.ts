@@ -39,9 +39,27 @@ export const EVENEMENTS: Record<string, string> = {
   FUSION_FICHES_ANNULEE: 'Fusion de fiches annulée',
   FUSION_DOUBLONS_FIN: 'Fusion des doublons terminée',
   RECLASSEMENT_ETIQUETTES_SUPPRIMEES: 'Étiquettes retirées après reclassement',
+  // Codes de `business_events` (journal métier, `AuditLogger::log`), lus par
+  // « Santé du système › 50 derniers événements ». La garde
+  // `tests/lib/evenements-metier-codes-serveur.test.ts` exige une phrase pour
+  // chacun. « Mise à jour » plutôt que « recalcul » : c'est le mot des écrans
+  // Audiences (bouton « Mettre à jour »).
   'company.enriched': 'Fiche enrichie',
-  'audience.refreshed': 'Audience recalculée',
-  'audience.refresh.failed': 'Échec du recalcul d’une audience',
+  'audience.refreshed': 'Audience mise à jour',
+  'audience.refresh.failed': 'Échec de mise à jour d’audience',
+  'company.tags_synced': 'Étiquettes synchronisées',
+  'company.archived': 'Fiche archivée',
+  'company.relation.saisie': 'Relation saisie à la main',
+  'company.presse_media_incertain_reparee': 'Fiche presse incertaine corrigée',
+  'company.presse_provenance_levee': 'Marque de provenance presse retirée',
+  'email.verified': 'Adresse e-mail vérifiée',
+  'liste_manuelle.creee': 'Liste créée',
+  'liste_manuelle.modifiee': 'Liste modifiée',
+  'liste_manuelle.corbeille': 'Liste mise à la corbeille',
+  'liste_manuelle.restauree': 'Liste restaurée',
+  'liste_manuelle.fiches_ajoutees': 'Fiches ajoutées à une liste',
+  'liste_manuelle.fiches_retirees': 'Fiches retirées d’une liste',
+  'liste_manuelle.import': 'Import dans une liste',
 };
 
 /** Requêtes de la console : [motif sur la route, verbe (ou * ), phrase]. */
@@ -63,7 +81,7 @@ const ROUTES: Array<[RegExp, string, string]> = [
   [/users\/[^/]+$/, 'DELETE', 'Utilisateur retiré'],
   [/workspace$/, '*', 'Paramètres de l’espace modifiés'],
   [/audiences\/(preview|apercu-destinataires)$/, '*', 'Aperçu d’une audience'],
-  [/audiences\/\d+\/refresh$/, '*', 'Audience recalculée'],
+  [/audiences\/\d+\/refresh$/, '*', 'Mise à jour d’une audience demandée'],
   [/audiences$/, 'POST', 'Audience créée'],
   [/companies\/\d+\/enrich$/, '*', 'Enrichissement d’une fiche demandé'],
   [/companies$/, 'POST', 'Fiche entreprise créée'],

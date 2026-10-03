@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { Activity, AlertTriangle, MailCheck, Archive, MapPin } from 'lucide-react';
 import { Card, KpiCard, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { ReglagesTechniques } from '@/features/settings/ReglagesTechniques';
+import { elementConcerne, libelleEvenementMetier, libelleMotifArchivage, type ElementConcerne } from './libelles';
 
 interface ObservabilitySummary {
   waterfall_errors_24h: number;
@@ -92,7 +94,7 @@ function SanteDuSysteme() {
               ? `${data.google_places_quota.pending_companies} fiches en attente : le quota est peut-être trop bas.`
               : data.google_places_quota.pending_companies > 0
               ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (reprise le 1er du mois)`
-              : `${data.google_places_quota.percent}% utilisé · smart skip actif`
+              : `${data.google_places_quota.percent}% utilisé · fiches déjà complètes ignorées`
           }
           progress={data.google_places_quota.percent}
           icon={<MapPin className="size-4" />}
@@ -115,13 +117,13 @@ function SanteDuSysteme() {
           tone={data.hunter_quota_month.percent > 80 ? 'amber' : 'sky'}
         />
         <KpiCard
-          label="Companies archivées"
+          label="Entreprises archivées"
           value={totalArchived}
           icon={<Archive className="size-4" />}
           tone="slate"
         />
         <KpiCard
-          label="Audiences non mises à jour (7 j)"
+          label="Échecs de mise à jour d’audience (7 j)"
           value={data.audience_failures_7d}
           icon={<Activity className="size-4" />}
           tone={data.audience_failures_7d > 0 ? 'amber' : 'emerald'}
@@ -134,12 +136,12 @@ function SanteDuSysteme() {
             <div className="text-sm text-slate-500">Aucun archivage enregistré.</div>
           ) : (
             <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
-              {Object.entries(data.archive_reasons).map(([reason, count]) => (
+              {motifsEnClair(data.archive_reasons).map(([libelle, count]) => (
                 <div
-                  key={reason}
+                  key={libelle}
                   className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40"
                 >
-                  <div className="text-xs uppercase text-slate-500">{reason}</div>
+                  <div className="text-xs text-slate-500">{libelle}</div>
                   <div className="text-lg font-semibold">{count}</div>
                 </div>
               ))}
@@ -159,7 +161,7 @@ function SanteDuSysteme() {
                   <tr>
                     <th className="p-2 text-left">Date</th>
                     <th className="p-2 text-left">Action</th>
-                    <th className="p-2 text-left">Resource</th>
+                    <th className="p-2 text-left">Élément</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -168,9 +170,9 @@ function SanteDuSysteme() {
                       <td className="p-2 text-xs text-slate-500">
                         {new Date(event.created_at).toLocaleString('fr-FR')}
                       </td>
-                      <td className="p-2 font-mono text-xs">{event.action}</td>
+                      <td className="p-2 text-xs">{libelleEvenementMetier(event.action)}</td>
                       <td className="p-2 text-xs text-slate-500">
-                        {event.resource_type ? `${event.resource_type} #${event.resource_id ?? '?'}` : '—'}
+                        <ElementCell element={elementConcerne(event.resource_type, event.resource_id)} />
                       </td>
                     </tr>
                   ))}
@@ -182,6 +184,48 @@ function SanteDuSysteme() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Les motifs d'archivage en clair, regroupés par libellé (deux codes inconnus
+ * tombent tous deux sous « Autre raison » : une seule tuile, leurs nombres
+ * additionnés).
+ */
+function motifsEnClair(motifs: Record<string, number>): Array<[string, number]> {
+  const parLibelle = new Map<string, number>();
+  for (const [motif, nombre] of Object.entries(motifs)) {
+    const libelle = libelleMotifArchivage(motif);
+    parLibelle.set(libelle, (parLibelle.get(libelle) ?? 0) + nombre);
+  }
+  return [...parLibelle.entries()];
+}
+
+const CLASSE_LIEN = 'text-indigo-700 hover:underline dark:text-indigo-300';
+
+function ElementCell({ element }: { element: ElementConcerne | null }) {
+  if (element === null) return <>—</>;
+  const { texte, lien } = element;
+  if (lien === null) return <>{texte}</>;
+  switch (lien.to) {
+    case '/companies/$companyId':
+      return (
+        <Link to="/companies/$companyId" params={lien.params} className={CLASSE_LIEN}>
+          {texte}
+        </Link>
+      );
+    case '/audiences/$audienceId':
+      return (
+        <Link to="/audiences/$audienceId" params={lien.params} className={CLASSE_LIEN}>
+          {texte}
+        </Link>
+      );
+    case '/listes/$listeId':
+      return (
+        <Link to="/listes/$listeId" params={lien.params} className={CLASSE_LIEN}>
+          {texte}
+        </Link>
+      );
+  }
 }
 
 function CardSection({ title, children }: { title: string; children: React.ReactNode }) {

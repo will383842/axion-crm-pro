@@ -167,7 +167,7 @@ test('ABANDON récent (gave_up) rougit ; un abandon ancien est compté mais ne r
         ->and($r['etat']['file_sortante']['gave_up_total'])->toBe(2);
 });
 
-test('ABANDON vu même si GitHub saute des passages : fenêtre de 26 h, et les lignes sont nommées par leur numéro', function () {
+test('ABANDON vu même si GitHub saute des passages : fenêtre de 26 h', function () {
     n2Reception(n2Espace(), 1);
     n2Sortant('gave_up', 30, 20 * 60); // abandonné il y a 20 h
 
@@ -175,9 +175,80 @@ test('ABANDON vu même si GitHub saute des passages : fenêtre de 26 h, et les l
 
     expect($r['code'])->toBe(1)
         ->and(n2Types($r['etat']))->toBe(['file_sortante_abandon'])
-        ->and($r['etat']['file_sortante']['fenetre_abandon_min'])->toBe(1560)
-        ->and($r['etat']['file_sortante']['gave_up_recents_ids'])->toHaveCount(1)
-        ->and($r['etat']['file_sortante']['gave_up_recents_ids'][0])->toBeInt();
+        ->and($r['etat']['file_sortante']['fenetre_abandon_min'])->toBe(1560);
+});
+
+/** Les numéros (BIGSERIAL) des lignes `gave_up` de la base de test. */
+function n2NumerosAbandons(): array
+{
+    return DB::table('crm_outbound_events')->where('status', 'gave_up')->pluck('id')
+        ->map(static fn ($id): string => (string) $id)->all();
+}
+
+test('ABANDONS — veto sécurité #310 : aucun numéro de ligne ne sort du serveur (ils dévoileraient le volume des demandes RGPD)', function () {
+    n2Reception(n2Espace(), 1);
+    // Des numéros élevés et reconnaissables, pour que la recherche dans la
+    // sortie ne tombe pas par hasard sur un autre nombre.
+    DB::statement("SELECT setval(pg_get_serial_sequence('crm_outbound_events', 'id'), 987650)");
+    n2Sortant('gave_up', 5, 10);
+    n2Sortant('gave_up', 5, 20);
+
+    $r = n2Lancer(['--memoriser-signales' => true]);
+    $sortie = json_encode($r['etat'], JSON_THROW_ON_ERROR);
+
+    expect($r['etat']['file_sortante'])->not->toHaveKey('gave_up_recents_ids')
+        ->and($r['etat']['file_sortante']['gave_up_nouveaux'])->toBe(2);
+    foreach (n2NumerosAbandons() as $numero) {
+        expect($r['brut'])->not->toContain($numero)
+            ->and($sortie)->not->toContain($numero);
+    }
+});
+
+test('ABANDONS — veto sécurité #310 : le « déjà signalé » est tenu CÔTÉ SERVEUR, chaque ligne n’est nouvelle qu’une fois', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+    n2Sortant('gave_up', 5, 20);
+
+    // Un passage de la surveillance : deux lignes nouvelles, mémorisées.
+    $premier = n2Lancer(['--memoriser-signales' => true]);
+    // Le passage suivant : l'alerte reste levée (fenêtre de 26 h), mais rien
+    // de nouveau à signaler.
+    $second = n2Lancer(['--memoriser-signales' => true]);
+    // Une troisième ligne abandonnée : elle seule est nouvelle.
+    n2Sortant('gave_up', 5, 1);
+    $troisieme = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($premier['etat']['file_sortante']['gave_up_nouveaux'])->toBe(2)
+        ->and(n2Types($second['etat']))->toBe(['file_sortante_abandon'])
+        ->and($second['etat']['file_sortante']['gave_up_recents'])->toBe(2)
+        ->and($second['etat']['file_sortante']['gave_up_nouveaux'])->toBe(0)
+        ->and($troisieme['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1);
+});
+
+test('ABANDONS : une mesure rejouée À LA MAIN (sans --memoriser-signales) ne consomme pas les nouveautés de la surveillance', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+
+    $main = n2Lancer();
+    $surveillance = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($main['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1)
+        ->and($surveillance['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1);
+});
+
+test('ABANDONS : mémoire illisible → tout est « nouveau » (un doublon, jamais un silence)', function () {
+    n2Reception(n2Espace(), 1);
+    n2Sortant('gave_up', 5, 10);
+    n2Lancer(['--memoriser-signales' => true]);
+
+    // Le magasin par défaut devient injoignable (il porte aussi le battement :
+    // `controle_impossible` s'ajoute, c'est attendu).
+    config(['cache.stores.n2_casse' => ['driver' => 'redis', 'connection' => 'n2-inexistante']]);
+    config(['cache.default' => 'n2_casse']);
+    $r = n2Lancer(['--memoriser-signales' => true]);
+
+    expect($r['etat']['file_sortante']['gave_up_nouveaux'])->toBe(1)
+        ->and(n2Types($r['etat']))->toContain('file_sortante_abandon');
 });
 
 test('CANAL FERMÉ EXPRÈS : site_muet et file_sortante_bloquee neutralisés, le JSON le dit ; gave_up jamais', function () {

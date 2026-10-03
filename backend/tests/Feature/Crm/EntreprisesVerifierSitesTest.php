@@ -18,7 +18,12 @@
  *     les 1er, 2 et 3 du mois) sauf `--forcer` ;
  *  5. essai à blanc : rien d'écrit, curseur compris ; `--audience` ;
  *  6. sélection servie par l'index partiel SOUS `axion_app` ;
- *  7. jamais inscrite au calendrier.
+ *  7. jamais inscrite au calendrier ;
+ *  8. réserves de relecture de #314 : redirection vers un autre domaine
+ *     jamais une preuve (R1), purge de la mémoire sans perte (R2), à blanc
+ *     sans aucun UPDATE ni transaction (R3), marqueur identique non réécrit,
+ *     comptage borné à la plage parcourue (R5), `--jusqua` après minuit
+ *     (R8), plancher du délai par domaine, droits du rôle applicatif.
  *
  * AUCUN appel réseau : `Http::fake`. Fixtures FICTIVES (dépôt public) :
  * noms « ZZ », SIREN 94xxxxxxx, domaines en `.test`.
@@ -30,12 +35,14 @@ use App\Crm\Sites\SiteFiable;
 use App\Crm\Sites\VerificationSite;
 use App\Services\Domain\DomainFinderService;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
@@ -55,6 +62,8 @@ beforeEach(function () {
         ]);
     }
     Carbon::setTestNow(Carbon::parse(EVS_MARDI, 'Europe/Paris'));
+    // Le délai par domaine a un plancher (1 000 ms) : on n'attend pas pour de vrai.
+    Sleep::fake();
 });
 
 afterEach(function () {
@@ -112,7 +121,7 @@ function evsReseau(array $pages, array $robots = [], ?Closure $espion = null): v
 /** @return array{code: int, sortie: string} */
 function evsLancer(array $options = []): array
 {
-    $code = Artisan::call('crm:entreprises:verifier-sites', $options + ['--delai-domaine-ms' => '0']);
+    $code = Artisan::call('crm:entreprises:verifier-sites', $options);
 
     return ['code' => $code, 'sortie' => Artisan::output()];
 }
@@ -401,7 +410,10 @@ test('une fiche déjà vérifiée n est pas relue ; une option invalide est refu
 
     expect(evsLancer(['--jusqua' => '25:00'])['code'])->toBe(1)
         ->and(evsLancer(['--limite' => '0'])['code'])->toBe(1)
-        ->and(evsLancer(['--concurrence' => '20'])['code'])->toBe(1);
+        ->and(evsLancer(['--concurrence' => '20'])['code'])->toBe(1)
+        // Plancher du délai par domaine : jamais deux requêtes d'un même domaine sans pause.
+        ->and(evsLancer(['--delai-domaine-ms' => '0'])['code'])->toBe(1)
+        ->and(evsLancer(['--delai-domaine-ms' => '999'])['code'])->toBe(1);
 });
 
 test('lien de mentions légales : préférence aux « mentions légales », jamais un autre site', function () {
@@ -427,6 +439,196 @@ test('SIREN prouvés par une page : SIRET et TVA acceptés, numéro collé refus
 
 test('la commande n est PAS inscrite au calendrier (lancement à la main seulement)', function () {
     expect((string) file_get_contents(base_path('routes/console.php')))->not->toContain('crm:entreprises:verifier-sites');
+});
+
+// ── Réserves de relecture (#314) ────────────────────────────────────────────
+
+/** Faux réseau avec redirections : URL → [code, corps, en-têtes]. */
+function evsReseauBrut(array $reponses): void
+{
+    Http::fake(function (Request $q) use ($reponses) {
+        $url = $q->url();
+        if (str_ends_with($url, '/robots.txt')) {
+            return Http::response('', 404);
+        }
+        if (isset($reponses[$url])) {
+            [$code, $corps, $entetes] = $reponses[$url];
+
+            return Http::response($corps, $code, $entetes);
+        }
+
+        return Http::response('', 404);
+    });
+}
+
+test('R1 — accueil redirigé (301) vers un AUTRE domaine qui porte le SIREN → non conforme (redirection), jamais vérifié', function () {
+    $id = evsFiche($this->espace, 'zz-devine.test', 'ZZ DEVINE FICTIF');
+    evsReseauBrut([
+        'https://zz-devine.test/' => [301, '', ['Location' => 'https://zz-annuaire.test/societe/zz-devine']],
+        'https://zz-annuaire.test/societe/zz-devine' => [200, evsPage('Annuaire', 'ZZ DEVINE FICTIF — SIREN ' . evsSiren($id), '<a href="/mentions-legales">Mentions légales</a>'), ['Content-Type' => 'text/html']],
+        'https://zz-annuaire.test/mentions-legales' => [200, evsPage('Mentions', 'SIREN ' . evsSiren($id)), ['Content-Type' => 'text/html']],
+    ]);
+
+    evsLancer();
+
+    expect(evsMarqueur($id))->toMatchArray(['statut' => SiteMedia::NON_CONFORME, 'motif' => VerificationSite::MOTIF_REDIRECTION])
+        ->and(evsEstNonVerifie($id))->toBeTrue();
+    // Les mentions du site d'ARRIVÉE ne sont jamais lues.
+    Http::assertNotSent(fn (Request $q): bool => $q->url() === 'https://zz-annuaire.test/mentions-legales');
+});
+
+test('R1 — mentions légales redirigées vers un autre domaine portant le SIREN → non conforme', function () {
+    $id = evsFiche($this->espace, 'zz-mredir.test', 'ZZ MREDIR FICTIF');
+    evsReseauBrut([
+        'https://zz-mredir.test/' => [200, evsPage('Accueil', 'Bienvenue.', '<a href="/mentions-legales">Mentions légales</a>'), ['Content-Type' => 'text/html']],
+        'https://zz-mredir.test/mentions-legales' => [302, '', ['Location' => 'https://zz-groupe.test/legal']],
+        'https://zz-groupe.test/legal' => [200, evsPage('Légal', 'SIREN ' . evsSiren($id)), ['Content-Type' => 'text/html']],
+    ]);
+
+    evsLancer();
+
+    expect(evsMarqueur($id))->toMatchArray(['statut' => SiteMedia::NON_CONFORME, 'motif' => VerificationSite::MOTIF_REDIRECTION])
+        ->and(evsEstNonVerifie($id))->toBeTrue();
+});
+
+test('R1 — redirection sur le MÊME domaine (http → https, sans www → www) reste acceptée', function () {
+    $id = evsFiche($this->espace, 'zz-meme.test', 'ZZ MEME FICTIF', ['website' => 'http://zz-meme.test/']);
+    evsReseauBrut([
+        'http://zz-meme.test/' => [301, '', ['Location' => 'https://www.zz-meme.test/accueil']],
+        'https://www.zz-meme.test/accueil' => [200, evsPage('Accueil', 'SIREN ' . evsSiren($id)), ['Content-Type' => 'text/html']],
+    ]);
+
+    evsLancer();
+
+    expect(evsMarqueur($id))->toMatchArray(['statut' => SiteMedia::VERIFIE, 'preuve' => VerificationSite::PREUVE_ACCUEIL]);
+});
+
+test('R1 — règle pure : arrivée sur un autre domaine enregistrable ou chez un parkeur refusée', function () {
+    expect(VerificationSite::motifArrivee('https://zz-a.test/', 'https://www.zz-a.test/x'))->toBeNull()
+        ->and(VerificationSite::motifArrivee('http://zz-a.test/', 'https://boutique.zz-a.test/'))->toBeNull()
+        ->and(VerificationSite::motifArrivee('https://zz-a.test/', 'https://zz-b.test/'))->toBe(VerificationSite::MOTIF_REDIRECTION)
+        ->and(VerificationSite::motifArrivee('https://zz-a.test/', 'https://zz-a.test.zz-b.test/'))->toBe(VerificationSite::MOTIF_REDIRECTION)
+        ->and(VerificationSite::motifArrivee('https://zz-a.test/', 'pas une url'))->not->toBeNull();
+});
+
+test('R2 — la purge du mémoire n efface pas une adresse que le paquet en cours va lire', function () {
+    config(['crm.verifier_sites.cache_max' => 2]);
+    $a = evsFiche($this->espace, 'zz-commun.test', 'ZZ COMMUN A');
+    $b = evsFiche($this->espace, 'zz-un.test', 'ZZ UN');
+    $c = evsFiche($this->espace, 'zz-commun.test', 'ZZ COMMUN C');
+    $d = evsFiche($this->espace, 'zz-deux.test', 'ZZ DEUX');
+    evsReseau([
+        'https://zz-commun.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($a) . ' et ' . evsSiren($c)),
+        'https://zz-un.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($b)),
+        'https://zz-deux.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($d)),
+    ]);
+
+    $r = evsLancer(['--paquet' => '2']);
+
+    foreach ([$a, $b, $c, $d] as $id) {
+        expect(evsMarqueur($id)['statut'] ?? null)->toBe(SiteMedia::VERIFIE);
+    }
+    expect($r['sortie'])->toMatch('/erreurs \(non marquées\)\D+0\b/u');
+});
+
+test('R3 — --dry-run n exécute AUCUN UPDATE (même annulé) ni transaction d écriture : SELECT count(*) au même WHERE', function () {
+    $id = evsFiche($this->espace, 'zz-blanc2.test', 'ZZ A BLANC DEUX');
+    evsReseau(['https://zz-blanc2.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($id))]);
+    $requetes = [];
+    $transactions = 0;
+    DB::listen(function ($q) use (&$requetes): void {
+        $requetes[] = strtolower(ltrim($q->sql));
+    });
+    DB::getEventDispatcher()?->listen(TransactionBeginning::class, function () use (&$transactions): void {
+        $transactions++;
+    });
+
+    $r = evsLancer(['--dry-run' => true]);
+
+    $ecritures = array_filter($requetes, fn (string $s): bool => preg_match('/^(update|insert|delete|set local)\b/', $s) === 1);
+    expect($r['code'])->toBe(0)
+        ->and($ecritures)->toBe([])
+        ->and($transactions)->toBe(0)
+        ->and(array_filter($requetes, fn (string $s): bool => str_contains($s, 'select count(*)') && str_contains($s, 'website = ?')))->not->toBe([])
+        ->and($r['sortie'])->toMatch('/vérifiés\D+1\b/u')
+        ->and(evsMarqueur($id))->toBeNull();
+});
+
+test('option R6 — un marqueur au même statut et à la même version n est pas réécrit ; une autre version l est', function () {
+    $meme = evsFiche($this->espace, 'zz-inchange.test', 'ZZ INCHANGE', ['metadata' => json_encode([SiteFiable::CLE => [
+        'statut' => SiteMedia::NON_CONFORME, 'url' => 'https://zz-inchange.test/', 'le' => '2026-01-01', 'v' => VerificationSite::VERSION,
+    ]])]);
+    $ancienne = evsFiche($this->espace, 'zz-ancienne.test', 'ZZ ANCIENNE', ['metadata' => json_encode([SiteFiable::CLE => [
+        'statut' => SiteMedia::NON_CONFORME, 'url' => 'https://zz-ancienne.test/', 'le' => '2026-01-01', 'v' => 0,
+    ]])]);
+    evsReseau([
+        'https://zz-inchange.test/' => evsPage('Accueil', 'Rien.'),
+        'https://zz-ancienne.test/' => evsPage('Accueil', 'Rien.'),
+    ]);
+    $miseAJour = [];
+    DB::listen(function ($q) use (&$miseAJour): void {
+        if (preg_match('/^\s*update companies/i', $q->sql) === 1) {
+            $miseAJour[] = $q->bindings;
+        }
+    });
+
+    $r = evsLancer();
+
+    expect(evsMarqueur($meme)['le'] ?? null)->toBe('2026-01-01')
+        ->and(evsMarqueur($ancienne))->toMatchArray(['statut' => SiteMedia::NON_CONFORME, 'v' => VerificationSite::VERSION])
+        ->and(evsMarqueur($ancienne)['le'] ?? null)->toBe('2026-10-06')
+        ->and($miseAJour)->toHaveCount(1)
+        ->and($r['sortie'])->toMatch('/inchangés[^\n]*?\D+1\b/u');
+});
+
+test('R5 — une fiche créée pendant le lancement ne fait pas échouer le comptage avant = après', function () {
+    $id = evsFiche($this->espace, 'zz-pendant.test', 'ZZ PENDANT');
+    $espace = $this->espace;
+    $cree = false;
+    evsReseau(['https://zz-pendant.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($id))], [], function () use (&$cree, $espace): void {
+        if (! $cree) {
+            $cree = true;
+            F::fiche($espace, 'ZZ SAISIE PENDANT LE LANCEMENT', ['website' => null]);
+        }
+    });
+
+    $r = evsLancer();
+
+    expect($r['code'])->toBe(0)
+        ->and($r['sortie'])->toContain('identique')
+        ->and(evsMarqueur($id)['statut'] ?? null)->toBe(SiteMedia::VERIFIE);
+});
+
+test('R8 — avec --forcer, --jusqua passe minuit (22:00 → 01:00 le lendemain)', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-06 22:00:00', 'Europe/Paris'));
+    $id = evsFiche($this->espace, 'zz-nuit.test', 'ZZ NUIT');
+    evsReseau(['https://zz-nuit.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($id))]);
+
+    $r = evsLancer(['--forcer' => true, '--jusqua' => '01:00']);
+
+    expect($r['code'])->toBe(0)
+        ->and($r['sortie'])->not->toContain('Arrêt à')
+        ->and(evsMarqueur($id)['statut'] ?? null)->toBe(SiteMedia::VERIFIE);
+});
+
+test('R9 — le SIREN d une AUTRE entreprise ne prouve rien ; un SIREN écrit avec des points prouve', function () {
+    $autre = evsFiche($this->espace, 'zz-autre-siren.test', 'ZZ AUTRE SIREN');
+    $points = evsFiche($this->espace, 'zz-points.test', 'ZZ POINTS');
+    $tiers = F::fiche($this->espace, 'ZZ TIERS', ['website' => null]);
+    evsReseau([
+        'https://zz-autre-siren.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($tiers)),
+        'https://zz-points.test/' => evsPage('Accueil', 'SIREN ' . implode('.', str_split(evsSiren($points), 3))),
+    ]);
+
+    evsLancer();
+
+    expect(evsMarqueur($autre)['statut'] ?? null)->toBe(SiteMedia::NON_CONFORME)
+        ->and(evsMarqueur($points)['statut'] ?? null)->toBe(SiteMedia::VERIFIE);
+});
+
+test('journal d interruption : la classe de l exception seulement, jamais son message (SQL et valeurs)', function () {
+    expect((string) file_get_contents(app_path('Console/Commands/CrmEntreprisesVerifierSites.php')))
+        ->not->toContain("['exception' => \$interruption]");
 });
 
 // ── Sous le rôle de production ──────────────────────────────────────────────
@@ -481,4 +683,17 @@ test('curseurs_traitements : sécurité par espace activée ET forcée, politiqu
     // Le rôle de production lit sans erreur (droits accordés), et ne voit rien hors contexte.
     evsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', (string) Str::uuid()]);
     expect(evsApp()->table('curseurs_traitements')->count())->toBe(0);
+});
+
+test('curseurs_traitements : le rôle de production ne peut ni DELETE ni TRUNCATE ; le retour arrière ne supprime rien', function () {
+    $droits = DB::selectOne(
+        "SELECT has_table_privilege('axion_app', 'curseurs_traitements', 'DELETE') AS del,
+                has_table_privilege('axion_app', 'curseurs_traitements', 'TRUNCATE') AS tru,
+                has_table_privilege('axion_app', 'curseurs_traitements', 'UPDATE') AS upd"
+    );
+    expect((bool) $droits->del)->toBeFalse()
+        ->and((bool) $droits->tru)->toBeFalse()
+        ->and((bool) $droits->upd)->toBeTrue()
+        ->and((string) file_get_contents(database_path('migrations/2026_10_03_000070_curseurs_traitements.php')))
+        ->not->toContain('DROP TABLE');
 });

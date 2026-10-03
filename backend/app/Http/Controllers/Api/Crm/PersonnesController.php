@@ -468,6 +468,9 @@ class PersonnesController extends ConsoleController
                     // sur la jointure déjà restreinte aux personnes de l'espace :
                     // rien à indexer. Sans fiche (LEFT JOIN nul) : rien à exclure.
                     $requete->whereRaw("COALESCE(btrim(companies.legal_form), '') NOT LIKE '1%'");
+                    // Lot N8 : une fiche opposée à la diffusion INSEE ne sort
+                    // jamais du fichier type (même jointure, rien à indexer).
+                    $requete->whereNull('companies.insee_non_diffusible_le');
                 }
                 // 🔴 QUARANTAINE (lot N5, `QuarantaineSite`) : une adresse
                 // venue d'un site deviné non vérifié ne sort JAMAIS — même

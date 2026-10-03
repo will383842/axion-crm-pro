@@ -1,0 +1,310 @@
+name: Surveillance des canaux d'échange
+
+# =============================================================================
+# ⚠️ POURQUOI CE WORKFLOW EXISTE (lot N2)
+#
+# Le CRM et le site échangent par deux canaux signés :
+#   - site → CRM : `POST /api/internal/site-sync` (+ `/gdpr`) ; chaque
+#     événement reçu laisse une activité `external_ref = site:event:<uuid>` ;
+#   - CRM → site : la file `crm_outbound_events`, vidée par
+#     `crm:flush-outbound` (oppositions, effacements).
+#
+# Leur panne est SILENCIEUSE par construction : le site garde ses lignes en
+# attente, le CRM garde les siennes, chacun répond poliment, et une opposition
+# RGPD peut rester bloquée des jours sans que personne ne le voie — un canal
+# muet ressemble exactement à un canal calme.
+#
+# 🔑 CE WORKFLOW TOURNE DEPUIS GITHUB, PAS DEPUIS LE SERVEUR — même doctrine
+# que `surveillance-sauvegarde.yml` : une garde hébergée sur la machine
+# qu'elle surveille meurt avec elle. Un serveur injoignable est une ALERTE.
+#
+# Toute la mesure vit dans `php artisan crm:canaux:etat` (LECTURE SEULE,
+# sortie JSON sans donnée personnelle) : elle se rejoue à la main sur le
+# serveur, et elle est couverte par `backend/tests/Feature/Commands/CanauxEtatTest.php`.
+#
+# 🔒 DÉPÔT PUBLIC : les issues sont publiques. Elles ne portent QUE le JSON de
+# la commande (des nombres et des dates) et ses messages. La sortie d'erreur
+# de ssh / docker (qui peut nommer le serveur) reste dans le journal du job,
+# où GitHub masque les secrets — elle n'entre JAMAIS dans une issue.
+#
+# ── SEUILS (réglables sans toucher au code) ─────────────────────────────────
+# Ordre de priorité : saisie du lancement manuel > variable du dépôt
+# (Settings → Secrets and variables → Actions → Variables) > défaut ci-dessous.
+#
+#   SURV_CANAUX_SEUIL_AGE_H        (2)   âge max d'une ligne pending/failed de
+#                                        la file sortante. Le backoff du flush
+#                                        plafonne à 60 min entre deux essais :
+#                                        2 h = au moins deux essais ratés.
+#   SURV_CANAUX_FENETRE_ABANDON_MIN (90) fenêtre où un passage en gave_up
+#                                        alerte. > 60 min pour couvrir une
+#                                        exécution horaire retardée par GitHub.
+#   SURV_CANAUX_SEUIL_SILENCE_H    (48)  silence max du canal site → CRM.
+#                                        ⚠️ Rien dans le code ne documente le
+#                                        volume NORMAL d'événements du site
+#                                        (formulaires, lettre, guide,
+#                                        candidatures). 48 h est un point de
+#                                        départ : si un week-end calme fait
+#                                        sonner l'alerte à tort, regarder
+#                                        `reception_site.derniere_reception_a`
+#                                        sur quelques semaines et relever la
+#                                        variable (72 h couvre un week-end).
+#   SURV_CANAUX_SEUIL_REFUS        (5)   refus de signature tolérés par heure.
+#                                        Un émetteur sain n'en produit aucun ;
+#                                        la marge absorbe une dérive d'horloge
+#                                        ponctuelle. Un secret désaligné en
+#                                        produit des dizaines.
+#
+# Ce qui reste hors de portée, en toute honnêteté : si GitHub Actions cesse de
+# déclencher les tâches planifiées, plus personne ne surveille.
+# =============================================================================
+
+on:
+  schedule:
+    # Toutes les heures, à la 17e minute : loin de l'heure pile, où GitHub
+    # retarde le plus les tâches planifiées.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      seuil_age_h:
+        description: "Âge max (h) d'une ligne pending/failed de la file sortante. Vide = variable du dépôt ou 2."
+        required: false
+        default: ''
+      seuil_silence_h:
+        description: "Silence max (h) du canal site → CRM. Mettre 1 pour VÉRIFIER QUE LA GARDE ROUGIT. Vide = variable ou 48."
+        required: false
+        default: ''
+      seuil_refus:
+        description: "Refus de signature tolérés sur 1 h. Vide = variable ou 5."
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: surveillance-canaux
+  cancel-in-progress: false
+
+jobs:
+  # F38-008 — plafonds anti-gel (cf. surveillance-sauvegarde.yml).
+  verifier:
+    name: Les canaux d'échange CRM ↔ site circulent-ils ?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15  # F38-008 (SSH + une commande artisan en lecture seule, une reprise)
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          # `|| true` : un keyscan raté (MaxStartups saturé par un autre job
+          # SSH) ne doit pas faire passer la garde pour « serveur injoignable » ;
+          # la connexion qui suit tranche.
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Mesurer l'état des canaux
+        id: controle
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          SEUIL_AGE_H: ${{ github.event.inputs.seuil_age_h || vars.SURV_CANAUX_SEUIL_AGE_H || '2' }}
+          FENETRE_ABANDON_MIN: ${{ vars.SURV_CANAUX_FENETRE_ABANDON_MIN || '90' }}
+          SEUIL_SILENCE_H: ${{ github.event.inputs.seuil_silence_h || vars.SURV_CANAUX_SEUIL_SILENCE_H || '48' }}
+          SEUIL_REFUS: ${{ github.event.inputs.seuil_refus || vars.SURV_CANAUX_SEUIL_REFUS || '5' }}
+        run: |
+          set -euo pipefail
+
+          # Les seuils partent dans une commande distante : entiers seulement.
+          for v in "$SEUIL_AGE_H" "$FENETRE_ABANDON_MIN" "$SEUIL_SILENCE_H" "$SEUIL_REFUS"; do
+            case "$v" in ''|*[!0-9]*) echo "::error::Seuil non entier : '$v'"; exit 1 ;; esac
+          done
+
+          OPTIONS="--seuil-age-h=$SEUIL_AGE_H --fenetre-abandon-min=$FENETRE_ABANDON_MIN --seuil-silence-h=$SEUIL_SILENCE_H --seuil-refus=$SEUIL_REFUS"
+
+          # `COMPOSE_FILE` : l'overlay de production, comme le déploiement.
+          # `< /dev/null` OBLIGATOIRE : sans lui, `docker compose exec -T` lit
+          # le stdin de ssh et peut rester suspendu.
+          # Pas de `-u root` : la commande ne doit rien créer (journal compris)
+          # sous un autre propriétaire que l'application.
+          mesurer() {
+            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$USER@$HOST" \
+              "cd '$PROJECT_PATH' && COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml \
+               docker compose exec -T api php artisan crm:canaux:etat $OPTIONS < /dev/null" \
+              > sortie.txt 2> erreurs.txt
+          }
+
+          extraire_json() {
+            # La commande imprime UNE ligne JSON ; tout autre bruit est ignoré.
+            grep -E '^\{' sortie.txt | tail -n 1 | jq -ce 'select(.alertes | type == "array")' > etat.json 2>/dev/null
+          }
+
+          ESSAI=1
+          while :; do
+            set +e
+            mesurer
+            CODE=$?
+            extraire_json
+            JSON_OK=$?
+            set -e
+            echo "Essai $ESSAI : code de sortie $CODE, JSON lisible : $([ "$JSON_OK" -eq 0 ] && echo oui || echo non)"
+            # Une reprise, une seule, si la commande n'a rien rendu de lisible :
+            # un déploiement en cours redémarre le conteneur api pendant
+            # quelques minutes, et ne mérite pas une issue.
+            if [ "$JSON_OK" -eq 0 ] || [ "$ESSAI" -ge 2 ]; then
+              break
+            fi
+            ESSAI=$((ESSAI + 1))
+            sleep 120
+          done
+
+          echo "::group::Sortie d'erreur (journal du job seulement — jamais dans une issue)"
+          cat erreurs.txt || true
+          echo "::endgroup::"
+
+          if [ "$JSON_OK" -eq 0 ]; then
+            jq . etat.json
+            ALERTES="$(jq -c '.alertes' etat.json)"
+          elif [ "$CODE" -eq 255 ]; then
+            # ssh sort en 255 quand il n'a pas pu joindre le serveur : surtout
+            # ne pas confondre « tout va bien » avec « je n'ai pas pu demander ».
+            echo "::error::Serveur injoignable en SSH — les canaux n'ont PAS pu être vérifiés."
+            ALERTES='[{"type":"controle_impossible","message":"Serveur injoignable en SSH (code 255) : les canaux n’ont PAS pu être vérifiés."}]'
+            echo '{}' > etat.json
+          else
+            echo "::error::La commande crm:canaux:etat n'a rendu aucun JSON lisible (code $CODE)."
+            ALERTES="$(jq -cn --arg c "$CODE" '[{type:"controle_impossible",message:("La commande crm:canaux:etat n’a rendu aucun JSON lisible (code de sortie " + $c + "). Voir le journal du job.")}]')"
+            echo '{}' > etat.json
+          fi
+
+          {
+            echo "alertes=$ALERTES"
+            echo "etat=$(jq -c . etat.json)"
+            echo "echec=$([ "$ALERTES" != "[]" ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+          # ⚠️ Cette étape ne fait PAS échouer le job : c'est l'étape Verdict
+          # qui s'en charge, pour que les sorties remontent de façon fiable au
+          # job d'alerte (cf. surveillance-sauvegarde.yml).
+
+      - name: Verdict
+        if: steps.controle.outputs.echec == 'true'
+        env:
+          ALERTES: ${{ steps.controle.outputs.alertes }}
+        run: |
+          echo "$ALERTES" | jq -r '.[] | "::error::[\(.type)] \(.message)"'
+          exit 1
+
+    outputs:
+      alertes: ${{ steps.controle.outputs.alertes }}
+      etat: ${{ steps.controle.outputs.etat }}
+
+  alerte:
+    name: Ouvrir une issue par type d'alerte
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10  # F38-008 (quelques appels à l'API des issues)
+    needs: [verifier]
+    if: failure()
+    steps:
+      - name: Ouvrir ou compléter l'issue de chaque type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ALERTES: ${{ needs.verifier.outputs.alertes }}
+          ETAT: ${{ needs.verifier.outputs.etat }}
+        run: |
+          set -euo pipefail
+
+          # Le job de mesure a pu échouer AVANT de produire ses sorties (clé
+          # SSH absente, runner en panne) : c'est encore un contrôle impossible.
+          if [ -z "${ALERTES:-}" ] || ! echo "$ALERTES" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+            ALERTES='[{"type":"controle_impossible","message":"Le job de mesure a échoué sans rendre de résultat. Voir le journal du job."}]'
+          fi
+          [ -n "${ETAT:-}" ] || ETAT='{}'
+
+          # Un type = un libellé = UNE issue vivante au plus. Une panne durable
+          # ne doit pas ouvrir 24 issues par jour : quand l'issue existe déjà,
+          # on la complète, au plus une fois par 24 h — sinon ce bruit
+          # reproduirait exactement le problème corrigé, des alertes que plus
+          # personne ne lit.
+          titre_de() {
+            case "$1" in
+              file_sortante_bloquee) echo "🔴 Canal CRM → site : la file sortante est bloquée" ;;
+              file_sortante_abandon) echo "🔴 Canal CRM → site : des événements ont été abandonnés (gave_up)" ;;
+              site_muet)             echo "🟠 Canal site → CRM : plus aucun événement reçu" ;;
+              refus_signature)       echo "🔴 Canaux signés : le CRM refuse les signatures du site" ;;
+              controle_impossible)   echo "🔴 Surveillance des canaux : contrôle impossible" ;;
+              *)                     echo "🔴 Surveillance des canaux : alerte « $1 »" ;;
+            esac
+          }
+
+          quoi_verifier() {
+            case "$1" in
+              file_sortante_bloquee) printf '%s\n' \
+                '1. `CRM_OUTBOUND_ENABLED`, `SITE_CRM_WEBHOOK_URL` et le secret partagé sont-ils posés ? (les trois vont ensemble, cf. `backend/config/crm.php`)' \
+                '2. Journal du planificateur : `crm:flush-outbound` tourne-t-il toutes les 5 minutes ?' \
+                '3. `last_error` des lignes en attente (sur le serveur, jamais dans cette issue) : le site répond-il ?' ;;
+              file_sortante_abandon) printf '%s\n' \
+                '1. Une ligne `gave_up` est TERMINALE : une opposition ou un effacement qui n’atteindra jamais le site. C’est une divergence RGPD, pas un incident mineur.' \
+                '2. Lire `last_error` sur le serveur (422 = refus définitif du site ; sinon plafond d’essais atteint).' \
+                '3. Corriger la cause, puis rejouer à la main les lignes concernées.' ;;
+              site_muet) printf '%s\n' \
+                '1. `CRM_INGEST_ENABLED` est-il ouvert ? (fermé, le CRM répond 503 à tout)' \
+                '2. Côté site : l’outbox vers le CRM se vide-t-elle ? Des lignes en attente ?' \
+                '3. Si le silence est simplement un calme normal (week-end), relever la variable `SURV_CANAUX_SEUIL_SILENCE_H` (voir l’en-tête du workflow).' ;;
+              refus_signature) printf '%s\n' \
+                '1. `bad_signature` : le secret `SITE_SYNC_HMAC_SECRET` est-il identique des deux côtés ? (rotation faite d’un seul côté)' \
+                '2. `stale_signature` : horloge du site ou du serveur dérivée ? fenêtre `CRM_INGEST_MAX_CLOCK_SKEW` ?' \
+                '3. `replay_guard_unavailable` ou compteur illisible : Redis est-il debout ?' ;;
+              *) printf '%s\n' \
+                '1. Le serveur répond-il en SSH ? Le conteneur `api` tourne-t-il ?' \
+                '2. Un déploiement était-il en cours (le conteneur redémarre) ? Si oui, attendre le passage suivant.' \
+                '3. Rejouer la commande à la main (ci-dessous) et lire son erreur.' ;;
+            esac
+          }
+
+          echo "$ALERTES" | jq -r '[.[].type] | unique | .[]' | while read -r TYPE; do
+            LIBELLE="canal-$(echo "$TYPE" | tr '_' '-')"
+            TITRE="$(titre_de "$TYPE")"
+
+            # Corps écrit ligne par ligne : une chaîne multiligne indentée
+            # deviendrait un bloc de code en markdown.
+            {
+              printf '%s\n' "La surveillance horaire des canaux d'échange a levé l'alerte **\`$TYPE\`**." ''
+              echo "$ALERTES" | jq -r --arg t "$TYPE" '.[] | select(.type == $t) | "- " + .message'
+              printf '%s\n' '' '## Quoi vérifier, dans cet ordre' ''
+              quoi_verifier "$TYPE"
+              printf '%s\n' '' '## Mesure complète (sans donnée personnelle)' '' '```json'
+              echo "$ETAT" | jq . 2>/dev/null || echo "$ETAT"
+              printf '%s\n' '```' '' '## Rejouer la mesure à la main (lecture seule)' '' '```sh' \
+                'cd /opt/axion-crm-pro && COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml \' \
+                '  docker compose exec -T api php artisan crm:canaux:etat < /dev/null | jq .' \
+                '```' '' '---' ''
+              echo "$RUN_URL"
+            } > corps.md
+
+            gh label create "$LIBELLE" --repo "$DEPOT" --color B60205 \
+              --description "Surveillance des canaux : $TYPE" --force >/dev/null
+
+            EXISTANTE="$(gh issue list --repo "$DEPOT" --state open --label "$LIBELLE" --json number --jq '.[0].number // empty')"
+            if [ -z "$EXISTANTE" ]; then
+              gh issue create --repo "$DEPOT" --title "$TITRE" --label "$LIBELLE" --body-file corps.md
+              continue
+            fi
+
+            DERNIER="$(gh issue view "$EXISTANTE" --repo "$DEPOT" --json createdAt,comments --jq '(.comments | last | .createdAt) // .createdAt')"
+            AGE_H=$(( ( $(date -u +%s) - $(date -u -d "$DERNIER" +%s) ) / 3600 ))
+            if [ "$AGE_H" -ge 24 ]; then
+              echo "Issue #$EXISTANTE ($TYPE) déjà ouverte — ajout de cette occurrence (dernier signe il y a ${AGE_H} h)."
+              gh issue comment "$EXISTANTE" --repo "$DEPOT" --body-file corps.md
+            else
+              echo "Issue #$EXISTANTE ($TYPE) déjà ouverte, complétée il y a ${AGE_H} h — rien de plus (au plus un ajout par 24 h)."
+            fi
+          done

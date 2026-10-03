@@ -34,6 +34,9 @@ use Throwable;
  *      seconde (job d'émission et balayage de la file) ; le second doit
  *      continuer à recevoir sa réponse 200 `noop_idempotent`.
  *
+ * Chaque refus incrémente aussi `CompteurRefusCanal` (un entier par motif,
+ * sans donnée personnelle), lu par la surveillance externe des canaux.
+ *
  * La mémoire ne contient qu'une empreinte sha256 — jamais le corps, jamais une
  * donnée personnelle — et expire avec la fenêtre. Si le magasin est
  * indisponible, la requête est refusée (503, que l'émetteur rejoue plus tard),
@@ -41,6 +44,12 @@ use Throwable;
  */
 final class CanalSigneSite
 {
+    /**
+     * Les canaux qui passent par ce contrôle (cf. `SiteSyncController`,
+     * `SiteGdprController`). Lu par `crm:canaux:etat` pour agréger les refus.
+     */
+    public const CANAUX = ['site-sync', 'site-sync/gdpr'];
+
     /**
      * @return JsonResponse|null null si la requête est authentifiée, sinon la réponse de refus
      */
@@ -55,6 +64,7 @@ final class CanalSigneSite
         // 1. Horodatage d'abord : sans lui, aucune signature n'est calculée.
         if ($timestamp === null || ! HmacSignature::timestampWithinWindow($timestamp, $fenetre)) {
             Log::warning("{$canal} rejeté (horodatage absent ou hors fenêtre)", ['ip' => $request->ip()]);
+            CompteurRefusCanal::incrementer($canal, 'stale_signature');
 
             return response()->json(['error' => 'stale_signature'], 401);
         }
@@ -64,6 +74,7 @@ final class CanalSigneSite
 
         if (! HmacSignature::verify($secret, $signedPayload, $request->header('X-Site-Signature'))) {
             Log::warning("{$canal} rejeté (signature invalide)", ['ip' => $request->ip()]);
+            CompteurRefusCanal::incrementer($canal, 'bad_signature');
 
             return response()->json(['error' => 'bad_signature'], 401);
         }
@@ -88,12 +99,14 @@ final class CanalSigneSite
                 'ip' => $request->ip(),
                 'exception' => $e::class,
             ]);
+            CompteurRefusCanal::incrementer($canal, 'replay_guard_unavailable');
 
             return response()->json(['error' => 'replay_guard_unavailable'], 503);
         }
 
         if (! $premiereFois) {
             Log::warning("{$canal} rejeté (requête déjà reçue)", ['ip' => $request->ip()]);
+            CompteurRefusCanal::incrementer($canal, 'stale_signature');
 
             return response()->json(['error' => 'stale_signature'], 401);
         }

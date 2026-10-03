@@ -1,13 +1,15 @@
 import { Link } from '@tanstack/react-router';
 import { Avatar, DropdownMenu, IconButton, QualityBadge, SizeCategoryBadge, cn } from '@/components/ui';
 import { effectifLabel } from '../effectif';
-import { libelleNaf } from '@/lib/naf-divisions';
+import { libelleActivite } from '@/lib/naf-divisions';
 
 export interface CompanyRowData {
   id: number;
   siren: string;
   denomination?: string | null;
   naf?: string | null;
+  /** Libellé INSEE de la sous-classe (lot N7), `null` si le code est inconnu. */
+  naf_label?: string | null;
   size_category?: string | null;
   effectif_range?: string | null;
   city?: string | null;
@@ -102,13 +104,14 @@ export function CompanyRow({
         </div>
       </div>
 
-      {/* Le libellé de la division NAF en clair ; le code complet en infobulle.
-          Un code sans division connue reste affiché tel quel plutôt que vide. */}
+      {/* Le libellé d'activité en clair (sous-classe si l'API le fournit,
+          sinon division) ; le code complet en infobulle. Un code sans libellé
+          connu reste affiché tel quel plutôt que vide. */}
       <div
         className="truncate text-xs text-slate-700 dark:text-slate-300"
         title={naf === '' ? undefined : `Code d’activité : ${naf}`}
       >
-        {libelleNaf(c.naf) ?? (naf === '' ? '—' : naf)}
+        {libelleActivite(c.naf_label, c.naf) ?? (naf === '' ? '—' : naf)}
       </div>
 
       <div><SizeCategoryBadge size={c.size_category} /></div>

@@ -14,11 +14,13 @@ reclassement de masse, écrans). Aucune autre liste de secteurs ne doit exister 
 | `nap600_secteurs.csv` | les 650 postes de la NAP 600 (1973, format `NN.NN` sans lettre) → secteur | 650 |
 | `metiers.csv` | les 91 métiers (clé, libellé), dans l'ordre de l'écran — chantier 2 | 91 |
 | `naf_rev2_metiers.csv` | 269 sous-classes de la NAF rév. 2 → métier (les autres n'en ont pas) — chantier 2 | 269 |
+| `naf_rev2_niveaux.csv` | les 4 niveaux supérieurs de la NAF rév. 2 (21 sections, 88 divisions, 272 groupes, 615 classes) : code, parent, libellé — lot N7 | 996 |
 
 ## Sources officielles (INSEE)
 
 - NAF rév. 2, liste des sous-classes (`naf2008_liste_n5.xls`) : https://www.insee.fr/fr/information/2120875
 - Table de passage NAF rév. 1 → NAF rév. 2 (`table_NAF1-NAF2.xls`) : https://www.insee.fr/fr/information/2579599
+- NAF rév. 2, arborescence et libellés des niveaux 1 à 4 (`naf2008_5_niveaux.xls`, `naf2008_liste_n1.xls` … `n4.xls`) : même page que la liste des sous-classes
 - Nomenclature d'activités et de produits NAP 1973 (`nap1973.xls`) : https://www.insee.fr/fr/information/3582824
 
 Les fichiers `.xls` ne sont pas versionnés (propriété INSEE, volumineux) : on les
@@ -110,3 +112,17 @@ même synchro que `sector-`, `size-`, `region-` (`EtiquettesClassement`), lue pa
 
 La garde `tests/Unit/Crm/MetiersTest.php` vérifie la cohérence des deux fichiers entre eux et
 avec la NAF, et la correspondance sur des exemples réels.
+
+## Libellés NAF en base (lot N7, 2026-10-03)
+
+Les tables de référence `naf_sections`, `naf_divisions`, `naf_groups`, `naf_classes` et
+`naf_subclasses` (codes SANS point : « J », « 62 », « 620 », « 6201 », « 6201Z ») sont
+remplies depuis `naf_rev2_niveaux.csv` et `naf_rev2_secteurs.csv` par :
+
+    php artisan crm:referentiels:charger-naf            # --dry-run pour compter sans écrire
+
+La commande est idempotente (upsert sur le code), ne supprime jamais une ligne et ne
+réécrit jamais `is_artisanat`. L'API en tire `naf_label` (liste et fiche des entreprises),
+le libellé de la sous-classe de `companies.naf_rev2`, sinon de `companies.naf`
+(`App\Crm\Referentiels\LibellesNaf`). `naf_rev2_niveaux.csv` se reconstruit avec
+`construire_niveaux.py` (mêmes conditions que `construire.py`, fichiers INSEE ci-dessus).

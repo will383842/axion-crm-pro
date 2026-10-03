@@ -29,7 +29,7 @@ import { ListesDeLaFiche } from '@/features/listes/ListesDeLaFiche';
 import { RelationCard } from './components/RelationCard';
 import type { LifecycleStage, RelationType } from '@/features/crm-console/types';
 import { libelleCategorieJuridique } from '@/lib/categories-juridiques';
-import { libelleNaf } from '@/lib/naf-divisions';
+import { libelleActivite } from '@/lib/naf-divisions';
 import { libelleEffectif } from './effectif';
 import { LibelleEtCode } from './components/LibelleEtCode';
 
@@ -357,12 +357,6 @@ function Item({ label, children, wide }: { label: string; children: React.ReactN
       <dd className="mt-1 text-slate-900 dark:text-white">{children}</dd>
     </div>
   );
-}
-
-/** Le libellé NAF fourni par l'API s'il existe, sinon celui de la division (comme la liste). */
-function libelleActivite(libelleApi: string | null | undefined, naf: string | null | undefined): string | null {
-  const fourni = libelleApi?.trim() ?? '';
-  return fourni !== '' ? fourni : libelleNaf(naf);
 }
 
 function Dot() {

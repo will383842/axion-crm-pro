@@ -7,6 +7,7 @@ use App\Data\Sources\InseeCompanyData;
 use App\Services\Http\SsrfGuard;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
@@ -35,6 +36,22 @@ class HttpInseeClient implements InseeClient
 
     /** Identifiants par requête groupée (`siren:… OR siren:…`) : URL ≈ 2 Ko. */
     public const PAR_REQUETE = 100;
+
+    /**
+     * Pages du flux, au plus, AU-DELÀ du total annoncé par Sirene
+     * (`header.total`) — relecture sécurité #313, réserve 3. Sans total lu,
+     * `PAGES_MAX` borne seul.
+     */
+    private const PAGES_MARGE = 5;
+
+    /** Plafond ABSOLU de pages d'un flux (20 M d'unités) : la boucle s'arrête toujours. */
+    public const PAGES_MAX = 20000;
+
+    /**
+     * Taille maximale d'une réponse Sirene AVANT décodage (réserve 5, serveur
+     * à 2 CPU) : une page de 1000 unités pèse quelques Mo.
+     */
+    public const REPONSE_MAX_OCTETS = 32 * 1024 * 1024;
 
     private int $delaiMs = 2100;
 
@@ -276,8 +293,8 @@ class HttpInseeClient implements InseeClient
         // C19-010, RENFORT : l'ÉTABLISSEMENT porte son propre statut de
         // diffusion (`statutDiffusionEtablissement`, mêmes valeurs O/P/N).
         // Même défaut `'O'` : une réponse qui ne porte pas le champ reste
-        // collectée (témoin dédié).
-        if (($etab['statutDiffusionEtablissement'] ?? 'O') !== 'O') {
+        // collectée (témoin dédié). Lu par le même `estDiffusible()`.
+        if (! self::estDiffusible($etab)) {
             return false;
         }
         if ($commercialOnly) {
@@ -354,8 +371,18 @@ class HttpInseeClient implements InseeClient
             throw new \InvalidArgumentException("Date Sirene invalide : « {$depuis} » (attendu AAAA-MM-JJ).");
         }
         $q = 'dateDernierTraitementUniteLegale:[' . $depuis . ' TO *]';
+        // Réserve 3 (#313) : la fin ne dépend plus du seul curseur répété.
+        // Un curseur DÉJÀ VU (A→B→A…) ou un nombre de pages au-delà du total
+        // annoncé lèvent : le passage reste « echouee », visible, au lieu de
+        // boucler — même lancé à la main sans `--duree-max`.
+        $vus = [$curseur => true];
+        $plafond = self::PAGES_MAX;
+        $pages = 0;
 
         while (true) {
+            if (++$pages > $plafond) {
+                throw new \RuntimeException("Flux Sirene : plus de {$plafond} pages lues — arrêt (curseurs incohérents ?).");
+            }
             $data = $this->appelSirene('/siren', [
                 'q' => $q,
                 'curseur' => $curseur,
@@ -367,8 +394,18 @@ class HttpInseeClient implements InseeClient
                 'is_array',
             ));
             $suivant = $data['header']['curseurSuivant'] ?? null;
+            $total = $data['header']['total'] ?? null;
+            if ($pages === 1 && is_int($total) && $total >= 0) {
+                $plafond = min(self::PAGES_MAX, intdiv($total, self::PAGE_SIRENE) + 1 + self::PAGES_MARGE);
+            }
             // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.
             $fin = ! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur;
+            if (! $fin && isset($vus[$suivant])) {
+                throw new \RuntimeException('Flux Sirene : curseur déjà vu — arrêt (pagination en boucle).');
+            }
+            if (! $fin) {
+                $vus[$suivant] = true;
+            }
 
             yield ['curseur' => $curseur, 'suivant' => $fin ? null : $suivant, 'unites' => $unites];
 
@@ -445,7 +482,11 @@ class HttpInseeClient implements InseeClient
 
     /**
      * Une requête Sirene, quota respecté, 429 et 5xx retentés (BORNÉ), 404 =
-     * « aucun résultat » (Sirene 3.11 répond 404 à une recherche vide).
+     * « aucun résultat » (Sirene 3.11 répond 404 à une recherche vide) —
+     * SEULEMENT si le corps est bien celui de Sirene (`header`) : un 404 d'un
+     * autre serveur (mauvais chemin, passerelle) lève (avis exactitude R10).
+     * Les erreurs ne portent que le statut et le chemin (`InseeErreurHttp`),
+     * et une réponse trop lourde est refusée AVANT d'être décodée.
      *
      * @param  array<string, scalar>  $params
      * @return array<string, mixed>
@@ -463,11 +504,15 @@ class HttpInseeClient implements InseeClient
                 ->get(self::BASE_URL . $chemin, $params);
 
             if ($resp->status() === 404) {
-                return [];
+                $data = $this->decoder($resp, $chemin);
+                if (is_array($data['header'] ?? null)) {
+                    return [];
+                }
+                throw new InseeErreurHttp(404, $chemin, '(réponse qui n est pas celle de Sirene)');
             }
             if ($resp->status() === 429) {
                 if (++$tentatives > 30) {
-                    throw new \RuntimeException("INSEE 429 persistant sur {$chemin} après 30 tentatives (quota atteint ?).");
+                    throw new InseeErreurHttp(429, $chemin, '(persistant après 30 tentatives, quota atteint ?)');
                 }
                 Sleep::for(20)->seconds();
 
@@ -475,21 +520,37 @@ class HttpInseeClient implements InseeClient
             }
             if ($resp->serverError()) {
                 if (++$tentatives > 8) {
-                    throw new \RuntimeException("INSEE {$resp->status()} persistant sur {$chemin} après 8 tentatives.");
+                    throw new InseeErreurHttp($resp->status(), $chemin, '(persistant après 8 tentatives)');
                 }
                 Sleep::for(5)->seconds();
 
                 continue;
             }
             if ($resp->failed()) {
-                throw new \RuntimeException(
-                    "INSEE {$resp->status()} sur {$chemin} — " . mb_substr((string) $resp->body(), 0, 500),
-                );
+                // Statut et chemin seulement : jamais le corps (réserve 7).
+                throw new InseeErreurHttp($resp->status(), $chemin);
             }
-            $data = $resp->json();
 
-            return is_array($data) ? $data : [];
+            return $this->decoder($resp, $chemin);
         }
+    }
+
+    /**
+     * Le corps JSON d'une réponse, sa taille BORNÉE avant décodage (réserve 5) :
+     * `Content-Length` d'abord, puis la longueur réelle du corps.
+     *
+     * @return array<string, mixed>
+     */
+    private function decoder(Response $resp, string $chemin): array
+    {
+        $annonce = $resp->header('Content-Length');
+        if (($annonce !== '' && is_numeric($annonce) && (int) $annonce > self::REPONSE_MAX_OCTETS)
+            || strlen($resp->body()) > self::REPONSE_MAX_OCTETS) {
+            throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)');
+        }
+        $data = json_decode($resp->body(), true);
+
+        return is_array($data) ? $data : [];
     }
 
     private function respecterQuota(): void
@@ -546,11 +607,17 @@ class HttpInseeClient implements InseeClient
      * source tierce) reste collectée. Faire l'inverse rendrait la collecte
      * muette sur un détail de forme — un témoin dédié fixe ce choix.
      *
-     * @param  array<string, mixed>  $uniteLegale  le bloc `uniteLegale` de la réponse INSEE
+     * Lit AUSSI `statutDiffusionEtablissement` quand le bloc le porte
+     * (établissement de la voie `/siret`, ou unité à laquelle l'appelant a
+     * joint le statut de son siège — `MiseAJourMensuelle`, relecture #313
+     * réserve 6) : l'opposition vaut aux deux niveaux. Même défaut `'O'`.
+     *
+     * @param  array<string, mixed>  $bloc  le bloc `uniteLegale` ou un établissement de la réponse INSEE
      */
-    private static function estDiffusible(array $uniteLegale): bool
+    public static function estDiffusible(array $bloc): bool
     {
-        return ($uniteLegale['statutDiffusionUniteLegale'] ?? 'O') === 'O';
+        return ($bloc['statutDiffusionUniteLegale'] ?? 'O') === 'O'
+            && ($bloc['statutDiffusionEtablissement'] ?? 'O') === 'O';
     }
 
     /**

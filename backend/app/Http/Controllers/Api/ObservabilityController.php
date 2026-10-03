@@ -338,6 +338,7 @@ class ObservabilityController extends Controller
     private function countWaterfallErrors24h(string $workspaceId): int
     {
         $this->borner();
+
         return (int) DB::table('scraper_runs')
             ->where('workspace_id', $workspaceId)
             ->where('status', 'failed')
@@ -391,6 +392,7 @@ class ObservabilityController extends Controller
     {
         try {
             $this->borner();
+
             return (int) DB::table('business_events')
                 ->where('workspace_id', $workspaceId)
                 ->where('action', 'audience.refresh.failed')
@@ -411,6 +413,7 @@ class ObservabilityController extends Controller
     {
         try {
             $this->borner();
+
             return DB::table('business_events')
                 ->where('workspace_id', $workspaceId)
                 ->orderByDesc('created_at')

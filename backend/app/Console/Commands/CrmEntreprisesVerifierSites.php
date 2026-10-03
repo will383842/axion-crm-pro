@@ -188,7 +188,8 @@ class CrmEntreprisesVerifierSites extends Command
         // La plage comptée : les fiches qui existent au lancement, après le
         // curseur de départ. Une fiche créée pendant le lancement (saisie,
         // import) n'en fait pas partie : pas de fausse alerte (#314, R5).
-        $plafond = (int) (DB::table('companies')->where('workspace_id', $this->workspaceId)->max('id') ?? 0);
+        // Corbeille comprise, exprès : la plage couvre toutes les lignes.
+        $plafond = (int) (DB::selectOne('SELECT max(id) AS m FROM companies WHERE workspace_id = ?', [$this->workspaceId])->m ?? 0);
         $avant = $this->compterFiches($depart, $plafond);
         $curseur = $depart;
         $arretHeure = false;
@@ -219,15 +220,18 @@ class CrmEntreprisesVerifierSites extends Command
         $apres = $this->compterFiches($depart, $plafond);
 
         Log::info('crm.entreprises.verifier_sites', $this->bilan + [
-            'dry_run' => $dryRun, 'audience' => $audience, 'curseur' => $curseur, 'lignes_avant' => $avant, 'lignes_apres' => $apres,
+            'dry_run' => $dryRun, 'audience' => $audience, 'curseur' => $curseur, 'lignes_avant' => $avant['toutes'], 'lignes_apres' => $apres['toutes'],
+            'vivantes_avant' => $avant['vivantes'], 'vivantes_apres' => $apres['vivantes'],
         ]);
         $this->info($dryRun ? '[À BLANC] les sites ont été lus, rien n\'a été écrit (ni marqueur, ni curseur).' : 'Vérification appliquée.');
         $lignes = [];
         foreach (self::LIBELLES as $k => $libelle) {
             $lignes[] = [$libelle, $this->bilan[$k]];
         }
-        $lignes[] = ['lignes avant (fiches de la plage parcourue)', $avant];
-        $lignes[] = ['lignes après (fiches de la plage parcourue)', $apres];
+        $lignes[] = ['lignes avant (plage parcourue, corbeille comprise)', $avant['toutes']];
+        $lignes[] = ['lignes après (plage parcourue, corbeille comprise)', $apres['toutes']];
+        $lignes[] = ['fiches vivantes avant', $avant['vivantes']];
+        $lignes[] = ['fiches vivantes après', $apres['vivantes']];
         $this->table(['compteur', 'nombre'], $lignes);
         $this->line("Curseur : fiche {$depart} → fiche {$curseur}" . ($audience !== null ? " (audience {$audience})" : '') . '.');
         if ($arretHeure && $fin !== null) {
@@ -237,11 +241,11 @@ class CrmEntreprisesVerifierSites extends Command
         }
 
         if ($avant !== $apres) {
-            $this->error("Comptage des fiches DIFFÉRENT : {$avant} avant, {$apres} après. Ce traitement ne crée ni ne supprime rien : à examiner.");
+            $this->error("Comptage des fiches DIFFÉRENT : {$avant['toutes']} avant, {$apres['toutes']} après ({$avant['vivantes']} → {$apres['vivantes']} vivantes). Ce traitement ne crée, ne supprime ni ne met à la corbeille rien : à examiner.");
 
             return self::FAILURE;
         }
-        $this->line("Comptage des fiches : identique ({$avant} avant, {$apres} après).");
+        $this->line("Comptage des fiches : identique ({$avant['toutes']} avant, {$apres['toutes']} après ; {$apres['vivantes']} vivantes).");
 
         if ($interruption !== null) {
             $this->error('INTERROMPU : ' . $interruption::class . ". Les paquets validés restent ; reprise au curseur (fiche {$curseur}).");
@@ -275,10 +279,23 @@ class CrmEntreprisesVerifierSites extends Command
         return ! $forcer && $demandee->greaterThan($finFenetre) ? $finFenetre : $demandee;
     }
 
-    private function compterFiches(int $depart, int $plafond): int
+    /**
+     * Les fiches de la plage parcourue — celles qui existaient au lancement,
+     * après le curseur de départ (`$depart` < id ≤ `$plafond`) : TOUTES,
+     * corbeille comprise (rien ne doit disparaître), et les vivantes (rien ne
+     * doit partir à la corbeille). Une fiche créée pendant un lancement de
+     * 11 h n'en fait pas partie : pas de fausse alerte (#314, R5).
+     *
+     * @return array{toutes: int, vivantes: int}
+     */
+    private function compterFiches(int $depart, int $plafond): array
     {
-        return DB::table('companies')->where('workspace_id', $this->workspaceId)
-            ->where('id', '>', $depart)->where('id', '<=', $plafond)->count();
+        $n = DB::table('companies')->where('workspace_id', $this->workspaceId)
+            ->where('id', '>', $depart)->where('id', '<=', $plafond)
+            ->selectRaw('count(*) AS toutes, count(*) FILTER (WHERE deleted_at IS NULL) AS vivantes')
+            ->first();
+
+        return ['toutes' => (int) ($n->toutes ?? 0), 'vivantes' => (int) ($n->vivantes ?? 0)];
     }
 
     /** @param  list<stdClass>  $fiches */

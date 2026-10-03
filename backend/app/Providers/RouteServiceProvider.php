@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Partners\ConfigurationCanalPartners;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
@@ -30,6 +31,14 @@ class RouteServiceProvider extends ServiceProvider
         // passe s'y devine aussi bien qu'à la connexion).
         RateLimiter::for('password-change', fn (Request $r) => Limit::perMinute(5)->by(optional($r->user())->id ?: $r->ip()));
         RateLimiter::for('internal', fn (Request $r) => Limit::perMinute(600)->by($r->ip()));
+        // Lot N11 — canal Partners. En mode `off`, AUCUNE limite : le limiteur
+        // ne compte rien et ne pose aucun en-tête `X-RateLimit-*`, et ne rend
+        // jamais 429 — la route doit répondre exactement comme une route absente
+        // (le tri de priorité de Laravel 12 place ce limiteur AVANT le
+        // vérificateur). Ouvert : même plafond que les autres canaux internes.
+        RateLimiter::for('partners', fn (Request $r) => config('crm.partners.mode') === ConfigurationCanalPartners::MODE_OFF
+            ? Limit::none()
+            : Limit::perMinute(600)->by($r->ip()));
 
         // Sprint 19.6 — scraper endpoints (anti-abus + protection quotas externes).
         // scraper-launch : 10/min/user (~1 launch/6s), couvre /coverage/launch + cancel + retry.

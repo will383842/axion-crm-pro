@@ -107,7 +107,7 @@ export function AudiencesListPage() {
     <div>
       <PageHeader
         title="Audiences"
-        subtitle="Segments dynamiques d'entreprises et contacts, prêts pour campagne email."
+        subtitle="Des listes d'entreprises et de contacts mises à jour chaque nuit, prêtes pour un envoi."
         actions={
           <Button
             variant="primary"

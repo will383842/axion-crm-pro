@@ -234,7 +234,7 @@ function ArbitrageCard({
           <Input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="ex. entreprise inexistante au RNE"
+            placeholder="ex. entreprise introuvable dans les registres"
           />
         </label>
         <Button

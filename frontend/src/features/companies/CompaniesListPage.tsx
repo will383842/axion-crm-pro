@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -6,6 +6,7 @@ import { Building2 } from "lucide-react";
 import {
   Button,
   Card,
+  Champ,
   CompaniesTableSkeleton,
   EmptyState,
   KpiCard,
@@ -704,8 +705,7 @@ export function CompaniesListPage() {
               />
             </div>
             <div>Entreprise</div>
-            <div className="font-mono">SIREN</div>
-            <div>NAF</div>
+            <div>Activité</div>
             <div>Taille</div>
             <div>Qualité</div>
             <div>Ville</div>
@@ -776,33 +776,6 @@ const FILTRES_SECONDAIRES: ReadonlyArray<keyof Filter> = [
   "cree_apres",
   "cree_avant",
 ];
-
-/** Un champ de filtre avec son étiquette VISIBLE au-dessus (audit P2-4). */
-function Champ({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  /** `null` quand le champ porte déjà sa propre étiquette (la recherche). */
-  htmlFor: string | null;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      {htmlFor === null ? (
-        <span aria-hidden className="text-xs font-medium text-slate-600">
-          {label}
-        </span>
-      ) : (
-        <label htmlFor={htmlFor} className="text-xs font-medium text-slate-600">
-          {label}
-        </label>
-      )}
-      {children}
-    </div>
-  );
-}
 
 function FilterSelect({
   label,

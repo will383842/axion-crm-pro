@@ -47,7 +47,7 @@ import {
  * cherchés par `gridTemplateColumns` et celui-ci passait par une classe. C'est
  * le même défaut, exactement, sur un dixième écran.
  */
-const RUNS_GRID = '80px minmax(120px,1fr) 80px 140px 140px minmax(140px,1.2fr) 72px';
+const RUNS_GRID = 'minmax(120px,1fr) 80px 140px 140px minmax(140px,1.2fr) 72px';
 
 // ---------------------------------------------------------------------------
 // Types — alignés sur ScraperRunsController@index (response: { data: Run[] })
@@ -385,7 +385,7 @@ export function ScraperRunsPage() {
       <PageHeader
         title="Historique des collectes"
         subtitle="Chaque passage de collecte, en direct : en cours, terminés, en échec."
-        badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
+        badge={<LiveBadge label="En direct" refreshLabel="Mis à jour toutes les 10 secondes" />}
         actions={
           <>
             <Button
@@ -493,7 +493,6 @@ export function ScraperRunsPage() {
             className="sticky top-0 z-10 grid gap-3 border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400"
             style={{ gridTemplateColumns: RUNS_GRID }}
           >
-            <div>ID</div>
             <div>Source</div>
             <div>Zone</div>
             <div>Statut</div>
@@ -589,24 +588,15 @@ export function ScraperRunsPage() {
 // Menu items builder (extracted to avoid TS spread inference issues)
 // ---------------------------------------------------------------------------
 function buildMenuItems(args: {
-  run: Run;
   cancellable: boolean;
   retryable: boolean;
   onOpenDetail: () => void;
   onAskCancel: () => void;
   onRetry: () => void;
 }): MenuItem[] {
-  const { run, cancellable, retryable, onOpenDetail, onAskCancel, onRetry } = args;
+  const { cancellable, retryable, onOpenDetail, onAskCancel, onRetry } = args;
   const items: MenuItem[] = [
     { id: 'detail', label: 'Voir détails', onSelect: onOpenDetail },
-    {
-      id: 'copy',
-      label: 'Copier l’ID',
-      onSelect: () => {
-        void navigator.clipboard?.writeText(String(run.id));
-        toast.info(`ID #${run.id} copié`);
-      },
-    },
   ];
   if (cancellable || retryable) {
     items.push({ id: 'div', divider: true, label: '' });
@@ -661,7 +651,6 @@ function RunRow({
       // montee a l'interieur du <TableScroll> de la liste, pas ici.
       style={{ gridTemplateColumns: RUNS_GRID }}
     >
-      <div className="font-mono text-xs text-slate-500 tabular-nums dark:text-slate-400">#{run.id}</div>
       <div className="min-w-0 truncate font-medium text-slate-900 dark:text-white" title={run.source}>
         {run.source}
       </div>
@@ -717,7 +706,7 @@ function RunRow({
               <IconDots />
             </IconButton>
           }
-          items={buildMenuItems({ run, cancellable, retryable, onOpenDetail, onAskCancel, onRetry })}
+          items={buildMenuItems({ cancellable, retryable, onOpenDetail, onAskCancel, onRetry })}
         />
       </div>
     </div>
@@ -738,7 +727,6 @@ function RunDrawerContent({ run }: { run: Run }) {
         <StatusPill tone={mapStatusToTone(run.status)} pulse={run.status === 'running'}>
           {statusLabel(run.status)}
         </StatusPill>
-        <span className="font-mono text-xs text-slate-500 dark:text-slate-400">#{run.id}</span>
       </div>
 
       <div>
@@ -753,7 +741,6 @@ function RunDrawerContent({ run }: { run: Run }) {
       <div className="grid grid-cols-2 gap-3">
         <DataItem label="Démarré" value={formatAbsolute(run.started_at)} hint={formatRelative(run.started_at)} />
         <DataItem label="Terminé" value={formatAbsolute(run.finished_at)} hint={run.finished_at ? formatRelative(run.finished_at) : 'en cours'} />
-        <DataItem label="Latence" value={run.latency_ms ? `${run.latency_ms} ms` : '—'} />
         <DataItem
           label="Entreprises"
           value={stat ? `${stat.created} / ${stat.target || '?'}` : '—'}

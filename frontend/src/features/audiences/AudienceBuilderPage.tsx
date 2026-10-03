@@ -285,7 +285,7 @@ export function AudienceBuilderPage() {
       const r = await api.post<PreviewResponse>('/audiences/preview', { criteria: c });
       setPreview(r.data);
     } catch (err) {
-      setPreviewError(extractApiMessage(err) ?? 'Preview indisponible');
+      setPreviewError(extractApiMessage(err) ?? 'Aperçu indisponible');
       setPreview(null);
     } finally {
       setPreviewLoading(false);

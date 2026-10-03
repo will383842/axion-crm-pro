@@ -54,7 +54,7 @@ function PersonTimelineContent() {
   if (data === undefined) {
     return (
       <div>
-        <EmptyState title="Fiche introuvable" description="Cette personne n’existe dans aucun univers accessible." />
+        <EmptyState title="Fiche introuvable" description="Cette personne n’existe dans aucune base à laquelle vous avez accès." />
       </div>
     );
   }
@@ -75,7 +75,7 @@ function PersonTimelineContent() {
             <CardTitle>Identité</CardTitle>
             {data.subjects.length === 0 ? (
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Aucune fiche dans les univers auxquels vous avez accès.
+                Aucune fiche dans les bases auxquelles vous avez accès.
               </p>
             ) : (
               <ul className="mt-2 flex flex-col gap-3 text-xs text-slate-600 dark:text-slate-300">
@@ -95,15 +95,15 @@ function PersonTimelineContent() {
           </Card>
 
           <Card>
-            <CardTitle>Univers</CardTitle>
+            <CardTitle>Base</CardTitle>
             <ul className="mt-2 flex flex-col gap-2 text-xs">
               <UniverseLine
-                label="Business"
+                label="Clients et prospects"
                 accessible={data.universes.business.accessible}
                 exists={data.universes.business.exists}
               />
               <UniverseLine
-                label="Vivier candidats"
+                label="Candidats"
                 accessible={data.universes.vivier.accessible}
                 exists={data.universes.vivier.exists}
               />
@@ -128,7 +128,7 @@ function PersonTimelineContent() {
                   <div className="text-xs text-slate-400">{entry.occurred_at ?? '—'}</div>
                   <div className="text-sm text-slate-900 dark:text-white">{entry.title ?? entry.kind}</div>
                   <div className="text-xs text-slate-400">
-                    {entry.universe === 'vivier' ? 'Vivier' : 'Business'}
+                    {entry.universe === 'vivier' ? 'Candidats' : 'Clients et prospects'}
                     {entry.external_ref !== null && <> · {entry.external_ref}</>}
                   </div>
                 </li>
@@ -159,7 +159,7 @@ function UniverseLine({
         <StatusPill tone="success">Fiche présente</StatusPill>
       ) : (
         // Un booléen, et rien d'autre : ni nom, ni étape, ni activité.
-        <StatusPill tone="info">Existe — basculer d’univers pour voir</StatusPill>
+        <StatusPill tone="info">Existe aussi dans l’autre base</StatusPill>
       )}
     </li>
   );

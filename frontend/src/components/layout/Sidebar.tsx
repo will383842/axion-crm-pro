@@ -75,7 +75,8 @@ export interface NavSection {
  * de la journée, puis une section « Technique » en dernier :
  *  - À traiter         : ce qui attend une décision (doublons, rattachements) ;
  *  - Ma base           : entreprises, contacts, newsletter et guide,
- *                        candidats, entreprises en Roumanie ;
+ *                        candidats (les entreprises en Roumanie sont sous
+ *                        « Technique » depuis l'audit UX lot 18) ;
  *  - Presse            : médias, journalistes, communiqués ;
  *  - Réseaux           : fédérations et ordres, événements ;
  *  - Ciblage           : audiences, listes (CHOISIR à qui s'adresser) ;
@@ -137,7 +138,6 @@ function sectionMaBase(features: ConsoleFeatures): NavSection {
   } else {
     items.push({ to: '/contacts', label: 'Contacts', icon: icone(UsersIcon) });
   }
-  items.push({ to: '/international/roumanie', label: 'Entreprises en Roumanie', icon: icone(Globe) });
   return { id: 'ma-base', title: 'Ma base', items };
 }
 
@@ -189,6 +189,7 @@ const SECTIONS_FIXES: NavSection[] = [
     id: 'technique',
     title: 'Technique',
     items: [
+      { to: '/international/roumanie', label: 'Entreprises en Roumanie', icon: icone(Globe) },
       { to: '/scraper-runs', label: 'Historique des collectes', icon: icone(Activity) },
       { to: '/admin/observability', label: 'Santé du système', icon: icone(Activity) },
       { to: '/llm/router', label: 'Moteurs d’IA', icon: icone(Bot) },

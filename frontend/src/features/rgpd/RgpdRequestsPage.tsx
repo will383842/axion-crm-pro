@@ -159,7 +159,7 @@ export function RgpdRequestsPage() {
     <div>
       <PageHeader
         title="Demandes RGPD"
-        subtitle="Articles 15-22 : accès / portabilité / suppression / rectification / opposition."
+        subtitle="Demandes des personnes sur leurs données (accès, suppression…)"
         actions={
           <Button
             variant="primary"
@@ -190,7 +190,7 @@ export function RgpdRequestsPage() {
         <EmptyState
           icon={<ClipboardList className="h-10 w-10" />}
           title="Aucune demande RGPD"
-          description="Les requêtes apparaitront ici après création par les sujets concernés."
+          description="Les demandes apparaîtront ici dès qu’une personne en fera une."
           action={
             <Button
               variant="primary"
@@ -216,7 +216,7 @@ export function RgpdRequestsPage() {
             style={{ gridTemplateColumns: GRID }}
           >
             <div>Type</div>
-            <div>Sujet</div>
+            <div>Personne</div>
             <div>Statut</div>
             <div>Demande</div>
             <div>Traitement</div>
@@ -275,7 +275,7 @@ export function RgpdRequestsPage() {
         open={newOpen}
         onClose={() => setNewOpen(false)}
         title="Nouvelle demande RGPD"
-        description="Articles 15-22 RGPD — création manuelle d'une demande au nom d'une personne concernée."
+        description="Enregistrer à la main une demande faite par une personne."
         footer={
           <>
             <Button variant="secondary" onClick={() => setNewOpen(false)}>
@@ -309,7 +309,7 @@ export function RgpdRequestsPage() {
           </label>
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">
-              Email du sujet
+              E-mail de la personne
             </span>
             <Input
               type="email"

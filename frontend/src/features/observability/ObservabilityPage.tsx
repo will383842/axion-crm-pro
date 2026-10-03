@@ -72,7 +72,7 @@ function SanteDuSysteme() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <KpiCard
-          label="Erreurs waterfall (24h)"
+          label="Erreurs d’enrichissement (24 h)"
           value={data.waterfall_errors_24h}
           icon={<AlertTriangle className="size-4" />}
           tone={data.waterfall_errors_24h > 10 ? 'rose' : 'slate'}
@@ -100,7 +100,7 @@ function SanteDuSysteme() {
           }
         />
         <KpiCard
-          label="Quota Hunter (mois)"
+          label="Quota Hunter.io (mois)"
           value={`${data.hunter_quota_month.used} / ${data.hunter_quota_month.soft_limit}`}
           sublabel={`${data.hunter_quota_month.percent}% utilisé`}
           progress={data.hunter_quota_month.percent}
@@ -142,7 +142,7 @@ function SanteDuSysteme() {
       </Card>
 
       <Card>
-        <CardSection title="50 derniers business events">
+        <CardSection title="50 derniers événements">
           <div className="max-h-[480px] overflow-y-auto text-sm">
             {data.recent_events.length === 0 ? (
               <div className="text-slate-500">Aucun event récent.</div>

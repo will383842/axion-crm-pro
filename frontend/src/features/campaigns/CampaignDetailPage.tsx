@@ -512,7 +512,7 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
-            <th className="px-4 py-2 text-left">#</th>
+            <th className="px-4 py-2 text-left">Passage du</th>
             <th className="px-4 py-2 text-left">Source</th>
             <th className="px-4 py-2 text-left">Statut</th>
             <th className="px-4 py-2 text-left">Démarré</th>
@@ -522,7 +522,11 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {runs.map((r) => (
             <tr key={r.id}>
-              <td className="px-4 py-2 font-mono text-xs tabular-nums">#{r.id}</td>
+              <td className="px-4 py-2 text-xs tabular-nums">
+                {r.started_at
+                  ? new Date(r.started_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </td>
               <td className="px-4 py-2">{r.source}</td>
               <td className="px-4 py-2">
                 <StatusPill

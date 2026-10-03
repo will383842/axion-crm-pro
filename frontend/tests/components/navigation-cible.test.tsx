@@ -83,7 +83,10 @@ describe('Navigation cible — arborescence', () => {
     const chemins = (id: string) => sections.find((s) => s.id === id)?.items.map((i) => i.to);
     expect(chemins('ciblage')).toEqual(['/audiences', '/listes']);
     expect(chemins('alimenter')).toEqual(['/campaigns', '/coverage']);
-    expect(chemins('ma-base')).toContain('/international/roumanie');
+    // Audit UX lot 18 (2026-10-03) : la Roumanie quitte « Ma base » pour la
+    // section repliée « Technique ».
+    expect(chemins('ma-base')).not.toContain('/international/roumanie');
+    expect(chemins('technique')).toContain('/international/roumanie');
   });
 
   it('aucune section de travail ne dépasse cinq entrées (fini les onze sous « Contacts »)', () => {

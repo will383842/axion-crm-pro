@@ -204,7 +204,7 @@ describe('ContactsHubPage — parcours', () => {
     });
 
     await screen.findByText('ACME GRENOBLE');
-    const select = screen.getByLabelText('Filtre statut de prospection');
+    const select = screen.getByLabelText('Statut de prospection');
     const option = within(select).getAllByRole('option')[1] as HTMLOptionElement;
 
     await user.selectOptions(select, option.value);

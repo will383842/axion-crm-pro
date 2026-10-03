@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Avatar, DropdownMenu, IconButton, QualityBadge, SizeCategoryBadge, cn } from '@/components/ui';
 import { effectifLabel } from '../effectif';
+import { libelleNaf } from '@/lib/naf-divisions';
 
 export interface CompanyRowData {
   id: number;
@@ -29,7 +30,9 @@ export interface CompanyRowProps {
 
 // Colonne de sélection EN TÊTE : l'en-tête collant de la liste partage cette
 // même grille — la modifier d'un seul côté désaligne tout le tableau.
-const GRID = '32px 2fr 110px 90px 110px 140px 1.1fr 100px 36px';
+// Audit UX lot 14 (2026-10-03) : la colonne SIREN a quitté la liste (elle
+// reste sur la fiche) et « NAF » est devenue « Activité », en clair.
+const GRID = '32px 2fr 1.4fr 110px 140px 1.1fr 100px 36px';
 
 /**
  * Single virtualised row in the companies list.
@@ -97,9 +100,14 @@ export function CompanyRow({
         </div>
       </div>
 
-      <div className="truncate font-mono text-xs tabular-nums text-slate-600 dark:text-slate-400">{c.siren}</div>
-
-      <div className="truncate font-mono text-xs text-slate-700 dark:text-slate-300">{c.naf ?? '—'}</div>
+      {/* Le libellé de la division NAF en clair ; le code complet en infobulle.
+          Un code sans division connue reste affiché tel quel plutôt que vide. */}
+      <div
+        className="truncate text-xs text-slate-700 dark:text-slate-300"
+        title={c.naf ? `Code d’activité : ${c.naf}` : undefined}
+      >
+        {libelleNaf(c.naf) ?? c.naf ?? '—'}
+      </div>
 
       <div><SizeCategoryBadge size={c.size_category} /></div>
 

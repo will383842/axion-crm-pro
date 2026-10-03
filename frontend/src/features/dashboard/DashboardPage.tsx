@@ -125,7 +125,7 @@ export function DashboardPage() {
         subtitle={miseAJour === null ? "Vue d'ensemble de votre base" : `Vue d'ensemble de votre base · ${miseAJour}`}
         actions={
           <>
-            <LiveBadge label="En direct" refreshLabel="actualisé toutes les 30s" />
+            <LiveBadge label="En direct" refreshLabel="Mis à jour toutes les 30 secondes" />
             <Button
               variant="secondary"
               size="sm"

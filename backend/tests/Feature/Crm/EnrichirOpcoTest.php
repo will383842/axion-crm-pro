@@ -104,8 +104,14 @@ function opcoSiret(): array
  */
 function opcoSource(string $contenu, ?string $releve = 'Table SIRO — DSN de juillet 2026', bool $echouer = false): SourceSiro
 {
-    $source = new class($contenu, $releve, $echouer) extends SourceSiro
+    $source = new class extends SourceSiro
     {
+        public string $contenu = '';
+
+        public ?string $titre = null;
+
+        public bool $echouer = false;
+
         /** @var list<string> */
         public array $chemins = [];
 
@@ -113,8 +119,6 @@ function opcoSource(string $contenu, ?string $releve = 'Table SIRO — DSN de ju
 
         /** `last_modified` publié : le changer simule un fichier remplacé. */
         public string $modifie = '2026-08-10T00:00:00';
-
-        public function __construct(private string $contenu, private ?string $titre, private bool $echouer) {}
 
         public function ressourceCourante(): array
         {
@@ -139,6 +143,9 @@ function opcoSource(string $contenu, ?string $releve = 'Table SIRO — DSN de ju
             }
         }
     };
+    $source->contenu = $contenu;
+    $source->titre = $releve;
+    $source->echouer = $echouer;
     app()->instance(SourceSiro::class, $source);
 
     return $source;
@@ -681,9 +688,11 @@ test('mêmes valeurs dans une publication plus récente : rien n’est réécrit
 test('mémoire constante : 100 000 lignes lues en flux, pic borné, tout compté', function () {
     $e = opcoEspace();
     $n = 100000;
-    $source = new class($n, $e['a']['siret']) extends SourceSiro
+    $source = new class extends SourceSiro
     {
-        public function __construct(private int $n, private string $connu) {}
+        public int $n = 0;
+
+        public string $connu = '';
 
         public function ressourceCourante(): array
         {
@@ -705,6 +714,8 @@ test('mémoire constante : 100 000 lignes lues en flux, pic borné, tout compté
             fclose($f);
         }
     };
+    $source->n = $n;
+    $source->connu = $e['a']['siret'];
     DB::connection()->disableQueryLog();
 
     gc_collect_cycles();

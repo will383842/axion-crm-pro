@@ -82,6 +82,9 @@ const CHAMPS: Readonly<Record<string, { libelle: string; valeurs?: Table }>> = {
   best_email_confidence: { libelle: 'Confiance de l’e-mail', valeurs: depuisOptions(CONFIANCE_EMAIL_OPTIONS) },
   enriched_at: { libelle: 'Date d’enrichissement' },
   has_email: { libelle: 'E-mail connu' },
+  // Lot N5 : hors adresses en quarantaine (site deviné non vérifié).
+  email_hors_quarantaine: { libelle: 'E-mail joignable (site vérifié)' },
+  site_non_verifie: { libelle: 'Site deviné non vérifié' },
   tags: { libelle: 'Étiquettes' },
   liste_manuelle: { libelle: 'Liste' },
   segment: { libelle: 'Segment', valeurs: { presse: 'Presse' } },

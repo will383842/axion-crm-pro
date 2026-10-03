@@ -6,6 +6,7 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
+use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
 use App\Support\CelluleCsv;
 use App\Support\MasquageCoordonnees;
@@ -425,6 +426,8 @@ class PersonnesController extends ConsoleController
      * « Prospection autorisée » à non et la colonne « Entrepreneur
      * individuel » à oui.
      *
+     * Quarantaine (lot N5) : une adresse venue d'un site deviné non vérifié
+     * (`QuarantaineSite`) ne sort jamais, quelle que soit l'option.
      * Provenance tiers (N12) : une personne apportée par un tiers dont
      * l'information est insuffisante (`ProvenanceTiers`) ne sort JAMAIS,
      * quelle que soit l'option — c'est une interdiction, pas une préférence.
@@ -466,6 +469,12 @@ class PersonnesController extends ConsoleController
                     // rien à indexer. Sans fiche (LEFT JOIN nul) : rien à exclure.
                     $requete->whereRaw("COALESCE(btrim(companies.legal_form), '') NOT LIKE '1%'");
                 }
+                // 🔴 QUARANTAINE (lot N5, `QuarantaineSite`) : une adresse
+                // venue d'un site deviné non vérifié ne sort JAMAIS — même
+                // avec `inclure_non_prospectables=oui`. Posée sur la jointure
+                // déjà restreinte aux personnes de l'espace (fiche par clé
+                // primaire) : aucun balayage de `companies`. Rien n'est effacé.
+                $requete->whereRaw('NOT ' . QuarantaineSite::personneLettreSql('personnes', 'companies'));
                 // 🔴 PROVENANCE TIERS (N12) : la personne apportée sans
                 // information suffisante ne sort JAMAIS — même avec
                 // `inclure_non_prospectables=oui`. Une sous-requête indexée par

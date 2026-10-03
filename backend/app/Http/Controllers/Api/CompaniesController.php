@@ -6,6 +6,7 @@ use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Referentiels\LibellesNaf;
+use App\Crm\Sites\QuarantaineSite;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
@@ -423,13 +424,25 @@ class CompaniesController extends ApiController
             // moins deux minutes. Le plafond rend le pire cas FINI, et le
             // fichier DIT qu'il est coupé. Cf. App\Support\PlafondExport.
             $tronque = PlafondExport::parcourirBorne($query, function ($c) use ($out, $confidenceScorer, $hasSante) {
+                // 🔴 QUARANTAINE (lot N5, `QuarantaineSite`) : une adresse
+                // venue d'un site deviné non vérifié ne sort JAMAIS du
+                // fichier. La fiche et la personne sortent, sans l'adresse —
+                // rien n'est effacé en base. Jugé sur la ligne déjà lue.
+                $methode = $c->getAttribute('website_method');
+                $site = $c->getAttribute('website');
+                $site = is_string($site) ? $site : null;
+                $nonVerifiee = QuarantaineSite::ficheNonVerifiee(is_string($methode) ? $methode : null, $c->getRawOriginal('metadata'));
                 $contacts = $c->contacts
-                    ->map(function ($ct) {
+                    ->map(function ($ct) use ($site, $nonVerifiee) {
                         $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
+                        $email = (string) ($ct->email ?? '');
+                        if (QuarantaineSite::personne($nonVerifiee, $ct->discovery_source, $email, $site)) {
+                            $email = '';
+                        }
                         $bits = array_filter([
                             $name,
                             $ct->role ? "({$ct->role})" : '',
-                            $ct->email ?? '',
+                            $email,
                             $ct->phone ?? '',
                         ]);
 
@@ -456,8 +469,8 @@ class CompaniesController extends ApiController
                     $c->size_category,
                     $c->department_code,
                     $c->city_name,
-                    $c->email_generic,
-                    $this->resolveBestConfidence($c, $confidenceScorer),
+                    $nonVerifiee ? null : $c->email_generic,
+                    $this->resolveBestConfidence($c, $confidenceScorer, $nonVerifiee),
                     $c->phone,
                     $c->website,
                     $mapsUrl,
@@ -477,9 +490,28 @@ class CompaniesController extends ApiController
      * Utilise `best_email_confidence` s'il est déjà calculé (cron
      * prospection:score-email-confidence) ; sinon recalcule à la volée depuis
      * les contacts déjà eager-loaded + email_generic (aucune requête N+1).
+     *
+     * Site deviné non vérifié (`$nonVerifiee`, lot N5) : la note écrite peut
+     * venir d'une adresse en quarantaine (« A » = domaine deviné). On la
+     * recalcule sur les SEULES adresses qui sortent, sans site de référence.
      */
-    private function resolveBestConfidence(Company $c, EmailConfidenceService $scorer): ?string
+    private function resolveBestConfidence(Company $c, EmailConfidenceService $scorer, bool $nonVerifiee = false): ?string
     {
+        if ($nonVerifiee) {
+            $best = null;
+            foreach ($c->contacts as $ct) {
+                $email = (string) ($ct->email ?? '');
+                if ($email === '' || QuarantaineSite::personne(true, $ct->discovery_source, $email, $c->website)) {
+                    continue;
+                }
+                $conf = $scorer->score($email, null);
+                if ($conf !== null && ($best === null || strcmp($conf, $best) < 0)) {
+                    $best = $conf;
+                }
+            }
+
+            return $best;
+        }
         if (! empty($c->best_email_confidence)) {
             return $c->best_email_confidence;
         }

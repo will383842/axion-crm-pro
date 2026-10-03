@@ -125,8 +125,12 @@ final class SiteFiable
      * légales (`discovery_source = 'mentions-legales'`) d'une fiche au site
      * NON VÉRIFIÉ — son adresse vient peut-être du site d'un autre.
      *
-     * Ce lot ne FILTRE rien (le filtrage des envois est le lot N5) : la
-     * condition est fournie pour lui. Rien n'est effacé.
+     * Le filtrage des envois (lot N5) passe par `QuarantaineSite`, qui
+     * élargit cette condition (sources `site`, domaine du site). Rien n'est
+     * effacé.
+     *
+     * @deprecated Définition partielle (mentions légales seulement) : utiliser
+     *             `QuarantaineSite::personneSql()`, la règle des envois.
      */
     public static function contactIssuSiteNonVerifieSql(string $aliasContact = 'contacts'): string
     {
@@ -139,8 +143,8 @@ final class SiteFiable
 
     /**
      * SQL : l'adresse générique (`email_generic`) de la fiche `$alias` a pu
-     * être extraite d'un site NON VÉRIFIÉ. Même statut que la condition
-     * ci-dessus : fournie pour le lot N5, rien n'est filtré ni effacé ici.
+     * être extraite d'un site NON VÉRIFIÉ. Le lot N5 la reprend
+     * (`QuarantaineSite::generiqueSql`) ; rien n'est effacé.
      */
     public static function emailGeneriqueIssuSiteNonVerifieSql(string $alias = 'companies'): string
     {

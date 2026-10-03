@@ -7,6 +7,8 @@ use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\FichesProtegees;
 use App\Crm\Listes\ListesManuelles;
+use App\Crm\Sites\QuarantaineSite;
+use App\Crm\Sites\SiteFiable;
 use App\Jobs\RefreshAudienceChunkJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
@@ -50,6 +52,33 @@ class AudienceBuilderService
         self::CHAMP_LISTE_MANUELLE,
         // 2026-10-01 — « audience presse » (`segment eq presse`, bloc `all`).
         self::CHAMP_SEGMENT,
+        // 2026-10-03 — quarantaine des adresses de sites devinés non vérifiés
+        // (lot N5, `QuarantaineSite`) : `eq` seulement, valeur booléenne.
+        self::CHAMP_EMAIL_HORS_QUARANTAINE, self::CHAMP_SITE_NON_VERIFIE,
+    ];
+
+    /**
+     * « A au moins une adresse joignable HORS QUARANTAINE » (lot N5,
+     * 03/10/2026) : `has_email`, moins les adresses que `QuarantaineSite` met
+     * en quarantaine (générique d'une fiche au site deviné non vérifié,
+     * personne relevée sur ce site ou sur son domaine). C'est le « joignable »
+     * des audiences par défaut et du compteur de l'accueil. `eq` seulement.
+     */
+    public const CHAMP_EMAIL_HORS_QUARANTAINE = 'email_hors_quarantaine';
+
+    /**
+     * « Le site de la fiche est deviné et non vérifié » (`SiteFiable`, lot
+     * N4) : sous `not`, il retire de « Confiance email A (domaine = site) »
+     * les fiches dont le « domaine = site » est un domaine deviné — une note A
+     * calculée avant le lot N5 y reste écrite, rien n'est réécrit. `eq`
+     * seulement.
+     */
+    public const CHAMP_SITE_NON_VERIFIE = 'site_non_verifie';
+
+    /** Les champs calculés (jamais une colonne : EXISTS / expression jamais NULL). */
+    private const CHAMPS_CALCULES = [
+        'tags', 'has_email', self::CHAMP_LISTE_MANUELLE, self::CHAMP_SEGMENT,
+        self::CHAMP_EMAIL_HORS_QUARANTAINE, self::CHAMP_SITE_NON_VERIFIE,
     ];
 
     /**
@@ -681,6 +710,15 @@ class AudienceBuilderService
                 $ou . ' : le champ has_email n admet que l operateur eq, recu ' . self::citer($op),
             );
         }
+
+        // Quarantaine (lot N5) : `eq` et une valeur booléenne, rien d'autre —
+        // « tout sauf » se dit avec le bloc `not`.
+        if (in_array($field, [self::CHAMP_EMAIL_HORS_QUARANTAINE, self::CHAMP_SITE_NON_VERIFIE], true)
+            && ($op !== 'eq' || ! is_bool($value))) {
+            throw CritereAudienceInvalide::parce(
+                $ou . ' : le champ ' . $field . ' n admet que eq avec true ou false',
+            );
+        }
     }
 
     /**
@@ -906,7 +944,7 @@ class AudienceBuilderService
     {
         // `tags` et `has_email` ne sont pas des colonnes : leurs prédicats sont
         // bâtis sur EXISTS, qui vaut toujours TRUE ou FALSE, jamais UNKNOWN.
-        $isRealColumn = ! in_array($field, ['tags', 'has_email', self::CHAMP_LISTE_MANUELLE, self::CHAMP_SEGMENT], true);
+        $isRealColumn = ! in_array($field, self::CHAMPS_CALCULES, true);
 
         if ($isRealColumn && in_array($op, self::NULL_SENSITIVE_OPS, true)) {
             return function ($q) use ($positive, $field) {
@@ -1008,6 +1046,38 @@ class AudienceBuilderService
                     $q->whereNotExists($contactSub)->whereNull('email_generic');
                 }
             };
+        }
+
+        // Quarantaine (lot N5, `QuarantaineSite`) : expressions jamais NULL,
+        // évaluées sur les fiches que les autres critères ont déjà retenues.
+        if ($field === self::CHAMP_SITE_NON_VERIFIE) {
+            if ($op !== 'eq' || ! is_bool($value)) {
+                return null;
+            }
+            $sql = 'COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false)';
+
+            return fn ($q) => $value ? $q->whereRaw($sql) : $q->whereRaw('NOT ' . $sql);
+        }
+        if ($field === self::CHAMP_EMAIL_HORS_QUARANTAINE) {
+            if ($op !== 'eq' || ! is_bool($value)) {
+                return null;
+            }
+            $joignable = function ($qq): void {
+                $qq->where(function ($g): void {
+                    $g->whereNotNull('companies.email_generic')
+                        ->whereRaw('NOT ' . QuarantaineSite::generiqueSql('companies'));
+                })->orWhereExists(function ($sub): void {
+                    $sub->select(DB::raw(1))
+                        ->from('contacts')
+                        ->whereColumn('contacts.company_id', 'companies.id')
+                        ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                        ->whereNotNull('contacts.email')
+                        ->whereNull('contacts.deleted_at')
+                        ->whereRaw('NOT ' . QuarantaineSite::personneSql('contacts', 'companies'));
+                });
+            };
+
+            return fn ($q) => $value ? $q->where($joignable) : $q->whereNot($joignable);
         }
 
         // Opérateurs tableau : valeur doit être un tableau, sinon condition ignorée.
@@ -1173,6 +1243,30 @@ class AudienceBuilderService
             $hasEmail = $hasContact || $hasGeneric;
 
             return $hasEmail === (bool) $value;
+        }
+        if ($field === self::CHAMP_SITE_NON_VERIFIE) {
+            return $op === 'eq' && is_bool($value)
+                && QuarantaineSite::ficheNonVerifiee($company->website_method, $company->getRawOriginal('metadata')) === $value;
+        }
+        if ($field === self::CHAMP_EMAIL_HORS_QUARANTAINE) {
+            if ($op !== 'eq' || ! is_bool($value)) {
+                return false;
+            }
+            // Miroir de `buildPositive()` (même règle : `QuarantaineSite`).
+            $nonVerifiee = QuarantaineSite::ficheNonVerifiee($company->website_method, $company->getRawOriginal('metadata'));
+            $joignable = ! empty($company->email_generic) && ! $nonVerifiee;
+            if (! $joignable) {
+                foreach ($company->contacts()->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
+                    ->whereNotNull('email')->get(['email', 'discovery_source']) as $c) {
+                    $source = is_string($c->discovery_source) ? $c->discovery_source : null;
+                    if (! QuarantaineSite::personne($nonVerifiee, $source, (string) $c->email, $company->website)) {
+                        $joignable = true;
+                        break;
+                    }
+                }
+            }
+
+            return $joignable === $value;
         }
 
         $actual = $company->{$field} ?? null;

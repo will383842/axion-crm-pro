@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Sites\SiteFiable;
 use App\Services\Email\EmailConfidenceService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,9 @@ class ScoreEmailConfidence extends Command
                 ->when($shards > 1, fn ($q) => $q->whereRaw('ct.id % ? = ?', [$shards, $shard]))
                 ->orderBy('ct.id')
                 ->limit(self::BATCH)
-                ->get(['ct.id', 'ct.email', 'co.website']);
+                ->select(['ct.id', 'ct.email', 'co.website'])
+                ->selectRaw(self::siteNonVerifieSql())
+                ->get();
 
             if ($rows->isEmpty()) {
                 break;
@@ -82,7 +85,7 @@ class ScoreEmailConfidence extends Command
             $values = [];
             $bindings = [$now];
             foreach ($rows as $row) {
-                $conf = $scorer->score((string) $row->email, $row->website !== null ? (string) $row->website : null);
+                $conf = $scorer->score((string) $row->email, self::siteDeReference($row));
                 $values[] = '(?::bigint, ?::char)';
                 $bindings[] = $row->id;
                 $bindings[] = $conf; // null autorisé (CHECK IN A/B/C ou NULL)
@@ -131,7 +134,9 @@ class ScoreEmailConfidence extends Command
                 })
                 ->orderBy('co.id')
                 ->limit(self::BATCH)
-                ->get(['co.id', 'co.email_generic', 'co.website']);
+                ->select(['co.id', 'co.email_generic', 'co.website'])
+                ->selectRaw(self::siteNonVerifieSql())
+                ->get();
 
             if ($companies->isEmpty()) {
                 break;
@@ -149,10 +154,13 @@ class ScoreEmailConfidence extends Command
             foreach ($companies as $co) {
                 $ranks = [];
                 foreach ($contactConf->get($co->id, collect()) as $c) {
-                    $ranks[] = $this->rank((string) $c->email_confidence);
+                    $rang = $this->rank((string) $c->email_confidence);
+                    // Site deviné non vérifié : un « A » écrit avant le lot N5
+                    // (domaine = site DEVINÉ) ne vaut pas mieux que B.
+                    $ranks[] = $co->site_non_verifie ? max($rang, 2) : $rang;
                 }
                 if ($co->email_generic !== null && $co->email_generic !== '') {
-                    $gc = $scorer->score((string) $co->email_generic, $co->website !== null ? (string) $co->website : null);
+                    $gc = $scorer->score((string) $co->email_generic, self::siteDeReference($co));
                     if ($gc !== null) {
                         $ranks[] = $this->rank($gc);
                     }
@@ -172,6 +180,29 @@ class ScoreEmailConfidence extends Command
         }
 
         return $processed;
+    }
+
+    /**
+     * QUARANTAINE (lot N5, `SiteFiable`) : « A » veut dire « domaine de
+     * l'adresse = site de l'entreprise ». Un site DEVINÉ non vérifié n'est pas
+     * une référence : l'adresse est notée sans site (B au mieux). Expression
+     * de la liste de sélection (la fiche est déjà jointe ou lue) : aucune
+     * condition, aucun balayage de plus. Seules les lignes que le passage
+     * écrit déjà (note NULL, ou `--refresh` demandé) en tiennent compte : rien
+     * n'est réécrit en masse.
+     */
+    private static function siteNonVerifieSql(): string
+    {
+        return 'COALESCE(' . SiteFiable::nonVerifieSql('co') . ', false) AS site_non_verifie';
+    }
+
+    private static function siteDeReference(\stdClass $ligne): ?string
+    {
+        if ($ligne->site_non_verifie || $ligne->website === null) {
+            return null;
+        }
+
+        return (string) $ligne->website;
     }
 
     /** A=1, B=2, C=3 (plus petit = meilleur). Défaut prudent (C) si inconnu. */

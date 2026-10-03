@@ -4,6 +4,7 @@ namespace App\Crm\Campagnes;
 
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Personnes\NatureEmail;
+use App\Crm\Sites\QuarantaineSite;
 use App\Support\EligibiliteCampagne;
 
 /**
@@ -33,6 +34,15 @@ use App\Support\EligibiliteCampagne;
  *                     AVANT celui-ci ; une adresse EI de provenance non
  *                     fiable est donc comptée sous sa provenance — exclue
  *                     de toute façon ;
+ *  0 bis. `site_non_verifie` l'adresse vient (ou peut venir) d'un site
+ *                     DEVINÉ et non vérifié : quarantaine du lot N5
+ *                     (`QuarantaineSite`, 03/10/2026) — jamais envoyée,
+ *                     quelle que soit sa vérification. Comme pour l'EI, le
+ *                     drapeau est posé par l'appelant sur les fiches et
+ *                     personnes qu'il a DÉJÀ lues. Hors segment presse
+ *                     seulement : la presse juge déjà la provenance
+ *                     (`AdressePresseFiable`, plus fine : une adresse de
+ *                     liste presse sur un site deviné y reste fiable) ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par
@@ -54,6 +64,8 @@ final class EligibiliteAdresse
 {
     public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
 
+    public const SITE_NON_VERIFIE = QuarantaineSite::MOTIF;
+
     public const INVALIDE = 'invalide';
 
     public const NON_VERIFIEE = 'non_verifiee';
@@ -68,7 +80,7 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::ENTREPRISE_INDIVIDUELLE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
     ];
 
@@ -86,7 +98,7 @@ final class EligibiliteAdresse
 
     /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, site_non_verifie, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
@@ -94,6 +106,11 @@ final class EligibiliteAdresse
         // la même boîte ne part pas « par » une autre fiche.
         if (self::une($occurrences, static fn (array $o): bool => ($o['entreprise_individuelle'] ?? false) === true)) {
             return self::ENTREPRISE_INDIVIDUELLE;
+        }
+        // Quarantaine (lot N5) : une seule occurrence venue d'un site deviné
+        // non vérifié suffit — on ne sait pas à qui est cette boîte.
+        if (self::une($occurrences, static fn (array $o): bool => ($o['site_non_verifie'] ?? false) === true)) {
+            return self::SITE_NON_VERIFIE;
         }
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false
             || self::une($occurrences, static fn (array $o): bool => in_array($o['status'] ?? null, ['invalid', 'disposable'], true))

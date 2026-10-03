@@ -6,10 +6,14 @@ use App\Crm\FichesProtegees;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\NomenclatureNaf;
 use App\Services\Insee\HttpInseeClient;
+use App\Services\Insee\InseeErreurHttp;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 
 /**
  * LA MISE À JOUR MENSUELLE INSEE (lot N8, 03/10/2026) —
@@ -26,34 +30,72 @@ use Illuminate\Support\Facades\DB;
  *               `prospection:collect`). Jamais par-dessus une fiche
  *               existante (`ON CONFLICT DO NOTHING`).
  *  - FERMETURE  état administratif `C` : la fiche est MARQUÉE
- *               (`insee_ferme_le`) et sort de la prospection
+ *               (`insee_ferme_le`). Elle sort de la prospection
  *               (`archived_no_email` / `entreprise_radiee`, la règle déjà
- *               respectée par le triage). Une réouverture (`A`) lève le
- *               marquage.
- *  - NON DIFFUSIBLE statut `P` ou `N` : la fiche est MARQUÉE
- *               (`insee_non_diffusible_le`), sort de la prospection
- *               (`archive_reason = non_diffusible`) et de toute campagne
- *               (motif `non_diffusible` d'`EligibiliteAdresse`). Aucun champ
- *               n'est recopié d'une unité opposée (les `[ND]`).
+ *               respectée par le triage) SEULEMENT si elle n'est pas déjà
+ *               archivée pour un autre motif : un `archive_reason` posé par
+ *               une personne ou un autre traitement (`manual`, `duplicate`,
+ *               `archived_no_email`…) n'est JAMAIS écrasé (veto sécurité
+ *               #313, bloquant 1). Une réouverture (`A`) lève le marquage et
+ *               ne remet en prospection QUE ce que l'INSEE avait archivé
+ *               (`archive_reason = entreprise_radiee`).
+ *  - NON DIFFUSIBLE statut `P` ou `N` de l'unité — ou de son siège, joint
+ *               par la passe prioritaire (`HttpInseeClient::estDiffusible`) :
+ *               la fiche est MARQUÉE (`insee_non_diffusible_le`) et sort de
+ *               toute campagne (motif `non_diffusible` d'`EligibiliteAdresse`),
+ *               de toute audience et de l'export des entreprises (filtre
+ *               sur le marquage). `archive_reason = non_diffusible` n'est posé
+ *               que si la fiche n'est pas archivée pour un motif non INSEE.
+ *               Aucun champ n'est recopié d'une unité opposée (les `[ND]`).
+ *               Le marquage est À SENS UNIQUE : une unité redevenue `O` reste
+ *               marquée — lever une opposition est une décision humaine
+ *               (avis exactitude R4, choix prudent, testé). Une unité non
+ *               diffusible ET fermée reçoit aussi `insee_ferme_le` (simple
+ *               marqueur : la fiche est déjà hors prospection).
  *  - MODIFICATION dénomination, activité (et son classement), forme
  *               juridique, tranche d'effectif (et la taille) — SAUF :
- *               une fiche PROTÉGÉE (`FichesProtegees`) n'est jamais touchée ;
- *               un champ dont `field_origins` dit autre chose que
- *               `ORIGINES_REMPLACABLES` (saisie manuelle `declared`, import
- *               de fédérations…) est gardé.
+ *               les colonnes métier d'une fiche PROTÉGÉE (`FichesProtegees`)
+ *               ne sont jamais réécrites — seuls les marqueurs
+ *               `insee_ferme_le`, `insee_non_diffusible_le` et
+ *               `insee_verifiee_le` y sont posés, décision explicite : c'est
+ *               ce qui exclut une fiche protégée opposée des campagnes
+ *               (avis exactitude R7) ; un champ dont `field_origins` dit
+ *               autre chose que `ORIGINES_REMPLACABLES` (saisie manuelle
+ *               `declared`, import de fédérations…) est gardé. Une valeur au
+ *               format inattendu (`FORMATS`) ou une dénomination trop longue
+ *               est IGNORÉE et comptée (`valeurs_rejetees`) ; une fiche dont
+ *               l'écriture échoue est ignorée et comptée (`lignes_ignorees`),
+ *               dans son propre point de sauvegarde : jamais de page
+ *               « poison » rejouée sans fin.
  *
  * RIEN N'EST JAMAIS SUPPRIMÉ : aucune ligne de ce fichier n'émet de DELETE,
  * ni ne pose `deleted_at`.
  *
  * Les fiches « non vérifiées INSEE » (`insee_verifiee_le` NULL) de
  * PROVENANCE TIERS passent EN PREMIER (`fichesPrioritaires`), par paquets
- * de SIREN, avant le flux des modifications.
+ * de SIREN, avant le flux des modifications ; le flux SAUTE les SIREN déjà
+ * traités par cette passe (sinon `--dry-run` les compterait deux fois —
+ * avis exactitude R1).
+ *
+ * GARDE-FOUS D'ÉCRITURE (avis exactitude R2, disque à ≈ 8 Go libres) : au
+ * plus `--max-modifications` écritures par passage (défaut
+ * `MAX_ECRITURES_DEFAUT`), au-delà le passage reste `en_cours` et reprendra ;
+ * une pause (`--pause-ms`) après chaque page qui a écrit, pour laisser
+ * checkpoints et autovacuum suivre.
  *
  * Traitement SÉQUENTIEL et léger (serveur à 2 CPU) : une page Sirene à la
  * fois, une requête de lecture indexée par page, une transaction par page.
  * Le curseur Sirene est mémorisé dans `insee_mises_a_jour` à chaque page :
  * une coupure, `--limite` ou la durée maximale laissent un passage
- * `en_cours`, que le passage suivant REPREND.
+ * `en_cours`, que le passage suivant REPREND. Une écriture se fait par fiche
+ * et par clé primaire (avis R8 : acceptable au débit imposé par Sirene,
+ * ≈ 28 pages par minute au plus ; un `UPDATE … FROM (VALUES …)` par page est
+ * une optimisation possible plus tard).
+ *
+ * LIMITE CONNUE (avis R5) : dans le FLUX, seul le statut de l'unité est lu —
+ * la voie `/siren` ne porte pas celui du siège. Le statut du siège
+ * (`statutDiffusionEtablissement`) est lu pour les fiches de la passe
+ * prioritaire et pour toute création (voie `/siret`).
  */
 final class MiseAJourMensuelle
 {
@@ -65,6 +107,33 @@ final class MiseAJourMensuelle
     public const MOTIF_FERMETURE = 'entreprise_radiee';
 
     public const ORIGINE = 'insee';
+
+    /**
+     * Les motifs d'archivage que CE traitement pose. Un `archive_reason`
+     * différent (`manual`, `duplicate`, `archived_no_email`…) est une
+     * décision d'une personne ou d'un autre traitement : jamais écrasé.
+     *
+     * @var list<string>
+     */
+    public const MOTIFS_INSEE = [self::MOTIF_FERMETURE, self::MOTIF_NON_DIFFUSIBLE];
+
+    /** Écritures de fiches (créations comprises), au plus, par passage. */
+    public const MAX_ECRITURES_DEFAUT = 100000;
+
+    /** Longueur maximale d'une dénomination recopiée (Sirene : 120). */
+    public const DENOMINATION_MAX = 250;
+
+    /**
+     * Le format attendu des valeurs Sirene recopiées : une autre valeur est
+     * ignorée et comptée (`valeurs_rejetees`).
+     *
+     * @var array<string, string>
+     */
+    public const FORMATS = [
+        'naf' => '/^\d{2}\.\d{2}[A-Z]$/',
+        'legal_form' => '/^\d{4}$/',
+        'effectif_range' => '/^(NN|\d{2})$/',
+    ];
 
     /**
      * Les origines (`field_origins`) qu'une donnée INSEE peut remplacer :
@@ -92,6 +161,7 @@ final class MiseAJourMensuelle
     public const COMPTEURS = [
         'creations', 'modifications', 'fermetures', 'non_diffusibles', 'reouvertures',
         'prioritaires', 'inconnues_sirene', 'unites_lues', 'pages', 'champs_preserves', 'protegees_preservees', 'hors_perimetre',
+        'archives_gardees', 'valeurs_rejetees', 'lignes_ignorees',
     ];
 
     /** @var array<string, int> */
@@ -105,6 +175,13 @@ final class MiseAJourMensuelle
     private int $limite = 0;
 
     private ?float $echeance = null;
+
+    private int $maxEcritures = self::MAX_ECRITURES_DEFAUT;
+
+    private int $pauseMs = 0;
+
+    /** @var array<string, true> SIREN déjà traités par la passe prioritaire */
+    private array $dejaTraites = [];
 
     private string $workspaceId = '';
 
@@ -145,6 +222,8 @@ final class MiseAJourMensuelle
      * @param  ?string  $depuis  AAAA-MM-JJ ; null = reprise du passage inachevé, sinon dernière exécution réussie, sinon `DEPUIS_INITIAL`
      * @param  ?callable(string): void  $journal  reçoit l'avancement (une ligne par page)
      * @param  ?list<string>  $departements  périmètre imposé (sinon : les départements présents dans l'espace)
+     * @param  int  $maxEcritures  écritures de fiches au plus par passage (0 = sans plafond)
+     * @param  int  $pauseMs  pause après chaque page qui a écrit
      * @return array{statut: string, depuis: string, reprise: bool, bilan: array<string, int>}
      */
     public function executer(
@@ -155,6 +234,8 @@ final class MiseAJourMensuelle
         int $dureeMaxMinutes = 0,
         ?callable $journal = null,
         ?array $departements = null,
+        int $maxEcritures = self::MAX_ECRITURES_DEFAUT,
+        int $pauseMs = 0,
     ): array {
         $this->workspaceId = $workspaceId;
         $this->essai = $essai;
@@ -163,6 +244,9 @@ final class MiseAJourMensuelle
         $this->bilan = array_fill_keys(self::COMPTEURS, 0);
         $this->bilanAnterieur = [];
         $this->departements = $departements;
+        $this->maxEcritures = max(0, $maxEcritures);
+        $this->pauseMs = max(0, $pauseMs);
+        $this->dejaTraites = [];
         $this->maintenant = now()->toIso8601String();
 
         return WorkspaceContext::run($workspaceId, function () use ($depuis, $journal): array {
@@ -173,7 +257,9 @@ final class MiseAJourMensuelle
             } catch (\Throwable $e) {
                 if ($passageId !== null) {
                     DB::table('insee_mises_a_jour')->where('id', $passageId)->where('workspace_id', $this->workspaceId)->update([
-                        'statut' => 'echouee', 'erreur' => mb_substr($e->getMessage(), 0, 2000),
+                        // Statut et chemin seulement (réserve sécurité 7) :
+                        // jamais un corps de réponse ni un message SQL.
+                        'statut' => 'echouee', 'erreur' => self::erreurJournalisable($e),
                         'bilan' => json_encode($this->bilanDuPassage()), 'maj_le' => now(),
                     ]);
                 }
@@ -195,6 +281,14 @@ final class MiseAJourMensuelle
                 'bilan' => $this->bilan,
             ];
         });
+    }
+
+    /** Ce que le journal garde d'une erreur : statut et chemin Sirene, sinon sa seule classe. */
+    public static function erreurJournalisable(\Throwable $e): string
+    {
+        return $e instanceof InseeErreurHttp
+            ? mb_substr($e->getMessage(), 0, 200)
+            : 'Erreur ' . class_basename($e) . ' (détail dans le journal applicatif)';
     }
 
     /**
@@ -263,6 +357,7 @@ final class MiseAJourMensuelle
 
         foreach ($this->insee->iterateModificationsDepuis($depuis, $curseur) as $page) {
             $unites = $page['unites'];
+            $ecrituresAvant = $this->ecritures();
             $reste = $this->limite > 0 ? $this->limite - $this->bilan['unites_lues'] : null;
             $partielle = $reste !== null && count($unites) > $reste;
             if ($partielle) {
@@ -273,7 +368,13 @@ final class MiseAJourMensuelle
             $aReprendre = $partielle ? $page['curseur'] : ($page['suivant'] ?? $page['curseur']);
 
             $this->transaction(function () use ($unites, $passageId, $aReprendre): void {
-                $this->traiterUnites($unites, true);
+                // R1 : une unité déjà traitée par la passe prioritaire n'est
+                // ni retraitée ni recomptée (elle compte dans les unités lues).
+                $this->bilan['unites_lues'] += count($unites);
+                $this->traiterUnites(array_values(array_filter(
+                    $unites,
+                    fn (array $u): bool => ! isset($this->dejaTraites[trim((string) ($u['siren'] ?? ''))]),
+                )), true, false);
                 $this->bilan['pages']++;
                 if ($passageId !== null) {
                     DB::table('insee_mises_a_jour')->where('id', $passageId)->where('workspace_id', $this->workspaceId)->update([
@@ -299,6 +400,11 @@ final class MiseAJourMensuelle
             }
             if ($partielle || $this->arret()) {
                 return false;
+            }
+            // R2 : laisser checkpoints et autovacuum suivre après une page
+            // qui a écrit (jamais en essai à blanc, rien n'est écrit).
+            if (! $this->essai && $this->pauseMs > 0 && $this->ecritures() > $ecrituresAvant) {
+                Sleep::usleep($this->pauseMs * 1000);
             }
         }
 
@@ -339,7 +445,10 @@ final class MiseAJourMensuelle
         $sirens = self::fichesPrioritaires($this->workspaceId, $depuis, $nombre);
 
         foreach (array_chunk($sirens, HttpInseeClient::PAR_REQUETE) as $paquet) {
-            $unites = $this->insee->unitesParSiren($paquet);
+            $unites = $this->avecDiffusionDuSiege($this->insee->unitesParSiren($paquet));
+            foreach ($paquet as $siren) {
+                $this->dejaTraites[$siren] = true;
+            }
             $this->transaction(function () use ($unites, $paquet, $depuis): void {
                 $this->traiterUnites($unites, false);
                 $this->bilan['prioritaires'] += count($paquet);
@@ -370,6 +479,48 @@ final class MiseAJourMensuelle
     }
 
     /**
+     * Joint à chaque unité diffusible le statut de diffusion de son SIÈGE
+     * (`statutDiffusionEtablissement`, voie `/siret`) : l'opposition vaut aussi
+     * au niveau établissement (C19-010 ; relecture #313, réserve 6). Une
+     * requête par paquet de 100 — seulement pour la passe prioritaire.
+     *
+     * @param  list<array<string, mixed>>  $unites
+     * @return list<array<string, mixed>>
+     */
+    private function avecDiffusionDuSiege(array $unites): array
+    {
+        $sirets = [];
+        foreach ($unites as $u) {
+            $p = is_array($u['periodesUniteLegale'][0] ?? null) ? $u['periodesUniteLegale'][0] : [];
+            $nic = (string) ($p['nicSiegeUniteLegale'] ?? '');
+            $siren = trim((string) ($u['siren'] ?? ''));
+            if (HttpInseeClient::estDiffusible($u) && preg_match('/^\d{9}$/', $siren) === 1 && preg_match('/^\d{5}$/', $nic) === 1) {
+                $sirets[$siren] = $siren . $nic;
+            }
+        }
+        if ($sirets === []) {
+            return $unites;
+        }
+        $sieges = $this->insee->etablissementsParSiret(array_values($sirets));
+        foreach ($unites as $i => $u) {
+            $siret = $sirets[trim((string) ($u['siren'] ?? ''))] ?? null;
+            $statut = $siret !== null ? ($sieges[$siret]['statutDiffusionEtablissement'] ?? null) : null;
+            if (is_string($statut)) {
+                $unites[$i]['statutDiffusionEtablissement'] = $statut;
+            }
+        }
+
+        return $unites;
+    }
+
+    /** Les écritures de fiches de ce lancement (plafond R2). */
+    private function ecritures(): int
+    {
+        return $this->bilan['creations'] + $this->bilan['modifications'] + $this->bilan['fermetures']
+            + $this->bilan['non_diffusibles'] + $this->bilan['reouvertures'];
+    }
+
+    /**
      * Le bilan à journaliser : celui de ce lancement, ajouté à celui déjà
      * journalisé quand le passage est repris.
      *
@@ -388,6 +539,7 @@ final class MiseAJourMensuelle
     private function arret(): bool
     {
         return ($this->limite > 0 && $this->bilan['unites_lues'] >= $this->limite)
+            || ($this->maxEcritures > 0 && $this->ecritures() >= $this->maxEcritures)
             || ($this->echeance !== null && microtime(true) >= $this->echeance);
     }
 
@@ -408,16 +560,20 @@ final class MiseAJourMensuelle
      *
      * @param  list<array<string, mixed>>  $unites
      */
-    private function traiterUnites(array $unites, bool $avecCreations): void
+    private function traiterUnites(array $unites, bool $avecCreations, bool $compter = true): void
     {
         $parSiren = [];
         foreach ($unites as $u) {
-            $siren = trim((string) ($u['siren'] ?? ''));
+            $siren = is_scalar($u['siren'] ?? null) ? trim((string) $u['siren']) : '';
             if (preg_match('/^\d{9}$/', $siren) === 1) {
                 $parSiren[$siren] = $u;
+            } else {
+                $this->bilan['lignes_ignorees']++;
             }
         }
-        $this->bilan['unites_lues'] += count($unites);
+        if ($compter) {
+            $this->bilan['unites_lues'] += count($unites);
+        }
         if ($parSiren === []) {
             return;
         }
@@ -436,7 +592,7 @@ final class MiseAJourMensuelle
         foreach ($fiches as $f) {
             $siren = trim((string) $f->siren);
             $connues[$siren] = true;
-            $this->traiterFiche($f, $parSiren[$siren], isset($protegees[(int) $f->id]));
+            $this->traiterFicheSure($f, $parSiren[$siren], isset($protegees[(int) $f->id]));
         }
 
         if ($avecCreations) {
@@ -468,51 +624,86 @@ final class MiseAJourMensuelle
     }
 
     /**
+     * Une fiche, isolée : une donnée Sirene inattendue ou une écriture refusée
+     * est ignorée et comptée, dans son propre point de sauvegarde — jamais de
+     * page « poison » rejouée sans fin (relecture sécurité #313, réserve 4).
+     *
+     * @param  array<string, mixed>  $u
+     */
+    private function traiterFicheSure(\stdClass $f, array $u, bool $protegee): void
+    {
+        $bilan = $this->bilan;
+        try {
+            $this->traiterFiche($f, $u, $protegee);
+        } catch (QueryException|\TypeError|\ValueError|\JsonException $e) {
+            $this->bilan = $bilan;
+            $this->bilan['lignes_ignorees']++;
+            Log::warning('[INSEE] mise à jour mensuelle : fiche ignorée', [
+                'company_id' => (int) $f->id, 'erreur' => class_basename($e),
+            ]);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $u
      */
     private function traiterFiche(\stdClass $f, array $u, bool $protegee): void
     {
         $p = is_array($u['periodesUniteLegale'][0] ?? null) ? $u['periodesUniteLegale'][0] : [];
-        $diffusible = ($u['statutDiffusionUniteLegale'] ?? 'O') === 'O';
+        // Unité ET, quand il est joint, siège (réserve sécurité 6).
+        $diffusible = HttpInseeClient::estDiffusible($u);
         $etat = $p['etatAdministratifUniteLegale'] ?? $u['etatAdministratifUniteLegale'] ?? null;
         $aujourdhui = CarbonImmutable::parse((string) $this->maintenant)->setTimezone(self::FUSEAU)->toDateString();
         $hors = $protegee || $f->deleted_at !== null;
+        $motif = is_string($f->archive_reason ?? null) && $f->archive_reason !== '' ? $f->archive_reason : null;
         $maj = [];
 
-        if (! $diffusible) {
-            // Opposée à la diffusion : MARQUÉE et sortie de la prospection.
-            // Aucun champ n'est lu dans une unité masquée « [ND] ».
-            if ($f->insee_non_diffusible_le === null) {
-                $maj['insee_non_diffusible_le'] = $aujourdhui;
-                $this->bilan['non_diffusibles']++;
-                if (! $hors) {
-                    $maj['prospection_status'] = 'archived_no_email';
-                    $maj['archive_reason'] = self::MOTIF_NON_DIFFUSIBLE;
-                }
+        if (! $diffusible && $f->insee_non_diffusible_le === null) {
+            // Opposée à la diffusion : MARQUÉE (c'est le marquage qui l'exclut
+            // des campagnes, des audiences et de l'export, protégée ou non).
+            // Le motif d'archivage n'est posé que sur une fiche qui n'est pas
+            // archivée pour un motif NON INSEE (bloquant 1). Aucun champ n'est
+            // lu dans une unité masquée « [ND] ».
+            $maj['insee_non_diffusible_le'] = $aujourdhui;
+            $this->bilan['non_diffusibles']++;
+            if (! $hors && ($motif === null || in_array($motif, self::MOTIFS_INSEE, true))) {
+                $maj['prospection_status'] = 'archived_no_email';
+                $maj['archive_reason'] = self::MOTIF_NON_DIFFUSIBLE;
+            } elseif (! $hors) {
+                $this->bilan['archives_gardees']++;
             }
-        } elseif ($etat === 'C') {
-            // Fermée : MARQUÉE et sortie de la prospection ; ses champs sont
-            // figés à la fermeture.
+        }
+
+        if ($etat === 'C') {
+            // Fermée : MARQUÉE ; sortie de la prospection seulement si rien
+            // d'autre ne l'archive déjà (bloquant 1) ; champs figés.
             if ($f->insee_ferme_le === null) {
                 $debut = is_string($p['dateDebut'] ?? null) && HttpInseeClient::estDateIso($p['dateDebut']) ? $p['dateDebut'] : $aujourdhui;
                 $maj['insee_ferme_le'] = $debut;
                 $this->bilan['fermetures']++;
-                if (! $hors && $f->archive_reason !== self::MOTIF_NON_DIFFUSIBLE) {
+                $motifCourant = $maj['archive_reason'] ?? $motif;
+                if (! $hors && ($motifCourant === null || $motifCourant === self::MOTIF_FERMETURE)) {
                     $maj['prospection_status'] = 'archived_no_email';
                     $maj['archive_reason'] = self::MOTIF_FERMETURE;
+                } elseif (! $hors && $motifCourant !== self::MOTIF_NON_DIFFUSIBLE) {
+                    $this->bilan['archives_gardees']++;
                 }
             }
         } else {
             if ($etat === 'A' && $f->insee_ferme_le !== null) {
-                // Réouverte : le marquage est levé, la prospection reprend.
+                // Réouverte : le marquage est levé. Ne revient en prospection
+                // QUE ce que la fermeture INSEE avait archivé : un motif posé
+                // par une personne (`manual`, `duplicate`…) reste.
                 $maj['insee_ferme_le'] = null;
                 $this->bilan['reouvertures']++;
-                if (! $hors && $f->archive_reason === self::MOTIF_FERMETURE) {
+                if (! $hors && $motif === self::MOTIF_FERMETURE && ! isset($maj['archive_reason'])) {
                     $maj['prospection_status'] = 'pending';
                     $maj['archive_reason'] = null;
                 }
             }
-            if ($protegee) {
+            if (! $diffusible) {
+                // Rien n'est recopié d'une unité opposée.
+            } elseif ($protegee) {
                 $this->bilan['protegees_preservees']++;
             } elseif ($f->deleted_at === null) {
                 $champs = $this->champsAMettreAJour($f, $u, $p);
@@ -536,7 +727,9 @@ final class MiseAJourMensuelle
             $maj['updated_at'] = now();
         }
         $maj['insee_verifiee_le'] = $this->maintenant;
-        DB::table('companies')->where('id', $f->id)->where('workspace_id', $this->workspaceId)->update($maj);
+        // Point de sauvegarde propre à la fiche : une écriture refusée ne
+        // fait pas échouer la page (`traiterFicheSure`).
+        DB::transaction(fn () => DB::table('companies')->where('id', $f->id)->where('workspace_id', $this->workspaceId)->update($maj));
     }
 
     /**
@@ -568,6 +761,14 @@ final class MiseAJourMensuelle
                 continue;
             }
             $valeur = trim($valeur);
+            // Réserve sécurité 4 : une valeur au format inattendu (ou une
+            // dénomination démesurée, ou de l'UTF-8 invalide) est IGNORÉE et
+            // comptée — la fiche garde sa valeur, la page continue.
+            if (! self::valeurValide($colonne, $valeur)) {
+                $this->bilan['valeurs_rejetees']++;
+
+                continue;
+            }
             if ($valeur === trim((string) ($f->{$colonne} ?? ''))) {
                 continue;
             }
@@ -604,6 +805,19 @@ final class MiseAJourMensuelle
         }
 
         return $maj;
+    }
+
+    /** Le format attendu d'une valeur Sirene avant recopie (`FORMATS`, `DENOMINATION_MAX`). */
+    public static function valeurValide(string $colonne, string $valeur): bool
+    {
+        if (! mb_check_encoding($valeur, 'UTF-8')) {
+            return false;
+        }
+        if ($colonne === 'denomination') {
+            return mb_strlen($valeur) <= self::DENOMINATION_MAX && preg_match('/[\x00-\x1F\x7F]/', $valeur) !== 1;
+        }
+
+        return ! isset(self::FORMATS[$colonne]) || preg_match(self::FORMATS[$colonne], $valeur) === 1;
     }
 
     /** @param  array<array-key, mixed>  $origines */
@@ -667,14 +881,35 @@ final class MiseAJourMensuelle
         }
 
         // Jamais par-dessus une fiche existante, même à la corbeille.
-        $this->bilan['creations'] += $this->essai ? count($lignes) : DB::table('companies')->insertOrIgnore($lignes);
+        if ($this->essai) {
+            $this->bilan['creations'] += count($lignes);
+
+            return;
+        }
+        try {
+            $this->bilan['creations'] += DB::transaction(fn (): int => DB::table('companies')->insertOrIgnore($lignes));
+        } catch (QueryException) {
+            // Une ligne refusée ne fait pas échouer la page (réserve 4) : on
+            // réessaie ligne par ligne, chacune dans son point de sauvegarde.
+            foreach ($lignes as $ligne) {
+                try {
+                    $this->bilan['creations'] += DB::transaction(fn (): int => DB::table('companies')->insertOrIgnore([$ligne]));
+                } catch (QueryException) {
+                    $this->bilan['lignes_ignorees']++;
+                }
+            }
+        }
     }
 
     /**
-     * Le périmètre géographique : les départements déjà présents dans
-     * l'espace (celui de l'import initial). Parcours « en saut » de
+     * Le périmètre géographique : les départements de l'IMPORT INSEE déjà
+     * présents dans l'espace (`discovery_source = 'insee'`) — une fiche de
+     * provenance tierce (fédérations, annuaires…) n'ouvre JAMAIS un
+     * département aux créations (avis exactitude R3). Parcours « en saut » de
      * `idx_companies_dept` (`workspace_id, department_code`) : une sonde
-     * d'index par département, jamais les 4,35 M de lignes.
+     * d'index par département, jamais les 4,35 M de lignes ; les fiches
+     * INSEE étant l'immense majorité, la première d'un département est
+     * trouvée en quelques lignes.
      *
      * @return list<string>
      */
@@ -686,16 +921,17 @@ final class MiseAJourMensuelle
         $lignes = DB::select(
             'WITH RECURSIVE d AS (
                 (SELECT department_code FROM companies
-                  WHERE workspace_id = ? AND department_code IS NOT NULL
+                  WHERE workspace_id = ? AND department_code IS NOT NULL AND discovery_source = ?
                   ORDER BY department_code LIMIT 1)
                 UNION ALL
                 SELECT (SELECT c.department_code FROM companies c
                          WHERE c.workspace_id = ? AND c.department_code > d.department_code
+                           AND c.discovery_source = ?
                          ORDER BY c.department_code LIMIT 1)
                   FROM d WHERE d.department_code IS NOT NULL
             )
             SELECT department_code FROM d WHERE department_code IS NOT NULL',
-            [$this->workspaceId, $this->workspaceId],
+            [$this->workspaceId, self::ORIGINE, $this->workspaceId, self::ORIGINE],
         );
 
         return $this->departements = array_values(array_map(static fn ($l): string => (string) $l->department_code, $lignes));

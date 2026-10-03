@@ -26,6 +26,14 @@ use Illuminate\Console\Command;
  * Planifiée dans `routes/console.php` (mensuelle, mardi→samedi, jamais les
  * 1er/2/3, 08:00-19:00 heure de Paris, sans chevauchement).
  *
+ * MISE EN PRODUCTION (avis exactitude R2) : lancer D'ABORD, à la main,
+ *   php artisan crm:insee:mise-a-jour-mensuelle --dry-run --duree-max=0
+ * pour connaître le volume du rattrapage initial (créations, modifications,
+ * fermetures), puis seulement laisser la planification s'en charger. Le
+ * plafond `--max-modifications` (défaut 100 000 écritures par passage) et la
+ * pause entre pages qui écrivent (`--pause-ms`) bornent le WAL et le
+ * gonflement des tables ; un passage plafonné reste `en_cours` et reprend.
+ *
  * RIEN N'EST JAMAIS SUPPRIMÉ.
  */
 class CrmInseeMiseAJourMensuelle extends Command
@@ -39,7 +47,9 @@ class CrmInseeMiseAJourMensuelle extends Command
         . ' {--duree-max=300 : durée maximale en minutes (0 = sans limite) ; le passage reprendra ensuite}'
         . ' {--workspace= : identifiant ou slug de l espace (défaut : l espace de prospection)}'
         . ' {--departements= : périmètre imposé, ex. 38,69 (défaut : les départements déjà présents dans l espace)}'
-        . ' {--delai-ms=2100 : délai minimal entre deux requêtes Sirene (2100 ≈ 30/min, plan public)}';
+        . ' {--delai-ms=2100 : délai minimal entre deux requêtes Sirene (2100 ≈ 30/min, plan public)}'
+        . ' {--max-modifications=' . MiseAJourMensuelle::MAX_ECRITURES_DEFAUT . ' : écritures de fiches au plus par passage (0 = sans plafond) ; le passage reprendra ensuite}'
+        . ' {--pause-ms=500 : pause après chaque page Sirene qui a écrit (checkpoints, autovacuum)}';
 
     protected $description = 'Met à jour les fiches depuis les modifications Sirene (créations, fermetures, non diffusibles, champs) — ne supprime rien.';
 
@@ -84,6 +94,8 @@ class CrmInseeMiseAJourMensuelle extends Command
             (int) $this->option('duree-max'),
             fn (string $ligne) => $this->line($ligne),
             $departements,
+            (int) $this->option('max-modifications'),
+            (int) $this->option('pause-ms'),
         );
 
         $b = $resultat['bilan'];
@@ -100,7 +112,7 @@ class CrmInseeMiseAJourMensuelle extends Command
         $this->line(sprintf('  non diffusibles : %d', $b['non_diffusibles']));
         $this->line(sprintf('  réouvertures : %d', $b['reouvertures']));
         $this->line(sprintf(
-            '  (unités lues : %d · pages : %d · fiches tiers prioritaires : %d dont %d inconnues de Sirene · champs gardés (saisie/origine) : %d · fiches protégées gardées : %d · hors périmètre : %d)',
+            '  (unités lues : %d · pages : %d · fiches tiers prioritaires : %d dont %d inconnues de Sirene · champs gardés (saisie/origine) : %d · fiches protégées gardées : %d · hors périmètre : %d · archivages d un autre motif gardés : %d · valeurs Sirene rejetées (format) : %d · lignes ignorées : %d)',
             $b['unites_lues'],
             $b['pages'],
             $b['prioritaires'],
@@ -108,9 +120,12 @@ class CrmInseeMiseAJourMensuelle extends Command
             $b['champs_preserves'],
             $b['protegees_preservees'],
             $b['hors_perimetre'],
+            $b['archives_gardees'],
+            $b['valeurs_rejetees'],
+            $b['lignes_ignorees'],
         ));
         if ($resultat['statut'] !== 'reussie') {
-            $this->warn('Passage INACHEVÉ (limite ou durée atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
+            $this->warn('Passage INACHEVÉ (limite, plafond d écritures ou durée atteinte) : le curseur est mémorisé, le prochain passage reprendra.');
         }
 
         return self::SUCCESS;

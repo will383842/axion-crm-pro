@@ -98,7 +98,7 @@ annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 
 ---
 
-## Glossaire (54 termes)
+## Glossaire (56 termes)
 
 ### Métier
 
@@ -107,6 +107,8 @@ annonçait « ~22 000 lignes estimé » — une estimation, jamais remesurée.
 - **Cabinet IA opérationnel** — Naming canonique d'Axion-IA (FR) / *operational AI consultancy* (EN). Jamais « agence/studio/atelier ».
 - **Offre Axion-IA** — Catalogue de prestations : *Audit Flash*, *Audit Ciblé* (Essentielle 490/790/1190 €, Approfondie 890/1390/1990 €), *Mission PME*, *Mission ETI*, *Grand programme*. Voir `pricing.ts` SSOT côté Axion-IA.
 - **Prospect chaud / tiède / froid / gelé** — Catégorisation contact pour priorisation outreach.
+- **Provenance tiers** — Personne apportée par un tiers du futur canal Axion Partners. Vocabulaire EXACT du contrat : `apporteur`, `commercial`, `societe` (`Taxonomy::FIELD_ORIGINS_TIERS`, table `contacts_provenances_tiers`). Lecture réservée au rôle owner. Exclue des campagnes et des exports tant que `information_tiers_version` (texte de version de l'information art. 14 reçu du tiers, stocké tel quel, ex. `information-article-14/v5`) n'est pas ≥ v5 ; tout autre format vaut « inconnue ». Les personnes apportées sont acquises par Axion-IA : ni échéance ni archivage. Rien ne supprime une provenance (clés étrangères en RESTRICT, rôle applicatif sans DELETE) ; la personne concernée la retrouve dans son export art. 15.
+- **Dernier échange à l'initiative** — `contacts.dernier_echange_initiative_at` : date du dernier geste fait par la personne elle-même (formulaire, demande du guide, rendez-vous, réponse — `Taxonomy::ACTIVITY_KINDS_INITIATIVE_PERSONNE`).
 
 ### Cibles
 

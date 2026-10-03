@@ -10,6 +10,9 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Evenements\EvenementAVenir;
 use App\Crm\Federations\EtiquettesFederation;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
+use App\Crm\Sites\QuarantaineSite;
+use App\Crm\Sites\SiteFiable;
 use App\Crm\Taxonomy;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -102,6 +105,8 @@ class CrmCampagneDestinataires extends Command
     private const COMPTEURS_MOTIFS = [
         EligibiliteAdresse::NON_DIFFUSIBLE => 'ecartees_non_diffusibles',
         EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
+        EligibiliteAdresse::SITE_NON_VERIFIE => 'ecartees_site_non_verifie',
+        EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE => 'ecartees_information_tiers',
         EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
         EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
         EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
@@ -158,7 +163,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_individuelle', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -358,10 +363,13 @@ class CrmCampagneDestinataires extends Command
             ->orderBy('companies.id')
             ->select([
                 'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
-                'companies.legal_form', 'companies.insee_non_diffusible_le',
+                'companies.legal_form', 'companies.website', 'companies.insee_non_diffusible_le',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
             ])
+            // Quarantaine (lot N5, `QuarantaineSite`) : une expression de la
+            // liste de sélection sur les fiches du segment, pas une condition.
+            ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
             // Segment presse : ce qui juge la provenance des adresses de la
             // fiche (`AdressePresseFiable`), et le « média possible ».
             ->when($presse, static fn ($q) => $q->selectRaw(
@@ -422,6 +430,10 @@ class CrmCampagneDestinataires extends Command
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($org->legal_form ?? null);
         // Lot N8 : fiche marquée « non diffusible » par la mise à jour INSEE.
         $nd = ($org->insee_non_diffusible_le ?? null) !== null;
+        // Quarantaine (lot N5) : hors presse — le segment presse juge déjà la
+        // provenance (`AdressePresseFiable`).
+        $nonVerifiee = ! $presse && (bool) ($org->site_non_verifie ?? false);
+        $site = is_string($org->website ?? null) ? $org->website : null;
         $fiche = $presse ? [
             'site_devine' => (bool) $org->site_devine,
             'site_verifie' => (bool) $org->site_verifie,
@@ -446,6 +458,9 @@ class CrmCampagneDestinataires extends Command
                 'deja_informe' => $org->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
                 'non_diffusible' => $nd,
+                'site_non_verifie' => $nonVerifiee,
+                // Une boîte d'organisation n'est pas une personne apportée.
+                'information_tiers_insuffisante' => false,
             ];
         }
 
@@ -463,7 +478,10 @@ class CrmCampagneDestinataires extends Command
             // même règle que l'audience presse (relecture A09).
             ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
             ->orderBy('id')
-            ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at'])
+            ->select(['id', 'email', 'first_name', 'last_name', 'role', 'email_status', 'metadata', 'first_info_at', 'discovery_source'])
+            // Personne apportée par un tiers sans information suffisante
+            // (`EligibiliteAdresse`, motif 0 bis).
+            ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
             ->when($presse, static fn ($q) => $q->selectRaw(
                 GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
                 // Le journaliste source opposé ou à la corbeille : l'adresse ne part pas.
@@ -494,6 +512,13 @@ class CrmCampagneDestinataires extends Command
                 'deja_informe' => $c->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
                 'non_diffusible' => $nd,
+                'site_non_verifie' => QuarantaineSite::personne(
+                    $nonVerifiee,
+                    is_string($c->discovery_source ?? null) ? $c->discovery_source : null,
+                    (string) $c->email,
+                    $site,
+                ),
+                'information_tiers_insuffisante' => (bool) $c->information_tiers_insuffisante,
             ];
         }
 

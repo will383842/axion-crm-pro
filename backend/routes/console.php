@@ -10,6 +10,7 @@ use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Insee\MiseAJourMensuelle;
+use App\Support\BattementPlanificateur;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -507,3 +508,12 @@ Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-ma
     ->onFailure(function (): void {
         Log::error('[INSEE] crm:insee:mise-a-jour-mensuelle est sortie en échec — le passage reste « echouee » dans insee_mises_a_jour, avec son curseur : relancer la commande le reprend.');
     });
+
+// Avis #308, réserve 5 — BATTEMENT DU PLANIFICATEUR. Chaque minute, un
+// horodatage posé en cache (en processus : ni sous-processus artisan, ni
+// requête SQL, ni verrou) ; `crm:canaux:etat` lève `planificateur_arrete`
+// s'il a plus de 15 minutes. Sans lui, un conteneur `scheduler` mort fait
+// taire toutes les tâches planifiées sans qu'aucune ne le dise.
+Schedule::call(static fn () => BattementPlanificateur::battre())
+    ->name(BattementPlanificateur::NOM_TACHE)
+    ->everyMinute();

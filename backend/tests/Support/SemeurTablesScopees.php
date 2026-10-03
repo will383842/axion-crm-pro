@@ -89,6 +89,9 @@ final class SemeurTablesScopees
         'business_events',
         'candidate_tag',
         'company_tag',
+        // 2026-10-03 (N12) : provenance tiers d'une personne — feuille de
+        // `contacts`.
+        'contacts_provenances_tiers',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -117,6 +120,8 @@ final class SemeurTablesScopees
         'linkedin_messages',
         'linkedin_profiles_cache',
         'linkedin_sequences',
+        // 2026-10-03 : le curseur persistant d'un traitement par lots (lot N6).
+        'curseurs_traitements',
         // 2026-09-30 : l'appartenance d'une fiche à une liste manuelle.
         'listes_manuelles_membres',
         'llm_usage',
@@ -397,10 +402,22 @@ final class SemeurTablesScopees
             'contact_id' => $id['contacts'],
         ]);
 
+        $inserer('contacts_provenances_tiers', [
+            'contact_id' => $id['contacts'],
+            'origine' => 'apporteur',
+            'reference_externe' => 'zz-etancheite',
+            'information_tiers_version' => 'information-article-14/v5',
+        ]);
+
         $inserer('listes_manuelles_membres', [
             'liste_id' => $id['listes_manuelles'],
             'company_id' => $id['companies'],
             'origine' => 'coche',
+        ]);
+
+        $inserer('curseurs_traitements', [
+            'traitement' => 'zz:etancheite',
+            'dernier_id' => 1,
         ]);
 
         $inserer('business_events', [

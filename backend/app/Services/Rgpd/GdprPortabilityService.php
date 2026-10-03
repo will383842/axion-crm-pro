@@ -65,6 +65,17 @@ class GdprPortabilityService
             'subject' => $email,
             'exported' => now()->toIso8601String(),
             'contacts' => DB::table('contacts')->where('email', $email)->get()->toArray(),
+            // N12 (03/10/2026) — D'OÙ VIENNENT SES DONNÉES (art. 15.1.g) : la
+            // personne apportée par un tiers a le droit de connaître la
+            // source. La réserve « lecture owner » vaut contre les comptes du
+            // CRM, jamais contre elle. Origine, version de l'information
+            // reçue et date de réception ; pas la référence opaque du tiers
+            // (son identifiant interne, qui ne lui apprend rien).
+            'provenances_tiers' => DB::table('contacts_provenances_tiers')
+                ->whereIn('contact_id', DB::table('contacts')->where('email', $email)->select('id'))
+                ->orderBy('id')
+                ->get(['origine', 'information_tiers_version', 'recu_le'])
+                ->toArray(),
             'candidates' => DB::table('candidates')->where('email', $email)->get()->toArray(),
             // 2026-09-29 (PR #255) : l'effacement atteint désormais les fiches
             // d'ORGANISATION qui portent l'adresse (e-mail générique, canaux) ;

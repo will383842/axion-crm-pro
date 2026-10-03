@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
+use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
 use App\Http\Controllers\Api\EvenementsController;
@@ -48,10 +49,12 @@ use App\Http\Controllers\Api\ScrapingCampaignsController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Http\Controllers\Internal\PartnersPingController;
 use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
 use App\Http\Controllers\Internal\ZeptoMailWebhookController;
+use App\Http\Middleware\VerificateurCanalPartners;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -504,6 +507,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('crm-console')->prefix('crm')->group(function () {
             Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
             Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
+            // N12 (03/10/2026) — provenance tiers d'une personne : rôle owner
+            // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
+            Route::get('/contacts/{contactId}/provenances-tiers', [ProvenancesTiersController::class, 'index'])
+                ->whereNumber('contactId');
 
             Route::get('/candidates', [CandidatesController::class, 'index']);
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);
@@ -612,4 +619,18 @@ Route::prefix('internal')->group(function () {
     Route::post('/email/zeptomail', [ZeptoMailWebhookController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.email.zeptomail');
+
+    // Lot N11 — SOCLE du futur canal Axion Partners, FERMÉ par défaut
+    // (`CRM_PARTNERS_MODE=off` → le 404 d'une route absente). Une seule route,
+    // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`, sur
+    // « horodatage.MÉTHODE chemin.Idempotency-Key.corps », signature v2),
+    // corps borné à 256 Kio, anti-rejeu, idempotente ; elle
+    // n'écrit que sa ligne d'idempotence. AUCUNE route métier tant que le
+    // contrat n'est pas figé. ⛔ Jamais comme sonde de supervision.
+    // Le tri de priorité de Laravel 12 place le limiteur AVANT le
+    // vérificateur : `throttle:partners` ne limite donc RIEN en `off`
+    // (`RouteServiceProvider`), pour ne poser ni `X-RateLimit-*` ni 429.
+    Route::post('/partners/v1/ping', PartnersPingController::class)
+        ->middleware(['throttle:partners', VerificateurCanalPartners::class])
+        ->name('internal.partners.ping');
 });

@@ -118,6 +118,8 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     socleExpectCheck('abonnements_canal_check', Taxonomy::ABONNEMENT_CANAUX);
     socleExpectCheck('abonnements_statut_check', Taxonomy::ABONNEMENT_STATUTS);
     socleExpectCheck('abonnements_legal_basis_check', Taxonomy::ABONNEMENT_LEGAL_BASES);
+    // N12 (03/10/2026) : le vocabulaire du contrat Axion Partners.
+    socleExpectCheck('contacts_provenances_tiers_origine_check', Taxonomy::FIELD_ORIGINS_TIERS);
     // Base presse (2026-08-25). `acces` commande QUI peut recevoir un mailing :
     // une divergence entre le code et le CHECK laisserait passer une porte
     // d'accès que la règle d'envoi ne connaît pas.

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToWorkspace;
+use App\Models\Concerns\MasqueProvenanceTiers;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,12 +40,16 @@ use Illuminate\Support\Carbon;
  * @property ?string $consent_version
  * @property ?Carbon $consent_at
  * @property ?string $consent_text_ref
+ *
+ * N14 réduit (migration 2026_10_03_000080) :
+ * @property ?string $dernier_echange_initiative_at
  * @property-read ?Company $company
  */
 class Contact extends Model
 {
     use BelongsToWorkspace;
     use HasFactory;
+    use MasqueProvenanceTiers;
 
     /**
      * 🔴 B10-016 — meme ecart que sur `Company`. La colonne existe (migration

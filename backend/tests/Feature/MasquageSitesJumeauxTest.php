@@ -585,6 +585,8 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         'federation' => $this->companyId,
         // 2026-09-30 : la liste manuelle et ses membres.
         'liste' => $this->listeId,
+        // 2026-10-03 (N12) : la provenance tiers d'une personne (owner seul).
+        'contactId' => $this->contactId,
     ];
 
     $cibles = [];

@@ -6,6 +6,9 @@ use App\Crm\Doublons\AdressesPartagees;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Emails\VerificationEmail;
 use App\Crm\Listes\ListesManuelles;
+use App\Crm\ProvenanceTiers\ProvenanceTiers;
+use App\Crm\Sites\QuarantaineSite;
+use App\Crm\Sites\SiteFiable;
 use App\Models\Company;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Audiences\CritereAudienceInvalide;
@@ -32,7 +35,7 @@ use RuntimeException;
  *     dans une liste manuelle ;
  *  3. chaque adresse est jugée UNE fois, sur toutes ses occurrences, par la
  *     règle de #253 (`EligibiliteAdresse` : entreprise individuelle,
- *     invalide, non vérifiée valide,
+ *     adresse en quarantaine d'un site non vérifié (lot N5), invalide, non vérifiée valide,
  *     personnelle, opposition/suppression via
  *     `EligibiliteCampagne::peutRecevoir`), puis par `AdressesPartagees`
  *     (cabinet, domiciliation — #260) ;
@@ -53,7 +56,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -113,7 +116,11 @@ final class ResolveurDestinataires
         /** @var array<string, list<Candidat>> $occurrences */
         $occurrences = [];
 
-        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form', 'companies.insee_non_diffusible_le'])
+        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form', 'companies.website', 'companies.insee_non_diffusible_le'])
+            // Quarantaine (lot N5) : calculée sur les fiches DÉJÀ retenues par
+            // l'audience — une expression de la liste de sélection, pas une
+            // condition : aucun balayage de plus sur `companies`.
+            ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
             ->when($presse, static fn ($q) => $q->selectRaw(
                 AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
                 . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie',
@@ -140,7 +147,10 @@ final class ResolveurDestinataires
                     ->when(! $presse, static fn ($q) => $q->whereRaw(GardePresse::conditionContactsSql('contacts')))
                     ->when($presse, static fn ($q) => $q->whereRaw(GardePresse::estContactPresseSql('contacts')))
                     ->orderBy('id')
-                    ->select(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at'])
+                    ->select(['id', 'company_id', 'email', 'role', 'email_status', 'metadata', 'first_info_at', 'discovery_source'])
+                    // Personne apportée par un tiers sans information
+                    // suffisante (`EligibiliteAdresse`, motif 0 bis).
+                    ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
                     ->when($presse, static fn ($q) => $q->selectRaw(
                         GardePresse::estContactPresseSql('contacts') . ' AS est_presse, '
                         . AdressePresseFiable::journalisteRetireSql('contacts') . ' AS journaliste_retire',
@@ -356,6 +366,10 @@ final class ResolveurDestinataires
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($fiche['legal_form'] ?? null);
         // Lot N8 : fiche marquée « non diffusible » par la mise à jour INSEE.
         $nd = ($fiche['insee_non_diffusible_le'] ?? null) !== null;
+        // Quarantaine (lot N5, `QuarantaineSite`) : hors presse seulement —
+        // une audience presse juge déjà la provenance (`AdressePresseFiable`).
+        $nonVerifiee = ! $presse && (bool) ($fiche['site_non_verifie'] ?? false);
+        $site = is_string($fiche['website'] ?? null) ? $fiche['website'] : null;
         $candidats = [];
         $vues = [];
 
@@ -365,7 +379,8 @@ final class ResolveurDestinataires
             $candidats[] = [
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'ecartee' => null,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
+                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -410,7 +425,8 @@ final class ResolveurDestinataires
                 'email' => $e, 'classe' => $classe === self::INCONNUE ? self::NOMINATIVE : $classe,
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'ecartee' => $ecartee,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
+                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
             ];
         }
 
@@ -436,6 +452,13 @@ final class ResolveurDestinataires
                 'deja_informe' => ($c->first_info_at ?? null) !== null,
                 'entreprise_individuelle' => $ei,
                 'non_diffusible' => $nd,
+                'site_non_verifie' => QuarantaineSite::personne(
+                    $nonVerifiee,
+                    is_string($c->discovery_source ?? null) ? $c->discovery_source : null,
+                    $e,
+                    $site,
+                ),
+                'information_tiers_insuffisante' => (bool) ($c->information_tiers_insuffisante ?? false),
                 'ecartee' => $ecartee,
             ];
         }

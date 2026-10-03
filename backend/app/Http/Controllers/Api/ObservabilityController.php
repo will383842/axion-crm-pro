@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\ResumeObservabiliteIncomplet;
 use App\Http\Controllers\Controller;
 use App\Services\Scraping\GooglePlacesClient;
+use App\Support\DelaiRequeteSql;
+use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -45,25 +49,172 @@ use Illuminate\Support\Facades\Log;
  * c'est-à-dire le défaut qu'on répare. Une rubrique qui échoue bruyamment vaut
  * mieux qu'une rubrique qui ment doucement.
  * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * ── 2026-10-03 : « Chargement de la santé du système… » SANS FIN ─────────────
+ *
+ * Mesuré en production, sous le rôle applicatif (`axion_app`, sécurité par
+ * espace forcée, 4,35 M de fiches dans `companies`) : le comptage des fiches
+ * « Google Places en attente » prenait 4,6 s, le décompte par motif
+ * d'archivage 4,1 s. Recalculés à chaque ouverture ET toutes les 30 s par
+ * l'écran ouvert, ils faisaient dépasser 10 s à la réponse ; le navigateur
+ * réessayait, et l'écran restait sur « Chargement… ».
+ *
+ * 1. Le résumé est servi depuis un cache PAR ESPACE (`Cache::flexible`, patron
+ *    de `DashboardController`) : frais 5 min, périmé servi jusqu'à 1 h pendant
+ *    qu'UN seul recalcul part après la réponse.
+ * 2. Un résumé INCOMPLET n'est jamais mis en cache : si une rubrique tombe
+ *    dans son filet, le résumé est rendu à l'appelant (rubrique journalisée,
+ *    comme avant) mais pas gardé — ses zéros de repli passeraient sinon pour
+ *    des mesures pendant une heure. Une exception de `countWaterfallErrors24h`
+ *    ou `countArchiveReasons` traverse le cache sans s'y écrire et reste un
+ *    500, comme le veut F39-007.
+ * 3. Le calcul tient dans un BUDGET de {@see self::BUDGET_MS} ms : chaque
+ *    requête reçoit comme délai SQL le temps qui reste (plancher 500 ms). Le
+ *    délai SQL de Postgres vaut par requête, pas pour la route : sans budget,
+ *    huit requêtes à 15 s chacune pourraient tenir l'écran deux minutes.
+ * 4. La requête Google Places est scopée par espace et reprend MOT POUR MOT le
+ *    prédicat de l'index partiel `idx_companies_google_places_en_attente`
+ *    (migration `2026_10_03_000050`) — les opérateurs JSON ne sont pas
+ *    « leakproof » : sous `axion_app`, seul un index dont le prédicat est
+ *    identique évite de relire toute la table.
  */
 class ObservabilityController extends Controller
 {
+    public const FRAIS_SECONDES = 300;
+
+    public const PERIME_SECONDES = 3600;
+
+    /** Budget total du calcul, en millisecondes (toutes requêtes SQL comprises). */
+    public const BUDGET_MS = 20000;
+
+    /** Délai SQL minimal accordé à une requête quand le budget est presque épuisé. */
+    private const PLANCHER_MS = 500;
+
+    /** Début du calcul en cours (`hrtime`, ns) — `null` hors calcul. */
+    private ?int $debutCalcul = null;
+
+    /** Une rubrique est-elle tombée dans son filet pendant le calcul en cours ? */
+    private bool $incomplet = false;
+
+    public static function cle(string $espace): string
+    {
+        return 'observability:summary:v1:' . $espace;
+    }
+
     public function summary(Request $request): JsonResponse
     {
-        $workspaceId = (string) ($request->user()->current_workspace_id ?? '');
+        // Le même espace que celui posé par `SetCurrentWorkspace` pour la
+        // sécurité par espace (identifiant validé, sinon chaîne vide).
+        $workspaceId = WorkspaceContext::validIdOrNull($request->user()->current_workspace_id ?? null) ?? '';
 
-        return response()->json([
-            'data' => [
-                'waterfall_errors_24h' => $this->countWaterfallErrors24h($workspaceId),
-                'hunter_quota_month' => $this->countHunterMonth($workspaceId),
-                'google_places_quota' => $this->googlePlacesQuotaSummary(),
-                'archive_reasons' => $this->countArchiveReasons($workspaceId),
-                'audience_failures_7d' => $this->countAudienceFailures7d($workspaceId),
-                'recent_events' => $this->recentBusinessEvents($workspaceId),
-                'site_sync' => $this->siteSyncReceptions($workspaceId),
-                'outbound' => $this->outboundBacklog(),
-            ],
-        ]);
+        // Sans espace : aucun cache (la clé n'aurait pas de propriétaire), le
+        // calcul se comporte comme avant.
+        if ($workspaceId === '') {
+            return response()->json(['data' => $this->calculer($workspaceId)]);
+        }
+
+        try {
+            /** @var mixed $resume */
+            $resume = Cache::flexible(
+                self::cle($workspaceId),
+                [self::FRAIS_SECONDES, self::PERIME_SECONDES],
+                function () use ($workspaceId): array {
+                    $resume = $this->calculer($workspaceId);
+                    if ($this->incomplet) {
+                        // Jamais en cache : cf. point 2 de l'en-tête.
+                        throw new ResumeObservabiliteIncomplet($resume);
+                    }
+
+                    return $resume;
+                },
+                lock: ['seconds' => 60],
+            );
+        } catch (ResumeObservabiliteIncomplet $e) {
+            $resume = $e->resume;
+        }
+
+        if (! is_array($resume)) {
+            $resume = $this->calculer($workspaceId);
+        }
+
+        return response()->json(['data' => $resume]);
+    }
+
+    /**
+     * Le calcul, sans cache.
+     *
+     * `WorkspaceContext::run` : le recalcul différé de `Cache::flexible` tourne
+     * APRÈS la réponse, quand `SetCurrentWorkspace` a retiré la variable de
+     * session de la sécurité par espace — sans elle, tout compterait zéro, et
+     * ces zéros partiraient en cache (cf. `DashboardController::calculer`).
+     *
+     * @return array<string, mixed>
+     */
+    private function calculer(string $workspaceId): array
+    {
+        $this->incomplet = false;
+        $this->debutCalcul = hrtime(true);
+        $delaiAvant = DelaiRequeteSql::courantMs();
+
+        $rubriques = fn (): array => [
+            'waterfall_errors_24h' => $this->countWaterfallErrors24h($workspaceId),
+            'hunter_quota_month' => $this->countHunterMonth($workspaceId),
+            'google_places_quota' => $this->googlePlacesQuotaSummary($workspaceId),
+            'archive_reasons' => $this->countArchiveReasons($workspaceId),
+            'audience_failures_7d' => $this->countAudienceFailures7d($workspaceId),
+            'recent_events' => $this->recentBusinessEvents($workspaceId),
+            'site_sync' => $this->siteSyncReceptions($workspaceId),
+            'outbound' => $this->outboundBacklog(),
+        ];
+
+        try {
+            return $workspaceId === '' ? $rubriques() : WorkspaceContext::run($workspaceId, $rubriques);
+        } finally {
+            $this->debutCalcul = null;
+            if ($delaiAvant !== null) {
+                DelaiRequeteSql::poser($delaiAvant);
+            }
+        }
+    }
+
+    /**
+     * Donne à la PROCHAINE requête le temps qui reste sur le budget du calcul
+     * (plancher {@see self::PLANCHER_MS} ms). Sans effet hors Postgres et hors
+     * calcul.
+     */
+    private function borner(): void
+    {
+        if ($this->debutCalcul === null) {
+            return;
+        }
+
+        $ecouleMs = intdiv(hrtime(true) - $this->debutCalcul, 1_000_000);
+        DelaiRequeteSql::poser(max(self::PLANCHER_MS, self::BUDGET_MS - $ecouleMs));
+    }
+
+    /**
+     * Les fiches dont l'enrichissement Google Places attend le quota du mois
+     * prochain, dans l'espace. Le prédicat est celui, MOT POUR MOT, de l'index
+     * partiel `idx_companies_google_places_en_attente` (et de
+     * `RetryGooglePlacesCommand`) : réécrit autrement (`signals ? '…'`),
+     * l'index ne servirait plus — sans aucune erreur.
+     */
+    public static function requeteGooglePlacesEnAttente(string $workspaceId): Builder
+    {
+        return DB::table('companies')
+            ->where('workspace_id', $workspaceId)
+            ->whereRaw("(signals->'google_places_pending') IS NOT NULL")
+            ->whereRaw("(signals->'google_places'->>'enriched_at') IS NULL");
+    }
+
+    /** Le décompte par motif d'archivage — servi par `idx_companies_archive_reason`. */
+    public static function requeteMotifsArchivage(string $workspaceId): Builder
+    {
+        return DB::table('companies')
+            ->where('workspace_id', $workspaceId)
+            ->whereNotNull('archive_reason')
+            ->select('archive_reason', DB::raw('COUNT(*) AS c'))
+            ->groupBy('archive_reason');
     }
 
     /**
@@ -85,9 +236,13 @@ class ObservabilityController extends Controller
     private function siteSyncReceptions(string $workspaceId): array
     {
         try {
-            $base = static fn (): Builder => DB::table('activities')
-                ->where('workspace_id', $workspaceId)
-                ->where('external_ref', 'LIKE', 'site:event:%');
+            $base = function () use ($workspaceId): Builder {
+                $this->borner();
+
+                return DB::table('activities')
+                    ->where('workspace_id', $workspaceId)
+                    ->where('external_ref', 'LIKE', 'site:event:%');
+            };
 
             $last = $base()->max('created_at');
 
@@ -99,6 +254,7 @@ class ObservabilityController extends Controller
         } catch (\Throwable $e) {
             // F39-007 — sans cette ligne, un canal d'ingestion MUET rendait
             // exactement les mêmes zéros qu'un canal simplement calme.
+            $this->incomplet = true;
             Log::warning('observability.site_sync indisponible', ['exception' => $e->getMessage()]);
 
             return ['ingested_today' => 0, 'ingested_7d' => 0, 'last_ingested_at' => null];
@@ -118,6 +274,7 @@ class ObservabilityController extends Controller
     private function outboundBacklog(): array
     {
         try {
+            $this->borner();
             $rows = DB::table('crm_outbound_events')
                 ->select('status', DB::raw('COUNT(*) AS c'))
                 ->whereIn('status', ['pending', 'failed', 'gave_up'])
@@ -134,6 +291,7 @@ class ObservabilityController extends Controller
         } catch (\Throwable $e) {
             // F39-007 — `gave_up = 0` est la valeur qu'on ESPÈRE : la rendre en
             // avalant l'erreur transforme une divergence RGPD en bonne nouvelle.
+            $this->incomplet = true;
             Log::warning('observability.outbound indisponible', ['exception' => $e->getMessage()]);
 
             return ['pending' => 0, 'gave_up' => 0];
@@ -141,24 +299,27 @@ class ObservabilityController extends Controller
     }
 
     /**
-     * Sprint H13 — KPI quota Google Places mensuel (couvre tous workspaces,
-     * c'est un compteur global de l'API key partagée côté infra).
+     * Sprint H13 — KPI quota Google Places mensuel. Le quota consommé est un
+     * compteur global de la clé d'API partagée ; les fiches EN ATTENTE sont
+     * comptées dans l'espace courant.
      *
      * @return array{used: int, soft_limit: int, percent: float, pending_companies: int}
      */
-    private function googlePlacesQuotaSummary(): array
+    private function googlePlacesQuotaSummary(string $workspaceId): array
     {
         try {
             $client = app(GooglePlacesClient::class);
             $used = $client->currentMonthUsage();
             $limit = $client->monthlyQuotaLimit();
-            $pending = (int) DB::table('companies')
-                ->whereRaw("(signals->'google_places_pending') IS NOT NULL")
-                ->whereRaw("(signals->'google_places'->>'enriched_at') IS NULL")
-                ->count();
+            // 2026-10-03 : scopée par espace. Sous la sécurité par espace, le
+            // comptage ne voyait de toute façon que l'espace courant ; sans ce
+            // filtre explicite, l'index partiel restait inutilisable.
+            $this->borner();
+            $pending = (int) self::requeteGooglePlacesEnAttente($workspaceId)->count();
         } catch (\Throwable $e) {
             // F39-007 — un quota à 0 % affiché parce que le client Google Places
             // ne répond pas est un feu vert fabriqué : il faut qu'il se voie.
+            $this->incomplet = true;
             Log::warning('observability.google_places_quota indisponible', ['exception' => $e->getMessage()]);
 
             $used = 0;
@@ -176,6 +337,7 @@ class ObservabilityController extends Controller
 
     private function countWaterfallErrors24h(string $workspaceId): int
     {
+        $this->borner();
         return (int) DB::table('scraper_runs')
             ->where('workspace_id', $workspaceId)
             ->where('status', 'failed')
@@ -191,6 +353,7 @@ class ObservabilityController extends Controller
             // (workspace_id, verified_at) sans avoir besoin d'index fonctionnel IMMUTABLE.
             $monthStart = now()->startOfMonth();
             $monthEnd = now()->endOfMonth();
+            $this->borner();
             $count = (int) DB::table('email_verification_logs')
                 ->where('workspace_id', $workspaceId)
                 ->where('provider', 'hunter')
@@ -200,6 +363,7 @@ class ObservabilityController extends Controller
             // F39-007 — le commentaire « table peut être absente avant migrate »
             // dit l'intention, il ne la trace pas : après la migration, la même
             // branche avale une vraie panne d'index avec le même silence.
+            $this->incomplet = true;
             Log::warning('observability.hunter_quota_month indisponible', ['exception' => $e->getMessage()]);
 
             $count = 0;  // table peut être absente avant migrate
@@ -215,11 +379,8 @@ class ObservabilityController extends Controller
     /** @return array<string, int> */
     private function countArchiveReasons(string $workspaceId): array
     {
-        $rows = DB::table('companies')
-            ->where('workspace_id', $workspaceId)
-            ->whereNotNull('archive_reason')
-            ->select('archive_reason', DB::raw('COUNT(*) AS c'))
-            ->groupBy('archive_reason')
+        $this->borner();
+        $rows = self::requeteMotifsArchivage($workspaceId)
             ->pluck('c', 'archive_reason')
             ->all();
 
@@ -229,6 +390,7 @@ class ObservabilityController extends Controller
     private function countAudienceFailures7d(string $workspaceId): int
     {
         try {
+            $this->borner();
             return (int) DB::table('business_events')
                 ->where('workspace_id', $workspaceId)
                 ->where('action', 'audience.refresh.failed')
@@ -237,6 +399,7 @@ class ObservabilityController extends Controller
         } catch (\Throwable $e) {
             // F39-007 — « 0 échec de rafraîchissement d'audience sur 7 jours »
             // est précisément ce qu'on veut lire : ne l'écrivons pas à l'aveugle.
+            $this->incomplet = true;
             Log::warning('observability.audience_failures_7d indisponible', ['exception' => $e->getMessage()]);
 
             return 0;
@@ -247,6 +410,7 @@ class ObservabilityController extends Controller
     private function recentBusinessEvents(string $workspaceId): array
     {
         try {
+            $this->borner();
             return DB::table('business_events')
                 ->where('workspace_id', $workspaceId)
                 ->orderByDesc('created_at')
@@ -264,6 +428,7 @@ class ObservabilityController extends Controller
         } catch (\Throwable $e) {
             // F39-007 — un flux d'activité vide raconte « il ne se passe rien »,
             // ce qui est la lecture la plus rassurante et la moins verifiable.
+            $this->incomplet = true;
             Log::warning('observability.recent_events indisponible', ['exception' => $e->getMessage()]);
 
             return [];

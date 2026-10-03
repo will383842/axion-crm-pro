@@ -23,7 +23,8 @@ interface ObservabilitySummary {
 /**
  * Sprint H4 — Dashboard observabilité.
  * KPI cards + table dernières 50 business_events.
- * Data via /api/v1/observability/summary, queries directes Postgres (<100ms).
+ * Data via /api/v1/observability/summary, servi depuis un cache de 5 min par
+ * espace côté serveur (le calcul complet peut prendre plusieurs secondes).
  */
 export function ObservabilityPage() {
   // P1-12 — les réglages techniques quittent les Paramètres et vivent ici,
@@ -44,6 +45,12 @@ function SanteDuSysteme() {
       return res.data.data;
     },
     refetchInterval: 30_000,
+    // 2026-10-03 — pas de nouvel essai automatique. Avec les trois essais par
+    // défaut (et 30 s de délai chacun), une réponse lente laissait l'écran
+    // plus d'une minute et demie sur « Chargement… » avant d'avouer l'échec.
+    // L'état d'erreur propose « Réessayer », et le rafraîchissement toutes
+    // les 30 s retente de lui-même.
+    retry: false,
   });
 
   if (isLoading) {

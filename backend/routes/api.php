@@ -448,8 +448,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/audit-logs/verify-chain', [AuditLogsController::class, 'verifyChain'])
             ->middleware('permission:audit.view');
 
-        // Sprint H4 — Dashboard observabilité (KPI cards + recent events)
-        Route::get('/observability/summary', [ObservabilityController::class, 'summary']);
+        // Sprint H4 — Dashboard observabilité (KPI cards + recent events).
+        // 2026-10-03 : `delai-sql:20` — aucune requête de la route ne dépasse
+        // 20 s ; le calcul lui-même tient dans un budget TOTAL de 20 s
+        // (`ObservabilityController::BUDGET_MS`), le délai SQL valant par
+        // requête et non pour la route.
+        Route::get('/observability/summary', [ObservabilityController::class, 'summary'])
+            ->middleware('delai-sql:20');
 
         // --- Scraping Campaigns (Sprint 19.7) ------------------------------
         Route::get('/campaigns', [ScrapingCampaignsController::class, 'index'])

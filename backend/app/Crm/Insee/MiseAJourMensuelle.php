@@ -731,7 +731,9 @@ final class MiseAJourMensuelle
             if ($etat === 'A' && $f->insee_ferme_le !== null) {
                 // Réouverte : le marquage est levé. Ne revient en prospection
                 // QUE ce que la fermeture INSEE avait archivé : un motif posé
-                // par une personne (`manual`, `duplicate`…) reste.
+                // par une personne (`manual`, `duplicate`…) reste. Elle repasse
+                // en `pending`, pas dans son statut d'avant la fermeture (non
+                // conservé) : le triage la reclasse ensuite (réserve A3 de #313).
                 $maj['insee_ferme_le'] = null;
                 $this->bilan['reouvertures']++;
                 if (! $hors && $motif === self::MOTIF_FERMETURE && ! isset($maj['archive_reason'])) {

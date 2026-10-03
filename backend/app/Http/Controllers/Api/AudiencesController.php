@@ -364,6 +364,11 @@ class AudiencesController extends ApiController
             ->when(! AudienceBuilderService::estAudiencePresse($criteres), static fn ($q) => $q
                 ->whereRaw(GardePresse::conditionSql('am.company_id'))
                 ->whereRaw('(am.contact_id IS NULL OR ' . GardePresse::conditionContactsSql('ct') . ')'))
+            // Non diffusible INSEE (lot N8, réserve S2 de #313) : un membre
+            // inscrit AVANT le marquage reste dans `audience_members` jusqu'au
+            // prochain rafraîchissement — il ne s'affiche plus d'ici là (aucun
+            // envoi n'était possible : `EligibiliteAdresse` l'écarte déjà).
+            ->whereNull('c.insee_non_diffusible_le')
             ->select(
                 'am.id',
                 'am.added_at',

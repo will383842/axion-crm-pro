@@ -402,7 +402,7 @@ final class SemeurTablesScopees
             'contact_id' => $id['contacts'],
             'origine' => 'apporteur',
             'reference_externe' => 'zz-etancheite',
-            'information_tiers_version' => 5,
+            'information_tiers_version' => 'information-article-14/v5',
         ]);
 
         $inserer('listes_manuelles_membres', [

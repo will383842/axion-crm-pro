@@ -36,12 +36,15 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\ProvenanceTiersServiceProvider;
 use App\Services\Audit\AuditHashChain;
+use App\Services\Rgpd\GdprPortabilityService;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\ResolveurDnsSimule;
@@ -61,11 +64,16 @@ function ptMetaValide(string $email): string
     ]]);
 }
 
-function ptProvenance(string $ws, int $contactId, string $origine, ?int $version, string $ref): int
+/**
+ * Une provenance. `$version` : un numéro (écrit au format du contrat Partners,
+ * `information-article-14/vN`), un texte brut tel que reçu, ou NULL.
+ */
+function ptProvenance(string $ws, int $contactId, string $origine, int|string|null $version, string $ref): int
 {
     return (int) DB::table('contacts_provenances_tiers')->insertGetId([
         'workspace_id' => $ws, 'contact_id' => $contactId, 'origine' => $origine,
-        'reference_externe' => $ref, 'information_tiers_version' => $version,
+        'reference_externe' => $ref,
+        'information_tiers_version' => is_int($version) ? ProvenanceTiers::PREFIXE_VERSION . $version : $version,
         'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 }
@@ -120,9 +128,17 @@ test('une provenance ne désigne pas une personne d un autre espace', function (
 
 test('la règle : version inconnue ou < 5 exclut ; 5 et plus ne l exclut pas', function () {
     expect(ProvenanceTiers::informationInsuffisante(null))->toBeTrue()
-        ->and(ProvenanceTiers::informationInsuffisante(4))->toBeTrue()
-        ->and(ProvenanceTiers::informationInsuffisante(5))->toBeFalse()
-        ->and(ProvenanceTiers::informationInsuffisante(6))->toBeFalse();
+        ->and(ProvenanceTiers::informationInsuffisante('information-article-14/v4'))->toBeTrue()
+        ->and(ProvenanceTiers::informationInsuffisante('information-article-14/v5'))->toBeFalse()
+        ->and(ProvenanceTiers::informationInsuffisante('information-article-14/v12'))->toBeFalse()
+        // Le texte reçu est stocké tel quel ; un « 5 » d'un AUTRE format ne
+        // vaut rien : seul le préfixe du contrat est reconnu.
+        ->and(ProvenanceTiers::informationInsuffisante('5'))->toBeTrue()
+        ->and(ProvenanceTiers::informationInsuffisante('autre-texte/v5'))->toBeTrue()
+        ->and(ProvenanceTiers::informationInsuffisante('information-article-14/v5-bis'))->toBeTrue()
+        ->and(ProvenanceTiers::informationInsuffisante(''))->toBeTrue()
+        ->and(ProvenanceTiers::numeroVersion('information-article-14/v5'))->toBe(5)
+        ->and(ProvenanceTiers::numeroVersion('v5'))->toBeNull();
 
     $occ = ['status' => null, 'verification' => VerificationEmail::VALIDE, 'perso' => false, 'deja_informe' => false];
     expect(EligibiliteAdresse::motif('zoe@zz-pt.example.invalid', [$occ + ['information_tiers_insuffisante' => true]]))
@@ -140,7 +156,7 @@ test('aperçu d une audience : la personne de provenance tiers mal informée est
     F::lier($ws, $fiche, $cible);
 
     $personnes = [
-        'v3' => 3, 'vnulle' => null, 'v5' => 5, 'sans' => false,
+        'v3' => 3, 'vnulle' => null, 'v5' => 5, 'sans' => false, 'autre' => 'autre-texte/v9',
     ];
     foreach ($personnes as $cle => $version) {
         $email = $cle . '@zz-pt-atelier.example.invalid';
@@ -159,7 +175,7 @@ test('aperçu d une audience : la personne de provenance tiers mal informée est
 
     $adresses = collect($r['lignes'])->pluck('email')->sort()->values()->all();
     expect($adresses)->toBe(['sans@zz-pt-atelier.example.invalid', 'v5@zz-pt-atelier.example.invalid'])
-        ->and($r['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE])->toBe(2);
+        ->and($r['exclues'][EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE])->toBe(3);
 });
 
 test('liste en fichier : la personne mal informée est comptée dans ecartees_information_tiers', function () {
@@ -311,10 +327,14 @@ test('les JSON servis aux rôles non-owner ne contiennent AUCUNE donnée de prov
         $sansMarqueur($role, 'provenances-tiers', (string) $refus->getContent());
 
         // L'aperçu d'audience (rôles qui y ont droit) : la personne est bien
-        // exclue — le total le dit —, mais le motif tiers n'est pas nommé.
+        // exclue (aucun destinataire), mais le motif tiers n'est ni nommé ni
+        // RECONSTITUABLE : `exclues_total` moins la somme des autres motifs
+        // redonnerait son compteur — il en est donc retiré aussi.
         $r = $this->postJson('/api/v1/audiences/apercu-destinataires', $apercu);
         if ($role !== 'viewer') {
-            $r->assertOk()->assertJsonPath('data.exclues_total', 1)->assertJsonPath('data.destinataires', 0);
+            $r->assertOk()->assertJsonPath('data.exclues_total', 0)->assertJsonPath('data.destinataires', 0);
+            $donnees = $r->json('data');
+            expect($donnees['exclues_total'])->toBe(array_sum($donnees['exclues']));
         }
         $sansMarqueur($role, 'apercu-destinataires', (string) $r->getContent());
     }
@@ -328,12 +348,14 @@ test('les JSON servis aux rôles non-owner ne contiennent AUCUNE donnée de prov
     $this->getJson("/api/v1/crm/contacts/{$contact}/provenances-tiers")->assertOk()
         ->assertJsonPath('data.0.origine', 'apporteur')
         ->assertJsonPath('data.0.reference_externe', 'zz-ref-opaque-7f3a')
-        ->assertJsonPath('data.0.information_tiers_version', 3)
+        ->assertJsonPath('data.0.information_tiers_version', 'information-article-14/v3')
+        ->assertJsonPath('data.0.information_tiers_numero', 3)
         ->assertJsonPath('data.0.information_suffisante', false);
     expect((string) $this->getJson("/api/v1/contacts/{$contact}")->assertOk()->getContent())->toContain('apporteur')
         ->and((string) $this->getJson("/api/v1/companies/{$fiche}")->assertOk()->getContent())->toContain('societe');
     $this->postJson('/api/v1/audiences/apercu-destinataires', $apercu)->assertOk()
-        ->assertJsonPath('data.exclues.' . EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE, 1);
+        ->assertJsonPath('data.exclues.' . EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE, 1)
+        ->assertJsonPath('data.exclues_total', 1);
 });
 
 // ── N14 réduit : dernier échange à l'initiative de la personne ──────────────
@@ -395,4 +417,262 @@ test('le déclencheur en base connaît exactement Taxonomy::ACTIVITY_KINDS_INITI
 
     expect($lu)->toBe($attendu)
         ->and(array_diff(Taxonomy::ACTIVITY_KINDS_INITIATIVE_PERSONNE, Taxonomy::ACTIVITY_KINDS))->toBe([]);
+});
+
+// ── Réserves des relectures de #312 (03/10/2026) ────────────────────────────
+//
+// RÈGLE ABSOLUE du propriétaire : on garde tout, on n'efface JAMAIS rien
+// automatiquement ; une demande d'effacement = mise à l'écart + décision
+// humaine au cas par cas.
+
+test('rien ne supprime une provenance : la suppression d une personne qui en porte une est REFUSÉE, la provenance subsiste', function () {
+    $ws = F::espace('zz-pt-restrict');
+    $c = F::contact($ws, F::fiche($ws, 'ZZ Restrict'), 'Zoe', 'ZZRESTRICT');
+    $p = ptProvenance($ws, $c, 'apporteur', 5, 'zz-ref-restrict');
+
+    // Savepoint : l'erreur ne doit pas avorter la transaction du test.
+    expect(fn () => DB::transaction(fn () => DB::table('contacts')->where('id', $c)->delete()))
+        ->toThrow(QueryException::class);
+
+    expect(DB::table('contacts')->where('id', $c)->exists())->toBeTrue()
+        ->and(DB::table('contacts_provenances_tiers')->where('id', $p)->exists())->toBeTrue();
+
+    // L'espace non plus ne peut pas emporter la provenance.
+    expect(fn () => DB::transaction(fn () => DB::table('workspaces')->where('id', $ws)->delete()))
+        ->toThrow(QueryException::class);
+    expect(DB::table('contacts_provenances_tiers')->where('id', $p)->exists())->toBeTrue();
+
+    // Les deux clés étrangères sont en RESTRICT (`r`), aucune en CASCADE.
+    $actions = collect(DB::select(
+        "SELECT a.attname AS colonne, c.confdeltype AS action FROM pg_constraint c
+           JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+          WHERE c.conrelid = 'public.contacts_provenances_tiers'::regclass AND c.contype = 'f'",
+    ))->mapWithKeys(fn ($l) => [$l->colonne => $l->action])->sortKeys()->all();
+    expect($actions)->toBe(['contact_id' => 'r', 'workspace_id' => 'r']);
+});
+
+test('le rôle applicatif ne peut ni supprimer ni vider une provenance (REVOKE DELETE, TRUNCATE)', function () {
+    $role = (string) config('database.connections.pgsql_app.username', 'axion_app');
+    if (DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$role]) === null) {
+        $this->markTestSkipped("Rôle {$role} absent de cette base.");
+    }
+    $droit = static fn (string $privilege): bool => (bool) DB::selectOne(
+        'SELECT has_table_privilege(?, ?, ?) AS ok',
+        [$role, 'public.contacts_provenances_tiers', $privilege],
+    )->ok;
+
+    expect($droit('DELETE'))->toBeFalse()
+        ->and($droit('TRUNCATE'))->toBeFalse()
+        ->and($droit('SELECT'))->toBeTrue()
+        ->and($droit('INSERT'))->toBeTrue()
+        ->and($droit('UPDATE'))->toBeTrue();
+});
+
+test('droit d accès (art. 15) : l export de la personne dit d où viennent ses données', function () {
+    Storage::fake('local');
+    $ws = F::espace('zz-pt-acces');
+    $email = 'zoe.acces@zz-pt.example.invalid';
+    $c = F::contact($ws, F::fiche($ws, 'ZZ Acces'), 'Zoe', 'ZZACCES', ['email' => $email]);
+    ptProvenance($ws, $c, 'commercial', 5, 'zz-ref-acces');
+    // Une autre personne : sa provenance ne sort pas dans cet export.
+    $autre = F::contact($ws, F::fiche($ws, 'ZZ Autre'), 'Zia', 'ZZAUTRE', ['email' => 'zia@zz-pt.example.invalid']);
+    ptProvenance($ws, $autre, 'societe', 4, 'zz-ref-autre');
+
+    $resultat = app(GdprPortabilityService::class)->export($email);
+    $json = Crypt::decryptString(
+        (string) Storage::disk('local')->get('gdpr-exports/' . $resultat['token'] . '.enc'),
+    );
+    $contenu = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+    expect($contenu)->toHaveKey('provenances_tiers')
+        ->and($contenu['provenances_tiers'])->toHaveCount(1)
+        ->and($contenu['provenances_tiers'][0]['origine'])->toBe('commercial')
+        ->and($contenu['provenances_tiers'][0]['information_tiers_version'])->toBe('information-article-14/v5')
+        ->and($contenu['provenances_tiers'][0]['recu_le'])->not->toBeNull()
+        ->and($json)->not->toContain('zz-ref-autre')
+        ->and($json)->not->toContain('societe');
+});
+
+test('exports entreprises et personnes : la personne apportée mal informée ne sort pas, les autres sortent', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+    config(['crm.console_v2' => true, 'crm.ingest.business_workspace' => 'axion-ia']);
+    $ws = Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'axion-ia', 'name' => 'ZZ Axion', 'settings' => []])->id;
+
+    $fiche = F::fiche($ws, 'ZZ Export', ['legal_form' => '5710']);
+    $adresses = ['mal' => 3, 'inconnue' => null, 'bien' => 5, 'sans' => false];
+    foreach ($adresses as $cle => $version) {
+        $email = $cle . '@zz-pt-export.example.invalid';
+        $id = F::contact($ws, $fiche, 'Zoe', 'ZZEXP' . strtoupper($cle), ['email' => $email]);
+        DB::table('personnes')->insert([
+            'workspace_id' => $ws, 'person_key' => hash('sha256', 'zz-pt|' . $email), 'contact_id' => $id,
+            'email' => $email, 'email_hash' => hash('sha256', $email), 'email_nature' => 'pro',
+            'premiere_source' => 'newsletter', 'premiere_source_at' => now()->subDays(3),
+            'derniere_interaction_at' => now()->subDays(3), 'legal_basis' => 'consent',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        if ($version !== false) {
+            ptProvenance($ws, $id, 'apporteur', $version, 'zz-ref-exp-' . $cle);
+        }
+    }
+
+    $this->actingAs(ptUtilisateur($ws, 'owner'));
+    $entreprises = (string) $this->get('/api/v1/companies/export')->assertOk()->streamedContent();
+    $personnes = (string) $this->get('/api/v1/crm/personnes/export')->assertOk()->streamedContent();
+    // Même avec `inclure_non_prospectables=oui` : ce n'est pas une préférence,
+    // c'est une interdiction.
+    $toutes = (string) $this->get('/api/v1/crm/personnes/export?inclure_non_prospectables=oui')->assertOk()->streamedContent();
+
+    foreach (['entreprises' => $entreprises, 'personnes' => $personnes, 'toutes' => $toutes] as $nom => $csv) {
+        foreach (['bien@zz-pt-export.example.invalid', 'sans@zz-pt-export.example.invalid'] as $sort) {
+            expect(str_contains($csv, $sort))->toBeTrue("{$nom} : « {$sort} » doit sortir");
+        }
+        foreach (['mal@zz-pt-export.example.invalid', 'inconnue@zz-pt-export.example.invalid', 'ZZEXPMAL', 'ZZEXPINCONNUE'] as $reste) {
+            expect(str_contains($csv, $reste))->toBeFalse("{$nom} : « {$reste} » ne doit pas sortir");
+        }
+    }
+});
+
+test('retour arrière refusé quand dernier_echange_initiative_at porte des valeurs ; la colonne reste', function () {
+    $ws = F::espace('zz-pt-down');
+    $c = F::contact($ws, F::fiche($ws, 'ZZ Down'), 'Zoe', 'ZZDOWN');
+    DB::table('activities')->insert([
+        'workspace_id' => $ws, 'contact_id' => $c, 'type' => 'form_submission', 'kind' => 'form_submission',
+        'occurred_at' => '2026-09-10 10:00:00+00', 'created_at' => now(),
+    ]);
+    expect(DB::table('contacts')->where('id', $c)->value('dernier_echange_initiative_at'))->not->toBeNull()
+        ->and(DB::table('contacts_provenances_tiers')->count())->toBe(0);
+
+    $migration = require database_path('migrations/2026_10_03_000080_provenance_tiers.php');
+    expect(fn () => DB::transaction(fn () => $migration->down()))
+        ->toThrow(RuntimeException::class, 'dernier_echange_initiative_at');
+
+    expect(DB::selectOne(
+        "SELECT 1 AS ok FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'dernier_echange_initiative_at'",
+    ))->not->toBeNull()
+        ->and(DB::table('contacts')->where('id', $c)->value('dernier_echange_initiative_at'))->not->toBeNull();
+});
+
+test('le garde-fou du retour arrière lit hors RLS : un rôle sans BYPASSRLS échoue au lieu de compter 0', function () {
+    $source = (string) file_get_contents(database_path('migrations/2026_10_03_000080_provenance_tiers.php'));
+    $down = substr($source, (int) strpos($source, 'public function down()'));
+
+    expect($down)->toContain('SET LOCAL row_security = off')
+        ->and(strpos($down, 'SET LOCAL row_security = off'))->toBeLessThan((int) strpos($down, 'count('));
+});
+
+test('l alias concaténé dans le SQL est gardé (patron QuarantaineSite::alias)', function () {
+    expect(ProvenanceTiers::informationInsuffisanteSql('contacts'))->toContain('contacts.id');
+    expect(fn () => ProvenanceTiers::informationInsuffisanteSql('contacts.id); DROP TABLE contacts; --'))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => ProvenanceTiers::informationInsuffisanteSql('Contacts'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => ProvenanceTiers::informationInsuffisanteSql('contacts', 'id OR 1=1'))->toThrow(InvalidArgumentException::class);
+});
+
+test('contrat Partners : la version est le TEXTE reçu (32 caractères au plus) ; aucune date d acte n est stockée', function () {
+    $colonnes = collect(DB::select(
+        "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns WHERE table_name = 'contacts_provenances_tiers'",
+    ))->keyBy('column_name');
+
+    expect($colonnes)->not->toHaveKey('information_tiers_at')
+        ->and($colonnes['information_tiers_version']->data_type)->toBe('text')
+        ->and($colonnes)->toHaveKey('derniere_sequence');
+
+    $ws = F::espace('zz-pt-version');
+    $c = F::contact($ws, F::fiche($ws, 'ZZ Version'), 'Zoe', 'ZZVERSION');
+    expect(fn () => DB::transaction(fn () => ptProvenance($ws, $c, 'apporteur', str_repeat('v', 33), 'zz-ref-long')))
+        ->toThrow(QueryException::class);
+});
+
+test('une séquence Partners plus ancienne (ou rejouée) n écrase jamais une provenance plus récente', function () {
+    $ws = F::espace('zz-pt-seq');
+    $c = F::contact($ws, F::fiche($ws, 'ZZ Seq'), 'Zoe', 'ZZSEQ');
+    $p = ptProvenance($ws, $c, 'apporteur', 4, 'zz-ref-seq');
+    DB::table('contacts_provenances_tiers')->where('id', $p)->update([
+        'information_tiers_version' => 'information-article-14/v5', 'derniere_sequence' => 10,
+    ]);
+
+    // Message v4 livré EN RETARD (séquence 7) : ignoré.
+    DB::table('contacts_provenances_tiers')->where('id', $p)->update([
+        'information_tiers_version' => 'information-article-14/v4', 'derniere_sequence' => 7,
+    ]);
+    // Rejeu de la même séquence : ignoré aussi.
+    DB::table('contacts_provenances_tiers')->where('id', $p)->update([
+        'information_tiers_version' => 'information-article-14/v4', 'derniere_sequence' => 10,
+    ]);
+    // Sans séquence alors qu'une est connue : ignoré.
+    DB::table('contacts_provenances_tiers')->where('id', $p)->update([
+        'information_tiers_version' => 'information-article-14/v4', 'derniere_sequence' => null,
+    ]);
+    $l = DB::table('contacts_provenances_tiers')->where('id', $p)->first();
+    expect($l->information_tiers_version)->toBe('information-article-14/v5')
+        ->and((int) $l->derniere_sequence)->toBe(10);
+
+    // Un message plus récent s'applique.
+    DB::table('contacts_provenances_tiers')->where('id', $p)->update([
+        'information_tiers_version' => 'information-article-14/v6', 'derniere_sequence' => 11,
+    ]);
+    expect(DB::table('contacts_provenances_tiers')->where('id', $p)->value('information_tiers_version'))
+        ->toBe('information-article-14/v6');
+});
+
+test('le déclencheur de la timeline ne s exécute que pour les gestes de la personne (clause WHEN)', function () {
+    $def = (string) DB::selectOne(
+        "SELECT pg_get_triggerdef(t.oid) AS d FROM pg_trigger t WHERE t.tgname = 'activites_echange_initiative' AND t.tgrelid = 'public.activities'::regclass",
+    )->d;
+    preg_match('/WHEN \(\(new\.kind = ANY \(ARRAY\[([^\]]*)\]/i', $def, $m);
+    preg_match_all("/'([^']+)'/", $m[1] ?? '', $valeurs);
+    $lu = $valeurs[1];
+    sort($lu);
+    $attendu = Taxonomy::ACTIVITY_KINDS_INITIATIVE_PERSONNE;
+    sort($attendu);
+
+    expect($lu)->toBe($attendu);
+});
+
+test('l index d opposition par empreinte de téléphone est construit à part, CONCURRENTLY, et valide', function () {
+    $principale = (string) file_get_contents(database_path('migrations/2026_10_03_000080_provenance_tiers.php'));
+    $index = (string) file_get_contents(database_path('migrations/2026_10_03_000081_opt_out_index_phone_hash.php'));
+
+    expect($principale)->not->toContain('CREATE INDEX IF NOT EXISTS idx_opt_out_scope_phone_hash')
+        ->and($index)->toContain('CREATE INDEX CONCURRENTLY')
+        ->and($index)->toContain('public $withinTransaction = false;');
+
+    $valide = DB::selectOne(
+        "SELECT i.indisvalid AS ok FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = 'idx_opt_out_scope_phone_hash'",
+    );
+    expect($valide)->not->toBeNull()->and($valide->ok)->toBeTrue();
+});
+
+test('l ancien numéro de migration est libéré pour #311 (000070)', function () {
+    expect(file_exists(database_path('migrations/2026_10_03_000070_provenance_tiers.php')))->toBeFalse()
+        ->and(file_exists(database_path('migrations/2026_10_03_000080_provenance_tiers.php')))->toBeTrue();
+});
+
+test('miroirs PHP et SQL de la règle de version : même verdict sur chaque texte', function () {
+    $ws = F::espace('zz-pt-miroir');
+    $fiche = F::fiche($ws, 'ZZ Miroir');
+    $textes = [
+        null, '', '5', 'v5', 'autre-texte/v5', 'information-article-14/v', 'information-article-14/v4',
+        'information-article-14/v5', 'information-article-14/v05', 'information-article-14/v12',
+        'information-article-14/v5-bis', 'INFORMATION-ARTICLE-14/V5', ' information-article-14/v5',
+        "information-article-14/v5\n",
+    ];
+    foreach ($textes as $i => $texte) {
+        $c = F::contact($ws, $fiche, 'Zoe', 'ZZMIROIR' . $i);
+        if ($texte !== '') {
+            ptProvenance($ws, $c, 'apporteur', $texte, 'zz-ref-miroir-' . $i);
+        } else {
+            // Le CHECK refuse un texte vide : on n'en stocke pas.
+            expect(fn () => DB::transaction(fn () => ptProvenance($ws, $c, 'apporteur', '', 'zz-ref-vide')))
+                ->toThrow(QueryException::class);
+
+            continue;
+        }
+        $sql = (bool) DB::selectOne(
+            'SELECT ' . ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS v FROM contacts WHERE contacts.id = ?',
+            [$c],
+        )->v;
+        expect($sql)->toBe(ProvenanceTiers::informationInsuffisante($texte), json_encode($texte));
+    }
 });

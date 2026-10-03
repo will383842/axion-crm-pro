@@ -56,6 +56,12 @@ class DomainFinderService
     /** Taille maximale d'un corps HTTP soumis à `verifyBody()` (1,5 Mo). */
     public const CORPS_MAX_OCTETS = 1_572_864;
 
+    /** Candidats SIREN examinés au plus par page (`sirensDansPage`). */
+    public const SIRENS_CANDIDATS_MAX = 2000;
+
+    /** Octets de texte gardés AVANT une suite de chiffres pour la juger (`sirensDansPage`). */
+    private const SIRENS_CONTEXTE_OCTETS = 48;
+
     /**
      * Mots retirés du nom pour la VÉRIFICATION (`verifyBody`) seulement :
      * formes juridiques, mots de structure et articles. « SELARL ZZ
@@ -506,6 +512,54 @@ class DomainFinderService
 
         return $this->nomDansIdentite($rawBody, $mots, $domaine)
             && $this->contientLieu($texte, $company);
+    }
+
+    /**
+     * Les SIREN qu'une page PROUVE (lot N6, `crm:entreprises:verifier-sites`) :
+     * chaque suite de 9 chiffres du texte visible (séparateurs permis comme
+     * dans `contientSiren`) que `contientSiren()` accepte — la MÊME règle que
+     * `verifyBody()`, arbitre unique : jamais collé à un autre chiffre sauf
+     * derrière `FR` + clé, suivi de chiffres accepté (SIRET).
+     *
+     * Rendre l'ensemble plutôt qu'un oui / non permet de lire UNE fois une page
+     * partagée par des milliers de fiches (france.fr) et d'en garder quelques
+     * numéros, jamais le texte. Corps tronqué à `CORPS_MAX_OCTETS`. Au plus
+     * `SIRENS_CANDIDATS_MAX` candidats examinés (page faite de chiffres).
+     *
+     * @return list<string>
+     */
+    public function sirensDansPage(string $rawBody): array
+    {
+        $rawBody = self::tronquer($rawBody);
+        if (! mb_check_encoding($rawBody, 'UTF-8')) {
+            $rawBody = (string) mb_convert_encoding($rawBody, 'UTF-8', 'Windows-1252');
+        }
+        $texte = $this->texteVisible($rawBody);
+        if (preg_match_all('/\d(?:[\s.\x{00A0}\x{202F}-]{0,2}\d){8,}/u', $texte, $m, PREG_OFFSET_CAPTURE) < 1) {
+            return [];
+        }
+        // Chaque candidat est jugé par `contientSiren` sur un EXTRAIT (la suite
+        // et ce qui la précède : assez pour « FR » + clé et les séparateurs),
+        // jamais sur la page entière — une page faite de chiffres ne coûte pas
+        // 2 000 balayages de 1,5 Mo.
+        $prouves = [];
+        $examines = 0;
+        foreach ($m[0] as [$suite, $position]) {
+            $debut = max(0, (int) $position - self::SIRENS_CONTEXTE_OCTETS);
+            $extrait = mb_strcut($texte, $debut, (int) $position - $debut + strlen($suite), 'UTF-8');
+            $chiffres = (string) preg_replace('/\D/', '', $suite);
+            for ($i = 0, $n = strlen($chiffres) - 9; $i <= $n; $i++) {
+                $candidat = substr($chiffres, $i, 9);
+                if (! isset($prouves[$candidat]) && $this->contientSiren($extrait, $candidat)) {
+                    $prouves[$candidat] = true;
+                }
+                if (++$examines >= self::SIRENS_CANDIDATS_MAX) {
+                    break 2;
+                }
+            }
+        }
+
+        return array_map('strval', array_keys($prouves));
     }
 
     /**

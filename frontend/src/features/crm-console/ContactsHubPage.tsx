@@ -10,11 +10,12 @@
  * la base froide (4,29 M de fiches collectées) ne se mélange pas au quotidien —
  * on change de vue, on ne coche pas une case.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   Card,
+  Champ,
   EmptyState,
   KpiCard,
   PageHeader,
@@ -79,6 +80,7 @@ function ContactsHubContent() {
   // fiches étrangères restaient introuvables depuis la console.
   const [country, setCountry] = useState('');
   const [prospection, setProspection] = useState('');
+  const idf = useId();
   // 2026-09-30 — cocher des organisations ou des PERSONNES pour les mettre dans
   // une liste manuelle (« seulement certains contacts »). Des identifiants
   // VISIBLES seulement : jamais « tout ce qui correspond au filtre ».
@@ -196,37 +198,43 @@ function ContactsHubContent() {
       <Toolbar
         left={
           <>
-            <SearchInput
-              label="Rechercher une entreprise, un SIREN ou une personne"
-              value={search}
-              onChange={setSearch}
-              placeholder="Nom d'entreprise, SIREN, personne…"
-              className="w-72"
-            />
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              aria-label="Filtre pays"
-              className={SELECT_CLS}
-            >
-              {COUNTRY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={prospection}
-              onChange={(e) => setProspection(e.target.value)}
-              aria-label="Filtre statut de prospection"
-              className={SELECT_CLS}
-            >
-              {PROSPECTION_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <Champ label="Recherche" htmlFor={null}>
+              <SearchInput
+                label="Rechercher une entreprise, un SIREN ou une personne"
+                value={search}
+                onChange={setSearch}
+                placeholder="Nom d'entreprise, SIREN, personne…"
+                className="w-72"
+              />
+            </Champ>
+            <Champ label="Pays" htmlFor={`${idf}-pays`}>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                id={`${idf}-pays`}
+                className={SELECT_CLS}
+              >
+                {COUNTRY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
+            <Champ label="Statut de prospection" htmlFor={`${idf}-prospection`}>
+              <select
+                value={prospection}
+                onChange={(e) => setProspection(e.target.value)}
+                id={`${idf}-prospection`}
+                className={SELECT_CLS}
+              >
+                {PROSPECTION_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
           </>
         }
         right={

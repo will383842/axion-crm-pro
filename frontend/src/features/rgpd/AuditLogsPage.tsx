@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ScrollText, ShieldCheck } from 'lucide-react';
 import {
   Button,
   Card,
+  Champ,
   CompaniesTableSkeleton,
   Drawer,
   EmptyState,
@@ -58,6 +59,7 @@ export function AuditLogsPage() {
   const [severityFilter, setSeverityFilter] = useState<Severity | ''>('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<AuditLog | null>(null);
+  const idGravite = useId();
 
   const list = useQuery({
     queryKey: ['audit-logs'],
@@ -68,12 +70,12 @@ export function AuditLogsPage() {
     mutationFn: async () => (await api.get<{ valid: boolean }>('/audit-logs/verify-chain')).data,
     onSuccess: (r) => {
       if (r.valid) {
-        toast.success("Chaîne d'audit VALIDE — aucune anomalie détectée.");
+        toast.success('Aucune modification détectée.');
       } else {
-        toast.error("Chaîne d'audit INVALIDE — possible falsification.");
+        toast.error('Attention : une modification a été détectée.');
       }
     },
-    onError: () => toast.error('Erreur vérification chaîne'),
+    onError: () => toast.error('La vérification n’a pas pu aboutir. Réessayez dans un instant.'),
   });
 
   const rows = useMemo(() => {
@@ -100,7 +102,7 @@ export function AuditLogsPage() {
             loading={verifyMut.isPending}
             onClick={() => verifyMut.mutate()}
           >
-            Vérifier la chaîne
+            Vérifier que rien n’a été modifié
           </Button>
         }
       />
@@ -108,25 +110,29 @@ export function AuditLogsPage() {
       <Toolbar
         left={
           <>
-            <SearchInput
-              label="Rechercher dans le journal d'audit"
-              value={search}
-              onChange={setSearch}
-              placeholder="Événement, chemin, IP, acteur…"
-              className="w-72"
-            />
+            <Champ label="Recherche" htmlFor={null}>
+              <SearchInput
+                label="Rechercher dans le journal d'audit"
+                value={search}
+                onChange={setSearch}
+                placeholder="Événement, écran, adresse IP, auteur…"
+                className="w-72"
+              />
+            </Champ>
+            <Champ label="Gravité" htmlFor={idGravite}>
             <select
+              id={idGravite}
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value as Severity | '')}
-              aria-label="Filtre sévérité"
               className="h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
             >
-              <option value="">Toutes sévérités</option>
+              <option value="">Toutes</option>
               <option value="info">Info</option>
               <option value="warning">Attention</option>
               <option value="error">Erreur</option>
               <option value="critical">Critique</option>
             </select>
+            </Champ>
           </>
         }
       />
@@ -173,10 +179,10 @@ export function AuditLogsPage() {
           >
             <div>Quand</div>
             <div>Événement</div>
-            <div>Chemin</div>
+            <div>Écran ou action</div>
             <div>Acteur</div>
-            <div>Sévérité</div>
-            <div>IP</div>
+            <div>Gravité</div>
+            <div>Adresse IP</div>
             <div>Empreinte</div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -237,7 +243,7 @@ export function AuditLogsPage() {
                 <div className="font-medium">{selected.event_type}</div>
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">Chemin</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Écran ou action</div>
                 <div className="font-mono text-xs">{selected.path ?? '—'}</div>
               </div>
               <div>
@@ -253,7 +259,7 @@ export function AuditLogsPage() {
                 <div>{selected.target ?? '—'}</div>
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">IP</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Adresse IP</div>
                 <div className="font-mono text-xs">{selected.ip ?? '—'}</div>
               </div>
               <div>
@@ -264,7 +270,7 @@ export function AuditLogsPage() {
 
             <div>
               <div className="mb-1 text-xs font-semibold uppercase text-slate-500">
-                Chaîne d'empreintes
+                Contrôle d’intégrité
               </div>
               <div className="rounded-lg bg-slate-50 p-3 text-xs font-mono dark:bg-slate-800/60">
                 <div>

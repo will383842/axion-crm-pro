@@ -120,9 +120,9 @@ const NATURE_PRESETS = enPresets(NATURES);
 
 const STATUS_PRESETS: Array<{ code: string; label: string }> = [
   { code: 'pending',              label: 'À compléter' },
-  { code: 'ready_for_outreach',   label: 'Prêt outreach' },
-  { code: 'partial_email',        label: 'Email partiel' },
-  { code: 'archived_no_email',    label: 'Archivé sans email' },
+  { code: 'ready_for_outreach',   label: 'Prêt pour la prospection' },
+  { code: 'partial_email',        label: 'E-mail partiel' },
+  { code: 'archived_no_email',    label: 'Archivé sans e-mail' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ export function AudienceBuilderPage() {
       const r = await api.post<PreviewResponse>('/audiences/preview', { criteria: c });
       setPreview(r.data);
     } catch (err) {
-      setPreviewError(extractApiMessage(err) ?? 'Preview indisponible');
+      setPreviewError(extractApiMessage(err) ?? 'Aperçu indisponible');
       setPreview(null);
     } finally {
       setPreviewLoading(false);

@@ -96,7 +96,7 @@ describe('ConsoleGate', () => {
     renderGate(OPEN, true);
 
     expect(screen.queryByText('Contenu de la console')).not.toBeInTheDocument();
-    expect(screen.getByText('Univers vivier candidats non accessible')).toBeInTheDocument();
+    expect(screen.getByText('La base des candidats n’est pas accessible avec votre compte.')).toBeInTheDocument();
   });
 
   it('affiche le vivier à un membre', () => {

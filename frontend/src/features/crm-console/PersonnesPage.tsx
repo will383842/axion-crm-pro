@@ -11,13 +11,14 @@
  * le droit « voir les coordonnées complètes », et une personne opposée ou dont
  * l'adresse est morte n'en sort jamais.
  */
-import { useState, type ChangeEvent } from 'react';
+import { useId, useState, type ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import {
   Button,
   Card,
+  Champ,
   EmptyState,
   KpiCard,
   PageHeader,
@@ -78,6 +79,7 @@ function PersonnesContent() {
   const [search, setSearch] = useState('');
   const rechercheDifferee = useAntiRebond(search);
   const [exporting, setExporting] = useState(false);
+  const idf = useId();
 
   const counts = useQuery<PersonnesCounts>({
     queryKey: ['crm', 'personnes', 'counts'],
@@ -152,38 +154,48 @@ function PersonnesContent() {
           <Toolbar
             left={
               <>
-                <SearchInput
-                  label="Rechercher une personne"
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Adresse, nom…"
-                  className="w-64"
-                />
-                <select value={filtres.statut_lettre} onChange={changer('statut_lettre')} aria-label="Filtre statut de la newsletter" className={SELECT_CLS}>
-                  <option value="">Tous les statuts</option>
-                  <option value="abonne">{STATUT_LETTRE_LABELS.abonne}</option>
-                  <option value="desabonne">{STATUT_LETTRE_LABELS.desabonne}</option>
-                  <option value="aucun">{STATUT_LETTRE_LABELS.aucun}</option>
-                </select>
-                <select value={filtres.source} onChange={changer('source')} aria-label="Filtre source" className={SELECT_CLS}>
-                  <option value="">Toutes les sources</option>
-                  {sources.map((s) => (
-                    <option key={s} value={s}>
-                      {SOURCE_PERSONNE_LABELS[s] ?? s}
-                    </option>
-                  ))}
-                </select>
-                <select value={filtres.nature} onChange={changer('nature')} aria-label="Filtre nature de l’adresse" className={SELECT_CLS}>
-                  <option value="">Toutes les adresses</option>
-                  <option value="pro">{NATURE_EMAIL_LABELS.pro}</option>
-                  <option value="perso">{NATURE_EMAIL_LABELS.perso}</option>
-                  <option value="inconnue">{NATURE_EMAIL_LABELS.inconnue}</option>
-                </select>
-                <select value={filtres.rattachee} onChange={changer('rattachee')} aria-label="Filtre rattachement" className={SELECT_CLS}>
-                  <option value="">Rattachées ou non</option>
-                  <option value="non">À rattacher</option>
-                  <option value="oui">Rattachées à une entreprise</option>
-                </select>
+                <Champ label="Recherche" htmlFor={null}>
+                  <SearchInput
+                    label="Rechercher une personne"
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Adresse, nom…"
+                    className="w-64"
+                  />
+                </Champ>
+                <Champ label="Newsletter" htmlFor={`${idf}-lettre`}>
+                  <select value={filtres.statut_lettre} onChange={changer('statut_lettre')} id={`${idf}-lettre`} className={SELECT_CLS}>
+                    <option value="">Tous les statuts</option>
+                    <option value="abonne">{STATUT_LETTRE_LABELS.abonne}</option>
+                    <option value="desabonne">{STATUT_LETTRE_LABELS.desabonne}</option>
+                    <option value="aucun">{STATUT_LETTRE_LABELS.aucun}</option>
+                  </select>
+                </Champ>
+                <Champ label="Source" htmlFor={`${idf}-source`}>
+                  <select value={filtres.source} onChange={changer('source')} id={`${idf}-source`} className={SELECT_CLS}>
+                    <option value="">Toutes les sources</option>
+                    {sources.map((s) => (
+                      <option key={s} value={s}>
+                        {SOURCE_PERSONNE_LABELS[s] ?? s}
+                      </option>
+                    ))}
+                  </select>
+                </Champ>
+                <Champ label="Type d’adresse" htmlFor={`${idf}-nature`}>
+                  <select value={filtres.nature} onChange={changer('nature')} id={`${idf}-nature`} className={SELECT_CLS}>
+                    <option value="">Toutes les adresses</option>
+                    <option value="pro">{NATURE_EMAIL_LABELS.pro}</option>
+                    <option value="perso">{NATURE_EMAIL_LABELS.perso}</option>
+                    <option value="inconnue">{NATURE_EMAIL_LABELS.inconnue}</option>
+                  </select>
+                </Champ>
+                <Champ label="Rattachement" htmlFor={`${idf}-rattachement`}>
+                  <select value={filtres.rattachee} onChange={changer('rattachee')} id={`${idf}-rattachement`} className={SELECT_CLS}>
+                    <option value="">Rattachées ou non</option>
+                    <option value="non">À rattacher</option>
+                    <option value="oui">Rattachées à une entreprise</option>
+                  </select>
+                </Champ>
               </>
             }
             right={

@@ -42,6 +42,13 @@ const RISK_TONE: Record<RiskClass, StatusTone> = {
   minimal: 'success',
 };
 
+const RISK_LABEL: Record<RiskClass, string> = {
+  prohibited: 'Interdit',
+  high: 'Élevé',
+  limited: 'Limité',
+  minimal: 'Faible',
+};
+
 const STATUS_TONE: Record<string, StatusTone> = {
   production: 'success',
   staging: 'info',
@@ -81,15 +88,15 @@ export function AiActRegisterPage() {
     <div>
       <PageHeader
         title="Registre de l’IA"
-        subtitle="Conformité UE 2024/1689 — systèmes IA + classification risque + supervision humaine documentés."
+        subtitle="Les outils d’IA utilisés et leur niveau de risque."
       />
 
       <div className="mb-4 rounded-2xl border-l-4 border-sky-400 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-200">
         <p className="flex items-start gap-2">
           <FileText className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            <strong>Article 9 AI Act</strong> — tout système classé <code>high</code> doit être documenté
-            ici avec DPIA, mesures de mitigation, supervision humaine et révision annuelle.
+            Un outil au niveau de risque <strong>élevé</strong> doit être décrit ici en détail : analyse
+            des risques, mesures prises, contrôle par une personne et révision chaque année.
           </span>
         </p>
       </div>
@@ -168,7 +175,7 @@ export function AiActRegisterPage() {
                     {e.risk_class === 'high' || e.risk_class === 'prohibited' ? (
                       <AlertTriangle className="-ml-0.5 mr-0.5 h-3 w-3" />
                     ) : null}
-                    {e.risk_class}
+                    {RISK_LABEL[e.risk_class]}
                   </StatusPill>
                 </div>
                 <div className="min-w-0">
@@ -211,7 +218,7 @@ export function AiActRegisterPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill tone={RISK_TONE[selected.risk_class]}>
-                Risque : {selected.risk_class.toUpperCase()}
+                Risque : {RISK_LABEL[selected.risk_class]}
               </StatusPill>
               {selected.status ? (
                 <StatusPill tone={STATUS_TONE[selected.status] ?? 'neutral'}>

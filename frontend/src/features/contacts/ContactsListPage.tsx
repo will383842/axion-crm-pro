@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, Phone, Linkedin, UserCircle2 } from 'lucide-react';
 import {
   Avatar,
   Card,
+  Champ,
   CompaniesTableSkeleton,
   EmptyState,
   PageHeader,
@@ -103,6 +104,7 @@ export function ContactsListPage() {
   const [country, setCountry] = useState('');
   const [prospection, setProspection] = useState('');
   const [joignabilite, setJoignabilite] = useState('');
+  const idf = useId();
   const [search, setSearch] = useState('');
   // G42-010 — anti-rebond de 300 ms AVANT la requete.
   //
@@ -148,7 +150,7 @@ export function ContactsListPage() {
             <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">
               {total !== undefined ? total.toLocaleString('fr-FR') : '…'}
             </span>{' '}
-            décideurs identifiés (waterfall + Direction Finder)
+            décideurs identifiés
           </>
         }
       />
@@ -156,67 +158,77 @@ export function ContactsListPage() {
       <Toolbar
         left={
           <>
-            <SearchInput
-              label="Rechercher un contact par nom de famille"
-              value={search}
-              onChange={setSearch}
-              placeholder="Nom de famille…"
-              className="w-72"
-            />
-            <select
-              value={emailStatus}
-              onChange={(e) => setEmailStatus(e.target.value)}
-              aria-label="Filtre statut email"
-              className="h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
-            >
-              {EMAIL_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <Champ label="Recherche" htmlFor={null}>
+              <SearchInput
+                label="Rechercher un contact par nom de famille"
+                value={search}
+                onChange={setSearch}
+                placeholder="Nom de famille…"
+                className="w-72"
+              />
+            </Champ>
+            <Champ label="Statut de l’e-mail" htmlFor={`${idf}-email`}>
+              <select
+                value={emailStatus}
+                onChange={(e) => setEmailStatus(e.target.value)}
+                id={`${idf}-email`}
+                className="h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
+              >
+                {EMAIL_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
 
             {/* Pays et statut de prospection vivent sur l'ENTREPRISE rattachée.
                 Sans eux, les 605 contacts roumains restaient noyés dans 1,3 M
                 de fiches françaises : visibles, mais introuvables. */}
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              aria-label="Filtre pays"
-              className={SELECT_CLS}
-            >
-              {COUNTRY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <Champ label="Pays" htmlFor={`${idf}-pays`}>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                id={`${idf}-pays`}
+                className={SELECT_CLS}
+              >
+                {COUNTRY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
 
-            <select
-              value={prospection}
-              onChange={(e) => setProspection(e.target.value)}
-              aria-label="Filtre statut de prospection"
-              className={SELECT_CLS}
-            >
-              {PROSPECTION_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <Champ label="Statut de prospection" htmlFor={`${idf}-prospection`}>
+              <select
+                value={prospection}
+                onChange={(e) => setProspection(e.target.value)}
+                id={`${idf}-prospection`}
+                className={SELECT_CLS}
+              >
+                {PROSPECTION_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
 
-            <select
-              value={joignabilite}
-              onChange={(e) => setJoignabilite(e.target.value)}
-              aria-label="Filtre joignabilité"
-              className={SELECT_CLS}
-            >
-              {JOIGNABILITE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <Champ label="Joignabilité" htmlFor={`${idf}-joignabilite`}>
+              <select
+                value={joignabilite}
+                onChange={(e) => setJoignabilite(e.target.value)}
+                id={`${idf}-joignabilite`}
+                className={SELECT_CLS}
+              >
+                {JOIGNABILITE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Champ>
           </>
         }
       />

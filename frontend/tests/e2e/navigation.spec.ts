@@ -71,8 +71,14 @@ test.describe('Navigation smoke', () => {
     await page.goto('/');
     await ouvrir(page, 'Ma base');
     await expect(page.getByRole('link', { name: 'Entreprises', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Entreprises en Roumanie' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Contacts', exact: true })).toHaveCount(1);
+  });
+
+  // Audit UX lot 18 (2026-10-03) — la Roumanie vit sous « Technique », repliée.
+  test('sidebar : entreprises en Roumanie sous « Technique »', async ({ page }) => {
+    await page.goto('/');
+    await ouvrir(page, 'Technique');
+    await expect(page.getByRole('link', { name: 'Entreprises en Roumanie' })).toBeVisible();
   });
 
   test('sidebar : médias et journalistes sous « Presse »', async ({ page }) => {

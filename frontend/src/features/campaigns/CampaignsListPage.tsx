@@ -163,7 +163,7 @@ export function CampaignsListPage() {
       <PageHeader
         title="Collectes"
         subtitle="Vos collectes d’entreprises."
-        badge={<LiveBadge label="En direct" refreshLabel="actualisé toutes les 10s" />}
+        badge={<LiveBadge label="En direct" refreshLabel="Mis à jour toutes les 10 secondes" />}
         actions={
           <Button
             variant="primary"

@@ -1,8 +1,8 @@
 import { Newspaper } from 'lucide-react';
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Button, Card, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchInput, cn } from "@/components/ui";
+import { Button, Card, Champ, EmptyState, KpiCard, PageHeader, QueryErrorState, SearchInput, cn } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAntiRebond } from "@/hooks/useAntiRebond";
 import { toast } from "sonner";
@@ -139,6 +139,7 @@ export function MediaListPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
   const [exporting, setExporting] = useState(false);
+  const idDepartement = useId();
 
   // G42-010 — les DEUX champs de saisie libre de cet ecran (« Rechercher un
   // media » et le code departement) sont differes de 300 ms avant d'atteindre
@@ -292,28 +293,32 @@ export function MediaListPage() {
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <SearchInput
-          label="Rechercher un média"
-          value={filter.search}
-          onChange={(v) => setFilterAndReset({ search: v })}
-          placeholder="Rechercher un média…"
-          className="w-72"
-        />
-        <Select value={filter.media_family} onChange={(v) => setFilterAndReset({ media_family: v })} options={FAMILY_OPTIONS} ariaLabel="Filtre famille" />
-        <Select value={filter.media_type} onChange={(v) => setFilterAndReset({ media_type: v })} options={MEDIA_TYPE_OPTIONS} ariaLabel="Filtre type" />
-        <Select value={filter.periodicity} onChange={(v) => setFilterAndReset({ periodicity: v })} options={PERIODICITY_OPTIONS} ariaLabel="Filtre périodicité" />
-        <Select value={filter.has_website} onChange={(v) => setFilterAndReset({ has_website: v })} options={SITE_OPTIONS} ariaLabel="Filtre site web" />
-        <Select value={filter.has_email} onChange={(v) => setFilterAndReset({ has_email: v })} options={EMAIL_OPTIONS} ariaLabel="Filtre email" />
-        <Select value={filter.email_confidence} onChange={(v) => setFilterAndReset({ email_confidence: v })} options={CONFIDENCE_OPTIONS} ariaLabel="Filtre confiance email" />
-        <input
-          type="text"
-          value={filter.department_code}
-          onChange={(e) => setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })}
-          placeholder="Dept (75…)"
-          aria-label="Filtre département"
-          className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
-        />
+      <div className="mb-4 flex flex-wrap items-end gap-2">
+        <Champ label="Recherche" htmlFor={null}>
+          <SearchInput
+            label="Rechercher un média"
+            value={filter.search}
+            onChange={(v) => setFilterAndReset({ search: v })}
+            placeholder="Rechercher un média…"
+            className="w-72"
+          />
+        </Champ>
+        <Select value={filter.media_family} onChange={(v) => setFilterAndReset({ media_family: v })} options={FAMILY_OPTIONS} label="Famille" />
+        <Select value={filter.media_type} onChange={(v) => setFilterAndReset({ media_type: v })} options={MEDIA_TYPE_OPTIONS} label="Type" />
+        <Select value={filter.periodicity} onChange={(v) => setFilterAndReset({ periodicity: v })} options={PERIODICITY_OPTIONS} label="Périodicité" />
+        <Select value={filter.has_website} onChange={(v) => setFilterAndReset({ has_website: v })} options={SITE_OPTIONS} label="Site web" />
+        <Select value={filter.has_email} onChange={(v) => setFilterAndReset({ has_email: v })} options={EMAIL_OPTIONS} label="E-mail" />
+        <Select value={filter.email_confidence} onChange={(v) => setFilterAndReset({ email_confidence: v })} options={CONFIDENCE_OPTIONS} label="Fiabilité de l’e-mail" />
+        <Champ label="Département" htmlFor={idDepartement}>
+          <input
+            id={idDepartement}
+            type="text"
+            value={filter.department_code}
+            onChange={(e) => setFilterAndReset({ department_code: e.target.value.toUpperCase().slice(0, 3) })}
+            placeholder="ex. 75"
+            className="h-9 w-24 rounded-lg bg-white px-3 font-mono text-xs text-slate-900 ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300 focus:outline-none dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600"
+          />
+        </Champ>
         {hasActiveFilter ? (
           <Button variant="ghost" size="sm" onClick={() => { setFilter(EMPTY_FILTER); setPage(1); }}>
             Réinitialiser
@@ -406,29 +411,33 @@ function Select({
   value,
   onChange,
   options,
-  ariaLabel,
+  label,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
-  ariaLabel: string;
+  /** Étiquette VISIBLE au-dessus du filtre (audit UX lot 18). */
+  label: string;
 }) {
+  const id = useId();
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={ariaLabel}
-      className={cn(
-        "h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none",
-        "dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600",
-      )}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <Champ label={label} htmlFor={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "h-9 rounded-lg bg-white px-2 pr-7 text-sm text-slate-900 ring-1 ring-slate-200 transition focus:ring-2 focus:ring-slate-300 focus:outline-none",
+          "dark:bg-slate-900 dark:text-white dark:ring-slate-700 dark:focus:ring-slate-600",
+        )}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Champ>
   );
 }
 

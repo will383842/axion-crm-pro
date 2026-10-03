@@ -2,14 +2,14 @@
  * Sprint Pipeline 360° — AudienceDetailPage.
  *
  * Détail d'une audience : header + KPI + tabs (Membres / Critères / Préparation campagne).
- * Refresh, Edit (toast), Delete.
+ * Mettre à jour, Supprimer.
  */
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  RefreshCw, Edit, Trash2, Users2, Zap, Mail, Building, Send,
+  RefreshCw, Trash2, Users2, Zap, Mail, Building, Send,
 } from 'lucide-react';
 import { api, messageApiLisible } from '@/lib/api';
 import { libelleReferentiel } from '@/lib/prospection-referentiels';
@@ -28,6 +28,8 @@ import {
   type TabItem,
 } from '@/components/ui';
 import type { EmailAudience } from './AudiencesListPage';
+import { criteresLisibles } from './criteres-lisibles';
+import type { ListeManuelle } from '@/features/listes/listes';
 import {
   REGLAGE_PAR_DEFAUT,
   reglageVersApi,
@@ -221,14 +223,6 @@ export function AudienceDetailPage() {
               onClick={() => refreshMutation.mutate()}
             >
               Mettre à jour
-            </Button>
-            <Button
-              variant="ghost"
-              size="md"
-              iconLeft={<Edit className="h-4 w-4" />}
-              onClick={() => toast.info('Édition bientôt disponible')}
-            >
-              Edit
             </Button>
             <Button
               variant="destructive"
@@ -465,24 +459,33 @@ function DestinatairesTab({ audience }: { audience: EmailAudience }) {
 // Tab — Critères
 // ---------------------------------------------------------------------------
 function CriteriaTab({ audience }: { audience: EmailAudience }) {
-  const json = JSON.stringify(audience.criteria, null, 2);
+  // Les noms des listes manuelles, SI l'écran de création les a déjà chargés :
+  // lecture du cache seulement, aucun appel ajouté (sinon « une liste manuelle »).
+  const qc = useQueryClient();
+  const listes = qc.getQueryData<ListeManuelle[]>(['listes-manuelles']) ?? [];
+  const lignes = criteresLisibles(
+    audience.criteria,
+    Object.fromEntries(listes.map((l) => [l.id, l.nom])),
+  );
   return (
     <div className="space-y-3">
       <Card padding="md">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Critères (format technique)</h3>
-          <Button
-            variant="secondary"
-            size="sm"
-            iconLeft={<Edit className="h-3.5 w-3.5" />}
-            onClick={() => toast.info('Édition bientôt disponible')}
-          >
-            Modifier
-          </Button>
-        </div>
-        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100 dark:bg-slate-950 dark:text-slate-200">
-          <code>{json}</code>
-        </pre>
+        <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Critères de l’audience</h3>
+        {lignes.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Aucun critère : toutes les fiches sont retenues, sauf les fiches protégées et la presse.</p>
+        ) : (
+          <ul className="space-y-1.5" aria-label="Critères de l’audience">
+            {lignes.map((l, i) => (
+              <li key={i} className="text-sm text-slate-700 dark:text-slate-300">
+                {l.bloc === 'Doit correspondre' ? null : (
+                  <span className="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">{l.bloc}</span>
+                )}
+                <span className="font-medium text-slate-900 dark:text-white">{l.libelle}</span>
+                {l.valeur !== '' ? <> : {l.valeur}</> : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
   );

@@ -499,6 +499,24 @@ function TabZones({ campaign }: { campaign: Campaign }) {
 // ---------------------------------------------------------------------------
 // TAB Runs
 // ---------------------------------------------------------------------------
+/** Statut d'un passage en clair ; un statut inconnu devient « Autre », jamais le code brut. */
+const STATUTS_PASSAGE: Readonly<Record<string, string>> = {
+  pending: 'En attente',
+  queued: 'En attente',
+  running: 'En cours',
+  paused: 'En pause',
+  success: 'Terminée',
+  completed: 'Terminée',
+  failed: 'Échouée',
+  cancelled: 'Annulée',
+  canceled: 'Annulée',
+};
+
+export function libelleStatutPassage(statut: string | null | undefined): string {
+  if (statut === null || statut === undefined || !Object.hasOwn(STATUTS_PASSAGE, statut)) return 'Autre';
+  return STATUTS_PASSAGE[statut] ?? 'Autre';
+}
+
 function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
   if (runs.length === 0) {
     return (
@@ -512,7 +530,7 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
           <tr>
-            <th className="px-4 py-2 text-left">#</th>
+            <th className="px-4 py-2 text-left">Passage du</th>
             <th className="px-4 py-2 text-left">Source</th>
             <th className="px-4 py-2 text-left">Statut</th>
             <th className="px-4 py-2 text-left">Démarré</th>
@@ -522,7 +540,11 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {runs.map((r) => (
             <tr key={r.id}>
-              <td className="px-4 py-2 font-mono text-xs tabular-nums">#{r.id}</td>
+              <td className="px-4 py-2 text-xs tabular-nums">
+                {r.started_at
+                  ? new Date(r.started_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </td>
               <td className="px-4 py-2">{r.source}</td>
               <td className="px-4 py-2">
                 <StatusPill
@@ -533,7 +555,7 @@ function TabRuns({ runs }: { runs: CampaignStatsResponse['last_events'] }) {
                   }
                   pulse={r.status === 'running'}
                 >
-                  {r.status}
+                  {libelleStatutPassage(r.status)}
                 </StatusPill>
               </td>
               <td className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">

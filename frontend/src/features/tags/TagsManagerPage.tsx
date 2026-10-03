@@ -50,7 +50,7 @@ const CATEGORIES: ReadonlyArray<{ key: TagCategory; label: string; description: 
   { key: 'geo', label: 'Géographie', description: 'Région et département (auto)' },
   { key: 'sector', label: 'Secteur et métier', description: 'Secteur et métier, depuis le code NAF (auto)' },
   { key: 'size', label: 'Taille', description: 'Effectif (auto)' },
-  { key: 'intent', label: 'Provenance et intérêt', description: 'Origine de la fiche (src:) et service demandé (svc:)' },
+  { key: 'intent', label: 'Provenance et intérêt', description: 'Origine de la fiche et service demandé' },
   { key: 'custom', label: 'Personnalisées', description: 'Étiquettes créées à la main' },
 ];
 

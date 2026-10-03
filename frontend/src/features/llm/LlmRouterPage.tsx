@@ -196,7 +196,7 @@ export function LlmRouterPage() {
           <EmptyState
             icon={<FileText className="h-10 w-10" />}
             title="Aucun prompt"
-            description="Les templates prompts sont versionnés en DB (prompt_template_versions)."
+            description="Les modèles de consignes sont conservés avec toutes leurs versions."
           />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

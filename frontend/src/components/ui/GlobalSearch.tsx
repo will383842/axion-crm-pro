@@ -195,7 +195,7 @@ export function GlobalSearch() {
                     onSelect={() => close()}
                     className="cursor-pointer rounded-md px-3 py-2 text-sm aria-selected:bg-slate-100"
                   >
-                    {t.name} <span className="ml-2 font-mono text-xs text-slate-400">#{t.slug}</span>
+                    {t.name}
                   </Command.Item>
                 ))}
               </Command.Group>

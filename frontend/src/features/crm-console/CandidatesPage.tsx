@@ -123,7 +123,7 @@ function CandidatesContent() {
     <div>
       <PageHeader
         title="Candidats"
-        subtitle="Univers étanche — base légale et durées de conservation distinctes de la base commerciale."
+        subtitle="Les candidats sont séparés des clients et prospects."
       />
 
       {echec ? (

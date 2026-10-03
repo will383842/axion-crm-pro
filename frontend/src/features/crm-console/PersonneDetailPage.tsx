@@ -165,7 +165,7 @@ function PersonneDetailContent() {
                 params={{ personKey: personne.person_key }}
                 className="mt-1 underline decoration-dotted underline-offset-2 hover:text-brand-600"
               >
-                Fiche 360° (tous univers)
+                Tout l’historique de cette personne
               </Link>
             </dl>
           </Card>

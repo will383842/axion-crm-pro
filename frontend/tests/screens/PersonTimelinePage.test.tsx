@@ -99,7 +99,7 @@ describe('PersonTimelinePage — rendu', () => {
 
     expect(await screen.findByText('Formulaire de contact')).toBeVisible();
     // La référence externe est collée à l'univers dans le même bloc
-    // (« Business · AXI-FORM-2026-118 ») : on interroge le bloc, pas un nœud.
+    // (« Clients et prospects · AXI-FORM-2026-118 ») : on interroge le bloc, pas un nœud.
     expect(screen.getByText(/AXI-FORM-2026-118/)).toBeVisible();
     // Une entrée sans titre retombe sur son `kind`, jamais sur du vide.
     expect(screen.getByText('application')).toBeVisible();
@@ -137,12 +137,15 @@ describe('PersonTimelinePage — rendu', () => {
       ],
     });
 
-    expect(await screen.findByText('Existe — basculer d’univers pour voir')).toBeVisible();
+    expect(await screen.findByText('Existe dans l’autre base')).toBeVisible();
 
     // Le vivier ne dit PAS « Fiche présente » — cette pastille-là est réservée
     // à un univers auquel on a droit, et elle s'accompagne d'une identité.
-    const ligneVivier = screen.getByText('Vivier candidats').closest('li');
+    // « Candidats » apparaît aussi dans la timeline (source d'une entrée) :
+    // on part de la pastille pour retrouver SA ligne.
+    const ligneVivier = screen.getByText('Existe dans l’autre base').closest('li');
     expect(ligneVivier).not.toBeNull();
+    expect(ligneVivier).toHaveTextContent('Candidats');
     expect(ligneVivier).not.toHaveTextContent('Fiche présente');
 
     // L'encart Identité ne liste que le sujet de l'univers ACCESSIBLE : une

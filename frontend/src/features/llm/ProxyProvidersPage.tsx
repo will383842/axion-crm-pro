@@ -44,7 +44,7 @@ export function ProxyProvidersPage() {
   const testMut = useMutation({
     mutationFn: async (id: number) =>
       (await api.post<{ healthy: boolean }>(`/proxy-providers/${id}/test`)).data,
-    onSuccess: (r) => toast.success(r.healthy ? 'Opérationnel ✓' : 'Indisponible ✗'),
+    onSuccess: (r) => (r.healthy ? toast.success('Opérationnel') : toast.error('Indisponible')),
     onError: () => toast.error('Échec du test'),
   });
 
@@ -54,7 +54,7 @@ export function ProxyProvidersPage() {
     <div>
       <PageHeader
         title="Serveurs relais"
-        subtitle="Webshare datacenter + IPRoyal résidentiel + Mock — bascule automatique selon zone."
+        subtitle="Fournisseurs d’adresses réseau utilisés pour la collecte."
       />
 
       {list.error !== null && list.data === undefined ? (

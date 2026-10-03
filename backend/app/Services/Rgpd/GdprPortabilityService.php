@@ -76,6 +76,17 @@ class GdprPortabilityService
                 ->orderBy('id')
                 ->get(['origine', 'information_tiers_version', 'recu_le'])
                 ->toArray(),
+            // N13 (relecture sécurité #316) : les valeurs qu'un tiers a
+            // proposées pour SES fiches personnes — en attente, acceptées,
+            // refusées — et, pour une acceptation, la valeur remplacée. Ni le
+            // compte qui a décidé (un salarié : un tiers pour elle), ni la
+            // référence opaque du tiers.
+            'propositions_champs' => DB::table('propositions_champs')
+                ->where('entite', 'personne')
+                ->whereIn('entite_id', DB::table('contacts')->where('email', $email)->select('id'))
+                ->orderBy('id')
+                ->get(['champ', 'valeur_actuelle', 'valeur_proposee', 'valeur_remplacee', 'origine', 'statut', 'created_at', 'decidee_le', 'effacee_le'])
+                ->toArray(),
             'candidates' => DB::table('candidates')->where('email', $email)->get()->toArray(),
             // 2026-09-29 (PR #255) : l'effacement atteint désormais les fiches
             // d'ORGANISATION qui portent l'adresse (e-mail générique, canaux) ;

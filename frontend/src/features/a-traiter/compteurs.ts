@@ -1,10 +1,12 @@
 /**
  * PASTILLES « À TRAITER » DU MENU (audit UX du 02/10/2026, lot 8).
  *
- * `GET /crm/a-traiter/compteurs` rend `{ doublons, a_rattacher }` : le total
- * des files « Doublons à vérifier » et « Personnes à rattacher », calculé par
- * les MÊMES requêtes que leurs écrans (le chiffre du menu = le total de
- * l'écran).
+ * `GET /crm/a-traiter/compteurs` rend `{ doublons, a_rattacher, relances }` :
+ * le total des files « Doublons à vérifier » et « Personnes à rattacher »,
+ * calculé par les MÊMES requêtes que leurs écrans (le chiffre du menu = le
+ * total de l'écran), et — depuis le nouvel accueil (03/10/2026) — celui des
+ * « Relances à faire » de l'écran Événements. `relances` n'a pas de pastille
+ * dans le menu : seul l'accueil le montre.
  *
  * Règles d'affichage :
  *  - un compteur `null` (échec, file inexistante dans cet univers) ou absent
@@ -18,7 +20,12 @@ import { api } from '@/lib/api';
 
 export type CleCompteur = 'doublons' | 'a_rattacher';
 
-export type CompteursATraiter = Record<CleCompteur, number | null>;
+/**
+ * `relances` est ABSENT (`undefined`) quand le serveur ne l'envoie pas (image
+ * antérieure au nouvel accueil) : l'accueil n'affiche alors pas la carte —
+ * ni chiffre inventé, ni fausse panne. `null` = le serveur n'a pas pu compter.
+ */
+export type CompteursATraiter = Record<CleCompteur, number | null> & { relances?: number | null };
 
 export const COMPTEURS_A_TRAITER_KEY = ['crm', 'a-traiter', 'compteurs'] as const;
 
@@ -35,7 +42,11 @@ function entierOuNull(valeur: unknown): number | null {
 
 export function normaliserCompteurs(brut: unknown): CompteursATraiter {
   const objet = (typeof brut === 'object' && brut !== null ? brut : {}) as Record<string, unknown>;
-  return { doublons: entierOuNull(objet['doublons']), a_rattacher: entierOuNull(objet['a_rattacher']) };
+  return {
+    doublons: entierOuNull(objet['doublons']),
+    a_rattacher: entierOuNull(objet['a_rattacher']),
+    ...('relances' in objet ? { relances: entierOuNull(objet['relances']) } : {}),
+  };
 }
 
 /**

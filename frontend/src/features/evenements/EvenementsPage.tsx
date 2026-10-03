@@ -9,7 +9,7 @@
  *  - Relances à faire : `GET /evenements?relance=a_faire`.
  */
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { CalendarDays } from "lucide-react";
@@ -459,8 +459,14 @@ const ONGLETS: { value: Onglet; label: string }[] = [
   { value: "relances", label: "Relances à faire" },
 ];
 
+/** L'onglet demandé par l'adresse (`?onglet=relances`), vérifié : l'URL n'est pas sûre. */
+function ongletDeLAdresse(recherche: Record<string, unknown>): Onglet {
+  return recherche["onglet"] === "relances" || recherche["onglet"] === "organisateurs" ? recherche["onglet"] : "evenements";
+}
+
 export function EvenementsPage() {
-  const [onglet, setOnglet] = useState<Onglet>("evenements");
+  const recherche: Record<string, unknown> = useSearch({ strict: false });
+  const [onglet, setOnglet] = useState<Onglet>(() => ongletDeLAdresse(recherche));
 
   return (
     <div>

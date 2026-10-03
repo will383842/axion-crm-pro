@@ -84,6 +84,13 @@ describe('normaliserCompteurs', () => {
     expect(normaliserCompteurs({ doublons: '3', a_rattacher: -1 })).toEqual({ doublons: null, a_rattacher: null });
     expect(normaliserCompteurs({ doublons: 1.5, a_rattacher: null })).toEqual({ doublons: null, a_rattacher: null });
   });
+
+  it('relances (accueil) : absent du serveur → absent (pas de carte) ; illisible → null ; entier → gardé', () => {
+    expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2 })).not.toHaveProperty('relances');
+    expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2, relances: 4 })).toEqual({ doublons: 1, a_rattacher: 2, relances: 4 });
+    expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2, relances: null })).toEqual({ doublons: 1, a_rattacher: 2, relances: null });
+    expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2, relances: 'x' })).toEqual({ doublons: 1, a_rattacher: 2, relances: null });
+  });
 });
 
 describe('Le menu', () => {

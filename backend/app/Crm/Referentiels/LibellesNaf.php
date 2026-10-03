@@ -96,7 +96,7 @@ final class LibellesNaf
 
         $code = "upper(replace(btrim(coalesce({$table}.naf_rev2, {$table}.naf)), '.', ''))";
 
-        return "(SELECT naf_s.label FROM naf_subclasses naf_s WHERE naf_s.code = "
+        return '(SELECT naf_s.label FROM naf_subclasses naf_s WHERE naf_s.code = '
             . "CASE WHEN {$code} ~ '^[0-9]{4}[A-Z]\$' THEN {$code}::char(5) END)";
     }
 

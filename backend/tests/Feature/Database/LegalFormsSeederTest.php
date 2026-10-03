@@ -55,7 +55,9 @@ it('ne porte que des codes de la nomenclature, avec son libellé exact', functio
     $table = nomenclatureFront();
 
     foreach (LegalFormsSeeder::FORMES as [$code, $libelle]) {
-        expect($table)->toHaveKey($code, "Code {$code} absent de la nomenclature INSEE.");
+        // `toHaveKey($cle, $valeur)` : le second argument est la VALEUR attendue,
+        // pas un message — on vérifie la présence, puis le libellé.
+        expect(array_key_exists($code, $table))->toBeTrue("Code {$code} absent de la nomenclature INSEE.");
         expect($libelle)->toBe($table[$code], "Libellé de {$code} différent de la nomenclature.");
     }
 });

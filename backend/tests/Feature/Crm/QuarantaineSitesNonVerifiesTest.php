@@ -232,6 +232,36 @@ test('campaigns:start-scheduled n envoie rien : il ne lance que des campagnes de
     Mail::assertNothingQueued();
 });
 
+test('audience presse : la générique d une fiche NON presse au site deviné n y passe jamais (ni celle d un média deviné)', function () {
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+    config(['crm.segments_ouverts' => 'presse']);
+    $ws = F::espace('zz-qs-presse');
+    $theme = F::tag($ws, 'zz-qs-theme');
+    $presse = F::tag($ws, FichesProtegees::TAG_PRESSE, ['is_locked' => true, 'category' => 'intent']);
+    // Fiche ordinaire au site deviné, même thème : hors audience presse.
+    foreach (qsJeu($ws) as $id) {
+        F::lier($ws, $id, $theme);
+    }
+    // Média au site deviné : sa générique est jugée par sa provenance.
+    $media = F::fiche($ws, 'ZZ Media Devine', ['website' => 'zz-media-devine.example.invalid', 'website_method' => 'guess',
+        'email_generic' => 'redaction@zz-media-devine.example.invalid', 'signals' => qsSignals('redaction@zz-media-devine.example.invalid'),
+        'entity_nature' => 'media', 'relation_type' => 'presse_media', 'metadata' => '{}']);
+    F::lier($ws, $media, $theme);
+    F::lier($ws, $media, $presse);
+
+    $r = app(ResolveurDestinataires::class)->resoudre(
+        $ws,
+        ['all' => [['field' => 'segment', 'op' => 'eq', 'value' => 'presse'], ['field' => 'tags', 'op' => 'contains_any', 'value' => ['zz-qs-theme']]]],
+        new ReglageDestinataires(ReglageDestinataires::LES_DEUX),
+        null,
+    );
+
+    $adresses = implode("\n", collect($r['lignes'])->pluck('email')->all());
+    qsAucuneEnQuarantaine($adresses);
+    expect($adresses)->not->toContain('zz-media-devine')
+        ->and($r['organisations'])->toBe(1);
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // Les quatre exports
 // ─────────────────────────────────────────────────────────────────────────
@@ -364,7 +394,8 @@ test('audiences par défaut : « Confiance email A » et « Prospects contactabl
 
     // 04:45 — notes recalculées (`--refresh`), puis 04:00 le lendemain.
     Artisan::call('prospection:score-email-confidence', ['--refresh' => true]);
-    expect(DB::table('companies')->where('id', $seule)->value('best_email_confidence'))->not->toBe('A')
+    // Sa seule adresse est en quarantaine : elle ne note plus la fiche.
+    expect(DB::table('companies')->where('id', $seule)->value('best_email_confidence'))->toBeNull()
         ->and(DB::table('contacts')->where('email', 'yves@mail.zz-devine.example.invalid')->value('email_confidence'))->not->toBe('A')
         ->and(DB::table('companies')->where('id', $j['fiable'])->value('best_email_confidence'))->toBe('A')
         ->and(DB::table('companies')->where('id', $j['verifiee'])->value('best_email_confidence'))->toBe('A');
@@ -493,7 +524,7 @@ function qsNettoyer(array $e): void
     });
 }
 
-test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, sans balayage séquentiel de companies', function () {
+test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
     $a = qsEspaceRls();
     $b = qsEspaceRls();
     $precedente = DB::getDefaultConnection();
@@ -524,16 +555,33 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
         expect($membres)->toBe([$a['fiable']]);
 
-        qsApp()->statement('SET enable_seqscan = off');
-        try {
-            $plan = implode("\n", array_map(
-                static fn ($l): string => (string) $l->{'QUERY PLAN'},
-                qsApp()->select('EXPLAIN ' . $q->toSql(), $q->getBindings()),
-            ));
-        } finally {
-            qsApp()->statement('RESET enable_seqscan');
+        // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
+        // n'ajoute AUCUN accès à `companies` et ne change pas son chemin
+        // d'accès — l'expression n'est qu'un filtre sur les fiches que les
+        // autres critères atteignent déjà (ici, le recalcul de 04:00, un
+        // traitement de fond ; l'aperçu web l'évalue sur les fiches retenues).
+        // Comparé avec et sans le critère, planificateur libre puis sans
+        // balayage séquentiel. Un `Seq Scan` imposé par le critère rougit.
+        $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
+        $acces = static function ($requete): array {
+            $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
+            $noeuds = [];
+            foreach ($lignes as $l) {
+                if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap|Bitmap Index) Scan)(?: using (\S+))? on companies\b/', $l, $m) === 1) {
+                    $noeuds[] = $m[1] . ' ' . ($m[2] ?? '');
+                }
+            }
+
+            return $noeuds;
+        };
+        foreach (['on', 'off'] as $balayage) {
+            qsApp()->statement('SET enable_seqscan = ' . $balayage);
+            try {
+                expect($acces($q))->toBe($acces($sans));
+            } finally {
+                qsApp()->statement('RESET enable_seqscan');
+            }
         }
-        expect($plan)->not->toMatch('/Seq Scan on companies/');
     } finally {
         DB::setDefaultConnection($precedente);
         qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);

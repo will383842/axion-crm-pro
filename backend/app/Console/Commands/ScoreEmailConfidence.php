@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Services\Email\EmailConfidenceService;
 use Illuminate\Console\Command;
@@ -146,7 +147,7 @@ class ScoreEmailConfidence extends Command
             $contactConf = DB::table('contacts')
                 ->whereIn('company_id', $ids)
                 ->whereNotNull('email_confidence')
-                ->get(['company_id', 'email_confidence'])
+                ->get(['company_id', 'email_confidence', 'email', 'discovery_source'])
                 ->groupBy('company_id');
 
             $values = [];
@@ -154,12 +155,24 @@ class ScoreEmailConfidence extends Command
             foreach ($companies as $co) {
                 $ranks = [];
                 foreach ($contactConf->get($co->id, collect()) as $c) {
+                    // Une adresse EN QUARANTAINE (lot N5) ne compte pas dans la
+                    // note : elle ne sortira ni ne partira jamais.
+                    if (QuarantaineSite::personne(
+                        (bool) $co->site_non_verifie,
+                        is_string($c->discovery_source) ? $c->discovery_source : null,
+                        (string) $c->email,
+                        $co->website !== null ? (string) $co->website : null,
+                    )) {
+                        continue;
+                    }
                     $rang = $this->rank((string) $c->email_confidence);
                     // Site deviné non vérifié : un « A » écrit avant le lot N5
                     // (domaine = site DEVINÉ) ne vaut pas mieux que B.
                     $ranks[] = $co->site_non_verifie ? max($rang, 2) : $rang;
                 }
-                if ($co->email_generic !== null && $co->email_generic !== '') {
+                // La générique d'une fiche au site non vérifié est en
+                // quarantaine (`QuarantaineSite`) : elle ne note pas la fiche.
+                if (! $co->site_non_verifie && $co->email_generic !== null && $co->email_generic !== '') {
                     $gc = $scorer->score((string) $co->email_generic, self::siteDeReference($co));
                     if ($gc !== null) {
                         $ranks[] = $this->rank($gc);

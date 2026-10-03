@@ -128,6 +128,9 @@ final class SiteFiable
      * Le filtrage des envois (lot N5) passe par `QuarantaineSite`, qui
      * élargit cette condition (sources `site`, domaine du site). Rien n'est
      * effacé.
+     *
+     * @deprecated Définition partielle (mentions légales seulement) : utiliser
+     *             `QuarantaineSite::personneSql()`, la règle des envois.
      */
     public static function contactIssuSiteNonVerifieSql(string $aliasContact = 'contacts'): string
     {

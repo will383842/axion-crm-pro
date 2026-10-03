@@ -1064,7 +1064,9 @@ class AudienceBuilderService
             }
             $joignable = function ($qq): void {
                 $qq->where(function ($g): void {
-                    $g->whereNotNull('companies.email_generic')
+                    // Une chaîne vide n'est pas une adresse — même lecture que
+                    // le miroir en mémoire (relecture #311).
+                    $g->whereRaw("NULLIF(btrim(companies.email_generic), '') IS NOT NULL")
                         ->whereRaw('NOT ' . QuarantaineSite::generiqueSql('companies'));
                 })->orWhereExists(function ($sub): void {
                     $sub->select(DB::raw(1))
@@ -1254,7 +1256,7 @@ class AudienceBuilderService
             }
             // Miroir de `buildPositive()` (même règle : `QuarantaineSite`).
             $nonVerifiee = QuarantaineSite::ficheNonVerifiee($company->website_method, $company->getRawOriginal('metadata'));
-            $joignable = ! empty($company->email_generic) && ! $nonVerifiee;
+            $joignable = trim((string) $company->email_generic) !== '' && ! $nonVerifiee;
             if (! $joignable) {
                 foreach ($company->contacts()->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                     ->whereNotNull('email')->get(['email', 'discovery_source']) as $c) {

@@ -60,10 +60,17 @@ final class HmacSignature
         return $timestamp . '.' . $body;
     }
 
+    /**
+     * Une fenêtre nulle ou négative n'est PAS « aucun contrôle » : elle fait
+     * échouer la vérification. La configuration est validée au démarrage
+     * (`App\Support\FenetreHorodatage`, appelée par
+     * `CanauxSignesServiceProvider`) ; cette ligne-ci protège d'un appelant qui
+     * passerait une valeur fausse sans passer par la configuration.
+     */
     public static function timestampWithinWindow(?string $timestamp, int $maxSkewSeconds): bool
     {
         if ($maxSkewSeconds <= 0) {
-            return true;
+            return false;
         }
         if ($timestamp === null || preg_match('/^\d{1,12}$/', $timestamp) !== 1) {
             return false;

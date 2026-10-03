@@ -77,6 +77,7 @@
         <env name="MOCK_FRANCE_TRAVAIL" value="true" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="CRM_INGEST_REPLAY_STORE" value="array" force="true"/>
         <!-- 🔴 `force="true"` OBLIGATOIRE sur les deux clés de connexion.
              Sans lui, un `<env>` de PHPUnit n'écrase PAS une variable déjà
              présente dans l'environnement du processus — et `docker-compose.yml`

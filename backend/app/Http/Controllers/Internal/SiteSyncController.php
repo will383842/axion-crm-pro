@@ -6,7 +6,7 @@ use App\Crm\Ingest\SiteSyncEvent;
 use App\Crm\Ingest\SiteSyncIngestService;
 use App\Crm\Ingest\SiteSyncRejection;
 use App\Http\Controllers\Api\ApiController;
-use App\Support\HmacSignature;
+use App\Support\CanalSigneSite;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -22,8 +22,9 @@ use Throwable;
  * d'AUTHENTIFICATION, pas un patron d'ingestion. Ici, on persiste.
  *
  * ORDRE DES CONTRÔLES, volontairement dans cet ordre :
- *   1. signature (avant tout, y compris avant le drapeau : un appelant non
- *      authentifié ne doit rien apprendre de l'état du système) ;
+ *   1. authentification (`CanalSigneSite` : horodatage, signature, requête
+ *      déjà vue), avant tout, y compris avant le drapeau : un appelant non
+ *      authentifié ne doit rien apprendre de l'état du système ;
  *   2. drapeau maître `CRM_INGEST_ENABLED` → 503 tant qu'il est à OFF ;
  *   3. contrat d'entrée strict → 422 ;
  *   4. ingestion.
@@ -38,23 +39,11 @@ class SiteSyncController extends ApiController
 
     public function store(Request $request): JsonResponse
     {
-        $body = $request->getContent();
-        $timestamp = $request->header('X-Site-Timestamp');
-        $secret = (string) config('crm.ingest.hmac_secret', '');
-        $maxSkew = (int) config('crm.ingest.max_clock_skew_seconds', 300);
-
-        $signedPayload = HmacSignature::signedPayload((string) $timestamp, $body);
-
-        if (! HmacSignature::verify($secret, $signedPayload, $request->header('X-Site-Signature'))) {
-            Log::warning('site-sync rejeté (signature invalide)', ['ip' => $request->ip()]);
-
-            return response()->json(['error' => 'bad_signature'], 401);
-        }
-
-        if (! HmacSignature::timestampWithinWindow(is_string($timestamp) ? $timestamp : null, $maxSkew)) {
-            Log::warning('site-sync rejeté (horodatage hors fenêtre)', ['ip' => $request->ip()]);
-
-            return response()->json(['error' => 'stale_signature'], 401);
+        // Horodatage, signature et requête déjà vue : contrôle commun aux
+        // routes signées par le site (`App\Support\CanalSigneSite`).
+        $refus = CanalSigneSite::controler($request, 'site-sync');
+        if ($refus !== null) {
+            return $refus;
         }
 
         if (! filter_var(config('crm.ingest.enabled', false), FILTER_VALIDATE_BOOLEAN)) {

@@ -123,7 +123,12 @@ function l4cEvent(string $type, string $at, array $overrides = [], string $email
 function l4cPost(array $event): TestResponse
 {
     $body = json_encode($event, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $timestamp = (string) time();
+    // Chaque appel est signé avec un horodatage DISTINCT (dans la fenêtre),
+    // comme le fait l'émetteur du site à chaque tentative : le CRM refuse une
+    // copie exacte d'une requête déjà reçue, et plusieurs appels d'un même test
+    // tombent souvent dans la même seconde.
+    static $decalage = 0;
+    $timestamp = (string) (time() - ($decalage++ % 200));
 
     return test()->call('POST', '/api/internal/site-sync', [], [], [], [
         'CONTENT_TYPE' => 'application/json',

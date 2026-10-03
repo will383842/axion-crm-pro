@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Internal;
 
 use App\Crm\Rgpd\SiteGdprService;
 use App\Http\Controllers\Api\ApiController;
-use App\Support\HmacSignature;
+use App\Support\CanalSigneSite;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -35,23 +35,11 @@ class SiteGdprController extends ApiController
 
     public function store(Request $request): JsonResponse
     {
-        $body = $request->getContent();
-        $timestamp = $request->header('X-Site-Timestamp');
-        $secret = (string) config('crm.ingest.hmac_secret', '');
-        $maxSkew = (int) config('crm.ingest.max_clock_skew_seconds', 300);
-
-        $signedPayload = HmacSignature::signedPayload((string) $timestamp, $body);
-
-        if (! HmacSignature::verify($secret, $signedPayload, $request->header('X-Site-Signature'))) {
-            Log::warning('site-sync/gdpr rejeté (signature invalide)', ['ip' => $request->ip()]);
-
-            return response()->json(['error' => 'bad_signature'], 401);
-        }
-
-        if (! HmacSignature::timestampWithinWindow(is_string($timestamp) ? $timestamp : null, $maxSkew)) {
-            Log::warning('site-sync/gdpr rejeté (horodatage hors fenêtre)', ['ip' => $request->ip()]);
-
-            return response()->json(['error' => 'stale_signature'], 401);
+        // Horodatage, signature et requête déjà vue : contrôle commun aux
+        // routes signées par le site (`App\Support\CanalSigneSite`).
+        $refus = CanalSigneSite::controler($request, 'site-sync/gdpr');
+        if ($refus !== null) {
+            return $refus;
         }
 
         if (! filter_var(config('crm.ingest.enabled', false), FILTER_VALIDATE_BOOLEAN)) {

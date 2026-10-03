@@ -115,7 +115,12 @@ function siteSyncEvent(array $overrides = []): array
 function siteSyncPost(array $event, ?string $secret = null, ?string $timestamp = null): TestResponse
 {
     $body = json_encode($event, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $timestamp ??= (string) time();
+    // Chaque appel est signé avec un horodatage DISTINCT (dans la fenêtre),
+    // comme le fait l'émetteur du site à chaque tentative : le CRM refuse une
+    // copie exacte d'une requête déjà reçue, et plusieurs appels d'un même test
+    // tombent souvent dans la même seconde.
+    static $decalage = 0;
+    $timestamp ??= (string) (time() - ($decalage++ % 200));
     $signature = hash_hmac('sha256', $timestamp . '.' . $body, $secret ?? SITE_SYNC_SECRET);
 
     return test()->call(

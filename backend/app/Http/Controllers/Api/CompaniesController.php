@@ -393,6 +393,13 @@ class CompaniesController extends ApiController
         // variable, on la mute, et on ne la deballe qu'une fois.
         $filtree = $this->buildFilteredQuery();
         $filtree->where('workspace_id', $workspaceId);
+        // 🔴 NON DIFFUSIBLE (lot N8, veto sécurité #313, bloquant 2) : une
+        // fiche marquée par la mise à jour INSEE (`insee_non_diffusible_le`)
+        // ne sort JAMAIS dans cet export de prospection — ni sa dénomination,
+        // ni ses adresses, ni ses dirigeants. Rien n'est effacé en base. Pas
+        // d'index dédié : la colonne est NULL sur la quasi-totalité des
+        // fiches, le filtre s'applique aux lignes déjà lues par l'export.
+        $filtree->whereNull('companies.insee_non_diffusible_le');
         $filtree->with($hasSante
             ? ['contacts' => $chargeContacts, 'healthPractitioners']
             : ['contacts' => $chargeContacts]);

@@ -103,6 +103,7 @@ class CrmCampagneDestinataires extends Command
 
     /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
     private const COMPTEURS_MOTIFS = [
+        EligibiliteAdresse::NON_DIFFUSIBLE => 'ecartees_non_diffusibles',
         EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
         EligibiliteAdresse::SITE_NON_VERIFIE => 'ecartees_site_non_verifie',
         EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE => 'ecartees_information_tiers',
@@ -162,7 +163,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -362,7 +363,7 @@ class CrmCampagneDestinataires extends Command
             ->orderBy('companies.id')
             ->select([
                 'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
-                'companies.legal_form', 'companies.website',
+                'companies.legal_form', 'companies.website', 'companies.insee_non_diffusible_le',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
             ])
@@ -427,6 +428,8 @@ class CrmCampagneDestinataires extends Command
         // Entrepreneur individuel (`EligibiliteAdresse`) : lu sur la fiche
         // déjà chargée, posé sur chacune de ses adresses.
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($org->legal_form ?? null);
+        // Lot N8 : fiche marquée « non diffusible » par la mise à jour INSEE.
+        $nd = ($org->insee_non_diffusible_le ?? null) !== null;
         // Quarantaine (lot N5) : hors presse — le segment presse juge déjà la
         // provenance (`AdressePresseFiable`).
         $nonVerifiee = ! $presse && (bool) ($org->site_non_verifie ?? false);
@@ -454,6 +457,7 @@ class CrmCampagneDestinataires extends Command
                 'perso' => false,
                 'deja_informe' => $org->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                'non_diffusible' => $nd,
                 'site_non_verifie' => $nonVerifiee,
                 // Une boîte d'organisation n'est pas une personne apportée.
                 'information_tiers_insuffisante' => false,
@@ -507,6 +511,7 @@ class CrmCampagneDestinataires extends Command
                 'perso' => is_array($meta) && ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => $c->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
+                'non_diffusible' => $nd,
                 'site_non_verifie' => QuarantaineSite::personne(
                     $nonVerifiee,
                     is_string($c->discovery_source ?? null) ? $c->discovery_source : null,

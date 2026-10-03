@@ -883,12 +883,17 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // recopiées — jamais une adresse ni un numéro en clair (`FusionFiches` ;
     // garde `DoublonsFusionTest` › « le journal ne garde AUCUNE coordonnée :
     // des identifiants et des empreintes »).
+    // 43 -> 44 et 29 -> 30 le 2026-10-03 (lot N8) : `insee_mises_a_jour.bilan`,
+    // le bilan chiffré d'un passage de la mise à jour mensuelle INSEE. Hors de
+    // portée PAR CONSTRUCTION : des COMPTEURS (créations, modifications,
+    // fermetures…) et rien d'autre — aucun SIREN, aucun nom, aucune coordonnée
+    // (`MiseAJourMensuelle::COMPTEURS`).
     expect($colonnes->count())->toBe(
-        43,
+        44,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        29,
+        30,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

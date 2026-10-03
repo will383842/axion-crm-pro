@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Contracts\InseeClient;
 use App\Crm\EspaceProspection;
+use App\Crm\Insee\LigneFicheInsee;
 use App\Crm\Referentiels\Classement;
-use App\Crm\Referentiels\NomenclatureNaf;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -100,41 +100,9 @@ class ProspectionCollect extends Command
             if ($data->siren === '') {
                 continue;
             }
-            $extra = $this->extraInseeFields($data->raw);
-            // LE calcul unique (`App\Crm\Referentiels`) : la collecte,
-            // l'enrichissement et le reclassement de masse rangent une même
-            // entreprise dans le même secteur et la même taille.
-            $naf = NomenclatureNaf::classer($data->naf);
-            $categorie = is_array($data->raw['uniteLegale'] ?? null) ? ($data->raw['uniteLegale']['categorieEntreprise'] ?? null) : null;
-            $buffer[] = [
-                'workspace_id' => $workspaceId,
-                'siren' => $data->siren,
-                'denomination' => $data->denomination,
-                'naf' => $data->naf,
-                'legal_form' => $data->legalForm,
-                'effectif_range' => $data->effectifRange,
-                'size_category' => Classement::tailleDepuisInsee(
-                    $data->effectifRange,
-                    is_string($categorie) ? $categorie : null,
-                ),
-                'sector_main' => $naf->secteur,
-                'naf_nomenclature' => $naf->nomenclature,
-                'naf_rev2' => $naf->codeRev2,
-                'entity_nature' => 'entreprise',
-                'region_code' => Classement::regionDuDepartement($deptCode),
-                'address' => $data->address,
-                'postcode' => $data->postcode,
-                'city' => $data->city,
-                'city_name' => $data->city,
-                'insee' => $data->insee,
-                'siret' => is_string($data->raw['siret'] ?? null) ? $data->raw['siret'] : null,
-                'enseigne' => $extra['enseigne'] ?? null,
-                'metadata' => json_encode($extra, JSON_UNESCAPED_UNICODE),
-                'discovery_source' => 'insee',
-                'department_code' => $deptCode,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            // La ligne est construite par `LigneFicheInsee` : la mise à jour
+            // mensuelle INSEE (lot N8) crée exactement la même.
+            $buffer[] = LigneFicheInsee::depuis($data, (string) $workspaceId, $deptCode);
             $count++;
 
             if (count($buffer) >= 500) {
@@ -155,33 +123,5 @@ class ProspectionCollect extends Command
         $this->line('Enrichissement (emails/tél/dirigeants) à lancer séparément.');
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Champs INSEE supplémentaires utiles (stockés en metadata JSONB) : SIRET,
-     * enseigne, catégorie officielle (TPE/PME/ETI/GE), date de création, forme
-     * juridique, ESS, coordonnées GPS Lambert.
-     *
-     * @param  array<string,mixed>  $raw  établissement INSEE brut
-     * @return array<string,mixed>
-     */
-    private function extraInseeFields(array $raw): array
-    {
-        $u = is_array($raw['uniteLegale'] ?? null) ? $raw['uniteLegale'] : [];
-        $periode = is_array($raw['periodesEtablissement'][0] ?? null) ? $raw['periodesEtablissement'][0] : [];
-        $adr = is_array($raw['adresseEtablissement'] ?? null) ? $raw['adresseEtablissement'] : [];
-
-        return array_filter([
-            'siret' => $raw['siret'] ?? null,
-            'sigle' => $u['sigleUniteLegale'] ?? null,
-            'enseigne' => $periode['enseigne1Etablissement'] ?? null,
-            'categorie_entreprise' => $u['categorieEntreprise'] ?? null,      // TPE/PME/ETI/GE officiel INSEE
-            'date_creation' => $u['dateCreationUniteLegale'] ?? null,
-            'forme_juridique' => $u['categorieJuridiqueUniteLegale'] ?? null,
-            'employeur' => $u['caractereEmployeurUniteLegale'] ?? null,   // O = a des salariés
-            'ess' => $u['economieSocialeSolidaireUniteLegale'] ?? null,
-            'gps_lambert_x' => $adr['coordonneeLambertAbscisseEtablissement'] ?? null,
-            'gps_lambert_y' => $adr['coordonneeLambertOrdonneeEtablissement'] ?? null,
-        ], static fn ($v) => $v !== null && $v !== '');
     }
 }

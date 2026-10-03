@@ -19,6 +19,13 @@ use App\Support\EligibiliteCampagne;
  * plusieurs fiches ou personnes) : une seule qui l'exige suffit à l'écarter.
  * Premier motif rencontré, dans cet ordre :
  *
+ * -1. `non_diffusible` l'adresse est rattachée à une fiche dont l'unité
+ *                     légale s'est opposée à la diffusion INSEE (statut `P`
+ *                     ou `N`, marquée `companies.insee_non_diffusible_le`
+ *                     par `crm:insee:mise-a-jour-mensuelle`, lot N8) :
+ *                     jamais destinataire, quelle que soit l'adresse. Même
+ *                     mécanique que le motif suivant : drapeau posé par
+ *                     l'appelant sur les fiches DÉJÀ lues ;
  *  0. `entreprise_individuelle` l'adresse est rattachée à une fiche
  *                     d'entrepreneur individuel (catégorie juridique INSEE
  *                     commençant par 1, `companies.legal_form`) : jamais
@@ -75,6 +82,8 @@ use App\Support\EligibiliteCampagne;
  */
 final class EligibiliteAdresse
 {
+    public const NON_DIFFUSIBLE = 'non_diffusible';
+
     public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
 
     public const SITE_NON_VERIFIE = QuarantaineSite::MOTIF;
@@ -95,7 +104,7 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::NON_DIFFUSIBLE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
     ];
 
@@ -113,10 +122,15 @@ final class EligibiliteAdresse
 
     /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : non_diffusible, entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
+        // Une personne qui a dit non à l'INSEE : aucune boîte ne part « par »
+        // sa fiche, quelle que soit sa qualité.
+        if (self::une($occurrences, static fn (array $o): bool => ($o['non_diffusible'] ?? false) === true)) {
+            return self::NON_DIFFUSIBLE;
+        }
         // Une seule occurrence rattachée à un entrepreneur individuel suffit :
         // la même boîte ne part pas « par » une autre fiche.
         if (self::une($occurrences, static fn (array $o): bool => ($o['entreprise_individuelle'] ?? false) === true)) {

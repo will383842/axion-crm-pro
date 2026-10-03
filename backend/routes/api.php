@@ -516,8 +516,13 @@ Route::prefix('v1')->group(function () {
             // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
             // Aucune route ne CRÉE de proposition : rien n'est branché à Partners.
             Route::get('/propositions', [PropositionsController::class, 'index']);
-            Route::post('/propositions/{id}/accepter', [PropositionsController::class, 'accepter'])->whereNumber('id');
-            Route::post('/propositions/{id}/refuser', [PropositionsController::class, 'refuser'])->whereNumber('id');
+            // `permission:` (garde F36-001) EN PLUS du contrôle owner du contrôleur.
+            Route::post('/propositions/{id}/accepter', [PropositionsController::class, 'accepter'])
+                ->whereNumber('id')
+                ->middleware('permission:companies.update');
+            Route::post('/propositions/{id}/refuser', [PropositionsController::class, 'refuser'])
+                ->whereNumber('id')
+                ->middleware('permission:companies.update');
 
             Route::get('/candidates', [CandidatesController::class, 'index']);
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);

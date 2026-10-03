@@ -552,3 +552,32 @@ test('TÉMOIN — à 50 homonymes non concluants, la fusion automatique passe', 
 
     expect(dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_AUTO, $this->paire))->toBeGreaterThan(0);
 });
+
+test('IDCC / OPCO (O14) : la ligne de l absorbée passe à la gardée qui n en a pas, et revient à l annulation', function () {
+    DB::table('companies_opco')->insert([
+        'workspace_id' => $this->ws, 'company_id' => $this->absorbee, 'siret' => null,
+        'idcc' => '1486', 'opco' => 'atlas', 'opco_gestion' => null, 'source' => 'saisie', 'releve_le' => null,
+    ]);
+    $ligne = (int) DB::table('companies_opco')->where('company_id', $this->absorbee)->value('id');
+
+    $fusion = dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
+    expect(DB::table('companies_opco')->where('id', $ligne)->value('company_id'))->toBe($this->garde);
+
+    dfAnnuler($this->ws, $fusion);
+    expect(DB::table('companies_opco')->where('id', $ligne)->value('company_id'))->toBe($this->absorbee)
+        ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(1);
+});
+
+test('IDCC / OPCO (O14) : la gardée garde la sienne, celle de l absorbée reste sur l absorbée (rien supprimé)', function () {
+    foreach ([[$this->garde, '1486'], [$this->absorbee, '2216']] as [$id, $idcc]) {
+        DB::table('companies_opco')->insert([
+            'workspace_id' => $this->ws, 'company_id' => $id, 'siret' => null,
+            'idcc' => $idcc, 'opco' => 'atlas', 'opco_gestion' => null, 'source' => 'saisie', 'releve_le' => null,
+        ]);
+    }
+
+    dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
+
+    expect(DB::table('companies_opco')->where('company_id', $this->garde)->value('idcc'))->toBe('1486')
+        ->and(DB::table('companies_opco')->where('company_id', $this->absorbee)->value('idcc'))->toBe('2216');
+});

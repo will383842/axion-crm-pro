@@ -24,8 +24,9 @@ name: Surveillance des canaux d'échange
 #
 # 🔒 DÉPÔT PUBLIC : les issues sont publiques. Elles ne portent QUE le JSON de
 # la commande (des nombres et des dates) et ses messages. La sortie d'erreur
-# de ssh / docker (qui peut nommer le serveur) reste dans le journal du job,
-# où GitHub masque les secrets — elle n'entre JAMAIS dans une issue.
+# de ssh / docker (qui peut nommer le serveur) n'est JAMAIS imprimée : le
+# journal du job est PUBLIC lui aussi (seul son nombre de lignes y figure).
+# Pour la lire, rejouer la commande à la main sur le serveur.
 #
 # ── SEUILS (réglables sans toucher au code) ─────────────────────────────────
 # Ordre de priorité : saisie du lancement manuel > variable du dépôt
@@ -78,9 +79,10 @@ on:
         required: false
         default: ''
 
+# Droit d'écrire des issues donné au seul job `alerte`, pas au job qui tient
+# la clé SSH.
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: surveillance-canaux
@@ -164,9 +166,8 @@ jobs:
             sleep 120
           done
 
-          echo "::group::Sortie d'erreur (journal du job seulement — jamais dans une issue)"
-          cat erreurs.txt || true
-          echo "::endgroup::"
+          # Journal PUBLIC (dépôt public) : on n'imprime que le volume.
+          echo "Sortie d'erreur : $(wc -l < erreurs.txt 2>/dev/null || echo 0) ligne(s), non affichée(s)."
 
           if [ "$JSON_OK" -eq 0 ]; then
             jq . etat.json
@@ -211,6 +212,9 @@ jobs:
     timeout-minutes: 10  # F38-008 (quelques appels à l'API des issues)
     needs: [verifier]
     if: failure()
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Ouvrir ou compléter l'issue de chaque type
         env:

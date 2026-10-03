@@ -197,7 +197,8 @@ class SourceSiro
     public function telecharger(string $url, string $chemin): void
     {
         $courante = $url;
-        for ($saut = 0; ; $saut++) {
+        $saut = 0;
+        while (true) {
             $ip = self::verifierUrl($courante);
             $reponse = Http::timeout(1800)->connectTimeout(15)
                 ->withOptions(['allow_redirects' => false, 'stream' => true] + SsrfGuard::optionsEpinglage($courante, $ip))
@@ -215,6 +216,7 @@ class SourceSiro
                 throw new RuntimeException('Téléchargement refusé : redirection sans destination.');
             }
             $courante = (string) UriResolver::resolve(new Uri($courante), new Uri($cible));
+            $saut++;
         }
 
         if (! $reponse->successful()) {

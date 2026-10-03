@@ -98,14 +98,9 @@ class DashboardController extends ApiController
 
         // Sans contexte d'espace : on ne compte rien — jamais le total de tout
         // le monde — et on le DIT. Des zéros faisaient croire à une base vide
-        // (audit UX du 2026-10-02, P0-1). Même forme d'erreur que le reste de
-        // l'API (`error` + `message`) ; `no_workspace` est déjà traduit côté
-        // écran (`MESSAGES_DES_CODES`).
+        // (audit UX du 2026-10-02, P0-1).
         if ($espace === null) {
-            return response()->json([
-                'error' => 'no_workspace',
-                'message' => "Aucun espace de travail n'est rattaché à votre compte.",
-            ], 409);
+            return $this->reponseSansEspace($r);
         }
 
         $this->dansLaRequete = true;
@@ -136,6 +131,53 @@ class DashboardController extends ApiController
             // là-bas. On lit le cache partagé, jamais une copie figée ici.
             'quality_a_recalculer_pct' => ScoresPerimes::enCache($espace),
         ]));
+    }
+
+    /**
+     * HTTP 409, dans la forme d'erreur de l'API (`error` + `message`). Deux
+     * situations, deux gestes différents pour l'administrateur, donc deux
+     * codes :
+     *
+     *  - `no_workspace` : le compte n'est membre d'AUCUN espace (aucune ligne
+     *    non révoquée dans `user_workspaces`). Il faut l'y rattacher.
+     *  - `workspace_not_selected` : le compte est membre d'au moins un espace,
+     *    mais `users.current_workspace_id` est vide. Il suffit d'en
+     *    sélectionner un. La console n'a pas (encore) de sélecteur d'espace
+     *    (P0-2 : un seul espace, rien à choisir) : le message renvoie donc
+     *    vers l'administrateur plutôt que vers un écran qui n'existe pas.
+     *
+     * `user_workspaces` n'est pas sous RLS (c'est la table qui DIT à quel
+     * espace on appartient, cf. `harden_workspace_isolation`) : la lecture
+     * est possible sans contexte d'espace. Une panne de cette lecture retombe
+     * sur `no_workspace`, journalisée.
+     */
+    private function reponseSansEspace(Request $r): JsonResponse
+    {
+        $membre = false;
+        $compte = $r->user();
+
+        if ($compte !== null) {
+            try {
+                $membre = DB::table('user_workspaces')
+                    ->where('user_id', $compte->getAuthIdentifier())
+                    ->whereNull('revoked_at')
+                    ->exists();
+            } catch (\Throwable $e) {
+                Log::warning('dashboard: appartenance indisponible', self::panneSansSql($e));
+            }
+        }
+
+        if ($membre) {
+            return response()->json([
+                'error' => 'workspace_not_selected',
+                'message' => "Aucun espace de travail n'est sélectionné sur votre compte. Contactez l'administrateur pour qu'il en sélectionne un.",
+            ], 409);
+        }
+
+        return response()->json([
+            'error' => 'no_workspace',
+            'message' => "Aucun espace de travail n'est rattaché à votre compte.",
+        ], 409);
     }
 
     /**
@@ -265,6 +307,10 @@ class DashboardController extends ApiController
             $this->incomplet = true;
             Log::warning('dashboard: qualite indisponible', self::panneSansSql($e));
 
+            // Pas des zéros : une répartition à 0 / 0 / 0 se lirait « aucune
+            // fiche ». `null` = « chiffre indisponible », l'écran écrit « — ».
+            $resultat['quality_distribution'] = null;
+
             return $resultat;
         }
 
@@ -342,10 +388,13 @@ class DashboardController extends ApiController
     }
 
     /**
+     * `null` quand la requête échoue : un gabarit à zéros se lirait « aucune
+     * fiche classée » ; l'écran écrit « Chiffre indisponible pour le moment ».
+     *
      * @param  array<string, int>  $gabarit
-     * @return array<string, int>
+     * @return array<string, int>|null
      */
-    private function repartition(string $table, string $espace, string $colonne, array $gabarit): array
+    private function repartition(string $table, string $espace, string $colonne, array $gabarit): ?array
     {
         if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $colonne)) {
             return $gabarit;
@@ -371,6 +420,8 @@ class DashboardController extends ApiController
             Log::warning('dashboard: repartition indisponible', [
                 'table' => $table, 'colonne' => $colonne, ...self::panneSansSql($e),
             ]);
+
+            return null;
         }
 
         return $gabarit;

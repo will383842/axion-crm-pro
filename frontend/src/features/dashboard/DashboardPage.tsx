@@ -32,8 +32,10 @@ interface DashboardStats {
   contacts_qualified: number | null;
   scraper_runs_24h: number | null;
   llm_cost_eur_month: number;
-  quality_distribution: { complete: number; partielle: number; basique: number };
-  size_distribution: Record<string, number>;
+  /** `null` = répartition indisponible (requête en échec) : « — », jamais 0. */
+  quality_distribution: { complete: number; partielle: number; basique: number } | null;
+  /** `null` = répartition indisponible (requête en échec) : « — », jamais 0. */
+  size_distribution: Record<string, number> | null;
   // Champs optionnels — non garantis côté backend, traités défensivement.
   companies_new_7d?: number;
   companies_total_trend_pct?: number;
@@ -82,13 +84,29 @@ function valeurKpi(n: number | null | undefined) {
 }
 
 /**
- * 409 `no_workspace` : le compte n'est rattaché à aucun espace de travail. Le
- * serveur ne compte alors RIEN (cloisonnement) et le dit ; avant, il rendait
- * des zéros et l'écran annonçait « Votre base est vide ».
+ * Sans espace de travail courant, le serveur ne compte RIEN (cloisonnement) et
+ * le dit en 409 ; avant, il rendait des zéros et l'écran annonçait « Votre base
+ * est vide ». Deux codes, deux messages :
+ *  - `no_workspace` : le compte n'est membre d'aucun espace ;
+ *  - `workspace_not_selected` : il est membre, mais aucun n'est sélectionné.
+ * Dans les deux cas, seul l'administrateur peut agir (la console n'a pas de
+ * sélecteur d'espace).
  */
-function estSansEspace(err: unknown): boolean {
+const MESSAGES_SANS_ESPACE: Readonly<Record<string, { titre: string; texte: string }>> = {
+  no_workspace: {
+    titre: 'Aucun espace de travail',
+    texte: 'Aucun espace de travail n’est rattaché à votre compte. Contactez l’administrateur.',
+  },
+  workspace_not_selected: {
+    titre: 'Aucun espace de travail sélectionné',
+    texte: 'Votre compte est rattaché à un espace de travail, mais aucun n’est sélectionné. Contactez l’administrateur pour qu’il en sélectionne un.',
+  },
+};
+
+function sansEspaceDe(err: unknown): { titre: string; texte: string } | null {
   const q = qualifierErreur(err);
-  return q.status === 409 && q.code === 'no_workspace';
+  if (q.status !== 409 || q.code === null) return null;
+  return MESSAGES_SANS_ESPACE[q.code] ?? null;
 }
 
 interface MeResponse {
@@ -119,7 +137,7 @@ export function DashboardPage() {
     queryKey: ['dashboard-stats'],
     queryFn: async ({ signal }) => (await api.get<DashboardStats>('/dashboard/stats', { signal })).data,
     // Sans espace de travail, redemander toutes les 30 s ne changera rien.
-    refetchInterval: (query) => (estSansEspace(query.state.error) ? false : 30_000),
+    refetchInterval: (query) => (sansEspaceDe(query.state.error) !== null ? false : 30_000),
     // D25-008 — PAS de `placeholderData` ici, et c'est délibéré. Un
     // `placeholderData` met `isPending` à faux dès le premier rendu ; `isLoading`
     // (= isPending && isFetching) ne vaut alors JAMAIS vrai, et le
@@ -147,7 +165,7 @@ export function DashboardPage() {
   const firstName = firstNameFrom(me);
   // P0-1 — une panne n'est PAS une base vide. L'état vide n'existe que sur un
   // vrai 0 venu d'une réponse RÉUSSIE ; un échec affiche l'erreur.
-  const sansEspace = estSansEspace(error);
+  const sansEspace = sansEspaceDe(error);
   const echec = error !== null && data === undefined;
   const isEmpty = data !== undefined && data.companies_total === 0;
   const miseAJour = fraicheur(data?.computed_at);
@@ -176,13 +194,9 @@ export function DashboardPage() {
 
       {isLoading ? (
         <DashboardSkeleton />
-      ) : sansEspace ? (
+      ) : sansEspace !== null ? (
         <Card padding="lg">
-          <EmptyState
-            title="Aucun espace de travail"
-            description="Aucun espace de travail n’est rattaché à votre compte. Contactez l’administrateur."
-            icon={<FolderX />}
-          />
+          <EmptyState title={sansEspace.titre} description={sansEspace.texte} icon={<FolderX />} />
         </Card>
       ) : echec ? (
         <QueryErrorState error={error} contexte="les chiffres du tableau de bord" onRetry={() => void refetch()} />
@@ -205,7 +219,12 @@ export function DashboardPage() {
       ) : (
         <>
           {/* KPI grid */}
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section
+            className={cn(
+              'grid gap-3 sm:grid-cols-2',
+              typeof stats.companies_new_7d === 'number' ? 'lg:grid-cols-4' : 'lg:grid-cols-3',
+            )}
+          >
             <KpiCard
               tone="sky"
               label="Total entreprises"
@@ -236,23 +255,30 @@ export function DashboardPage() {
                   }
                 : {})}
             />
-            <KpiCard
-              tone="emerald"
-              label="Nouvelles 7j"
-              // Pas de valeur inventée (l'ancien repli `enrichies 24 h × 7`) :
-              // sans chiffre du serveur, on l'écrit.
-              value={valeurKpi(stats.companies_new_7d)}
-              sublabel="Découvertes sur 7 jours"
-              {...(typeof stats.new_7d_trend_pct === 'number'
-                ? {
-                    trend: {
-                      value: Math.abs(stats.new_7d_trend_pct),
-                      direction: stats.new_7d_trend_pct >= 0 ? 'up' : 'down',
-                      label: 'vs S-1',
-                    },
-                  }
-                : {})}
-            />
+            {/*
+              Relecture de #301 : le serveur ne calcule PAS (encore)
+              `companies_new_7d`. Afficher « — / indisponible pour le moment »
+              en permanence ferait passer une absence de calcul pour une panne
+              passagère. La vignette n'apparaît que si le serveur envoie le
+              chiffre ; sans lui, elle n'existe pas.
+            */}
+            {typeof stats.companies_new_7d === 'number' ? (
+              <KpiCard
+                tone="emerald"
+                label="Nouvelles 7j"
+                value={valeurKpi(stats.companies_new_7d)}
+                sublabel="Découvertes sur 7 jours"
+                {...(typeof stats.new_7d_trend_pct === 'number'
+                  ? {
+                      trend: {
+                        value: Math.abs(stats.new_7d_trend_pct),
+                        direction: stats.new_7d_trend_pct >= 0 ? 'up' : 'down',
+                        label: 'vs S-1',
+                      },
+                    }
+                  : {})}
+              />
+            ) : null}
             <KpiCard
               tone="amber"
               label="Qualité moyenne"

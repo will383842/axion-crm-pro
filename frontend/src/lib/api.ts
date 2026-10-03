@@ -205,6 +205,7 @@ export function qualifierErreur(error: unknown): ErreurQualifiee {
 export const MESSAGES_DES_CODES: Readonly<Record<string, string>> = {
   'workspace required': 'Aucun espace actif sur ce compte.',
   no_workspace: 'Aucun espace actif sur ce compte.',
+  workspace_not_selected: 'Aucun espace de travail n’est sélectionné sur ce compte.',
   'slug already exists': 'Une étiquette porte déjà ce nom.',
   'refresh failed': 'La mise à jour a échoué. Réessayez dans un instant.',
   'cannot update auto/llm tag': 'Les étiquettes automatiques ou proposées par l’IA ne se modifient pas.',

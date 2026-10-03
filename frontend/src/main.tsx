@@ -9,6 +9,7 @@ import { routeTree } from './app/routeTree';
 // `document.getElementById('root')` est nul sous vitest.
 import { AppRoot } from './app/AppRoot';
 import { initSentry } from './lib/sentry';
+import { doitReessayer } from './lib/nouvel-essai';
 // D26-003 — la densite d'affichage etait un `useState` local a /settings, sans
 // effet et sans persistance. Elle est relue ici, a l'amorcage, comme le theme :
 // un reglage d'apparence qui n'existe que dans l'ecran qui le regle n'en est
@@ -30,12 +31,9 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 30_000,
       gcTime: 5 * 60_000,
-      retry: (count, err) => {
-        const status = (err as { response?: { status?: number } } | null)?.response?.status;
-        // 409 : le serveur a répondu, et sa réponse ne changera pas en
-        // réessayant (ex. `no_workspace` du tableau de bord, audit UX P0-1).
-        return status !== 401 && status !== 403 && status !== 409 && count < 2;
-      },
+      // Règle testée dans `tests/lib/nouvel-essai.test.ts` (401/403/409 :
+      // jamais ; le reste : deux fois).
+      retry: doitReessayer,
       refetchOnWindowFocus: false,
     },
   },

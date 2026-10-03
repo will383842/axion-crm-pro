@@ -24,7 +24,8 @@
  *                                         + `filter[entity_nature]`, la
  *                                         prospection internationale)
  *   idx_companies_archive_reason ........ Index Scan  (`RescrapeArchivesCommand`
- *                                         :54 et `ObservabilityController`:174)
+ *                                         :54 et `ObservabilityController::
+ *                                         requeteMotifsArchivage`)
  *   idx_companies_best_email_confidence . Index Scan  (`filter[best_email_
  *                                         confidence]`, `CompanyQueryFilters`:38)
  *   idx_companies_revalidate ............ Index Scan  (`ProspectionFindWebsites`
@@ -363,7 +364,8 @@ test('G41-008 — la reprise des fiches archivees EMPLOIE son index', function (
     fixtureIndexes($this->workspace->id);
 
     // `RescrapeArchivesCommand:54` (`->where('archive_reason', $reason)`) et
-    // `ObservabilityController:174-177` (le decompte par motif d'archivage).
+    // `ObservabilityController::requeteMotifsArchivage` (le decompte par motif
+    // d'archivage).
     $plan = planForce(
         "SELECT id FROM companies WHERE workspace_id = ? AND archive_reason = 'no_email' LIMIT 50",
         [$this->workspace->id],

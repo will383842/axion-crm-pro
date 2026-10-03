@@ -623,7 +623,8 @@ Route::prefix('internal')->group(function () {
     // Lot N11 — SOCLE du futur canal Axion Partners, FERMÉ par défaut
     // (`CRM_PARTNERS_MODE=off` → le 404 d'une route absente). Une seule route,
     // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`, sur
-    // « horodatage.Idempotency-Key.corps »), anti-rejeu, idempotente ; elle
+    // « horodatage.MÉTHODE chemin.Idempotency-Key.corps », signature v2),
+    // corps borné à 256 Kio, anti-rejeu, idempotente ; elle
     // n'écrit que sa ligne d'idempotence. AUCUNE route métier tant que le
     // contrat n'est pas figé. ⛔ Jamais comme sonde de supervision.
     // Le tri de priorité de Laravel 12 place le limiteur AVANT le

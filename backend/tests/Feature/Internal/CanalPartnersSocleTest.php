@@ -10,7 +10,11 @@
  *     signature fausse ou absente, horodatage absent ou hors fenêtre, clé
  *     d'idempotence absente, hors format ou réécrite, rejeu, clé d'essai en
  *     mode actif) rendent un 401 au corps IDENTIQUE À L'OCTET ;
- *   - la clé d'idempotence est couverte par la signature ;
+ *   - la clé d'idempotence, la MÉTHODE et le CHEMIN sont couverts par la
+ *     signature (v2) : une signature valable pour une route est refusée, par
+ *     le même 401, sur une autre route ou sous une autre méthode ;
+ *   - un corps de plus de 256 Kio est refusé AVANT tout calcul HMAC, par le
+ *     même 401 (Content-Length annoncé ou taille réelle) ;
  *   - refus de démarrage : mode inconnu, secret entrant manquant, trop court,
  *     trop pauvre, au préfixe de développement, etc. ;
  *   - idempotence par (route, clé) : reprise rejouée À L'IDENTIQUE (mode
@@ -29,6 +33,7 @@ use App\Support\Partners\IdempotencePartners;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
@@ -78,8 +83,10 @@ function n11Configurer(string $mode, ?string $entrants = null, string $kidEssai 
 }
 
 /**
- * En-têtes signés comme Partners les produira :
- * HMAC-SHA256(secret, "<horodatage>.<Idempotency-Key>.<corps>").
+ * En-têtes signés comme Partners les produira (signature v2, accord du
+ * 03/10/2026 sur axion-apporteurs#220) :
+ * HMAC-SHA256(secret, "<horodatage>.<MÉTHODE> <chemin>.<Idempotency-Key>.<corps>"),
+ * ex. « 1759510000.POST /api/internal/partners/v1/ping.<clé>.<corps> ».
  *
  * @return array<string, string>
  */
@@ -90,6 +97,8 @@ function n11Entetes(
     ?string $horodatage = null,
     ?string $cle = N11_CLE,
     ?string $cleSignee = null,
+    string $methode = 'POST',
+    string $chemin = N11_ROUTE,
 ): array {
     $horodatage ??= (string) time();
     $secret ??= $kid === N11_KID_PROD ? n11SecretProd() : n11SecretEssai();
@@ -97,7 +106,7 @@ function n11Entetes(
 
     $entetes = [
         'HTTP_X_PARTNERS_TIMESTAMP' => $horodatage,
-        'HTTP_X_PARTNERS_SIGNATURE' => hash_hmac('sha256', $horodatage . '.' . $cleSignee . '.' . $corps, $secret),
+        'HTTP_X_PARTNERS_SIGNATURE' => hash_hmac('sha256', n11Chaine($horodatage, $methode, $chemin, $cleSignee, $corps), $secret),
     ];
     if ($kid !== null) {
         $entetes['HTTP_X_PARTNERS_KID'] = $kid;
@@ -107,6 +116,12 @@ function n11Entetes(
     }
 
     return $entetes;
+}
+
+/** Chaîne signée v2 : « <horodatage>.<MÉTHODE> <chemin>.<Idempotency-Key>.<corps> ». */
+function n11Chaine(string $horodatage, string $methode, string $chemin, string $cle, string $corps): string
+{
+    return $horodatage . '.' . $methode . ' ' . $chemin . '.' . $cle . '.' . $corps;
 }
 
 /** @param array<string, string> $entetes */
@@ -263,11 +278,21 @@ test('chaque refus d’authentification rend le MÊME 401, à l’octet près', 
         'signature fausse' => n11Entetes($corps, N11_KID_PROD, n11Fort('autre')),
         'signature absente' => array_diff_key(n11Entetes($corps, N11_KID_PROD), ['HTTP_X_PARTNERS_SIGNATURE' => 1]),
         'signature sans la clé d’idempotence' => array_merge(n11Entetes($corps, N11_KID_PROD, null, (string) $maintenant), [
-            'HTTP_X_PARTNERS_SIGNATURE' => hash_hmac('sha256', $maintenant . '.' . $corps, n11SecretProd()),
+            'HTTP_X_PARTNERS_SIGNATURE' => hash_hmac('sha256', $maintenant . '.POST ' . N11_ROUTE . '.' . $corps, n11SecretProd()),
         ]),
+        'signature v1 (sans méthode ni chemin)' => array_merge(n11Entetes($corps, N11_KID_PROD, null, (string) $maintenant), [
+            'HTTP_X_PARTNERS_SIGNATURE' => hash_hmac('sha256', $maintenant . '.' . N11_CLE . '.' . $corps, n11SecretProd()),
+        ]),
+        'signature sur la méthode en minuscules' => n11Entetes($corps, N11_KID_PROD, methode: 'post'),
+        'signature sur le chemin sans la barre initiale' => n11Entetes($corps, N11_KID_PROD, chemin: ltrim(N11_ROUTE, '/')),
+        'signature sur l’URL complète (avec le domaine)' => n11Entetes($corps, N11_KID_PROD, chemin: 'http://localhost' . N11_ROUTE),
+        'signature sur le chemin avec ses paramètres' => n11Entetes($corps, N11_KID_PROD, chemin: N11_ROUTE . '?x=1'),
         'horodatage absent' => array_diff_key(n11Entetes($corps, N11_KID_PROD), ['HTTP_X_PARTNERS_TIMESTAMP' => 1]),
-        'horodatage périmé' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant - 301)),
-        'horodatage en avance' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant + 301)),
+        // Marge d'une minute au-delà de la fenêtre (300 s) : les cas sont tous
+        // construits avant d'être envoyés, et l'horloge avance entre-temps ;
+        // « + 301 » retombait dans la fenêtre sur une machine chargée.
+        'horodatage périmé' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant - 360)),
+        'horodatage en avance' => n11Entetes($corps, N11_KID_PROD, null, (string) ($maintenant + 360)),
         'horodatage non entier' => n11Entetes($corps, N11_KID_PROD, null, $maintenant . '.5'),
         'clé d’idempotence absente' => n11Entetes($corps, N11_KID_PROD, cle: null, cleSignee: ''),
         'clé d’idempotence hors format (point)' => n11Entetes($corps, N11_KID_PROD, cle: 'cle.avec.point'),
@@ -310,6 +335,148 @@ test('une requête interceptée ne peut pas être présentée sous une autre cl�
     expect(n11Appel($corps, $detournee)->getContent())->toBe(N11_CORPS_401);
     n11Appel($corps, $entetes)->assertOk();
     expect(n11Lignes())->toBe(1);
+});
+
+// ─── Signature v2 : méthode et chemin signés ─────────────────────────────
+
+const N11_ROUTE_TEMOIN = '/api/internal/partners/v1/n11-temoin';
+
+/**
+ * Seconde route derrière le MÊME vérificateur, déclarée pour ce test seulement
+ * (POST et PUT) : elle ne lit rien et n'écrit rien, elle dit seulement « passé ».
+ */
+function n11DeclarerRouteTemoin(): void
+{
+    Route::match(['POST', 'PUT'], N11_ROUTE_TEMOIN, fn () => response()->json(['temoin' => true]))
+        ->middleware(VerificateurCanalPartners::class);
+    Route::getRoutes()->refreshNameLookups();
+}
+
+test('TÉMOIN v2 : la route témoin accepte une requête signée pour elle-même', function () {
+    n11Configurer('essai');
+    n11DeclarerRouteTemoin();
+    $corps = '{"essai":"temoin"}';
+
+    n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN), 'POST', N11_ROUTE_TEMOIN)
+        ->assertOk()->assertExactJson(['temoin' => true]);
+    n11Appel($corps, n11Entetes($corps, methode: 'PUT', chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 1)), 'PUT', N11_ROUTE_TEMOIN)
+        ->assertOk()->assertExactJson(['temoin' => true]);
+});
+
+test('une signature valable pour une route est refusée (même 401) sur une AUTRE route', function () {
+    n11Configurer('essai');
+    n11DeclarerRouteTemoin();
+    $corps = '{"essai":"autre-route"}';
+
+    // Signée pour le ping, présentée à la route témoin…
+    $detournee = n11Appel($corps, n11Entetes($corps), 'POST', N11_ROUTE_TEMOIN);
+    // … et signée pour la route témoin, présentée au ping.
+    $inverse = n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 1)));
+
+    foreach (['ping → témoin' => $detournee, 'témoin → ping' => $inverse] as $cas => $reponse) {
+        expect($reponse->getStatusCode())->toBe(401, "statut pour : {$cas}")
+            ->and($reponse->getContent())->toBe(N11_CORPS_401, "corps pour : {$cas}")
+            ->and($reponse->headers->get('Content-Type'))->toBe('application/json');
+    }
+    expect(n11Lignes())->toBe(0);
+});
+
+test('une signature valable pour une méthode est refusée (même 401) sous une AUTRE méthode', function () {
+    n11Configurer('essai');
+    n11DeclarerRouteTemoin();
+    $corps = '{"essai":"autre-methode"}';
+
+    $put = n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN), 'PUT', N11_ROUTE_TEMOIN);
+    $post = n11Appel($corps, n11Entetes($corps, methode: 'PUT', chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 1)), 'POST', N11_ROUTE_TEMOIN);
+
+    // Méthode substituée (`_method` en paramètre de requête, non signé) : la
+    // méthode EFFECTIVE change, la signature avec elle.
+    $substituee = n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 2)), 'POST', N11_ROUTE_TEMOIN . '?_method=PUT');
+
+    foreach (['POST signé, PUT présenté' => $put, 'PUT signé, POST présenté' => $post, 'POST signé, _method=PUT' => $substituee] as $cas => $reponse) {
+        expect($reponse->getStatusCode())->toBe(401, "statut pour : {$cas}")
+            ->and($reponse->getContent())->toBe(N11_CORPS_401, "corps pour : {$cas}");
+    }
+});
+
+test('le chemin signé ne comprend pas les paramètres de requête', function () {
+    n11Configurer('essai');
+    $corps = '{"essai":"parametres"}';
+
+    // Signée sur le chemin seul, envoyée avec « ?x=1 » : acceptée.
+    n11Appel($corps, n11Entetes($corps), 'POST', N11_ROUTE . '?x=1')
+        ->assertOk()
+        ->assertExactJson(['ok' => true, 'mode' => 'essai']);
+});
+
+// ─── Corps borné avant tout calcul HMAC ──────────────────────────────────
+
+/** Corps JSON d'exactement $octets octets. */
+function n11CorpsDeTaille(int $octets): string
+{
+    $enveloppe = '{"remplissage":""}';
+
+    return '{"remplissage":"' . str_repeat('x', $octets - strlen($enveloppe)) . '"}';
+}
+
+test('la borne du corps vaut 256 Kio (262 144 octets)', function () {
+    expect(VerificateurCanalPartners::CORPS_MAX_OCTETS)->toBe(262144);
+});
+
+test('TÉMOIN : un corps d’exactement 256 Kio, bien signé, passe', function () {
+    n11Configurer('essai');
+    $corps = n11CorpsDeTaille(262144);
+    expect(strlen($corps))->toBe(262144);
+
+    n11Appel($corps, n11Entetes($corps))->assertOk();
+});
+
+test('un corps de plus de 256 Kio est refusé par le même 401, même bien signé', function () {
+    n11Configurer('essai');
+    $corps = n11CorpsDeTaille(262145);
+    expect(strlen($corps))->toBe(262145);
+
+    $reponse = n11Appel($corps, n11Entetes($corps));
+
+    expect($reponse->getStatusCode())->toBe(401)
+        ->and($reponse->getContent())->toBe(N11_CORPS_401)
+        ->and($reponse->headers->get('Content-Type'))->toBe('application/json')
+        ->and(n11Lignes())->toBe(0);
+});
+
+test('Content-Length annoncé au-delà de 256 Kio : même 401, sans même regarder le corps', function () {
+    n11Configurer('essai');
+    $corps = '{"essai":"annonce"}';
+
+    $reponse = n11Appel($corps, array_merge(n11Entetes($corps), ['CONTENT_LENGTH' => '262145']));
+
+    expect($reponse->getStatusCode())->toBe(401)
+        ->and($reponse->getContent())->toBe(N11_CORPS_401)
+        ->and(n11Lignes())->toBe(0);
+});
+
+test('Content-Length qui ment (petit annoncé, gros reçu) : la taille réelle fait foi, même 401', function () {
+    n11Configurer('essai');
+    $corps = n11CorpsDeTaille(262145);
+
+    $reponse = n11Appel($corps, array_merge(n11Entetes($corps), ['CONTENT_LENGTH' => '20']));
+
+    expect($reponse->getStatusCode())->toBe(401)
+        ->and($reponse->getContent())->toBe(N11_CORPS_401)
+        ->and(n11Lignes())->toBe(0);
+});
+
+test('corps trop gros : refusé AVANT tout calcul HMAC, cause écrite au journal', function () {
+    n11Configurer('essai');
+    $corps = n11CorpsDeTaille(262145);
+    // Signature volontairement fausse : si un HMAC était calculé, la cause
+    // serait « signature invalide ». Elle doit être la taille.
+    $entetes = array_merge(n11Entetes($corps), ['HTTP_X_PARTNERS_SIGNATURE' => str_repeat('0', 64)]);
+
+    $journal = n11JournalPartners(fn () => n11Appel($corps, $entetes));
+
+    expect($journal)->toHaveCount(1)
+        ->and($journal[0]['message'])->toContain('corps trop volumineux');
 });
 
 // ─── Idempotence ─────────────────────────────────────────────────────────
@@ -463,6 +630,23 @@ test('une seule route sous partners : le ping, en POST, limiteur dédié puis v�
         ->and($route->gatherMiddleware())->not->toContain('throttle:internal');
 });
 
+test('aucun point dans les routes Partners (le point sépare les parties de la chaîne signée)', function () {
+    $routes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($route) => str_contains($route->uri(), 'partners'));
+
+    expect($routes)->not->toBeEmpty();
+    foreach ($routes as $route) {
+        expect($route->uri())->not->toContain('.');
+        // Un paramètre ne doit pas pouvoir capturer un point non plus : une
+        // contrainte `where` explicite est exigée pour chaque paramètre.
+        foreach ($route->parameterNames() as $parametre) {
+            $motif = $route->wheres[$parametre] ?? null;
+            expect($motif)->not->toBeNull("paramètre « {$parametre} » sans contrainte sur {$route->uri()}");
+            expect(preg_match('/^(?:' . $motif . ')$/', 'a.b'))->toBe(0, "le paramètre « {$parametre} » accepte un point");
+        }
+    }
+});
+
 test('la table d’idempotence n’est lue par aucun contrôleur ni aucune route', function () {
     $fichiers = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(app_path()));
     $lecteurs = [];
@@ -608,27 +792,111 @@ test('une violation d’unicité levée PAR LE TRAITEMENT remonte telle quelle (
         ->and($reprise->headers->has('Idempotent-Replayed'))->toBeFalse();
 });
 
-test('course perdue sur (route, clé) : traitement annulé, puis 409 ou rejeu — jamais une exception', function () {
+/**
+ * Course RÉELLE sur (route, clé) : pendant le traitement de la « perdante »
+ * (connexion par défaut, dans la transaction du test), la « gagnante » insère
+ * ET VALIDE sa ligne par une SECONDE session PostgreSQL (`pgsql_owner`, en
+ * auto-commit, hors de la transaction de `RefreshDatabase`). L'INSERT … ON
+ * CONFLICT de la perdante heurte alors une ligne réellement validée par
+ * quelqu'un d'autre, et `rejouer()` la relit dans un nouvel instantané
+ * (READ COMMITTED).
+ *
+ * La ligne de la gagnante survit au rollback du test : elle est supprimée
+ * explicitement dans un `finally`, par la même seconde connexion.
+ *
+ * @return array{0: JsonResponse, 1: int} réponse de la perdante, nombre d'effets restants
+ */
+function n11CourseReelle(string $corpsGagnante, string $corpsPerdante, string $route): array
+{
+    $gagnante = DB::connection('pgsql_owner');
+    expect($gagnante->getPdo())->not->toBe(DB::connection()->getPdo());
     n11TableEffets();
-    $corps = '{"essai":"course"}';
 
-    // La « gagnante » est simulée par une ligne écrite pendant le traitement :
-    // l'INSERT d'IdempotencePartners heurte alors sa propre contrainte.
-    $reponse = IdempotencePartners::executer(n11Requete($corps), 'route-n11', function () use ($corps): array {
-        DB::table('n11_effets')->insert(['cle' => 'effet-course']);
-        DB::table(IdempotencePartners::TABLE)->insert([
-            'route' => 'route-n11',
-            'cle_idempotence' => N11_CLE,
-            'empreinte_corps' => hash('sha256', 'un autre corps ' . $corps),
-            'code_reponse' => 200,
-        ]);
+    try {
+        $reponse = IdempotencePartners::executer(n11Requete($corpsPerdante), $route, function () use ($gagnante, $corpsGagnante, $route): array {
+            DB::table('n11_effets')->insert(['cle' => 'effet-course']);
+            // La gagnante, AUTRE session, valide sa ligne pendant ce traitement.
+            expect($gagnante->transactionLevel())->toBe(0);
+            $gagnante->table(IdempotencePartners::TABLE)->insert([
+                'route' => $route,
+                'cle_idempotence' => N11_CLE,
+                'empreinte_corps' => hash('sha256', $corpsGagnante),
+                'code_reponse' => 201,
+                'resume_reponse' => 'gagnante',
+                'recu_le' => now(),
+            ]);
 
-        return [200, null];
-    }, n11Rendu());
+            return [200, 'perdante'];
+        }, n11Rendu());
+
+        return [$reponse, DB::table('n11_effets')->count()];
+    } finally {
+        $gagnante->table(IdempotencePartners::TABLE)
+            ->where('route', $route)
+            ->where('cle_idempotence', N11_CLE)
+            ->delete();
+        expect($gagnante->table(IdempotencePartners::TABLE)->where('route', $route)->count())->toBe(0);
+    }
+}
+
+test('course RÉELLE perdue, corps identique : traitement annulé, réponse de la gagnante REJOUÉE', function () {
+    $corps = '{"essai":"course-identique"}';
+
+    [$reponse, $effets] = n11CourseReelle($corps, $corps, 'route-n11-course-identique');
+
+    expect($reponse->getStatusCode())->toBe(201)
+        ->and($reponse->headers->get('Idempotent-Replayed'))->toBe('true')
+        ->and($reponse->getData(true))->toBe(['code' => 201, 'resume' => 'gagnante'])
+        ->and($effets)->toBe(0);
+});
+
+test('course RÉELLE perdue, corps différent : traitement annulé, 409 cle_reutilisee', function () {
+    [$reponse, $effets] = n11CourseReelle('{"essai":"gagnante"}', '{"essai":"perdante"}', 'route-n11-course-differente');
 
     expect($reponse->getStatusCode())->toBe(409)
         ->and($reponse->getContent())->toBe('{"erreur":"cle_reutilisee"}')
-        ->and(DB::table('n11_effets')->count())->toBe(0);
+        ->and($reponse->headers->has('Idempotent-Replayed'))->toBeFalse()
+        ->and($effets)->toBe(0);
+});
+
+test('IdempotencePartners::executer() fonctionne sous le rôle applicatif (SET ROLE, SELECT/INSERT seuls)', function () {
+    $role = (string) config('database.connections.pgsql_app.username');
+    if ($role === '' || DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$role]) === null) {
+        if (getenv('CI') !== false && getenv('CI') !== '') {
+            $this->fail("Rôle applicatif « {$role} » absent en CI : l'épreuve des droits ne mesure plus rien.");
+        }
+        $this->markTestSkipped("Rôle applicatif « {$role} » absent de cette base locale.");
+    }
+
+    $corps = '{"essai":"role-applicatif"}';
+    $executions = 0;
+    $traitement = function () use (&$executions): array {
+        $executions++;
+
+        return [200, 'sous-role'];
+    };
+
+    DB::statement('SET ROLE ' . $role);
+    try {
+        expect(DB::selectOne('SELECT current_user AS u')->u)->toBe($role);
+
+        $premiere = IdempotencePartners::executer(n11Requete($corps), 'route-n11-role', $traitement, n11Rendu());
+        $reprise = IdempotencePartners::executer(n11Requete($corps), 'route-n11-role', $traitement, n11Rendu());
+        $autre = IdempotencePartners::executer(n11Requete('{"essai":"autre"}'), 'route-n11-role', $traitement, n11Rendu());
+
+        // Toujours sous le rôle : rien n'a basculé en chemin.
+        expect(DB::selectOne('SELECT current_user AS u')->u)->toBe($role);
+    } finally {
+        DB::statement('RESET ROLE');
+    }
+
+    expect($premiere->getStatusCode())->toBe(200)
+        ->and($premiere->headers->has('Idempotent-Replayed'))->toBeFalse()
+        ->and($reprise->getStatusCode())->toBe(200)
+        ->and($reprise->headers->get('Idempotent-Replayed'))->toBe('true')
+        ->and($autre->getStatusCode())->toBe(409)
+        ->and($executions)->toBe(1)
+        ->and(n11Lignes())->toBe(1);
 });
 
 test('la contrainte d’unicité (route, clé) porte bien le nom attendu par IdempotencePartners', function () {

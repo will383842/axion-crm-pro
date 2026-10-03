@@ -2,6 +2,7 @@
 
 use App\Providers\AppServiceProvider;
 use App\Providers\AuthServiceProvider;
+use App\Providers\CanalPartnersServiceProvider;
 use App\Providers\CanauxSignesServiceProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\MockServicesProvider;
@@ -10,6 +11,7 @@ use App\Providers\TelescopeServiceProvider;
 
 return [
     CanauxSignesServiceProvider::class,
+    CanalPartnersServiceProvider::class,
     AppServiceProvider::class,
     AuthServiceProvider::class,
     HorizonServiceProvider::class,

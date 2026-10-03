@@ -48,10 +48,12 @@ use App\Http\Controllers\Api\ScrapingCampaignsController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WorkspaceController;
+use App\Http\Controllers\Internal\PartnersPingController;
 use App\Http\Controllers\Internal\ScraperResultController;
 use App\Http\Controllers\Internal\SiteGdprController;
 use App\Http\Controllers\Internal\SiteSyncController;
 use App\Http\Controllers\Internal\ZeptoMailWebhookController;
+use App\Http\Middleware\VerificateurCanalPartners;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -612,4 +614,14 @@ Route::prefix('internal')->group(function () {
     Route::post('/email/zeptomail', [ZeptoMailWebhookController::class, 'store'])
         ->middleware('throttle:internal')
         ->name('internal.email.zeptomail');
+
+    // Lot N11 — SOCLE du futur canal Axion Partners, FERMÉ par défaut
+    // (`CRM_PARTNERS_MODE=off` → 404 comme une route absente). Une seule route,
+    // TECHNIQUE : signée (`X-Partners-Timestamp` / `-Kid` / `-Signature`),
+    // anti-rejeu, idempotente (`Idempotency-Key`), elle n'écrit que sa ligne
+    // d'idempotence. AUCUNE route métier tant que le contrat n'est pas figé.
+    // Le vérificateur passe AVANT le limiteur : en `off`, rien n'est compté.
+    Route::post('/partners/v1/ping', PartnersPingController::class)
+        ->middleware([VerificateurCanalPartners::class, 'throttle:internal'])
+        ->name('internal.partners.ping');
 });

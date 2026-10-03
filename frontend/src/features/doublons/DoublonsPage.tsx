@@ -20,6 +20,7 @@ import { CheckCircle2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
+import { COMPTEURS_A_TRAITER_KEY } from "@/features/a-traiter/compteurs";
 
 export type FicheDoublon = {
   id: number;
@@ -122,6 +123,7 @@ export function DoublonsPage() {
       (await api.post<{ fusion_id: number }>(`/doublons/${p.id}/fusionner`)).data,
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ["doublons"] });
+      void qc.invalidateQueries({ queryKey: COMPTEURS_A_TRAITER_KEY });
       toast.success(`Fiches fusionnées (fusion n° ${r.fusion_id}, annulable).`);
     },
     onError: (err: unknown) => toast.error(erreur(err, "La fusion n'a pas été faite.")),
@@ -132,6 +134,7 @@ export function DoublonsPage() {
       (await api.post<{ ok: boolean }>(`/doublons/${p.id}/ignorer`)).data,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["doublons"] });
+      void qc.invalidateQueries({ queryKey: COMPTEURS_A_TRAITER_KEY });
       toast.success("Paire écartée : elle ne sera plus proposée.");
     },
     onError: (err: unknown) => toast.error(erreur(err, "La paire n'a pas été écartée.")),

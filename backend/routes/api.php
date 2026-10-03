@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\Crm\ArbitrageController;
+use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
 use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
@@ -543,6 +544,13 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:companies.update');
 
             Route::post('/bulk', BulkController::class)->middleware('delai-sql:300');
+
+            // Pastilles « À traiter » du menu (audit UX lot 8) : les totaux des
+            // files « Doublons à vérifier » et « Personnes à rattacher », par
+            // les MÊMES requêtes que leurs écrans. Appelée par le menu, sur
+            // tous les écrans, toutes les 60 s : trois secondes au plus, un
+            // compteur qui les dépasse vaut `null` (pas de pastille).
+            Route::get('/a-traiter/compteurs', [ATraiterController::class, 'compteurs'])->middleware('delai-sql:3');
         });
 
         // --- Phase 2 (stubs, retournent 501 Not Implemented) ---------------

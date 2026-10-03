@@ -63,6 +63,9 @@ describe('Catégorie juridique INSEE', () => {
     ['6540', 'Société civile immobilière (SCI)'],
     ['9220', 'Association déclarée'],
     ['7210', 'Commune et commune nouvelle'],
+    ['5498', 'SARL unipersonnelle (EURL)'],
+    ['6220', 'GIE, groupement d’intérêt économique'],
+    ['6210', 'GEIE, groupement européen d’intérêt économique'],
   ])('%s → %s', (code, libelle) => {
     expect(libelleCategorieJuridique(code)).toBe(libelle);
   });
@@ -77,8 +80,9 @@ describe('Catégorie juridique INSEE', () => {
     expect(libelleCategorieJuridique('5770')).toBe('SAS');
     expect(libelleCategorieJuridique('5415')).toBe('SARL');
     expect(libelleCategorieJuridique('5570')).toBe('SA');
+    expect(libelleCategorieJuridique('6564')).toBe('Société civile');
     expect(libelleCategorieJuridique('9299')).toBe('Association loi 1901 ou assimilé');
-    expect(libelleCategorieJuridique('7999')).toBe('Personne morale de droit public');
+    expect(libelleCategorieJuridique('7999')).toBe('Personne morale de droit administratif');
   });
 
   it.each(['3120', '0000', '12', 'abc', '', null, undefined])('code inconnu ou mal formé (%s) → null', (code) => {
@@ -102,6 +106,8 @@ describe('Tranche d’effectif INSEE', () => {
   it('« NN » : non employeuse', () => {
     expect(libelleEffectif('NN')).toBe('Non employeuse');
     expect(libelleEffectif('nn')).toBe('Non employeuse');
+    // Une clé héritée d'Object n'est pas une tranche.
+    expect(libelleEffectif('toString')).toBeNull();
   });
 
   it.each(['99', 'ZZ', '', null, undefined])('tranche inconnue (%s) → null ; la liste garde « — »', (code) => {

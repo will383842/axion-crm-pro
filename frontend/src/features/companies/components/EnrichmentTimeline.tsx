@@ -12,10 +12,12 @@ export interface TimelineStep {
  * Statut d'une source, EN CLAIR (constaté en production le 03/10/2026 :
  * « Base Adresse Nationale · success »).
  *
- * Valeurs réellement produites : le front lui-même (`success` / `pending`
- * ci-dessous, quand le signal n'a pas de statut), et côté serveur
- * `WaterfallOrchestrator::recordRun()` (`success`, `failed`, `partial`), plus
- * les états de passage (`skipped`, `gave_up`, `running`…). Les synonymes sont
+ * La fiche lit `companies.signals` (voir `deriveTimelineFromSignals`), PAS
+ * les traces de passage des sources. Aujourd'hui, aucun signal ne porte de
+ * champ `status` : seules arrivent les valeurs par défaut posées ci-dessous,
+ * `success` (signal présent) et `pending` (signal vide). La table couvre
+ * malgré tout les autres valeurs plausibles (`failed`, `partial`, `skipped`,
+ * `not_found`…) pour le jour où un signal en portera une. Les synonymes sont
  * regroupés ; une valeur jamais vue devient « Autre » plutôt que de laisser
  * passer un mot anglais.
  */

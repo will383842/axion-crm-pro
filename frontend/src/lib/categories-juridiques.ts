@@ -17,6 +17,10 @@
  * sont abrégés pour tenir sur une ligne. Un code absent de la table retombe
  * sur le libellé de sa famille (`FAMILLES`), jamais sur un libellé deviné ;
  * un code dont on ne connaît même pas la famille s'affiche tel quel.
+ *
+ * 6564 (SCP d'huissiers, profession devenue commissaire de justice) est
+ * volontairement absent : faute de libellé INSEE actuel certain, il retombe
+ * sur « Société civile ».
  */
 export const CATEGORIES_JURIDIQUES: Readonly<Record<string, string>> = {
   '1000': 'Entrepreneur individuel',
@@ -36,6 +40,7 @@ export const CATEGORIES_JURIDIQUES: Readonly<Record<string, string>> = {
   '5460': 'Autre SARL coopérative',
   '5470': 'Société de participations financières de profession libérale à responsabilité limitée (SPFPL SARL)',
   '5485': 'Société d’exercice libéral à responsabilité limitée (SELARL)',
+  '5498': 'SARL unipersonnelle (EURL)',
   '5499': 'SARL, société à responsabilité limitée',
 
   '5505': 'SA à participation ouvrière à conseil d’administration',
@@ -93,6 +98,9 @@ export const CATEGORIES_JURIDIQUES: Readonly<Record<string, string>> = {
   '5785': 'Société d’exercice libéral par actions simplifiée (SELAS)',
   '5800': 'Société européenne',
 
+  '6210': 'GEIE, groupement européen d’intérêt économique',
+  '6220': 'GIE, groupement d’intérêt économique',
+
   '6316': 'Coopérative d’utilisation de matériel agricole en commun (CUMA)',
   '6317': 'Société coopérative agricole',
   '6318': 'Union de sociétés coopératives agricoles',
@@ -119,7 +127,6 @@ export const CATEGORIES_JURIDIQUES: Readonly<Record<string, string>> = {
   '6561': 'SCP d’avocats',
   '6562': 'SCP d’avocats aux conseils',
   '6563': 'SCP d’avoués d’appel',
-  '6564': 'SCP d’huissiers',
   '6565': 'SCP de notaires',
   '6566': 'SCP de commissaires-priseurs',
   '6567': 'SCP de greffiers de tribunal de commerce',
@@ -252,7 +259,7 @@ const FAMILLES: ReadonlyArray<readonly [string, string]> = [
   ['65', 'Société civile'],
   ['92', 'Association loi 1901 ou assimilé'],
   ['1', 'Entrepreneur individuel'],
-  ['7', 'Personne morale de droit public'],
+  ['7', 'Personne morale de droit administratif'],
 ];
 
 /** Le code à 4 chiffres (« 57.10 », « 5710 » → « 5710 »), ou `null`. */

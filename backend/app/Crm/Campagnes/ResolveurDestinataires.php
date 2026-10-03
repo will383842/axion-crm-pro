@@ -31,7 +31,8 @@ use RuntimeException;
  *     filtre éventuel par fonction (`contacts.role`) et par personnes cochées
  *     dans une liste manuelle ;
  *  3. chaque adresse est jugée UNE fois, sur toutes ses occurrences, par la
- *     règle de #253 (`EligibiliteAdresse` : invalide, non vérifiée valide,
+ *     règle de #253 (`EligibiliteAdresse` : entreprise individuelle,
+ *     invalide, non vérifiée valide,
  *     personnelle, opposition/suppression via
  *     `EligibiliteCampagne::peutRecevoir`), puis par `AdressesPartagees`
  *     (cabinet, domiciliation — #260) ;
@@ -52,7 +53,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -112,7 +113,7 @@ final class ResolveurDestinataires
         /** @var array<string, list<Candidat>> $occurrences */
         $occurrences = [];
 
-        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals'])
+        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form'])
             ->when($presse, static fn ($q) => $q->selectRaw(
                 AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
                 . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie',
@@ -350,6 +351,9 @@ final class ResolveurDestinataires
         $signals = json_decode(is_string($fiche['signals'] ?? null) ? $fiche['signals'] : '{}', true);
         $signals = is_array($signals) ? $signals : [];
         $dejaInformee = $fiche['first_info_at'] !== null;
+        // Lu sur la fiche DÉJÀ chargée (le lot de l'audience) : aucune
+        // condition de plus sur `companies`, rien à indexer.
+        $ei = EligibiliteAdresse::estEntrepriseIndividuelle($fiche['legal_form'] ?? null);
         $candidats = [];
         $vues = [];
 
@@ -359,7 +363,7 @@ final class ResolveurDestinataires
             $candidats[] = [
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'ecartee' => null,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -404,7 +408,7 @@ final class ResolveurDestinataires
                 'email' => $e, 'classe' => $classe === self::INCONNUE ? self::NOMINATIVE : $classe,
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'ecartee' => $ecartee,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'ecartee' => $ecartee,
             ];
         }
 
@@ -428,6 +432,7 @@ final class ResolveurDestinataires
                 'verification' => VerificationEmail::statutDe($meta['email_verification'] ?? null, $e),
                 'perso' => ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => ($c->first_info_at ?? null) !== null,
+                'entreprise_individuelle' => $ei,
                 'ecartee' => $ecartee,
             ];
         }

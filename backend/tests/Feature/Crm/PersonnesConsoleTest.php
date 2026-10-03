@@ -409,6 +409,38 @@ test('L4-C relecture — l’export ne sort par défaut QUE les personnes prospe
         ->and(str_getcsv((string) $ligneGuide)[9])->toBe('non');
 });
 
+test('L4-C relecture — l’export n’emporte JAMAIS par défaut une personne d’entrepreneur individuel ; sur demande, la colonne le dit', function () {
+    // SIREN de la plage fictive du dépôt (90000050x), formes juridiques INSEE.
+    $ei = l4cEntreprise($this->workspace->id, '900000511');
+    $societe = l4cEntreprise($this->workspace->id, '900000512');
+    $inconnue = l4cEntreprise($this->workspace->id, '900000513');
+    DB::table('companies')->where('id', $ei)->update(['legal_form' => '1000']);
+    DB::table('companies')->where('id', $societe)->update(['legal_form' => '5710']);
+    l4cPersonne($this->workspace->id, 'zz.ei@example.invalid', ['company_id' => $ei]);
+    l4cPersonne($this->workspace->id, 'zz.societe@example.invalid', ['company_id' => $societe]);
+    l4cPersonne($this->workspace->id, 'zz.inconnue@example.invalid', ['company_id' => $inconnue]);
+    l4cPersonne($this->workspace->id, 'zz.sans-fiche@example.invalid');
+
+    $defaut = $this->get('/api/v1/crm/personnes/export')->assertOk()->streamedContent();
+
+    expect($defaut)->not->toContain('zz.ei@example.invalid')
+        ->toContain('zz.societe@example.invalid')
+        ->toContain('zz.inconnue@example.invalid')
+        ->toContain('zz.sans-fiche@example.invalid')
+        ->toContain('Entrepreneur individuel');
+
+    $tous = $this->get('/api/v1/crm/personnes/export?inclure_non_prospectables=oui')->assertOk()->streamedContent();
+    $ligne = static fn (string $email): array => str_getcsv((string) collect(explode("\n", $tous))
+        ->first(fn (string $l): bool => str_contains($l, $email)));
+
+    // Colonne 9 « Prospection autorisée », colonne 13 « Entrepreneur individuel ».
+    expect($ligne('zz.ei@example.invalid')[9])->toBe('non')
+        ->and($ligne('zz.ei@example.invalid')[13])->toBe('oui')
+        ->and($ligne('zz.societe@example.invalid')[9])->toBe('oui')
+        ->and($ligne('zz.societe@example.invalid')[13])->toBe('non')
+        ->and($ligne('zz.inconnue@example.invalid')[13])->toBe('non');
+});
+
 test('L4-C relecture — l’export NEUTRALISE une formule venue du formulaire public', function () {
     l4cPersonne($this->workspace->id, 'zz.formule@example.invalid', [
         'first_name' => '=HYPERLINK("http://example.invalid","x")',

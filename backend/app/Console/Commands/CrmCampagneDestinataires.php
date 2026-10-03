@@ -100,6 +100,7 @@ class CrmCampagneDestinataires extends Command
 
     /** Motif d'`EligibiliteAdresse` => compteur du bilan (noms inchangés depuis #253). */
     private const COMPTEURS_MOTIFS = [
+        EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
         EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
         EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
         EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
@@ -156,7 +157,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_entreprise_individuelle', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -356,6 +357,7 @@ class CrmCampagneDestinataires extends Command
             ->orderBy('companies.id')
             ->select([
                 'companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals',
+                'companies.legal_form',
                 'federations.pertinence', 'federations.famille', 'federations.niveau', 'federations.secteurs',
                 'federations.parent_company_id',
             ])
@@ -414,6 +416,9 @@ class CrmCampagneDestinataires extends Command
     private function adresses(string $workspaceId, \stdClass $org, bool $presse = false): array
     {
         $adresses = [];
+        // Entrepreneur individuel (`EligibiliteAdresse`) : lu sur la fiche
+        // déjà chargée, posé sur chacune de ses adresses.
+        $ei = EligibiliteAdresse::estEntrepriseIndividuelle($org->legal_form ?? null);
         $fiche = $presse ? [
             'site_devine' => (bool) $org->site_devine,
             'site_verifie' => (bool) $org->site_verifie,
@@ -436,6 +441,7 @@ class CrmCampagneDestinataires extends Command
                 'verification' => VerificationEmail::statutDe($verification, (string) $org->email_generic),
                 'perso' => false,
                 'deja_informe' => $org->first_info_at !== null,
+                'entreprise_individuelle' => $ei,
             ];
         }
 
@@ -482,6 +488,7 @@ class CrmCampagneDestinataires extends Command
                 'verification' => VerificationEmail::statutDe(is_array($meta) ? ($meta['email_verification'] ?? null) : null, (string) $c->email),
                 'perso' => is_array($meta) && ($meta['email_nature'] ?? null) === 'perso',
                 'deja_informe' => $c->first_info_at !== null,
+                'entreprise_individuelle' => $ei,
             ];
         }
 

@@ -386,7 +386,11 @@ test('une signature valable pour une méthode est refusée (même 401) sous une 
     $put = n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN), 'PUT', N11_ROUTE_TEMOIN);
     $post = n11Appel($corps, n11Entetes($corps, methode: 'PUT', chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 1)), 'POST', N11_ROUTE_TEMOIN);
 
-    foreach (['POST signé, PUT présenté' => $put, 'PUT signé, POST présenté' => $post] as $cas => $reponse) {
+    // Méthode substituée (`_method` en paramètre de requête, non signé) : la
+    // méthode EFFECTIVE change, la signature avec elle.
+    $substituee = n11Appel($corps, n11Entetes($corps, chemin: N11_ROUTE_TEMOIN, horodatage: (string) (time() - 2)), 'POST', N11_ROUTE_TEMOIN . '?_method=PUT');
+
+    foreach (['POST signé, PUT présenté' => $put, 'PUT signé, POST présenté' => $post, 'POST signé, _method=PUT' => $substituee] as $cas => $reponse) {
         expect($reponse->getStatusCode())->toBe(401, "statut pour : {$cas}")
             ->and($reponse->getContent())->toBe(N11_CORPS_401, "corps pour : {$cas}");
     }

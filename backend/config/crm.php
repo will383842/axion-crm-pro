@@ -179,9 +179,12 @@ return [
     | secret sont rognés ; un secret fait 32 octets dont 12 caractères
     | distincts, sans virgule (séparateur).
     |
-    | Signature attendue de Partners :
+    | Signature attendue de Partners (v2, accord du 03/10/2026) :
     |   X-Partners-Signature = hex(HMAC-SHA256(secret,
-    |                             "<X-Partners-Timestamp>.<Idempotency-Key>.<corps>"))
+    |     "<X-Partners-Timestamp>.<MÉTHODE> <chemin>.<Idempotency-Key>.<corps brut>"))
+    |   ex. "1759510000.POST /api/internal/partners/v1/ping.<clé>.<corps>"
+    |   (méthode en majuscules, chemin sans domaine ni paramètres de requête ;
+    |   corps de plus de 256 Kio refusé avant tout calcul, même 401).
     |
     | `kid_essai` : identifiant de la clé entrante réservée aux essais. Elle
     | n'est acceptée qu'en mode `essai` ; en `actif`, elle reçoit le même 401

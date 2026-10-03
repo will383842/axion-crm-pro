@@ -228,7 +228,7 @@ afterEach(function () {
     try {
         catApp()->statement('RESET enable_seqscan');
         catApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // Connexion déjà perdue : elle part avec le `disconnect()`.
     }
     catApp()->disconnect();

@@ -29,7 +29,10 @@ use App\Support\Partners\IdempotencePartners;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
@@ -507,4 +510,205 @@ test('le rôle applicatif lit et insère, mais ne modifie, ne supprime ni ne vid
         ->and($droit('UPDATE'))->toBeFalse('UPDATE rétabli — un GRANT ON ALL TABLES a-t-il été relancé ?')
         ->and($droit('DELETE'))->toBeFalse('DELETE rétabli — un GRANT ON ALL TABLES a-t-il été relancé ?')
         ->and($droit('TRUNCATE'))->toBeFalse('TRUNCATE rétabli');
+});
+
+// ─── Réserves de relecture de #307 (avant toute route métier) ────────────
+
+/**
+ * Requête prête pour `IdempotencePartners::executer()` (l'authentification est
+ * celle du vérificateur, éprouvée plus haut ; ici seule l'idempotence compte).
+ */
+function n11Requete(string $corps, string $cle = N11_CLE): Request
+{
+    return Request::create('/n11', 'POST', [], [], [], ['HTTP_IDEMPOTENCY_KEY' => $cle], $corps);
+}
+
+/** Rendu neutre : le code et le résumé tels quels. */
+function n11Rendu(): Closure
+{
+    return fn (int $code, ?string $resume): array => ['code' => $code, 'resume' => $resume];
+}
+
+/** Table témoin d'un effet du traitement, avec sa propre contrainte d'unicité. */
+function n11TableEffets(): void
+{
+    DB::statement('CREATE TEMPORARY TABLE n11_effets (cle text CONSTRAINT n11_effets_cle_unique UNIQUE)');
+}
+
+test('une 5xx n’est PAS mémorisée : rien n’est inséré, l’effet est annulé, la reprise retente', function () {
+    n11TableEffets();
+    $corps = '{"essai":"5xx"}';
+    $executions = 0;
+
+    $echec = IdempotencePartners::executer(n11Requete($corps), 'route-n11', function () use (&$executions): array {
+        $executions++;
+        DB::table('n11_effets')->insert(['cle' => 'effet-1']);
+
+        return [503, null];
+    }, n11Rendu());
+
+    expect($echec->getStatusCode())->toBe(503)
+        ->and($echec->headers->has('Idempotent-Replayed'))->toBeFalse()
+        ->and(n11Lignes())->toBe(0)
+        ->and(DB::table('n11_effets')->count())->toBe(0);
+
+    $reprise = IdempotencePartners::executer(n11Requete($corps), 'route-n11', function () use (&$executions): array {
+        $executions++;
+        DB::table('n11_effets')->insert(['cle' => 'effet-1']);
+
+        return [200, 'fait'];
+    }, n11Rendu());
+
+    expect($reprise->getStatusCode())->toBe(200)
+        ->and($reprise->headers->has('Idempotent-Replayed'))->toBeFalse()
+        ->and($reprise->getData(true))->toBe(['code' => 200, 'resume' => 'fait'])
+        ->and($executions)->toBe(2)
+        ->and(n11Lignes())->toBe(1)
+        ->and(DB::table('n11_effets')->count())->toBe(1);
+});
+
+test('une 4xx reste mémorisée et rejouée (seules les 5xx sont retentées)', function () {
+    $corps = '{"essai":"4xx"}';
+    $executions = 0;
+    $traitement = function () use (&$executions): array {
+        $executions++;
+
+        return [422, 'refus'];
+    };
+
+    IdempotencePartners::executer(n11Requete($corps), 'route-n11', $traitement, n11Rendu());
+    $reprise = IdempotencePartners::executer(n11Requete($corps), 'route-n11', $traitement, n11Rendu());
+
+    expect($reprise->getStatusCode())->toBe(422)
+        ->and($reprise->headers->get('Idempotent-Replayed'))->toBe('true')
+        ->and($executions)->toBe(1)
+        ->and(n11Lignes())->toBe(1);
+});
+
+test('une violation d’unicité levée PAR LE TRAITEMENT remonte telle quelle (jamais un 409 trompeur)', function () {
+    n11TableEffets();
+    DB::table('n11_effets')->insert(['cle' => 'deja-la']);
+    $corps = '{"essai":"unicite-metier"}';
+
+    try {
+        IdempotencePartners::executer(n11Requete($corps), 'route-n11', function (): array {
+            DB::table('n11_effets')->insert(['cle' => 'deja-la']);
+
+            return [200, null];
+        }, n11Rendu());
+        $this->fail('La violation d’unicité du traitement aurait dû remonter.');
+    } catch (UniqueConstraintViolationException $e) {
+        expect($e->getMessage())->toContain('n11_effets_cle_unique');
+    }
+
+    // Rien n'est mémorisé : la même clé, reprise, s'exécute réellement.
+    expect(n11Lignes())->toBe(0);
+    $reprise = IdempotencePartners::executer(n11Requete($corps), 'route-n11', fn (): array => [201, null], n11Rendu());
+    expect($reprise->getStatusCode())->toBe(201)
+        ->and($reprise->headers->has('Idempotent-Replayed'))->toBeFalse();
+});
+
+test('course perdue sur (route, clé) : traitement annulé, puis 409 ou rejeu — jamais une exception', function () {
+    n11TableEffets();
+    $corps = '{"essai":"course"}';
+
+    // La « gagnante » est simulée par une ligne écrite pendant le traitement :
+    // l'INSERT d'IdempotencePartners heurte alors sa propre contrainte.
+    $reponse = IdempotencePartners::executer(n11Requete($corps), 'route-n11', function () use ($corps): array {
+        DB::table('n11_effets')->insert(['cle' => 'effet-course']);
+        DB::table(IdempotencePartners::TABLE)->insert([
+            'route' => 'route-n11',
+            'cle_idempotence' => N11_CLE,
+            'empreinte_corps' => hash('sha256', 'un autre corps ' . $corps),
+            'code_reponse' => 200,
+        ]);
+
+        return [200, null];
+    }, n11Rendu());
+
+    expect($reponse->getStatusCode())->toBe(409)
+        ->and($reponse->getContent())->toBe('{"erreur":"cle_reutilisee"}')
+        ->and(DB::table('n11_effets')->count())->toBe(0);
+});
+
+test('la contrainte d’unicité (route, clé) porte bien le nom attendu par IdempotencePartners', function () {
+    $contrainte = DB::selectOne(
+        "SELECT pg_get_constraintdef(c.oid) AS def FROM pg_constraint c
+          WHERE c.conname = ? AND c.conrelid = ?::regclass AND c.contype = 'u'",
+        [IdempotencePartners::CONTRAINTE_UNICITE, IdempotencePartners::TABLE],
+    );
+
+    expect($contrainte)->not->toBeNull()
+        ->and($contrainte->def)->toBe('UNIQUE (route, cle_idempotence)');
+});
+
+/** @return list<array{message: string, contexte: array<string, mixed>}> */
+function n11JournalPartners(Closure $action): array
+{
+    $journal = [];
+    Log::listen(function (MessageLogged $e) use (&$journal): void {
+        if (str_starts_with($e->message, 'canal Partners')) {
+            $journal[] = ['message' => $e->message, 'contexte' => $e->context];
+        }
+    });
+    $action();
+
+    return $journal;
+}
+
+test('journal des refus : empreinte HMAC à clé de l’IP, jamais l’IP en clair', function () {
+    n11Configurer('actif');
+    config(['crm.journaux.ip_cle' => n11Fort('cle-journal-ip')]);
+    $ip = '203.0.113.47';
+    $corps = '{"essai":"journal"}';
+
+    $journal = n11JournalPartners(function () use ($corps, $ip): void {
+        $reponse = n11Appel($corps, array_merge(n11Entetes($corps, 'inconnu-1', n11SecretProd()), ['REMOTE_ADDR' => $ip]));
+        // Le 401 ne change pas d'un octet.
+        expect($reponse->getStatusCode())->toBe(401)
+            ->and($reponse->getContent())->toBe(N11_CORPS_401);
+    });
+
+    expect($journal)->toHaveCount(1)
+        ->and(json_encode($journal))->not->toContain($ip)
+        ->and($journal[0]['contexte'])->not->toHaveKey('ip')
+        ->and($journal[0]['contexte']['ip_empreinte'])
+        ->toBe(substr(hash_hmac('sha256', $ip, n11Fort('cle-journal-ip')), 0, 32));
+});
+
+test('journal du 503 (mémoire anti-rejeu indisponible) : empreinte HMAC, jamais l’IP en clair', function () {
+    n11Configurer('essai');
+    config(['crm.journaux.ip_cle' => n11Fort('cle-journal-ip'), 'crm.ingest.replay_store' => 'magasin-inexistant']);
+    $ip = '198.51.100.23';
+    $corps = '{"essai":"journal-503"}';
+
+    $journal = n11JournalPartners(function () use ($corps, $ip): void {
+        $reponse = n11Appel($corps, array_merge(n11Entetes($corps), ['REMOTE_ADDR' => $ip]));
+        expect($reponse->getStatusCode())->toBe(503);
+    });
+
+    expect($journal)->toHaveCount(1)
+        ->and(json_encode($journal))->not->toContain($ip)
+        ->and($journal[0]['contexte']['ip_empreinte'])
+        ->toBe(substr(hash_hmac('sha256', $ip, n11Fort('cle-journal-ip')), 0, 32));
+});
+
+test('sans clé dédiée, l’empreinte reste à clé (dérivée de APP_KEY), jamais l’IP ni un sha256 nu', function () {
+    n11Configurer('actif');
+    config(['crm.journaux.ip_cle' => '']);
+    $ip = '192.0.2.99';
+    $corps = '{"essai":"journal-derive"}';
+
+    $journal = n11JournalPartners(fn () => n11Appel($corps, array_merge(n11Entetes($corps, 'inconnu-1', n11SecretProd()), ['REMOTE_ADDR' => $ip])));
+
+    $empreinte = (string) $journal[0]['contexte']['ip_empreinte'];
+    expect(json_encode($journal))->not->toContain($ip)
+        ->and($empreinte)->toMatch('/^[0-9a-f]{32}$/')
+        ->and($empreinte)->not->toBe(substr(hash('sha256', $ip), 0, 32));
+});
+
+test('plus aucun TODO d’IP en clair dans le vérificateur', function () {
+    expect((string) file_get_contents(app_path('Http/Middleware/VerificateurCanalPartners.php')))
+        ->not->toContain('TODO(N11-IP-JOURNAUX)')
+        ->not->toContain("'ip' =>");
 });

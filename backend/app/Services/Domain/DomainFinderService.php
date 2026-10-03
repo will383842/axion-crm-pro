@@ -4,12 +4,14 @@ namespace App\Services\Domain;
 
 use App\Crm\Brave\QuotaBrave;
 use App\Crm\Brave\RechercheBrave;
+use App\Crm\Sites\SiteFiable;
 use App\Models\Company;
 use App\Models\Media;
 use App\Services\Http\ProxiedHttpClient;
 use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Sentry\State\Hub;
 
 /**
@@ -42,6 +44,33 @@ class DomainFinderService
 
     private const GUESS_CONNECT_TIMEOUT = 2;
 
+    /** `website_method` d'un site lu dans `signals.legal.siteweb` (annuaire des entreprises). */
+    public const METHODE_ANNUAIRE = 'annuaire';
+
+    /** `website_method` d'un site rendu par la recherche Brave. */
+    public const METHODE_BRAVE = 'brave';
+
+    /** `website_method` d'un site trouvé sur Pages Jaunes. */
+    public const METHODE_PAGES_JAUNES = 'pages-jaunes';
+
+    /** Taille maximale d'un corps HTTP soumis à `verifyBody()` (1,5 Mo). */
+    public const CORPS_MAX_OCTETS = 1_572_864;
+
+    /**
+     * Mots retirés du nom pour la VÉRIFICATION (`verifyBody`) seulement :
+     * formes juridiques, mots de structure et articles. « SELARL ZZ
+     * Martin » doit se reconnaître sur une page titrée « Cabinet ZZ
+     * Martin ». `nameTokens()` (donc `candidateDomains()`) garde sa propre
+     * liste, inchangée.
+     *
+     * @var list<string>
+     */
+    public const MOTS_VIDES_VERIFICATION = [
+        'sarl', 'sarlu', 'sas', 'sasu', 'sa', 'selarl', 'selas', 'eurl', 'snc', 'sci', 'scop', 'scea', 'gaec',
+        'scm', 'sca', 'earl', 'gie', 'sccv', 'ste', 'societe', 'ets', 'etablissements', 'association', 'groupe',
+        'holding', 'au', 'aux', 'en', 'et', 'la', 'le', 'les', 'l', 'de', 'du', 'des', 'd',
+    ];
+
     private const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
     /**
@@ -57,6 +86,23 @@ class DomainFinderService
      * Retourne l'URL canonique `https://domain.fr/` ou null.
      */
     public function find(Company $company): ?string
+    {
+        return $this->findAvecMethode($company)['url'] ?? null;
+    }
+
+    /**
+     * Comme `find()`, mais dit AUSSI par quelle stratégie le site a été
+     * trouvé, pour `companies.website_method` (lot N4, 03/10/2026) : jusque-là,
+     * l'enrichissement (`WaterfallOrchestrator::step3b_find_domain`) écrivait
+     * un site DEVINÉ sans méthode, et il passait pour un site fiable.
+     *
+     * Méthodes : `annuaire` (signals.legal.siteweb), `brave`,
+     * `SiteFiable::METHODE_DEVINEE` (devinette — NON VÉRIFIÉ au sens de
+     * `SiteFiable`), `pages-jaunes`.
+     *
+     * @return array{url: string, methode: string}|null
+     */
+    public function findAvecMethode(Company $company): ?array
     {
         // Stratégie 1 : signals.legal.siteweb (toujours en priorité)
         $signals = $company->signals ?? [];
@@ -79,7 +125,7 @@ class DomainFinderService
                 return null;
             }
 
-            return $this->canonicalize($existing);
+            return self::trouve($this->canonicalize($existing), self::METHODE_ANNUAIRE);
         }
 
         if (! $company->denomination) {
@@ -90,29 +136,39 @@ class DomainFinderService
         // Stratégie 2 : Brave Search API (graceful skip si pas de clé)
         $url = $this->searchBrave($company->denomination, $ville);
         if ($url) {
-            return $url;
+            return self::trouve($url, self::METHODE_BRAVE);
         }
 
         // Stratégie 3 : domain-guessing (DNS + HTTP) — 100% GRATUIT, sans clé, scalable.
         // Devine le domaine depuis le nom + vérifie que le site est bien l'entreprise.
+        // Le site reste NON VÉRIFIÉ (`SiteFiable`) tant que le lot de
+        // vérification n'a pas posé `metadata.site_entreprise.statut`.
         $url = $this->guessDomain($company);
         if ($url) {
-            return $url;
+            return self::trouve($url, SiteFiable::METHODE_DEVINEE);
         }
 
         // Stratégie 4 : Pages Jaunes — uniquement quand scrapers réels activés
         if (config('services.scrapers.mock', true) === false) {
-            return $this->searchPagesJaunes($company->denomination, $ville);
+            return self::trouve($this->searchPagesJaunes($company->denomination, $ville), self::METHODE_PAGES_JAUNES);
         }
 
         return null;
+    }
+
+    /** @return array{url: string, methode: string}|null */
+    private static function trouve(?string $url, string $methode): ?array
+    {
+        return $url === null || $url === '' ? null : ['url' => $url, 'methode' => $methode];
     }
 
     /**
      * Devine le domaine officiel depuis le nom de l'entreprise, sans aucune API :
      * génère des candidats (`nomcomplet.fr`, `nom-complet.fr`, `premiermot.fr`…),
      * vérifie l'existence (DNS) puis que la page mentionne bien l'entreprise
-     * (SIREN, ville, ou ≥2 mots du nom) pour éviter les faux positifs.
+     * (règle stricte de `verifyBody()` : SIREN, ou nom dans le titre et code
+     * postal ou ville) pour éviter les faux positifs. Le site trouvé reste
+     * NON VÉRIFIÉ (`SiteFiable`).
      */
     /**
      * Génère les domaines candidats pour un jeu de mots (nomcomplet.fr, nom-complet.fr,
@@ -259,7 +315,7 @@ class DomainFinderService
                     continue;
                 }
                 try {
-                    if ($resp->successful() && $this->verifyBody((string) $resp->body(), $it['c'], $it['tokens'])) {
+                    if ($resp->successful() && $this->verifyBody(self::tronquer((string) $resp->body()), $it['c'], $it['tokens'], $it['domain'])) {
                         $result[$cid] = $this->canonicalize("https://{$it['domain']}/");
                     }
                 } catch (\Throwable $e) {
@@ -354,8 +410,8 @@ class DomainFinderService
     }
 
     /**
-     * Récupère la page d'accueil et confirme qu'elle appartient bien à l'entreprise :
-     * SIREN présent, OU ≥2 mots du nom, OU (1 mot du nom + la ville). Anti-parking.
+     * Récupère la page d'accueil et confirme qu'elle appartient bien à
+     * l'entreprise — règle stricte de `verifyBody()`.
      *
      * @param  list<string>  $tokens
      */
@@ -363,7 +419,7 @@ class DomainFinderService
     {
         $body = $this->recupererAccueil($domain);
 
-        return $body !== null && $this->verifyBody($body, $company, $tokens);
+        return $body !== null && $this->verifyBody($body, $company, $tokens, $domain);
     }
 
     /**
@@ -391,16 +447,77 @@ class DomainFinderService
             return null;
         }
 
-        return $resp->successful() ? (string) $resp->body() : null;
+        return $resp->successful() ? self::tronquer((string) $resp->body()) : null;
     }
 
     /**
-     * Confirme qu'une page HTML appartient bien à l'entreprise (anti-faux-positif) :
-     * SIREN présent, OU ≥2 mots du nom, OU (1 mot + la ville). Écarte pages vides/parking.
+     * Le corps HTTP borné à `CORPS_MAX_OCTETS` (1,5 Mo), coupé sur une
+     * frontière de caractère : une page d'accueil n'a pas besoin de plus
+     * pour porter son nom, son SIREN ou son adresse, et `verifyBody()`
+     * passe plusieurs expressions régulières sur tout le texte.
+     */
+    public static function tronquer(string $corps): string
+    {
+        return strlen($corps) > self::CORPS_MAX_OCTETS ? mb_strcut($corps, 0, self::CORPS_MAX_OCTETS, 'UTF-8') : $corps;
+    }
+
+    /**
+     * Confirme qu'une page HTML appartient bien à l'entreprise — règle STRICTE
+     * (lot N4, 03/10/2026). La page est acceptée si :
+     *
+     *  1. elle contient le SIREN de l'entreprise (ou son SIRET, qui le
+     *     commence), écrit d'un bloc ou espacé, non collé à un autre chiffre
+     *     — sauf derrière `FR` + clé (numéro de TVA intracommunautaire) ;
+     *  2. OU le NOM est dans l'identité de la page (<title>, og:site_name,
+     *     <h1>) — TOUS ses mots, en mots entiers, une fois retiré ce qui
+     *     recopie l'adresse du domaine essayé (`$domaine`) — ET le code
+     *     postal OU la ville de l'entreprise apparaissent dans la page.
+     *
+     * Sinon : refusée. L'ancienne règle (deux mots du nom n'importe où, ou un
+     * mot et la ville) acceptait france.fr, paris.fr, maison.fr pour des
+     * milliers de fiches ; elle ne survit que dans `correspondanceLache()`,
+     * pour `AppartenanceSite` qui la complète d'une règle plus stricte.
+     *
+     * Un site deviné accepté ici reste NON VÉRIFIÉ (`SiteFiable`) : cette
+     * règle ferme le robinet, elle ne vaut pas vérification.
+     *
+     * Les mots du nom sont tirés de la dénomination par la MÊME
+     * normalisation que la page (`normaliserMots` : `Str::ascii` puis
+     * minuscules — « CŒUR » et « coeur » se rencontrent), sans les
+     * `MOTS_VIDES_VERIFICATION`. `$tokens` ne sert que si la dénomination
+     * est vide.
+     *
+     * @param  list<string>  $tokens  `nameTokens()` du nom
+     */
+    public function verifyBody(string $rawBody, Company|Media $company, array $tokens, ?string $domaine = null): bool
+    {
+        if (! mb_check_encoding($rawBody, 'UTF-8')) {
+            $rawBody = (string) mb_convert_encoding($rawBody, 'UTF-8', 'Windows-1252');
+        }
+        $nom = trim((string) $company->denomination);
+        $mots = $nom !== '' ? $this->motsPourVerification($nom) : $this->motsPourVerification(implode(' ', $tokens));
+        $texte = $this->texteVisible($rawBody);
+        if (mb_strlen($texte) < 200) {
+            return false;
+        }
+        if ($this->contientSiren($texte, (string) $company->siren)) {
+            return true;
+        }
+
+        return $this->nomDansIdentite($rawBody, $mots, $domaine)
+            && $this->contientLieu($texte, $company);
+    }
+
+    /**
+     * L'ANCIENNE règle, permissive : SIREN, OU ≥2 mots du nom n'importe où,
+     * OU (1 mot + la ville). ⛔ Ne suffit JAMAIS seule à accepter un site
+     * deviné : seule `AppartenanceSite` (fédérations, résultats Brave) s'en
+     * sert, comme premier filtre avant sa propre règle d'identité, plus
+     * stricte (sigle, mots distinctifs, département).
      *
      * @param  list<string>  $tokens
      */
-    public function verifyBody(string $rawBody, Company|Media $company, array $tokens): bool
+    public function correspondanceLache(string $rawBody, Company|Media $company, array $tokens): bool
     {
         $body = mb_strtolower(strip_tags($rawBody));
         if (mb_strlen($body) < 200) {
@@ -420,6 +537,130 @@ class DomainFinderService
         $villeOk = mb_strlen($ville) >= 3 && str_contains($this->stripAccents($body), $ville);
 
         return $hits >= 2 || ($hits >= 1 && $villeOk);
+    }
+
+    /** Le texte visible de la page (sans scripts ni styles), entités décodées. */
+    private function texteVisible(string $html): string
+    {
+        $html = (string) preg_replace('#<(script|style|noscript)\b[^>]*>.*?</\1\s*>#is', ' ', $html);
+        $texte = strip_tags(str_replace('<', ' <', $html));
+
+        return trim(html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    /**
+     * Les mots d'un nom pour la VÉRIFICATION : `normaliserMots`, sans les
+     * `MOTS_VIDES_VERIFICATION` (mots entiers), deux caractères au moins,
+     * quatre au plus.
+     *
+     * @return list<string>
+     */
+    public function motsPourVerification(string $nom): array
+    {
+        $mots = array_filter(
+            explode(' ', $this->normaliserMots($nom)),
+            static fn (string $m): bool => strlen($m) >= 2 && ! in_array($m, self::MOTS_VIDES_VERIFICATION, true),
+        );
+
+        return array_slice(array_values(array_unique($mots)), 0, 4);
+    }
+
+    /** Minuscules, sans accents, tout ce qui n'est ni lettre ni chiffre devient une espace. */
+    private function normaliserMots(string $texte): string
+    {
+        $texte = mb_strtolower(Str::ascii(html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', $texte));
+    }
+
+    /**
+     * Le SIREN (9 chiffres) figure dans le texte, d'un bloc ou ses chiffres
+     * séparés par espaces (dont insécables), points ou tirets (deux au plus
+     * entre deux chiffres) : `941234567`, `941 234 567`, `941.234.567`,
+     * `941-234-567`. Jamais précédé d'un autre chiffre, séparateurs compris
+     * (un numéro de téléphone `06 12 34 56 78` contient `612345678`), sauf
+     * derrière `FR` + clé de TVA. Suivi de chiffres : c'est le SIRET, accepté.
+     */
+    private function contientSiren(string $texte, string $siren): bool
+    {
+        $siren = (string) preg_replace('/\D/', '', $siren);
+        if (strlen($siren) !== 9) {
+            return false;
+        }
+        $sep = '[\s.\x{00A0}\x{202F}-]';
+        if (preg_match_all('/' . implode($sep . '{0,2}', str_split($siren)) . '/u', $texte, $m, PREG_OFFSET_CAPTURE) < 1) {
+            return false;
+        }
+        foreach ($m[0] as [, $position]) {
+            $avant = (string) preg_replace('/' . $sep . '+$/u', '', substr($texte, 0, (int) $position));
+            if (preg_match('/\d$/', $avant) !== 1 || preg_match('/fr' . $sep . '*\d\d$/iu', $avant) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * TOUS les mots du nom (`motsPourVerification`) figurent, en mots entiers, dans
+     * l'identité de la page : <title>, og:site_name, <h1>. Ce qui recopie
+     * l'adresse du domaine essayé en est retiré d'abord : une page de
+     * parking titrée « boulangerie-martin.fr » ne prouve rien.
+     *
+     * @param  list<string>  $mots
+     */
+    private function nomDansIdentite(string $html, array $mots, ?string $domaine): bool
+    {
+        if ($mots === []) {
+            return false;
+        }
+
+        $morceaux = [];
+        if (preg_match('#<title\b[^>]*>(.*?)</title\s*>#is', $html, $m) === 1) {
+            $morceaux[] = $m[1];
+        }
+        if (preg_match_all('#<h1\b[^>]*>(.*?)</h1\s*>#is', $html, $m) > 0) {
+            array_push($morceaux, ...$m[1]);
+        }
+        if (preg_match_all('#<meta\b[^>]*>#i', $html, $m) > 0) {
+            foreach ($m[0] as $balise) {
+                if (preg_match('#\b(?:property|name)\s*=\s*["\']og:site_name["\']#i', $balise) === 1
+                    && preg_match('#\bcontent\s*=\s*(["\'])(.*?)\1#is', $balise, $c) === 1) {
+                    $morceaux[] = $c[2];
+                }
+            }
+        }
+        $identite = ' ' . $this->normaliserMots(strip_tags(str_replace('<', ' <', implode(' ', $morceaux)))) . ' ';
+
+        if ($domaine !== null && $domaine !== '') {
+            $hote = $this->normaliserMots((string) preg_replace('/^www\./i', '', $domaine));
+            if ($hote !== '') {
+                $identite = str_replace(' ' . $hote . ' ', ' ', $identite);
+            }
+        }
+
+        foreach ($mots as $mot) {
+            if (! str_contains($identite, ' ' . $mot . ' ')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Le code postal (5 chiffres, nombre entier) OU la ville (mots entiers) de l'entreprise figurent dans la page. */
+    private function contientLieu(string $texte, Company|Media $company): bool
+    {
+        $cp = (string) preg_replace('/\D/', '', (string) ($company->postcode ?? ''));
+        if (strlen($cp) === 5 && preg_match('/(?<!\d)' . $cp . '(?!\d)/', $texte) === 1) {
+            return true;
+        }
+        $ville = $this->normaliserMots((string) ($company->city_name ?? $company->city ?? ''));
+        if (mb_strlen(str_replace(' ', '', $ville)) < 3) {
+            return false;
+        }
+
+        return str_contains(' ' . $this->normaliserMots($texte) . ' ', ' ' . $ville . ' ');
     }
 
     /**

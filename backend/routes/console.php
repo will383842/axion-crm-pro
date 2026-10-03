@@ -503,10 +503,31 @@ Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-ma
     ->between('08:00', '19:00')
     ->when(fn (): bool => MiseAJourMensuelle::estJourPlanifie(now()))
     ->withoutOverlapping(360)
+    ->createMutexNameUsing(MiseAJourMensuelle::VERROU)
     ->onOneServer()
     ->runInBackground()
     ->onFailure(function (): void {
         Log::error('[INSEE] crm:insee:mise-a-jour-mensuelle est sortie en échec — le passage reste « echouee » dans insee_mises_a_jour, avec son curseur : relancer la commande le reprend.');
+    });
+
+// Avis exactitude #313, R6 — REPRISE LES JOURS SUIVANTS. Un passage coupé
+// (`--duree-max`, plafond d'écritures, 429 persistant, réseau) ne doit pas
+// attendre un mois : du mardi au samedi, à 09:30 heure de Paris, à partir du
+// 4 (jamais les 1er, 2 et 3), 08:00-19:00 — UNIQUEMENT s'il existe un passage
+// `en_cours` ou `echouee` (`MiseAJourMensuelle::repriseEnAttente`) et jamais
+// le jour de la mensuelle elle-même. Sans `--depuis` : la commande reprend le
+// passage inachevé, à son curseur. Même verrou que la mensuelle.
+Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-max=300')
+    ->cron('30 9 * * 2-6')
+    ->timezone(MiseAJourMensuelle::FUSEAU)
+    ->between('08:00', '19:00')
+    ->when(fn (): bool => MiseAJourMensuelle::estJourDeReprise(now()) && MiseAJourMensuelle::repriseEnAttente())
+    ->withoutOverlapping(360)
+    ->createMutexNameUsing(MiseAJourMensuelle::VERROU)
+    ->onOneServer()
+    ->runInBackground()
+    ->onFailure(function (): void {
+        Log::error('[INSEE] reprise de crm:insee:mise-a-jour-mensuelle sortie en échec — le passage reste « echouee », avec son curseur.');
     });
 
 // Avis #308, réserve 5 — BATTEMENT DU PLANIFICATEUR. Chaque minute, un

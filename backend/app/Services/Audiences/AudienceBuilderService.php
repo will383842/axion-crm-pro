@@ -742,7 +742,15 @@ class AudienceBuilderService
         // sont des pertes, la seconde silencieuse elle aussi.
         self::validerCriteres($criteria);
 
-        $query = Company::query()->where('workspace_id', $workspaceId);
+        // 🔴 NON DIFFUSIBLE (lot N8, veto sécurité #313, bloquant 2) : une
+        // fiche marquée par la mise à jour INSEE n'entre dans AUCUNE audience
+        // — protégée ou non, liste manuelle exigée ou non, presse comprise.
+        // Posé ici, AVANT toute porte d'entrée, et jamais dans un `orWhere`.
+        // Pas d'index dédié : la colonne est NULL sur la quasi-totalité des
+        // 4,35 M de fiches ; le filtre s'applique aux lignes que les critères
+        // ont déjà retenues.
+        $query = Company::query()->where('workspace_id', $workspaceId)
+            ->whereNull('companies.insee_non_diffusible_le');
 
         // Une liste manuelle citée doit exister, vivante, dans CET espace.
         $listes = self::listesCitees($criteria);
@@ -1146,6 +1154,12 @@ class AudienceBuilderService
      */
     private function companyMatchesCriteria(Company $company, array $criteria): bool
     {
+        // Même règle que `buildQuery()` : une fiche non diffusible n'est
+        // rattachée à aucune audience (veto #313, bloquant 2).
+        if ($company->getAttribute('insee_non_diffusible_le') !== null) {
+            return false;
+        }
+
         // 🔴 Découvert en écrivant la garde de D26-001, non signalé par
         // l'audit : la version EN MÉMOIRE ferme sur `all` et sur `any` (une
         // condition fausse fait échouer le bloc) mais OUVRE sur `not` —

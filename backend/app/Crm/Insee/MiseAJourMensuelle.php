@@ -2,6 +2,7 @@
 
 namespace App\Crm\Insee;
 
+use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Crm\Referentiels\Classement;
 use App\Crm\Referentiels\NomenclatureNaf;
@@ -157,6 +158,9 @@ final class MiseAJourMensuelle
 
     public const FUSEAU = 'Europe/Paris';
 
+    /** Le verrou partagé par la mensuelle et ses reprises (`routes/console.php`). */
+    public const VERROU = 'crm-insee-mise-a-jour-mensuelle';
+
     /** Compteurs du bilan, dans l'ordre d'affichage. */
     public const COMPTEURS = [
         'creations', 'modifications', 'fermetures', 'non_diffusibles', 'reouvertures',
@@ -211,6 +215,40 @@ final class MiseAJourMensuelle
         }
 
         return true;
+    }
+
+    /**
+     * Un jour de REPRISE possible (avis exactitude R6) : du mardi au samedi,
+     * à partir du 4 (jamais les 1er, 2 et 3), 08:00-19:00 heure de Paris, et
+     * pas le jour de la mensuelle (`estJourPlanifie`).
+     */
+    public static function estJourDeReprise(CarbonInterface $instant): bool
+    {
+        $t = CarbonImmutable::instance($instant)->setTimezone(self::FUSEAU);
+
+        return $t->hour >= 8 && $t->hour < 19 && $t->day >= 4 && self::ouvre($t) && ! self::estJourPlanifie($t);
+    }
+
+    /**
+     * Un passage `en_cours` ou `echouee`, postérieur à la dernière exécution
+     * réussie, attend-il d'être repris dans l'espace de prospection ?
+     */
+    public static function repriseEnAttente(?string $workspaceId = null): bool
+    {
+        $workspaceId ??= EspaceProspection::resoudre(null);
+        if ($workspaceId === null) {
+            return false;
+        }
+
+        return WorkspaceContext::run($workspaceId, static function () use ($workspaceId): bool {
+            $idReussie = DB::table('insee_mises_a_jour')
+                ->where('workspace_id', $workspaceId)->where('statut', 'reussie')->max('id');
+
+            return DB::table('insee_mises_a_jour')
+                ->where('workspace_id', $workspaceId)->whereIn('statut', ['en_cours', 'echouee'])
+                ->when($idReussie !== null, static fn ($q) => $q->where('id', '>', $idReussie))
+                ->exists();
+        });
     }
 
     private static function ouvre(CarbonImmutable $jour): bool

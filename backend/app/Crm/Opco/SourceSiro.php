@@ -2,6 +2,7 @@
 
 namespace App\Crm\Opco;
 
+use App\Services\Http\SsrfGuard;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
@@ -124,6 +125,10 @@ class SourceSiro
 
     /**
      * Télécharge la ressource EN FLUX dans `$chemin` (jamais en mémoire).
+     *
+     * L'URL vient de l'API data.gouv, pas du code : elle passe la garde SSRF
+     * (https, port 443, aucune adresse interne, connexion épinglée sur l'IP
+     * vérifiée, chaque redirection revérifiée).
      */
     public function telecharger(string $url, string $chemin): void
     {
@@ -131,8 +136,13 @@ class SourceSiro
             throw new RuntimeException('Téléchargement refusé : la ressource SIRO doit être en https.');
         }
 
+        $verification = SsrfGuard::verifier($url, [443]);
+        if (! $verification['ok']) {
+            throw new RuntimeException('Téléchargement refusé par la garde SSRF : ' . $verification['reason'] . '.');
+        }
+
         $reponse = Http::timeout(1800)->connectTimeout(15)
-            ->withOptions([
+            ->withOptions(SsrfGuard::redirectOptions() + SsrfGuard::optionsEpinglage($url, $verification['ip']) + [
                 'sink' => $chemin,
                 'on_headers' => static function (ResponseInterface $r): void {
                     $taille = (int) $r->getHeaderLine('Content-Length');

@@ -41,7 +41,8 @@ use stdClass;
  *     personnes, étiquettes (protection comprise : la fiche gardée en HÉRITE),
  *     liens d'événements, ligne fédération et antennes, activités et
  *     démarches, historique métier (`business_events`), affaires, audiences,
- *     collectes, médias, journalistes, praticiens, personnes de la lettre ;
+ *     collectes, médias, journalistes, praticiens, personnes de la lettre,
+ *     IDCC / OPCO (`companies_opco`, si la fiche gardée n'en a pas) ;
  *  4. recopie sur la fiche gardée les coordonnées qu'elle n'a pas (adresse
  *     générique, téléphone, site, LinkedIn, date d'information art. 14) et
  *     les métadonnées de la presse (`CLES_METADONNEES` : site vérifié,
@@ -95,6 +96,8 @@ final class FusionFiches
      */
     public const REFERENCES = [
         'audience_members.company_id',
+        // 2026-10-05 (O14) : IDCC et OPCO de la fiche.
+        'companies_opco.company_id',
         'company_tag.company_id',
         'contacts.company_id',
         'deals.company_id',
@@ -542,6 +545,17 @@ final class FusionFiches
         );
         $deplacements['listes_manuelles_personnes'] = $this->reporterPersonnes($ws, $pairesPersonnes);
 
+        // IDCC / OPCO (O14) : une ligne par fiche. Celle de l'absorbée passe à
+        // la fiche gardée si la gardée n'en a pas ; sinon elle reste sur
+        // l'absorbée (à la corbeille avec elle) — jamais supprimée.
+        $deplacements['companies_opco'] = $this->ids(DB::select(
+            'UPDATE companies_opco co_abs SET company_id = ?, updated_at = now()
+             WHERE co_abs.workspace_id = ? AND co_abs.company_id = ?
+               AND NOT EXISTS (SELECT 1 FROM companies_opco co_gar WHERE co_gar.workspace_id = co_abs.workspace_id AND co_gar.company_id = ?)
+             RETURNING co_abs.id',
+            [$gardeId, $ws, $absorbeeId, $gardeId],
+        ), 'id');
+
         foreach (self::TABLES_SIMPLES as $table) {
             $deplacements[$table] = $this->ids(DB::select(
                 "UPDATE {$table} SET company_id = ? WHERE workspace_id = ? AND company_id = ? RETURNING id",
@@ -894,7 +908,7 @@ final class FusionFiches
 
         $parCle = [
             'contacts' => 'id', 'audience_members' => 'id', 'listes_manuelles_membres' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
-            'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id',
+            'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id', 'companies_opco' => 'id',
             'company_tag' => 'tag_id', 'event_organizers' => 'event_id',
         ];
         foreach ($parCle as $table => $cle) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\Opco\LectureOpco;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Referentiels\LibellesNaf;
 use App\Crm\Sites\QuarantaineSite;
@@ -635,6 +636,9 @@ class CompaniesController extends ApiController
             [$company->getKey()],
         );
         $company->setAttribute('naf_label', $libelle?->naf_label);
+        // Lot O14 — IDCC et OPCO, en lecture seule (`companies_opco`) ; null
+        // tant que rien n'est connu pour cette fiche.
+        $company->setAttribute('opco', LectureOpco::pourEntreprise((int) $company->getKey(), (string) $company->workspace_id));
 
         return $this->ok(MasquageCoordonnees::masquerSiRequis($company->load($relations)));
     }

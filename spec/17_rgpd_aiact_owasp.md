@@ -47,6 +47,27 @@ INSERT INTO data_processing_log (workspace_id, processing_purpose, legal_basis, 
  ARRAY['encryption_at_rest','hash_chain','immutable_append_only']);
 ```
 
+### Traitement 4 — IDCC et OPCO des entreprises (lot O14, 05/10/2026)
+
+| Rubrique (art. 30.1) | Contenu |
+|---|---|
+| Finalité | **Orienter le financement de la formation** : connaître la convention collective (IDCC) et l'OPCO de chaque entreprise du CRM pour lui indiquer l'organisme qui finance ses actions de formation. |
+| Base légale | Art. 6.1.f — intérêt légitime (prospection B2B, même base que le traitement 1). |
+| Source | **France compétences — table SIRET → OPCO (« table SIRO »)**, publiée sur data.gouv.fr sous licence ouverte 2.0, établie à partir des déclarations sociales nominatives (DSN). Ressource résolue à chaque passage par l'API du jeu de données ; le mois de la DSN est noté (`companies_opco.releve_le`). Ou saisie par une personne (`source = 'saisie'`). |
+| Données | SIRET de l'établissement, code IDCC, OPCO propriétaire, OPCO de gestion, mois de la DSN. **Aucune donnée sur les salariés.** |
+| Personnes concernées | Les entreprises du CRM. ⚠️ **Le SIRET d'une entreprise individuelle (entrepreneur individuel, micro-entrepreneur, profession libérale) désigne une personne physique : c'est alors une DONNÉE PERSONNELLE**, et l'IDCC / l'OPCO qui lui sont rattachés aussi. **Exclues** : les fiches marquées non diffusibles par l'INSEE (`companies.insee_non_diffusible_le`, opposition à la diffusion Sirene) ne sont jamais enrichies ; elles sont seulement comptées au bilan (`exclues_non_diffusibles`). |
+| Destinataires | Équipes internes commerciales et marketing d'Axion-IA (lecture seule sur la fiche entreprise). Aucune transmission à un tiers. |
+| Stockage | Table dédiée `companies_opco` (RLS par espace, ENABLE + FORCE) ; `companies` n'est pas modifiée. Journal des passages : `companies_opco_passages` (compteurs seulement, aucun SIRET). |
+| Conservation | Tant que la fiche entreprise est conservée. Rien n'est effacé automatiquement (règle du propriétaire) : le rôle applicatif n'a ni DELETE ni TRUNCATE ; une demande d'effacement est une décision humaine, au cas par cas. Une ligne `siro` est remplacée par la publication suivante de la table SIRO. |
+| Sécurité | RLS Postgres, téléchargement en https, port 443, depuis une liste fermée d'hôtes (`static.data.gouv.fr`, `www.data.gouv.fr`) revérifiée à chaque redirection (3 au plus), derrière la garde SSRF, volume reçu borné à 300 Mo, fichier source supprimé à la fin de chaque passage (même en erreur), commande lancée à la main dans une fenêtre bornée (mardi→samedi, 08:00-19:00, jamais les 1er/2/3). |
+| Droits | Opposition et effacement : procédure §2. **Aucun écran de saisie n'existe encore (à venir)** : la fiche affiche l'IDCC et l'OPCO en lecture seule. Procédure MANUELLE effective en attendant, exécutée par l'administrateur technique sur demande écrite du DPO / responsable du traitement : **rectification** — `UPDATE companies_opco SET idcc = …, opco = …, opco_gestion = …, source = 'saisie', updated_at = now() WHERE workspace_id = … AND company_id = …` (sous le contexte RLS de l'espace) ; **opposition / effacement** — la ligne n'est pas supprimée (aucun DELETE) mais neutralisée : `idcc`, `opco`, `opco_gestion` et `siret` à NULL et `source = 'saisie'`, ce qui empêche toute réécriture par la table SIRO. La demande et la date de traitement sont notées au registre des demandes (§2). |
+
+### Information article 14 — mention à ajouter (traitement 4)
+
+Les données n'étant pas collectées auprès de la personne, l'information de l'article 14 (premier contact au plus tard) est complétée ainsi :
+
+> **Sources de vos données.** Outre les registres publics de l'INSEE (Sirene), nous utilisons la **table SIRET → OPCO publiée par France compétences** sur data.gouv.fr (licence ouverte 2.0, issue des déclarations sociales nominatives) pour connaître la convention collective (IDCC) et l'opérateur de compétences (OPCO) de votre entreprise. **Finalité : orienter le financement de vos formations.** Base légale : notre intérêt légitime. Si vous exercez en entreprise individuelle, votre SIRET et ces informations vous concernent personnellement : vous pouvez vous y opposer, en demander la rectification ou l'effacement à tout moment (contact RGPD indiqué ci-dessous).
+
 ### Conservation
 
 - Données scraping : 90 jours après dernière utilisation (auto-purge job nightly `app:purge-stale-records`)

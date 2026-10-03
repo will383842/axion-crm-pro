@@ -123,6 +123,51 @@ describe('CompanyDetailPage — rendu', () => {
   });
 });
 
+describe('CompanyDetailPage — IDCC et OPCO (lot O14)', () => {
+  it('affiche IDCC, OPCO et la SOURCE France compétences, en lecture seule', async () => {
+    const { handler } = recordGet('/companies/42', {
+      ...FICHE,
+      opco: {
+        idcc: '1486',
+        opco: 'atlas',
+        opco_libelle: 'ATLAS',
+        opco_gestion: 'atlas',
+        opco_gestion_libelle: 'ATLAS',
+        source: 'siro',
+        releve_le: '2026-07-01',
+        mention: 'source : France compétences (DSN de juillet 2026)',
+      },
+    });
+
+    await renderScreen(<CompanyDetailPage />, {
+      path: PATH,
+      url: URL_VISITEE,
+      landingRoutes: LANDING,
+      handlers: [handler],
+    });
+
+    expect(await screen.findByText('1486')).toBeVisible();
+    expect(screen.getByText('ATLAS')).toBeVisible();
+    expect(screen.getByText('source : France compétences (DSN de juillet 2026)')).toBeVisible();
+    // Lecture seule : aucun champ de saisie pour l'IDCC ou l'OPCO.
+    expect(screen.queryByRole('textbox', { name: /IDCC|OPCO/i })).toBeNull();
+  });
+
+  it('sans donnée connue : un tiret, et aucune mention de source', async () => {
+    const { handler } = recordGet('/companies/42', { ...FICHE, opco: null });
+
+    await renderScreen(<CompanyDetailPage />, {
+      path: PATH,
+      url: URL_VISITEE,
+      landingRoutes: LANDING,
+      handlers: [handler],
+    });
+
+    expect(await screen.findByText('Convention collective (IDCC)')).toBeVisible();
+    expect(screen.queryByText(/France compétences/)).toBeNull();
+  });
+});
+
 describe('CompanyDetailPage — parcours', () => {
   it('déplier « Données brutes » RÉVÈLE les signaux, replier les cache', async () => {
     const user = userEvent.setup();

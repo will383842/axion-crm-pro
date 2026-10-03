@@ -22,9 +22,9 @@
 
 use App\Crm\Presse\SiteMedia;
 use App\Crm\Sites\SiteFiable;
+use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
 use App\Services\Waterfall\WaterfallOrchestrator;
-use App\Models\Company;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

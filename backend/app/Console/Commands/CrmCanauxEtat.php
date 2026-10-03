@@ -88,7 +88,7 @@ class CrmCanauxEtat extends Command
 
         $this->line((string) json_encode($etat, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        return $this->alertes === [] ? self::SUCCESS : self::FAILURE;
+        return $this->aucuneAlerte() ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -235,6 +235,11 @@ class CrmCanauxEtat extends Command
         }
 
         return $mesure;
+    }
+
+    private function aucuneAlerte(): bool
+    {
+        return $this->alertes === [];
     }
 
     private function alerter(string $type, string $message): void

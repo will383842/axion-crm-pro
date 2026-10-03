@@ -14,6 +14,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use stdClass;
 use Throwable;
 
@@ -45,10 +46,16 @@ use Throwable;
  *   - curseur PERSISTANT (`curseurs_traitements`) écrit dans la transaction
  *     du paquet : la reprise est exacte ; un par périmètre (`--audience`) ;
  *   - une seule exécution à la fois (verrou consultatif Postgres) ;
- *   - `--dry-run` : les sites sont lus, chaque paquet est ANNULÉ (marqueurs
- *     ET curseur) ;
+ *   - `--dry-run` : les sites sont lus, AUCUNE écriture n'est exécutée — ni
+ *     UPDATE annulé, ni transaction d'écriture, ni curseur : chaque marqueur
+ *     est remplacé par un `SELECT count(*)` au même WHERE (#314, R3) ;
+ *   - une page n'est une preuve que si son adresse d'ARRIVÉE est sur le
+ *     même domaine enregistrable que le site deviné (#314, R1) ;
+ *   - un marqueur au même statut, motif, adresse et version n'est pas
+ *     réécrit (moins d'écritures, de WAL et de versions mortes ; #314, R6) ;
  *   - rapport : des COMPTEURS seulement (ni domaine, ni SIREN, ni nom) et
- *     le comptage des fiches avant = après.
+ *     le comptage avant = après des fiches de la plage parcourue (celles qui
+ *     existaient au lancement, après le curseur de départ ; #314, R5).
  *
  * ⛔ NE PAS inscrire au calendrier (`routes/console.php`) : lancement à la
  * main, après un essai à blanc de 200 fiches validé par Will.
@@ -64,15 +71,21 @@ class CrmEntreprisesVerifierSites extends Command
                             {--depuis-debut : Repartir du début (le curseur de ce périmètre revient à 0)}
                             {--paquet=40 : Fiches par paquet et par transaction (1 à 200)}
                             {--concurrence=3 : Requêtes HTTP simultanées au plus (1 à 6)}
-                            {--delai-domaine-ms=1500 : Attente minimale entre deux requêtes d\'un même domaine}
+                            {--delai-domaine-ms=1500 : Attente minimale entre deux requêtes d\'un même domaine (1000 à 60000)}
                             {--timeout=5 : Délai d\'attente d\'une requête, en secondes (1 à 10)}';
 
     protected $description = 'Vérifie les sites devinés par le SIREN (accueil ou mentions légales), par lots, avec reprise au curseur. Ne supprime rien.';
 
     public const USER_AGENT = 'AxionCRM-VerificationSites/1.0 (+https://axion-ia.com; contact@axion-ia.com)';
 
-    /** Adresses lues gardées en mémoire (statut, quelques SIREN, lien de mentions) au plus. */
+    /**
+     * Adresses lues gardées en mémoire (statut, quelques SIREN, lien de
+     * mentions) au plus ; `crm.verifier_sites.cache_max` la réduit en test.
+     */
     private const CACHE_MAX = 20000;
+
+    /** Plancher du délai par domaine : jamais deux requêtes d'un même site sans pause (#314). */
+    private const DELAI_MIN_MS = 1000;
 
     private const STATUT_ERREUR = 'erreur';
 
@@ -84,6 +97,7 @@ class CrmEntreprisesVerifierSites extends Command
         'non_conformes' => 'non conformes (SIREN absent, restent non vérifiés)',
         'injoignables' => 'injoignables',
         'ignores_robots' => 'ignorés (robots.txt)',
+        'inchanges' => 'inchangés (même marqueur et même version : non réécrits)',
         'erreurs' => 'erreurs (non marquées)',
         'ecartes' => 'écartés (fiche modifiée pendant la lecture)',
         'fiches_lues' => 'fiches lues',
@@ -106,13 +120,13 @@ class CrmEntreprisesVerifierSites extends Command
         $audience = $this->entier('audience', 1, PHP_INT_MAX);
         $paquet = $this->entier('paquet', 1, 200);
         $concurrence = $this->entier('concurrence', 1, 6);
-        $delai = $this->entier('delai-domaine-ms', 0, 60000);
+        $delai = $this->entier('delai-domaine-ms', self::DELAI_MIN_MS, 60000);
         $timeout = $this->entier('timeout', 1, 10);
         $jusqua = $this->option('jusqua');
         if ($limite === false || $audience === false || $paquet === false || $paquet === null || $concurrence === false
             || $concurrence === null || $delai === false || $delai === null || $timeout === false || $timeout === null
             || ($jusqua !== null && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $jusqua) !== 1)) {
-            $this->error('Options invalides (--limite ≥ 1, --paquet 1 à 200, --concurrence 1 à 6, --timeout 1 à 10, --jusqua HH:MM).');
+            $this->error('Options invalides (--limite ≥ 1, --paquet 1 à 200, --concurrence 1 à 6, --delai-domaine-ms 1000 à 60000, --timeout 1 à 10, --jusqua HH:MM).');
 
             return self::FAILURE;
         }
@@ -148,7 +162,13 @@ class CrmEntreprisesVerifierSites extends Command
                 return self::FAILURE;
             }
             try {
-                return $this->parcourir($finder, $dryRun, $limite, $audience, $paquet, new LecturePageAccueil($concurrence, $timeout, $delai, null, self::USER_AGENT), $fin);
+                $dormir = static function (int $ms): void {
+                    if ($ms > 0) {
+                        Sleep::usleep($ms * 1000);
+                    }
+                };
+
+                return $this->parcourir($finder, $dryRun, $limite, $audience, $paquet, new LecturePageAccueil($concurrence, $timeout, $delai, $dormir, self::USER_AGENT), $fin);
             } finally {
                 DB::select('SELECT pg_advisory_unlock(hashtext(?))', [$verrou]);
             }
@@ -160,12 +180,16 @@ class CrmEntreprisesVerifierSites extends Command
         $cle = VerificationSite::cleCurseur($audience);
         $this->bilan = array_fill_keys(array_keys(self::LIBELLES), 0);
         $this->cache = [];
-        $avant = $this->compterFiches();
 
         if ((bool) $this->option('depuis-debut') && ! $dryRun) {
             CurseurTraitement::remettreAZero($this->workspaceId, $cle);
         }
         $depart = (bool) $this->option('depuis-debut') ? 0 : (CurseurTraitement::lire($this->workspaceId, $cle) ?? 0);
+        // La plage comptée : les fiches qui existent au lancement, après le
+        // curseur de départ. Une fiche créée pendant le lancement (saisie,
+        // import) n'en fait pas partie : pas de fausse alerte (#314, R5).
+        $plafond = (int) (DB::table('companies')->where('workspace_id', $this->workspaceId)->max('id') ?? 0);
+        $avant = $this->compterFiches($depart, $plafond);
         $curseur = $depart;
         $arretHeure = false;
         $termine = false;
@@ -192,7 +216,7 @@ class CrmEntreprisesVerifierSites extends Command
         } catch (Throwable $e) {
             $interruption = $e;
         }
-        $apres = $this->compterFiches();
+        $apres = $this->compterFiches($depart, $plafond);
 
         Log::info('crm.entreprises.verifier_sites', $this->bilan + [
             'dry_run' => $dryRun, 'audience' => $audience, 'curseur' => $curseur, 'lignes_avant' => $avant, 'lignes_apres' => $apres,
@@ -202,8 +226,8 @@ class CrmEntreprisesVerifierSites extends Command
         foreach (self::LIBELLES as $k => $libelle) {
             $lignes[] = [$libelle, $this->bilan[$k]];
         }
-        $lignes[] = ['lignes avant (fiches de l\'espace)', $avant];
-        $lignes[] = ['lignes après (fiches de l\'espace)', $apres];
+        $lignes[] = ['lignes avant (fiches de la plage parcourue)', $avant];
+        $lignes[] = ['lignes après (fiches de la plage parcourue)', $apres];
         $this->table(['compteur', 'nombre'], $lignes);
         $this->line("Curseur : fiche {$depart} → fiche {$curseur}" . ($audience !== null ? " (audience {$audience})" : '') . '.');
         if ($arretHeure && $fin !== null) {
@@ -221,7 +245,9 @@ class CrmEntreprisesVerifierSites extends Command
 
         if ($interruption !== null) {
             $this->error('INTERROMPU : ' . $interruption::class . ". Les paquets validés restent ; reprise au curseur (fiche {$curseur}).");
-            Log::error('crm:entreprises:verifier-sites interrompu', ['exception' => $interruption]);
+            // La classe seulement : le message d'une `QueryException` porte le
+            // SQL et ses valeurs (sites, identifiants).
+            Log::error('crm:entreprises:verifier-sites interrompu', ['exception' => $interruption::class, 'curseur' => $curseur]);
 
             return self::FAILURE;
         }
@@ -231,7 +257,9 @@ class CrmEntreprisesVerifierSites extends Command
 
     /**
      * L'heure d'arrêt du jour (Paris) : `--jusqua`, plafonnée à la fin de
-     * fenêtre sans `--forcer` ; aucune avec `--forcer` sans `--jusqua`.
+     * fenêtre sans `--forcer` ; aucune avec `--forcer` sans `--jusqua`. Avec
+     * `--forcer`, une heure déjà passée est celle du LENDEMAIN (22:00 →
+     * `--jusqua=01:00` : arrêt à 01:00 le lendemain).
      */
     private function heureDArret(CarbonInterface $maintenant, ?string $jusqua, bool $forcer): ?CarbonInterface
     {
@@ -240,13 +268,17 @@ class CrmEntreprisesVerifierSites extends Command
             return $forcer ? null : $finFenetre;
         }
         $demandee = $maintenant->copy()->setTimeFromTimeString($jusqua);
+        if ($forcer && $demandee->lessThanOrEqualTo($maintenant)) {
+            $demandee = $demandee->addDay();
+        }
 
         return ! $forcer && $demandee->greaterThan($finFenetre) ? $finFenetre : $demandee;
     }
 
-    private function compterFiches(): int
+    private function compterFiches(int $depart, int $plafond): int
     {
-        return DB::table('companies')->where('workspace_id', $this->workspaceId)->count();
+        return DB::table('companies')->where('workspace_id', $this->workspaceId)
+            ->where('id', '>', $depart)->where('id', '<=', $plafond)->count();
     }
 
     /** @param  list<stdClass>  $fiches */
@@ -276,7 +308,10 @@ class CrmEntreprisesVerifierSites extends Command
                 continue;
             }
             $lu = $this->cache[$f->cible] ?? ['statut' => self::STATUT_ERREUR, 'sirens' => [], 'mentions' => null, 'finale' => $f->cible];
-            $f->decision = match ($lu['statut']) {
+            // Arrivée sur un AUTRE domaine (parking, revente, annuaire) : la
+            // page n'est pas celle du site deviné, rien n'y prouve (#314, R1).
+            $motif = $lu['statut'] === LecturePageAccueil::STATUT_LU ? VerificationSite::motifArrivee($f->cible, $lu['finale']) : null;
+            $f->decision = $motif !== null ? [SiteMedia::NON_CONFORME, $f->cible, null, $motif] : match ($lu['statut']) {
                 LecturePageAccueil::STATUT_LU => in_array($f->siren, $lu['sirens'], true)
                     ? [SiteMedia::VERIFIE, $f->cible, VerificationSite::PREUVE_ACCUEIL, null] : null,
                 LecturePageAccueil::STATUT_ROBOTS => [SiteMedia::ROBOTS_INTERDIT, $f->cible, null, null],
@@ -299,24 +334,42 @@ class CrmEntreprisesVerifierSites extends Command
         foreach ($fiches as $f) {
             if ($f->decision === null && $f->mentions !== null) {
                 $lu = $this->cache[$f->mentions] ?? null;
-                $f->decision = $lu !== null && $lu['statut'] === LecturePageAccueil::STATUT_LU && in_array($f->siren, $lu['sirens'], true)
+                $motif = null;
+                $prouve = false;
+                if ($lu !== null && $lu['statut'] === LecturePageAccueil::STATUT_LU) {
+                    // Mentions redirigées vers un autre domaine : jamais une preuve (R1).
+                    $motif = VerificationSite::motifArrivee($f->cible, $lu['finale']);
+                    $prouve = $motif === null && in_array($f->siren, $lu['sirens'], true);
+                }
+                $f->decision = $prouve
                     ? [SiteMedia::VERIFIE, $f->cible, VerificationSite::PREUVE_MENTIONS, null]
-                    : [SiteMedia::NON_CONFORME, $f->cible, null, null];
+                    : [SiteMedia::NON_CONFORME, $f->cible, null, $motif];
             }
         }
 
-        // 3. Écrire, dans UNE transaction par paquet, avec le curseur.
-        DB::beginTransaction();
+        // 3. Écrire, dans UNE transaction par paquet, avec le curseur. À blanc :
+        // AUCUNE écriture, ni transaction — un `SELECT count(*)` au même WHERE
+        // dit si l'écriture aurait eu lieu (#314, R3).
+        if (! $dryRun) {
+            DB::beginTransaction();
+        }
         try {
-            DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
+            if (! $dryRun) {
+                DB::statement("SET LOCAL app.conserver_updated_at = 'on'");
+            }
             foreach ($fiches as $f) {
                 if (! is_array($f->decision)) {
                     $this->compter($delta, 'erreurs');
 
                     continue;
                 }
+                if ($this->inchange($f)) {
+                    $this->compter($delta, 'inchanges');
+
+                    continue;
+                }
                 try {
-                    $n = DB::transaction(fn (): int => $this->ecrire($f));
+                    $n = $dryRun ? $this->compterEligibles($f) : DB::transaction(fn (): int => $this->ecrire($f));
                 } catch (Throwable $e) {
                     Log::warning('crm:entreprises:verifier-sites écriture en erreur', ['fiche' => (int) $f->id, 'exception' => $e::class]);
                     $this->compter($delta, 'erreurs');
@@ -336,10 +389,14 @@ class CrmEntreprisesVerifierSites extends Command
                     default => $this->compter($delta, 'injoignables'),
                 };
             }
-            CurseurTraitement::ecrire($this->workspaceId, $cle, (int) $fiches[count($fiches) - 1]->id);
-            $dryRun ? DB::rollBack() : DB::commit();
+            if (! $dryRun) {
+                CurseurTraitement::ecrire($this->workspaceId, $cle, (int) $fiches[count($fiches) - 1]->id);
+                DB::commit();
+            }
         } catch (Throwable $e) {
-            DB::rollBack();
+            if (! $dryRun) {
+                DB::rollBack();
+            }
 
             throw $e;
         }
@@ -366,10 +423,46 @@ class CrmEntreprisesVerifierSites extends Command
         return DB::update(
             "UPDATE companies
                 SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(?::text, ?::jsonb)
-              WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL AND website = ?
-                AND " . SiteFiable::nonVerifieSql('companies'),
-            [SiteFiable::CLE, json_encode($valeur, JSON_THROW_ON_ERROR), (int) $f->id, $this->workspaceId, (string) $f->website],
+              WHERE " . self::gardeEcritureSql(),
+            [SiteFiable::CLE, json_encode($valeur, JSON_THROW_ON_ERROR), ...$this->gardeEcritureLiaisons($f)],
         );
+    }
+
+    /** À blanc : la fiche serait-elle écrite ? Même WHERE que `ecrire`, rien d'écrit. */
+    private function compterEligibles(stdClass $f): int
+    {
+        return (int) DB::selectOne(
+            'SELECT count(*) AS n FROM companies WHERE ' . self::gardeEcritureSql(),
+            $this->gardeEcritureLiaisons($f),
+        )->n;
+    }
+
+    /** La fiche est toujours vivante, au même site, et toujours « non vérifiée ». */
+    private static function gardeEcritureSql(): string
+    {
+        return 'id = ? AND workspace_id = ? AND deleted_at IS NULL AND website = ? AND ' . SiteFiable::nonVerifieSql('companies');
+    }
+
+    /** @return list<int|string> */
+    private function gardeEcritureLiaisons(stdClass $f): array
+    {
+        return [(int) $f->id, $this->workspaceId, (string) $f->website];
+    }
+
+    /**
+     * Le marqueur en place porte déjà ce statut, ce motif, cette adresse et
+     * cette version : le réécrire ne changerait que sa date, au prix d'une
+     * version de ligne et d'entrées dans chaque index (#314, R6).
+     */
+    private function inchange(stdClass $f): bool
+    {
+        [$statut, $url, , $motif] = $f->decision;
+
+        return $statut !== SiteMedia::VERIFIE
+            && $f->statut_avant === $statut
+            && $f->url_avant === $url
+            && $f->motif_avant === $motif
+            && (string) $f->v_avant === (string) VerificationSite::VERSION;
     }
 
     /**
@@ -382,12 +475,17 @@ class CrmEntreprisesVerifierSites extends Command
      */
     private function lire(array $cibles, LecturePageAccueil $lecteur, DomainFinderService $finder): void
     {
-        $nouvelles = array_values(array_filter(array_unique($cibles), fn (string $c): bool => ! isset($this->cache[$c])));
+        // Purger AVANT de choisir les adresses à lire : une purge après ce
+        // choix effaçait des adresses déjà en mémoire que le paquet en cours
+        // allait lire (#314, R2). Après la purge, toutes les adresses du
+        // paquet sont relues : elles sont toutes en mémoire au retour.
+        $cibles = array_values(array_unique($cibles));
+        if (count($this->cache) + count($cibles) > max(1, (int) config('crm.verifier_sites.cache_max', self::CACHE_MAX))) {
+            $this->cache = [];
+        }
+        $nouvelles = array_values(array_filter($cibles, fn (string $c): bool => ! isset($this->cache[$c])));
         if ($nouvelles === []) {
             return;
-        }
-        if (count($this->cache) + count($nouvelles) > self::CACHE_MAX) {
-            $this->cache = [];
         }
         try {
             $lus = $lecteur->lire($nouvelles, true);

@@ -47,15 +47,27 @@ return new class extends Migration
              USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))
              WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))",
         );
+
+        // Le rôle applicatif lit, crée et avance un curseur — il ne le
+        // SUPPRIME jamais (`remettreAZero` réécrit 0). Les privilèges par
+        // défaut du schéma lui donneraient DELETE et TRUNCATE : on les lui
+        // retire (#314, relecture sécurité n° 4).
+        $roleApplicatif = (string) config('database.connections.pgsql_app.username', 'axion_app');
+        if ($roleApplicatif !== '' && DB::selectOne('SELECT 1 AS e FROM pg_roles WHERE rolname = ?', [$roleApplicatif]) !== null) {
+            $role = '"' . str_replace('"', '""', $roleApplicatif) . '"';
+            DB::statement('REVOKE DELETE, TRUNCATE ON public.curseurs_traitements FROM ' . $role);
+            DB::statement('GRANT SELECT, INSERT, UPDATE ON public.curseurs_traitements TO ' . $role);
+        }
     }
 
     /**
-     * Retour arrière : la table ne porte que des positions de reprise. La
-     * perdre fait seulement repartir le traitement du début (les fiches déjà
-     * vérifiées sont sautées par la règle `SiteFiable`).
+     * Retour arrière INERTE : rien n'est jamais supprimé, positions de reprise
+     * comprises (#314, relecture sécurité n° 4). La table, additive, ne gêne
+     * aucun code antérieur ; la retirer se ferait à la main, en connaissance
+     * de cause.
      */
     public function down(): void
     {
-        DB::statement('DROP TABLE IF EXISTS curseurs_traitements');
+        // Volontairement vide.
     }
 };

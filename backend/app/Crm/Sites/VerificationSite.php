@@ -16,7 +16,11 @@ use Illuminate\Support\Str;
  * Un site deviné (`SiteFiable`) devient VÉRIFIÉ si, et seulement si, le
  * SIREN de l'entreprise figure sur sa page d'accueil OU sur sa page de
  * mentions légales (lien trouvé sur l'accueil, sur le même site ; à défaut
- * `/mentions-legales`). La présence du SIREN est jugée par la règle de #305
+ * `/mentions-legales`). Une page n'est une preuve QUE si son adresse
+ * d'ARRIVÉE, après redirections, est sur le même domaine enregistrable que
+ * le site deviné (`motifArrivee`, même garde que `SiteMedia::juger`) : un
+ * domaine parqué ou revendu qui renvoie vers un annuaire portant le SIREN ne
+ * valide rien (#314, R1). La présence du SIREN est jugée par la règle de #305
  * (`DomainFinderService::sirensDansPage`, arbitre `contientSiren`). Le nom,
  * la ville, le code postal ne suffisent JAMAIS ici : c'est la preuve faible
  * qui a laissé passer france.fr, paris.fr, maison.fr.
@@ -51,6 +55,12 @@ final class VerificationSite
     public const MOTIF_ILLISIBLE = 'illisible';
 
     public const MOTIF_ADRESSE = 'adresse-invalide';
+
+    /** Arrivée (après redirections) sur un AUTRE domaine enregistrable (#314, R1). */
+    public const MOTIF_REDIRECTION = SiteMedia::MOTIF_REDIRECTION;
+
+    /** Arrivée chez un parkeur / une place de marché de domaines. */
+    public const MOTIF_PARKING = SiteMedia::MOTIF_PARKING;
 
     /** Clé du curseur persistant (`curseurs_traitements.traitement`). */
     public const TRAITEMENT = 'entreprises:verifier-sites';
@@ -106,7 +116,9 @@ final class VerificationSite
      * de l'index `idx_companies_site_non_verifie_id`), avec un SIREN et un
      * site, après le curseur, dans l'ordre des identifiants. `$audience` :
      * membres de cette audience seulement (sonde par l'index unique
-     * `audience_members (audience_id, company_id, contact_id)`).
+     * `audience_members (audience_id, company_id, contact_id)`). Rend aussi
+     * le marqueur en place (`statut_avant`, `url_avant`, `motif_avant`,
+     * `v_avant`) : un marqueur identique n'est pas réécrit (#314).
      *
      * @return array{0: string, 1: list<int|string>}
      */
@@ -121,12 +133,16 @@ final class VerificationSite
         $liaisons[] = $limite;
 
         return [
-            'SELECT c.id, c.siren, c.website
+            "SELECT c.id, c.siren, c.website,
+                    c.metadata -> '" . SiteFiable::CLE . "' ->> 'statut' AS statut_avant,
+                    c.metadata -> '" . SiteFiable::CLE . "' ->> 'url' AS url_avant,
+                    c.metadata -> '" . SiteFiable::CLE . "' ->> 'motif' AS motif_avant,
+                    c.metadata -> '" . SiteFiable::CLE . "' ->> 'v' AS v_avant
                FROM companies c
               WHERE c.workspace_id = ?
                 AND c.deleted_at IS NULL
                 AND c.id > ?
-                AND ' . SiteFiable::nonVerifieSql('c') . "
+                AND " . SiteFiable::nonVerifieSql('c') . "
                 AND c.siren IS NOT NULL
                 AND c.website IS NOT NULL AND btrim(c.website) <> ''{$membres}
               ORDER BY c.id
@@ -180,6 +196,27 @@ final class VerificationSite
         $cible = LecturePageAccueil::cible($url);
 
         return $cible === null ? null : LecturePageAccueil::origine($cible) . self::CHEMIN_MENTIONS;
+    }
+
+    /**
+     * Null si l'adresse d'ARRIVÉE `$finale` (après redirections) peut servir
+     * de preuve pour le site deviné `$cible` : même domaine enregistrable
+     * (`www.` ou non, http → https, sous-domaine du même domaine acceptés),
+     * hors parkeur. Sinon le motif du refus (`redirection` ou `parking`) :
+     * la page n'est PAS celle du site deviné, son SIREN ne prouve rien.
+     */
+    public static function motifArrivee(string $cible, string $finale): ?string
+    {
+        $hote = (string) parse_url($cible, PHP_URL_HOST);
+        $arrivee = (string) parse_url($finale, PHP_URL_HOST);
+        if ($hote === '' || $arrivee === '') {
+            return self::MOTIF_REDIRECTION;
+        }
+        if (SiteMedia::estHoteParking($arrivee)) {
+            return self::MOTIF_PARKING;
+        }
+
+        return SiteMedia::domaineEnregistrable($arrivee) === SiteMedia::domaineEnregistrable($hote) ? null : self::MOTIF_REDIRECTION;
     }
 
     /** Même hôte, `www.` ignoré. */

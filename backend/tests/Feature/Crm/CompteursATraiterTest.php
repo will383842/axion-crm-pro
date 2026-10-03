@@ -26,11 +26,11 @@ use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\User;
 use App\Services\Audit\AuditHashChain;
 use Database\Seeders\PermissionsAndRolesSeeder;
-use DateTimeInterface;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -86,7 +86,7 @@ function catActivite(string $ws, array $payload, ?int $sujet = null): int
 }
 
 /** Un événement, avec ou sans date de relance. */
-function catEvenement(string $ws, ?DateTimeInterface $relance): int
+function catEvenement(string $ws, ?Carbon $relance): int
 {
     return (int) DB::table('events')->insertGetId([
         'workspace_id' => $ws, 'external_ref' => 'zz-cat-' . Str::random(8), 'nom' => 'ZZ Salon', 'type' => 'salon',

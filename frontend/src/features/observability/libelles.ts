@@ -30,7 +30,9 @@ export const MOTIFS_ARCHIVAGE: Readonly<Record<string, string>> = {
 
 export function libelleMotifArchivage(motif: string | null | undefined): string {
   const cle = typeof motif === 'string' ? motif.trim().toLowerCase() : '';
-  return MOTIFS_ARCHIVAGE[cle] ?? AUTRE_RAISON;
+  // `Object.hasOwn` : « constructor » ou « __proto__ » rendraient sinon une
+  // propriété héritée du prototype (une fonction, que React refuse d'afficher).
+  return Object.hasOwn(MOTIFS_ARCHIVAGE, cle) ? (MOTIFS_ARCHIVAGE[cle] ?? AUTRE_RAISON) : AUTRE_RAISON;
 }
 
 /** La phrase d'une action du journal métier (`business_events.action`). */
@@ -71,7 +73,7 @@ export function elementConcerne(type: string | null | undefined, id: string | nu
     return { texte: ident ? `Adresse e-mail ${ident}` : 'Adresse e-mail', lien: null };
   }
 
-  const nom = TYPES[t] ?? 'Autre élément';
+  const nom = Object.hasOwn(TYPES, t) ? (TYPES[t] ?? 'Autre élément') : 'Autre élément';
   const texte = ident ? `${nom} n° ${ident}` : nom;
   if (ident === null || !/^\d+$/.test(ident)) return { texte, lien: null };
 

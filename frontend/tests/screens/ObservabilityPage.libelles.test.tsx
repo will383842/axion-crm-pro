@@ -33,7 +33,7 @@ describe('Santé du système — libellés en clair', () => {
 
     expect(await screen.findByText('Entreprises archivées')).toBeInTheDocument();
     expect(screen.getByText('Échecs de mise à jour d’audience (7 j)')).toBeInTheDocument();
-    expect(screen.getByText(/fiches déjà complètes ignorées/)).toBeInTheDocument();
+    expect(screen.getByText(/fiches qui ont déjà un e-mail ignorées/)).toBeInTheDocument();
 
     expect(screen.getByText('Entreprise radiée')).toBeInTheDocument();
     expect(screen.getByText('Sans e-mail')).toBeInTheDocument();

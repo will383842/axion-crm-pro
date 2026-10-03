@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { AUTRE_OPERATION, EVENEMENTS } from '@/features/dashboard/activite';
+import { AUTRE_OPERATION, EVENEMENTS, libelleActivite } from '@/features/dashboard/activite';
 import {
   AUTRE_RAISON,
   MOTIFS_ARCHIVAGE,
@@ -31,7 +31,7 @@ describe('Motifs d’archivage', () => {
     expect(libelleMotifArchivage('ENTREPRISE_RADIEE')).toBe('Entreprise radiée');
   });
 
-  it.each(['motif_inconnu', '', null, undefined])('motif inconnu « %s » → « Autre raison »', (motif) => {
+  it.each(['motif_inconnu', '', null, undefined, '__proto__', 'constructor', 'toString', 'hasOwnProperty'])('motif inconnu « %s » → « Autre raison »', (motif) => {
     expect(libelleMotifArchivage(motif)).toBe(AUTRE_RAISON);
   });
 });
@@ -47,6 +47,16 @@ describe('Actions du journal métier', () => {
   it.each(['company.nouveau_code', 'x', '', null, undefined])('action inconnue « %s » → « Autre opération »', (action) => {
     expect(libelleEvenementMetier(action)).toBe(AUTRE_OPERATION);
   });
+
+  // Propriétés héritées du prototype : avec `in`, « constructor » rendait la
+  // fonction `Object` au lieu d'une phrase (et React plantait à l'affichage).
+  it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'nom hérité du prototype « %s » → « Autre opération » (texte, jamais une fonction)',
+    (action) => {
+      expect(libelleEvenementMetier(action)).toBe(AUTRE_OPERATION);
+      expect(libelleActivite(action, null)).toBe(AUTRE_OPERATION);
+    },
+  );
 });
 
 describe('Élément concerné', () => {
@@ -76,6 +86,10 @@ describe('Élément concerné', () => {
     const element = elementConcerne('widget', '3');
     expect(element).toEqual({ texte: 'Autre élément n° 3', lien: null });
     expect(element?.texte).not.toContain('widget');
+  });
+
+  it.each(['__proto__', 'constructor', 'toString'])('type hérité du prototype « %s » → « Autre élément »', (type) => {
+    expect(elementConcerne(type, '3')).toEqual({ texte: 'Autre élément n° 3', lien: null });
   });
 
   it('identifiant non numérique : pas de lien', () => {

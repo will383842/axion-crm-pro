@@ -109,13 +109,17 @@ export function libelleActivite(eventType?: string | null, path?: string | null)
   const route = typeof path === 'string' ? path.trim().replace(/^\/+/, '') : '';
 
   if (/_(LOT|PAQUET)$/.test(type)) return null;
-  if (type in EVENEMENTS) return EVENEMENTS[type] ?? null;
+  // `Object.hasOwn`, jamais `in` : « constructor » ou « __proto__ » sont
+  // « dans » tout objet (hérités du prototype) et rendaient une fonction au
+  // lieu d'une phrase.
+  if (Object.hasOwn(EVENEMENTS, type)) return EVENEMENTS[type] ?? null;
 
-  if (type in VERBES || type === 'GET') {
+  const verbeConnu = Object.hasOwn(VERBES, type);
+  if (verbeConnu || type === 'GET') {
     for (const [motif, verbe, phrase] of ROUTES) {
       if ((verbe === '*' || verbe === type) && motif.test(route)) return phrase;
     }
-    return VERBES[type] ? `${VERBES[type]} dans la console` : 'Action dans la console';
+    return verbeConnu ? `${VERBES[type]} dans la console` : 'Action dans la console';
   }
 
   // Un code INCONNU du dictionnaire ne s'affiche plus déguisé en phrase

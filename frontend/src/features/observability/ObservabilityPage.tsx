@@ -94,7 +94,7 @@ function SanteDuSysteme() {
               ? `${data.google_places_quota.pending_companies} fiches en attente : le quota est peut-être trop bas.`
               : data.google_places_quota.pending_companies > 0
               ? `${data.google_places_quota.percent}% utilisé · ${data.google_places_quota.pending_companies} en attente (reprise le 1er du mois)`
-              : `${data.google_places_quota.percent}% utilisé · fiches déjà complètes ignorées`
+              : `${data.google_places_quota.percent}% utilisé · fiches qui ont déjà un e-mail ignorées`
           }
           progress={data.google_places_quota.percent}
           icon={<MapPin className="size-4" />}

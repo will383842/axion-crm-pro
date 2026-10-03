@@ -9,8 +9,16 @@ namespace App\Services\Insee;
  */
 final class InseeErreurHttp extends \RuntimeException
 {
-    public function __construct(public readonly int $statut, public readonly string $chemin, string $precision = '')
-    {
+    /**
+     * @param  bool  $tropVolumineuse  corps au-delà de `HttpInseeClient::REPONSE_MAX_OCTETS`
+     *                                 (non lu au-delà) : le flux redemande la page plus petite
+     */
+    public function __construct(
+        public readonly int $statut,
+        public readonly string $chemin,
+        string $precision = '',
+        public readonly bool $tropVolumineuse = false,
+    ) {
         parent::__construct(trim("INSEE {$statut} sur {$chemin} {$precision}"));
     }
 }

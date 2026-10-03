@@ -10,6 +10,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 
 /**
@@ -61,10 +62,40 @@ class HttpInseeClient implements InseeClient
     public const PAGES_MAX = 20000;
 
     /**
-     * Taille maximale d'une réponse Sirene AVANT décodage (réserve 5, serveur
-     * à 2 CPU) : une page de 1000 unités pèse quelques Mo.
+     * Taille maximale d'une réponse Sirene, lue PAR MORCEAUX et jamais au-delà
+     * (réserve 5 de #313, réserve 1 de #320) : le corps de 8 Mo et son
+     * décodage (≈ 3 à 5 fois le JSON) tiennent ensemble dans la marge que
+     * laisse la garde mémoire à 128 Mo. Au-delà, le flux redemande la MÊME
+     * page plus petite (`PAGE_SIRENE_PLANCHER`) au lieu d'épuiser la mémoire.
      */
-    public const REPONSE_MAX_OCTETS = 32 * 1024 * 1024;
+    public const REPONSE_MAX_OCTETS = 8 * 1024 * 1024;
+
+    /**
+     * Taille de page la plus petite du flux : une page encore trop lourde à
+     * cette taille lève (passage `echouee`, curseur gardé, reprise possible).
+     */
+    public const PAGE_SIRENE_PLANCHER = 25;
+
+    /** Pages légères d'affilée avant de redoubler une taille de page réduite. */
+    public const PAGES_AVANT_REMONTEE = 10;
+
+    /**
+     * Les SEULS champs que lit `MiseAJourMensuelle` (paramètre `champs` de
+     * Sirene 3.11) : chaque période de l'historique ne voyage plus qu'avec
+     * eux. Toute lecture d'un nouveau champ d'unité doit l'ajouter ici.
+     * Sirene ne sait pas rendre la seule période courante d'une recherche
+     * (`periode(…)` dans `q` filtre les UNITÉS, pas les périodes rendues) :
+     * la réduction à la période courante reste faite après décodage.
+     */
+    public const CHAMPS_UNITES = [
+        'siren', 'statutDiffusionUniteLegale', 'etatAdministratifUniteLegale',
+        'prenom1UniteLegale', 'trancheEffectifsUniteLegale', 'categorieEntreprise',
+        'dateDebut', 'denominationUniteLegale', 'nomUniteLegale',
+        'activitePrincipaleUniteLegale', 'categorieJuridiqueUniteLegale', 'nicSiegeUniteLegale',
+    ];
+
+    /** Faux si Sirene a refusé `champs` (400) : la suite se passe du paramètre. */
+    private bool $champsAcceptes = true;
 
     private int $delaiMs = 2100;
 
@@ -397,21 +428,46 @@ class HttpInseeClient implements InseeClient
         /** @var array<string, true> $vus les `CURSEURS_VUS` derniers, dans l'ordre */
         $vus = [$curseur => true];
         $plafond = self::PAGES_MAX;
+        $total = null;
         $pages = 0;
+        // Taille de page COURANTE : réduite (÷ 2, jusqu'au plancher) quand
+        // une page dépasse `REPONSE_MAX_OCTETS`, redoublée après
+        // `PAGES_AVANT_REMONTEE` pages légères. Le curseur désigne une
+        // POSITION du flux : redemander le même curseur plus petit ne perd
+        // ni ne répète aucune unité.
+        $nombre = self::PAGE_SIRENE;
+        $legeres = 0;
 
         while (true) {
             if (++$pages > $plafond) {
                 throw new \RuntimeException("Flux Sirene : plus de {$plafond} pages lues — arrêt (curseurs incohérents ?).");
             }
-            $data = $this->appelSirene('/siren', [
-                'q' => $q,
-                'curseur' => $curseur,
-                'nombre' => self::PAGE_SIRENE,
-                'tri' => 'siren',
-                // Les champs nuls ne voyagent pas : l'appelant lit tout par
-                // `?? null`, une valeur absente vaut une valeur nulle.
-                'masquerValeursNulles' => 'true',
-            ]);
+            try {
+                $data = $this->appelUnites([
+                    'q' => $q,
+                    'curseur' => $curseur,
+                    'nombre' => $nombre,
+                    'tri' => 'siren',
+                    // Les champs nuls ne voyagent pas : l'appelant lit tout par
+                    // `?? null`, une valeur absente vaut une valeur nulle.
+                    'masquerValeursNulles' => 'true',
+                ]);
+            } catch (InseeErreurHttp $e) {
+                if (! $e->tropVolumineuse || $nombre <= self::PAGE_SIRENE_PLANCHER) {
+                    throw $e;
+                }
+                // Page trop lourde (unités à long historique) : la MÊME page,
+                // deux fois plus petite. Fini : ÷ 2 jusqu'au plancher, puis lève.
+                $nombre = max(self::PAGE_SIRENE_PLANCHER, intdiv($nombre, 2));
+                $legeres = 0;
+                $pages--;
+                if (is_int($total)) {
+                    $plafond = self::plafondDePages($total, $nombre);
+                }
+                Log::info('[INSEE] flux Sirene : page trop volumineuse, redemandée plus petite', ['nombre' => $nombre]);
+
+                continue;
+            }
             $unites = [];
             foreach (is_array($data['unitesLegales'] ?? null) ? $data['unitesLegales'] : [] as $u) {
                 if (is_array($u)) {
@@ -419,10 +475,15 @@ class HttpInseeClient implements InseeClient
                 }
             }
             $suivant = $data['header']['curseurSuivant'] ?? null;
-            $total = $data['header']['total'] ?? null;
+            $annonce = $data['header']['total'] ?? null;
+            if ($pages === 1 && is_int($annonce) && $annonce >= 0) {
+                $total = $annonce;
+                $plafond = self::plafondDePages($total, $nombre);
+            }
             unset($data);
-            if ($pages === 1 && is_int($total) && $total >= 0) {
-                $plafond = min(self::PAGES_MAX, intdiv($total, self::PAGE_SIRENE) + 1 + self::PAGES_MARGE);
+            if ($nombre < self::PAGE_SIRENE && ++$legeres >= self::PAGES_AVANT_REMONTEE) {
+                $nombre = min(self::PAGE_SIRENE, $nombre * 2);
+                $legeres = 0;
             }
             // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.
             if (! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur) {
@@ -448,6 +509,42 @@ class HttpInseeClient implements InseeClient
 
             $curseur = $suivant;
         }
+    }
+
+    /**
+     * Plafond de pages d'un flux de `$total` unités lues par pages de
+     * `$nombre` au moins (réserve 3 de #313) : une taille réduite RELÈVE le
+     * plafond, sans jamais dépasser `PAGES_MAX`.
+     */
+    private static function plafondDePages(int $total, int $nombre): int
+    {
+        return min(self::PAGES_MAX, intdiv($total, max(1, $nombre)) + 1 + self::PAGES_MARGE);
+    }
+
+    /**
+     * Une requête `/siren` du lot N8 restreinte aux `CHAMPS_UNITES`. Si Sirene
+     * refuse le paramètre (400 : nom de champ inconnu d'une future version),
+     * la requête est refaite UNE fois sans lui, et la suite s'en passe : le
+     * flux reste juste, seulement plus lourd.
+     *
+     * @param  array<string, scalar>  $params
+     * @return array<string, mixed>
+     */
+    private function appelUnites(array $params): array
+    {
+        if ($this->champsAcceptes) {
+            try {
+                return $this->appelSirene('/siren', $params + ['champs' => implode(',', self::CHAMPS_UNITES)]);
+            } catch (InseeErreurHttp $e) {
+                if ($e->statut !== 400) {
+                    throw $e;
+                }
+                $this->champsAcceptes = false;
+                Log::warning('[INSEE] Sirene refuse le paramètre « champs » : requêtes complètes à la place');
+            }
+        }
+
+        return $this->appelSirene('/siren', $params);
     }
 
     /**
@@ -480,7 +577,7 @@ class HttpInseeClient implements InseeClient
     {
         $unites = [];
         foreach (array_chunk(self::identifiants($sirens, 9), self::PAR_REQUETE) as $paquet) {
-            $data = $this->appelSirene('/siren', [
+            $data = $this->appelUnites([
                 'q' => implode(' OR ', array_map(static fn (string $s): string => 'siren:' . $s, $paquet)),
                 'nombre' => count($paquet),
             ]);
@@ -589,8 +686,11 @@ class HttpInseeClient implements InseeClient
     }
 
     /**
-     * Le corps JSON d'une réponse, sa taille BORNÉE avant décodage (réserve 5) :
-     * `Content-Length` d'abord, puis la longueur réelle du corps.
+     * Le corps JSON d'une réponse, sa taille BORNÉE avant décodage (réserve 5
+     * de #313, réserve 1 de #320) : `Content-Length` d'abord, puis le corps
+     * lu PAR MORCEAUX et jamais au-delà de `REPONSE_MAX_OCTETS` — une réponse
+     * sans longueur annoncée ne peut plus remplir la mémoire. Le corps est lu
+     * UNE fois (incident mémoire du 03/10/2026).
      *
      * @return array<string, mixed>
      */
@@ -598,14 +698,25 @@ class HttpInseeClient implements InseeClient
     {
         $annonce = $resp->header('Content-Length');
         if ($annonce !== '' && is_numeric($annonce) && (int) $annonce > self::REPONSE_MAX_OCTETS) {
-            throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)');
+            throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)', tropVolumineuse: true);
         }
-        // Le corps est lu UNE fois : chaque `body()` en refait une copie
-        // complète depuis le flux (incident mémoire du 03/10/2026).
-        $corps = $resp->body();
-        if (strlen($corps) > self::REPONSE_MAX_OCTETS) {
-            throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)');
+        $flux = $resp->toPsrResponse()->getBody();
+        if ($flux->isSeekable()) {
+            $flux->rewind();
         }
+        $corps = '';
+        while (! $flux->eof()) {
+            $morceau = $flux->read(65536);
+            if ($morceau === '') {
+                break;
+            }
+            $corps .= $morceau;
+            if (strlen($corps) > self::REPONSE_MAX_OCTETS) {
+                unset($corps, $morceau);
+                throw new InseeErreurHttp($resp->status(), $chemin, '(réponse trop volumineuse)', tropVolumineuse: true);
+            }
+        }
+        unset($morceau);
         $data = json_decode($corps, true);
         unset($corps);
 

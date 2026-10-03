@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Crm;
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\Taxonomy;
@@ -414,6 +415,14 @@ class PersonnesController extends ConsoleController
      * EXPORT CSV du segment filtré. Les coordonnées ne sortent en clair
      * qu'avec `contacts.view_pii` ; les personnes opposées ou à l'adresse
      * morte n'en sortent jamais (même règle que l'éligibilité).
+     *
+     * Entrepreneurs individuels (03/10/2026, confirmé par Williams) : une
+     * personne rattachée à une fiche dont la catégorie juridique INSEE
+     * commence par 1 (`EligibiliteAdresse::estEntrepriseIndividuelle`) n'est
+     * jamais destinataire d'une campagne. Elle ne sort donc pas du fichier
+     * par défaut ; avec `inclure_non_prospectables=oui`, elle sort avec
+     * « Prospection autorisée » à non et la colonne « Entrepreneur
+     * individuel » à oui.
      */
     public function export(Request $request): StreamedResponse
     {
@@ -429,7 +438,7 @@ class PersonnesController extends ConsoleController
         ]);
         $tous = ($choix['inclure_non_prospectables'] ?? null) === 'oui';
 
-        $entete = ['Adresse', 'Prénom', 'Nom', 'Nature', 'Source', 'Statut lettre', 'Base légale (lettre)', 'Consentement (version)', 'Consentement le', 'Prospection autorisée', 'Rattachée', 'SIREN', 'Dernière interaction'];
+        $entete = ['Adresse', 'Prénom', 'Nom', 'Nature', 'Source', 'Statut lettre', 'Base légale (lettre)', 'Consentement (version)', 'Consentement le', 'Prospection autorisée', 'Rattachée', 'SIREN', 'Dernière interaction', 'Entrepreneur individuel'];
 
         // La requête est construite ICI, sous le contexte d'espace, et lue dans
         // le flux ; le contexte est reposé autour de la lecture.
@@ -442,9 +451,15 @@ class PersonnesController extends ConsoleController
                 fwrite($out, "\xEF\xBB\xBF");
                 fputcsv($out, $entete);
 
-                $requete = Abonnements::exclureOpposees($this->requete($workspaceId, $filtres));
+                $requete = Abonnements::exclureOpposees($this->requete($workspaceId, $filtres))
+                    ->addSelect('companies.legal_form');
                 if (! $tous) {
                     $requete = Abonnements::limiterAuxProspectables($requete);
+                    // Même règle qu'`EligibiliteAdresse::estEntrepriseIndividuelle`
+                    // (forme juridique, espaces retirés, commençant par 1), posée
+                    // sur la jointure déjà restreinte aux personnes de l'espace :
+                    // rien à indexer. Sans fiche (LEFT JOIN nul) : rien à exclure.
+                    $requete->whereRaw("COALESCE(btrim(companies.legal_form), '') NOT LIKE '1%'");
                 }
 
                 // Même plafond que tous les exports du dépôt (G41-007), même
@@ -456,6 +471,7 @@ class PersonnesController extends ConsoleController
                 $lues = 0;
                 $tronque = false;
                 $ecrire = function (\stdClass $p) use ($out, $masquer): void {
+                    $ei = EligibiliteAdresse::estEntrepriseIndividuelle($p->legal_form ?? null);
                     // Chaque cellule est NEUTRALISÉE : prénom, nom, source et
                     // version viennent d'un formulaire public (injection de
                     // formule à l'ouverture dans un tableur).
@@ -469,13 +485,14 @@ class PersonnesController extends ConsoleController
                         $p->base_lettre,
                         $p->consent_version,
                         $p->consent_at,
-                        Abonnements::prospectionAutorisee(
+                        ! $ei && Abonnements::prospectionAutorisee(
                             is_string($p->email_nature) ? $p->email_nature : null,
                             is_string($p->statut_lettre) ? $p->statut_lettre : null,
                         ) ? 'oui' : 'non',
                         $p->contact_id === null ? 'non' : 'oui',
                         $p->siren,
                         $p->derniere_interaction_at,
+                        $ei ? 'oui' : 'non',
                     ]));
                 };
                 $requete->chunkById(min(1000, $plafond + 1), function ($lot) use (&$lues, &$tronque, $plafond, $ecrire): bool {

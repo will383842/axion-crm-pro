@@ -25,7 +25,14 @@ use App\Support\EligibiliteCampagne;
  *                     qualité de l'adresse (03/10/2026). Le drapeau est posé
  *                     par l'appelant sur les fiches qu'il a DÉJÀ lues —
  *                     aucune requête de plus, aucun balayage de `companies`.
- *                     Une forme juridique absente ou inconnue n'exclut pas ;
+ *                     Une forme juridique absente, vide ou non codée
+ *                     (« SAS » en clair) n'exclut pas : on n'exclut que ce
+ *                     qui est su. Segment ou audience PRESSE : le motif de
+ *                     PROVENANCE (`AdressePresseFiable` : site deviné,
+ *                     journaliste sans accès ou retiré) est jugé et compté
+ *                     AVANT celui-ci ; une adresse EI de provenance non
+ *                     fiable est donc comptée sous sa provenance — exclue
+ *                     de toute façon ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par

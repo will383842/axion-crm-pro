@@ -22,7 +22,11 @@ uses(TestCase::class, RefreshDatabase::class);
  * secondaire) qu'aucune fiche ne porte. Un SIRET dont le SIREN est inconnu
  * ne rend rien. Il n'y a ni index sur `siret` ni table d'établissements.
  *
- * Numéros et noms fictifs (dépôt PUBLIC).
+ * Numéros et noms fictifs (dépôt PUBLIC) : les SIREN sont TIRÉS AU HASARD à
+ * chaque test (`sirenFictif`, clé de Luhn valide), jamais un numéro écrit en
+ * dur qui pourrait être celui d'une vraie entreprise ; le SIRET « inconnu »
+ * (999 999 999 00011) n'a pas de clé de Luhn valide, donc n'est attribué à
+ * personne.
  */
 beforeEach(function () {
     $this->seed(PermissionsAndRolesSeeder::class);
@@ -44,20 +48,43 @@ beforeEach(function () {
     ]);
     $this->actingAs($user);
 
-    // Le siège : SIREN 552100554, SIRET du siège 552 100 554 00017.
+    // Le siège : SIREN tiré au hasard, SIRET du siège = SIREN + NIC 00017.
+    $this->siren = sirenFictif();
+    do {
+        $voisin = sirenFictif();
+    } while ($voisin === $this->siren);
     $this->siege = (int) DB::table('companies')->insertGetId([
-        'workspace_id' => $this->workspace->id, 'siren' => '552100554', 'siret' => '55210055400017',
+        'workspace_id' => $this->workspace->id, 'siren' => $this->siren, 'siret' => $this->siren . '00017',
         'denomination' => 'Zz Réseau Siège', 'discovery_source' => 'site', 'quality_score' => 0,
         'signals' => '{}', 'metadata' => '{}', 'relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     // TÉMOIN : un SIREN voisin, qui ne doit jamais remonter.
     DB::table('companies')->insert([
-        'workspace_id' => $this->workspace->id, 'siren' => '552100555', 'denomination' => 'Zz Voisine',
+        'workspace_id' => $this->workspace->id, 'siren' => $voisin, 'denomination' => 'Zz Voisine',
         'discovery_source' => 'site', 'quality_score' => 0, 'signals' => '{}', 'metadata' => '{}',
         'relation_type' => 'prospect', 'lifecycle_stage' => 'nouveau', 'created_at' => now(), 'updated_at' => now(),
     ]);
 });
+
+/** Un SIREN fictif tiré au hasard (9 chiffres, clé de Luhn valide). */
+function sirenFictif(): string
+{
+    $corps = (string) random_int(10000000, 99999999);
+    for ($cle = 0; $cle <= 9; $cle++) {
+        $n = $corps . $cle;
+        $somme = 0;
+        foreach (str_split(strrev($n)) as $i => $c) {
+            $d = (int) $c * ($i % 2 === 1 ? 2 : 1);
+            $somme += $d > 9 ? $d - 9 : $d;
+        }
+        if ($somme % 10 === 0) {
+            return $n;
+        }
+    }
+
+    throw new LogicException('Clé de Luhn introuvable.');
+}
 
 /** @return list<int> */
 function sirenIds(TestResponse $reponse, string $cle): array
@@ -71,7 +98,7 @@ function sirenIds(TestResponse $reponse, string $cle): array
 test('sélecteur « Entreprise » : le SIRET d une agence retrouve la fiche du siège', function () {
     // Agence (établissement secondaire) : même SIREN, NIC 00025 — aucune
     // fiche ne porte ce SIRET.
-    $agence = '55210055400025';
+    $agence = $this->siren . '00025';
     expect(DB::table('companies')->where('siret', $agence)->exists())->toBeFalse();
 
     $reponse = $this->getJson('/api/v1/crm/entreprises/choix?q=' . $agence)->assertOk();
@@ -79,10 +106,10 @@ test('sélecteur « Entreprise » : le SIRET d une agence retrouve la fiche du s
     $reponse->assertJsonPath('indice', null);
 
     // Espaces et points tolérés.
-    expect(sirenIds($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode('552 100 554 00025'))->assertOk(), 'data'))
+    expect(sirenIds($this->getJson('/api/v1/crm/entreprises/choix?q=' . urlencode(implode(' ', str_split($this->siren, 3)) . ' 00025'))->assertOk(), 'data'))
         ->toBe([$this->siege]);
     // TÉMOIN : le SIRET du siège lui-même.
-    expect(sirenIds($this->getJson('/api/v1/crm/entreprises/choix?q=55210055400017')->assertOk(), 'data'))->toBe([$this->siege]);
+    expect(sirenIds($this->getJson('/api/v1/crm/entreprises/choix?q=' . $this->siren . '00017')->assertOk(), 'data'))->toBe([$this->siege]);
 });
 
 test('sélecteur « Entreprise » : un SIRET dont le SIREN est inconnu ne rend rien', function () {
@@ -92,10 +119,10 @@ test('sélecteur « Entreprise » : un SIRET dont le SIREN est inconnu ne rend r
 });
 
 test('palette Ctrl+K : le SIRET d une agence retrouve la fiche du siège', function () {
-    $reponse = $this->getJson('/api/v1/search?q=55210055400025')->assertOk();
+    $reponse = $this->getJson('/api/v1/search?q=' . $this->siren . '00025')->assertOk();
     expect(sirenIds($reponse, 'companies'))->toBe([$this->siege]);
 
-    expect(sirenIds($this->getJson('/api/v1/search?q=' . urlencode('552.100.554.00025'))->assertOk(), 'companies'))
+    expect(sirenIds($this->getJson('/api/v1/search?q=' . urlencode(implode('.', str_split($this->siren, 3)) . '.00025'))->assertOk(), 'companies'))
         ->toBe([$this->siege]);
 });
 

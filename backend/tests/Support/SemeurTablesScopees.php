@@ -92,6 +92,9 @@ final class SemeurTablesScopees
         // 2026-10-03 (N12) : provenance tiers d'une personne — feuille de
         // `contacts`.
         'contacts_provenances_tiers',
+        // 2026-10-03 (N13) : propositions venues d'un tiers — feuille de
+        // `companies` (pas de clé étrangère : un déclencheur vérifie l'espace).
+        'propositions_champs',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -403,6 +406,14 @@ final class SemeurTablesScopees
             'origine' => 'apporteur',
             'reference_externe' => 'zz-etancheite',
             'information_tiers_version' => 'information-article-14/v5',
+        ]);
+
+        $inserer('propositions_champs', [
+            'entite' => 'entreprise',
+            'entite_id' => $id['companies'],
+            'champ' => 'city',
+            'valeur_proposee' => 'ZZ Etancheite',
+            'origine' => 'apporteur',
         ]);
 
         $inserer('listes_manuelles_membres', [

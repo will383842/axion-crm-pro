@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Console\ScoresPerimes;
-use App\Exceptions\TableauDeBordIncomplet;
 use App\Crm\Taxonomy;
+use App\Exceptions\TableauDeBordIncomplet;
 use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;

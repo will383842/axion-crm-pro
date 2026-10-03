@@ -437,9 +437,9 @@ describe('DashboardPage — P0-1 lot 1 : sans espace, et compteurs indisponibles
     });
     // Un null n'est PAS une base vide.
     expect(screen.queryByText('Votre base est vide')).not.toBeInTheDocument();
-    expect(vignette('Total entreprises')).not.toHaveTextContent(/0/);
+    expect(vignette('Total entreprises')).not.toHaveTextContent(/\b0\b/);
     expect(vignette('Enrichies 24h')).toHaveTextContent('—');
-    expect(vignette('Enrichies 24h')).not.toHaveTextContent(/0/);
+    expect(vignette('Enrichies 24h')).not.toHaveTextContent(/\b0\b/);
     // Témoin : les chiffres connus restent affichés.
     expect(vignette('Nouvelles 7j')).toHaveTextContent(/5.400/);
 

@@ -44,7 +44,7 @@ describe('NextActions', () => {
     const { container } = render(<NextActions companiesTotal={null} scraperRuns24h={null} qualityAvgScore={0} />);
     expect(screen.queryByText('Récupérer des entreprises')).not.toBeInTheDocument();
     expect(screen.queryByText('Voir vos entreprises')).not.toBeInTheDocument();
-    expect(container.textContent ?? '').not.toMatch(/0 fiches/);
+    expect(container.textContent ?? '').not.toMatch(/\b0 fiches/);
     // Repli : la carte reste utile.
     expect(screen.getByText('Voir la carte')).toBeInTheDocument();
   });

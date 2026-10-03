@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
+use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
@@ -511,6 +512,17 @@ Route::prefix('v1')->group(function () {
             // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
             Route::get('/contacts/{contactId}/provenances-tiers', [ProvenancesTiersController::class, 'index'])
                 ->whereNumber('contactId');
+            // N13 (03/10/2026) — propositions venues d'un tiers : rôle owner
+            // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
+            // Aucune route ne CRÉE de proposition : rien n'est branché à Partners.
+            Route::get('/propositions', [PropositionsController::class, 'index']);
+            // `permission:` (garde F36-001) EN PLUS du contrôle owner du contrôleur.
+            Route::post('/propositions/{id}/accepter', [PropositionsController::class, 'accepter'])
+                ->whereNumber('id')
+                ->middleware('permission:companies.update');
+            Route::post('/propositions/{id}/refuser', [PropositionsController::class, 'refuser'])
+                ->whereNumber('id')
+                ->middleware('permission:companies.update');
 
             Route::get('/candidates', [CandidatesController::class, 'index']);
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);

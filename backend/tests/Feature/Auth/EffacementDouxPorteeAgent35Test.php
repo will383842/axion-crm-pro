@@ -527,10 +527,13 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // numéros et l'effacement des fiches d'organisation. Même geste, sur
     // `users` ; seule sa ligne a bougé. 255 -> 258 : le relevé des numéros
     // opposables (4e relecture) ; même geste, seule la ligne a bougé.
+    // 110 -> 128 et 271 -> 289 le 2026-10-03 (relecture sécurité #316) : la
+    // neutralisation des propositions de tiers est insérée au-dessus. Mêmes
+    // gestes (`journalists`, `users`) ; seules leurs lignes ont bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:110',
-        'app/Services/Rgpd/GdprErasureService.php:271',
+        'app/Services/Rgpd/GdprErasureService.php:128',
+        'app/Services/Rgpd/GdprErasureService.php:289',
     ]);
 });
 

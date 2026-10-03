@@ -70,6 +70,14 @@ class AudienceBuilderService
      * ne rend pas sa fiche joignable — elle ne part jamais, elle ne compte
      * donc pas. Sous-requête par personne, lue par l'index
      * `idx_contacts_provenances_tiers_contact` ; rien n'est réécrit.
+     *
+     * Écart CONNU avec l'envoi, le même pour les deux motifs (quarantaine et
+     * tiers) : ce critère juge chaque PERSONNE de la fiche, alors
+     * qu'`EligibiliteAdresse` juge la BOÎTE sur toutes ses occurrences. Une
+     * adresse portée par une personne mal informée de la fiche A et par une
+     * personne sans provenance de la fiche B rend B joignable, mais ne part
+     * pas. Le compte peut donc dépasser l'envoi, jamais l'inverse ; à traiter
+     * en une fois pour les deux motifs si cela pèse.
      */
     public const CHAMP_EMAIL_HORS_QUARANTAINE = 'email_hors_quarantaine';
 

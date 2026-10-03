@@ -375,7 +375,8 @@ class HttpInseeClient implements InseeClient
         // Un curseur DÉJÀ VU (A→B→A…) ou un nombre de pages au-delà du total
         // annoncé lèvent : le passage reste « echouee », visible, au lieu de
         // boucler — même lancé à la main sans `--duree-max`.
-        $vus = [$curseur => true];
+        /** @var list<string> $vus */
+        $vus = [$curseur];
         $plafond = self::PAGES_MAX;
         $pages = 0;
 
@@ -399,19 +400,18 @@ class HttpInseeClient implements InseeClient
                 $plafond = min(self::PAGES_MAX, intdiv($total, self::PAGE_SIRENE) + 1 + self::PAGES_MARGE);
             }
             // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.
-            $fin = ! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur;
-            if (! $fin && isset($vus[$suivant])) {
-                throw new \RuntimeException('Flux Sirene : curseur déjà vu — arrêt (pagination en boucle).');
-            }
-            if (! $fin) {
-                $vus[$suivant] = true;
-            }
+            if (! is_string($suivant) || $suivant === '' || $suivant === '*' || $suivant === $curseur) {
+                yield ['curseur' => $curseur, 'suivant' => null, 'unites' => $unites];
 
-            yield ['curseur' => $curseur, 'suivant' => $fin ? null : $suivant, 'unites' => $unites];
-
-            if ($fin) {
                 return;
             }
+            if (in_array($suivant, $vus, true)) {
+                throw new \RuntimeException('Flux Sirene : curseur déjà vu — arrêt (pagination en boucle).');
+            }
+            $vus[] = $suivant;
+
+            yield ['curseur' => $curseur, 'suivant' => $suivant, 'unites' => $unites];
+
             $curseur = $suivant;
         }
     }

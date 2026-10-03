@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
  * INT-T69-P) n'est pas figé côté Partners.
  *
  * ⛔ INTERDIT comme sonde de supervision : chaque appel accepté laisse une
- * ligne (sans purge) dans `partners_idempotence`. Le ping sert à valider le
+ * ligne (sans purge) dans la table tenue par `IdempotencePartners`. Le ping sert à valider le
  * canal à la main, lors d'une mise en service ou d'une rotation de clé.
  *
  * L'authentification est portée par `VerificateurCanalPartners` ; ce

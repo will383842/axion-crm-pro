@@ -53,7 +53,7 @@ final class IdempotencePartners
     /**
      * Clé fournie par l'émetteur. Accepte `<uuid>:<type>:<version>` (forme
      * prévue côté Partners). JAMAIS de point : la clé est signée dans
-     * « horodatage.clé.corps », le point y est le séparateur.
+     * « horodatage.MÉTHODE chemin.clé.corps », le point y est le séparateur.
      */
     public const MOTIF_CLE = '/^[A-Za-z0-9_:-]{8,128}$/';
 

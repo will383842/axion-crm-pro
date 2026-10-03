@@ -21,7 +21,14 @@ use Throwable;
  * ── CE QUI EST STOCKÉ ───────────────────────────────────────────────────────
  * Un ENTIER par (canal, motif, tranche de 5 minutes). Ni adresse IP, ni corps,
  * ni en-tête : le compteur ne contient aucune donnée personnelle. Les clés
- * expirent seules au bout de deux heures — pas de ménage à faire.
+ * expirent seules au bout de trois heures — pas de ménage à faire.
+ *
+ * ── LE BRUIT D'INTERNET À PART ──────────────────────────────────────────────
+ * `/api/internal/site-sync` est publique, et son chemin figure dans un dépôt
+ * public : un scanner y envoie des POST anonymes. Un POST qui ne porte AUCUN
+ * des deux en-têtes du site (ni horodatage, ni signature) n'est pas un
+ * émetteur désaligné : il est compté sous le motif `sans_entete`, mesuré mais
+ * hors de `total` — il ne lève aucune alerte (avis #308, réserve 1).
  *
  * ── MAGASIN ─────────────────────────────────────────────────────────────────
  * Le même que la mémoire anti-rejeu (`crm.ingest.replay_store`, `redis` en
@@ -37,14 +44,26 @@ use Throwable;
  */
 final class CompteurRefusCanal
 {
-    /** Les réponses de refus de {@see CanalSigneSite::controler()}. */
-    public const MOTIFS = ['bad_signature', 'stale_signature', 'replay_guard_unavailable'];
+    /** Les réponses de refus de {@see CanalSigneSite::controler()} qui comptent dans `total`. */
+    public const MOTIFS_ALERTE = ['bad_signature', 'stale_signature', 'replay_guard_unavailable'];
+
+    /** Un POST sans aucun en-tête du site : bruit d'Internet, mesuré, jamais alerté. */
+    public const MOTIF_SANS_ENTETE = 'sans_entete';
+
+    /** Tous les motifs comptés. */
+    public const MOTIFS = [...self::MOTIFS_ALERTE, self::MOTIF_SANS_ENTETE];
 
     /** Largeur d'une tranche, en secondes. */
     public const TRANCHE_SECONDES = 300;
 
-    /** Durée de vie d'une tranche : deux heures couvrent toute fenêtre de lecture utile. */
-    public const TTL_SECONDES = 7200;
+    /**
+     * Durée de vie d'une tranche : trois heures couvrent la fenêtre de lecture
+     * de 120 min (plus la tranche entamée) avec de la marge.
+     */
+    public const TTL_SECONDES = 10800;
+
+    /** Fenêtre de lecture maximale : au-delà, les tranches ont expiré. */
+    public const FENETRE_MAX_MINUTES = 170;
 
     private const PREFIXE = 'canal-signe:refus:';
 
@@ -55,7 +74,7 @@ final class CompteurRefusCanal
         }
 
         try {
-            $cle = self::cle($canal, $motif, self::tranche(time()));
+            $cle = self::cle($canal, $motif, self::tranche(now()->getTimestamp()));
             $magasin = self::magasin();
             $magasin->add($cle, 0, self::TTL_SECONDES);
             $magasin->increment($cle);
@@ -68,14 +87,17 @@ final class CompteurRefusCanal
     /**
      * Agrège les refus des `$minutes` dernières minutes (arrondies à la tranche).
      *
+     * `total` et `par_canal` ne comptent que {@see self::MOTIFS_ALERTE} ;
+     * `par_motif` donne aussi `sans_entete`.
+     *
      * @param  list<string>  $canaux
      * @return array{disponible: bool, fenetre_min: int, total: int, par_motif: array<string, int>, par_canal: array<string, int>}
      */
-    public static function lire(array $canaux, int $minutes = 60): array
+    public static function lire(array $canaux, int $minutes = 120): array
     {
-        $minutes = max(5, $minutes);
+        $minutes = min(self::FENETRE_MAX_MINUTES, max(5, $minutes));
         $nbTranches = (int) ceil($minutes * 60 / self::TRANCHE_SECONDES);
-        $courante = self::tranche(time());
+        $courante = self::tranche(now()->getTimestamp());
 
         $parMotif = array_fill_keys(self::MOTIFS, 0);
         $parCanal = array_fill_keys($canaux, 0);
@@ -109,6 +131,9 @@ final class CompteurRefusCanal
             $n = $valeurs[$cle] ?? null;
             $n = is_numeric($n) ? (int) $n : 0;
             $parMotif[$motif] += $n;
+            if ($motif === self::MOTIF_SANS_ENTETE) {
+                continue;
+            }
             $parCanal[$canal] += $n;
             $total += $n;
         }

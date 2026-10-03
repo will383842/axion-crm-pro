@@ -121,6 +121,8 @@ final class SemeurTablesScopees
         'linkedin_messages',
         'linkedin_profiles_cache',
         'linkedin_sequences',
+        // 2026-10-03 : le curseur persistant d'un traitement par lots (lot N6).
+        'curseurs_traitements',
         // 2026-09-30 : l'appartenance d'une fiche à une liste manuelle.
         'listes_manuelles_membres',
         'llm_usage',
@@ -420,6 +422,11 @@ final class SemeurTablesScopees
             'liste_id' => $id['listes_manuelles'],
             'company_id' => $id['companies'],
             'origine' => 'coche',
+        ]);
+
+        $inserer('curseurs_traitements', [
+            'traitement' => 'zz:etancheite',
+            'dernier_id' => 1,
         ]);
 
         $inserer('business_events', [

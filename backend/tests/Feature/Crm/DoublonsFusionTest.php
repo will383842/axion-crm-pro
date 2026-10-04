@@ -568,16 +568,57 @@ test('IDCC / OPCO (O14) : la ligne de l absorbée passe à la gardée qui n en a
         ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(1);
 });
 
-test('IDCC / OPCO (O14) : la gardée garde la sienne, celle de l absorbée reste sur l absorbée (rien supprimé)', function () {
+test('IDCC / OPCO (O14) : la gardée garde la sienne, celle de l absorbée reste sur l absorbée (rien supprimé), le conflit est tracé', function () {
     foreach ([[$this->garde, '1486'], [$this->absorbee, '2216']] as [$id, $idcc]) {
         DB::table('companies_opco')->insert([
             'workspace_id' => $this->ws, 'company_id' => $id, 'siret' => null,
             'idcc' => $idcc, 'opco' => 'atlas', 'opco_gestion' => null, 'source' => 'saisie', 'releve_le' => null,
         ]);
     }
+    $ligneAbsorbee = (int) DB::table('companies_opco')->where('company_id', $this->absorbee)->value('id');
 
-    dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
+    $fusion = dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
 
     expect(DB::table('companies_opco')->where('company_id', $this->garde)->value('idcc'))->toBe('1486')
-        ->and(DB::table('companies_opco')->where('company_id', $this->absorbee)->value('idcc'))->toBe('2216');
+        ->and(DB::table('companies_opco')->where('company_id', $this->absorbee)->value('idcc'))->toBe('2216')
+        ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(2);
+    $journal = json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true);
+    expect($journal['deplacements']['companies_opco_restees'])->toBe([$ligneAbsorbee])
+        ->and($journal['deplacements']['companies_opco_echanges'])->toBe([]);
+
+    dfAnnuler($this->ws, $fusion);
+    expect(DB::table('companies_opco')->where('company_id', $this->garde)->value('idcc'))->toBe('1486')
+        ->and(DB::table('companies_opco')->where('company_id', $this->absorbee)->value('idcc'))->toBe('2216')
+        ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(2);
+});
+
+test('IDCC / OPCO (O14) : gardée siro, absorbée saisie — la SAISIE passe sur la gardée, et revient à l annulation', function () {
+    DB::table('companies_opco')->insert([
+        'workspace_id' => $this->ws, 'company_id' => $this->garde, 'siret' => '00000000000017',
+        'idcc' => '1486', 'opco' => 'atlas', 'opco_gestion' => 'atlas', 'source' => 'siro', 'releve_le' => '2026-07-01',
+    ]);
+    DB::table('companies_opco')->insert([
+        'workspace_id' => $this->ws, 'company_id' => $this->absorbee, 'siret' => null,
+        'idcc' => '2216', 'opco' => 'akto', 'opco_gestion' => null, 'source' => 'saisie', 'releve_le' => null,
+    ]);
+    $ligneGarde = (int) DB::table('companies_opco')->where('company_id', $this->garde)->value('id');
+    $ligneAbsorbee = (int) DB::table('companies_opco')->where('company_id', $this->absorbee)->value('id');
+    $lire = fn (int $company): array => (array) DB::table('companies_opco')->where('company_id', $company)
+        ->first(['id', 'idcc', 'opco', 'source', 'siret']);
+
+    $fusion = dfFusionner($this->ws, $this->garde, $this->absorbee, FusionFiches::MODE_MANUEL, $this->paire);
+
+    expect($lire($this->garde))->toMatchArray(['id' => $ligneGarde, 'idcc' => '2216', 'opco' => 'akto', 'source' => 'saisie', 'siret' => null])
+        ->and($lire($this->absorbee))->toMatchArray(['id' => $ligneAbsorbee, 'idcc' => '1486', 'opco' => 'atlas', 'source' => 'siro', 'siret' => '00000000000017'])
+        ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(2);
+    $journal = json_decode((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'), true);
+    expect($journal['deplacements']['companies_opco_restees'])->toBe([$ligneAbsorbee])
+        ->and($journal['deplacements']['companies_opco_echanges'][0]['garde'])->toBe($ligneGarde)
+        ->and($journal['deplacements']['companies_opco_echanges'][0]['absorbee'])->toBe($ligneAbsorbee);
+
+    dfAnnuler($this->ws, $fusion);
+
+    expect($lire($this->garde))->toMatchArray(['id' => $ligneGarde, 'idcc' => '1486', 'opco' => 'atlas', 'source' => 'siro', 'siret' => '00000000000017'])
+        ->and($lire($this->absorbee))->toMatchArray(['id' => $ligneAbsorbee, 'idcc' => '2216', 'opco' => 'akto', 'source' => 'saisie', 'siret' => null])
+        ->and(DB::table('companies_opco')->where('workspace_id', $this->ws)->count())->toBe(2);
 });

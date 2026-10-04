@@ -42,7 +42,8 @@ use stdClass;
  *     liens d'événements, ligne fédération et antennes, activités et
  *     démarches, historique métier (`business_events`), affaires, audiences,
  *     collectes, médias, journalistes, praticiens, personnes de la lettre,
- *     IDCC / OPCO (`companies_opco`, si la fiche gardée n'en a pas) ;
+ *     IDCC / OPCO (`companies_opco`, si la fiche gardée n'en a pas ; en
+ *     conflit, une saisie de l'absorbée l'emporte sur une ligne `siro`) ;
  *  4. recopie sur la fiche gardée les coordonnées qu'elle n'a pas (adresse
  *     générique, téléphone, site, LinkedIn, date d'information art. 14) et
  *     les métadonnées de la presse (`CLES_METADONNEES` : site vérifié,
@@ -547,14 +548,60 @@ final class FusionFiches
 
         // IDCC / OPCO (O14) : une ligne par fiche. Celle de l'absorbée passe à
         // la fiche gardée si la gardée n'en a pas ; sinon elle reste sur
-        // l'absorbée (à la corbeille avec elle) — jamais supprimée.
-        $deplacements['companies_opco'] = $this->ids(DB::select(
-            'UPDATE companies_opco co_abs SET company_id = ?, updated_at = now()
-             WHERE co_abs.workspace_id = ? AND co_abs.company_id = ?
-               AND NOT EXISTS (SELECT 1 FROM companies_opco co_gar WHERE co_gar.workspace_id = co_abs.workspace_id AND co_gar.company_id = ?)
-             RETURNING co_abs.id',
-            [$gardeId, $ws, $absorbeeId, $gardeId],
-        ), 'id');
+        // l'absorbée (à la corbeille avec elle) — jamais supprimée — et le
+        // conflit est noté au journal (`companies_opco_restees`). Une ligne
+        // déplacée garde son `siret` (celui de l'absorbée) : une ligne `siro`
+        // est réalignée sur le SIRET de la gardée au passage suivant de la
+        // table SIRO, une ligne `saisie` le garde jusqu'à sa correction.
+        $deplacements['companies_opco'] = [];
+        $deplacements['companies_opco_restees'] = [];
+        $deplacements['companies_opco_echanges'] = [];
+        $opco = [];
+        foreach (DB::select(
+            'SELECT id, company_id, source FROM companies_opco WHERE workspace_id = ? AND company_id IN (?, ?) ORDER BY id FOR UPDATE',
+            [$ws, $gardeId, $absorbeeId],
+        ) as $l) {
+            if ($l instanceof stdClass) {
+                $opco[(int) $l->company_id] = $l;
+            }
+        }
+        if (isset($opco[$absorbeeId]) && ! isset($opco[$gardeId])) {
+            $deplacements['companies_opco'] = $this->ids(DB::select(
+                'UPDATE companies_opco co_abs SET company_id = ?, updated_at = now()
+                 WHERE co_abs.workspace_id = ? AND co_abs.company_id = ?
+                   AND NOT EXISTS (SELECT 1 FROM companies_opco co_gar WHERE co_gar.workspace_id = co_abs.workspace_id AND co_gar.company_id = ?)
+                 RETURNING co_abs.id',
+                [$gardeId, $ws, $absorbeeId, $gardeId],
+            ), 'id');
+        } elseif (isset($opco[$absorbeeId], $opco[$gardeId])) {
+            $idGarde = (int) $opco[$gardeId]->id;
+            $idAbsorbee = (int) $opco[$absorbeeId]->id;
+            $deplacements['companies_opco_restees'] = [$idAbsorbee];
+            // Priorité saisie > siro : une saisie de l'absorbée ne reste pas
+            // invisible à la corbeille derrière une ligne `siro` de la gardée
+            // (que la commande réécrirait). Les deux lignes ÉCHANGENT leur
+            // contenu : la contrainte UNIQUE (workspace_id, company_id) n'est
+            // pas différable (arbitre du ON CONFLICT de l'enrichissement), un
+            // échange de `company_id` la heurterait. Chaque id reste sur sa
+            // fiche ; l'annulation refait l'échange si aucune des deux lignes
+            // n'a bougé depuis (`updated_at`).
+            if ($opco[$gardeId]->source === 'siro' && $opco[$absorbeeId]->source === 'saisie') {
+                $echange = DB::select(
+                    'UPDATE companies_opco co SET siret = autre.siret, idcc = autre.idcc, opco = autre.opco,
+                            opco_gestion = autre.opco_gestion, source = autre.source, releve_le = autre.releve_le, updated_at = now()
+                       FROM companies_opco autre
+                      WHERE co.workspace_id = ? AND autre.workspace_id = co.workspace_id
+                        AND co.id IN (?, ?) AND autre.id IN (?, ?) AND autre.id <> co.id
+                  RETURNING co.updated_at::text AS le',
+                    [$ws, $idGarde, $idAbsorbee, $idGarde, $idAbsorbee],
+                );
+                if (count($echange) === 2 && $echange[0] instanceof stdClass) {
+                    $deplacements['companies_opco_echanges'] = [[
+                        'garde' => $idGarde, 'absorbee' => $idAbsorbee, 'le' => (string) $echange[0]->le,
+                    ]];
+                }
+            }
+        }
 
         foreach (self::TABLES_SIMPLES as $table) {
             $deplacements[$table] = $this->ids(DB::select(
@@ -920,6 +967,34 @@ final class FusionFiches
                 "UPDATE {$table} SET company_id = ? WHERE workspace_id = ? AND company_id = ? AND {$cle} = ANY(?::bigint[])",
                 [$absorbeeId, $ws, $gardeId, self::tableau($ids)],
             ), count($ids));
+        }
+        // IDCC / OPCO échangés (priorité saisie > siro) : l'échange est refait,
+        // si aucune des deux lignes n'a bougé depuis la fusion.
+        foreach ((array) ($deplacements['companies_opco_echanges'] ?? []) as $e) {
+            if (! is_array($e)) {
+                continue;
+            }
+            $idGarde = (int) ($e['garde'] ?? 0);
+            $idAbsorbee = (int) ($e['absorbee'] ?? 0);
+            $le = (string) ($e['le'] ?? '');
+            if ($le === '') {
+                $compter(0, 2);
+
+                continue;
+            }
+            $compter(count(DB::select(
+                'UPDATE companies_opco co SET siret = autre.siret, idcc = autre.idcc, opco = autre.opco,
+                        opco_gestion = autre.opco_gestion, source = autre.source, releve_le = autre.releve_le, updated_at = now()
+                   FROM companies_opco autre
+                  WHERE co.workspace_id = ? AND autre.workspace_id = co.workspace_id
+                    AND co.id IN (?, ?) AND autre.id IN (?, ?) AND autre.id <> co.id
+                    AND co.updated_at = CAST(? AS timestamptz) AND autre.updated_at = CAST(? AS timestamptz)
+                    AND EXISTS (SELECT 1 FROM companies_opco g WHERE g.workspace_id = co.workspace_id AND g.id = ? AND g.company_id = ?)
+                    AND EXISTS (SELECT 1 FROM companies_opco a WHERE a.workspace_id = co.workspace_id AND a.id = ? AND a.company_id = ?)
+              RETURNING co.id',
+                [$ws, $idGarde, $idAbsorbee, $idGarde, $idAbsorbee, $le, $le,
+                    $idGarde, $gardeId, $idAbsorbee, $absorbeeId],
+            )), 2);
         }
         // Les appartenances des homonymes reviennent à la personne absorbée,
         // si elles n'ont pas bougé depuis.

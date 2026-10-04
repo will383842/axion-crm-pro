@@ -271,13 +271,16 @@ final class QuarantaineSite
             ->whereNotNull('email')
             ->get(['email', 'contact_id']);
         // La source d'une personne est celle du contact lié, SUPPRIMÉ ou non :
-        // miroir de `personneLettreSql()` (clé primaire, sans `deleted_at`).
+        // miroir de `personneLettreSql()` (clé primaire). Lecture CONSCIENTE de
+        // la corbeille (`deleted_at` lu, jamais filtré) : un contact mis à la
+        // corbeille n'efface pas l'origine de l'adresse de la personne
+        // (garde `EffacementDouxPorteeAgent35Test`).
         $idsContacts = $personnes->pluck('contact_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all();
         $relevesSurLeSite = $idsContacts === [] ? [] : DB::table('contacts')
             ->whereIn('id', $idsContacts)
             ->whereIn('discovery_source', self::SOURCES_SITE)
-            ->pluck('id')
-            ->mapWithKeys(fn ($id): array => [(int) $id => true])
+            ->get(['id', 'deleted_at'])
+            ->mapWithKeys(fn ($c): array => [(int) $c->id => true])
             ->all();
         foreach ($personnes as $p) {
             $email = (string) $p->email;

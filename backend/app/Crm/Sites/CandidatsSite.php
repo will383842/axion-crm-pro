@@ -84,7 +84,11 @@ final class CandidatsSite
     /** Longueur minimale d'une étiquette de domaine candidate (sigle compris). */
     private const ETIQUETTE_MIN = 3;
 
-    /** Les mots d'un nom, normalisés pour un domaine (au plus 4). @return list<string> */
+    /**
+     * Les mots d'un nom, normalisés pour un domaine (au plus 4).
+     *
+     * @return list<string>
+     */
     public static function mots(?string $nom): array
     {
         $s = Str::lower(Str::ascii(str_replace('&', ' ', (string) $nom)));
@@ -94,7 +98,7 @@ final class CandidatsSite
             static fn (string $m): bool => strlen($m) >= 2 && ! in_array($m, self::MOTS_VIDES, true),
         );
 
-        return array_values(array_slice($mots, 0, 4));
+        return array_slice($mots, 0, 4);
     }
 
     /**

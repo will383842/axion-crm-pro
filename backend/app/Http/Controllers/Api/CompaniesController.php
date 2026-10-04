@@ -471,6 +471,7 @@ class CompaniesController extends ApiController
                     $mapsUrl = 'https://www.google.com/maps/search/?api=1&query='
                         . rawurlencode(trim(($c->address ?? '') . ', ' . ($c->postcode ?? '') . ' ' . ($c->city_name ?? $c->city ?? '')));
                 }
+                $generique = $c->email_generic;
                 fputcsv($out, [
                     $c->siren,
                     $c->denomination,
@@ -479,7 +480,7 @@ class CompaniesController extends ApiController
                     $c->size_category,
                     $c->department_code,
                     $c->city_name,
-                    QuarantaineSite::adresseFiche($nonVerifiee, (string) $c->email_generic, $site, $ancien) ? null : $c->email_generic,
+                    QuarantaineSite::adresseFiche($nonVerifiee, (string) $generique, $site, $ancien) ? null : $generique,
                     $this->resolveBestConfidence($c, $confidenceScorer, $nonVerifiee, $ancien),
                     $c->phone,
                     $c->website,

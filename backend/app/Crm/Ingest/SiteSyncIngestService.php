@@ -467,21 +467,54 @@ final class SiteSyncIngestService
                 continue;
             }
 
-            $pivot = $subjectType === 'candidate' ? 'candidate_tag' : 'company_tag';
-            $key = $subjectType === 'candidate' ? 'candidate_id' : 'company_id';
-
-            DB::table($pivot)->insertOrIgnore([
-                $key => $subjectId,
-                'tag_id' => $tagId,
-                'workspace_id' => $workspaceId,
-                'assigned_at' => now(),
-                'assigned_by' => 'auto-rule',
-            ]);
+            $this->insererEtiquette($workspaceId, $subjectType, $subjectId, $tagId);
 
             $attached[] = $slug;
         }
 
         return [$attached, $ignores];
+    }
+
+    /**
+     * Rendez-vous resté dans la file « Personnes à rattacher » puis RATTACHÉ à
+     * une entreprise (constat prod du 2026-10-04) : l'étiquette `rdv:*` que
+     * l'ingestion n'a pas pu poser faute de fiche est posée ICI, avec la même
+     * règle (`SiteSyncClassifier::etiquetteRendezVous`) et le même référentiel
+     * gouverné. Idempotent (`insertOrIgnore` sur la clé du pivot). Rend le
+     * slug posé, ou null : type absent, `autre`, apporteur, inconnu, ou
+     * activité qui n'est pas un rendez-vous.
+     *
+     * @param  array<mixed>  $payload  `activities.payload` décodé
+     */
+    public function etiqueterRendezVousRattache(string $workspaceId, int $companyId, string $kind, array $payload): ?string
+    {
+        $slug = $this->classifier->etiquetteRendezVous($kind, $payload['typeRendezVous'] ?? null);
+        if ($slug === null) {
+            return null;
+        }
+
+        $tagId = $this->resolveTagId($workspaceId, $slug);
+        if ($tagId === null) {
+            return null;
+        }
+
+        $this->insererEtiquette($workspaceId, 'company', $companyId, $tagId);
+
+        return $slug;
+    }
+
+    private function insererEtiquette(string $workspaceId, string $subjectType, int $subjectId, int $tagId): void
+    {
+        $pivot = $subjectType === 'candidate' ? 'candidate_tag' : 'company_tag';
+        $key = $subjectType === 'candidate' ? 'candidate_id' : 'company_id';
+
+        DB::table($pivot)->insertOrIgnore([
+            $key => $subjectId,
+            'tag_id' => $tagId,
+            'workspace_id' => $workspaceId,
+            'assigned_at' => now(),
+            'assigned_by' => 'auto-rule',
+        ]);
     }
 
     /**

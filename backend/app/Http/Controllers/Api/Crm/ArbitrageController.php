@@ -6,6 +6,7 @@ use App\Crm\Console\ConsoleAccess;
 use App\Crm\Console\FilesATraiter;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\SiteSyncClassifier;
+use App\Crm\Ingest\SiteSyncIngestService;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,7 @@ class ArbitrageController extends ConsoleController
     public function __construct(
         private readonly ContactUpserter $contacts,
         private readonly SiteSyncClassifier $classifier,
+        private readonly SiteSyncIngestService $ingestion,
     ) {}
 
     /**
@@ -181,6 +183,16 @@ class ArbitrageController extends ConsoleController
                     'contact_id' => $contactId,
                     'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
                 ]);
+
+                // Un rendez-vous d'un prospect inconnu n'a reçu aucune
+                // étiquette à l'ingestion (pas de fiche où la poser) : c'est
+                // maintenant qu'elle trouve sa fiche.
+                $this->ingestion->etiqueterRendezVousRattache(
+                    $workspaceId,
+                    $companyId,
+                    is_string($activity->kind ?? null) ? $activity->kind : '',
+                    $payload,
+                );
 
                 return $this->ok([
                     'activity_id' => $activityId,

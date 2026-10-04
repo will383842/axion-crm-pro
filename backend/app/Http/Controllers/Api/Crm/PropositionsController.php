@@ -147,8 +147,8 @@ class PropositionsController extends ConsoleController
             }
         }
         $colonnes = [
-            Propositions::ENTREPRISE => array_merge(['id', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::ENTREPRISE])),
-            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::PERSONNE])),
+            Propositions::ENTREPRISE => array_merge(['id', 'field_origins'], Propositions::colonnes(Propositions::ENTREPRISE)),
+            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name', 'field_origins'], Propositions::colonnes(Propositions::PERSONNE)),
         ];
         $tables = [Propositions::ENTREPRISE => 'companies', Propositions::PERSONNE => 'contacts'];
 
@@ -177,9 +177,17 @@ class PropositionsController extends ConsoleController
         return trim(trim((string) ($fiche->first_name ?? '')) . ' ' . trim((string) ($fiche->last_name ?? ''))) ?: 'Personne sans nom';
     }
 
-    /** Owner seulement, mais la règle de masquage des téléphones reste la même partout. */
+    /** Owner seulement, mais la règle de masquage des coordonnées reste la même partout. */
     private function masquer(string $champ, ?string $valeur): ?string
     {
-        return $champ === 'phone' && MasquageCoordonnees::requis() ? MasquageCoordonnees::telephone($valeur) : $valeur;
+        if (! MasquageCoordonnees::requis()) {
+            return $valeur;
+        }
+
+        return match ($champ) {
+            'phone' => MasquageCoordonnees::telephone($valeur),
+            'email_generic' => MasquageCoordonnees::email($valeur),
+            default => $valeur,
+        };
     }
 }

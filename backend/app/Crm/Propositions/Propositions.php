@@ -69,6 +69,17 @@ final class Propositions
     /** @var list<string> */
     public const ORIGINES = Taxonomy::FIELD_ORIGINS_TIERS;
 
+    /**
+     * Les origines d'un AUTOMATISME du CRM (04/10/2026) : elles n'entrent dans
+     * la file que par `proposerAutomatisme()`, jamais par `proposer()`.
+     *
+     * @var list<string>
+     */
+    public const ORIGINES_AUTOMATISMES = Taxonomy::FIELD_ORIGINS_AUTOMATISMES;
+
+    /** L'adresse affichée sur un site vérifié (`crm:entreprises:email-site-verifie`). */
+    public const ORIGINE_SITE_VERIFIE = 'site-verifie';
+
     /** @var list<string> */
     public const STATUTS = ['en_attente', 'acceptee', 'refusee', 'effacee'];
 
@@ -121,6 +132,20 @@ final class Propositions
     ];
 
     /**
+     * Les champs qu'un AUTOMATISME peut proposer (`proposerAutomatisme()`),
+     * jamais un tiers : l'e-mail générique relevé sur un site VÉRIFIÉ (SIREN
+     * prouvé) — c'est cette preuve qui manque à un tiers. Une proposition de
+     * ce champ ne vient que d'une origine de `ORIGINES_AUTOMATISMES`.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public const CHAMPS_AUTOMATISMES = [
+        self::ENTREPRISE => [
+            'email_generic' => 'E-mail générique',
+        ],
+    ];
+
+    /**
      * Champs TOUJOURS proposés, jamais remplis directement, même vides :
      * `contacts.role` choisit les destinataires des campagnes (filtre
      * `fonctions` de `ReglageDestinataires`, REQ-CAM-079) — un tiers ne fait
@@ -147,7 +172,127 @@ final class Propositions
 
     public static function libelleChamp(string $entite, string $champ): string
     {
-        return self::CHAMPS[$entite][$champ] ?? $champ;
+        return self::CHAMPS[$entite][$champ] ?? self::CHAMPS_AUTOMATISMES[$entite][$champ] ?? $champ;
+    }
+
+    /**
+     * Les colonnes d'une fiche qu'une proposition peut viser (tiers et automatismes).
+     *
+     * @return list<string>
+     */
+    public static function colonnes(string $entite): array
+    {
+        return array_keys((self::CHAMPS[$entite] ?? []) + (self::CHAMPS_AUTOMATISMES[$entite] ?? []));
+    }
+
+    /** Ce champ peut-il être décidé pour une proposition de cette origine ? */
+    private static function champAdmis(string $entite, string $champ, string $origine): bool
+    {
+        if (array_key_exists($champ, self::CHAMPS[$entite] ?? [])) {
+            return true;
+        }
+
+        return in_array($origine, self::ORIGINES_AUTOMATISMES, true)
+            && array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? []);
+    }
+
+    /**
+     * Une valeur relevée par un AUTOMATISME du CRM, pour un champ de fiche
+     * qui porte DÉJÀ une valeur (ou que l'automatisme ne doit pas remplir :
+     * champ déclaré, fiche protégée). Elle n'écrit JAMAIS sur la fiche :
+     * c'est l'appelant qui décide de remplir un champ vide, avec ses propres
+     * gardes ; ici, la valeur n'entre que dans la file, et seul le
+     * propriétaire décide.
+     *
+     * @return self::IGNOREE|self::IDENTIQUE|self::PROPOSEE|self::DEJA_PROPOSEE
+     *
+     * @throws InvalidArgumentException fiche, champ ou origine inconnus
+     */
+    public function proposerAutomatisme(
+        string $workspaceId,
+        string $entite,
+        int $entiteId,
+        string $champ,
+        ?string $valeur,
+        string $origine,
+        ?string $reference = null,
+    ): string {
+        $table = self::TABLES[$entite] ?? throw new InvalidArgumentException('Type de fiche inconnu : ' . json_encode($entite));
+        if (! in_array($origine, self::ORIGINES_AUTOMATISMES, true)) {
+            throw new InvalidArgumentException('Origine d\'automatisme inconnue : ' . json_encode($origine));
+        }
+        if (! array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? [])) {
+            throw new InvalidArgumentException('Champ non proposable par un automatisme : ' . json_encode($champ));
+        }
+        $valeur = $valeur === null ? '' : trim($valeur);
+        if ($valeur === '') {
+            return self::IGNOREE;
+        }
+        if (mb_strlen($valeur) > self::LONGUEUR_MAX) {
+            throw new InvalidArgumentException("Valeur trop longue pour {$champ} (au plus " . self::LONGUEUR_MAX . ' caractères).');
+        }
+        // Une référence trop longue (adresse de page) n'empêche pas la
+        // proposition : elle n'est simplement pas gardée.
+        $reference = $reference === null || trim($reference) === '' || mb_strlen(trim($reference)) > self::LONGUEUR_MAX_REFERENCE ? null : trim($reference);
+
+        $resultat = WorkspaceContext::run($workspaceId, fn (): string => DB::transaction(function () use (
+            $workspaceId,
+            $entite,
+            $table,
+            $entiteId,
+            $champ,
+            $valeur,
+            $origine,
+            $reference,
+        ): string {
+            $fiche = DB::table($table)
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $entiteId)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first(['id', $champ]);
+            if (! $fiche instanceof stdClass) {
+                throw new InvalidArgumentException("Fiche {$entite} {$entiteId} introuvable dans cet espace.");
+            }
+            $actuelle = self::texte($fiche->{$champ} ?? null);
+            if ($actuelle !== null && mb_strtolower($actuelle) === mb_strtolower($valeur)) {
+                return self::IDENTIQUE;
+            }
+
+            $inseree = DB::table('propositions_champs')->insertOrIgnore([
+                'workspace_id' => $workspaceId,
+                'entite' => $entite,
+                'entite_id' => $entiteId,
+                'champ' => $champ,
+                'valeur_actuelle' => $actuelle,
+                'valeur_proposee' => $valeur,
+                'origine' => $origine,
+                'reference_externe' => $reference,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $inseree > 0 ? self::PROPOSEE : self::DEJA_PROPOSEE;
+        }));
+
+        if ($resultat === self::PROPOSEE) {
+            self::oublierApresCommit($workspaceId);
+        }
+
+        return $resultat;
+    }
+
+    /** Une proposition identique (même fiche, champ et valeur) attend-elle déjà ? Lecture seule. */
+    public static function dejaEnAttente(string $workspaceId, string $entite, int $entiteId, string $champ, string $valeur): bool
+    {
+        return DB::table('propositions_champs')
+            ->where('workspace_id', $workspaceId)
+            ->where('entite', $entite)
+            ->where('entite_id', $entiteId)
+            ->where('champ', $champ)
+            ->where('statut', 'en_attente')
+            ->whereRaw('md5(valeur_proposee) = md5(?)', [trim($valeur)])
+            ->exists();
     }
 
     /**
@@ -337,7 +482,7 @@ final class Propositions
             $originePrecedente = null;
             if ($statut === 'acceptee') {
                 $table = self::TABLES[$entite] ?? throw new PropositionImpossible('Type de fiche inconnu.');
-                if (! array_key_exists($champ, self::CHAMPS[$entite])) {
+                if (! self::champAdmis($entite, $champ, (string) $p->origine)) {
                     throw new PropositionImpossible("Ce champ n'est plus modifiable par une proposition.");
                 }
                 $fiche = DB::table($table)

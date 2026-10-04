@@ -6,6 +6,7 @@ use App\Crm\Console\ScoresPerimes;
 use App\Crm\Taxonomy;
 use App\Exceptions\TableauDeBordIncomplet;
 use App\Support\DelaiRequeteSql;
+use App\Support\EntreprisesFermees;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -93,7 +94,9 @@ class DashboardController extends ApiController
      */
     public static function cle(string $espace): string
     {
-        return 'crm:dashboard:stats:v5:' . $espace;
+        // `v6` (04/10/2026) : les entreprises fermées selon l'INSEE ne sont
+        // plus comptées (`App\Support\EntreprisesFermees`).
+        return 'crm:dashboard:stats:v6:' . $espace;
     }
 
     /**
@@ -322,7 +325,7 @@ class DashboardController extends ApiController
                         count(*) FILTER (WHERE quality_score > 0) AS notees,
                         round(avg(quality_score)) AS moyenne
                    FROM companies
-                  WHERE workspace_id = ? AND deleted_at IS NULL',
+                  WHERE workspace_id = ? AND deleted_at IS NULL AND insee_ferme_le IS NULL',
                 [$espace],
             );
             $resultat['quality_distribution'] = [
@@ -455,6 +458,12 @@ class DashboardController extends ApiController
      * l'écran écrit « — », jamais 0. Une table ABSENTE reste à 0 : avant la
      * migration, il n'y a vraiment rien à compter.
      */
+    /** Les entreprises fermées selon l'INSEE sont-elles à retrancher de `$table` ? */
+    private function masqueFermees(string $table): bool
+    {
+        return $table === 'companies' && Schema::hasColumn('companies', EntreprisesFermees::COLONNE);
+    }
+
     private function compter(string $table, string $espace, ?callable $affiner = null): ?int
     {
         if (! Schema::hasTable($table)) {
@@ -469,6 +478,16 @@ class DashboardController extends ApiController
             }
             if ($affiner !== null) {
                 $affiner($q);
+            }
+
+            // 04/10/2026 — les entreprises FERMÉES selon l'INSEE ne comptent
+            // pas. PAR DIFFÉRENCE : le comptage de toutes garde son parcours
+            // d'index seul, celui des fermées passe par leur petit index
+            // partiel (cf. `EntreprisesFermees`).
+            if ($this->masqueFermees($table)) {
+                $fermees = (int) EntreprisesFermees::appliquer(clone $q, EntreprisesFermees::SEULES)->count();
+
+                return max(0, (int) $q->count() - $fermees);
             }
 
             return (int) $q->count();
@@ -507,8 +526,19 @@ class DashboardController extends ApiController
                 ->groupBy($colonne)
                 ->get();
 
+            // Les fermées sont retranchées, comme dans `compter()`.
+            $fermees = [];
+            if ($this->masqueFermees($table)) {
+                $requeteFermees = DB::table($table)->where('workspace_id', $espace)->whereNotNull($colonne);
+                foreach (EntreprisesFermees::appliquer($requeteFermees, EntreprisesFermees::SEULES)
+                    ->select($colonne, DB::raw('count(*) as n'))->groupBy($colonne)->get() as $ligne) {
+                    $fermees[(string) $ligne->{$colonne}] = (int) $ligne->n;
+                }
+            }
+
             foreach ($lignes as $ligne) {
                 $cle = (string) $ligne->{$colonne};
+                $ligne->n = max(0, (int) $ligne->n - ($fermees[$cle] ?? 0));
                 // On n'invente pas de catégorie : une valeur hors gabarit est
                 // ajoutée telle quelle, l'écran la rendra sous son nom brut
                 // plutôt que de la perdre en silence.

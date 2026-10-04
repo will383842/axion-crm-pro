@@ -16,6 +16,7 @@ use App\Services\Waterfall\WaterfallOrchestrator;
 use App\Support\CompanyQueryFilters;
 use App\Support\DelaiRequeteSql;
 use App\Support\EligibiliteCampagne;
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\TotalListe;
@@ -55,6 +56,7 @@ class CompaniesController extends ApiController
      *     @OA\Parameter(name="filter[priority]", in="query", @OA\Schema(type="string", enum={"haute","moyenne","basse","gelee"})),
      *     @OA\Parameter(name="filter[denomination]", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="sort", in="query", @OA\Schema(type="string", example="-quality_score")),
+     *     @OA\Parameter(name="fermees", in="query", description="Entreprises fermées selon l'INSEE : masquées par défaut ; `inclure` les montre, `seules` ne montre qu'elles", @OA\Schema(type="string", enum={"inclure","seules"})),
      *
      *     @OA\Response(response=200, description="Liste paginée"),
      *     @OA\Response(response=401, description="Unauthenticated"),
@@ -141,6 +143,16 @@ class CompaniesController extends ApiController
             //
             // Le total reste un comptage EXACT, simplement pas a la seconde
             // pres (60 s de fraicheur). Cf. `App\Support\TotalListe`.
+            //
+            // 04/10/2026 — les entreprises FERMÉES selon l'INSEE sont masquées
+            // par défaut (`fermees=inclure|seules` pour les voir). Le total est
+            // compté PAR DIFFÉRENCE AVANT de poser la condition : toutes (plan
+            // et clé de cache inchangés) moins les fermées (petit index
+            // partiel). Cf. `App\Support\EntreprisesFermees`.
+            $fermees = EntreprisesFermees::mode($r->query('fermees'));
+            $total = EntreprisesFermees::total($query->toBase(), $fermees, $workspaceId);
+            EntreprisesFermees::appliquer($query, $fermees);
+
             $page = $query->paginate(
                 $perPage,
                 // Les colonnes sont posées par `select()` ci-dessus : `paginate`
@@ -153,7 +165,7 @@ class CompaniesController extends ApiController
                 // par l'enveloppe `Spatie\QueryBuilder` (reforwarde par
                 // `__call`) et par l'analyse statique, qui perd le type Spatie
                 // des le premier `->where()`.
-                TotalListe::pour($query->toBase(), $workspaceId),
+                $total,
             );
 
             // Masquage des coordonnées pour les comptes en lecture seule
@@ -209,11 +221,15 @@ class CompaniesController extends ApiController
         'id', 'workspace_id', 'siren', 'denomination', 'naf', 'size_category', 'effectif_range',
         'city', 'postcode', 'department_code', 'quality_score', 'priority', 'enriched_at',
         'discovery_source', 'prospection_status',
+        // La pastille « Fermée » de la ligne (fermées affichées sur demande).
+        'insee_ferme_le',
     ];
 
     public static function cleStats(string $espace): string
     {
-        return 'crm:companies:stats:v1:' . $espace;
+        // `v2` (04/10/2026) : les entreprises fermées selon l'INSEE ne sont
+        // plus comptées (`EntreprisesFermees`).
+        return 'crm:companies:stats:v2:' . $espace;
     }
 
     /**
@@ -256,13 +272,13 @@ class CompaniesController extends ApiController
     {
         $echantillon = DB::selectOne(
             'SELECT count(*) AS n, count(enriched_at) AS e FROM companies TABLESAMPLE SYSTEM (1)
-              WHERE workspace_id = ? AND deleted_at IS NULL',
+              WHERE workspace_id = ? AND deleted_at IS NULL AND insee_ferme_le IS NULL',
             [$espace],
         );
         // Petite base : l'échantillon de 1 % ne dit rien, on compte tout.
         if ((int) $echantillon->n < 500) {
             $echantillon = DB::selectOne(
-                'SELECT count(*) AS n, count(enriched_at) AS e FROM companies WHERE workspace_id = ? AND deleted_at IS NULL',
+                'SELECT count(*) AS n, count(enriched_at) AS e FROM companies WHERE workspace_id = ? AND deleted_at IS NULL AND insee_ferme_le IS NULL',
                 [$espace],
             );
         }
@@ -271,15 +287,33 @@ class CompaniesController extends ApiController
         // Relecture A09 de #284 : la part est calculée sur TOUTES les fiches,
         // valeur absente comprise (groupe `null`), et non « parmi les fiches
         // renseignées » — sinon « 93 % » se lirait comme 93 % de la base.
-        $repartition = static fn (string $colonne): array => DB::table('companies')
-            ->where('workspace_id', $espace)
-            ->whereNull('deleted_at')
+        //
+        // 04/10/2026 — les entreprises FERMÉES selon l'INSEE ne comptent pas.
+        // PAR DIFFÉRENCE (cf. `EntreprisesFermees`) : la répartition de toutes
+        // les fiches garde son plan, celle des fermées passe par leur petit
+        // index partiel, et l'on retranche.
+        $compter = static fn (string $colonne, string $mode): array => EntreprisesFermees::appliquer(
+            DB::table('companies')->where('workspace_id', $espace)->whereNull('deleted_at'),
+            $mode,
+        )
             ->groupBy($colonne)
             ->selectRaw("{$colonne} AS code, count(*) AS n")
-            ->orderByDesc('n')
             ->get()
-            ->map(static fn ($l): array => ['code' => $l->code === null ? null : (string) $l->code, 'n' => (int) $l->n])
+            ->mapWithKeys(static fn ($l): array => [($l->code === null ? '' : "v:{$l->code}") => (int) $l->n])
             ->all();
+        $repartition = static function (string $colonne) use ($compter): array {
+            $fermees = $compter($colonne, EntreprisesFermees::SEULES);
+            $lignes = [];
+            foreach ($compter($colonne, EntreprisesFermees::INCLURE) as $cle => $n) {
+                $reste = $n - ($fermees[$cle] ?? 0);
+                if ($reste > 0) {
+                    $lignes[] = ['code' => $cle === '' ? null : substr((string) $cle, 2), 'n' => $reste];
+                }
+            }
+            usort($lignes, static fn (array $a, array $b): int => $b['n'] <=> $a['n']);
+
+            return $lignes;
+        };
 
         $tailles = $repartition('size_category');
         $secteurs = $repartition('sector_main');

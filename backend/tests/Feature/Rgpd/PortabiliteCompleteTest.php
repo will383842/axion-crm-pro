@@ -892,12 +892,17 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // le bilan chiffré d'un passage de `crm:enrichir-opco`. Hors de portée PAR
     // CONSTRUCTION : des COMPTEURS (lues, rapprochées, écrites, rejets par
     // motif) et rien d'autre — aucun SIRET (`EnrichissementOpco::COMPTEURS`).
+    // 45 -> 46 et 31 -> 32 le 2026-10-06 : `insee_imports_familles.bilan`, le
+    // bilan chiffré d'un passage de `crm:insee:importer-familles`. Hors de
+    // portée PAR CONSTRUCTION : des COMPTEURS (lues, à créer, créées, déjà
+    // présentes, ignorées par motif) et rien d'autre — aucun SIREN, aucun nom
+    // (`ImportFamilles::COMPTEURS`).
     expect($colonnes->count())->toBe(
-        45,
+        46,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        31,
+        32,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

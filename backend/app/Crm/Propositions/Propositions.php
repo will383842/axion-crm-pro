@@ -513,6 +513,7 @@ final class Propositions
                         is_string($fiche->website_method ?? null) ? $fiche->website_method : null,
                         $fiche->metadata ?? null,
                         is_string($fiche->email_generic ?? null) ? $fiche->email_generic : null,
+                        $fiche->signals ?? null,
                         is_string($fiche->website ?? null) ? $fiche->website : null,
                         (string) $p->valeur_proposee,
                     )) {

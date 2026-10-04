@@ -482,7 +482,7 @@ final class EnrichissementAnnuaire
         if (! $this->essai) {
             $requete->lockForUpdate();
         }
-        $fiches = $requete->get(['id', 'legal_form', 'insee_non_diffusible_le', 'email_generic', 'phone', 'website', 'website_method', 'metadata', 'field_origins'])->keyBy('id');
+        $fiches = $requete->get(['id', 'legal_form', 'insee_non_diffusible_le', 'email_generic', 'phone', 'website', 'website_method', 'metadata', 'signals', 'field_origins'])->keyBy('id');
         $protegees = $this->protegees(array_keys($rapprochements));
 
         foreach ($rapprochements as $id => [$o, $mode]) {
@@ -618,6 +618,7 @@ final class EnrichissementAnnuaire
                 is_string($fiche->website_method) ? $fiche->website_method : null,
                 $metadata,
                 is_string($fiche->email_generic) ? $fiche->email_generic : null,
+                $fiche->signals,
                 is_string($fiche->website) ? $fiche->website : null,
                 $o->site,
                 $o->email,

@@ -81,6 +81,12 @@ class GovernedTagsSeeder extends Seeder
         'svc:implementation' => ['name' => 'Intérêt — implémentation', 'category' => 'intent'],
         'svc:conference' => ['name' => 'Intérêt — conférence', 'category' => 'intent'],
 
+        // Type de rendez-vous pris sur le site (2026-10-04) — miroir de
+        // `Taxonomy::RENDEZ_VOUS_TYPES` (garde : `SiteSyncIngestTest`).
+        'rdv:diagnostic' => ['name' => 'Rendez-vous — Diagnostic IA', 'category' => 'intent'],
+        'rdv:echange-projet' => ['name' => 'Rendez-vous — Échange projet', 'category' => 'intent'],
+        'rdv:salon' => ['name' => 'Rendez-vous — Salon', 'category' => 'intent'],
+
         // Taille (doublon volontaire du champ `size_category` : champ pour les
         // règles, tag pour les facettes du constructeur d'audiences).
         'taille:tpe' => ['name' => 'TPE', 'category' => 'size'],

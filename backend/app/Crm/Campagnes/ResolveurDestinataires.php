@@ -121,6 +121,9 @@ final class ResolveurDestinataires
             // l'audience — une expression de la liste de sélection, pas une
             // condition : aucun balayage de plus sur `companies`.
             ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
+            // Site trouvé par candidat (04/10/2026) : l'ancien site deviné,
+            // dont rien de ce qui en vient n'est libéré.
+            ->selectRaw(QuarantaineSite::siteAncienSql('companies') . ' AS site_ancien')
             ->when($presse, static fn ($q) => $q->selectRaw(
                 AdressePresseFiable::siteDevineSql('companies.id', 'companies') . ' AS site_devine, '
                 . AdressePresseFiable::siteVerifieSql('companies') . ' AS site_verifie',
@@ -370,6 +373,7 @@ final class ResolveurDestinataires
         // une audience presse juge déjà la provenance (`AdressePresseFiable`).
         $nonVerifiee = ! $presse && (bool) ($fiche['site_non_verifie'] ?? false);
         $site = is_string($fiche['website'] ?? null) ? $fiche['website'] : null;
+        $ancien = ! $presse && is_string($fiche['site_ancien'] ?? null) ? $fiche['site_ancien'] : null;
         $candidats = [];
         $vues = [];
 
@@ -380,7 +384,7 @@ final class ResolveurDestinataires
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
                 'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
-                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => null,
+                'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, $generique, $site, $ancien), 'information_tiers_insuffisante' => false, 'ecartee' => null,
             ];
             $vues[$generique] = true;
         }
@@ -426,7 +430,7 @@ final class ResolveurDestinataires
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
                 'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
-                'site_non_verifie' => $nonVerifiee, 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
+                'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, $e, $site, $ancien), 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
             ];
         }
 
@@ -457,6 +461,7 @@ final class ResolveurDestinataires
                     is_string($c->discovery_source ?? null) ? $c->discovery_source : null,
                     $e,
                     $site,
+                    $ancien,
                 ),
                 'information_tiers_insuffisante' => (bool) ($c->information_tiers_insuffisante ?? false),
                 'ecartee' => $ecartee,

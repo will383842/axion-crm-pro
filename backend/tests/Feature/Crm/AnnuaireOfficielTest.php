@@ -513,6 +513,94 @@ test('accepter le site de l’annuaire ne rend pas envoyable l’adresse tirée 
         ->and(DB::table('propositions_champs')->where('id', $p->id)->value('statut'))->toBe('en_attente');
 });
 
+test('site écrit sur une fiche « devinée » dont un CANAL typé vient d’un autre domaine : site non écrit', function () {
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ DEPARTEMENT A', [
+        'website_method' => 'guess',
+        'signals' => json_encode(['contact_channels' => [
+            'emails' => ['contact@zz-immobilier.example'],
+            'details' => ['agence@zz-immobilier.example' => ['type' => 'generique']],
+        ]]),
+    ]);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-a.example')]);
+
+    annuaireLancer($ws);
+
+    $f = annuaireLigne($a['id']);
+    expect($f['website'])->toBeNull()->and($f['website_method'])->toBe('guess');
+});
+
+test('site écrit sur une fiche « devinée » dont une personne est liée à un contact du site SUPPRIMÉ : site non écrit', function () {
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ DEPARTEMENT A', ['website_method' => 'guess']);
+    $contact = F::contact($ws, $a['id'], 'Zz', 'Releve', [
+        'email' => 'zz.releve@zz-ailleurs.example', 'discovery_source' => 'site', 'deleted_at' => now(),
+    ]);
+    DB::table('personnes')->insert([
+        'workspace_id' => $ws, 'company_id' => $a['id'], 'contact_id' => $contact, 'email' => 'zz.releve@zz-ailleurs.example',
+        'person_key' => hash('sha256', 'zz-releve-supprime'), 'premiere_source' => 'newsletter', 'premiere_source_at' => now(), 'legal_basis' => 'consent',
+    ]);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-a.example')]);
+
+    annuaireLancer($ws);
+
+    $f = annuaireLigne($a['id']);
+    expect($f['website'])->toBeNull()->and($f['website_method'])->toBe('guess');
+});
+
+test('accepter le site de l’annuaire ne rend pas envoyable un CANAL typé tiré de l’ancien site deviné', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ COMMUNE X', [
+        'legal_form' => '7210',
+        'website' => 'https://zz-immobilier.example', 'website_method' => 'guess',
+        'signals' => json_encode(['contact_channels' => [
+            'emails' => ['contact@zz-immobilier.example', 'agence@zz-immobilier.example'],
+            'details' => ['contact@zz-immobilier.example' => ['type' => 'generique'], 'agence@zz-immobilier.example' => ['type' => 'generique']],
+        ]]),
+    ]);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-ville-x.example')]);
+    annuaireLancer($ws);
+    $p = DB::table('propositions_champs')->where('entite_id', $a['id'])->where('champ', 'website')->first();
+    $fiche = DB::table('companies')->where('id', $a['id'])->first();
+    $owner = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'zz-owner-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ owner',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $ws, 'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($ws);
+    $owner->assignRole('owner');
+
+    expect($p)->not->toBeNull();
+    expect(fn () => app(Propositions::class)->accepter($ws, (int) $p->id, $owner, Propositions::empreinte(Propositions::ENTREPRISE, $fiche, 'website')))
+        ->toThrow(PropositionImpossible::class, 'ancien site deviné');
+
+    $f = annuaireLigne($a['id']);
+    expect($f['website'])->toBe('https://zz-immobilier.example')
+        ->and($f['website_method'])->toBe('guess')
+        ->and(DB::table('propositions_champs')->where('id', $p->id)->value('statut'))->toBe('en_attente');
+});
+
+test('la migration rejouée garde une origine ÉTRANGÈRE déjà admise par le CHECK (union prouvée)', function () {
+    $def = (string) DB::selectOne(
+        "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",
+    )->d;
+    preg_match_all("/'([a-z][a-z0-9_-]{0,63})'/", $def, $m);
+    $origines = array_values(array_unique(array_merge($m[1], ['zz-autre'])));
+    DB::statement('ALTER TABLE propositions_champs DROP CONSTRAINT propositions_champs_origine_check');
+    DB::statement('ALTER TABLE propositions_champs ADD CONSTRAINT propositions_champs_origine_check CHECK (origine IN ('
+        . implode(', ', array_map(static fn (string $o): string => "'{$o}'", $origines)) . '))');
+
+    (require database_path('migrations/2026_10_07_000010_propositions_origine_annuaire.php'))->up();
+
+    $apres = (string) DB::selectOne(
+        "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",
+    )->d;
+    expect($apres)->toContain("'zz-autre'")->and($apres)->toContain("'annuaire-service-public'");
+    foreach (Propositions::ORIGINES_EN_BASE as $origine) {
+        expect($apres)->toContain("'{$origine}'");
+    }
+});
+
 test('le CHECK d’origine garde les origines déjà admises par une autre migration (union)', function () {
     $def = (string) DB::selectOne(
         "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",

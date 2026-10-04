@@ -6,6 +6,7 @@ use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\RechercheEntreprisesParNom;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -179,7 +180,7 @@ class GlobalSearchController extends ApiController
                 $espace,
                 $ids,
                 ['id', 'siren', 'denomination'],
-                static fn (\Illuminate\Database\Query\Builder $q) => EntreprisesFermees::appliquer($q, $fermees),
+                static fn (Builder $q) => EntreprisesFermees::appliquer($q, $fermees),
             );
         });
     }
@@ -226,7 +227,7 @@ class GlobalSearchController extends ApiController
      *
      * @param  list<int>  $ids
      * @param  list<string>  $colonnes
-     * @param  (callable(\Illuminate\Database\Query\Builder): mixed)|null  $affiner
+     * @param  (callable(Builder): mixed)|null  $affiner
      * @return list<array<string, mixed>>
      */
     private function relire(string $table, string $espace, array $ids, array $colonnes, ?callable $affiner = null): array

@@ -298,15 +298,7 @@ Schedule::command('media:tag-emissions-status --limit=20000')
     ->withoutOverlapping(180)
     ->runInBackground();
 
-// Recherche des sites web manquants — toutes les 30 min, BORNÉE en mémoire (--limit
-// évite la fuite du DomainFinderService sur de gros volumes), withoutOverlapping (pas
-// d'empilement) + runInBackground (process isolé). Le conteneur `scheduler` relance
-// le job à l'heure suivante → SURVIT aux redéploiements (robustesse sans systemd).
-Schedule::command('media:find-websites --limit=20000')
-    ->everyThirtyMinutes()
-    ->withoutOverlapping(30)
-    ->runInBackground()
-    ->onOneServer();
+// media:find-websites — Coupé le 04/10/2026 (décision du propriétaire) : devinette non vérifiée. Lançable à la main.
 
 // Rafraîchissement hebdomadaire des registres officiels CPPAP (lundi tôt).
 Schedule::command('media:import-opendatasoft cppap')->weeklyOn(1, '02:15')->withoutOverlapping(120)->onOneServer();
@@ -319,9 +311,7 @@ Schedule::command('media:import-emissions-wikidata')->weekly()->sundays()->at('0
 // Radios FM + chaînes TV autorisées par l'ARCOM (niveau station, zone géo) — hebdo.
 Schedule::command('media:import-arcom')->weekly()->sundays()->at('03:30')->withoutOverlapping(180)->runInBackground();
 
-// Emails rédaction déterministes (redaction@/contact@) validés MX pour les médias sans email.
-// Reprenable + borné en mémoire (--limit) ; toutes les 2h pour rattraper le backlog.
-Schedule::command('media:generate-redaction-emails --limit=20000')->everyTwoHours()->withoutOverlapping(120)->runInBackground();
+// media:generate-redaction-emails — Coupé le 04/10/2026 (décision du propriétaire) : devinette non vérifiée. Lançable à la main.
 
 // ── Correctifs audit 2026-07-14 ────────────────────────────────────────────────
 
@@ -488,17 +478,17 @@ Schedule::command('crm:emails:verifier')
 // depuis la dernière exécution réussie (créations du périmètre, fermetures et
 // non diffusibles MARQUÉS, champs INSEE). Rien n'est jamais supprimé.
 //
-// Une fois par mois : le PREMIER jour, à partir du 4, qui tombe du mardi au
-// samedi (jamais les 1er, 2 et 3), à 09:30 heure de Paris — toujours entre le 4
-// et le 6 (`MiseAJourMensuelle::estJourPlanifie`, qui borne aussi la fenêtre
-// 08:00-19:00). Une expression cron seule ne sait pas le dire : jour du mois
-// ET jour de la semaine s'y combinent en OU.
+// Une fois par mois : le 4, à 09:30 heure de Paris, QUEL QUE SOIT le jour de
+// la semaine — dimanche et lundi compris (décision du 04/10/2026 : les tâches
+// lourdes planifiées tournent la nuit, 02:00-05:30 ; la journée est libre).
+// `MiseAJourMensuelle::estJourPlanifie` le redit et borne la fenêtre
+// 08:00-19:00.
 //
 // Serveur à 2 CPU : traitement séquentiel, ≈ 30 requêtes Sirene par minute, en
 // arrière-plan. `--duree-max=300` (5 h) rend la main avant 15:00 et sous le
 // verrou de 360 min (B17-002) ; un passage coupé reprend au curseur mémorisé.
 Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-max=300')
-    ->cron('30 9 4-6 * *')
+    ->cron('30 9 4 * *')
     ->timezone(MiseAJourMensuelle::FUSEAU)
     ->between('08:00', '19:00')
     ->when(fn (): bool => MiseAJourMensuelle::estJourPlanifie(now()))
@@ -512,13 +502,13 @@ Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-ma
 
 // Avis exactitude #313, R6 — REPRISE LES JOURS SUIVANTS. Un passage coupé
 // (`--duree-max`, plafond d'écritures, 429 persistant, réseau) ne doit pas
-// attendre un mois : du mardi au samedi, à 09:30 heure de Paris, à partir du
-// 4 (jamais les 1er, 2 et 3), 08:00-19:00 — UNIQUEMENT s'il existe un passage
-// `en_cours` ou `echouee` (`MiseAJourMensuelle::repriseEnAttente`) et jamais
-// le jour de la mensuelle elle-même. Sans `--depuis` : la commande reprend le
+// attendre un mois : TOUS LES JOURS, dimanche et lundi compris, à 09:30 heure
+// de Paris, 08:00-19:00 — UNIQUEMENT s'il existe un passage `en_cours` ou
+// `echouee` (`MiseAJourMensuelle::repriseEnAttente`), donc tant que le
+// rattrapage n'est pas fini, et jamais le jour de la mensuelle elle-même. Sans `--depuis` : la commande reprend le
 // passage inachevé, à son curseur. Même verrou que la mensuelle.
 Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-max=300')
-    ->cron('30 9 * * 2-6')
+    ->cron('30 9 * * *')
     ->timezone(MiseAJourMensuelle::FUSEAU)
     ->between('08:00', '19:00')
     ->when(fn (): bool => MiseAJourMensuelle::estJourDeReprise(now()) && MiseAJourMensuelle::repriseEnAttente())

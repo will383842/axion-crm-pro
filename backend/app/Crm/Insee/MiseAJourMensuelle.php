@@ -168,6 +168,9 @@ final class MiseAJourMensuelle
 
     public const FUSEAU = 'Europe/Paris';
 
+    /** Le jour du mois de la mensuelle (`estJourPlanifie`). */
+    public const JOUR_DU_MOIS = 4;
+
     /** Le verrou partagé par la mensuelle et ses reprises (`routes/console.php`). */
     public const VERROU = 'crm-insee-mise-a-jour-mensuelle';
 
@@ -264,36 +267,30 @@ final class MiseAJourMensuelle
     }
 
     /**
-     * Le jour et l'heure de la planification : le PREMIER jour du mois, à
-     * partir du 4, qui tombe du mardi au samedi (jamais les 1er, 2 et 3),
-     * entre 08:00 et 19:00, heure de Paris. Exactement un jour par mois — il
-     * tombe toujours entre le 4 et le 6.
+     * Le jour et l'heure de la planification : le 4 du mois
+     * (`JOUR_DU_MOIS`), QUEL QUE SOIT le jour de la semaine — dimanche et
+     * lundi compris (décision du 04/10/2026 : les tâches planifiées lourdes
+     * tournent la nuit, la journée est libre) —, entre 08:00 et 19:00, heure
+     * de Paris. Exactement un jour par mois.
      */
     public static function estJourPlanifie(CarbonInterface $instant): bool
     {
         $t = CarbonImmutable::instance($instant)->setTimezone(self::FUSEAU);
-        if ($t->hour < 8 || $t->hour >= 19 || $t->day < 4 || ! self::ouvre($t)) {
-            return false;
-        }
-        for ($jour = 4; $jour < $t->day; $jour++) {
-            if (self::ouvre($t->setDay($jour))) {
-                return false;
-            }
-        }
 
-        return true;
+        return self::dansLesHeures($t) && $t->day === self::JOUR_DU_MOIS;
     }
 
     /**
-     * Un jour de REPRISE possible (avis exactitude R6) : du mardi au samedi,
-     * à partir du 4 (jamais les 1er, 2 et 3), 08:00-19:00 heure de Paris, et
-     * pas le jour de la mensuelle (`estJourPlanifie`).
+     * Un jour de REPRISE possible (avis exactitude R6) : TOUS LES JOURS,
+     * 08:00-19:00 heure de Paris, sauf le jour de la mensuelle
+     * (`estJourPlanifie`) — tant qu'un passage reste à finir
+     * (`repriseEnAttente`).
      */
     public static function estJourDeReprise(CarbonInterface $instant): bool
     {
         $t = CarbonImmutable::instance($instant)->setTimezone(self::FUSEAU);
 
-        return $t->hour >= 8 && $t->hour < 19 && $t->day >= 4 && self::ouvre($t) && ! self::estJourPlanifie($t);
+        return self::dansLesHeures($t) && $t->day !== self::JOUR_DU_MOIS;
     }
 
     /**
@@ -318,9 +315,9 @@ final class MiseAJourMensuelle
         });
     }
 
-    private static function ouvre(CarbonImmutable $jour): bool
+    private static function dansLesHeures(CarbonImmutable $t): bool
     {
-        return $jour->dayOfWeekIso >= 2 && $jour->dayOfWeekIso <= 6;
+        return $t->hour >= 8 && $t->hour < 19;
     }
 
     /**

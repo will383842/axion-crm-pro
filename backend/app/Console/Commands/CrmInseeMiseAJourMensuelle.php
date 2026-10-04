@@ -24,8 +24,9 @@ use Illuminate\Support\Facades\DB;
  * même curseur), sinon part de la dernière exécution réussie, sinon du
  * rattrapage initial (`MiseAJourMensuelle::DEPUIS_INITIAL`).
  *
- * Planifiée dans `routes/console.php` (mensuelle, mardi→samedi, jamais les
- * 1er/2/3, 08:00-19:00 heure de Paris, sans chevauchement).
+ * Planifiée dans `routes/console.php` (mensuelle le 4 à 09:30, reprise les
+ * jours suivants, tous les jours de la semaine, 08:00-19:00 heure de Paris,
+ * sans chevauchement).
  *
  * MISE EN PRODUCTION (avis exactitude R2) : lancer D'ABORD, à la main,
  *   php artisan crm:insee:mise-a-jour-mensuelle --dry-run --duree-max=0

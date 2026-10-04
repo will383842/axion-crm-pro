@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\DB;
  *   php artisan crm:enrichir-opco --dry-run
  *   php artisan crm:enrichir-opco --limite=500000
  *
- * FENÊTRE : refuse de partir hors du mardi→samedi, 08:00-19:00 heure de
- * Paris, et jamais les 1er, 2 et 3 du mois (`FenetreOpco`).
+ * FENÊTRE : refuse de partir hors de 08:00-19:00 heure de Paris, tous les
+ * jours (`FenetreOpco`).
  *
  * PAS PLANIFIÉE : aucune entrée dans `routes/console.php` — elle se lance à
  * la main, une fois par publication de la table (mensuelle).
@@ -47,7 +47,7 @@ class CrmEnrichirOpco extends Command
         $refus = FenetreOpco::refus(now());
         if ($refus !== null) {
             $this->error($refus);
-            $this->line('Fenêtre autorisée : du mardi au samedi, 08:00-19:00 heure de Paris, jamais les 1er, 2 et 3 du mois.');
+            $this->line('Fenêtre autorisée : tous les jours, 08:00-19:00 heure de Paris.');
 
             return self::FAILURE;
         }

@@ -143,7 +143,7 @@ class CrmInseeImporterFamilles extends Command
             $import = (new ImportFamilles($insee))
                 ->avecPlafondMemoire($memoireMax > 0 ? $memoireMax * 1024 * 1024 : null);
 
-            $this->info(sprintf('Famille %s — %s (lot %s)', $famille, FamillesInsee::LIBELLES[$famille], FamillesInsee::LOT));
+            $this->info(sprintf('Famille %s — %s (lot %s)', $famille, FamillesInsee::libelle($famille), FamillesInsee::LOT));
             $this->line('  requête Sirene : ' . FamillesInsee::requete($famille));
             if ($essai) {
                 $this->warn('ESSAI À BLANC — Sirene est lu, RIEN n\'est écrit (ni fiche, ni journal, ni curseur).');

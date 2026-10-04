@@ -39,7 +39,7 @@ final class FamillesInsee
     /** @var list<string> les familles importées SEULEMENT avec salariés */
     public const AVEC_SALARIES_SEULEMENT = ['6', '9'];
 
-    /** @var array<string, string> libellé de chaque famille */
+    /** @var array<int, string> libellé de chaque famille (clé entière : PHP convertit « 5 » en 5) */
     public const LIBELLES = [
         '5' => 'sociétés commerciales (rattrapage des absents)',
         '6' => 'sociétés civiles et autres personnes morales immatriculées, avec salariés',
@@ -50,6 +50,11 @@ final class FamillesInsee
 
     /** Les tranches Sirene « avec salariés » : `01` à `53`. */
     private const TRANCHE_AVEC_SALARIES = '/^(0[1-9]|[1-4]\d|5[0-3])$/';
+
+    public static function libelle(string $famille): string
+    {
+        return self::LIBELLES[(int) $famille] ?? $famille;
+    }
 
     public static function estFamille(string $famille): bool
     {

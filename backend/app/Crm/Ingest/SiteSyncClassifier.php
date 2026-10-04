@@ -169,9 +169,9 @@ final class SiteSyncClassifier
             $tags[] = $service;
         }
 
-        $rendezVous = $this->typeRendezVous($event);
+        $rendezVous = $this->etiquetteRendezVous($event->eventType, $event->str('payload', 'typeRendezVous'));
         if ($rendezVous !== null) {
-            $tags[] = Taxonomy::RENDEZ_VOUS_TYPES[$rendezVous]['tag'];
+            $tags[] = $rendezVous;
         }
 
         $offer = $event->str('candidate', 'offer_slug');
@@ -197,13 +197,37 @@ final class SiteSyncClassifier
      */
     public function typeRendezVous(SiteSyncEvent $event): ?string
     {
-        if (! str_starts_with($event->eventType, 'calendly_')) {
+        return $this->typeRendezVousDepuis($event->eventType, $event->str('payload', 'typeRendezVous'));
+    }
+
+    /**
+     * La MÊME règle, lue sur une activité DÉJÀ ENREGISTRÉE (son `kind` et la
+     * valeur `typeRendezVous` de son `payload`) : c'est ce qui sert quand un
+     * rendez-vous resté dans la file « Personnes à rattacher » est rattaché
+     * plus tard à une entreprise. Une seule règle pour l'ingestion et le
+     * rattachement — sinon les deux finiraient par diverger.
+     */
+    public function typeRendezVousDepuis(string $eventType, mixed $valeur): ?string
+    {
+        if (! str_starts_with($eventType, 'calendly_')) {
             return null;
         }
 
-        $type = $event->str('payload', 'typeRendezVous');
+        $type = is_string($valeur) && trim($valeur) !== '' ? trim($valeur) : null;
 
         return $type !== null && array_key_exists($type, Taxonomy::RENDEZ_VOUS_TYPES) ? $type : null;
+    }
+
+    /**
+     * Étiquette `rdv:*` d'un rendez-vous (`rdv:diagnostic`,
+     * `rdv:echange-projet`, `rdv:salon`), ou null : type absent, `autre`,
+     * apporteur, inconnu, ou événement qui n'est pas un rendez-vous.
+     */
+    public function etiquetteRendezVous(string $eventType, mixed $valeur): ?string
+    {
+        $type = $this->typeRendezVousDepuis($eventType, $valeur);
+
+        return $type === null ? null : Taxonomy::RENDEZ_VOUS_TYPES[$type]['tag'];
     }
 
     /**

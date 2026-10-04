@@ -218,12 +218,12 @@ final class CandidatsSite
                     {$m} ->> 'reessais' AS reessais_avant,
                     {$m} ->> 'reessai_le' AS reessai_le_avant,
                     (c.field_origins -> 'website') IS NOT NULL AS site_de_source,
-                    NOT " . FichesProtegees::conditionSql('c.id') . " AS protegee
+                    NOT " . FichesProtegees::conditionSql('c.id') . ' AS protegee
                FROM companies c
               WHERE c.workspace_id = ?
                 AND c.deleted_at IS NULL
                 AND c.id > ?
-                AND " . SiteFiable::nonVerifieSql('c') . "
+                AND ' . SiteFiable::nonVerifieSql('c') . "
                 AND {$m} ->> 'statut' IN ('" . SiteMedia::NON_CONFORME . "', '" . SiteMedia::INJOIGNABLE . "')
                 AND ({$m} -> 'candidats') IS NULL
                 AND c.siren IS NOT NULL

@@ -79,6 +79,14 @@ final class Propositions
     public const ORIGINE_ANNUAIRE = 'annuaire-service-public';
 
     /**
+     * Toutes les origines admises par le CHECK
+     * `propositions_champs_origine_check` (tiers et sources officielles).
+     *
+     * @var list<string>
+     */
+    public const ORIGINES_EN_BASE = [...self::ORIGINES, self::ORIGINE_ANNUAIRE];
+
+    /**
      * Champs que SEULE une source officielle peut proposer, en plus de
      * `CHAMPS` : l'adresse générique et le site d'une entreprise. Accepter le
      * site de l'annuaire pose aussi `website_method` = l'origine : un site

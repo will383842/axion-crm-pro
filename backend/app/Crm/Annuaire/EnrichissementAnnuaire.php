@@ -173,7 +173,9 @@ final class EnrichissementAnnuaire
                 $this->chargerCommunes();
                 $journal(sprintf(
                     'Annuaire indexé : %d SIRET, %d SIREN seuls, %d codes de mairie ; %d codes de commune sûrs dans le CRM.',
-                    count($this->sirets), count($this->sirens), count($this->mairies),
+                    count($this->sirets),
+                    count($this->sirens),
+                    count($this->mairies),
                     count(array_filter($this->communes, static fn (int $id): bool => $id > 0)),
                 ));
                 [$curseur, $termine] = $this->lire($chemin, $depart, max(0, $limite), $arret, $journal);

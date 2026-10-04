@@ -36,9 +36,9 @@ use Illuminate\Support\Facades\DB;
  * lancement suivant de la même famille. Un essai à blanc n'écrit RIEN (ni
  * fiche, ni journal, ni curseur) et part toujours du début.
  *
- * FENÊTRE (celle de la mise à jour mensuelle) : un passage réel ne part que
- * du mardi au samedi, de 08:00 à 19:00 heure de Paris, jamais les 1er, 2 et
- * 3 du mois, et s'arrête au plus tard à 19:00. Un essai à blanc, qui n'écrit
+ * FENÊTRE (celle des traitements lourds, #324 du 04/10/2026 —
+ * `FenetreOpco`) : un passage réel ne part que de 08:00 à 19:00 heure de
+ * Paris, tous les jours, et s'arrête au plus tard à 19:00. Un essai à blanc, qui n'écrit
  * rien, peut partir à toute heure. Le verrou de la mise à jour mensuelle est
  * pris : les deux ne tournent jamais ensemble (même quota Sirene, même table).
  */

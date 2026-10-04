@@ -484,23 +484,32 @@ test('--jusqua : le passage s arrête proprement à l heure dite et garde son cu
         ->and(iffImporter($e['ws'], '7', ['--jusqua' => '25h']))->toBe(1);
 });
 
-test('fenêtre de la mise à jour mensuelle : un passage réel refusé hors fenêtre, l essai à blanc permis', function (string $instant) {
+test('fenêtre des traitements lourds : un passage réel refusé hors 08:00-19:00, l essai à blanc permis', function (string $instant) {
     $e = iffScenario7();
     $this->travelTo(CarbonImmutable::parse($instant, 'Europe/Paris'));
     $avant = iffInstantane($e['ws']);
 
     $code = iffImporter($e['ws'], '7');
     $sortie = Artisan::output();
-    expect($code)->toBe(1, $instant . ' — now() = ' . now()->toIso8601String() . "\n" . $sortie)
+    expect($code)->toBe(1, $sortie)
         ->and($sortie)->toContain('Refusé')
         ->and(iffInstantane($e['ws']))->toBe($avant)
         ->and(iffImporter($e['ws'], '7', ['--dry-run' => true]))->toBe(0);
 })->with([
-    'dimanche' => ['2026-10-04 10:00'],
-    'lundi' => ['2026-10-05 10:00'],
-    'le 2 du mois' => ['2026-12-02 10:00'],
     'avant 08:00' => ['2026-10-06 07:59'],
-    'après 19:00' => ['2026-10-06 19:00'],
+    'à 19:00' => ['2026-10-06 19:00'],
+    'la nuit, un dimanche' => ['2026-10-04 23:30'],
+]);
+
+test('fenêtre : tous les jours, dimanche et lundi compris, de 08:00 à 19:00 (décision du 04/10/2026, #324)', function (string $instant) {
+    $e = iffScenario7();
+    $this->travelTo(CarbonImmutable::parse($instant, 'Europe/Paris'));
+
+    expect(iffImporter($e['ws'], '7'))->toBe(0, Artisan::output());
+})->with([
+    'dimanche' => ['2026-10-04 10:00'],
+    'lundi' => ['2026-10-05 08:00'],
+    'le 2 du mois' => ['2026-12-02 18:59'],
 ]);
 
 test('le verrou de la mise à jour mensuelle est respecté : jamais les deux ensemble', function () {

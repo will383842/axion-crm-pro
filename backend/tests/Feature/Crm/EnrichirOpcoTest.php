@@ -11,7 +11,8 @@
  * dénominations « ZZ ».
  *
  * Ce qui est verrouillé :
- *  - la fenêtre : refus le lundi, le dimanche, le 2 du mois, à 20:00 ;
+ *  - la fenêtre : refus avant 08:00 et à partir de 19:00 ; accepté tous les
+ *    jours, dimanche, lundi et 2 du mois compris ;
  *  - `--dry-run` : bilan chiffré, RIEN d'écrit (ni table, ni journal) ;
  *  - l'idempotence : deux passages donnent le même état, le second n'écrit rien ;
  *  - une ligne `saisie` n'est JAMAIS écrasée ;
@@ -202,13 +203,12 @@ function opcoEtat(string $ws): array
 // ── Fenêtre horaire ───────────────────────────────────────────────────────
 
 dataset('hors fenêtre', [
-    'un lundi' => ['2026-10-05 10:00:00', 'mardi au samedi'],
-    'un dimanche' => ['2026-10-11 10:00:00', 'mardi au samedi'],
-    'le 2 du mois' => ['2026-10-02 10:00:00', '1er, 2 et 3'],
+    'un dimanche à 07:59' => ['2026-10-11 07:59:00', '08:00 et 19:00'],
+    'un lundi à 19:00' => ['2026-10-05 19:00:00', '08:00 et 19:00'],
     'à 20:00' => ['2026-10-06 20:00:00', '08:00 et 19:00'],
 ]);
 
-test('fenêtre : REFUSE de partir hors du mardi→samedi 08:00-19:00 Paris et les 1er/2/3', function (string $instant, string $motif) {
+test('fenêtre : REFUSE de partir hors de 08:00-19:00 Paris', function (string $instant, string $motif) {
     $e = opcoEspace();
     $source = opcoSource(opcoCsv([[$e['a']['siret'], '1486', 'ATLAS', 'ATLAS']]));
     $this->travelTo(CarbonImmutable::parse($instant, 'Europe/Paris'));
@@ -223,8 +223,12 @@ test('fenêtre : REFUSE de partir hors du mardi→samedi 08:00-19:00 Paris et le
         ->and(DB::table('companies_opco_passages')->count())->toBe(0);
 })->with('hors fenêtre');
 
-test('fenêtre : 08:00 un samedi et 18:59 un mardi sont acceptés, 19:00 refusé', function () {
+test('fenêtre : tous les jours — dimanche, lundi et 1er/2/3 du mois compris — 08:00 et 18:59 acceptés, 19:00 refusé', function () {
     expect(FenetreOpco::refus(CarbonImmutable::parse('2026-10-10 08:00', 'Europe/Paris')))->toBeNull()
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-11 10:00', 'Europe/Paris')))->toBeNull() // dimanche
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-05 10:00', 'Europe/Paris')))->toBeNull() // lundi
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-02 10:00', 'Europe/Paris')))->toBeNull() // le 2
+        ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-11 18:59', 'Europe/Paris')))->toBeNull()
         ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 18:59', 'Europe/Paris')))->toBeNull()
         ->and(FenetreOpco::refus(CarbonImmutable::parse('2026-10-06 19:00', 'Europe/Paris')))->not->toBeNull()
         // Un instant UTC est lu à l'heure de Paris (06:30 UTC = 08:30 Paris en octobre).

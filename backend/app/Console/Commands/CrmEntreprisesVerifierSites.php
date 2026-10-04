@@ -40,8 +40,8 @@ use Throwable;
  *     (`--delai-domaine-ms`, 1 500), délai d'expiration court (`--timeout`, 5 s) ;
  *   - une page partagée par des milliers de fiches (france.fr) n'est lue
  *     qu'une fois : seuls quelques SIREN en sont gardés, jamais le texte ;
- *   - refus de démarrer hors fenêtre (mardi → samedi, 08:00-19:00, heure de
- *     Paris, jamais les 1er, 2 et 3 du mois) sauf `--forcer` ; arrêt propre
+ *   - refus de démarrer hors fenêtre (tous les jours, 08:00-19:00, heure de
+ *     Paris) sauf `--forcer` ; arrêt propre
  *     entre deux paquets à `--jusqua` (19:00 au plus sans `--forcer`) ;
  *   - curseur PERSISTANT (`curseurs_traitements`) écrit dans la transaction
  *     du paquet : la reprise est exacte ; un par périmètre (`--audience`) ;

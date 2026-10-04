@@ -14,8 +14,8 @@
  *     avant = après, affiché au rapport) ;
  *  3. arrêt propre à l'heure (`--jusqua`, heure de Paris), puis REPRISE
  *     EXACTE au curseur persistant ;
- *  4. refus de démarrer hors fenêtre (mardi → samedi, 08:00-19:00, jamais
- *     les 1er, 2 et 3 du mois) sauf `--forcer` ;
+ *  4. refus de démarrer hors fenêtre (tous les jours, 08:00-19:00, heure
+ *     de Paris) sauf `--forcer` ;
  *  5. essai à blanc : rien d'écrit, curseur compris ; `--audience` ;
  *  6. sélection servie par l'index partiel SOUS `axion_app` ;
  *  7. jamais inscrite au calendrier ;
@@ -302,7 +302,7 @@ test('arrêt propre à l heure fixée (--jusqua), puis reprise EXACTE au curseur
         ->and(CurseurTraitement::lire($this->espace, VerificationSite::cleCurseur(null)))->toBe($ids['d']);
 });
 
-test('refus de démarrer hors fenêtre — dimanche, lundi, avant 8 h, après 19 h, les 1er, 2 et 3 du mois — sauf --forcer', function (string $quand) {
+test('refus de démarrer hors fenêtre — avant 8 h, à partir de 19 h, quel que soit le jour — sauf --forcer', function (string $quand) {
     $id = evsFiche($this->espace, 'zz-fenetre.test', 'ZZ FENETRE');
     evsReseau(['https://zz-fenetre.test/' => evsPage('Accueil', 'SIREN ' . evsSiren($id))]);
     Carbon::setTestNow(Carbon::parse($quand, 'Europe/Paris'));
@@ -318,13 +318,11 @@ test('refus de démarrer hors fenêtre — dimanche, lundi, avant 8 h, après 19
     expect($force['code'])->toBe(0)
         ->and(evsMarqueur($id)['statut'] ?? null)->toBe(SiteMedia::VERIFIE);
 })->with([
-    'dimanche' => ['2026-10-11 10:00:00'],
-    'lundi' => ['2026-10-12 10:00:00'],
+    'dimanche 7 h 59' => ['2026-10-11 07:59:00'],
+    'lundi 19 h' => ['2026-10-12 19:00:00'],
     'mardi 7 h 59' => ['2026-10-13 07:59:00'],
     'mardi 19 h' => ['2026-10-13 19:00:00'],
-    'samedi 3 du mois' => ['2026-10-03 10:00:00'],
-    'jeudi 1er du mois' => ['2026-10-01 10:00:00'],
-    'vendredi 2 du mois' => ['2026-10-02 10:00:00'],
+    'jeudi 1er du mois 6 h' => ['2026-10-01 06:00:00'],
 ]);
 
 test('fenêtre : les règles pures', function () {
@@ -332,8 +330,13 @@ test('fenêtre : les règles pures', function () {
 
     expect(VerificationSite::horsFenetre($p('2026-10-06 08:00:00')))->toBeNull()   // mardi
         ->and(VerificationSite::horsFenetre($p('2026-10-10 18:59:00')))->toBeNull() // samedi
-        ->and(VerificationSite::horsFenetre($p('2026-10-04 12:00:00')))->not->toBeNull() // dimanche
-        ->and(VerificationSite::horsFenetre($p('2026-11-03 12:00:00')))->not->toBeNull() // mardi 3
+        // Tous les jours (décision du 04/10/2026) : dimanche, lundi, 1er/2/3 du mois.
+        ->and(VerificationSite::horsFenetre($p('2026-10-04 12:00:00')))->toBeNull() // dimanche
+        ->and(VerificationSite::horsFenetre($p('2026-10-05 08:00:00')))->toBeNull() // lundi
+        ->and(VerificationSite::horsFenetre($p('2026-11-03 12:00:00')))->toBeNull() // mardi 3
+        ->and(VerificationSite::horsFenetre($p('2026-10-01 18:59:00')))->toBeNull() // jeudi 1er
+        ->and(VerificationSite::horsFenetre($p('2026-10-04 07:59:00')))->not->toBeNull()
+        ->and(VerificationSite::horsFenetre($p('2026-10-05 19:00:00')))->not->toBeNull()
         // 10:00 UTC un mardi = 12:00 à Paris : l'heure est celle de PARIS.
         ->and(VerificationSite::horsFenetre(Carbon::parse('2026-10-06 17:30:00', 'UTC')))->not->toBeNull();
 });

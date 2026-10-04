@@ -36,7 +36,6 @@ use Carbon\CarbonInterval;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -53,15 +52,13 @@ beforeEach(function () {
     putenv('INSEE_API_KEY=cle-de-banc');
     Http::swap(new HttpFactory(app('events')));
     // Un mardi, 10:00 heure de Paris : dans la fenêtre de lancement.
-    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-06 10:00', 'Europe/Paris'));
-    Carbon::setTestNow(CarbonImmutable::parse('2026-10-06 10:00', 'Europe/Paris'));
+    $this->travelTo(CarbonImmutable::parse('2026-10-06 10:00', 'Europe/Paris'));
 });
 
 afterEach(function () {
     unset($_ENV['INSEE_API_KEY'], $_SERVER['INSEE_API_KEY']);
     putenv('INSEE_API_KEY');
-    CarbonImmutable::setTestNow();
-    Carbon::setTestNow();
+    $this->travelBack();
 });
 
 /** Un SIREN FICTIF : préfixe 96, clé de Luhn volontairement FAUSSE. */
@@ -471,9 +468,7 @@ test('--jusqua : le passage s arrête proprement à l heure dite et garde son cu
             $e['s']['g'] . '00017' => iffSiege($e['s']['g'], '38999', '7346'),
         ],
         function (string $curseur): void {
-            $plus = CarbonImmutable::now()->addMinutes(2);
-            CarbonImmutable::setTestNow($plus);
-            Carbon::setTestNow($plus);
+            $this->travel(2)->minutes();
         },
     );
 
@@ -491,9 +486,7 @@ test('--jusqua : le passage s arrête proprement à l heure dite et garde son cu
 
 test('fenêtre de la mise à jour mensuelle : un passage réel refusé hors fenêtre, l essai à blanc permis', function (string $instant) {
     $e = iffScenario7();
-    $t = CarbonImmutable::parse($instant, 'Europe/Paris');
-    CarbonImmutable::setTestNow($t);
-    Carbon::setTestNow($t);
+    $this->travelTo(CarbonImmutable::parse($instant, 'Europe/Paris'));
     $avant = iffInstantane($e['ws']);
 
     expect(iffImporter($e['ws'], '7'))->toBe(1)
@@ -540,6 +533,10 @@ test('mémoire CONSTANTE : des dizaines de pages de 1000 unités, une seule page
 
         return Http::response(['header' => ['total' => $pages * 1000, 'curseur' => 'C' . $n, 'curseurSuivant' => $suivant], 'unitesLegales' => $unites], 200);
     });
+    // Le faux client garde chaque réponse pour `Http::recorded()` : c'est le
+    // BANC qui accumulerait, pas l'import (même geste que
+    // `InseeMiseAJourMemoireTest`).
+    (fn () => $this->recording = false)->call(Http::getFacadeRoot());
 
     $mesures = [];
     $r = (new ImportFamilles((new HttpInseeClient)->avecDelaiEntreRequetes(0)))->executer(

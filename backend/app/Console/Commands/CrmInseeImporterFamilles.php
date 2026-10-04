@@ -83,7 +83,7 @@ class CrmInseeImporterFamilles extends Command
         }
 
         $essai = (bool) $this->option('dry-run');
-        $maintenant = CarbonImmutable::now(MiseAJourMensuelle::FUSEAU);
+        $maintenant = CarbonImmutable::instance(now())->setTimezone(MiseAJourMensuelle::FUSEAU);
         if (! $essai) {
             $refus = FenetreOpco::refus($maintenant);
             if ($refus !== null) {

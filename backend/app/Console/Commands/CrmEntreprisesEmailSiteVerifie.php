@@ -147,7 +147,7 @@ class CrmEntreprisesEmailSiteVerifie extends Command
         $jusqua = $this->option('jusqua');
         if ($limite === false || $paquet === false || $paquet === null || $concurrence === false || $concurrence === null
             || $delai === false || $delai === null || $timeout === false || $timeout === null
-            || ($jusqua !== null && (! is_string($jusqua) || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $jusqua) !== 1))) {
+            || ($jusqua !== null && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $jusqua) !== 1)) {
             $this->error('Options invalides (--limite ≥ 1, --paquet 1 à 200, --concurrence 1 à 6, --delai-domaine-ms 1000 à 60000, --timeout 1 à 10, --jusqua HH:MM).');
 
             return self::FAILURE;

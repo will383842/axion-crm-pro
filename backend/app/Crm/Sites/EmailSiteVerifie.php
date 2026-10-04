@@ -251,7 +251,7 @@ final class EmailSiteVerifie
     {
         $choix = null;
         $meilleur = PHP_INT_MAX;
-        foreach (array_values($generiques) as $i => $email) {
+        foreach ($generiques as $i => $email) {
             $local = (string) strstr($email, '@', true);
             $tete = (string) preg_replace('/[0-9._+-].*$/', '', $local);
             $rang = array_search($tete, self::PREFERENCE, true);

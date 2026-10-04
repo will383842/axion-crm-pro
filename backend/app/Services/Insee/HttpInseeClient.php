@@ -3,6 +3,7 @@
 namespace App\Services\Insee;
 
 use App\Contracts\InseeClient;
+use App\Crm\Insee\FamillesInsee;
 use App\Data\Sources\InseeCompanyData;
 use App\Services\Http\SsrfGuard;
 use Illuminate\Http\Client\ConnectionException;
@@ -39,6 +40,15 @@ class HttpInseeClient implements InseeClient
      * par deux, pour ≈ 14 000 unités par minute au quota public.
      */
     public const PAGE_SIRENE = 500;
+
+    /**
+     * Taille d'une page de l'import des familles (`iterateFamille`) : le
+     * maximum Sirene. La requête ne rend que des unités ACTIVES de la
+     * période en cours, restreintes aux `CHAMPS_UNITES` : la page est bien
+     * plus légère que celle du flux des modifications, et une page trop
+     * lourde est de toute façon redemandée plus petite.
+     */
+    public const PAGE_FAMILLE = 1000;
 
     /**
      * Curseurs du flux mémorisés pour détecter une pagination en boucle
@@ -353,6 +363,33 @@ class HttpInseeClient implements InseeClient
     }
 
     /**
+     * LE PÉRIMÈTRE DES CRÉATIONS PAR FAMILLE (décision du 04/10/2026) : le
+     * périmètre de l'import ci-dessus SANS sa restriction aux sociétés 5xxx
+     * (siège, actif, diffusible — unité ET établissement), puis la famille
+     * de la catégorie juridique et, pour 6 et 9, des salariés
+     * (`FamillesInsee::admise`). Jamais la famille 1. Sert l'import des
+     * familles et les créations de la mise à jour mensuelle ;
+     * `prospection:collect` garde `estDansPerimetreImport()` inchangé.
+     *
+     * @param  array<string, mixed>  $etab  un élément de `etablissements`
+     * @param  ?string  $famille  imposée (import d'une famille), ou null : toutes
+     */
+    public static function estDansPerimetreFamilles(array $etab, ?string $famille = null): bool
+    {
+        if (! self::estDansPerimetreImport($etab, false)) {
+            return false;
+        }
+        $u = is_array($etab['uniteLegale'] ?? null) ? $etab['uniteLegale'] : [];
+        $periodes = is_array($u['periodesUniteLegale'][0] ?? null) ? $u['periodesUniteLegale'][0] : $u;
+
+        return FamillesInsee::admise(
+            $periodes['categorieJuridiqueUniteLegale'] ?? $u['categorieJuridiqueUniteLegale'] ?? null,
+            $u['trancheEffectifsUniteLegale'] ?? null,
+            $famille,
+        );
+    }
+
+    /**
      * Un établissement (siège) de la voie `/siret`, mis en forme pour la
      * collecte — adresse comprise, disponible dès la récupération INSEE.
      *
@@ -420,7 +457,33 @@ class HttpInseeClient implements InseeClient
         if (! self::estDateIso($depuis)) {
             throw new \InvalidArgumentException("Date Sirene invalide : « {$depuis} » (attendu AAAA-MM-JJ).");
         }
-        $q = 'dateDernierTraitementUniteLegale:[' . $depuis . ' TO *]';
+
+        yield from $this->fluxUnites('dateDernierTraitementUniteLegale:[' . $depuis . ' TO *]', $curseur, self::PAGE_SIRENE);
+    }
+
+    /**
+     * IMPORT DES FAMILLES (`crm:insee:importer-familles`, 04/10/2026) : les
+     * unités légales ACTIVES et DIFFUSIBLES d'une famille de catégories
+     * juridiques (`FamillesInsee::requete`), par pages de `PAGE_FAMILLE`,
+     * curseur Sirene — même générateur que le flux des modifications : une
+     * page à la fois, période courante seule, taille réduite d'elle-même sur
+     * une page trop lourde, curseurs en boucle et pages en trop arrêtés.
+     *
+     * @return \Generator<int, PageSirene>
+     */
+    public function iterateFamille(string $famille, string $curseur = '*'): \Generator
+    {
+        yield from $this->fluxUnites(FamillesInsee::requete($famille), $curseur, self::PAGE_FAMILLE);
+    }
+
+    /**
+     * Le flux paginé d'une recherche `/siren` (`$q`), à partir de `$curseur`,
+     * par pages de `$taille` au plus.
+     *
+     * @return \Generator<int, PageSirene>
+     */
+    private function fluxUnites(string $q, string $curseur, int $taille): \Generator
+    {
         // Réserve 3 (#313) : la fin ne dépend plus du seul curseur répété.
         // Un curseur DÉJÀ VU (A→B→A…) ou un nombre de pages au-delà du total
         // annoncé lèvent : le passage reste « echouee », visible, au lieu de
@@ -435,7 +498,7 @@ class HttpInseeClient implements InseeClient
         // `PAGES_AVANT_REMONTEE` pages légères. Le curseur désigne une
         // POSITION du flux : redemander le même curseur plus petit ne perd
         // ni ne répète aucune unité.
-        $nombre = self::PAGE_SIRENE;
+        $nombre = $taille;
         $legeres = 0;
 
         while (true) {
@@ -481,8 +544,8 @@ class HttpInseeClient implements InseeClient
                 $plafond = self::plafondDePages($total, $nombre);
             }
             unset($data);
-            if ($nombre < self::PAGE_SIRENE && ++$legeres >= self::PAGES_AVANT_REMONTEE) {
-                $nombre = min(self::PAGE_SIRENE, $nombre * 2);
+            if ($nombre < $taille && ++$legeres >= self::PAGES_AVANT_REMONTEE) {
+                $nombre = min($taille, $nombre * 2);
                 $legeres = 0;
             }
             // Fin : Sirene rend le MÊME curseur (ou rien) sur la dernière page.

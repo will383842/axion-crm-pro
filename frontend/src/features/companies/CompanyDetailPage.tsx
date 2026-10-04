@@ -32,6 +32,7 @@ import { libelleCategorieJuridique } from '@/lib/categories-juridiques';
 import { libelleActivite } from '@/lib/naf-divisions';
 import { libelleEffectif } from './effectif';
 import { LibelleEtCode } from './components/LibelleEtCode';
+import { libelleFermeture } from './fermees';
 
 interface CompanyDetail {
   id: number;
@@ -57,6 +58,8 @@ interface CompanyDetail {
     contact?: number | null;
   } | null;
   priority?: string | null;
+  /** Fermeture INSEE (`AAAA-MM-JJ`), `null` si l'entreprise est active. */
+  insee_ferme_le?: string | null;
   signals?: Record<string, unknown>;
   created_at?: string | null;
   enriched_at?: string | null;
@@ -144,6 +147,7 @@ export function CompanyDetailPage() {
   const name = c.denomination ?? c.siren;
   const dept = c.department ?? c.postcode?.slice(0, 2) ?? '—';
   const addressLine = [c.address, c.postcode, c.city].filter(Boolean).join(', ') || '—';
+  const fermeture = libelleFermeture(c.insee_ferme_le);
 
   return (
     <div>
@@ -154,6 +158,20 @@ export function CompanyDetailPage() {
         ]}
         className="mb-3"
       />
+
+      {/* 04/10/2026 — une entreprise fermée est masquée des listes, mais sa
+          fiche reste ouverte par son lien direct : on le dit d'emblée. */}
+      {fermeture ? (
+        <div
+          role="status"
+          className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 ring-1 ring-amber-200"
+        >
+          {fermeture}
+          <span className="ml-1 font-normal text-amber-800">
+            — elle n’apparaît plus dans les listes, sauf si vous affichez les entreprises fermées.
+          </span>
+        </div>
+      ) : null}
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">

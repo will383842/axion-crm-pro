@@ -26,6 +26,7 @@ import {
   type OptionReferentiel,
 } from '@/lib/prospection-referentiels';
 import { EFFECTIF_OPTIONS } from './effectif';
+import { FERMEES_INCLURE, FERMEES_SEULES } from './fermees';
 
 export const QUALITY_OPTIONS: OptionReferentiel[] = [
   { value: '', label: 'Toutes les fiches' },
@@ -69,6 +70,11 @@ export interface Filter {
   tag: string;
   cree_apres: string;
   cree_avant: string;
+  /**
+   * Entreprises fermées selon l'INSEE : `''` = masquées (par défaut),
+   * `inclure` = affichées avec les autres, `seules` = elles seules.
+   */
+  fermees: string;
 }
 
 export const EMPTY_FILTER: Filter = {
@@ -90,6 +96,7 @@ export const EMPTY_FILTER: Filter = {
   tag: '',
   cree_apres: '',
   cree_avant: '',
+  fermees: '',
 };
 
 /** Ce que l'adresse porte : seulement les filtres renseignés. */
@@ -153,6 +160,7 @@ const REGLES: Record<keyof Filter, Regle> = {
   tag: texteBorne(LONGUEUR_MAX_ETIQUETTE),
   cree_apres: dateValide,
   cree_avant: dateValide,
+  fermees: (v) => v === FERMEES_INCLURE || v === FERMEES_SEULES,
 };
 
 const CLES = Object.keys(EMPTY_FILTER) as Array<keyof Filter>;

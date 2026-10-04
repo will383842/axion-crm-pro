@@ -298,15 +298,7 @@ Schedule::command('media:tag-emissions-status --limit=20000')
     ->withoutOverlapping(180)
     ->runInBackground();
 
-// Recherche des sites web manquants — toutes les 30 min, BORNÉE en mémoire (--limit
-// évite la fuite du DomainFinderService sur de gros volumes), withoutOverlapping (pas
-// d'empilement) + runInBackground (process isolé). Le conteneur `scheduler` relance
-// le job à l'heure suivante → SURVIT aux redéploiements (robustesse sans systemd).
-Schedule::command('media:find-websites --limit=20000')
-    ->everyThirtyMinutes()
-    ->withoutOverlapping(30)
-    ->runInBackground()
-    ->onOneServer();
+// media:find-websites — Coupé le 04/10/2026 (décision du propriétaire) : devinette non vérifiée. Lançable à la main.
 
 // Rafraîchissement hebdomadaire des registres officiels CPPAP (lundi tôt).
 Schedule::command('media:import-opendatasoft cppap')->weeklyOn(1, '02:15')->withoutOverlapping(120)->onOneServer();
@@ -319,9 +311,7 @@ Schedule::command('media:import-emissions-wikidata')->weekly()->sundays()->at('0
 // Radios FM + chaînes TV autorisées par l'ARCOM (niveau station, zone géo) — hebdo.
 Schedule::command('media:import-arcom')->weekly()->sundays()->at('03:30')->withoutOverlapping(180)->runInBackground();
 
-// Emails rédaction déterministes (redaction@/contact@) validés MX pour les médias sans email.
-// Reprenable + borné en mémoire (--limit) ; toutes les 2h pour rattraper le backlog.
-Schedule::command('media:generate-redaction-emails --limit=20000')->everyTwoHours()->withoutOverlapping(120)->runInBackground();
+// media:generate-redaction-emails — Coupé le 04/10/2026 (décision du propriétaire) : devinette non vérifiée. Lançable à la main.
 
 // ── Correctifs audit 2026-07-14 ────────────────────────────────────────────────
 

@@ -251,16 +251,6 @@ class ArbitrageController extends ConsoleController
                     'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
                 ]);
 
-                // Un rendez-vous d'un prospect inconnu n'a reçu aucune
-                // étiquette à l'ingestion (pas de fiche où la poser) : c'est
-                // maintenant qu'elle trouve sa fiche.
-                $this->ingestion->etiqueterRendezVousRattache(
-                    $workspaceId,
-                    $companyId,
-                    is_string($activity->kind ?? null) ? $activity->kind : '',
-                    $payload,
-                );
-
                 return $this->ok(['activity_id' => $activityId, 'dismissed' => true]);
             });
         });

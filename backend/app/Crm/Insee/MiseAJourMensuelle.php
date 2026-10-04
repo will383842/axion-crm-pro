@@ -24,9 +24,11 @@ use Illuminate\Support\Sleep;
  * reporte TOUTES les modifications sur les fiches d'un espace :
  *
  *  - CRÉATION   une unité absente de l'espace, dont le siège entre dans le
- *               périmètre de l'import initial (`HttpInseeClient::
- *               estDansPerimetreImport` : siège actif, diffusible, société
- *               5xxx) et dans un département DÉJÀ présent dans l'espace ;
+ *               périmètre des familles (`HttpInseeClient::
+ *               estDansPerimetreFamilles` : siège actif, diffusible, catégorie
+ *               juridique 5, 7 ou 8, ou 6 et 9 avec salariés — décision du
+ *               04/10/2026, `FamillesInsee` ; jamais 1) et dans un département
+ *               DÉJÀ présent dans l'espace ;
  *               ligne construite par `LigneFicheInsee` (celle de
  *               `prospection:collect`). Jamais par-dessus une fiche
  *               existante (`ON CONFLICT DO NOTHING`).
@@ -984,10 +986,12 @@ final class MiseAJourMensuelle
             $cj = (string) ($p['categorieJuridiqueUniteLegale'] ?? '');
             $nic = (string) ($p['nicSiegeUniteLegale'] ?? '');
             // Premier tri sur l'unité (évite une requête `/siret` inutile) ;
-            // le périmètre complet est jugé sur le siège.
+            // le périmètre complet est jugé sur le siège. Les familles de la
+            // décision du 04/10/2026 (`FamillesInsee`) : 5, 7 et 8 toutes, 6
+            // et 9 avec salariés — jamais 1.
             if (! HttpInseeClient::estDiffusible($u)
                 || ($p['etatAdministratifUniteLegale'] ?? null) !== 'A'
-                || $cj === '' || $cj[0] !== '5'
+                || ! FamillesInsee::admise($cj, $u['trancheEffectifsUniteLegale'] ?? null)
                 || preg_match('/^\d{5}$/', $nic) !== 1) {
                 continue;
             }
@@ -1000,7 +1004,7 @@ final class MiseAJourMensuelle
         $perimetre = array_flip($this->departements());
         $lignes = [];
         foreach ($this->insee->etablissementsParSiret($sirets) as $etab) {
-            if (! HttpInseeClient::estDansPerimetreImport($etab)) {
+            if (! HttpInseeClient::estDansPerimetreFamilles($etab)) {
                 continue;
             }
             $donnees = HttpInseeClient::donneesEtablissement($etab);
@@ -1057,9 +1061,18 @@ final class MiseAJourMensuelle
      */
     private function departements(): array
     {
-        if ($this->departements !== null) {
-            return $this->departements;
-        }
+        return $this->departements ??= self::departementsInsee($this->workspaceId);
+    }
+
+    /**
+     * Les départements de l'IMPORT INSEE présents dans un espace (voir
+     * `departements()`), aussi le périmètre géographique de
+     * `crm:insee:importer-familles`. À appeler sous le contexte de l'espace.
+     *
+     * @return list<string>
+     */
+    public static function departementsInsee(string $workspaceId): array
+    {
         $lignes = DB::select(
             'WITH RECURSIVE d AS (
                 (SELECT department_code FROM companies
@@ -1073,9 +1086,9 @@ final class MiseAJourMensuelle
                   FROM d WHERE d.department_code IS NOT NULL
             )
             SELECT department_code FROM d WHERE department_code IS NOT NULL',
-            [$this->workspaceId, self::ORIGINE, $this->workspaceId, self::ORIGINE],
+            [$workspaceId, self::ORIGINE, $workspaceId, self::ORIGINE],
         );
 
-        return $this->departements = array_values(array_map(static fn ($l): string => (string) $l->department_code, $lignes));
+        return array_values(array_map(static fn ($l): string => (string) $l->department_code, $lignes));
     }
 }

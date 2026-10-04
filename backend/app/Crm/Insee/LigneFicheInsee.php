@@ -43,7 +43,7 @@ final class LigneFicheInsee
             'sector_main' => $naf->secteur,
             'naf_nomenclature' => $naf->nomenclature,
             'naf_rev2' => $naf->codeRev2,
-            'entity_nature' => 'entreprise',
+            'entity_nature' => self::nature($data),
             'region_code' => Classement::regionDuDepartement($departement),
             'address' => $data->address,
             'postcode' => $data->postcode,
@@ -58,6 +58,30 @@ final class LigneFicheInsee
             'created_at' => now(),
             'updated_at' => now(),
         ];
+    }
+
+    /**
+     * La nature de la fiche. Une société commerciale (5xxx) — tout ce que
+     * créait l'import initial — reste `entreprise`, comme avant. Les familles
+     * ouvertes le 04/10/2026 (`FamillesInsee`) sont rangées par la règle
+     * existante (`Classement::natureDeduite` : 92xx association, NAF 94.1x et
+     * 94.20Z organisation professionnelle, 84.xx institution), sinon par leur
+     * famille : droit public (7) `institution`, groupement de droit privé (9)
+     * `association`, le reste (6, 8) `entreprise`.
+     */
+    public static function nature(InseeCompanyData $data): string
+    {
+        $famille = FamillesInsee::familleDe($data->legalForm);
+        if ($famille === null || $famille === '5') {
+            return 'entreprise';
+        }
+        [$nature] = Classement::natureDeduite($data->legalForm, $data->naf, null, $data->siren);
+
+        return $nature ?? match ($famille) {
+            '7' => 'institution',
+            '9' => 'association',
+            default => 'entreprise',
+        };
     }
 
     /**

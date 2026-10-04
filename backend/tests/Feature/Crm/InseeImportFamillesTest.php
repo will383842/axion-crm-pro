@@ -489,8 +489,10 @@ test('fenêtre de la mise à jour mensuelle : un passage réel refusé hors fen�
     $this->travelTo(CarbonImmutable::parse($instant, 'Europe/Paris'));
     $avant = iffInstantane($e['ws']);
 
-    expect(iffImporter($e['ws'], '7'))->toBe(1)
-        ->and(Artisan::output())->toContain('Refusé')
+    $code = iffImporter($e['ws'], '7');
+    $sortie = Artisan::output();
+    expect($code)->toBe(1, $instant . ' — now() = ' . now()->toIso8601String() . "\n" . $sortie)
+        ->and($sortie)->toContain('Refusé')
         ->and(iffInstantane($e['ws']))->toBe($avant)
         ->and(iffImporter($e['ws'], '7', ['--dry-run' => true]))->toBe(0);
 })->with([

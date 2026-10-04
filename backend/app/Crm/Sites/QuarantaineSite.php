@@ -36,9 +36,27 @@ use InvalidArgumentException;
  * Médias et journalistes (exports) : la ligne `media` porte sa propre
  * méthode (`media.website_method`) ; son site n'est vérifié que par le
  * marqueur de la fiche rattachée (`metadata.site_media` ou
- * `metadata.site_entreprise`, statut `verifie` / `trouve-verifie`). Son
- * adresse de rédaction, et tout journaliste relevé sur ce site, sont alors en
- * quarantaine.
+ * `metadata.site_entreprise`, statut `verifie` / `trouve-verifie`). Sinon,
+ * son adresse de rédaction, et tout journaliste relevé sur ce site, sont en
+ * quarantaine. Un marqueur `site_entreprise` TROUVÉ PAR CANDIDAT prouve un
+ * AUTRE site : il ne vérifie la ligne `media` que si `media.website` est sur
+ * le même domaine que le site prouvé (`companies.website`).
+ *
+ * ── SITE TROUVÉ PAR CANDIDAT (04/10/2026) ────────────────────────────────
+ *
+ * `crm:entreprises:chercher-site-prouve` remplace un site deviné non
+ * conforme par un candidat PROUVÉ (SIREN) : la fiche devient vérifiée
+ * (`trouve-verifie`, `origine` = `candidat`), et l'ancien site deviné reste
+ * dans le marqueur (`ancien.url`). Ce qui a été relevé AVANT venait de
+ * l'ancien site — celui d'une autre entreprise. Sur une telle fiche, seul le
+ * domaine prouvé est libéré :
+ *   - générique et canaux typés : en quarantaine SAUF sur le domaine du site
+ *     prouvé (`companies.website`) ;
+ *   - personne : en quarantaine si relevée sur un site (`SOURCES_SITE`) ou
+ *     sur le domaine de l'ANCIEN site, SAUF sur le domaine du site prouvé ;
+ *     une personne connue autrement, à une adresse d'un autre domaine, n'est
+ *     pas en quarantaine (comme partout ailleurs).
+ * Une fiche vérifiée par N6 (même site, pas d'`ancien`) n'est pas touchée.
  *
  * ── LE SQL ───────────────────────────────────────────────────────────────
  *
@@ -65,17 +83,56 @@ final class QuarantaineSite
     }
 
     /**
+     * L'ancien site deviné d'une fiche dont le site a été TROUVÉ par
+     * candidat (marqueur vérifié, `origine` = `candidat`), ou null. Miroir de
+     * `siteAncienSql()`.
+     */
+    public static function siteAncien(mixed $metadata): ?string
+    {
+        if (is_string($metadata)) {
+            $metadata = json_decode($metadata, true);
+        }
+        $m = is_array($metadata) ? ($metadata[SiteFiable::CLE] ?? null) : null;
+        if (! is_array($m) || ($m['origine'] ?? null) !== CandidatsSite::ORIGINE
+            || ! in_array($m['statut'] ?? null, SiteFiable::STATUTS_VERIFIES, true)) {
+            return null;
+        }
+        $url = is_array($m['ancien'] ?? null) ? ($m['ancien']['url'] ?? null) : null;
+
+        return is_string($url) ? $url : '';
+    }
+
+    /**
      * Une personne de la fiche est-elle en quarantaine ?
      *
      * @param  bool  $ficheNonVerifiee  `ficheNonVerifiee()` de SA fiche
+     * @param  ?string  $siteAncien  `siteAncien()` de SA fiche (site trouvé par candidat)
      */
-    public static function personne(bool $ficheNonVerifiee, ?string $source, string $email, ?string $site): bool
+    public static function personne(bool $ficheNonVerifiee, ?string $source, string $email, ?string $site, ?string $siteAncien = null): bool
     {
-        if (! $ficheNonVerifiee) {
+        if ($ficheNonVerifiee) {
+            return in_array($source, self::SOURCES_SITE, true) || self::memeDomaine($email, $site);
+        }
+        if ($siteAncien === null) {
             return false;
         }
 
-        return in_array($source, self::SOURCES_SITE, true) || self::memeDomaine($email, $site);
+        return ! self::memeDomaine($email, $site)
+            && (in_array($source, self::SOURCES_SITE, true) || self::memeDomaine($email, $siteAncien));
+    }
+
+    /**
+     * Une adresse de la FICHE (générique, canal typé relevé sur le site) est-
+     * elle en quarantaine ? Fiche non vérifiée : oui ; site trouvé par
+     * candidat : oui, sauf sur le domaine du site prouvé ; sinon non.
+     */
+    public static function adresseFiche(bool $ficheNonVerifiee, string $email, ?string $site, ?string $siteAncien = null): bool
+    {
+        if ($ficheNonVerifiee) {
+            return true;
+        }
+
+        return $siteAncien !== null && ! self::memeDomaine($email, $site);
     }
 
     /**
@@ -84,13 +141,7 @@ final class QuarantaineSite
      */
     public static function memeDomaine(string $email, ?string $site): bool
     {
-        $de = self::domaineEmail($email);
-        $ds = self::domaineSite($site);
-        if ($de === '' || $ds === '') {
-            return false;
-        }
-
-        return $de === $ds || str_ends_with($de, '.' . $ds) || str_ends_with($ds, '.' . $de);
+        return self::domainesLies(self::domaineEmail($email), self::domaineSite($site));
     }
 
     /** Domaine d'une adresse, en minuscules (`''` si aucun). Miroir du SQL. */
@@ -122,8 +173,12 @@ final class QuarantaineSite
         return mb_strtolower($d);
     }
 
-    /** La ligne `media` (méthode) et le marqueur de sa fiche : site non vérifié ? */
-    public static function mediaNonVerifie(?string $methode, mixed $metadataFiche): bool
+    /**
+     * La ligne `media` (méthode, site) et le marqueur de sa fiche (site de la
+     * fiche) : site non vérifié ? Miroir de `mediaSql()`. Un site d'entreprise
+     * trouvé par candidat ne vérifie la ligne que sur le même domaine.
+     */
+    public static function mediaNonVerifie(?string $methode, mixed $metadataFiche, ?string $siteMedia = null, ?string $siteFiche = null): bool
     {
         if (! SiteFiable::estMethodeDevinee($methode)) {
             return false;
@@ -132,9 +187,30 @@ final class QuarantaineSite
             $metadataFiche = json_decode($metadataFiche, true);
         }
         $media = is_array($metadataFiche) ? ($metadataFiche[SiteMedia::CLE] ?? null) : null;
+        $entreprise = SiteFiable::marqueurVerifie($metadataFiche)
+            && (self::siteAncien($metadataFiche) === null || self::memeSite($siteMedia, $siteFiche));
 
-        return ! SiteFiable::marqueurVerifie($metadataFiche)
+        return ! $entreprise
             && ! (is_array($media) && in_array($media['statut'] ?? null, SiteMedia::STATUTS_VERIFIES, true));
+    }
+
+    /**
+     * Les deux sites sont-ils sur le même domaine (égal, sous-domaine de l'un
+     * ou de l'autre) ? Miroir de `memeSiteExpr()`.
+     */
+    public static function memeSite(?string $siteA, ?string $siteB): bool
+    {
+        return self::domainesLies(self::domaineSite($siteA), self::domaineSite($siteB));
+    }
+
+    /** Deux domaines (déjà normalisés) égaux, ou l'un sous-domaine de l'autre. */
+    private static function domainesLies(string $da, string $db): bool
+    {
+        if ($da === '' || $db === '') {
+            return false;
+        }
+
+        return $da === $db || str_ends_with($da, '.' . $db) || str_ends_with($db, '.' . $da);
     }
 
     // ── SQL ──────────────────────────────────────────────────────────────
@@ -147,7 +223,29 @@ final class QuarantaineSite
     {
         self::alias($alias);
 
-        return "COALESCE({$alias}.email_generic IS NOT NULL AND " . SiteFiable::nonVerifieSql($alias) . ', false)';
+        return "COALESCE({$alias}.email_generic IS NOT NULL AND (" . SiteFiable::nonVerifieSql($alias)
+            . ' OR (' . self::trouveParCandidatSql($alias) . ' AND NOT ' . self::memeDomaineSql("{$alias}.email_generic", "{$alias}.website") . ')), false)';
+    }
+
+    /**
+     * SQL : l'ancien site deviné de la fiche `$alias` si son site a été
+     * TROUVÉ par candidat, sinon NULL. Miroir de `siteAncien()`.
+     */
+    public static function siteAncienSql(string $alias = 'companies'): string
+    {
+        self::alias($alias);
+
+        return 'CASE WHEN ' . self::trouveParCandidatSql($alias)
+            . " THEN COALESCE({$alias}.metadata -> '" . SiteFiable::CLE . "' -> 'ancien' ->> 'url', '') END";
+    }
+
+    /** SQL (jamais NULL) : le site de la fiche `$alias` a été trouvé par candidat et prouvé. */
+    private static function trouveParCandidatSql(string $alias): string
+    {
+        $statuts = "'" . implode("', '", SiteFiable::STATUTS_VERIFIES) . "'";
+
+        return "(COALESCE({$alias}.metadata -> '" . SiteFiable::CLE . "' ->> 'origine', '') = '" . CandidatsSite::ORIGINE . "'"
+            . " AND COALESCE({$alias}.metadata -> '" . SiteFiable::CLE . "' ->> 'statut', '') IN ({$statuts}))";
     }
 
     /**
@@ -160,9 +258,13 @@ final class QuarantaineSite
         self::alias($aliasFiche);
         $sources = "'" . implode("', '", self::SOURCES_SITE) . "'";
 
-        return 'COALESCE(' . SiteFiable::nonVerifieSql($aliasFiche)
+        return 'COALESCE((' . SiteFiable::nonVerifieSql($aliasFiche)
             . " AND (COALESCE({$aliasContact}.discovery_source, '') IN ({$sources})"
-            . ' OR ' . self::memeDomaineSql("{$aliasContact}.email", "{$aliasFiche}.website") . '), false)';
+            . ' OR ' . self::memeDomaineSql("{$aliasContact}.email", "{$aliasFiche}.website") . '))'
+            . ' OR (' . self::trouveParCandidatSql($aliasFiche)
+            . ' AND NOT ' . self::memeDomaineSql("{$aliasContact}.email", "{$aliasFiche}.website")
+            . " AND (COALESCE({$aliasContact}.discovery_source, '') IN ({$sources})"
+            . ' OR ' . self::memeDomaineExpr("{$aliasContact}.email", self::ancienExpr($aliasFiche)) . ')), false)';
     }
 
     /**
@@ -177,10 +279,15 @@ final class QuarantaineSite
         self::alias($aliasFiche);
         $sources = "'" . implode("', '", self::SOURCES_SITE) . "'";
 
-        return 'COALESCE(' . SiteFiable::nonVerifieSql($aliasFiche)
+        $releve = "EXISTS (SELECT 1 FROM contacts qs_ct WHERE qs_ct.id = {$aliasPersonne}.contact_id"
+            . " AND qs_ct.discovery_source IN ({$sources}))";
+
+        return 'COALESCE((' . SiteFiable::nonVerifieSql($aliasFiche)
             . ' AND (' . self::memeDomaineSql("{$aliasPersonne}.email", "{$aliasFiche}.website")
-            . " OR EXISTS (SELECT 1 FROM contacts qs_ct WHERE qs_ct.id = {$aliasPersonne}.contact_id"
-            . " AND qs_ct.discovery_source IN ({$sources}))), false)";
+            . " OR {$releve}))"
+            . ' OR (' . self::trouveParCandidatSql($aliasFiche)
+            . ' AND NOT ' . self::memeDomaineSql("{$aliasPersonne}.email", "{$aliasFiche}.website")
+            . ' AND (' . self::memeDomaineExpr("{$aliasPersonne}.email", self::ancienExpr($aliasFiche)) . " OR {$releve})), false)";
     }
 
     /**
@@ -192,18 +299,55 @@ final class QuarantaineSite
     {
         self::colonne($colonneEmail);
         self::colonne($colonneSite);
-        $de = "lower(split_part(btrim({$colonneEmail}), '@', 2))";
-        $ds = CrmRelationsImporter::expressionDomaineDuSite($colonneSite);
 
-        return "COALESCE(({$de} <> '' AND {$ds} <> '' AND ({$de} = {$ds}"
-            . " OR right({$de}, length({$ds}) + 1) = '.' || {$ds}"
-            . " OR right({$ds}, length({$de}) + 1) = '.' || {$de})), false)";
+        return self::memeDomaineExpr($colonneEmail, $colonneSite);
+    }
+
+    /** L'ancien site (expression SQL interne, jamais une donnée) de la fiche `$alias`. */
+    private static function ancienExpr(string $alias): string
+    {
+        return "({$alias}.metadata -> '" . SiteFiable::CLE . "' -> 'ancien' ->> 'url')";
+    }
+
+    /**
+     * `memeDomaineSql()` sur des expressions INTERNES (colonnes gardées, ou
+     * `ancienExpr`) — jamais une donnée.
+     */
+    private static function memeDomaineExpr(string $colonneEmail, string $colonneSite): string
+    {
+        return self::domainesLiesExpr(
+            "lower(split_part(btrim({$colonneEmail}), '@', 2))",
+            CrmRelationsImporter::expressionDomaineDuSite($colonneSite),
+        );
+    }
+
+    /**
+     * SQL (jamais NULL) : les sites `$colonneA` et `$colonneB` (expressions
+     * INTERNES) sont sur le même domaine. Miroir de `memeSite()`.
+     */
+    private static function memeSiteExpr(string $colonneA, string $colonneB): string
+    {
+        return self::domainesLiesExpr(
+            CrmRelationsImporter::expressionDomaineDuSite($colonneA),
+            CrmRelationsImporter::expressionDomaineDuSite($colonneB),
+        );
+    }
+
+    /** Deux expressions de domaine (internes) égales, ou l'une sous-domaine de l'autre. */
+    private static function domainesLiesExpr(string $da, string $db): string
+    {
+        return "COALESCE(({$da} <> '' AND {$db} <> '' AND ({$da} = {$db}"
+            . " OR right({$da}, length({$db}) + 1) = '.' || {$db}"
+            . " OR right({$db}, length({$da}) + 1) = '.' || {$da})), false)";
     }
 
     /**
      * SQL (jamais NULL) : la ligne `media` `$aliasMedia` porte un site deviné
      * que sa fiche n'a pas vérifié. Sous-requête par clé primaire de
-     * `companies` (une ligne).
+     * `companies` (une ligne). Un marqueur `site_entreprise` trouvé par
+     * candidat (autre site que celui deviné) ne vérifie la ligne que si
+     * `media.website` est sur le domaine du site prouvé. Miroir de
+     * `mediaNonVerifie()`.
      */
     public static function mediaSql(string $aliasMedia = 'media'): string
     {
@@ -212,7 +356,9 @@ final class QuarantaineSite
 
         return "COALESCE({$aliasMedia}.website_method LIKE '" . SiteFiable::PREFIXE_DEVINE . "%'"
             . " AND NOT EXISTS (SELECT 1 FROM companies qs_c WHERE qs_c.id = {$aliasMedia}.company_id"
-            . " AND (COALESCE(qs_c.metadata -> '" . SiteFiable::CLE . "' ->> 'statut', '') IN ({$statuts})"
+            . " AND ((COALESCE(qs_c.metadata -> '" . SiteFiable::CLE . "' ->> 'statut', '') IN ({$statuts})"
+            . " AND (COALESCE(qs_c.metadata -> '" . SiteFiable::CLE . "' ->> 'origine', '') <> '" . CandidatsSite::ORIGINE . "'"
+            . ' OR ' . self::memeSiteExpr("{$aliasMedia}.website", 'qs_c.website') . '))'
             . " OR COALESCE(qs_c.metadata -> '" . SiteMedia::CLE . "' ->> 'statut', '') IN ({$statuts}))), false)";
     }
 

@@ -4,11 +4,14 @@ use App\Console\Commands\AuditVerifyChain;
 use App\Console\Commands\CoverageRefreshMatrix;
 use App\Console\Commands\CrmFederationsTrouverSites;
 use App\Console\Commands\CrmInseeMiseAJourMensuelle;
+use App\Console\Commands\CrmPublicAnnuaireOfficiel;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
+use App\Crm\Annuaire\EnrichissementAnnuaire;
+use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
 use App\Support\BattementPlanificateur;
 use Illuminate\Foundation\Inspiring;
@@ -528,6 +531,38 @@ Schedule::command(CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE . ' --duree-ma
     ->runInBackground()
     ->onFailure(function (): void {
         Log::error('[INSEE] reprise de crm:insee:mise-a-jour-mensuelle sortie en échec — le passage reste « echouee », avec son curseur.');
+    });
+
+// ANNUAIRE OFFICIEL DE L'ADMINISTRATION (décision du 04/10/2026) — e-mail,
+// téléphone et site officiels des fiches du secteur public, rapprochement
+// CERTAIN, rien d'écrasé (conflit → proposition), rien de supprimé.
+//
+// MENSUELLE, APRÈS la mise à jour INSEE (le 4, reprise le 5) : à partir du 6,
+// tous les jours à 15:00 heure de Paris, TANT QUE le passage du mois n'est
+// pas fini (`EnrichissementAnnuaire::moisTermine`) et qu'aucun passage INSEE
+// ne reste à finir. 15:00 : la mise à jour INSEE (09:30, `--duree-max=300`)
+// a rendu la main ; la commande s'arrête d'elle-même à 19:00 (fin de
+// fenêtre) et reprend le lendemain au curseur. Sans chevauchement : verrou
+// du planificateur, et verrou « un seul traitement lourd à la fois » pris
+// par la commande (`TraitementsLourds`).
+Schedule::command(CrmPublicAnnuaireOfficiel::SIGNATURE_PLANIFIEE)
+    ->cron('0 15 * * *')
+    ->timezone(EnrichissementAnnuaire::FUSEAU)
+    ->between('08:00', '19:00')
+    ->when(function (): bool {
+        $espace = EspaceProspection::resoudre(null);
+
+        return $espace !== null
+            && EnrichissementAnnuaire::estJourPlanifie(now())
+            && ! EnrichissementAnnuaire::moisTermine($espace, now())
+            && ! MiseAJourMensuelle::repriseEnAttente($espace);
+    })
+    ->withoutOverlapping(300)
+    ->createMutexNameUsing(EnrichissementAnnuaire::VERROU_PLANIFICATEUR)
+    ->onOneServer()
+    ->runInBackground()
+    ->onFailure(function (): void {
+        Log::error('[ANNUAIRE] crm:public:annuaire-officiel est sortie en échec (ou a refusé de partir) — le curseur du mois est gardé : le passage reprendra au prochain lancement.');
     });
 
 // Avis #308, réserve 5 — BATTEMENT DU PLANIFICATEUR. Chaque minute, un

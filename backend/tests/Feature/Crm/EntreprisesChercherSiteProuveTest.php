@@ -410,8 +410,8 @@ test('--limite, curseur et reprise : N fiches au plus, puis reprise après la de
     expect(cspMarqueur($ids[2])['candidats'] ?? null)->not->toBeNull();
 });
 
-test('refus hors fenêtre (même fenêtre que N6) sauf --forcer ; options invalides refusées', function () {
-    Carbon::setTestNow(Carbon::parse('2026-10-11 10:00:00', 'Europe/Paris')); // dimanche
+test('refus hors fenêtre (celle de N6, 08:00-19:00) sauf --forcer ; options invalides refusées', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-06 21:00:00', 'Europe/Paris')); // après 19:00
     expect(cspLancer()['code'])->toBe(1)
         ->and(cspLancer(['--forcer' => true, '--concurrence' => '9'])['code'])->toBe(1)
         ->and(cspLancer(['--forcer' => true, '--delai-domaine-ms' => '10'])['code'])->toBe(1)
@@ -484,7 +484,7 @@ test('quarantaine : site prouvé par candidat → adresses de SON domaine éligi
 
     $contact = static fn (string $email, string $source): int => (int) DB::table('contacts')->insertGetId([
         'workspace_id' => test()->espace, 'company_id' => $id, 'email' => $email, 'discovery_source' => $source,
-        'first_name' => 'Zz', 'last_name' => 'Fictif', 'sources' => json_encode([$source]), 'metadata' => '{}',
+        'first_name' => 'Zz', 'last_name' => 'Fictif ' . md5($email), 'sources' => json_encode([$source]), 'metadata' => '{}',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     $nouveau = $contact('direction@zzquarantainefictive.test', 'site');

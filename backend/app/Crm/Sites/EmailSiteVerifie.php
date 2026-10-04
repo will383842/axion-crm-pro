@@ -274,8 +274,8 @@ final class EmailSiteVerifie
     /**
      * `GENERIQUE` ou `NOMINATIF`. Générique SEULEMENT si la partie locale est
      * un mot générique (`QualificationEmail`, `MxEmailValidator::ROLE_PREFIXES`,
-     * `MOTS_GENERIQUES_SITE`) SEUL ou suivi uniquement de chiffres :
-     * `^(mot)[0-9]*@`. Tout le reste est nominatif.
+     * `MOTS_GENERIQUES_SITE`) SEUL ou suivi uniquement de chiffres
+     * (motif `^(mot)[0-9]*` avant l'arobase). Tout le reste est nominatif.
      */
     public static function type(string $email): string
     {

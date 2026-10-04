@@ -28,7 +28,8 @@ use stdClass;
  * `POST /v1/crm/propositions/{id}/refuser`  : la fiche ne bouge pas.
  *
  * Aucune route ici ne CRÉE de proposition : rien n'est branché au canal
- * Partners.
+ * Partners. L'annuaire officiel de l'administration
+ * (`crm:public:annuaire-officiel`) en ouvre pour les valeurs en conflit.
  */
 class PropositionsController extends ConsoleController
 {
@@ -147,8 +148,8 @@ class PropositionsController extends ConsoleController
             }
         }
         $colonnes = [
-            Propositions::ENTREPRISE => array_merge(['id', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::ENTREPRISE])),
-            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name', 'field_origins'], array_keys(Propositions::CHAMPS[Propositions::PERSONNE])),
+            Propositions::ENTREPRISE => array_merge(['id', 'field_origins'], Propositions::colonnesProposables(Propositions::ENTREPRISE)),
+            Propositions::PERSONNE => array_merge(['id', 'company_id', 'first_name', 'last_name', 'field_origins'], Propositions::colonnesProposables(Propositions::PERSONNE)),
         ];
         $tables = [Propositions::ENTREPRISE => 'companies', Propositions::PERSONNE => 'contacts'];
 

@@ -4,6 +4,7 @@ namespace App\Crm\Sites;
 
 use App\Console\Commands\CrmRelationsImporter;
 use App\Crm\Presse\SiteMedia;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -192,6 +193,105 @@ final class QuarantaineSite
 
         return ! $entreprise
             && ! (is_array($media) && in_array($media['statut'] ?? null, SiteMedia::STATUTS_VERIFIES, true));
+    }
+
+    /**
+     * Rendre le site de la fiche FIABLE (méthode non devinée, ou marqueur
+     * `verifie`) avec `$siteGaranti` libérerait-il une adresse que rien ne
+     * garantit ? (relecture #329, défaut 1)
+     *
+     * La quarantaine ne regarde que l'ÉTAT du site : le jour où il devient
+     * fiable, TOUTES les adresses de la fiche sortent — l'adresse générique,
+     * les personnes relevées sur l'ancien site (deviné, peut-être celui d'un
+     * autre) ou sur son domaine. Une adresse n'est GARANTIE que si elle est
+     * `$emailGaranti` (l'adresse de la source officielle) ou sur le domaine
+     * de `$siteGaranti` — générique, canaux typés `signals.contact_channels`
+     * (`emails` et clés de `details`), personnes. Sur une fiche au site déjà fiable, rien n'est en
+     * quarantaine : false.
+     *
+     * Lecture des personnes de LA fiche (index `idx_contacts_company`,
+     * `idx_personnes_company`) ; aucun balayage.
+     */
+    public static function liberationNonGarantie(
+        int $companyId,
+        ?string $methode,
+        mixed $metadata,
+        ?string $emailGeneric,
+        mixed $signals,
+        ?string $siteActuel,
+        string $siteGaranti,
+        ?string $emailGaranti = null,
+    ): bool {
+        if (! self::ficheNonVerifiee($methode, $metadata)) {
+            return false;
+        }
+        $garantie = static function (string $email) use ($siteGaranti, $emailGaranti): bool {
+            return ($emailGaranti !== null && mb_strtolower(trim($email)) === mb_strtolower(trim($emailGaranti)))
+                || self::memeDomaine($email, $siteGaranti);
+        };
+
+        $generique = trim((string) $emailGeneric);
+        if ($generique !== '' && ! $garantie($generique)) {
+            return true;
+        }
+
+        // Les canaux typés relevés sur le site (règle n°2) : la liste `emails`
+        // et les clés de `details`, comme `ResolveurDestinataires`.
+        if (is_string($signals)) {
+            $signals = json_decode($signals, true);
+        }
+        $canaux = is_array($signals) && is_array($signals['contact_channels'] ?? null) ? $signals['contact_channels'] : [];
+        $adressesCanaux = array_map('strval', array_keys(is_array($canaux['details'] ?? null) ? $canaux['details'] : []));
+        foreach (is_array($canaux['emails'] ?? null) ? $canaux['emails'] : [] as $e) {
+            if (is_string($e)) {
+                $adressesCanaux[] = $e;
+            }
+        }
+        foreach ($adressesCanaux as $e) {
+            if (trim($e) !== '' && ! $garantie($e)) {
+                return true;
+            }
+        }
+
+        $contacts = DB::table('contacts')
+            ->where('company_id', $companyId)
+            ->whereNull('deleted_at')
+            ->whereNotNull('email')
+            ->get(['email', 'discovery_source']);
+        foreach ($contacts as $c) {
+            $email = (string) $c->email;
+            if (self::personne(true, is_string($c->discovery_source) ? $c->discovery_source : null, $email, $siteActuel)
+                && ! $garantie($email)) {
+                return true;
+            }
+        }
+
+        $personnes = DB::table('personnes')
+            ->where('company_id', $companyId)
+            ->whereNotNull('email')
+            ->get(['email', 'contact_id']);
+        // La source d'une personne est celle du contact lié, SUPPRIMÉ ou non :
+        // miroir de `personneLettreSql()` (clé primaire). Lecture CONSCIENTE de
+        // la corbeille (`deleted_at` lu, jamais filtré) : un contact mis à la
+        // corbeille n'efface pas l'origine de l'adresse de la personne
+        // (garde `EffacementDouxPorteeAgent35Test`).
+        $idsContacts = $personnes->pluck('contact_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all();
+        $relevesSurLeSite = $idsContacts === [] ? [] : DB::table('contacts')
+            ->whereIn('id', $idsContacts)
+            ->whereIn('discovery_source', self::SOURCES_SITE)
+            ->get(['id', 'deleted_at'])
+            ->mapWithKeys(fn ($c): array => [(int) $c->id => true])
+            ->all();
+        foreach ($personnes as $p) {
+            $email = (string) $p->email;
+            $enQuarantaine = self::memeDomaine($email, $siteActuel)
+                || ($p->contact_id !== null && isset($relevesSurLeSite[(int) $p->contact_id]));
+            if ($enQuarantaine && ! $garantie($email)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

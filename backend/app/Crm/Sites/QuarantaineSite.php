@@ -4,6 +4,7 @@ namespace App\Crm\Sites;
 
 use App\Console\Commands\CrmRelationsImporter;
 use App\Crm\Presse\SiteMedia;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -135,6 +136,77 @@ final class QuarantaineSite
 
         return ! SiteFiable::marqueurVerifie($metadataFiche)
             && ! (is_array($media) && in_array($media['statut'] ?? null, SiteMedia::STATUTS_VERIFIES, true));
+    }
+
+    /**
+     * Rendre le site de la fiche FIABLE (méthode non devinée, ou marqueur
+     * `verifie`) avec `$siteGaranti` libérerait-il une adresse que rien ne
+     * garantit ? (relecture #329, défaut 1)
+     *
+     * La quarantaine ne regarde que l'ÉTAT du site : le jour où il devient
+     * fiable, TOUTES les adresses de la fiche sortent — l'adresse générique,
+     * les personnes relevées sur l'ancien site (deviné, peut-être celui d'un
+     * autre) ou sur son domaine. Une adresse n'est GARANTIE que si elle est
+     * `$emailGaranti` (l'adresse de la source officielle) ou sur le domaine
+     * de `$siteGaranti`. Sur une fiche au site déjà fiable, rien n'est en
+     * quarantaine : false.
+     *
+     * Lecture des personnes de LA fiche (index `idx_contacts_company`,
+     * `idx_personnes_company`) ; aucun balayage.
+     */
+    public static function liberationNonGarantie(
+        int $companyId,
+        ?string $methode,
+        mixed $metadata,
+        ?string $emailGeneric,
+        ?string $siteActuel,
+        string $siteGaranti,
+        ?string $emailGaranti = null,
+    ): bool {
+        if (! self::ficheNonVerifiee($methode, $metadata)) {
+            return false;
+        }
+        $garantie = static function (string $email) use ($siteGaranti, $emailGaranti): bool {
+            return ($emailGaranti !== null && mb_strtolower(trim($email)) === mb_strtolower(trim($emailGaranti)))
+                || self::memeDomaine($email, $siteGaranti);
+        };
+
+        $generique = trim((string) $emailGeneric);
+        if ($generique !== '' && ! $garantie($generique)) {
+            return true;
+        }
+
+        $contacts = DB::table('contacts')
+            ->where('company_id', $companyId)
+            ->whereNull('deleted_at')
+            ->whereNotNull('email')
+            ->get(['id', 'email', 'discovery_source']);
+        $relevesSurLeSite = [];
+        foreach ($contacts as $c) {
+            $email = (string) $c->email;
+            if (in_array($c->discovery_source, self::SOURCES_SITE, true)) {
+                $relevesSurLeSite[(int) $c->id] = true;
+            }
+            if (self::personne(true, is_string($c->discovery_source) ? $c->discovery_source : null, $email, $siteActuel)
+                && ! $garantie($email)) {
+                return true;
+            }
+        }
+
+        $personnes = DB::table('personnes')
+            ->where('company_id', $companyId)
+            ->whereNotNull('email')
+            ->get(['email', 'contact_id']);
+        foreach ($personnes as $p) {
+            $email = (string) $p->email;
+            $enQuarantaine = self::memeDomaine($email, $siteActuel)
+                || ($p->contact_id !== null && isset($relevesSurLeSite[(int) $p->contact_id]));
+            if ($enQuarantaine && ! $garantie($email)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ── SQL ──────────────────────────────────────────────────────────────

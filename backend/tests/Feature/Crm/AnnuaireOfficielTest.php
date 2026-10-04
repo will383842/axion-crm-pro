@@ -27,6 +27,7 @@ use App\Crm\Annuaire\EnrichissementAnnuaire;
 use App\Crm\Annuaire\OrganismeAnnuaire;
 use App\Crm\Annuaire\SourceAnnuaire;
 use App\Crm\FichesProtegees;
+use App\Crm\Propositions\PropositionImpossible;
 use App\Crm\Propositions\Propositions;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
@@ -429,6 +430,97 @@ test('site DEVINÉ différent : proposition ; acceptée, le site devient fiable'
     expect($f['website'])->toBe('https://www.zz-a.example')
         ->and($f['website_method'])->toBe('annuaire-service-public')
         ->and(SiteFiable::estNonVerifie($f['website_method'], $f['metadata']))->toBeFalse();
+});
+
+// ── Relecture #329 : quarantaine et unicité du SIREN ──────────────────────
+
+test('SIREN : un service sans SIRET partageant le SIREN de la mairie est AMBIGU — la fiche reçoit la mairie', function () {
+    $ws = F::espace('zz-annuaire');
+    $commune = annuaireFiche($ws, 'ZZ COMMUNE Y', ['legal_form' => '7210']);
+    annuaireSource([
+        // La ligne du service arrive AVANT celle de la mairie.
+        annuaireOrganisme('zz-mediatheque', ['siren' => $commune['siren']], 'mediatheque@zz-y.example', '01 99 00 00 05'),
+        annuaireOrganisme('zz-mairie', ['siret' => $commune['siret']], 'mairie@zz-y.example', '01 99 00 00 06'),
+    ]);
+
+    [, $sortie] = annuaireLancer($ws);
+
+    $f = annuaireLigne($commune['id']);
+    expect($f['email_generic'])->toBe('mairie@zz-y.example')
+        ->and($f['phone'])->toBe('01 99 00 00 06')
+        ->and(annuaireCompteur($sortie, 'rapprochés par SIRET'))->toBe(1)
+        ->and(annuaireCompteur($sortie, 'rapprochés par SIREN'))->toBe(0)
+        ->and($sortie)->toContain('ambigus : 1');
+});
+
+test('site deviné CONFIRMÉ mais adresse générique d’un autre domaine : rien n’est marqué, l’adresse reste en quarantaine', function () {
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ DEPARTEMENT A', [
+        'website' => 'http://zz-a.example/', 'website_method' => 'guess', 'email_generic' => 'contact@zz-ailleurs.example',
+    ]);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-a.example')]);
+
+    [, $sortie] = annuaireLancer($ws);
+
+    $f = annuaireLigne($a['id']);
+    $r = DB::selectOne('SELECT ' . QuarantaineSite::generiqueSql('c') . ' AS q FROM companies c WHERE c.id = ?', [$a['id']]);
+    expect(SiteFiable::estNonVerifie($f['website_method'], $f['metadata']))->toBeTrue()
+        ->and($r->q)->toBeTrue()
+        ->and($sortie)->toContain('sites devinés confirmés : 0')
+        ->and($sortie)->toContain('adresses non garanties sur la fiche) : 1');
+});
+
+test('site écrit sur une fiche « devinée » dont une personne vient de l’ancien site : site non écrit', function () {
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ DEPARTEMENT A', ['website_method' => 'guess']);
+    F::contact($ws, $a['id'], 'Zz', 'Releve', ['email' => 'zz.releve@zz-ailleurs.example', 'discovery_source' => 'site']);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-a.example')]);
+
+    annuaireLancer($ws);
+
+    $f = annuaireLigne($a['id']);
+    expect($f['website'])->toBeNull()->and($f['website_method'])->toBe('guess');
+});
+
+test('accepter le site de l’annuaire ne rend pas envoyable l’adresse tirée de l’ancien site deviné', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $ws = F::espace('zz-annuaire');
+    $a = annuaireFiche($ws, 'ZZ COMMUNE X', [
+        'legal_form' => '7210',
+        'website' => 'https://zz-immobilier.example', 'website_method' => 'guess',
+        'email_generic' => 'contact@zz-immobilier.example',
+    ]);
+    F::contact($ws, $a['id'], 'Zz', 'Agent', ['email' => 'agent@zz-immobilier.example', 'discovery_source' => 'site']);
+    annuaireSource([annuaireOrganisme('zz-1', ['siret' => $a['siret']], null, null, 'https://www.zz-ville-x.example')]);
+    annuaireLancer($ws);
+    $p = DB::table('propositions_champs')->where('entite_id', $a['id'])->where('champ', 'website')->first();
+    $fiche = DB::table('companies')->where('id', $a['id'])->first();
+    $owner = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'zz-owner-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ owner',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $ws, 'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($ws);
+    $owner->assignRole('owner');
+
+    expect(fn () => app(Propositions::class)->accepter($ws, (int) $p->id, $owner, Propositions::empreinte(Propositions::ENTREPRISE, $fiche, 'website')))
+        ->toThrow(PropositionImpossible::class, 'ancien site deviné');
+
+    $f = annuaireLigne($a['id']);
+    $r = DB::selectOne('SELECT ' . QuarantaineSite::generiqueSql('c') . ' AS q FROM companies c WHERE c.id = ?', [$a['id']]);
+    expect($f['website'])->toBe('https://zz-immobilier.example')
+        ->and($f['website_method'])->toBe('guess')
+        ->and($r->q)->toBeTrue()
+        ->and(DB::table('propositions_champs')->where('id', $p->id)->value('statut'))->toBe('en_attente');
+});
+
+test('le CHECK d’origine garde les origines déjà admises par une autre migration (union)', function () {
+    $def = (string) DB::selectOne(
+        "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",
+    )->d;
+
+    foreach (Propositions::ORIGINES_EN_BASE as $origine) {
+        expect($def)->toContain("'{$origine}'");
+    }
 });
 
 // ── Hôtes, fenêtre, verrou, reprise, planification ────────────────────────

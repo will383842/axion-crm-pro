@@ -137,6 +137,8 @@ class CrmPublicAnnuaireOfficiel extends Command
         $this->line(sprintf('  e-mails %s : %d (mis à jour : %d)', $verbe, $b['emails_ajoutes'], $b['emails_mis_a_jour']));
         $this->line(sprintf('  téléphones %s : %d (mis à jour : %d)', $verbe, $b['telephones_ajoutes'], $b['telephones_mis_a_jour']));
         $this->line(sprintf('  sites %s : %d (mis à jour : %d, sites devinés confirmés : %d)', $verbe, $b['sites_ajoutes'], $b['sites_mis_a_jour'], $b['sites_confirmes']));
+        $this->line(sprintf('  sites gardés en attente (adresses non garanties sur la fiche) : %d', $b['confirmations_differees']));
+        $this->line(sprintf('  e-mails %s mais en quarantaine (site deviné non vérifié) : %d', $essai ? 'à ajouter' : 'ajoutés', $b['emails_en_quarantaine']));
         $this->line(sprintf('  conflits : %d (%s ; déjà proposées ou refusées : %d)', $b['conflits'], $essai ? 'propositions à ouvrir' : 'propositions ouvertes', $b['propositions_deja_faites']));
         $this->line(sprintf('  valeurs identiques : %d', $b['inchanges']));
         $av = $resultat['avant'];
@@ -144,6 +146,11 @@ class CrmPublicAnnuaireOfficiel extends Command
         if ($resultat['apres'] !== null) {
             $ap = $resultat['apres'];
             $this->line(sprintf('  après : %d fiches du secteur public — %d avec e-mail, %d avec téléphone, %d avec site', $ap['fiches'], $ap['avec_email'], $ap['avec_telephone'], $ap['avec_site']));
+            // Ce traitement ne crée ni ne retire aucune fiche : un écart vient
+            // d'ailleurs (import, corbeille) pendant le passage — signalé.
+            if ($ap['fiches'] !== $av['fiches']) {
+                $this->warn(sprintf('Le nombre de fiches du secteur public a changé pendant le passage (%d → %d) : un autre traitement a écrit en même temps.', $av['fiches'], $ap['fiches']));
+            }
         }
         $this->line(sprintf('  curseur : ligne %d', $resultat['curseur']));
         if ($resultat['statut'] !== 'reussie') {

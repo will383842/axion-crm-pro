@@ -5,6 +5,7 @@ namespace App\Crm\Annuaire;
 use App\Crm\FichesProtegees;
 use App\Crm\Propositions\Propositions;
 use App\Crm\Sites\CurseurTraitement;
+use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Crm\Sites\VerificationSite;
 use App\Support\ListeSuppression;
@@ -32,8 +33,9 @@ use stdClass;
  *  1. SIRET de l'annuaire = `companies.siret` — si ce SIRET n'est porté que
  *     par UN organisme de l'annuaire ;
  *  2. organisme SANS SIRET, avec un SIREN = `companies.siren` — si ce SIREN
- *     n'est porté que par UN organisme de l'annuaire (un SIREN partagé par
- *     plusieurs services ne désigne aucun d'eux) ;
+ *     n'est porté que par UN organisme de l'annuaire, lignes à SIRET
+ *     comprises (un SIREN partagé par plusieurs services, ou par la mairie
+ *     et un de ses services, ne désigne aucun d'eux) ;
  *  3. MAIRIE (pivot `mairie`) dont le code INSEE de commune est unique dans
  *     la ligne ET n'est porté par aucune autre mairie de l'annuaire ↔ LA
  *     fiche de COMMUNE (catégorie 7210) de ce code dans le CRM, si elle est
@@ -102,7 +104,8 @@ final class EnrichissementAnnuaire
         'non_rapproches', 'ambigus', 'doublons', 'exclues_non_diffusibles', 'hors_secteur_public',
         'emails_ajoutes', 'telephones_ajoutes', 'sites_ajoutes',
         'emails_mis_a_jour', 'telephones_mis_a_jour', 'sites_mis_a_jour',
-        'inchanges', 'sites_confirmes', 'conflits', 'propositions_deja_faites', 'lignes_malformees',
+        'inchanges', 'sites_confirmes', 'confirmations_differees', 'emails_en_quarantaine',
+        'conflits', 'propositions_deja_faites', 'lignes_malformees',
     ];
 
     /** @var array<string, int> */
@@ -117,7 +120,7 @@ final class EnrichissementAnnuaire
     /** @var array<int, int> SIRET → nombre d'organismes */
     private array $sirets = [];
 
-    /** @var array<int, int> SIREN (organismes sans SIRET) → nombre */
+    /** @var array<int, int> SIREN (toutes les lignes, SIREN déduit du SIRET compris) → nombre */
     private array $sirens = [];
 
     /** @var array<string, int> code commune → nombre de mairies */
@@ -267,7 +270,11 @@ final class EnrichissementAnnuaire
             }
             if (($s = $o->cleSiret()) !== null) {
                 $this->sirets[$s] = ($this->sirets[$s] ?? 0) + 1;
-            } elseif (($s = $o->cleSiren()) !== null) {
+            }
+            // TOUTES les lignes comptent pour le SIREN, SIREN déduit du SIRET
+            // compris (relecture #329, défaut 2) : un service sans SIRET ne
+            // désigne l'unité légale que s'il est le SEUL organisme de ce SIREN.
+            if (($s = $o->cleSiren()) !== null) {
                 $this->sirens[$s] = ($this->sirens[$s] ?? 0) + 1;
             }
             if ($o->codeMairie !== null) {
@@ -598,6 +605,36 @@ final class EnrichissementAnnuaire
                 $o->identifiant,
             );
             $this->bilan[$resultat === Propositions::PROPOSEE ? 'conflits' : 'propositions_deja_faites']++;
+        }
+
+        // Rendre le site FIABLE (site écrit avec sa méthode, ou site deviné
+        // confirmé) sort de quarantaine TOUTES les adresses de la fiche : refusé
+        // tant qu'une adresse n'est garantie ni par l'annuaire ni par le
+        // domaine du site officiel (relecture #329, défaut 1). Le site n'est
+        // alors pas écrit, le marqueur pas posé : `confirmations_differees`.
+        if ((isset($maj['website']) || $siteConfirme) && $o->site !== null
+            && QuarantaineSite::liberationNonGarantie(
+                (int) $fiche->id,
+                is_string($fiche->website_method) ? $fiche->website_method : null,
+                $metadata,
+                is_string($fiche->email_generic) ? $fiche->email_generic : null,
+                is_string($fiche->website) ? $fiche->website : null,
+                $o->site,
+                $o->email,
+            )) {
+            $this->bilan['confirmations_differees']++;
+            if (isset($maj['website'])) {
+                $this->bilan[trim((string) $fiche->website) === '' ? 'sites_ajoutes' : 'sites_mis_a_jour']--;
+                unset($maj['website']);
+            }
+            $siteConfirme = false;
+        }
+        // L'adresse écrite sur une fiche dont le site reste deviné non vérifié
+        // tombe aussitôt en quarantaine (`QuarantaineSite::generiqueSql`) :
+        // comptée, pour que le bilan ne surestime pas les adresses gagnées.
+        if (isset($maj['email_generic']) && ! isset($maj['website'])
+            && SiteFiable::estNonVerifie(is_string($fiche->website_method) ? $fiche->website_method : null, $metadata)) {
+            $this->bilan['emails_en_quarantaine']++;
         }
 
         if ($maj === [] && ! $siteConfirme) {

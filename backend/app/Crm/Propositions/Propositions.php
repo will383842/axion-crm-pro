@@ -3,6 +3,7 @@
 namespace App\Crm\Propositions;
 
 use App\Crm\FichesProtegees;
+use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\User;
@@ -502,7 +503,24 @@ final class Propositions
                 ];
                 // Le site d'une source officielle accepté n'est pas un site
                 // deviné : sa méthode le dit (`SiteFiable`, `QuarantaineSite`).
+                // Mais un site rendu fiable sort de quarantaine TOUTES les
+                // adresses de la fiche : refusé tant qu'une adresse tirée de
+                // l'ancien site deviné n'est pas garantie par le nouveau
+                // (relecture #329, défaut 1).
                 if ($champ === 'website' && isset(self::CHAMPS_SOURCES_OFFICIELLES[(string) $p->origine])) {
+                    if (QuarantaineSite::liberationNonGarantie(
+                        (int) $fiche->id,
+                        is_string($fiche->website_method ?? null) ? $fiche->website_method : null,
+                        $fiche->metadata ?? null,
+                        is_string($fiche->email_generic ?? null) ? $fiche->email_generic : null,
+                        is_string($fiche->website ?? null) ? $fiche->website : null,
+                        (string) $p->valeur_proposee,
+                    )) {
+                        throw new PropositionImpossible(
+                            'La fiche porte des adresses relevées sur son ancien site deviné, hors du domaine du site officiel : '
+                            . 'accepter ce site les rendrait envoyables. Corrigez ou retirez-les d’abord, puis acceptez.',
+                        );
+                    }
                     $maj['website_method'] = (string) $p->origine;
                 }
                 DB::table($table)->where('id', (int) $p->entite_id)->update($maj);

@@ -21,7 +21,7 @@ import { api, messageApiLisible } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from '@/features/crm-console/ConsoleGate';
 import { COMPTEURS_A_TRAITER_KEY, formaterNombre } from '@/features/a-traiter/compteurs';
 
-export type OriginePartenaire = 'apporteur' | 'commercial' | 'societe';
+export type OriginePartenaire = 'apporteur' | 'commercial' | 'societe' | 'annuaire-service-public';
 
 export interface Proposition {
   id: number;
@@ -56,6 +56,7 @@ export const LIBELLES_ORIGINE: Record<OriginePartenaire, string> = {
   apporteur: 'Un apporteur d’affaires',
   commercial: 'Un commercial partenaire',
   societe: 'Une société partenaire',
+  'annuaire-service-public': 'L’annuaire officiel de l’administration',
 };
 
 export function PropositionsPage() {

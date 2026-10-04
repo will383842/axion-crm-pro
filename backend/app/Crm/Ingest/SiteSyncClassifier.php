@@ -169,6 +169,11 @@ final class SiteSyncClassifier
             $tags[] = $service;
         }
 
+        $rendezVous = $this->typeRendezVous($event);
+        if ($rendezVous !== null) {
+            $tags[] = Taxonomy::RENDEZ_VOUS_TYPES[$rendezVous]['tag'];
+        }
+
         $offer = $event->str('candidate', 'offer_slug');
         if ($offer !== null) {
             $tags[] = 'cand-offre:' . $offer;
@@ -179,6 +184,41 @@ final class SiteSyncClassifier
         }
 
         return array_values(array_unique($tags));
+    }
+
+    /**
+     * Type de rendez-vous d'un événement `calendly_*` (`payload.typeRendezVous`,
+     * chantier « Types de rendez-vous », 2026-10-04), ou null.
+     *
+     * TOLÉRANT par construction : le champ est un AJOUT au contrat — un ancien
+     * événement sans lui, une valeur `autre` ou une valeur inconnue rendent
+     * null et l'événement passe exactement comme avant (aucun refus : perdre
+     * un rendez-vous pour une étiquette serait pire que de ne pas l'étiqueter).
+     */
+    public function typeRendezVous(SiteSyncEvent $event): ?string
+    {
+        if (! str_starts_with($event->eventType, 'calendly_')) {
+            return null;
+        }
+
+        $type = $event->str('payload', 'typeRendezVous');
+
+        return $type !== null && array_key_exists($type, Taxonomy::RENDEZ_VOUS_TYPES) ? $type : null;
+    }
+
+    /**
+     * Besoin déclaré à la réservation (`payload.besoin` : audit, formation…),
+     * ou null. Texte libre côté site : coupé à 120 caractères pour l'affichage.
+     */
+    public function besoinRendezVous(SiteSyncEvent $event): ?string
+    {
+        if (! str_starts_with($event->eventType, 'calendly_')) {
+            return null;
+        }
+
+        $besoin = $event->str('payload', 'besoin');
+
+        return $besoin === null ? null : mb_substr($besoin, 0, 120);
     }
 
     /**

@@ -1005,3 +1005,98 @@ test('R2 — TEMOIN : sans la marque manuelle, le meme formulaire promeut l etap
     expect($company->relation_type)->toBe('prospect')
         ->and($company->lifecycle_stage)->toBe('opportunite');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPES DE RENDEZ-VOUS (chantier « Types de rendez-vous », 2026-10-04)
+// `payload.typeRendezVous` / `payload.besoin` sont des AJOUTS au contrat : un
+// ancien événement sans eux doit passer exactement comme avant.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @param  array<string, mixed>  $payload
+ * @return array<string, mixed>
+ */
+function siteSyncRendezVous(array $payload, string $eventType = 'calendly_booked'): array
+{
+    $event = siteSyncEvent([
+        'event_type' => $eventType,
+        'source_slug' => 'calendly',
+        'subject_ref' => 'site:calendly_event:' . Str::uuid(),
+    ]);
+    unset($event['form_type']);
+    $event['payload'] = $payload;
+
+    return $event;
+}
+
+/** @return list<string> */
+function siteSyncEtiquettesPosees(): array
+{
+    return DB::table('company_tag')
+        ->join('tags', 'tags.id', '=', 'company_tag.tag_id')
+        ->pluck('tags.slug')
+        ->all();
+}
+
+test('RDV — un diagnostic pose l’étiquette rdv:diagnostic et un titre lisible avec le besoin', function () {
+    siteSyncPost(siteSyncRendezVous(['typeRendezVous' => 'diagnostic', 'besoin' => 'audit']))
+        ->assertOk()
+        ->assertJsonPath('result.status', 'created');
+
+    expect(siteSyncEtiquettesPosees())->toContain('rdv:diagnostic')
+        ->and(siteSyncEtiquettesPosees())->toContain('src:calendly');
+
+    $activity = DB::table('activities')->first();
+    expect($activity->kind)->toBe('calendly_booked')
+        ->and($activity->title)->toBe('Rendez-vous pris — Diagnostic IA · Besoin : audit');
+});
+
+test('RDV — échange projet et salon posent chacun leur étiquette', function (string $type, string $etiquette, string $libelle) {
+    siteSyncPost(siteSyncRendezVous(['typeRendezVous' => $type, 'besoin' => null], 'calendly_completed'))->assertOk();
+
+    expect(siteSyncEtiquettesPosees())->toContain($etiquette)
+        ->and(DB::table('activities')->value('title'))->toBe('Rendez-vous honoré — ' . $libelle);
+})->with([
+    ['echange_projet', 'rdv:echange-projet', 'Échange projet'],
+    ['salon', 'rdv:salon', 'Salon'],
+]);
+
+test('RDV — sans typeRendezVous ni besoin : comportement INCHANGÉ (aucune étiquette rdv:, titre d’avant)', function () {
+    siteSyncPost(siteSyncRendezVous(['page' => '/fr/appel']))
+        ->assertOk()
+        ->assertJsonPath('result.status', 'created')
+        ->assertJsonPath('result.tags_ignores', []);
+
+    $etiquettes = siteSyncEtiquettesPosees();
+    expect($etiquettes)->toContain('src:calendly')
+        ->and(array_filter($etiquettes, static fn (string $s): bool => str_starts_with($s, 'rdv:')))->toBe([])
+        ->and(DB::table('activities')->value('title'))->toBe('calendly booked');
+
+    $company = DB::table('companies')->first();
+    expect($company->lifecycle_stage)->toBe('opportunite');
+});
+
+test('RDV — une valeur inconnue (ou « autre ») est IGNORÉE, l’événement passe', function (string $valeur) {
+    siteSyncPost(siteSyncRendezVous(['typeRendezVous' => $valeur]))
+        ->assertOk()
+        ->assertJsonPath('result.status', 'created')
+        ->assertJsonPath('result.tags_ignores', []);
+
+    expect(array_filter(siteSyncEtiquettesPosees(), static fn (string $s): bool => str_starts_with($s, 'rdv:')))->toBe([])
+        ->and(DB::table('activities')->value('title'))->toBe('calendly booked');
+})->with(['autre', 'apporteur', 'DIAGNOSTIC']);
+
+test('RDV — typeRendezVous sur un événement NON calendly ne pose rien', function () {
+    siteSyncPost(siteSyncEvent(['payload' => ['typeRendezVous' => 'diagnostic']]))->assertOk();
+
+    expect(array_filter(siteSyncEtiquettesPosees(), static fn (string $s): bool => str_starts_with($s, 'rdv:')))->toBe([]);
+});
+
+test('RDV — chaque type de rendez-vous a son étiquette au référentiel gouverné', function () {
+    $referential = GovernedTagsSeeder::referential();
+
+    foreach (Taxonomy::RENDEZ_VOUS_TYPES as $type => $spec) {
+        expect(array_key_exists($spec['tag'], $referential))->toBeTrue("étiquette absente du référentiel : {$spec['tag']} ({$type})")
+            ->and($referential[$spec['tag']]['category'])->toBe(Taxonomy::TAG_NAMESPACES['rdv']);
+    }
+});

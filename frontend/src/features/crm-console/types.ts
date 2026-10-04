@@ -289,10 +289,21 @@ export interface PersonneFiche {
   timeline: PersonneTimelineEntry[];
 }
 
+/**
+ * Types de rendez-vous client (2026-10-04) — miroir de
+ * `Taxonomy::RENDEZ_VOUS_TYPES` côté API : étiquette `rdv:<valeur>` → libellé.
+ */
+export const RENDEZ_VOUS_LABELS: Record<string, string> = {
+  diagnostic: 'Diagnostic IA',
+  'echange-projet': 'Échange projet',
+  salon: 'Salon',
+};
+
 /** Libellé humain d'un tag gouverné : `sect:btp` → « Secteur · btp ». */
 export function tagLabel(slug: string): string {
   const [namespace, value] = slug.split(':');
   if (value === undefined) return slug;
+  if (namespace === 'rdv') return `Rendez-vous · ${RENDEZ_VOUS_LABELS[value] ?? value}`;
 
   const namespaces: Record<string, string> = {
     sect: 'Secteur',

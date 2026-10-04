@@ -25,8 +25,9 @@ use Illuminate\Support\Str;
  * (`companies.enseigne`) et du SIGLE (`metadata.sigle`, INSEE) : minuscules,
  * accents retirés, mots vides juridiques et articles ôtés (SARL, SAS, SA,
  * EURL, SCI…), au plus 4 mots ; chaque nom donne la forme collée et la forme
- * à tirets ; `.fr` d'abord, `.com` ensuite ; l'ancien domaine deviné est
- * exclu ; AU PLUS `MAX` (6) candidats par fiche. Un candidat n'est retenu QUE
+ * à tirets ; `.fr` d'abord, `.com` ensuite ; l'ancien domaine deviné et
+ * les annuaires d'entreprises (`ANNUAIRES` : societe.com, pappers.fr…) sont
+ * exclus ; AU PLUS `MAX` (6) candidats par fiche. Un candidat n'est retenu QUE
  * par la preuve forte de N6 : le SIREN sur son accueil ou ses mentions
  * légales, page d'ARRIVÉE sur le même domaine (`VerificationSite`). Le nom
  * ne suffit jamais.
@@ -81,6 +82,16 @@ final class CandidatsSite
         'et', 'de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'au', 'aux', 'en', 'a',
     ];
 
+    /**
+     * Annuaires d'entreprises : ils portent le SIREN de tout le monde, ils ne
+     * sont JAMAIS le site d'une fiche (ni leurs sous-domaines). Jamais
+     * candidats, donc jamais acceptés comme site prouvé.
+     */
+    public const ANNUAIRES = [
+        'societe.com', 'pappers.fr', 'verif.com', 'infogreffe.fr', 'manageo.fr',
+        'annuaire-entreprises.data.gouv.fr', 'pagesjaunes.fr',
+    ];
+
     /** Longueur minimale d'une étiquette de domaine candidate (sigle compris). */
     private const ETIQUETTE_MIN = 3;
 
@@ -133,7 +144,7 @@ final class CandidatsSite
                         continue;
                     }
                     $hote = $etiquette . '.' . $ext;
-                    if ($hote === $exclu || in_array($hote, $sortie, true)) {
+                    if ($hote === $exclu || self::estAnnuaire($hote) || in_array($hote, $sortie, true)) {
                         continue;
                     }
                     $sortie[] = $hote;
@@ -145,6 +156,19 @@ final class CandidatsSite
         }
 
         return $sortie;
+    }
+
+    /** L'hôte est-il un annuaire d'entreprises (`ANNUAIRES`, sous-domaines compris) ? */
+    public static function estAnnuaire(string $hote): bool
+    {
+        $hote = rtrim(mb_strtolower(trim($hote)), '.');
+        foreach (self::ANNUAIRES as $annuaire) {
+            if ($hote === $annuaire || str_ends_with($hote, '.' . $annuaire)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

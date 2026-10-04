@@ -34,15 +34,20 @@ use App\Crm\Sites\CurseurTraitement;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Crm\Sites\VerificationSite;
+use App\Models\User;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
 
@@ -441,12 +446,12 @@ test('la commande n est PAS inscrite au calendrier, et partage le verrou de N6',
 // ── 4. Règles pures des candidats ──────────────────────────────────────────
 
 test('candidats : accents, mots vides juridiques, tirets ; .fr puis .com ; avec et sans tiret ; bornés à 6', function () {
-    $d = CandidatsSite::domaines('SARL Les Ateliers Électriques du Nord', 'Élec Nord', 'A.E.N', 'https://zz-ancien.test/', ['fr', 'com']);
+    $d = CandidatsSite::domaines('SARL Les ZZ Ateliers Électriques du Nord', 'ZZ Élec Nord', 'Z.A.E.N', 'https://zz-ancien.test/', ['fr', 'com']);
 
     expect($d)->toHaveCount(CandidatsSite::MAX)
         ->and($d)->toBe([
-            'atelierselectriquesnord.fr', 'ateliers-electriques-nord.fr', 'elecnord.fr', 'elec-nord.fr', 'aen.fr',
-            'atelierselectriquesnord.com',
+            'zzatelierselectriquesnord.fr', 'zz-ateliers-electriques-nord.fr', 'zzelecnord.fr', 'zz-elec-nord.fr', 'zaen.fr',
+            'zzatelierselectriquesnord.com',
         ]);
     // .fr d'abord, puis .com
     $premierCom = array_search(true, array_map(static fn (string $x): bool => str_ends_with($x, '.com'), $d), true);
@@ -462,6 +467,19 @@ test('candidats : l ancien domaine deviné est exclu ; un nom vide ou trop court
         ->and(CandidatsSite::domaines('SAS', null, null, null, ['fr']))->toBe([])
         ->and(CandidatsSite::domaines('', '', 'AB', null, ['fr']))->toBe([])
         ->and(CandidatsSite::domaines(null, null, null, null, ['fr']))->toBe([]);
+});
+
+test('candidats : un annuaire d entreprises (societe.com, pappers.fr…) n est JAMAIS candidat', function () {
+    expect(CandidatsSite::domaines('Pappers', null, null, null, ['fr', 'com']))->toBe(['pappers.com'])
+        ->and(CandidatsSite::domaines('Verif', 'Pages Jaunes', 'MANAGEO', null, ['fr', 'com']))->toBe(['verif.fr', 'pages-jaunes.fr', 'pagesjaunes.com', 'pages-jaunes.com', 'manageo.com'])
+        ->and(CandidatsSite::estAnnuaire('www.societe.com'))->toBeTrue()
+        ->and(CandidatsSite::estAnnuaire('Infogreffe.fr.'))->toBeTrue()
+        ->and(CandidatsSite::estAnnuaire('annuaire-entreprises.data.gouv.fr'))->toBeTrue()
+        ->and(CandidatsSite::estAnnuaire('zz-societe.com'))->toBeFalse()
+        ->and(CandidatsSite::estAnnuaire('data.gouv.fr'))->toBeFalse();
+    foreach (CandidatsSite::ANNUAIRES as $annuaire) {
+        expect(CandidatsSite::estAnnuaire($annuaire))->toBeTrue();
+    }
 });
 
 test('réessais : variantes www / sans www / http, au plus 3 ; échéance de 3 jours, 3 réessais au plus', function () {
@@ -532,4 +550,87 @@ test('quarantaine : une fiche vérifiée par N6 (même site) reste entièrement 
         ->and(QuarantaineSite::siteAncien((string) DB::table('companies')->where('id', $verifiee)->value('metadata')))->toBeNull()
         ->and(QuarantaineSite::adresseFiche(false, 'x@zz-autre.test', 'https://zz-n6.test/', null))->toBeFalse()
         ->and(QuarantaineSite::adresseFiche(true, 'x@zz-n6.test', 'https://zz-n6.test/', null))->toBeTrue();
+});
+
+/** Un propriétaire de l'espace, pour les exports. */
+function cspExportateur(string $espace): User
+{
+    $user = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'csp-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ Exportateur',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $espace, 'first_login_completed_at' => now(),
+    ]);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($espace);
+    $user->assignRole('owner');
+    DB::table('user_workspaces')->insertOrIgnore([
+        'user_id' => $user->id, 'workspace_id' => $espace, 'role_slug' => 'owner', 'invited_at' => now(), 'joined_at' => now(),
+    ]);
+
+    return $user;
+}
+
+function cspCsv(TestResponse $reponse): string
+{
+    ob_start();
+    $reponse->baseResponse->sendContent();
+
+    return (string) ob_get_clean();
+}
+
+test('quarantaine : médias et journalistes de l ANCIEN site restent masqués aux exports ; même domaine que le site prouvé → libérés', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    config(['crm.console_v2' => true]);
+    $id = cspFiche($this->espace, 'zz-autre.test', 'ZZ RADIO FICTIVE', SiteMedia::NON_CONFORME);
+    $media = static fn (string $nom, string $site, string $email): int => (int) DB::table('media')->insertGetId([
+        'workspace_id' => test()->espace, 'company_id' => $id, 'name' => $nom, 'media_type' => 'radio', 'website' => $site,
+        'website_method' => 'guess', 'email' => $email, 'source' => 'naf-extract', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $journaliste = static fn (int $mediaId, string $nom, string $email) => DB::table('journalists')->insert([
+        'workspace_id' => test()->espace, 'media_id' => $mediaId, 'first_name' => 'Zz', 'last_name' => $nom, 'email' => $email,
+        'source' => 'ours', 'opt_out' => false, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    // Ligne `media` au site deviné d'une AUTRE entreprise ; ligne `media` sur le domaine prouvé.
+    $ancien = $media('ZZ RADIO ANCIENNE', 'https://zz-autre.test/', 'redaction@zz-autre.test');
+    $prouve = $media('ZZ RADIO PROUVEE', 'https://www.zzradiofictive.test/', 'redaction@zzradiofictive.test');
+    $journaliste($ancien, 'ZZANCIEN', 'wanda@zz-autre.test');
+    $journaliste($prouve, 'ZZPROUVE', 'yann@zzradiofictive.test');
+
+    cspReseau(['https://zzradiofictive.test/' => cspPage('ZZ Radio', 'SIREN ' . cspSiren($id))]);
+    cspLancer();
+    expect(cspMarqueur($id))->toMatchArray(['statut' => SiteMedia::TROUVE_VERIFIE, 'origine' => CandidatsSite::ORIGINE])
+        ->and(cspSite($id))->toBe('https://zzradiofictive.test/');
+
+    // SQL et mémoire : même verdict.
+    $f = DB::table('companies')->where('id', $id)->first(['website', 'metadata']);
+    $q = static fn (int $m): bool => (bool) DB::selectOne('SELECT ' . QuarantaineSite::mediaSql('m') . ' AS q FROM media m WHERE id = ?', [$m])->q;
+    expect($q($ancien))->toBeTrue()
+        ->and($q($prouve))->toBeFalse()
+        ->and(QuarantaineSite::mediaNonVerifie('guess', $f->metadata, 'https://zz-autre.test/', $f->website))->toBeTrue()
+        ->and(QuarantaineSite::mediaNonVerifie('guess', $f->metadata, 'https://www.zzradiofictive.test/', $f->website))->toBeFalse();
+
+    $this->actingAs(cspExportateur($this->espace));
+    $medias = cspCsv($this->get('/api/v1/media/export')->assertOk());
+    expect($medias)->toContain('ZZ RADIO ANCIENNE')
+        ->and($medias)->not->toContain('redaction@zz-autre.test')
+        ->and($medias)->toContain('redaction@zzradiofictive.test');
+    $journalistes = cspCsv($this->get('/api/v1/journalists/export')->assertOk());
+    expect($journalistes)->toContain('ZZANCIEN')
+        ->and($journalistes)->not->toContain('wanda@zz-autre.test')
+        ->and($journalistes)->toContain('yann@zzradiofictive.test');
+
+    // Rien n'a été effacé ni réécrit.
+    expect(DB::table('media')->where('id', $ancien)->value('email'))->toBe('redaction@zz-autre.test')
+        ->and(DB::table('journalists')->where('media_id', $ancien)->value('email'))->toBe('wanda@zz-autre.test');
+});
+
+test('quarantaine : une ligne media sur une fiche vérifiée par N6 (pas de candidat) reste libérée', function () {
+    $id = cspFiche($this->espace, 'zz-n6-media.test', 'ZZ N6 MEDIA', SiteMedia::VERIFIE);
+    $m = (int) DB::table('media')->insertGetId([
+        'workspace_id' => $this->espace, 'company_id' => $id, 'name' => 'ZZ N6 RADIO', 'media_type' => 'radio', 'website' => 'https://zz-n6-ailleurs.test/',
+        'website_method' => 'guess', 'email' => 'redaction@zz-n6-ailleurs.test', 'source' => 'naf-extract', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $meta = (string) DB::table('companies')->where('id', $id)->value('metadata');
+
+    expect((bool) DB::selectOne('SELECT ' . QuarantaineSite::mediaSql('m') . ' AS q FROM media m WHERE id = ?', [$m])->q)->toBeFalse()
+        ->and(QuarantaineSite::mediaNonVerifie('guess', $meta, 'https://zz-n6-ailleurs.test/', 'https://zz-n6-media.test/'))->toBeFalse()
+        ->and(QuarantaineSite::mediaNonVerifie('guess', '{}', 'https://zz-n6-ailleurs.test/', 'https://zz-n6-media.test/'))->toBeTrue();
 });

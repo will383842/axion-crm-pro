@@ -272,6 +272,25 @@ final class Taxonomy
     ];
 
     /**
+     * TYPES DE RENDEZ-VOUS CLIENT (chantier « Types de rendez-vous »,
+     * 2026-10-04) — valeur du contrat site → CRM (`payload.typeRendezVous` des
+     * événements `calendly_*`) => étiquette gouvernée + libellé affiché.
+     *
+     * Liste FERMÉE : une valeur absente d'ici (dont `autre`, et toute valeur
+     * inconnue) ne pose AUCUNE étiquette et n'est pas refusée — l'événement
+     * passe comme avant. Les rendez-vous apporteurs ne sont jamais envoyés par
+     * le site. Chaque étiquette figure au référentiel `GovernedTagsSeeder`
+     * (garde : `SiteSyncIngestTest`).
+     *
+     * @var array<string, array{tag: string, libelle: string}>
+     */
+    public const RENDEZ_VOUS_TYPES = [
+        'diagnostic' => ['tag' => 'rdv:diagnostic', 'libelle' => 'Diagnostic IA'],
+        'echange_projet' => ['tag' => 'rdv:echange-projet', 'libelle' => 'Échange projet'],
+        'salon' => ['tag' => 'rdv:salon', 'libelle' => 'Salon'],
+    ];
+
+    /**
      * Vocabulaire FERMÉ de la timeline (`activities.kind`).
      *
      * @var list<string>
@@ -563,6 +582,9 @@ final class Taxonomy
         'geo' => 'geo',
         'svc' => 'intent',
         'src' => 'intent',
+        // Type de rendez-vous pris sur le site (chantier « Types de
+        // rendez-vous », 2026-10-04) : liste fermée `RENDEZ_VOUS_TYPES`.
+        'rdv' => 'intent',
         'cand-offre' => 'candidate',
         'cand-b2b' => 'candidate',
         'cand-ia' => 'candidate',

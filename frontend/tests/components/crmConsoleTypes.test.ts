@@ -44,6 +44,12 @@ describe('lexique de la console CRM v2', () => {
     expect(tagLabel('cand-dispo:immediate')).toBe('Dispo · immediate');
   });
 
+  it('traduit les étiquettes de type de rendez-vous en libellés clairs', () => {
+    expect(tagLabel('rdv:diagnostic')).toBe('Rendez-vous · Diagnostic IA');
+    expect(tagLabel('rdv:echange-projet')).toBe('Rendez-vous · Échange projet');
+    expect(tagLabel('rdv:salon')).toBe('Rendez-vous · Salon');
+  });
+
   it('ne casse pas sur un slug sans namespace', () => {
     // La gouvernance impose `namespace:valeur`, mais le stock historique porte
     // des tags nus : l'écran doit les afficher, pas planter.

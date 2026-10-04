@@ -440,11 +440,13 @@ class CompaniesController extends ApiController
                 $site = $c->getAttribute('website');
                 $site = is_string($site) ? $site : null;
                 $nonVerifiee = QuarantaineSite::ficheNonVerifiee(is_string($methode) ? $methode : null, $c->getRawOriginal('metadata'));
+                // Site trouvé par candidat : seul le domaine prouvé est libéré.
+                $ancien = QuarantaineSite::siteAncien($c->getRawOriginal('metadata'));
                 $contacts = $c->contacts
-                    ->map(function ($ct) use ($site, $nonVerifiee) {
+                    ->map(function ($ct) use ($site, $nonVerifiee, $ancien) {
                         $name = trim(($ct->first_name ?? '') . ' ' . ($ct->last_name ?? ''));
                         $email = (string) ($ct->email ?? '');
-                        if (QuarantaineSite::personne($nonVerifiee, $ct->discovery_source, $email, $site)) {
+                        if (QuarantaineSite::personne($nonVerifiee, $ct->discovery_source, $email, $site, $ancien)) {
                             $email = '';
                         }
                         $bits = array_filter([
@@ -477,8 +479,8 @@ class CompaniesController extends ApiController
                     $c->size_category,
                     $c->department_code,
                     $c->city_name,
-                    $nonVerifiee ? null : $c->email_generic,
-                    $this->resolveBestConfidence($c, $confidenceScorer, $nonVerifiee),
+                    QuarantaineSite::adresseFiche($nonVerifiee, (string) $c->email_generic, $site, $ancien) ? null : $c->email_generic,
+                    $this->resolveBestConfidence($c, $confidenceScorer, $nonVerifiee, $ancien),
                     $c->phone,
                     $c->website,
                     $mapsUrl,
@@ -502,17 +504,27 @@ class CompaniesController extends ApiController
      * Site deviné non vérifié (`$nonVerifiee`, lot N5) : la note écrite peut
      * venir d'une adresse en quarantaine (« A » = domaine deviné). On la
      * recalcule sur les SEULES adresses qui sortent, sans site de référence.
+     * Site trouvé par candidat (`$siteAncien`) : même recalcul, le site prouvé
+     * servant de référence.
      */
-    private function resolveBestConfidence(Company $c, EmailConfidenceService $scorer, bool $nonVerifiee = false): ?string
+    private function resolveBestConfidence(Company $c, EmailConfidenceService $scorer, bool $nonVerifiee = false, ?string $siteAncien = null): ?string
     {
-        if ($nonVerifiee) {
+        if ($nonVerifiee || $siteAncien !== null) {
             $best = null;
             foreach ($c->contacts as $ct) {
                 $email = (string) ($ct->email ?? '');
-                if ($email === '' || QuarantaineSite::personne(true, $ct->discovery_source, $email, $c->website)) {
+                if ($email === '' || QuarantaineSite::personne($nonVerifiee, $ct->discovery_source, $email, $c->website, $siteAncien)) {
                     continue;
                 }
-                $conf = $scorer->score($email, null);
+                // Site prouvé par candidat : il sert de référence ; deviné, non.
+                $conf = $scorer->score($email, $nonVerifiee ? null : $c->website);
+                if ($conf !== null && ($best === null || strcmp($conf, $best) < 0)) {
+                    $best = $conf;
+                }
+            }
+            $generique = (string) ($c->email_generic ?? '');
+            if ($generique !== '' && ! QuarantaineSite::adresseFiche($nonVerifiee, $generique, $c->website, $siteAncien)) {
+                $conf = $scorer->score($generique, $c->website);
                 if ($conf !== null && ($best === null || strcmp($conf, $best) < 0)) {
                     $best = $conf;
                 }

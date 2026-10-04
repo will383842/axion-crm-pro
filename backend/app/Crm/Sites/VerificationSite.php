@@ -39,9 +39,10 @@ use Illuminate\Support\Str;
  *
  * ── LA FENÊTRE ───────────────────────────────────────────────────────────
  *
- * Lancement permis du mardi au samedi, de 08:00 à 19:00, heure de PARIS,
- * jamais les 1er, 2 et 3 du mois (`horsFenetre`) ; `--forcer` passe outre
- * pour un essai.
+ * Lancement permis TOUS LES JOURS, dimanche et lundi compris, de 08:00 à
+ * 19:00, heure de PARIS (`horsFenetre` ; décision du 04/10/2026 : les
+ * tâches planifiées lourdes tournent la nuit) ; `--forcer` passe outre pour
+ * un essai.
  */
 final class VerificationSite
 {
@@ -71,12 +72,6 @@ final class VerificationSite
 
     public const HEURE_FIN = '19:00';
 
-    /** Jours ISO permis : mardi (2) → samedi (6). */
-    public const JOURS_PERMIS = [2, 3, 4, 5, 6];
-
-    /** Jours du mois interdits (clôtures, envois du début de mois). */
-    public const QUANTIEMES_INTERDITS = [1, 2, 3];
-
     /** Adresse essayée quand l'accueil ne porte aucun lien de mentions légales. */
     public const CHEMIN_MENTIONS = '/mentions-legales';
 
@@ -90,12 +85,6 @@ final class VerificationSite
     public static function horsFenetre(CarbonInterface $quand): ?string
     {
         $paris = $quand->copy()->setTimezone(self::FUSEAU);
-        if (in_array($paris->day, self::QUANTIEMES_INTERDITS, true)) {
-            return 'jamais les 1er, 2 et 3 du mois';
-        }
-        if (! in_array($paris->dayOfWeekIso, self::JOURS_PERMIS, true)) {
-            return 'du mardi au samedi seulement';
-        }
         $hm = $paris->format('H:i');
         if ($hm < self::HEURE_DEBUT || $hm >= self::HEURE_FIN) {
             return 'de ' . self::HEURE_DEBUT . ' à ' . self::HEURE_FIN . ' (heure de Paris) seulement';

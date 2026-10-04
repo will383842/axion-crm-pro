@@ -20,7 +20,8 @@
  *  - fiches de provenance tiers rafraîchies EN PREMIER ;
  *  - `--dry-run` : bilan chiffré, rien d'écrit ; `--limite` et reprise ;
  *  - le motif `non_diffusible` d'`EligibiliteAdresse` ;
- *  - la planification (mardi→samedi, jamais les 1er/2/3, 08:00-19:00) ;
+ *  - la planification (le 4 du mois, tous les jours de la semaine, reprise
+ *    les jours suivants, 08:00-19:00) ;
  *  - le rejeu sous `axion_app` (RLS forcée).
  */
 
@@ -526,7 +527,7 @@ test('éligibilité : une fiche non diffusible sort de toute campagne (motif non
         ->not->toBe(EligibiliteAdresse::NON_DIFFUSIBLE);
 });
 
-test('planification : mensuelle, mardi→samedi, jamais les 1er/2/3, 08:00-19:00 Paris, sans chevauchement', function () {
+test('planification : mensuelle le 4 (dimanche et lundi compris), reprise les autres jours, 08:00-19:00 Paris, sans chevauchement', function () {
     $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($ev) => str_contains((string) $ev->command, CrmInseeMiseAJourMensuelle::SIGNATURE_PLANIFIEE));
     // La mensuelle et sa reprise les jours suivants (avis R6), sous le MÊME verrou.
@@ -538,7 +539,7 @@ test('planification : mensuelle, mardi→samedi, jamais les 1er/2/3, 08:00-19:00
             ->and($ev->mutexName())->toBe(MiseAJourMensuelle::VERROU);
     }
 
-    // Exactement UN jour par mois, toujours un mardi→samedi, jamais avant le 4.
+    // Exactement UN jour par mois : le 4, quel que soit le jour de la semaine.
     foreach (['2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06'] as $mois) {
         $jours = [];
         $d = CarbonImmutable::parse($mois . '-01 10:00', 'Europe/Paris');
@@ -549,17 +550,28 @@ test('planification : mensuelle, mardi→samedi, jamais les 1er/2/3, 08:00-19:00
             $d = $d->addDay();
         }
         expect($jours)->toHaveCount(1);
-        expect($jours[0]->day)->toBeGreaterThanOrEqual(4)
-            ->and($jours[0]->dayOfWeekIso)->toBeGreaterThanOrEqual(2)
-            ->and($jours[0]->dayOfWeekIso)->toBeLessThanOrEqual(6);
+        expect($jours[0]->day)->toBe(4);
     }
     // Fenêtre horaire : 08:00-19:00 (heure de Paris).
     $jour = CarbonImmutable::parse('2026-11-04 10:00', 'Europe/Paris');
     expect(MiseAJourMensuelle::estJourPlanifie($jour))->toBeTrue()
         ->and(MiseAJourMensuelle::estJourPlanifie($jour->setTime(7, 59)))->toBeFalse()
         ->and(MiseAJourMensuelle::estJourPlanifie($jour->setTime(19, 0)))->toBeFalse()
-        // Le 3 novembre 2026 est un mardi : jamais le 3.
-        ->and(MiseAJourMensuelle::estJourPlanifie(CarbonImmutable::parse('2026-11-03 10:00', 'Europe/Paris')))->toBeFalse();
+        // Le 4 octobre 2026 est un dimanche, le 4 janvier 2027 un lundi : planifiés.
+        ->and(MiseAJourMensuelle::estJourPlanifie(CarbonImmutable::parse('2026-10-04 09:30', 'Europe/Paris')))->toBeTrue()
+        ->and(MiseAJourMensuelle::estJourPlanifie(CarbonImmutable::parse('2027-01-04 09:30', 'Europe/Paris')))->toBeTrue()
+        ->and(MiseAJourMensuelle::estJourPlanifie(CarbonImmutable::parse('2026-11-05 10:00', 'Europe/Paris')))->toBeFalse();
+
+    // Reprise : tous les jours (dimanche et lundi compris), 08:00-19:00, jamais le jour de la mensuelle.
+    expect(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-10-05 09:30', 'Europe/Paris')))->toBeTrue() // lundi 5
+        ->and(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-10-11 09:30', 'Europe/Paris')))->toBeTrue() // dimanche
+        ->and(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-11-02 09:30', 'Europe/Paris')))->toBeTrue() // lundi 2
+        ->and(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-10-04 09:30', 'Europe/Paris')))->toBeFalse() // jour de la mensuelle
+        ->and(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-10-05 07:59', 'Europe/Paris')))->toBeFalse()
+        ->and(MiseAJourMensuelle::estJourDeReprise(CarbonImmutable::parse('2026-10-05 19:00', 'Europe/Paris')))->toBeFalse();
+
+    // Les expressions cron : le 4 à 09:30, et la reprise chaque jour à 09:30.
+    expect($evenements->map(fn ($ev) => $ev->expression)->sort()->values()->all())->toBe(['30 9 * * *', '30 9 4 * *']);
 });
 
 // ── Sous le rôle de production (axion_app, RLS forcée) ──────────────────────
@@ -920,14 +932,15 @@ test('R10 et réserve 5 : un 404 qui n est pas Sirene lève ; une réponse trop 
     expect(fn () => mamPasser($ws))->toThrow(RuntimeException::class, 'trop volumineuse');
 });
 
-test('R6 : la reprise planifiée, jamais les 1er/2/3, jamais le jour de la mensuelle, du mardi au samedi', function () {
+test('R6 : la reprise planifiée, tous les jours (dimanche et lundi compris), jamais le jour de la mensuelle', function () {
     // Novembre 2026 : la mensuelle tombe le mercredi 4.
     $p = static fn (string $d): CarbonImmutable => CarbonImmutable::parse($d, 'Europe/Paris');
     expect(MiseAJourMensuelle::estJourDeReprise($p('2026-11-04 09:30')))->toBeFalse()
         ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-05 09:30')))->toBeTrue()
-        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-03 09:30')))->toBeFalse()
-        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-12-01 09:30')))->toBeFalse()
-        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-09 09:30')))->toBeFalse()
+        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-03 09:30')))->toBeTrue()
+        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-12-01 09:30')))->toBeTrue()
+        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-08 09:30')))->toBeTrue() // dimanche
+        ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-09 09:30')))->toBeTrue() // lundi
         ->and(MiseAJourMensuelle::estJourDeReprise($p('2026-11-05 07:59')))->toBeFalse();
 
     $ws = F::espace('zz-insee-maj');

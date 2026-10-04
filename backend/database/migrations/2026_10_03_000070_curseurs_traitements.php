@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
  * CURSEURS DES TRAITEMENTS PAR LOTS (lot N6, 03/10/2026).
  *
  * `crm:entreprises:verifier-sites` parcourt ≈ 824 000 fiches sur plusieurs
- * jours, par fenêtres (mardi → samedi, 08:00-19:00). Il doit reprendre
+ * jours, par fenêtres (tous les jours, 08:00-19:00). Il doit reprendre
  * EXACTEMENT où il s'est arrêté — arrêt à l'heure, coupure, redémarrage du
  * serveur. Le cache (Redis) peut être vidé ou évincé : le curseur vit donc en
  * base, écrit dans la MÊME transaction que le paquet qu'il clôt (un paquet

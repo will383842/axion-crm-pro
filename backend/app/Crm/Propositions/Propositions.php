@@ -3,6 +3,7 @@
 namespace App\Crm\Propositions;
 
 use App\Crm\FichesProtegees;
+use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\User;
@@ -79,6 +80,45 @@ final class Propositions
 
     /** L'adresse affichée sur un site vérifié (`crm:entreprises:email-site-verifie`). */
     public const ORIGINE_SITE_VERIFIE = 'site-verifie';
+
+    /**
+     * L'annuaire officiel de l'administration (Service-public / DILA, licence
+     * ouverte) — `crm:public:annuaire-officiel`. Ce n'est PAS un tiers : une
+     * source publique OFFICIELLE. Elle n'ouvre une proposition que pour une
+     * valeur EN CONFLIT avec la fiche (`proposerSourceOfficielle`), jamais
+     * par `proposer()`.
+     */
+    public const ORIGINE_ANNUAIRE = 'annuaire-service-public';
+
+    /**
+     * Toutes les origines admises par le CHECK
+     * `propositions_champs_origine_check` : tiers, automatismes du CRM et
+     * sources officielles. Source UNIQUE : les migrations posent l'union de
+     * ce qui est en base et de leur valeur, le test du socle compare à elle.
+     *
+     * @var list<string>
+     */
+    public const ORIGINES_EN_BASE = [...self::ORIGINES, ...self::ORIGINES_AUTOMATISMES, self::ORIGINE_ANNUAIRE];
+
+    /**
+     * Champs que SEULE une source officielle peut proposer, en plus de
+     * `CHAMPS` : l'adresse générique et le site d'une entreprise. Accepter le
+     * site de l'annuaire pose aussi `website_method` = l'origine : un site
+     * officiel n'est pas un site deviné (`SiteFiable`). L'adresse, elle, suit
+     * le circuit normal d'éligibilité (`EligibiliteAdresse`) : rien ne la
+     * marque vérifiée.
+     *
+     * @var array<string, array<string, array<string, string>>>
+     */
+    public const CHAMPS_SOURCES_OFFICIELLES = [
+        self::ORIGINE_ANNUAIRE => [
+            self::ENTREPRISE => [
+                'phone' => 'Téléphone',
+                'email_generic' => 'E-mail générique',
+                'website' => 'Site web',
+            ],
+        ],
+    ];
 
     /** @var list<string> */
     public const STATUTS = ['en_attente', 'acceptee', 'refusee', 'effacee'];
@@ -172,28 +212,13 @@ final class Propositions
 
     public static function libelleChamp(string $entite, string $champ): string
     {
-        return self::CHAMPS[$entite][$champ] ?? self::CHAMPS_AUTOMATISMES[$entite][$champ] ?? $champ;
-    }
-
-    /**
-     * Les colonnes d'une fiche qu'une proposition peut viser (tiers et automatismes).
-     *
-     * @return list<string>
-     */
-    public static function colonnes(string $entite): array
-    {
-        return array_keys((self::CHAMPS[$entite] ?? []) + (self::CHAMPS_AUTOMATISMES[$entite] ?? []));
-    }
-
-    /** Ce champ peut-il être décidé pour une proposition de cette origine ? */
-    private static function champAdmis(string $entite, string $champ, string $origine): bool
-    {
-        if (array_key_exists($champ, self::CHAMPS[$entite] ?? [])) {
-            return true;
+        foreach (self::CHAMPS_SOURCES_OFFICIELLES as $champs) {
+            if (isset($champs[$entite][$champ])) {
+                return $champs[$entite][$champ];
+            }
         }
 
-        return in_array($origine, self::ORIGINES_AUTOMATISMES, true)
-            && array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? []);
+        return self::CHAMPS[$entite][$champ] ?? self::CHAMPS_AUTOMATISMES[$entite][$champ] ?? $champ;
     }
 
     /**
@@ -293,6 +318,106 @@ final class Propositions
             ->where('statut', 'en_attente')
             ->whereRaw('md5(valeur_proposee) = md5(?)', [trim($valeur)])
             ->exists();
+    }
+
+    /**
+     * Le champ peut-il être écrit par l'acceptation d'une proposition de
+     * cette origine ? Trois familles : les champs de tous (`CHAMPS`), ceux
+     * d'une source officielle (`CHAMPS_SOURCES_OFFICIELLES[$origine]`) et
+     * ceux d'un automatisme du CRM (`CHAMPS_AUTOMATISMES`, origine de
+     * `ORIGINES_AUTOMATISMES` seulement).
+     */
+    public static function champAdmis(string $entite, string $champ, string $origine): bool
+    {
+        return array_key_exists($champ, self::CHAMPS[$entite] ?? [])
+            || array_key_exists($champ, self::CHAMPS_SOURCES_OFFICIELLES[$origine][$entite] ?? [])
+            || (in_array($origine, self::ORIGINES_AUTOMATISMES, true)
+                && array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? []));
+    }
+
+    /**
+     * Toutes les colonnes qu'une proposition peut viser pour ce type de fiche
+     * (tiers, automatismes et sources officielles) — l'écran les lit pour
+     * l'empreinte.
+     *
+     * @return list<string>
+     */
+    public static function colonnesProposables(string $entite): array
+    {
+        $colonnes = array_merge(array_keys(self::CHAMPS[$entite] ?? []), array_keys(self::CHAMPS_AUTOMATISMES[$entite] ?? []));
+        foreach (self::CHAMPS_SOURCES_OFFICIELLES as $champs) {
+            $colonnes = array_merge($colonnes, array_keys($champs[$entite] ?? []));
+        }
+
+        return array_values(array_unique($colonnes));
+    }
+
+    /**
+     * Une valeur d'une SOURCE OFFICIELLE (annuaire de l'administration) EN
+     * CONFLIT avec la fiche : jamais écrite, une proposition est ouverte. À
+     * appeler dans la transaction (et le contexte d'espace) de l'appelant.
+     *
+     * Une valeur déjà proposée par la même source pour le même champ — en
+     * attente OU déjà refusée par le propriétaire — n'en ouvre pas une
+     * nouvelle : un refus n'est pas reposé chaque mois.
+     *
+     * @return self::PROPOSEE|self::DEJA_PROPOSEE
+     *
+     * @throws InvalidArgumentException origine ou champ inconnus
+     */
+    public static function proposerSourceOfficielle(
+        string $workspaceId,
+        string $entite,
+        int $entiteId,
+        string $champ,
+        ?string $valeurActuelle,
+        string $valeurProposee,
+        string $origine,
+        ?string $referenceExterne = null,
+    ): string {
+        if (! isset(self::CHAMPS_SOURCES_OFFICIELLES[$origine][$entite][$champ])) {
+            throw new InvalidArgumentException('Champ ou origine officielle inconnus : ' . json_encode([$origine, $entite, $champ]));
+        }
+        $valeurProposee = trim($valeurProposee);
+        if ($valeurProposee === '' || mb_strlen($valeurProposee) > (self::LONGUEURS_MAX_CHAMP[$champ] ?? self::LONGUEUR_MAX)) {
+            throw new InvalidArgumentException("Valeur proposée vide ou trop longue pour {$champ}.");
+        }
+        $actuelle = self::texte($valeurActuelle);
+        if ($actuelle !== null && mb_strlen($actuelle) > self::LONGUEUR_MAX) {
+            $actuelle = mb_substr($actuelle, 0, self::LONGUEUR_MAX);
+        }
+        $reference = $referenceExterne === null || trim($referenceExterne) === '' ? null : mb_substr(trim($referenceExterne), 0, self::LONGUEUR_MAX_REFERENCE);
+
+        $dejaVue = DB::table('propositions_champs')
+            ->where('workspace_id', $workspaceId)
+            ->where('entite', $entite)
+            ->where('entite_id', $entiteId)
+            ->where('champ', $champ)
+            ->where('origine', $origine)
+            ->whereIn('statut', ['en_attente', 'refusee'])
+            ->whereRaw('md5(valeur_proposee) = md5(?)', [$valeurProposee])
+            ->exists();
+        if ($dejaVue) {
+            return self::DEJA_PROPOSEE;
+        }
+
+        $inseree = DB::table('propositions_champs')->insertOrIgnore([
+            'workspace_id' => $workspaceId,
+            'entite' => $entite,
+            'entite_id' => $entiteId,
+            'champ' => $champ,
+            'valeur_actuelle' => $actuelle,
+            'valeur_proposee' => $valeurProposee,
+            'origine' => $origine,
+            'reference_externe' => $reference,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        if ($inseree > 0) {
+            self::oublierApresCommit($workspaceId);
+        }
+
+        return $inseree > 0 ? self::PROPOSEE : self::DEJA_PROPOSEE;
     }
 
     /**
@@ -503,11 +628,35 @@ final class Propositions
                 $origines = self::origines($fiche->field_origins ?? null);
                 $originePrecedente = isset($origines[$champ]) && is_string($origines[$champ]) ? $origines[$champ] : null;
                 $origines[$champ] = (string) $p->origine;
-                DB::table($table)->where('id', (int) $p->entite_id)->update([
+                $maj = [
                     $champ => (string) $p->valeur_proposee,
                     'field_origins' => json_encode($origines, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
                     'updated_at' => now(),
-                ]);
+                ];
+                // Le site d'une source officielle accepté n'est pas un site
+                // deviné : sa méthode le dit (`SiteFiable`, `QuarantaineSite`).
+                // Mais un site rendu fiable sort de quarantaine TOUTES les
+                // adresses de la fiche : refusé tant qu'une adresse tirée de
+                // l'ancien site deviné n'est pas garantie par le nouveau
+                // (relecture #329, défaut 1).
+                if ($champ === 'website' && isset(self::CHAMPS_SOURCES_OFFICIELLES[(string) $p->origine])) {
+                    if (QuarantaineSite::liberationNonGarantie(
+                        (int) $fiche->id,
+                        is_string($fiche->website_method ?? null) ? $fiche->website_method : null,
+                        $fiche->metadata ?? null,
+                        is_string($fiche->email_generic ?? null) ? $fiche->email_generic : null,
+                        $fiche->signals ?? null,
+                        is_string($fiche->website ?? null) ? $fiche->website : null,
+                        (string) $p->valeur_proposee,
+                    )) {
+                        throw new PropositionImpossible(
+                            'La fiche porte des adresses relevées sur son ancien site deviné, hors du domaine du site officiel : '
+                            . 'accepter ce site les rendrait envoyables. Corrigez ou retirez-les d’abord, puis acceptez.',
+                        );
+                    }
+                    $maj['website_method'] = (string) $p->origine;
+                }
+                DB::table($table)->where('id', (int) $p->entite_id)->update($maj);
             }
 
             DB::table('propositions_champs')->where('id', $propositionId)->update([

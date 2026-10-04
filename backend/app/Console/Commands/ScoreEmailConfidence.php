@@ -137,6 +137,8 @@ class ScoreEmailConfidence extends Command
                 ->limit(self::BATCH)
                 ->select(['co.id', 'co.email_generic', 'co.website'])
                 ->selectRaw(self::siteNonVerifieSql())
+                // Site trouvé par candidat : rien de l'ancien site n'est noté.
+                ->selectRaw(QuarantaineSite::siteAncienSql('co') . ' AS site_ancien')
                 ->get();
 
             if ($companies->isEmpty()) {
@@ -162,6 +164,7 @@ class ScoreEmailConfidence extends Command
                         is_string($c->discovery_source) ? $c->discovery_source : null,
                         (string) $c->email,
                         $co->website !== null ? (string) $co->website : null,
+                        $co->site_ancien !== null ? (string) $co->site_ancien : null,
                     )) {
                         continue;
                     }
@@ -172,7 +175,12 @@ class ScoreEmailConfidence extends Command
                 }
                 // La générique d'une fiche au site non vérifié est en
                 // quarantaine (`QuarantaineSite`) : elle ne note pas la fiche.
-                if (! $co->site_non_verifie && $co->email_generic !== null && $co->email_generic !== '') {
+                if ($co->email_generic !== null && $co->email_generic !== '' && ! QuarantaineSite::adresseFiche(
+                    (bool) $co->site_non_verifie,
+                    (string) $co->email_generic,
+                    $co->website !== null ? (string) $co->website : null,
+                    $co->site_ancien !== null ? (string) $co->site_ancien : null,
+                )) {
                     $gc = $scorer->score((string) $co->email_generic, self::siteDeReference($co));
                     if ($gc !== null) {
                         $ranks[] = $this->rank($gc);

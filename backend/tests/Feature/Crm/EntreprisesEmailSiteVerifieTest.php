@@ -26,6 +26,7 @@
 
 use App\Crm\Presse\SiteMedia;
 use App\Crm\Propositions\Propositions;
+use App\Crm\Scraping\EmailMxValidator;
 use App\Crm\Sites\CurseurTraitement;
 use App\Crm\Sites\EmailSiteVerifie;
 use App\Crm\Sites\SiteFiable;
@@ -178,6 +179,30 @@ test('jugement : autre domaine, noreply, exemple, image rejetés ; générique /
         ->and(EmailSiteVerifie::juger('logo@2x.png', $site))->toBe([null, EmailSiteVerifie::MOTIF_IMAGE]);
 });
 
+test('générique SEULEMENT si le mot est seul ou suivi de chiffres : un mot + un nom est nominatif', function () {
+    $site = 'https://zz-acme.example/';
+
+    foreach (['contact', 'rh', 'rh2', 'compta', 'commercial', 'accueil01', 'formation', 'info'] as $local) {
+        expect(EmailSiteVerifie::type("{$local}@zz-acme.example"))->toBe(EmailSiteVerifie::GENERIQUE, $local);
+    }
+    foreach (['rh.marie.durand', 'compta.jdupont', 'commercial.pierre', 'contact.jean.dupont', 'agence.martin', 'info-lucie', 'rh_zzpaul', 'contactzz', 'rh2.marie'] as $local) {
+        expect(EmailSiteVerifie::type("{$local}@zz-acme.example"))->toBe(EmailSiteVerifie::NOMINATIF, $local);
+    }
+    expect(EmailSiteVerifie::juger('rh.marie.durand@zz-acme.example', $site))->toBe([EmailSiteVerifie::NOMINATIF, null]);
+});
+
+test('plateformes partagées : aucune adresse n y est « du site »', function () {
+    expect(EmailSiteVerifie::estPlateforme('https://www.facebook.com/zz-acme'))->toBeTrue()
+        ->and(EmailSiteVerifie::estPlateforme('https://sites.google.com/view/zz-acme'))->toBeTrue()
+        ->and(EmailSiteVerifie::estPlateforme('https://zz-acme.wixsite.com/site'))->toBeTrue()
+        ->and(EmailSiteVerifie::estPlateforme('https://fr.linkedin.com/company/zz'))->toBeTrue()
+        ->and(EmailSiteVerifie::estPlateforme('https://www.pagesjaunes.fr/pros/zz'))->toBeTrue()
+        ->and(EmailSiteVerifie::estPlateforme('https://zz-acme.example/'))->toBeFalse()
+        ->and(EmailSiteVerifie::estPlateforme('https://zzfacebook.com/'))->toBeFalse()
+        ->and(EmailSiteVerifie::juger('contact@facebook.com', 'https://www.facebook.com/zz-acme'))->toBe([null, EmailSiteVerifie::MOTIF_AUTRE_DOMAINE])
+        ->and(EmailSiteVerifie::juger('contact@google.com', 'https://sites.google.com/view/zz'))->toBe([null, EmailSiteVerifie::MOTIF_AUTRE_DOMAINE]);
+});
+
 test('préférence : contact@ avant les autres génériques, ordre d apparition sinon', function () {
     expect(EmailSiteVerifie::preferee(['direction@zz.example', 'contact@zz.example', 'info@zz.example']))->toBe('contact@zz.example')
         ->and(EmailSiteVerifie::preferee(['formation@zz.example', 'rh@zz.example']))->toBe('formation@zz.example')
@@ -281,6 +306,88 @@ test('générique préférée à la nominative ; une nominative seule n est jama
     expect(eesvEmail($mixte))->toBe('accueil@zz-mixte.example')
         ->and(eesvEmail($nominative))->toBeNull()
         ->and(DB::table('contacts')->count())->toBe(0);
+});
+
+test('un mot générique suivi d un nom (rh.marie.durand@) est NOMINATIF : compté, jamais écrit', function () {
+    $id = eesvFiche($this->espace, 'zz-prefixe.example', 'ZZ PREFIXE FICTIF');
+    eesvReseau([
+        'https://zz-prefixe.example/' => eesvAccueil(),
+        'https://zz-prefixe.example/mentions-legales' => eesvPage('Mentions légales', 'RH : rh.marie.zzdurand@zz-prefixe.example — Compta : compta.jzzdupont@zz-prefixe.example'),
+        'https://zz-prefixe.example/contact' => eesvPage('Contact', 'Commercial : commercial.pierre@zz-prefixe.example'),
+    ]);
+
+    $r = eesvLancer();
+
+    expect(eesvEmail($id))->toBeNull()
+        ->and(eesvPropositions())->toBe(0)
+        ->and($r['sortie'])->toMatch('/nominatives trouvées \(jamais écrites\)\s*\|\s*3/')
+        ->and($r['sortie'])->toMatch('/génériques trouvées\s*\|\s*0/');
+});
+
+test('site sur une plateforme partagée : fiche ignorée, aucune requête', function () {
+    $id = F::fiche($this->espace, 'ZZ PLATEFORME FICTIVE', [
+        'website' => 'https://sites.google.com/view/zz-plateforme', 'website_method' => null,
+    ]);
+    $requetes = 0;
+    eesvReseau([
+        'https://sites.google.com/view/zz-plateforme' => eesvPage('Accueil', 'contact@google.com'),
+    ], espion: function () use (&$requetes) {
+        $requetes++;
+    });
+
+    $r = eesvLancer();
+
+    expect(eesvEmail($id))->toBeNull()
+        ->and($requetes)->toBe(0)
+        ->and($r['sortie'])->toMatch('/ignorées \(site sur une plateforme partagée\)\s*\|\s*1/');
+});
+
+test('la vérification MX est faite HORS de la transaction d écriture', function () {
+    $id = eesvFiche($this->espace, 'zz-mx.example', 'ZZ MX FICTIF');
+    eesvReseau([
+        'https://zz-mx.example/' => eesvAccueil(),
+        'https://zz-mx.example/mentions-legales' => eesvPage('Mentions légales', 'contact@zz-mx.example'),
+    ]);
+    $base = DB::transactionLevel();
+    $niveaux = new ArrayObject;
+    app()->instance(EmailMxValidator::class, new class($niveaux) extends EmailMxValidator
+    {
+        public function __construct(private readonly ArrayObject $niveaux) {}
+
+        public function isDeliverable(string $email): bool
+        {
+            $this->niveaux->append(DB::transactionLevel());
+
+            return true;
+        }
+    });
+
+    eesvLancer();
+
+    expect(eesvEmail($id))->toBe('contact@zz-mx.example')
+        ->and($niveaux->getArrayCopy())->not->toBeEmpty()
+        ->and(array_values(array_unique($niveaux->getArrayCopy())))->toBe([$base]);
+});
+
+test('la migration site-verifie pose l UNION du CHECK en place : rien n est retiré', function () {
+    $def = (string) DB::selectOne(
+        "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",
+    )->d;
+    preg_match_all("/'([a-z][a-z0-9_-]{0,63})'/", $def, $m);
+    $origines = array_values(array_diff(array_unique(array_merge($m[1], ['zz-autre'])), ['site-verifie']));
+    DB::statement('ALTER TABLE propositions_champs DROP CONSTRAINT propositions_champs_origine_check');
+    DB::statement('ALTER TABLE propositions_champs ADD CONSTRAINT propositions_champs_origine_check CHECK (origine IN ('
+        . implode(', ', array_map(static fn (string $o): string => "'{$o}'", $origines)) . '))');
+
+    (require database_path('migrations/2026_10_08_000010_propositions_origine_site_verifie.php'))->up();
+
+    $apres = (string) DB::selectOne(
+        "SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conname = 'propositions_champs_origine_check'",
+    )->d;
+    expect($apres)->toContain("'zz-autre'")->and($apres)->toContain("'site-verifie'")->and($apres)->toContain("'annuaire-service-public'");
+    foreach (Propositions::ORIGINES_EN_BASE as $origine) {
+        expect($apres)->toContain("'{$origine}'");
+    }
 });
 
 test('valeur manuelle jamais écrasée : conflit → proposition ; champ déclaré vide → proposition', function () {

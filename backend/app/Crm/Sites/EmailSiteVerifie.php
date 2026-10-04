@@ -4,6 +4,7 @@ namespace App\Crm\Sites;
 
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Presse\LecturePageAccueil;
+use App\Services\Email\MxEmailValidator;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -41,11 +42,19 @@ use InvalidArgumentException;
  * contact commercial).
  *
  * GÉNÉRIQUE (contact@, info@, accueil@, direction@, rh@, formation@…) ou
- * NOMINATIVE (tout le reste : dans le doute, on protège — même règle que
- * `QualificationEmail::type`, complétée de quelques boîtes de service
- * courantes sur les sites). La générique est préférée (`preferee`). Une
- * NOMINATIVE n'est JAMAIS écrite dans `email_generic` : elle suit les règles
- * des personnes, qu'aucun automatisme ne contourne.
+ * NOMINATIVE (tout le reste : dans le doute, on protège). Les mots de
+ * `QualificationEmail`, complétés de quelques boîtes de service courantes
+ * sur les sites, mais PLUS STRICTS que `QualificationEmail::type` : le mot
+ * doit être SEUL, ou suivi uniquement de chiffres (`contact@`, `rh2@`).
+ * `rh.marie.durand@`, `compta.jdupont@`, `commercial.pierre@` désignent une
+ * personne : NOMINATIVES (relecture #328, remarque 2). La générique est
+ * préférée (`preferee`). Une NOMINATIVE n'est JAMAIS écrite dans
+ * `email_generic` : elle est comptée, et suit les règles des personnes,
+ * qu'aucun automatisme ne contourne.
+ *
+ * Un site hébergé sur une PLATEFORME partagée (réseau social, constructeur
+ * de sites, annuaire : `HOTES_PLATEFORMES`) n'est pas le domaine de
+ * l'entreprise : aucune adresse n'y est « du site » (`estPlateforme`).
  */
 final class EmailSiteVerifie
 {
@@ -102,6 +111,22 @@ final class EmailSiteVerifie
         'rh', 'recrutement', 'emploi', 'commercial', 'commerciale', 'devis', 'compta', 'comptabilite', 'facturation',
         'factures', 'sav', 'commande', 'commandes', 'reservation', 'reservations', 'agence', 'magasin', 'boutique',
         'atelier', 'cabinet', 'etude', 'gestion', 'qualite', 'vente', 'ventes', 'export', 'boite', 'equipe',
+    ];
+
+    /**
+     * Hôtes de PLATEFORMES partagées (relecture #328, remarque 5) : un site
+     * « fiable » sur l'un d'eux ou un de ses sous-domaines (`xxx.wixsite.com`)
+     * n'est pas celui de l'entreprise — `contact@facebook.com` n'en est pas
+     * l'adresse. La fiche est ignorée, aucune page n'est demandée.
+     *
+     * @var list<string>
+     */
+    public const HOTES_PLATEFORMES = [
+        'facebook.com', 'fb.com', 'm.facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com',
+        'youtube.com', 'tiktok.com', 'pinterest.com', 'sites.google.com', 'google.com', 'business.site',
+        'wixsite.com', 'wix.com', 'weebly.com', 'jimdo.com', 'jimdosite.com', 'webnode.fr', 'webnode.com',
+        'wordpress.com', 'blogspot.com', 'over-blog.com', 'e-monsite.com', 'site-solocal.com', 'squarespace.com',
+        'pagesjaunes.fr', 'societe.com', 'doctolib.fr', 'tripadvisor.fr', 'tripadvisor.com', 'yelp.fr', 'linktr.ee',
     ];
 
     /** Ordre de préférence entre génériques (les autres suivent, dans l'ordre d'apparition). */
@@ -218,27 +243,63 @@ final class EmailSiteVerifie
         return [self::type($email), null];
     }
 
-    /** Le domaine de l'adresse est celui du site (sans `www.`) ou un de ses sous-domaines. */
+    /**
+     * Le domaine de l'adresse est celui du site (sans `www.`) ou un de ses
+     * sous-domaines — jamais pour un site sur une plateforme partagée.
+     */
     public static function surLeSite(string $domaineEmail, string $site): bool
     {
         $ds = QuarantaineSite::domaineSite($site);
         $de = strtolower(rtrim($domaineEmail, '.'));
 
-        return $ds !== '' && $de !== '' && ($de === $ds || str_ends_with($de, '.' . $ds));
+        return $ds !== '' && $de !== '' && ! self::estPlateforme($site) && ($de === $ds || str_ends_with($de, '.' . $ds));
     }
 
-    /** `GENERIQUE` ou `NOMINATIF` : la règle de `QualificationEmail`, complétée de `MOTS_GENERIQUES_SITE`. */
+    /** Le site est-il hébergé sur une plateforme partagée (`HOTES_PLATEFORMES`, sous-domaines compris) ? */
+    public static function estPlateforme(string $site): bool
+    {
+        $ds = rtrim(QuarantaineSite::domaineSite($site), '.');
+        if ($ds === '') {
+            return false;
+        }
+        foreach (self::HOTES_PLATEFORMES as $hote) {
+            if ($ds === $hote || str_ends_with($ds, '.' . $hote)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * `GENERIQUE` ou `NOMINATIF`. Générique SEULEMENT si la partie locale est
+     * un mot générique (`QualificationEmail`, `MxEmailValidator::ROLE_PREFIXES`,
+     * `MOTS_GENERIQUES_SITE`) SEUL ou suivi uniquement de chiffres :
+     * `^(mot)[0-9]*@`. Tout le reste est nominatif.
+     */
     public static function type(string $email): string
     {
-        if (QualificationEmail::type($email) === 'generique') {
-            return self::GENERIQUE;
-        }
         $email = QualificationEmail::normaliser($email);
         $at = strrpos($email, '@');
         $local = $at === false ? $email : substr($email, 0, $at);
-        $mots = implode('|', array_map(static fn (string $m): string => preg_quote($m, '/'), self::MOTS_GENERIQUES_SITE));
 
-        return preg_match('/^(?:' . $mots . ')(?:$|[0-9._+-])/', $local) === 1 ? self::GENERIQUE : self::NOMINATIF;
+        return preg_match(self::motifGenerique(), $local) === 1 ? self::GENERIQUE : self::NOMINATIF;
+    }
+
+    private static function motifGenerique(): string
+    {
+        static $motif = null;
+        if ($motif === null) {
+            $mots = array_values(array_unique(array_merge(
+                QualificationEmail::MOTS_GENERIQUES_FEDERATIONS,
+                MxEmailValidator::ROLE_PREFIXES,
+                self::MOTS_GENERIQUES_SITE,
+            )));
+            usort($mots, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+            $motif = '/^(?:' . implode('|', array_map(static fn (string $m): string => preg_quote($m, '/'), $mots)) . ')[0-9]*$/';
+        }
+
+        return $motif;
     }
 
     /**

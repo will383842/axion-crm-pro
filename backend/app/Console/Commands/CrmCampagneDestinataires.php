@@ -370,6 +370,8 @@ class CrmCampagneDestinataires extends Command
             // Quarantaine (lot N5, `QuarantaineSite`) : une expression de la
             // liste de sélection sur les fiches du segment, pas une condition.
             ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
+            // Site trouvé par candidat : l'ancien site deviné (rien n'en est libéré).
+            ->selectRaw(QuarantaineSite::siteAncienSql('companies') . ' AS site_ancien')
             // Segment presse : ce qui juge la provenance des adresses de la
             // fiche (`AdressePresseFiable`), et le « média possible ».
             ->when($presse, static fn ($q) => $q->selectRaw(
@@ -434,6 +436,7 @@ class CrmCampagneDestinataires extends Command
         // provenance (`AdressePresseFiable`).
         $nonVerifiee = ! $presse && (bool) ($org->site_non_verifie ?? false);
         $site = is_string($org->website ?? null) ? $org->website : null;
+        $ancien = ! $presse && is_string($org->site_ancien ?? null) ? $org->site_ancien : null;
         $fiche = $presse ? [
             'site_devine' => (bool) $org->site_devine,
             'site_verifie' => (bool) $org->site_verifie,
@@ -458,7 +461,7 @@ class CrmCampagneDestinataires extends Command
                 'deja_informe' => $org->first_info_at !== null,
                 'entreprise_individuelle' => $ei,
                 'non_diffusible' => $nd,
-                'site_non_verifie' => $nonVerifiee,
+                'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, (string) $org->email_generic, $site, $ancien),
                 // Une boîte d'organisation n'est pas une personne apportée.
                 'information_tiers_insuffisante' => false,
             ];
@@ -517,6 +520,7 @@ class CrmCampagneDestinataires extends Command
                     is_string($c->discovery_source ?? null) ? $c->discovery_source : null,
                     (string) $c->email,
                     $site,
+                    $ancien,
                 ),
                 'information_tiers_insuffisante' => (bool) $c->information_tiers_insuffisante,
             ];

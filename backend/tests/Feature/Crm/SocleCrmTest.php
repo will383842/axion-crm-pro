@@ -1,5 +1,6 @@
 <?php
 
+use App\Crm\Propositions\Propositions;
 use App\Crm\Taxonomy;
 use App\Models\Candidate;
 use Database\Seeders\GovernedTagsSeeder;
@@ -121,8 +122,9 @@ test('les CHECK en base correspondent exactement à App\\Crm\\Taxonomy', functio
     // N12 (03/10/2026) : le vocabulaire du contrat Axion Partners.
     socleExpectCheck('contacts_provenances_tiers_origine_check', Taxonomy::FIELD_ORIGINS_TIERS);
     // N13 (03/10/2026) : les propositions venues d'un tiers, même vocabulaire,
-    // et celles d'un automatisme du CRM (`site-verifie`, 04/10/2026).
-    socleExpectCheck('propositions_champs_origine_check', array_merge(Taxonomy::FIELD_ORIGINS_TIERS, Taxonomy::FIELD_ORIGINS_AUTOMATISMES));
+    // et celles d'un automatisme du CRM (`site-verifie`) et de l'annuaire
+    // officiel de l'administration (04/10/2026) : une seule source de vérité.
+    socleExpectCheck('propositions_champs_origine_check', Propositions::ORIGINES_EN_BASE);
     // Base presse (2026-08-25). `acces` commande QUI peut recevoir un mailing :
     // une divergence entre le code et le CHECK laisserait passer une porte
     // d'accès que la règle d'envoi ne connaît pas.

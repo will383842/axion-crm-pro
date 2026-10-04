@@ -695,11 +695,50 @@ final class SiteSyncIngestService
 
     private function activityTitle(SiteSyncEvent $event): string
     {
+        $rendezVous = $this->rendezVousTitle($event);
+        if ($rendezVous !== null) {
+            return $rendezVous;
+        }
+
         return match ($event->eventType) {
             'form_submission' => 'Formulaire — ' . (string) $event->formType,
             'application_submitted' => 'Candidature — ' . ($event->str('candidate', 'offer_slug') ?? 'spontanée'),
             default => str_replace('_', ' ', $event->eventType),
         };
+    }
+
+    /**
+     * Titre LISIBLE d'un rendez-vous dont le site a précisé le type ou le
+     * besoin (2026-10-04) : « Rendez-vous pris — Diagnostic IA · Besoin :
+     * audit ». C'est le titre que la console affiche dans l'historique de la
+     * fiche (personne, timeline 360°). Sans aucun des deux champs : null, et
+     * le titre reste celui d'avant (« calendly booked »).
+     */
+    private function rendezVousTitle(SiteSyncEvent $event): ?string
+    {
+        $type = $this->classifier->typeRendezVous($event);
+        $besoin = $this->classifier->besoinRendezVous($event);
+        if ($type === null && $besoin === null) {
+            return null;
+        }
+
+        $parts = [];
+        if ($type !== null) {
+            $parts[] = Taxonomy::RENDEZ_VOUS_TYPES[$type]['libelle'];
+        }
+        if ($besoin !== null) {
+            $parts[] = 'Besoin : ' . $besoin;
+        }
+
+        $base = match ($event->eventType) {
+            'calendly_booked' => 'Rendez-vous pris',
+            'calendly_completed' => 'Rendez-vous honoré',
+            'calendly_canceled' => 'Rendez-vous annulé',
+            'calendly_no_show' => 'Rendez-vous non honoré',
+            default => 'Rendez-vous',
+        };
+
+        return $base . ' — ' . implode(' · ', $parts);
     }
 
     // ── Utilitaires ─────────────────────────────────────────────────────────

@@ -121,6 +121,8 @@ final class SemeurTablesScopees
         'health_practitioners',
         // 2026-10-03 (lot N8) : journal des passages de la mise à jour INSEE.
         'insee_mises_a_jour',
+        // 2026-10-06 : journal des passages de `crm:insee:importer-familles`.
+        'insee_imports_familles',
         'invitations',
         'journalists',
         'linkedin_invitations',
@@ -636,6 +638,11 @@ final class SemeurTablesScopees
 
         $inserer('insee_mises_a_jour', [
             'depuis' => '2026-07-06',
+        ]);
+
+        $inserer('insee_imports_familles', [
+            'famille' => '7',
+            'lot' => 'zz-etancheite',
         ]);
 
         $inserer('strategic_keywords', [

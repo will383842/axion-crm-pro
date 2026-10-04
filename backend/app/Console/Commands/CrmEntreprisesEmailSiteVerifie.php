@@ -116,6 +116,7 @@ class CrmEntreprisesEmailSiteVerifie extends Command
         'robots' => 'pages ignorées (robots.txt)',
         'injoignables' => 'pages injoignables',
         'marqueur_autre_site' => 'ignorées (marqueur d\'un autre site)',
+        'plateformes' => 'ignorées (site sur une plateforme partagée)',
         'ecartes' => 'écartées (fiche modifiée pendant la lecture)',
         'erreurs' => 'erreurs',
         'paquets' => 'paquets validés',
@@ -304,6 +305,14 @@ class CrmEntreprisesEmailSiteVerifie extends Command
 
                 continue;
             }
+            // Un réseau social, un constructeur de sites, un annuaire : pas
+            // le domaine de l'entreprise, aucune page n'est demandée.
+            if (EmailSiteVerifie::estPlateforme($f->cible)) {
+                $this->compter($delta, 'plateformes');
+                $f->ignoree = true;
+
+                continue;
+            }
             $aLire[] = $f->cible;
         }
         $accueils = $this->lire($aLire, $lecteur);
@@ -349,18 +358,35 @@ class CrmEntreprisesEmailSiteVerifie extends Command
             unset($lus);
         }
 
-        // 3. Décider puis écrire, dans UNE transaction par paquet, avec le
-        // curseur. À blanc : aucune écriture ni transaction.
+        // 3. Choisir l'adresse de chaque fiche (opposition, MX : DNS) HORS
+        // transaction : aucun verrou n'est tenu pendant une attente réseau.
+        foreach ($fiches as $f) {
+            $f->choisie = null;
+            if ($f->ignoree) {
+                continue;
+            }
+            try {
+                $f->choisie = $this->choisir($f, $delta);
+            } catch (Throwable $e) {
+                Log::warning('crm:entreprises:email-site-verifie choix en erreur', ['fiche' => (int) $f->id, 'exception' => $e::class]);
+                $this->compter($delta, 'erreurs');
+                $f->ignoree = true;
+            }
+        }
+
+        // 4. Écrire, dans UNE transaction par paquet, avec le curseur : rien
+        // d'autre que des lectures-écritures en base. À blanc : aucune
+        // écriture ni transaction.
         if (! $dryRun) {
             DB::beginTransaction();
         }
         try {
             foreach ($fiches as $f) {
-                if ($f->ignoree) {
+                if ($f->ignoree || $f->choisie === null) {
                     continue;
                 }
                 try {
-                    $this->decider($f, $delta, $dryRun);
+                    $this->decider($f, $f->choisie, $delta, $dryRun);
                 } catch (Throwable $e) {
                     Log::warning('crm:entreprises:email-site-verifie écriture en erreur', ['fiche' => (int) $f->id, 'exception' => $e::class]);
                     $this->compter($delta, 'erreurs');
@@ -442,8 +468,14 @@ class CrmEntreprisesEmailSiteVerifie extends Command
         }
     }
 
-    /** @param  array<string, int>  $delta */
-    private function decider(stdClass $f, array &$delta, bool $dryRun): void
+    /**
+     * La générique retenue pour la fiche — par ordre de préférence, la
+     * première ni opposée ni sans courrier — ou null. Appelée HORS
+     * transaction : la vérification MX interroge le DNS.
+     *
+     * @param  array<string, int>  $delta
+     */
+    private function choisir(stdClass $f, array &$delta): ?string
     {
         $generiques = [];
         foreach ($f->adresses as $email => $a) {
@@ -466,9 +498,19 @@ class CrmEntreprisesEmailSiteVerifie extends Command
         }
         if ($choisie === null) {
             $this->compter($delta, 'sans_generique');
-
-            return;
         }
+
+        return $choisie;
+    }
+
+    /**
+     * Écrit l'adresse retenue (champ vide) ou ouvre une proposition (conflit).
+     * Appelée dans la transaction du paquet : aucun appel réseau.
+     *
+     * @param  array<string, int>  $delta
+     */
+    private function decider(stdClass $f, string $choisie, array &$delta, bool $dryRun): void
+    {
         $page = (string) $f->adresses[$choisie]['url'];
         $actuelle = trim((string) ($f->email_generic ?? ''));
 

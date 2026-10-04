@@ -1289,14 +1289,16 @@ class AudienceBuilderService
             // Miroir de `buildPositive()` (même règle : `QuarantaineSite`,
             // puis le motif tiers de `ProvenanceTiers`).
             $nonVerifiee = QuarantaineSite::ficheNonVerifiee($company->website_method, $company->getRawOriginal('metadata'));
-            $joignable = trim((string) $company->email_generic) !== '' && ! $nonVerifiee;
+            $ancien = QuarantaineSite::siteAncien($company->getRawOriginal('metadata'));
+            $joignable = trim((string) $company->email_generic) !== ''
+                && ! QuarantaineSite::adresseFiche($nonVerifiee, (string) $company->email_generic, $company->website, $ancien);
             if (! $joignable) {
                 foreach ($company->contacts()->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
                     ->whereNotNull('email')->select(['email', 'discovery_source'])
                     ->selectRaw(ProvenanceTiers::informationInsuffisanteSql('contacts') . ' AS information_tiers_insuffisante')
                     ->get() as $c) {
                     $source = is_string($c->discovery_source) ? $c->discovery_source : null;
-                    if (! QuarantaineSite::personne($nonVerifiee, $source, (string) $c->email, $company->website)
+                    if (! QuarantaineSite::personne($nonVerifiee, $source, (string) $c->email, $company->website, $ancien)
                         && ! (bool) $c->getAttribute('information_tiers_insuffisante')) {
                         $joignable = true;
                         break;

@@ -39,13 +39,25 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-/** Les `signals` d'une fiche dont la boîte générique est vérifiée VALIDE. */
-function fevSignals(string $email): string
+/**
+ * Les `signals` d'une fiche dont la boîte générique est vérifiée VALIDE, avec
+ * en option un CANAL typé « générique » (autre adresse de la fiche, #255),
+ * vérifié VALIDE lui aussi.
+ */
+function fevSignals(string $email, ?string $canal = null): string
 {
-    return (string) json_encode(['email_generic_verification' => [
+    $signals = ['email_generic_verification' => [
         'statut' => VerificationEmail::VALIDE, 'motif' => 'mx', 'verifie_par' => VerificationEmail::SOURCE,
         'empreinte' => VerificationEmail::empreinte(mb_strtolower(trim($email))), 'type' => 'generique',
-    ]]);
+    ]];
+    if ($canal !== null) {
+        $signals['contact_channels'] = ['details' => [$canal => [
+            'type' => 'generique', 'statut' => VerificationEmail::VALIDE, 'motif' => 'mx', 'verifie_par' => VerificationEmail::SOURCE,
+            'empreinte' => VerificationEmail::empreinte(mb_strtolower(trim($canal))),
+        ]]];
+    }
+
+    return (string) json_encode($signals);
 }
 
 /** Les `metadata` d'une personne dont l'adresse est vérifiée VALIDE. */
@@ -92,7 +104,7 @@ test('la règle : le motif entreprise_fermee, sa place dans l ordre des motifs',
         ->and($motif([]))->toBeNull();
 });
 
-test('aperçu d une audience : la fermée et sa personne sont exclues (entreprise_fermee), l ouverte identique part', function () {
+test('aperçu d une audience : la fermée, son canal et sa personne sont exclus (entreprise_fermee), l ouverte identique part', function () {
     $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
     $ws = F::espace('zz-fev-apercu');
     $cible = F::tag($ws, 'zz-cible-fev');
@@ -100,8 +112,10 @@ test('aperçu d une audience : la fermée et sa personne sont exclues (entrepris
     foreach (['ouverte' => [], 'fermee' => fevFermee()] as $cle => $insee) {
         $generique = 'contact@zz-fev-' . $cle . '.example.invalid';
         $personne = 'zoe@zz-fev-' . $cle . '.example.invalid';
+        // Un CANAL : une autre adresse de la fiche (chemin propre du résolveur).
+        $canal = 'accueil@zz-fev-' . $cle . '.example.invalid';
         $ids[$cle] = F::fiche($ws, 'ZZ FEV ' . strtoupper($cle), $insee + [
-            'legal_form' => '5710', 'email_generic' => $generique, 'signals' => fevSignals($generique),
+            'legal_form' => '5710', 'email_generic' => $generique, 'signals' => fevSignals($generique, $canal),
         ]);
         F::lier($ws, $ids[$cle], $cible);
         F::contact($ws, $ids[$cle], 'Zoe', 'ZZFEV', ['email' => $personne, 'metadata' => fevMetaPersonne($personne)]);
@@ -115,8 +129,12 @@ test('aperçu d une audience : la fermée et sa personne sont exclues (entrepris
     );
 
     $adresses = collect($r['lignes'])->pluck('email')->sort()->values()->all();
-    expect($adresses)->toBe(['contact@zz-fev-ouverte.example.invalid', 'zoe@zz-fev-ouverte.example.invalid'])
-        ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(2)
+    // Générique, canal ET personne : l'ouverte les envoie (témoin des trois
+    // chemins), la fermée aucun.
+    expect($adresses)->toBe([
+        'accueil@zz-fev-ouverte.example.invalid', 'contact@zz-fev-ouverte.example.invalid', 'zoe@zz-fev-ouverte.example.invalid',
+    ])
+        ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(3)
         ->and($r['organisations'])->toBe(2)
         ->and($r['organisations_sans_destinataire'])->toBe(1);
 
@@ -125,12 +143,15 @@ test('aperçu d une audience : la fermée et sa personne sont exclues (entrepris
     expect($ligne->deleted_at)->toBeNull()->and((string) $ligne->insee_ferme_le)->toStartWith('2026-09-15');
 });
 
-test('liste en fichier : la fermée est comptée dans ecartees_entreprise_fermee, l ouverte part', function () {
+test('liste en fichier : la fermée et sa personne sont écartées (ecartees_entreprise_fermee), l ouverte part', function () {
     $ws = F::espace('zz-fev-liste');
     config(['crm.ingest.business_workspace' => F::slug($ws)]);
     foreach ([['ZZ FEV Ouverte', [], 'bureau@zz-fev-ouverte.example.invalid'], ['ZZ FEV Fermee', fevFermee(), 'bureau@zz-fev-fermee.example.invalid']] as [$nom, $insee, $email]) {
         $id = F::fiche($ws, $nom, $insee + ['legal_form' => '5710', 'email_generic' => $email]);
         F::proteger($ws, $id, FichesProtegees::TAG_ORGANISATEURS);
+        // Une PERSONNE de la fiche (chemin propre des contacts), vérifiée par
+        // `toutVerifier()` comme la boîte générique.
+        F::contact($ws, $id, 'Zoe', 'ZZFEV', ['email' => str_replace('bureau@', 'zoe@', $email)]);
     }
 
     ResolveurDnsSimule::toutVerifier();
@@ -146,8 +167,11 @@ test('liste en fichier : la fermée est comptée dans ecartees_entreprise_fermee
         @unlink($fichier);
     }
 
-    expect($emails)->toBe(['bureau@zz-fev-ouverte.example.invalid'])
-        ->and(F::compteur($sortie, 'ecartees_entreprise_fermee'))->toBe(1)
+    sort($emails);
+    // La boîte ET la personne de l'ouverte partent (témoin des deux chemins) ;
+    // rien de la fermée.
+    expect($emails)->toBe(['bureau@zz-fev-ouverte.example.invalid', 'zoe@zz-fev-ouverte.example.invalid'])
+        ->and(F::compteur($sortie, 'ecartees_entreprise_fermee'))->toBe(2)
         ->and(F::compteur($sortie, 'ecartees_entreprise_individuelle'))->toBe(0);
 });
 
@@ -214,8 +238,10 @@ function fevNettoyer(array $e): void
     });
 }
 
-test('sous axion_app (RLS) : la fermée est exclue, l ouverte part, rien d un autre espace', function () {
+test('sous axion_app (RLS) : la fermée est exclue, l ouverte part, rien de l espace voisin (lui aussi une ouverte et une fermée)', function () {
     $a = fevEspace();
+    // L'espace voisin porte SA PROPRE ouverte et SA PROPRE fermée : aucune des
+    // deux ne doit apparaître, ni comme destinataire, ni comme exclue.
     $b = fevEspace();
     $precedente = DB::getDefaultConnection();
 
@@ -229,7 +255,12 @@ test('sous axion_app (RLS) : la fermée est exclue, l ouverte part, rien d un au
         $r = app(ResolveurDestinataires::class)->resoudre($a['id'], $criteres, new ReglageDestinataires(ReglageDestinataires::GENERIQUE), null);
 
         $marqueA = substr(str_replace('-', '', $a['id']), 0, 8);
-        expect(collect($r['lignes'])->pluck('email')->all())->toBe(['ouverte@zz-fev-rls-' . $marqueA . '.example.invalid'])
+        $marqueB = substr(str_replace('-', '', $b['id']), 0, 8);
+        $emails = collect($r['lignes'])->pluck('email')->all();
+        expect($emails)->toBe(['ouverte@zz-fev-rls-' . $marqueA . '.example.invalid'])
+            ->and(implode(' ', $emails))->not->toContain($marqueB)
+            // Une seule exclue (celle de A) et deux organisations (celles de A) :
+            // ni l'ouverte ni la fermée de B ne sont lues.
             ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(1)
             ->and($r['organisations'])->toBe(2);
     } finally {

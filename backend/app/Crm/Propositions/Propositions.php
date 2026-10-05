@@ -71,6 +71,17 @@ final class Propositions
     public const ORIGINES = Taxonomy::FIELD_ORIGINS_TIERS;
 
     /**
+     * Les origines d'un AUTOMATISME du CRM (04/10/2026) : elles n'entrent dans
+     * la file que par `proposerAutomatisme()`, jamais par `proposer()`.
+     *
+     * @var list<string>
+     */
+    public const ORIGINES_AUTOMATISMES = Taxonomy::FIELD_ORIGINS_AUTOMATISMES;
+
+    /** L'adresse affichée sur un site vérifié (`crm:entreprises:email-site-verifie`). */
+    public const ORIGINE_SITE_VERIFIE = 'site-verifie';
+
+    /**
      * L'annuaire officiel de l'administration (Service-public / DILA, licence
      * ouverte) — `crm:public:annuaire-officiel`. Ce n'est PAS un tiers : une
      * source publique OFFICIELLE. Elle n'ouvre une proposition que pour une
@@ -81,11 +92,13 @@ final class Propositions
 
     /**
      * Toutes les origines admises par le CHECK
-     * `propositions_champs_origine_check` (tiers et sources officielles).
+     * `propositions_champs_origine_check` : tiers, automatismes du CRM et
+     * sources officielles. Source UNIQUE : les migrations posent l'union de
+     * ce qui est en base et de leur valeur, le test du socle compare à elle.
      *
      * @var list<string>
      */
-    public const ORIGINES_EN_BASE = [...self::ORIGINES, self::ORIGINE_ANNUAIRE];
+    public const ORIGINES_EN_BASE = [...self::ORIGINES, ...self::ORIGINES_AUTOMATISMES, self::ORIGINE_ANNUAIRE];
 
     /**
      * Champs que SEULE une source officielle peut proposer, en plus de
@@ -159,6 +172,20 @@ final class Propositions
     ];
 
     /**
+     * Les champs qu'un AUTOMATISME peut proposer (`proposerAutomatisme()`),
+     * jamais un tiers : l'e-mail générique relevé sur un site VÉRIFIÉ (SIREN
+     * prouvé) — c'est cette preuve qui manque à un tiers. Une proposition de
+     * ce champ ne vient que d'une origine de `ORIGINES_AUTOMATISMES`.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public const CHAMPS_AUTOMATISMES = [
+        self::ENTREPRISE => [
+            'email_generic' => 'E-mail générique',
+        ],
+    ];
+
+    /**
      * Champs TOUJOURS proposés, jamais remplis directement, même vides :
      * `contacts.role` choisit les destinataires des campagnes (filtre
      * `fonctions` de `ReglageDestinataires`, REQ-CAM-079) — un tiers ne fait
@@ -191,28 +218,133 @@ final class Propositions
             }
         }
 
-        return self::CHAMPS[$entite][$champ] ?? $champ;
+        return self::CHAMPS[$entite][$champ] ?? self::CHAMPS_AUTOMATISMES[$entite][$champ] ?? $champ;
+    }
+
+    /**
+     * Une valeur relevée par un AUTOMATISME du CRM, pour un champ de fiche
+     * qui porte DÉJÀ une valeur (ou que l'automatisme ne doit pas remplir :
+     * champ déclaré, fiche protégée). Elle n'écrit JAMAIS sur la fiche :
+     * c'est l'appelant qui décide de remplir un champ vide, avec ses propres
+     * gardes ; ici, la valeur n'entre que dans la file, et seul le
+     * propriétaire décide.
+     *
+     * @return self::IGNOREE|self::IDENTIQUE|self::PROPOSEE|self::DEJA_PROPOSEE
+     *
+     * @throws InvalidArgumentException fiche, champ ou origine inconnus
+     */
+    public function proposerAutomatisme(
+        string $workspaceId,
+        string $entite,
+        int $entiteId,
+        string $champ,
+        ?string $valeur,
+        string $origine,
+        ?string $reference = null,
+    ): string {
+        $table = self::TABLES[$entite] ?? throw new InvalidArgumentException('Type de fiche inconnu : ' . json_encode($entite));
+        if (! in_array($origine, self::ORIGINES_AUTOMATISMES, true)) {
+            throw new InvalidArgumentException('Origine d\'automatisme inconnue : ' . json_encode($origine));
+        }
+        if (! array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? [])) {
+            throw new InvalidArgumentException('Champ non proposable par un automatisme : ' . json_encode($champ));
+        }
+        $valeur = $valeur === null ? '' : trim($valeur);
+        if ($valeur === '') {
+            return self::IGNOREE;
+        }
+        if (mb_strlen($valeur) > self::LONGUEUR_MAX) {
+            throw new InvalidArgumentException("Valeur trop longue pour {$champ} (au plus " . self::LONGUEUR_MAX . ' caractères).');
+        }
+        // Une référence trop longue (adresse de page) n'empêche pas la
+        // proposition : elle n'est simplement pas gardée.
+        $reference = $reference === null || trim($reference) === '' || mb_strlen(trim($reference)) > self::LONGUEUR_MAX_REFERENCE ? null : trim($reference);
+
+        $resultat = WorkspaceContext::run($workspaceId, fn (): string => DB::transaction(function () use (
+            $workspaceId,
+            $entite,
+            $table,
+            $entiteId,
+            $champ,
+            $valeur,
+            $origine,
+            $reference,
+        ): string {
+            $fiche = DB::table($table)
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $entiteId)
+                ->whereNull('deleted_at')
+                ->lockForUpdate()
+                ->first(['id', $champ]);
+            if (! $fiche instanceof stdClass) {
+                throw new InvalidArgumentException("Fiche {$entite} {$entiteId} introuvable dans cet espace.");
+            }
+            $actuelle = self::texte($fiche->{$champ} ?? null);
+            if ($actuelle !== null && mb_strtolower($actuelle) === mb_strtolower($valeur)) {
+                return self::IDENTIQUE;
+            }
+
+            $inseree = DB::table('propositions_champs')->insertOrIgnore([
+                'workspace_id' => $workspaceId,
+                'entite' => $entite,
+                'entite_id' => $entiteId,
+                'champ' => $champ,
+                'valeur_actuelle' => $actuelle,
+                'valeur_proposee' => $valeur,
+                'origine' => $origine,
+                'reference_externe' => $reference,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $inseree > 0 ? self::PROPOSEE : self::DEJA_PROPOSEE;
+        }));
+
+        if ($resultat === self::PROPOSEE) {
+            self::oublierApresCommit($workspaceId);
+        }
+
+        return $resultat;
+    }
+
+    /** Une proposition identique (même fiche, champ et valeur) attend-elle déjà ? Lecture seule. */
+    public static function dejaEnAttente(string $workspaceId, string $entite, int $entiteId, string $champ, string $valeur): bool
+    {
+        return DB::table('propositions_champs')
+            ->where('workspace_id', $workspaceId)
+            ->where('entite', $entite)
+            ->where('entite_id', $entiteId)
+            ->where('champ', $champ)
+            ->where('statut', 'en_attente')
+            ->whereRaw('md5(valeur_proposee) = md5(?)', [trim($valeur)])
+            ->exists();
     }
 
     /**
      * Le champ peut-il être écrit par l'acceptation d'une proposition de
-     * cette origine ?
+     * cette origine ? Trois familles : les champs de tous (`CHAMPS`), ceux
+     * d'une source officielle (`CHAMPS_SOURCES_OFFICIELLES[$origine]`) et
+     * ceux d'un automatisme du CRM (`CHAMPS_AUTOMATISMES`, origine de
+     * `ORIGINES_AUTOMATISMES` seulement).
      */
     public static function champAdmis(string $entite, string $champ, string $origine): bool
     {
         return array_key_exists($champ, self::CHAMPS[$entite] ?? [])
-            || array_key_exists($champ, self::CHAMPS_SOURCES_OFFICIELLES[$origine][$entite] ?? []);
+            || array_key_exists($champ, self::CHAMPS_SOURCES_OFFICIELLES[$origine][$entite] ?? [])
+            || (in_array($origine, self::ORIGINES_AUTOMATISMES, true)
+                && array_key_exists($champ, self::CHAMPS_AUTOMATISMES[$entite] ?? []));
     }
 
     /**
      * Toutes les colonnes qu'une proposition peut viser pour ce type de fiche
-     * (tiers et sources officielles) — l'écran les lit pour l'empreinte.
+     * (tiers, automatismes et sources officielles) — l'écran les lit pour
+     * l'empreinte.
      *
      * @return list<string>
      */
     public static function colonnesProposables(string $entite): array
     {
-        $colonnes = array_keys(self::CHAMPS[$entite] ?? []);
+        $colonnes = array_merge(array_keys(self::CHAMPS[$entite] ?? []), array_keys(self::CHAMPS_AUTOMATISMES[$entite] ?? []));
         foreach (self::CHAMPS_SOURCES_OFFICIELLES as $champs) {
             $colonnes = array_merge($colonnes, array_keys($champs[$entite] ?? []));
         }

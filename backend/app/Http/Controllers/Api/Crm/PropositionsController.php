@@ -178,9 +178,17 @@ class PropositionsController extends ConsoleController
         return trim(trim((string) ($fiche->first_name ?? '')) . ' ' . trim((string) ($fiche->last_name ?? ''))) ?: 'Personne sans nom';
     }
 
-    /** Owner seulement, mais la règle de masquage des téléphones reste la même partout. */
+    /** Owner seulement, mais la règle de masquage des coordonnées reste la même partout. */
     private function masquer(string $champ, ?string $valeur): ?string
     {
-        return $champ === 'phone' && MasquageCoordonnees::requis() ? MasquageCoordonnees::telephone($valeur) : $valeur;
+        if (! MasquageCoordonnees::requis()) {
+            return $valeur;
+        }
+
+        return match ($champ) {
+            'phone' => MasquageCoordonnees::telephone($valeur),
+            'email_generic' => MasquageCoordonnees::email($valeur),
+            default => $valeur,
+        };
     }
 }

@@ -404,6 +404,23 @@ final class Taxonomy
     ];
 
     /**
+     * PROVENANCE D'UNE INFORMATION RELEVÉE PAR UN AUTOMATISME DU CRM, qui peut
+     * ouvrir une PROPOSITION (`propositions_champs`) quand la fiche porte déjà
+     * une valeur (04/10/2026) : `site-verifie`, l'adresse affichée sur un site
+     * dont le SIREN est prouvé (`crm:entreprises:email-site-verifie`).
+     *
+     * Comme une valeur tiers, elle n'est JAMAIS une déclaration et n'écrase
+     * jamais une valeur présente. Le CHECK `propositions_champs_origine_check`
+     * admet `Propositions::ORIGINES_EN_BASE` (tiers, cette liste, sources
+     * officielles ; `Feature\Crm\SocleCrmTest`).
+     *
+     * @var list<string>
+     */
+    public const FIELD_ORIGINS_AUTOMATISMES = [
+        'site-verifie',
+    ];
+
+    /**
      * Événements professionnels (table `events`, 2026-09-27) — le type tel que
      * le sourcing le qualifie.
      *

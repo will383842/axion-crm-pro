@@ -71,10 +71,10 @@ beforeEach(function () {
     $this->seed(PermissionsAndRolesSeeder::class);
 });
 
-test('la clé de cache passe en v5 : la forme de la réponse a changé', function () {
+test('la clé de cache passe en v6 : les entreprises fermées ne sont plus comptées', function () {
     $espace = (string) Str::uuid();
 
-    expect(DashboardController::cle($espace))->toBe('crm:dashboard:stats:v5:' . $espace);
+    expect(DashboardController::cle($espace))->toBe('crm:dashboard:stats:v6:' . $espace);
 });
 
 test('fiches enrichies : toutes les fiches vivantes avec enriched_at, ni la corbeille ni un autre espace', function () {

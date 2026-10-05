@@ -188,7 +188,13 @@ test('G41-006 — deux affichages de la liste entreprises ne comptent pas deux f
         $this->getJson('/api/v1/companies?per_page=25')->assertOk()->assertJsonPath('meta.total', 2);
     });
 
-    expect($premier)->toBe(1, 'le premier affichage calcule le total : c\'est normal, et c\'est le plancher');
+    // DEUX comptages depuis le 04/10/2026, et c'est le plancher : les
+    // entreprises fermées selon l'INSEE sont masquées par défaut et le total
+    // se compte PAR DIFFÉRENCE (`EntreprisesFermees::total`) — toutes (même
+    // plan, même clé de cache qu'avant) moins les fermées (petit index
+    // partiel `idx_companies_ws_fermees`). Un comptage unique portant
+    // `insee_ferme_le IS NULL` perdrait l'Index Only Scan.
+    expect($premier)->toBe(2, 'le premier affichage calcule le total (toutes, puis les fermées) : c\'est le plancher');
     expect($second)->toBe(
         0,
         "Le second affichage a REEMIS un count(*) complet sur `companies`. C'est le constat "

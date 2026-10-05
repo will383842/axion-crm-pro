@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { Avatar, DropdownMenu, IconButton, QualityBadge, SizeCategoryBadge, cn } from '@/components/ui';
 import { effectifLabel } from '../effectif';
 import { libelleActivite } from '@/lib/naf-divisions';
+import { dateFermeture, libelleFermeture } from '../fermees';
 
 export interface CompanyRowData {
   id: number;
@@ -17,6 +18,8 @@ export interface CompanyRowData {
   quality_score?: number | null;
   priority?: string | null;
   enriched_at?: string | null;
+  /** Fermeture INSEE : présente seulement quand les fermées sont affichées. */
+  insee_ferme_le?: string | null;
 }
 
 export interface CompanyRowProps {
@@ -53,6 +56,7 @@ export function CompanyRow({
   const name = c.denomination ?? c.siren;
   // Un code NAF vide (« ») se lit comme une absence : « — », jamais une case blanche.
   const naf = c.naf?.trim() ?? '';
+  const fermeeLe = dateFermeture(c.insee_ferme_le);
 
   return (
     <div
@@ -85,13 +89,25 @@ export function CompanyRow({
       <div className="flex min-w-0 items-center gap-3">
         <Avatar name={name} size="sm" />
         <div className="min-w-0">
-          <Link
-            to="/companies/$companyId"
-            params={{ companyId: String(c.id) }}
-            className="block truncate font-medium text-slate-900 hover:text-brand-700 hover:underline dark:text-white"
-          >
-            {c.denomination ?? '—'}
-          </Link>
+          {/* La pastille tient sur la ligne du nom : la hauteur de ligne est
+              fixe (virtualiseur), une troisième ligne déborderait. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Link
+              to="/companies/$companyId"
+              params={{ companyId: String(c.id) }}
+              className="block truncate font-medium text-slate-900 hover:text-brand-700 hover:underline dark:text-white"
+            >
+              {c.denomination ?? '—'}
+            </Link>
+            {c.insee_ferme_le ? (
+              <span
+                className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200"
+                title={libelleFermeture(c.insee_ferme_le) ?? undefined}
+              >
+                {fermeeLe ? `Fermée le ${fermeeLe}` : 'Fermée'}
+              </span>
+            ) : null}
+          </div>
           <div className="truncate text-xs text-slate-500 dark:text-slate-400">
             {c.city ?? '—'}
             {c.postcode ? <span className="ml-1 text-slate-400">({c.postcode})</span> : null}

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\RechercheEntreprisesParNom;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,6 +70,7 @@ class GlobalSearchController extends ApiController
      *     security={{"sanctumCookie":{}}},
      *
      *     @OA\Parameter(name="q", in="query", required=true, @OA\Schema(type="string", minLength=2)),
+     *     @OA\Parameter(name="fermees", in="query", description="Entreprises fermées selon l'INSEE : masquées par défaut", @OA\Schema(type="string", enum={"inclure","seules"})),
      *
      *     @OA\Response(response=200, description="Résultats groupés"))
      */
@@ -101,9 +104,13 @@ class GlobalSearchController extends ApiController
         // Le contexte d'espace est posé EXPLICITEMENT : les fonctions de
         // recherche (SECURITY DEFINER) ne rendent rien si l'espace demandé
         // n'est pas celui de la connexion.
-        return WorkspaceContext::run($espace, function () use ($espace, $terme): JsonResponse {
+        // 04/10/2026 — les entreprises FERMÉES selon l'INSEE sont masquées par
+        // défaut, comme dans la liste (`fermees=inclure|seules` pour les voir).
+        $fermees = EntreprisesFermees::mode($r->query('fermees'));
+
+        return WorkspaceContext::run($espace, function () use ($espace, $terme, $fermees): JsonResponse {
             $charge = MasquageCoordonnees::masquerTableauSiRequis([
-                'companies' => $this->chercherEntreprises($espace, $terme),
+                'companies' => $this->chercherEntreprises($espace, $terme, $fermees),
                 'contacts' => $this->chercherPersonnes($espace, $terme),
                 'tags' => $this->chercherEtiquettes($espace, $terme),
             ]);
@@ -134,9 +141,9 @@ class GlobalSearchController extends ApiController
      *
      * @return list<array<string, mixed>>
      */
-    private function chercherEntreprises(string $espace, string $terme): array
+    private function chercherEntreprises(string $espace, string $terme, string $fermees = EntreprisesFermees::MASQUER): array
     {
-        return $this->sur('companies', function () use ($espace, $terme): array {
+        return $this->sur('companies', function () use ($espace, $terme, $fermees): array {
             $chiffres = preg_replace('/[\s.\-]/u', '', $terme) ?? '';
 
             $ids = [];
@@ -165,7 +172,16 @@ class GlobalSearchController extends ApiController
                 }
             }
 
-            return $this->relire('companies', $espace, $ids, ['id', 'siren', 'denomination']);
+            // Le masquage des fermées se fait à la RELECTURE (sous la RLS) :
+            // les fonctions de recherche ne le connaissent pas. Une fermée
+            // retirée laisse sa place vide (au plus `PLAFOND` résultats).
+            return $this->relire(
+                'companies',
+                $espace,
+                $ids,
+                ['id', 'siren', 'denomination'],
+                static fn (Builder $q) => EntreprisesFermees::appliquer($q, $fermees),
+            );
         });
     }
 
@@ -211,16 +227,22 @@ class GlobalSearchController extends ApiController
      *
      * @param  list<int>  $ids
      * @param  list<string>  $colonnes
+     * @param  (callable(Builder): mixed)|null  $affiner
      * @return list<array<string, mixed>>
      */
-    private function relire(string $table, string $espace, array $ids, array $colonnes): array
+    private function relire(string $table, string $espace, array $ids, array $colonnes, ?callable $affiner = null): array
     {
         if ($ids === []) {
             return [];
         }
 
+        $requete = DB::table($table)->where('workspace_id', $espace)->whereNull('deleted_at')->whereIn('id', $ids);
+        if ($affiner !== null) {
+            $affiner($requete);
+        }
+
         $parId = [];
-        foreach (DB::table($table)->where('workspace_id', $espace)->whereNull('deleted_at')->whereIn('id', $ids)->get($colonnes) as $ligne) {
+        foreach ($requete->get($colonnes) as $ligne) {
             /** @var array<string, mixed> $tableau */
             $tableau = (array) $ligne;
             $parId[(int) ($tableau['id'] ?? 0)] = $tableau;

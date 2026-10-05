@@ -47,6 +47,7 @@ import {
   type Filter,
 } from "./filtresUrl";
 import { Pagination } from "./components/Pagination";
+import { FERMEES_INCLURE, FERMEES_SEULES } from "./fermees";
 import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
 
 type Company = CompanyRowData & {
@@ -292,6 +293,8 @@ export function CompaniesListPage() {
         ...(f.cree_avant ? { "filter[cree_avant]": f.cree_avant } : {}),
         ...(f.entity_nature ? { "filter[entity_nature]": f.entity_nature } : {}),
         ...(f.joignabilite ? { "filter[joignabilite]": f.joignabilite } : {}),
+        // Fermées selon l'INSEE : masquées par le serveur sans ce paramètre.
+        ...(f.fermees ? { fermees: f.fermees } : {}),
       });
       const r = await api.get<CompaniesResponse>(`/companies?${params.toString()}`);
       return r.data;
@@ -346,7 +349,11 @@ export function CompaniesListPage() {
             <span className="font-semibold text-slate-700 tabular-nums dark:text-slate-200">
               {(total ?? 0).toLocaleString("fr-FR")}
             </span>{" "}
-            entreprises actives
+            {filter.fermees === FERMEES_SEULES
+              ? "entreprises fermées"
+              : filter.fermees === FERMEES_INCLURE
+                ? "entreprises, fermées comprises"
+                : "entreprises actives"}
           </>
         }
         actions={
@@ -455,6 +462,39 @@ export function CompaniesListPage() {
             onChange={(v) => setFilterAndReset({ sector_main: v })}
             options={SECTEUR_OPTIONS}
           />
+          {/* 04/10/2026 — les entreprises fermées selon l'INSEE sont masquées
+              par défaut. Le réglage reste TOUJOURS visible : une liste ne doit
+              jamais cacher quelque chose sans le dire. */}
+          <Champ label="Entreprises fermées" htmlFor={null}>
+            <div className="flex h-9 items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={filter.fermees !== ""}
+                  onChange={(e) =>
+                    setFilterAndReset({ fermees: e.target.checked ? FERMEES_INCLURE : "" })
+                  }
+                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                Afficher les entreprises fermées
+              </label>
+              {filter.fermees !== "" ? (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={filter.fermees === FERMEES_SEULES}
+                    onChange={(e) =>
+                      setFilterAndReset({
+                        fermees: e.target.checked ? FERMEES_SEULES : FERMEES_INCLURE,
+                      })
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  Uniquement celles-ci
+                </label>
+              ) : null}
+            </div>
+          </Champ>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"

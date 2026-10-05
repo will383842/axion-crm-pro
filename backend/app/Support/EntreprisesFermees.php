@@ -17,9 +17,11 @@ use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
  * (toutes) ou `fermees=seules` (uniquement les fermées). La fiche d'une
  * entreprise fermée reste accessible par son lien direct.
  *
- * Les exports et les audiences n'appellent PAS cette classe : ils excluent
- * déjà les fermées par l'archivage (`archive_reason = entreprise_radiee`) et
- * leur logique ne change pas.
+ * Les exports et les audiences n'appellent PAS cette classe et NE MASQUENT
+ * PAS les fermées : leur comportement est inchangé (ils ne filtrent que
+ * `insee_non_diffusible_le`). Un export peut donc contenir des fermées que
+ * l'écran masque ; les en exclure est une décision à prendre à part
+ * (relecture #331, remarque 1).
  *
  * ── Performance (≈ 4,4 M de fiches, rôle `axion_app`) ─────────────────────
  * `IS NULL` / `IS NOT NULL` ne sont pas des appels de fonction : sous la RLS

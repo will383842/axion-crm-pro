@@ -44,6 +44,7 @@ export const FONCTIONS_PROPOSEES = [
 
 export const MOTIFS_EXCLUSION: Record<string, string> = {
   non_diffusible: 'Opposée à la diffusion INSEE (jamais en campagne)',
+  entreprise_fermee: 'Entreprise fermée selon l’INSEE (jamais en campagne)',
   entreprise_individuelle: 'Entrepreneur individuel (jamais en campagne)',
   site_non_verifie: 'Adresse d’un site deviné non vérifié (en quarantaine)',
   // Servi au seul rôle owner (provenance tiers, N12).

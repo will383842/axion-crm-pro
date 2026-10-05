@@ -26,6 +26,20 @@ use App\Support\EligibiliteCampagne;
  *                     jamais destinataire, quelle que soit l'adresse. Même
  *                     mécanique que le motif suivant : drapeau posé par
  *                     l'appelant sur les fiches DÉJÀ lues ;
+ * -1 bis. `entreprise_fermee` l'adresse est rattachée à une fiche que la
+ *                     mise à jour INSEE a marquée FERMÉE
+ *                     (`companies.insee_ferme_le`, état administratif `C`) :
+ *                     jamais destinataire d'une campagne, quelle que soit
+ *                     l'adresse (décision du propriétaire, 05/10/2026 : « on
+ *                     peut toujours les exporter, mais on ne leur écrit
+ *                     plus »). Les EXPORTS, eux, gardent les fermées
+ *                     (`App\Support\EntreprisesFermees`). Même mécanique que
+ *                     les deux motifs voisins : drapeau posé par l'appelant
+ *                     sur les fiches DÉJÀ lues, aucune requête de plus. Placé
+ *                     APRÈS `non_diffusible` (une fiche opposée et fermée
+ *                     reste comptée comme opposée, motif inchangé) et AVANT
+ *                     l'EI (la fermeture est le fait le plus fort : l'entité
+ *                     n'existe plus) ;
  *  0. `entreprise_individuelle` l'adresse est rattachée à une fiche
  *                     d'entrepreneur individuel (catégorie juridique INSEE
  *                     commençant par 1, `companies.legal_form`) : jamais
@@ -84,6 +98,8 @@ final class EligibiliteAdresse
 {
     public const NON_DIFFUSIBLE = 'non_diffusible';
 
+    public const ENTREPRISE_FERMEE = 'entreprise_fermee';
+
     public const ENTREPRISE_INDIVIDUELLE = 'entreprise_individuelle';
 
     public const SITE_NON_VERIFIE = QuarantaineSite::MOTIF;
@@ -104,7 +120,7 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::NON_DIFFUSIBLE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::NON_DIFFUSIBLE, self::ENTREPRISE_FERMEE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
     ];
 
@@ -122,7 +138,7 @@ final class EligibiliteAdresse
 
     /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : non_diffusible, entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : non_diffusible, entreprise_fermee, entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
@@ -130,6 +146,11 @@ final class EligibiliteAdresse
         // sa fiche, quelle que soit sa qualité.
         if (self::une($occurrences, static fn (array $o): bool => ($o['non_diffusible'] ?? false) === true)) {
             return self::NON_DIFFUSIBLE;
+        }
+        // Une entreprise fermée selon l'INSEE : on ne lui écrit plus, par
+        // aucune de ses boîtes (décision du 05/10/2026).
+        if (self::une($occurrences, static fn (array $o): bool => ($o['entreprise_fermee'] ?? false) === true)) {
+            return self::ENTREPRISE_FERMEE;
         }
         // Une seule occurrence rattachée à un entrepreneur individuel suffit :
         // la même boîte ne part pas « par » une autre fiche.

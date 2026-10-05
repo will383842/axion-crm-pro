@@ -34,7 +34,8 @@ use RuntimeException;
  *     filtre éventuel par fonction (`contacts.role`) et par personnes cochées
  *     dans une liste manuelle ;
  *  3. chaque adresse est jugée UNE fois, sur toutes ses occurrences, par la
- *     règle de #253 (`EligibiliteAdresse` : entreprise individuelle,
+ *     règle de #253 (`EligibiliteAdresse` : non diffusible, entreprise
+ *     fermée selon l'INSEE, entreprise individuelle,
  *     adresse en quarantaine d'un site non vérifié (lot N5), invalide, non vérifiée valide,
  *     personnelle, opposition/suppression via
  *     `EligibiliteCampagne::peutRecevoir`), puis par `AdressesPartagees`
@@ -56,7 +57,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, entreprise_fermee?: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -116,7 +117,7 @@ final class ResolveurDestinataires
         /** @var array<string, list<Candidat>> $occurrences */
         $occurrences = [];
 
-        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form', 'companies.website', 'companies.insee_non_diffusible_le'])
+        $query->select(['companies.id', 'companies.denomination', 'companies.email_generic', 'companies.first_info_at', 'companies.signals', 'companies.legal_form', 'companies.website', 'companies.insee_non_diffusible_le', 'companies.insee_ferme_le'])
             // Quarantaine (lot N5) : calculée sur les fiches DÉJÀ retenues par
             // l'audience — une expression de la liste de sélection, pas une
             // condition : aucun balayage de plus sur `companies`.
@@ -369,6 +370,9 @@ final class ResolveurDestinataires
         $ei = EligibiliteAdresse::estEntrepriseIndividuelle($fiche['legal_form'] ?? null);
         // Lot N8 : fiche marquée « non diffusible » par la mise à jour INSEE.
         $nd = ($fiche['insee_non_diffusible_le'] ?? null) !== null;
+        // Fiche marquée FERMÉE par la mise à jour INSEE (05/10/2026) : lue sur
+        // la fiche déjà chargée, comme les deux drapeaux voisins.
+        $fermee = ($fiche['insee_ferme_le'] ?? null) !== null;
         // Quarantaine (lot N5, `QuarantaineSite`) : hors presse seulement —
         // une audience presse juge déjà la provenance (`AdressePresseFiable`).
         $nonVerifiee = ! $presse && (bool) ($fiche['site_non_verifie'] ?? false);
@@ -383,7 +387,7 @@ final class ResolveurDestinataires
             $candidats[] = [
                 'email' => $generique, 'classe' => self::GENERIQUE, 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'entreprise_fermee' => $fermee,
                 'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, $generique, $site, $ancien), 'information_tiers_insuffisante' => false, 'ecartee' => null,
             ];
             $vues[$generique] = true;
@@ -429,7 +433,7 @@ final class ResolveurDestinataires
                 'email' => $e, 'classe' => $classe === self::INCONNUE ? self::NOMINATIVE : $classe,
                 'crm_ref' => 'organisation:' . $id, 'fonction' => null,
                 'status' => null, 'verification' => VerificationEmail::statutDe($d, $e),
-                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd,
+                'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'entreprise_fermee' => $fermee,
                 'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, $e, $site, $ancien), 'information_tiers_insuffisante' => false, 'ecartee' => $ecartee,
             ];
         }
@@ -456,6 +460,7 @@ final class ResolveurDestinataires
                 'deja_informe' => ($c->first_info_at ?? null) !== null,
                 'entreprise_individuelle' => $ei,
                 'non_diffusible' => $nd,
+                'entreprise_fermee' => $fermee,
                 'site_non_verifie' => QuarantaineSite::personne(
                     $nonVerifiee,
                     is_string($c->discovery_source ?? null) ? $c->discovery_source : null,

@@ -17,11 +17,20 @@ use Spatie\QueryBuilder\QueryBuilder as SpatieQueryBuilder;
  * (toutes) ou `fermees=seules` (uniquement les fermées). La fiche d'une
  * entreprise fermée reste accessible par son lien direct.
  *
- * Les exports et les audiences n'appellent PAS cette classe et NE MASQUENT
- * PAS les fermées : leur comportement est inchangé (ils ne filtrent que
- * `insee_non_diffusible_le`). Un export peut donc contenir des fermées que
- * l'écran masque ; les en exclure est une décision à prendre à part
- * (relecture #331, remarque 1).
+ * Hors écrans, la règle est tranchée par le propriétaire (05/10/2026) :
+ * « on peut toujours les exporter, mais on ne leur écrit plus ».
+ *  - EXPORTS (`CompaniesController::export`, export des personnes…) :
+ *    INCHANGÉS, ils n'appellent pas cette classe et GARDENT les fermées
+ *    (ils ne filtrent que `insee_non_diffusible_le`). Un export peut donc
+ *    contenir des fermées que l'écran masque — c'est voulu.
+ *  - ENVOIS : une fiche fermée, et chacune de ses adresses (boîte générique,
+ *    canaux, personnes), n'est JAMAIS destinataire d'une campagne — motif
+ *    `entreprise_fermee` d'`App\Crm\Campagnes\EligibiliteAdresse`, jugé par
+ *    `ResolveurDestinataires` (aperçu des destinataires d'une audience) et
+ *    `crm:campagne:destinataires` (liste en fichier, compteur
+ *    `ecartees_entreprise_fermee`). Les audiences elles-mêmes gardent la
+ *    fiche (comptée dans l'audience) : c'est l'adresse qui est écartée, et
+ *    le motif est dit à l'écran.
  *
  * ── Performance (≈ 4,4 M de fiches, rôle `axion_app`) ─────────────────────
  * `IS NULL` / `IS NOT NULL` ne sont pas des appels de fonction : sous la RLS

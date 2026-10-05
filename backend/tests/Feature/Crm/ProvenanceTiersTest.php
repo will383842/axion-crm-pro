@@ -694,9 +694,10 @@ test('ordre des motifs : EI, puis site non vérifié, puis tiers, tous avant inv
     $email = 'zoe@zz-pt-ordre.example.invalid';
     $motif = static fn (array ...$occ): ?string => EligibiliteAdresse::motif($email, array_map(static fn (array $o): array => $o + $base, $occ));
 
-    // `non_diffusible` (lot N8, #313) passe avant tous les autres.
-    expect(array_slice(EligibiliteAdresse::MOTIFS, 0, 5))->toBe([
-        EligibiliteAdresse::NON_DIFFUSIBLE, EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE, EligibiliteAdresse::SITE_NON_VERIFIE,
+    // `non_diffusible` (lot N8, #313) passe avant tous les autres, puis
+    // `entreprise_fermee` (décision du 05/10/2026), puis l'EI.
+    expect(array_slice(EligibiliteAdresse::MOTIFS, 0, 6))->toBe([
+        EligibiliteAdresse::NON_DIFFUSIBLE, EligibiliteAdresse::ENTREPRISE_FERMEE, EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE, EligibiliteAdresse::SITE_NON_VERIFIE,
         EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE, EligibiliteAdresse::INVALIDE,
     ])
         // Les trois drapeaux sur la même occurrence, puis répartis sur deux.

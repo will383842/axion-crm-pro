@@ -41,7 +41,10 @@ use Illuminate\Support\Sleep;
  *               `archived_no_email`…) n'est JAMAIS écrasé (veto sécurité
  *               #313, bloquant 1). Une réouverture (`A`) lève le marquage et
  *               ne remet en prospection QUE ce que l'INSEE avait archivé
- *               (`archive_reason = entreprise_radiee`).
+ *               (`archive_reason = entreprise_radiee`). Quel que soit son
+ *               archivage (fiche protégée comprise), le marquage la sort de
+ *               toute campagne (motif `entreprise_fermee` d'`EligibiliteAdresse`,
+ *               05/10/2026) ; les exports la gardent.
  *  - NON DIFFUSIBLE statut `P` ou `N` de l'unité — ou de son siège, joint
  *               par la passe prioritaire (`HttpInseeClient::estDiffusible`) :
  *               la fiche est MARQUÉE (`insee_non_diffusible_le`) et sort de

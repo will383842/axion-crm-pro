@@ -59,6 +59,12 @@
     "`pnpm audit` sur workers/pnpm-lock.yaml rend « No known vulnerabilities found » :",
     "high=0, critical=0 (etait 10/1, puis 13/0 mesure en CI le jour meme)."
   ],
+  "_resserrage_frontend_2026_10_24": [
+    "Resserre le 2026-10-24 (fix/controle-security) : mesure `pnpm audit` sur",
+    "frontend/pnpm-lock.yaml = high 0, critical 1 (etait 18/1).",
+    "Le critique restant est a solder par une tache datee (montee majeure",
+    "d une dependance cartographique) ; detail dans le registre prive."
+  ],
   "lots": {
     "frontend": {
       "high": 0,

@@ -61,7 +61,7 @@
   ],
   "lots": {
     "frontend": {
-      "high": 18,
+      "high": 0,
       "critical": 1
     },
     "workers": {

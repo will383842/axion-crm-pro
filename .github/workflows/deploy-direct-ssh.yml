@@ -24,7 +24,7 @@ name: Deploy direct SSH Hetzner
 # Trigger : push sur main (auto) + workflow_dispatch (manuel).
 # Secrets requis (à configurer côté GitHub UI, cf. _AUDIT/DEPLOY-PIPELINE.md) :
 #   - HETZNER_SSH_PRIVATE_KEY  → clé privée OpenSSH du compte root@hetzner
-#   - HETZNER_HOST             → IP ou hostname (par défaut 46.62.248.239)
+#   - HETZNER_HOST             → IP ou hostname (valeur dans le secret, jamais écrite dans ce dépôt public)
 #   - HETZNER_USER             → utilisateur SSH (par défaut root)
 #   - HETZNER_PROJECT_PATH     → chemin du repo sur le serveur (par défaut /opt/axion-crm-pro)
 
@@ -656,7 +656,7 @@ jobs:
           TEXTE="${TEXTE}L API ou l application peut etre injoignable EN CE MOMENT.${NL}${NL}"
           TEXTE="${TEXTE}Commit : ${SUJET}${NL}Journal : ${RUN_URL}${NL}${NL}"
           TEXTE="${TEXTE}Geste de secours si l API rend 502 :${NL}"
-          TEXTE="${TEXTE}  ssh root@46.62.248.239${NL}"
+          TEXTE="${TEXTE}  ssh root@<adresse du serveur : secret HETZNER_HOST>${NL}"
           # ⚠️ `docker restart`, PAS `docker compose restart`. Deux raisons, et
           # la seconde n'est pas cosmetique :
           #  - c'est la commande REELLEMENT jouee a la main le 2026-08-21, qui a

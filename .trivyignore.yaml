@@ -34,4 +34,39 @@
 # Toute nouvelle exception : un `id`, un `paths` si possible, un `statement`
 # qui dit pourquoi rien n'est corrigeable ICI, et un `expired_at`.
 # -----------------------------------------------------------------------------
-vulnerabilities: []
+# -----------------------------------------------------------------------------
+# 2026-10-24 (T0-07) — exceptions DATÉES, une par avis. Le dépôt est PUBLIC :
+# chaque entrée ne porte que l'identifiant ; la raison complète est dans le
+# registre PRIVÉ (securite/crm-exceptions.md). Échéance 2026-11-07 : passé ce
+# jour, la garde redevient rouge et force le réexamen (montée de l'épinglage Go
+# du stade `caddy-build`, ou de la base Alpine de l'image `api`).
+# -----------------------------------------------------------------------------
+vulnerabilities:
+  - id: CVE-2026-63209
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-78669
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-111943
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-78667
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-97031
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-111497
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07

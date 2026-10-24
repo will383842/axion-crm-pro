@@ -74,8 +74,12 @@ a3c42d66398b94afdb31843f5427e840388c33aa:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/
 8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-44/pest-ci-config-full.txt:generic-api-key:89
 8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/03_baseline_suite_complete.txt:generic-api-key:162
 
-# T0-07 — balayage de tout l'historique (gitleaks git --log-opts="--all") : 10 empreintes, toutes
+# T0-07 — balayage de tout l'historique (gitleaks git --log-opts="--all") : 14 empreintes, toutes
 # classés faux positifs. Raison de chacun : voir registre privé.
+af16d86f71e3813908288b45b726157a6224490d:backend/tests/Feature/Infra/RunbookDisquePleinTest.php:generic-api-key:52
+af16d86f71e3813908288b45b726157a6224490d:backend/tests/Feature/Internal/ReponseVeridiqueIngestionTest.php:generic-api-key:64
+af16d86f71e3813908288b45b726157a6224490d:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:173
+af16d86f71e3813908288b45b726157a6224490d:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:206
 14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:201
 14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:168
 218d9d23e4615f5109dd626179509fbed4a1c205:_AUDIT/DEPLOY-PIPELINE.md:private-key:192

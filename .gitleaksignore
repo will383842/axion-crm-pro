@@ -74,9 +74,10 @@ a3c42d66398b94afdb31843f5427e840388c33aa:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/
 8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-44/pest-ci-config-full.txt:generic-api-key:89
 8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-45/03_baseline_suite_complete.txt:generic-api-key:162
 
-# T0-07 — balayage de tout l'historique (gitleaks git --log-opts="--all") : 10 lignes, 9 empreintes distinctes, tous
+# T0-07 — balayage de tout l'historique (gitleaks git --log-opts="--all") : 10 empreintes, toutes
 # classés faux positifs. Raison de chacun : voir registre privé.
 14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:201
+14d69e8e98aa2b2e7e243140aa7874acfd7d9c2f:backend/tests/Unit/Auth/NotPwnedPasswordRuleTest.php:generic-api-key:168
 218d9d23e4615f5109dd626179509fbed4a1c205:_AUDIT/DEPLOY-PIPELINE.md:private-key:192
 3df87618744b8d60698b7649c425edeaae177628:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-35/greement-navigateur/docker-compose.verif.banc.yml:generic-api-key:7
 4030dda29a98161baa79f2723f2b72db73a0e281:_REPORTS/RUNBOOK-CONSOLE-LOCALE.md:generic-api-key:249

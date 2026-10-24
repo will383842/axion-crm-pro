@@ -34,4 +34,38 @@
 # Toute nouvelle exception : un `id`, un `paths` si possible, un `statement`
 # qui dit pourquoi rien n'est corrigeable ICI, et un `expired_at`.
 # -----------------------------------------------------------------------------
-vulnerabilities: []
+# -----------------------------------------------------------------------------
+# 2026-10-24 (T0-07) — exceptions DATÉES, une par avis. Dépôt PUBLIC : seul
+# l'identifiant figure ici ; raisons dans le registre privé. Échéance 2026-11-07.
+# -----------------------------------------------------------------------------
+vulnerabilities:
+  - id: CVE-2026-63209
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-78669
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-111943
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-78667
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-97031
+    paths:
+      - usr/bin/caddy
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07
+  - id: CVE-2026-111497
+    purls:
+      - pkg:apk/alpine/brotli-libs@1.2.0-r1
+    statement: "raison : voir registre privé"
+    expired_at: 2026-11-07

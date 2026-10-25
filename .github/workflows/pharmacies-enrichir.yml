@@ -1,0 +1,83 @@
+name: Pharmacies — enrichissement (dry-run ou apply)
+
+# Lance `crm:pharmacies:enrichir` sur le serveur de prod, puis affiche
+# `crm:pharmacies:rapport-enrichissement`.
+#  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ni mis en file ;
+#  - apply : pose le groupement (champs vides seulement) et met en file les
+#    enrichisseurs EXISTANTS du CRM (waterfall sans Google Places ni LLM ;
+#    site + téléphone seulement pour les personnes physiques). Aucun e-mail,
+#    aucun SMS, aucune suppression, aucune valeur écrasée.
+# `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI.
+# Dépôt public : seuls des totaux sont affichés, aucune donnée personnelle.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (totaux seulement) ou apply (met les enrichisseurs en file)'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      limite:
+        description: 'Fiches mises en file au plus (0 = toutes)'
+        type: string
+        default: '0'
+      confirmer:
+        description: 'Écrire OUI pour autoriser apply'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+# Jamais deux enrichissements en même temps.
+concurrency:
+  group: pharmacies-enrichir
+  cancel-in-progress: false
+
+jobs:
+  enrichir:
+    name: Enrichissement pharmacies (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Vérifier les entrées
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMER: ${{ inputs.confirmer }}
+          LIMITE: ${{ inputs.limite }}
+        run: |
+          if ! printf '%s' "$LIMITE" | grep -Eq '^[0-9]{1,6}$'; then
+            echo "limite invalide : un entier de 0 à 999999." >&2
+            exit 1
+          fi
+          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
+            echo "apply refusé : saisir OUI dans l'entrée « confirmer »." >&2
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Lancer l'enrichissement sur la prod
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          MODE: ${{ inputs.mode }}
+          LIMITE: ${{ inputs.limite }}
+        run: |
+          set -e
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          OPT="--dry-run"
+          [ "$MODE" = "apply" ] && OPT="--apply"
+          $SSH "cd /opt/axion-crm-pro && docker compose exec -u root -T api php artisan crm:pharmacies:enrichir $OPT --limite=$LIMITE"
+
+      - name: Rapport (totaux uniquement)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          $SSH "cd /opt/axion-crm-pro && docker compose exec -u root -T api php artisan crm:pharmacies:rapport-enrichissement"

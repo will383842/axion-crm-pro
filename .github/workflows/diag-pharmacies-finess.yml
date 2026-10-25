@@ -1,0 +1,97 @@
+name: Diagnostic — Pharmacies FINESS vs CRM (prod, lecture seule)
+
+# Télécharge la liste officielle FINESS (officines), la charge dans une table
+# TEMPORAIRE de la base prod (elle disparaît à la fin de la session) et compte
+# ce qui manque dans `companies`. Aucune écriture dans les tables du CRM.
+# Seuls des totaux sont affichés (dépôt public : aucune liste nominative).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  finess:
+    name: Comparaison FINESS / CRM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Télécharger FINESS et préparer le fichier
+        run: |
+          set -e
+          curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          unzip -q -o finess.zip etablissements.csv
+          python3 - <<'PY'
+          import csv
+          cats = {'620', '627', '628', '629', '641', '690'}
+          cols = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal',
+                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape']
+          src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
+          out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
+          out.writerow(cols)
+          n = 0
+          for r in src:
+              if r['categorie'] in cats:
+                  out.writerow([r[c] for c in cols]); n += 1
+          print('lignes pharmacie FINESS :', n)
+          PY
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Comparer sur la base prod (table temporaire)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          set -e
+          cat > requetes.sql <<'SQL'
+          \echo >> FINESS : lignes par categorie et etat
+          SELECT categorie, etat, count(*) FROM fin GROUP BY 1,2 ORDER BY 1,2;
+          \echo >> Officines actives (620) : rapprochement avec le CRM
+          WITH a AS (SELECT * FROM fin WHERE categorie='620' AND etat='A' AND siret<>''),
+          m AS (
+            SELECT a.*,
+              EXISTS (SELECT 1 FROM companies c WHERE c.deleted_at IS NULL AND c.siret=a.siret) AS par_siret,
+              EXISTS (SELECT 1 FROM companies c WHERE c.deleted_at IS NULL AND c.siren=left(a.siret,9)) AS par_siren
+            FROM a)
+          SELECT count(*) AS officines_actives_avec_siret,
+                 count(*) FILTER (WHERE par_siret) AS deja_au_crm_par_siret,
+                 count(*) FILTER (WHERE NOT par_siret AND par_siren) AS siren_present_siret_different,
+                 count(*) FILTER (WHERE NOT par_siren) AS absentes_du_crm
+          FROM m;
+          \echo >> Officines actives SANS siret dans FINESS
+          SELECT count(*) FROM fin WHERE categorie='620' AND etat='A' AND siret='';
+          \echo >> Absentes du CRM : par forme juridique
+          SELECT statut, count(*) FROM fin f WHERE categorie='620' AND etat='A' AND siret<>''
+            AND NOT EXISTS (SELECT 1 FROM companies c WHERE c.deleted_at IS NULL AND c.siren=left(f.siret,9))
+            GROUP BY 1 ORDER BY 2 DESC;
+          \echo >> Absentes du CRM : par departement (15 premiers)
+          SELECT dep, count(*) FROM fin f WHERE categorie='620' AND etat='A' AND siret<>''
+            AND NOT EXISTS (SELECT 1 FROM companies c WHERE c.deleted_at IS NULL AND c.siren=left(f.siret,9))
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 15;
+          \echo >> Autres categories actives absentes du CRM
+          SELECT categorie, count(*) AS actives, count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM companies c WHERE c.deleted_at IS NULL AND c.siren=left(f.siret,9))) AS absentes
+            FROM fin f WHERE categorie<>'620' AND etat='A' AND siret<>'' GROUP BY 1 ORDER BY 1;
+          \echo >> CRM 4773Z : lien avec FINESS
+          SELECT count(*) AS crm_4773z,
+                 count(*) FILTER (WHERE EXISTS (SELECT 1 FROM fin f WHERE f.etat='A' AND left(f.siret,9)=c.siren)) AS avec_officine_active,
+                 count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM fin f WHERE f.etat='A' AND left(f.siret,9)=c.siren)
+                                   AND EXISTS (SELECT 1 FROM fin f WHERE f.etat<>'A' AND left(f.siret,9)=c.siren)) AS officine_fermee_dans_finess,
+                 count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM fin f WHERE left(f.siret,9)=c.siren)) AS inconnues_de_finess
+            FROM companies c WHERE c.deleted_at IS NULL AND replace(c.naf,'.','')='4773Z';
+          \echo >> Siren a plusieurs officines actives
+          SELECT count(*) AS siren_multi_officines, coalesce(sum(n),0) AS officines FROM (SELECT left(siret,9) s, count(*) n FROM fin WHERE categorie='620' AND etat='A' AND siret<>'' GROUP BY 1 HAVING count(*)>1) t;
+          SQL
+          {
+            echo "SET default_transaction_read_only = on;"
+            echo "CREATE TEMP TABLE fin (finess_et text, siret text, categorie text, etat text, nom_long text, code_postal text, commune text, dep text, statut text, ape text);"
+            echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"
+            cat finess_pharma.csv
+            printf '\\.\n'
+            sed 's/^          //' requetes.sql
+          } | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" \
+              "cd /opt/axion-crm-pro && docker compose exec -T postgres psql -U axion -d axion_crm -X -P pager=off -v ON_ERROR_STOP=1 -f -"

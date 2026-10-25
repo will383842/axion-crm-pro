@@ -403,8 +403,15 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
         // d'`AnonymizeOldIps` ci-dessous : une fiche à la corbeille garde la
         // coordonnée, et un effacement qui la sauterait laisserait la donnée de
         // la personne en base en se disant complet.
-        'companies' => 23,
-        'contacts' => 30,
+        // 23 -> 29 et 30 -> 34 le 2026-10-25 : la synchro du dossier client
+        // de la console (`DossierClientIngest`). Ses lectures de rapprochement
+        // VEULENT voir la corbeille : une fiche ou une personne mise à la
+        // corbeille dans le CRM n'est jamais recréée en double ni restaurée
+        // (la ligne part en arbitrage, ou le contact est ignoré) — le test
+        // `DossierClientSynchroTest` le prouve. Les autres sont l'écriture qui
+        // suit une lecture verrouillée de la même ligne.
+        'companies' => 29,
+        'contacts' => 34,
         'email_audiences' => 0,
         'health_practitioners' => 2,
         'journalists' => 1,
@@ -465,7 +472,9 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     // table ne bouge, ce serait le balayage qui derive, pas le code.
     // 88 -> 93 le 2026-09-29 : les cinq lecteurs de l'effacement art. 17
     // (plafonds `companies` et `contacts` ci-dessus, même justification).
-    expect(count($aveugles))->toBeLessThanOrEqual(93);
+    // 93 -> 103 le 2026-10-25 : les dix lectures de la synchro du dossier
+    // client (plafonds `companies` et `contacts` ci-dessus).
+    expect(count($aveugles))->toBeLessThanOrEqual(103);
 });
 
 /**

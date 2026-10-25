@@ -897,12 +897,18 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // portée PAR CONSTRUCTION : des COMPTEURS (lues, à créer, créées, déjà
     // présentes, ignorées par motif) et rien d'autre — aucun SIREN, aucun nom
     // (`ImportFamilles::COMPTEURS`).
+    // 46 -> 48 et 32 -> 33 le 2026-10-25 (synchro du dossier client de la
+    // console) : `companies.field_origins_at` et `contacts.field_origins_at`,
+    // la DATE de chaque entrée de `field_origins` — des noms de colonnes et
+    // des horodatages, jamais une valeur. `contacts` est COUVERTE (la colonne
+    // part avec la ligne) ; `companies` est hors de portée comme le reste de
+    // la personne morale.
     expect($colonnes->count())->toBe(
-        46,
+        48,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        32,
+        33,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

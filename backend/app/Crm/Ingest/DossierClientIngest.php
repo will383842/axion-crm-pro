@@ -441,7 +441,10 @@ final class DossierClientIngest
         if (($fiche->console_client_ref ?? null) === null) {
             $maj['console_client_ref'] = $ref;
         }
-        if (($fiche->external_ref ?? null) === null) {
+        // `external_ref` est UNIQUE : après une fusion, la fiche absorbée
+        // (à la corbeille) le porte encore — on ne le pose que s'il est libre.
+        if (($fiche->external_ref ?? null) === null
+            && ! DB::table('companies')->where('workspace_id', $workspaceId)->where('external_ref', $ref)->exists()) {
             $maj['external_ref'] = $ref;
         }
         $maj['console_dossier_version'] = $dossier->version;

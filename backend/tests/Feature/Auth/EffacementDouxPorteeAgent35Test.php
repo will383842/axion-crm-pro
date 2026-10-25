@@ -410,7 +410,11 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
         // (la ligne part en arbitrage, ou le contact est ignoré) — le test
         // `DossierClientSynchroTest` le prouve. Les autres sont l'écriture qui
         // suit une lecture verrouillée de la même ligne.
-        'companies' => 29,
+        // 29 -> 33 le 2026-10-25 (relecture #341) : la fiche gardée d'une
+        // fusion, l'autre fiche au SIREN envoyé, la relecture après report de
+        // la référence, l'`external_ref` encore porté par une absorbée — toutes
+        // DOIVENT voir la corbeille (une absorbée y est, et garde ses clés).
+        'companies' => 33,
         'contacts' => 34,
         'email_audiences' => 0,
         'health_practitioners' => 2,
@@ -475,7 +479,9 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     // 93 -> 104 le 2026-10-25 : les lectures de la synchro du dossier client
     // (plafonds `companies` et `contacts` ci-dessus) ; 104 est le compte
     // MESURÉ par la CI de la PR #341, pas une estimation.
-    expect(count($aveugles))->toBeLessThanOrEqual(104);
+    // 104 -> 108 le 2026-10-25 : les quatre lectures `companies` de la
+    // relecture #341 (plafond ci-dessus).
+    expect(count($aveugles))->toBeLessThanOrEqual(108);
 });
 
 /**

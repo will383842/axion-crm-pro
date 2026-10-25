@@ -412,6 +412,7 @@ test('ARBITRAGE en désaccord de SIREN : la décision humaine est retenue, le me
 test('la fiche de la référence n a PAS de SIREN mais une AUTRE fiche porte celui envoyé → arbitrage', function () {
     $sansSiren = DB::table('companies')->insertGetId([
         'workspace_id' => $this->espace, 'siren' => null, 'denomination' => 'ZZ SANS SIREN',
+        'country_code' => 'FR', 'foreign_id' => 'zz:sans-siren-console', 'entity_nature' => 'association',
         'console_client_ref' => 'site:client:' . DCS_CLIENT,
         'signals' => '{}', 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now(),
     ]);

@@ -51,7 +51,7 @@ class CrmPharmaciesImportFiness extends Command
         $this->warn($appliquer ? 'APPLICATION — seules les fiches manquantes sont créées.' : 'ESSAI À BLANC — rien n\'est écrit.');
 
         try {
-            $b = (new ImportFiness())->executer($workspaceId, $fichier, $appliquer, $paquet);
+            $b = (new ImportFiness)->executer($workspaceId, $fichier, $appliquer, $paquet);
         } catch (\Throwable $e) {
             $this->error('Échec : ' . $e->getMessage());
 
@@ -68,9 +68,11 @@ class CrmPharmaciesImportFiness extends Command
         if ($appliquer) {
             $this->line(sprintf('  établissements notés : %d', $b['etablissements_ajoutes']));
         }
-        $this->line('  À PART (non créées) : ' . ($b['autres_categories'] === [] ? 'aucune' : implode(', ', array_map(
-            static fn ($c, $n): string => $c . ' = ' . $n, array_keys($b['autres_categories']), $b['autres_categories'],
-        ))));
+        $aPart = [];
+        foreach ($b['autres_categories'] as $categorie => $n) {
+            $aPart[] = $categorie . ' = ' . $n;
+        }
+        $this->line('  À PART (non créées) : ' . ($aPart === [] ? 'aucune' : implode(', ', $aPart)));
         $this->line('  fiches à créer par département :');
         foreach ($b['par_departement'] as $dep => $n) {
             $this->line(sprintf('    %s : %d', $dep, $n));

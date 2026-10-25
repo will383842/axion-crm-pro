@@ -20,6 +20,10 @@ on:
         description: 'Écrire OUI pour autoriser apply'
         type: string
         default: ''
+      empreinte:
+        description: 'SHA-256 attendu de finess.zip (facultatif ; si fourni et différent, apply est refusé)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -46,22 +50,34 @@ jobs:
           fi
 
       - name: Télécharger FINESS et préparer le fichier
+        env:
+          MODE: ${{ inputs.mode }}
+          EMPREINTE_ATTENDUE: ${{ inputs.empreinte }}
         run: |
           set -e
           curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          EMPREINTE_REELLE=$(sha256sum finess.zip | cut -d' ' -f1)
+          echo "SHA-256 de finess.zip : $EMPREINTE_REELLE (à saisir dans l'entrée « empreinte » pour la figer)"
+          if [ -n "$EMPREINTE_ATTENDUE" ] && [ "$EMPREINTE_ATTENDUE" != "$EMPREINTE_REELLE" ]; then
+            echo "empreinte différente de celle attendue" >&2
+            if [ "$MODE" = "apply" ]; then
+              echo "apply refusé : empreinte SHA-256 inattendue." >&2
+              exit 1
+            fi
+          fi
           unzip -q -o finess.zip etablissements.csv
           python3 - <<'PY'
           import csv, sys
           cats = {'620', '627', '628', '629', '641', '690'}
           cols = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal',
-                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape']
+                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape', 'ej_statut_juridique_code']
           src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
           out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
-          out.writerow(['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape'])
+          out.writerow(['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape', 'statut_code'])
           n = 0
           for r in src:
               if r['categorie'] in cats:
-                  out.writerow([' '.join(r[c].split()) for c in cols]); n += 1
+                  out.writerow([' '.join((r.get(c) or '').split()) for c in cols]); n += 1
           print('lignes pharmacie FINESS :', n)
           n620 = sum(1 for _ in csv.DictReader(open('finess_pharma.csv', encoding='utf-8'))
                      if _['categorie'] == '620')

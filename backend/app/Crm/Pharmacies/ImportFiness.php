@@ -33,8 +33,19 @@ final class ImportFiness
 
     private const COLONNES = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape'];
 
+    /** Colonne facultative : code du statut juridique FINESS (absente des anciens exports). */
+    private const COLONNE_CODE_STATUT = 'statut_code';
+
+    /** Code FINESS « Personne Physique » ; le libellé reste le filet de sécurité. */
+    private const CODES_PERSONNE_PHYSIQUE = ['73'];
+
+    public const DENOMINATION_GENERIQUE = 'Entreprise individuelle pharmacie';
+
+    /** Forme juridique INSEE « entrepreneur individuel » : fait jouer EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE. */
+    public const FORME_JURIDIQUE_EI = '1000';
+
     /** Alias des en-têtes de l'export brut FINESS. */
-    private const ALIAS = ['commune_acheminement' => 'commune', 'departement' => 'dep', 'ej_statut_juridique_libelle' => 'statut', 'ej_code_ape' => 'ape'];
+    private const ALIAS = ['commune_acheminement' => 'commune', 'departement' => 'dep', 'ej_statut_juridique_libelle' => 'statut', 'ej_statut_juridique_code' => 'statut_code', 'ej_code_ape' => 'ape'];
 
     /**
      * @return array<string, mixed> bilan chiffré (aucun nom)
@@ -44,7 +55,7 @@ final class ImportFiness
         $bilan = [
             'lignes' => 0, 'officines' => 0, 'sans_siret' => 0, 'inactives' => 0, 'doublons_fichier' => 0,
             'deja_par_siret' => 0, 'siren_autre_siret' => 0, 'corbeille' => 0, 'a_creer' => 0,
-            'creees' => 0, 'etablissements_ajoutes' => 0,
+            'creees' => 0, 'etablissements_ajoutes' => 0, 'personnes_physiques' => 0,
             'autres_categories' => [], 'par_departement' => [],
         ];
 
@@ -150,6 +161,9 @@ final class ImportFiness
                     continue;
                 }
                 $bilan['a_creer']++;
+                if ($this->estPersonnePhysique($l)) {
+                    $bilan['personnes_physiques']++;
+                }
                 $cle = $dep !== '' ? $dep : '??';
                 $bilan['par_departement'][$cle] = ($bilan['par_departement'][$cle] ?? 0) + 1;
                 $sirensPrevus[$siren] = true;
@@ -202,6 +216,30 @@ final class ImportFiness
         }
         $classe = NomenclatureNaf::classer($naf);
 
+        if ($this->estPersonnePhysique($l)) {
+            // Entrepreneur individuel : le nom est souvent celui du titulaire et le statut de
+            // diffusion INSEE est inconnu. Ni nom ni adresse ici ; la mise à jour mensuelle
+            // INSEE les complète seulement si l'entreprise est diffusible.
+            return [
+                'workspace_id' => $workspaceId,
+                'siren' => $siren,
+                'siret' => $l['siret'],
+                'denomination' => self::DENOMINATION_GENERIQUE,
+                'naf' => $naf,
+                'sector_main' => $classe->secteur,
+                'naf_nomenclature' => $classe->nomenclature,
+                'naf_rev2' => $classe->codeRev2,
+                'legal_form' => self::FORME_JURIDIQUE_EI,
+                'entity_nature' => 'entreprise',
+                'department_code' => $dep !== '' ? $dep : null,
+                'region_code' => Classement::regionFrancaise($dep !== '' ? $dep : null, null)[0],
+                'discovery_source' => self::SOURCE,
+                'metadata' => json_encode(['personne_physique' => true, 'legal_form' => self::FORME_JURIDIQUE_EI, 'source' => self::SOURCE], JSON_UNESCAPED_UNICODE),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
         return [
             'workspace_id' => $workspaceId,
             'siren' => $siren,
@@ -223,6 +261,13 @@ final class ImportFiness
             'created_at' => now(),
             'updated_at' => now(),
         ];
+    }
+
+    /** @param array<string, string> $l */
+    private function estPersonnePhysique(array $l): bool
+    {
+        return in_array(trim($l['statut_code']), self::CODES_PERSONNE_PHYSIQUE, true)
+            || preg_match('/personne\s+physique/iu', $l['statut']) === 1;
     }
 
     /** @param array<string, string> $l */
@@ -256,9 +301,9 @@ final class ImportFiness
                 continue;
             }
             $ligne = [];
-            foreach (self::COLONNES as $c) {
+            foreach ([...self::COLONNES, self::COLONNE_CODE_STATUT] as $c) {
                 $i = array_search($c, $entete, true);
-                $ligne[$c] = trim((string) ($row[$i] ?? ''));
+                $ligne[$c] = $i === false ? '' : trim((string) ($row[$i] ?? ''));
             }
             $ligne['etat'] = strtoupper($ligne['etat']);
             $ligne['siret'] = preg_replace('/\s+/', '', $ligne['siret']) ?? '';

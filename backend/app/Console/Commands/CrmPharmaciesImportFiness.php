@@ -54,6 +54,12 @@ class CrmPharmaciesImportFiness extends Command
         try {
             $b = (new ImportFiness)->executer($workspaceId, $fichier, $appliquer, $paquet);
         } catch (Throwable $e) {
+            // Colonnes manquantes : message sans aucune donnée personnelle, affiché tel quel.
+            if ($e instanceof \InvalidArgumentException) {
+                $this->error('Échec : ' . $e->getMessage());
+
+                return self::FAILURE;
+            }
             // Jamais getMessage() : un message d'erreur de base peut contenir du SQL avec ses valeurs.
             $sqlstate = $e instanceof \Illuminate\Database\QueryException ? ' (SQLSTATE ' . ($e->errorInfo[0] ?? '?') . ')' : '';
             $this->error('Échec : ' . $e::class . $sqlstate);
@@ -68,6 +74,7 @@ class CrmPharmaciesImportFiness extends Command
         $this->line(sprintf('  SIREN connu, autre SIRET (établissement ajouté, fiche intacte) : %d', $b['siren_autre_siret']));
         $this->line(sprintf('  SIREN à la corbeille (ignorées) : %d', $b['corbeille']));
         $this->line(sprintf('  fiches %s : %d', $appliquer ? 'créées' : 'à créer', $appliquer ? $b['creees'] : $b['a_creer']));
+        $this->line(sprintf('  personnes physiques %d dont créées sans nom ni adresse', $b['personnes_physiques']));
         if ($appliquer) {
             $this->line(sprintf('  établissements notés : %d', $b['etablissements_ajoutes']));
         }

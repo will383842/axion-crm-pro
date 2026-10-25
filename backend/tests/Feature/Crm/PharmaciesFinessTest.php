@@ -26,11 +26,11 @@ function csvFiness(array $lignes): string
 {
     $chemin = tempnam(sys_get_temp_dir(), 'zzfiness');
     $f = fopen($chemin, 'w');
-    fputcsv($f, ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape'], ',', '"', '');
+    fputcsv($f, ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape', 'statut_code'], ',', '"', '');
     foreach ($lignes as $l) {
         fputcsv($f, array_merge([
             'finess_et' => '990000001', 'siret' => '', 'categorie' => '620', 'etat' => 'A', 'nom_long' => 'ZZ OFFICINE',
-            'code_postal' => '99100', 'commune' => 'ZZVILLE', 'dep' => '99', 'statut' => 'SARL', 'ape' => '4773Z',
+            'code_postal' => '99100', 'commune' => 'ZZVILLE', 'dep' => '99', 'statut' => 'SARL', 'ape' => '4773Z', 'statut_code' => '',
         ], $l), ',', '"', '');
     }
     fclose($f);
@@ -198,4 +198,75 @@ it('second passage : aucun nouvel établissement', function () {
 
     expect(DB::table('finess_etablissements')->where('workspace_id', $espace)->count())->toBe(2);
     expect($sortie)->toContain('établissements notés : 0');
+});
+
+it('société d\'exercice libéral : la fiche garde le nom et l\'adresse du fichier', function () {
+    $espace = F::espace();
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000010100011', 'statut' => 'Société d\'exercice libéral', 'statut_code' => '95', 'nom_long' => 'ZZ SELARL TEST'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    $f = DB::table('companies')->where('siren', '940000101')->first();
+    expect($f->denomination)->toBe('ZZ SELARL TEST')->and($f->postcode)->toBe('99100')->and($f->city)->toBe('ZZVILLE');
+    expect(json_decode($f->metadata, true))->not->toHaveKey('personne_physique');
+});
+
+it('personne physique (libellé ou code) : fiche sans nom ni adresse, garde d\'éligibilité posée', function () {
+    $espace = F::espace();
+
+    $sortie = lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000011100011', 'statut' => 'Personne Physique', 'nom_long' => 'ZZ TITULAIRE UN'],
+        ['siret' => '94000011200011', 'statut' => '', 'statut_code' => '73', 'nom_long' => 'ZZ TITULAIRE DEUX'],
+        ['siret' => '94000011300011'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    foreach (['940000111', '940000112'] as $siren) {
+        $f = DB::table('companies')->where('siren', $siren)->first();
+        expect($f->denomination)->toBe('Entreprise individuelle pharmacie')
+            ->and($f->postcode)->toBeNull()->and($f->city)->toBeNull()->and($f->city_name)->toBeNull()
+            ->and($f->naf)->toBe('47.73Z')->and($f->department_code)->toBe('99')->and($f->region_code)->not->toBeNull()
+            ->and($f->legal_form)->toBe('1000')->and($f->discovery_source)->toBe('finess');
+        $meta = json_decode($f->metadata, true);
+        expect($meta['personne_physique'])->toBeTrue()->and($meta['legal_form'])->toBe('1000')->and($meta['source'])->toBe('finess');
+        expect(json_encode($f))->not->toContain('TITULAIRE');
+    }
+    expect(DB::table('companies')->where('siren', '940000113')->value('denomination'))->toBe('ZZ OFFICINE');
+    expect($sortie)->toContain('personnes physiques 2 dont créées sans nom ni adresse')->not->toContain('TITULAIRE');
+});
+
+it('personne physique : essai à blanc et apply annoncent les mêmes totaux', function () {
+    $espace = F::espace();
+    $csv = csvFiness([['siret' => '94000012100011', 'statut' => 'Personne Physique'], ['siret' => '94000012200011']]);
+
+    $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace]);
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+
+    expect($essai)->toContain('personnes physiques 1 dont créées sans nom ni adresse')->toContain('fiches à créer : 2');
+    expect($apply)->toContain('personnes physiques 1 dont créées sans nom ni adresse')->toContain('fiches créées : 2');
+});
+
+it('affiche le message des colonnes manquantes, sans donnée personnelle', function () {
+    $espace = F::espace();
+    $chemin = tempnam(sys_get_temp_dir(), 'zzfiness');
+    file_put_contents($chemin, "finess_et,siret\n990000001,94000013100011\n");
+
+    $sortie = lancer('crm:pharmacies:import-finess', ['fichier' => $chemin, '--workspace' => $espace]);
+
+    expect($sortie)->toContain('Colonnes manquantes : categorie');
+});
+
+it('classer-taille : effectif_min rempli et effectif_max vide ne change rien ; metadata NULL gérée ; updated_at posé', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000014100011'], ['siret' => '94000014200011']]), '--workspace' => $espace, '--apply' => true]);
+    DB::table('companies')->where('siren', '940000141')->update(['effectif_range' => '12', 'effectif_min' => 7, 'effectif_max' => null]);
+    DB::table('companies')->where('siren', '940000142')->update(['metadata' => null, 'updated_at' => '2020-01-01 00:00:00']);
+
+    lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    $un = DB::table('companies')->where('siren', '940000141')->first();
+    expect((int) $un->effectif_min)->toBe(7)->and($un->effectif_max)->toBeNull();
+    $deux = DB::table('companies')->where('siren', '940000142')->first();
+    expect(json_decode($deux->metadata, true)['nb_officines_societe'])->toBe(1);
+    expect($deux->updated_at > '2020-01-02')->toBeTrue();
 });

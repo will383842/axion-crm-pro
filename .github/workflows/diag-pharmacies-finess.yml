@@ -33,7 +33,7 @@ jobs:
           n = 0
           for r in src:
               if r['categorie'] in cats:
-                  out.writerow([r[c] for c in cols]); n += 1
+                  out.writerow([' '.join(r[c].split()) for c in cols]); n += 1
           print('lignes pharmacie FINESS :', n)
           PY
 

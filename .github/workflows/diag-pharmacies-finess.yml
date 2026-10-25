@@ -75,7 +75,8 @@ jobs:
                  count(*) FILTER (WHERE insee_ferme_le IS NOT NULL AND (phone IS NOT NULL OR website IS NOT NULL OR enriched_at IS NOT NULL)) AS fermees_avec_donnees_enrichies
           FROM companies WHERE workspace_id=:'ws' AND deleted_at IS NULL AND replace(naf,'.','')='4773Z';
           \echo >> Contacts rattaches aux pharmacies fermees
-          SELECT count(*) AS contacts, count(DISTINCT p.id) AS pharmacies FROM contacts c JOIN companies p ON p.id=c.company_id WHERE p.workspace_id=:'ws' AND p.deleted_at IS NULL AND replace(p.naf,'.','')='4773Z' AND p.insee_ferme_le IS NOT NULL;          SQL
+          SELECT count(*) AS contacts, count(DISTINCT p.id) AS pharmacies FROM contacts c JOIN companies p ON p.id=c.company_id WHERE p.workspace_id=:'ws' AND p.deleted_at IS NULL AND replace(p.naf,'.','')='4773Z' AND p.insee_ferme_le IS NOT NULL;
+          SQL
           {
             echo "CREATE TEMP TABLE fin (finess_et text, siret text, categorie text, etat text, nom_long text, code_postal text, commune text, dep text, statut text, ape text);"
             echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"

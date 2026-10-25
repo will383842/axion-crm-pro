@@ -62,32 +62,20 @@ jobs:
           SELECT workspace_id AS ws FROM companies WHERE workspace_id IS NOT NULL LIMIT 1 \gset
           \echo >> FINESS : lignes par categorie et etat
           SELECT categorie, etat, count(*) FROM fin GROUP BY 1,2 ORDER BY 1,2;
-          \echo >> Recherche des SIREN FINESS dans le CRM (par l index workspace_id + siren)
+          \echo >> Pharmacies du CRM (NAF 47.73Z) : ouvertes / fermees
           SET enable_nestloop = off;
           SET default_transaction_read_only = off;
-          CREATE TEMP TABLE sir AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE etat='A' AND siret<>'';
+          CREATE TEMP TABLE sir AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE categorie='620' AND etat='A' AND siret<>'';
           ANALYZE sir;
-          CREATE TEMP TABLE pres AS SELECT c.siren FROM companies c JOIN sir ON sir.s=c.siren WHERE c.workspace_id=:'ws';
-          ANALYZE pres;
           SET default_transaction_read_only = on;
-          SET enable_nestloop = on;
-          SELECT (SELECT count(*) FROM sir) AS siren_finess_actifs, (SELECT count(*) FROM pres) AS deja_au_crm;
-          \echo >> Officines actives (620) : deja au CRM / absentes
-          SELECT count(*) AS officines_actives_avec_siret,
-                 count(*) FILTER (WHERE left(f.siret,9) IN (SELECT siren FROM pres)) AS siren_deja_au_crm,
-                 count(*) FILTER (WHERE left(f.siret,9) NOT IN (SELECT siren FROM pres)) AS absentes_du_crm
-          FROM fin f WHERE categorie='620' AND etat='A' AND siret<>'';
-          \echo >> Officines actives SANS siret dans FINESS
-          SELECT count(*) FROM fin WHERE categorie='620' AND etat='A' AND siret='';
-          \echo >> Absentes du CRM : par departement (20 premiers)
-          SELECT dep, count(*) FROM fin f WHERE categorie='620' AND etat='A' AND siret<>'' AND left(siret,9) NOT IN (SELECT siren FROM pres) GROUP BY 1 ORDER BY 2 DESC LIMIT 20;
-          \echo >> Absentes du CRM : par forme juridique
-          SELECT statut, count(*) FROM fin f WHERE categorie='620' AND etat='A' AND siret<>'' AND left(siret,9) NOT IN (SELECT siren FROM pres) GROUP BY 1 ORDER BY 2 DESC LIMIT 15;
-          \echo >> Autres categories actives (627 628 629 641 690) : total / absentes
-          SELECT categorie, count(*) AS actives, count(*) FILTER (WHERE left(siret,9) NOT IN (SELECT siren FROM pres)) AS absentes FROM fin f WHERE categorie<>'620' AND etat='A' AND siret<>'' GROUP BY 1 ORDER BY 1;
-          \echo >> Siren a plusieurs officines actives
-          SELECT count(*) AS siren_multi_officines, coalesce(sum(n),0) AS officines FROM (SELECT left(siret,9) s, count(*) n FROM fin WHERE categorie='620' AND etat='A' AND siret<>'' GROUP BY 1 HAVING count(*)>1) t;
-          SQL
+          SELECT count(*) AS total,
+                 count(*) FILTER (WHERE insee_ferme_le IS NOT NULL) AS fermees_selon_insee,
+                 count(*) FILTER (WHERE insee_ferme_le IS NULL AND siren IN (SELECT s FROM sir)) AS ouvertes_et_officine_active_finess,
+                 count(*) FILTER (WHERE insee_ferme_le IS NULL AND siren NOT IN (SELECT s FROM sir)) AS ouvertes_hors_finess_actif,
+                 count(*) FILTER (WHERE insee_ferme_le IS NOT NULL AND (phone IS NOT NULL OR website IS NOT NULL OR enriched_at IS NOT NULL)) AS fermees_avec_donnees_enrichies
+          FROM companies WHERE workspace_id=:'ws' AND deleted_at IS NULL AND replace(naf,'.','')='4773Z';
+          \echo >> Contacts rattaches aux pharmacies fermees
+          SELECT count(*) AS contacts, count(DISTINCT p.id) AS pharmacies FROM contacts c JOIN companies p ON p.id=c.company_id WHERE p.workspace_id=:'ws' AND p.deleted_at IS NULL AND replace(p.naf,'.','')='4773Z' AND p.insee_ferme_le IS NOT NULL;          SQL
           {
             echo "CREATE TEMP TABLE fin (finess_et text, siret text, categorie text, etat text, nom_long text, code_postal text, commune text, dep text, statut text, ape text);"
             echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"

@@ -1,0 +1,83 @@
+name: Pharmacies — import FINESS (dry-run ou apply)
+
+# Télécharge la liste officielle FINESS, ne garde que les lignes pharmacie,
+# puis lance `crm:pharmacies:import-finess` sur le serveur de prod.
+#  - dry-run (défaut) : totaux par département, RIEN n'est écrit ;
+#  - apply : crée UNIQUEMENT les fiches manquantes (jamais d'écrasement ni de
+#    suppression), puis `crm:pharmacies:classer-taille` (champs vides seulement).
+# `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI.
+# Dépôt public : seuls des totaux sont affichés, aucune liste nominative.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (totaux seulement) ou apply (crée les fiches manquantes)'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      confirmer:
+        description: 'Écrire OUI pour autoriser apply'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    name: Import FINESS (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Vérifier la confirmation
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMER: ${{ inputs.confirmer }}
+        run: |
+          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
+            echo "apply refusé : saisir OUI dans l'entrée « confirmer »." >&2
+            exit 1
+          fi
+
+      - name: Télécharger FINESS et préparer le fichier
+        run: |
+          set -e
+          curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          unzip -q -o finess.zip etablissements.csv
+          python3 - <<'PY'
+          import csv
+          cats = {'620', '627', '628', '629', '641', '690'}
+          cols = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal',
+                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape']
+          src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
+          out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
+          out.writerow(['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape'])
+          n = 0
+          for r in src:
+              if r['categorie'] in cats:
+                  out.writerow([' '.join(r[c].split()) for c in cols]); n += 1
+          print('lignes pharmacie FINESS :', n)
+          PY
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Lancer l'import sur la prod
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -e
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          $SSH "cat > /tmp/finess_pharma.csv" < finess_pharma.csv
+          OPT=""
+          [ "$MODE" = "apply" ] && OPT="--apply"
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api php artisan crm:pharmacies:import-finess /tmp/finess_pharma.csv $OPT"
+          if [ "$MODE" = "apply" ]; then
+            $SSH "cd /opt/axion-crm-pro && docker compose exec -u root -T api php artisan crm:pharmacies:classer-taille"
+          fi
+          $SSH "rm -f /tmp/finess_pharma.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_pharma.csv" || true

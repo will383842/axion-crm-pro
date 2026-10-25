@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Crm\EspaceProspection;
 use App\Crm\Pharmacies\ImportFiness;
 use Illuminate\Console\Command;
+use Throwable;
 
 /**
  * OFFICINES FINESS → FICHES MANQUANTES (dépôt public : totaux seulement).
@@ -52,7 +53,7 @@ class CrmPharmaciesImportFiness extends Command
 
         try {
             $b = (new ImportFiness)->executer($workspaceId, $fichier, $appliquer, $paquet);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Jamais getMessage() : un message d'erreur de base peut contenir du SQL avec ses valeurs.
             $sqlstate = $e instanceof \Illuminate\Database\QueryException ? ' (SQLSTATE ' . ($e->errorInfo[0] ?? '?') . ')' : '';
             $this->error('Échec : ' . $e::class . $sqlstate);

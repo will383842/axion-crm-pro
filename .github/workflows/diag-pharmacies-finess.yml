@@ -91,6 +91,7 @@ jobs:
             echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"
             cat finess_pharma.csv
             printf '\\.\n'
+            echo "SET default_transaction_read_only = on;"
             sed 's/^          //' requetes.sql
           } | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" \
               "cd /opt/axion-crm-pro && docker compose exec -T postgres psql -U axion -d axion_crm -X -P pager=off -v ON_ERROR_STOP=1 -f -"

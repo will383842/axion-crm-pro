@@ -1,0 +1,45 @@
+name: Diagnostic — Pharmacies (prod, lecture seule)
+
+# Compte les pharmacies (NAF 47.73Z) dans la base prod : total, par forme
+# juridique, par département, enrichissement. Aucune écriture.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  pharmacies:
+    name: Comptage pharmacies sur prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Comptage via SSH (lecture seule)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -e
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<'EOF2'
+            set -euo pipefail
+            cd "$PROJECT_PATH" 2>/dev/null || cd /opt/axion-crm-pro
+            PSQL='docker compose exec -T postgres psql -U axion -d axion_crm -X -P pager=off -v ON_ERROR_STOP=1'
+            run() { echo; echo ">> $1"; echo "$2" | $PSQL -c "SET default_transaction_read_only = on;" -f - ; }
+            run "TOTAL entreprises (non supprimées)" "SELECT count(*) FROM companies WHERE deleted_at IS NULL;"
+            run "PHARMACIES NAF 47.73Z : total / actives" "SELECT count(*) AS total, count(DISTINCT siren) AS siren_distincts FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','') ILIKE '4773Z';"
+            run "Formes NAF voisines (ex. 4646Z gros, 4773Z détail)" "SELECT naf, count(*) FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','') IN ('4773Z','4646Z','4774Z') GROUP BY 1;"
+            run "Pharmacies par forme juridique" "SELECT legal_form, count(*) FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','')='4773Z' GROUP BY 1 ORDER BY 2 DESC;"
+            run "Pharmacies par département (30 premiers)" "SELECT left(postcode,2) AS dep, count(*) FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','')='4773Z' GROUP BY 1 ORDER BY 2 DESC LIMIT 30;"
+            run "Pharmacies sans code postal" "SELECT count(*) FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','')='4773Z' AND (postcode IS NULL OR postcode='');"
+            run "Enrichissement des pharmacies" "SELECT count(*) AS total, count(website) AS avec_site, count(phone) AS avec_tel, count(*) FILTER (WHERE enriched_at IS NOT NULL) AS enrichies FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','')='4773Z';"
+            run "Contacts rattachés aux pharmacies" "SELECT count(*) AS contacts, count(DISTINCT c.company_id) AS pharmacies_avec_contact FROM contacts c JOIN companies p ON p.id=c.company_id WHERE p.deleted_at IS NULL AND replace(p.naf,'.','')='4773Z';"
+            run "Entreprises dont le nom contient PHARMACIE mais NAF différent" "SELECT naf, count(*) FROM companies WHERE deleted_at IS NULL AND denomination_normalized ILIKE '%pharmacie%' AND replace(coalesce(naf,''),'.','')<>'4773Z' GROUP BY 1 ORDER BY 2 DESC LIMIT 15;"
+            run "Workspaces" "SELECT workspace_id, count(*) FROM companies WHERE deleted_at IS NULL AND replace(naf,'.','')='4773Z' GROUP BY 1;"
+          EOF2

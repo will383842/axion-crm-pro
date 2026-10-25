@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Crm\FichesProtegees;
+use App\Jobs\Concerns\RunsInWorkspace;
+use App\Models\Company;
+use App\Services\Domain\DomainFinderService;
+use App\Services\Legal\MentionsLegalesScraperService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Enrichissement RESTREINT d'une officine tenue par une PERSONNE PHYSIQUE
+ * (`metadata.personne_physique`) : le site de l'officine et son téléphone,
+ * rien d'autre. Le waterfall complet n'est pas utilisé ici : il écrit les
+ * dirigeants et l'adresse de la personne.
+ *
+ * Réutilise `DomainFinderService` (site) et `MentionsLegalesScraperService::
+ * harvestFromWebsite` (téléphone lu sur le site de l'établissement, sans
+ * persistance par le service). Ne remplace jamais une valeur non vide.
+ */
+class EnrichirSiteOfficineJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, RunsInWorkspace, SerializesModels;
+
+    public int $tries = 2;
+
+    public int $timeout = 300;
+
+    public function __construct(public readonly int $companyId) {}
+
+    /** @return list<int> */
+    public function backoff(): array
+    {
+        return [120, 900];
+    }
+
+    public function handle(DomainFinderService $domaines, MentionsLegalesScraperService $mentions): void
+    {
+        $espace = $this->espaceDuJob() ?? $this->espaceDepuisLaLigne('companies', $this->companyId);
+        if ($espace === null) {
+            Log::warning('EnrichirSiteOfficineJob: aucun espace de travail', ['company_id' => $this->companyId]);
+
+            return;
+        }
+        $this->inWorkspace($espace, fn () => $this->enrichir($domaines, $mentions));
+    }
+
+    private function enrichir(DomainFinderService $domaines, MentionsLegalesScraperService $mentions): void
+    {
+        $company = Company::find($this->companyId);
+        if (! $company || FichesProtegees::estProtegee((int) $company->id)) {
+            return;
+        }
+        $sources = [];
+        try {
+            if (empty($company->website)) {
+                $trouve = $domaines->findAvecMethode($company);
+                if ($trouve !== null) {
+                    $company->website = $trouve['url'];
+                    $company->website_method = $trouve['methode'];
+                    $company->save();
+                    $sources[] = 'domain-finder';
+                }
+            }
+            if (empty($company->phone) && ! empty($company->website)) {
+                $canaux = $mentions->harvestFromWebsite((string) $company->website);
+                if (! empty($canaux['phones'])) {
+                    // Écriture conditionnelle : jamais par-dessus un numéro posé entre-temps.
+                    $posees = DB::table('companies')->where('id', $company->id)
+                        ->where(fn ($q) => $q->whereNull('phone')->orWhere('phone', ''))
+                        ->update(['phone' => $canaux['phones'][0], 'updated_at' => now()]);
+                    if ($posees > 0) {
+                        $sources[] = 'site-officine';
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('EnrichirSiteOfficineJob failed', ['company_id' => $this->companyId, 'error' => $e->getMessage()]);
+        }
+        if ($sources !== []) {
+            DB::update(
+                "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('enrichissement_pharmacie_sources', ?::jsonb) WHERE id = ?",
+                [json_encode($sources), $this->companyId],
+            );
+        }
+    }
+}

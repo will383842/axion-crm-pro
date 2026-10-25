@@ -29,7 +29,7 @@ jobs:
           set -e
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<'EOF2'
             set -euo pipefail
-            cd "$PROJECT_PATH" 2>/dev/null || cd /opt/axion-crm-pro
+            cd /opt/axion-crm-pro
             PSQL='docker compose exec -T postgres psql -U axion -d axion_crm -X -P pager=off -v ON_ERROR_STOP=1'
             run() { echo; echo ">> $1"; echo "$2" | $PSQL -c "SET default_transaction_read_only = on;" -f - ; }
             run "TOTAL entreprises (non supprimées)" "SELECT count(*) FROM companies WHERE deleted_at IS NULL;"

@@ -16,6 +16,11 @@ use Illuminate\Support\Facades\Schema;
  * `CONCURRENTLY`, hors transaction : aucune écriture bloquée. Un index laissé
  * INVALIDE par une construction interrompue est retiré puis reconstruit
  * (patron de `2026_10_06_000020`). PUREMENT ADDITIVE.
+ *
+ * Valide aussi `activities_kind_check`, reposé `NOT VALID` par
+ * `2026_10_25_000010` : hors transaction, `VALIDATE` ne prend qu'un verrou
+ * `SHARE UPDATE EXCLUSIVE` (lectures et écritures continuent). Patron de
+ * `2026_09_29_000002`.
  */
 return new class extends Migration
 {
@@ -31,6 +36,8 @@ return new class extends Migration
 
         DB::statement("SET lock_timeout = '30s'");
         try {
+            DB::statement('ALTER TABLE activities VALIDATE CONSTRAINT activities_kind_check');
+
             $invalide = DB::selectOne(
                 'SELECT NOT i.indisvalid AS invalide FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = ?',
                 [self::NOM],

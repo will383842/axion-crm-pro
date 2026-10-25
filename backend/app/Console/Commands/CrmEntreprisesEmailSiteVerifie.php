@@ -10,6 +10,7 @@ use App\Crm\Sites\CurseurTraitement;
 use App\Crm\Sites\EmailSiteVerifie;
 use App\Crm\Sites\SiteFiable;
 use App\Crm\Sites\VerificationSite;
+use App\Crm\Taxonomy;
 use App\Services\Email\EmailConfidenceService;
 use App\Support\EligibiliteCampagne;
 use App\Support\WorkspaceContext;
@@ -520,7 +521,7 @@ class CrmEntreprisesEmailSiteVerifie extends Command
             return;
         }
         // Remplir directement : champ vide, non déclaré, fiche non protégée.
-        if ($actuelle === '' && $f->origine_email !== 'declared' && ! FichesProtegees::estProtegee((int) $f->id)) {
+        if ($actuelle === '' && ! in_array($f->origine_email, Taxonomy::FIELD_ORIGINS_PROTEGEES, true) && ! FichesProtegees::estProtegee((int) $f->id)) {
             $n = $dryRun ? $this->compterEligibles($f) : DB::transaction(fn (): int => $this->ecrire($f, $choisie, $page));
             $this->compter($delta, $n > 0 ? 'ecrites' : 'ecartes');
 
@@ -594,7 +595,7 @@ class CrmEntreprisesEmailSiteVerifie extends Command
     {
         return "id = ? AND workspace_id = ? AND deleted_at IS NULL AND website = ?
             AND (email_generic IS NULL OR btrim(email_generic) = '')
-            AND COALESCE(field_origins ->> 'email_generic', '') <> 'declared'
+            AND COALESCE(field_origins ->> 'email_generic', '') NOT IN ('declared', 'manual')
             AND " . SiteFiable::fiableSql('companies');
     }
 

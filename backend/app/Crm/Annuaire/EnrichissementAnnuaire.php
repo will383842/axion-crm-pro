@@ -8,6 +8,7 @@ use App\Crm\Sites\CurseurTraitement;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Sites\SiteFiable;
 use App\Crm\Sites\VerificationSite;
+use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
@@ -565,7 +566,7 @@ final class EnrichissementAnnuaire
             }
             $actuelle = trim((string) ($fiche->{$champ} ?? ''));
             $origine = is_string($origines[$champ] ?? null) ? $origines[$champ] : null;
-            $bloque = $protegee || $origine === 'declared';
+            $bloque = $protegee || in_array($origine, Taxonomy::FIELD_ORIGINS_PROTEGEES, true);
 
             if ($actuelle !== '' && self::memeValeur($champ, $actuelle, $nouvelle)) {
                 $this->bilan['inchanges']++;

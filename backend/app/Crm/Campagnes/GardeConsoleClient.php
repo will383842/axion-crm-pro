@@ -23,6 +23,10 @@ use Illuminate\Support\Facades\DB;
  * requête hors contexte ne verrait aucune personne et laisserait tout passer
  * — la garde doit fermer, pas ouvrir). Patron de `AdressesPartagees::exclues`.
  * Aucune ligne ici n'envoie quoi que ce soit.
+ *
+ * L'adresse générique part du TAG (quelques dizaines de fiches), jamais d'un
+ * parcours des ≈ 4,4 M fiches : l'expression `lower(btrim(...))` n'est servie
+ * par aucun index (relecture #341).
  */
 final class GardeConsoleClient
 {
@@ -50,18 +54,18 @@ final class GardeConsoleClient
                                      WHERE gc_ct.company_id = c.company_id AND gc_t.slug = ?))
                  UNION
                  SELECT lower(btrim(co.email_generic)) AS adresse
-                   FROM companies co
-                  WHERE co.workspace_id = ?
+                   FROM tags gc_t2
+                   JOIN company_tag gc_ct2 ON gc_ct2.tag_id = gc_t2.id
+                   JOIN companies co ON co.id = gc_ct2.company_id
+                  WHERE gc_t2.workspace_id = ? AND gc_t2.slug = ?
+                    AND co.workspace_id = ?
                     AND co.email_generic IS NOT NULL AND co.email_generic <> ''
-                    AND lower(btrim(co.email_generic)) IN ({$marques})
-                    AND EXISTS (SELECT 1 FROM company_tag gc_ct JOIN tags gc_t ON gc_t.id = gc_ct.tag_id
-                                 WHERE gc_ct.company_id = co.id AND gc_t.slug = ?)",
+                    AND lower(btrim(co.email_generic)) IN ({$marques})",
                 array_merge(
                     [$workspaceId],
                     $paquet,
-                    [DossierClientIngest::DISCOVERY_SOURCE, FichesProtegees::TAG_CONSOLE_CLIENT, $workspaceId],
+                    [DossierClientIngest::DISCOVERY_SOURCE, FichesProtegees::TAG_CONSOLE_CLIENT, $workspaceId, FichesProtegees::TAG_CONSOLE_CLIENT, $workspaceId],
                     $paquet,
-                    [FichesProtegees::TAG_CONSOLE_CLIENT],
                 ),
             );
             foreach ($lignes as $ligne) {

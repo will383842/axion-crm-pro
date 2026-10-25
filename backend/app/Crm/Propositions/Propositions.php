@@ -568,7 +568,7 @@ final class Propositions
     /** Le champ de cette fiche a-t-il été déclaré par la personne elle-même ? */
     public static function declare(stdClass $fiche, string $champ): bool
     {
-        return (self::origines($fiche->field_origins ?? null)[$champ] ?? null) === 'declared';
+        return in_array(self::origines($fiche->field_origins ?? null)[$champ] ?? null, Taxonomy::FIELD_ORIGINS_PROTEGEES, true);
     }
 
     /**

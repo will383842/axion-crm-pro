@@ -767,6 +767,13 @@ class AudienceBuilderService
         $query = Company::query()->where('workspace_id', $workspaceId)
             ->whereNull('companies.insee_non_diffusible_le');
 
+        // 🔴 CLIENT DE LA CONSOLE (synchro du dossier client, garde-fou (h),
+        // relecture #341) : n'entre dans AUCUNE audience, même par une liste
+        // manuelle exigée — la seule porte qui lève les autres protections.
+        // Posé ici, hors de tout `orWhere`.
+        $query->whereRaw('NOT EXISTS (SELECT 1 FROM company_tag cc_ct JOIN tags cc_t ON cc_t.id = cc_ct.tag_id'
+            . ' WHERE cc_ct.company_id = companies.id AND cc_t.slug = ?)', [FichesProtegees::TAG_CONSOLE_CLIENT]);
+
         // Une liste manuelle citée doit exister, vivante, dans CET espace.
         $listes = self::listesCitees($criteria);
         $inconnues = array_values(array_diff($listes['toutes'], ListesManuelles::existantes($workspaceId, $listes['toutes'])));

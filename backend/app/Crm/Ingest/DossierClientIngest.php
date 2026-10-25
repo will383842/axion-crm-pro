@@ -2,6 +2,7 @@
 
 namespace App\Crm\Ingest;
 
+use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
 use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
@@ -23,12 +24,17 @@ use Throwable;
  *      `site:client:<uuid>`, PUIS le SIREN. Sans SIREN, ou si les deux
  *      désignent des fiches différentes, ou si la fiche est à la corbeille :
  *      la ligne part dans « Personnes à rattacher » (arbitrage). JAMAIS de
- *      fusion, jamais de création d'une seconde fiche.
- *  (d) CONFLIT : un champ modifié des deux côtés → le plus récent gagne
- *      (`field_origins_at`, ou à défaut `updated_at` de la fiche pour une
- *      valeur déclarée/manuelle non datée). L'ANCIENNE valeur est gardée dans
- *      la ligne de timeline (`changements[].avant`). Une retouche manuelle plus
- *      récente que le message n'est jamais écrasée (`ignores[]`).
+ *      fusion, jamais de création d'une seconde fiche. Le SIREN accepté par un
+ *      rattachement humain est retenu (`metadata.console_arbitrage`) ; une
+ *      fiche absorbée par une fusion renvoie vers la fiche gardée.
+ *  (d) CONFLIT : la console envoie TOUT le dossier à chaque version ; un
+ *      champ n'est proposé que si SA valeur a changé depuis la dernière reçue
+ *      (empreinte gardée dans `metadata.console_recu`, jamais la valeur en
+ *      clair) — une retouche faite dans le CRM n'est donc jamais écrasée par
+ *      une valeur que la console n'a pas touchée. Un champ modifié des deux
+ *      côtés → le plus récent gagne (`field_origins_at`, ou à défaut
+ *      `updated_at` pour une valeur déclarée/manuelle non datée). L'ANCIENNE
+ *      valeur est gardée dans la ligne de timeline (`changements[].avant`).
  *  (e) AUCUNE SUPPRESSION ne se propage : une valeur absente ou nulle ne vide
  *      rien, un contact absent de la liste reste, une fiche ou un contact mis
  *      à la corbeille dans le CRM n'est ni restauré ni recréé.
@@ -54,6 +60,9 @@ final class DossierClientIngest
     public const DISCOVERY_SOURCE = 'console';
 
     public const TITRE = 'Dossier client — console du site';
+
+    /** `metadata.console_recu` : empreinte de la dernière valeur reçue, par colonne. */
+    public const CLE_RECU = 'console_recu';
 
     public function __construct(private readonly SiteSyncClassifier $classifier) {}
 
@@ -106,6 +115,7 @@ final class DossierClientIngest
         }
 
         $tag = $this->etiqueter($workspaceId, (int) $fiche->id);
+        $this->solderEnAttente($workspaceId, (int) $fiche->id, $ref);
         $activityId = $this->journaliser($workspaceId, (int) $fiche->id, $activityRef, $event->occurredAt, $ref, $dossier, $resultat);
 
         return new IngestOutcome(
@@ -167,6 +177,23 @@ final class DossierClientIngest
             ->whereIn('id', $enAttente->pluck('id')->reject(static fn ($id): bool => (int) $id === $activityId)->all())
             ->update(['subject_type' => 'company', 'subject_id' => $companyId]);
 
+        // La décision HUMAINE est retenue : le SIREN envoyé par la console est
+        // accepté pour cette fiche, les messages suivants ne repartent plus en
+        // `desaccord_siren` pour lui (relecture #341).
+        $sirenEnvoye = null;
+        if ($plusRecente !== null && is_array($plusRecente[1]) && is_array($plusRecente[1]['pending_match'] ?? null)) {
+            $candidat = $plusRecente[1]['pending_match']['siren'] ?? null;
+            $sirenEnvoye = is_string($candidat) && $candidat !== '' ? $candidat : null;
+        }
+        if ($sirenEnvoye !== null) {
+            $brut = json_decode(is_string($fiche->metadata ?? null) ? $fiche->metadata : '{}', true);
+            $meta = is_array($brut) ? $brut : [];
+            $meta['console_arbitrage'] = ['siren_accepte' => $sirenEnvoye, 'le' => now()->toAtomString()];
+            DB::table('companies')->where('id', $companyId)->update([
+                'metadata' => json_encode($meta, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+        }
+
         $fiche = DB::table('companies')->where('id', $companyId)->first();
         if ($plusRecente === null || $fiche === null || (int) ($fiche->console_dossier_version ?? 0) >= $versionMax) {
             return ['applique' => false];
@@ -193,12 +220,26 @@ final class DossierClientIngest
         $parRef = DB::table('companies')->where('workspace_id', $workspaceId)->where('console_client_ref', $ref)->lockForUpdate()->first()
             ?? DB::table('companies')->where('workspace_id', $workspaceId)->where('external_ref', $ref)->lockForUpdate()->first();
 
-        if ($parRef !== null) {
-            if ($parRef->deleted_at !== null) {
+        if ($parRef !== null && $parRef->deleted_at !== null) {
+            $parRef = $this->suivreFusion($workspaceId, $parRef, $ref);
+            if ($parRef === null) {
                 return [null, 'fiche_a_la_corbeille'];
             }
-            if ($siren !== null && is_string($parRef->siren ?? null) && $parRef->siren !== '' && $parRef->siren !== $siren) {
-                return [null, 'desaccord_siren'];
+        }
+
+        if ($parRef !== null) {
+            if ($siren !== null && ! $this->sirenAccepte($parRef, $siren)) {
+                $sirenFiche = is_string($parRef->siren ?? null) ? $parRef->siren : '';
+                if ($sirenFiche !== '' && $sirenFiche !== $siren) {
+                    return [null, 'desaccord_siren'];
+                }
+                // La fiche de la référence n'a pas de SIREN, mais une AUTRE
+                // fiche porte celui envoyé : les deux désignent des fiches
+                // différentes → arbitrage, jamais d'application à l'aveugle.
+                if ($sirenFiche === '' && DB::table('companies')->where('workspace_id', $workspaceId)
+                    ->where('siren', $siren)->where('id', '!=', $parRef->id)->exists()) {
+                    return [null, 'desaccord_siren'];
+                }
             }
 
             return [$parRef, null];
@@ -221,6 +262,57 @@ final class DossierClientIngest
         }
 
         return [$parSiren, null];
+    }
+
+    /** Le SIREN envoyé a-t-il été accepté par un rattachement humain ? */
+    private function sirenAccepte(stdClass $fiche, string $siren): bool
+    {
+        $brut = json_decode(is_string($fiche->metadata ?? null) ? $fiche->metadata : '{}', true);
+
+        return is_array($brut) && ($brut['console_arbitrage']['siren_accepte'] ?? null) === $siren;
+    }
+
+    /**
+     * Fiche de la référence à la corbeille : si elle a été ABSORBÉE par une
+     * fusion humaine (`FusionFiches`), la référence console passe sur la fiche
+     * gardée (l'index unique n'en tolère qu'une). Sinon : null (arbitrage).
+     */
+    private function suivreFusion(string $workspaceId, stdClass $absorbee, string $ref): ?stdClass
+    {
+        $chaine = FusionFiches::gardeDe($workspaceId, (int) $absorbee->id);
+        if ($chaine === null) {
+            return null;
+        }
+        $garde = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $chaine['garde'])->lockForUpdate()->first();
+        if ($garde === null || $garde->deleted_at !== null) {
+            return null;
+        }
+        $refGarde = $garde->console_client_ref ?? null;
+        if (is_string($refGarde) && $refGarde !== '' && $refGarde !== $ref) {
+            return null;
+        }
+
+        DB::table('companies')->where('id', $absorbee->id)->where('console_client_ref', $ref)->update(['console_client_ref' => null]);
+        $version = max((int) ($garde->console_dossier_version ?? 0), (int) ($absorbee->console_dossier_version ?? 0));
+        DB::table('companies')->where('id', $garde->id)->update(['console_client_ref' => $ref, 'console_dossier_version' => $version ?: null]);
+
+        return DB::table('companies')->where('id', $garde->id)->first();
+    }
+
+    /**
+     * Le client est rapproché : ses lignes encore en attente d'arbitrage (un
+     * message parti « sans SIREN » avant qu'il en reçoive un) sont rattachées
+     * à la fiche, au lieu de rester dans « Personnes à rattacher ».
+     */
+    private function solderEnAttente(string $workspaceId, int $companyId, string $ref): void
+    {
+        DB::table('activities')
+            ->where('workspace_id', $workspaceId)
+            ->where('kind', DossierClient::EVENT_TYPE)
+            ->whereNull('subject_id')
+            ->whereRaw("payload -> 'pending_match' ->> 'subject_ref' = ?", [$ref])
+            ->whereRaw("payload -> 'arbitrage_dismissed' IS NULL")
+            ->update(['subject_type' => 'company', 'subject_id' => $companyId]);
     }
 
     /**
@@ -289,7 +381,7 @@ final class DossierClientIngest
             'discovery_source' => self::DISCOVERY_SOURCE,
             'quality_score' => 0,
             'signals' => '{}',
-            'metadata' => json_encode(['console' => $dossier->metadonnees()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'metadata' => json_encode(['console' => $dossier->metadonnees(), self::CLE_RECU => self::empreintes($valeurs)], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             // Une fiche que le canal CRÉE n'était dans aucune prospection :
             // `prospect`, et l'étape « client » seulement quand la facture
             // est établie ET que le drapeau est ouvert.
@@ -322,11 +414,13 @@ final class DossierClientIngest
             'denomination' => is_string($entreprise['name'] ?? null) ? $entreprise['name'] : null,
         ];
 
-        [$maj, $changements, $ignores, $origines] = $this->trancher($fiche, $proposes, $quand, ['denomination']);
-
         $brut = json_decode(is_string($fiche->metadata ?? null) ? $fiche->metadata : '{}', true);
         $metadonnees = is_array($brut) ? $brut : [];
+
+        [$maj, $changements, $ignores, $origines, $recus] = $this->trancher($fiche, $proposes, $quand, self::recus($metadonnees), ['denomination']);
+
         $metadonnees['console'] = $dossier->metadonnees();
+        $metadonnees[self::CLE_RECU] = $recus;
         $maj['metadata'] = json_encode($metadonnees, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $maj['legal_basis'] = $this->classifier->mergeLegalBasis(
@@ -367,11 +461,17 @@ final class DossierClientIngest
     /**
      * LA RÈGLE DU CONFLIT, écrite une fois pour les fiches et les personnes.
      *
+     * Un champ dont la valeur envoyée est IDENTIQUE à la dernière reçue de la
+     * console n'est pas proposé du tout : la console ne l'a pas changé, ce
+     * que le CRM en a fait depuis (retouche, correction) reste (relecture
+     * #341, bloquant 1).
+     *
      * @param  array<string, ?string>  $proposes  colonne => valeur de la console
+     * @param  array<string, string>  $recus  colonne => empreinte de la dernière valeur reçue
      * @param  list<string>  $remplirSeulement  colonnes jamais remplacées, seulement remplies
-     * @return array{0: array<string, string>, 1: list<array<string, mixed>>, 2: list<array<string, mixed>>, 3: array{0: array<string, string>, 1: array<string, string>}}
+     * @return array{0: array<string, string>, 1: list<array<string, mixed>>, 2: list<array<string, mixed>>, 3: array{0: array<string, string>, 1: array<string, string>}, 4: array<string, string>}
      */
-    private function trancher(stdClass $ligne, array $proposes, DateTimeImmutable $quand, array $remplirSeulement = []): array
+    private function trancher(stdClass $ligne, array $proposes, DateTimeImmutable $quand, array $recus, array $remplirSeulement = []): array
     {
         $origines = OriginesDesChamps::decoder($ligne->field_origins ?? null);
         $dates = OriginesDesChamps::decoder($ligne->field_origins_at ?? null);
@@ -384,6 +484,11 @@ final class DossierClientIngest
             if ($valeur === null) {
                 continue; // (e) une valeur absente ne vide jamais rien
             }
+            $empreinte = self::empreinte($valeur);
+            if (($recus[$colonne] ?? null) === $empreinte) {
+                continue; // inchangée côté console : rien à proposer
+            }
+            $recus[$colonne] = $empreinte;
             $actuelle = $ligne->{$colonne} ?? null;
             $actuelle = is_string($actuelle) ? trim($actuelle) : ($actuelle === null ? null : (string) $actuelle);
             if ($actuelle === $valeur) {
@@ -421,7 +526,7 @@ final class DossierClientIngest
             $dates[$colonne] = $quand->format(DATE_ATOM);
         }
 
-        return [$maj, $changements, $ignores, [$origines, $dates]];
+        return [$maj, $changements, $ignores, [$origines, $dates], $recus];
     }
 
     /**
@@ -442,8 +547,7 @@ final class DossierClientIngest
 
             // L'opposition gagne partout : une personne opposée n'est ni créée
             // ni modifiée (anti-réinsertion, même empreinte que le site).
-            if ($c['email'] !== null
-                && DB::table('opt_out')->where('scope', 'business')->where('email_hash', ListeSuppression::empreinte($c['email']))->exists()) {
+            if ($this->estOppose($c['email'], $c['telephone'])) {
                 $bilan['ignores'][] = ['ref' => $c['ref'], 'raison' => 'opposition'];
 
                 continue;
@@ -494,7 +598,7 @@ final class DossierClientIngest
                     'company_id' => $companyId,
                     'discovery_source' => self::DISCOVERY_SOURCE,
                     'sources' => json_encode([self::DISCOVERY_SOURCE], JSON_THROW_ON_ERROR),
-                    'metadata' => json_encode(['console_ref' => $refContact], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+                    'metadata' => json_encode(['console_ref' => $refContact, self::CLE_RECU => self::empreintes($valeurs)], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
                     'person_key' => $c['person_key'],
                     'legal_basis' => $base,
                     'created_at' => now(),
@@ -504,7 +608,10 @@ final class DossierClientIngest
                 continue;
             }
 
-            [$maj, $changements, $ignores, $origines] = $this->trancher($existant, $proposes, $quand);
+            $meta = json_decode(is_string($existant->metadata ?? null) ? $existant->metadata : '{}', true);
+            $meta = is_array($meta) ? $meta : [];
+
+            [$maj, $changements, $ignores, $origines, $recus] = $this->trancher($existant, $proposes, $quand, self::recus($meta));
 
             // Le nom alimente `normalized_hash` (UNIQUE) : pas d'écriture qui
             // entrerait en collision avec une autre personne de la fiche.
@@ -518,9 +625,8 @@ final class DossierClientIngest
                 }
             }
 
-            $meta = json_decode(is_string($existant->metadata ?? null) ? $existant->metadata : '{}', true);
-            $meta = is_array($meta) ? $meta : [];
             $meta['console_ref'] = $refContact;
+            $meta[self::CLE_RECU] = $recus;
             $maj['metadata'] = json_encode($meta, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if (($existant->person_key ?? null) === null && $c['person_key'] !== null) {
                 $maj['person_key'] = $c['person_key'];
@@ -617,6 +723,81 @@ final class DossierClientIngest
             'postcode' => $event->str('company', 'postcode'),
             'city' => $event->str('company', 'city'),
         ], static fn (?string $v): bool => $v !== null);
+    }
+
+    /**
+     * Empreinte (jamais la valeur en clair : un effacement art. 17 vide les
+     * colonnes, il ne doit rien rester dans `metadata`). Espaces repliés,
+     * minuscules : « 01 40 » et « 0140 », « A@x.fr » et « a@x.fr » sont la
+     * même valeur reçue.
+     */
+    private static function empreinte(string $valeur): string
+    {
+        return hash('sha256', mb_strtolower((string) preg_replace('/\s+/u', '', $valeur)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $valeurs
+     * @return array<string, string>
+     */
+    private static function empreintes(array $valeurs): array
+    {
+        $out = [];
+        foreach ($valeurs as $colonne => $valeur) {
+            if (is_string($valeur)) {
+                $out[$colonne] = self::empreinte($valeur);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<mixed>  $metadonnees
+     * @return array<string, string>
+     */
+    private static function recus(array $metadonnees): array
+    {
+        $brut = $metadonnees[self::CLE_RECU] ?? null;
+        if (! is_array($brut)) {
+            return [];
+        }
+        $out = [];
+        foreach ($brut as $colonne => $empreinte) {
+            if (is_string($colonne) && is_string($empreinte)) {
+                $out[$colonne] = $empreinte;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Opposition (univers business) sur l'adresse OU le téléphone — même
+     * requête que `ScrapedRecordIngestService::estOppose`.
+     */
+    private function estOppose(?string $email, ?string $telephone): bool
+    {
+        $email = $email !== null && trim($email) !== '' ? $email : null;
+        $variantes = $telephone !== null ? ListeSuppression::variantesTelephone($telephone) : [];
+        if ($email === null && $variantes === []) {
+            return false;
+        }
+
+        return DB::table('opt_out')
+            ->where('scope', 'business')
+            ->where(function ($q) use ($email, $variantes): void {
+                if ($email !== null) {
+                    $q->orWhere('email_hash', ListeSuppression::empreinte($email));
+                }
+                if ($variantes !== []) {
+                    $q->orWhereRaw(
+                        "regexp_replace(phone, '[^0-9]', '', 'g') IN (" . implode(', ', array_fill(0, count($variantes), '?')) . ')',
+                        $variantes,
+                    );
+                }
+            })
+            ->exists();
     }
 
     private function date(mixed $valeur): ?DateTimeImmutable

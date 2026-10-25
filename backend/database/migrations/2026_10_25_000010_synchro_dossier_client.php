@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\DB;
  *     fiche venue d'un formulaire y porte déjà `site:submission:<uuid>`.
  *     L'index unique partiel est posé par `2026_10_25_000020` (CONCURRENTLY) ;
  *  3. `activities_kind_check` reconstruit depuis `Taxonomy::ACTIVITY_KINDS`
- *     (gagne `dossier_client_synchro`), `NOT VALID` puis `VALIDATE` ;
+ *     (gagne `dossier_client_synchro`), `NOT VALID` ; le `VALIDATE` est fait
+ *     HORS transaction par `2026_10_25_000020` ;
  *  4. le déclencheur `refuser_suppression_fiche_protegee` réinstallé avec le
  *     cinquième tag protégé `src:console-client` (sa liste est FIGÉE,
  *     `FichesProtegeesTest` lit la fonction installée).
@@ -53,7 +54,9 @@ return new class extends Migration
             'ALTER TABLE activities ADD CONSTRAINT activities_kind_check
              CHECK (kind IS NULL OR kind IN (' . Taxonomy::sqlList(Taxonomy::ACTIVITY_KINDS) . ')) NOT VALID',
         );
-        DB::statement('ALTER TABLE activities VALIDATE CONSTRAINT activities_kind_check');
+        // `VALIDATE` hors de cette transaction (`2026_10_25_000020`) : ici il
+        // garderait le verrou EXCLUSIF de l'`ADD CONSTRAINT` pendant toute la
+        // relecture d'`activities` (relecture #341, patron `2026_09_29_000002`).
 
         $this->installerProtection(self::SLUGS);
     }

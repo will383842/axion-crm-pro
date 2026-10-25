@@ -3,6 +3,7 @@
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\GardeConsoleClient;
 use App\Crm\Console\FilesATraiter;
+use App\Crm\Doublons\Rapprochement;
 use App\Crm\FichesProtegees;
 use App\Crm\Ingest\DossierClient;
 use App\Crm\Ingest\SiteSyncEvent;
@@ -352,6 +353,113 @@ test('RETOUCHE MANUELLE récente (console du CRM) : jamais écrasée par une val
     expect($ignore['raison'])->toBe('valeur_crm_plus_recente');
 });
 
+test('RETOUCHE MANUELLE puis message PLUS RÉCENT au même téléphone : la retouche reste (la console n a rien changé)', function () {
+    dcsPost(dcsEvenement())->assertOk();
+    $fiche = dcsFiche();
+    $contact = DB::table('contacts')->where('company_id', $fiche->id)->first();
+    // Retouches faites dans le CRM, APRÈS v1, sur la fiche et la personne.
+    DB::table('companies')->where('id', $fiche->id)->update([
+        'phone' => '+33188888888',
+        'field_origins' => json_encode(['phone' => 'manual']),
+        'field_origins_at' => json_encode(['phone' => '2026-10-20T11:00:00+02:00']),
+    ]);
+    DB::table('contacts')->where('id', $contact->id)->update(['role' => 'Présidente', 'field_origins' => json_encode(['role' => 'manual'])]);
+
+    // v2, PLUS RÉCENTE que les retouches, ne change que la rue : téléphone et
+    // fonction identiques à ceux de v1.
+    dcsPost(dcsEvenement(['version' => 2, 'rue' => '13 rue des Tests'], ['occurred_at' => '2026-10-23T10:00:00+02:00']))->assertOk();
+
+    expect(dcsFiche()->phone)->toBe('+33188888888')
+        ->and(dcsFiche()->address)->toBe('13 rue des Tests')
+        ->and(DB::table('contacts')->where('id', $contact->id)->value('role'))->toBe('Présidente');
+
+    // v3 change VRAIMENT le téléphone : le plus récent gagne, l'ancien est à l'historique.
+    dcsPost(dcsEvenement(['version' => 3, 'rue' => '13 rue des Tests', 'telephone' => '+33140000003'], ['occurred_at' => '2026-10-24T10:00:00+02:00']))->assertOk();
+    expect(dcsFiche()->phone)->toBe('+33140000003')
+        ->and(collect(dcsDernierJournal()['changements'])->firstWhere('champ', 'phone')['avant'])->toBe(['phone' => '+33188888888'])
+        // Jamais la valeur en clair dans `metadata` : une empreinte.
+        ->and(json_decode(dcsFiche()->metadata, true)['console_recu']['phone'])->not->toContain('3314');
+});
+
+test('ARBITRAGE en désaccord de SIREN : la décision humaine est retenue, le message suivant ne repart pas en arbitrage', function () {
+    config(['crm.console_v2' => true]);
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+
+    dcsPost(dcsEvenement())->assertOk();
+    $fiche = dcsFiche();
+    $autreSiren = ['company' => ['siren' => '900000888', 'name' => 'ZZ CLIENT CONSOLE SAS']];
+    dcsPost(dcsEvenement(['version' => 2, 'rue' => 'RUE ARBITREE'], $autreSiren))->assertOk()->assertJsonPath('result.status', 'pending_match');
+
+    setPermissionsTeamId($this->espace);
+    $user = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'dcs-arb2-' . Str::random(8) . '@example.invalid', 'name' => 'ZZ admin',
+        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->espace, 'first_login_completed_at' => now(),
+    ]);
+    $user->assignRole('admin');
+    $this->actingAs($user);
+
+    $ligne = (int) FilesATraiter::aRattacher($this->espace)->value('id');
+    $this->postJson("/api/v1/crm/arbitrage/{$ligne}/attach", ['company_id' => $fiche->id])->assertOk();
+    expect(dcsFiche()->address)->toBe('RUE ARBITREE');
+
+    dcsPost(dcsEvenement(['version' => 3, 'rue' => 'RUE SUIVANTE'], $autreSiren))->assertOk()->assertJsonPath('result.status', 'updated');
+    expect(dcsFiche()->address)->toBe('RUE SUIVANTE')
+        ->and(dcsFiche()->siren)->toBe('900000777')
+        ->and(FilesATraiter::aRattacher($this->espace)->count())->toBe(0);
+});
+
+test('la fiche de la référence n a PAS de SIREN mais une AUTRE fiche porte celui envoyé → arbitrage', function () {
+    $sansSiren = DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => null, 'denomination' => 'ZZ SANS SIREN',
+        'console_client_ref' => 'site:client:' . DCS_CLIENT,
+        'signals' => '{}', 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('companies')->insert([
+        'workspace_id' => $this->espace, 'siren' => '900000777', 'denomination' => 'ZZ PORTEUSE DU SIREN',
+        'signals' => '{}', 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    dcsPost(dcsEvenement(['version' => 2]))->assertOk()->assertJsonPath('result.status', 'pending_match');
+
+    expect(DB::table('companies')->where('id', $sansSiren)->value('address'))->toBeNull()
+        ->and(DB::table('companies')->count())->toBe(2);
+});
+
+test('FUSION humaine : la fiche console absorbée renvoie vers la fiche gardée, qui reçoit la référence', function () {
+    dcsPost(dcsEvenement())->assertOk();
+    $absorbee = dcsFiche();
+    $garde = DB::table('companies')->insertGetId([
+        'workspace_id' => $this->espace, 'siren' => '900000776', 'denomination' => 'ZZ GARDEE',
+        'signals' => '{}', 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('companies')->where('id', $absorbee->id)->update(['deleted_at' => now()]);
+    DB::table('fusions_fiches')->insert([
+        'workspace_id' => $this->espace, 'garde_id' => $garde, 'absorbee_id' => $absorbee->id,
+        'motif' => array_key_first(Rapprochement::MOTIFS), 'mode' => 'manuel',
+        'journal' => '{}', 'absorbee_supprimee_le' => now(), 'created_at' => now(),
+    ]);
+
+    // Sans SIREN : seule la référence (et la fusion) désigne la fiche.
+    dcsPost(dcsEvenement(['version' => 2, 'rue' => 'RUE APRES FUSION'], ['company' => ['name' => 'ZZ CLIENT CONSOLE SAS']]))
+        ->assertOk()->assertJsonPath('result.status', 'updated');
+
+    expect(DB::table('companies')->where('id', $garde)->value('console_client_ref'))->toBe('site:client:' . DCS_CLIENT)
+        ->and(DB::table('companies')->where('id', $garde)->value('address'))->toBe('RUE APRES FUSION')
+        ->and(DB::table('companies')->where('id', $absorbee->id)->value('console_client_ref'))->toBeNull()
+        ->and(DB::table('companies')->where('id', $absorbee->id)->value('deleted_at'))->not->toBeNull();
+});
+
+test('un client parti en arbitrage SANS SIREN puis reçu AVEC : ses anciennes lignes quittent « Personnes à rattacher »', function () {
+    dcsPost(dcsEvenement([], ['company' => ['name' => 'ZZ BIENTOT SIREN']]))->assertOk()->assertJsonPath('result.status', 'pending_match');
+    expect(FilesATraiter::aRattacher($this->espace)->count())->toBe(1);
+
+    dcsPost(dcsEvenement(['version' => 2]))->assertOk()->assertJsonPath('result.status', 'created');
+
+    expect(FilesATraiter::aRattacher($this->espace)->count())->toBe(0)
+        ->and(DB::table('activities')->where('kind', 'dossier_client_synchro')->where('subject_id', dcsFiche()->id)->count())->toBe(2);
+});
+
 test('AUCUNE suppression ne se propage : champ absent, contact absent, contact à la corbeille', function () {
     dcsPost(dcsEvenement(['contacts' => [
         ['ref' => 'c-1', 'nom' => 'ZZ UN', 'email' => 'zz.un@client.example.invalid'],
@@ -383,6 +491,17 @@ test('une personne OPPOSÉE n est ni créée ni modifiée', function () {
     dcsPost(dcsEvenement())->assertOk();
 
     expect(DB::table('contacts')->count())->toBe(0);
+});
+
+test('une personne OPPOSÉE par son TÉLÉPHONE (sans e-mail) n est pas créée, quelle que soit l écriture du numéro', function () {
+    DB::table('opt_out')->insert([
+        'email' => null, 'email_hash' => null, 'phone' => '06 00 00 00 22',
+        'scope' => 'business', 'source' => 'test', 'created_at' => now(),
+    ]);
+
+    dcsPost(dcsEvenement(['contacts' => [['ref' => 'c-9', 'nom' => 'ZZ SANS MAIL', 'telephone' => '+33600000022']]]))->assertOk();
+
+    expect(DB::table('contacts')->where('last_name', 'ZZ SANS MAIL')->exists())->toBeFalse();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

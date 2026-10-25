@@ -472,9 +472,10 @@ test('B10-016-PORTEE PLAFOND — les lectures DB::table aveugles a deleted_at n 
     // table ne bouge, ce serait le balayage qui derive, pas le code.
     // 88 -> 93 le 2026-09-29 : les cinq lecteurs de l'effacement art. 17
     // (plafonds `companies` et `contacts` ci-dessus, même justification).
-    // 93 -> 103 le 2026-10-25 : les dix lectures de la synchro du dossier
-    // client (plafonds `companies` et `contacts` ci-dessus).
-    expect(count($aveugles))->toBeLessThanOrEqual(103);
+    // 93 -> 104 le 2026-10-25 : les lectures de la synchro du dossier client
+    // (plafonds `companies` et `contacts` ci-dessus) ; 104 est le compte
+    // MESURÉ par la CI de la PR #341, pas une estimation.
+    expect(count($aveugles))->toBeLessThanOrEqual(104);
 });
 
 /**

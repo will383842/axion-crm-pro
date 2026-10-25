@@ -216,8 +216,8 @@ it('personne physique (libellÃ© ou code) : fiche sans nom ni adresse, garde d\'Ã
     $espace = F::espace();
 
     $sortie = lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
-        ['siret' => '94000011100011', 'statut' => 'Personne Physique', 'nom_long' => 'ZZ TITULAIRE UN'],
-        ['siret' => '94000011200011', 'statut' => '', 'statut_code' => '73', 'nom_long' => 'ZZ TITULAIRE DEUX'],
+        ['siret' => '94000011100011', 'statut' => 'Personne Physique', 'nom_long' => 'ZZ TITULAIRE UN', 'dep' => '75'],
+        ['siret' => '94000011200011', 'statut' => '', 'statut_code' => '73', 'nom_long' => 'ZZ TITULAIRE DEUX', 'dep' => '75'],
         ['siret' => '94000011300011'],
     ]), '--workspace' => $espace, '--apply' => true]);
 
@@ -225,7 +225,7 @@ it('personne physique (libellÃ© ou code) : fiche sans nom ni adresse, garde d\'Ã
         $f = DB::table('companies')->where('siren', $siren)->first();
         expect($f->denomination)->toBe('Entreprise individuelle pharmacie')
             ->and($f->postcode)->toBeNull()->and($f->city)->toBeNull()->and($f->city_name)->toBeNull()
-            ->and($f->naf)->toBe('47.73Z')->and($f->department_code)->toBe('99')->and($f->region_code)->not->toBeNull()
+            ->and($f->naf)->toBe('47.73Z')->and($f->department_code)->toBe('75')->and($f->region_code)->not->toBeNull()
             ->and($f->legal_form)->toBe('1000')->and($f->discovery_source)->toBe('finess');
         $meta = json_decode($f->metadata, true);
         expect($meta['personne_physique'])->toBeTrue()->and($meta['legal_form'])->toBe('1000')->and($meta['source'])->toBe('finess');

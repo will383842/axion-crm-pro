@@ -1,0 +1,83 @@
+name: Pharmacies — écarter les fermées (prod, jamais de suppression)
+
+# Lance `crm:pharmacies:ecarter-fermees` sur la prod. Dry-run par défaut :
+# totaux seulement. `apply` pose la corbeille (deleted_at) + metadata, SANS
+# jamais supprimer. `apply` est refusé sauf confirmer = OUI.
+# Seuls des totaux sont affichés (dépôt public : aucune liste nominative).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run (défaut) ou apply"
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      confirmer:
+        description: "Écrire OUI pour autoriser apply"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pharmacies-ecarter
+  cancel-in-progress: false
+
+jobs:
+  ecarter:
+    name: Écarter les pharmacies fermées
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Garde-fou apply
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMER: ${{ inputs.confirmer }}
+        run: |
+          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
+            echo "REFUS : apply exige confirmer = OUI"; exit 1
+          fi
+
+      - name: Télécharger FINESS (officines)
+        run: |
+          set -e
+          curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          unzip -q -o finess.zip etablissements.csv
+          python3 - <<'PY'
+          import csv
+          src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
+          out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
+          out.writerow(['siret', 'categorie', 'etat'])
+          for r in src:
+              if r['categorie'] in {'620', '627', '628', '629', '641', '690'}:
+                  out.writerow([r['siret'], r['categorie'], r['etat']])
+          PY
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Lancer la commande
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -e
+          OPT=""; [ "$MODE" = "apply" ] && OPT="--apply"
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          cat finess_pharma.csv | $SSH "cat > /tmp/finess_pharma.csv"
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api php artisan crm:pharmacies:ecarter-fermees --finess=/tmp/finess_pharma.csv $OPT < /dev/null"
+
+      - name: Nettoyage
+        if: always()
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" \
+            "rm -f /tmp/finess_pharma.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_pharma.csv" || true
+          rm -f finess.zip etablissements.csv finess_pharma.csv

@@ -54,6 +54,7 @@ export const MOTIFS_EXCLUSION: Record<string, string> = {
   personnelle: 'Adresse personnelle (gmail…)',
   opposition: 'Ne plus écrire (opposition ou suppression)',
   adresse_partagee: 'Cabinet ou domiciliation partagée',
+  fiche_console: 'Client de la console du site (jamais en campagne)',
   // Audience presse : la provenance de l'adresse (`AdressePresseFiable`).
   site_devine: 'Adresse tirée d’un site deviné, non vérifié',
   journaliste_sans_acces: 'Journaliste sans accès « e-mail de rédaction »',

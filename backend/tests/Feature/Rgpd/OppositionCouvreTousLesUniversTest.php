@@ -284,8 +284,13 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // portée `business` et lit `opt_out` dans cette même portée, pour ne pas
     // doubler une ligne (idempotence). L'effacement couvre `opt_out` comme
     // avant (il n'efface jamais une opposition).
+    // Synchro du dossier client de la console (2026-10-25) : +1.
+    // `DossierClientIngest` lit `opt_out` en portée `business` pour ne jamais
+    // créer ni modifier une personne opposée (l'opposition gagne). Il n'écrit
+    // rien dans cette table, et ne lit pas le vivier.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
+        'app/Crm/Ingest/DossierClientIngest.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Joignabilite/Joignabilite.php',

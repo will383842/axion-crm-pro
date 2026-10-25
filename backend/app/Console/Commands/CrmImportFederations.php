@@ -600,7 +600,7 @@ class CrmImportFederations extends Command
             if ($actuel !== null && trim((string) $actuel) !== '') {
                 continue;
             }
-            if (($origines[$colonne] ?? null) === 'declared') {
+            if (in_array($origines[$colonne] ?? null, Taxonomy::FIELD_ORIGINS_PROTEGEES, true)) {
                 continue;
             }
             $maj[$colonne] = $valeur;

@@ -89,6 +89,16 @@ final class FichesProtegees
     public const TAG_PRESSE = 'src:scraping-presse-2026';
 
     /**
+     * Fiches nées ou rattachées par la synchro du DOSSIER CLIENT de la console
+     * du site (`DossierClientIngest`, 25/10/2026). Ordre permanent de Will :
+     * AUCUNE destruction des données clients. Ni purge, ni enrichissement
+     * automatique, ni reclassement, ni audience ; leurs personnes sont aussi
+     * écartées de toute campagne (`EligibiliteAdresse::FICHE_CONSOLE`). Ce tag
+     * n'ouvre AUCUN segment (`Segments::tag`).
+     */
+    public const TAG_CONSOLE_CLIENT = 'src:console-client';
+
+    /**
      * ⚠️ Chaque slug ajouté ici exige une NOUVELLE migration qui réinstalle le
      * déclencheur de la base (sa liste est figée) — `FichesProtegeesTest` lit la
      * fonction installée et rougit sinon.
@@ -100,6 +110,7 @@ final class FichesProtegees
         self::TAG_FEDERATIONS,
         self::TAG_GOFAB,
         self::TAG_PRESSE,
+        self::TAG_CONSOLE_CLIENT,
     ];
 
     /**

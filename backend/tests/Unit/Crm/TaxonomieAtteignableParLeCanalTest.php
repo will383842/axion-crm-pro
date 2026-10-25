@@ -37,6 +37,7 @@ declare(strict_types=1);
  * pure et `SiteSyncEvent::fromArray()` ne fait que valider son entrée.
  */
 
+use App\Crm\Ingest\DossierClient;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Ingest\SiteSyncEvent;
 use App\Crm\Taxonomy;
@@ -48,6 +49,13 @@ use App\Crm\Taxonomy;
 function evenementDuCanal(string $eventType, ?string $formType): ?SiteSyncEvent
 {
     if ($eventType === 'form_submission' && $formType === null) {
+        return null;
+    }
+    // Le dossier client de la console (25/10/2026) ne passe PAS par le
+    // classifieur : `DossierClientIngest` crée toujours en `prospect` et ne
+    // change jamais le type d'une fiche existante. Son contrat (référence
+    // `site:client:<uuid>`, `payload.dossier`) n'est pas celui d'un formulaire.
+    if ($eventType === DossierClient::EVENT_TYPE) {
         return null;
     }
 

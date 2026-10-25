@@ -69,6 +69,9 @@ class GovernedTagsSeeder extends Seeder
         'src:guide-ia' => ['name' => 'Guide IA entreprise', 'category' => 'intent'],
         'src:chatbot' => ['name' => 'Chatbot', 'category' => 'intent'],
         'src:avis-client' => ['name' => 'Avis client', 'category' => 'intent'],
+        // Synchro du dossier client de la console (25/10/2026) — tag PROTÉGÉ
+        // (`FichesProtegees::TAG_CONSOLE_CLIENT`).
+        'src:console-client' => ['name' => 'Dossier client (console du site)', 'category' => 'intent'],
 
         // Source d'acquisition — COLLECTE : depuis le lot L3, ces tags sont
         // DÉRIVÉS du registre `scraping_sources` (un tag `src:scraping-<slug>`

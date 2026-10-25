@@ -145,6 +145,16 @@ return [
         // Rollback = remettre à false, par un DÉPLOIEMENT (un `restart` ne
         // relit pas l'environnement).
         'personnes_enabled' => env('CRM_INGEST_PERSONNES_ENABLED', false),
+        // Synchro AUTOMATIQUE du dossier client de la console du site
+        // (25/10/2026, `DossierClientIngest`). Fermé (défaut) : les messages
+        // `dossier_client_synchro` sont refusés en 503 et restent en attente
+        // côté site. À ouvrir APRÈS `migrate` (colonnes `console_*`).
+        'dossier_enabled' => env('CRM_INGEST_DOSSIER_ENABLED', false),
+        // Le CRM passe la fiche à l'étape « client » quand la console dit que
+        // la facture est établie (`facture_emise = true`). Décision recommandée
+        // à Will (25/10/2026), fermée par défaut : tant qu'elle l'est, la
+        // synchro ne change JAMAIS l'étape d'une fiche.
+        'dossier_client_stage' => env('CRM_SYNC_DOSSIER_CLIENT_STAGE', false),
         'hmac_secret' => env('SITE_SYNC_HMAC_SECRET', ''),
         'business_workspace' => env('CRM_INGEST_BUSINESS_WORKSPACE', 'axion-ia'),
         // Fenêtre de tolérance de l'horodatage signé, en secondes. Variable

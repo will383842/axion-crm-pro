@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Console\ConsoleAccess;
 use App\Crm\Console\FilesATraiter;
 use App\Crm\Ingest\ContactUpserter;
+use App\Crm\Ingest\DossierClient;
+use App\Crm\Ingest\DossierClientIngest;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Ingest\SiteSyncIngestService;
 use App\Support\MasquageCoordonnees;
@@ -40,6 +42,7 @@ class ArbitrageController extends ConsoleController
         private readonly ContactUpserter $contacts,
         private readonly SiteSyncClassifier $classifier,
         private readonly SiteSyncIngestService $ingestion,
+        private readonly DossierClientIngest $dossiers,
     ) {}
 
     /**
@@ -170,12 +173,29 @@ class ArbitrageController extends ConsoleController
                     $contactId = $upserted === null ? null : $upserted[0];
                 }
 
+                // Dossier client de la console (25/10/2026) : le rattachement
+                // pose la référence console sur la fiche choisie et applique
+                // le dossier le plus récent, avec les mêmes garde-fous que la
+                // synchro automatique. Le geste est humain : c'est la SEULE
+                // façon de lier un client sans SIREN, jamais une fusion.
+                $dossier = null;
+                if (($activity->kind ?? null) === DossierClient::EVENT_TYPE) {
+                    $refClient = $this->stringOrNull($pending, 'subject_ref');
+                    if ($refClient === null) {
+                        abort(409, "Ce dossier client n'a pas de référence console.");
+                    }
+                    $dossier = $this->dossiers->appliquerApresArbitrage($workspaceId, $companyId, $refClient, $activityId);
+                }
+
                 $payload['arbitrage'] = [
                     'attached_at' => now()->toIso8601String(),
                     'attached_by' => (string) $this->currentUser($request)->getKey(),
                     'company_id' => $companyId,
                     'contact_id' => $contactId,
                 ];
+                if ($dossier !== null) {
+                    $payload['arbitrage']['dossier'] = $dossier;
+                }
 
                 DB::table('activities')->where('id', $activityId)->update([
                     'subject_type' => 'company',

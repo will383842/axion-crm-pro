@@ -47,6 +47,7 @@ final class SiteSyncIngestService
         private readonly SiteSyncClassifier $classifier,
         private readonly ContactUpserter $contacts,
         private readonly PersonnesIngestService $personnes,
+        private readonly DossierClientIngest $dossiers,
     ) {}
 
     public function ingest(SiteSyncEvent $event): IngestOutcome
@@ -72,6 +73,16 @@ final class SiteSyncIngestService
             throw SiteSyncRejection::unavailable(
                 'personnes_ingest_disabled',
                 'Le flux « personnes » (lettre et guide) est fermé (CRM_INGEST_PERSONNES_ENABLED). La ligne reste en attente côté site.',
+            );
+        }
+
+        // Synchro du dossier client de la console (25/10/2026) — drapeau
+        // fermé : 503, la ligne reste en attente côté site, rien n'est perdu.
+        // Le drapeau s'ouvre APRÈS `migrate` (colonnes `console_*`).
+        if ($event->eventType === DossierClient::EVENT_TYPE && ! DossierClientIngest::drapeauOuvert()) {
+            throw SiteSyncRejection::unavailable(
+                'dossier_ingest_disabled',
+                'La synchro du dossier client est fermée (CRM_INGEST_DOSSIER_ENABLED). La ligne reste en attente côté site.',
             );
         }
 
@@ -123,6 +134,12 @@ final class SiteSyncIngestService
                 subjectId: is_numeric($already->subject_id ?? null) ? (int) $already->subject_id : null,
                 activityId: (int) $already->id,
             );
+        }
+
+        // Dossier client de la console : son propre chemin, ses propres
+        // garde-fous (`DossierClientIngest`) — jamais `upsertBusiness`.
+        if ($event->eventType === DossierClient::EVENT_TYPE) {
+            return $this->dossiers->ingerer($event, $workspaceId, $activityRef);
         }
 
         // Lot L4-C — la lettre et le guide vers `personnes`, AVANT

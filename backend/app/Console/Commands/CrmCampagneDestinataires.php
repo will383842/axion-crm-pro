@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Crm\Campagnes\AdressePresseFiable;
 use App\Crm\Campagnes\EligibiliteAdresse;
+use App\Crm\Campagnes\GardeConsoleClient;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Doublons\AdressesPartagees;
@@ -118,6 +119,7 @@ class CrmCampagneDestinataires extends Command
         EligibiliteAdresse::DEJA_INFORMEE => 'ecartees_deja_informees',
         EligibiliteAdresse::OPPOSITION => 'ecartees_opposition',
         EligibiliteAdresse::ADRESSE_PARTAGEE => 'ecartees_adresse_partagee',
+        EligibiliteAdresse::FICHE_CONSOLE => 'ecartees_fiche_console',
     ];
 
     public function handle(): int
@@ -169,7 +171,7 @@ class CrmCampagneDestinataires extends Command
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
             'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_fermee', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
-            'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'adresses_partagees', 'sans_evenement_a_venir',
+            'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'ecartees_fiche_console', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
             // Compteurs propres au segment presse (`AdressePresseFiable`).
@@ -221,10 +223,23 @@ class CrmCampagneDestinataires extends Command
             fn (): array => AdressesPartagees::exclues($workspaceId, array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
         );
 
+        // Clients de la console du site (25/10/2026) : jamais destinataires,
+        // question posée en une fois, DANS le contexte d'espace (RLS).
+        $consoleExclues = WorkspaceContext::run(
+            $workspaceId,
+            fn (): array => GardeConsoleClient::exclues($workspaceId, array_map(static fn (int|string $e): string => (string) $e, array_keys($parAdresse))),
+        );
+
         $lignes = [];
         foreach ($parAdresse as $email => $occurrences) {
             $bilan['adresses_distinctes']++;
             $email = (string) $email;
+
+            if (isset($consoleExclues[$email])) {
+                $bilan['ecartees_fiche_console']++;
+
+                continue;
+            }
 
             if ($presse) {
                 // La PROVENANCE d'abord (`AdressePresseFiable`) : aucun

@@ -118,10 +118,17 @@ final class EligibiliteAdresse
 
     public const ADRESSE_PARTAGEE = 'adresse_partagee';
 
+    /**
+     * Adresse portée par un client de la console du site (`GardeConsoleClient`,
+     * 25/10/2026) : JAMAIS destinataire d'une campagne. Comme `ADRESSE_PARTAGEE`,
+     * posé APRÈS `motif()`, par paquet et dans le contexte d'espace.
+     */
+    public const FICHE_CONSOLE = 'fiche_console';
+
     /** @var list<string> */
     public const MOTIFS = [
         self::NON_DIFFUSIBLE, self::ENTREPRISE_FERMEE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
-        self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE,
+        self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE, self::FICHE_CONSOLE,
     ];
 
     /**

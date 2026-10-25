@@ -711,7 +711,7 @@ final class Propositions
     /** @param  array<string, mixed>  $origines */
     private function protege(string $entite, stdClass $fiche, string $champ, array $origines): bool
     {
-        if (($origines[$champ] ?? null) === 'declared') {
+        if (in_array($origines[$champ] ?? null, Taxonomy::FIELD_ORIGINS_PROTEGEES, true)) {
             return true;
         }
         $entreprise = $entite === self::ENTREPRISE ? (int) $fiche->id : (int) ($fiche->company_id ?? 0);

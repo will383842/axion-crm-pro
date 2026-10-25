@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
+use App\Crm\Ingest\OriginesDesChamps;
 use App\Crm\Opco\LectureOpco;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Referentiels\LibellesNaf;
 use App\Crm\Sites\QuarantaineSite;
+use App\Crm\Taxonomy;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Jobs\EnrichCompanyJob;
 use App\Models\Company;
@@ -753,7 +755,29 @@ class CompaniesController extends ApiController
             'phone' => ['nullable', 'string', 'max:32'],
             'linkedin_url' => ['nullable', 'url', 'max:255'],
         ]);
-        $company->update($validated);
+        $company->fill($validated);
+        // Synchro console du site ↔ CRM (25/10/2026) — chaque colonne
+        // RÉELLEMENT modifiée ici est notée `manual` dans `field_origins`, avec
+        // sa date dans `field_origins_at` : la synchro du dossier client
+        // (`DossierClientIngest`) n'écrase jamais une retouche manuelle par une
+        // valeur plus ancienne, et les collecteurs ne la réécrivent pas
+        // (`Taxonomy::FIELD_ORIGINS_PROTEGEES`). Une colonne envoyée à
+        // l'identique n'est pas marquée.
+        $modifiees = array_keys($company->getDirty());
+        if ($modifiees !== []) {
+            $brut = $company->getAttributes();
+            $company->forceFill(OriginesDesChamps::marquer(
+                $brut['field_origins'] ?? null,
+                $brut['field_origins_at'] ?? null,
+                $modifiees,
+                Taxonomy::FIELD_ORIGIN_MANUELLE,
+                now()->toIso8601String(),
+                // Fenêtre de déploiement : le code démarre AVANT `migrate`.
+                // Tant que la colonne n'existe pas, on ne l'écrit pas.
+                avecDates: array_key_exists('field_origins_at', $brut),
+            ));
+        }
+        $company->save();
 
         // L'ecriture est faite AVANT le masquage : ce qui part en reponse est
         // masque, ce qui est en base ne l'est pas. Une garde relit la base

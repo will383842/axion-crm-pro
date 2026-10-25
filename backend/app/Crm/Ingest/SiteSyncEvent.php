@@ -55,6 +55,11 @@ final class SiteSyncEvent
         //   - `email_hard_bounced` : rebond dur constaté par le site.
         'lead_magnet_requested',
         'email_hard_bounced',
+        // Synchro console du site → CRM (25/10/2026) : la fiche « dossier
+        // client » de la console, envoyée AUTOMATIQUEMENT à chaque changement
+        // (décision de Will). Contrat de `payload.dossier` : `DossierClient`.
+        // Refusé en 503 tant que `crm.ingest.dossier_enabled` est fermé.
+        DossierClient::EVENT_TYPE,
     ];
 
     /**
@@ -113,6 +118,7 @@ final class SiteSyncEvent
         public readonly array $candidate,
         public readonly array $tags,
         public readonly array $payload,
+        public readonly ?DossierClient $dossier = null,
     ) {}
 
     /**
@@ -161,8 +167,17 @@ final class SiteSyncEvent
         $company = self::section($raw, 'company', self::COMPANY_KEYS);
         $consent = self::section($raw, 'consent', self::CONSENT_KEYS);
         $candidate = self::section($raw, 'candidate', self::CANDIDATE_KEYS);
+        $payload = self::assocArray($raw['payload'] ?? [], 'payload');
 
-        self::assertPerson($person);
+        // Le dossier client n'a pas de « personne » au sens d'un formulaire :
+        // ses interlocuteurs voyagent dans `payload.dossier.contacts`. Son
+        // contrat est vérifié À PART, et plus serré (`DossierClient`).
+        $dossier = null;
+        if ($eventType === DossierClient::EVENT_TYPE) {
+            $dossier = DossierClient::depuisEvenement($subjectRef, $formType, $raw, $person, $company, $consent, $candidate, $payload);
+        } else {
+            self::assertPerson($person);
+        }
         self::assertCompany($company);
 
         return new self(
@@ -177,7 +192,8 @@ final class SiteSyncEvent
             consent: $consent,
             candidate: $candidate,
             tags: self::assertTags($raw['tags'] ?? []),
-            payload: self::assocArray($raw['payload'] ?? [], 'payload'),
+            payload: $payload,
+            dossier: $dossier,
         );
     }
 

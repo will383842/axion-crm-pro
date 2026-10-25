@@ -191,6 +191,15 @@ final class ResolveurDestinataires
             $verdicts[(string) $email] = ($presse ? self::motifProvenance($occ) : null)
                 ?? EligibiliteAdresse::motif((string) $email, $occ);
         }
+        // Clients de la console du site (25/10/2026) : jamais destinataires,
+        // quel que soit le réglage (`GardeConsoleClient`, sous le contexte
+        // d'espace ouvert par `resoudre`).
+        $console = GardeConsoleClient::exclues($ws, array_map(static fn (int|string $e): string => (string) $e, array_keys(array_filter($verdicts, static fn (?string $m): bool => $m === null))));
+        foreach (array_keys($console) as $e) {
+            if (array_key_exists((string) $e, $verdicts)) {
+                $verdicts[(string) $e] = EligibiliteAdresse::FICHE_CONSOLE;
+            }
+        }
         if (! $reglage->avecAdressesPartagees) {
             $eligibles = array_keys(array_filter($verdicts, static fn (?string $m): bool => $m === null));
             $partagees = AdressesPartagees::exclues($ws, array_map(static fn (int|string $e): string => (string) $e, $eligibles));

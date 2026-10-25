@@ -5,6 +5,7 @@ namespace App\Crm\Scraping;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\Identite\CleDePersonne;
 use App\Crm\Personnes\NatureEmail;
+use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Services\Tags\AutoTaggerService;
 use App\Support\ListeSuppression;
@@ -341,7 +342,7 @@ final class ScrapedRecordIngestService
             if ($current !== null && trim((string) $current) !== '') {
                 continue;
             }
-            if (($origins[$column] ?? null) === 'declared') {
+            if (in_array($origins[$column] ?? null, Taxonomy::FIELD_ORIGINS_PROTEGEES, true)) {
                 continue;
             }
             $update[$column] = $value;
@@ -678,7 +679,7 @@ final class ScrapedRecordIngestService
             if ($current !== null && trim((string) $current) !== '') {
                 continue;
             }
-            if (($origins[$column] ?? null) === 'declared') {
+            if (in_array($origins[$column] ?? null, Taxonomy::FIELD_ORIGINS_PROTEGEES, true)) {
                 continue;
             }
             $update[$column] = $value;

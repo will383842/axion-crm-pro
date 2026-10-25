@@ -358,6 +358,12 @@ final class Taxonomy
         'partenariat_en_discussion',
         'partenariat_accepte',
         'partenariat_refuse',
+        // ── Dossier client de la console du site (25/10/2026) ──────────────
+        // Type d'événement du canal site → CRM (`SiteSyncEvent::EVENT_TYPES`) :
+        // il DOIT figurer ici (liste fermée, CHECK `activities_kind_check`
+        // reconstruit par `2026_10_25_000010_synchro_dossier_client`). La ligne
+        // de timeline garde l'ANCIENNE valeur de chaque champ remplacé.
+        'dossier_client_synchro',
     ];
 
     /**
@@ -419,6 +425,29 @@ final class Taxonomy
     public const FIELD_ORIGINS_AUTOMATISMES = [
         'site-verifie',
     ];
+
+    /**
+     * RETOUCHE MANUELLE dans la console du CRM (25/10/2026) : posée par
+     * `CompaniesController::update` sur chaque colonne réellement modifiée, avec
+     * sa date dans `field_origins_at`. La synchro du dossier client de la
+     * console du site (`DossierClientIngest`) ne l'écrase JAMAIS avec une
+     * valeur plus ancienne qu'elle.
+     */
+    public const FIELD_ORIGIN_MANUELLE = 'manual';
+
+    /** Valeur écrite par la synchro du dossier client de la console du site. */
+    public const FIELD_ORIGIN_CONSOLE = 'console';
+
+    /**
+     * Les origines qu'AUCUN collecteur (scraping, fédérations, propositions)
+     * ne réécrit : la déclaration de la personne et la retouche manuelle.
+     * Avant le 25/10/2026 seule `declared` existait ; une retouche manuelle
+     * d'un champ déclaré le marque désormais `manual`, il devait donc rester
+     * protégé au même titre.
+     *
+     * @var list<string>
+     */
+    public const FIELD_ORIGINS_PROTEGEES = ['declared', self::FIELD_ORIGIN_MANUELLE];
 
     /**
      * Événements professionnels (table `events`, 2026-09-27) — le type tel que

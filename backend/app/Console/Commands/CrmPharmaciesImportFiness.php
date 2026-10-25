@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Crm\EspaceProspection;
 use App\Crm\Pharmacies\ImportFiness;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use InvalidArgumentException;
 use Throwable;
 
@@ -62,7 +63,7 @@ class CrmPharmaciesImportFiness extends Command
                 return self::FAILURE;
             }
             // Jamais getMessage() : un message d'erreur de base peut contenir du SQL avec ses valeurs.
-            $sqlstate = $e instanceof \Illuminate\Database\QueryException ? ' (SQLSTATE ' . ($e->errorInfo[0] ?? '?') . ')' : '';
+            $sqlstate = $e instanceof QueryException ? ' (SQLSTATE ' . ($e->errorInfo[0] ?? '?') . ')' : '';
             $this->error('Échec : ' . $e::class . $sqlstate);
 
             return self::FAILURE;

@@ -87,7 +87,6 @@ jobs:
           SELECT count(*) AS siren_multi_officines, coalesce(sum(n),0) AS officines FROM (SELECT left(siret,9) s, count(*) n FROM fin WHERE categorie='620' AND etat='A' AND siret<>'' GROUP BY 1 HAVING count(*)>1) t;
           SQL
           {
-            echo "SET default_transaction_read_only = on;"
             echo "CREATE TEMP TABLE fin (finess_et text, siret text, categorie text, etat text, nom_long text, code_postal text, commune text, dep text, statut text, ape text);"
             echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"
             cat finess_pharma.csv

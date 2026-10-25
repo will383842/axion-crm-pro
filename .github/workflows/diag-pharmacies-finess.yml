@@ -63,12 +63,14 @@ jobs:
           \echo >> FINESS : lignes par categorie et etat
           SELECT categorie, etat, count(*) FROM fin GROUP BY 1,2 ORDER BY 1,2;
           \echo >> Recherche des SIREN FINESS dans le CRM (par l index workspace_id + siren)
-          SET enable_seqscan = off;
+          SET enable_nestloop = off;
           SET default_transaction_read_only = off;
           CREATE TEMP TABLE sir AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE etat='A' AND siret<>'';
-          CREATE TEMP TABLE pres AS SELECT c.siren FROM companies c WHERE c.workspace_id=:'ws' AND c.siren = ANY(ARRAY(SELECT s FROM sir));
+          ANALYZE sir;
+          CREATE TEMP TABLE pres AS SELECT c.siren FROM companies c JOIN sir ON sir.s=c.siren WHERE c.workspace_id=:'ws';
+          ANALYZE pres;
           SET default_transaction_read_only = on;
-          SET enable_seqscan = on;
+          SET enable_nestloop = on;
           SELECT (SELECT count(*) FROM sir) AS siren_finess_actifs, (SELECT count(*) FROM pres) AS deja_au_crm;
           \echo >> Officines actives (620) : deja au CRM / absentes
           SELECT count(*) AS officines_actives_avec_siret,

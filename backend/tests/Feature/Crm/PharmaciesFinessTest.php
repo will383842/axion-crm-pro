@@ -256,11 +256,11 @@ it('affiche le message des colonnes manquantes, sans donnée personnelle', funct
     expect($sortie)->toContain('Colonnes manquantes : categorie');
 });
 
-it('classer-taille : effectif_min rempli et effectif_max vide ne change rien ; metadata NULL gérée ; updated_at posé', function () {
+it('classer-taille : effectif_min rempli et effectif_max vide ne change rien ; metadata vide gérée ; updated_at posé', function () {
     $espace = F::espace();
     lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000014100011'], ['siret' => '94000014200011']]), '--workspace' => $espace, '--apply' => true]);
     DB::table('companies')->where('siren', '940000141')->update(['effectif_range' => '12', 'effectif_min' => 7, 'effectif_max' => null]);
-    DB::table('companies')->where('siren', '940000142')->update(['metadata' => null, 'updated_at' => '2020-01-01 00:00:00']);
+    DB::table('companies')->where('siren', '940000142')->update(['metadata' => '{}', 'updated_at' => '2020-01-01 00:00:00']);
 
     lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
 

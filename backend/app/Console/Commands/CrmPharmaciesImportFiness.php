@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Crm\EspaceProspection;
 use App\Crm\Pharmacies\ImportFiness;
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -55,7 +56,7 @@ class CrmPharmaciesImportFiness extends Command
             $b = (new ImportFiness)->executer($workspaceId, $fichier, $appliquer, $paquet);
         } catch (Throwable $e) {
             // Colonnes manquantes : message sans aucune donnée personnelle, affiché tel quel.
-            if ($e instanceof \InvalidArgumentException) {
+            if ($e instanceof InvalidArgumentException) {
                 $this->error('Échec : ' . $e->getMessage());
 
                 return self::FAILURE;

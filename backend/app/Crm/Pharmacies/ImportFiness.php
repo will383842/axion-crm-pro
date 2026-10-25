@@ -37,7 +37,6 @@ final class ImportFiness
     private const ALIAS = ['commune_acheminement' => 'commune', 'departement' => 'dep', 'ej_statut_juridique_libelle' => 'statut', 'ej_code_ape' => 'ape'];
 
     /**
-     * @param  callable(string): void|null  $journal
      * @return array<string, mixed> bilan chiffré (aucun nom)
      */
     public function executer(string $workspaceId, string $fichier, bool $appliquer, int $paquet = 500): array

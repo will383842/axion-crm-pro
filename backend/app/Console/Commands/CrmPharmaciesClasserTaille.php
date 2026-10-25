@@ -6,6 +6,7 @@ use App\Crm\EspaceProspection;
 use App\Crm\Referentiels\Classement;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -93,7 +94,7 @@ class CrmPharmaciesClasserTaille extends Command
         return self::SUCCESS;
     }
 
-    private function inconnues($requete): int
+    private function inconnues(Builder $requete): int
     {
         return (int) $requete->where(fn ($q) => $q->whereNull('size_category')->orWhere('size_category', ''))->count();
     }

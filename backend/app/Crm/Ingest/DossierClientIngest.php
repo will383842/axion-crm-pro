@@ -181,7 +181,7 @@ final class DossierClientIngest
         // accepté pour cette fiche, les messages suivants ne repartent plus en
         // `desaccord_siren` pour lui (relecture #341).
         $sirenEnvoye = null;
-        if ($plusRecente !== null && is_array($plusRecente[1]) && is_array($plusRecente[1]['pending_match'] ?? null)) {
+        if ($plusRecente !== null && is_array($plusRecente[1]['pending_match'] ?? null)) {
             $candidat = $plusRecente[1]['pending_match']['siren'] ?? null;
             $sirenEnvoye = is_string($candidat) && $candidat !== '' ? $candidat : null;
         }

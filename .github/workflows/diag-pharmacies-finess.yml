@@ -62,20 +62,16 @@ jobs:
           SELECT workspace_id AS ws FROM companies WHERE workspace_id IS NOT NULL LIMIT 1 \gset
           \echo >> FINESS : lignes par categorie et etat
           SELECT categorie, etat, count(*) FROM fin GROUP BY 1,2 ORDER BY 1,2;
-          \echo >> Pharmacies du CRM (NAF 47.73Z) : ouvertes / fermees
           SET enable_nestloop = off;
           SET default_transaction_read_only = off;
           CREATE TEMP TABLE sir AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE categorie='620' AND etat='A' AND siret<>'';
-          ANALYZE sir;
+          CREATE TEMP TABLE sin AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE categorie='620' AND etat<>'A' AND siret<>'';
+          CREATE TEMP TABLE sau AS SELECT DISTINCT left(siret,9) AS s FROM fin WHERE categorie<>'620' AND siret<>'';
+          ANALYZE sir; ANALYZE sin; ANALYZE sau;
           SET default_transaction_read_only = on;
-          SELECT count(*) AS total,
-                 count(*) FILTER (WHERE insee_ferme_le IS NOT NULL) AS fermees_selon_insee,
-                 count(*) FILTER (WHERE insee_ferme_le IS NULL AND siren IN (SELECT s FROM sir)) AS ouvertes_et_officine_active_finess,
-                 count(*) FILTER (WHERE insee_ferme_le IS NULL AND siren NOT IN (SELECT s FROM sir)) AS ouvertes_hors_finess_actif,
-                 count(*) FILTER (WHERE insee_ferme_le IS NOT NULL AND (phone IS NOT NULL OR website IS NOT NULL OR enriched_at IS NOT NULL)) AS fermees_avec_donnees_enrichies
-          FROM companies WHERE workspace_id=:'ws' AND deleted_at IS NULL AND replace(naf,'.','')='4773Z';
-          \echo >> Contacts rattaches aux pharmacies fermees
-          SELECT count(*) AS contacts, count(DISTINCT p.id) AS pharmacies FROM contacts c JOIN companies p ON p.id=c.company_id WHERE p.workspace_id=:'ws' AND p.deleted_at IS NULL AND replace(p.naf,'.','')='4773Z' AND p.insee_ferme_le IS NOT NULL;
+          \echo >> Les ouvertes (INSEE) hors officine active FINESS : nature
+          WITH h AS (SELECT c.id, c.siren, c.legal_form, c.size_category, c.phone, c.website, c.enriched_at, c.discovery_source FROM companies c WHERE c.workspace_id=:'ws' AND c.deleted_at IS NULL AND replace(c.naf,'.','')='4773Z' AND c.insee_ferme_le IS NULL AND c.siren NOT IN (SELECT s FROM sir))
+          SELECT CASE WHEN siren IN (SELECT s FROM sin) THEN 'officine FINESS inactive' WHEN siren IN (SELECT s FROM sau) THEN 'autre categorie FINESS (PUI, mutualiste...)' ELSE 'inconnue de FINESS' END AS nature, count(*) AS fiches, count(*) FILTER (WHERE phone IS NOT NULL OR website IS NOT NULL OR enriched_at IS NOT NULL) AS avec_donnees, count(*) FILTER (WHERE EXISTS (SELECT 1 FROM contacts k WHERE k.company_id=h.id)) AS avec_contact FROM h GROUP BY 1 ORDER BY 2 DESC;
           SQL
           {
             echo "CREATE TEMP TABLE fin (finess_et text, siret text, categorie text, etat text, nom_long text, code_postal text, commune text, dep text, statut text, ape text);"

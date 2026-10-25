@@ -25,7 +25,7 @@ return new class extends Migration
                 id           BIGSERIAL PRIMARY KEY,
                 workspace_id UUID   NOT NULL REFERENCES workspaces(id) ON DELETE RESTRICT,
                 company_id   BIGINT NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
-                siret        CHAR(14) NOT NULL,
+                siret        CHAR(14) NOT NULL CHECK (siret ~ '^[0-9]{14}$'),
                 finess_et    TEXT,
                 categorie    TEXT NOT NULL,
                 code_postal  TEXT,
@@ -36,6 +36,28 @@ return new class extends Migration
             )
             SQL,
         );
+        DB::unprepared(
+            <<<'SQL'
+            CREATE OR REPLACE FUNCTION public.finess_etablissements_meme_espace() RETURNS trigger
+            LANGUAGE plpgsql
+            SET search_path = public, pg_catalog
+            AS $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM companies c WHERE c.id = NEW.company_id AND c.workspace_id = NEW.workspace_id) THEN
+                    RAISE EXCEPTION 'finess_etablissements : l entreprise % n est pas de cet espace', NEW.company_id
+                        USING ERRCODE = '23514';
+                END IF;
+                RETURN NEW;
+            END;
+            $$;
+
+            DROP TRIGGER IF EXISTS finess_etablissements_meme_espace ON finess_etablissements;
+            CREATE TRIGGER finess_etablissements_meme_espace
+                BEFORE INSERT OR UPDATE OF workspace_id, company_id ON finess_etablissements
+                FOR EACH ROW EXECUTE FUNCTION public.finess_etablissements_meme_espace();
+            SQL,
+        );
+        DB::statement("COMMENT ON TABLE finess_etablissements IS 'Établissements FINESS rattachés à une fiche. GRANT DELETE et TRUNCATE interdits au rôle applicatif : on garde tout.'");
         DB::statement('CREATE INDEX IF NOT EXISTS idx_finess_etablissements_company ON finess_etablissements (company_id)');
 
         DB::statement('ALTER TABLE finess_etablissements ENABLE ROW LEVEL SECURITY');

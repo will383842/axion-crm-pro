@@ -53,7 +53,9 @@ class CrmPharmaciesImportFiness extends Command
         try {
             $b = (new ImportFiness)->executer($workspaceId, $fichier, $appliquer, $paquet);
         } catch (\Throwable $e) {
-            $this->error('Échec : ' . $e->getMessage());
+            // Jamais getMessage() : un message d'erreur de base peut contenir du SQL avec ses valeurs.
+            $sqlstate = $e instanceof \Illuminate\Database\QueryException ? ' (SQLSTATE ' . ($e->errorInfo[0] ?? '?') . ')' : '';
+            $this->error('Échec : ' . $e::class . $sqlstate);
 
             return self::FAILURE;
         }

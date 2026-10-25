@@ -48,7 +48,7 @@ class CrmPharmaciesClasserTaille extends Command
 
         $bilan = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $essai): array {
             $cible = fn () => DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
-                ->where(fn ($q) => $q->where('discovery_source', 'finess')->orWhereRaw("replace(naf, '.', '') = '4773Z'"));
+                ->where(fn ($q) => $q->where('discovery_source', 'finess')->orWhereIn('naf', ['47.73Z', '4773Z']));
             $b = ['total' => $cible()->count(), 'inconnue_avant' => $this->inconnues($cible()), 'taille' => 0, 'effectif' => 0, 'officines' => 0];
 
             $cible()->orderBy('id')->select(['id', 'effectif_range', 'effectif_min', 'effectif_max', 'size_category', 'metadata'])->chunkById(1000, function ($fiches) use ($workspaceId, $essai, &$b): void {
@@ -56,25 +56,37 @@ class CrmPharmaciesClasserTaille extends Command
                     ->whereIn('company_id', $fiches->pluck('id')->all())->groupBy('company_id')
                     ->selectRaw('company_id, count(*) AS n')->pluck('n', 'company_id');
                 foreach ($fiches as $f) {
-                    $maj = [];
                     $tranche = trim((string) $f->effectif_range);
+                    $taille = null;
                     if (trim((string) $f->size_category) === '' && $tranche !== '') {
-                        $maj['size_category'] = Classement::tailleDepuisInsee($tranche, null);
+                        $taille = Classement::tailleDepuisInsee($tranche, null);
                         $b['taille']++;
                     }
+                    $bornes = null;
                     if ($f->effectif_min === null && $f->effectif_max === null && isset(self::TRANCHES[$tranche])) {
-                        [$maj['effectif_min'], $maj['effectif_max']] = self::TRANCHES[$tranche];
+                        $bornes = self::TRANCHES[$tranche];
                         $b['effectif']++;
                     }
                     $meta = json_decode((string) $f->metadata, true);
-                    $meta = is_array($meta) ? $meta : [];
-                    if (! array_key_exists('nb_officines_societe', $meta) && isset($nb[$f->id])) {
-                        $meta['nb_officines_societe'] = (int) $nb[$f->id];
-                        $maj['metadata'] = json_encode($meta, JSON_UNESCAPED_UNICODE);
+                    $poserOfficines = ! (is_array($meta) && array_key_exists('nb_officines_societe', $meta)) && isset($nb[$f->id]);
+                    if ($poserOfficines) {
                         $b['officines']++;
                     }
-                    if ($maj !== [] && ! $essai) {
-                        DB::table('companies')->where('id', $f->id)->update($maj);
+                    if ($essai) {
+                        continue;
+                    }
+                    // Écritures conditionnelles en SQL : jamais de relecture ni de réécriture complète de metadata.
+                    if ($poserOfficines) {
+                        DB::update(
+                            "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('nb_officines_societe', ?::int) WHERE id = ? AND NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'nb_officines_societe')",
+                            [(int) $nb[$f->id], $f->id],
+                        );
+                    }
+                    if ($taille !== null) {
+                        DB::table('companies')->where('id', $f->id)->where(fn ($q) => $q->whereNull('size_category')->orWhere('size_category', ''))->update(['size_category' => $taille]);
+                    }
+                    if ($bornes !== null) {
+                        DB::table('companies')->where('id', $f->id)->whereNull('effectif_min')->whereNull('effectif_max')->update(['effectif_min' => $bornes[0], 'effectif_max' => $bornes[1]]);
                     }
                 }
             });

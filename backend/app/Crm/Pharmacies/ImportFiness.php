@@ -51,6 +51,8 @@ final class ImportFiness
         $lignes = $this->lire($fichier);
         $lot = [];
         $sirets = [];
+        // SIREN déjà prévus à la création, communs à tous les paquets (essai à blanc inclus).
+        $sirensPrevus = [];
         foreach ($lignes as $l) {
             $bilan['lignes']++;
             $cat = $l['categorie'];
@@ -81,12 +83,12 @@ final class ImportFiness
             $sirets[$l['siret']] = true;
             $lot[] = $l;
             if (count($lot) >= $paquet) {
-                $this->traiter($workspaceId, $lot, $appliquer, $bilan);
+                $this->traiter($workspaceId, $lot, $appliquer, $bilan, $sirensPrevus);
                 $lot = [];
             }
         }
         if ($lot !== []) {
-            $this->traiter($workspaceId, $lot, $appliquer, $bilan);
+            $this->traiter($workspaceId, $lot, $appliquer, $bilan, $sirensPrevus);
         }
         ksort($bilan['par_departement']);
         ksort($bilan['autres_categories']);
@@ -97,17 +99,23 @@ final class ImportFiness
     /**
      * @param  list<array<string, string>>  $lot
      * @param  array<string, mixed>  $bilan
+     * @param  array<string, true>  $sirensPrevus
      */
-    private function traiter(string $workspaceId, array $lot, bool $appliquer, array &$bilan): void
+    private function traiter(string $workspaceId, array $lot, bool $appliquer, array &$bilan, array &$sirensPrevus): void
     {
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lot, $appliquer, &$bilan): void {
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lot, $appliquer, &$bilan, &$sirensPrevus): void {
             $sirets = array_column($lot, 'siret');
             $sirens = array_values(array_unique(array_map(static fn (string $s): string => substr($s, 0, 9), $sirets)));
 
-            $parSiret = DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('siret', $sirets)->whereNull('deleted_at')->pluck('id', 'siret')->all();
+            // Une seule requête, par SIREN (index unique espace + SIREN) : `siret` n'est pas indexé.
             // Corbeille INCLUSE : l'unicité (espace, SIREN) vaut aussi pour elle.
+            $parSiret = [];
             $parSiren = [];
-            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('siren', $sirens)->get(['id', 'siren', 'deleted_at']) as $c) {
+            $demandes = array_flip($sirets);
+            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('siren', $sirens)->get(['id', 'siren', 'siret', 'deleted_at']) as $c) {
+                if ($c->deleted_at === null && $c->siret !== null && isset($demandes[$c->siret])) {
+                    $parSiret[$c->siret] = (int) $c->id;
+                }
                 if (! isset($parSiren[$c->siren]) || $c->deleted_at === null) {
                     $parSiren[$c->siren] = ['id' => (int) $c->id, 'corbeille' => $c->deleted_at !== null];
                 }
@@ -134,15 +142,17 @@ final class ImportFiness
 
                     continue;
                 }
-                if (isset($creations[$siren])) {
-                    // Même société, autre officine, dans ce lot : fiche unique.
+                if (isset($sirensPrevus[$siren])) {
+                    // Même société, autre officine, dans ce lot ou un précédent : fiche unique.
                     $bilan['siren_autre_siret']++;
                     $etablissements[$l['siret']] = [$l, $siren];
 
                     continue;
                 }
                 $bilan['a_creer']++;
-                $bilan['par_departement'][$dep] = ($bilan['par_departement'][$dep] ?? 0) + 1;
+                $cle = $dep !== '' ? $dep : '??';
+                $bilan['par_departement'][$cle] = ($bilan['par_departement'][$cle] ?? 0) + 1;
+                $sirensPrevus[$siren] = true;
                 $creations[$siren] = $this->ligneFiche($workspaceId, $l, $siren, $dep);
                 $etablissements[$l['siret']] = [$l, $siren];
             }
@@ -168,7 +178,7 @@ final class ImportFiness
                         'workspace_id' => $workspaceId, 'company_id' => $ids[$siren], 'siret' => $siret,
                         'finess_et' => $l['finess_et'] ?: null, 'categorie' => $l['categorie'],
                         'code_postal' => $l['code_postal'] ?: null, 'commune' => $l['commune'] ?: null,
-                        'departement' => $this->departement($l), 'created_at' => now(),
+                        'departement' => $this->departement($l) ?: null, 'created_at' => now(),
                     ];
                 }
                 if ($lignes !== []) {
@@ -186,6 +196,10 @@ final class ImportFiness
     {
         $naf = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $l['ape']) ?? '');
         $naf = $naf !== '' ? $naf : '4773Z';
+        // Écrit avec le point, comme les fiches INSEE (47.73Z).
+        if (preg_match('/^\d{4}[A-Z]$/', $naf) === 1) {
+            $naf = substr($naf, 0, 2) . '.' . substr($naf, 2);
+        }
         $classe = NomenclatureNaf::classer($naf);
 
         return [
@@ -200,8 +214,10 @@ final class ImportFiness
             'postcode' => $l['code_postal'] ?: null,
             'city' => $l['commune'] ?: null,
             'city_name' => $l['commune'] ?: null,
-            'department_code' => $dep !== '??' ? $dep : null,
-            'region_code' => $dep !== '??' ? Classement::regionDuDepartement($dep) : null,
+            'entity_nature' => 'entreprise',
+            // Département : celui du fichier seulement, jamais déduit du code postal.
+            'department_code' => $dep !== '' ? $dep : null,
+            'region_code' => Classement::regionFrancaise($dep !== '' ? $dep : null, $l['code_postal'])[0],
             'discovery_source' => self::SOURCE,
             'metadata' => json_encode(['finess_et' => $l['finess_et'], 'finess_statut' => $l['statut']], JSON_UNESCAPED_UNICODE),
             'created_at' => now(),
@@ -213,11 +229,10 @@ final class ImportFiness
     private function departement(array $l): string
     {
         $dep = strtoupper(trim($l['dep']));
-        if ($dep === '') {
-            $dep = (string) Classement::departementDuCodePostal($l['code_postal']);
-        }
+        // FINESS code l'outre-mer 9A à 9F (971 à 976).
+        $dep = ['9A' => '971', '9B' => '972', '9C' => '973', '9D' => '974', '9E' => '975', '9F' => '976'][$dep] ?? $dep;
 
-        return $dep !== '' ? $dep : '??';
+        return $dep;
     }
 
     /** @return \Generator<array<string, string>> */

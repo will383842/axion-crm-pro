@@ -139,3 +139,63 @@ it('classer-taille ne remplit que les champs vides et affiche la part inconnue',
     expect($deux->size_category)->toBe('eti');
     expect($sortie)->toContain('taille inconnue avant : 1 (50,0 %)')->toContain('taille inconnue après : 0 (0,0 %)');
 });
+
+it('paquets multiples : deux SIRET du même SIREN dans deux paquets, essai à blanc et apply donnent le même total', function () {
+    $espace = F::espace();
+    $csv = csvFiness([['siret' => '94000005100011'], ['siret' => '94000005100029'], ['siret' => '94000005200011']]);
+
+    $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--paquet' => 1]);
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--paquet' => 1, '--apply' => true]);
+
+    expect($essai)->toContain('fiches à créer : 2');
+    expect($apply)->toContain('fiches créées : 2');
+    expect(DB::table('companies')->where('workspace_id', $espace)->count())->toBe(2);
+    expect(DB::table('finess_etablissements')->where('workspace_id', $espace)->count())->toBe(3);
+});
+
+it('accepte le BOM et les alias d\'en-têtes de l\'export brut', function () {
+    $espace = F::espace();
+    $chemin = tempnam(sys_get_temp_dir(), 'zzfiness');
+    file_put_contents($chemin, "\xEF\xBB\xBFfiness_et,siret,categorie,etat,nom_long,code_postal,commune_acheminement,departement,ej_statut_juridique_libelle,ej_code_ape\n"
+        . "990000001,94000006100011,620,A,ZZ OFFICINE,99100,ZZVILLE,99,SARL,4773Z\n");
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => $chemin, '--workspace' => $espace, '--apply' => true]);
+
+    $f = DB::table('companies')->where('workspace_id', $espace)->first();
+    expect($f->city)->toBe('ZZVILLE')->and($f->department_code)->toBe('99')->and($f->naf)->toBe('47.73Z')->and($f->entity_nature)->toBe('entreprise');
+});
+
+it('convertit le département FINESS 9A en 971 ; département absent : laissé nul, jamais déduit du code postal', function () {
+    $espace = F::espace();
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000007100011', 'dep' => '9A', 'code_postal' => '97100'],
+        ['siret' => '94000007200011', 'dep' => '', 'code_postal' => '75001'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    expect(DB::table('companies')->where('siren', '940000071')->value('department_code'))->toBe('971');
+    $sans = DB::table('companies')->where('siren', '940000072')->first();
+    expect($sans->department_code)->toBeNull();
+    expect($sans->region_code)->not->toBeNull();
+});
+
+it('classer-taille conserve les autres clés de metadata', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000008100011']]), '--workspace' => $espace, '--apply' => true]);
+
+    lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    $meta = json_decode(DB::table('companies')->where('siren', '940000081')->value('metadata'), true);
+    expect($meta)->toHaveKey('finess_et')->toHaveKey('finess_statut')->and($meta['nb_officines_societe'])->toBe(1);
+});
+
+it('second passage : aucun nouvel établissement', function () {
+    $espace = F::espace();
+    $csv = csvFiness([['siret' => '94000009100011'], ['siret' => '94000009100029']]);
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+    $sortie = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+
+    expect(DB::table('finess_etablissements')->where('workspace_id', $espace)->count())->toBe(2);
+    expect($sortie)->toContain('établissements notés : 0');
+});

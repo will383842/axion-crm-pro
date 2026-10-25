@@ -24,6 +24,11 @@ on:
 permissions:
   contents: read
 
+# Jamais deux apply (ni deux imports) en même temps.
+concurrency:
+  group: pharmacies-import
+  cancel-in-progress: false
+
 jobs:
   import:
     name: Import FINESS (${{ inputs.mode }})
@@ -46,7 +51,7 @@ jobs:
           curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
           unzip -q -o finess.zip etablissements.csv
           python3 - <<'PY'
-          import csv
+          import csv, sys
           cats = {'620', '627', '628', '629', '641', '690'}
           cols = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal',
                   'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape']
@@ -58,7 +63,22 @@ jobs:
               if r['categorie'] in cats:
                   out.writerow([' '.join(r[c].split()) for c in cols]); n += 1
           print('lignes pharmacie FINESS :', n)
+          n620 = sum(1 for _ in csv.DictReader(open('finess_pharma.csv', encoding='utf-8'))
+                     if _['categorie'] == '620')
+          print('lignes catégorie 620 :', n620)
+          # Garde-fou : un fichier tronqué ou vide ne doit jamais alimenter un apply.
+          if not 15000 <= n620 <= 25000:
+              print('catégorie 620 hors fourchette 15000-25000 : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
           PY
+
+      - name: Refuser apply si la source est hors fourchette
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          if [ -f refus_apply ]; then
+            echo "apply refusé : nombre de lignes 620 hors fourchette (15000 à 25000)." >&2
+            exit 1
+          fi
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
@@ -73,11 +93,19 @@ jobs:
         run: |
           set -e
           SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
-          $SSH "cat > /tmp/finess_pharma.csv" < finess_pharma.csv
           OPT=""
           [ "$MODE" = "apply" ] && OPT="--apply"
+          $SSH "umask 077; cat > /tmp/finess_pharma.csv" < finess_pharma.csv
           $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api php artisan crm:pharmacies:import-finess /tmp/finess_pharma.csv $OPT"
           if [ "$MODE" = "apply" ]; then
             $SSH "cd /opt/axion-crm-pro && docker compose exec -u root -T api php artisan crm:pharmacies:classer-taille"
           fi
+
+      - name: Nettoyer le CSV (hôte et conteneur api)
+        if: ${{ always() }}
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
           $SSH "rm -f /tmp/finess_pharma.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_pharma.csv" || true

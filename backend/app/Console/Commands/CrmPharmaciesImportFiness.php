@@ -76,7 +76,7 @@ class CrmPharmaciesImportFiness extends Command
         $this->line(sprintf('  SIREN connu, autre SIRET (établissement ajouté, fiche intacte) : %d', $b['siren_autre_siret']));
         $this->line(sprintf('  SIREN à la corbeille (ignorées) : %d', $b['corbeille']));
         $this->line(sprintf('  fiches %s : %d', $appliquer ? 'créées' : 'à créer', $appliquer ? $b['creees'] : $b['a_creer']));
-        $this->line(sprintf('  personnes physiques %d dont créées sans nom ni adresse', $b['personnes_physiques']));
+        $this->line(sprintf('  personnes physiques : %d (fiches sans nom ni adresse)', $b['personnes_physiques']));
         if ($appliquer) {
             $this->line(sprintf('  établissements notés : %d', $b['etablissements_ajoutes']));
         }

@@ -20,7 +20,8 @@ use SplFileObject;
  *  - SIREN à la corbeille : compté, jamais restauré ni recréé ;
  *  - JAMAIS d'écrasement, de suppression ni de purge ;
  *  - les fiches créées ont `discovery_source = finess` (provenance « tiers » :
- *    la mise à jour mensuelle INSEE les complète en passe prioritaire).
+ *    la mise à jour mensuelle INSEE ne remplace que denomination, naf, legal_form et
+ *    effectif_range, jamais l'adresse, et seulement si l'entreprise est diffusible).
  */
 final class ImportFiness
 {
@@ -36,8 +37,8 @@ final class ImportFiness
     /** Colonne facultative : code du statut juridique FINESS (absente des anciens exports). */
     private const COLONNE_CODE_STATUT = 'statut_code';
 
-    /** Code FINESS « Personne Physique » ; le libellé reste le filet de sécurité. */
-    private const CODES_PERSONNE_PHYSIQUE = ['73'];
+    /** Code FINESS « Personne Physique » (70 ; 73 = société anonyme, 85 = SELARL, 91 = SELAS) ; le libellé reste le filet de sécurité. */
+    private const CODES_PERSONNE_PHYSIQUE = ['70'];
 
     public const DENOMINATION_GENERIQUE = 'Entreprise individuelle pharmacie';
 
@@ -45,7 +46,7 @@ final class ImportFiness
     public const FORME_JURIDIQUE_EI = '1000';
 
     /** Alias des en-têtes de l'export brut FINESS. */
-    private const ALIAS = ['commune_acheminement' => 'commune', 'departement' => 'dep', 'ej_statut_juridique_libelle' => 'statut', 'ej_statut_juridique_code' => 'statut_code', 'ej_code_ape' => 'ape'];
+    private const ALIAS = ['commune_acheminement' => 'commune', 'departement' => 'dep', 'ej_statut_juridique_libelle' => 'statut', 'ej_statut_juridique' => 'statut_code', 'ej_code_ape' => 'ape'];
 
     /**
      * @return array<string, mixed> bilan chiffré (aucun nom)
@@ -188,10 +189,12 @@ final class ImportFiness
                     if (! isset($ids[$siren])) {
                         continue;
                     }
+                    // Personne physique : ni adresse ni identifiant FINESS recopiés (le département reste).
+                    $pp = $this->estPersonnePhysique($l);
                     $lignes[] = [
                         'workspace_id' => $workspaceId, 'company_id' => $ids[$siren], 'siret' => $siret,
-                        'finess_et' => $l['finess_et'] ?: null, 'categorie' => $l['categorie'],
-                        'code_postal' => $l['code_postal'] ?: null, 'commune' => $l['commune'] ?: null,
+                        'finess_et' => $pp ? null : ($l['finess_et'] ?: null), 'categorie' => $l['categorie'],
+                        'code_postal' => $pp ? null : ($l['code_postal'] ?: null), 'commune' => $pp ? null : ($l['commune'] ?: null),
                         'departement' => $this->departement($l) ?: null, 'created_at' => now(),
                     ];
                 }
@@ -219,7 +222,8 @@ final class ImportFiness
         if ($this->estPersonnePhysique($l)) {
             // Entrepreneur individuel : le nom est souvent celui du titulaire et le statut de
             // diffusion INSEE est inconnu. Ni nom ni adresse ici ; la mise à jour mensuelle
-            // INSEE les complète seulement si l'entreprise est diffusible.
+            // INSEE ne remplace que denomination, naf, legal_form et effectif_range (jamais
+            // l'adresse), seulement si l'entreprise est diffusible.
             return [
                 'workspace_id' => $workspaceId,
                 'siren' => $siren,

@@ -1,6 +1,6 @@
 name: Pharmacies — import FINESS (dry-run ou apply)
 
-# Télécharge la liste officielle FINESS, ne garde que les lignes pharmacie,
+# Télécharge le miroir tiers du flux FINESS de data.gouv.fr (pas la liste officielle), ne garde que les lignes pharmacie,
 # puis lance `crm:pharmacies:import-finess` sur le serveur de prod.
 #  - dry-run (défaut) : totaux par département, RIEN n'est écrit ;
 #  - apply : crée UNIQUEMENT les fiches manquantes (jamais d'écrasement ni de
@@ -21,7 +21,7 @@ on:
         type: string
         default: ''
       empreinte:
-        description: 'SHA-256 attendu de finess.zip (facultatif ; si fourni et différent, apply est refusé)'
+        description: 'SHA-256 de finess.zip, OBLIGATOIRE pour apply (le dry-run l affiche dans le journal)'
         type: string
         default: ''
 
@@ -58,10 +58,13 @@ jobs:
           curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
           EMPREINTE_REELLE=$(sha256sum finess.zip | cut -d' ' -f1)
           echo "SHA-256 de finess.zip : $EMPREINTE_REELLE (à saisir dans l'entrée « empreinte » pour la figer)"
-          if [ -n "$EMPREINTE_ATTENDUE" ] && [ "$EMPREINTE_ATTENDUE" != "$EMPREINTE_REELLE" ]; then
-            echo "empreinte différente de celle attendue" >&2
-            if [ "$MODE" = "apply" ]; then
-              echo "apply refusé : empreinte SHA-256 inattendue." >&2
+          if [ "$MODE" = "apply" ]; then
+            if [ -z "$EMPREINTE_ATTENDUE" ]; then
+              echo "apply refusé : saisir l'empreinte SHA-256 (affichée par le dry-run)." >&2
+              exit 1
+            fi
+            if [ "$EMPREINTE_ATTENDUE" != "$EMPREINTE_REELLE" ]; then
+              echo "apply refusé : empreinte SHA-256 différente de celle attendue." >&2
               exit 1
             fi
           fi
@@ -70,7 +73,7 @@ jobs:
           import csv, sys
           cats = {'620', '627', '628', '629', '641', '690'}
           cols = ['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal',
-                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape', 'ej_statut_juridique_code']
+                  'commune_acheminement', 'departement', 'ej_statut_juridique_libelle', 'ej_code_ape', 'ej_statut_juridique']
           src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
           out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
           out.writerow(['finess_et', 'siret', 'categorie', 'etat', 'nom_long', 'code_postal', 'commune', 'dep', 'statut', 'ape', 'statut_code'])
@@ -80,11 +83,11 @@ jobs:
                   out.writerow([' '.join((r.get(c) or '').split()) for c in cols]); n += 1
           print('lignes pharmacie FINESS :', n)
           n620 = sum(1 for _ in csv.DictReader(open('finess_pharma.csv', encoding='utf-8'))
-                     if _['categorie'] == '620')
-          print('lignes catégorie 620 :', n620)
+                     if _['categorie'] == '620' and _['etat'] == 'A')
+          print('lignes catégorie 620 état A (actives) :', n620)
           # Garde-fou : un fichier tronqué ou vide ne doit jamais alimenter un apply.
           if not 15000 <= n620 <= 25000:
-              print('catégorie 620 hors fourchette 15000-25000 : apply refusé', file=sys.stderr)
+              print('catégorie 620 état A hors fourchette 15000-25000 : apply refusé', file=sys.stderr)
               open('refus_apply', 'w').close()
           PY
 
@@ -92,7 +95,7 @@ jobs:
         if: ${{ inputs.mode == 'apply' }}
         run: |
           if [ -f refus_apply ]; then
-            echo "apply refusé : nombre de lignes 620 hors fourchette (15000 à 25000)." >&2
+            echo "apply refusé : nombre de lignes 620 actives hors fourchette (15000 à 25000)." >&2
             exit 1
           fi
 
@@ -101,6 +104,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Lancer l'import sur la prod
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
@@ -108,7 +118,7 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           set -e
-          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          SSH="ssh $USER@$HOST"
           OPT=""
           [ "$MODE" = "apply" ] && OPT="--apply"
           $SSH "umask 077; cat > /tmp/finess_pharma.csv" < finess_pharma.csv
@@ -123,5 +133,5 @@ jobs:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER || 'root' }}
         run: |
-          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          SSH="ssh $USER@$HOST"
           $SSH "rm -f /tmp/finess_pharma.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_pharma.csv" || true

@@ -204,7 +204,7 @@ it('société d\'exercice libéral : la fiche garde le nom et l\'adresse du fich
     $espace = F::espace();
 
     lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
-        ['siret' => '94000010100011', 'statut' => 'Société d\'exercice libéral', 'statut_code' => '95', 'nom_long' => 'ZZ SELARL TEST'],
+        ['siret' => '94000010100011', 'statut' => 'Société d\'exercice libéral', 'statut_code' => '85', 'nom_long' => 'ZZ SELARL TEST'],
     ]), '--workspace' => $espace, '--apply' => true]);
 
     $f = DB::table('companies')->where('siren', '940000101')->first();
@@ -217,7 +217,7 @@ it('personne physique (libellé ou code) : fiche sans nom ni adresse, garde d\'�
 
     $sortie = lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
         ['siret' => '94000011100011', 'statut' => 'Personne Physique', 'nom_long' => 'ZZ TITULAIRE UN', 'dep' => '75'],
-        ['siret' => '94000011200011', 'statut' => '', 'statut_code' => '73', 'nom_long' => 'ZZ TITULAIRE DEUX', 'dep' => '75'],
+        ['siret' => '94000011200011', 'statut' => '', 'statut_code' => '70', 'nom_long' => 'ZZ TITULAIRE DEUX', 'dep' => '75'],
         ['siret' => '94000011300011'],
     ]), '--workspace' => $espace, '--apply' => true]);
 
@@ -232,7 +232,24 @@ it('personne physique (libellé ou code) : fiche sans nom ni adresse, garde d\'�
         expect(json_encode($f))->not->toContain('TITULAIRE');
     }
     expect(DB::table('companies')->where('siren', '940000113')->value('denomination'))->toBe('ZZ OFFICINE');
-    expect($sortie)->toContain('personnes physiques 2 dont créées sans nom ni adresse')->not->toContain('TITULAIRE');
+    $etabs = DB::table('finess_etablissements')->whereIn('siret', ['94000011100011', '94000011200011'])->get();
+    expect($etabs)->toHaveCount(2);
+    foreach ($etabs as $e) {
+        expect($e->commune)->toBeNull()->and($e->code_postal)->toBeNull()->and($e->finess_et)->toBeNull()->and($e->departement)->toBe('75');
+        expect(json_encode($e))->not->toContain('ZZVILLE')->not->toContain('99100');
+    }
+    expect($sortie)->toContain('personnes physiques : 2 (fiches sans nom ni adresse)')->not->toContain('TITULAIRE');
+});
+
+it('code 73 (société anonyme) : la fiche garde son nom', function () {
+    $espace = F::espace();
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000014100011', 'statut' => 'Société anonyme (SA)', 'statut_code' => '73', 'nom_long' => 'ZZ SA TEST'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    $f = DB::table('companies')->where('siren', '940000141')->first();
+    expect($f->denomination)->toBe('ZZ SA TEST')->and(json_decode($f->metadata, true))->not->toHaveKey('personne_physique');
 });
 
 it('personne physique : essai à blanc et apply annoncent les mêmes totaux', function () {
@@ -242,8 +259,8 @@ it('personne physique : essai à blanc et apply annoncent les mêmes totaux', fu
     $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace]);
     $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
 
-    expect($essai)->toContain('personnes physiques 1 dont créées sans nom ni adresse')->toContain('fiches à créer : 2');
-    expect($apply)->toContain('personnes physiques 1 dont créées sans nom ni adresse')->toContain('fiches créées : 2');
+    expect($essai)->toContain('personnes physiques : 1 (fiches sans nom ni adresse)')->toContain('fiches à créer : 2');
+    expect($apply)->toContain('personnes physiques : 1 (fiches sans nom ni adresse)')->toContain('fiches créées : 2');
 });
 
 it('affiche le message des colonnes manquantes, sans donnée personnelle', function () {

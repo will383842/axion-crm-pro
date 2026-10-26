@@ -78,15 +78,15 @@ class CrmPharmaciesClasserTaille extends Command
                     // Écritures conditionnelles en SQL : jamais de relecture ni de réécriture complète de metadata.
                     if ($poserOfficines) {
                         DB::update(
-                            "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('nb_officines_societe', ?::int), updated_at = now() WHERE id = ? AND NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'nb_officines_societe')",
-                            [(int) $nb[$f->id], $f->id],
+                            "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('nb_officines_societe', ?::int), updated_at = now() WHERE id = ? AND workspace_id = ? AND NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'nb_officines_societe')",
+                            [(int) $nb[$f->id], $f->id, $workspaceId],
                         );
                     }
                     if ($taille !== null) {
-                        DB::table('companies')->where('id', $f->id)->where(fn ($q) => $q->whereNull('size_category')->orWhere('size_category', ''))->update(['size_category' => $taille, 'updated_at' => now()]);
+                        DB::table('companies')->where('id', $f->id)->where('workspace_id', $workspaceId)->where(fn ($q) => $q->whereNull('size_category')->orWhere('size_category', ''))->update(['size_category' => $taille, 'updated_at' => now()]);
                     }
                     if ($bornes !== null) {
-                        DB::table('companies')->where('id', $f->id)->whereNull('effectif_min')->whereNull('effectif_max')->update(['effectif_min' => $bornes[0], 'effectif_max' => $bornes[1], 'updated_at' => now()]);
+                        DB::table('companies')->where('id', $f->id)->where('workspace_id', $workspaceId)->whereNull('effectif_min')->whereNull('effectif_max')->update(['effectif_min' => $bornes[0], 'effectif_max' => $bornes[1], 'updated_at' => now()]);
                     }
                 }
             });

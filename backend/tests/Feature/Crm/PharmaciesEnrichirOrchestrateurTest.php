@@ -253,12 +253,16 @@ it('mode sans payant : lat/lon/insee déjà posés ne sont pas réécrits', func
 
 it('mode sans payant : aucune étiquette AutoTagger retirée', function () {
     $id = poFiche($this->espace, ['department_code' => '75']);
-    $tag = DB::table('tags')->insertGetId(['workspace_id' => $this->espace, 'slug' => 'dept-99', 'name' => 'ZZ', 'category' => 'geo', 'kind' => 'auto', 'rules' => '{}', 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+    $tag = WorkspaceContext::run($this->espace, function () use ($id): int {
+        $tag = DB::table('tags')->insertGetId(['workspace_id' => $this->espace, 'slug' => 'dept-99', 'name' => 'ZZ', 'category' => 'geo', 'kind' => 'auto', 'rules' => '{}', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+
+        return $tag;
+    });
 
     poEnrichir($this->espace, $id, true);
 
-    expect(DB::table('company_tag')->where('company_id', $id)->where('tag_id', $tag)->exists())->toBeTrue();
+    expect(WorkspaceContext::run($this->espace, fn () => DB::table('company_tag')->where('company_id', $id)->where('tag_id', $tag)->exists()))->toBeTrue();
 });
 
 it('mode sans payant : la recherche de site se fait avec Brave plafond 0', function () {
@@ -327,8 +331,12 @@ it('EnrichirSiteOfficineJob : téléphone et site déjà présents ne sont pas �
 
 it('EnrichirSiteOfficineJob : une fiche protégée n est pas touchée', function () {
     $id = poFiche($this->espace, ['legal_form' => '1000', 'enseigne' => 'ZZ']);
-    $tag = DB::table('tags')->insertGetId(['workspace_id' => $this->espace, 'slug' => 'src:scraping-evenements-pro', 'name' => 'ZZ', 'category' => 'intent', 'kind' => 'auto', 'rules' => '{}', 'is_locked' => true, 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+    $tag = WorkspaceContext::run($this->espace, function () use ($id): int {
+        $tag = DB::table('tags')->insertGetId(['workspace_id' => $this->espace, 'slug' => 'src:scraping-evenements-pro', 'name' => 'ZZ', 'category' => 'intent', 'kind' => 'auto', 'rules' => '{}', 'is_locked' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $this->espace, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+
+        return $tag;
+    });
 
     (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
 

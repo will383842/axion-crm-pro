@@ -23,7 +23,7 @@ function csvTel(array $lignes): string
         'finess_et' => '990000001', 'finess_ej' => '990000002', 'siret' => '', 'categorie' => '620', 'etat' => 'A', 'telephone' => '',
         'telecopie' => '', 'courriel' => '', 'numero_voie' => '', 'type_voie' => '', 'libelle_voie' => '', 'complement_voie' => '',
         'lieu_dit' => '', 'adresse_ligne_4' => '', 'code_postal' => '', 'commune_acheminement' => '', 'latitude' => '', 'longitude' => '',
-        'date_ouverture' => '',
+        'date_ouverture' => '', 'commune' => '',
     ];
     fputcsv($f, array_keys($defauts), ';', '"', '');
     foreach ($lignes as $l) {
@@ -59,9 +59,9 @@ function csvEj(array $ej): string
     return $chemin;
 }
 
-function lancerTel(string $espace, string $csv, bool $apply = true, ?string $ej = null): string
+function lancerTel(string $espace, string $csv, bool $apply = true, ?string $ej = null, ?int $paquet = null): string
 {
-    Artisan::call('crm:pharmacies:telephones-finess', array_filter(['fichier' => $csv, 'entites' => $ej, '--workspace' => $espace, '--apply' => $apply ?: null]));
+    Artisan::call('crm:pharmacies:telephones-finess', array_filter(['fichier' => $csv, 'entites' => $ej, '--workspace' => $espace, '--apply' => $apply ?: null, '--paquet' => $paquet]));
 
     return Artisan::output();
 }
@@ -101,10 +101,10 @@ it('écarte un numéro en liste d\'opposition, quelle que soit son écriture', f
     expect($sortie)->toContain('écartés pour opposition : 1');
 });
 
-it('écarte les personnes physiques (forme 1…, vide, ou métadonnée)', function () {
+it('écarte les personnes physiques (forme 1…, marque d\'import FINESS, ou métadonnée)', function () {
     $espace = F::espace();
     [$a, $sa] = ficheTel($espace, ['legal_form' => ' 1000']);
-    [$b, $sb] = ficheTel($espace, ['legal_form' => null]);
+    [$b, $sb] = ficheTel($espace, ['legal_form' => null, 'discovery_source' => 'finess', 'metadata' => json_encode(['personne_physique' => true, 'source' => 'finess'])]);
     [$c, $sc] = ficheTel($espace, ['metadata' => json_encode(['personne_physique' => true])]);
 
     $sortie = lancerTel($espace, csvTel([
@@ -113,6 +113,16 @@ it('écarte les personnes physiques (forme 1…, vide, ou métadonnée)', functi
 
     expect(DB::table('companies')->whereIn('id', [$a, $b, $c])->whereNotNull('phone')->count())->toBe(0);
     expect($sortie)->toContain('personnes physiques écartées : 3');
+});
+
+it('une fiche FINESS à forme juridique vide sans marque personne physique est une personne morale', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace, ['legal_form' => null, 'discovery_source' => 'finess', 'metadata' => json_encode(['finess_categorie' => '620'])]);
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'telephone' => '0140000001']]));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBe('0140000001');
+    expect($sortie)->toContain('personnes physiques écartées : 0');
 });
 
 it('écarte un numéro invalide', function () {
@@ -169,14 +179,99 @@ it('ajoute adresse, GPS et date d\'ouverture sur champs vides, sans jamais écra
         ->toContain('dates d\'ouverture ajoutés : 1')->not->toContain('RUE DU ZZ')->not->toContain('48.85');
 });
 
-it('complète seulement les champs d\'adresse vides (partiel)', function () {
+it('n\'ajoute code postal et ville que si l\'adresse est vide ou égale à la rue FINESS', function () {
     $espace = F::espace();
-    [$id, $siret] = ficheTel($espace, ['address' => '5 AVENUE ZZ', 'postcode' => null, 'city' => '']);
+    [$autre, $sa] = ficheTel($espace, ['address' => '5 AVENUE ZZ', 'postcode' => null, 'city' => '']);
+    [$meme, $sb] = ficheTel($espace, ['address' => '9  avenue zz', 'postcode' => null, 'city' => '']);
 
-    lancerTel($espace, csvTel([['siret' => $siret, 'numero_voie' => '9', 'libelle_voie' => 'AUTRE', 'code_postal' => '99002', 'commune_acheminement' => 'ZZBOURG']]));
+    lancerTel($espace, csvTel([
+        ['siret' => $sa, 'numero_voie' => '9', 'type_voie' => 'AVENUE', 'libelle_voie' => 'ZZ', 'code_postal' => '99002', 'commune_acheminement' => '99002 ZZBOURG CEDEX 03'],
+        ['siret' => $sb, 'numero_voie' => '9', 'type_voie' => 'AVENUE', 'libelle_voie' => 'ZZ', 'code_postal' => '99002', 'commune_acheminement' => '99002 ZZBOURG CEDEX 03'],
+    ]));
+
+    $a = DB::table('companies')->where('id', $autre)->first();
+    expect($a->address)->toBe('5 AVENUE ZZ')->and($a->postcode)->toBeNull()->and($a->city)->toBe('');
+    $m = DB::table('companies')->where('id', $meme)->first();
+    expect($m->address)->toBe('9  avenue zz')->and($m->postcode)->toBe('99002')->and($m->city)->toBe('ZZBOURG')->and($m->city_name)->toBe('ZZBOURG');
+});
+
+it('fiche protégée, fermée, non officine ou écartée : rien n\'est écrit', function () {
+    $espace = F::espace();
+    [$p, $sp] = ficheTel($espace);
+    F::proteger($espace, $p, 'src:scraping-federations-2026');
+    [$f, $sf] = ficheTel($espace, ['insee_ferme_le' => '2020-01-01']);
+    [$o, $so] = ficheTel($espace, ['metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
+    [$e, $se] = ficheTel($espace, ['metadata' => json_encode(['ecartee_motif' => 'test'])]);
+    $adr = ['telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $sp] + $adr, ['siret' => $sf] + $adr, ['siret' => $so] + $adr, ['siret' => $se] + $adr]));
+
+    foreach ([$p, $f, $o, $e] as $id) {
+        $c = DB::table('companies')->where('id', $id)->first();
+        expect($c->phone)->toBeNull()->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
+        expect(json_decode((string) $c->metadata, true) ?? [])->not->toHaveKey('telephone_source')->not->toHaveKey('finess_date_ouverture');
+    }
+    expect($sortie)->toContain('téléphones ajoutés : 0')->toContain('fiches exclues (protégées, fermées, non officine ou écartées) : 4');
+});
+
+it('GPS hors France écarté et compté', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace);
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'latitude' => '40.7', 'longitude' => '-74.0']]));
+
+    expect(DB::table('companies')->where('id', $id)->value('lat'))->toBeNull();
+    expect($sortie)->toContain('coordonnées GPS hors France écartées : 1')->toContain('coordonnées GPS ajoutés : 0');
+});
+
+it('second passage : plus rien à ajouter, et les autres clés de metadata sont conservées', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace, ['metadata' => json_encode(['autre_cle' => 'garde', 'sous' => ['a' => 1]])]);
+    $csv = csvTel([['siret' => $siret, 'telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'commune_acheminement' => 'ZZVILLE', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01']]);
+
+    $premier = lancerTel($espace, $csv);
+    $second = lancerTel($espace, $csv);
+
+    expect($premier)->toContain('téléphones ajoutés : 1')->toContain('adresses complétées ajoutés : 1')->toContain('coordonnées GPS ajoutés : 1')->toContain('dates d\'ouverture ajoutés : 1');
+    expect($second)->toContain('téléphones ajoutés : 0')->toContain('adresses complétées ajoutés : 0')->toContain('coordonnées GPS ajoutés : 0')->toContain('dates d\'ouverture ajoutés : 0');
+    $meta = json_decode((string) DB::table('companies')->where('id', $id)->value('metadata'), true);
+    expect($meta)->toMatchArray(['autre_cle' => 'garde', 'sous' => ['a' => 1], 'telephone_source' => 'finess', 'finess_date_ouverture' => '2001-01-01']);
+});
+
+it('deux SIRET sur une fiche, dans deux paquets : le SIRET de la fiche et son propre téléphone priment', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace);                        // companies.siret = $siret
+    $autre = substr($siret, 0, 9) . '00029';
+    DB::table('finess_etablissements')->insert(['workspace_id' => $espace, 'company_id' => $id, 'siret' => $autre, 'categorie' => '620', 'created_at' => now()]);
+    // Le second SIRET est lu EN PREMIER ; paquet = 1 les sépare dans l'ancien découpage.
+    $csv = csvTel([
+        ['siret' => $autre, 'telephone' => '0140000002', 'numero_voie' => '2', 'libelle_voie' => 'RUE B', 'latitude' => '48.2', 'longitude' => '2.2', 'date_ouverture' => '2002-02-02'],
+        ['siret' => $siret, 'telephone' => '0140000001', 'numero_voie' => '1', 'libelle_voie' => 'RUE A', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'],
+    ]);
+
+    lancerTel($espace, $csv, true, null, 1);
 
     $c = DB::table('companies')->where('id', $id)->first();
-    expect($c->address)->toBe('5 AVENUE ZZ')->and($c->postcode)->toBe('99002')->and($c->city)->toBe('ZZBOURG');
+    expect($c->phone)->toBe('0140000001')->and($c->address)->toBe('1 RUE A')->and((float) $c->lat)->toBe(48.1);
+    expect(json_decode((string) $c->metadata, true)['finess_date_ouverture'])->toBe('2001-01-01');
+});
+
+it('deux officines actives sans SIRET de la fiche : pas d\'adresse, GPS ni date ; téléphone propre avant société exploitante', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace);
+    DB::table('companies')->where('id', $id)->update(['siret' => substr($siret, 0, 9) . '00099']);
+    $autre = substr($siret, 0, 9) . '00029';
+    DB::table('finess_etablissements')->insert(['workspace_id' => $espace, 'company_id' => $id, 'siret' => $autre, 'categorie' => '620', 'created_at' => now()]);
+    $csv = csvTel([
+        ['siret' => $siret, 'finess_ej' => '990000002', 'numero_voie' => '1', 'code_postal' => '99001', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'],
+        ['siret' => $autre, 'telephone' => '0140000003', 'numero_voie' => '2', 'code_postal' => '99002'],
+    ]);
+
+    lancerTel($espace, $csv, true, csvEj(['990000002' => '0140000008']), 1);
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->phone)->toBe('0140000003')->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
+    expect(json_decode((string) $c->metadata, true))->not->toHaveKey('finess_date_ouverture')->and(json_decode((string) $c->metadata, true)['telephone_source'])->toBe('finess');
 });
 
 it('personne physique : ni adresse, ni GPS, ni date, ni téléphone', function () {

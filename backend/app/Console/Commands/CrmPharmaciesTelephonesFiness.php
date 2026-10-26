@@ -76,6 +76,7 @@ class CrmPharmaciesTelephonesFiness extends Command
         $this->info('Bilan' . ($appliquer ? '' : ' (ESSAI À BLANC)'));
         $this->line(sprintf('  lignes lues : %d (officines actives 620 : %d, sans téléphone : %d)', $b['lignes'], $b['officines'], $b['sans_telephone']));
         $this->line(sprintf('  fiches trouvées : %d (introuvables : %d)', $b['trouvees'], $b['introuvables']));
+        $this->line(sprintf('  fiches exclues (protégées, fermées, non officine ou écartées) : %d', $b['exclues']));
         $this->line(sprintf('  personnes physiques écartées : %d', $b['personnes_physiques']));
         $this->line(sprintf('  déjà renseignées : %d', $b['deja_renseignees']));
         $this->line(sprintf('  numéros invalides : %d', $b['invalides']));
@@ -86,6 +87,7 @@ class CrmPharmaciesTelephonesFiness extends Command
         $this->line(sprintf('  téléphones société exploitante %s : %d', $v, $b['ej_' . $k]));
         $this->line(sprintf('  adresses complétées %s : %d', $v, $b['adr_' . $k]));
         $this->line(sprintf('  coordonnées GPS %s : %d', $v, $b['gps_' . $k]));
+        $this->line(sprintf('  coordonnées GPS hors France écartées : %d', $b['gps_hors_france']));
         $this->line(sprintf('  dates d\'ouverture %s : %d', $v, $b['date_' . $k]));
         $this->line(sprintf('  paquets en échec : %d', $b['lots_en_echec']));
 

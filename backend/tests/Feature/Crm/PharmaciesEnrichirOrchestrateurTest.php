@@ -117,7 +117,7 @@ beforeEach(function () {
         {
             PoCompteurs::inc('llm');
 
-            return new LLMResponseData(text: '{"priority":"high"}', providerUsed: 'faux', modelUsed: 'faux');
+            return new LLMResponseData(text: '{"priority":"haute"}', providerUsed: 'faux', modelUsed: 'faux');
         }
     });
     $this->app->instance(GooglePlacesClient::class, new class extends GooglePlacesClient

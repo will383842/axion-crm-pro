@@ -222,8 +222,14 @@ test('API : l export CSV filtré par nom rend les mêmes fiches que la liste, et
 
     $denominationsExport = function (User $u, string $saisie): array {
         $this->actingAs($u);
-        $csv = $this->get('/api/v1/companies/export?' . http_build_query(['filter' => ['denomination' => $saisie]]))
-            ->assertOk()->streamedContent();
+        $reponse = $this->get('/api/v1/companies/export?' . http_build_query(['filter' => ['denomination' => $saisie]]))
+            ->assertOk();
+        // Le flux est CONSOMMÉ après la requête : en production le callback
+        // tourne pendant l'envoi, avant `SetCurrentWorkspace::terminate`, donc
+        // le contexte est posé ; ici `terminate` l'a déjà vidé et la fonction
+        // (qui exige le contexte) ne rendrait rien. On le repose, comme en prod.
+        DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', (string) $u->current_workspace_id]);
+        $csv = $reponse->streamedContent();
         $lignes = array_map('str_getcsv', array_filter(explode("\n", ltrim($csv, "\xEF\xBB\xBF"))));
         array_shift($lignes);
         $noms = array_map(static fn (array $l): string => (string) $l[1], $lignes);

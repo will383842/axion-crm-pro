@@ -42,6 +42,7 @@ function pePharmacie(string $espace, array $attrs = []): int
         'siren' => (string) (950000000 + $seq),
         'denomination' => 'ZZ officine ' . $seq,
         'naf' => '47.73Z',
+        'legal_form' => '5499',
         'discovery_source' => 'insee',
         'created_at' => now(),
         'updated_at' => now(),
@@ -135,7 +136,8 @@ it('envoie une pharmacie de forme 1000 sans aucune metadata vers le job restrein
 it('le critère personne physique tolère les espaces autour de la forme juridique', function () {
     expect(SelectionEnrichissement::estPersonnePhysique(null, ' 1000'))->toBeTrue()
         ->and(SelectionEnrichissement::estPersonnePhysique(null, '5499'))->toBeFalse()
-        ->and(SelectionEnrichissement::estPersonnePhysique(null, null))->toBeFalse()
+        ->and(SelectionEnrichissement::estPersonnePhysique(null, null))->toBeTrue()
+        ->and(SelectionEnrichissement::estPersonnePhysique(null, '  '))->toBeTrue()
         ->and(SelectionEnrichissement::estPersonnePhysique('{"personne_physique":true}', null))->toBeTrue();
 });
 
@@ -180,4 +182,37 @@ it('le rapport ne donne que des totaux, sans nom ni adresse', function () {
 
     expect($sortie)->toContain('Par taille')->toContain('Par département')->toContain('tpe')->toContain('75')
         ->not->toContain('ZZ NOM UNIQUE')->not->toContain('SECRETE')->not->toContain('0100000000');
+});
+
+it('une forme juridique vide ou NULL est traitée comme personne physique (job restreint)', function () {
+    $nulle = pePharmacie($this->espace, ['legal_form' => null]);
+    $vide = pePharmacie($this->espace, ['legal_form' => '  ']);
+    $morale = pePharmacie($this->espace, ['legal_form' => '5499']);
+
+    peLancer($this, ['--apply' => true, '--pause' => 0]);
+
+    $restreints = Queue::pushed(EnrichirSiteOfficineJob::class)->map(fn ($j) => $j->companyId)->sort()->values()->all();
+    expect($restreints)->toBe(collect([$nulle, $vide])->sort()->values()->all())
+        ->and(Queue::pushed(EnrichCompanyJob::class)->map(fn ($j) => $j->companyId)->all())->toBe([$morale]);
+});
+
+it('pour une forme 1xxx (ou vide), seuls le site et le téléphone comptent comme manquants', function () {
+    $base = ['phone' => '0100000001', 'website' => 'https://zz-site.example/'];
+    $physique = pePharmacie($this->espace, $base + ['legal_form' => '1000']);
+    $vide = pePharmacie($this->espace, $base + ['legal_form' => null]);
+    $marquee = pePharmacie($this->espace, $base + ['metadata' => ['personne_physique' => true]]);
+    $morale = pePharmacie($this->espace, $base + ['legal_form' => '5499']);
+    $sansSite = pePharmacie($this->espace, ['phone' => '0100000002', 'legal_form' => '1000']);
+
+    $ids = SelectionEnrichissement::aEnrichir($this->espace, 30)->pluck('id')->map(fn ($i) => (int) $i)->sort()->values()->all();
+
+    expect($ids)->toBe(collect([$morale, $sansSite])->sort()->values()->all())
+        ->and($ids)->not->toContain($physique)->not->toContain($vide)->not->toContain($marquee);
+});
+
+it('Groupement : santepharma est cherché comme mot entier', function () {
+    expect(Groupement::detecter('Santé Pharma', null))->toBe('Santé Pharma')
+        ->and(Groupement::detecter(null, 'https://www.santepharma.fr/'))->toBe('Santé Pharma')
+        ->and(Groupement::detecter('Centre Santé Pharmaceutique', null))->toBeNull()
+        ->and(Groupement::detecter(null, 'https://unesantepharmacie.example/'))->toBeNull();
 });

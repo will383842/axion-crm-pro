@@ -18,13 +18,23 @@ final class SelectionEnrichissement
     /** Clé de `metadata` qui porte la date et les sources du dernier passage. */
     public const CLE_PASSAGE = 'enrichissement_pharmacie';
 
-    /** Colonnes dont l'absence compte comme « champ manquant ». */
+    /**
+     * Personne physique côté SQL : forme juridique « 1xxx », VIDE ou NULL (par prudence),
+     * ou marque `metadata.personne_physique`. Même critère que `estPersonnePhysique`.
+     */
+    private const PHYSIQUE_SQL = "(COALESCE(btrim(legal_form), '') = '' OR btrim(legal_form) LIKE '1%' OR COALESCE(metadata->>'personne_physique', '') = 'true')";
+
+    /**
+     * Colonnes dont l'absence compte comme « champ manquant ». Pour une personne
+     * physique, seuls le site et le téléphone comptent (l'adresse, l'e-mail et les
+     * coordonnées ne sont jamais enrichis pour elle).
+     */
     private const MANQUANTS_SQL = [
         "(phone IS NULL OR phone = '')",
         "(website IS NULL OR website = '')",
-        "(email_generic IS NULL OR email_generic = '')",
-        "(address IS NULL OR address = '')",
-        '(lat IS NULL)',
+        '(NOT ' . self::PHYSIQUE_SQL . " AND (email_generic IS NULL OR email_generic = ''))",
+        '(NOT ' . self::PHYSIQUE_SQL . " AND (address IS NULL OR address = ''))",
+        '(NOT ' . self::PHYSIQUE_SQL . ' AND lat IS NULL)',
     ];
 
     public static function ouvertes(string $workspaceId): Builder
@@ -65,11 +75,14 @@ final class SelectionEnrichissement
     /**
      * Personne physique = forme juridique INSEE « 1xxx » (même critère que
      * `PersonnesController` : `COALESCE(btrim(legal_form), '') LIKE '1%'`),
-     * ou, en complément, la marque `metadata.personne_physique`.
+     * forme VIDE ou NULL (traitée comme personne physique par prudence : le
+     * waterfall complet écrirait des données nominatives), ou, en complément,
+     * la marque `metadata.personne_physique`.
      */
     public static function estPersonnePhysique(mixed $metadata, mixed $legalForm = null): bool
     {
-        if (str_starts_with(trim((string) $legalForm), '1')) {
+        $forme = trim((string) $legalForm);
+        if ($forme === '' || str_starts_with($forme, '1')) {
             return true;
         }
         $m = is_string($metadata) ? json_decode($metadata, true) : $metadata;

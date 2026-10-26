@@ -226,6 +226,32 @@ class MentionsLegalesScraperService
     }
 
     /**
+     * Téléphones lus sur le site, avec la part qui ne vient PAS d'une page de mentions
+     * légales (là, le numéro est souvent celui de l'hébergeur ou de l'éditeur du site).
+     * `null` = aucune page n'a répondu (panne réseau, site muet) : à distinguer de
+     * « pages lues, aucun numéro ».
+     *
+     * @return array{phones: list<string>, hors_mentions: list<string>}|null
+     */
+    public function harvestTelephones(string $website): ?array
+    {
+        $body = $this->fetchAnyMentionsLegalesPage($website);
+        if ($body === null) {
+            return null;
+        }
+        $hors = [];
+        // Pages accumulées : `<!-- page: {chemin} -->` puis le corps de la page.
+        preg_match_all('/<!-- page: (\S+) -->(.*?)(?=<!-- page: |\z)/s', $body, $pages, PREG_SET_ORDER);
+        foreach ($pages as [, $chemin, $contenu]) {
+            if (preg_match('~mentions|legal|imprint~i', $chemin) !== 1) {
+                $hors = [...$hors, ...$this->extractAllPhones($contenu)];
+            }
+        }
+
+        return ['phones' => array_values($this->extractAllPhones($body)), 'hors_mentions' => array_values(array_unique($hors))];
+    }
+
+    /**
      * Sprint H-SPEED — Récupère EN PARALLÈLE (Http::pool) les 8 paths les plus
      * utiles (contact + mentions-légales) en une seule salve concurrente, au lieu
      * de la boucle séquentielle historique. On tape le site une seule fois par run

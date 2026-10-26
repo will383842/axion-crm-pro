@@ -478,27 +478,23 @@ test('arret par paquet : cumul hors fourchette en cours d ecriture, paquet suiva
     pefFiche($a, '720000001', ['insee_ferme_le' => '2024-01-01']);
     pefFiche($b, '720000002', ['insee_ferme_le' => '2024-01-01']);
 
-    // Entre l'essai a blanc et l'ecriture, des fiches fermees arrivent : la
-    // fourchette cumulee doit arreter l'ecriture avant le paquet fautif.
-    $lectures = 0;
+    // Entre l'essai a blanc et l'ecriture, des fiches fermees arrivent dans le
+    // second espace : declenche apres la PREMIERE ecriture (mise a la corbeille),
+    // donc independamment du nombre de lectures. La fourchette cumulee doit
+    // arreter l'ecriture avant le paquet fautif.
     $inserees = false;
-    DB::listen(function ($requete) use (&$lectures, &$inserees, $a, $b): void {
-        if ($inserees || ! str_contains($requete->sql, 'SELECT id FROM companies')) {
-            return;
-        }
-        if (++$lectures < 3) {
+    DB::listen(function ($requete) use (&$inserees, $b): void {
+        if ($inserees || ! str_contains($requete->sql, 'deleted_at = now()')) {
             return;
         }
         $inserees = true;
-        foreach ([$a, $b] as $ws) {
-            $lignes = [];
-            for ($i = 0; $i < 3; $i++) {
-                $lignes[] = ['workspace_id' => $ws, 'siren' => (string) (730000000 + $i), 'denomination' => 'ZZ FICTIVE',
-                    'naf' => '47.73Z', 'signals' => '{}', 'metadata' => '{}', 'field_origins' => '{}', 'insee_ferme_le' => '2024-01-01',
-                    'created_at' => now(), 'updated_at' => now()];
-            }
-            DB::table('companies')->insert($lignes);
+        $lignes = [];
+        for ($i = 0; $i < 3; $i++) {
+            $lignes[] = ['workspace_id' => $b, 'siren' => (string) (730000000 + $i), 'denomination' => 'ZZ FICTIVE',
+                'naf' => '47.73Z', 'signals' => '{}', 'metadata' => '{}', 'field_origins' => '{}', 'insee_ferme_le' => '2024-01-01',
+                'created_at' => now(), 'updated_at' => now()];
         }
+        DB::table('companies')->insert($lignes);
     });
 
     $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true, '--max-insee' => 4]);
@@ -506,6 +502,6 @@ test('arret par paquet : cumul hors fourchette en cours d ecriture, paquet suiva
     expect($code)->toBe(1);
     expect($inserees)->toBeTrue();
     expect(Artisan::output())->toContain('REFUS : cumul hors fourchette');
-    // Seul le premier espace (lu avant l'arrivee des fiches) est ecrit ; le second, fautif, ne l'est pas.
+    // Seul le premier espace est ecrit ; le second (1 + 3 fiches, cumul 5 > 4), fautif, ne l'est pas.
     expect(DB::table('companies')->whereNotNull('deleted_at')->count())->toBe(1);
 });

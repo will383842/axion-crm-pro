@@ -73,7 +73,7 @@ class CrmPharmaciesImportFiness extends Command
         $this->line(sprintf('  lignes lues : %d (inactives : %d)', $b['lignes'], $b['inactives']));
         $this->line(sprintf('  officines actives (620) : %d (sans SIRET : %d, doublons du fichier : %d)', $b['officines'], $b['sans_siret'], $b['doublons_fichier']));
         $this->line(sprintf('  officines sans code de statut juridique (statut_code) : %d', $b['sans_code']));
-        if (! $appliquer && $b['officines'] > 0 && $b['sans_code'] * 100 > $b['officines']) {
+        if (! $appliquer && $b['officines'] > 0 && $b['officines'] < $b['sans_code'] * 100) {
             $this->warn('  --apply serait refusé : statut_code absent ou vide sur plus de 1 % des officines.');
         }
         $this->line(sprintf('  déjà au CRM par SIRET : %d', $b['deja_par_siret']));

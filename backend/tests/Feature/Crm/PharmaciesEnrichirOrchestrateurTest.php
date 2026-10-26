@@ -161,7 +161,7 @@ beforeEach(function () {
     {
         public function __construct() {}
 
-        public function find(string $firstName, string $lastName, string $domain): array
+        public function find(string $firstName, string $lastName, string $domain, ?string $knownPattern = null): array
         {
             PoCompteurs::inc('hunter');
 

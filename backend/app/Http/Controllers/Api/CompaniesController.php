@@ -266,7 +266,7 @@ class CompaniesController extends ApiController
         // deux fois, et jusqu'à 3 calculs identiques tenaient chacun un worker
         // PHP. Cache vide : on répond tout de suite `$vide` (`total: null`) et le
         // calcul unique part APRÈS la réponse, sous verrou.
-        if (! Cache::has(self::cleStats($espace))) {
+        if (Cache::has(self::cleStats($espace)) === false) {
             defer(fn () => $this->rechaufferStats($espace));
 
             return $this->ok($vide);
@@ -293,13 +293,13 @@ class CompaniesController extends ApiController
     public function rechaufferStats(string $espace): bool
     {
         $verrou = Cache::lock('crm:companies:stats:calcul:' . $espace, 150);
-        if (! $verrou->get()) {
+        if ($verrou->get() === false) {
             return false;
         }
 
         try {
             // Re-test sous verrou : un autre calcul a pu finir entre-temps.
-            if (! Cache::has(self::cleStats($espace))) {
+            if (Cache::has(self::cleStats($espace)) === false) {
                 Cache::flexible(
                     self::cleStats($espace),
                     [1800, 86400],

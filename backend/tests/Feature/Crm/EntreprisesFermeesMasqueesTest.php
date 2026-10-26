@@ -16,6 +16,7 @@
  * Luhn volontairement FAUSSE, donc attribués à personne.
  */
 
+use App\Http\Controllers\Api\CompaniesController;
 use App\Models\User;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -152,7 +153,7 @@ test('la fiche d une entreprise fermée reste accessible par son lien direct, av
 
 test('compteurs de la liste (/companies/stats) : la fermée ne compte pas', function () {
     // Cache vide : la requête ne calcule plus (cf. `StatsEntreprisesSansCalculSynchroneTest`).
-    app(\App\Http\Controllers\Api\CompaniesController::class)->rechaufferStats($this->espace);
+    app(CompaniesController::class)->rechaufferStats($this->espace);
     $s = $this->getJson('/api/v1/companies/stats')->assertOk();
 
     expect($s->json('total'))->toBe(1)

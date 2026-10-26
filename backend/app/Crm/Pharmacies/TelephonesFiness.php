@@ -262,7 +262,7 @@ final class TelephonesFiness
                 $propre = $reference !== null && $reference['telephone'] !== '';
                 if ($propre && ! $phoneVide) {
                     $locale['deja_renseignees']++;
-                } elseif ($propre && $reference !== null) {
+                } elseif ($propre) {
                     $tel = self::normaliser($reference['telephone']);
                     if ($tel === null) {
                         $locale['invalides']++;

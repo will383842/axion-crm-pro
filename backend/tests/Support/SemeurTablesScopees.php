@@ -113,6 +113,8 @@ final class SemeurTablesScopees
         // 2026-09-29 (chantier 3) : la ligne « organisation professionnelle »
         // d'une fiche — feuille de `companies`.
         'federations',
+        // 2026-10-25 : établissements FINESS d'une société (import des officines).
+        'finess_etablissements',
         // 2026-09-30 (chantier 5) : journal des fusions — APRES `duplicate_flags`
         // (cle etrangere `flag_id`).
         'fusions_fiches',
@@ -535,6 +537,12 @@ final class SemeurTablesScopees
 
         $inserer('email_warmup_pools', [
             'domain' => 'zz-' . $marque . '.test.invalid',
+        ]);
+
+        $inserer('finess_etablissements', [
+            'company_id' => $id['companies'],
+            'siret' => sprintf('94%012d', crc32($marque)),
+            'categorie' => '620',
         ]);
 
         $inserer('health_practitioners', [

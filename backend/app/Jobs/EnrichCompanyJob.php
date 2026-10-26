@@ -21,6 +21,20 @@ class EnrichCompanyJob implements ShouldQueue
     public int $timeout = 600;
 
     /**
+     * Saute les étapes potentiellement payantes (Google Places, LLM). Propriété
+     * déclarée (pas promue) : une charge sérialisée avant son ajout reprend le
+     * défaut `false` à la désérialisation.
+     */
+    public bool $sansPayant = false;
+
+    public function sansPayant(bool $oui = true): static
+    {
+        $this->sansPayant = $oui;
+
+        return $this;
+    }
+
+    /**
      * 🔴 CONSTAT B11-002 / B17-010. Ce constructeur portait, depuis le lot L0,
      * un second paramètre PROMU `?string $workspaceId = null`. Mesure du
      * 2026-08-21 :
@@ -67,6 +81,6 @@ class EnrichCompanyJob implements ShouldQueue
         if (! $company) {
             return;
         }
-        $waterfall->enrich($company);
+        $this->sansPayant ? $waterfall->enrichSansPayant($company) : $waterfall->enrich($company);
     }
 }

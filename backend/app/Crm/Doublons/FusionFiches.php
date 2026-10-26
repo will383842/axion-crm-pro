@@ -105,6 +105,8 @@ final class FusionFiches
         'event_organizers.company_id',
         'federations.company_id',
         'federations.parent_company_id',
+        // 2026-10-25 : établissements FINESS d'une société (import des officines).
+        'finess_etablissements.company_id',
         'health_practitioners.company_id',
         'journalists.company_id',
         // 2026-09-30 : une organisation cochée dans une liste manuelle.
@@ -128,7 +130,7 @@ final class FusionFiches
     ];
 
     /** Tables rattachées ligne par ligne, par leur identifiant, sans conflit possible. */
-    private const TABLES_SIMPLES = ['deals', 'scraper_runs', 'health_practitioners', 'media', 'journalists', 'personnes'];
+    private const TABLES_SIMPLES = ['deals', 'scraper_runs', 'finess_etablissements', 'health_practitioners', 'media', 'journalists', 'personnes'];
 
     /** Coordonnées de la fiche recopiées sur la fiche gardée QUAND ELLE NE LES A PAS. */
     public const CHAMPS_FICHE = ['email_generic', 'phone', 'website', 'linkedin_url', 'first_info_at'];
@@ -955,7 +957,7 @@ final class FusionFiches
 
         $parCle = [
             'contacts' => 'id', 'audience_members' => 'id', 'listes_manuelles_membres' => 'id', 'deals' => 'id', 'scraper_runs' => 'id',
-            'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id', 'companies_opco' => 'id',
+            'finess_etablissements' => 'id', 'health_practitioners' => 'id', 'media' => 'id', 'journalists' => 'id', 'personnes' => 'id', 'companies_opco' => 'id',
             'company_tag' => 'tag_id', 'event_organizers' => 'event_id',
         ];
         foreach ($parCle as $table => $cle) {

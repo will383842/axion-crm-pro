@@ -73,13 +73,22 @@ jobs:
           unzip -q -o finess.zip etablissements.csv entites-juridiques.csv
           python3 - <<'PY'
           import csv, sys
-          n620 = ntel = 0
+          n620 = ntel = ncom = ncomnum = 0
           for r in csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';'):
               if r['categorie'] == '620' and r['etat'] == 'A':
                   n620 += 1
                   if (r.get('telephone') or '').strip():
                       ntel += 1
+                  com = (r.get('commune') or '').strip()
+                  if com:
+                      ncom += 1
+                      if com.isdigit():
+                          ncomnum += 1
           print('lignes catégorie 620 état A (actives) :', n620)
+          print('dont commune renseignée :', ncom, 'dont numérique (code) :', ncomnum)
+          if ncom and ncomnum * 2 > ncom:
+              print('colonne commune majoritairement numérique (codes) : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
           print('dont avec téléphone :', ntel)
           nej = ntelej = 0
           for r in csv.DictReader(open('entites-juridiques.csv', encoding='utf-8-sig'), delimiter=';'):

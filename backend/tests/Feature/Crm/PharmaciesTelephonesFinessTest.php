@@ -256,7 +256,7 @@ it('deux SIRET sur une fiche, dans deux paquets : le SIRET de la fiche et son pr
     expect(json_decode((string) $c->metadata, true)['finess_date_ouverture'])->toBe('2001-01-01');
 });
 
-it('deux officines actives sans SIRET de la fiche : pas d\'adresse, GPS ni date ; téléphone propre avant société exploitante', function () {
+it('deux officines actives sans SIRET de la fiche : pas d\'adresse, GPS, date ni téléphone d\'une autre officine ; repli société exploitante', function () {
     $espace = F::espace();
     [$id, $siret] = ficheTel($espace);
     DB::table('companies')->where('id', $id)->update(['siret' => substr($siret, 0, 9) . '00099']);
@@ -264,14 +264,14 @@ it('deux officines actives sans SIRET de la fiche : pas d\'adresse, GPS ni date 
     DB::table('finess_etablissements')->insert(['workspace_id' => $espace, 'company_id' => $id, 'siret' => $autre, 'categorie' => '620', 'created_at' => now()]);
     $csv = csvTel([
         ['siret' => $siret, 'finess_ej' => '990000002', 'numero_voie' => '1', 'code_postal' => '99001', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'],
-        ['siret' => $autre, 'telephone' => '0140000003', 'numero_voie' => '2', 'code_postal' => '99002'],
+        ['siret' => $autre, 'finess_ej' => '990000002', 'telephone' => '0140000003', 'numero_voie' => '2', 'code_postal' => '99002'],
     ]);
 
     lancerTel($espace, $csv, true, csvEj(['990000002' => '0140000008']), 1);
 
     $c = DB::table('companies')->where('id', $id)->first();
-    expect($c->phone)->toBe('0140000003')->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
-    expect(json_decode((string) $c->metadata, true))->not->toHaveKey('finess_date_ouverture')->and(json_decode((string) $c->metadata, true)['telephone_source'])->toBe('finess');
+    expect($c->phone)->toBe('0140000008')->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
+    expect(json_decode((string) $c->metadata, true))->not->toHaveKey('finess_date_ouverture')->and(json_decode((string) $c->metadata, true)['telephone_source'])->toBe('finess_ej');
 });
 
 it('personne physique : ni adresse, ni GPS, ni date, ni téléphone', function () {
@@ -337,4 +337,52 @@ it('essai à blanc : aucun ajout étendu écrit, totaux seulement', function () 
     $c = DB::table('companies')->where('id', $id)->first();
     expect($c->phone)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
     expect($sortie)->toContain('téléphones société exploitante à ajouter : 1')->toContain('coordonnées GPS à ajouter : 1')->not->toContain('99004');
+});
+
+it('un numéro en opposition écarte la fiche entière : ni adresse, ni GPS, ni date', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace);
+    DB::table('opt_out')->insert(['phone' => '0140000001', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'telephone' => '01 40 00 00 01', 'numero_voie' => '3', 'code_postal' => '99003', 'commune_acheminement' => 'ZZVILLE', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01']]));
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->phone)->toBeNull()->and($c->address)->toBeNull()->and($c->lat)->toBeNull();
+    expect(json_decode((string) $c->metadata, true) ?? [])->not->toHaveKey('finess_date_ouverture');
+    expect($sortie)->toContain('écartés pour opposition : 1');
+});
+
+it('un e-mail générique en opposition écarte la fiche entière', function () {
+    $espace = F::espace();
+    $email = 'zz-opposee@zz.example.invalid';
+    [$id, $siret] = ficheTel($espace, ['email_generic' => $email]);
+    DB::table('opt_out')->insert(['email_hash' => hash('sha256', $email), 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'telephone' => '0140000001', 'numero_voie' => '3', 'latitude' => '48.1', 'longitude' => '2.1']]));
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->phone)->toBeNull()->and($c->address)->toBeNull()->and($c->lat)->toBeNull();
+    expect($sortie)->toContain('téléphones ajoutés : 0')->toContain('écartés pour opposition : 1');
+});
+
+it('un téléphone déjà présent sur la fiche et en opposition écarte la fiche entière', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace, ['phone' => '01 40 00 00 05']);
+    DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 05', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'numero_voie' => '3', 'latitude' => '48.1', 'longitude' => '2.1']]));
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->address)->toBeNull()->and($c->lat)->toBeNull();
+    expect($sortie)->toContain('écartés pour opposition : 1');
+});
+
+it('la colonne commune numérique (code) est ignorée : le libellé vient de commune_acheminement', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace);
+
+    lancerTel($espace, csvTel([['siret' => $siret, 'numero_voie' => '4', 'libelle_voie' => 'RUE ZZ', 'code_postal' => '99002', 'commune' => '185', 'commune_acheminement' => '99002 ZZBOURG']]));
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->city)->toBe('ZZBOURG')->and($c->city_name)->toBe('ZZBOURG')->and($c->postcode)->toBe('99002');
 });

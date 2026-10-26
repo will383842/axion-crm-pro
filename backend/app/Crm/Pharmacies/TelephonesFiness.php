@@ -35,6 +35,12 @@ use Throwable;
  *    société exploitante (`entites-juridiques.csv`, jointure finess_ej) seulement si l'officine n'a
  *    pas de téléphone propre dans FINESS et si companies.phone est vide (telephone_source = finess_ej) ;
  *  - JAMAIS le fax (telecopie) ni le courriel ; personnes physiques : ni adresse ni téléphone ;
+ *  - téléphone PROPRE : il ne vient que de la ligne de référence (SIRET de la fiche, ou la seule officine
+ *    active qui y pointe) ; sans ligne de référence ou sans téléphone sur elle, repli sur la société
+ *    exploitante (telephone_source = finess_ej), jamais sur le téléphone d'une autre officine ;
+ *  - un téléphone DÉJÀ présent sur la fiche est aussi contrôlé contre l'opposition : s'il est opposé,
+ *    la fiche entière est écartée (comptée dans `opposition`) ;
+ *  - `trouvees`, `exclues` et `personnes_physiques` comptent des FICHES (pas des lignes du fichier) ;
  *  - un paquet qui échoue n'arrête pas les suivants ; seuls des totaux sont journalisés.
  */
 final class TelephonesFiness
@@ -224,18 +230,18 @@ final class TelephonesFiness
             [$fiches, $extra] = $this->fiches($workspaceId, array_keys($lot));
 
             // Plan par fiche, puis une seule requête d'opposition pour tout le paquet.
-            /** @var array<int, array{tel: ?string, source: string, ajouts: array<string, mixed>, email: string}> $plans */
+            /** @var array<int, array{tel: ?string, source: string, ajouts: array<string, mixed>, email: string, existant: list<string>}> $plans */
             $plans = [];
             $variantes = [];
             $emails = [];
             $locale = ['trouvees' => 0, 'exclues' => 0, 'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
             foreach ($lot as $id => $lignes) {
                 if (! isset($fiches[$id])) {
-                    $locale['exclues'] += count($lignes);
+                    $locale['exclues']++;
 
                     continue;
                 }
-                $locale['trouvees'] += count($lignes);
+                $locale['trouvees']++;
                 $f = $fiches[$id];
                 if ($this->estPersonnePhysique($f->legalForm, $f->metadata)) {
                     $locale['personnes_physiques']++;
@@ -252,28 +258,17 @@ final class TelephonesFiness
                 $phoneVide = trim($f->phone) === '';
                 $source = self::SOURCE;
                 $tel = null;
-                $propre = false;
-                $invalide = false;
-                foreach ($lignes as $l) {
-                    if ($l['telephone'] === '') {
-                        continue;
-                    }
-                    $propre = true;
-                    if (! $phoneVide) {
-                        break;
-                    }
-                    $tel = self::normaliser($l['telephone']);
-                    if ($tel !== null) {
-                        break;
-                    }
-                    $invalide = true;
-                }
+                // Téléphone propre : uniquement celui de la ligne de référence.
+                $propre = $reference !== null && $reference['telephone'] !== '';
                 if ($propre && ! $phoneVide) {
                     $locale['deja_renseignees']++;
-                } elseif ($invalide && $tel === null) {
-                    $locale['invalides']++;
-                } elseif (! $propre && $phoneVide) {
-                    // Pas de téléphone propre dans FINESS (aucun des établissements) : repli sur la société exploitante.
+                } elseif ($propre && $reference !== null) {
+                    $tel = self::normaliser($reference['telephone']);
+                    if ($tel === null) {
+                        $locale['invalides']++;
+                    }
+                } elseif ($phoneVide) {
+                    // Pas de téléphone propre (ligne de référence absente ou sans numéro) : repli sur la société exploitante.
                     foreach ($lignes as $l) {
                         if (($this->telephonesEj[$l['finess_ej']] ?? '') !== '') {
                             $tel = self::normaliser($this->telephonesEj[$l['finess_ej']]);
@@ -289,10 +284,13 @@ final class TelephonesFiness
                 if ($tel !== null) {
                     array_push($variantes, ...ListeSuppression::variantesTelephone($tel));
                 }
+                // Téléphone déjà présent sur la fiche : également contrôlé contre l'opposition.
+                $existant = $phoneVide ? [] : ListeSuppression::variantesTelephone($f->phone);
+                array_push($variantes, ...$existant);
                 if ($extra[$id]['email'] !== '') {
                     $emails[] = $extra[$id]['email'];
                 }
-                $plans[$id] = ['tel' => $tel, 'source' => $source, 'ajouts' => $ajouts, 'email' => $extra[$id]['email']];
+                $plans[$id] = ['tel' => $tel, 'source' => $source, 'ajouts' => $ajouts, 'email' => $extra[$id]['email'], 'existant' => $existant];
             }
             $opposes = $this->opposes(array_values(array_unique($variantes)));
             $emailsOpposes = $this->emailsOpposes(array_values(array_unique($emails)));
@@ -300,8 +298,9 @@ final class TelephonesFiness
             $n = ['a_ajouter' => 0, 'ajoutees' => 0, 'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'opposition' => 0,
                 'adr_a_ajouter' => 0, 'adr_ajoutees' => 0, 'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0];
             foreach ($plans as $id => $p) {
-                // Numéro à ajouter OU e-mail générique en opposition : la fiche entière est écartée.
+                // Numéro à ajouter, numéro déjà présent OU e-mail générique en opposition : la fiche entière est écartée.
                 if (($p['tel'] !== null && array_intersect(ListeSuppression::variantesTelephone($p['tel']), $opposes) !== [])
+                    || array_intersect($p['existant'], $opposes) !== []
                     || ($p['email'] !== '' && isset($emailsOpposes[mb_strtolower($p['email'])]))) {
                     $n['opposition']++;
 
@@ -317,7 +316,7 @@ final class TelephonesFiness
                             ->where(fn ($q) => $q->whereNull('phone')->orWhereRaw("btrim(phone) = ''"))
                             ->update([
                                 'phone' => $p['tel'],
-                                'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('telephone_source', '" . $p['source'] . "')"),
+                                'metadata' => DB::raw("CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || jsonb_build_object('telephone_source', '" . $p['source'] . "')"),
                                 'updated_at' => now(),
                             ]);
                     }
@@ -400,13 +399,15 @@ final class TelephonesFiness
     }
 
     /**
-     * Commune comme l'import (colonne `commune`), sinon commune_acheminement sans code postal ni CEDEX.
+     * Commune comme l'import (colonne `commune`, si ce n'est pas un code numérique), sinon
+     * commune_acheminement sans code postal ni CEDEX.
      *
      * @param  array<string, string>  $l
      */
     private static function commune(array $l): string
     {
-        if ($l['commune'] !== '') {
+        // Le FINESS brut met parfois un CODE commune numérique (ex. 185) dans `commune` : jamais un libellé.
+        if ($l['commune'] !== '' && preg_match('/^\d+$/', $l['commune']) !== 1) {
             return $l['commune'];
         }
         $c = (string) preg_replace('/^\s*\d{5}\s+/', '', $l['commune_acheminement']);
@@ -455,7 +456,7 @@ final class TelephonesFiness
         }
         if ($type === 'date') {
             return $q->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'finess_date_ouverture')")->update([
-                'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('finess_date_ouverture', " . DB::getPdo()->quote((string) $valeur) . '::text)'),
+                'metadata' => DB::raw("CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || jsonb_build_object('finess_date_ouverture', " . DB::getPdo()->quote((string) $valeur) . '::text)'),
                 'updated_at' => now(),
             ]);
         }

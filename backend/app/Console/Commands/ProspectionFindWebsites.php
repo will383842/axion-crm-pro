@@ -128,7 +128,10 @@ class ProspectionFindWebsites extends Command
 
         while (true) {
             $q = $this->requeteSource($sourceStatus, $naf, $espace, $dept, $shards, $shard);
-            $companies = $q->limit($batch)->get();
+            // Avec --naf, --limit borne réellement le lot (sinon un lot entier de $batch
+            // fiches est traité avant le contrôle). Sans --naf : comportement inchangé.
+            $taille = $naf !== null && $limit > 0 ? max(1, min($batch, $limit - $processed)) : $batch;
+            $companies = $q->limit($taille)->get();
             if ($companies->isEmpty()) {
                 break;
             }

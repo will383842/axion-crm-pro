@@ -50,15 +50,29 @@ jobs:
           src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
           out = csv.writer(open('finess_pharma.csv', 'w', newline='', encoding='utf-8'))
           out.writerow(['siret', 'categorie', 'etat'])
+          from collections import Counter
+          total, par_etat = 0, Counter()
           for r in src:
               if r['categorie'] in {'620', '627', '628', '629', '641', '690'}:
                   out.writerow([r['siret'], r['categorie'], r['etat']])
+                  total += 1
+                  par_etat[(r['categorie'], r['etat'])] += 1
+          print(f'FINESS retenu : {total} lignes')
+          for (cat, etat), n in sorted(par_etat.items()):
+              print(f'  categorie {cat} etat {etat} : {n}')
           PY
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Connaître l'hôte (known_hosts, comme les workflows de déploiement)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Lancer la commande
         env:
@@ -68,7 +82,7 @@ jobs:
         run: |
           set -e
           OPT=""; [ "$MODE" = "apply" ] && OPT="--apply"
-          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $USER@$HOST"
+          SSH="ssh $USER@$HOST"
           cat finess_pharma.csv | $SSH "cat > /tmp/finess_pharma.csv"
           $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api php artisan crm:pharmacies:ecarter-fermees --finess=/tmp/finess_pharma.csv $OPT < /dev/null"
 
@@ -78,6 +92,6 @@ jobs:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER: ${{ secrets.HETZNER_USER || 'root' }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" \
+          ssh "$USER@$HOST" \
             "rm -f /tmp/finess_pharma.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_pharma.csv" || true
           rm -f finess.zip etablissements.csv finess_pharma.csv

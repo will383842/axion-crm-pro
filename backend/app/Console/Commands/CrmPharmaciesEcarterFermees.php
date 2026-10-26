@@ -345,7 +345,7 @@ class CrmPharmaciesEcarterFermees extends Command
             ),
         );
 
-        foreach (array_chunk($tous, $taille) as $ids) {
+        foreach (array_chunk($tous, max(1, $taille)) as $ids) {
             $marques = implode(',', array_fill(0, count($ids), '?'));
             /** @var list<\stdClass> $fiches */
             $fiches = DB::select(

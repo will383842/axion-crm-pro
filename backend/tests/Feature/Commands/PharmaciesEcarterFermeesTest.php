@@ -493,8 +493,13 @@ test('restaurer --workspace : l autre espace n est pas touche', function () {
 });
 
 test('arret par paquet : cumul hors fourchette en cours d ecriture, paquet suivant non ecrit', function () {
-    $a = pefEspace();
-    $b = pefEspace();
+    // La commande parcourt les espaces par id (UUID aleatoire) : on impose
+    // $a < $b pour que $a soit ecrit en premier et que l'arrivee des fiches
+    // dans $b tombe toujours avant son paquet (sinon test non deterministe).
+    [$a, $b] = [pefEspace(), pefEspace()];
+    if ($a > $b) {
+        [$a, $b] = [$b, $a];
+    }
     pefFiche($a, '720000001', ['insee_ferme_le' => '2024-01-01']);
     pefFiche($b, '720000002', ['insee_ferme_le' => '2024-01-01']);
 

@@ -2,7 +2,7 @@ name: Pharmacies — vérification des totaux (prod, lecture seule)
 
 # Compte les fiches pharmacie (NAF 47.73Z / 4773Z) du workspace unique de la
 # prod : actives, corbeille, étiquettes, types, tailles, coordonnées, contacts,
-# groupements, départements, doublons. Aucune écriture dans les tables du CRM
+# groupements, départements, doublons de SIRET. Aucune écriture dans les tables du CRM
 # (seule une table TEMPORAIRE de session est créée, elle disparaît à la fin).
 # Dépôt public : seuls des totaux sont affichés, jamais de nom, d'adresse,
 # de téléphone ni d'e-mail.
@@ -37,32 +37,41 @@ jobs:
           set -e
           cat > prepa.sql <<'SQL'
           SET statement_timeout = '120s';
+          \echo >> Workspaces actifs (doit etre 1)
+          SELECT count(*) AS workspaces_actifs, count(*) = 1 AS un_seul FROM workspaces WHERE deleted_at IS NULL \gset
+          \echo workspaces actifs : :workspaces_actifs
+          \if :un_seul
+          \else
+            \echo ARRET : il faut exactement un workspace actif
+            \quit
+          \endif
+          SELECT id AS ws FROM workspaces WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1 \gset
           SET default_transaction_read_only = off;
-          \echo >> Workspaces (doit etre 1)
-          SELECT count(*) AS workspaces FROM workspaces;
-          SELECT id AS ws FROM workspaces ORDER BY created_at LIMIT 1 \gset
           CREATE TEMP TABLE ph AS
             SELECT id, siren, siret, deleted_at, size_category, phone, website, email_generic,
                    postcode, metadata
             FROM companies
             WHERE workspace_id = :'ws' AND naf IN ('47.73Z', '4773Z');
-          CREATE INDEX ON ph (id);
-          ANALYZE ph;
           SET default_transaction_read_only = on;
+          ANALYZE ph;
+          \echo >> Fiches pharmacie chargees
+          SELECT count(*) AS ph_total, count(*) > 0 AS ph_ok FROM ph \gset
+          \echo ph_total : :ph_total
+          \if :ph_ok
+          \else
+            \echo ARRET : aucune fiche chargee (RLS forcee ?)
+            \quit
+          \endif
           SQL
           cat > requetes.sql <<'SQL'
-          SET enable_nestloop = off;
           \echo >> Totaux
           SELECT count(*) FILTER (WHERE deleted_at IS NULL) AS actives,
                  count(*) FILTER (WHERE deleted_at IS NOT NULL) AS corbeille
           FROM ph;
-          \echo >> Etiquette a_verifier_fermee (metadata ou tag) et type non_officine (actives)
-          SELECT count(*) FILTER (WHERE metadata::text LIKE '%a_verifier_fermee%') AS etiquette_metadata,
+          \echo >> Etiquette a_verifier_fermee (metadata) et type non_officine (actives)
+          SELECT count(*) FILTER (WHERE metadata ? 'a_verifier_fermee') AS etiquette_metadata,
                  count(*) FILTER (WHERE metadata->>'type_etablissement' = 'non_officine') AS non_officine_metadata
           FROM ph WHERE deleted_at IS NULL;
-          SELECT count(DISTINCT p.id) AS etiquette_tag
-          FROM ph p JOIN company_tag ct ON ct.company_id = p.id JOIN tags t ON t.id = ct.tag_id
-          WHERE p.deleted_at IS NULL AND t.slug = 'a_verifier_fermee';
           \echo >> Repartition par size_category (actives)
           SELECT coalesce(size_category, '(vide)') AS size_category, count(*)
           FROM ph WHERE deleted_at IS NULL GROUP BY 1 ORDER BY 2 DESC;
@@ -72,20 +81,28 @@ jobs:
                  count(*) FILTER (WHERE coalesce(website, '') <> '') AS avec_site
           FROM ph WHERE deleted_at IS NULL;
           \echo >> Contacts (actives)
-          SELECT count(DISTINCT p.id) AS fiches_avec_contact, count(c.id) AS contacts_total
-          FROM ph p JOIN contacts c ON c.company_id = p.id AND c.workspace_id = :'ws'
+          SELECT count(DISTINCT p.id) AS fiches_avec_contact, count(c.id) AS contacts_total,
+                 count(c.id) FILTER (WHERE c.email IS NOT NULL) AS contacts_avec_email
+          FROM ph p JOIN contacts c ON c.company_id = p.id AND c.workspace_id = :'ws' AND c.deleted_at IS NULL
           WHERE p.deleted_at IS NULL;
           \echo >> Groupement detecte (cle metadata, actives)
           SELECT metadata->>'groupement' AS groupement, count(*)
           FROM ph WHERE deleted_at IS NULL AND metadata ? 'groupement'
           GROUP BY 1 ORDER BY 2 DESC LIMIT 30;
           \echo >> Top 15 departements (actives)
-          SELECT left(postcode, 2) AS dep, count(*) FROM ph WHERE deleted_at IS NULL
+          SELECT CASE WHEN postcode LIKE '97%' THEN left(postcode, 3) ELSE left(postcode, 2) END AS dep, count(*) FROM ph WHERE deleted_at IS NULL
           GROUP BY 1 ORDER BY 2 DESC LIMIT 15;
-          \echo >> Doublons : SIREN avec plus d une fiche sur le meme siret (doit etre 0)
-          SELECT count(*) AS siren_en_doublon FROM (
-            SELECT siren, siret FROM ph WHERE deleted_at IS NULL AND siret IS NOT NULL
-            GROUP BY 1, 2 HAVING count(*) > 1) t;
+          \echo >> Doublons : SIRET porte par plusieurs fiches actives (doit etre 0)
+          SELECT count(*) AS siret_multi_fiches FROM (
+            SELECT siret FROM ph WHERE deleted_at IS NULL AND siret IS NOT NULL
+            GROUP BY siret HAVING count(*) > 1) t;
+          \echo >> Fiches actives sans SIREN (doit etre 0)
+          SELECT count(*) AS actives_sans_siren FROM ph WHERE deleted_at IS NULL AND siren IS NULL;
+          \echo >> Fiches dont le SIRET est aussi un etablissement FINESS d une autre fiche (doit etre 0)
+          SELECT count(DISTINCT p.id) AS siret_aussi_etablissement_autre_fiche
+          FROM ph p JOIN finess_etablissements fe
+            ON fe.workspace_id = :'ws' AND fe.siret = p.siret AND fe.company_id <> p.id
+          WHERE p.deleted_at IS NULL;
           SQL
           {
             sed 's/^          //' prepa.sql

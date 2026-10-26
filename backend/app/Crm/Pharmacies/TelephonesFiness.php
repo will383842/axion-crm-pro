@@ -119,7 +119,7 @@ final class TelephonesFiness
                 }
                 $locale['trouvees']++;
                 $f = $fiches[$id];
-                if ($this->estPersonnePhysique($f)) {
+                if ($this->estPersonnePhysique((string) $f->legal_form, (string) $f->metadata)) {
                     $locale['personnes_physiques']++;
 
                     continue;
@@ -188,18 +188,18 @@ final class TelephonesFiness
         }
         $in = implode(', ', array_fill(0, count($variantes), '?'));
 
-        return array_map('strval', DB::table('opt_out')->where('scope', 'business')
+        return array_values(array_map('strval', DB::table('opt_out')->where('scope', 'business')
             ->whereRaw("regexp_replace(phone, '[^0-9]', '', 'g') IN ({$in})", $variantes)
-            ->selectRaw("regexp_replace(phone, '[^0-9]', '', 'g') AS chiffres")->pluck('chiffres')->all());
+            ->selectRaw("regexp_replace(phone, '[^0-9]', '', 'g') AS chiffres")->pluck('chiffres')->all()));
     }
 
-    private function estPersonnePhysique(object $f): bool
+    private function estPersonnePhysique(string $legalForm, string $metadata): bool
     {
-        $forme = trim((string) $f->legal_form);
+        $forme = trim($legalForm);
         if ($forme === '' || str_starts_with($forme, '1')) {
             return true;
         }
-        $meta = json_decode((string) $f->metadata, true);
+        $meta = json_decode($metadata, true);
 
         return is_array($meta) && ! empty($meta['personne_physique']);
     }

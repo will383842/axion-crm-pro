@@ -172,6 +172,14 @@ const REGISTRE: ReadonlyArray<{ fichier: string; nombre: number; motif: string }
       + 'se remplissent par des taches de fond, aucun evenement diffuse. 60 s, '
       + 'jamais onglet cache, cache serveur de 60 s par espace.',
   },
+  {
+    fichier: 'src/features/companies/CompaniesListPage.tsx',
+    nombre: 1,
+    motif:
+      'Indicateurs de l ecran Entreprises : apres un deploiement le cache serveur est vide et le '
+      + 'calcul se fait apres la reponse (aucun evenement diffuse). 5 s, CONDITIONNELLE : '
+      + 's arrete des qu un chiffre arrive ou au bout de 45 s.',
+  },
 ];
 
 // ── Lecture du depot ──────────────────────────────────────────────────────

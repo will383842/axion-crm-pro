@@ -29,7 +29,7 @@ import {
   SECTEUR_OPTIONS,
   TAILLE_OPTIONS,
 } from "@/lib/prospection-referentiels";
-import { indicateursEntreprises, type StatsBase } from "./indicateurs";
+import { indicateursEntreprises, ATTENTE_MAX_STATS_MS, statsIndisponibles, type StatsBase } from "./indicateurs";
 import { toast } from "sonner";
 import { CompanyRow, COMPANY_ROW_GRID, type CompanyRowData } from "./components/CompanyRow";
 import { EFFECTIF_OPTIONS } from "./effectif";
@@ -56,6 +56,8 @@ type Company = CompanyRowData & {
 
 interface CompaniesResponse {
   data: Company[];
+  /** Le serveur n'a pas pu lire : 200 avec une liste vide qui n'est PAS « aucune entreprise ». */
+  degraded?: boolean;
   meta: {
     total: number;
     last_page: number;
@@ -317,12 +319,30 @@ export function CompaniesListPage() {
   // Lot 3 (2026-10-02) — les indicateurs portent sur TOUTE la base (serveur,
   // `/companies/stats`, mis en cache), plus sur les 100 lignes affichées :
   // « Enrichies 100 % » venait d'une page triée par score, toute enrichie.
-  const { data: statsBase } = useQuery({
+  //
+  // Cache serveur vide (après un déploiement) : la réponse arrive tout de suite
+  // SANS chiffre (`computed_at` nul) et le calcul se fait après coup ; on
+  // réinterroge toutes les 5 s, au plus ~45 s, puis « indisponible ».
+  const [debutStats] = useState(() => Date.now());
+  const {
+    data: statsBase,
+    isError: statsEnErreur,
+    dataUpdatedAt: statsRecuLe,
+  } = useQuery({
     queryKey: ["companies-stats"],
     queryFn: async () => (await api.get<StatsBase>("/companies/stats")).data,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: (q) =>
+      q.state.data !== undefined && q.state.data.computed_at == null && Date.now() - debutStats < ATTENTE_MAX_STATS_MS
+        ? 5000
+        : false,
   });
-  const kpis = useMemo(() => indicateursEntreprises(statsBase), [statsBase]);
+  const statsHorsService = statsIndisponibles({
+    stats: statsBase,
+    enErreur: statsEnErreur,
+    attenteMs: (statsRecuLe || Date.now()) - debutStats,
+  });
+  const kpis = useMemo(() => indicateursEntreprises(statsBase, statsHorsService), [statsBase, statsHorsService]);
 
   const setFilterAndReset = (next: Partial<Filter>) => {
     setFilter((f) => ({ ...f, ...next }));
@@ -652,6 +672,23 @@ export function CompaniesListPage() {
         <QueryErrorState error={error} contexte="la liste des entreprises" onRetry={() => void refetch()} />
       ) : isLoading ? (
         <CompaniesTableSkeleton />
+      ) : data?.degraded === true ? (
+        // Réponse 200 « dégradée » : le serveur n'a pas pu lire la liste. Ce
+        // n'est pas « Aucune entreprise » (cf. NotificationsBell).
+        <EmptyState
+          icon={<Building2 />}
+          title="Liste momentanément indisponible"
+          description="Le serveur n’a pas pu lire la liste des entreprises. Vos données ne sont pas perdues : réessayez dans un instant."
+          action={
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-gradient-to-b from-slate-900 to-slate-800 px-4 text-sm font-medium text-white"
+            >
+              Réessayer
+            </button>
+          }
+        />
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<Building2 />}

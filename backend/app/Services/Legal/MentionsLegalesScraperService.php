@@ -248,7 +248,7 @@ class MentionsLegalesScraperService
             }
         }
 
-        return ['phones' => $this->extractAllPhones($body), 'hors_mentions' => array_values(array_unique($hors))];
+        return ['phones' => array_values($this->extractAllPhones($body)), 'hors_mentions' => array_values(array_unique($hors))];
     }
 
     /**

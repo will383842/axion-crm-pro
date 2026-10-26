@@ -6,6 +6,7 @@
  * opposition respectée, essai à blanc par défaut.
  */
 
+use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -142,7 +143,7 @@ it('opposition sur le numéro ou l\'e-mail : fiche écartée', function () {
     $a = ficheOsm($espace, ['phone' => '0140000001']);
     $b = ficheOsm($espace, ['phone' => '0140000002']);
     DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 01', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
-    App\Support\ListeSuppression::inscrire('oppose@zz.test', App\Support\ListeSuppression::MANUEL, 'test');
+    ListeSuppression::inscrire('oppose@zz.test', ListeSuppression::MANUEL, 'test');
 
     $sortie = lancerOsm($espace, csvOsm([
         ['telephone' => '0140000001', 'email' => 'libre@zz.test'],

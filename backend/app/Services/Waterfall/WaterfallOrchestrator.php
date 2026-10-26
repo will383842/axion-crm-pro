@@ -625,7 +625,7 @@ class WaterfallOrchestrator
     /** Ajout seulement : lat/lon/insee posés uniquement s'ils sont encore NULL. */
     private function step8_geocode_ajout(Company $company, GeocodeResult $result): void
     {
-        if ($company->lat === null && $company->lon === null && $result->lat !== null && $result->lon !== null) {
+        if ($company->lat === null && $company->lon === null) {
             $company->lat = $result->lat;
             $company->lon = $result->lon;
             DB::statement(

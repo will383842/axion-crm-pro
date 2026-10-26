@@ -159,7 +159,7 @@ class CrmPharmaciesEcarterFermees extends Command
                 break;
             }
             $curseur = (int) end($fiches)->id;
-            $protegees = $this->protegees(array_values(array_map(fn ($f) => (int) $f->id, $fiches)));
+            $protegees = $this->protegees(array_map(fn ($f) => (int) $f->id, $fiches));
 
             $corbeille = ['insee_ferme' => [], 'finess_inactif' => []];
             $verifier = [];

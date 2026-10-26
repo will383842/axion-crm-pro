@@ -44,7 +44,7 @@ use Illuminate\Support\Facades\Schema;
  * ── LA SOURCE FINESS ────────────────────────────────────────────────────────
  * Un CSV (colonnes `siret`, `categorie`, `etat`, séparateur `,` ou `;`).
  * Refusé s'il est tronqué, s'il compte moins de 20 000 lignes de catégorie 620
- * ou moins de 90 % de lignes actives. Sans `--finess`, seul le motif INSEE
+ * ou moins de 75 % de lignes actives. Sans `--finess`, seul le motif INSEE
  * s'applique.
  *
  * ── FOURCHETTES DE SÛRETÉ ───────────────────────────────────────────────────
@@ -87,7 +87,7 @@ class CrmPharmaciesEcarterFermees extends Command
 
     private const MIN_OFFICINES_620 = 20000;
 
-    private const MIN_ACTIVES_PCT = 90;
+    private const MIN_ACTIVES_PCT = 75;
 
     private const MOTIFS_CORBEILLE = ['insee_ferme', 'finess_inactif'];
 

@@ -105,6 +105,55 @@ final class RechercheDenomination
     }
 
     /**
+     * Plafond de termes confiés à `entreprises_liste_denomination_ids` (la
+     * fonction refuse au-delà). Plus de termes : on retombe sur `appliquer`,
+     * lent mais juste — tronquer la liste de termes rendrait moins de fiches
+     * sans le dire.
+     */
+    private const TERMES_MAX_DANS_ESPACE = 20;
+
+    /**
+     * MÊME recherche que `appliquer`, mais servie par l'index trigrammes SOUS
+     * LA RLS — pour la liste « Entreprises » (`CompaniesController`).
+     *
+     * 🔴 Sous le rôle applicatif `axion_app` (RLS forcée), `ILIKE` n'est pas
+     * « leakproof » : Postgres ne peut l'évaluer qu'APRÈS le filtre de la
+     * politique, et `appliquer` balaie ≈ 4,4 M de lignes (diagnostic du
+     * 26/10/2026, §2.4). Les identifiants sont donc cherchés par
+     * `entreprises_liste_denomination_ids` (SECURITY DEFINER, migration
+     * `2026_10_26_000010`), qui ne rend RIEN si `$workspaceId` n'est pas
+     * l'espace du contexte de la connexion ; la requête de liste les RELIT par
+     * une semi-jointure ordinaire, sous la RLS, avec son propre
+     * `workspace_id = ?` et tous ses autres filtres — double garde. Patron de
+     * `entreprises_choix_ids` (#292), SANS plafond : la liste est paginée et
+     * son total (`TotalListe`) doit rester exact.
+     *
+     * Sémantique identique à `appliquer` : termes échappés des jokers `LIKE`,
+     * normalisés par `normalize_name` (dans la fonction), en OU.
+     *
+     * @param  Builder<Company>  $query
+     */
+    public static function appliquerDansEspace(Builder $query, mixed $valeur, string $workspaceId): void
+    {
+        $termes = self::termes($valeur);
+
+        if ($termes === []) {
+            return;
+        }
+
+        if (count($termes) > self::TERMES_MAX_DANS_ESPACE) {
+            self::appliquer($query, $valeur);
+
+            return;
+        }
+
+        $query->whereRaw(
+            'companies.id IN (SELECT t.id FROM public.entreprises_liste_denomination_ids(?::uuid, ?::text[]) AS t(id))',
+            [$workspaceId, RechercheEntreprisesParNom::tableauPg($termes)],
+        );
+    }
+
+    /**
      * La condition seule, en ET — pour s'insérer dans un groupe de recherche
      * déjà ouvert (la recherche multi-champs du hub : dénomination OU SIREN OU
      * personne rattachée, où celle-ci est la première branche).

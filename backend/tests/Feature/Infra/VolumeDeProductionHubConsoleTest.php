@@ -455,17 +455,37 @@ test('G41-004 — la liste entreprises partage le correctif du filtre', function
     // MEME liste de filtres (`CompanyQueryFilters`), donc meme defaut et meme
     // correctif. Le patron A-011 de ce depot est « le correctif existe deja
     // quelque part et n'a pas ete porte ailleurs » : on garde les DEUX sites.
-    $plan = hubPlanDeLEndpoint($this, '/api/v1/companies?' . http_build_query([
+    //
+    // 26/10/2026 — la liste va un cran plus loin que le hub : sous la RLS
+    // (`axion_app`), `ILIKE` direct ne peut pas employer l'index (cf.
+    // `ListeEntreprisesRechercheSousRlsTest`). Elle passe donc par la fonction
+    // cloisonnee `entreprises_liste_denomination_ids`, et l'index est employe
+    // A L'INTERIEUR de la fonction — invisible a `EXPLAIN` de la requete
+    // externe. On le mesure donc par le compteur de parcours de l'index dans
+    // la transaction courante, autour de l'appel REEL de l'endpoint.
+    $index = "'idx_companies_denomination_trgm'::regclass";
+    $avant = (int) DB::selectOne("SELECT pg_stat_get_xact_numscans({$index}) AS n")->n;
+
+    $sql = hubSqlDeLEndpoint($this, '/api/v1/companies?' . http_build_query([
         'filter' => ['denomination' => 'c3a4'],
     ]));
 
+    $apres = (int) DB::selectOne("SELECT pg_stat_get_xact_numscans({$index}) AS n")->n;
+
     $this->assertStringContainsString(
-        'idx_companies_denomination_trgm',
-        $plan,
-        'La liste entreprises (`CompaniesController`) partage `CompanyQueryFilters` avec le '
-        . "hub. Si cette garde rougit seule, c'est que le correctif n'a ete porte que sur un "
-        . "des deux sites.\n\n{$plan}",
+        'entreprises_liste_denomination_ids',
+        $sql,
+        'La liste entreprises ne passe plus par la fonction cloisonnee : sous la RLS, sa '
+        . "recherche par nom balaie de nouveau toute la table.\n\n{$sql}",
     );
+    $this->assertGreaterThan(
+        $avant,
+        $apres,
+        "La recherche par nom de la liste entreprises n'a pas parcouru `idx_companies_denomination_trgm`.\n\n{$sql}",
+    );
+
+    $plan = collect(DB::select('EXPLAIN ' . $sql))->map(fn ($ligne) => (array) $ligne)->flatten()->implode("\n");
+    $this->assertStringNotContainsString('Seq Scan on companies', $plan, $plan);
 });
 
 // ── JUSTESSE : un correctif de vitesse ne doit rien casser ───────────────────

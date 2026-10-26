@@ -47,11 +47,19 @@ class CrmPharmaciesClasserTaille extends Command
         $essai = (bool) $this->option('dry-run');
 
         $bilan = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $essai): array {
-            $cible = fn () => DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
-                ->where(fn ($q) => $q->where('discovery_source', 'finess')->orWhereIn('naf', ['47.73Z', '4773Z']));
-            $b = ['total' => $cible()->count(), 'inconnue_avant' => $this->inconnues($cible()), 'taille' => 0, 'effectif' => 0, 'officines' => 0];
+            // Liste des identifiants en deux requêtes indexées (NAF + espace, puis FINESS + espace),
+            // puis paquets par clé primaire : aucun parcours complet de `companies`.
+            $ids = $this->identifiants($workspaceId);
+            $paquets = array_chunk($ids, 1000);
+            $requete = fn (array $paquet) => DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->whereIn('id', $paquet);
+            $b = ['total' => 0, 'inconnue_avant' => 0, 'taille' => 0, 'effectif' => 0, 'officines' => 0];
+            foreach ($paquets as $paquet) {
+                $b['total'] += $requete($paquet)->count();
+                $b['inconnue_avant'] += $this->inconnues($requete($paquet));
+            }
 
-            $cible()->orderBy('id')->select(['id', 'effectif_range', 'effectif_min', 'effectif_max', 'size_category', 'metadata'])->chunkById(1000, function ($fiches) use ($workspaceId, $essai, &$b): void {
+            foreach ($paquets as $paquet) {
+                $fiches = $requete($paquet)->orderBy('id')->get(['id', 'effectif_range', 'effectif_min', 'effectif_max', 'size_category', 'metadata']);
                 $nb = DB::table('finess_etablissements')->where('workspace_id', $workspaceId)->where('categorie', '620')
                     ->whereIn('company_id', $fiches->pluck('id')->all())->groupBy('company_id')
                     ->selectRaw('company_id, count(*) AS n')->pluck('n', 'company_id');
@@ -89,8 +97,14 @@ class CrmPharmaciesClasserTaille extends Command
                         DB::table('companies')->where('id', $f->id)->where('workspace_id', $workspaceId)->whereNull('effectif_min')->whereNull('effectif_max')->update(['effectif_min' => $bornes[0], 'effectif_max' => $bornes[1], 'updated_at' => now()]);
                     }
                 }
-            });
-            $b['inconnue_apres'] = $essai ? null : $this->inconnues($cible());
+            }
+            $b['inconnue_apres'] = null;
+            if (! $essai) {
+                $b['inconnue_apres'] = 0;
+                foreach ($paquets as $paquet) {
+                    $b['inconnue_apres'] += $this->inconnues($requete($paquet));
+                }
+            }
 
             return $b;
         });
@@ -104,6 +118,19 @@ class CrmPharmaciesClasserTaille extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Identifiants des fiches pharmacie : NAF 47.73Z (index espace + NAF) UNION fiches portant une ligne FINESS.
+     *
+     * @return list<int>
+     */
+    private function identifiants(string $workspaceId): array
+    {
+        $parNaf = DB::table('companies')->select('id')->where('workspace_id', $workspaceId)->whereIn('naf', ['47.73Z', '4773Z'])->whereNull('deleted_at');
+        $parFiness = DB::table('finess_etablissements')->select('company_id AS id')->where('workspace_id', $workspaceId);
+
+        return array_values(array_map('intval', $parNaf->union($parFiness)->orderBy('id')->pluck('id')->all()));
     }
 
     private function inconnues(Builder $requete): int

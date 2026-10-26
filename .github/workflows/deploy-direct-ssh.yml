@@ -121,6 +121,10 @@ jobs:
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           SKIP_MIGRATE: ${{ github.event.inputs.skip_migrate || 'false' }}
           INSEE_API_KEY: ${{ secrets.INSEE_API_KEY }}
+          # Synchro du dossier client de la console du site (2026-10-26). Variables GitHub (pas des
+          # secrets) : `true` ou `false`. Absentes ou autres => le .env n'est PAS touché.
+          CRM_INGEST_DOSSIER_ENABLED: ${{ vars.CRM_INGEST_DOSSIER_ENABLED }}
+          CRM_SYNC_DOSSIER_CLIENT_STAGE: ${{ vars.CRM_SYNC_DOSSIER_CLIENT_STAGE }}
           # Jeton EPHEMERE du run, pour que le serveur puisse lire un depot
           # PRIVE. Il expire a la fin du job ; rien n'est ecrit sur le disque
           # du serveur (voir le bloc `git fetch` plus bas).
@@ -174,7 +178,7 @@ jobs:
               -o ServerAliveCountMax=10 \
               "$USER@$HOST" 'bash -s' -- \
             "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \
-            "$GH_TOKEN_LECTURE" "$GH_DEPOT" <<'REMOTE' | tee /tmp/deploy-remote.log
+            "$GH_TOKEN_LECTURE" "$GH_DEPOT"             "$CRM_INGEST_DOSSIER_ENABLED" "$CRM_SYNC_DOSSIER_CLIENT_STAGE" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"
@@ -182,6 +186,8 @@ jobs:
           INSEE_API_KEY="${4:-}"
           GH_TOKEN_LECTURE="${5:-}"
           GH_DEPOT="${6:-}"
+          CRM_INGEST_DOSSIER_ENABLED="${7:-}"
+          CRM_SYNC_DOSSIER_CLIENT_STAGE="${8:-}"
 
           cd "$PROJECT_PATH"
 
@@ -289,6 +295,18 @@ jobs:
             fi
             echo "INSEE_API_KEY synchronisée."
           fi
+          echo "::endgroup::"
+
+          echo "::group::sync drapeaux du dossier client into .env"
+          # Une valeur vide (variable GitHub absente) ne touche PAS au .env : seul `true`/`false` est écrit.
+          for kv in "CRM_INGEST_DOSSIER_ENABLED=$CRM_INGEST_DOSSIER_ENABLED" "CRM_SYNC_DOSSIER_CLIENT_STAGE=$CRM_SYNC_DOSSIER_CLIENT_STAGE"; do
+            cle="${kv%%=*}"; val="${kv#*=}"
+            case "$val" in true|false) ;; *) continue ;; esac
+            if [ -f .env ]; then
+              if grep -q "^${cle}=" .env; then sed -i "s|^${cle}=.*|${cle}=${val}|" .env; else echo "${cle}=${val}" >> .env; fi
+              echo "${cle}=${val}"
+            fi
+          done
           echo "::endgroup::"
 
           echo "::group::docker compose build + up"

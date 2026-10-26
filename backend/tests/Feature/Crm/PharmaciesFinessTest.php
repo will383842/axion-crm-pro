@@ -156,8 +156,8 @@ it('paquets multiples : deux SIRET du même SIREN dans deux paquets, essai à bl
 it('accepte le BOM et les alias d\'en-têtes de l\'export brut', function () {
     $espace = F::espace();
     $chemin = tempnam(sys_get_temp_dir(), 'zzfiness');
-    file_put_contents($chemin, "\xEF\xBB\xBFfiness_et,siret,categorie,etat,nom_long,code_postal,commune_acheminement,departement,ej_statut_juridique_libelle,ej_code_ape\n"
-        . "990000001,94000006100011,620,A,ZZ OFFICINE,99100,ZZVILLE,99,SARL,4773Z\n");
+    file_put_contents($chemin, "\xEF\xBB\xBFfiness_et,siret,categorie,etat,nom_long,code_postal,commune_acheminement,departement,ej_statut_juridique_libelle,ej_code_ape,ej_statut_juridique\n"
+        . "990000001,94000006100011,620,A,ZZ OFFICINE,99100,ZZVILLE,99,SARL,4773Z,85\n");
 
     lancer('crm:pharmacies:import-finess', ['fichier' => $chemin, '--workspace' => $espace, '--apply' => true]);
 
@@ -314,7 +314,7 @@ it('apply échoue, sans rien écrire, si statut_code manque sur plus de 1 % des 
 
 it('personne physique déjà connue par son SIRET : ligne d\'établissement sans adresse, fiche intacte', function () {
     $espace = F::espace();
-    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000022100011']]), '--workspace' => $espace, '--apply' => true]);
+    DB::table('companies')->insert(['workspace_id' => $espace, 'siren' => '940000221', 'siret' => '94000022100011', 'denomination' => 'ZZ FICHE CONNUE', 'naf' => '47.73Z', 'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now()]);
     $avant = DB::table('companies')->where('siren', '940000221')->first();
 
     lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([

@@ -479,7 +479,7 @@ final class TelephonesFiness
      * @param  list<string>  $variantes
      * @return list<string> variantes (chiffres) présentes en liste d'opposition business
      */
-    private function opposes(array $variantes): array
+    public function opposes(array $variantes): array
     {
         if ($variantes === []) {
             return [];
@@ -495,7 +495,7 @@ final class TelephonesFiness
      * @param  list<string>  $emails
      * @return array<string, true> e-mails (minuscules) en opposition ou supprimés, univers business
      */
-    private function emailsOpposes(array $emails): array
+    public function emailsOpposes(array $emails): array
     {
         $opposes = [];
         $parHash = [];

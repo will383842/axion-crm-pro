@@ -32,7 +32,7 @@ class CrmEntreprisesRechaufferCache extends Command
         $designation = $this->option('workspace');
         $espaces = is_string($designation) && $designation !== ''
             ? [$designation]
-            : DB::table('workspaces')->where('is_active', true)->pluck('id')->map(static fn ($id): string => (string) $id)->all();
+            : DB::table('workspaces')->where('is_active', true)->whereNull('deleted_at')->pluck('id')->map(static fn ($id): string => (string) $id)->all();
 
         $echecs = 0;
         foreach ($espaces as $espace) {

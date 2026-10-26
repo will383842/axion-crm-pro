@@ -513,8 +513,7 @@ jobs:
           # dizaines de secondes). Un échec ne doit JAMAIS casser le
           # déploiement : journalisé, puis on continue.
           echo "::group::php artisan crm:entreprises:rechauffer-cache"
-          docker compose exec -u root -T api php artisan crm:entreprises:rechauffer-cache </dev/null \
-            || echo "::warning::réchauffage du cache Entreprises échoué (non bloquant) — les chiffres se recalculeront au premier affichage"
+          docker compose exec -u root -T api php artisan crm:entreprises:rechauffer-cache </dev/null || echo "::warning::réchauffage du cache Entreprises échoué (non bloquant)"
           echo "::endgroup::"
 
           echo "::group::vérification post-déploiement — santé des conteneurs"

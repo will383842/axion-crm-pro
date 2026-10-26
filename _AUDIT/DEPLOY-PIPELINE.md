@@ -68,6 +68,7 @@ push sur main
          │     ├─ pull + up (services applicatifs, puis postgres/redis)
          │     ├─ migrate --force  (BLOQUANT)
          │     ├─ cache:clear
+         │     ├─ crm:entreprises:rechauffer-cache  (NON bloquant)
          │     ├─ vérif : santé des 6 conteneurs vitaux
          │     ├─ vérif : ports RÉELLEMENT publiés (verifier-ports-publies.sh)
          │     ├─ vérif : aucune migration Pending
@@ -151,6 +152,10 @@ docker compose exec -u root -T api php artisan migrate --force --database=pgsql_
 # Cache APPLICATIF (Redis) seulement. `config:clear` et `route:clear` ont été
 # retirés : entrypoint-prod.sh construit ces caches au démarrage.
 docker compose exec -u root -T api php artisan cache:clear </dev/null
+
+# Réchauffage des indicateurs et du total de la liste Entreprises, que le
+# `cache:clear` ci-dessus vient de vider. Un échec ne bloque JAMAIS le déploiement.
+docker compose exec -u root -T api php artisan crm:entreprises:rechauffer-cache </dev/null || echo "::warning::réchauffage du cache Entreprises échoué (non bloquant)"
 
 # Vérification 1 — les 6 conteneurs vitaux (api app horizon postgres redis caddy)
 # sont `running` et aucun n'est `unhealthy`.

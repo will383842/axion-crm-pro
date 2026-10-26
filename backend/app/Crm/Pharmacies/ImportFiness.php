@@ -60,6 +60,9 @@ final class ImportFiness
             'autres_categories' => [], 'par_departement' => [],
         ];
 
+        if ($appliquer) {
+            $this->verifierCodesStatut($fichier);
+        }
         $lignes = $this->lire($fichier);
         $lot = [];
         $sirets = [];
@@ -106,6 +109,28 @@ final class ImportFiness
         ksort($bilan['autres_categories']);
 
         return $bilan;
+    }
+
+    /**
+     * Le code de statut juridique protège les personnes physiques : s'il manque (ou est vide) sur plus
+     * de 1 % des officines 620 actives, l'écriture est refusée AVANT toute création.
+     */
+    private function verifierCodesStatut(string $fichier): void
+    {
+        $officines = 0;
+        $sansCode = 0;
+        foreach ($this->lire($fichier) as $l) {
+            if ($l['etat'] !== 'A' || $l['categorie'] !== self::CATEGORIE_OFFICINE) {
+                continue;
+            }
+            $officines++;
+            if ($l['statut_code'] === '') {
+                $sansCode++;
+            }
+        }
+        if ($officines > 0 && $sansCode * 100 > $officines) {
+            throw new \InvalidArgumentException(sprintf('Code de statut juridique (statut_code) absent ou vide sur %d des %d officines (plus de 1 %%) : écriture refusée.', $sansCode, $officines));
+        }
     }
 
     /**
@@ -211,8 +236,9 @@ final class ImportFiness
      */
     private function ligneFiche(string $workspaceId, array $l, string $siren, string $dep): array
     {
+        // L'APE du fichier est celui de la société exploitante : on ne le garde que s'il est du commerce de détail spécialisé (47.7x).
         $naf = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $l['ape']) ?? '');
-        $naf = $naf !== '' ? $naf : '4773Z';
+        $naf = str_starts_with($naf, '477') ? $naf : '4773Z';
         // Écrit avec le point, comme les fiches INSEE (47.73Z).
         if (preg_match('/^\d{4}[A-Z]$/', $naf) === 1) {
             $naf = substr($naf, 0, 2) . '.' . substr($naf, 2);
@@ -241,7 +267,7 @@ final class ImportFiness
                 'department_code' => $dep !== '' ? $dep : null,
                 'region_code' => Classement::regionFrancaise($dep !== '' ? $dep : null, null)[0],
                 'discovery_source' => self::SOURCE,
-                'metadata' => json_encode(['personne_physique' => true, 'legal_form' => self::FORME_JURIDIQUE_EI, 'source' => self::SOURCE], JSON_UNESCAPED_UNICODE),
+                'metadata' => json_encode(['personne_physique' => true, 'legal_form' => self::FORME_JURIDIQUE_EI, 'source' => self::SOURCE, 'finess_categorie' => self::CATEGORIE_OFFICINE], JSON_UNESCAPED_UNICODE),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -265,7 +291,7 @@ final class ImportFiness
             'department_code' => $dep !== '' ? $dep : null,
             'region_code' => Classement::regionFrancaise($dep !== '' ? $dep : null, $l['code_postal'])[0],
             'discovery_source' => self::SOURCE,
-            'metadata' => json_encode(['finess_et' => $l['finess_et'], 'finess_statut' => $l['statut']], JSON_UNESCAPED_UNICODE),
+            'metadata' => json_encode(['finess_et' => $l['finess_et'], 'finess_statut' => $l['statut'], 'finess_categorie' => self::CATEGORIE_OFFICINE], JSON_UNESCAPED_UNICODE),
             'created_at' => now(),
             'updated_at' => now(),
         ];

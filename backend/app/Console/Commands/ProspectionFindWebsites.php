@@ -2,10 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\EspaceProspection;
 use App\Crm\FichesProtegees;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
+use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -24,12 +27,21 @@ use Illuminate\Support\Facades\DB;
  * Permet d'exécuter N instances EN PARALLÈLE sur des machines distinctes (runners
  * GitHub) sans chevauchement — chaque instance fait le domain-guessing sur SA machine
  * → débit ≈ ×N. Voir le workflow `prospection-find-websites-distributed.yml`.
+ *
+ * FILTRE NAF (`--naf=47.73Z`, avec `--workspace=` ; défaut = espace par défaut) :
+ * ne traite que les fiches de CE code (ex. pharmacies), ouvertes (ni corbeille, ni
+ * fermée à l'INSEE, ni `non_officine`, ni protégée). La requête commence par
+ * `workspace_id` + `naf` : elle suit l'index `idx_companies_workspace_naf`, sans
+ * parcourir la table. AJOUT SEULEMENT : un site déjà connu n'est jamais remplacé
+ * (source `website IS NULL` + garde dans l'UPDATE). `--dry-run` (avec `--naf`)
+ * compte les fiches à traiter sans rien écrire ni interroger le réseau. Sans
+ * `--naf`, le comportement est inchangé.
  */
 class ProspectionFindWebsites extends Command
 {
-    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=100} {--retry} {--revalidate} {--shard=} {--shards=}';
+    protected $signature = 'prospection:find-websites {--department=} {--limit=0} {--batch=100} {--retry} {--revalidate} {--shard=} {--shards=} {--naf=} {--workspace=} {--dry-run}';
 
-    protected $description = 'Trouve le site web des entreprises (devinette) + marque le statut. Reprenable. --retry = pass 2 ; --revalidate = pass 3 (re-teste les sites found → dead si morts) ; --shard/--shards = exécution distribuée.';
+    protected $description = 'Trouve le site web des entreprises (devinette) + marque le statut. Reprenable. --retry = pass 2 ; --revalidate = pass 3 (re-teste les sites found → dead si morts) ; --shard/--shards = exécution distribuée ; --naf=47.73Z (+ --workspace, --dry-run) = ne traite que ce code NAF, ajout seulement.';
 
     public function handle(DomainFinderService $finder): int
     {
@@ -48,11 +60,56 @@ class ProspectionFindWebsites extends Command
             return self::FAILURE;
         }
 
+        $naf = $this->option('naf');
+        $naf = is_string($naf) && trim($naf) !== '' ? trim($naf) : null;
+        $espace = null;
+        if ($naf !== null) {
+            if ($revalidate) {
+                $this->error('--naf ne se combine pas avec --revalidate.');
+
+                return self::FAILURE;
+            }
+            $espace = EspaceProspection::resoudre(is_string($this->option('workspace')) ? $this->option('workspace') : null);
+            if ($espace === null) {
+                $this->error('Aucun espace cible (--workspace=UUID ou slug).');
+
+                return self::FAILURE;
+            }
+        } elseif ($this->option('dry-run')) {
+            $this->error('--dry-run n\'est disponible qu\'avec --naf.');
+
+            return self::FAILURE;
+        }
+        $dryRun = $naf !== null && (bool) $this->option('dry-run');
+
         // Pass 3 (--revalidate) : re-teste les sites déjà `found`. Prioritaire sur --retry.
         if ($revalidate) {
             return $this->handleRevalidate($finder, $dept, $limit, $batch, $shards, $shard);
         }
 
+        // Avec --naf, `Company` exige un contexte d'espace (comme `prospection:enrich`).
+        if ($espace !== null) {
+            return (int) WorkspaceContext::run($espace, fn (): int => $this->handleSource($finder, $naf, $espace, $dept, $limit, $batch, $retry, $shards, $shard, $dryRun));
+        }
+
+        return $this->handleSource($finder, $naf, $espace, $dept, $limit, $batch, $retry, $shards, $shard, $dryRun);
+    }
+
+    /**
+     * Passes 1 et 2 (hors revalidation).
+     */
+    private function handleSource(
+        DomainFinderService $finder,
+        ?string $naf,
+        ?string $espace,
+        mixed $dept,
+        int $limit,
+        int $batch,
+        bool $retry,
+        ?int $shards,
+        ?int $shard,
+        bool $dryRun,
+    ): int {
         // Pass 1 = pending → found/not_found. Pass 2 (--retry) = not_found → found/exhausted.
         $sourceStatus = $retry ? 'not_found' : 'pending';
         $missStatus = $retry ? 'exhausted' : 'not_found';
@@ -62,25 +119,22 @@ class ProspectionFindWebsites extends Command
         $found = 0;
         $start = microtime(true);
 
+        if ($dryRun && $naf !== null && $espace !== null) {
+            $total = $this->requeteSource($sourceStatus, $naf, $espace, $dept, $shards, $shard)->count();
+            $this->info("✅ Essai à blanc (NAF {$naf}) : {$total} fiches à traiter, rien écrit.");
+
+            return self::SUCCESS;
+        }
+
         while (true) {
-            $q = Company::query()
-                ->where('website_status', $sourceStatus)
-                ->whereNull('website')
-                ->whereNotNull('denomination');
-            // `pending` est la valeur par défaut de la colonne : sans cette
-            // exclusion, toute fiche protégée serait ramassée.
-            FichesProtegees::exclure($q);
-            if ($dept) {
-                $q->where('department_code', $dept);
-            }
-            if ($shards !== null) {
-                $q->whereRaw('id % ? = ?', [$shards, $shard]);
-            }
-            $companies = $q->limit($batch)->get();
+            $q = $this->requeteSource($sourceStatus, $naf, $espace, $dept, $shards, $shard);
+            // Avec --naf, --limit borne réellement le lot (sinon un lot entier de $batch
+            // fiches est traité avant le contrôle). Sans --naf : comportement inchangé.
+            $taille = $naf !== null && $limit > 0 ? max(1, min($batch, $limit - $processed)) : $batch;
+            $companies = $q->limit($taille)->get();
             if ($companies->isEmpty()) {
                 break;
             }
-
             // Devinette CONCURRENTE (Http::pool) : tout le lot testé en parallèle.
             // En pass 2, on active les candidats étendus.
             $urls = $finder->guessDomainsBatch($companies, extended: $retry);
@@ -102,6 +156,39 @@ class ProspectionFindWebsites extends Command
         $this->info("✅ Terminé ({$pass}, {$scope}) : {$processed} traités · {$found} sites trouvés ({$pct}%).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Source des passes 1 et 2 : fiches sans site au statut voulu, hors fiches protégées.
+     * Avec `$naf`, filtre par espace + NAF (index `idx_companies_workspace_naf`) et ne
+     * garde que les fiches ouvertes (ni corbeille — `SoftDeletes` —, ni fermée à l'INSEE,
+     * ni `non_officine`). Les variantes de NAF `47.73Z` / `4773Z` sont toutes deux admises.
+     *
+     * @return Builder<Company>
+     */
+    private function requeteSource(string $sourceStatus, ?string $naf, ?string $espace, mixed $dept, ?int $shards, ?int $shard): Builder
+    {
+        $q = Company::query();
+        if ($naf !== null && $espace !== null) {
+            $q->where('companies.workspace_id', $espace)
+                ->whereIn('companies.naf', array_values(array_unique([$naf, str_replace('.', '', $naf)])))
+                ->whereNull('companies.insee_ferme_le')
+                ->whereRaw("COALESCE(companies.metadata->>'type_etablissement', '') <> 'non_officine'");
+        }
+        $q->where('website_status', $sourceStatus)
+            ->whereNull('website')
+            ->whereNotNull('denomination');
+        // `pending` est la valeur par défaut de la colonne : sans cette
+        // exclusion, toute fiche protégée serait ramassée.
+        FichesProtegees::exclure($q);
+        if ($dept) {
+            $q->where('department_code', $dept);
+        }
+        if ($shards !== null) {
+            $q->whereRaw('id % ? = ?', [$shards, $shard]);
+        }
+
+        return $q;
     }
 
     /**
@@ -261,7 +348,8 @@ class ProspectionFindWebsites extends Command
                     website_checked_at = ?::timestamptz,
                     updated_at = ?::timestamptz
                 FROM (VALUES {$values}) AS v(id, website, status, method)
-                WHERE c.id = v.id";
+                WHERE c.id = v.id
+                  AND c.website IS NULL";
         DB::update($sql, $bindings);
 
         return [$processed, $found];

@@ -29,10 +29,12 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\RechercheDenomination;
 use Illuminate\Database\Connection;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -143,6 +145,11 @@ afterEach(function () {
 });
 
 test('API : un espace B ne voit JAMAIS les résultats de recherche de l espace A (lignes et total)', function () {
+    // ⚠️ HONNÊTETÉ : ce test passe par la connexion par défaut de la transaction
+    // de test (propriétaire, hors RLS). Le cloisonnement y est porté par le
+    // `where workspace_id` externe de la liste ; la garde PROPRE à la fonction
+    // (contexte de connexion) est prouvée par les tests sous `axion_app`
+    // ci-dessous, pas par celui-ci.
     $a = lersOperateur('Espace A');
     $b = lersOperateur('Espace B');
 
@@ -150,22 +157,36 @@ test('API : un espace B ne voit JAMAIS les résultats de recherche de l espace A
     $idsA = lersFiches(DB::connection(), (string) $a->current_workspace_id, ['OURY TRANSPORTS', 'AXION IA', 'La Boulangerie Oury']);
     $idsB = lersFiches(DB::connection(), (string) $b->current_workspace_id, ['OURY TRANSPORTS', 'AUTRE NOM']);
 
-    foreach (['OURY', 'oury', 'AXION IA', 'Oury,axion'] as $saisie) {
+    // Résultats ATTENDUS, par saisie et par espace : une liste vide (contexte
+    // mal posé, filtre cassé) ne peut donc PAS passer pour un cloisonnement.
+    $attendu = [
+        'OURY' => [[$idsA[0], $idsA[2]], [$idsB[0]]],
+        'oury' => [[$idsA[0], $idsA[2]], [$idsB[0]]],
+        'AXION IA' => [[$idsA[1]], []],
+        'Oury,axion' => [[$idsA[0], $idsA[1], $idsA[2]], [$idsB[0]]],
+    ];
+    $trier = static function (array $ids): array {
+        sort($ids);
+
+        return $ids;
+    };
+
+    foreach ($attendu as $saisie => [$attenduA, $attenduB]) {
         $url = '/api/v1/companies?vue=liste&' . http_build_query(['filter' => ['denomination' => $saisie]]);
 
         $this->actingAs($b);
         $vuB = $this->getJson($url)->assertOk();
         $idsVusParB = array_map('intval', array_column($vuB->json('data') ?? [], 'id'));
         expect(array_intersect($idsVusParB, $idsA))->toBe([], "B voit une fiche de A pour « {$saisie} »");
-        expect($idsVusParB)->each->toBeIn($idsB);
-        expect($vuB->json('meta.total'))->toBe(count($idsVusParB));
+        expect($trier($idsVusParB))->toBe($trier($attenduB), "B ne voit pas exactement ses fiches pour « {$saisie} »");
+        expect($vuB->json('meta.total'))->toBe(count($attenduB));
 
         $this->actingAs($a);
         $vuA = $this->getJson($url)->assertOk();
         $idsVusParA = array_map('intval', array_column($vuA->json('data') ?? [], 'id'));
         expect(array_intersect($idsVusParA, $idsB))->toBe([], "A voit une fiche de B pour « {$saisie} »");
-        expect($idsVusParA)->each->toBeIn($idsA);
-        expect($vuA->json('meta.total'))->toBe(count($idsVusParA));
+        expect($trier($idsVusParA))->toBe($trier($attenduA), "A ne voit pas exactement ses fiches pour « {$saisie} »");
+        expect($vuA->json('meta.total'))->toBe(count($attenduA));
     }
 
     // Justesse : mêmes résultats qu'avant le correctif (normalisation, OU).
@@ -182,6 +203,54 @@ test('API : un espace B ne voit JAMAIS les résultats de recherche de l espace A
 
     $this->actingAs($b);
     expect($noms('AXION IA'))->toBe([]);
+    // Témoin positif côté B : ses propres fiches sortent, et elles seules.
+    expect($noms('OURY'))->toBe(['OURY TRANSPORTS']);
+    expect($noms('autre'))->toBe(['AUTRE NOM']);
+});
+
+test('API : l export CSV filtré par nom rend les mêmes fiches que la liste, et aucune de l autre espace', function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+    $a = lersOperateur('Espace A');
+    $b = lersOperateur('Espace B');
+    foreach ([$a, $b] as $u) {
+        app(PermissionRegistrar::class)->setPermissionsTeamId($u->current_workspace_id);
+        $u->assignRole('owner');
+    }
+
+    lersFiches(DB::connection(), (string) $a->current_workspace_id, ['OURY TRANSPORTS', 'AXION IA', 'La Boulangerie Oury']);
+    lersFiches(DB::connection(), (string) $b->current_workspace_id, ['OURY TRANSPORTS ZZB', 'AUTRE NOM']);
+
+    $denominationsExport = function (User $u, string $saisie): array {
+        $this->actingAs($u);
+        $csv = $this->get('/api/v1/companies/export?' . http_build_query(['filter' => ['denomination' => $saisie]]))
+            ->assertOk()->streamedContent();
+        $lignes = array_map('str_getcsv', array_filter(explode("\n", ltrim($csv, "\xEF\xBB\xBF"))));
+        array_shift($lignes);
+        $noms = array_map(static fn (array $l): string => (string) $l[1], $lignes);
+        sort($noms);
+
+        return $noms;
+    };
+    $denominationsListe = function (User $u, string $saisie): array {
+        $this->actingAs($u);
+
+        return collect($this->getJson('/api/v1/companies?' . http_build_query(['filter' => ['denomination' => $saisie]]))
+            ->assertOk()->json('data'))->pluck('denomination')->sort()->values()->all();
+    };
+
+    foreach (['OURY', 'oury,axion'] as $saisie) {
+        $exportA = $denominationsExport($a, $saisie);
+        expect($exportA)->not->toBe([])
+            ->and($exportA)->toBe($denominationsListe($a, $saisie))
+            ->and($exportA)->not->toContain('OURY TRANSPORTS ZZB');
+    }
+    expect($denominationsExport($a, 'OURY'))->toBe(['La Boulangerie Oury', 'OURY TRANSPORTS']);
+    expect($denominationsExport($a, 'AXION IA'))->toBe(['AXION IA']);
+
+    // B : ses propres fiches seulement, jamais « AXION IA » ni celles de A.
+    expect($denominationsExport($b, 'OURY'))->toBe(['OURY TRANSPORTS ZZB']);
+    expect($denominationsExport($b, 'AXION IA'))->toBe([]);
+    expect($denominationsExport($b, 'OURY'))->toBe($denominationsListe($b, 'OURY'));
 });
 
 test('sous axion_app : la fonction ne rend que l espace du contexte, jamais un autre', function () {
@@ -251,6 +320,89 @@ test('sous axion_app : le SQL réellement émis par la liste de A, rejoué dans 
         });
         expect($plan)->toContain('entreprises_liste_denomination_ids')
             ->and($plan)->not->toContain('Seq Scan on companies');
+    } finally {
+        lersContexte(null);
+        lersNettoyer($a);
+        lersNettoyer($b);
+    }
+});
+
+test('sous axion_app : p_workspace NULL ne rend rien, même avec un contexte posé', function () {
+    $a = lersEspaceCommite();
+
+    try {
+        lersContexte($a['id']);
+        // Témoin : avec l'espace, la fonction rend bien les fiches.
+        expect(lersChercher($a['id'], ['zzlers']))->toBe($a['ids']);
+
+        $lignes = lersApp()->select('SELECT id FROM public.entreprises_liste_denomination_ids(NULL::uuid, ?::text[]) AS t(id)', ['{"zzlers"}']);
+        expect($lignes)->toBe([]);
+    } finally {
+        lersContexte(null);
+        lersNettoyer($a);
+    }
+});
+
+test('sous axion_app : plus de 20 termes retombent sur l ancien chemin, résultats justes et cloisonnés', function () {
+    $a = lersEspaceCommite();
+    $b = lersEspaceCommite();
+
+    try {
+        $termes = array_merge(['oury', 'axion'], array_map(static fn (int $i): string => 'inconnu' . $i, range(1, 23)));
+        expect($termes)->toHaveCount(25);
+
+        $requete = Company::query()->whereNull('deleted_at')->where('workspace_id', $a['id']);
+        RechercheDenomination::appliquerDansEspace($requete, $termes, $a['id']);
+        $sql = $requete->toBase()->select('companies.id')->toRawSql();
+        // Au-delà du plafond de la fonction : condition directe, pas la fonction.
+        expect($sql)->not->toContain('entreprises_liste_denomination_ids')
+            ->and($sql)->toContain('denomination_normalized');
+
+        $ids = static fn (string $sql): array => array_map(static fn ($l): int => (int) $l->id, lersApp()->select($sql));
+
+        lersContexte($a['id']);
+        $vusParA = $ids($sql);
+        sort($vusParA);
+        expect($vusParA)->toBe([$a['ids'][0], $a['ids'][1]]);
+
+        // Même SQL (visant A) dans le contexte de B : la RLS ne rend rien.
+        lersContexte($b['id']);
+        expect($ids($sql))->toBe([]);
+
+        // Visant B depuis B : seulement les siennes.
+        $requeteB = Company::query()->whereNull('deleted_at')->where('workspace_id', $b['id']);
+        RechercheDenomination::appliquerDansEspace($requeteB, $termes, $b['id']);
+        $vusParB = $ids($requeteB->toBase()->select('companies.id')->toRawSql());
+        sort($vusParB);
+        expect($vusParB)->toBe([$b['ids'][0], $b['ids'][1]])
+            ->and(array_intersect($vusParB, $a['ids']))->toBe([]);
+    } finally {
+        lersContexte(null);
+        lersNettoyer($a);
+        lersNettoyer($b);
+    }
+});
+
+test('sous axion_app : un UUID d espace en MAJUSCULES dans le contexte NE FUIT PAS (comportement actuel : liste vide)', function () {
+    // Documente l'état actuel, sans le corriger : la fonction compare
+    // `p_workspace::TEXT` (minuscules) au texte BRUT du contexte, donc une
+    // casse différente échoue FERMÉ — au pire une liste vide, jamais la fiche
+    // d'un autre espace.
+    $a = lersEspaceCommite();
+    $b = lersEspaceCommite();
+
+    try {
+        lersContexte($a['id']);
+        expect(lersChercher($a['id'], ['zzlers']))->toBe($a['ids']);
+
+        lersContexte(strtoupper($a['id']));
+        expect(lersChercher($a['id'], ['zzlers']))->toBe([]);
+        expect(lersChercher(strtoupper($a['id']), ['zzlers']))->toBe([]);
+        expect(lersChercher($b['id'], ['zzlers']))->toBe([]);
+
+        lersContexte(strtoupper($b['id']));
+        expect(lersChercher($a['id'], ['zzlers']))->toBe([]);
+        expect(lersChercher($b['id'], ['zzlers']))->toBe([]);
     } finally {
         lersContexte(null);
         lersNettoyer($a);

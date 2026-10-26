@@ -263,7 +263,7 @@ test('une activite sans rapport (scraped) ne protege pas', function () {
 test('CSV FINESS suspect : refus (trop court, trop d inactives, tronque, colonnes)', function () {
     pefJeu();
     $court = pefCsv([['100000003', '620', 'A']], 10);
-    $inactifs = pefCsv([], 15000, 5000);
+    $inactifs = pefCsv([], 12000, 8000);
     $tronque = pefCsv([]);
     file_put_contents($tronque, 'F9,9999', FILE_APPEND);
 
@@ -278,6 +278,26 @@ test('CSV FINESS suspect : refus (trop court, trop d inactives, tronque, colonne
     $mauvais = tempnam(sys_get_temp_dir(), 'pef');
     file_put_contents($mauvais, "a,b\n1,2\n");
     expect(Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $mauvais]))->toBe(1);
+});
+
+test('CSV FINESS : 82 % de lignes actives (donnees reelles) est accepte', function () {
+    pefJeu();
+    $csv = pefCsv([], 19921, 4105);
+
+    $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $csv]);
+
+    expect($code)->toBe(0);
+    expect(Artisan::output())->not->toContain('REFUS');
+});
+
+test('CSV FINESS : 60 % de lignes actives est refuse', function () {
+    pefJeu();
+    $csv = pefCsv([], 15000, 10000);
+
+    $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $csv]);
+
+    expect($code)->toBe(1);
+    expect(Artisan::output())->toContain('REFUS');
 });
 
 test('fourchette : apply refuse hors bornes, rien n est ecrit ; relevable par option', function () {
@@ -473,8 +493,13 @@ test('restaurer --workspace : l autre espace n est pas touche', function () {
 });
 
 test('arret par paquet : cumul hors fourchette en cours d ecriture, paquet suivant non ecrit', function () {
-    $a = pefEspace();
-    $b = pefEspace();
+    // La commande parcourt les espaces par id (UUID aleatoire) : on impose
+    // $a < $b pour que $a soit ecrit en premier et que l'arrivee des fiches
+    // dans $b tombe toujours avant son paquet (sinon test non deterministe).
+    [$a, $b] = [pefEspace(), pefEspace()];
+    if ($a > $b) {
+        [$a, $b] = [$b, $a];
+    }
     pefFiche($a, '720000001', ['insee_ferme_le' => '2024-01-01']);
     pefFiche($b, '720000002', ['insee_ferme_le' => '2024-01-01']);
 

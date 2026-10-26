@@ -19,8 +19,7 @@ use Throwable;
  *  - `companies.phone` n'est écrit que s'il est NULL ou vide (condition portée par l'UPDATE) ;
  *  - forme stockée : 10 chiffres « 0XXXXXXXXX », comme les autres collectes du CRM ;
  *  - numéros en liste d'opposition (`opt_out`, mêmes variantes que l'ingestion) et numéros
- *    invalides écartés ; personnes physiques écartées (forme juridique « 1… » ou métadonnée
- *    `personne_physique` posée par ImportFiness ; une forme vide est une personne morale) ;
+ *    invalides écartés ;
  *  - fiches protégées (FichesProtegees), fermées à l'INSEE, `non_officine` ou écartées : jamais touchées
  *    (SELECT et chaque UPDATE) ; numéro ou e-mail générique en opposition : fiche entière écartée ;
  *  - un SIREN regroupe plusieurs établissements : lignes groupées par fiche avant le découpage en
@@ -34,13 +33,19 @@ use Throwable;
  *    date d'ouverture → metadata.finess_date_ouverture (si la clé est absente), et téléphone de la
  *    société exploitante (`entites-juridiques.csv`, jointure finess_ej) seulement si l'officine n'a
  *    pas de téléphone propre dans FINESS et si companies.phone est vide (telephone_source = finess_ej) ;
- *  - JAMAIS le fax (telecopie) ni le courriel ; personnes physiques : ni adresse ni téléphone ;
+ *  - JAMAIS le fax (telecopie) ni le courriel ;
+ *  - exploitation en nom propre (personne physique : forme juridique « 1… » ou métadonnée
+ *    `personne_physique` posée par ImportFiness) : la fiche reçoit les informations de l'OFFICINE (local
+ *    professionnel, données publiques FINESS : adresse, GPS, téléphone de l'officine, date d'ouverture),
+ *    sous les mêmes gardes que les autres ; aucun champ nominatif n'est ajouté, jamais de domicile, et pas
+ *    de repli sur le téléphone de la société exploitante (c'est la personne elle-même) ;
  *  - téléphone PROPRE : il ne vient que de la ligne de référence (SIRET de la fiche, ou la seule officine
  *    active qui y pointe) ; sans ligne de référence ou sans téléphone sur elle, repli sur la société
  *    exploitante (telephone_source = finess_ej), jamais sur le téléphone d'une autre officine ;
  *  - un téléphone DÉJÀ présent sur la fiche est aussi contrôlé contre l'opposition : s'il est opposé,
  *    la fiche entière est écartée (comptée dans `opposition`) ;
- *  - `trouvees`, `exclues` et `personnes_physiques` comptent des FICHES (pas des lignes du fichier) ;
+ *  - `trouvees`, `exclues` et `personnes_physiques_traitees` (compteur informatif : fiches
+ *    en nom propre examinées, déjà comprises dans `trouvees`) comptent des FICHES (pas des lignes du fichier) ;
  *  - un paquet qui échoue n'arrête pas les suivants ; seuls des totaux sont journalisés.
  */
 final class TelephonesFiness
@@ -86,7 +91,7 @@ final class TelephonesFiness
             'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'adr_a_ajouter' => 0, 'adr_ajoutees' => 0,
             'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0, 'gps_hors_france' => 0,
             'lignes' => 0, 'officines' => 0, 'sans_telephone' => 0, 'trouvees' => 0, 'introuvables' => 0, 'exclues' => 0,
-            'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
+            'personnes_physiques_traitees' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
             'a_ajouter' => 0, 'ajoutees' => 0, 'lots_en_echec' => 0,
         ];
         $lignes = [];
@@ -234,7 +239,7 @@ final class TelephonesFiness
             $plans = [];
             $variantes = [];
             $emails = [];
-            $locale = ['trouvees' => 0, 'exclues' => 0, 'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
+            $locale = ['trouvees' => 0, 'exclues' => 0, 'personnes_physiques_traitees' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
             foreach ($lot as $id => $lignes) {
                 if (! isset($fiches[$id])) {
                     $locale['exclues']++;
@@ -243,10 +248,9 @@ final class TelephonesFiness
                 }
                 $locale['trouvees']++;
                 $f = $fiches[$id];
-                if ($this->estPersonnePhysique($f->legalForm, $f->metadata)) {
-                    $locale['personnes_physiques']++;
-
-                    continue;
+                $nomPropre = $this->estPersonnePhysique($f->legalForm, $f->metadata);
+                if ($nomPropre) {
+                    $locale['personnes_physiques_traitees']++;
                 }
                 // La ligne dont le SIRET est celui de la fiche passe en premier.
                 $siretFiche = $extra[$id]['siret'];
@@ -267,8 +271,9 @@ final class TelephonesFiness
                     if ($tel === null) {
                         $locale['invalides']++;
                     }
-                } elseif ($phoneVide) {
-                    // Pas de téléphone propre (ligne de référence absente ou sans numéro) : repli sur la société exploitante.
+                } elseif ($phoneVide && ! $nomPropre) {
+                    // Pas de téléphone propre (ligne de référence absente ou sans numéro) : repli sur la société exploitante
+                    // (jamais pour une exploitation en nom propre : la société exploitante est la personne).
                     foreach ($lignes as $l) {
                         if (($this->telephonesEj[$l['finess_ej']] ?? '') !== '') {
                             $tel = self::normaliser($this->telephonesEj[$l['finess_ej']]);

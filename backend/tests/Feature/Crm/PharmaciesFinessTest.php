@@ -30,7 +30,7 @@ function csvFiness(array $lignes): string
     foreach ($lignes as $l) {
         fputcsv($f, array_merge([
             'finess_et' => '990000001', 'siret' => '', 'categorie' => '620', 'etat' => 'A', 'nom_long' => 'ZZ OFFICINE',
-            'code_postal' => '99100', 'commune' => 'ZZVILLE', 'dep' => '99', 'statut' => 'SARL', 'ape' => '4773Z', 'statut_code' => '',
+            'code_postal' => '99100', 'commune' => 'ZZVILLE', 'dep' => '99', 'statut' => 'SARL', 'ape' => '4773Z', 'statut_code' => '85',
         ], $l), ',', '"', '');
     }
     fclose($f);
@@ -286,4 +286,62 @@ it('classer-taille : effectif_min rempli et effectif_max vide ne change rien ; m
     $deux = DB::table('companies')->where('siren', '940000142')->first();
     expect(json_decode($deux->metadata, true)['nb_officines_societe'])->toBe(1);
     expect($deux->updated_at > '2020-01-02')->toBeTrue();
+});
+
+it('APE de la société exploitante : gardé seulement s\'il commence par 47.7, sinon 47.73Z ; finess_categorie posé', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000020100011', 'ape' => '4774Z'], ['siret' => '94000020200011', 'ape' => '6820B'], ['siret' => '94000020300011', 'ape' => ''],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    expect(DB::table('companies')->where('siren', '940000201')->value('naf'))->toBe('47.74Z');
+    foreach (['940000202', '940000203'] as $siren) {
+        $f = DB::table('companies')->where('siren', $siren)->first();
+        expect($f->naf)->toBe('47.73Z')->and(json_decode($f->metadata, true)['finess_categorie'])->toBe('620');
+    }
+});
+
+it('apply échoue, sans rien écrire, si statut_code manque sur plus de 1 % des officines ; l\'essai à blanc passe', function () {
+    $espace = F::espace();
+    $csv = csvFiness([['siret' => '94000021100011', 'statut_code' => ''], ['siret' => '94000021200011']]);
+
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+
+    expect($apply)->toContain('statut_code');
+    expect(DB::table('companies')->where('workspace_id', $espace)->count())->toBe(0);
+    expect(lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace]))->toContain('ESSAI À BLANC');
+});
+
+it('personne physique déjà connue par son SIRET : ligne d\'établissement sans adresse, fiche intacte', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000022100011']]), '--workspace' => $espace, '--apply' => true]);
+    $avant = DB::table('companies')->where('siren', '940000221')->first();
+
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000022100011', 'statut' => 'Personne Physique', 'statut_code' => '70', 'finess_et' => '990000077'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    $etab = DB::table('finess_etablissements')->where('siret', '94000022100011')->first();
+    expect($etab)->not->toBeNull()->and($etab->commune)->toBeNull()->and($etab->code_postal)->toBeNull()->and($etab->finess_et)->toBeNull();
+    expect(DB::table('companies')->where('siren', '940000221')->value('denomination'))->toBe($avant->denomination);
+});
+
+it('classer-taille par liste d\'identifiants : fiches NAF seules et fiches FINESS, corbeille et autre espace ignorés', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000023100011'], ['siret' => '94000023100029'], ['siret' => '94000023200011']]), '--workspace' => $espace, '--apply' => true]);
+    DB::table('companies')->where('siren', '940000231')->update(['effectif_range' => '12']);
+    DB::table('companies')->where('siren', '940000232')->update(['effectif_range' => '03', 'deleted_at' => now()]);
+    // Fiche au NAF 47.73Z sans ligne FINESS, et fiche d'un autre NAF sans ligne FINESS (hors cible).
+    DB::table('companies')->insert([
+        ['workspace_id' => $espace, 'siren' => '940000233', 'denomination' => 'ZZ NAF', 'naf' => '47.73Z', 'effectif_range' => '21', 'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now()],
+        ['workspace_id' => $espace, 'siren' => '940000234', 'denomination' => 'ZZ AUTRE', 'naf' => '62.01Z', 'effectif_range' => '21', 'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now()],
+    ]);
+
+    $sortie = lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    expect($sortie)->toContain('fiches pharmacie : 2')->toContain('taille inconnue avant : 2 (100,0 %)')->toContain('taille inconnue après : 0 (0,0 %)');
+    expect(DB::table('companies')->where('siren', '940000231')->value('size_category'))->toBe('pme');
+    expect(DB::table('companies')->where('siren', '940000233')->value('size_category'))->not->toBeNull();
+    expect(DB::table('companies')->where('siren', '940000232')->value('size_category'))->toBeNull();
+    expect(DB::table('companies')->where('siren', '940000234')->value('size_category'))->toBeNull();
 });

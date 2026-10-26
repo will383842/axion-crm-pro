@@ -11,8 +11,8 @@
  * Fixtures FICTIVES (depot public).
  */
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Crm\FichesProtegees;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;

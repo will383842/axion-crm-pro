@@ -132,28 +132,28 @@ final class ContactsOsm
         $q = SelectionEnrichissement::ouvertes($workspaceId);
         $q->select(['id', 'phone', 'email_generic', 'website', 'website_method', 'postcode', 'lat', 'lon', 'legal_form', 'metadata', 'field_origins'])
             ->chunkById(2000, function ($lignes) use (&$fiches): void {
-            foreach ($lignes as $c) {
-                $meta = json_decode((string) $c->metadata, true);
-                $meta = is_array($meta) ? $meta : [];
-                if (str_starts_with(trim((string) $c->legal_form), '1') || ($meta['personne_physique'] ?? false) === true) {
-                    continue;
+                foreach ($lignes as $c) {
+                    $meta = json_decode((string) $c->metadata, true);
+                    $meta = is_array($meta) ? $meta : [];
+                    if (str_starts_with(trim((string) $c->legal_form), '1') || ($meta['personne_physique'] ?? false) === true) {
+                        continue;
+                    }
+                    $origines = json_decode((string) $c->field_origins, true);
+                    $phone = trim((string) $c->phone);
+                    $fiches[(int) $c->id] = [
+                        'tel' => $phone === '' ? null : TelephonesFiness::normaliser($phone),
+                        'phone' => $phone,
+                        'email' => trim((string) $c->email_generic),
+                        'website' => trim((string) $c->website),
+                        'cp' => preg_replace('/\s+/', '', (string) $c->postcode) ?? '',
+                        'lat' => $c->lat === null ? null : (float) $c->lat,
+                        'lon' => $c->lon === null ? null : (float) $c->lon,
+                        'origines' => is_array($origines) ? $origines : [],
+                        'meta' => $meta,
+                        'methode' => trim((string) $c->website_method),
+                    ];
                 }
-                $origines = json_decode((string) $c->field_origins, true);
-                $phone = trim((string) $c->phone);
-                $fiches[(int) $c->id] = [
-                    'tel' => $phone === '' ? null : TelephonesFiness::normaliser($phone),
-                    'phone' => $phone,
-                    'email' => trim((string) $c->email_generic),
-                    'website' => trim((string) $c->website),
-                    'cp' => preg_replace('/\s+/', '', (string) $c->postcode) ?? '',
-                    'lat' => $c->lat === null ? null : (float) $c->lat,
-                    'lon' => $c->lon === null ? null : (float) $c->lon,
-                    'origines' => is_array($origines) ? $origines : [],
-                    'meta' => $meta,
-                    'methode' => trim((string) $c->website_method),
-                ];
-            }
-        }, 'id');
+            }, 'id');
 
         return $fiches;
     }

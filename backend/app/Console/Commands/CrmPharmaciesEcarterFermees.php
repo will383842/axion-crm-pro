@@ -452,7 +452,9 @@ class CrmPharmaciesEcarterFermees extends Command
                 continue;
             }
             $filtre = $table === 'activities' ? " AND kind IN ({$kinds})" : '';
-            $ou[] = "EXISTS (SELECT 1 FROM {$table} x WHERE x.{$colonne} = c.id AND x.{$condition}{$filtre})";
+            // `business_events.resource_id` est un TEXTE : on convertit le côté fiche.
+            $id = $table === 'business_events' ? 'c.id::text' : 'c.id';
+            $ou[] = "EXISTS (SELECT 1 FROM {$table} x WHERE x.{$colonne} = {$id} AND x.{$condition}{$filtre})";
         }
 
         $sql = 'SELECT c.id FROM companies c WHERE c.workspace_id = ? AND c.id IN (' . $liste . ') AND (' . implode(' OR ', $ou) . ')';

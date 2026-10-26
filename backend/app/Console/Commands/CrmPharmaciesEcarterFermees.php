@@ -146,6 +146,7 @@ class CrmPharmaciesEcarterFermees extends Command
         $curseur = 0;
 
         while (true) {
+            /** @var list<\stdClass> $fiches */
             $fiches = DB::select(
                 "SELECT id, siren, insee_ferme_le, lifecycle_stage, metadata
                  FROM companies
@@ -158,7 +159,7 @@ class CrmPharmaciesEcarterFermees extends Command
                 break;
             }
             $curseur = (int) end($fiches)->id;
-            $protegees = $this->protegees(array_map(fn ($f) => (int) $f->id, $fiches));
+            $protegees = $this->protegees(array_values(array_map(fn ($f) => (int) $f->id, $fiches)));
 
             $corbeille = ['insee_ferme' => [], 'finess_inactif' => []];
             $verifier = [];
@@ -199,7 +200,7 @@ class CrmPharmaciesEcarterFermees extends Command
     }
 
     /** @return 'insee_ferme'|'finess_inactif'|'non_officine'|null */
-    private function motif(object $f, bool $finess): ?string
+    private function motif(\stdClass $f, bool $finess): ?string
     {
         if ($f->insee_ferme_le !== null) {
             return 'insee_ferme';

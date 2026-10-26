@@ -3,18 +3,22 @@ name: Pharmacies — écarter les fermées (prod, jamais de suppression)
 # Lance `crm:pharmacies:ecarter-fermees` sur la prod. Dry-run par défaut :
 # totaux seulement. `apply` pose la corbeille (deleted_at) + metadata, SANS
 # jamais supprimer. `apply` est refusé sauf confirmer = OUI.
+# `restaurer` rétablit (deleted_at vidé) les seules fiches écartées par la
+# commande : dry-run par défaut aussi, `apply` exigeant confirmer = OUI.
 # Seuls des totaux sont affichés (dépôt public : aucune liste nominative).
+# NB : la source FINESS ci-dessous est un miroir tiers, sans empreinte officielle
+# (rien ne garantit son intégrité autrement que les garde-fous de la commande).
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dry-run (défaut) ou apply"
+        description: "dry-run (défaut), apply, restaurer-dry-run ou restaurer"
         type: choice
-        options: [dry-run, apply]
+        options: [dry-run, apply, restaurer-dry-run, restaurer]
         default: dry-run
       confirmer:
-        description: "Écrire OUI pour autoriser apply"
+        description: "Écrire OUI pour autoriser apply ou restaurer"
         type: string
         default: ""
 
@@ -36,8 +40,8 @@ jobs:
           MODE: ${{ inputs.mode }}
           CONFIRMER: ${{ inputs.confirmer }}
         run: |
-          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
-            echo "REFUS : apply exige confirmer = OUI"; exit 1
+          if { [ "$MODE" = "apply" ] || [ "$MODE" = "restaurer" ]; } && [ "$CONFIRMER" != "OUI" ]; then
+            echo "REFUS : $MODE exige confirmer = OUI"; exit 1
           fi
 
       - name: Télécharger FINESS (officines)
@@ -81,10 +85,15 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           set -e
-          OPT=""; [ "$MODE" = "apply" ] && OPT="--apply"
           SSH="ssh $USER@$HOST"
+          case "$MODE" in
+            restaurer) CMD="php artisan crm:pharmacies:ecarter-fermees --restaurer --apply" ;;
+            restaurer-dry-run) CMD="php artisan crm:pharmacies:ecarter-fermees --restaurer" ;;
+            apply) CMD="php artisan crm:pharmacies:ecarter-fermees --finess=/tmp/finess_pharma.csv --apply" ;;
+            *) CMD="php artisan crm:pharmacies:ecarter-fermees --finess=/tmp/finess_pharma.csv" ;;
+          esac
           cat finess_pharma.csv | $SSH "cat > /tmp/finess_pharma.csv"
-          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api php artisan crm:pharmacies:ecarter-fermees --finess=/tmp/finess_pharma.csv $OPT < /dev/null"
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_pharma.csv api:/tmp/finess_pharma.csv && docker compose exec -u root -T api $CMD < /dev/null"
 
       - name: Nettoyage
         if: always()

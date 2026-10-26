@@ -88,6 +88,16 @@ function pefProteger(string $source, string $ws, int $id): void
                 'kind' => 'auto', 'rules' => '{}', 'is_locked' => true] + $maintenant);
             DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $ws, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
             break;
+        case 'etiquette_manuelle':
+            // Slug hors liste protegee : seule la main d'une personne protege.
+            $tag = (int) DB::table('tags')->insertGetId([
+                'workspace_id' => $ws, 'slug' => 'zz-etiquette-manuelle', 'name' => 'Manuelle', 'category' => 'intent',
+                'kind' => 'manual', 'rules' => '{}', 'is_locked' => false] + $maintenant);
+            DB::table('company_tag')->insert(['company_id' => $id, 'tag_id' => $tag, 'workspace_id' => $ws, 'assigned_at' => now(), 'assigned_by' => 'user']);
+            break;
+        case 'activite_sans_type':
+            DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => null, 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+            break;
         case 'console_client_ref':
             DB::table('companies')->where('id', $id)->update(['console_client_ref' => 'site:client:00000000-0000-0000-0000-000000000001']);
             break;
@@ -169,12 +179,14 @@ function pefJeu(): array
 test('dry-run : zero ecriture, totaux justes, aucun nom', function () {
     [$ws, $ids, $csv] = pefJeu();
     $avant = DB::table('companies')->orderBy('id')->get()->toJson();
+    $activites = DB::table('activities')->orderBy('id')->get()->toJson();
 
     $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $csv]);
     $sortie = Artisan::output();
 
     expect($code)->toBe(0);
     expect(DB::table('companies')->orderBy('id')->get()->toJson())->toBe($avant);
+    expect(DB::table('activities')->orderBy('id')->get()->toJson())->toBe($activites);
     expect($sortie)->toContain('DRY-RUN')->toContain('insee_ferme   : 1')->toContain('finess_inactif: 0')
         ->toContain('INSEE ouvert (etiquette seule): 1')->toContain('liens, sans corbeille) : 1')->toContain('non_officine')->not->toContain('ZZ FICTIVE');
 });
@@ -232,7 +244,7 @@ test('chaque source de protection : etiquette a_verifier_fermee, jamais la corbe
     expect($fiche->deleted_at)->toBeNull();
     expect(json_decode($fiche->metadata, true))->toHaveKey('a_verifier_fermee')->not->toHaveKey('ecartee_motif');
 })->with([
-    'contact', 'deal', 'audience', 'lifecycle_stage', 'relation_type', 'etiquette_protegee',
+    'contact', 'deal', 'audience', 'lifecycle_stage', 'relation_type', 'etiquette_protegee', 'etiquette_manuelle', 'activite_sans_type',
     'console_client_ref', 'activite_rendez_vous', 'personne', 'praticien', 'media', 'evenement_metier',
     'tache', 'note_saisie', 'echange_call', 'echange_linkedin_message', 'journaliste', 'organisateur',
     'federation', 'federation_parent', 'opco', 'liste_manuelle',
@@ -290,10 +302,13 @@ test('fourchette : apply refuse hors bornes, rien n est ecrit ; relevable par op
 test('fourchette non_officine : refus quand elle est depassee', function () {
     [$ws, $ids, $csv] = pefJeu();
 
+    $avant = DB::table('companies')->orderBy('id')->pluck('metadata', 'id')->toJson();
+
     $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $csv, '--apply' => true, '--max-non-officine' => 0]);
 
     expect($code)->toBe(1);
     expect(DB::table('companies')->whereNotNull('deleted_at')->count())->toBe(0);
+    expect(DB::table('companies')->orderBy('id')->pluck('metadata', 'id')->toJson())->toBe($avant);
 });
 
 test('apply journalise chaque ecartement dans activities', function () {
@@ -424,4 +439,73 @@ test('apply par paquets : paquets de taille 1, toutes les fiches examinees', fun
     Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true, '--taille-lot' => 1]);
 
     expect(DB::table('companies')->whereNotNull('deleted_at')->count())->toBe(3);
+});
+
+test('restaurer : une fiche a la corbeille hors NAF 47.73Z n est pas touchee', function () {
+    $ws = pefEspace();
+    $hors = pefFiche($ws, '700000001', ['naf' => '10.11Z', 'deleted_at' => now()]);
+    $dans = pefFiche($ws, '700000002', ['insee_ferme_le' => '2024-01-01']);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+    // Journal « ecartee » a l'instant exact de la corbeille, pour la fiche hors NAF aussi.
+    $instant = (string) DB::selectOne('SELECT deleted_at::text AS i FROM companies WHERE id = ?', [$hors])->i;
+    DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'reclassified', 'subject_type' => 'company', 'subject_id' => $hors,
+        'payload' => json_encode(['source' => 'pharmacies:ecarter-fermees', 'action' => 'ecartee', 'motif' => 'insee_ferme', 'deleted_at' => $instant]), 'created_at' => now()]);
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--restaurer' => true]);
+    expect(Artisan::output())->toContain('DRY-RUN restauration : 1 fiche');
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--restaurer' => true, '--apply' => true]);
+
+    expect(DB::table('companies')->where('id', $dans)->value('deleted_at'))->toBeNull();
+    expect(DB::table('companies')->where('id', $hors)->value('deleted_at'))->not->toBeNull();
+});
+
+test('restaurer --workspace : l autre espace n est pas touche', function () {
+    $a = pefEspace();
+    $b = pefEspace();
+    $fa = pefFiche($a, '710000001', ['insee_ferme_le' => '2024-01-01']);
+    $fb = pefFiche($b, '710000002', ['insee_ferme_le' => '2024-01-01']);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--restaurer' => true, '--apply' => true, '--workspace' => $a]);
+
+    expect(DB::table('companies')->where('id', $fa)->value('deleted_at'))->toBeNull();
+    expect(DB::table('companies')->where('id', $fb)->value('deleted_at'))->not->toBeNull();
+});
+
+test('arret par paquet : cumul hors fourchette en cours d ecriture, paquet suivant non ecrit', function () {
+    $a = pefEspace();
+    $b = pefEspace();
+    pefFiche($a, '720000001', ['insee_ferme_le' => '2024-01-01']);
+    pefFiche($b, '720000002', ['insee_ferme_le' => '2024-01-01']);
+
+    // Entre l'essai a blanc et l'ecriture, des fiches fermees arrivent : la
+    // fourchette cumulee doit arreter l'ecriture avant le paquet fautif.
+    $lectures = 0;
+    $inserees = false;
+    DB::listen(function ($requete) use (&$lectures, &$inserees, $a, $b): void {
+        if ($inserees || ! str_contains($requete->sql, 'SELECT id FROM companies')) {
+            return;
+        }
+        if (++$lectures < 3) {
+            return;
+        }
+        $inserees = true;
+        foreach ([$a, $b] as $ws) {
+            $lignes = [];
+            for ($i = 0; $i < 3; $i++) {
+                $lignes[] = ['workspace_id' => $ws, 'siren' => (string) (730000000 + $i), 'denomination' => 'ZZ FICTIVE',
+                    'naf' => '47.73Z', 'signals' => '{}', 'metadata' => '{}', 'field_origins' => '{}', 'insee_ferme_le' => '2024-01-01',
+                    'created_at' => now(), 'updated_at' => now()];
+            }
+            DB::table('companies')->insert($lignes);
+        }
+    });
+
+    $code = Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true, '--max-insee' => 4]);
+
+    expect($code)->toBe(1);
+    expect($inserees)->toBeTrue();
+    expect(Artisan::output())->toContain('REFUS : cumul hors fourchette');
+    // Seul le premier espace (lu avant l'arrivee des fiches) est ecrit ; le second, fautif, ne l'est pas.
+    expect(DB::table('companies')->whereNotNull('deleted_at')->count())->toBe(1);
 });

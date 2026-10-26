@@ -37,7 +37,7 @@ use Illuminate\Support\Facades\Schema;
  * affaires, audiences, listes manuelles, personnes, praticiens, journalistes,
  * médias, organisateurs, fédérations, OPCO, activités de rendez-vous /
  * échanges / e-mails, événements métier), une étiquette protégée
- * (`FichesProtegees`), un `console_client_ref`, une `relation_type` autre que
+ * (`FichesProtegees`) ou posée par une personne (`assigned_by = user`), un `console_client_ref`, une `relation_type` autre que
  * `prospect`, ou un `lifecycle_stage` avancé. Les envois / échanges rattachés
  * à un contact sont couverts par le contact lui-même.
  *
@@ -182,9 +182,11 @@ class CrmPharmaciesEcarterFermees extends Command
             $this->error('REFUS : ' . $e->getMessage());
 
             return self::FAILURE;
-        }
-        foreach ($espaces as $espace) {
-            TotalListe::oublier((string) $espace);
+        } finally {
+            // Même après un arrêt par paquet : des paquets déjà écrits changent le total.
+            foreach ($espaces as $espace) {
+                TotalListe::oublier((string) $espace);
+            }
         }
         $this->info('APPLIQUE.');
 
@@ -530,7 +532,9 @@ class CrmPharmaciesEcarterFermees extends Command
     {
         $liste = implode(',', array_map('intval', $ids));
         $ou = [
-            'NOT (' . FichesProtegees::conditionSql('c.id') . ')',
+            'NOT (' . FichesProtegees::conditionSql('c.id', null, 'c.workspace_id') . ')',
+            // Une étiquette posée par une personne protège, quel que soit son slug.
+            "EXISTS (SELECT 1 FROM company_tag x WHERE x.workspace_id = c.workspace_id AND x.company_id = c.id AND x.assigned_by = 'user')",
             'c.console_client_ref IS NOT NULL',
             "(c.relation_type IS NOT NULL AND c.relation_type <> 'prospect')",
         ];
@@ -660,12 +664,13 @@ class CrmPharmaciesEcarterFermees extends Command
             // à CET instant (deleted_at = instant du journal) ET dont la dernière
             // ligne de journal de la commande est « ecartee ». Le journal fait foi
             // (metadata est réécrite par la collecte).
-            $filtre = "workspace_id = ? AND deleted_at IS NOT NULL
+            // `naf` : l'index (workspace_id, naf) évite de lire toute la table (9 Go).
+            $filtre = "workspace_id = ? AND naf IN ('47.73Z', '4773Z') AND deleted_at IS NOT NULL
                 AND EXISTS (SELECT 1 FROM activities a WHERE a.workspace_id = companies.workspace_id
                       AND a.subject_type = 'company' AND a.subject_id = companies.id
                       AND a.payload->>'source' = ? AND a.payload->>'action' = 'ecartee'
                       AND a.payload->>'motif' IN ({$marques})
-                      AND a.payload->>'deleted_at' = companies.deleted_at::text
+                      AND companies.deleted_at = (a.payload->>'deleted_at')::timestamptz
                       AND a.id = (SELECT max(b.id) FROM activities b
                                   WHERE b.workspace_id = companies.workspace_id AND b.subject_type = 'company'
                                     AND b.subject_id = companies.id AND b.payload->>'source' = ?))";

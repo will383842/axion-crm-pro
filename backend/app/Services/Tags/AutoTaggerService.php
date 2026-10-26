@@ -65,10 +65,11 @@ class AutoTaggerService
     /**
      * Synchronise les tags auto pour une company.
      * Retourne le delta : ['added' => [...], 'removed' => [...]]
+     * `$ajoutSeulement` : n'ajoute que, ne retire aucune étiquette.
      *
      * @return array{added: list<string>, removed: list<string>}
      */
-    public function syncTags(Company $company): array
+    public function syncTags(Company $company, bool $ajoutSeulement = false): array
     {
         $desiredAutoTags = $this->computeDesiredTags($company);
         $desiredSlugs = array_keys($desiredAutoTags);
@@ -95,8 +96,8 @@ class AutoTaggerService
         $added = [];
         $removed = [];
 
-        // 1. Retirer les tags auto qui ne sont plus désirés
-        foreach ($currentlyAttached as $row) {
+        // 1. Retirer les tags auto qui ne sont plus désirés (jamais en ajout seulement)
+        foreach ($ajoutSeulement ? [] : $currentlyAttached as $row) {
             if ($row->assigned_by === 'user' || $row->kind === 'manual') {
                 continue;  // Skip tags manuels
             }

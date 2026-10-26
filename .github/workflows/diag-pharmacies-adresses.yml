@@ -1,0 +1,96 @@
+name: Diagnostic — Pharmacies adresses (prod, lecture seule)
+
+# Mesure la couverture des adresses des officines (NAF 47.73Z) dans UN seul espace
+# (l'espace par défaut : le premier créé, comme EspaceProspection::parDefaut).
+# Aucune écriture dans les tables du CRM (seules des tables temporaires de session).
+# Seuls des totaux sont affichés (dépôt public : ni nom, ni adresse, ni identifiant).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  adresses:
+    name: Couverture des adresses
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Télécharger FINESS et préparer le fichier
+        run: |
+          set -e
+          curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          unzip -q -o finess.zip etablissements.csv
+          python3 - <<'PY'
+          import csv
+          cols = ['siret', 'categorie', 'etat']
+          src = csv.DictReader(open('etablissements.csv', encoding='utf-8-sig'), delimiter=';')
+          out = csv.writer(open('finess_620.csv', 'w', newline='', encoding='utf-8'))
+          out.writerow(cols)
+          n = 0
+          for r in src:
+              if r['categorie'] == '620' and r['etat'] == 'A' and r['siret']:
+                  out.writerow([r[c].strip() for c in cols]); n += 1
+          print('lignes FINESS 620 actives :', n)
+          PY
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Mesurer sur la base prod (lecture seule)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          set -e
+          cat > requetes.sql <<'SQL'
+          \echo >> (a) Fiches retenues par taille
+          SELECT coalesce(size_category,'(vide)') AS taille, count(*) AS fiches FROM base GROUP BY 1 ORDER BY 1;
+          \echo >> (b) Couverture par taille : adresse / code postal / ville / lat+lon
+          SELECT coalesce(size_category,'(vide)') AS taille, count(*) AS fiches,
+                 count(*) FILTER (WHERE nullif(btrim(address),'') IS NOT NULL) AS avec_address,
+                 count(*) FILTER (WHERE nullif(btrim(postcode),'') IS NOT NULL) AS avec_postcode,
+                 count(*) FILTER (WHERE nullif(btrim(city),'') IS NOT NULL) AS avec_city,
+                 count(*) FILTER (WHERE lat IS NOT NULL AND lon IS NOT NULL) AS avec_lat_lon
+            FROM base GROUP BY 1 ORDER BY 1;
+          \echo >> (c) Fiches sans address mais avec une ligne finess_etablissements
+          SELECT count(*) AS sans_address,
+                 count(*) FILTER (WHERE EXISTS (SELECT 1 FROM finess_etablissements fe
+                                                WHERE fe.workspace_id = (SELECT id FROM ws) AND fe.company_id = b.id)) AS avec_ligne_finess
+            FROM base b WHERE nullif(btrim(b.address),'') IS NULL;
+          \echo >> (d) Fiches sans address : personnes physiques / discovery_source finess
+          SELECT count(*) AS sans_address,
+                 count(*) FILTER (WHERE btrim(coalesce(legal_form,'')) LIKE '1%' OR metadata->>'personne_physique' = 'true') AS personnes_physiques,
+                 count(*) FILTER (WHERE discovery_source = 'finess') AS source_finess,
+                 count(*) FILTER (WHERE discovery_source = 'finess'
+                                   AND NOT (btrim(coalesce(legal_form,'')) LIKE '1%' OR metadata->>'personne_physique' = 'true')) AS source_finess_hors_physique
+            FROM base WHERE nullif(btrim(address),'') IS NULL;
+          \echo >> (e) FINESS 620 etat A rattaches a une fiche sans address : fiches a plusieurs etablissements actifs
+          WITH r AS (
+            SELECT fe.company_id, count(DISTINCT fe.siret) AS actifs
+              FROM fin f
+              JOIN finess_etablissements fe ON fe.workspace_id = (SELECT id FROM ws) AND fe.siret = f.siret
+              JOIN base b ON b.id = fe.company_id AND nullif(btrim(b.address),'') IS NULL
+             GROUP BY 1)
+          SELECT count(*) AS fiches_rattachees,
+                 count(*) FILTER (WHERE actifs > 1) AS fiches_plusieurs_etablissements_actifs
+            FROM r;
+          SQL
+          {
+            echo "CREATE TEMP TABLE fin (siret text, categorie text, etat text);"
+            echo "COPY fin FROM STDIN WITH (FORMAT csv, HEADER true);"
+            cat finess_620.csv
+            printf '\\.\n'
+            echo "CREATE TEMP TABLE ws AS SELECT id FROM workspaces WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1;"
+            echo "CREATE TEMP TABLE base AS SELECT c.id, c.size_category, c.address, c.postcode, c.city, c.lat, c.lon, c.legal_form, c.discovery_source, c.metadata"
+            echo "  FROM companies c WHERE c.workspace_id = (SELECT id FROM ws) AND c.naf IN ('47.73Z','4773Z')"
+            echo "  AND c.deleted_at IS NULL AND c.insee_ferme_le IS NULL"
+            echo "  AND NOT jsonb_exists(COALESCE(c.metadata, '{}'::jsonb), 'ecartee_motif')"
+            echo "  AND COALESCE(c.metadata->>'type_etablissement', '') <> 'non_officine';"
+            echo "SET default_transaction_read_only = on;"
+            sed 's/^          //' requetes.sql
+          } | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" \
+              "cd /opt/axion-crm-pro && docker compose exec -T postgres psql -U axion -d axion_crm -X -P pager=off -v ON_ERROR_STOP=1 -f -"

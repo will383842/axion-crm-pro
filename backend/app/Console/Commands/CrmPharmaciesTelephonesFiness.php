@@ -38,7 +38,7 @@ class CrmPharmaciesTelephonesFiness extends Command
             return self::FAILURE;
         }
         $entites = $this->argument('entites');
-        if ($entites !== null && (! is_string($entites) || ! is_file($entites) || ! is_readable($entites))) {
+        if ($entites !== null && (! is_file($entites) || ! is_readable($entites))) {
             $this->error('Fichier des entités juridiques illisible.');
 
             return self::FAILURE;

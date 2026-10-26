@@ -399,7 +399,11 @@ final class TelephonesFiness
         return $a;
     }
 
-    /** Commune comme l'import (colonne `commune`), sinon commune_acheminement sans code postal ni CEDEX. */
+    /**
+     * Commune comme l'import (colonne `commune`), sinon commune_acheminement sans code postal ni CEDEX.
+     *
+     * @param  array<string, string>  $l
+     */
     private static function commune(array $l): string
     {
         if ($l['commune'] !== '') {
@@ -583,6 +587,7 @@ final class TelephonesFiness
 
                 continue;
             }
+            /** @var array<string, string> $ligne */
             $ligne = [];
             foreach (array_merge(self::COLONNES, self::COLONNES_OPTIONNELLES) as $c) {
                 $i = array_search($c, $entete, true);

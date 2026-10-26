@@ -1,0 +1,78 @@
+name: Pharmacies — recherche des sites web (dry-run ou apply)
+
+# Lance `prospection:find-websites --naf=47.73Z` sur le serveur de prod : trouve
+# GRATUITEMENT le site web des pharmacies ouvertes qui n'en ont pas (devinette de
+# domaine : DNS + vérification du contenu de la page).
+#  - dry-run (défaut) : compte les fiches à traiter, RIEN n'est écrit ;
+#  - apply : pose le site trouvé. AJOUT SEULEMENT : un site déjà connu n'est jamais
+#    remplacé, rien n'est supprimé, aucun envoi, aucune API payante. Fiches
+#    protégées, corbeille, fermées et non-officines exclues.
+# `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI.
+# Dépôt public : seuls des totaux sont affichés, jamais de nom ni d'adresse.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (compte seulement) ou apply (pose les sites trouvés)'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      limite:
+        description: 'Fiches traitées au plus (0 = toutes)'
+        type: string
+        default: '0'
+      confirmer:
+        description: 'Écrire OUI pour autoriser apply'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+# Jamais deux recherches en même temps.
+concurrency:
+  group: pharmacies-sites
+  cancel-in-progress: false
+
+jobs:
+  sites:
+    name: Sites des pharmacies (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 340
+    steps:
+      - name: Vérifier les entrées
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMER: ${{ inputs.confirmer }}
+          LIMITE: ${{ inputs.limite }}
+        run: |
+          if ! printf '%s' "$LIMITE" | grep -Eq '^[0-9]{1,6}$'; then
+            echo "limite invalide : un entier de 0 à 999999." >&2
+            exit 1
+          fi
+          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
+            echo "apply refusé : saisir OUI dans l'entrée « confirmer »." >&2
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Chercher les sites sur la prod (totaux uniquement)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          MODE: ${{ inputs.mode }}
+          LIMITE: ${{ inputs.limite }}
+        run: |
+          set -e
+          OPT="--dry-run"
+          [ "$MODE" = "apply" ] && OPT=""
+          # Keepalive SSH : un lot lent peut rester silencieux plusieurs minutes.
+          # La sortie de la commande ne contient que des compteurs (traités, trouvés).
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o TCPKeepAlive=yes \
+              "$USER@$HOST" "cd /opt/axion-crm-pro && docker compose exec -u root -T api php artisan prospection:find-websites --naf=47.73Z --limit=$LIMITE $OPT" < /dev/null

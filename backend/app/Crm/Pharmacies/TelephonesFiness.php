@@ -119,17 +119,18 @@ final class TelephonesFiness
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lot, $appliquer, &$bilan): void {
             $ids = DB::table('finess_etablissements')->where('workspace_id', $workspaceId)
                 ->whereIn('siret', array_column($lot, 'siret'))->pluck('company_id', 'siret')->all();
+            /** @var array<int, FicheFiness> $fiches */
             $fiches = [];
             foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
                 ->whereIn('id', array_values(array_unique($ids)))
                 ->get(['id', 'phone', 'legal_form', 'metadata', 'address', 'postcode', 'city', 'city_name', 'lat', 'lon']) as $c) {
-                $fiches[(int) $c->id] = $c;
+                $fiches[(int) $c->id] = FicheFiness::depuisLigne($c);
             }
 
             // Numéros valides du lot, puis une seule requête d'opposition pour tout le paquet.
             /** @var array<int, array{0: string, 1: string}> $candidats id → [numéro, source] */
             $candidats = [];
-            /** @var array<int, array<string, mixed>> $ajouts id → adresse / gps / date à ajouter */
+            /** @var array<int, array{adresse?: array<string, string>, gps?: array{float, float}, date?: string}> $ajouts id → adresse / gps / date à ajouter */
             $ajouts = [];
             $variantes = [];
             $locale = ['trouvees' => 0, 'introuvables' => 0, 'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0];
@@ -142,13 +143,13 @@ final class TelephonesFiness
                 }
                 $locale['trouvees']++;
                 $f = $fiches[$id];
-                if ($this->estPersonnePhysique((string) $f->legal_form, (string) $f->metadata)) {
+                if ($this->estPersonnePhysique($f->legalForm, $f->metadata)) {
                     $locale['personnes_physiques']++;
 
                     continue;
                 }
-                $this->collecterAjouts($ajouts[$id], $f, $l);
-                $phoneVide = trim((string) $f->phone) === '';
+                $ajouts[$id] = $this->collecterAjouts($f, $l, $ajouts[$id] ?? []);
+                $phoneVide = trim($f->phone) === '';
                 $source = self::SOURCE;
                 $tel = null;
                 if ($l['telephone'] !== '') {
@@ -225,29 +226,29 @@ final class TelephonesFiness
     /**
      * Ce que FINESS peut ajouter à la fiche (champs vides ou NULL seulement) ; le premier établissement gagne.
      *
-     * @param  array<string, mixed>|null  $a
      * @param  array<string, string>  $l
+     * @param  array{adresse?: array<string, string>, gps?: array{float, float}, date?: string}  $a  ajouts déjà retenus pour la fiche
+     * @return array{adresse?: array<string, string>, gps?: array{float, float}, date?: string}
      */
-    private function collecterAjouts(?array &$a, object $f, array $l): void
+    private function collecterAjouts(FicheFiness $f, array $l, array $a): array
     {
-        $a ??= [];
         if (! isset($a['adresse'])) {
             $rue = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_filter(
                 array_map(static fn (string $c): string => $l[$c], ['numero_voie', 'type_voie', 'libelle_voie', 'complement_voie', 'lieu_dit', 'adresse_ligne_4']),
                 static fn (string $v): bool => $v !== '',
             ))));
             $champs = [];
-            if ($rue !== '' && trim((string) $f->address) === '') {
+            if ($rue !== '' && trim($f->address) === '') {
                 $champs['address'] = $rue;
             }
-            if ($l['code_postal'] !== '' && trim((string) $f->postcode) === '') {
+            if ($l['code_postal'] !== '' && trim($f->postcode) === '') {
                 $champs['postcode'] = $l['code_postal'];
             }
             if ($l['commune_acheminement'] !== '') {
-                if (trim((string) $f->city) === '') {
+                if (trim($f->city) === '') {
                     $champs['city'] = $l['commune_acheminement'];
                 }
-                if (trim((string) $f->city_name) === '') {
+                if (trim($f->cityName) === '') {
                     $champs['city_name'] = $l['commune_acheminement'];
                 }
             }
@@ -265,11 +266,13 @@ final class TelephonesFiness
         }
         if (! isset($a['date'])) {
             $date = self::normaliserDate($l['date_ouverture']);
-            $meta = json_decode((string) $f->metadata, true);
+            $meta = json_decode($f->metadata, true);
             if ($date !== null && ! (is_array($meta) && array_key_exists('finess_date_ouverture', $meta))) {
                 $a['date'] = $date;
             }
         }
+
+        return $a;
     }
 
     /** AAAA-MM-JJ depuis « AAAA-MM-JJ » ou « JJ/MM/AAAA », ou null. */

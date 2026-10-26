@@ -72,7 +72,7 @@ class CrmPharmaciesEcarterFermees extends Command
         }
 
         $taille = max(1, (int) $this->option('taille-lot'));
-        $espaces = DB::table('workspaces')->orderBy('id')->pluck('id');
+        $espaces = DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id');
         if (is_string($this->option('workspace')) && $this->option('workspace') !== '') {
             $espaces = $espaces->filter(fn ($id) => (string) $id === $this->option('workspace'))->values();
         }

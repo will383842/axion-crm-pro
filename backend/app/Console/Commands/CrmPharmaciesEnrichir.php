@@ -104,12 +104,13 @@ class CrmPharmaciesEnrichir extends Command
                 }
                 $this->marquer((int) $f->id, $physique);
                 $job = $physique
-                    ? EnrichirSiteOfficineJob::dispatch((int) $f->id)
-                    : EnrichCompanyJob::dispatch((int) $f->id)->sansPayant();
+                    ? new EnrichirSiteOfficineJob((int) $f->id)
+                    : (new EnrichCompanyJob((int) $f->id))->sansPayant();
                 $job->pourEspace($espace);
                 if ($pause > 0 && $numero > 0) {
                     $job->delay(now()->addSeconds($pause * $numero));
                 }
+                dispatch($job);
             }
         }
 

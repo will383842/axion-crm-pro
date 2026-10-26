@@ -20,7 +20,7 @@ use Throwable;
  *  - forme stockée : 10 chiffres « 0XXXXXXXXX », comme les autres collectes du CRM ;
  *  - numéros en liste d'opposition (`opt_out`, mêmes variantes que l'ingestion) et numéros
  *    invalides écartés ;
- *  - fiches protégées (FichesProtegees), fermées à l'INSEE, `non_officine` ou écartées : jamais touchées
+ *  - fiches protégées (FichesProtegees), fermées ou non diffusibles à l'INSEE, `non_officine` ou écartées : jamais touchées
  *    (SELECT et chaque UPDATE) ; numéro ou e-mail générique en opposition : fiche entière écartée ;
  *  - un SIREN regroupe plusieurs établissements : lignes groupées par fiche avant le découpage en
  *    paquets ; adresse, GPS, date seulement depuis la ligne dont le SIRET est celui de la fiche, sinon
@@ -45,7 +45,8 @@ use Throwable;
  *  - un téléphone DÉJÀ présent sur la fiche est aussi contrôlé contre l'opposition : s'il est opposé,
  *    la fiche entière est écartée (comptée dans `opposition`) ;
  *  - `trouvees`, `exclues` et `personnes_physiques_traitees` (compteur informatif : fiches
- *    en nom propre examinées, déjà comprises dans `trouvees`) comptent des FICHES (pas des lignes du fichier) ;
+ *    en nom propre examinées, déjà comprises dans `trouvees` ; `pp_sans_repli_ej` : celles sans téléphone propre dont le
+ *    repli est coupé ; `exclues_non_diffusibles` : fiches non diffusibles INSEE, comprises dans `exclues`) comptent des FICHES (pas des lignes du fichier) ;
  *  - un paquet qui échoue n'arrête pas les suivants ; seuls des totaux sont journalisés.
  */
 final class TelephonesFiness
@@ -91,7 +92,7 @@ final class TelephonesFiness
             'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'adr_a_ajouter' => 0, 'adr_ajoutees' => 0,
             'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0, 'gps_hors_france' => 0,
             'lignes' => 0, 'officines' => 0, 'sans_telephone' => 0, 'trouvees' => 0, 'introuvables' => 0, 'exclues' => 0,
-            'personnes_physiques_traitees' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
+            'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
             'a_ajouter' => 0, 'ajoutees' => 0, 'lots_en_echec' => 0,
         ];
         $lignes = [];
@@ -208,10 +209,27 @@ final class TelephonesFiness
         return [$fiches, $extra];
     }
 
-    /** Mêmes conditions que SelectionEnrichissement::ouvertes (hors NAF et protection) ; fonctionne en SELECT comme en UPDATE. */
+    /**
+     * Parmi ces ids, nombre de fiches marquées NON DIFFUSIBLE par l'INSEE (écartées par `ouvertes()`).
+     *
+     * @param  list<int>  $ids
+     */
+    private function nonDiffusibles(string $workspaceId, array $ids): int
+    {
+        $total = 0;
+        foreach (array_chunk($ids, self::IDS_PAR_REQUETE) as $morceau) {
+            $total += DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
+                ->whereIn('id', $morceau)->whereNotNull('insee_non_diffusible_le')->count();
+        }
+
+        return $total;
+    }
+
+    /** Mêmes conditions que SelectionEnrichissement::ouvertes (hors NAF et protection), plus RGPD (non diffusibles) ; fonctionne en SELECT comme en UPDATE. */
     private function ouvertes(Builder $q): void
     {
         $q->whereNull('insee_ferme_le')
+            ->whereNull('insee_non_diffusible_le')
             ->whereRaw("COALESCE(metadata->>'type_etablissement', '') <> 'non_officine'")
             ->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'ecartee_motif')");
     }
@@ -239,7 +257,11 @@ final class TelephonesFiness
             $plans = [];
             $variantes = [];
             $emails = [];
-            $locale = ['trouvees' => 0, 'exclues' => 0, 'personnes_physiques_traitees' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
+            $locale = ['trouvees' => 0, 'exclues' => 0, 'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
+            $absentes = array_values(array_diff(array_keys($lot), array_keys($fiches)));
+            if ($absentes !== []) {
+                $locale['exclues_non_diffusibles'] += $this->nonDiffusibles($workspaceId, $absentes);
+            }
             foreach ($lot as $id => $lignes) {
                 if (! isset($fiches[$id])) {
                     $locale['exclues']++;
@@ -271,9 +293,11 @@ final class TelephonesFiness
                     if ($tel === null) {
                         $locale['invalides']++;
                     }
-                } elseif ($phoneVide && ! $nomPropre) {
+                } elseif ($phoneVide && $nomPropre) {
+                    $locale['pp_sans_repli_ej']++;
+                } elseif ($phoneVide) {
                     // Pas de téléphone propre (ligne de référence absente ou sans numéro) : repli sur la société exploitante
-                    // (jamais pour une exploitation en nom propre : la société exploitante est la personne).
+                    // (coupé pour une exploitation en nom propre : la société exploitante est la personne).
                     foreach ($lignes as $l) {
                         if (($this->telephonesEj[$l['finess_ej']] ?? '') !== '') {
                             $tel = self::normaliser($this->telephonesEj[$l['finess_ej']]);

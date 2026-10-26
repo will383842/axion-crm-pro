@@ -77,7 +77,9 @@ class CrmPharmaciesTelephonesFiness extends Command
         $this->line(sprintf('  lignes lues : %d (officines actives 620 : %d, sans téléphone : %d)', $b['lignes'], $b['officines'], $b['sans_telephone']));
         $this->line(sprintf('  fiches trouvées : %d (introuvables : %d)', $b['trouvees'], $b['introuvables']));
         $this->line(sprintf('  fiches exclues (protégées, fermées, non officine ou écartées) : %d', $b['exclues']));
+        $this->line(sprintf('  dont non diffusibles INSEE : %d', $b['exclues_non_diffusibles']));
         $this->line(sprintf('  personnes physiques traitées (comprises dans les fiches trouvées) : %d', $b['personnes_physiques_traitees']));
+        $this->line(sprintf('  personnes physiques sans téléphone propre ni repli société exploitante : %d', $b['pp_sans_repli_ej']));
         $this->line(sprintf('  déjà renseignées : %d', $b['deja_renseignees']));
         $this->line(sprintf('  numéros invalides : %d', $b['invalides']));
         $this->line(sprintf('  écartés pour opposition : %d', $b['opposition']));

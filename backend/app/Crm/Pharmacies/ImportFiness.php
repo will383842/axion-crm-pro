@@ -217,7 +217,8 @@ final class ImportFiness
                     if (! isset($ids[$siren])) {
                         continue;
                     }
-                    // Personne physique : ni adresse ni identifiant FINESS recopiés (le département reste).
+                    // Personne physique : ni adresse ni identifiant FINESS recopiés (le département reste). L'adresse de
+                    // l'officine est ajoutée ensuite par crm:pharmacies:telephones-finess, sur décision du propriétaire.
                     $pp = $this->estPersonnePhysique($l);
                     $lignes[] = [
                         'workspace_id' => $workspaceId, 'company_id' => $ids[$siren], 'siret' => $siret,
@@ -248,7 +249,8 @@ final class ImportFiness
 
         if ($this->estPersonnePhysique($l)) {
             // Entrepreneur individuel : le nom est souvent celui du titulaire et le statut de
-            // diffusion INSEE est inconnu. Ni nom ni adresse ici ; la mise à jour mensuelle
+            // diffusion INSEE est inconnu. Ni nom ni adresse ici (l'adresse de l'officine est ajoutée ensuite par
+            // crm:pharmacies:telephones-finess, sur décision du propriétaire ; le nom n'est jamais posé) ; la mise à jour mensuelle
             // INSEE ne remplace que denomination, naf, legal_form et effectif_range (jamais
             // l'adresse), seulement si l'entreprise est diffusible.
             return [

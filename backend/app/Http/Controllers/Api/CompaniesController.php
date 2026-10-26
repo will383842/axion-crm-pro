@@ -98,7 +98,7 @@ class CompaniesController extends ApiController
             // Les méthodes de `QueryBuilder` (allowedSorts/defaultSort) AVANT
             // le `where` Eloquent : l'ordre inverse perd le type et le scope
             // ne compilerait pas.
-            $query = $this->buildFilteredQuery()
+            $query = $this->buildFilteredQuery((string) $workspaceId)
                 ->allowedSorts(...['quality_score', 'enriched_at', 'denomination', 'created_at'])
                 ->defaultSort('-quality_score')
                 ->where('workspace_id', $workspaceId);
@@ -406,13 +406,17 @@ class CompaniesController extends ApiController
         ];
     }
 
-    private function buildFilteredQuery(): QueryBuilder
+    private function buildFilteredQuery(string $workspaceId): QueryBuilder
     {
         // Liste PARTAGÉE avec la console v2 (lot L6) : deux listes jumelles
         // finissent toujours par diverger, et l'écart se découvre par un export
         // qui ne correspond plus à la liste affichée.
+        //
+        // L'espace est passé aux filtres (26/10/2026) : la recherche par nom
+        // n'est servie par l'index sous la RLS que par la fonction cloisonnée
+        // à cet espace (`RechercheDenomination::appliquerDansEspace`).
         return QueryBuilder::for(Company::query()->whereNull('deleted_at'))
-            ->allowedFilters(...CompanyQueryFilters::allowed());
+            ->allowedFilters(...CompanyQueryFilters::allowed($workspaceId));
     }
 
     /**
@@ -496,7 +500,7 @@ class CompaniesController extends ApiController
         // de se plaindre : c'est le meme ecart enveloppe/Builder qui a produit
         // le 500 du constat F36-008. On garde donc l'enveloppe dans une
         // variable, on la mute, et on ne la deballe qu'une fois.
-        $filtree = $this->buildFilteredQuery();
+        $filtree = $this->buildFilteredQuery((string) $workspaceId);
         $filtree->where('workspace_id', $workspaceId);
         // 🔴 NON DIFFUSIBLE (lot N8, veto sécurité #313, bloquant 2) : une
         // fiche marquée par la mise à jour INSEE (`insee_non_diffusible_le`)

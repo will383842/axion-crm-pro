@@ -10,6 +10,7 @@ use App\Contracts\LLMClient;
 use App\Crm\Campagnes\GardePresse;
 use App\Crm\FichesProtegees;
 use App\Data\LLM\LLMRequestData;
+use App\Data\Sources\GeocodeResult;
 use App\Jobs\DispatchScrapeJob;
 use App\Models\AudienceMember;
 use App\Models\Company;
@@ -622,7 +623,7 @@ class WaterfallOrchestrator
     }
 
     /** Ajout seulement : lat/lon/insee posés uniquement s'ils sont encore NULL. */
-    private function step8_geocode_ajout(Company $company, object $result): void
+    private function step8_geocode_ajout(Company $company, GeocodeResult $result): void
     {
         if ($company->lat === null && $company->lon === null && $result->lat !== null && $result->lon !== null) {
             $company->lat = $result->lat;

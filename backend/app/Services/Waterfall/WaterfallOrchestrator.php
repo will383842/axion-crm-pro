@@ -68,12 +68,25 @@ class WaterfallOrchestrator
         private readonly ?GooglePlacesClient $googlePlaces = null,
     ) {}
 
+    /** true pendant `enrichSansPayant()` : saute Google Places (3d) et la classification LLM (10). */
+    private bool $sansPayant = false;
+
     /**
-     * @param  bool  $sansPayant  true = saute les étapes qui peuvent coûter de l'argent
-     *                            (Google Places 3d, classification LLM 10). Défaut false :
-     *                            tous les appelants historiques sont inchangés.
+     * Même waterfall, sans les étapes qui peuvent coûter de l'argent. La
+     * signature d'`enrich()` reste inchangée (des doublures de test la surchargent).
      */
-    public function enrich(Company $company, bool $sansPayant = false): void
+    public function enrichSansPayant(Company $company): void
+    {
+        $precedent = $this->sansPayant;
+        $this->sansPayant = true;
+        try {
+            $this->enrich($company);
+        } finally {
+            $this->sansPayant = $precedent;
+        }
+    }
+
+    public function enrich(Company $company): void
     {
         // Garde UNIQUE pour tous les chemins d'enrichissement (commande,
         // EnrichCompanyJob, bulk-enrich, coverage, re-scrape, Google Places) :
@@ -108,14 +121,14 @@ class WaterfallOrchestrator
         $this->safe(fn () => $this->step3_bodacc($company), 'step3_bodacc', $company);
         $this->step3b_find_domain($company);
         $this->step3c_mentions_legales($company);
-        if (! $sansPayant) {
+        if (! $this->sansPayant) {
             $this->step3d_google_places($company);
         }
         $this->step4_dispatch_node_scrapes($company);
         $this->step7_email_finder($company);
         $this->safe(fn () => $this->step8_geocode($company), 'step8_geocode', $company);
         $this->step9_france_travail($company);
-        if (! $sansPayant) {
+        if (! $this->sansPayant) {
             $this->step10_classify($company);
         }
         $this->step10b_auto_classify($company);

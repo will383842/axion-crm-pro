@@ -81,6 +81,6 @@ class EnrichCompanyJob implements ShouldQueue
         if (! $company) {
             return;
         }
-        $waterfall->enrich($company, $this->sansPayant);
+        $this->sansPayant ? $waterfall->enrichSansPayant($company) : $waterfall->enrich($company);
     }
 }

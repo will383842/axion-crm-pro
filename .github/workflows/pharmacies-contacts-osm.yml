@@ -6,7 +6,7 @@ name: Pharmacies — contacts OpenStreetMap (dry-run ou apply)
 #  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ;
 #  - apply : AJOUTE e-mail, site et téléphone sur champ vide ou NULL seulement (jamais d'écrasement),
 #    pour les fiches rapprochées par DEUX preuves (même téléphone, ou GPS < 80 m + même code postal) ;
-#    hors opposition, fiches protégées et personnes physiques. Aucune adresse n'est devinée.
+#    hors opposition, fiches protégées et personnes physiques ; e-mails génériques seulement. Aucune adresse n'est devinée.
 # `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI.
 # Dépôt public : seuls des totaux sont affichés, aucun nom, adresse, e-mail ni numéro.
 # Attribution : © les contributeurs d'OpenStreetMap, données sous licence ODbL.
@@ -56,10 +56,18 @@ jobs:
 
           ENDPOINT = 'https://overpass-api.de/api/interpreter'
           UA = 'axion-crm-pro-osm-pharmacies/1.0 (+https://github.com/will383842/axion-crm-pro)'
-          # Zones ISO 3166-2 : 13 régions métropolitaines (Corse = FR-20R) + 5 DROM.
-          ZONES = ['FR-ARA', 'FR-BFC', 'FR-BRE', 'FR-CVL', 'FR-20R', 'FR-GES', 'FR-HDF', 'FR-IDF', 'FR-NOR',
-                   'FR-NAQ', 'FR-OCC', 'FR-PDL', 'FR-PAC', 'FR-GP', 'FR-MQ', 'FR-GF', 'FR-RE', 'FR-YT']
+          # Zones ISO 3166-2 : 13 régions métropolitaines (Corse = FR-20R) + 5 DROM (971, 972, 973, 974, 976).
+          METROPOLE = ['FR-ARA', 'FR-BFC', 'FR-BRE', 'FR-CVL', 'FR-20R', 'FR-GES', 'FR-HDF', 'FR-IDF', 'FR-NOR',
+                       'FR-NAQ', 'FR-OCC', 'FR-PDL', 'FR-PAC']
+          OUTRE_MER = ['FR-971', 'FR-972', 'FR-GF', 'FR-RE', 'FR-976']
+          ZONES = METROPOLE + OUTRE_MER
+          # Minimum d'éléments par zone : en dessous, la réponse est jugée tronquée et apply est refusé.
+          MINIMUM = {z: 300 for z in METROPOLE}
+          MINIMUM.update({z: 1 for z in OUTRE_MER})
           EMAIL = re.compile(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)+$')
+
+          class Remarque(Exception):
+              pass
 
           def requete(zone):
               q = ('[out:json][timeout:180];area["ISO3166-2"="%s"]->.z;'
@@ -69,16 +77,24 @@ jobs:
                   req = urllib.request.Request(ENDPOINT, data=data, headers={'User-Agent': UA})
                   try:
                       with urllib.request.urlopen(req, timeout=240) as r:
-                          return json.load(r)['elements']
+                          data = json.load(r)
+                      # `remark` = erreur de durée ou de mémoire côté Overpass : résultat potentiellement partiel.
+                      if data.get('remark'):
+                          raise Remarque()
+                      return data['elements']
                   except urllib.error.HTTPError as e:
                       if e.code not in (429, 502, 503, 504):
                           raise
                       attente = 30 * (essai + 1)
                       print('zone %s : HTTP %d, nouvel essai dans %d s' % (zone, e.code, attente), flush=True)
                       time.sleep(attente)
+                  except Remarque:
+                      attente = 30 * (essai + 1)
+                      print('zone %s : réponse Overpass avec remark, nouvel essai dans %d s' % (zone, attente), flush=True)
+                      time.sleep(attente)
                   except (urllib.error.URLError, TimeoutError):
                       time.sleep(30 * (essai + 1))
-              raise SystemExit('zone %s : Overpass indisponible après 6 essais' % zone)
+              raise SystemExit('zone %s : Overpass indisponible ou réponse partielle (remark) après 6 essais' % zone)
 
           def premier(tags, cles, valide):
               for c in cles:
@@ -89,9 +105,12 @@ jobs:
               return ''
 
           vus = {}
+          faibles = []
           for zone in ZONES:
               els = requete(zone)
               print('zone %s : %d éléments' % (zone, len(els)), flush=True)
+              if len(els) < MINIMUM[zone]:
+                  faibles.append(zone)
               for e in els:
                   t = e.get('tags', {})
                   lat = e.get('lat', (e.get('center') or {}).get('lat'))
@@ -118,13 +137,16 @@ jobs:
           if not 3000 <= len(lignes) <= 40000:
               print('nombre de points hors fourchette 3000-40000 : apply refusé', file=sys.stderr)
               open('refus_apply', 'w').close()
+          if faibles:
+              print('zones sous leur minimum (%s) : apply refusé' % ', '.join(faibles), file=sys.stderr)
+              open('refus_apply', 'w').close()
           PY
 
       - name: Refuser apply si la source est hors fourchette
         if: ${{ inputs.mode == 'apply' }}
         run: |
           if [ -f refus_apply ]; then
-            echo "apply refusé : nombre de points OSM hors fourchette." >&2
+            echo "apply refusé : nombre de points OSM hors fourchette ou zone sous son minimum." >&2
             exit 1
           fi
 

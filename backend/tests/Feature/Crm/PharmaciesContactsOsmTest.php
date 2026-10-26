@@ -52,7 +52,12 @@ it('rapproche par téléphone normalisé et ajoute e-mail et site sur champs vid
     $c = DB::table('companies')->where('id', $id)->first();
     expect($c->email_generic)->toBe('contact@zz-pharma.test')->and($c->website)->toBe('http://www.zz-pharma.test')->and($c->website_method)->toBe('osm');
     expect(json_decode((string) $c->field_origins, true))->toMatchArray(['email_generic' => 'osm', 'website' => 'osm']);
-    expect(json_decode((string) $c->metadata, true))->toMatchArray(['email_source' => 'osm', 'email_statut' => 'non_verifie']);
+    $meta = json_decode((string) $c->metadata, true);
+    expect($meta)->toMatchArray(['email_source' => 'osm', 'email_statut' => 'non_verifie']);
+    expect($meta['contacts_osm'])->toMatchArray(['email_generic' => now()->toDateString(), 'website' => now()->toDateString(), 'licence' => 'ODbL']);
+    expect($meta['contacts_osm']['attribution'])->toContain('OpenStreetMap');
+    // Adresse NON vérifiée : aucune fiche de vérification, donc jamais « valide » pour les campagnes.
+    expect(json_decode((string) $c->signals, true))->not->toHaveKey('email_generic_verification');
     expect($sortie)->toContain('points OSM lus : 1')->toContain('e-mails ajoutés : 1')->toContain('sites ajoutés : 1')->not->toContain('zz-pharma');
 });
 
@@ -60,10 +65,10 @@ it('rapproche par GPS (moins de 80 m, même code postal) et ajoute le téléphon
     $espace = F::espace();
     $id = ficheOsm($espace, ['lat' => 48.1000, 'lon' => 2.1000, 'postcode' => '99003']);
 
-    $sortie = lancerOsm($espace, csvOsm([['lat' => '48.10040', 'lon' => '2.10000', 'cp' => '99003', 'telephone' => '04 00 00 00 02', 'email' => 'a@zz.test']]));
+    $sortie = lancerOsm($espace, csvOsm([['lat' => '48.10040', 'lon' => '2.10000', 'cp' => '99003', 'telephone' => '04 00 00 00 02', 'email' => 'contact@zz.test']]));
 
     $c = DB::table('companies')->where('id', $id)->first();
-    expect($c->phone)->toBe('0400000002')->and($c->email_generic)->toBe('a@zz.test');
+    expect($c->phone)->toBe('0400000002')->and($c->email_generic)->toBe('contact@zz.test');
     expect($sortie)->toContain('rapprochés : 1')->toContain('téléphones ajoutés : 1');
 });
 
@@ -73,8 +78,8 @@ it('GPS trop loin ou code postal différent : aucun rapprochement', function () 
     $b = ficheOsm($espace, ['lat' => 48.2, 'lon' => 2.2, 'postcode' => '99004']);
 
     $sortie = lancerOsm($espace, csvOsm([
-        ['lat' => '48.1020', 'lon' => '2.1', 'cp' => '99003', 'email' => 'loin@zz.test'],
-        ['lat' => '48.2', 'lon' => '2.2', 'cp' => '99999', 'email' => 'autre@zz.test'],
+        ['lat' => '48.1020', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@loin.zz.test'],
+        ['lat' => '48.2', 'lon' => '2.2', 'cp' => '99999', 'email' => 'info@autre.zz.test'],
     ]));
 
     expect(DB::table('companies')->whereIn('id', [$a, $b])->whereNotNull('email_generic')->count())->toBe(0);
@@ -88,9 +93,9 @@ it('ambiguïté : deux fiches candidates, ou deux points pour une fiche, n\'écr
     $c = ficheOsm($espace, ['phone' => '0140000009']);
 
     $sortie = lancerOsm($espace, csvOsm([
-        ['lat' => '48.1', 'lon' => '2.1', 'cp' => '99003', 'email' => 'x@zz.test'],
-        ['telephone' => '0140000009', 'email' => 'y@zz.test'],
-        ['telephone' => '0140000009', 'email' => 'z@zz.test'],
+        ['lat' => '48.1', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@zz.test'],
+        ['telephone' => '0140000009', 'email' => 'accueil@zz.test'],
+        ['telephone' => '0140000009', 'email' => 'contact@zz2.test'],
     ]));
 
     expect(DB::table('companies')->whereIn('id', [$a, $b, $c])->whereNotNull('email_generic')->count())->toBe(0);
@@ -101,7 +106,7 @@ it('n\'écrase jamais un e-mail, un site ou un téléphone existant', function (
     $espace = F::espace();
     $id = ficheOsm($espace, ['phone' => '0140000001', 'email_generic' => 'garde@zz.test', 'website' => 'https://garde.zz.test']);
 
-    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'nouveau@zz.test', 'site' => 'nouveau.zz.test']]));
+    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'info@nouveau.zz.test', 'site' => 'nouveau.zz.test']]));
 
     $c = DB::table('companies')->where('id', $id)->first();
     expect($c->email_generic)->toBe('garde@zz.test')->and($c->website)->toBe('https://garde.zz.test')->and($c->phone)->toBe('0140000001');
@@ -112,7 +117,7 @@ it('une origine protégée (déclarée) bloque l\'écriture du champ vide', func
     $espace = F::espace();
     $id = ficheOsm($espace, ['phone' => '0140000001', 'field_origins' => json_encode(['email_generic' => 'declared'])]);
 
-    lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'x@zz.test']]));
+    lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'info@zz.test']]));
 
     expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
 });
@@ -127,10 +132,12 @@ it('fiche protégée, fermée, non officine, écartée ou personne physique : in
     $ids[] = ficheOsm($espace, ['phone' => '0140000004', 'metadata' => json_encode(['ecartee_motif' => 'test'])]);
     $ids[] = ficheOsm($espace, ['phone' => '0140000005', 'legal_form' => '1000']);
     $ids[] = ficheOsm($espace, ['phone' => '0140000006', 'naf' => '56.10A']);
+    $ids[] = ficheOsm($espace, ['phone' => '0140000007', 'legal_form' => '']);
+    $ids[] = ficheOsm($espace, ['phone' => '0140000008', 'legal_form' => null]);
 
     $csv = [];
-    foreach (range(1, 6) as $n) {
-        $csv[] = ['telephone' => '014000000' . $n, 'email' => "p{$n}@zz.test", 'site' => "p{$n}.zz.test"];
+    foreach (range(1, 8) as $n) {
+        $csv[] = ['telephone' => '014000000' . $n, 'email' => "contact{$n}@zz.test", 'site' => "p{$n}.zz.test"];
     }
     $sortie = lancerOsm($espace, csvOsm($csv));
 
@@ -143,11 +150,11 @@ it('opposition sur le numéro ou l\'e-mail : fiche écartée', function () {
     $a = ficheOsm($espace, ['phone' => '0140000001']);
     $b = ficheOsm($espace, ['phone' => '0140000002']);
     DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 01', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
-    ListeSuppression::inscrire('oppose@zz.test', ListeSuppression::MANUEL, 'test');
+    ListeSuppression::inscrire('contact@oppose.zz.test', ListeSuppression::MANUEL, 'test');
 
     $sortie = lancerOsm($espace, csvOsm([
-        ['telephone' => '0140000001', 'email' => 'libre@zz.test'],
-        ['telephone' => '0140000002', 'email' => 'oppose@zz.test'],
+        ['telephone' => '0140000001', 'email' => 'contact@libre.zz.test'],
+        ['telephone' => '0140000002', 'email' => 'contact@oppose.zz.test'],
     ]));
 
     expect(DB::table('companies')->whereIn('id', [$a, $b])->whereNotNull('email_generic')->count())->toBe(0);
@@ -158,7 +165,7 @@ it('essai à blanc par défaut : totaux seulement, rien d\'écrit', function () 
     $espace = F::espace();
     $id = ficheOsm($espace, ['phone' => '0140000001']);
 
-    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'x@zz.test']]), false);
+    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'info@zz.test']]), false);
 
     expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
     expect($sortie)->toContain('ESSAI À BLANC')->toContain('e-mails à ajouter : 1');
@@ -173,7 +180,118 @@ it('ignore les e-mails invalides et ne touche pas un autre espace', function () 
     lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'pas-un-email']]));
     expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
 
-    lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'ok@zz.test']]));
-    expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBe('ok@zz.test');
+    lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'contact@ok.zz.test']]));
+    expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBe('contact@ok.zz.test');
     expect(DB::table('companies')->where('id', $ailleurs)->value('email_generic'))->toBeNull();
+});
+
+it('fiche protégée à 10 m d\'une fiche ouverte, point GPS sur la protégée : aucune écriture', function () {
+    $espace = F::espace();
+    $protegee = ficheOsm($espace, ['lat' => 48.1, 'lon' => 2.1, 'postcode' => '99003']);
+    F::proteger($espace, $protegee, 'src:scraping-federations-2026');
+    $voisine = ficheOsm($espace, ['lat' => 48.10009, 'lon' => 2.1, 'postcode' => '99003']);
+
+    $sortie = lancerOsm($espace, csvOsm([['lat' => '48.1', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@zz.test']]));
+
+    expect(DB::table('companies')->whereIn('id', [$protegee, $voisine])->whereNotNull('email_generic')->count())->toBe(0);
+    expect($sortie)->toContain('ambigus (rien écrit) : 1');
+});
+
+it('candidate unique inéligible (téléphone) : exclue, rien reporté sur la voisine', function () {
+    $espace = F::espace();
+    $fermee = ficheOsm($espace, ['phone' => '0140000001', 'insee_ferme_le' => '2020-01-01']);
+    $ouverte = ficheOsm($espace, ['lat' => 48.1, 'lon' => 2.1, 'postcode' => '99003']);
+
+    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'info@zz.test']]));
+
+    expect(DB::table('companies')->whereIn('id', [$fermee, $ouverte])->whereNotNull('email_generic')->count())->toBe(0);
+    expect($sortie)->toContain('exclues (fiche inéligible, rien écrit) : 1')->toContain('rapprochés : 0');
+});
+
+it('preuves contradictoires : ambigu, rien d\'écrit', function () {
+    $espace = F::espace();
+    // Téléphone identique mais code postal différent.
+    $a = ficheOsm($espace, ['phone' => '0140000001', 'postcode' => '99003']);
+    // Téléphone identique mais à plus de 2 km.
+    $b = ficheOsm($espace, ['phone' => '0140000002', 'lat' => 48.1, 'lon' => 2.1, 'postcode' => '99003']);
+    // GPS proche mais numéros différents des deux côtés.
+    $c = ficheOsm($espace, ['phone' => '0140000003', 'lat' => 47.1, 'lon' => 2.1, 'postcode' => '99005']);
+    // GPS proche, coordonnées partagées par deux fiches (même point).
+    $d = ficheOsm($espace, ['lat' => 46.1, 'lon' => 2.1, 'postcode' => '99006']);
+    $e = ficheOsm($espace, ['lat' => 46.1, 'lon' => 2.1, 'postcode' => '99007']);
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'cp' => '99004', 'email' => 'info@zz.test'],
+        ['telephone' => '0140000002', 'lat' => '48.5', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@zz2.test'],
+        ['telephone' => '0140000099', 'lat' => '47.1', 'lon' => '2.1', 'cp' => '99005', 'email' => 'info@zz3.test'],
+        ['lat' => '46.1', 'lon' => '2.1', 'cp' => '99006', 'email' => 'info@zz4.test'],
+    ]));
+
+    expect(DB::table('companies')->whereIn('id', [$a, $b, $c, $d, $e])->whereNotNull('email_generic')->count())->toBe(0);
+    expect($sortie)->toContain('ambigus (rien écrit) : 4')->toContain('rapprochés : 0');
+});
+
+it('téléphone vers la fiche A et GPS vers la fiche B : ambigu', function () {
+    $espace = F::espace();
+    $a = ficheOsm($espace, ['phone' => '0140000001', 'lat' => 48.5, 'lon' => 2.1, 'postcode' => '99003']);
+    $b = ficheOsm($espace, ['lat' => 48.10009, 'lon' => 2.1, 'postcode' => '99003']);
+
+    $sortie = lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'lat' => '48.10009', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@zz.test']]));
+
+    expect(DB::table('companies')->whereIn('id', [$a, $b])->whereNotNull('email_generic')->count())->toBe(0);
+    expect($sortie)->toContain('ambigus (rien écrit) : 1');
+});
+
+it('opposition sur un téléphone ou un e-mail DÉJÀ présent sur la fiche : fiche écartée', function () {
+    $espace = F::espace();
+    $a = ficheOsm($espace, ['phone' => '0140000001']);
+    $b = ficheOsm($espace, ['phone' => '0140000002', 'email_generic' => 'contact@deja.zz.test']);
+    DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 01', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    ListeSuppression::inscrire('contact@deja.zz.test', ListeSuppression::MANUEL, 'test');
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'email' => 'info@zz.test', 'site' => 'a.zz.test'],
+        ['telephone' => '0140000002', 'site' => 'b.zz.test'],
+    ]));
+
+    expect(DB::table('companies')->whereIn('id', [$a, $b])->whereNotNull('website')->count())->toBe(0);
+    expect($sortie)->toContain('écartés pour opposition : 2');
+});
+
+it('en-tête CSV incomplet : la commande échoue sans rien écrire', function () {
+    $espace = F::espace();
+    $id = ficheOsm($espace, ['phone' => '0140000001']);
+    $chemin = tempnam(sys_get_temp_dir(), 'zzosm');
+    file_put_contents($chemin, "lat,lon,cp\n48.1,2.1,99003\n");
+
+    $code = Artisan::call('crm:pharmacies:contacts-osm', ['--osm' => $chemin, '--workspace' => $espace, '--apply' => true]);
+
+    expect($code)->toBe(1)->and(Artisan::output())->toContain('Colonnes manquantes');
+    expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
+});
+
+it('compte les points non rapprochés et ignore les e-mails nominatifs', function () {
+    $espace = F::espace();
+    $id = ficheOsm($espace, ['phone' => '0140000001']);
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'email' => 'prenom.nom@zz.test', 'site' => 'ok.zz.test'],
+        ['telephone' => '0140000077', 'email' => 'info@zz.test'],
+        ['lat' => '10', 'lon' => '10', 'cp' => '99999', 'email' => 'info@zz2.test'],
+    ]));
+
+    expect($sortie)->toContain('non rapprochés : 2')->toContain('e-mails nominatifs ignorés : 1')->toContain('e-mails ajoutés : 0')->toContain('sites ajoutés : 1');
+    expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
+});
+
+it('fusionne metadata.contacts_osm champ par champ sans écraser l\'existant', function () {
+    $espace = F::espace();
+    $id = ficheOsm($espace, ['phone' => '0140000001', 'metadata' => json_encode(['contacts_osm' => ['phone' => '2020-01-01'], 'autre' => 'garde'])]);
+
+    lancerOsm($espace, csvOsm([['telephone' => '0140000001', 'email' => 'info@zz.test']]));
+
+    $meta = json_decode((string) DB::table('companies')->where('id', $id)->value('metadata'), true);
+    expect($meta['autre'])->toBe('garde')
+        ->and($meta['contacts_osm']['phone'])->toBe('2020-01-01')
+        ->and($meta['contacts_osm']['email_generic'])->toBe(now()->toDateString());
 });

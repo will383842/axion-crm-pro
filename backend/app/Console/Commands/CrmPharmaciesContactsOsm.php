@@ -24,7 +24,7 @@ class CrmPharmaciesContactsOsm extends Command
                             {--workspace= : Identifiant ou slug de l espace (défaut : l espace de prospection)}
                             {--paquet=500 : Fiches par paquet (1 à 2000)}';
 
-    protected $description = 'Ajoute e-mail, site et téléphone OpenStreetMap des pharmacies UNIQUEMENT sur champ vide (rapprochement par téléphone ou GPS 80 m + code postal), hors opposition et fiches protégées.';
+    protected $description = 'Ajoute e-mail, site et téléphone OpenStreetMap des pharmacies UNIQUEMENT sur champ vide (rapprochement par téléphone ou GPS 80 m + code postal, boîtes génériques seulement), hors opposition et fiches protégées.';
 
     public function handle(): int
     {
@@ -65,6 +65,8 @@ class CrmPharmaciesContactsOsm extends Command
         $this->line(sprintf('  points OSM lus : %d', $b['points']));
         $this->line(sprintf('  rapprochés : %d (non rapprochés : %d)', $b['rapproches'], $b['non_rapproches']));
         $this->line(sprintf('  ambigus (rien écrit) : %d', $b['ambigus']));
+        $this->line(sprintf('  exclues (fiche inéligible, rien écrit) : %d', $b['exclues']));
+        $this->line(sprintf('  e-mails nominatifs ignorés : %d', $b['emails_nominatifs_ignores']));
         $this->line(sprintf('  écartés pour opposition : %d', $b['opposition']));
         $this->line(sprintf('  e-mails %s : %d', $v, $b['emails_' . $k]));
         $this->line(sprintf('  sites %s : %d', $v, $b['sites_' . $k]));

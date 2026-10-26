@@ -39,8 +39,6 @@ final class ContactsOsm
 
     private const COLONNES = ['lat', 'lon', 'cp', 'telephone', 'email', 'site'];
 
-    private const IDS_PAR_LOT = 500;
-
     /**
      * @return array<string, int> bilan chiffré (aucun nom, aucune adresse, aucun numéro)
      */

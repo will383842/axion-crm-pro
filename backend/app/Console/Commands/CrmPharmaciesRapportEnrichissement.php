@@ -6,7 +6,6 @@ use App\Crm\EspaceProspection;
 use App\Crm\Pharmacies\SelectionEnrichissement;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 /**
  * RAPPORT D'ENRICHISSEMENT DES PHARMACIES OUVERTES — TOTAUX SEULEMENT.
@@ -43,9 +42,12 @@ class CrmPharmaciesRapportEnrichissement extends Command
             foreach ($lignes[$cle] as $l) {
                 $this->line(sprintf(
                     '  %-12s fiches %6d | tél %5s | e-mail %5s | site %5s | contact %5s | groupement %5s',
-                    $l->groupe, $l->total,
-                    $this->part($l->telephone, $l->total), $this->part($l->email, $l->total),
-                    $this->part($l->site, $l->total), $this->part($l->contact, $l->total),
+                    $l->groupe,
+                    $l->total,
+                    $this->part($l->telephone, $l->total),
+                    $this->part($l->email, $l->total),
+                    $this->part($l->site, $l->total),
+                    $this->part($l->contact, $l->total),
                     $this->part($l->groupement, $l->total),
                 ));
             }

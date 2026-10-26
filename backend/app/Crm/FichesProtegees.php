@@ -162,8 +162,10 @@ final class FichesProtegees
      */
     /**
      * @param  list<string>|null  $tags  sous-ensemble de `TAGS` (défaut : tous)
+     * @param  string|null  $colonneEspace  colonne d'espace de travail de la fiche (ex. `c.workspace_id`) :
+     *                                      borne alors `company_tag` à cet espace (index, isolation)
      */
-    public static function conditionSql(string $colonneId = 'companies.id', ?array $tags = null): string
+    public static function conditionSql(string $colonneId = 'companies.id', ?array $tags = null, ?string $colonneEspace = null): string
     {
         $slugs = implode(', ', array_map(
             static fn (string $slug): string => "'" . str_replace("'", "''", $slug) . "'",
@@ -171,7 +173,8 @@ final class FichesProtegees
         ));
 
         return 'NOT EXISTS (SELECT 1 FROM company_tag fp_ct JOIN tags fp_t ON fp_t.id = fp_ct.tag_id'
-            . " WHERE fp_ct.company_id = {$colonneId} AND fp_t.slug IN ({$slugs}))";
+            . ($colonneEspace !== null ? " WHERE fp_ct.workspace_id = {$colonneEspace} AND" : ' WHERE')
+            . " fp_ct.company_id = {$colonneId} AND fp_t.slug IN ({$slugs}))";
     }
 
     public static function estProtegee(int $companyId): bool

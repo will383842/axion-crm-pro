@@ -166,9 +166,12 @@ final class RechercheEntreprisesParNom
      * Littéral de tableau Postgres (`{"a","b"}`) : guillemets et barres
      * obliques inverses échappés — les mots portent déjà l'échappement `LIKE`.
      *
+     * Publique : `RechercheDenomination::appliquerDansEspace` passe ses termes
+     * à `entreprises_liste_denomination_ids` par le même littéral.
+     *
      * @param  list<string>  $mots
      */
-    private static function tableauPg(array $mots): string
+    public static function tableauPg(array $mots): string
     {
         return '{' . implode(',', array_map(
             static fn (string $m): string => '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $m) . '"',

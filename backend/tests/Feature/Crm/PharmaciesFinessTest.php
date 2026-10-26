@@ -345,3 +345,109 @@ it('classer-taille par liste d\'identifiants : fiches NAF seules et fiches FINES
     expect(DB::table('companies')->where('siren', '940000232')->value('size_category'))->toBeNull();
     expect(DB::table('companies')->where('siren', '940000234')->value('size_category'))->toBeNull();
 });
+
+it('classer-taille : une fiche d\'un autre NAF portant une ligne FINESS 620 est comptée et classée ; une ligne 627 ne suffit pas', function () {
+    $espace = F::espace();
+    $ligne = fn (string $siren, string $naf) => DB::table('companies')->insertGetId(['workspace_id' => $espace, 'siren' => $siren, 'denomination' => 'ZZ ' . $naf, 'naf' => $naf, 'effectif_range' => '12', 'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now()]);
+    $ancienne = $ligne('940000251', '68.20B');
+    $autre = $ligne('940000252', '47.74Z');
+    $horsCategorie = $ligne('940000253', '62.01Z');
+    DB::table('finess_etablissements')->insert([
+        ['workspace_id' => $espace, 'company_id' => $ancienne, 'siret' => '94000025100011', 'categorie' => '620', 'created_at' => now()],
+        ['workspace_id' => $espace, 'company_id' => $horsCategorie, 'siret' => '94000025300011', 'categorie' => '627', 'created_at' => now()],
+    ]);
+
+    $sortie = lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    expect($sortie)->toContain('fiches pharmacie : 1');
+    expect(DB::table('companies')->where('id', $ancienne)->value('size_category'))->toBe('pme');
+    expect(json_decode((string) DB::table('companies')->where('id', $ancienne)->value('metadata'), true)['nb_officines_societe'])->toBe(1);
+    expect(DB::table('companies')->where('id', $autre)->value('size_category'))->toBeNull();
+    expect(DB::table('companies')->where('id', $horsCategorie)->value('size_category'))->toBeNull();
+});
+
+it('classer-taille : nb_officines_societe vaut 2 pour une société à deux SIRET', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000023100011'], ['siret' => '94000023100029'], ['siret' => '94000023200011']]), '--workspace' => $espace, '--apply' => true]);
+
+    lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    expect(json_decode((string) DB::table('companies')->where('siren', '940000231')->value('metadata'), true)['nb_officines_societe'])->toBe(2);
+    expect(json_decode((string) DB::table('companies')->where('siren', '940000232')->value('metadata'), true)['nb_officines_societe'])->toBe(1);
+});
+
+it('classer-taille : un second espace n est ni compté ni modifié', function () {
+    $espace = F::espace();
+    $autreEspace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([['siret' => '94000026100011'], ['siret' => '94000026200011']]), '--workspace' => $espace, '--apply' => true]);
+    $voisine = DB::table('companies')->insertGetId(['workspace_id' => $autreEspace, 'siren' => '940000263', 'denomination' => 'ZZ VOISINE', 'naf' => '47.73Z', 'effectif_range' => '21', 'entity_nature' => 'entreprise', 'created_at' => now(), 'updated_at' => now()]);
+
+    $sortie = lancer('crm:pharmacies:classer-taille', ['--workspace' => $espace]);
+
+    expect($sortie)->toContain('fiches pharmacie : 2');
+    expect(DB::table('companies')->where('id', $voisine)->value('size_category'))->toBeNull();
+});
+
+/** CSV de $n officines 620 dont les $sansCode premières n'ont pas de statut_code. */
+function csvSeuil(int $n, int $sansCode): string
+{
+    $lignes = [];
+    for ($i = 0; $i < $n; $i++) {
+        $siren = '940' . str_pad((string) (300 + $i), 6, '0', STR_PAD_LEFT);
+        $lignes[] = ['siret' => $siren . '00011', 'statut_code' => $i < $sansCode ? '' : '85'];
+    }
+
+    return csvFiness($lignes);
+}
+
+it('seuil de 1 % à la limite : 1 officine sans statut_code sur 100 est acceptée', function () {
+    $espace = F::espace();
+    $csv = csvSeuil(100, 1);
+
+    $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace]);
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+
+    expect($essai)->toContain('(statut_code) : 1')->not->toContain('serait refusé');
+    expect($apply)->toContain('fiches créées : 100');
+    expect(DB::table('companies')->where('workspace_id', $espace)->count())->toBe(100);
+});
+
+it('seuil de 1 % dépassé : 2 officines sans statut_code sur 100 sont refusées ; l\'essai à blanc le dit sans échouer', function () {
+    $espace = F::espace();
+    $csv = csvSeuil(100, 2);
+
+    $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace]);
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true]);
+
+    expect($essai)->toContain('ESSAI À BLANC')->toContain('(statut_code) : 2')->toContain('--apply serait refusé')->not->toContain('Échec');
+    expect($apply)->toContain('Échec')->toContain('statut_code');
+    expect(DB::table('companies')->where('workspace_id', $espace)->count())->toBe(0);
+});
+
+it('un fichier sans la colonne statut_code est refusé à l\'apply, accepté à blanc', function () {
+    $espace = F::espace();
+    $chemin = tempnam(sys_get_temp_dir(), 'zzfiness');
+    file_put_contents($chemin, "finess_et,siret,categorie,etat,nom_long,code_postal,commune,dep,statut,ape\n990000001,94000027100011,620,A,ZZ OFFICINE,99100,ZZVILLE,99,SARL,4773Z\n");
+
+    $essai = lancer('crm:pharmacies:import-finess', ['fichier' => $chemin, '--workspace' => $espace]);
+    $apply = lancer('crm:pharmacies:import-finess', ['fichier' => $chemin, '--workspace' => $espace, '--apply' => true]);
+
+    expect($essai)->toContain('ESSAI À BLANC')->toContain('(statut_code) : 1')->toContain('--apply serait refusé');
+    expect($apply)->toContain('statut_code');
+    expect(DB::table('companies')->where('workspace_id', $espace)->count())->toBe(0);
+});
+
+it('APE : exige la forme 477 + chiffre + lettre, sinon 47.73Z', function () {
+    $espace = F::espace();
+    lancer('crm:pharmacies:import-finess', ['fichier' => csvFiness([
+        ['siret' => '94000028100011', 'ape' => '4779Z'], ['siret' => '94000028200011', 'ape' => '477'],
+        ['siret' => '94000028300011', 'ape' => '4770'], ['siret' => '94000028400011', 'ape' => '477AZ'],
+        ['siret' => '94000028500011', 'ape' => '47.74z'],
+    ]), '--workspace' => $espace, '--apply' => true]);
+
+    $naf = fn (string $siren) => DB::table('companies')->where('siren', $siren)->value('naf');
+    expect($naf('940000281'))->toBe('47.79Z')->and($naf('940000285'))->toBe('47.74Z');
+    foreach (['940000282', '940000283', '940000284'] as $siren) {
+        expect($naf($siren))->toBe('47.73Z');
+    }
+});

@@ -858,7 +858,7 @@ final class ScrapedRecordIngestService
      * empreinte que le reste du CRM (`ListeSuppression::empreinte`, calculée en
      * PHP : la base est en locale C, `lower()` n'y abaisse pas les accents).
      */
-    private function estOppose(?string $email, ?string $telephone): bool
+    public function estOppose(?string $email, ?string $telephone): bool
     {
         $email = $email !== null && trim($email) !== '' ? $email : null;
         $variantes = $telephone !== null ? ListeSuppression::variantesTelephone($telephone) : [];

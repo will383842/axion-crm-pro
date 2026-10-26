@@ -20,9 +20,15 @@ use Spatie\QueryBuilder\AllowedFilter;
 final class CompanyQueryFilters
 {
     /**
+     * `$workspaceId` : l'espace de la liste. Fourni (liste et export
+     * `CompaniesController`), `filter[denomination]` passe par la fonction
+     * cloisonnée `entreprises_liste_denomination_ids`, seule servie par l'index
+     * trigrammes sous la RLS (cf. `RechercheDenomination::appliquerDansEspace`).
+     * Absent (hub de la console), la condition reste `appliquer`, inchangée.
+     *
      * @return list<AllowedFilter|string>
      */
-    public static function allowed(): array
+    public static function allowed(?string $workspaceId = null): array
     {
         return [
             AllowedFilter::exact('naf'),
@@ -103,8 +109,15 @@ final class CompanyQueryFilters
             // patron `A-011` : on l'écrit une fois, les deux sites l'appellent.
             // Cette liste sert LA LISTE ENTREPRISES *et* LE HUB, donc les deux
             // sont corrigés d'un coup ici.
-            AllowedFilter::callback('denomination', function (Builder $query, mixed $value): void {
-                RechercheDenomination::appliquer($query, $value);
+            //
+            // 26/10/2026 — sous la RLS, ce correctif ne suffisait plus : `ILIKE`
+            // n'étant pas « leakproof », l'index restait inutilisable sous
+            // `axion_app` (Parallel Seq Scan, 4,4 M de lignes). La liste passe
+            // donc par la fonction cloisonnée quand son espace est connu.
+            AllowedFilter::callback('denomination', function (Builder $query, mixed $value) use ($workspaceId): void {
+                $workspaceId === null
+                    ? RechercheDenomination::appliquer($query, $value)
+                    : RechercheDenomination::appliquerDansEspace($query, $value, $workspaceId);
             }),
             // ⚠️ `postcode` reste en `partial` : il n'a ni colonne normalisée
             // ni index trigrammes, donc il balaie lui aussi. Réparer ça exige

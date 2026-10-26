@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\EspaceProspection;
+use App\Crm\Pharmacies\ImportFiness;
 use App\Crm\Referentiels\Classement;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\DB;
  *  - `effectif_min` / `effectif_max` depuis cette tranche ;
  *  - `metadata.nb_officines_societe` : officines de la même société
  *    (`finess_etablissements`, catégorie 620), si la clé est absente.
+ *
+ * Périmètre : fiches au NAF 47.73Z OU rattachées à au moins une ligne
+ * `finess_etablissements` de catégorie 620 (officine), dans l'espace ciblé,
+ * hors corbeille ; les autres catégories FINESS (627 à 690) n'entrent pas.
  *
  * Aucune valeur existante n'est modifiée, aucun appel réseau. Affiche la part
  * de taille inconnue (avant / après).
@@ -128,7 +133,7 @@ class CrmPharmaciesClasserTaille extends Command
     private function identifiants(string $workspaceId): array
     {
         $parNaf = DB::table('companies')->select('id')->where('workspace_id', $workspaceId)->whereIn('naf', ['47.73Z', '4773Z'])->whereNull('deleted_at');
-        $parFiness = DB::table('finess_etablissements')->select('company_id AS id')->where('workspace_id', $workspaceId);
+        $parFiness = DB::table('finess_etablissements')->select('company_id AS id')->where('workspace_id', $workspaceId)->where('categorie', ImportFiness::CATEGORIE_OFFICINE);
 
         return array_values(array_map('intval', $parNaf->union($parFiness)->orderBy('id')->pluck('id')->all()));
     }

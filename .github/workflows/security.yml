@@ -184,6 +184,10 @@ jobs:
   # allumer la garde ne bloque donc rien au moment où on l'allume.
   trivy:
     name: Container scan (Trivy)
+    # Hors pull_request (file GitHub saturee ; scans non obligatoires pour fusionner,
+    # rouges sur une CVE curl sans rapport avec la PR). Ils tournent sur push main et
+    # sur le cron du lundi.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 (construction des images avant scan)
     strategy:
@@ -305,6 +309,10 @@ jobs:
   # bloquante du job `trivy` ci-dessus. Reste ici ce qu'on tire tel quel.
   trivy-images-tirees:
     name: Scan images tirées (inventaire)
+    # Hors pull_request (file GitHub saturee ; scans non obligatoires pour fusionner,
+    # rouges sur une CVE curl sans rapport avec la PR). Ils tournent sur push main et
+    # sur le cron du lundi.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 (une image tiree puis scannee par entree d'inventaire)
     strategy:

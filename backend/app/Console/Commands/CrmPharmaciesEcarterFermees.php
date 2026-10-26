@@ -340,6 +340,7 @@ class CrmPharmaciesEcarterFermees extends Command
             $curseur = (int) end($fiches)->id;
             $protegees = $this->protegees($espace, array_map(fn ($f) => (int) $f->id, $fiches));
 
+            /** @var array<string, list<int>> $corbeille */
             $corbeille = [];
             $verifier = [];
             $nonOfficine = [];
@@ -481,7 +482,7 @@ class CrmPharmaciesEcarterFermees extends Command
              WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ({$marques}) RETURNING id",
             array_merge([$meta, $espace], $ids),
         );
-        $this->journaliser(array_map(fn ($r) => (int) $r->id, $touchees), $espace, ['action' => 'ecartee', 'motif' => $motif]);
+        $this->journaliser(array_values(array_map(fn ($r) => (int) $r->id, $touchees)), $espace, ['action' => 'ecartee', 'motif' => $motif]);
     }
 
     /**
@@ -560,7 +561,7 @@ class CrmPharmaciesEcarterFermees extends Command
                  WHERE {$filtre} RETURNING id",
                 array_merge([json_encode(['restauree_le' => now()->toDateString()])], $params),
             );
-            $ids = array_map(fn ($r) => (int) $r->id, $touchees);
+            $ids = array_values(array_map(fn ($r) => (int) $r->id, $touchees));
             $this->journaliser($ids, $espace, ['action' => 'restauree', 'motif' => $motif ?? 'tous']);
             $ids === [] || TotalListe::oublier($espace);
             $n += count($ids);

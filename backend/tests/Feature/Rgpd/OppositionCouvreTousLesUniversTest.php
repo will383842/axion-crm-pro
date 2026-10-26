@@ -288,6 +288,10 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `DossierClientIngest` lit `opt_out` en portée `business` pour ne jamais
     // créer ni modifier une personne opposée (l'opposition gagne). Il n'écrit
     // rien dans cette table, et ne lit pas le vivier.
+    // Téléphones FINESS des officines (2026-10-26) : +1.
+    // `Pharmacies\TelephonesFiness` lit `opt_out` en portée `business` pour ne
+    // jamais poser un téléphone en opposition sur une fiche. Il n'écrit rien
+    // dans cette table, et ne lit pas le vivier.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/DossierClientIngest.php',
@@ -295,6 +299,7 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Joignabilite/Joignabilite.php',
         'app/Crm/Personnes/Abonnements.php',
+        'app/Crm/Pharmacies/TelephonesFiness.php',
         'app/Crm/Presse/LienJournalisteContact.php',
         'app/Crm/Rgpd/SiteGdprService.php',
         'app/Crm/Scraping/ScrapedRecordIngestService.php',

@@ -130,7 +130,7 @@ class CrmPharmaciesClasserTaille extends Command
         $parNaf = DB::table('companies')->select('id')->where('workspace_id', $workspaceId)->whereIn('naf', ['47.73Z', '4773Z'])->whereNull('deleted_at');
         $parFiness = DB::table('finess_etablissements')->select('company_id AS id')->where('workspace_id', $workspaceId);
 
-        return $parNaf->union($parFiness)->orderBy('id')->pluck('id')->map(fn ($i) => (int) $i)->values()->all();
+        return array_values(array_map('intval', $parNaf->union($parFiness)->orderBy('id')->pluck('id')->all()));
     }
 
     private function inconnues(Builder $requete): int

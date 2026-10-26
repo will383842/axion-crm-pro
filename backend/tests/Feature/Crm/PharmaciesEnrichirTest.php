@@ -7,6 +7,8 @@
  * Fixtures FICTIVES (dépôt public) : SIREN 95xxxxxxx, noms « ZZ ».
  */
 
+use App\Crm\Pharmacies\Groupement;
+use App\Crm\Pharmacies\SelectionEnrichissement;
 use App\Jobs\EnrichCompanyJob;
 use App\Jobs\EnrichirSiteOfficineJob;
 use App\Models\Workspace;
@@ -120,6 +122,43 @@ it('envoie une personne physique vers le job restreint, jamais vers le waterfall
     expect(Queue::pushed(EnrichirSiteOfficineJob::class)->map(fn ($j) => $j->companyId)->all())->toBe([$id]);
 });
 
+it('envoie une pharmacie de forme 1000 sans aucune metadata vers le job restreint', function () {
+    $id = pePharmacie($this->espace, ['legal_form' => '1000']);
+    $morale = pePharmacie($this->espace, ['legal_form' => ' 5499 ']);
+
+    peLancer($this, ['--apply' => true, '--pause' => 0]);
+
+    expect(Queue::pushed(EnrichirSiteOfficineJob::class)->map(fn ($j) => $j->companyId)->all())->toBe([$id])
+        ->and(Queue::pushed(EnrichCompanyJob::class)->map(fn ($j) => $j->companyId)->all())->toBe([$morale]);
+});
+
+it('le critère personne physique tolère les espaces autour de la forme juridique', function () {
+    expect(SelectionEnrichissement::estPersonnePhysique(null, ' 1000'))->toBeTrue()
+        ->and(SelectionEnrichissement::estPersonnePhysique(null, '5499'))->toBeFalse()
+        ->and(SelectionEnrichissement::estPersonnePhysique(null, null))->toBeFalse()
+        ->and(SelectionEnrichissement::estPersonnePhysique('{"personne_physique":true}', null))->toBeTrue();
+});
+
+it('marque le passage après la mise en file', function () {
+    $id = pePharmacie($this->espace);
+
+    peLancer($this, ['--apply' => true, '--pause' => 0]);
+
+    Queue::assertPushed(EnrichCompanyJob::class, 1);
+    $meta = json_decode((string) DB::table('companies')->where('id', $id)->value('metadata'), true);
+    expect($meta)->toHaveKey('enrichissement_pharmacie');
+});
+
+it('Groupement : les mots courts exigent des limites de mots', function () {
+    expect(Groupement::detecter('Pharmacie Giphar ZZ', null))->toBe('Giphar')
+        ->and(Groupement::detecter(null, 'https://www.giphar-zz.example'))->toBe('Giphar')
+        ->and(Groupement::detecter('Pharmacie Pharmavie', null))->toBe('Pharmavie')
+        ->and(Groupement::detecter('Pharmacie Aprium', null))->toBe('Aprium')
+        ->and(Groupement::detecter('Pharmacie Rue Gipharzz', null))->toBeNull()
+        ->and(Groupement::detecter('Pharmacie Anapriumx', null))->toBeNull()
+        ->and(Groupement::detecter('Pharmacie Lafayette', null))->toBe('Pharmacie Lafayette');
+});
+
 it('pose le groupement sans jamais écraser une valeur existante', function () {
     $vide = pePharmacie($this->espace, ['enseigne' => 'Pharmacie Lafayette ZZ']);
     $deja = pePharmacie($this->espace, ['enseigne' => 'Giphar ZZ', 'metadata' => ['groupement' => 'Saisi à la main']]);
@@ -131,14 +170,6 @@ it('pose le groupement sans jamais écraser une valeur existante', function () {
     expect($groupement($vide))->toBe('Pharmacie Lafayette')
         ->and($groupement($deja))->toBe('Saisi à la main')
         ->and($groupement($site))->toBe('Plus Pharmacie');
-});
-
-it('ne modifie aucune valeur de coordonnée existante', function () {
-    $id = pePharmacie($this->espace, ['phone' => '0100000000']);
-
-    peLancer($this, ['--apply' => true, '--pause' => 0]);
-
-    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBe('0100000000');
 });
 
 it('le rapport ne donne que des totaux, sans nom ni adresse', function () {

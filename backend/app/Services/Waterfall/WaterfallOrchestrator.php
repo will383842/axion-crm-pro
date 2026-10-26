@@ -68,7 +68,14 @@ class WaterfallOrchestrator
         private readonly ?GooglePlacesClient $googlePlaces = null,
     ) {}
 
-    /** true pendant `enrichSansPayant()` : saute Google Places (3d) et la classification LLM (10). */
+    /**
+     * true pendant `enrichSansPayant()` : mode AJOUT SEULEMENT. Saute Google
+     * Places (3d), la classification LLM (10), l'e-mail finder / Hunter (7), le
+     * triage (11) et l'auto-segment (12) ; Brave a un plafond 0 ; l'étape INSEE
+     * (1) ne réécrit ni dénomination, NAF, forme juridique ni effectif ; le
+     * géocodage (8) ne remplit que lat/lon/insee encore NULL ; l'AutoTagger ne
+     * retire aucune étiquette. Le mode normal (`enrich()`) reste inchangé.
+     */
     private bool $sansPayant = false;
 
     /**
@@ -125,7 +132,9 @@ class WaterfallOrchestrator
             $this->step3d_google_places($company);
         }
         $this->step4_dispatch_node_scrapes($company);
-        $this->step7_email_finder($company);
+        if (! $this->sansPayant) {
+            $this->step7_email_finder($company);
+        }
         $this->safe(fn () => $this->step8_geocode($company), 'step8_geocode', $company);
         $this->step9_france_travail($company);
         if (! $this->sansPayant) {
@@ -133,9 +142,13 @@ class WaterfallOrchestrator
         }
         $this->step10b_auto_classify($company);
         $this->step10c_auto_tag($company);
-        $this->step11_triage_auto($company);
+        if (! $this->sansPayant) {
+            $this->step11_triage_auto($company);
+        }
         $this->step11b_recompute_quality($company);
-        $this->step12_auto_segment($company);
+        if (! $this->sansPayant) {
+            $this->step12_auto_segment($company);
+        }
 
         $company->enriched_at = now();
         $company->save();
@@ -155,6 +168,13 @@ class WaterfallOrchestrator
         $data = $this->insee->fetchBySiren($company->siren);
         if (! $data) {
             return 'ok';
+        }
+
+        // Ajout seulement : l'INSEE ne réécrit rien (ni statut, ni dénomination, ni NAF…).
+        if ($this->sansPayant) {
+            $this->recordRun($company, 'insee', 'partial');
+
+            return ($data->etatAdministratif !== null && $data->etatAdministratif !== 'A') ? 'archived' : 'ok';
         }
 
         // Sprint H3 — Garde-fou état admin : entreprise radiée → archived_no_email + reason
@@ -259,7 +279,7 @@ class WaterfallOrchestrator
             // Lot N4 (03/10/2026) — la MÉTHODE est écrite avec le site : un
             // site deviné (`guess`) posé sans méthode passait pour fiable
             // (`SiteFiable`), alors qu'il n'est pas vérifié.
-            $trouve = $this->domainFinder->findAvecMethode($company);
+            $trouve = $this->domainFinder->findAvecMethode($company, $this->sansPayant);
             if ($trouve !== null) {
                 $company->website = $trouve['url'];
                 $company->website_method = $trouve['methode'];
@@ -575,6 +595,11 @@ class WaterfallOrchestrator
 
             return;
         }
+        if ($this->sansPayant) {
+            $this->step8_geocode_ajout($company, $result);
+
+            return;
+        }
         $company->lat = $result->lat;
         $company->lon = $result->lon;
         $company->insee = $result->insee ?? $company->insee;
@@ -596,6 +621,24 @@ class WaterfallOrchestrator
         $this->recordRun($company, 'ban', 'success');
     }
 
+    /** Ajout seulement : lat/lon/insee posés uniquement s'ils sont encore NULL. */
+    private function step8_geocode_ajout(Company $company, object $result): void
+    {
+        if ($company->lat === null && $company->lon === null && $result->lat !== null && $result->lon !== null) {
+            $company->lat = $result->lat;
+            $company->lon = $result->lon;
+            DB::statement(
+                'UPDATE companies SET geo_point = ST_SetSRID(ST_MakePoint(?, ?), 4326) WHERE id = ? AND geo_point IS NULL',
+                [$result->lon, $result->lat, $company->id],
+            );
+        }
+        if (empty($company->insee) && ! empty($result->insee)) {
+            $company->insee = $result->insee;
+        }
+        $company->save();
+        $this->recordRun($company, 'ban', 'success');
+    }
+
     /**
      * Fallback géocodage quand la BAN ne renvoie aucun résultat : on tente de
      * reconstruire lat/lon depuis les coordonnées Lambert-93 INSEE stockées en
@@ -611,11 +654,14 @@ class WaterfallOrchestrator
         if (! is_numeric($x) || ! is_numeric($y)) {
             return;
         }
+        if ($this->sansPayant && $company->lat !== null) {
+            return;
+        }
         try {
             DB::statement(
                 'UPDATE companies SET lat = ST_Y(g), lon = ST_X(g), geo_point = g '
                 . 'FROM (SELECT ST_Transform(ST_SetSRID(ST_MakePoint(?, ?), 2154), 4326) AS g) t '
-                . 'WHERE companies.id = ?',
+                . 'WHERE companies.id = ?' . ($this->sansPayant ? ' AND companies.lat IS NULL' : ''),
                 [(float) $x, (float) $y, $company->id],
             );
             $company->refresh();
@@ -677,7 +723,7 @@ class WaterfallOrchestrator
     private function step10c_auto_tag(Company $company): void
     {
         try {
-            $delta = $this->autoTagger->syncTags($company);
+            $delta = $this->autoTagger->syncTags($company, $this->sansPayant);
             Log::debug('auto-tag delta', ['company_id' => $company->id, 'delta' => $delta]);
             $this->recordRun($company, 'auto-tag', 'success');
         } catch (\Throwable $e) {

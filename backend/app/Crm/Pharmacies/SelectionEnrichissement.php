@@ -62,8 +62,16 @@ final class SelectionEnrichissement
             ->orderBy('id');
     }
 
-    public static function estPersonnePhysique(mixed $metadata): bool
+    /**
+     * Personne physique = forme juridique INSEE « 1xxx » (même critère que
+     * `PersonnesController` : `COALESCE(btrim(legal_form), '') LIKE '1%'`),
+     * ou, en complément, la marque `metadata.personne_physique`.
+     */
+    public static function estPersonnePhysique(mixed $metadata, mixed $legalForm = null): bool
     {
+        if (str_starts_with(trim((string) $legalForm), '1')) {
+            return true;
+        }
         $m = is_string($metadata) ? json_decode($metadata, true) : $metadata;
 
         return is_array($m) && ($m['personne_physique'] ?? false) === true;

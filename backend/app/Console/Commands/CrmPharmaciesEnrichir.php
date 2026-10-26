@@ -18,8 +18,11 @@ use Illuminate\Support\Facades\DB;
  *  - société / EI à forme morale : `EnrichCompanyJob` (waterfall : annuaire,
  *    recherche du site, mentions légales, e-mail générique, téléphone,
  *    contacts, géocodage BAN, proxys Webshare du CRM pour Pages Jaunes), en
- *    mode `sansPayant` : Google Places et la classification LLM sont SAUTÉS ;
- *  - personne physique (`metadata.personne_physique`) : `EnrichirSiteOfficineJob`
+ *    mode `sansPayant` = AJOUT SEULEMENT : Google Places, classification LLM,
+ *    e-mail finder (Hunter), triage et auto-segment SAUTÉS ; Brave plafond 0 ;
+ *    dénomination, NAF, forme juridique, effectif et statut jamais réécrits ;
+ *    lat/lon/insee posés seulement s'ils sont NULL ; aucune étiquette retirée ;
+ *  - personne physique (forme juridique « 1xxx », ou `metadata.personne_physique`) : `EnrichirSiteOfficineJob`
  *    — le site et le téléphone de l'officine seulement, jamais le nom ni
  *    l'adresse de la personne.
  *
@@ -87,7 +90,7 @@ class CrmPharmaciesEnrichir extends Command
         $restant = $limite > 0 ? $limite : PHP_INT_MAX;
         // Sélection figée avant toute mise en file : le marqueur posé en cours de route ne la fait pas bouger.
         $ids = SelectionEnrichissement::classer(SelectionEnrichissement::aEnrichir($espace, $jours))
-            ->limit($limite > 0 ? $limite : PHP_INT_MAX)->get(['id', 'metadata']);
+            ->limit($limite > 0 ? $limite : PHP_INT_MAX)->get(['id', 'metadata', 'legal_form']);
         foreach ($ids->chunk($lot) as $numero => $paquet) {
             if ($restant <= 0) {
                 break;
@@ -97,12 +100,11 @@ class CrmPharmaciesEnrichir extends Command
                 if ($restant-- <= 0) {
                     break;
                 }
-                $physique = SelectionEnrichissement::estPersonnePhysique($f->metadata);
+                $physique = SelectionEnrichissement::estPersonnePhysique($f->metadata, $f->legal_form);
                 $physique ? $b['physiques']++ : $b['complet']++;
                 if (! $appliquer) {
                     continue;
                 }
-                $this->marquer((int) $f->id, $physique);
                 $job = $physique
                     ? (new EnrichirSiteOfficineJob((int) $f->id))->pourEspace($espace)
                     : (new EnrichCompanyJob((int) $f->id))->sansPayant()->pourEspace($espace);
@@ -110,6 +112,8 @@ class CrmPharmaciesEnrichir extends Command
                     $job->delay(now()->addSeconds($pause * $numero));
                 }
                 dispatch($job);
+                // Marqué APRÈS la mise en file : un échec du dispatch ne laisse pas une fiche « passée » sans job.
+                $this->marquer((int) $f->id, $physique);
             }
         }
 

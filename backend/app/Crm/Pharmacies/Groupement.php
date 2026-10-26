@@ -40,17 +40,29 @@ final class Groupement
         'Univers Pharmacie' => ['universpharmacie'],
     ];
 
+    /**
+     * Mots courts, susceptibles de se retrouver au milieu d'un autre mot
+     * (« giphar » dans un nom propre…) : cherchés comme MOT ENTIER, avec des
+     * limites de mots, jamais comme simple suite de lettres.
+     *
+     * @var list<string>
+     */
+    private const MOTS_COURTS = ['aprium', 'pharmavie', 'giphar'];
+
     /** Le groupement reconnu dans l'enseigne, sinon dans le site ; null si aucun. */
     public static function detecter(?string $enseigne, ?string $website): ?string
     {
         foreach ([$enseigne, self::hote($website)] as $texte) {
-            $compact = self::compacter((string) $texte);
+            $phrase = self::normaliser((string) $texte);
+            $compact = str_replace(' ', '', $phrase);
             if ($compact === '') {
                 continue;
             }
             foreach (self::MOTS_CLES as $libelle => $mots) {
                 foreach ($mots as $mot) {
-                    if (str_contains($compact, $mot)) {
+                    if (in_array($mot, self::MOTS_COURTS, true)
+                        ? preg_match('/(?<![a-z0-9])' . $mot . '(?![a-z0-9])/', $phrase) === 1
+                        : str_contains($compact, $mot)) {
                         return $libelle;
                     }
                 }
@@ -71,12 +83,13 @@ final class Groupement
         return is_string($hote) ? $hote : '';
     }
 
-    private static function compacter(string $texte): string
+    /** Minuscules, sans accent, mots séparés par une espace. */
+    private static function normaliser(string $texte): string
     {
         $texte = mb_strtolower(trim($texte));
         $sans = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texte);
         $texte = $sans === false ? $texte : $sans;
 
-        return (string) preg_replace('/[^a-z0-9]+/', '', $texte);
+        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', $texte));
     }
 }

@@ -3,10 +3,14 @@ name: Pharmacies — enrichissement (dry-run ou apply)
 # Lance `crm:pharmacies:enrichir` sur le serveur de prod, puis affiche
 # `crm:pharmacies:rapport-enrichissement`.
 #  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ni mis en file ;
-#  - apply : pose le groupement (champs vides seulement) et met en file les
-#    enrichisseurs EXISTANTS du CRM (waterfall sans Google Places ni LLM ;
-#    site + téléphone seulement pour les personnes physiques). Aucun e-mail,
-#    aucun SMS, aucune suppression, aucune valeur écrasée.
+#  - apply : pose le groupement (champ vide seulement) et met en file les
+#    enrichisseurs EXISTANTS du CRM en mode AJOUT SEULEMENT : Google Places,
+#    classification LLM, e-mail finder (Hunter), triage et auto-segment SAUTÉS ;
+#    Brave plafond 0 ; dénomination, NAF, forme juridique, effectif et statut de
+#    prospection jamais réécrits ; lat/lon/insee posés seulement s'ils sont
+#    NULL ; aucune étiquette retirée. Personnes physiques (forme « 1xxx ») :
+#    site et téléphone seulement, posés si vides. Aucun e-mail, aucun SMS,
+#    aucune suppression, aucune valeur existante écrasée.
 # `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI.
 # Dépôt public : seuls des totaux sont affichés, aucune donnée personnelle.
 

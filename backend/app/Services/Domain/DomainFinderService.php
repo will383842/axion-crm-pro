@@ -106,9 +106,11 @@ class DomainFinderService
      * `SiteFiable::METHODE_DEVINEE` (devinette — NON VÉRIFIÉ au sens de
      * `SiteFiable`), `pages-jaunes`.
      *
+     * `$sansBrave` : saute la stratégie Brave (plafond 0 pour ce chemin).
+     *
      * @return array{url: string, methode: string}|null
      */
-    public function findAvecMethode(Company $company): ?array
+    public function findAvecMethode(Company $company, bool $sansBrave = false): ?array
     {
         // Stratégie 1 : signals.legal.siteweb (toujours en priorité)
         $signals = $company->signals ?? [];
@@ -140,7 +142,8 @@ class DomainFinderService
         $ville = $company->city_name ?? $company->city ?? '';
 
         // Stratégie 2 : Brave Search API (graceful skip si pas de clé)
-        $url = $this->searchBrave($company->denomination, $ville);
+        // `$sansBrave` = plafond 0 : aucune requête n'est réservée ni envoyée.
+        $url = $sansBrave ? null : $this->searchBrave($company->denomination, $ville);
         if ($url) {
             return self::trouve($url, self::METHODE_BRAVE);
         }

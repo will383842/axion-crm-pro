@@ -10,6 +10,8 @@ use App\Services\Legal\MentionsLegalesScraperService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Enrichissement RESTREINT d'une officine tenue par une PERSONNE PHYSIQUE
- * (`metadata.personne_physique`) : le site de l'officine et son téléphone,
+ * (forme juridique « 1xxx » ou `metadata.personne_physique`) : le site de l'officine et son téléphone,
  * rien d'autre. Le waterfall complet n'est pas utilisé ici : il écrit les
  * dirigeants et l'adresse de la personne.
  *
@@ -61,12 +63,24 @@ class EnrichirSiteOfficineJob implements ShouldQueue
         $sources = [];
         try {
             if (empty($company->website)) {
-                $trouve = $domaines->findAvecMethode($company);
+                // Cherché avec l'ENSEIGNE (Brave plafond 0) ; sans enseigne, pas de recherche :
+                // jamais le nom de la personne physique.
+                $enseigne = trim((string) $company->enseigne);
+                $trouve = null;
+                if ($enseigne !== '') {
+                    $copie = clone $company;
+                    $copie->denomination = $enseigne;
+                    $trouve = $domaines->findAvecMethode($copie, true);
+                }
                 if ($trouve !== null) {
-                    $company->website = $trouve['url'];
-                    $company->website_method = $trouve['methode'];
-                    $company->save();
-                    $sources[] = 'domain-finder';
+                    // Écriture conditionnelle : jamais par-dessus un site posé entre-temps.
+                    $poses = DB::table('companies')->where('id', $company->id)
+                        ->where(fn ($q) => $q->whereNull('website')->orWhere('website', ''))
+                        ->update(['website' => $trouve['url'], 'website_method' => $trouve['methode'], 'updated_at' => now()]);
+                    if ($poses > 0) {
+                        $company->website = $trouve['url'];
+                        $sources[] = 'domain-finder';
+                    }
                 }
             }
             if (empty($company->phone) && ! empty($company->website)) {
@@ -81,6 +95,10 @@ class EnrichirSiteOfficineJob implements ShouldQueue
                     }
                 }
             }
+        } catch (ConnectionException|RequestException $e) {
+            // Erreur réseau passagère : on relance (tries/backoff) au lieu de l'avaler.
+            Log::warning('EnrichirSiteOfficineJob: erreur réseau, nouvel essai', ['company_id' => $this->companyId, 'error' => $e->getMessage()]);
+            throw $e;
         } catch (\Throwable $e) {
             Log::warning('EnrichirSiteOfficineJob failed', ['company_id' => $this->companyId, 'error' => $e->getMessage()]);
         }

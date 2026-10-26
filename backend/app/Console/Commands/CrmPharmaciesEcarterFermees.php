@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
-use App\Crm\Taxonomy;
 use App\Support\TotalListe;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
@@ -93,15 +92,18 @@ class CrmPharmaciesEcarterFermees extends Command
     private const MOTIFS_CORBEILLE = ['insee_ferme', 'finess_inactif'];
 
     /**
-     * Gestes de la timeline qui prouvent un travail commercial : rendez-vous,
-     * échanges, e-mails / messages. (Les envois rattachés à un contact sont
-     * déjà couverts par la protection « a un contact » : plus de LIENS_CONTACT.)
+     * Gestes AUTOMATIQUES de la timeline : seuls à ne PAS protéger une fiche.
+     * Toute autre activité `subject_type = company` (tâche, changement d'étape,
+     * rendez-vous, échange, presse, événement…) ou toute ligne saisie par un
+     * utilisateur (`user_id` non nul) la protège.
      */
-    private const ACTIVITES_PROTEGEES = [
-        'calendly_booked', 'calendly_completed', 'calendly_no_show', 'calendly_canceled',
-        'call', 'linkedin_message', 'form_submission',
-        'press_release_sent', 'press_followup', 'press_reply',
-    ];
+    private const ACTIVITES_AUTOMATIQUES = ['scraped', 'enriched', 'reclassified', 'email_hard_bounced'];
+
+    /** @var list<array{0: string, 1: string, 2: bool}>|null [table, colonne, a workspace_id] */
+    private ?array $liens = null;
+
+    /** @var array<string, int> cumul écrit pendant --apply (bornes par paquet) */
+    private array $cumul = [];
 
     /** @var array<string, array{actives: int, inactives: int}> SIREN → officines 620 */
     private array $officines = [];
@@ -173,7 +175,14 @@ class CrmPharmaciesEcarterFermees extends Command
             return self::FAILURE;
         }
 
-        $this->parcourir($espaces, $taille, true, $finess);
+        $this->cumul = $this->vide();
+        try {
+            $this->parcourir($espaces, $taille, true, $finess);
+        } catch (\RuntimeException $e) {
+            $this->error('REFUS : ' . $e->getMessage());
+
+            return self::FAILURE;
+        }
         foreach ($espaces as $espace) {
             TotalListe::oublier((string) $espace);
         }
@@ -185,7 +194,7 @@ class CrmPharmaciesEcarterFermees extends Command
     /** @return array<string, int> */
     private function vide(): array
     {
-        return ['examinees' => 0, 'insee_ferme' => 0, 'finess_inactif' => 0, 'finess_inactif_insee_ouvert' => 0, 'a_verifier' => 0, 'non_officine' => 0];
+        return ['examinees' => 0, 'insee_ferme' => 0, 'finess_inactif' => 0, 'finess_inactif_insee_ouvert' => 0, 'insee_ferme_finess_actif' => 0, 'restauree_ignoree' => 0, 'a_verifier' => 0, 'non_officine' => 0];
     }
 
     /**
@@ -238,6 +247,8 @@ class CrmPharmaciesEcarterFermees extends Command
         $this->line('ecartees (corbeille) insee_ferme   : ' . $total['insee_ferme']);
         $this->line('ecartees (corbeille) finess_inactif: ' . $total['finess_inactif']);
         $this->line('finess inactif, INSEE ouvert (etiquette seule): ' . $total['finess_inactif_insee_ouvert']);
+        $this->line('INSEE ferme, FINESS actif (etiquette seule): ' . $total['insee_ferme_finess_actif']);
+        $this->line('deja restaurees (ignorees)         : ' . $total['restauree_ignoree']);
         $this->line('a verifier (liens, sans corbeille) : ' . $total['a_verifier']);
         $this->line('marquees non_officine (sans corbeille): ' . $total['non_officine']);
     }
@@ -320,24 +331,34 @@ class CrmPharmaciesEcarterFermees extends Command
     private function traiterEspace(string $espace, int $taille, bool $apply, bool $finess): array
     {
         $bilan = $this->vide();
-        $curseur = 0;
 
-        while (true) {
-            // `naf IN (…)` + workspace_id : sert l'index (workspace_id, naf),
-            // aucun parcours complet de companies.
+        // Une seule lecture, par l'index (workspace_id, naf) : ~25 000 entiers.
+        // Une pagination `id > ? ORDER BY id LIMIT` pourrait parcourir toute la
+        // clé primaire de companies ; ici le découpage se fait en PHP.
+        $tous = array_map(
+            static fn ($r): int => (int) $r->id,
+            DB::select(
+                "SELECT id FROM companies
+                 WHERE workspace_id = ? AND naf IN ('47.73Z', '4773Z') AND deleted_at IS NULL
+                 ORDER BY id",
+                [$espace],
+            ),
+        );
+
+        foreach (array_chunk($tous, $taille) as $ids) {
+            $marques = implode(',', array_fill(0, count($ids), '?'));
             /** @var list<\stdClass> $fiches */
             $fiches = DB::select(
                 "SELECT id, siren, insee_ferme_le, lifecycle_stage, metadata
                  FROM companies
-                 WHERE workspace_id = ? AND naf IN ('47.73Z', '4773Z')
-                   AND id > ? AND deleted_at IS NULL
-                 ORDER BY id LIMIT {$taille}",
-                [$espace, $curseur],
+                 WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ({$marques})
+                 ORDER BY id",
+                array_merge([$espace], $ids),
             );
             if ($fiches === []) {
-                break;
+                continue;
             }
-            $curseur = (int) end($fiches)->id;
+            $restaurees = $this->dejaRestaurees($espace, $ids);
             $protegees = $this->protegees($espace, array_map(fn ($f) => (int) $f->id, $fiches));
 
             /** @var array<string, list<int>> $corbeille */
@@ -347,6 +368,12 @@ class CrmPharmaciesEcarterFermees extends Command
             $protegeesLot = 0;
             foreach ($fiches as $f) {
                 $bilan['examinees']++;
+                if (isset($restaurees[(int) $f->id])) {
+                    // Rétablie par la commande : jamais remise à la corbeille.
+                    $bilan['restauree_ignoree']++;
+
+                    continue;
+                }
                 $motif = $this->motif($f, $finess);
                 if ($motif === null) {
                     continue;
@@ -359,6 +386,18 @@ class CrmPharmaciesEcarterFermees extends Command
                 }
                 $protegee = isset($protegees[$id])
                     || ($f->lifecycle_stage !== null && $f->lifecycle_stage !== 'nouveau');
+                if ($motif === 'insee_ferme_finess_actif') {
+                    // INSEE fermée mais FINESS actif : doute → étiquette seule.
+                    if ($protegee) {
+                        $verifier[] = $id;
+                        $protegeesLot++;
+                    } else {
+                        $bilan['insee_ferme_finess_actif']++;
+                        $verifier[] = $id;
+                    }
+
+                    continue;
+                }
                 if ($motif === 'finess_inactif') {
                     // Décision : l'INSEE ne dit pas fermée → étiquette seule,
                     // comptée à part (ni corbeille, ni « a_verifier » des liens).
@@ -381,6 +420,16 @@ class CrmPharmaciesEcarterFermees extends Command
             $bilan['non_officine'] += count($nonOfficine);
 
             if ($apply) {
+                foreach (['insee_ferme', 'finess_inactif', 'non_officine'] as $cle) {
+                    $this->cumul[$cle] += match ($cle) {
+                        'non_officine' => count($nonOfficine),
+                        default => count($corbeille[$cle] ?? []),
+                    };
+                }
+                $hors = $this->horsBornes($this->cumul);
+                if ($hors !== []) {
+                    throw new \RuntimeException('cumul hors fourchette avant ecriture du paquet (' . implode(' ; ', $hors) . '), paquet non ecrit.');
+                }
                 DB::transaction(function () use ($corbeille, $verifier, $nonOfficine, $espace): void {
                     foreach ($corbeille as $motif => $ids) {
                         $this->ecarter($ids, $espace, $motif);
@@ -394,13 +443,15 @@ class CrmPharmaciesEcarterFermees extends Command
         return $bilan;
     }
 
-    /** @return 'insee_ferme'|'finess_inactif'|'non_officine'|null */
+    /** @return 'insee_ferme'|'insee_ferme_finess_actif'|'finess_inactif'|'non_officine'|null */
     private function motif(\stdClass $f, bool $finess): ?string
     {
-        if ($f->insee_ferme_le !== null) {
-            return 'insee_ferme';
-        }
         $siren = (string) $f->siren;
+        if ($f->insee_ferme_le !== null) {
+            $o = $finess && preg_match('/^\d{9}$/', $siren) === 1 ? ($this->officines[$siren] ?? null) : null;
+
+            return $o !== null && $o['actives'] > 0 ? 'insee_ferme_finess_actif' : 'insee_ferme';
+        }
         if (! $finess || preg_match('/^\d{9}$/', $siren) !== 1) {
             return null;
         }
@@ -412,6 +463,59 @@ class CrmPharmaciesEcarterFermees extends Command
         $o = $this->officines[$siren] ?? null;
 
         return $o !== null && $o['inactives'] > 0 && $o['actives'] === 0 ? 'finess_inactif' : null;
+    }
+
+    /**
+     * Tables liées à une fiche, calculées UNE fois (Schema::hasColumn).
+     *
+     * @return list<array{0: string, 1: string, 2: bool}>
+     */
+    private function liens(): array
+    {
+        if ($this->liens !== null) {
+            return $this->liens;
+        }
+        // Hors company_tag, scraper_runs, finess_etablissements : données de la
+        // fiche, pas du travail humain.
+        $ignorees = ['company_tag', 'scraper_runs', 'finess_etablissements'];
+        $refs = array_merge(FusionFiches::REFERENCES, array_keys(FusionFiches::REFERENCES_SANS_CLE));
+        $liens = [];
+        foreach ($refs as $ref) {
+            [$table, $colonne] = explode('.', $ref);
+            if (in_array($table, $ignorees, true) || ! Schema::hasColumn($table, $colonne)) {
+                continue;
+            }
+            $liens[] = [$table, $colonne, Schema::hasColumn($table, 'workspace_id')];
+        }
+
+        return $this->liens = $liens;
+    }
+
+    /**
+     * Fiches du paquet dont la DERNIÈRE ligne de journal de cette commande est
+     * « restauree ».
+     *
+     * @param  list<int>  $ids
+     * @return array<int, true>
+     */
+    private function dejaRestaurees(string $espace, array $ids): array
+    {
+        $marques = implode(',', array_fill(0, count($ids), '?'));
+        $lignes = DB::select(
+            "SELECT a.subject_id FROM activities a
+             WHERE a.workspace_id = ? AND a.subject_type = 'company' AND a.subject_id IN ({$marques})
+               AND a.payload->>'source' = ? AND a.payload->>'action' = 'restauree'
+               AND a.id = (SELECT max(b.id) FROM activities b
+                           WHERE b.workspace_id = a.workspace_id AND b.subject_type = 'company'
+                             AND b.subject_id = a.subject_id AND b.payload->>'source' = ?)",
+            array_merge([$espace], $ids, [self::SOURCE_LOG, self::SOURCE_LOG]),
+        );
+        $out = [];
+        foreach ($lignes as $l) {
+            $out[(int) $l->subject_id] = true;
+        }
+
+        return $out;
     }
 
     /**
@@ -431,30 +535,26 @@ class CrmPharmaciesEcarterFermees extends Command
             "(c.relation_type IS NOT NULL AND c.relation_type <> 'prospect')",
         ];
 
-        // Tables liées par clé étrangère (hors company_tag, scraper_runs,
-        // finess_etablissements : données de la fiche, pas du travail humain).
-        $ignorees = ['company_tag', 'scraper_runs', 'finess_etablissements'];
-        foreach (FusionFiches::REFERENCES as $ref) {
-            [$table, $colonne] = explode('.', $ref);
-            if (in_array($table, $ignorees, true) || ! Schema::hasColumn($table, $colonne)) {
-                continue;
-            }
-            $ou[] = "EXISTS (SELECT 1 FROM {$table} x WHERE x.{$colonne} = c.id)";
-        }
+        // `x.workspace_id = c.workspace_id` : les index commencent par
+        // workspace_id (PostgreSQL 16 ne saute pas la première colonne).
+        foreach ($this->liens() as [$table, $colonne, $aEspace]) {
+            $ws = $aEspace ? 'x.workspace_id = c.workspace_id AND ' : '';
+            if ($table === 'activities') {
+                $auto = implode(', ', array_map(static fn (string $k): string => "'" . $k . "'", self::ACTIVITES_AUTOMATIQUES));
+                $ou[] = "EXISTS (SELECT 1 FROM activities x WHERE {$ws}x.subject_id = c.id AND x.subject_type = 'company'
+                    AND (x.user_id IS NOT NULL
+                         OR (COALESCE(x.kind, '') NOT IN ({$auto})
+                             AND COALESCE(x.payload->>'source', '') <> '" . self::SOURCE_LOG . "')))";
 
-        $kinds = implode(', ', array_map(
-            static fn (string $k): string => "'" . $k . "'",
-            array_values(array_intersect(self::ACTIVITES_PROTEGEES, Taxonomy::ACTIVITY_KINDS)),
-        ));
-        foreach (FusionFiches::REFERENCES_SANS_CLE as $ref => $condition) {
-            [$table, $colonne] = explode('.', $ref);
-            if (! Schema::hasColumn($table, $colonne)) {
                 continue;
             }
-            $filtre = $table === 'activities' ? " AND kind IN ({$kinds})" : '';
-            // `business_events.resource_id` est un TEXTE : on convertit le côté fiche.
-            $id = $table === 'business_events' ? 'c.id::text' : 'c.id';
-            $ou[] = "EXISTS (SELECT 1 FROM {$table} x WHERE x.{$colonne} = {$id} AND x.{$condition}{$filtre})";
+            if ($table === 'business_events') {
+                // `resource_id` est un TEXTE : on convertit le côté fiche.
+                $ou[] = "EXISTS (SELECT 1 FROM business_events x WHERE {$ws}x.resource_id = c.id::text AND x.resource_type = 'company')";
+
+                continue;
+            }
+            $ou[] = "EXISTS (SELECT 1 FROM {$table} x WHERE {$ws}x.{$colonne} = c.id)";
         }
 
         $sql = 'SELECT c.id FROM companies c WHERE c.workspace_id = ? AND c.id IN (' . $liste . ') AND (' . implode(' OR ', $ou) . ')';
@@ -481,10 +581,21 @@ class CrmPharmaciesEcarterFermees extends Command
         $meta = json_encode(['ecartee_motif' => $motif, 'ecartee_le' => now()->toDateString()]);
         $touchees = DB::select(
             "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || ?::jsonb, deleted_at = now()
-             WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ({$marques}) RETURNING id",
+             WHERE workspace_id = ? AND deleted_at IS NULL AND id IN ({$marques}) RETURNING id, deleted_at::text AS instant",
             array_merge([$meta, $espace], $ids),
         );
-        $this->journaliser(array_values(array_map(fn ($r) => (int) $r->id, $touchees)), $espace, ['action' => 'ecartee', 'motif' => $motif]);
+        if ($touchees === []) {
+            return;
+        }
+        // Même transaction : un seul instant pour tout le paquet.
+        $instant = (string) $touchees[0]->instant;
+        $faits = array_values(array_map(fn ($r) => (int) $r->id, $touchees));
+        $marquesFaits = implode(',', array_fill(0, count($faits), '?'));
+        DB::update(
+            "UPDATE companies SET metadata = metadata || ?::jsonb WHERE workspace_id = ? AND id IN ({$marquesFaits})",
+            array_merge([json_encode(['ecartee_instant' => $instant]), $espace], $faits),
+        );
+        $this->journaliser($faits, $espace, ['action' => 'ecartee', 'motif' => $motif, 'deleted_at' => $instant]);
     }
 
     /**
@@ -526,7 +637,7 @@ class CrmPharmaciesEcarterFermees extends Command
 
     /**
      * Rétablit (deleted_at = NULL) les seules fiches écartées par cette
-     * commande : reconnues au journal `activities` ou à `metadata.ecartee_motif`.
+     * commande : reconnues au journal `activities` (instant exact de la corbeille).
      *
      * @param  iterable<mixed>  $espaces
      */
@@ -545,13 +656,20 @@ class CrmPharmaciesEcarterFermees extends Command
         $n = 0;
         foreach ($espaces as $espace) {
             $espace = (string) $espace;
+            // Rétablit seulement une fiche mise à la corbeille par cette commande
+            // à CET instant (deleted_at = instant du journal) ET dont la dernière
+            // ligne de journal de la commande est « ecartee ». Le journal fait foi
+            // (metadata est réécrite par la collecte).
             $filtre = "workspace_id = ? AND deleted_at IS NOT NULL
-                AND (metadata->>'ecartee_motif' IN ({$marques})
-                  OR EXISTS (SELECT 1 FROM activities a WHERE a.workspace_id = companies.workspace_id
+                AND EXISTS (SELECT 1 FROM activities a WHERE a.workspace_id = companies.workspace_id
                       AND a.subject_type = 'company' AND a.subject_id = companies.id
                       AND a.payload->>'source' = ? AND a.payload->>'action' = 'ecartee'
-                      AND a.payload->>'motif' IN ({$marques})))";
-            $params = array_merge([$espace], $motifs, [self::SOURCE_LOG], $motifs);
+                      AND a.payload->>'motif' IN ({$marques})
+                      AND a.payload->>'deleted_at' = companies.deleted_at::text
+                      AND a.id = (SELECT max(b.id) FROM activities b
+                                  WHERE b.workspace_id = companies.workspace_id AND b.subject_type = 'company'
+                                    AND b.subject_id = companies.id AND b.payload->>'source' = ?))";
+            $params = array_merge([$espace, self::SOURCE_LOG], $motifs, [self::SOURCE_LOG]);
             if (! $apply) {
                 $n += (int) DB::selectOne("SELECT count(*) AS n FROM companies WHERE {$filtre}", $params)->n;
 
@@ -559,7 +677,7 @@ class CrmPharmaciesEcarterFermees extends Command
             }
             $touchees = DB::select(
                 "UPDATE companies SET deleted_at = NULL,
-                    metadata = (COALESCE(metadata, '{}'::jsonb) - 'ecartee_motif' - 'ecartee_le') || ?::jsonb
+                    metadata = (COALESCE(metadata, '{}'::jsonb) - 'ecartee_motif' - 'ecartee_le' - 'ecartee_instant') || ?::jsonb
                  WHERE {$filtre} RETURNING id",
                 array_merge([json_encode(['restauree_le' => now()->toDateString()])], $params),
             );

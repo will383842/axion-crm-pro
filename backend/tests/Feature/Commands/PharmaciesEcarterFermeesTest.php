@@ -104,6 +104,42 @@ function pefProteger(string $source, string $ws, int $id): void
             DB::table('media')->insert(['workspace_id' => $ws, 'company_id' => $id, 'name' => 'ZZ titre', 'media_type' => 'presse_quotidien',
                 'media_family' => 'editorial', 'source' => 'cppap', 'enrich_status' => 'pending'] + $maintenant);
             break;
+        case 'tache':
+            DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'task', 'kind' => 'task', 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+            break;
+        case 'note_saisie':
+            $user = (string) Str::uuid();
+            DB::table('users')->insert(['id' => $user, 'email' => $user . '@zz.example.invalid', 'name' => 'ZZ', 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'reclassified', 'user_id' => $user, 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+            break;
+        case 'echange_call':
+            DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'call', 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+            break;
+        case 'echange_linkedin_message':
+            DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => 'linkedin_message', 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+            break;
+        case 'journaliste':
+            $titre = (int) DB::table('media')->insertGetId(['workspace_id' => $ws, 'name' => 'ZZ Media J', 'media_type' => 'blog']);
+            DB::table('journalists')->insert(['workspace_id' => $ws, 'media_id' => $titre, 'company_id' => $id, 'last_name' => 'ZZ Journaliste']);
+            break;
+        case 'organisateur':
+            $evt = (int) DB::table('events')->insertGetId(['workspace_id' => $ws, 'external_ref' => 'zz-evt-' . $id, 'nom' => 'ZZ evt', 'type' => 'salon'] + $maintenant);
+            DB::table('event_organizers')->insert(['event_id' => $evt, 'company_id' => $id, 'workspace_id' => $ws, 'created_at' => now()]);
+            break;
+        case 'federation':
+            DB::table('federations')->insert(['company_id' => $id, 'workspace_id' => $ws, 'famille' => 'ordre', 'niveau' => 'national', 'pertinence' => 'haute', 'contactabilite' => 'aucun_contact']);
+            break;
+        case 'federation_parent':
+            $antenne = pefFiche($ws, (string) (800000000 + $id));
+            DB::table('federations')->insert(['company_id' => $antenne, 'workspace_id' => $ws, 'famille' => 'ordre', 'niveau' => 'departemental', 'pertinence' => 'haute', 'contactabilite' => 'aucun_contact', 'parent_company_id' => $id]);
+            break;
+        case 'opco':
+            DB::table('companies_opco')->insert(['workspace_id' => $ws, 'company_id' => $id, 'siret' => null, 'idcc' => '1486', 'opco' => 'atlas', 'opco_gestion' => null, 'source' => 'saisie', 'releve_le' => null]);
+            break;
+        case 'liste_manuelle':
+            $liste = (int) DB::table('listes_manuelles')->insertGetId(['workspace_id' => $ws, 'nom' => 'ZZ Liste'] + $maintenant);
+            DB::table('listes_manuelles_membres')->insert(['workspace_id' => $ws, 'liste_id' => $liste, 'company_id' => $id, 'origine' => 'coche']);
+            break;
         case 'evenement_metier':
             DB::table('business_events')->insert(['workspace_id' => $ws, 'action' => 'zz.tag', 'resource_type' => 'company', 'resource_id' => (string) $id, 'created_at' => now()]);
             break;
@@ -198,6 +234,8 @@ test('chaque source de protection : etiquette a_verifier_fermee, jamais la corbe
 })->with([
     'contact', 'deal', 'audience', 'lifecycle_stage', 'relation_type', 'etiquette_protegee',
     'console_client_ref', 'activite_rendez_vous', 'personne', 'praticien', 'media', 'evenement_metier',
+    'tache', 'note_saisie', 'echange_call', 'echange_linkedin_message', 'journaliste', 'organisateur',
+    'federation', 'federation_parent', 'opco', 'liste_manuelle',
 ]);
 
 test('une activite sans rapport (scraped) ne protege pas', function () {
@@ -316,4 +354,74 @@ test('restaurer : vide deleted_at des seules fiches ecartees par la commande', f
     expect(DB::table('companies')->count())->toBe($nb);
     expect(DB::table('companies')->where('id', $ids['insee'])->value('deleted_at'))->toBeNull();
     expect(DB::table('companies')->where('id', $autre)->value('deleted_at'))->not->toBeNull();
+});
+
+test('activites automatiques (enriched, reclassified, journal de la commande) ne protegent pas', function () {
+    $ws = pefEspace();
+    $id = pefFiche($ws, '200000003', ['insee_ferme_le' => '2024-01-01']);
+    foreach (['enriched', 'reclassified', 'email_hard_bounced'] as $kind) {
+        DB::table('activities')->insert(['workspace_id' => $ws, 'type' => 'note', 'kind' => $kind, 'subject_type' => 'company', 'subject_id' => $id, 'created_at' => now()]);
+    }
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+
+    expect(DB::table('companies')->where('id', $id)->value('deleted_at'))->not->toBeNull();
+});
+
+test('INSEE ferme mais FINESS encore actif : etiquette seule, compte a part', function () {
+    $ws = pefEspace();
+    $id = pefFiche($ws, '200000004', ['insee_ferme_le' => '2024-01-01']);
+    $csv = pefCsv([['200000004', '620', 'A']]);
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--finess' => $csv, '--apply' => true]);
+    $sortie = Artisan::output();
+
+    $fiche = DB::table('companies')->where('id', $id)->first();
+    expect($fiche->deleted_at)->toBeNull();
+    expect(json_decode($fiche->metadata, true))->toHaveKey('a_verifier_fermee')->not->toHaveKey('ecartee_motif');
+    expect($sortie)->toContain('FINESS actif (etiquette seule): 1')->toContain('insee_ferme   : 0');
+});
+
+test('restaurer : une fiche retablie par un humain puis remise a la corbeille par ailleurs n est pas ressuscitee', function () {
+    $ws = pefEspace();
+    $id = pefFiche($ws, '200000005', ['insee_ferme_le' => '2024-01-01']);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+    $instant = DB::table('companies')->where('id', $id)->value('deleted_at');
+    expect(json_decode(DB::table('activities')->where('subject_id', $id)->value('payload'), true))->toHaveKey('deleted_at');
+    expect(json_decode(DB::table('companies')->where('id', $id)->value('metadata'), true))->toHaveKey('ecartee_instant');
+
+    // Retablie par un humain, puis remise a la corbeille plus tard (fusion de doublon).
+    DB::table('companies')->where('id', $id)->update(['deleted_at' => null]);
+    DB::table('companies')->where('id', $id)->update(['deleted_at' => now()->addMinutes(5)]);
+    expect(DB::table('companies')->where('id', $id)->value('deleted_at'))->not->toBe($instant);
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--restaurer' => true, '--apply' => true]);
+
+    expect(DB::table('companies')->where('id', $id)->value('deleted_at'))->not->toBeNull();
+});
+
+test('apres restaurer, apply ne remet pas les memes fiches a la corbeille', function () {
+    $ws = pefEspace();
+    $id = pefFiche($ws, '200000006', ['insee_ferme_le' => '2024-01-01']);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--restaurer' => true, '--apply' => true]);
+    expect(DB::table('companies')->where('id', $id)->value('deleted_at'))->toBeNull();
+
+    // collect reecrit metadata en entier : seul le journal reste.
+    DB::table('companies')->where('id', $id)->update(['metadata' => '{}']);
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true]);
+
+    expect(DB::table('companies')->where('id', $id)->value('deleted_at'))->toBeNull();
+    expect(Artisan::output())->toContain('deja restaurees (ignorees)         : 1');
+});
+
+test('apply par paquets : paquets de taille 1, toutes les fiches examinees', function () {
+    $ws = pefEspace();
+    foreach (['600000001', '600000002', '600000003'] as $siren) {
+        pefFiche($ws, $siren, ['insee_ferme_le' => '2024-01-01']);
+    }
+
+    Artisan::call('crm:pharmacies:ecarter-fermees', ['--apply' => true, '--taille-lot' => 1]);
+
+    expect(DB::table('companies')->whereNotNull('deleted_at')->count())->toBe(3);
 });

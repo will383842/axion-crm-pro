@@ -36,6 +36,8 @@ use RuntimeException;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+use function Illuminate\Support\defer;
+
 class CompaniesController extends ApiController
 {
     // 🔴 G43-005 (S0) — verrouillage optimiste OPTIONNEL sur `update()`. Le trait
@@ -258,15 +260,80 @@ class CompaniesController extends ApiController
             return $this->ok($vide);
         }
 
+        // 26/10/2026 — JAMAIS DE CALCUL DANS LA REQUÊTE À FROID. Après un
+        // `cache:clear` (chaque déploiement), l'ancien `Cache::flexible` calculait
+        // ici, sous un délai SQL de 120 s : le front abandonnait à 30 s, relançait
+        // deux fois, et jusqu'à 3 calculs identiques tenaient chacun un worker
+        // PHP. Cache vide : on répond tout de suite `$vide` (`total: null`) et le
+        // calcul unique part APRÈS la réponse, sous verrou.
+        if (! Cache::has(self::cleStats($espace))) {
+            defer(fn () => $this->rechaufferStats($espace));
+
+            return $this->ok($vide);
+        }
+
         /** @var mixed $charge */
         $charge = Cache::flexible(
             self::cleStats($espace),
             [1800, 86400],
-            fn (): array => DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => $this->calculerStats($espace))),
+            fn (): array => $this->calculerStatsEnContexte($espace),
             lock: ['seconds' => 120],
         );
 
         return $this->ok(is_array($charge) ? $charge : $vide);
+    }
+
+    /**
+     * Calcule et met en cache les indicateurs d'un espace, UNE SEULE FOIS à la
+     * fois : `Cache::lock` (borné) écarte les appels concurrents, qui ne
+     * recalculent pas. Rend `false` si un autre processus calcule déjà.
+     * Sert au rattrapage après la réponse (`stats`) et à la commande de
+     * réchauffage post-déploiement (`crm:entreprises:rechauffer-cache`).
+     */
+    public function rechaufferStats(string $espace): bool
+    {
+        $verrou = Cache::lock('crm:companies:stats:calcul:' . $espace, 150);
+        if (! $verrou->get()) {
+            return false;
+        }
+
+        try {
+            // Re-test sous verrou : un autre calcul a pu finir entre-temps.
+            if (! Cache::has(self::cleStats($espace))) {
+                Cache::flexible(
+                    self::cleStats($espace),
+                    [1800, 86400],
+                    fn (): array => $this->calculerStatsEnContexte($espace),
+                    lock: ['seconds' => 120],
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('companies.stats rechauffage failed', ['exception' => $e->getMessage()]);
+            report($e);
+
+            return false;
+        } finally {
+            $verrou->release();
+        }
+
+        return true;
+    }
+
+    /** @return array<string, mixed> */
+    private function calculerStatsEnContexte(string $espace): array
+    {
+        return DelaiRequeteSql::etendu(120, fn (): array => WorkspaceContext::run($espace, fn (): array => $this->calculerStats($espace)));
+    }
+
+    /**
+     * Réchauffe le total de la liste par défaut (fermées masquées, sans
+     * filtre) : même requête de base et même clé que `index()`.
+     */
+    public static function rechaufferTotalDefaut(string $espace): int
+    {
+        $base = Company::query()->whereNull('deleted_at')->where('workspace_id', $espace)->toBase();
+
+        return EntreprisesFermees::total($base, EntreprisesFermees::MASQUER, $espace);
     }
 
     /** @return array<string, mixed> */

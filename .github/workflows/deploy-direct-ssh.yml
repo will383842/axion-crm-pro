@@ -507,6 +507,16 @@ jobs:
           docker compose exec -u root -T api php artisan cache:clear </dev/null
           echo "::endgroup::"
 
+          # Réchauffage des indicateurs et du total de la liste Entreprises,
+          # que `cache:clear` vient de vider (sinon la page « Entreprises »
+          # reste sur ses squelettes jusqu'à la fin de comptages de plusieurs
+          # dizaines de secondes). Un échec ne doit JAMAIS casser le
+          # déploiement : journalisé, puis on continue.
+          echo "::group::php artisan crm:entreprises:rechauffer-cache"
+          docker compose exec -u root -T api php artisan crm:entreprises:rechauffer-cache </dev/null \
+            || echo "::warning::réchauffage du cache Entreprises échoué (non bloquant) — les chiffres se recalculeront au premier affichage"
+          echo "::endgroup::"
+
           echo "::group::vérification post-déploiement — santé des conteneurs"
           docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}'
           PS_OUT="$(docker compose ps --format '{{.Service}}|{{.State}}|{{.Status}}')"

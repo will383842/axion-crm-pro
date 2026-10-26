@@ -157,6 +157,8 @@ test('entreprises : /companies/stats compte TOUTE la base, pas la page', functio
     // fiches (relecture A09), pas parmi les seules fiches renseignées.
     l3Entreprise($this->espace);
 
+    // Cache vide : la requête ne calcule plus (cf. `StatsEntreprisesSansCalculSynchroneTest`).
+    app(CompaniesController::class)->rechaufferStats($this->espace);
     $s = $this->getJson('/api/v1/companies/stats')->assertOk();
 
     expect($s->json('total'))->toBe(5)

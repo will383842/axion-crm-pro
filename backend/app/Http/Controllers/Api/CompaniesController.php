@@ -27,6 +27,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+
+use function Illuminate\Support\defer;
+
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,8 +38,6 @@ use Illuminate\Validation\Rule;
 use RuntimeException;
 use Spatie\QueryBuilder\QueryBuilder;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-
-use function Illuminate\Support\defer;
 
 class CompaniesController extends ApiController
 {

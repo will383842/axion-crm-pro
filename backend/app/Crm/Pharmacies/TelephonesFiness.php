@@ -21,20 +21,41 @@ use Throwable;
  *    ou métadonnée `personne_physique`) ;
  *  - ni e-mail, ni statut de prospection, ni contacts, ni étiquettes ;
  *  - `metadata.telephone_source = finess` fusionné seulement si le numéro vient d'être posé ;
+ *  - EXTENSION (toujours en ajout seul, champ vide ou NULL seulement, condition portée par l'UPDATE) :
+ *    adresse (numero_voie… lieu_dit, adresse_ligne_4 → address ; code_postal → postcode ;
+ *    commune_acheminement → city / city_name), latitude + longitude si lat ET lon sont NULL,
+ *    date d'ouverture → metadata.finess_date_ouverture (si la clé est absente), et téléphone de la
+ *    société exploitante (`entites-juridiques.csv`, jointure finess_ej) seulement si l'officine n'a
+ *    pas de téléphone propre dans FINESS et si companies.phone est vide (telephone_source = finess_ej) ;
+ *  - JAMAIS le fax (telecopie) ni le courriel ; personnes physiques : ni adresse ni téléphone ;
  *  - un paquet qui échoue n'arrête pas les suivants ; seuls des totaux sont journalisés.
  */
 final class TelephonesFiness
 {
     public const SOURCE = 'finess';
 
+    public const SOURCE_EJ = 'finess_ej';
+
     private const COLONNES = ['siret', 'categorie', 'etat', 'telephone'];
+
+    /** Colonnes facultatives de etablissements.csv (absentes = vides). Aucune colonne fax/courriel. */
+    private const COLONNES_OPTIONNELLES = [
+        'finess_ej', 'numero_voie', 'type_voie', 'libelle_voie', 'complement_voie', 'lieu_dit', 'adresse_ligne_4',
+        'code_postal', 'commune_acheminement', 'latitude', 'longitude', 'date_ouverture',
+    ];
+
+    /** @var array<string, string> finess_ej → téléphone brut de la société exploitante */
+    private array $telephonesEj = [];
 
     /**
      * @return array<string, int> bilan chiffré (aucun numéro, aucun nom)
      */
-    public function executer(string $workspaceId, string $fichier, bool $appliquer, int $paquet = 500): array
+    public function executer(string $workspaceId, string $fichier, bool $appliquer, int $paquet = 500, ?string $fichierEj = null): array
     {
+        $this->telephonesEj = $fichierEj !== null ? $this->lireEntites($fichierEj) : [];
         $bilan = [
+            'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'adr_a_ajouter' => 0, 'adr_ajoutees' => 0,
+            'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0,
             'lignes' => 0, 'officines' => 0, 'sans_telephone' => 0, 'trouvees' => 0, 'introuvables' => 0,
             'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
             'a_ajouter' => 0, 'ajoutees' => 0, 'lots_en_echec' => 0,
@@ -58,8 +79,6 @@ final class TelephonesFiness
             $bilan['officines']++;
             if ($l['telephone'] === '') {
                 $bilan['sans_telephone']++;
-
-                continue;
             }
             if (preg_match('/^\d{14}$/', $l['siret']) !== 1 || isset($sirets[$l['siret']])) {
                 continue;
@@ -102,12 +121,16 @@ final class TelephonesFiness
                 ->whereIn('siret', array_column($lot, 'siret'))->pluck('company_id', 'siret')->all();
             $fiches = [];
             foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
-                ->whereIn('id', array_values(array_unique($ids)))->get(['id', 'phone', 'legal_form', 'metadata']) as $c) {
+                ->whereIn('id', array_values(array_unique($ids)))
+                ->get(['id', 'phone', 'legal_form', 'metadata', 'address', 'postcode', 'city', 'city_name', 'lat', 'lon']) as $c) {
                 $fiches[(int) $c->id] = $c;
             }
 
             // Numéros valides du lot, puis une seule requête d'opposition pour tout le paquet.
+            /** @var array<int, array{0: string, 1: string}> $candidats id → [numéro, source] */
             $candidats = [];
+            /** @var array<int, array<string, mixed>> $ajouts id → adresse / gps / date à ajouter */
+            $ajouts = [];
             $variantes = [];
             $locale = ['trouvees' => 0, 'introuvables' => 0, 'personnes_physiques' => 0, 'deja_renseignees' => 0, 'invalides' => 0];
             foreach ($lot as $l) {
@@ -124,57 +147,168 @@ final class TelephonesFiness
 
                     continue;
                 }
-                if (trim((string) $f->phone) !== '') {
-                    $locale['deja_renseignees']++;
-
-                    continue;
+                $this->collecterAjouts($ajouts[$id], $f, $l);
+                $phoneVide = trim((string) $f->phone) === '';
+                $source = self::SOURCE;
+                $tel = null;
+                if ($l['telephone'] !== '') {
+                    if (! $phoneVide) {
+                        $locale['deja_renseignees']++;
+                    } else {
+                        $tel = self::normaliser($l['telephone']);
+                        if ($tel === null) {
+                            $locale['invalides']++;
+                        }
+                    }
+                } elseif ($phoneVide && ($this->telephonesEj[$l['finess_ej']] ?? '') !== '') {
+                    // Pas de téléphone propre dans FINESS : repli sur la société exploitante.
+                    $tel = self::normaliser($this->telephonesEj[$l['finess_ej']]);
+                    $source = self::SOURCE_EJ;
                 }
-                $tel = self::normaliser($l['telephone']);
                 if ($tel === null) {
-                    $locale['invalides']++;
-
                     continue;
                 }
-                // Une société à plusieurs officines n'a qu'une fiche : un seul numéro, le premier.
-                if (isset($candidats[$id])) {
+                // Une société à plusieurs officines n'a qu'une fiche : un seul numéro, le propre d'abord.
+                if (isset($candidats[$id]) && ! ($candidats[$id][1] === self::SOURCE_EJ && $source === self::SOURCE)) {
                     continue;
                 }
-                $candidats[$id] = $tel;
+                $candidats[$id] = [$tel, $source];
                 array_push($variantes, ...ListeSuppression::variantesTelephone($tel));
             }
             $opposes = $this->opposes(array_values(array_unique($variantes)));
 
-            $aAjouter = 0;
-            $ajoutees = 0;
-            $ecartes = 0;
-            foreach ($candidats as $id => $tel) {
+            $n = ['a_ajouter' => 0, 'ajoutees' => 0, 'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'opposition' => 0,
+                'adr_a_ajouter' => 0, 'adr_ajoutees' => 0, 'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0];
+            foreach ($candidats as $id => [$tel, $source]) {
                 if (array_intersect(ListeSuppression::variantesTelephone($tel), $opposes) !== []) {
-                    $ecartes++;
+                    $n['opposition']++;
 
                     continue;
                 }
-                $aAjouter++;
+                $ej = $source === self::SOURCE_EJ;
+                $n[$ej ? 'ej_a_ajouter' : 'a_ajouter']++;
                 if (! $appliquer) {
                     continue;
                 }
                 // Condition SQL « phone vide » : jamais d'écrasement, même si la fiche a changé entre-temps.
-                $ajoutees += DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)
+                $n[$ej ? 'ej_ajoutees' : 'ajoutees'] += DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)
                     ->whereNull('deleted_at')
                     ->where(fn ($q) => $q->whereNull('phone')->orWhereRaw("btrim(phone) = ''"))
                     ->update([
                         'phone' => $tel,
-                        'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('telephone_source', '" . self::SOURCE . "')"),
+                        'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('telephone_source', '" . $source . "')"),
                         'updated_at' => now(),
                     ]);
             }
 
-            foreach ($locale as $cle => $n) {
-                $bilan[$cle] += $n;
+            foreach ($ajouts as $id => $a) {
+                foreach (['adr' => 'adresse', 'gps' => 'gps', 'date' => 'date'] as $abrev => $type) {
+                    if (! isset($a[$type])) {
+                        continue;
+                    }
+                    $n[$abrev . '_a_ajouter']++;
+                    if ($appliquer) {
+                        $n[$abrev . '_ajoutees'] += $this->ecrire($workspaceId, $id, $type, $a[$type]);
+                    }
+                }
             }
-            $bilan['opposition'] += $ecartes;
-            $bilan['a_ajouter'] += $aAjouter;
-            $bilan['ajoutees'] += $ajoutees;
+
+            foreach ($locale as $cle => $v) {
+                $bilan[$cle] += $v;
+            }
+            foreach ($n as $cle => $v) {
+                $bilan[$cle] += $v;
+            }
         });
+    }
+
+    /**
+     * Ce que FINESS peut ajouter à la fiche (champs vides ou NULL seulement) ; le premier établissement gagne.
+     *
+     * @param  array<string, mixed>|null  $a
+     * @param  array<string, string>  $l
+     */
+    private function collecterAjouts(?array &$a, object $f, array $l): void
+    {
+        $a ??= [];
+        if (! isset($a['adresse'])) {
+            $rue = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_filter(
+                array_map(static fn (string $c): string => $l[$c], ['numero_voie', 'type_voie', 'libelle_voie', 'complement_voie', 'lieu_dit', 'adresse_ligne_4']),
+                static fn (string $v): bool => $v !== '',
+            ))));
+            $champs = [];
+            if ($rue !== '' && trim((string) $f->address) === '') {
+                $champs['address'] = $rue;
+            }
+            if ($l['code_postal'] !== '' && trim((string) $f->postcode) === '') {
+                $champs['postcode'] = $l['code_postal'];
+            }
+            if ($l['commune_acheminement'] !== '') {
+                if (trim((string) $f->city) === '') {
+                    $champs['city'] = $l['commune_acheminement'];
+                }
+                if (trim((string) $f->city_name) === '') {
+                    $champs['city_name'] = $l['commune_acheminement'];
+                }
+            }
+            if ($champs !== []) {
+                $a['adresse'] = $champs;
+            }
+        }
+        if (! isset($a['gps']) && $f->lat === null && $f->lon === null) {
+            $lat = str_replace(',', '.', $l['latitude']);
+            $lon = str_replace(',', '.', $l['longitude']);
+            if (is_numeric($lat) && is_numeric($lon) && abs((float) $lat) <= 90 && abs((float) $lon) <= 180
+                && ((float) $lat !== 0.0 || (float) $lon !== 0.0)) {
+                $a['gps'] = [(float) $lat, (float) $lon];
+            }
+        }
+        if (! isset($a['date'])) {
+            $date = self::normaliserDate($l['date_ouverture']);
+            $meta = json_decode((string) $f->metadata, true);
+            if ($date !== null && ! (is_array($meta) && array_key_exists('finess_date_ouverture', $meta))) {
+                $a['date'] = $date;
+            }
+        }
+    }
+
+    /** AAAA-MM-JJ depuis « AAAA-MM-JJ » ou « JJ/MM/AAAA », ou null. */
+    public static function normaliserDate(string $brut): ?string
+    {
+        $brut = trim($brut);
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $brut, $m) === 1) {
+            [$y, $mo, $d] = [(int) $m[1], (int) $m[2], (int) $m[3]];
+        } elseif (preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $brut, $m) === 1) {
+            [$d, $mo, $y] = [(int) $m[1], (int) $m[2], (int) $m[3]];
+        } else {
+            return null;
+        }
+
+        return checkdate($mo, $d, $y) ? sprintf('%04d-%02d-%02d', $y, $mo, $d) : null;
+    }
+
+    /** UPDATE conditionnel (champ vide / clé absente) : renvoie 1 si la fiche a été complétée. */
+    private function ecrire(string $workspaceId, int $id, string $type, mixed $valeur): int
+    {
+        $q = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at');
+        if ($type === 'gps') {
+            return $q->whereNull('lat')->whereNull('lon')->update(['lat' => $valeur[0], 'lon' => $valeur[1], 'updated_at' => now()]);
+        }
+        if ($type === 'date') {
+            return $q->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'finess_date_ouverture')")->update([
+                'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('finess_date_ouverture', " . DB::getPdo()->quote((string) $valeur) . '::text)'),
+                'updated_at' => now(),
+            ]);
+        }
+        // Adresse : chaque champ garde sa valeur s'il est déjà renseigné ; au moins un doit être vide.
+        $sets = ['updated_at' => now()];
+        $vides = [];
+        foreach ($valeur as $col => $v) {
+            $sets[$col] = DB::raw("CASE WHEN {$col} IS NULL OR btrim({$col}) = '' THEN " . DB::getPdo()->quote((string) $v) . " ELSE {$col} END");
+            $vides[] = "{$col} IS NULL OR btrim({$col}) = ''";
+        }
+
+        return $q->whereRaw('(' . implode(' OR ', $vides) . ')')->update($sets);
     }
 
     /**
@@ -204,6 +338,43 @@ final class TelephonesFiness
         return is_array($meta) && ! empty($meta['personne_physique']);
     }
 
+    /**
+     * entites-juridiques.csv : finess_ej → téléphone brut (renseignés seulement). Le fax n'est pas lu.
+     *
+     * @return array<string, string>
+     */
+    private function lireEntites(string $fichier): array
+    {
+        $f = new SplFileObject($fichier, 'r');
+        $f->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::READ_AHEAD | SplFileObject::DROP_NEW_LINE);
+        $f->setCsvControl(';', '"', '');
+        $entete = null;
+        $iEj = $iTel = false;
+        $map = [];
+        foreach ($f as $row) {
+            if (! is_array($row) || $row === [null]) {
+                continue;
+            }
+            if ($entete === null) {
+                $entete = array_map(static fn ($c): string => trim(ltrim((string) $c, "\xEF\xBB\xBF")), $row);
+                $iEj = array_search('finess_ej', $entete, true);
+                $iTel = array_search('telephone', $entete, true);
+                if ($iEj === false || $iTel === false) {
+                    throw new \InvalidArgumentException('Colonnes manquantes dans les entités juridiques : finess_ej, telephone');
+                }
+
+                continue;
+            }
+            $ej = trim((string) ($row[$iEj] ?? ''));
+            $tel = trim((string) ($row[$iTel] ?? ''));
+            if ($ej !== '' && $tel !== '') {
+                $map[$ej] = $tel;
+            }
+        }
+
+        return $map;
+    }
+
     /** @return \Generator<array<string, string>> */
     private function lire(string $fichier): \Generator
     {
@@ -225,7 +396,7 @@ final class TelephonesFiness
                 continue;
             }
             $ligne = [];
-            foreach (self::COLONNES as $c) {
+            foreach (array_merge(self::COLONNES, self::COLONNES_OPTIONNELLES) as $c) {
                 $i = array_search($c, $entete, true);
                 $ligne[$c] = $i === false ? '' : trim((string) ($row[$i] ?? ''));
             }

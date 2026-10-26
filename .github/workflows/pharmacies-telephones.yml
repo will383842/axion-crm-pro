@@ -3,8 +3,10 @@ name: Pharmacies — téléphones FINESS (dry-run ou apply)
 # Télécharge le miroir tiers du flux FINESS de data.gouv.fr (pas la liste officielle), puis lance
 # `crm:pharmacies:telephones-finess` sur le serveur de prod.
 #  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ;
-#  - apply : AJOUTE le téléphone des officines 620 actives dans companies.phone UNIQUEMENT
-#    s'il est vide (jamais d'écrasement), hors opposition, numéros invalides et personnes physiques.
+#  - apply : AJOUTE, sur champ vide ou NULL seulement (jamais d'écrasement), pour les officines 620
+#    actives : téléphone (repli sur celui de la société exploitante, entites-juridiques.csv), adresse,
+#    GPS et date d'ouverture ; hors opposition, numéros invalides et personnes physiques. Jamais le
+#    fax ni le courriel.
 # `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI et si l'empreinte SHA-256 correspond.
 # Dépôt public : seuls des totaux sont affichés, aucune liste nominative ni aucun numéro.
 
@@ -12,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry-run (totaux seulement) ou apply (ajoute les téléphones manquants)'
+        description: 'dry-run (totaux seulement) ou apply (ajoute téléphones, adresses, GPS, dates sur champs vides)'
         type: choice
         options: [dry-run, apply]
         default: dry-run
@@ -68,7 +70,7 @@ jobs:
               exit 1
             fi
           fi
-          unzip -q -o finess.zip etablissements.csv
+          unzip -q -o finess.zip etablissements.csv entites-juridiques.csv
           python3 - <<'PY'
           import csv, sys
           n620 = ntel = 0
@@ -79,6 +81,15 @@ jobs:
                       ntel += 1
           print('lignes catégorie 620 état A (actives) :', n620)
           print('dont avec téléphone :', ntel)
+          nej = ntelej = 0
+          for r in csv.DictReader(open('entites-juridiques.csv', encoding='utf-8-sig'), delimiter=';'):
+              nej += 1
+              if (r.get('telephone') or '').strip():
+                  ntelej += 1
+          print('entités juridiques :', nej, 'dont avec téléphone :', ntelej)
+          if not 50000 <= ntelej <= 100000:
+              print('téléphones des entités juridiques hors fourchette 50000-100000 : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
           # Garde-fou : un fichier tronqué ou vide ne doit jamais alimenter un apply.
           if not 15000 <= n620 <= 25000:
               print('catégorie 620 état A hors fourchette 15000-25000 : apply refusé', file=sys.stderr)
@@ -89,7 +100,7 @@ jobs:
         if: ${{ inputs.mode == 'apply' }}
         run: |
           if [ -f refus_apply ]; then
-            echo "apply refusé : nombre de lignes 620 actives hors fourchette (15000 à 25000)." >&2
+            echo "apply refusé : nombre de lignes 620 actives hors fourchette (15000 à 25000 officines, 50000 à 100000 téléphones d'entités)." >&2
             exit 1
           fi
 
@@ -116,7 +127,8 @@ jobs:
           OPT=""
           [ "$MODE" = "apply" ] && OPT="--apply"
           $SSH "umask 077; cat > /tmp/finess_etablissements.csv" < etablissements.csv
-          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_etablissements.csv api:/tmp/finess_etablissements.csv && docker compose exec -u root -T api php artisan crm:pharmacies:telephones-finess /tmp/finess_etablissements.csv $OPT"
+          $SSH "umask 077; cat > /tmp/finess_entites.csv" < entites-juridiques.csv
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_etablissements.csv api:/tmp/finess_etablissements.csv && docker compose cp /tmp/finess_entites.csv api:/tmp/finess_entites.csv && docker compose exec -u root -T api php artisan crm:pharmacies:telephones-finess /tmp/finess_etablissements.csv /tmp/finess_entites.csv $OPT"
 
       - name: Nettoyer le CSV (hôte et conteneur api)
         if: ${{ always() }}
@@ -125,4 +137,4 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
         run: |
           SSH="ssh $USER@$HOST"
-          $SSH "rm -f /tmp/finess_etablissements.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_etablissements.csv" || true
+          $SSH "rm -f /tmp/finess_etablissements.csv /tmp/finess_entites.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_etablissements.csv /tmp/finess_entites.csv" || true

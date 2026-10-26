@@ -57,7 +57,7 @@ class CrmPharmaciesRapportEnrichissement extends Command
     /** @return list<\stdClass> */
     private function agreger(string $espace, string $groupe): array
     {
-        return array_values(SelectionEnrichissement::ouvertes($espace)
+        $lignes = SelectionEnrichissement::ouvertes($espace)
             ->selectRaw(
                 "{$groupe} AS groupe, count(*) AS total,"
                 . " count(*) FILTER (WHERE phone IS NOT NULL AND phone <> '') AS telephone,"
@@ -66,7 +66,9 @@ class CrmPharmaciesRapportEnrichissement extends Command
                 . ' count(*) FILTER (WHERE EXISTS (SELECT 1 FROM contacts ct WHERE ct.company_id = companies.id)) AS contact,'
                 . " count(*) FILTER (WHERE COALESCE(metadata->>'groupement', '') <> '') AS groupement",
             )
-            ->groupByRaw($groupe)->orderByRaw('count(*) DESC')->get()->all());
+            ->groupByRaw($groupe)->orderByRaw('count(*) DESC')->get()->all();
+
+        return array_values($lignes);
     }
 
     private function part(int|string $n, int|string $total): string

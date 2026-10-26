@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Crm\FichesProtegees;
+use App\Crm\Pharmacies\SelectionEnrichissement;
+use App\Crm\Scraping\ScrapedRecordIngestService;
 use App\Jobs\Concerns\RunsInWorkspace;
 use App\Models\Company;
 use App\Services\Domain\DomainFinderService;
@@ -61,6 +63,7 @@ class EnrichirSiteOfficineJob implements ShouldQueue
             return;
         }
         $sources = [];
+        $aucunePage = false;
         try {
             if (empty($company->website)) {
                 // Cherché avec l'ENSEIGNE (Brave plafond 0) ; sans enseigne, pas de recherche :
@@ -84,14 +87,20 @@ class EnrichirSiteOfficineJob implements ShouldQueue
                 }
             }
             if (empty($company->phone) && ! empty($company->website)) {
-                $canaux = $mentions->harvestFromWebsite((string) $company->website);
-                if (! empty($canaux['phones'])) {
-                    // Écriture conditionnelle : jamais par-dessus un numéro posé entre-temps.
-                    $posees = DB::table('companies')->where('id', $company->id)
-                        ->where(fn ($q) => $q->whereNull('phone')->orWhere('phone', ''))
-                        ->update(['phone' => $canaux['phones'][0], 'updated_at' => now()]);
-                    if ($posees > 0) {
-                        $sources[] = 'site-officine';
+                $releve = $mentions->harvestTelephones((string) $company->website);
+                if ($releve === null) {
+                    // Aucune page n'a répondu (panne réseau) : la fiche n'est PAS « passée », elle sera reprise.
+                    $aucunePage = true;
+                } else {
+                    $numero = $this->choisirTelephone($releve);
+                    if ($numero !== null) {
+                        // Écriture conditionnelle : jamais par-dessus un numéro posé entre-temps.
+                        $posees = DB::table('companies')->where('id', $company->id)
+                            ->where(fn ($q) => $q->whereNull('phone')->orWhere('phone', ''))
+                            ->update(['phone' => $numero, 'updated_at' => now()]);
+                        if ($posees > 0) {
+                            $sources[] = 'site-officine';
+                        }
                     }
                 }
             }
@@ -102,11 +111,34 @@ class EnrichirSiteOfficineJob implements ShouldQueue
         } catch (\Throwable $e) {
             Log::warning('EnrichirSiteOfficineJob failed', ['company_id' => $this->companyId, 'error' => $e->getMessage()]);
         }
+        if ($aucunePage) {
+            // Le marqueur de passage est posé à la mise en file : on le retire pour que la fiche soit reprise.
+            DB::update("UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) - ? WHERE id = ?", [SelectionEnrichissement::CLE_PASSAGE, $this->companyId]);
+        }
         if ($sources !== []) {
             DB::update(
                 "UPDATE companies SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('enrichissement_pharmacie_sources', ?::jsonb) WHERE id = ?",
                 [json_encode($sources), $this->companyId],
             );
         }
+    }
+
+    /**
+     * Premier numéro non opposé, en préférant ceux qui ne viennent pas d'une page de
+     * mentions légales ; null si aucun.
+     *
+     * @param  array{phones: list<string>, hors_mentions: list<string>}  $releve
+     */
+    private function choisirTelephone(array $releve): ?string
+    {
+        $ingest = app(ScrapedRecordIngestService::class);
+        $candidats = array_values(array_unique([...$releve['hors_mentions'], ...$releve['phones']]));
+        foreach ($candidats as $tel) {
+            if (! $ingest->estOppose(null, $tel)) {
+                return $tel;
+            }
+        }
+
+        return null;
     }
 }

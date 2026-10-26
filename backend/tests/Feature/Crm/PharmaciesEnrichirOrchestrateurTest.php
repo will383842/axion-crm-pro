@@ -46,11 +46,23 @@ final class PoCompteurs
 
     public static array $telephones = ['0100000077'];
 
+    /** Numéros lus hors des pages de mentions légales (null = les mêmes que `$telephones`). */
+    public static ?array $horsMentions = null;
+
+    /** Vrai : aucune page du site n'a répondu (panne réseau). */
+    public static bool $aucunePage = false;
+
+    /** Vrai : la BAN ne trouve rien (déclenche le repli Lambert). */
+    public static bool $banVide = false;
+
     public static function reset(): void
     {
         self::$n = [];
         self::$domaines = [];
         self::$telephones = ['0100000077'];
+        self::$horsMentions = null;
+        self::$aucunePage = false;
+        self::$banVide = false;
     }
 
     public static function inc(string $k): void
@@ -108,6 +120,10 @@ beforeEach(function () {
     {
         public function geocode(string $address, ?string $postcode = null): ?GeocodeResult
         {
+            if (PoCompteurs::$banVide) {
+                return null;
+            }
+
             return new GeocodeResult(address: $address, lat: 48.5, lon: 2.5, insee: '75101', postcode: $postcode, city: 'ZZ-Ville');
         }
     });
@@ -155,6 +171,13 @@ beforeEach(function () {
             PoCompteurs::inc('moisson');
 
             return ['emails' => [], 'phones' => PoCompteurs::$telephones];
+        }
+
+        public function harvestTelephones(string $website): ?array
+        {
+            PoCompteurs::inc('moisson');
+
+            return PoCompteurs::$aucunePage ? null : ['phones' => PoCompteurs::$telephones, 'hors_mentions' => PoCompteurs::$horsMentions ?? PoCompteurs::$telephones];
         }
     });
     $this->app->instance(EmailFinderService::class, new class extends EmailFinderService
@@ -342,4 +365,74 @@ it('EnrichirSiteOfficineJob : une fiche protégée n est pas touchée', function
 
     $l = poLigne($id);
     expect($l->website)->toBeNull()->and($l->phone)->toBeNull()->and(PoCompteurs::$domaines)->toBe([]);
+});
+
+it('EnrichirSiteOfficineJob : un numéro en opposition est écarté, le suivant est posé', function () {
+    PoCompteurs::$telephones = ['0100000066', '0100000077'];
+    DB::table('opt_out')->insert(['email' => null, 'phone' => '0100000066', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    $id = poFiche($this->espace, ['legal_form' => '1000', 'website' => 'https://zz-site.example/']);
+
+    (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
+
+    expect(poLigne($id)->phone)->toBe('0100000077');
+});
+
+it('EnrichirSiteOfficineJob : tous les numéros en opposition, aucun n est posé', function () {
+    PoCompteurs::$telephones = ['0100000066'];
+    DB::table('opt_out')->insert(['email' => null, 'phone' => '0100000066', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    $id = poFiche($this->espace, ['legal_form' => '1000', 'website' => 'https://zz-site.example/']);
+
+    (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
+
+    expect(poLigne($id)->phone)->toBeNull();
+});
+
+it('EnrichirSiteOfficineJob : un numéro hors page de mentions légales est préféré', function () {
+    PoCompteurs::$telephones = ['0100000066', '0100000077'];
+    PoCompteurs::$horsMentions = ['0100000077'];
+    $id = poFiche($this->espace, ['legal_form' => '1000', 'website' => 'https://zz-site.example/']);
+
+    (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
+
+    expect(poLigne($id)->phone)->toBe('0100000077');
+});
+
+it('EnrichirSiteOfficineJob : aucune page n a répondu, la fiche n est pas marquée passée', function () {
+    PoCompteurs::$aucunePage = true;
+    $id = poFiche($this->espace, ['legal_form' => '1000', 'website' => 'https://zz-site.example/', 'metadata' => ['enrichissement_pharmacie' => ['le' => now()->toDateTimeString(), 'mode' => 'physique'], 'autre' => 'garde']]);
+
+    (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
+
+    $meta = json_decode(poLigne($id)->metadata, true);
+    expect($meta)->not->toHaveKey('enrichissement_pharmacie')->and($meta['autre'])->toBe('garde')->and(poLigne($id)->phone)->toBeNull();
+});
+
+it('EnrichirSiteOfficineJob : pages lues sans numéro, la fiche reste marquée passée', function () {
+    PoCompteurs::$telephones = [];
+    $id = poFiche($this->espace, ['legal_form' => '1000', 'website' => 'https://zz-site.example/', 'metadata' => ['enrichissement_pharmacie' => ['le' => now()->toDateTimeString(), 'mode' => 'physique']]]);
+
+    (new EnrichirSiteOfficineJob($id))->pourEspace($this->espace)->handle(app(DomainFinderService::class), app(MentionsLegalesScraperService::class));
+
+    expect(json_decode(poLigne($id)->metadata, true))->toHaveKey('enrichissement_pharmacie');
+});
+
+it('repli Lambert en mode ajout seulement : pose lat/lon quand ils manquent', function () {
+    PoCompteurs::$banVide = true;
+    $id = poFiche($this->espace, ['metadata' => ['gps_lambert_x' => 652000, 'gps_lambert_y' => 6862000]]);
+
+    poEnrichir($this->espace, $id, true);
+
+    $l = poLigne($id);
+    expect($l->lat)->not->toBeNull()->and((float) $l->lat)->toBeGreaterThan(48.0)->toBeLessThan(49.5)
+        ->and((float) $l->lon)->toBeGreaterThan(1.0)->toBeLessThan(4.0);
+});
+
+it('repli Lambert en mode ajout seulement : un lat/lon déjà posé n est pas réécrit', function () {
+    PoCompteurs::$banVide = true;
+    $id = poFiche($this->espace, ['lat' => 43.1, 'lon' => 5.1, 'metadata' => ['gps_lambert_x' => 652000, 'gps_lambert_y' => 6862000]]);
+
+    poEnrichir($this->espace, $id, true);
+
+    $l = poLigne($id);
+    expect((float) $l->lat)->toBe(43.1)->and((float) $l->lon)->toBe(5.1);
 });

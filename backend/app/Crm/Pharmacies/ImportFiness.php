@@ -55,7 +55,7 @@ final class ImportFiness
     {
         $bilan = [
             'lignes' => 0, 'officines' => 0, 'sans_siret' => 0, 'inactives' => 0, 'doublons_fichier' => 0,
-            'deja_par_siret' => 0, 'siren_autre_siret' => 0, 'corbeille' => 0, 'a_creer' => 0,
+            'sans_code' => 0, 'deja_par_siret' => 0, 'siren_autre_siret' => 0, 'corbeille' => 0, 'a_creer' => 0,
             'creees' => 0, 'etablissements_ajoutes' => 0, 'personnes_physiques' => 0,
             'autres_categories' => [], 'par_departement' => [],
         ];
@@ -85,6 +85,9 @@ final class ImportFiness
                 continue;
             }
             $bilan['officines']++;
+            if ($l['statut_code'] === '') {
+                $bilan['sans_code']++;
+            }
             if (preg_match('/^\d{14}$/', $l['siret']) !== 1) {
                 $bilan['sans_siret']++;
 
@@ -238,11 +241,9 @@ final class ImportFiness
     {
         // L'APE du fichier est celui de la société exploitante : on ne le garde que s'il est du commerce de détail spécialisé (47.7x).
         $naf = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $l['ape']) ?? '');
-        $naf = str_starts_with($naf, '477') ? $naf : '4773Z';
+        $naf = preg_match('/^477\d[A-Z]$/', $naf) === 1 ? $naf : '4773Z';
         // Écrit avec le point, comme les fiches INSEE (47.73Z).
-        if (preg_match('/^\d{4}[A-Z]$/', $naf) === 1) {
-            $naf = substr($naf, 0, 2) . '.' . substr($naf, 2);
-        }
+        $naf = substr($naf, 0, 2) . '.' . substr($naf, 2);
         $classe = NomenclatureNaf::classer($naf);
 
         if ($this->estPersonnePhysique($l)) {

@@ -35,7 +35,7 @@ final class Groupement
         'Welcoop' => ['welcoop'],
         'PHR' => ['groupephr'],
         'Aprium' => ['apriumpharmacie', 'aprium'],
-        'Santé Pharma' => ['santepharma'],
+        'Santé Pharma' => ['santepharma', 'sante pharma'],
         'Pharmodel' => ['pharmodel'],
         'Univers Pharmacie' => ['universpharmacie'],
     ];
@@ -47,7 +47,7 @@ final class Groupement
      *
      * @var list<string>
      */
-    private const MOTS_COURTS = ['aprium', 'pharmavie', 'giphar'];
+    private const MOTS_COURTS = ['aprium', 'pharmavie', 'giphar', 'santepharma', 'sante pharma'];
 
     /** Le groupement reconnu dans l'enseigne, sinon dans le site ; null si aucun. */
     public static function detecter(?string $enseigne, ?string $website): ?string

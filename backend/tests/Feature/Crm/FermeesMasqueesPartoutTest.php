@@ -153,11 +153,12 @@ test('accueil : contacts qualifiés ne compte pas le contact d une fiche fermée
 test('accueil et pastilles du hub : les fiches fermées se retranchent par différence, la fiche seule reste lisible', function () {
     config(['crm.console_v2' => true]);
     $this->getJson('/api/v1/crm/contacts-hub/counts')->assertOk();
-    $hub = $this->getJson('/api/v1/crm/contacts-hub?per_page=50')->assertOk()->json('data');
-    $inclure = $this->getJson('/api/v1/crm/contacts-hub?per_page=50&fermees=inclure')->assertOk()->json('data');
+    $hub = $this->getJson('/api/v1/crm/contacts-hub?per_page=50&temperature=tous')->assertOk()->json('data');
+    $inclure = $this->getJson('/api/v1/crm/contacts-hub?per_page=50&temperature=tous&fermees=inclure')->assertOk()->json('data');
     $denominations = fn (array $lignes): array => array_column($lignes, 'denomination');
 
-    expect($denominations($hub))->not->toContain('ZZ MPF FERMEE')
+    // `temperature=tous` : la vue par défaut du hub ne montre que les fiches actives.
+    expect($denominations($hub))->toContain('ZZ MPF OUVERTE')->not->toContain('ZZ MPF FERMEE')
         ->and($denominations($inclure))->toContain('ZZ MPF FERMEE');
     expect(DB::table('companies')->where('id', $this->fermee)->exists())->toBeTrue();
 });

@@ -203,9 +203,14 @@ class GlobalSearchController extends ApiController
                 [$espace, $terme, self::PLAFOND],
             );
 
-            return $this->relire('contacts', $espace, $ids, ['id', 'first_name', 'last_name', 'email', 'company_id'],
+            return $this->relire(
+                'contacts',
+                $espace,
+                $ids,
+                ['id', 'first_name', 'last_name', 'email', 'company_id'],
                 // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée est masqué par défaut.
-                static fn (Builder $q) => EntreprisesFermees::appliquerAuxContacts($q, $fermees, 'contacts.company_id'));
+                static fn (Builder $q) => EntreprisesFermees::appliquerAuxContacts($q, $fermees, 'contacts.company_id'),
+            );
         });
     }
 

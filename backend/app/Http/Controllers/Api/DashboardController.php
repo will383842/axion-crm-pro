@@ -8,6 +8,7 @@ use App\Exceptions\TableauDeBordIncomplet;
 use App\Support\DelaiRequeteSql;
 use App\Support\EntreprisesFermees;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -273,7 +274,7 @@ class DashboardController extends ApiController
                     $sq->whereNotNull('email')->orWhereNotNull('phone');
                 });
                 // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée ne compte pas.
-                /** @var \Illuminate\Database\Query\Builder $q */
+                /** @var QueryBuilder $q */
                 EntreprisesFermees::appliquerAuxContacts($q, EntreprisesFermees::MASQUER);
             }),
             'scraper_runs_24h' => $this->compter('scraper_runs', $espace, function ($q) {

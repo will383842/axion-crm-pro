@@ -164,11 +164,12 @@ UPLOAD_URL="$(jq -r '.uploadUrl' "$TMP/upload.json")"
 printf 'header = "Authorization: %s"\n' "$(jq -r '.authorizationToken' "$TMP/upload.json")" > "$TMP/upload.cfg"
 
 log "Envoi vers le bucket B2…"
+# B2 attend un POST pour l envoi : -T seul enverrait un PUT (405).
 if ! b2_curl -K "$TMP/upload.cfg" \
         -H "X-Bz-File-Name: $B2_PREFIX$NOM" \
         -H 'Content-Type: b2/x-auto' \
         -H "X-Bz-Content-Sha1: $SHA1" \
-        -T "$ARCHIVE" "$UPLOAD_URL" > "$TMP/resultat.json"; then
+        -X POST -T "$ARCHIVE" "$UPLOAD_URL" > "$TMP/resultat.json"; then
     log "❌ Envoi B2 en échec."
     exit 1
 fi

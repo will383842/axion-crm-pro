@@ -205,8 +205,8 @@ it('fiche protégée, fermée, non officine ou écartée : rien n\'est écrit', 
     [$p, $sp] = ficheTel($espace);
     F::proteger($espace, $p, 'src:scraping-federations-2026');
     [$f, $sf] = ficheTel($espace, ['insee_ferme_le' => '2020-01-01', 'legal_form' => '1000']);
-    [$o, $so] = ficheTel($espace, ['metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
-    [$e, $se] = ficheTel($espace, ['metadata' => json_encode(['ecartee_motif' => 'test'])]);
+    [$o, $so] = ficheTel($espace, ['legal_form' => '1000', 'metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
+    [$e, $se] = ficheTel($espace, ['legal_form' => '1000', 'metadata' => json_encode(['ecartee_motif' => 'test'])]);
     $adr = ['telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
 
     $sortie = lancerTel($espace, csvTel([['siret' => $sp] + $adr, ['siret' => $sf] + $adr, ['siret' => $so] + $adr, ['siret' => $se] + $adr]));
@@ -301,6 +301,24 @@ it('personne physique : adresse, GPS, téléphone et date de l\'officine, aucun 
 
     $d = DB::table('companies')->where('id', $id2)->first();
     expect($d->phone)->toBe('0499999999')->and($d->address)->toBe('Existante')->and($d->postcode)->toBe('75001');
+});
+
+it('personne physique : lieu_dit et adresse_ligne_4 jamais dans l\'adresse (comptés) ; personne morale : lieu_dit conservé', function () {
+    $espace = F::espace();
+    [$pp, $spp] = ficheTel($espace, ['legal_form' => '1000']);
+    [$pm, $spm] = ficheTel($espace);
+    $voie = ['numero_voie' => '3', 'type_voie' => 'RUE', 'libelle_voie' => 'DES TESTS', 'code_postal' => '99003', 'commune_acheminement' => 'TESTVILLE'];
+
+    $sortie = lancerTel($espace, csvTel([
+        ['siret' => $spp, 'lieu_dit' => 'ZZ TITULAIRE', 'adresse_ligne_4' => 'ZZ TITULAIRE'] + $voie,
+        ['siret' => $spm, 'lieu_dit' => 'ZZ LIEUDIT'] + $voie,
+    ]));
+
+    $c = DB::table('companies')->where('id', $pp)->first();
+    expect(str_contains(json_encode($c, JSON_UNESCAPED_UNICODE), 'ZZ TITULAIRE'))->toBeFalse();
+    expect($c->address)->toContain('3')->toContain('RUE')->toContain('DES TESTS');
+    expect(DB::table('companies')->where('id', $pm)->value('address'))->toContain('ZZ LIEUDIT');
+    expect($sortie)->toContain('ignoré (peut porter le nom du titulaire) : 1');
 });
 
 it('personne physique sans téléphone propre : pas de repli sur la société exploitante', function () {

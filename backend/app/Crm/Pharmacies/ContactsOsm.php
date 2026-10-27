@@ -24,8 +24,11 @@ use Throwable;
  *    candidate unique est inéligible, le point est compté « exclue » et rien n'est reporté sur une voisine ;
  *  - rapprochement par DEUX preuves possibles : (a) même téléphone normalisé, OU (b) distance GPS
  *    inférieure à 80 m ET même code postal. Zéro ou plusieurs fiches candidates (ou une fiche visée par
- *    plusieurs points) : rien n'est écrit, le point est compté « ambigu ». Preuves contradictoires
+ *    plusieurs points, contradictoires ou ineligibles compris) : rien n'est écrit, le point est compté
+ *    « ambigu ». Preuves contradictoires
  *    (téléphones sans intersection, plus de 2 km, code postal différent, coordonnées partagées) : ambigu ;
+ *  - un e-mail ou un site présent sur DEUX points OSM ou plus (réseau, groupement) est ignoré et compté
+ *    (`valeurs_partagees_ignorees`) ; les réseaux sociaux et annuaires ne sont pas des sites d'officine ;
  *  - écriture sur champ vide ou NULL seulement (condition portée par l'UPDATE, avec la garde d'origine et
  *    la garde personne physique), jamais d'écrasement ; origine `osm` dans `field_origins` ;
  *  - e-mail : boîtes GÉNÉRIQUES seulement (`QualificationEmail::type`), les nominatives sont ignorées et
@@ -54,6 +57,13 @@ final class ContactsOsm
 
     public const ATTRIBUTION = "© les contributeurs d'OpenStreetMap";
 
+    /** Réseaux sociaux, annuaires et cartes : ce ne sont pas le site d'une officine. */
+    private const HOTES_NON_OFFICINE = [
+        'facebook.com', 'fb.com', 'fb.me', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com', 'youtu.be',
+        'tiktok.com', 'pinterest.com', 'linktr.ee', 'pagesjaunes.fr', 'doctolib.fr', 'google.com', 'google.fr', 'goo.gl', 'g.page',
+        'mappy.com', 'yelp.com', 'yelp.fr', 'tripadvisor.com', 'tripadvisor.fr', 'wikipedia.org',
+    ];
+
     private const COLONNES = ['lat', 'lon', 'cp', 'telephone', 'email', 'site'];
 
     /**
@@ -64,7 +74,7 @@ final class ContactsOsm
         $bilan = [
             'points' => 0, 'rapproches' => 0, 'ambigus' => 0, 'non_rapproches' => 0, 'exclues' => 0, 'opposition' => 0,
             'emails_a_ajouter' => 0, 'emails_ajoutes' => 0, 'sites_a_ajouter' => 0, 'sites_ajoutes' => 0,
-            'telephones_a_ajouter' => 0, 'telephones_ajoutes' => 0, 'emails_nominatifs_ignores' => 0, 'lots_en_echec' => 0,
+            'telephones_a_ajouter' => 0, 'telephones_ajoutes' => 0, 'emails_nominatifs_ignores' => 0, 'valeurs_partagees_ignorees' => 0, 'lots_en_echec' => 0,
         ];
 
         $points = [];
@@ -76,6 +86,25 @@ final class ContactsOsm
                 $bilan['emails_nominatifs_ignores']++;
             }
             $points[] = $p;
+        }
+
+        // Une valeur portée par plusieurs points OSM est celle d'un réseau, pas d'une officine.
+        $partagees = ['email' => [], 'site' => []];
+        foreach ($points as $p) {
+            foreach (['email', 'site'] as $k) {
+                if ($p[$k] !== '') {
+                    $cle = mb_strtolower($p[$k]);
+                    $partagees[$k][$cle] = ($partagees[$k][$cle] ?? 0) + 1;
+                }
+            }
+        }
+        foreach ($points as $i => $p) {
+            foreach (['email', 'site'] as $k) {
+                if ($p[$k] !== '' && $partagees[$k][mb_strtolower($p[$k])] >= 2) {
+                    $points[$i][$k] = '';
+                    $bilan['valeurs_partagees_ignorees']++;
+                }
+            }
         }
 
         // Rapprochement sur TOUTES les fiches 47.73Z de l'espace (éligibles ou non) : une voisine protégée,
@@ -97,9 +126,12 @@ final class ContactsOsm
             }
         }
 
-        // Fiche → points rapprochés ; une fiche visée par plusieurs points n'est servie par aucun.
+        // Fiche → TOUS les points qui la visent (contradictoires et ineligibles compris) ; une fiche visée
+        // par plusieurs points n'est servie par aucun.
         /** @var array<int, list<int>> $visees */
         $visees = [];
+        /** @var array<int, array{tel: bool, gps: bool}> $cibles point → preuves vers sa fiche */
+        $cibles = [];
         foreach ($points as $i => $p) {
             /** @var array<int, array{tel: bool, gps: bool}> $voies */
             $voies = [];
@@ -130,14 +162,8 @@ final class ContactsOsm
                 continue;
             }
             $id = (int) array_key_first($voies);
-            $f = $fiches[$id];
-            if ($this->contradictoire($f, $p, $voies[$id], $coordonnees)) {
-                $bilan['ambigus']++;
-            } elseif (! $f['eligible']) {
-                $bilan['exclues']++;
-            } else {
-                $visees[$id][] = $i;
-            }
+            $visees[$id][] = $i;
+            $cibles[$i] = $voies[$id];
         }
 
         /** @var array<int, array<string, string>> $plans */
@@ -148,8 +174,19 @@ final class ContactsOsm
 
                 continue;
             }
+            $i = $indices[0];
+            if ($this->contradictoire($fiches[$id], $points[$i], $cibles[$i], $coordonnees)) {
+                $bilan['ambigus']++;
+
+                continue;
+            }
+            if (! $fiches[$id]['eligible']) {
+                $bilan['exclues']++;
+
+                continue;
+            }
             $bilan['rapproches']++;
-            $plan = $this->planifier($fiches[$id], $points[$indices[0]]);
+            $plan = $this->planifier($fiches[$id], $points[$i]);
             if ($plan !== []) {
                 $plans[$id] = $plan;
             }
@@ -385,7 +422,7 @@ final class ContactsOsm
         return $e !== '' && strlen($e) <= 190 && filter_var($e, FILTER_VALIDATE_EMAIL) !== false ? $e : null;
     }
 
-    /** Site http(s) avec un nom de domaine, ou null. */
+    /** Site http(s) avec un nom de domaine (hors réseaux sociaux et annuaires), ou null. */
     public static function normaliserSite(string $brut): ?string
     {
         $s = trim($brut);
@@ -396,8 +433,17 @@ final class ContactsOsm
             $s = 'http://' . $s;
         }
         $hote = parse_url($s, PHP_URL_HOST);
+        if (! is_string($hote) || preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i', $hote) !== 1 || strlen($s) > 255) {
+            return null;
+        }
+        $hote = mb_strtolower($hote);
+        foreach (self::HOTES_NON_OFFICINE as $domaine) {
+            if ($hote === $domaine || str_ends_with($hote, '.' . $domaine)) {
+                return null;
+            }
+        }
 
-        return is_string($hote) && preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i', $hote) === 1 && strlen($s) <= 255 ? $s : null;
+        return $s;
     }
 
     /** @return \Generator<array{lat: ?float, lon: ?float, cp: string, tels: list<string>, email: string, site: string}> */

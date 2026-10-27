@@ -61,9 +61,10 @@ jobs:
                        'FR-NAQ', 'FR-OCC', 'FR-PDL', 'FR-PAC']
           OUTRE_MER = ['FR-971', 'FR-972', 'FR-GF', 'FR-RE', 'FR-976']
           ZONES = METROPOLE + OUTRE_MER
-          # Minimum d'éléments par zone : en dessous, la réponse est jugée tronquée et apply est refusé.
+          # Minimum d'éléments par zone (environ 50 % du compte OSM mesuré) : en dessous, la réponse est jugée
+          # tronquée et apply est refusé. Mesures : FR-20R 118, FR-GF 51, FR-RE 229, FR-971 135, FR-972 104, FR-976 27.
           MINIMUM = {z: 300 for z in METROPOLE}
-          MINIMUM.update({z: 1 for z in OUTRE_MER})
+          MINIMUM.update({'FR-20R': 60, 'FR-971': 50, 'FR-972': 50, 'FR-GF': 25, 'FR-RE': 50, 'FR-976': 10})
           EMAIL = re.compile(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)+$')
 
           class Remarque(Exception):
@@ -72,16 +73,16 @@ jobs:
           def requete(zone):
               q = ('[out:json][timeout:180];area["ISO3166-2"="%s"]->.z;'
                    '(nwr["amenity"="pharmacy"](area.z););out center tags;' % zone)
-              data = urllib.parse.urlencode({'data': q}).encode()
+              corps = urllib.parse.urlencode({'data': q}).encode()
               for essai in range(6):
-                  req = urllib.request.Request(ENDPOINT, data=data, headers={'User-Agent': UA})
+                  req = urllib.request.Request(ENDPOINT, data=corps, headers={'User-Agent': UA})
                   try:
                       with urllib.request.urlopen(req, timeout=240) as r:
-                          data = json.load(r)
+                          rep = json.load(r)
                       # `remark` = erreur de durée ou de mémoire côté Overpass : résultat potentiellement partiel.
-                      if data.get('remark'):
+                      if rep.get('remark'):
                           raise Remarque()
-                      return data['elements']
+                      return rep['elements']
                   except urllib.error.HTTPError as e:
                       if e.code not in (429, 502, 503, 504):
                           raise
@@ -91,6 +92,11 @@ jobs:
                   except Remarque:
                       attente = 30 * (essai + 1)
                       print('zone %s : réponse Overpass avec remark, nouvel essai dans %d s' % (zone, attente), flush=True)
+                      time.sleep(attente)
+                  except json.JSONDecodeError:
+                      # Overpass répond parfois en HTML (surcharge) : on réessaie.
+                      attente = 30 * (essai + 1)
+                      print('zone %s : réponse non JSON, nouvel essai dans %d s' % (zone, attente), flush=True)
                       time.sleep(attente)
                   except (urllib.error.URLError, TimeoutError):
                       time.sleep(30 * (essai + 1))

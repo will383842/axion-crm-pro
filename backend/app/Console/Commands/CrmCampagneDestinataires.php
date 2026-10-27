@@ -113,6 +113,7 @@ class CrmCampagneDestinataires extends Command
         EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE => 'ecartees_entreprise_individuelle',
         EligibiliteAdresse::SITE_NON_VERIFIE => 'ecartees_site_non_verifie',
         EligibiliteAdresse::INFORMATION_TIERS_INSUFFISANTE => 'ecartees_information_tiers',
+        EligibiliteAdresse::SOURCE_OSM => 'ecartees_source_osm',
         EligibiliteAdresse::INVALIDE => 'ecartees_invalides',
         EligibiliteAdresse::NON_VERIFIEE => 'ecartees_non_verifiees',
         EligibiliteAdresse::PERSONNELLE => 'ecartees_perso',
@@ -170,7 +171,7 @@ class CrmCampagneDestinataires extends Command
 
         /** @var array<string, int> $bilan */
         $bilan = array_fill_keys([
-            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_fermee', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
+            'fiches', 'ecartees_pertinence_faible', 'ecartees_sans_classement', 'ecartees_syndicats_salaries', 'adresses_distinctes', 'destinataires', 'ecartees_non_diffusibles', 'ecartees_entreprise_fermee', 'ecartees_entreprise_individuelle', 'ecartees_site_non_verifie', 'ecartees_information_tiers', 'ecartees_source_osm', 'ecartees_invalides', 'ecartees_non_verifiees', 'ecartees_perso',
             'ecartees_deja_informees', 'ecartees_opposition', 'ecartees_adresse_partagee', 'ecartees_fiche_console', 'adresses_partagees', 'sans_evenement_a_venir',
         ], 0);
         if ($presse) {
@@ -390,6 +391,8 @@ class CrmCampagneDestinataires extends Command
             // Quarantaine (lot N5, `QuarantaineSite`) : une expression de la
             // liste de sélection sur les fiches du segment, pas une condition.
             ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
+            // Adresse ajoutée depuis OpenStreetMap (`ContactsOsm`) : jamais envoyée avant validation.
+            ->selectRaw("companies.metadata->>'email_source' AS email_source")
             // Site trouvé par candidat : l'ancien site deviné (rien n'en est libéré).
             ->selectRaw(QuarantaineSite::siteAncienSql('companies') . ' AS site_ancien')
             // Segment presse : ce qui juge la provenance des adresses de la
@@ -487,6 +490,7 @@ class CrmCampagneDestinataires extends Command
                 'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, (string) $org->email_generic, $site, $ancien),
                 // Une boîte d'organisation n'est pas une personne apportée.
                 'information_tiers_insuffisante' => false,
+                'email_source' => is_string($org->email_source ?? null) ? $org->email_source : null,
             ];
         }
 

@@ -24,7 +24,7 @@ chmod +x "$B2_SCRIPT" "$SCRIPT_DIR/verifier-sauvegarde-b2.sh"
 
 if ! command -v jq >/dev/null 2>&1; then
     log "Installation de jq (paquet de la distribution)…"
-    apt-get install -y jq
+    apt-get update -qq && apt-get install -y jq
 fi
 
 ( crontab -l 2>/dev/null | grep -vF "$B2_SCRIPT" || true ; echo "$CRON_LINE" ) | crontab -

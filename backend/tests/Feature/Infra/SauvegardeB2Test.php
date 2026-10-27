@@ -80,14 +80,17 @@ test('B2 — ne supprime jamais hors du bucket B2', function () {
     $code = codeB2('infra/scripts/backup-b2.sh');
 
     // Aucune commande de suppression de fichiers/dossiers locaux ni distants.
-    expect($code)->not->toMatch('/\brm\s+-[a-z]*r?f?\s+(?!"\$TMP")/');
+    // Le SEUL `rm` autorisé est celui du répertoire temporaire du script.
+    expect(preg_match_all('/\brm\b/', $code))->toBe(substr_count($code, 'rm -rf "$TMP"\''));
+    expect($code)->not->toMatch('/\brm\s+(?!-rf "\$TMP"\')/');
     expect($code)->not->toMatch('/\bfind\b[^\n]*(-delete|-exec\s+rm)/');
     expect($code)->not->toMatch('/\b(sftp|sshpass|scp|unlink|shred)\b/');
     expect($code)->not->toMatch('/\bSB_[A-Z]+/');
     expect($code)->not->toContain('BACKUP_DIR/$NOM');
 
     // Seule suppression distante : une VERSION de fichier du bucket B2.
-    expect(substr_count($code, 'b2_delete_file_version'))->toBe(1);
+    // (purge préalable sous plafond + rotation), toujours au-delà des plus récentes.
+    expect(substr_count($code, 'b2_delete_file_version'))->toBe(2);
     // Et seulement dans le préfixe de la rotation, après les 4 dernières.
     expect($code)->toContain('B2_COPIES_A_GARDER=4');
     expect($code)->toContain('.[$k:][]');
@@ -144,3 +147,113 @@ test('B2 — la surveillance a un job borné qui ne rougit pas sans configuratio
     expect($verif)->toContain('SEUIL_AGE_J="${SEUIL_AGE_J:-9}"');
     expect($verif)->toContain('SEUIL_TAILLE_MO="${SEUIL_TAILLE_MO:-100}"');
 });
+
+
+/**
+ * Lance backup-b2.sh avec un `curl` simulé dans le PATH.
+ *
+ * @param  list<int>  $taillesVersions  tailles des copies déjà dans le bucket, de la plus ancienne à la plus récente
+ * @return array{code: int, sortie: string, appels: string}
+ */
+function lancerBackupB2Simule(array $taillesVersions, bool $archiveRecente = true): array
+{
+    $dir = sys_get_temp_dir() . '/b2sim_' . bin2hex(random_bytes(6));
+    mkdir($dir . '/bin', 0700, true);
+    mkdir($dir . '/backups', 0700, true);
+
+    $versions = [];
+    foreach ($taillesVersions as $i => $taille) {
+        $versions[] = [
+            'fileId' => 'id' . ($i + 1),
+            'fileName' => 'axion-crm/axion_crm_2026010' . ($i + 1) . '.sql.gz.enc',
+            'action' => 'upload',
+            'contentLength' => $taille,
+            'uploadTimestamp' => 1_700_000_000_000 + $i * 1000,
+        ];
+    }
+    file_put_contents($dir . '/versions.json', (string) json_encode(['files' => $versions, 'nextFileName' => null]));
+
+    $archive = $dir . '/backups/axion_crm_20260301T030000Z.sql.gz.enc';
+    file_put_contents($archive, str_repeat('x', 1000));
+    if (! $archiveRecente) {
+        touch($archive, time() - 3 * 86400);
+    }
+
+    file_put_contents($dir . '/bin/curl', <<<'SH'
+#!/usr/bin/env bash
+url="${@: -1}"; file=""; data=""
+while [ $# -gt 0 ]; do
+    case "$1" in -T) file="$2"; shift ;; -d) data="$2"; shift ;; esac
+    shift
+done
+echo "$url $data" >> "$FAKE_LOG"
+case "$url" in
+    *authorize_account) echo '{"accountId":"acc","authorizationToken":"tok","apiInfo":{"storageApi":{"apiUrl":"https://api.test"}}}' ;;
+    *b2_list_buckets) echo '{"buckets":[{"bucketId":"bk"}]}' ;;
+    *b2_list_file_versions) cat "$FAKE_VERSIONS" ;;
+    *b2_get_upload_url) echo '{"uploadUrl":"https://upload.test/u","authorizationToken":"tok2"}' ;;
+    https://upload.test/*) jq -nc --arg s "$(sha1sum "$file" | cut -d' ' -f1)" --argjson l "$(stat -c%s "$file")" '{contentSha1:$s,contentLength:$l}' ;;
+    *b2_delete_file_version) echo '{}' ;;
+esac
+SH);
+    chmod($dir . '/bin/curl', 0700);
+
+    $sortie = [];
+    $code = -1;
+    exec(
+        'env PATH=' . escapeshellarg($dir . '/bin:' . (string) getenv('PATH'))
+        . ' FAKE_LOG=' . escapeshellarg($dir . '/appels.log')
+        . ' FAKE_VERSIONS=' . escapeshellarg($dir . '/versions.json')
+        . ' B2_KEY_ID=k B2_APP_KEY=s B2_BUCKET=bucket FORCE_B2=1'
+        . ' BACKUP_DIR=' . escapeshellarg($dir . '/backups')
+        . ' bash ' . escapeshellarg(racineDepotB2() . '/infra/scripts/backup-b2.sh') . ' 2>&1',
+        $sortie,
+        $code,
+    );
+    $appels = is_file($dir . '/appels.log') ? (string) file_get_contents($dir . '/appels.log') : '';
+    exec('rm -rf ' . escapeshellarg($dir));
+
+    return ['code' => $code, 'sortie' => implode("\n", $sortie), 'appels' => $appels];
+}
+
+$sansEnvProd = fn () => is_file('/opt/axion-crm-pro/.env');
+
+test('B2 simulé — la rotation ne garde que 4 copies et ne supprime que dans B2', function () {
+    $r = lancerBackupB2Simule([1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000]);
+
+    expect($r['code'])->toBe(0);
+    expect($r['appels'])->toContain('b2_get_upload_url');
+    expect(substr_count($r['appels'], 'b2_delete_file_version'))->toBe(2);
+    expect($r['appels'])->toContain('"fileId":"id1"');
+    expect($r['appels'])->toContain('"fileId":"id2"');
+    expect($r['appels'])->not->toContain('"fileId":"id3"');
+})->skip($sansEnvProd, 'Un .env de production existe sur cette machine.');
+
+test('B2 simulé — le plafond purge d abord les copies condamnées puis envoie', function () {
+    // 4 × 2,4 Go = 9,6 Go : l'envoi dépasserait 9 Go, mais la plus ancienne sera supprimée par la rotation.
+    $r = lancerBackupB2Simule([2_400_000_000, 2_400_000_000, 2_400_000_000, 2_400_000_000]);
+
+    expect($r['code'])->toBe(0);
+    expect(substr_count($r['appels'], 'b2_delete_file_version'))->toBe(1);
+    expect($r['appels'])->toContain('"fileId":"id1"');
+    $posSuppression = strpos($r['appels'], 'b2_delete_file_version');
+    $posEnvoi = strpos($r['appels'], 'b2_get_upload_url');
+    expect($posSuppression)->toBeLessThan($posEnvoi);
+})->skip($sansEnvProd, 'Un .env de production existe sur cette machine.');
+
+test('B2 simulé — le plafond reste DUR : rien n est envoyé ni supprimé s il est dépassé', function () {
+    $r = lancerBackupB2Simule([3_100_000_000, 3_100_000_000, 3_100_000_000]);
+
+    expect($r['code'])->toBe(1);
+    expect($r['sortie'])->toContain('PLAFOND');
+    expect($r['appels'])->not->toContain('b2_get_upload_url');
+    expect($r['appels'])->not->toContain('b2_delete_file_version');
+})->skip($sansEnvProd, 'Un .env de production existe sur cette machine.');
+
+test('B2 simulé — une archive locale de plus de 2 jours est refusée', function () {
+    $r = lancerBackupB2Simule([1_000_000], false);
+
+    expect($r['code'])->toBe(1);
+    expect($r['sortie'])->toContain('plus de 2 jours');
+    expect($r['appels'])->not->toContain('b2_get_upload_url');
+})->skip($sansEnvProd, 'Un .env de production existe sur cette machine.');

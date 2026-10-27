@@ -162,6 +162,9 @@ jobs:
           SEUIL_TAILLE_MO: ${{ github.event.inputs.seuil_taille_mo || '100' }}
         run: |
           set -euo pipefail
+          for v in "$SEUIL_AGE_J" "$SEUIL_TAILLE_MO"; do
+            [[ "$v" =~ ^[0-9]+$ ]] || { echo "::error::Seuil non numérique refusé : $v"; exit 1; }
+          done
           set +e
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$USER@$HOST" \
             "SEUIL_AGE_J='$SEUIL_AGE_J' SEUIL_TAILLE_MO='$SEUIL_TAILLE_MO' \

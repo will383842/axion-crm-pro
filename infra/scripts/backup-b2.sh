@@ -6,6 +6,9 @@
 # `axion_crm_<horodatage>.sql.gz.enc` (produite par backup-postgres.sh, déjà
 # chiffrée AES-256) vers un bucket Backblaze B2. Coût NUL : 10 Go gratuits.
 #
+# ⚠️ COMPTE B2 DÉDIÉ, AUCUN AUTRE BUCKET : les 10 Go gratuits valent pour TOUT
+# le compte, pas par bucket. Le plafond ci-dessous ne voit que ce bucket.
+#
 # Choix de l'outil : `curl` + API NATIVE de B2 (+ `jq` pour lire le JSON).
 #  · curl est déjà sur le serveur et sert déjà aux scripts du dépôt ; `jq` est
 #    un paquet apt de la distribution (installé par setup-backup-b2.sh).
@@ -18,7 +21,10 @@
 #  · B2_KEY_ID / B2_APP_KEY / B2_BUCKET absentes → « non configuré », code 0,
 #    pour ne pas casser le cron avant la pose des clés ;
 #  · PLAFOND DUR : si le bucket dépasserait 9 Go après envoi, rien n'est envoyé
-#    et le script sort en erreur (le coût doit rester NUL) ;
+#    et le script sort en erreur (le coût doit rester NUL). Les copies que la
+#    rotation supprimerait de toute façon (au-delà des 3 plus récentes) sont
+#    purgées AVANT l'envoi si le plafond l'exige — jamais en dessous de 3 ;
+#  · refuse une archive locale de plus de 2 jours (sauvegarde quotidienne en panne) ;
 #  · on garde les 4 dernières copies ; les plus anciennes sont supprimées
 #    UNIQUEMENT dans le bucket B2 (jamais en local, jamais sur la Storage Box) ;
 #  · ne lit ni n'affiche jamais BACKUP_ENCRYPTION_PASSPHRASE ni les clés B2.
@@ -71,6 +77,10 @@ if [ -z "$ARCHIVE" ]; then
     exit 1
 fi
 NOM="$(basename "$ARCHIVE")"
+if [ -z "$(find "$ARCHIVE" -maxdepth 0 -mmin -2880 2>/dev/null)" ]; then
+    log "❌ Archive locale $NOM de plus de 2 jours : la sauvegarde quotidienne est en panne, rien n'est envoyé."
+    exit 1
+fi
 TAILLE="$(stat -c%s "$ARCHIVE")"
 log "Archive retenue : $NOM ($((TAILLE / 1048576)) Mo)"
 
@@ -110,16 +120,39 @@ if [ "$(jq -r '.nextFileName // empty' "$TMP/versions.json")" != "" ]; then
 fi
 TOTAL="$(jq '[.files[].contentLength] | add // 0' "$TMP/versions.json")"
 
-if jq -e --arg n "$B2_PREFIX$NOM" '.files[] | select(.fileName == $n)' "$TMP/versions.json" >/dev/null; then
+if jq -e --arg n "$B2_PREFIX$NOM" '.files[] | select(.action == "upload" and .fileName == $n)' "$TMP/versions.json" >/dev/null; then
     log "✅ $NOM est déjà dans le bucket — rien à envoyer."
     exit 0
 fi
 
 # --- 6. PLAFOND DUR ---
+# Après l'envoi, la rotation ne garde que $B2_COPIES_A_GARDER copies : seules les
+# (COPIES-1) plus récentes déjà présentes survivent. Les autres sont déjà
+# condamnées ; on les purge AVANT l'envoi si le plafond l'exige, et seulement
+# s'il en reste au moins COPIES-1 (=3) ensuite. Le plafond reste dur.
+GARDEES_AVANT=$((B2_COPIES_A_GARDER - 1))
+jq -r --argjson k "$GARDEES_AVANT" --arg p "$B2_PREFIX" \
+    '[.files[] | select(.action == "upload" and (.fileName | startswith($p)))] | sort_by(.uploadTimestamp) | reverse
+     | . as $tous | ($tous | length) as $n | if $n > $k then .[$k:][] | "\(.fileId)\t\(.fileName)\t\(.contentLength)" else empty end' \
+    "$TMP/versions.json" > "$TMP/purge_avant.tsv"
+CONDAMNE=0
+while IFS=$'\t' read -r _ _ LONG; do
+    [ -n "$LONG" ] && CONDAMNE=$((CONDAMNE + LONG))
+done < "$TMP/purge_avant.tsv"
+
 if [ $((TOTAL + TAILLE)) -gt "$B2_PLAFOND_OCTETS" ]; then
-    log "❌ PLAFOND : bucket à $((TOTAL / 1048576)) Mo + $((TAILLE / 1048576)) Mo dépasserait $((B2_PLAFOND_OCTETS / 1000000)) Mo."
-    log "   Rien n'est envoyé (coût nul exigé). Vider ou purger le bucket B2 à la main, ou relever le plafond en connaissance de cause."
-    exit 1
+    if [ -s "$TMP/purge_avant.tsv" ] && [ $((TOTAL - CONDAMNE + TAILLE)) -le "$B2_PLAFOND_OCTETS" ]; then
+        while IFS=$'\t' read -r FILE_ID FILE_NAME _; do
+            [ -n "$FILE_ID" ] || continue
+            log "Plafond : purge préalable de l'ancienne copie $FILE_NAME (hors des $GARDEES_AVANT plus récentes conservées)"
+            b2_post b2_delete_file_version "$(jq -nc --arg i "$FILE_ID" --arg n "$FILE_NAME" '{fileId:$i,fileName:$n}')" >/dev/null
+        done < "$TMP/purge_avant.tsv"
+        TOTAL=$((TOTAL - CONDAMNE))
+    else
+        log "❌ PLAFOND : bucket à $((TOTAL / 1048576)) Mo + $((TAILLE / 1048576)) Mo dépasserait $((B2_PLAFOND_OCTETS / 1000000)) Mo, même après rotation."
+        log "   Rien n'est envoyé (coût nul exigé). Vider ou purger le bucket B2 à la main, ou relever le plafond en connaissance de cause."
+        exit 1
+    fi
 fi
 
 # --- 7. Envoi + contrôle SHA-1 / taille ---

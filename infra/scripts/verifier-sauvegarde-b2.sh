@@ -58,8 +58,10 @@ if [ -z "$BUCKET_ID" ]; then
     exit 1
 fi
 
-DERNIERE="$(b2_post b2_list_file_versions "$(jq -nc --arg b "$BUCKET_ID" '{bucketId:$b,prefix:"axion-crm/",maxFileCount:1000}')" \
-    | jq -c '[.files[] | select(.action == "upload")] | sort_by(.uploadTimestamp) | last // empty')"
+# Volume TOTAL du bucket (toutes versions, sans préfixe : c'est ce qui est facturé).
+b2_post b2_list_file_versions "$(jq -nc --arg b "$BUCKET_ID" '{bucketId:$b,maxFileCount:1000}')" > "$TMP/versions.json"
+TOTAL_OCTETS="$(jq '[.files[].contentLength] | add // 0' "$TMP/versions.json")"
+DERNIERE="$(jq -c --arg p "axion-crm/" '[.files[] | select(.action == "upload" and (.fileName | startswith($p)))] | sort_by(.uploadTimestamp) | last // empty' "$TMP/versions.json")"
 if [ -z "$DERNIERE" ]; then
     log "❌ Aucune copie dans le bucket B2."
     exit 1
@@ -71,6 +73,10 @@ AGE_J=$(( ($(date -u +%s) - $(jq -r '.uploadTimestamp' <<<"$DERNIERE") / 1000) /
 log "Dernière copie : $NOM — ${TAILLE_MO} Mo, âgée de ${AGE_J} jour(s)."
 
 CODE=0
+if [ "$TOTAL_OCTETS" -gt 8000000000 ]; then
+    log "❌ Bucket B2 à $((TOTAL_OCTETS / 1048576)) Mo : au-delà de 8 Go (10 Go gratuits pour tout le compte)."
+    CODE=1
+fi
 if [ "$AGE_J" -ge "$SEUIL_AGE_J" ]; then
     log "❌ Copie trop vieille : ${AGE_J} j (seuil : moins de ${SEUIL_AGE_J} j)."
     CODE=1

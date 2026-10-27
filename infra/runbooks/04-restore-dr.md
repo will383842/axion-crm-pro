@@ -430,7 +430,8 @@ Deux chemins, dans cet ordre de préférence :
 seconde copie hors-site, hebdomadaire (dimanche 04:30 UTC), posée par
 `infra/scripts/setup-backup-b2.sh` et envoyée par `infra/scripts/backup-b2.sh`.
 Elle garde les **4 dernières** archives chiffrées `axion_crm_<horodatage>.sql.gz.enc`
-sous le préfixe `axion-crm/` du bucket. Elle n'existe que si Will a posé
+sous le préfixe `axion-crm/` du bucket. Elle exige un **compte B2 dédié, aucun autre bucket** (les 10 Go gratuits valent
+pour tout le compte). Elle n'existe que si Will a posé
 `B2_KEY_ID`, `B2_APP_KEY` et `B2_BUCKET` dans le `.env` : sinon le script répond
 « non configuré » et il n'y a rien à reprendre ici.
 
@@ -441,7 +442,13 @@ sous le préfixe `axion-crm/` du bucket. Elle n'existe que si Will a posé
 > avec lui.
 
 1. Dans la console web de B2, télécharge l'archive la plus récente du bucket
-   (dossier `axion-crm/`) vers `/tmp/restore`. Note son SHA-1, affiché sur sa fiche.
+   (dossier `axion-crm/`). Note son SHA-1, affiché sur sa fiche.
+   **Rapatrie-la vers le serveur** : soit depuis ton poste
+   `scp axion_crm_20260820T030000Z.sql.gz.enc root@<serveur>:/tmp/restore/`
+   (après `mkdir -p /tmp/restore` sur le serveur), soit directement sur le serveur
+   avec `curl` sur l'URL `b2_download_file_by_name` de ton bucket
+   (`<downloadUrl>/file/<bucket>/axion-crm/<archive>`), l'en-tête `Authorization`
+   étant lu depuis un fichier de configuration `curl -K` (jamais en argument).
 2. Contrôle le transfert, puis déchiffre avec les **mêmes paramètres** que
    `backup-postgres.sh` (`-pbkdf2 -iter 100000` : sans eux, « bad decrypt »
    même avec la bonne phrase) :
@@ -457,7 +464,7 @@ gunzip -t /tmp/restore/axion_crm_20260820T030000Z.sql.gz
 3. Poursuis au §3 (remonter la pile) puis au §4 : `restore-postgres.sh` prend
    l'archive déchiffrée `.sql.gz`.
 4. Une fois la nouvelle machine debout, repose les clés `B2_*` dans son `.env`
-   et relance `infra/scripts/setup-backup-b2.sh` (§9).
+   et relance `infra/scripts/setup-backup-b2.sh` (cron hebdomadaire B2, voir aussi §9).
 
 La surveillance de cette copie est le job `verifier-b2` de
 `.github/workflows/surveillance-sauvegarde.yml` (alerte au-delà de 9 jours ou
@@ -480,6 +487,10 @@ crontab -l
 `setup-backup.sh` vérifie `sshpass` et `SB_PASSWORD`, teste l'accès à la Storage
 Box, crée le dossier distant, **lance une première sauvegarde**, puis installe le
 cron quotidien de 03:00 UTC vers `/var/log/axion-backup.log`.
+
+Si la copie hors-site Backblaze B2 est utilisée (§8 bis), lance aussi
+`bash /opt/axion-crm-pro/infra/scripts/setup-backup-b2.sh` : il installe `jq` et
+le cron hebdomadaire du dimanche 04:30 UTC.
 
 Le lendemain, confirme :
 

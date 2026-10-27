@@ -96,8 +96,9 @@ class CrmSanteEnrichirFiness extends Command
             $b = $service->executer($workspaceId, $fichier, $appliquer, $categories, $paquet, $classer, $inclure);
         } catch (Throwable $e) {
             if ($e instanceof InvalidArgumentException) {
-                // Message brut réservé aux erreurs de lecture du fichier (colonnes manquantes) ; sinon libellé fixe.
-                $this->error('Échec : fichier invalide ou argument invalide.');
+                // Message brut réservé aux colonnes manquantes (noms de colonnes seulement) ; sinon libellé fixe.
+                $m = $e->getMessage();
+                $this->error(str_starts_with($m, 'Colonnes manquantes') ? 'Échec : ' . $m : 'Échec : fichier invalide ou argument invalide.');
 
                 return self::FAILURE;
             }
@@ -119,6 +120,7 @@ class CrmSanteEnrichirFiness extends Command
         $this->line(sprintf('  fiches enrichies : %d', $b['fiches_enrichies']));
         $this->line(sprintf('  fiches %s : %d, conflits de catégorie (rien écrit) : %d', $appliquer ? 'classées' : 'à classer', $b['classees'], $b['categorie_conflit']));
         $this->line(sprintf('  fiches non_officine incluses : %d', $b['non_officine_incluses']));
+        $this->line(sprintf('  fiches déjà classées (même code) : %d, fiches non classées pour opposition : %d', $b['deja_classee'], $b['classement_opposition']));
         $this->line(sprintf('  paquets en échec : %d', $b['lots_en_echec']));
         foreach ($b['par_categorie'] as $code => $c) {
             $this->line(sprintf(

@@ -305,7 +305,7 @@ it('essai à blanc : rien n\'est écrit, bilan par catégorie exact', function (
         expect($f->phone)->toBeNull()->and($f->lat)->toBeNull();
     }
     expect($sortie)->toContain('ESSAI À BLANC');
-    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies', 'classees', 'categorie_conflit', 'non_officine_incluses'], 0);
+    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies', 'classees', 'categorie_conflit', 'non_officine_incluses', 'deja_classee', 'classement_opposition'], 0);
     expect($r['par_categorie']['101'])->toEqual(array_merge($zero, ['actives' => 2, 'trouvees_n1' => 1, 'cp_divergent' => 1, 'tel' => 1, 'adr' => 1, 'gps' => 1, 'fiches_enrichies' => 1]));
     expect($r['par_categorie']['106'])->toEqual(array_merge($zero, ['actives' => 2, 'sans_siret' => 1, 'trouvees_n2' => 1, 'tel' => 1, 'fiches_enrichies' => 1]));
     expect($r['tel'])->toBe(2)->and($r['fiches_enrichies'])->toBe(2)->and($r['actives'])->toBe(4);
@@ -507,4 +507,64 @@ it('--max-classer dépassé : apply refusé, rien n\'est écrit', function () {
     }
     $code = Artisan::call('crm:sante:enrichir-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true, '--classer' => true, '--max-classer' => 2]);
     expect($code)->toBe(0)->and(metaSante($a)['finess_categorie'])->toBe('355');
+});
+
+it('classer : fiche N2 (rapprochée par SIREN) jamais classée', function () {
+    $espace = F::espace();
+    $siren = F::siren();
+    $id = F::fiche($espace, 'ZZ CLINIQUE', ['siren' => $siren, 'siret' => null, 'legal_form' => '5499', 'postcode' => '99003']);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($siren . '00011')]));
+
+    expect($r['trouvees_n2'])->toBe(1)->and($r['classees'])->toBe(0);
+    expect(metaSante($id))->not->toHaveKey('finess_categorie');
+});
+
+it('classer : fiche en opposition (téléphone, e-mail) jamais classée, compteur dédié', function () {
+    $espace = F::espace();
+    $email = 'zz-classe-opposee@zz.example.invalid';
+    [$a, $sa] = ficheSante($espace, ['phone' => '01 40 00 00 05']);
+    [$b, $sb] = ficheSante($espace, ['email_generic' => $email]);
+    DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 05', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    DB::table('opt_out')->insert(['email_hash' => hash('sha256', $email), 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($sa), ['telephone' => ''] + ligneClassee($sb)]));
+
+    foreach ([$a, $b] as $id) {
+        expect(metaSante($id))->not->toHaveKey('finess_categorie');
+    }
+    expect($r['classement_opposition'])->toBe(2)->and($r['classees'])->toBe(0);
+});
+
+it('classer : même code déjà présent → deja_classee, ni classees ni categorie_conflit', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace, ['metadata' => json_encode(['finess_categorie' => '355'])]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($siret)]));
+
+    expect($r['deja_classee'])->toBe(1)->and($r['classees'])->toBe(0)->and($r['categorie_conflit'])->toBe(0);
+    expect(metaSante($id))->not->toHaveKey('finess_categorie_libelle');
+});
+
+it('classer : metadata NULL → fiche classée', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace);
+    DB::table('companies')->where('id', $id)->update(['metadata' => null]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($siret)]));
+
+    expect($r['classees'])->toBe(1)->and(metaSante($id)['finess_categorie'])->toBe('355');
+});
+
+it('--classer sans --apply via Artisan : rien n\'est écrit, sortie en totaux seulement', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace);
+    $csv = csvSante([ligneClassee($siret)]);
+
+    $code = Artisan::call('crm:sante:enrichir-finess', ['fichier' => $csv, '--workspace' => $espace, '--classer' => true]);
+    $sortie = Artisan::output();
+
+    expect($code)->toBe(0)->and(metaSante($id))->not->toHaveKey('finess_categorie');
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
+    expect($sortie)->toContain('ESSAI À BLANC')->toContain('fiches à classer : 1')->not->toContain('01 40 00 00 01')->not->toContain($siret);
 });

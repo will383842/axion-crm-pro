@@ -22,7 +22,7 @@ final class SelectionEnrichissement
      * Personne physique côté SQL : forme juridique « 1xxx », VIDE ou NULL (par prudence),
      * ou marque `metadata.personne_physique`. Même critère que `estPersonnePhysique`.
      */
-    private const PHYSIQUE_SQL = "(COALESCE(btrim(legal_form), '') = '' OR btrim(legal_form) LIKE '1%' OR COALESCE(metadata->>'personne_physique', '') = 'true')";
+    public const PHYSIQUE_SQL = "(COALESCE(btrim(legal_form), '') = '' OR btrim(legal_form) LIKE '1%' OR COALESCE(metadata->>'personne_physique', '') = 'true')";
 
     /**
      * Colonnes dont l'absence compte comme « champ manquant ». Pour une personne

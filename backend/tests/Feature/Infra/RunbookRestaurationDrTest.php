@@ -909,8 +909,11 @@ test('P6-DR — le runbook ne promet plus une sauvegarde horaire ni un stockage 
     $minuscules = mb_strtolower($contenu);
 
     foreach ([
-        'backblaze' => "aucun compte Backblaze n'est configure nulle part dans le depot ; la "
-            . 'seule copie hors-site est une Storage Box Hetzner en SFTP.',
+        // Depuis la PR #372, une seconde copie HEBDOMADAIRE vers Backblaze B2 existe vraiment
+        // (`infra/scripts/backup-b2.sh`) : le mot seul n'est plus une promesse fantome. Reste
+        // interdit : la promettre CONTINUE ou horaire.
+        'backblaze en continu' => 'la copie Backblaze est hebdomadaire (dimanche), jamais continue.',
+        'backblaze horaire' => 'la copie Backblaze est hebdomadaire (dimanche), jamais horaire.',
         'wal streaming' => "aucun archivage WAL n'est configure : `archive_mode` n'apparait dans "
             . 'aucun fichier du depot. Promettre du WAL, c est promettre un RPO d une minute '
             . 'sur une sauvegarde QUOTIDIENNE.',

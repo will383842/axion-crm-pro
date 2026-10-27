@@ -97,8 +97,22 @@ class CrmSanteEnrichirFiness extends Command
         foreach ($b['par_categorie'] as $code => $c) {
             $this->line(sprintf(
                 '  catégorie %s : actives %d, sans_siret %d, n1 %d, n2 %d, ambigu %d, partagé %d, autre_siret %d, cp_divergent %d, exclues %d, pp %d, opposition %d, tel %d, adr %d, gps %d, enrichies %d',
-                $code, $c['actives'], $c['sans_siret'], $c['trouvees_n1'], $c['trouvees_n2'], $c['siren_ambigu'], $c['siret_partage'],
-                $c['siret_different'], $c['cp_divergent'], $c['exclues'], $c['pp'], $c['opposition'], $c['tel'], $c['adr'], $c['gps'], $c['fiches_enrichies'],
+                $code,
+                $c['actives'],
+                $c['sans_siret'],
+                $c['trouvees_n1'],
+                $c['trouvees_n2'],
+                $c['siren_ambigu'],
+                $c['siret_partage'],
+                $c['siret_different'],
+                $c['cp_divergent'],
+                $c['exclues'],
+                $c['pp'],
+                $c['opposition'],
+                $c['tel'],
+                $c['adr'],
+                $c['gps'],
+                $c['fiches_enrichies'],
             ));
         }
 

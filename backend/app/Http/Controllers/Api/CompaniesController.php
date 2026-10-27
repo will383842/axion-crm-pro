@@ -509,6 +509,9 @@ class CompaniesController extends ApiController
         // d'index dédié : la colonne est NULL sur la quasi-totalité des
         // fiches, le filtre s'applique aux lignes déjà lues par l'export.
         $filtree->whereNull('companies.insee_non_diffusible_le');
+        // FERMÉES INSEE (décision du 27/10/2026) : masquées par défaut aussi à
+        // l'export ; `fermees=inclure|seules` les remet. Rien n'est effacé.
+        EntreprisesFermees::appliquer($filtree, EntreprisesFermees::mode($r->query('fermees')));
         $filtree->with($hasSante
             ? ['contacts' => $chargeContacts, 'healthPractitioners']
             : ['contacts' => $chargeContacts]);

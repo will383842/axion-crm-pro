@@ -9,6 +9,7 @@ use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
 use App\Support\CelluleCsv;
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\WorkspaceContext;
@@ -445,13 +446,14 @@ class PersonnesController extends ConsoleController
             'inclure_non_prospectables' => ['nullable', 'string', 'in:oui,non'],
         ]);
         $tous = ($choix['inclure_non_prospectables'] ?? null) === 'oui';
+        $fermees = EntreprisesFermees::mode($request->query('fermees'));
 
         $entete = ['Adresse', 'Prénom', 'Nom', 'Nature', 'Source', 'Statut lettre', 'Base légale (lettre)', 'Consentement (version)', 'Consentement le', 'Prospection autorisée', 'Rattachée', 'SIREN', 'Dernière interaction', 'Entrepreneur individuel'];
 
         // La requête est construite ICI, sous le contexte d'espace, et lue dans
         // le flux ; le contexte est reposé autour de la lecture.
-        return response()->streamDownload(function () use ($workspaceId, $filtres, $masquer, $entete, $tous): void {
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $filtres, $masquer, $entete, $tous): void {
+        return response()->streamDownload(function () use ($workspaceId, $filtres, $masquer, $entete, $tous, $fermees): void {
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $filtres, $masquer, $entete, $tous, $fermees): void {
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
@@ -476,6 +478,10 @@ class PersonnesController extends ConsoleController
                 // rien à indexer ; sans fiche (LEFT JOIN nul) : rien à exclure.
                 // Rien n'est effacé.
                 $requete->whereNull('companies.insee_non_diffusible_le');
+                // FERMÉES INSEE (décision du 27/10/2026) : la personne d'une
+                // fiche fermée ne sort pas par défaut ; `fermees=inclure|seules`
+                // la remet. Même jointure : sans fiche (LEFT JOIN nul), rien à exclure.
+                EntreprisesFermees::appliquer($requete, $fermees, 'companies');
                 // 🔴 QUARANTAINE (lot N5, `QuarantaineSite`) : une adresse
                 // venue d'un site deviné non vérifié ne sort JAMAIS — même
                 // avec `inclure_non_prospectables=oui`. Posée sur la jointure

@@ -369,6 +369,8 @@ class AudiencesController extends ApiController
             // prochain rafraîchissement — il ne s'affiche plus d'ici là (aucun
             // envoi n'était possible : `EligibiliteAdresse` l'écarte déjà).
             ->whereNull('c.insee_non_diffusible_le')
+            // Fermées INSEE (27/10/2026) : un membre inscrit avant la fermeture ne s'affiche plus.
+            ->whereNull('c.insee_ferme_le')
             ->select(
                 'am.id',
                 'am.added_at',

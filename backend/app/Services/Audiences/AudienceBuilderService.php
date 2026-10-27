@@ -765,7 +765,10 @@ class AudienceBuilderService
         // 4,35 M de fiches ; le filtre s'applique aux lignes que les critères
         // ont déjà retenues.
         $query = Company::query()->where('workspace_id', $workspaceId)
-            ->whereNull('companies.insee_non_diffusible_le');
+            ->whereNull('companies.insee_non_diffusible_le')
+            // Fermées INSEE (décision du 27/10/2026) : hors de toute audience,
+            // preview et compteurs compris. Rien n'est effacé en base.
+            ->whereNull('companies.insee_ferme_le');
 
         // 🔴 CLIENT DE LA CONSOLE (synchro du dossier client, garde-fou (h),
         // relecture #341) : n'entre dans AUCUNE audience, même par une liste

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Contact;
 use App\Support\ContactQueryFilters;
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,14 +43,18 @@ class ContactsController extends ApiController
         $masquer = MasquageCoordonnees::requis();
 
         try {
-            $page = QueryBuilder::for(
+            // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée est
+            // masqué par défaut (`fermees=inclure|seules`).
+            $base = EntreprisesFermees::appliquerAuxContacts(
                 Contact::query()
                     // Scope EXPLICITE en plus de la RLS : la défense en
                     // profondeur du lot L0 vaut pour les deux couches.
                     ->where('workspace_id', $workspaceId)
                     ->whereNull('deleted_at')
                     ->with('company:id,denomination'),
-            )
+                EntreprisesFermees::mode($r->query('fermees')),
+            );
+            $page = QueryBuilder::for($base)
                 ->allowedFilters(...ContactQueryFilters::allowed())
                 ->allowedSorts(...['last_name', 'email_score', 'created_at'])
                 // Tri par défaut sur `id` DÉCROISSANT, adossé à l'index

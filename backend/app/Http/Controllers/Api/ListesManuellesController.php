@@ -314,7 +314,7 @@ class ListesManuellesController extends ApiController
     {
         return $q
             ->whereRaw('(m.contact_id IS NULL OR ct.deleted_at IS NULL)')
-            ->whereRaw('EXISTS (SELECT 1 FROM companies ml_c WHERE ml_c.id = coalesce(m.company_id, ct.company_id) AND ml_c.deleted_at IS NULL)')
+            ->whereRaw('EXISTS (SELECT 1 FROM companies ml_c WHERE ml_c.id = coalesce(m.company_id, ct.company_id) AND ml_c.deleted_at IS NULL AND ml_c.insee_ferme_le IS NULL)')
             ->whereRaw(GardePresse::conditionSql('coalesce(m.company_id, ct.company_id)'))
             ->whereRaw('(m.contact_id IS NULL OR ' . GardePresse::conditionContactsSql('ct') . ')');
     }

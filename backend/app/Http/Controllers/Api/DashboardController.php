@@ -272,6 +272,8 @@ class DashboardController extends ApiController
                 $q->where(function ($sq) {
                     $sq->whereNotNull('email')->orWhereNotNull('phone');
                 });
+                // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée ne compte pas.
+                EntreprisesFermees::appliquerAuxContacts($q, EntreprisesFermees::MASQUER);
             }),
             'scraper_runs_24h' => $this->compter('scraper_runs', $espace, function ($q) {
                 $q->where('created_at', '>=', now()->subDay());

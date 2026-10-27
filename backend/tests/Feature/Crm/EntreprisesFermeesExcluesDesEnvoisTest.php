@@ -2,8 +2,8 @@
 
 /**
  * ENTREPRISES FERMÉES SELON L'INSEE : PLUS JAMAIS DESTINATAIRES D'UN ENVOI,
- * TOUJOURS DANS LES EXPORTS (décision du propriétaire, 05/10/2026 : « on
- * peut toujours les exporter, mais on ne leur écrit plus »).
+ * MASQUÉES AUSSI DES EXPORTS PAR DÉFAUT (décision du 27/10/2026, qui remplace
+ * celle du 05/10 : `fermees=inclure` les remet).
  *
  * Une adresse rattachée à une fiche marquée fermée par la mise à jour INSEE
  * (`companies.insee_ferme_le`) est exclue, motif `entreprise_fermee`, par la
@@ -175,7 +175,7 @@ test('liste en fichier : la fermée et sa personne sont écartées (ecartees_ent
         ->and(F::compteur($sortie, 'ecartees_entreprise_individuelle'))->toBe(0);
 });
 
-test('export CSV des entreprises : la fermée Y RESTE (décision : on exporte toujours)', function () {
+test('export CSV des entreprises : la fermée est masquée par défaut, fermees=inclure la remet (décision du 27/10/2026)', function () {
     $ws = F::espace('zz-fev-export');
     $commun = ['siren' => null, 'department_code' => '38'];
     F::fiche($ws, 'ZZ FEV EXPORT OUVERTE', $commun + ['email_generic' => 'contact@zz-fev-export-ouverte.example.invalid', 'prospection_status' => 'ready_for_outreach']);
@@ -190,7 +190,10 @@ test('export CSV des entreprises : la fermée Y RESTE (décision : on exporte to
     $u->assignRole('owner');
     $this->actingAs($u);
 
-    $csv = $this->get('/api/v1/companies/export')->assertOk()->streamedContent();
+    $parDefaut = $this->get('/api/v1/companies/export')->assertOk()->streamedContent();
+    expect($parDefaut)->toContain('ZZ FEV EXPORT OUVERTE')->not->toContain('ZZ FEV EXPORT FERMEE');
+
+    $csv = $this->get('/api/v1/companies/export?fermees=inclure')->assertOk()->streamedContent();
 
     expect($csv)->toContain('ZZ FEV EXPORT OUVERTE')
         ->and($csv)->toContain('ZZ FEV EXPORT FERMEE')

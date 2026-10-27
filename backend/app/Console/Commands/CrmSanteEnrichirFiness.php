@@ -73,7 +73,8 @@ class CrmSanteEnrichirFiness extends Command
             $b = (new EnrichissementFinessSante)->executer($workspaceId, $fichier, $appliquer, $categories, $paquet);
         } catch (Throwable $e) {
             if ($e instanceof InvalidArgumentException) {
-                $this->error('Échec : ' . $e->getMessage());
+                // Message brut réservé aux erreurs de lecture du fichier (colonnes manquantes) ; sinon libellé fixe.
+                $this->error('Échec : ' . (str_starts_with($e->getMessage(), 'Colonnes manquantes') ? $e->getMessage() : 'argument invalide'));
 
                 return self::FAILURE;
             }
@@ -86,8 +87,8 @@ class CrmSanteEnrichirFiness extends Command
         $this->info('Bilan' . ($appliquer ? '' : ' (ESSAI À BLANC)'));
         $this->line(sprintf('  lignes lues : %d (établissements actifs : %d, sans SIRET valide : %d)', $b['lignes'], $b['actives'], $b['sans_siret']));
         $this->line(sprintf('  fiches trouvées par SIRET (N1) : %d, par SIREN (N2) : %d', $b['trouvees_n1'], $b['trouvees_n2']));
-        $this->line(sprintf('  SIREN sans fiche utilisable (absente, fermée, protégée, corbeille) : %d', $b['exclues']));
-        $this->line(sprintf('  SIREN ambigus : %d, SIRET partagés : %d, autre SIRET sur la fiche : %d, code postal divergent : %d', $b['siren_ambigu'], $b['siret_partage'], $b['siret_different'], $b['cp_divergent']));
+        $this->line(sprintf('  SIREN sans fiche utilisable (absente, fermée, protégée, corbeille) : %d dont non_officine (exclusion volontaire) : %d', $b['exclues'], $b['exclues_non_officine']));
+        $this->line(sprintf('  SIREN ambigus : %d, SIRET partagés : %d, autre SIRET sur la fiche : %d, code postal divergent : %d, fiches à SIRET partagé : %d', $b['siren_ambigu'], $b['siret_partage'], $b['siret_different'], $b['cp_divergent'], $b['fiches_siret_partage']));
         $this->line(sprintf('  personnes physiques écartées : %d', $b['personnes_physiques_ecartees']));
         $this->line(sprintf('  écartées pour opposition : %d', $b['opposition']));
         $this->line(sprintf('  numéros invalides : %d, GPS hors France écartés : %d', $b['invalides'], $b['gps_hors_france']));

@@ -6,7 +6,9 @@
  * rapprochement N1 (SIRET) / N2 (SIREN) et gardes ; opposition écartée ; corbeille jamais touchée ; isolation par espace.
  */
 
+use App\Crm\Pharmacies\TelephonesFiness;
 use App\Crm\Sante\EnrichissementFinessSante;
+use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -131,16 +133,24 @@ it('--categories=620 ou invalide est refusé', function () {
     expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
 });
 
-it('N2 : fiche sans SIRET, un seul établissement actif, code postal égal ou même département', function () {
+it('N2 : fiche sans SIRET, un seul établissement actif, code postal égal', function () {
     $espace = F::espace();
     [$a, $sa] = ficheSante($espace, ['siret' => null, 'postcode' => '99003', 'address' => '1 RUE ZZ']);
-    [$b, $sb] = ficheSante($espace, ['siret' => '', 'department_code' => '99']);
 
-    $r = bilanSante($espace, csvSante([ligneSante($sa), ligneSante($sb)]));
+    $r = bilanSante($espace, csvSante([ligneSante($sa)]));
 
     expect(DB::table('companies')->where('id', $a)->value('phone'))->toBe('0140000001');
-    expect(DB::table('companies')->where('id', $b)->value('phone'))->toBe('0140000001');
-    expect($r['trouvees_n2'])->toBe(2)->and($r['trouvees_n1'])->toBe(0);
+    expect($r['trouvees_n2'])->toBe(1)->and($r['trouvees_n1'])->toBe(0);
+});
+
+it('N2 refusé : fiche sans code postal, même avec le même département', function () {
+    $espace = F::espace();
+    [$b, $sb] = ficheSante($espace, ['siret' => '', 'postcode' => null, 'department_code' => '99']);
+
+    $r = bilanSante($espace, csvSante([ligneSante($sb)]));
+
+    expect(DB::table('companies')->where('id', $b)->value('phone'))->toBeNull();
+    expect($r['cp_divergent'])->toBe(1)->and($r['trouvees_n2'])->toBe(0);
 });
 
 it('N2 refusé : deux établissements actifs pour le SIREN, ou code postal différent', function () {
@@ -295,7 +305,7 @@ it('essai à blanc : rien n\'est écrit, bilan par catégorie exact', function (
         expect($f->phone)->toBeNull()->and($f->lat)->toBeNull();
     }
     expect($sortie)->toContain('ESSAI À BLANC');
-    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies'], 0);
+    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies'], 0);
     expect($r['par_categorie']['101'])->toEqual(array_merge($zero, ['actives' => 2, 'trouvees_n1' => 1, 'cp_divergent' => 1, 'tel' => 1, 'adr' => 1, 'gps' => 1, 'fiches_enrichies' => 1]));
     expect($r['par_categorie']['106'])->toEqual(array_merge($zero, ['actives' => 2, 'sans_siret' => 1, 'trouvees_n2' => 1, 'tel' => 1, 'fiches_enrichies' => 1]));
     expect($r['tel'])->toBe(2)->and($r['fiches_enrichies'])->toBe(2)->and($r['actives'])->toBe(4);
@@ -328,4 +338,67 @@ it('ne lit ni n\'écrit jamais companies sans filtre sur le SIREN ou l\'identifi
     foreach ($visees as $sql) {
         expect(preg_match('/"siren" in|"id" = /', $sql))->toBe(1);
     }
+});
+
+
+it('SIREN avec un SIRET en 620 et un autre en 101, fiche sans SIRET : siren_ambigu', function () {
+    $espace = F::espace();
+    [$id, $siret, $siren] = ficheSante($espace, ['siret' => null, 'postcode' => '99003']);
+
+    $r = bilanSante($espace, csvSante([ligneSante($siren . '00029', '620'), ligneSante($siren . '00037', '101')]));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
+    expect($r['siren_ambigu'])->toBe(1)->and($r['trouvees_n2'])->toBe(0)->and($r['fiches_enrichies'])->toBe(0);
+});
+
+it('même SIRET en 620 et en 101 avec des téléphones différents : siret_partage', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace);
+    $l620 = ['telephone' => '04 00 00 00 02'] + ligneSante($siret, '620');
+
+    $r = bilanSante($espace, csvSante([ligneSante($siret, '101'), $l620]));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
+    expect($r['siret_partage'])->toBe(1)->and($r['fiches_siret_partage'])->toBe(1)->and($r['fiches_enrichies'])->toBe(0);
+});
+
+it('deux lignes identiques pour un même SIRET : pas un partage, la fiche est enrichie', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace);
+
+    $r = bilanSante($espace, csvSante([ligneSante($siret), ligneSante($siret)]));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBe('0140000001');
+    expect($r['siret_partage'])->toBe(0)->and($r['fiches_enrichies'])->toBe(1);
+});
+
+it('fiche non_officine : exclusion volontaire comptée à part', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace, ['metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
+
+    $r = bilanSante($espace, csvSante([ligneSante($siret)]));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
+    expect($r['exclues'])->toBe(1)->and($r['exclues_non_officine'])->toBe(1);
+});
+
+it('ecrire() directement : 0 ligne sur une fiche protégée ou déjà remplie', function () {
+    $espace = F::espace();
+    [$protegee] = ficheSante($espace);
+    [$remplie] = ficheSante($espace, ['address' => '9 RUE EXISTANTE', 'postcode' => '99003', 'city' => 'AUTRE', 'lat' => 45.0, 'lon' => 1.0]);
+    F::proteger($espace, $protegee, 'src:scraping-evenements-pro');
+    $adresse = ['rue' => '3 rue zz', 'champs' => ['address' => '3 RUE ZZ', 'postcode' => '99003', 'city' => 'ZZVILLE']];
+
+    $ecrits = WorkspaceContext::run($espace, function () use ($espace, $protegee, $remplie, $adresse): int {
+        $tf = new TelephonesFiness;
+
+        return $tf->ecrire($espace, $protegee, 'gps', [48.1, 2.1])
+            + $tf->ecrire($espace, $protegee, 'adresse', $adresse)
+            + $tf->ecrire($espace, $remplie, 'gps', [48.1, 2.1])
+            + $tf->ecrire($espace, $remplie, 'adresse', $adresse);
+    });
+
+    expect($ecrits)->toBe(0);
+    expect(DB::table('companies')->where('id', $protegee)->value('lat'))->toBeNull();
+    expect((float) DB::table('companies')->where('id', $remplie)->value('lat'))->toBe(45.0);
 });

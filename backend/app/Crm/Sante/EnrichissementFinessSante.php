@@ -21,7 +21,7 @@ use Throwable;
  *  - `finess_etablissements` ne contient que des officines : le rapprochement se fait dans `companies`
  *    (unique par espace + SIREN, `siret` non indexé) : `whereIn('siren')` par paquets, SIRET comparé en PHP ;
  *  - N1 : le SIRET de la fiche est celui de FINESS ; N2 (SIREN gardé) : fiche sans SIRET, un seul
- *    établissement FINESS actif (toutes catégories) pour ce SIREN, code postal égal (vide : même département) ;
+ *    établissement FINESS actif (toutes catégories) pour ce SIREN, code postal égal (fiche sans code postal : jamais rapprochée) ;
  *  - fiche avec un AUTRE SIRET : `siret_different` ; code postal différent : `cp_divergent` ; plusieurs
  *    établissements actifs pour un SIREN sans SIRET de fiche : `siren_ambigu` ; un SIRET porté par plusieurs
  *    lignes actives de téléphone ou d'adresse différents : `siret_partage` ; rien n'est écrit dans ces cas ;
@@ -30,12 +30,14 @@ use Throwable;
  *  - personne physique (forme « 1… » ou métadonnée) : fiche écartée ; numéro à ajouter, numéro déjà présent
  *    ou e-mail générique en opposition : fiche écartée ;
  *  - bilan : totaux et `par_categorie` seulement ; `exclues` = SIREN sans fiche utilisable (absente,
- *    fermée, protégée, corbeille : non distinguables sans lire la corbeille) ; `trouvees_*` = fiches
+ *    fermée, protégée, corbeille : non distinguables sans lire la corbeille) ; `exclues_non_officine` (sous-ensemble de
+ *    `exclues`) = fiches volontairement exclues par `metadata.type_etablissement = non_officine` ; `fiches_siret_partage`
+ *    = fiches dont le SIRET est partagé (déjà compté dans `siret_partage`) ; `trouvees_*` = fiches
  *    rapprochées après le contrôle du code postal ; `pp` et `opposition` en sont des sous-ensembles ;
  *  - un paquet en échec ne bloque pas les suivants ; ni message SQL ni numéro dans les journaux.
  *
  * @phpstan-type Compteurs array<string, int>
- * @phpstan-type Bilan array{lignes: int, lots_en_echec: int, invalides: int, gps_hors_france: int, actives: int, sans_siret: int, trouvees_n1: int, trouvees_n2: int, siren_ambigu: int, siret_partage: int, siret_different: int, cp_divergent: int, exclues: int, personnes_physiques_ecartees: int, opposition: int, tel: int, adr: int, gps: int, fiches_enrichies: int, par_categorie: array<string, array<string, int>>}
+ * @phpstan-type Bilan array{lignes: int, lots_en_echec: int, invalides: int, gps_hors_france: int, actives: int, sans_siret: int, trouvees_n1: int, trouvees_n2: int, siren_ambigu: int, siret_partage: int, siret_different: int, cp_divergent: int, exclues: int, exclues_non_officine: int, fiches_siret_partage: int, personnes_physiques_ecartees: int, opposition: int, tel: int, adr: int, gps: int, fiches_enrichies: int, par_categorie: array<string, array<string, int>>}
  */
 final class EnrichissementFinessSante
 {
@@ -43,7 +45,7 @@ final class EnrichissementFinessSante
 
     private const CLES = [
         'actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different',
-        'cp_divergent', 'exclues', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies',
+        'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies',
     ];
 
     /**
@@ -149,7 +151,7 @@ final class EnrichissementFinessSante
             'gps_hors_france' => $bilan['gps_hors_france'], 'actives' => $t['actives'], 'sans_siret' => $t['sans_siret'],
             'trouvees_n1' => $t['trouvees_n1'], 'trouvees_n2' => $t['trouvees_n2'], 'siren_ambigu' => $t['siren_ambigu'],
             'siret_partage' => $t['siret_partage'], 'siret_different' => $t['siret_different'], 'cp_divergent' => $t['cp_divergent'],
-            'exclues' => $t['exclues'], 'personnes_physiques_ecartees' => $t['pp'], 'opposition' => $t['opposition'],
+            'exclues' => $t['exclues'], 'exclues_non_officine' => $t['exclues_non_officine'], 'fiches_siret_partage' => $t['fiches_siret_partage'], 'personnes_physiques_ecartees' => $t['pp'], 'opposition' => $t['opposition'],
             'tel' => $t['tel'], 'adr' => $t['adr'], 'gps' => $t['gps'], 'fiches_enrichies' => $t['fiches_enrichies'],
             'par_categorie' => $par,
         ];
@@ -177,31 +179,6 @@ final class EnrichissementFinessSante
         return count($empreintes) > 1;
     }
 
-    /** Département depuis un code postal (97x/98x : trois chiffres, 20xxx : Corse). */
-    private function departement(string $cp): string
-    {
-        $cp = trim($cp);
-        if (preg_match('/^\d{5}$/', $cp) !== 1) {
-            return '';
-        }
-        if (str_starts_with($cp, '97') || str_starts_with($cp, '98')) {
-            return substr($cp, 0, 3);
-        }
-
-        return substr($cp, 0, 2);
-    }
-
-    private function memeDepartement(string $departementFiche, string $cp): bool
-    {
-        $d = $this->departement($cp);
-        $f = strtoupper(trim($departementFiche));
-        if ($d === '' || $f === '') {
-            return false;
-        }
-
-        return $d === '20' ? in_array($f, ['20', '2A', '2B'], true) : $f === $d;
-    }
-
     /**
      * @param  array<string, array<string, array<string, string>>>  $lot  siren → siret → ligne
      * @param  array<string, array<string, true>>  $partages
@@ -227,6 +204,17 @@ final class EnrichissementFinessSante
                 $extra[$siren] = ['siret' => trim((string) $c->siret), 'email' => trim((string) $c->email_generic), 'dep' => trim((string) $c->department_code)];
             }
 
+            // Exclusion volontaire (non_officine) : une seule lecture par paquet, sans la corbeille.
+            /** @var array<string, true> $nonOfficines */
+            $nonOfficines = [];
+            $no = DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')
+                ->whereIn('siren', array_map('strval', array_keys($lot)))
+                ->whereRaw("metadata->>'type_etablissement' = 'non_officine'");
+            FichesProtegees::exclure($no);
+            foreach ($no->pluck('siren') as $s) {
+                $nonOfficines[(string) $s] = true;
+            }
+
             /** @var array<string, array<string, int>> $par */
             $par = [];
             $compte = static function (string $cat, string $cle, int $n = 1) use (&$par): void {
@@ -245,6 +233,9 @@ final class EnrichissementFinessSante
                 $premiere = (string) (array_values($etablissements)[0]['categorie'] ?? '');
                 if (! isset($fiches[$siren])) {
                     $compte($premiere, 'exclues');
+                    if (isset($nonOfficines[$siren])) {
+                        $compte($premiere, 'exclues_non_officine');
+                    }
 
                     continue;
                 }
@@ -256,7 +247,9 @@ final class EnrichissementFinessSante
                     if (isset($etablissements[$ficheSiret])) {
                         $ligne = $etablissements[$ficheSiret];
                         $niveau = 1;
-                    } elseif (! isset($partages[$siren][$ficheSiret])) {
+                    } elseif (isset($partages[$siren][$ficheSiret])) {
+                        $compte($premiere, 'fiches_siret_partage');
+                    } else {
                         foreach ($etablissements as $l) {
                             $compte($l['categorie'], 'siret_different');
                         }
@@ -274,13 +267,13 @@ final class EnrichissementFinessSante
                 }
                 $cat = $ligne['categorie'];
 
-                // Garde 2 : code postal. N1 : divergent seulement si les deux existent ; N2 : égal, ou même département si la fiche n'en a pas.
+                // Garde 2 : code postal. N1 : divergent seulement si les deux existent ; N2 : code postal exigé et égal.
                 $cpFiche = trim($f->postcode);
                 $cpLigne = trim($ligne['code_postal']);
                 if ($niveau === 1) {
                     $divergent = $cpFiche !== '' && $cpLigne !== '' && $cpFiche !== $cpLigne;
                 } else {
-                    $divergent = $cpFiche !== '' ? $cpFiche !== $cpLigne : ! $this->memeDepartement($extra[$siren]['dep'], $cpLigne);
+                    $divergent = $cpFiche === '' || $cpFiche !== $cpLigne;
                 }
                 if ($divergent) {
                     $compte($cat, 'cp_divergent');

@@ -234,8 +234,12 @@ final class TelephonesFiness
             ->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'ecartee_motif')");
     }
 
-    /** Garde portée par chaque UPDATE : fiche ouverte ET non protégée, même si elle a changé entre-temps. */
-    private function gardes(Builder $q): Builder
+    /**
+     * Garde portée par chaque UPDATE : fiche ouverte ET non protégée, même si elle a changé entre-temps.
+     *
+     * @internal réutilisé par EnrichissementFinessSante
+     */
+    public function gardes(Builder $q): Builder
     {
         $this->ouvertes($q);
         $q->whereRaw(FichesProtegees::conditionSql('companies.id', null, 'companies.workspace_id'));
@@ -373,11 +377,13 @@ final class TelephonesFiness
     /**
      * Ce que FINESS peut ajouter à la fiche (champs vides ou NULL seulement) depuis UN établissement.
      *
+     * @internal réutilisé par EnrichissementFinessSante
+     *
      * @param  array<string, string>  $l
      * @param  array<string, int>  $locale  totaux du paquet (gps_hors_france)
      * @return array{adresse?: array{champs: array<string, string>, rue: string}, gps?: array{float, float}, date?: string}
      */
-    private function collecterAjouts(FicheFiness $f, array $l, array &$locale): array
+    public function collecterAjouts(FicheFiness $f, array $l, array &$locale): array
     {
         $a = [];
         $rue = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_filter(
@@ -476,8 +482,12 @@ final class TelephonesFiness
         return checkdate($mo, $d, $y) ? sprintf('%04d-%02d-%02d', $y, $mo, $d) : null;
     }
 
-    /** UPDATE conditionnel (champ vide / clé absente) : renvoie 1 si la fiche a été complétée. */
-    private function ecrire(string $workspaceId, int $id, string $type, mixed $valeur): int
+    /**
+     * UPDATE conditionnel (champ vide / clé absente) : renvoie 1 si la fiche a été complétée.
+     *
+     * @internal réutilisé par EnrichissementFinessSante
+     */
+    public function ecrire(string $workspaceId, int $id, string $type, mixed $valeur): int
     {
         $q = $this->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at'));
         if ($type === 'gps') {
@@ -549,8 +559,10 @@ final class TelephonesFiness
      * Personne physique = ce que l'import FINESS marque (`metadata.personne_physique`) ou une forme
      * juridique « 1… ». `legal_form` est NULL pour une personne morale importée de FINESS : un champ
      * vide n'est donc PAS une personne physique.
+     *
+     * @internal réutilisé par EnrichissementFinessSante
      */
-    private function estPersonnePhysique(string $legalForm, string $metadata): bool
+    public function estPersonnePhysique(string $legalForm, string $metadata): bool
     {
         if (str_starts_with(trim($legalForm), '1')) {
             return true;
@@ -597,8 +609,12 @@ final class TelephonesFiness
         return $map;
     }
 
-    /** @return \Generator<array<string, string>> */
-    private function lire(string $fichier): \Generator
+    /**
+     * @internal réutilisé par EnrichissementFinessSante
+     *
+     * @return \Generator<array<string, string>>
+     */
+    public function lire(string $fichier): \Generator
     {
         $f = new SplFileObject($fichier, 'r');
         $f->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::READ_AHEAD | SplFileObject::DROP_NEW_LINE);

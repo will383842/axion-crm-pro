@@ -305,7 +305,7 @@ it('essai à blanc : rien n\'est écrit, bilan par catégorie exact', function (
         expect($f->phone)->toBeNull()->and($f->lat)->toBeNull();
     }
     expect($sortie)->toContain('ESSAI À BLANC');
-    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies'], 0);
+    $zero = array_fill_keys(['actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different', 'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies', 'classees', 'categorie_conflit', 'non_officine_incluses'], 0);
     expect($r['par_categorie']['101'])->toEqual(array_merge($zero, ['actives' => 2, 'trouvees_n1' => 1, 'cp_divergent' => 1, 'tel' => 1, 'adr' => 1, 'gps' => 1, 'fiches_enrichies' => 1]));
     expect($r['par_categorie']['106'])->toEqual(array_merge($zero, ['actives' => 2, 'sans_siret' => 1, 'trouvees_n2' => 1, 'tel' => 1, 'fiches_enrichies' => 1]));
     expect($r['tel'])->toBe(2)->and($r['fiches_enrichies'])->toBe(2)->and($r['actives'])->toBe(4);
@@ -400,4 +400,111 @@ it('ecrire() directement : 0 ligne sur une fiche protégée ou déjà remplie', 
     expect($ecrits)->toBe(0);
     expect(DB::table('companies')->where('id', $protegee)->value('lat'))->toBeNull();
     expect((float) DB::table('companies')->where('id', $remplie)->value('lat'))->toBe(45.0);
+});
+
+/** @return array<string, string> ligne CSV avec libellés de catégorie */
+function ligneClassee(string $siret, string $categorie = '355', string $libelle = 'Centre Hospitalier ZZ', string $famille = 'Établissements hospitaliers'): array
+{
+    return array_merge(ligneSante($siret, $categorie), ['categorie_libelle' => $libelle, 'categorie_agregat_niv1_libelle' => $famille]);
+}
+
+function bilanClasse(string $espace, string $csv, bool $apply = true, bool $inclure = false): array
+{
+    return (new EnrichissementFinessSante)->executer($espace, $csv, $apply, [], 500, true, $inclure);
+}
+
+it('classer : fiche N1 déjà avec téléphone est classée avec le libellé du CSV', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace, ['phone' => '0499999999', 'metadata' => json_encode(['sector_main' => 'sante'])]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($siret)]));
+
+    $m = metaSante($id);
+    expect($m['finess_categorie'])->toBe('355')->and($m['finess_categorie_libelle'])->toBe('Centre Hospitalier ZZ')
+        ->and($m['finess_categorie_famille'])->toBe('Établissements hospitaliers')->and($m['sector_main'])->toBe('sante');
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBe('0499999999');
+    expect($r['classees'])->toBe(1)->and($r['categorie_conflit'])->toBe(0);
+});
+
+it('classer : CSV sans libellé → libellé de secours, code inconnu → libellé neutre', function () {
+    $espace = F::espace();
+    [$a, $sa] = ficheSante($espace);
+    [$b, $sb] = ficheSante($espace);
+
+    bilanClasse($espace, csvSante([ligneClassee($sa, '500', '', ''), ligneClassee($sb, '999', '', '')]));
+
+    expect(metaSante($a)['finess_categorie_libelle'])->toBe('EHPAD')->and(metaSante($a))->not->toHaveKey('finess_categorie_famille');
+    expect(metaSante($b)['finess_categorie_libelle'])->toBe('Établissement de santé (FINESS 999)');
+});
+
+it('classer : finess_categorie existant → rien écrit, categorie_conflit compté', function () {
+    $espace = F::espace();
+    [$a, $sa] = ficheSante($espace, ['metadata' => json_encode(['finess_categorie' => '620'])]);
+    [$b, $sb] = ficheSante($espace, ['metadata' => json_encode(['finess_categorie' => '101'])]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($sa), ligneClassee($sb, '355')]));
+
+    expect(metaSante($a)['finess_categorie'])->toBe('620')->and(metaSante($a))->not->toHaveKey('finess_categorie_libelle');
+    expect(metaSante($b)['finess_categorie'])->toBe('101');
+    expect($r['classees'])->toBe(0)->and($r['categorie_conflit'])->toBe(2);
+});
+
+it('non_officine : écartée sans l\'option, enrichie et classée avec elle, marqueur gardé', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace, ['metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
+    $csv = csvSante([ligneClassee($siret)]);
+
+    bilanClasse($espace, $csv);
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull()->and(metaSante($id))->not->toHaveKey('finess_categorie');
+
+    $r = bilanClasse($espace, $csv, true, true);
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->phone)->toBe('0140000001')->and($c->address)->toBe('3 RUE ZZ');
+    expect(metaSante($id)['type_etablissement'])->toBe('non_officine')->and(metaSante($id)['finess_categorie'])->toBe('355');
+    expect($r['non_officine_incluses'])->toBe(1)->and($r['classees'])->toBe(1);
+});
+
+it('classer : fiche fermée, protégée, en corbeille ou écartée → rien', function () {
+    $espace = F::espace();
+    [$f, $sf] = ficheSante($espace, ['insee_ferme_le' => '2020-01-01']);
+    [$p, $sp] = ficheSante($espace);
+    F::proteger($espace, $p, 'src:scraping-evenements-pro');
+    [$t, $st] = ficheSante($espace, ['deleted_at' => now()]);
+    [$e, $se] = ficheSante($espace, ['metadata' => json_encode(['ecartee_motif' => 'test'])]);
+
+    $r = bilanClasse($espace, csvSante([ligneClassee($sf), ligneClassee($sp), ligneClassee($st), ligneClassee($se)]), true, true);
+
+    foreach ([$f, $p, $t, $e] as $id) {
+        expect(metaSante($id))->not->toHaveKey('finess_categorie');
+    }
+    expect($r['classees'])->toBe(0);
+});
+
+it('classer : essai à blanc n\'écrit rien, le passage suivant classe puis le troisième ne classe plus', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheSante($espace);
+    $csv = csvSante([ligneClassee($siret)]);
+
+    $blanc = bilanClasse($espace, $csv, false);
+    expect($blanc['classees'])->toBe(1)->and(metaSante($id))->not->toHaveKey('finess_categorie');
+
+    expect(bilanClasse($espace, $csv)['classees'])->toBe(1);
+    expect(bilanClasse($espace, $csv)['classees'])->toBe(0);
+});
+
+it('--max-classer dépassé : apply refusé, rien n\'est écrit', function () {
+    $espace = F::espace();
+    [$a, $sa] = ficheSante($espace);
+    [$b, $sb] = ficheSante($espace);
+    $csv = csvSante([ligneClassee($sa), ligneClassee($sb)]);
+
+    $code = Artisan::call('crm:sante:enrichir-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true, '--classer' => true, '--max-classer' => 1]);
+
+    expect($code)->toBe(1);
+    foreach ([$a, $b] as $id) {
+        expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull()->and(metaSante($id))->not->toHaveKey('finess_categorie');
+    }
+    $code = Artisan::call('crm:sante:enrichir-finess', ['fichier' => $csv, '--workspace' => $espace, '--apply' => true, '--classer' => true, '--max-classer' => 2]);
+    expect($code)->toBe(0)->and(metaSante($a)['finess_categorie'])->toBe('355');
 });

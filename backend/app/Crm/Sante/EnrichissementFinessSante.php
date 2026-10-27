@@ -34,10 +34,15 @@ use Throwable;
  *    `exclues`) = fiches volontairement exclues par `metadata.type_etablissement = non_officine` ; `fiches_siret_partage`
  *    = fiches dont le SIRET est partagé (déjà compté dans `siret_partage`) ; `trouvees_*` = fiches
  *    rapprochées après le contrôle du code postal ; `pp` et `opposition` en sont des sous-ensembles ;
+ *  - CLASSEMENT (option `classer`, N1 seulement, ajout seul) : metadata.finess_categorie (code), finess_categorie_libelle
+ *    (libellé du CSV, sinon `CategoriesFiness`) et finess_categorie_famille (agrégat niveau 1) ; jamais d'écrasement
+ *    (clé déjà présente avec une autre valeur : rien écrit, `categorie_conflit`) ; sector_main et type_etablissement
+ *    restent intacts ; fait avant le test « rien à ajouter » ;
+ *  - option `inclureNonOfficine` : les fiches `non_officine` ne sont plus écartées (marqueur conservé) ;
  *  - un paquet en échec ne bloque pas les suivants ; ni message SQL ni numéro dans les journaux.
  *
  * @phpstan-type Compteurs array<string, int>
- * @phpstan-type Bilan array{lignes: int, lots_en_echec: int, invalides: int, gps_hors_france: int, actives: int, sans_siret: int, trouvees_n1: int, trouvees_n2: int, siren_ambigu: int, siret_partage: int, siret_different: int, cp_divergent: int, exclues: int, exclues_non_officine: int, fiches_siret_partage: int, personnes_physiques_ecartees: int, opposition: int, tel: int, adr: int, gps: int, fiches_enrichies: int, par_categorie: array<string, array<string, int>>}
+ * @phpstan-type Bilan array{lignes: int, lots_en_echec: int, invalides: int, gps_hors_france: int, actives: int, sans_siret: int, trouvees_n1: int, trouvees_n2: int, siren_ambigu: int, siret_partage: int, siret_different: int, cp_divergent: int, exclues: int, exclues_non_officine: int, fiches_siret_partage: int, personnes_physiques_ecartees: int, opposition: int, tel: int, adr: int, gps: int, fiches_enrichies: int, classees: int, categorie_conflit: int, non_officine_incluses: int, par_categorie: array<string, array<string, int>>}
  */
 final class EnrichissementFinessSante
 {
@@ -46,13 +51,14 @@ final class EnrichissementFinessSante
     private const CLES = [
         'actives', 'sans_siret', 'trouvees_n1', 'trouvees_n2', 'siren_ambigu', 'siret_partage', 'siret_different',
         'cp_divergent', 'exclues', 'exclues_non_officine', 'fiches_siret_partage', 'pp', 'opposition', 'tel', 'adr', 'gps', 'fiches_enrichies',
+        'classees', 'categorie_conflit', 'non_officine_incluses',
     ];
 
     /**
      * @param  list<string>  $categories  codes FINESS à traiter ; vide = toutes sauf 620 (620 est toujours ignorée)
      * @return Bilan
      */
-    public function executer(string $workspaceId, string $fichier, bool $appliquer, array $categories = [], int $paquet = 500): array
+    public function executer(string $workspaceId, string $fichier, bool $appliquer, array $categories = [], int $paquet = 500, bool $classer = false, bool $inclureNonOfficine = false): array
     {
         $tf = new TelephonesFiness;
         $filtre = array_flip(array_values(array_diff($categories, [self::EXCLUE])));
@@ -128,7 +134,7 @@ final class EnrichissementFinessSante
                 $lot[$s] = $cibles[$s];
             }
             try {
-                $local = $this->traiter($tf, $workspaceId, $lot, $partages, $parSiren, $appliquer);
+                $local = $this->traiter($tf, $workspaceId, $lot, $partages, $parSiren, $appliquer, $classer, $inclureNonOfficine);
                 foreach ($local['par'] as $cat => $c) {
                     $par[$cat] ??= array_fill_keys(self::CLES, 0);
                     foreach ($c as $cle => $v) {
@@ -158,8 +164,47 @@ final class EnrichissementFinessSante
             'siret_partage' => $t['siret_partage'], 'siret_different' => $t['siret_different'], 'cp_divergent' => $t['cp_divergent'],
             'exclues' => $t['exclues'], 'exclues_non_officine' => $t['exclues_non_officine'], 'fiches_siret_partage' => $t['fiches_siret_partage'], 'personnes_physiques_ecartees' => $t['pp'], 'opposition' => $t['opposition'],
             'tel' => $t['tel'], 'adr' => $t['adr'], 'gps' => $t['gps'], 'fiches_enrichies' => $t['fiches_enrichies'],
+            'classees' => $t['classees'], 'categorie_conflit' => $t['categorie_conflit'], 'non_officine_incluses' => $t['non_officine_incluses'],
             'par_categorie' => $par,
         ];
+    }
+
+    /**
+     * Classe la fiche (N1) dans sa catégorie FINESS : ajout seul, jamais d'écrasement.
+     *
+     * @param  array<string, string>  $ligne
+     * @param  callable(string, string, int=): void  $compte
+     */
+    private function classer(TelephonesFiness $tf, string $workspaceId, int $id, string $metadata, array $ligne, bool $appliquer, bool $inclureNonOfficine, string $cat, callable $compte): void
+    {
+        $meta = json_decode($metadata, true);
+        if (is_array($meta) && array_key_exists('finess_categorie', $meta)) {
+            // Même code : déjà classée ; autre valeur : conflit, rien n'est écrit.
+            if ((string) $meta['finess_categorie'] !== $cat) {
+                $compte($cat, 'categorie_conflit');
+            }
+
+            return;
+        }
+        if (! $appliquer) {
+            $compte($cat, 'classees');
+
+            return;
+        }
+        $pdo = DB::getPdo();
+        $champs = "'finess_categorie', " . $pdo->quote($cat) . '::text, '
+            . "'finess_categorie_libelle', " . $pdo->quote(CategoriesFiness::libelle($cat, $ligne['categorie_libelle'])) . '::text';
+        $famille = trim($ligne['categorie_agregat_niv1_libelle']);
+        if ($famille !== '') {
+            $champs .= ", 'finess_categorie_famille', " . $pdo->quote($famille) . '::text';
+        }
+        $n = $tf->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at'), $inclureNonOfficine)
+            ->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'finess_categorie')")
+            ->update([
+                'metadata' => DB::raw("CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || jsonb_build_object({$champs})"),
+                'updated_at' => now(),
+            ]);
+        $compte($cat, 'classees', $n);
     }
 
     /**
@@ -190,13 +235,13 @@ final class EnrichissementFinessSante
      * @param  array<string, array<string, true>>  $parSiren
      * @return array{par: array<string, array<string, int>>, invalides: int, gps_hors_france: int}
      */
-    private function traiter(TelephonesFiness $tf, string $workspaceId, array $lot, array $partages, array $parSiren, bool $appliquer): array
+    private function traiter(TelephonesFiness $tf, string $workspaceId, array $lot, array $partages, array $parSiren, bool $appliquer, bool $classer, bool $inclureNonOfficine): array
     {
         /** @var array{par: array<string, array<string, int>>, invalides: int, gps_hors_france: int} $sortie */
-        $sortie = WorkspaceContext::run($workspaceId, function () use ($tf, $workspaceId, $lot, $partages, $parSiren, $appliquer): array {
+        $sortie = WorkspaceContext::run($workspaceId, function () use ($tf, $workspaceId, $lot, $partages, $parSiren, $appliquer, $classer, $inclureNonOfficine): array {
             $q = DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->whereIn('siren', array_map('strval', array_keys($lot)));
             // Fiches ouvertes (INSEE, non officine, écartée) et non protégées : la corbeille n'est jamais lue.
-            $tf->gardes($q);
+            $tf->gardes($q, $inclureNonOfficine);
             FichesProtegees::exclure($q);
 
             /** @var array<string, FicheFiness> $fiches */
@@ -293,6 +338,14 @@ final class EnrichissementFinessSante
                     continue;
                 }
 
+                if ($inclureNonOfficine && (json_decode($f->metadata, true)['type_etablissement'] ?? null) === 'non_officine') {
+                    $compte($cat, 'non_officine_incluses');
+                }
+
+                if ($classer && $niveau === 1) {
+                    $this->classer($tf, $workspaceId, $f->id, $f->metadata, $ligne, $appliquer, $inclureNonOfficine, $cat, $compte);
+                }
+
                 $ajouts = $tf->collecterAjouts($f, $ligne, $locale);
                 unset($ajouts['date']);
                 $tel = null;
@@ -338,7 +391,7 @@ final class EnrichissementFinessSante
                     } else {
                         // Condition SQL « phone vide » : jamais d'écrasement, même si la fiche a changé entre-temps.
                         $n = $tf->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)
-                            ->whereNull('deleted_at'))
+                            ->whereNull('deleted_at'), $inclureNonOfficine)
                             ->where(fn ($q) => $q->whereNull('phone')->orWhereRaw("btrim(phone) = ''"))
                             ->update([
                                 'phone' => $p['tel'],
@@ -353,7 +406,7 @@ final class EnrichissementFinessSante
                     if (! isset($p['ajouts'][$type])) {
                         continue;
                     }
-                    $n = $appliquer ? $tf->ecrire($workspaceId, $id, $type, $p['ajouts'][$type]) : 1;
+                    $n = $appliquer ? $tf->ecrire($workspaceId, $id, $type, $p['ajouts'][$type], $inclureNonOfficine) : 1;
                     $compte($p['cat'], $abrev, $n);
                     $enrichie = $enrichie || $n > 0;
                 }

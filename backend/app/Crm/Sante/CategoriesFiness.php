@@ -8,7 +8,7 @@ namespace App\Crm\Sante;
  */
 final class CategoriesFiness
 {
-    /** @var array<string, string> */
+    /** @var array<int, string> */
     private const LIBELLES = [
         '101' => 'Centre hospitalier régional',
         '355' => 'Centre hospitalier',
@@ -38,6 +38,6 @@ final class CategoriesFiness
             return $libelleCsv;
         }
 
-        return self::LIBELLES[$code] ?? 'Établissement de santé (FINESS ' . $code . ')';
+        return self::LIBELLES[(int) $code] ?? 'Établissement de santé (FINESS ' . $code . ')';
     }
 }

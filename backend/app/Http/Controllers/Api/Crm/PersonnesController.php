@@ -170,6 +170,11 @@ class PersonnesController extends ConsoleController
      */
     private function soustraire(array $a, array $b): array
     {
+        /**
+         * @param  array<string, int>  $x
+         * @param  array<string, int>  $y
+         * @return array<string, int>
+         */
         $diff = static function (array $x, array $y): array {
             foreach ($x as $cle => $n) {
                 $x[$cle] = max(0, $n - ($y[$cle] ?? 0));
@@ -758,7 +763,7 @@ class PersonnesController extends ConsoleController
 
     private function personne(string $workspaceId, int $id): \stdClass
     {
-        $personne = $this->requete($workspaceId, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null])
+        $personne = $this->requete($workspaceId, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null, 'fermees' => EntreprisesFermees::INCLURE])
             ->where('personnes.id', $id)
             ->first();
 

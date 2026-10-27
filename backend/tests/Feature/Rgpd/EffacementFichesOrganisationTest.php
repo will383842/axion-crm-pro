@@ -589,10 +589,15 @@ function efoDemandeEnAttente(string $espace, ?string $misAJour = null, string $v
 {
     // `updated_at` posé à l'INSERTION : le déclencheur de la table le remet à
     // `now()` à chaque UPDATE.
+    // Un instant ABSOLU (avec décalage) : une heure murale « Y-m-d H:i:s »
+    // est ambiguë dans l'heure doublée du passage à l'heure d'hiver, et Postgres
+    // la relit alors d'une heure plus récente.
+    $misAJour = $misAJour ?? now()->toIso8601String();
+
     return (int) DB::table('rgpd_requests')->insertGetId([
         'workspace_id' => $espace, 'type' => 'erasure', 'status' => $statut, 'subject_email' => EFO_EMAIL,
         'requested_at' => now(), 'processed_at' => now(), 'metadata' => json_encode(['verification' => $verification]),
-        'created_at' => now(), 'updated_at' => $misAJour ?? now(),
+        'created_at' => now(), 'updated_at' => $misAJour,
     ]);
 }
 
@@ -649,10 +654,10 @@ test('R7 — une demande sans espace, ou introuvable, est refusee bruyamment (ja
 });
 
 test('R7 — la commande planifiee signale les verifications en attente ou en echec depuis plus de 24 h', function () {
-    $vieille = efoDemandeEnAttente($this->espace, now()->subHours(25)->toDateTimeString());
-    $echec = efoDemandeEnAttente($this->espace, now()->subHours(30)->toDateTimeString(), 'echec');
+    $vieille = efoDemandeEnAttente($this->espace, now()->subHours(25)->toIso8601String());
+    $echec = efoDemandeEnAttente($this->espace, now()->subHours(30)->toIso8601String(), 'echec');
     $recente = efoDemandeEnAttente($this->espace);
-    $soldee = efoDemandeEnAttente($this->espace, now()->subHours(40)->toDateTimeString(), 'complete', 'done');
+    $soldee = efoDemandeEnAttente($this->espace, now()->subHours(40)->toIso8601String(), 'complete', 'done');
 
     $code = Artisan::call('rgpd:verifications-en-attente');
     $sortie = Artisan::output();

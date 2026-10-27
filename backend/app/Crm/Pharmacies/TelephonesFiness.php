@@ -28,7 +28,8 @@ use Throwable;
  *  - ni e-mail, ni statut de prospection, ni contacts, ni étiquettes ;
  *  - `metadata.telephone_source = finess` fusionné seulement si le numéro vient d'être posé ;
  *  - EXTENSION (toujours en ajout seul, champ vide ou NULL seulement, condition portée par l'UPDATE) :
- *    adresse (numero_voie… lieu_dit, adresse_ligne_4 → address ; code_postal → postcode ;
+ *    adresse (numero_voie… lieu_dit, adresse_ligne_4 → address, sans lieu_dit ni
+ *    adresse_ligne_4 en nom propre : ils peuvent porter le nom du titulaire, ignorés et comptés dans `pp_adresse_sans_lieu_dit` ; code_postal → postcode ;
  *    commune_acheminement → city / city_name), latitude + longitude si lat ET lon sont NULL,
  *    date d'ouverture → metadata.finess_date_ouverture (si la clé est absente), et téléphone de la
  *    société exploitante (`entites-juridiques.csv`, jointure finess_ej) seulement si l'officine n'a
@@ -92,7 +93,7 @@ final class TelephonesFiness
             'ej_a_ajouter' => 0, 'ej_ajoutees' => 0, 'adr_a_ajouter' => 0, 'adr_ajoutees' => 0,
             'gps_a_ajouter' => 0, 'gps_ajoutees' => 0, 'date_a_ajouter' => 0, 'date_ajoutees' => 0, 'gps_hors_france' => 0,
             'lignes' => 0, 'officines' => 0, 'sans_telephone' => 0, 'trouvees' => 0, 'introuvables' => 0, 'exclues' => 0,
-            'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
+            'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'pp_adresse_sans_lieu_dit' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'opposition' => 0,
             'a_ajouter' => 0, 'ajoutees' => 0, 'lots_en_echec' => 0,
         ];
         $lignes = [];
@@ -257,7 +258,7 @@ final class TelephonesFiness
             $plans = [];
             $variantes = [];
             $emails = [];
-            $locale = ['trouvees' => 0, 'exclues' => 0, 'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
+            $locale = ['trouvees' => 0, 'exclues' => 0, 'exclues_non_diffusibles' => 0, 'personnes_physiques_traitees' => 0, 'pp_sans_repli_ej' => 0, 'pp_adresse_sans_lieu_dit' => 0, 'deja_renseignees' => 0, 'invalides' => 0, 'gps_hors_france' => 0];
             $absentes = array_values(array_diff(array_keys($lot), array_keys($fiches)));
             if ($absentes !== []) {
                 $locale['exclues_non_diffusibles'] += $this->nonDiffusibles($workspaceId, $absentes);
@@ -279,7 +280,7 @@ final class TelephonesFiness
                 usort($lignes, static fn (array $a, array $b): int => ((int) ($b['siret'] === $siretFiche)) <=> ((int) ($a['siret'] === $siretFiche)));
                 // Adresse, GPS, date : la ligne du SIRET de la fiche, sinon la seule officine active qui y pointe.
                 $reference = $lignes[0]['siret'] === $siretFiche || count($lignes) === 1 ? $lignes[0] : null;
-                $ajouts = $reference !== null ? $this->collecterAjouts($f, $reference, $locale) : [];
+                $ajouts = $reference !== null ? $this->collecterAjouts($f, $reference, $nomPropre, $locale) : [];
 
                 $phoneVide = trim($f->phone) === '';
                 $source = self::SOURCE;
@@ -374,14 +375,23 @@ final class TelephonesFiness
      * Ce que FINESS peut ajouter à la fiche (champs vides ou NULL seulement) depuis UN établissement.
      *
      * @param  array<string, string>  $l
-     * @param  array<string, int>  $locale  totaux du paquet (gps_hors_france)
+     * @param  array<string, int>  $locale  totaux du paquet (gps_hors_france, pp_adresse_sans_lieu_dit)
      * @return array{adresse?: array{champs: array<string, string>, rue: string}, gps?: array{float, float}, date?: string}
      */
-    private function collecterAjouts(FicheFiness $f, array $l, array &$locale): array
+    private function collecterAjouts(FicheFiness $f, array $l, bool $nomPropre, array &$locale): array
     {
         $a = [];
+        // En nom propre, lieu_dit et adresse_ligne_4 peuvent contenir le nom du titulaire : jamais dans la rue.
+        $colonnesRue = ['numero_voie', 'type_voie', 'libelle_voie', 'complement_voie'];
+        if ($nomPropre) {
+            if ($l['lieu_dit'] !== '' || $l['adresse_ligne_4'] !== '') {
+                $locale['pp_adresse_sans_lieu_dit']++;
+            }
+        } else {
+            array_push($colonnesRue, 'lieu_dit', 'adresse_ligne_4');
+        }
         $rue = trim((string) preg_replace('/\s+/', ' ', implode(' ', array_filter(
-            array_map(static fn (string $c): string => $l[$c], ['numero_voie', 'type_voie', 'libelle_voie', 'complement_voie', 'lieu_dit', 'adresse_ligne_4']),
+            array_map(static fn (string $c): string => $l[$c], $colonnesRue),
             static fn (string $v): bool => $v !== '',
         ))));
         $champs = [];

@@ -546,10 +546,10 @@ it('classer : même code déjà présent → deja_classee, ni classees ni catego
     expect(metaSante($id))->not->toHaveKey('finess_categorie_libelle');
 });
 
-it('classer : metadata NULL → fiche classée', function () {
+it('classer : metadata JSON null → fiche classée', function () {
     $espace = F::espace();
     [$id, $siret] = ficheSante($espace);
-    DB::table('companies')->where('id', $id)->update(['metadata' => null]);
+    DB::table('companies')->where('id', $id)->update(['metadata' => DB::raw("'null'::jsonb")]);
 
     $r = bilanClasse($espace, csvSante([ligneClassee($siret)]));
 

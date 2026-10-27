@@ -211,7 +211,7 @@ final class EnrichissementFinessSante
             return;
         }
         // Rien écrit : la clé est peut-être apparue entre-temps (même code ou autre valeur) ; sinon fiche devenue inéligible.
-        $actuel = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->value('metadata');
+        $actuel = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at')->value('metadata');
         $apparue = is_string($actuel) ? json_decode($actuel, true) : null;
         if (is_array($apparue) && array_key_exists('finess_categorie', $apparue)) {
             $compte($cat, (string) $apparue['finess_categorie'] !== $cat ? 'categorie_conflit' : 'deja_classee');

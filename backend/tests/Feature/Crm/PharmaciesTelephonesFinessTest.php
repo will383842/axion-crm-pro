@@ -3,7 +3,7 @@
 /**
  * `crm:pharmacies:telephones-finess` — fixtures FICTIVES (ZZ, SIREN 94xxxxxxx).
  * Verrouillé : essai à blanc par défaut ; ajout sur champ vide seulement ; jamais d'écrasement ;
- * opposition, numéro invalide et personne physique écartés ; isolation par espace.
+ * opposition et numéro invalide écartés ; isolation par espace.
  */
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,9 +25,14 @@ function csvTel(array $lignes): string
         'lieu_dit' => '', 'adresse_ligne_4' => '', 'code_postal' => '', 'commune_acheminement' => '', 'latitude' => '', 'longitude' => '',
         'date_ouverture' => '', 'commune' => '',
     ];
-    fputcsv($f, array_keys($defauts), ';', '"', '');
+    $colonnes = array_keys($defauts);
     foreach ($lignes as $l) {
-        fputcsv($f, array_values(array_merge($defauts, $l)), ';', '"', '');
+        $colonnes = array_values(array_unique(array_merge($colonnes, array_keys($l))));
+    }
+    fputcsv($f, $colonnes, ';', '"', '');
+    foreach ($lignes as $l) {
+        $complete = array_merge($defauts, $l);
+        fputcsv($f, array_map(static fn (string $col): string => $complete[$col] ?? '', $colonnes), ';', '"', '');
     }
     fclose($f);
 
@@ -101,7 +106,7 @@ it('écarte un numéro en liste d\'opposition, quelle que soit son écriture', f
     expect($sortie)->toContain('écartés pour opposition : 1');
 });
 
-it('écarte les personnes physiques (forme 1…, marque d\'import FINESS, ou métadonnée)', function () {
+it('reçoit le téléphone de l\'officine pour une personne physique (forme 1…, marque d\'import FINESS, ou métadonnée)', function () {
     $espace = F::espace();
     [$a, $sa] = ficheTel($espace, ['legal_form' => ' 1000']);
     [$b, $sb] = ficheTel($espace, ['legal_form' => null, 'discovery_source' => 'finess', 'metadata' => json_encode(['personne_physique' => true, 'source' => 'finess'])]);
@@ -111,8 +116,8 @@ it('écarte les personnes physiques (forme 1…, marque d\'import FINESS, ou mé
         ['siret' => $sa, 'telephone' => '0140000001'], ['siret' => $sb, 'telephone' => '0140000002'], ['siret' => $sc, 'telephone' => '0140000003'],
     ]));
 
-    expect(DB::table('companies')->whereIn('id', [$a, $b, $c])->whereNotNull('phone')->count())->toBe(0);
-    expect($sortie)->toContain('personnes physiques écartées : 3');
+    expect(DB::table('companies')->whereIn('id', [$a, $b, $c])->whereNotNull('phone')->count())->toBe(3);
+    expect($sortie)->toContain('personnes physiques traitées (comprises dans les fiches trouvées) : 3')->toContain('fiches trouvées : 3');
 });
 
 it('une fiche FINESS à forme juridique vide sans marque personne physique est une personne morale', function () {
@@ -122,7 +127,7 @@ it('une fiche FINESS à forme juridique vide sans marque personne physique est u
     $sortie = lancerTel($espace, csvTel([['siret' => $siret, 'telephone' => '0140000001']]));
 
     expect(DB::table('companies')->where('id', $id)->value('phone'))->toBe('0140000001');
-    expect($sortie)->toContain('personnes physiques écartées : 0');
+    expect($sortie)->toContain('personnes physiques traitées (comprises dans les fiches trouvées) : 0');
 });
 
 it('écarte un numéro invalide', function () {
@@ -199,7 +204,7 @@ it('fiche protégée, fermée, non officine ou écartée : rien n\'est écrit', 
     $espace = F::espace();
     [$p, $sp] = ficheTel($espace);
     F::proteger($espace, $p, 'src:scraping-federations-2026');
-    [$f, $sf] = ficheTel($espace, ['insee_ferme_le' => '2020-01-01']);
+    [$f, $sf] = ficheTel($espace, ['insee_ferme_le' => '2020-01-01', 'legal_form' => '1000']);
     [$o, $so] = ficheTel($espace, ['metadata' => json_encode(['type_etablissement' => 'non_officine'])]);
     [$e, $se] = ficheTel($espace, ['metadata' => json_encode(['ecartee_motif' => 'test'])]);
     $adr = ['telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
@@ -274,15 +279,68 @@ it('deux officines actives sans SIRET de la fiche : pas d\'adresse, GPS, date ni
     expect(json_decode((string) $c->metadata, true))->not->toHaveKey('finess_date_ouverture')->and(json_decode((string) $c->metadata, true)['telephone_source'])->toBe('finess_ej');
 });
 
-it('personne physique : ni adresse, ni GPS, ni date, ni téléphone', function () {
+it('personne physique : adresse, GPS, téléphone et date de l\'officine, aucun nom ajouté, rien d\'écrasé', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace, ['legal_form' => '1000']);
+    [$id2, $siret2] = ficheTel($espace, ['legal_form' => '1000', 'phone' => '0499999999', 'address' => 'Existante', 'postcode' => '75001']);
+    $avant = DB::table('companies')->where('id', $id)->first();
+    $ligne = ['telephone' => '0140000001', 'numero_voie' => '3', 'type_voie' => 'RUE', 'libelle_voie' => 'DES TESTS', 'code_postal' => '99003', 'commune_acheminement' => 'TESTVILLE', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
+    // Colonnes nominatives fictives : jamais lues.
+    $nominatif = ['raison_sociale' => 'ZZ TITULAIRE', 'nom_long' => 'ZZ TITULAIRE', 'complement_raison_sociale' => 'ZZ TITULAIRE', 'telecopie' => 'ZZ TITULAIRE'];
+
+    lancerTel($espace, csvTel([['siret' => $siret] + $nominatif + $ligne, ['siret' => $siret2] + $ligne]), true, csvEj(['990000002' => '0140000008']));
+
+    $c = DB::table('companies')->where('id', $id)->first();
+    expect($c->phone)->toBe('0140000001')->and($c->address)->not->toBeNull()->and($c->postcode)->toBe('99003')->and((float) $c->lat)->toBe(48.1);
+    expect(json_decode((string) $c->metadata, true)['finess_date_ouverture'])->toBe('2001-01-01');
+    expect($c->denomination)->toBe($avant->denomination);
+    $metadata = json_decode((string) $c->metadata, true);
+    expect(array_diff(array_keys($metadata), array_keys(json_decode((string) $avant->metadata, true) ?? [])))->toEqualCanonicalizing(['telephone_source', 'finess_date_ouverture']);
+    expect(str_contains(json_encode($c, JSON_UNESCAPED_UNICODE), 'ZZ TITULAIRE'))->toBeFalse();
+    expect(DB::table('contacts')->where('company_id', $id)->count())->toBe(0);
+
+    $d = DB::table('companies')->where('id', $id2)->first();
+    expect($d->phone)->toBe('0499999999')->and($d->address)->toBe('Existante')->and($d->postcode)->toBe('75001');
+});
+
+it('personne physique sans téléphone propre : pas de repli sur la société exploitante', function () {
     $espace = F::espace();
     [$id, $siret] = ficheTel($espace, ['legal_form' => '1000']);
 
-    lancerTel($espace, csvTel([['siret' => $siret, 'telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01']]), true, csvEj(['990000002' => '0140000008']));
+    $sortie = lancerTel($espace, csvTel([['siret' => $siret]]), true, csvEj(['990000002' => '0140000008']));
+
+    expect(DB::table('companies')->where('id', $id)->value('phone'))->toBeNull();
+    expect($sortie)->toContain('personnes physiques sans téléphone propre ni repli société exploitante : 1');
+});
+
+it('fiche non diffusible INSEE : rien n\'est écrit, comptée à part', function () {
+    $espace = F::espace();
+    [$id, $siret] = ficheTel($espace, ['legal_form' => '1000', 'insee_non_diffusible_le' => now()]);
+    $ligne = ['siret' => $siret, 'telephone' => '0140000001', 'numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
+
+    $sortie = lancerTel($espace, csvTel([$ligne]));
 
     $c = DB::table('companies')->where('id', $id)->first();
     expect($c->phone)->toBeNull()->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
-    expect(json_decode((string) $c->metadata, true) ?? [])->not->toHaveKey('finess_date_ouverture');
+    expect(json_decode((string) $c->metadata, true) ?? [])->not->toHaveKey('telephone_source')->not->toHaveKey('finess_date_ouverture');
+    expect($sortie)->toContain('téléphones ajoutés : 0')->toContain('dont non diffusibles INSEE : 1');
+});
+
+it('personne physique protégée ou en opposition : rien n\'est écrit', function () {
+    $espace = F::espace();
+    [$p, $sp] = ficheTel($espace, ['legal_form' => '1000']);
+    F::proteger($espace, $p, 'src:scraping-federations-2026');
+    [$o, $so] = ficheTel($espace, ['legal_form' => '1000']);
+    DB::table('opt_out')->insert(['phone' => '+33 1 40 00 00 01', 'scope' => 'business', 'source' => 'test', 'created_at' => now()]);
+    $adr = ['numero_voie' => '3', 'code_postal' => '99003', 'latitude' => '48.1', 'longitude' => '2.1', 'date_ouverture' => '2001-01-01'];
+
+    lancerTel($espace, csvTel([['siret' => $sp, 'telephone' => '0140000002'] + $adr, ['siret' => $so, 'telephone' => '0140000001'] + $adr]));
+
+    foreach ([$p, $o] as $id) {
+        $c = DB::table('companies')->where('id', $id)->first();
+        expect($c->phone)->toBeNull()->and($c->address)->toBeNull()->and($c->postcode)->toBeNull()->and($c->lat)->toBeNull();
+        expect(json_decode((string) $c->metadata, true) ?? [])->not->toHaveKey('finess_date_ouverture');
+    }
 });
 
 it('téléphone de la société exploitante : seulement sans téléphone propre et phone vide', function () {

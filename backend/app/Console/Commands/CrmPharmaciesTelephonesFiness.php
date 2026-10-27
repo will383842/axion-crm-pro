@@ -27,7 +27,7 @@ class CrmPharmaciesTelephonesFiness extends Command
                             {--workspace= : Identifiant ou slug de l espace (défaut : l espace de prospection)}
                             {--paquet=500 : Lignes par paquet (1 à 2000)}';
 
-    protected $description = 'Ajoute le téléphone FINESS des officines (620, état A) dans companies.phone UNIQUEMENT s il est vide, hors opposition, numéros invalides et personnes physiques.';
+    protected $description = 'Ajoute le téléphone FINESS des officines (620, état A) dans companies.phone UNIQUEMENT s il est vide, hors opposition et numéros invalides.';
 
     public function handle(): int
     {
@@ -77,7 +77,9 @@ class CrmPharmaciesTelephonesFiness extends Command
         $this->line(sprintf('  lignes lues : %d (officines actives 620 : %d, sans téléphone : %d)', $b['lignes'], $b['officines'], $b['sans_telephone']));
         $this->line(sprintf('  fiches trouvées : %d (introuvables : %d)', $b['trouvees'], $b['introuvables']));
         $this->line(sprintf('  fiches exclues (protégées, fermées, non officine ou écartées) : %d', $b['exclues']));
-        $this->line(sprintf('  personnes physiques écartées : %d', $b['personnes_physiques']));
+        $this->line(sprintf('  dont non diffusibles INSEE : %d', $b['exclues_non_diffusibles']));
+        $this->line(sprintf('  personnes physiques traitées (comprises dans les fiches trouvées) : %d', $b['personnes_physiques_traitees']));
+        $this->line(sprintf('  personnes physiques sans téléphone propre ni repli société exploitante : %d', $b['pp_sans_repli_ej']));
         $this->line(sprintf('  déjà renseignées : %d', $b['deja_renseignees']));
         $this->line(sprintf('  numéros invalides : %d', $b['invalides']));
         $this->line(sprintf('  écartés pour opposition : %d', $b['opposition']));

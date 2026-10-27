@@ -5,8 +5,9 @@ name: Pharmacies — téléphones FINESS (dry-run ou apply)
 #  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ;
 #  - apply : AJOUTE, sur champ vide ou NULL seulement (jamais d'écrasement), pour les officines 620
 #    actives : téléphone (repli sur celui de la société exploitante, entites-juridiques.csv), adresse,
-#    GPS et date d'ouverture ; hors opposition, numéros invalides et personnes physiques. Jamais le
-#    fax ni le courriel.
+#    GPS et date d'ouverture ; hors opposition et numéros invalides. Les pharmacies exploitées en nom
+#    propre reçoivent les informations de l'officine (données publiques FINESS), jamais de nom ni de
+#    domicile. Jamais le fax ni le courriel.
 # `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI et si l'empreinte SHA-256 correspond.
 # Dépôt public : seuls des totaux sont affichés, aucune liste nominative ni aucun numéro.
 

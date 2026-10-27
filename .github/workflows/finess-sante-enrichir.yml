@@ -1,0 +1,161 @@
+name: Santé — enrichissement FINESS (dry-run ou apply)
+
+# Télécharge le miroir tiers du flux FINESS de data.gouv.fr (pas la liste officielle), puis lance
+# `crm:sante:enrichir-finess` sur le serveur de prod.
+#  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ;
+#  - apply : AJOUTE, sur champ vide ou NULL seulement (jamais d'écrasement), pour les établissements de
+#    santé actifs (toutes catégories FINESS sauf 620, déjà traitée) : téléphone, adresse, GPS ; hors
+#    opposition. Aucune fiche créée, ni fax, ni courriel, ni date.
+# `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI et si l'empreinte SHA-256 correspond.
+# Dépôt public : seuls des totaux sont affichés, aucune liste nominative ni aucun numéro.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (totaux seulement) ou apply (ajoute téléphones, adresses, GPS sur champs vides)'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      confirmer:
+        description: 'Écrire OUI pour autoriser apply'
+        type: string
+        default: ''
+      empreinte:
+        description: 'SHA-256 de finess.zip, OBLIGATOIRE pour apply (le dry-run l affiche dans le journal)'
+        type: string
+        default: ''
+      categories:
+        description: '« toutes » (sauf 620) ou codes FINESS séparés par des virgules (ex. 101,106)'
+        type: string
+        default: 'toutes'
+
+permissions:
+  contents: read
+
+# Jamais deux apply (ni deux exécutions) en même temps.
+concurrency:
+  group: finess-sante
+  cancel-in-progress: false
+
+jobs:
+  sante:
+    name: Santé FINESS (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Vérifier la confirmation et les catégories
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMER: ${{ inputs.confirmer }}
+          CATEGORIES: ${{ inputs.categories }}
+        run: |
+          if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
+            echo "apply refusé : saisir OUI dans l'entrée « confirmer »." >&2
+            exit 1
+          fi
+          if [ "$CATEGORIES" != "toutes" ] && ! printf '%s' "$CATEGORIES" | grep -Eq '^[0-9]{3}(,[0-9]{3})*$'; then
+            echo "catégories invalides : « toutes » ou codes à trois chiffres séparés par des virgules." >&2
+            exit 1
+          fi
+          if printf '%s' "$CATEGORIES" | grep -Eq '(^|,)620(,|$)'; then
+            echo "catégorie 620 refusée : elle a son propre workflow." >&2
+            exit 1
+          fi
+
+      - name: Télécharger FINESS et contrôler le fichier
+        env:
+          MODE: ${{ inputs.mode }}
+          EMPREINTE_ATTENDUE: ${{ inputs.empreinte }}
+        run: |
+          set -e
+          curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
+          EMPREINTE_REELLE=$(sha256sum finess.zip | cut -d' ' -f1)
+          echo "SHA-256 de finess.zip : $EMPREINTE_REELLE (à saisir dans l'entrée « empreinte » pour la figer)"
+          if [ "$MODE" = "apply" ]; then
+            if [ -z "$EMPREINTE_ATTENDUE" ]; then
+              echo "apply refusé : saisir l'empreinte SHA-256 (affichée par le dry-run)." >&2
+              exit 1
+            fi
+            if [ "$EMPREINTE_ATTENDUE" != "$EMPREINTE_REELLE" ]; then
+              echo "apply refusé : empreinte SHA-256 différente de celle attendue." >&2
+              exit 1
+            fi
+          fi
+          unzip -q -o finess.zip etablissements.csv
+          python3 - <<'PY'
+          import csv, sys
+          from collections import Counter
+          with open('etablissements.csv', encoding='utf-8-sig') as fichier:
+              lecteur = csv.DictReader(fichier, delimiter=';')
+              print('En-tête du CSV :', ';'.join(lecteur.fieldnames or []))
+              parcat = Counter()
+              ncom = ncomnum = 0
+              for r in lecteur:
+                  if (r.get('etat') or '').strip().upper() != 'A':
+                      continue
+                  parcat[(r.get('categorie') or '').strip()] += 1
+                  com = (r.get('commune') or '').strip()
+                  if com:
+                      ncom += 1
+                      if com.isdigit():
+                          ncomnum += 1
+          total = sum(parcat.values())
+          print('établissements actifs, toutes catégories :', total)
+          for code in sorted(parcat):
+              print('  catégorie', code, ':', parcat[code])
+          print('dont commune renseignée :', ncom, 'dont numérique (code) :', ncomnum)
+          if ncom and ncomnum * 2 > ncom:
+              print('colonne commune majoritairement numérique (codes) : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
+          # Garde-fou : un fichier tronqué ou vide ne doit jamais alimenter un apply.
+          if not 50000 <= total <= 150000:
+              print('actives toutes catégories hors fourchette 50000-150000 : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
+          if not 15000 <= parcat['620'] <= 25000:
+              print('catégorie 620 état A hors fourchette 15000-25000 : apply refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
+          PY
+
+      - name: Refuser apply si la source est hors fourchette
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          if [ -f refus_apply ]; then
+            echo "apply refusé : source hors fourchette (50000 à 150000 actives, 15000 à 25000 officines 620) ou colonne commune en codes." >&2
+            exit 1
+          fi
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Lancer la commande sur la prod
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          MODE: ${{ inputs.mode }}
+          CATEGORIES: ${{ inputs.categories }}
+        run: |
+          set -e
+          SSH="ssh $USER@$HOST"
+          OPT=""
+          [ "$MODE" = "apply" ] && OPT="--apply"
+          $SSH "umask 077; cat > /tmp/finess_sante_etablissements.csv" < etablissements.csv
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_sante_etablissements.csv api:/tmp/finess_sante_etablissements.csv && docker compose exec -u root -T api php artisan crm:sante:enrichir-finess /tmp/finess_sante_etablissements.csv --categories=$CATEGORIES $OPT"
+
+      - name: Nettoyer le CSV (hôte et conteneur api)
+        if: ${{ always() }}
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+        run: |
+          SSH="ssh $USER@$HOST"
+          $SSH "rm -f /tmp/finess_sante_etablissements.csv; cd /opt/axion-crm-pro && docker compose exec -u root -T api rm -f /tmp/finess_sante_etablissements.csv" || true

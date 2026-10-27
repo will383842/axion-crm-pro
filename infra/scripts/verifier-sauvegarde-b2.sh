@@ -49,7 +49,7 @@ fi
 API_URL="$(jq -r '.apiInfo.storageApi.apiUrl' "$TMP/auth.json")"
 printf 'header = "Authorization: %s"\n' "$(jq -r '.authorizationToken' "$TMP/auth.json")" > "$TMP/token.cfg"
 
-b2_post() { curl -fsS --max-time 60 -K "$TMP/token.cfg" -H 'Content-Type: application/json' -d "$2" "$API_URL/b2api/v3/$1"; }
+b2_post() { curl -fsS --max-time 60 -K "$TMP/token.cfg" -H 'Content-Type: application/json' -d "$2" "$API_URL/b2api/v2/$1"; }
 
 BUCKET_ID="$(b2_post b2_list_buckets "$(jq -nc --arg a "$(jq -r '.accountId' "$TMP/auth.json")" --arg n "$B2_BUCKET" '{accountId:$a,bucketName:$n}')" \
     | jq -r '.buckets[0].bucketId // empty')"

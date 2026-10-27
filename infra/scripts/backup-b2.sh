@@ -50,6 +50,8 @@ B2_BUCKET="${B2_BUCKET:-}"
 B2_PREFIX="axion-crm/"
 B2_COPIES_A_GARDER=4
 B2_PLAFOND_OCTETS=9000000000   # 9 Go : 1 Go de marge sous les 10 Go gratuits
+# Les appels POST (liste, URL d envoi, suppression) passent par /b2api/v2/ : la v3 les refuse (405).
+# Le jeton obtenu par b2_authorize_account (v3) reste valable en v2.
 B2_AUTH_URL="https://api.backblazeb2.com/b2api/v3/b2_authorize_account"
 
 log() { echo "[backup-b2] $*"; }
@@ -102,7 +104,7 @@ ACCOUNT_ID="$(jq -r '.accountId' "$TMP/auth.json")"
 printf 'header = "Authorization: %s"\n' "$(jq -r '.authorizationToken' "$TMP/auth.json")" > "$TMP/token.cfg"
 
 b2_post() { # b2_post <opération> <json>
-    b2_curl -K "$TMP/token.cfg" -H 'Content-Type: application/json' -d "$2" "$API_URL/b2api/v3/$1"
+    b2_curl -K "$TMP/token.cfg" -H 'Content-Type: application/json' -d "$2" "$API_URL/b2api/v2/$1"
 }
 
 BUCKET_ID="$(b2_post b2_list_buckets "$(jq -nc --arg a "$ACCOUNT_ID" --arg n "$B2_BUCKET" '{accountId:$a,bucketName:$n}')" \

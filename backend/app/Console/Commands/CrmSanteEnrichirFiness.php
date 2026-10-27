@@ -14,6 +14,7 @@ use Throwable;
  *   php artisan crm:sante:enrichir-finess etablissements.csv                          # essai à blanc, toutes catégories sauf 620
  *   php artisan crm:sante:enrichir-finess etablissements.csv --categories=101,106 --apply
  *
+ * Options : --classer (catégorie FINESS en metadata, N1, ajout seul), --inclure-non-officine, --max-classer=6000.
  * Ajoute, sur champ vide seulement : téléphone, adresse, GPS. Jamais d'écrasement, jamais de fiche créée,
  * ni fax, ni courriel, ni date. La catégorie 620 (officines) a sa propre commande : refusée ici.
  * Règle complète : `App\Crm\Sante\EnrichissementFinessSante`.
@@ -25,7 +26,10 @@ class CrmSanteEnrichirFiness extends Command
                             {--apply : Ajoute les informations (sans cette option : essai à blanc, rien n est écrit)}
                             {--workspace= : Identifiant ou slug de l espace (défaut : l espace de prospection)}
                             {--categories=toutes : « toutes » (sauf 620) ou codes FINESS séparés par des virgules (ex. 101,106)}
-                            {--paquet=500 : SIREN par paquet (1 à 2000)}';
+                            {--paquet=500 : SIREN par paquet (1 à 2000)}
+                            {--classer : Classe aussi chaque fiche retrouvée par SIRET exact (N1) dans sa catégorie FINESS (metadata, ajout seul)}
+                            {--inclure-non-officine : Ne met plus à l écart les fiches marquées non_officine (le marqueur est conservé)}
+                            {--max-classer=6000 : Plafond de fiches à classer en --apply (essai à blanc préalable, refus au-delà)}';
 
     protected $description = 'Ajoute téléphone, adresse et GPS FINESS des établissements de santé (hors 620, état A) dans companies, sur champ vide seulement.';
 
@@ -58,6 +62,12 @@ class CrmSanteEnrichirFiness extends Command
                 return self::FAILURE;
             }
         }
+        $maxClasser = (int) $this->option('max-classer');
+        if ($maxClasser < 0) {
+            $this->error('--max-classer doit être positif ou nul.');
+
+            return self::FAILURE;
+        }
         $designation = $this->option('workspace');
         $workspaceId = EspaceProspection::resoudre(is_string($designation) ? $designation : null);
         if ($workspaceId === null) {
@@ -69,12 +79,26 @@ class CrmSanteEnrichirFiness extends Command
         $appliquer = (bool) $this->option('apply');
         $this->warn($appliquer ? 'APPLICATION — informations ajoutées sur champ vide seulement.' : 'ESSAI À BLANC — rien n\'est écrit.');
 
+        $classer = (bool) $this->option('classer');
+        $inclure = (bool) $this->option('inclure-non-officine');
+
         try {
-            $b = (new EnrichissementFinessSante)->executer($workspaceId, $fichier, $appliquer, $categories, $paquet);
+            $service = new EnrichissementFinessSante;
+            if ($appliquer && $classer) {
+                // Plafond : essai à blanc préalable (rien n'est écrit), refus avant toute écriture.
+                $essai = $service->executer($workspaceId, $fichier, false, $categories, $paquet, true, $inclure);
+                if ($essai['classees'] > $maxClasser) {
+                    $this->error(sprintf('apply refusé : %d fiches à classer, au-delà du plafond --max-classer=%d.', $essai['classees'], $maxClasser));
+
+                    return self::FAILURE;
+                }
+            }
+            $b = $service->executer($workspaceId, $fichier, $appliquer, $categories, $paquet, $classer, $inclure);
         } catch (Throwable $e) {
             if ($e instanceof InvalidArgumentException) {
-                // Message brut réservé aux erreurs de lecture du fichier (colonnes manquantes) ; sinon libellé fixe.
-                $this->error('Échec : ' . (str_starts_with($e->getMessage(), 'Colonnes manquantes') ? $e->getMessage() : 'argument invalide'));
+                // Message brut réservé aux colonnes manquantes (noms de colonnes seulement) ; sinon libellé fixe.
+                $m = $e->getMessage();
+                $this->error(str_starts_with($m, 'Colonnes manquantes') ? 'Échec : ' . $m : 'Échec : fichier invalide ou argument invalide.');
 
                 return self::FAILURE;
             }
@@ -94,10 +118,13 @@ class CrmSanteEnrichirFiness extends Command
         $this->line(sprintf('  numéros invalides : %d, GPS hors France écartés : %d', $b['invalides'], $b['gps_hors_france']));
         $this->line(sprintf('  téléphones %s : %d, adresses %s : %d, GPS %s : %d', $v, $b['tel'], $v, $b['adr'], $v, $b['gps']));
         $this->line(sprintf('  fiches enrichies : %d', $b['fiches_enrichies']));
+        $this->line(sprintf('  fiches %s : %d, conflits de catégorie (rien écrit) : %d', $appliquer ? 'classées' : 'à classer', $b['classees'], $b['categorie_conflit']));
+        $this->line(sprintf('  fiches non_officine incluses : %d', $b['non_officine_incluses']));
+        $this->line(sprintf('  fiches déjà classées (même code) : %d, fiches non classées pour opposition : %d', $b['deja_classee'], $b['classement_opposition']));
         $this->line(sprintf('  paquets en échec : %d', $b['lots_en_echec']));
         foreach ($b['par_categorie'] as $code => $c) {
             $this->line(sprintf(
-                '  catégorie %s : actives %d, sans_siret %d, n1 %d, n2 %d, ambigu %d, partagé %d, autre_siret %d, cp_divergent %d, exclues %d, pp %d, opposition %d, tel %d, adr %d, gps %d, enrichies %d',
+                '  catégorie %s : actives %d, sans_siret %d, n1 %d, n2 %d, ambigu %d, partagé %d, autre_siret %d, cp_divergent %d, exclues %d, pp %d, opposition %d, tel %d, adr %d, gps %d, enrichies %d, classées %d, conflits %d',
                 $code,
                 $c['actives'],
                 $c['sans_siret'],
@@ -114,6 +141,8 @@ class CrmSanteEnrichirFiness extends Command
                 $c['adr'],
                 $c['gps'],
                 $c['fiches_enrichies'],
+                $c['classees'],
+                $c['categorie_conflit'],
             ));
         }
 

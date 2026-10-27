@@ -61,6 +61,7 @@ final class TelephonesFiness
     private const COLONNES_OPTIONNELLES = [
         'finess_ej', 'numero_voie', 'type_voie', 'libelle_voie', 'complement_voie', 'lieu_dit', 'adresse_ligne_4',
         'code_postal', 'commune', 'commune_acheminement', 'latitude', 'longitude', 'date_ouverture',
+        'categorie_libelle', 'categorie_agregat_niv1_libelle',
     ];
 
     /** @var array<string, string> finess_ej → téléphone brut de la société exploitante */
@@ -226,12 +227,14 @@ final class TelephonesFiness
     }
 
     /** Mêmes conditions que SelectionEnrichissement::ouvertes (hors NAF et protection), plus RGPD (non diffusibles) ; fonctionne en SELECT comme en UPDATE. */
-    private function ouvertes(Builder $q): void
+    private function ouvertes(Builder $q, bool $tolererNonOfficine = false): void
     {
         $q->whereNull('insee_ferme_le')
             ->whereNull('insee_non_diffusible_le')
-            ->whereRaw("COALESCE(metadata->>'type_etablissement', '') <> 'non_officine'")
             ->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'ecartee_motif')");
+        if (! $tolererNonOfficine) {
+            $q->whereRaw("COALESCE(metadata->>'type_etablissement', '') <> 'non_officine'");
+        }
     }
 
     /**
@@ -239,9 +242,9 @@ final class TelephonesFiness
      *
      * @internal réutilisé par EnrichissementFinessSante
      */
-    public function gardes(Builder $q): Builder
+    public function gardes(Builder $q, bool $tolererNonOfficine = false): Builder
     {
-        $this->ouvertes($q);
+        $this->ouvertes($q, $tolererNonOfficine);
         $q->whereRaw(FichesProtegees::conditionSql('companies.id', null, 'companies.workspace_id'));
 
         return $q;
@@ -487,9 +490,9 @@ final class TelephonesFiness
      *
      * @internal réutilisé par EnrichissementFinessSante
      */
-    public function ecrire(string $workspaceId, int $id, string $type, mixed $valeur): int
+    public function ecrire(string $workspaceId, int $id, string $type, mixed $valeur, bool $tolererNonOfficine = false): int
     {
-        $q = $this->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at'));
+        $q = $this->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at'), $tolererNonOfficine);
         if ($type === 'gps') {
             return $q->whereNull('lat')->whereNull('lon')->update(['lat' => $valeur[0], 'lon' => $valeur[1], 'updated_at' => now()]);
         }

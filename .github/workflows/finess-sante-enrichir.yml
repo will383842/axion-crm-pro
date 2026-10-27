@@ -1,11 +1,14 @@
 name: Santé — enrichissement FINESS (dry-run ou apply)
 
-# Télécharge le miroir tiers du flux FINESS de data.gouv.fr (pas la liste officielle), puis lance
+# Télécharge le miroir irreductix.fr du jeu FINESS de data.gouv.fr (Licence Ouverte Etalab 2.0, usage
+# commercial accepté par Will le 27/10/2026 ; source et date de mise à jour à citer), puis lance
 # `crm:sante:enrichir-finess` sur le serveur de prod.
 #  - dry-run (défaut) : totaux seulement, RIEN n'est écrit ;
 #  - apply : AJOUTE, sur champ vide ou NULL seulement (jamais d'écrasement), pour les établissements de
 #    santé actifs (toutes catégories FINESS sauf 620, déjà traitée) : téléphone, adresse, GPS ; hors
 #    opposition. Aucune fiche créée, ni fax, ni courriel, ni date.
+#  - classer (défaut oui ; plafond max_classer) : classe aussi chaque fiche retrouvée par SIRET exact dans sa catégorie FINESS
+#    (metadata, ajout seul) ; inclure_non_officine (défaut non) : ne met plus à l'écart les fiches non_officine.
 # `apply` est REFUSÉ sauf si l'entrée « confirmer » vaut OUI et si l'empreinte SHA-256 correspond.
 # Dépôt public : seuls des totaux sont affichés, aucune liste nominative ni aucun numéro.
 
@@ -29,6 +32,18 @@ on:
         description: '« toutes » (sauf 620) ou codes FINESS séparés par des virgules (ex. 101,106)'
         type: string
         default: 'toutes'
+      classer:
+        description: 'Classer les fiches retrouvées par SIRET dans leur catégorie FINESS (ajout seul)'
+        type: boolean
+        default: true
+      inclure_non_officine:
+        description: 'Ne plus écarter les fiches non_officine (marqueur conservé)'
+        type: boolean
+        default: false
+      max_classer:
+        description: 'Plafond de fiches à classer en apply (nombre entier, refus au-delà)'
+        type: string
+        default: '6000'
 
 permissions:
   contents: read
@@ -49,7 +64,12 @@ jobs:
           MODE: ${{ inputs.mode }}
           CONFIRMER: ${{ inputs.confirmer }}
           CATEGORIES: ${{ inputs.categories }}
+          MAX_CLASSER: ${{ inputs.max_classer }}
         run: |
+          if ! printf '%s' "$MAX_CLASSER" | grep -Eq '^[0-9]+$'; then
+            echo "max_classer invalide : nombre entier attendu." >&2
+            exit 1
+          fi
           if [ "$MODE" = "apply" ] && [ "$CONFIRMER" != "OUI" ]; then
             echo "apply refusé : saisir OUI dans l'entrée « confirmer »." >&2
             exit 1
@@ -67,6 +87,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           EMPREINTE_ATTENDUE: ${{ inputs.empreinte }}
+          CLASSER: ${{ inputs.classer }}
         run: |
           set -e
           curl -fsSL -o finess.zip https://irreductix.fr/telecharger/finess.zip
@@ -84,17 +105,23 @@ jobs:
           fi
           unzip -q -o finess.zip etablissements.csv
           python3 - <<'PY'
-          import csv, sys
+          import csv, os, sys
           from collections import Counter
           with open('etablissements.csv', encoding='utf-8-sig') as fichier:
               lecteur = csv.DictReader(fichier, delimiter=';')
               print('En-tête du CSV :', ';'.join(lecteur.fieldnames or []))
               parcat = Counter()
               ncom = ncomnum = 0
+              colonnes = lecteur.fieldnames or []
+              manquantes = [c for c in ('categorie_libelle', 'categorie_agregat_niv1_libelle') if c not in colonnes]
+              nlib = {'categorie_libelle': 0, 'categorie_agregat_niv1_libelle': 0}
               for r in lecteur:
                   if (r.get('etat') or '').strip().upper() != 'A':
                       continue
                   parcat[(r.get('categorie') or '').strip()] += 1
+                  for c in nlib:
+                      if (r.get(c) or '').strip():
+                          nlib[c] += 1
                   com = (r.get('commune') or '').strip()
                   if com:
                       ncom += 1
@@ -104,6 +131,11 @@ jobs:
           print('établissements actifs, toutes catégories :', total)
           for code in sorted(parcat):
               print('  catégorie', code, ':', parcat[code])
+          for c, n in nlib.items():
+              print('libellés non vides', c, ':', n, '(colonne absente)' if c in manquantes else '')
+          if manquantes and os.environ.get('CLASSER') == 'true':
+              print('colonne(s) de libellé absente(s) : apply avec classer refusé', file=sys.stderr)
+              open('refus_apply', 'w').close()
           print('dont commune renseignée :', ncom, 'dont numérique (code) :', ncomnum)
           if ncom and ncomnum * 2 > ncom:
               print('colonne commune majoritairement numérique (codes) : apply refusé', file=sys.stderr)
@@ -121,7 +153,7 @@ jobs:
         if: ${{ inputs.mode == 'apply' }}
         run: |
           if [ -f refus_apply ]; then
-            echo "apply refusé : source hors fourchette (50000 à 150000 actives, 15000 à 25000 officines 620) ou colonne commune en codes." >&2
+            echo "apply refusé : source hors fourchette (50000 à 150000 actives, 15000 à 25000 officines 620) ou colonne commune en codes ou libellés de catégorie absents avec classer." >&2
             exit 1
           fi
 
@@ -143,11 +175,16 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           MODE: ${{ inputs.mode }}
           CATEGORIES: ${{ inputs.categories }}
+          CLASSER: ${{ inputs.classer }}
+          INCLURE_NON_OFFICINE: ${{ inputs.inclure_non_officine }}
+          MAX_CLASSER: ${{ inputs.max_classer }}
         run: |
           set -e
           SSH="ssh $USER@$HOST"
           OPT=""
           [ "$MODE" = "apply" ] && OPT="--apply"
+          [ "$CLASSER" = "true" ] && OPT="$OPT --classer --max-classer=$MAX_CLASSER"
+          [ "$INCLURE_NON_OFFICINE" = "true" ] && OPT="$OPT --inclure-non-officine"
           $SSH "umask 077; cat > /tmp/finess_sante_etablissements.csv" < etablissements.csv
           $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_sante_etablissements.csv api:/tmp/finess_sante_etablissements.csv && docker compose exec -u root -T api php -d memory_limit=2G artisan crm:sante:enrichir-finess /tmp/finess_sante_etablissements.csv --categories=$CATEGORIES $OPT"
 

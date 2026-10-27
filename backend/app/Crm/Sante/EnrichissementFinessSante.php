@@ -348,7 +348,7 @@ final class EnrichissementFinessSante
                                 'updated_at' => now(),
                             ]);
                         $compte($p['cat'], 'tel', $n);
-                        $enrichie = $enrichie || $n > 0;
+                        $enrichie = $n > 0;
                     }
                 }
                 foreach (['adr' => 'adresse', 'gps' => 'gps'] as $abrev => $type) {

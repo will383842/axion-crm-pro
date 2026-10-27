@@ -134,9 +134,12 @@ test('aperçu d une audience : la fermée, son canal et sa personne sont exclus 
     expect($adresses)->toBe([
         'accueil@zz-fev-ouverte.example.invalid', 'contact@zz-fev-ouverte.example.invalid', 'zoe@zz-fev-ouverte.example.invalid',
     ])
-        ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(3)
-        ->and($r['organisations'])->toBe(2)
-        ->and($r['organisations_sans_destinataire'])->toBe(1);
+        // Depuis le 27/10/2026 la fermée n'entre plus dans l'audience : le
+        // résolveur ne la voit pas (rien à écarter), la règle d'adresse
+        // reste le filet des chemins qui ne passent pas par l'audience.
+        ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(0)
+        ->and($r['organisations'])->toBe(1)
+        ->and($r['organisations_sans_destinataire'])->toBe(0);
 
     // Rien n'a bougé en base.
     $ligne = DB::table('companies')->where('id', $ids['fermee'])->first();
@@ -262,10 +265,11 @@ test('sous axion_app (RLS) : la fermée est exclue, l ouverte part, rien de l es
         $emails = collect($r['lignes'])->pluck('email')->all();
         expect($emails)->toBe(['ouverte@zz-fev-rls-' . $marqueA . '.example.invalid'])
             ->and(implode(' ', $emails))->not->toContain($marqueB)
-            // Une seule exclue (celle de A) et deux organisations (celles de A) :
-            // ni l'ouverte ni la fermée de B ne sont lues.
-            ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(1)
-            ->and($r['organisations'])->toBe(2);
+            // La fermée de A n'entre plus dans l'audience (27/10/2026) : rien à
+            // écarter, une seule organisation (l'ouverte de A) ; ni l'ouverte
+            // ni la fermée de B ne sont lues.
+            ->and($r['exclues'][EligibiliteAdresse::ENTREPRISE_FERMEE])->toBe(0)
+            ->and($r['organisations'])->toBe(1);
     } finally {
         DB::setDefaultConnection($precedente);
         DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);

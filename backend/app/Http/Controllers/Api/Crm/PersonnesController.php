@@ -170,17 +170,13 @@ class PersonnesController extends ConsoleController
      */
     private function soustraire(array $a, array $b): array
     {
-        /**
-         * @param  array<string, int>  $x
-         * @param  array<string, int>  $y
-         * @return array<string, int>
-         */
         $diff = static function (array $x, array $y): array {
+            $reste = [];
             foreach ($x as $cle => $n) {
-                $x[$cle] = max(0, $n - ($y[$cle] ?? 0));
+                $reste[(string) $cle] = max(0, (int) $n - (int) ($y[$cle] ?? 0));
             }
 
-            return $x;
+            return $reste;
         };
 
         return [

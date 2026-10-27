@@ -200,7 +200,7 @@ final class EnrichissementFinessSante
         }
         $n = $tf->gardes(DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $id)->whereNull('deleted_at'), $inclureNonOfficine)
             ->whereRaw("NOT jsonb_exists(COALESCE(metadata, '{}'::jsonb), 'finess_categorie')")
-            ->whereRaw("jsonb_typeof(COALESCE(metadata, '{}'::jsonb)) = 'object'")
+            ->whereRaw("jsonb_typeof(COALESCE(metadata, '{}'::jsonb)) IN ('object', 'null')")
             ->update([
                 'metadata' => DB::raw("CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || jsonb_build_object({$champs})"),
                 'updated_at' => now(),

@@ -67,6 +67,7 @@ class CrmPharmaciesContactsOsm extends Command
         $this->line(sprintf('  ambigus (rien écrit) : %d', $b['ambigus']));
         $this->line(sprintf('  exclues (fiche inéligible, rien écrit) : %d', $b['exclues']));
         $this->line(sprintf('  e-mails nominatifs ignorés : %d', $b['emails_nominatifs_ignores']));
+        $this->line(sprintf('  valeurs partagées ignorées (e-mail ou site sur 2 points OSM ou plus) : %d', $b['valeurs_partagees_ignorees']));
         $this->line(sprintf('  écartés pour opposition : %d', $b['opposition']));
         $this->line(sprintf('  e-mails %s : %d', $v, $b['emails_' . $k]));
         $this->line(sprintf('  sites %s : %d', $v, $b['sites_' . $k]));

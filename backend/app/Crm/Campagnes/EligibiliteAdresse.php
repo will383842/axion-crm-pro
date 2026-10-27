@@ -79,6 +79,9 @@ use App\Support\EligibiliteCampagne;
  *                     tous les rôles ; celui-ci n'est servi qu'au owner) ;
  *  1. `invalide`      syntaxe, `email_status` invalid/disposable, ou
  *                     vérification `invalide`/`jetable` ;
+ *  1 bis. `source_osm` l'adresse a été ajoutée depuis OpenStreetMap
+ *                     (`metadata.email_source` = `osm`, `ContactsOsm`) : jamais
+ *                     envoyée tant qu'elle n'a pas été validée par le propriétaire ;
  *  2. `non_verifiee`  aucune occurrence vérifiée `valide` par
  *                     `crm:emails:verifier` (#261) ;
  *  3. `personnelle`   messagerie grand public ou adresse marquée personnelle
@@ -106,6 +109,8 @@ final class EligibiliteAdresse
 
     public const INFORMATION_TIERS_INSUFFISANTE = 'information_tiers_insuffisante';
 
+    public const SOURCE_OSM = 'source_osm';
+
     public const INVALIDE = 'invalide';
 
     public const NON_VERIFIEE = 'non_verifiee';
@@ -127,7 +132,7 @@ final class EligibiliteAdresse
 
     /** @var list<string> */
     public const MOTIFS = [
-        self::NON_DIFFUSIBLE, self::ENTREPRISE_FERMEE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::NON_VERIFIEE, self::PERSONNELLE,
+        self::NON_DIFFUSIBLE, self::ENTREPRISE_FERMEE, self::ENTREPRISE_INDIVIDUELLE, self::SITE_NON_VERIFIE, self::INFORMATION_TIERS_INSUFFISANTE, self::INVALIDE, self::SOURCE_OSM, self::NON_VERIFIEE, self::PERSONNELLE,
         self::DEJA_INFORMEE, self::OPPOSITION, self::ADRESSE_PARTAGEE, self::FICHE_CONSOLE,
     ];
 
@@ -145,7 +150,7 @@ final class EligibiliteAdresse
 
     /**
      * @param  string  $email  adresse NORMALISÉE (minuscules, sans espaces)
-     * @param  list<array<string, mixed>>  $occurrences  clés lues : non_diffusible, entreprise_fermee, entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, status, verification, perso, deja_informe
+     * @param  list<array<string, mixed>>  $occurrences  clés lues : non_diffusible, entreprise_fermee, entreprise_individuelle, site_non_verifie, information_tiers_insuffisante, email_source, status, verification, perso, deja_informe
      */
     public static function motif(string $email, array $occurrences, bool $nonInformes = false): ?string
     {
@@ -178,6 +183,10 @@ final class EligibiliteAdresse
             || self::une($occurrences, static fn (array $o): bool => in_array($o['status'] ?? null, ['invalid', 'disposable'], true))
             || self::une($occurrences, static fn (array $o): bool => in_array($o['verification'] ?? null, [VerificationEmail::INVALIDE, VerificationEmail::JETABLE], true))) {
             return self::INVALIDE;
+        }
+        // Adresse issue d'OpenStreetMap : jamais en campagne tant que le propriétaire ne l'a pas validée.
+        if (self::une($occurrences, static fn (array $o): bool => ($o['email_source'] ?? null) === 'osm')) {
+            return self::SOURCE_OSM;
         }
         // Seule une adresse VÉRIFIÉE valide part : jamais une adresse dont on
         // ne sait pas si son domaine reçoit du courrier.

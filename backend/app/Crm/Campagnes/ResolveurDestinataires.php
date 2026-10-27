@@ -57,7 +57,7 @@ use RuntimeException;
  * exclue pour `site_devine`, `journaliste_sans_acces` ou
  * `journaliste_retire`, comptée et dite à l'écran.
  *
- * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, entreprise_fermee?: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
+ * @phpstan-type Candidat array{email: string, classe: string, crm_ref: string, fonction: ?string, status: ?string, verification: ?string, perso: bool, deja_informe: bool, entreprise_individuelle: bool, non_diffusible?: bool, entreprise_fermee?: bool, site_non_verifie: bool, information_tiers_insuffisante: bool, email_source?: ?string, ecartee: ?string, provenance?: string, provenance_fiable?: bool, journaliste_retire?: bool}
  */
 final class ResolveurDestinataires
 {
@@ -122,6 +122,8 @@ final class ResolveurDestinataires
             // l'audience — une expression de la liste de sélection, pas une
             // condition : aucun balayage de plus sur `companies`.
             ->selectRaw('COALESCE(' . SiteFiable::nonVerifieSql('companies') . ', false) AS site_non_verifie')
+            // Adresse ajoutée depuis OpenStreetMap (`ContactsOsm`) : jamais envoyée avant validation.
+            ->selectRaw("companies.metadata->>'email_source' AS email_source")
             // Site trouvé par candidat (04/10/2026) : l'ancien site deviné,
             // dont rien de ce qui en vient n'est libéré.
             ->selectRaw(QuarantaineSite::siteAncienSql('companies') . ' AS site_ancien')
@@ -398,6 +400,7 @@ final class ResolveurDestinataires
                 'status' => null, 'verification' => VerificationEmail::statutDe($verification, $generique),
                 'perso' => false, 'deja_informe' => $dejaInformee, 'entreprise_individuelle' => $ei, 'non_diffusible' => $nd, 'entreprise_fermee' => $fermee,
                 'site_non_verifie' => QuarantaineSite::adresseFiche($nonVerifiee, $generique, $site, $ancien), 'information_tiers_insuffisante' => false, 'ecartee' => null,
+                'email_source' => is_string($fiche['email_source'] ?? null) ? $fiche['email_source'] : null,
             ];
             $vues[$generique] = true;
         }

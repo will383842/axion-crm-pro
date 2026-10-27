@@ -6,7 +6,9 @@
  * opposition respectée, essai à blanc par défaut.
  */
 
+use App\Crm\Pharmacies\ContactsOsm;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -294,4 +296,93 @@ it('fusionne metadata.contacts_osm champ par champ sans écraser l\'existant', f
     expect($meta['autre'])->toBe('garde')
         ->and($meta['contacts_osm']['phone'])->toBe('2020-01-01')
         ->and($meta['contacts_osm']['email_generic'])->toBe(now()->toDateString());
+});
+
+it('une fiche visée par un point contradictoire et un point valide est ambiguë : rien d\'écrit', function () {
+    $espace = F::espace();
+    // Le premier point vise la fiche par téléphone mais à plus de 2 km (contradictoire), le second est propre.
+    $id = ficheOsm($espace, ['phone' => '0140000001', 'lat' => 48.1, 'lon' => 2.1, 'postcode' => '99003']);
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'lat' => '49.5', 'lon' => '2.1', 'cp' => '99003', 'email' => 'info@a.zz.test'],
+        ['telephone' => '0140000001', 'lat' => '48.1', 'lon' => '2.1', 'cp' => '99003', 'email' => 'contact@b.zz.test'],
+    ]));
+
+    expect(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
+    expect($sortie)->toContain('ambigus (rien écrit) : 2')->toContain('rapprochés : 0');
+});
+
+it('une fiche inéligible visée par deux points est ambiguë, pas exclue', function () {
+    $espace = F::espace();
+    ficheOsm($espace, ['phone' => '0140000001', 'insee_ferme_le' => '2020-01-01']);
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'email' => 'info@a.zz.test'],
+        ['telephone' => '0140000001', 'email' => 'contact@b.zz.test'],
+    ]));
+
+    expect($sortie)->toContain('ambigus (rien écrit) : 2')->toContain('exclues (fiche inéligible, rien écrit) : 0');
+});
+
+it('ignore un e-mail ou un site présent sur deux points OSM ou plus et les compte', function () {
+    $espace = F::espace();
+    $a = ficheOsm($espace, ['phone' => '0140000001']);
+    $b = ficheOsm($espace, ['phone' => '0140000002']);
+    $c = ficheOsm($espace, ['phone' => '0140000003']);
+
+    $sortie = lancerOsm($espace, csvOsm([
+        ['telephone' => '0140000001', 'email' => 'info@reseau.zz.test', 'site' => 'www.a.zz.test'],
+        ['telephone' => '0140000002', 'email' => 'INFO@reseau.zz.test', 'site' => 'www.b.zz.test'],
+        ['telephone' => '0140000003', 'email' => 'info@c.zz.test', 'site' => 'www.reseau2.zz.test'],
+        ['telephone' => '0140000099', 'site' => 'WWW.reseau2.zz.test'],
+    ]));
+
+    expect(DB::table('companies')->where('id', $a)->value('email_generic'))->toBeNull();
+    expect(DB::table('companies')->where('id', $b)->value('email_generic'))->toBeNull();
+    expect(DB::table('companies')->where('id', $a)->value('website'))->toBe('http://www.a.zz.test');
+    expect(DB::table('companies')->where('id', $c)->value('email_generic'))->toBe('info@c.zz.test');
+    expect(DB::table('companies')->where('id', $c)->value('website'))->toBeNull();
+    expect($sortie)->toContain('valeurs partagées ignorées (e-mail ou site sur 2 points OSM ou plus) : 4');
+});
+
+it('rejette les réseaux sociaux et annuaires comme site', function () {
+    foreach (['https://www.facebook.com/zz', 'instagram.com/zz', 'fr.linkedin.com/zz', 'twitter.com/zz', 'x.com/zz', 'm.youtube.com/zz', 'www.pagesjaunes.fr/zz', 'www.doctolib.fr/zz', 'maps.google.com/zz', 'www.mappy.com/zz'] as $site) {
+        expect(ContactsOsm::normaliserSite($site))->toBeNull();
+    }
+    expect(ContactsOsm::normaliserSite('www.zz-pharma.test'))->toBe('http://www.zz-pharma.test')
+        ->and(ContactsOsm::normaliserSite('https://netx.com.test'))->toBe('https://netx.com.test');
+});
+
+it('ecrire n\'écrit rien sur une fiche à forme juridique vide', function () {
+    $espace = F::espace();
+    $id = ficheOsm($espace, ['legal_form' => null]);
+
+    $n = WorkspaceContext::run($espace, function () use ($espace, $id): int {
+        $m = new ReflectionMethod(ContactsOsm::class, 'ecrire');
+
+        return $m->invoke(new ContactsOsm, $espace, $id, 'email_generic', 'info@zz.test');
+    });
+
+    expect($n)->toBe(0)->and(DB::table('companies')->where('id', $id)->value('email_generic'))->toBeNull();
+});
+
+it('ecrire respecte la garde field_origins declared ou manual', function () {
+    $espace = F::espace();
+    $declaree = ficheOsm($espace, ['field_origins' => json_encode(['email_generic' => 'declared'])]);
+    $manuelle = ficheOsm($espace, ['field_origins' => json_encode(['email_generic' => 'manual'])]);
+    $libre = ficheOsm($espace);
+
+    $n = WorkspaceContext::run($espace, function () use ($espace, $declaree, $manuelle, $libre): array {
+        $m = new ReflectionMethod(ContactsOsm::class, 'ecrire');
+        $o = new ContactsOsm;
+
+        return [
+            $m->invoke($o, $espace, $declaree, 'email_generic', 'info@zz.test'),
+            $m->invoke($o, $espace, $manuelle, 'email_generic', 'info@zz.test'),
+            $m->invoke($o, $espace, $libre, 'email_generic', 'info@zz.test'),
+        ];
+    });
+
+    expect($n)->toBe([0, 0, 1])
+        ->and(DB::table('companies')->whereIn('id', [$declaree, $manuelle])->whereNotNull('email_generic')->count())->toBe(0);
 });

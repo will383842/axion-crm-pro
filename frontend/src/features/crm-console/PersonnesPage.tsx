@@ -28,6 +28,7 @@ import {
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
+import { FERMEES_INCLURE } from '@/features/companies/fermees';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
   NATURE_EMAIL_LABELS,
@@ -46,9 +47,11 @@ interface Filtres {
   source: string;
   nature: string;
   rattachee: string;
+  /** '' = fiches fermées masquées (serveur) ; 'inclure' les remet — liste, pastilles et export. */
+  fermees: string;
 }
 
-const FILTRES_VIDES: Filtres = { statut_lettre: '', source: '', nature: '', rattachee: '' };
+const FILTRES_VIDES: Filtres = { statut_lettre: '', source: '', nature: '', rattachee: '', fermees: '' };
 
 function formatDate(value: string | null): string {
   if (value === null) return '—';
@@ -82,8 +85,12 @@ function PersonnesContent() {
   const idf = useId();
 
   const counts = useQuery<PersonnesCounts>({
-    queryKey: ['crm', 'personnes', 'counts'],
-    queryFn: async () => (await api.get<PersonnesCounts>('/crm/personnes/counts')).data,
+    queryKey: ['crm', 'personnes', 'counts', filtres.fermees],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filtres.fermees !== '') params.set('fermees', filtres.fermees);
+      return (await api.get<PersonnesCounts>(`/crm/personnes/counts?${params.toString()}`)).data;
+    },
   });
 
   const list = useQuery<CursorResponse<PersonneRow>>({
@@ -196,6 +203,15 @@ function PersonnesContent() {
                     <option value="oui">Rattachées à une entreprise</option>
                   </select>
                 </Champ>
+                <label className="flex items-center gap-2 self-end pb-3 text-xs text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={filtres.fermees === FERMEES_INCLURE}
+                    onChange={(e) => setFiltres((f) => ({ ...f, fermees: e.target.checked ? FERMEES_INCLURE : '' }))}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  Inclure les fermées
+                </label>
               </>
             }
             right={

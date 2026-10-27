@@ -490,6 +490,16 @@ class DashboardController extends ApiController
                 return max(0, (int) $q->count() - $fermees);
             }
 
+            // 27/10/2026 — le contact d'une fiche fermée ne compte pas, lui
+            // non plus : PAR DIFFÉRENCE (pas de `NOT EXISTS` sur 1,3 M de
+            // contacts), les fermées se lisent par l'index partiel
+            // `idx_companies_ws_fermees`.
+            if ($table === 'contacts' && Schema::hasColumn('companies', EntreprisesFermees::COLONNE)) {
+                $fermees = (int) EntreprisesFermees::appliquerAuxContacts(clone $q, EntreprisesFermees::SEULES)->count();
+
+                return max(0, (int) $q->count() - $fermees);
+            }
+
             return (int) $q->count();
         } catch (\Throwable $e) {
             // Constat A-015 : l'accueil s'effaçait entièrement dès qu'une seule

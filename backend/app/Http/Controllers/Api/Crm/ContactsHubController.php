@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Support\CompanyQueryFilters;
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\RechercheDenomination;
 use Illuminate\Contracts\Database\Eloquent\Builder as BuilderContract;
@@ -83,7 +84,7 @@ class ContactsHubController extends ConsoleController
             'temperature' => ['nullable', 'string', 'in:actifs,froids,tous'],
         ]);
 
-        $query = $this->buildQuery($workspaceId, $validated);
+        $query = $this->buildQuery($workspaceId, $validated, EntreprisesFermees::mode($request->query('fermees')));
 
         // Décidé UNE fois par requête : la permission ne change pas d'une
         // ligne à l'autre.
@@ -130,7 +131,7 @@ class ContactsHubController extends ConsoleController
      * @param  array<string, mixed>  $validated
      * @return QueryBuilder<Company>
      */
-    private function buildQuery(string $workspaceId, array $validated): QueryBuilder
+    private function buildQuery(string $workspaceId, array $validated, string $fermees = EntreprisesFermees::MASQUER): QueryBuilder
     {
         $base = Company::query()
             ->select(array_map(static fn (string $c): string => 'companies.' . $c, self::COLONNES_LISTE))
@@ -139,6 +140,10 @@ class ContactsHubController extends ConsoleController
             // lot L0 vaut pour les deux couches, pas pour l'une OU l'autre.
             ->where('workspace_id', $workspaceId)
             ->with(['contacts', 'tags']);
+
+        // Fermées INSEE (27/10/2026) : masquées par défaut ; la liste n'a pas
+        // de total (curseur), la condition est donc posée telle quelle.
+        EntreprisesFermees::appliquer($base, $fermees);
 
         $relationType = $validated['relation_type'] ?? null;
         if (is_string($relationType)) {

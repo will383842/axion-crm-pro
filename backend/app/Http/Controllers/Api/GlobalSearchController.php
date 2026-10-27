@@ -111,7 +111,7 @@ class GlobalSearchController extends ApiController
         return WorkspaceContext::run($espace, function () use ($espace, $terme, $fermees): JsonResponse {
             $charge = MasquageCoordonnees::masquerTableauSiRequis([
                 'companies' => $this->chercherEntreprises($espace, $terme, $fermees),
-                'contacts' => $this->chercherPersonnes($espace, $terme),
+                'contacts' => $this->chercherPersonnes($espace, $terme, $fermees),
                 'tags' => $this->chercherEtiquettes($espace, $terme),
             ]);
 
@@ -194,16 +194,23 @@ class GlobalSearchController extends ApiController
      *
      * @return list<array<string, mixed>>
      */
-    private function chercherPersonnes(string $espace, string $terme): array
+    private function chercherPersonnes(string $espace, string $terme, string $fermees = EntreprisesFermees::MASQUER): array
     {
-        return $this->sur('contacts', function () use ($espace, $terme): array {
+        return $this->sur('contacts', function () use ($espace, $terme, $fermees): array {
             $ids = $this->identifiants(
                 'SELECT t.id FROM public.contacts_recherche_ids(?::uuid, ?, ?) WITH ORDINALITY AS t(id, rang) ORDER BY t.rang',
                 // Saisie BRUTE : la fonction neutralise elle-même les jokers.
                 [$espace, $terme, self::PLAFOND],
             );
 
-            return $this->relire('contacts', $espace, $ids, ['id', 'first_name', 'last_name', 'email', 'company_id']);
+            return $this->relire(
+                'contacts',
+                $espace,
+                $ids,
+                ['id', 'first_name', 'last_name', 'email', 'company_id'],
+                // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée est masqué par défaut.
+                static fn (Builder $q) => EntreprisesFermees::appliquerAuxContacts($q, $fermees, 'contacts.company_id'),
+            );
         });
     }
 

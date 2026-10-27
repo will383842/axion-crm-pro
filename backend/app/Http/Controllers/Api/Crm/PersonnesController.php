@@ -9,6 +9,7 @@ use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
 use App\Support\CelluleCsv;
+use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
 use App\Support\PlafondExport;
 use App\Support\WorkspaceContext;
@@ -83,47 +84,108 @@ class PersonnesController extends ConsoleController
     {
         $workspaceId = $this->businessWorkspace($request);
 
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId): JsonResponse {
-            $total = DB::table('personnes')->where('workspace_id', $workspaceId)->count();
+        $mode = EntreprisesFermees::mode($request->query('fermees'));
 
-            $parStatut = array_fill_keys(array_merge(Taxonomy::ABONNEMENT_STATUTS, ['aucun']), 0);
-            $lignes = DB::table('personnes')
-                ->leftJoin('abonnements', function ($join): void {
-                    $join->on('abonnements.personne_id', '=', 'personnes.id')
-                        ->where('abonnements.canal', '=', 'lettre');
-                })
-                ->where('personnes.workspace_id', $workspaceId)
-                ->selectRaw("coalesce(abonnements.statut, 'aucun') AS statut, count(*) AS total")
-                ->groupByRaw("coalesce(abonnements.statut, 'aucun')")
-                ->get();
-            foreach ($lignes as $ligne) {
-                $parStatut[(string) $ligne->statut] = (int) $ligne->total;
-            }
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $mode): JsonResponse {
+            // PAR DIFFÉRENCE (cf. `EntreprisesFermees`) : toutes les personnes
+            // (plan inchangé) moins celles des fiches fermées (index partiel).
+            $toutes = $this->mesures($workspaceId, false);
+            $fermees = $mode === EntreprisesFermees::INCLURE ? null : $this->mesures($workspaceId, true);
+            $m = match ($mode) {
+                EntreprisesFermees::INCLURE => $toutes,
+                EntreprisesFermees::SEULES => $fermees ?? $toutes,
+                default => $this->soustraire($toutes, $fermees ?? $toutes),
+            };
 
-            $parNature = array_fill_keys(Taxonomy::PERSONNE_EMAIL_NATURES, 0);
-            foreach (DB::table('personnes')->where('workspace_id', $workspaceId)
-                ->selectRaw('email_nature, count(*) AS total')->groupBy('email_nature')->get() as $ligne) {
-                $parNature[(string) $ligne->email_nature] = (int) $ligne->total;
-            }
-
-            $parSource = [];
-            foreach (DB::table('personnes')->where('workspace_id', $workspaceId)
-                ->selectRaw('premiere_source, count(*) AS total')->groupBy('premiere_source')
-                ->orderByDesc('total')->limit(20)->get() as $ligne) {
-                $parSource[(string) $ligne->premiere_source] = (int) $ligne->total;
-            }
-
-            $rattachees = DB::table('personnes')->where('workspace_id', $workspaceId)->whereNotNull('contact_id')->count();
+            $palmares = array_filter($m['source']);
+            arsort($palmares);
 
             return $this->ok([
-                'total' => $total,
-                'by_statut_lettre' => $parStatut,
-                'by_nature' => $parNature,
-                'by_source' => $parSource,
-                'rattachees' => $rattachees,
-                'non_rattachees' => $total - $rattachees,
+                'total' => $m['total'],
+                'by_statut_lettre' => $m['statut'],
+                'by_nature' => $m['nature'],
+                'by_source' => array_slice($palmares, 0, 20, true),
+                'rattachees' => $m['rattachees'],
+                'non_rattachees' => $m['total'] - $m['rattachees'],
             ]);
         });
+    }
+
+    /**
+     * Les mesures des pastilles, sur toutes les personnes de l'espace ou
+     * seulement celles dont la fiche est fermée.
+     *
+     * @return array{total: int, statut: array<string, int>, nature: array<string, int>, source: array<string, int>, rattachees: int}
+     */
+    private function mesures(string $workspaceId, bool $seulementFermees): array
+    {
+        $base = function () use ($workspaceId, $seulementFermees): Builder {
+            $q = DB::table('personnes')->where('personnes.workspace_id', $workspaceId);
+            if ($seulementFermees) {
+                $q->join('companies', 'companies.id', '=', 'personnes.company_id');
+                EntreprisesFermees::appliquer($q, EntreprisesFermees::SEULES, 'companies');
+            }
+
+            return $q;
+        };
+
+        $statut = array_fill_keys(array_merge(Taxonomy::ABONNEMENT_STATUTS, ['aucun']), 0);
+        $lignes = $base()
+            ->leftJoin('abonnements', function ($join): void {
+                $join->on('abonnements.personne_id', '=', 'personnes.id')
+                    ->where('abonnements.canal', '=', 'lettre');
+            })
+            ->selectRaw("coalesce(abonnements.statut, 'aucun') AS statut, count(*) AS total")
+            ->groupByRaw("coalesce(abonnements.statut, 'aucun')")
+            ->get();
+        foreach ($lignes as $ligne) {
+            $statut[(string) $ligne->statut] = (int) $ligne->total;
+        }
+
+        $nature = array_fill_keys(Taxonomy::PERSONNE_EMAIL_NATURES, 0);
+        foreach ($base()->selectRaw('personnes.email_nature, count(*) AS total')->groupBy('personnes.email_nature')->get() as $ligne) {
+            $nature[(string) $ligne->email_nature] = (int) $ligne->total;
+        }
+
+        // Pas de `limit` ici : la différence se fait source par source, le
+        // palmarès (20 premières) est coupé après la soustraction.
+        $source = [];
+        foreach ($base()->selectRaw('personnes.premiere_source, count(*) AS total')->groupBy('personnes.premiere_source')->get() as $ligne) {
+            $source[(string) $ligne->premiere_source] = (int) $ligne->total;
+        }
+
+        return [
+            'total' => $base()->count(),
+            'statut' => $statut,
+            'nature' => $nature,
+            'source' => $source,
+            'rattachees' => $base()->whereNotNull('personnes.contact_id')->count(),
+        ];
+    }
+
+    /**
+     * @param  array{total: int, statut: array<string, int>, nature: array<string, int>, source: array<string, int>, rattachees: int}  $a
+     * @param  array{total: int, statut: array<string, int>, nature: array<string, int>, source: array<string, int>, rattachees: int}  $b
+     * @return array{total: int, statut: array<string, int>, nature: array<string, int>, source: array<string, int>, rattachees: int}
+     */
+    private function soustraire(array $a, array $b): array
+    {
+        $diff = static function (array $x, array $y): array {
+            $reste = [];
+            foreach ($x as $cle => $n) {
+                $reste[(string) $cle] = max(0, (int) $n - (int) ($y[$cle] ?? 0));
+            }
+
+            return $reste;
+        };
+
+        return [
+            'total' => max(0, $a['total'] - $b['total']),
+            'statut' => $diff($a['statut'], $b['statut']),
+            'nature' => $diff($a['nature'], $b['nature']),
+            'source' => $diff($a['source'], $b['source']),
+            'rattachees' => max(0, $a['rattachees'] - $b['rattachees']),
+        ];
     }
 
     /**
@@ -545,7 +607,7 @@ class PersonnesController extends ConsoleController
     // ── Internes ────────────────────────────────────────────────────────────
 
     /**
-     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string}
+     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string}
      */
     private function filtres(Request $request): array
     {
@@ -563,11 +625,12 @@ class PersonnesController extends ConsoleController
             'nature' => $this->texte($v['nature'] ?? null),
             'rattachee' => $this->texte($v['rattachee'] ?? null),
             'q' => $this->texte($v['q'] ?? null),
+            'fermees' => EntreprisesFermees::mode($request->query('fermees')),
         ];
     }
 
     /**
-     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string}  $f
+     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string}  $f
      */
     private function requete(string $workspaceId, array $f): Builder
     {
@@ -601,6 +664,11 @@ class PersonnesController extends ConsoleController
                 'companies.denomination',
                 'companies.siren',
             ]);
+
+        // FERMÉES INSEE (décision du 27/10/2026) : la personne d'une fiche
+        // fermée n'apparaît ni dans la liste ni dans l'export par défaut ;
+        // `fermees=inclure|seules` la remet. Sans fiche (LEFT JOIN nul), rien à exclure.
+        EntreprisesFermees::appliquer($requete, $f['fermees'], 'companies');
 
         if ($f['source'] !== null) {
             $requete->where('personnes.premiere_source', $f['source']);
@@ -691,7 +759,7 @@ class PersonnesController extends ConsoleController
 
     private function personne(string $workspaceId, int $id): \stdClass
     {
-        $personne = $this->requete($workspaceId, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null])
+        $personne = $this->requete($workspaceId, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null, 'fermees' => EntreprisesFermees::INCLURE])
             ->where('personnes.id', $id)
             ->first();
 

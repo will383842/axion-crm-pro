@@ -91,7 +91,7 @@ final class EnrichissementFinessSante
         // Établissements à traiter, par SIREN ; un SIRET partagé (téléphone ou adresse différents) est écarté.
         /** @var array<string, array<string, array<string, string>>> $cibles siren → siret → ligne */
         $cibles = [];
-        /** @var array<string, array<string, true>> $partages siren → sirets partagés */
+        /** @var array<string, array<string, string>> $partages siren → siret partagé → catégorie */
         $partages = [];
         foreach ($parSiret as $siret => $lignes) {
             $cat = null;
@@ -110,11 +110,16 @@ final class EnrichissementFinessSante
             $siren = substr((string) $siret, 0, 9);
             if ($this->partage($lignes)) {
                 $par[$cat]['siret_partage']++;
-                $partages[$siren][(string) $siret] = true;
+                $partages[$siren][(string) $siret] = $cat;
 
                 continue;
             }
             $cibles[$siren][(string) $siret] = $ligne;
+        }
+
+        // Un SIREN dont tous les SIRET cibles sont partagés entre aussi dans un paquet : sa fiche est comptée à part.
+        foreach (array_keys($partages) as $siren) {
+            $cibles[(string) $siren] ??= [];
         }
 
         foreach (array_chunk(array_map('strval', array_keys($cibles)), $paquet) as $sirens) {
@@ -181,7 +186,7 @@ final class EnrichissementFinessSante
 
     /**
      * @param  array<string, array<string, array<string, string>>>  $lot  siren → siret → ligne
-     * @param  array<string, array<string, true>>  $partages
+     * @param  array<string, array<string, string>>  $partages
      * @param  array<string, array<string, true>>  $parSiren
      * @return array{par: array<string, array<string, int>>, invalides: int, gps_hors_france: int}
      */
@@ -230,7 +235,7 @@ final class EnrichissementFinessSante
             $emails = [];
             foreach ($lot as $siren => $etablissements) {
                 $siren = (string) $siren;
-                $premiere = (string) (array_values($etablissements)[0]['categorie'] ?? '');
+                $premiere = (string) (array_values($etablissements)[0]['categorie'] ?? array_values($partages[$siren] ?? [])[0] ?? '');
                 if (! isset($fiches[$siren])) {
                     $compte($premiere, 'exclues');
                     if (isset($nonOfficines[$siren])) {

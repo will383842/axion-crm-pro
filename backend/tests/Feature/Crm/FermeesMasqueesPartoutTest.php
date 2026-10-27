@@ -176,7 +176,8 @@ test('appliquerAuxContacts : deux espaces ne se mélangent pas, chacun a ses fer
     $contactAutre = F::contact($autre, $ficheAutre, 'Xavi', 'ZZMPFAUTRE');
 
     $ids = fn (string $espace, string $mode): array => EntreprisesFermees::appliquerAuxContacts(
-        DB::table('contacts')->where('workspace_id', $espace), $mode,
+        DB::table('contacts')->where('workspace_id', $espace),
+        $mode,
     )->pluck('id')->map(fn ($id) => (int) $id)->all();
 
     expect($ids($this->ws, EntreprisesFermees::MASQUER))->toBe([$this->cOuvert])

@@ -8,7 +8,6 @@ use App\Exceptions\TableauDeBordIncomplet;
 use App\Support\DelaiRequeteSql;
 use App\Support\EntreprisesFermees;
 use App\Support\WorkspaceContext;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

@@ -148,7 +148,6 @@ test('B2 — la surveillance a un job borné qui ne rougit pas sans configuratio
     expect($verif)->toContain('SEUIL_TAILLE_MO="${SEUIL_TAILLE_MO:-100}"');
 });
 
-
 /**
  * Lance backup-b2.sh avec un `curl` simulé dans le PATH.
  *

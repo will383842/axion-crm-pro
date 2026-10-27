@@ -440,7 +440,7 @@ sous le préfixe `axion-crm/` du bucket. Elle n'existe que si Will a posé
 > n'était que dans le `.env` du serveur détruit, la copie hors-site serait morte
 > avec lui.
 
-1. Dans la console web Backblaze, télécharge l'archive la plus récente du bucket
+1. Dans la console web de B2, télécharge l'archive la plus récente du bucket
    (dossier `axion-crm/`) vers `/tmp/restore`. Note son SHA-1, affiché sur sa fiche.
 2. Contrôle le transfert, puis déchiffre avec les **mêmes paramètres** que
    `backup-postgres.sh` (`-pbkdf2 -iter 100000` : sans eux, « bad decrypt »

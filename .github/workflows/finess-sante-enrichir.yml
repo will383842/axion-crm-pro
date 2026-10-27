@@ -149,7 +149,7 @@ jobs:
           OPT=""
           [ "$MODE" = "apply" ] && OPT="--apply"
           $SSH "umask 077; cat > /tmp/finess_sante_etablissements.csv" < etablissements.csv
-          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_sante_etablissements.csv api:/tmp/finess_sante_etablissements.csv && docker compose exec -u root -T api php artisan crm:sante:enrichir-finess /tmp/finess_sante_etablissements.csv --categories=$CATEGORIES $OPT"
+          $SSH "cd /opt/axion-crm-pro && docker compose cp /tmp/finess_sante_etablissements.csv api:/tmp/finess_sante_etablissements.csv && docker compose exec -u root -T api php -d memory_limit=2G artisan crm:sante:enrichir-finess /tmp/finess_sante_etablissements.csv --categories=$CATEGORIES $OPT"
 
       - name: Nettoyer le CSV (hôte et conteneur api)
         if: ${{ always() }}

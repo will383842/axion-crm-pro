@@ -7,6 +7,9 @@
 
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Emails\VerificationEmail;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 it('refuse une adresse dont la source est osm, même vérifiée valide', function () {
     $valide = ['verification' => VerificationEmail::VALIDE];

@@ -273,9 +273,6 @@ class DashboardController extends ApiController
                 $q->where(function ($sq) {
                     $sq->whereNotNull('email')->orWhereNotNull('phone');
                 });
-                // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée ne compte pas.
-                /** @var QueryBuilder $q */
-                EntreprisesFermees::appliquerAuxContacts($q, EntreprisesFermees::MASQUER);
             }),
             'scraper_runs_24h' => $this->compter('scraper_runs', $espace, function ($q) {
                 $q->where('created_at', '>=', now()->subDay());
@@ -490,6 +487,16 @@ class DashboardController extends ApiController
             // partiel (cf. `EntreprisesFermees`).
             if ($this->masqueFermees($table)) {
                 $fermees = (int) EntreprisesFermees::appliquer(clone $q, EntreprisesFermees::SEULES)->count();
+
+                return max(0, (int) $q->count() - $fermees);
+            }
+
+            // 27/10/2026 — le contact d'une fiche fermée ne compte pas, lui
+            // non plus : PAR DIFFÉRENCE (pas de `NOT EXISTS` sur 1,3 M de
+            // contacts), les fermées se lisent par l'index partiel
+            // `idx_companies_ws_fermees`.
+            if ($table === 'contacts' && Schema::hasColumn('companies', EntreprisesFermees::COLONNE)) {
+                $fermees = (int) EntreprisesFermees::appliquerAuxContacts(clone $q, EntreprisesFermees::SEULES)->count();
 
                 return max(0, (int) $q->count() - $fermees);
             }

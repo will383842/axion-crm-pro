@@ -4,6 +4,7 @@ namespace App\Crm\Console;
 
 use App\Crm\Taxonomy;
 use App\Support\DelaiRequeteSql;
+use App\Support\EntreprisesFermees;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -160,9 +161,25 @@ final class CompteursHub
             ->groupBy('relation_type', 'lifecycle_stage')
             ->get()));
 
+        // 27/10/2026 — les fiches fermées selon l'INSEE ne comptent pas, PAR
+        // DIFFÉRENCE (cf. `EntreprisesFermees`) : le comptage de toutes garde
+        // son parcours d'index couvrant, celui des fermées passe par leur
+        // petit index partiel `idx_companies_ws_fermees`.
+        $fermees = DelaiRequeteSql::etendu(120, static fn () => WorkspaceContext::run($workspaceId, static fn () => EntreprisesFermees::appliquer(
+            DB::table('companies')
+                ->selectRaw('relation_type, lifecycle_stage, count(*) AS total')
+                ->where('workspace_id', $workspaceId)
+                ->whereNull('deleted_at'),
+            EntreprisesFermees::SEULES,
+        )->groupBy('relation_type', 'lifecycle_stage')->get()));
+        $aRetirer = [];
+        foreach ($fermees as $row) {
+            $aRetirer[(string) $row->relation_type . '|' . (string) $row->lifecycle_stage] = (int) $row->total;
+        }
+
         $total = 0;
         foreach ($rows as $row) {
-            $count = (int) $row->total;
+            $count = max(0, (int) $row->total - ($aRetirer[(string) $row->relation_type . '|' . (string) $row->lifecycle_stage] ?? 0));
             $total += $count;
 
             $type = is_string($row->relation_type) ? $row->relation_type : '';

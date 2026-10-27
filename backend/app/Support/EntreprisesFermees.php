@@ -106,13 +106,20 @@ final class EntreprisesFermees
      * fiche n'est jamais « fermé ». Recherche par clé primaire de `companies`
      * (ou par l'index partiel des fermées pour `seules`) : pas de balayage.
      *
-     * @template T of Builder|EloquentBuilder
+     * `$colonneFiche` est INTERPOLÉE dans le SQL : elle doit être de la forme
+     * `table.colonne` (identifiants simples), sans quoi on lève une exception.
+     *
+     * @template T of Builder|EloquentBuilder|SpatieQueryBuilder
      *
      * @param  T  $requete
      * @return T
      */
-    public static function appliquerAuxContacts(Builder|EloquentBuilder $requete, string $mode, string $colonneFiche = 'contacts.company_id'): Builder|EloquentBuilder
+    public static function appliquerAuxContacts(Builder|EloquentBuilder|SpatieQueryBuilder $requete, string $mode, string $colonneFiche = 'contacts.company_id'): Builder|EloquentBuilder|SpatieQueryBuilder
     {
+        if (preg_match('/^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$/', $colonneFiche) !== 1) {
+            throw new \InvalidArgumentException('Colonne de fiche invalide : ' . $colonneFiche);
+        }
+
         $fermee = 'SELECT 1 FROM companies fe_c WHERE fe_c.id = ' . $colonneFiche . ' AND fe_c.' . self::COLONNE . ' IS NOT NULL';
 
         if ($mode === self::SEULES) {
@@ -143,6 +150,28 @@ final class EntreprisesFermees
         }
 
         // Les deux totaux ont chacun leur fraîcheur (60 s) : jamais négatif.
+        return max(0, TotalListe::pour($base, $workspaceId) - $fermees);
+    }
+
+    /**
+     * Le total d'une liste de CONTACTS selon le mode, PAR DIFFÉRENCE (cf.
+     * en-tête) : tous les contacts (plan inchangé, 1,3 M de lignes) moins ceux
+     * des fiches fermées. Jamais de `NOT EXISTS` sur le comptage.
+     *
+     * `$base` est la requête SANS la condition des fermées ; elle n'est pas
+     * modifiée (clones).
+     */
+    public static function totalContacts(Builder $base, string $mode, string $workspaceId, string $colonneFiche = 'contacts.company_id'): int
+    {
+        if ($mode === self::INCLURE) {
+            return TotalListe::pour($base, $workspaceId);
+        }
+
+        $fermees = TotalListe::pour(self::appliquerAuxContacts(clone $base, self::SEULES, $colonneFiche), $workspaceId);
+        if ($mode === self::SEULES) {
+            return $fermees;
+        }
+
         return max(0, TotalListe::pour($base, $workspaceId) - $fermees);
     }
 }

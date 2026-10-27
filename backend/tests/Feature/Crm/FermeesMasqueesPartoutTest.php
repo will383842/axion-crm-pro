@@ -9,10 +9,12 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
+use App\Models\Company;
 use App\Models\EmailAudience;
 use App\Models\User;
 use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Audit\AuditHashChain;
+use App\Support\EntreprisesFermees;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -58,24 +60,53 @@ test('export CSV des entreprises : la fermée est masquée par défaut, fermees=
         ->and($seules)->toContain('ZZ MPF FERMEE')->not->toContain('ZZ MPF OUVERTE');
 });
 
-test('export CSV des personnes : la personne d une fiche fermée est masquée par défaut', function () {
-    config(['crm.console_v2' => true, 'crm.ingest.business_workspace' => F::slug($this->ws)]);
-    $base = ['workspace_id' => $this->ws, 'email_nature' => 'pro', 'premiere_source' => 'newsletter', 'legal_basis' => 'consent',
+/** Une personne de la lettre par fiche (ouverte, fermée) ; l'espace métier est celui du test. */
+function personnesDesDeuxFiches(object $t): void
+{
+    config(['crm.console_v2' => true, 'crm.ingest.business_workspace' => F::slug($t->ws)]);
+    $base = ['workspace_id' => $t->ws, 'email_nature' => 'pro', 'premiere_source' => 'newsletter', 'legal_basis' => 'consent',
         'premiere_source_at' => now(), 'derniere_interaction_at' => now(), 'created_at' => now(), 'updated_at' => now()];
-    foreach ([['zoe@zz-mpf-ouverte.example.invalid', $this->ouverte], ['yann@zz-mpf-fermee.example.invalid', $this->fermee]] as [$email, $fiche]) {
+    foreach ([['zoe@zz-mpf-ouverte.example.invalid', $t->ouverte], ['yann@zz-mpf-fermee.example.invalid', $t->fermee]] as [$email, $fiche]) {
         $pid = (int) DB::table('personnes')->insertGetId($base + [
             'person_key' => hash('sha256', 'mpf|' . $email), 'email' => $email, 'email_hash' => hash('sha256', $email),
             'company_id' => $fiche, 'rattachee_at' => now(),
         ]);
-        DB::table('abonnements')->insert(['workspace_id' => $this->ws, 'personne_id' => $pid, 'canal' => 'lettre', 'statut' => 'abonne',
+        DB::table('abonnements')->insert(['workspace_id' => $t->ws, 'personne_id' => $pid, 'canal' => 'lettre', 'statut' => 'abonne',
             'consent_version' => 'v1', 'consent_at' => now(), 'dernier_evenement_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     }
+}
+
+test('export CSV des personnes : la personne d une fiche fermée est masquée par défaut, inclure la remet, seules ne garde qu elle', function () {
+    personnesDesDeuxFiches($this);
 
     $parDefaut = $this->get('/api/v1/crm/personnes/export')->assertOk()->streamedContent();
     $inclure = $this->get('/api/v1/crm/personnes/export?fermees=inclure')->assertOk()->streamedContent();
+    $seules = $this->get('/api/v1/crm/personnes/export?fermees=seules')->assertOk()->streamedContent();
 
     expect($parDefaut)->toContain('zoe@zz-mpf-ouverte')->not->toContain('yann@zz-mpf-fermee')
-        ->and($inclure)->toContain('zoe@zz-mpf-ouverte')->toContain('yann@zz-mpf-fermee');
+        ->and($inclure)->toContain('zoe@zz-mpf-ouverte')->toContain('yann@zz-mpf-fermee')
+        ->and($seules)->toContain('yann@zz-mpf-fermee')->not->toContain('zoe@zz-mpf-ouverte');
+});
+
+test('personnes : la liste et les pastilles masquent la fermée par défaut (différence), fermees=inclure|seules les remettent', function () {
+    personnesDesDeuxFiches($this);
+    $emails = fn (string $q): array => array_column($this->getJson('/api/v1/crm/personnes' . $q)->assertOk()->json('data'), 'email');
+
+    expect($emails(''))->toBe(['zoe@zz-mpf-ouverte.example.invalid'])
+        ->and($emails('?fermees=inclure'))->toEqualCanonicalizing(['zoe@zz-mpf-ouverte.example.invalid', 'yann@zz-mpf-fermee.example.invalid'])
+        ->and($emails('?fermees=seules'))->toBe(['yann@zz-mpf-fermee.example.invalid']);
+
+    $pastilles = fn (string $q): array => $this->getJson('/api/v1/crm/personnes/counts' . $q)->assertOk()->json();
+    $defaut = $pastilles('');
+    $inclure = $pastilles('?fermees=inclure');
+    $seules = $pastilles('?fermees=seules');
+    expect($defaut['total'])->toBe(1)
+        ->and($inclure['total'])->toBe(2)
+        ->and($seules['total'])->toBe(1)
+        ->and($defaut['by_statut_lettre']['abonne'])->toBe(1)
+        ->and($inclure['by_statut_lettre']['abonne'])->toBe(2)
+        ->and($defaut['by_source'])->toBe(['newsletter' => 1])
+        ->and($defaut['rattachees'])->toBe(1);
 });
 
 test('audience : ni la construction (aperçu, compteurs) ni les membres déjà inscrits ne montrent la fermée', function () {
@@ -112,9 +143,46 @@ test('recherche globale : le contact d une fiche fermée est masqué par défaut
     $ids = fn (string $q): array => array_map('intval', array_column($this->getJson('/api/v1/search?q=ZZMPF' . $q)->assertOk()->json('contacts'), 'id'));
 
     expect($ids(''))->toContain($this->cOuvert)->not->toContain($this->cFerme)
-        ->and($ids('&fermees=inclure'))->toContain($this->cOuvert)->toContain($this->cFerme);
+        ->and($ids('&fermees=inclure'))->toContain($this->cOuvert)->toContain($this->cFerme)
+        ->and($ids('&fermees=seules'))->toContain($this->cFerme)->not->toContain($this->cOuvert);
 });
 
 test('accueil : contacts qualifiés ne compte pas le contact d une fiche fermée', function () {
     expect($this->getJson('/api/v1/dashboard/stats')->assertOk()->json('contacts_qualified'))->toBe(1);
+});
+
+test('accueil et pastilles du hub : les fiches fermées se retranchent par différence, la fiche seule reste lisible', function () {
+    $this->getJson('/api/v1/crm/contacts-hub/counts')->assertOk();
+    $hub = $this->getJson('/api/v1/crm/contacts-hub?per_page=50')->assertOk()->json('data');
+    $inclure = $this->getJson('/api/v1/crm/contacts-hub?per_page=50&fermees=inclure')->assertOk()->json('data');
+    $denominations = fn (array $lignes): array => array_column($lignes, 'denomination');
+
+    expect($denominations($hub))->not->toContain('ZZ MPF FERMEE')
+        ->and($denominations($inclure))->toContain('ZZ MPF FERMEE');
+    expect(DB::table('companies')->where('id', $this->fermee)->exists())->toBeTrue();
+});
+
+test('waterfall : la fiche fermée n est rattachée à aucune audience, l ouverte oui', function () {
+    $audience = EmailAudience::create(['workspace_id' => $this->ws, 'name' => 'ZZ MPF auto', 'criteria' => [], 'is_active' => true, 'auto_refresh' => true]);
+    $service = new AudienceBuilderService;
+
+    expect($service->evaluateForCompany(Company::query()->findOrFail($this->ouverte)))->toContain($audience->id)
+        ->and($service->evaluateForCompany(Company::query()->findOrFail($this->fermee)))->not->toContain($audience->id);
+});
+
+test('appliquerAuxContacts : deux espaces ne se mélangent pas, chacun a ses fermées', function () {
+    $autre = F::espace('zz-mpf-bis');
+    $ficheAutre = F::fiche($autre, 'ZZ MPF AUTRE FERMEE', ['insee_ferme_le' => '2026-08-01']);
+    $contactAutre = F::contact($autre, $ficheAutre, 'Xavi', 'ZZMPFAUTRE');
+
+    $ids = fn (string $espace, string $mode): array => EntreprisesFermees::appliquerAuxContacts(
+        DB::table('contacts')->where('workspace_id', $espace), $mode,
+    )->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+    expect($ids($this->ws, EntreprisesFermees::MASQUER))->toBe([$this->cOuvert])
+        ->and($ids($this->ws, EntreprisesFermees::SEULES))->toBe([$this->cFerme])
+        ->and($ids($autre, EntreprisesFermees::MASQUER))->toBe([])
+        ->and($ids($autre, EntreprisesFermees::SEULES))->toBe([$contactAutre])
+        ->and(fn () => EntreprisesFermees::appliquerAuxContacts(DB::table('contacts'), EntreprisesFermees::MASQUER, 'contacts.company_id; DROP TABLE x'))
+        ->toThrow(InvalidArgumentException::class);
 });

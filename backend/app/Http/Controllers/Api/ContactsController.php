@@ -43,26 +43,32 @@ class ContactsController extends ApiController
         $masquer = MasquageCoordonnees::requis();
 
         try {
-            // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée est
-            // masqué par défaut (`fermees=inclure|seules`).
-            $base = EntreprisesFermees::appliquerAuxContacts(
-                Contact::query()
-                    // Scope EXPLICITE en plus de la RLS : la défense en
-                    // profondeur du lot L0 vaut pour les deux couches.
-                    ->where('workspace_id', $workspaceId)
-                    ->whereNull('deleted_at')
-                    ->with('company:id,denomination'),
-                EntreprisesFermees::mode($r->query('fermees')),
-            );
-            $page = QueryBuilder::for($base)
+            $base = Contact::query()
+                // Scope EXPLICITE en plus de la RLS : la défense en
+                // profondeur du lot L0 vaut pour les deux couches.
+                ->where('workspace_id', $workspaceId)
+                ->whereNull('deleted_at')
+                ->with('company:id,denomination');
+            $qb = QueryBuilder::for($base)
                 ->allowedFilters(...ContactQueryFilters::allowed())
                 ->allowedSorts(...['last_name', 'email_score', 'created_at'])
                 // Tri par défaut sur `id` DÉCROISSANT, adossé à l'index
                 // `(workspace_id, id DESC)` : un tri sur `last_name` aurait
                 // imposé un tri sur disque de 1,3 M de lignes pour en afficher
                 // 50 — le défaut mesuré à 6,4 s sur la liste entreprises.
-                ->defaultSort('-id')
-                ->paginate($perPage)
+                ->defaultSort('-id');
+
+            // Fermées INSEE (27/10/2026) : le contact d'une fiche fermée est
+            // masqué par défaut (`fermees=inclure|seules`). Le total est compté
+            // PAR DIFFÉRENCE avant de poser la condition (le `count(*)` de
+            // `paginate()` sur 1,3 M de contacts, avec un `NOT EXISTS`, serait
+            // un balayage) ; la page de 50 lignes garde le `NOT EXISTS`.
+            // Cf. `App\Support\EntreprisesFermees`.
+            $fermees = EntreprisesFermees::mode($r->query('fermees'));
+            $total = EntreprisesFermees::totalContacts($qb->toBase(), $fermees, $workspaceId);
+            EntreprisesFermees::appliquerAuxContacts($qb, $fermees);
+
+            $page = $qb->paginate($perPage, ['*'], 'page', null, $total)
                 ->appends($r->query());
 
             return $this->ok([

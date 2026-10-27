@@ -1188,6 +1188,12 @@ class AudienceBuilderService
             return false;
         }
 
+        // Fermées INSEE (décision du 27/10/2026) : même règle que `buildQuery()`,
+        // la fiche fermée n'est rattachée à aucune audience (chemin waterfall).
+        if ($company->getAttribute('insee_ferme_le') !== null) {
+            return false;
+        }
+
         // 🔴 Découvert en écrivant la garde de D26-001, non signalé par
         // l'audit : la version EN MÉMOIRE ferme sur `all` et sur `any` (une
         // condition fausse fait échouer le bloc) mais OUVRE sur `not` —

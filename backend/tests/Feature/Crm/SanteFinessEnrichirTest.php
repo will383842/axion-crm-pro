@@ -340,7 +340,6 @@ it('ne lit ni n\'écrit jamais companies sans filtre sur le SIREN ou l\'identifi
     }
 });
 
-
 it('SIREN avec un SIRET en 620 et un autre en 101, fiche sans SIRET : siren_ambigu', function () {
     $espace = F::espace();
     [$id, $siret, $siren] = ficheSante($espace, ['siret' => null, 'postcode' => '99003']);

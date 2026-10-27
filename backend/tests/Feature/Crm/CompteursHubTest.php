@@ -321,7 +321,9 @@ test('deux affichages de suite ne recalculent pas les compteurs', function () {
         $this->getJson('/api/v1/crm/contacts-hub/counts')->assertOk()->assertJsonPath('total', 1);
     });
 
-    expect($premier)->toBe(1, 'le premier affichage calcule');
+    // Deux comptages au premier affichage (27/10/2026) : toutes les fiches, puis
+    // les fermées retranchées par différence (`EntreprisesFermees`).
+    expect($premier)->toBe(2, 'le premier affichage calcule');
     expect($second)->toBe(0, 'le second est servi par le cache — sinon le balayage revient à chaque rendu');
 });
 

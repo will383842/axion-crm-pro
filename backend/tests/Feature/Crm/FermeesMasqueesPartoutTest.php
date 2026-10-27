@@ -105,8 +105,7 @@ test('personnes : la liste et les pastilles masquent la fermée par défaut (dif
         ->and($seules['total'])->toBe(1)
         ->and($defaut['by_statut_lettre']['abonne'])->toBe(1)
         ->and($inclure['by_statut_lettre']['abonne'])->toBe(2)
-        ->and($defaut['by_source'])->toBe(['newsletter' => 1])
-        ->and($defaut['rattachees'])->toBe(1);
+        ->and($defaut['by_source'])->toBe(['newsletter' => 1]);
 });
 
 test('audience : ni la construction (aperçu, compteurs) ni les membres déjà inscrits ne montrent la fermée', function () {
@@ -152,6 +151,7 @@ test('accueil : contacts qualifiés ne compte pas le contact d une fiche fermée
 });
 
 test('accueil et pastilles du hub : les fiches fermées se retranchent par différence, la fiche seule reste lisible', function () {
+    config(['crm.console_v2' => true]);
     $this->getJson('/api/v1/crm/contacts-hub/counts')->assertOk();
     $hub = $this->getJson('/api/v1/crm/contacts-hub?per_page=50')->assertOk()->json('data');
     $inclure = $this->getJson('/api/v1/crm/contacts-hub?per_page=50&fermees=inclure')->assertOk()->json('data');

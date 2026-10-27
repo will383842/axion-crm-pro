@@ -424,6 +424,47 @@ Deux chemins, dans cet ordre de préférence :
 
 ---
 
+## 8 bis. Reprise depuis la copie B2
+
+À utiliser quand **la Storage Box ET le disque du serveur sont perdus**. C'est la
+seconde copie hors-site, hebdomadaire (dimanche 04:30 UTC), posée par
+`infra/scripts/setup-backup-b2.sh` et envoyée par `infra/scripts/backup-b2.sh`.
+Elle garde les **4 dernières** archives chiffrées `axion_crm_<horodatage>.sql.gz.enc`
+sous le préfixe `axion-crm/` du bucket. Elle n'existe que si Will a posé
+`B2_KEY_ID`, `B2_APP_KEY` et `B2_BUCKET` dans le `.env` : sinon le script répond
+« non configuré » et il n'y a rien à reprendre ici.
+
+> ⚠️ **La phrase secrète `BACKUP_ENCRYPTION_PASSPHRASE` doit être conservée HORS
+> du serveur** (gestionnaire de mots de passe de Will). L'archive B2 est
+> chiffrée AES-256 : sans cette phrase, elle est illisible — et si la phrase
+> n'était que dans le `.env` du serveur détruit, la copie hors-site serait morte
+> avec lui.
+
+1. Dans la console web Backblaze, télécharge l'archive la plus récente du bucket
+   (dossier `axion-crm/`) vers `/tmp/restore`. Note son SHA-1, affiché sur sa fiche.
+2. Contrôle le transfert, puis déchiffre avec les **mêmes paramètres** que
+   `backup-postgres.sh` (`-pbkdf2 -iter 100000` : sans eux, « bad decrypt »
+   même avec la bonne phrase) :
+
+```bash
+sha1sum /tmp/restore/axion_crm_20260820T030000Z.sql.gz.enc
+read -rs BACKUP_ENCRYPTION_PASSPHRASE
+export BACKUP_ENCRYPTION_PASSPHRASE
+openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass env:BACKUP_ENCRYPTION_PASSPHRASE -in /tmp/restore/axion_crm_20260820T030000Z.sql.gz.enc -out /tmp/restore/axion_crm_20260820T030000Z.sql.gz
+gunzip -t /tmp/restore/axion_crm_20260820T030000Z.sql.gz
+```
+
+3. Poursuis au §3 (remonter la pile) puis au §4 : `restore-postgres.sh` prend
+   l'archive déchiffrée `.sql.gz`.
+4. Une fois la nouvelle machine debout, repose les clés `B2_*` dans son `.env`
+   et relance `infra/scripts/setup-backup-b2.sh` (§9).
+
+La surveillance de cette copie est le job `verifier-b2` de
+`.github/workflows/surveillance-sauvegarde.yml` (alerte au-delà de 9 jours ou
+sous 100 Mo) ; à la main : `infra/scripts/verifier-sauvegarde-b2.sh`.
+
+---
+
 ## 9. Remettre la sauvegarde en marche
 
 **Une reprise n'est pas finie tant que la nouvelle machine ne sauvegarde pas.**

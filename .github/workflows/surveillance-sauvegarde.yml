@@ -38,6 +38,10 @@ on:
         description: "Taille minimale attendue, en Mo (100 par défaut). Mettre 999999 pour vérifier que la garde rougit."
         required: false
         default: '100'
+      seuil_age_b2_j:
+        description: "Âge maximum de la dernière copie Backblaze B2, en jours (9 par défaut). Mettre 0 pour VÉRIFIER QUE LA GARDE ROUGIT (sans effet tant que B2 n'est pas configuré)."
+        required: false
+        default: '9'
 
 permissions:
   contents: read
@@ -128,11 +132,70 @@ jobs:
     outputs:
       rapport: ${{ steps.controle.outputs.rapport }}
 
+  # Copie hebdomadaire Backblaze B2 (infra/scripts/backup-b2.sh). Tant que
+  # B2_* sont absentes du .env du serveur, le script dit « non configuré » et
+  # sort en 0 : ce job reste vert. Un serveur injoignable, lui, le fait rougir.
+  verifier-b2:
+    name: La copie hebdomadaire Backblaze B2 est-elle à jour ?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20  # F38-008 (SSH + 3 appels à l'API B2)
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Trust host key
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Contrôler la copie B2
+        id: controle
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          SEUIL_AGE_J: ${{ github.event.inputs.seuil_age_b2_j || '9' }}
+          SEUIL_TAILLE_MO: ${{ github.event.inputs.seuil_taille_mo || '100' }}
+        run: |
+          set -euo pipefail
+          set +e
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 "$USER@$HOST" \
+            "SEUIL_AGE_J='$SEUIL_AGE_J' SEUIL_TAILLE_MO='$SEUIL_TAILLE_MO' \
+             bash '$PROJECT_PATH/infra/scripts/verifier-sauvegarde-b2.sh'" \
+            > rapport-b2.txt 2>&1
+          CODE=$?
+          set -e
+
+          cat rapport-b2.txt
+          if [ "$CODE" -eq 255 ]; then
+            echo "::error::Serveur injoignable en SSH — copie B2 non vérifiable."
+            echo "SERVEUR INJOIGNABLE (ssh code 255) — la copie B2 n'a PAS pu être vérifiée." >> rapport-b2.txt
+          fi
+          {
+            echo 'rapport<<FIN_RAPPORT'
+            cat rapport-b2.txt
+            echo 'FIN_RAPPORT'
+            echo "echec=$([ "$CODE" -ne 0 ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verdict
+        if: steps.controle.outputs.echec == 'true'
+        run: |
+          echo "::error::La copie hors-site Backblaze B2 n'est pas fiable — voir le rapport ci-dessus."
+          exit 1
+
+    outputs:
+      rapport: ${{ steps.controle.outputs.rapport }}
+
   alerte:
     name: Ouvrir une issue si la sauvegarde n'est pas fiable
     runs-on: ubuntu-24.04
     timeout-minutes: 10  # F38-008 (ouverture d'une issue)
-    needs: [verifier]
+    needs: [verifier, verifier-b2]
     if: failure()
     steps:
       - name: Ouvrir ou compléter l'issue de suivi
@@ -141,6 +204,7 @@ jobs:
           DEPOT: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RAPPORT: ${{ needs.verifier.outputs.rapport }}
+          RAPPORT_B2: ${{ needs.verifier-b2.outputs.rapport }}
         run: |
           set -euo pipefail
           TITRE="🔴 La sauvegarde de production n'est pas fiable"
@@ -159,6 +223,9 @@ jobs:
             '' \
             '```' > corps-alerte.md
           printf '%s\n' "$RAPPORT" >> corps-alerte.md
+          if [ -n "$RAPPORT_B2" ]; then
+            printf '%s\n' '' 'Copie hebdomadaire Backblaze B2 :' '' "$RAPPORT_B2" >> corps-alerte.md
+          fi
           printf '%s\n' \
             '```' \
             '' \

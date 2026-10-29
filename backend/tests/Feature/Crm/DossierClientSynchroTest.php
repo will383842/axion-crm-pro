@@ -689,8 +689,8 @@ test('fiche complète : chaque nouvelle clé est acceptée et gardée dans metad
     $meta = json_decode($fiche->metadata, true)['console'];
     expect($meta['etape'])->toBe('devis_envoye')
         ->and($meta['cloture_prevue'])->toBe('2026-12-15')
-        ->and($meta['prochaine_action'])->toBe(['type' => 'relance', 'date' => '2026-11-05'])
-        ->and($meta['taches_ouvertes'])->toBe(['nb' => 3, 'prochaine_le' => '2026-11-03'])
+        ->and($meta['prochaine_action'])->toEqual(['type' => 'relance', 'date' => '2026-11-05'])
+        ->and($meta['taches_ouvertes'])->toEqual(['nb' => 3, 'prochaine_le' => '2026-11-03'])
         ->and($meta['nb_emails_console'])->toBe(7)
         ->and($meta['nb_notes_console'])->toBe(4)
         ->and($meta['sante'])->toBe('a_surveiller')

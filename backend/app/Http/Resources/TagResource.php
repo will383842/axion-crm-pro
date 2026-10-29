@@ -23,6 +23,7 @@ class TagResource extends JsonResource
             'color' => $this->color,
             'category' => $this->category ?? 'custom',
             'kind' => $this->kind ?? 'manual',
+            'is_locked' => (bool) $this->is_locked,
             'description' => $this->description,
             'companies_count' => $this->companies_count ?? 0,
             'created_at' => optional($this->created_at)?->toIso8601String(),

@@ -109,7 +109,7 @@ export function RelationCard({ companyId, relationType, lifecycleStage, saisieMa
             : 'Jamais posée à la main : l’import du site peut la faire progresser, jamais reculer.'}
         </p>
         <Button
-          variant="primary"
+          variant="secondary"
           size="md"
           full
           disabled={!modifie}

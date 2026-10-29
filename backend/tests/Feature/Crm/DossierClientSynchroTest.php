@@ -779,10 +779,29 @@ test('fiche complète : les montants, notes et textes restent refusés', functio
 
 test('fiche complète : le contrat ne retire aucune clé interdite', function () {
     expect(DossierClient::CLES_INTERDITES)->toContain(
-        'reponse', 'reponses', 'reponses_equipe', 'reponses_dirigeant', 'texte', 'texte_libre',
-        'commentaire', 'commentaires', 'notes', 'donnees', 'montant', 'montant_ht', 'montant_ttc',
-        'prix', 'tarif', 'total', 'ca', 'chiffre_affaires', 'numero_facture', 'facture_numero',
-        'numero_devis', 'devis', 'outils',
+        'reponse',
+        'reponses',
+        'reponses_equipe',
+        'reponses_dirigeant',
+        'texte',
+        'texte_libre',
+        'commentaire',
+        'commentaires',
+        'notes',
+        'donnees',
+        'montant',
+        'montant_ht',
+        'montant_ttc',
+        'prix',
+        'tarif',
+        'total',
+        'ca',
+        'chiffre_affaires',
+        'numero_facture',
+        'facture_numero',
+        'numero_devis',
+        'devis',
+        'outils',
     );
 });
 

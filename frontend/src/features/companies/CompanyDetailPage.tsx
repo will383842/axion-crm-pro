@@ -25,6 +25,8 @@ import { ContactsCard, type ContactItem } from './components/ContactsCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
 import { EvenementsCard } from './components/EvenementsCard';
+import { TachesCrmCard } from './components/TachesCrmCard';
+import { EtiquettesCard, type EtiquetteFiche } from './components/EtiquettesCard';
 import { ListesDeLaFiche } from '@/features/listes/ListesDeLaFiche';
 import { RelationCard } from './components/RelationCard';
 import type { LifecycleStage, RelationType } from '@/features/crm-console/types';
@@ -64,6 +66,7 @@ interface CompanyDetail {
   created_at?: string | null;
   enriched_at?: string | null;
   contacts?: ContactItem[];
+  tags?: EtiquetteFiche[];
   // Chantiers B et D (2026-10-01).
   relation_type?: RelationType;
   lifecycle_stage?: LifecycleStage;
@@ -202,7 +205,7 @@ export function CompanyDetailPage() {
 
         <div className="flex items-center gap-2">
           <Button
-            variant="primary"
+            variant="secondary"
             size="md"
             loading={enrichMut.isPending}
             onClick={() => enrichMut.mutate()}
@@ -365,6 +368,8 @@ export function CompanyDetailPage() {
           />
           <ContactsCard contacts={c.contacts ?? []} />
           <EvenementsCard companyId={c.id} />
+          <TachesCrmCard companyId={c.id} />
+          <EtiquettesCard companyId={c.id} etiquettes={c.tags ?? []} />
           {/* 2026-09-30 — les listes manuelles de la fiche, et « ajouter à une liste ». */}
           <ListesDeLaFiche companyId={c.id} contacts={c.contacts ?? []} />
           <QualityScoreCard
@@ -380,7 +385,7 @@ export function CompanyDetailPage() {
             </CardHeader>
             <div className="flex flex-col gap-2">
               <Button
-                variant="primary"
+                variant="secondary"
                 size="md"
                 full
                 loading={enrichMut.isPending}

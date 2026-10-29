@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\Auth\PasswordResetController;
 use App\Http\Controllers\Api\Auth\TwoFactorController;
 use App\Http\Controllers\Api\CompaniesController;
 use App\Http\Controllers\Api\CompanyRelationController;
+use App\Http\Controllers\Api\CompanyTachesController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
@@ -212,6 +213,17 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('event')
             ->middleware('permission:companies.update');
         Route::get('/companies/{company}/evenements', [EvenementsController::class, 'pourEntreprise']);
+
+        // Lot A4 — tâches propres au CRM sur une entreprise (restent dans le CRM).
+        Route::get('/companies/{company}/taches', [CompanyTachesController::class, 'index'])
+            ->whereNumber('company');
+        Route::post('/companies/{company}/taches', [CompanyTachesController::class, 'store'])
+            ->whereNumber('company')
+            ->middleware('permission:companies.update');
+        Route::post('/companies/{company}/taches/{activityId}/terminer', [CompanyTachesController::class, 'terminer'])
+            ->whereNumber('company')
+            ->whereNumber('activityId')
+            ->middleware('permission:companies.update');
 
         // Fédérations et organisations professionnelles (chantier 3,
         // 2026-09-29). Mêmes droits que les événements : lire suit la lecture

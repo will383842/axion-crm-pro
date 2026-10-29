@@ -659,3 +659,190 @@ test('ARBITRAGE : rattacher un dossier sans SIREN pose la référence et appliqu
     dcsPost(dcsEvenement(['version' => 3, 'rue' => '100 rue Choisie'], $sansSiren))->assertOk()->assertJsonPath('result.status', 'updated');
     expect(DB::table('companies')->where('id', $cible)->value('address'))->toBe('100 rue Choisie');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fiche complète (29/10/2026) : le CRM accepte d'abord, la console enverra ensuite
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** @return array<string, mixed> */
+function dcsComplements(): array
+{
+    return [
+        'etape' => 'devis_envoye',
+        'cloture_prevue' => '2026-12-15',
+        'prochaine_action' => ['type' => 'relance', 'date' => '2026-11-05'],
+        'taches_ouvertes' => ['nb' => 3, 'prochaine_le' => '2026-11-03'],
+        'nb_emails_console' => 7,
+        'nb_notes_console' => 4,
+        'sante' => 'a_surveiller',
+        'questionnaire' => ['envoye_le' => '2026-10-18T09:00:00+02:00', 'recu_le' => null, 'nb_reponses_equipe' => 2, 'attendus' => 5, 'date_limite' => '2026-11-10'],
+        'contacts' => [
+            ['ref' => 'c-1', 'prenom' => 'Zoé', 'nom' => 'ZZ DIRIGEANTE', 'email' => 'zz.dirigeante@client.example.invalid', 'fonction' => 'Gérante', 'role_decision' => 'decideur'],
+        ],
+    ];
+}
+
+test('fiche complète : chaque nouvelle clé est acceptée et gardée dans metadata.console', function () {
+    dcsPost(dcsEvenement(dcsComplements()))->assertOk()->assertJsonPath('result.status', 'created');
+
+    $fiche = dcsFiche();
+    $meta = json_decode($fiche->metadata, true)['console'];
+    expect($meta['etape'])->toBe('devis_envoye')
+        ->and($meta['cloture_prevue'])->toBe('2026-12-15')
+        ->and($meta['prochaine_action'])->toEqual(['type' => 'relance', 'date' => '2026-11-05'])
+        ->and($meta['taches_ouvertes'])->toEqual(['nb' => 3, 'prochaine_le' => '2026-11-03'])
+        ->and($meta['nb_emails_console'])->toBe(7)
+        ->and($meta['nb_notes_console'])->toBe(4)
+        ->and($meta['sante'])->toBe('a_surveiller')
+        ->and($meta['questionnaire']['attendus'])->toBe(5)
+        ->and($meta['questionnaire']['date_limite'])->toBe('2026-11-10')
+        ->and($meta['questionnaire']['nb_reponses_equipe'])->toBe(2);
+
+    // L'étape de la console ne touche ni le cycle de vie ni le motif d'archive.
+    expect($fiche->lifecycle_stage)->toBe('qualifie')
+        ->and($fiche->archive_reason)->toBeNull();
+
+    $contact = DB::table('contacts')->where('company_id', $fiche->id)->first();
+    expect(json_decode($contact->metadata, true)['role_decision'])->toBe('decideur');
+});
+
+test('fiche complète : clés absentes = aucun effet, ancienne version de la console toujours acceptée', function () {
+    // Version ancienne de la console : aucune des nouvelles clés.
+    dcsPost(dcsEvenement())->assertOk()->assertJsonPath('result.status', 'created');
+    expect(json_decode(dcsFiche()->metadata, true)['console'])
+        ->not->toHaveKeys(['etape', 'cloture_prevue', 'prochaine_action', 'taches_ouvertes', 'nb_emails_console', 'nb_notes_console', 'sante']);
+
+    // Les valeurs reçues puis un message SANS ces clés : elles restent.
+    dcsPost(dcsEvenement(['version' => 2] + dcsComplements()))->assertOk()->assertJsonPath('result.status', 'updated');
+    dcsPost(dcsEvenement(['version' => 3, 'rue' => '13 rue des Tests']))->assertOk()->assertJsonPath('result.status', 'updated');
+
+    $fiche = dcsFiche();
+    $meta = json_decode($fiche->metadata, true)['console'];
+    expect($fiche->address)->toBe('13 rue des Tests')
+        ->and($meta['etape'])->toBe('devis_envoye')
+        ->and($meta['sante'])->toBe('a_surveiller')
+        ->and($meta['nb_notes_console'])->toBe(4)
+        ->and($meta['prochaine_action']['type'])->toBe('relance')
+        ->and($meta['questionnaire']['attendus'])->toBe(5)
+        ->and($meta['questionnaire']['nb_reponses_equipe'])->toBe(2);
+
+    $contact = DB::table('contacts')->where('company_id', $fiche->id)->first();
+    expect(json_decode($contact->metadata, true)['role_decision'])->toBe('decideur');
+
+    // `null` explicite = absence : rien n'est vidé.
+    dcsPost(dcsEvenement(['version' => 4, 'etape' => null, 'sante' => null, 'prochaine_action' => null, 'taches_ouvertes' => null]))->assertOk();
+    expect(json_decode(dcsFiche()->metadata, true)['console']['sante'])->toBe('a_surveiller');
+});
+
+test('fiche complète : une valeur hors liste fermée ou mal formée = 422 explicite pour cette clé', function (array $dossier, string $code) {
+    dcsPost(dcsEvenement($dossier))->assertStatus(422)->assertJsonPath('error', $code);
+
+    expect(DB::table('companies')->count())->toBe(0);
+})->with([
+    'étape inconnue' => [['etape' => 'perdu'], 'invalid_enum'],
+    'santé inconnue' => [['sante' => 'excellente'], 'invalid_enum'],
+    'type d action inconnu' => [['prochaine_action' => ['type' => 'telephoner', 'date' => '2026-11-05']], 'invalid_enum'],
+    'action sans type' => [['prochaine_action' => ['date' => '2026-11-05']], 'missing_field'],
+    'clé inconnue dans l action' => [['prochaine_action' => ['type' => 'rappel', 'objet' => 'x']], 'unknown_field'],
+    'tâches sans nombre' => [['taches_ouvertes' => ['prochaine_le' => '2026-11-03']], 'missing_field'],
+    'tâches négatives' => [['taches_ouvertes' => ['nb' => -1]], 'invalid_type'],
+    'e-mails en texte' => [['nb_emails_console' => '7'], 'invalid_type'],
+    'notes négatives' => [['nb_notes_console' => -2], 'invalid_type'],
+    'clôture mal écrite' => [['cloture_prevue' => '15/12/2026'], 'invalid_date'],
+    'clôture impossible' => [['cloture_prevue' => '2026-02-31'], 'invalid_date'],
+    'attendus en texte' => [['questionnaire' => ['attendus' => 'cinq']], 'invalid_type'],
+    'date limite fausse' => [['questionnaire' => ['date_limite' => 'bientôt']], 'invalid_date'],
+    'rôle inconnu' => [['contacts' => [['ref' => 'c-1', 'nom' => 'ZZ', 'role_decision' => 'chef']]], 'invalid_enum'],
+]);
+
+test('fiche complète : les montants, notes et textes restent refusés', function (array $dossier) {
+    dcsPost(dcsEvenement($dossier))->assertStatus(422)->assertJsonPath('error', 'forbidden_field');
+
+    expect(DB::table('companies')->count())->toBe(0);
+})->with([
+    'notes' => [['notes' => 'texte de note']],
+    'texte' => [['texte' => 'x']],
+    'commentaire' => [['commentaire' => 'x']],
+    'commentaires' => [['commentaires' => ['x']]],
+    'montant dans l action' => [['prochaine_action' => ['type' => 'envoi_devis', 'montant' => 1200]]],
+    'montant_ttc' => [['montant_ttc' => 1]],
+    'prix dans les tâches' => [['taches_ouvertes' => ['nb' => 1, 'prix' => 10]]],
+    'tarif' => [['tarif' => 10]],
+    'total' => [['total' => 10]],
+    'ca' => [['ca' => 10]],
+    'devis' => [['devis' => 'D-1']],
+    'outils' => [['outils' => ['x']]],
+    'réponses' => [['reponses' => ['q' => 'oui']]],
+    'réponse dans le questionnaire' => [['questionnaire' => ['attendus' => 2, 'reponse' => 'x']]],
+    'note dans un contact' => [['contacts' => [['ref' => 'c-1', 'nom' => 'ZZ', 'role_decision' => 'decideur', 'notes' => 'x']]]],
+]);
+
+test('fiche complète : le contrat ne retire aucune clé interdite', function () {
+    expect(DossierClient::CLES_INTERDITES)->toContain(
+        'reponse',
+        'reponses',
+        'reponses_equipe',
+        'reponses_dirigeant',
+        'texte',
+        'texte_libre',
+        'commentaire',
+        'commentaires',
+        'notes',
+        'donnees',
+        'montant',
+        'montant_ht',
+        'montant_ttc',
+        'prix',
+        'tarif',
+        'total',
+        'ca',
+        'chiffre_affaires',
+        'numero_facture',
+        'facture_numero',
+        'numero_devis',
+        'devis',
+        'outils',
+    );
+});
+
+test('fiche complète : un contact « parti » n est ni accepté ni créé', function (array $contact, string $code) {
+    dcsPost(dcsEvenement(['contacts' => [$contact]]))->assertStatus(422)->assertJsonPath('error', $code);
+
+    expect(DB::table('companies')->count())->toBe(0)
+        ->and(DB::table('contacts')->count())->toBe(0);
+})->with([
+    'drapeau parti' => [['ref' => 'c-9', 'nom' => 'ZZ PARTI', 'parti' => true], 'unknown_field'],
+    'statut parti' => [['ref' => 'c-9', 'nom' => 'ZZ PARTI', 'statut' => 'parti'], 'unknown_field'],
+    'rôle parti' => [['ref' => 'c-9', 'nom' => 'ZZ PARTI', 'role_decision' => 'parti'], 'invalid_enum'],
+]);
+
+test('fiche complète : l étape « archive » pose seulement archive_reason, sans rien supprimer', function () {
+    dcsPost(dcsEvenement())->assertOk();
+    $avant = dcsFiche();
+
+    dcsPost(dcsEvenement(['version' => 2, 'etape' => 'archive']))->assertOk()->assertJsonPath('result.status', 'updated');
+
+    $fiche = dcsFiche();
+    expect($fiche->archive_reason)->toBe('manual')
+        ->and($fiche->deleted_at)->toBeNull()
+        ->and($fiche->address)->toBe($avant->address)
+        ->and($fiche->lifecycle_stage)->toBe($avant->lifecycle_stage)
+        ->and(DB::table('contacts')->where('company_id', $fiche->id)->whereNull('deleted_at')->count())->toBe(1)
+        ->and(json_decode($fiche->metadata, true)['console']['etape'])->toBe('archive');
+
+    // Un motif déjà posé n'est jamais remplacé.
+    DB::table('companies')->where('id', $fiche->id)->update(['archive_reason' => 'duplicate']);
+    dcsPost(dcsEvenement(['version' => 3, 'etape' => 'archive']))->assertOk();
+    expect(dcsFiche()->archive_reason)->toBe('duplicate');
+});
+
+test('fiche complète : l étape « client » de la console ne change jamais le cycle de vie, drapeau fermé', function () {
+    dcsPost(dcsEvenement())->assertOk();
+
+    dcsPost(dcsEvenement(['version' => 2, 'etape' => 'client']))->assertOk();
+    expect(dcsFiche()->lifecycle_stage)->toBe('qualifie');
+
+    // Facture émise mais drapeau FERMÉ (config de test) : toujours `qualifie`.
+    dcsPost(dcsEvenement(['version' => 3, 'etape' => 'client', 'statut' => 'client', 'facture_emise' => true]))->assertOk();
+    expect(dcsFiche()->lifecycle_stage)->toBe('qualifie');
+});

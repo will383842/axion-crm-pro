@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Company;
+use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,22 +60,16 @@ class CompanyTachesController extends ApiController
         // comme sur la fiche personne).
         $ref = 'console:company:' . $company->id . ':task:' . now()->format('Y-m-d\TH:i') . ':' . substr(sha1((string) $data['title']), 0, 12);
 
-        $existante = DB::table('activities')
-            ->where('workspace_id', $company->workspace_id)
-            ->where('external_ref', $ref)
-            ->value('id');
-
-        if ($existante !== null) {
-            return $this->ok(['activity_id' => (int) $existante, 'deja_consignee' => true]);
-        }
-
-        $activityId = (int) DB::table('activities')->insertGetId([
+        // `insertOrIgnore` (ON CONFLICT DO NOTHING sur l'index unique
+        // workspace + external_ref) : deux clics simultanés ne donnent jamais
+        // d'erreur 500, le second relit la ligne du premier.
+        $cree = DB::table('activities')->insertOrIgnore([
             'workspace_id' => $company->workspace_id,
             'user_id' => $request->user()?->getKey(),
             'type' => 'task',
             'kind' => 'task',
             'occurred_at' => now(),
-            'due_at' => isset($data['due_at']) ? new \DateTimeImmutable((string) $data['due_at']) : null,
+            'due_at' => isset($data['due_at']) ? new DateTimeImmutable((string) $data['due_at']) : null,
             'external_ref' => $ref,
             'subject_type' => 'company',
             'subject_id' => $company->id,
@@ -83,6 +78,15 @@ class CompanyTachesController extends ApiController
             'payload' => json_encode(['surface' => 'console:entreprises', 'saisie' => 'manuelle'], JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);
+
+        $activityId = (int) DB::table('activities')
+            ->where('workspace_id', $company->workspace_id)
+            ->where('external_ref', $ref)
+            ->value('id');
+
+        if ($cree === 0) {
+            return $this->ok(['activity_id' => $activityId, 'deja_consignee' => true]);
+        }
 
         return $this->ok(['activity_id' => $activityId, 'deja_consignee' => false], 201);
     }

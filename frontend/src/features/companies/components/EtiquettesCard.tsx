@@ -28,8 +28,14 @@ export function EtiquettesCard({
   const queryClient = useQueryClient();
   const [choix, setChoix] = useState('');
 
-  const { data: referentiel } = useQuery({
-    queryKey: ['tags'],
+  const {
+    data: referentiel,
+    isLoading: referentielEnChargement,
+    isError: referentielEnErreur,
+  } = useQuery({
+    // Clé propre à la fiche : `['tags']` est déjà rangé par TagsManagerPage
+    // avec la réponse entière `{data, meta}` (collision de forme).
+    queryKey: ['tags', 'referentiel-fiche'],
     queryFn: async () => (await api.get<{ data: EtiquetteFiche[] }>('/tags')).data.data,
   });
 
@@ -48,7 +54,7 @@ export function EtiquettesCard({
   });
 
   const posees = new Set(etiquettes.map((t) => t.slug));
-  const disponibles = (referentiel ?? []).filter((t) => !t.is_locked && !posees.has(t.slug));
+  const disponibles = (referentiel ?? []).filter((t) => !t.is_locked && !t.slug.startsWith('src:') && !posees.has(t.slug));
 
   return (
     <Card padding="md">
@@ -73,7 +79,7 @@ export function EtiquettesCard({
                 <button
                   type="button"
                   aria-label={`Retirer l'étiquette ${t.name}`}
-                  className="text-slate-400 hover:text-rose-600"
+                  className="rounded-full text-slate-400 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-slate-400 dark:hover:text-rose-400"
                   disabled={modifier.isPending}
                   onClick={() => modifier.mutate({ slug: t.slug, action: 'remove' })}
                 >
@@ -89,6 +95,7 @@ export function EtiquettesCard({
         <select
           aria-label="Étiquette à ajouter"
           value={choix}
+          disabled={referentielEnChargement}
           onChange={(e) => setChoix(e.target.value)}
           className="h-9 min-w-0 flex-1 rounded-lg bg-white px-2 text-sm text-slate-900 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700"
         >
@@ -109,6 +116,11 @@ export function EtiquettesCard({
           Ajouter
         </Button>
       </div>
+      {referentielEnErreur ? (
+        <p role="alert" className="mt-2 text-xs text-rose-600 dark:text-rose-400">
+          Liste des étiquettes indisponible.
+        </p>
+      ) : null}
     </Card>
   );
 }

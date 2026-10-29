@@ -117,4 +117,33 @@ test('un compte sans droit de modification ne peut ni ajouter ni clore', functio
 
     $this->postJson("/api/v1/companies/{$this->fiche->id}/taches", ['title' => 'Interdit'])->assertForbidden();
     $this->getJson("/api/v1/companies/{$this->fiche->id}/taches")->assertOk();
+
+    // Une tâche existante ne se clôt pas non plus.
+    $id = DB::table('activities')->insertGetId([
+        'workspace_id' => $this->workspace->id, 'type' => 'task', 'kind' => 'task', 'occurred_at' => now(),
+        'subject_type' => 'company', 'subject_id' => $this->fiche->id, 'title' => 'Déjà là', 'created_at' => now(),
+    ]);
+    $this->postJson("/api/v1/companies/{$this->fiche->id}/taches/{$id}/terminer")->assertForbidden();
+    expect(DB::table('activities')->where('id', $id)->whereNull('done_at')->exists())->toBeTrue();
+});
+
+test('une entreprise d’un AUTRE espace de travail donne 404 en lecture, ajout et clôture', function () {
+    $autreEspace = Workspace::create([
+        'id' => (string) Str::uuid(), 'slug' => 'ws-ailleurs', 'name' => 'Ailleurs', 'settings' => [],
+    ]);
+    $etrangere = Company::create([
+        'workspace_id' => $autreEspace->id, 'siren' => '444555666',
+        'denomination' => 'ETRANGERE', 'signals' => [], 'metadata' => [],
+    ]);
+    $id = DB::table('activities')->insertGetId([
+        'workspace_id' => $autreEspace->id, 'type' => 'task', 'kind' => 'task', 'occurred_at' => now(),
+        'subject_type' => 'company', 'subject_id' => $etrangere->id, 'title' => 'Chez l’autre', 'created_at' => now(),
+    ]);
+
+    $this->getJson("/api/v1/companies/{$etrangere->id}/taches")->assertNotFound();
+    $this->postJson("/api/v1/companies/{$etrangere->id}/taches", ['title' => 'Intrusion'])->assertNotFound();
+    $this->postJson("/api/v1/companies/{$etrangere->id}/taches/{$id}/terminer")->assertNotFound();
+
+    expect(DB::table('activities')->where('id', $id)->whereNull('done_at')->exists())->toBeTrue()
+        ->and(DB::table('activities')->where('workspace_id', $autreEspace->id)->count())->toBe(1);
 });

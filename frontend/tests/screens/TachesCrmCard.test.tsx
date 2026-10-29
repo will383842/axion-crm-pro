@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { TachesCrmCard } from '@/features/companies/components/TachesCrmCard';
 import { EtiquettesCard } from '@/features/companies/components/EtiquettesCard';
 import { renderScreen } from '../helpers/renderScreen';
-import { getJson, recordPost } from '../msw/handlers';
+import { getJson, getStatus, recordPost } from '../msw/handlers';
 
 const PATH = '/companies/$companyId';
 
@@ -39,6 +39,18 @@ describe('TachesCrmCard', () => {
     await waitFor(() => expect(terminer.bodies).toHaveLength(1));
   });
 
+  it('erreur 500 : message d’erreur et « Réessayer », jamais « Aucune tâche »', async () => {
+    await renderScreen(<TachesCrmCard companyId={42} />, {
+      path: PATH,
+      url: '/companies/42',
+      handlers: [getStatus('/companies/42/taches', 500)],
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Impossible de charger les tâches.');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible();
+    expect(screen.queryByText('Aucune tâche pour cette entreprise.')).not.toBeInTheDocument();
+  });
+
   it('« Ajouter une tâche CRM » envoie l’intitulé et l’échéance', async () => {
     const ajout = recordPost('/companies/42/taches', { activity_id: 9 }, 201);
     await renderScreen(<TachesCrmCard companyId={42} />, {
@@ -61,9 +73,10 @@ describe('TachesCrmCard', () => {
 describe('EtiquettesCard', () => {
   const REFERENTIEL = {
     data: [
-      { id: 1, slug: 'vip', name: 'VIP' },
-      { id: 2, slug: 'salon', name: 'Salon' },
-      { id: 3, slug: 'src:insee', name: 'Source INSEE', is_locked: true },
+      { id: 1, slug: 'vip', name: 'VIP', color: null, category: 'custom', kind: 'manual', is_locked: false },
+      { id: 2, slug: 'salon', name: 'Salon', color: null, category: 'custom', kind: 'manual', is_locked: false },
+      { id: 3, slug: 'src:insee', name: 'Source INSEE', color: null, category: 'source', kind: 'system', is_locked: true },
+      { id: 4, slug: 'src:console', name: 'Source console', color: null, category: 'source', kind: 'system', is_locked: false },
     ],
   };
 
@@ -80,6 +93,8 @@ describe('EtiquettesCard', () => {
     // Déjà posée et verrouillée : non proposées.
     expect(screen.queryByRole('option', { name: 'VIP' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Source INSEE' })).not.toBeInTheDocument();
+    // Une étiquette « src: » n'est jamais proposée, même non verrouillée.
+    expect(screen.queryByRole('option', { name: 'Source console' })).not.toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText('Étiquette à ajouter'), 'salon');
     await userEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
@@ -98,5 +113,17 @@ describe('EtiquettesCard', () => {
     await userEvent.click(screen.getByRole('button', { name: "Retirer l'étiquette VIP" }));
     await waitFor(() => expect(bulk.bodies).toHaveLength(1));
     expect(bulk.bodies[0]).toEqual({ ids: [42], tag: 'vip', action: 'remove' });
+  });
+});
+
+describe('EtiquettesCard — liste indisponible', () => {
+  it('affiche « Liste des étiquettes indisponible » quand /tags répond 500', async () => {
+    await renderScreen(<EtiquettesCard companyId={42} etiquettes={[]} />, {
+      path: PATH,
+      url: '/companies/42',
+      handlers: [getStatus('/tags', 500)],
+    });
+
+    expect(await screen.findByText('Liste des étiquettes indisponible.')).toBeVisible();
   });
 });

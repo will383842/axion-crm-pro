@@ -30,7 +30,12 @@ export function TachesCrmCard({ companyId }: { companyId: number }) {
   const [intitule, setIntitule] = useState('');
   const [echeance, setEcheance] = useState('');
 
-  const { data: taches } = useQuery({
+  const {
+    data: taches,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: cle,
     queryFn: async () =>
       (await api.get<{ data: TacheCrm[] }>(`/companies/${companyId}/taches`)).data.data,
@@ -70,7 +75,18 @@ export function TachesCrmCard({ companyId }: { companyId: number }) {
         </div>
       </CardHeader>
 
-      {!taches || taches.length === 0 ? (
+      {isLoading ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">Chargement…</p>
+      ) : isError ? (
+        <div className="space-y-2">
+          <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">
+            Impossible de charger les tâches.
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+            Réessayer
+          </Button>
+        </div>
+      ) : !taches || taches.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Aucune tâche pour cette entreprise.</p>
       ) : (
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">

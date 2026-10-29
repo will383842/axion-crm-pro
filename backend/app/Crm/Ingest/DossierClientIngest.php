@@ -388,6 +388,7 @@ final class DossierClientIngest
             'relation_type' => 'prospect',
             'lifecycle_stage' => $dossier->estClient() && self::etapeClientOuverte() ? 'client' : 'qualifie',
             'legal_basis' => $dossier->estClient() ? 'contract' : 'precontractual',
+            'archive_reason' => $dossier->estArchive() ? 'manual' : null,
             'external_ref' => $ref,
             'console_client_ref' => $ref,
             'console_dossier_version' => $dossier->version,
@@ -419,7 +420,8 @@ final class DossierClientIngest
 
         [$maj, $changements, $ignores, $origines, $recus] = $this->trancher($fiche, $proposes, $quand, self::recus($metadonnees), ['denomination']);
 
-        $metadonnees['console'] = $dossier->metadonnees();
+        // Les clés de la fiche complète absentes du message gardent leur valeur.
+        $metadonnees['console'] = $dossier->metadonneesFusionnees(is_array($metadonnees['console'] ?? null) ? $metadonnees['console'] : []);
         $metadonnees[self::CLE_RECU] = $recus;
         $maj['metadata'] = json_encode($metadonnees, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -436,6 +438,12 @@ final class DossierClientIngest
                 $maj['lifecycle_stage'] = $apres;
                 $changements[] = ['champ' => 'lifecycle_stage', 'avant' => ['lifecycle_stage' => $avant], 'apres' => ['lifecycle_stage' => $apres], 'origine_avant' => null];
             }
+        }
+
+        // Étape « archive » de la console : on pose le motif, jamais rien de
+        // plus (aucune suppression, aucun motif déjà posé n'est remplacé).
+        if ($dossier->estArchive() && ($fiche->archive_reason ?? null) === null) {
+            $maj['archive_reason'] = 'manual';
         }
 
         if (($fiche->console_client_ref ?? null) === null) {
@@ -601,7 +609,11 @@ final class DossierClientIngest
                     'company_id' => $companyId,
                     'discovery_source' => self::DISCOVERY_SOURCE,
                     'sources' => json_encode([self::DISCOVERY_SOURCE], JSON_THROW_ON_ERROR),
-                    'metadata' => json_encode(['console_ref' => $refContact, self::CLE_RECU => self::empreintes($valeurs)], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+                    'metadata' => json_encode(
+                        ['console_ref' => $refContact, self::CLE_RECU => self::empreintes($valeurs)]
+                        + ($c['role_decision'] !== null ? ['role_decision' => $c['role_decision']] : []),
+                        JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+                    ),
                     'person_key' => $c['person_key'],
                     'legal_basis' => $base,
                     'created_at' => now(),
@@ -629,6 +641,9 @@ final class DossierClientIngest
             }
 
             $meta['console_ref'] = $refContact;
+            if ($c['role_decision'] !== null) {
+                $meta['role_decision'] = $c['role_decision'];
+            }
             $meta[self::CLE_RECU] = $recus;
             $maj['metadata'] = json_encode($meta, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if (($existant->person_key ?? null) === null && $c['person_key'] !== null) {

@@ -44,7 +44,31 @@ use Exception;
  *                    seulement, jamais une réponse
  *   contacts         liste (≤ 50) de { ref (obligatoire, ≤ 64, identifiant
  *                    stable du contact dans la console), prenom?, nom?,
- *                    email?, telephone?, fonction?, person_key? (sha256 hex) }
+ *                    email?, telephone?, fonction?, person_key? (sha256 hex),
+ *                    role_decision? }
+ *
+ * ── Fiche complète (29/10/2026) : clés FACULTATIVES, listes FERMÉES ────────
+ *   Le CRM accepte d'abord, la console enverra ensuite. Une clé ABSENTE ou
+ *   `null` n'a AUCUN effet (la valeur déjà gardée reste) : une ancienne version
+ *   de la console reste acceptée telle quelle. Rien d'autre que des états, des
+ *   dates et des nombres — jamais un montant, jamais un texte de note.
+ *   etape            "prospect" | "devis_envoye" | "client" | "archive" —
+ *                    gardée dans `metadata.console` ; ne change JAMAIS
+ *                    `lifecycle_stage` (c'est `facture_emise` + le drapeau
+ *                    `CRM_SYNC_DOSSIER_CLIENT_STAGE` qui décident) ; « archive »
+ *                    pose seulement `archive_reason = manual` (rien n'est supprimé)
+ *   cloture_prevue   date AAAA-MM-JJ
+ *   prochaine_action { type: "relance" | "rappel" | "envoi_devis" |
+ *                    "rendez_vous" | "autre" (obligatoire), date? } — pas de texte
+ *   taches_ouvertes  { nb: entier ≥ 0 (obligatoire), prochaine_le? }
+ *   nb_emails_console, nb_notes_console   entiers ≥ 0 (des nombres, pas des textes)
+ *   sante            "bonne" | "a_surveiller" | "a_risque"
+ *   questionnaire.attendus     entier ≥ 0
+ *   questionnaire.date_limite  date
+ *   contacts[].role_decision   "decideur" | "financeur" | "influenceur" |
+ *                    "utilisateur" | "referent" | "bloqueur" | "autre"
+ *   Les dates se donnent en AAAA-MM-JJ (ou en ISO 8601, ramenée au jour).
+ *   Un contact « parti » n'a pas de clé : il n'est ni accepté ni créé.
  *
  * Une clé ABSENTE ou `null` ne change rien côté CRM : AUCUNE suppression ne se
  * propage (ni d'un champ, ni d'un contact, ni de la fiche).
@@ -65,14 +89,24 @@ final class DossierClient
 
     public const MAX_CONTACTS = 50;
 
+    public const ETAPES = ['prospect', 'devis_envoye', 'client', 'archive'];
+
+    public const ACTIONS = ['relance', 'rappel', 'envoi_devis', 'rendez_vous', 'autre'];
+
+    public const SANTES = ['bonne', 'a_surveiller', 'a_risque'];
+
+    public const ROLES_DECISION = ['decideur', 'financeur', 'influenceur', 'utilisateur', 'referent', 'bloqueur', 'autre'];
+
     private const CLES_DOSSIER = [
         'version', 'statut', 'facture_emise', 'rue', 'telephone', 'axi_cli',
         'effectif_tranche', 'url_console', 'questionnaire', 'contacts',
+        'etape', 'cloture_prevue', 'prochaine_action', 'taches_ouvertes',
+        'nb_emails_console', 'nb_notes_console', 'sante',
     ];
 
-    private const CLES_QUESTIONNAIRE = ['envoye_le', 'recu_le', 'nb_reponses_equipe'];
+    private const CLES_QUESTIONNAIRE = ['envoye_le', 'recu_le', 'nb_reponses_equipe', 'attendus', 'date_limite'];
 
-    private const CLES_CONTACT = ['ref', 'prenom', 'nom', 'email', 'telephone', 'fonction', 'person_key'];
+    private const CLES_CONTACT = ['ref', 'prenom', 'nom', 'email', 'telephone', 'fonction', 'person_key', 'role_decision'];
 
     private const CLES_ENTREPRISE = ['siren', 'name', 'postcode', 'city'];
 
@@ -91,7 +125,8 @@ final class DossierClient
     ];
 
     /**
-     * @param  list<array{ref: string, prenom: ?string, nom: ?string, email: ?string, telephone: ?string, fonction: ?string, person_key: ?string}>  $contacts
+     * @param  list<array{ref: string, prenom: ?string, nom: ?string, email: ?string, telephone: ?string, fonction: ?string, person_key: ?string, role_decision: ?string}>  $contacts
+     * @param  array<string, mixed>  $complements  fiche complète : SEULEMENT les clés reçues et non nulles
      */
     private function __construct(
         public readonly string $clientUuid,
@@ -107,6 +142,7 @@ final class DossierClient
         public readonly ?string $questionnaireRecuLe,
         public readonly ?int $nbReponsesEquipe,
         public readonly array $contacts,
+        public readonly array $complements = [],
     ) {}
 
     /**
@@ -181,7 +217,11 @@ final class DossierClient
             throw SiteSyncRejection::invalid('invalid_url_console', 'Dossier client : url_console doit être une adresse https.');
         }
 
-        [$envoye, $recu, $nb] = self::questionnaire($dossier['questionnaire'] ?? null);
+        [$envoye, $recu, $nb, $questionnaireComplet] = self::questionnaire($dossier['questionnaire'] ?? null);
+        $complements = self::complements($dossier);
+        if ($questionnaireComplet !== []) {
+            $complements['questionnaire'] = $questionnaireComplet;
+        }
 
         return new self(
             clientUuid: $m[1],
@@ -197,6 +237,7 @@ final class DossierClient
             questionnaireRecuLe: $recu,
             nbReponsesEquipe: $nb,
             contacts: self::contacts($dossier['contacts'] ?? null),
+            complements: $complements,
         );
     }
 
@@ -204,6 +245,34 @@ final class DossierClient
     public function estClient(): bool
     {
         return $this->statut === self::STATUT_CLIENT && $this->factureEmise;
+    }
+
+    /** L'étape « archive » : le CRM pose seulement `archive_reason`, rien n'est supprimé. */
+    public function estArchive(): bool
+    {
+        return ($this->complements['etape'] ?? null) === 'archive';
+    }
+
+    /**
+     * `metadata.console` à écrire : l'ancien contenu, recouvert par ce message.
+     * Les clés de la fiche complète ABSENTES du message gardent leur valeur
+     * (absence = aucun effet) ; les objets (`prochaine_action`,
+     * `taches_ouvertes`) sont remplacés d'un bloc, le questionnaire clé à clé.
+     *
+     * @param  array<mixed>  $ancien
+     * @return array<string, mixed>
+     */
+    public function metadonneesFusionnees(array $ancien): array
+    {
+        $nouveau = $this->metadonnees();
+        $questionnaire = array_merge(
+            is_array($ancien['questionnaire'] ?? null) ? $ancien['questionnaire'] : [],
+            $nouveau['questionnaire'],
+        );
+        $fusion = array_merge($ancien, $nouveau);
+        $fusion['questionnaire'] = $questionnaire;
+
+        return $fusion;
     }
 
     /**
@@ -214,7 +283,11 @@ final class DossierClient
      */
     public function metadonnees(): array
     {
-        return [
+        $complements = $this->complements;
+        $questionnaire = $complements['questionnaire'] ?? [];
+        unset($complements['questionnaire']);
+
+        return $complements + [
             'client_ref' => 'site:client:' . $this->clientUuid,
             'version' => $this->version,
             'statut' => $this->statut,
@@ -226,7 +299,7 @@ final class DossierClient
                 'envoye_le' => $this->questionnaireEnvoyeLe,
                 'recu_le' => $this->questionnaireRecuLe,
                 'nb_reponses_equipe' => $this->nbReponsesEquipe,
-            ],
+            ] + $questionnaire,
         ];
     }
 
@@ -237,7 +310,11 @@ final class DossierClient
      */
     public function enTableau(): array
     {
-        return [
+        $complements = $this->complements;
+        $questionnaire = $complements['questionnaire'] ?? [];
+        unset($complements['questionnaire']);
+
+        return $complements + [
             'version' => $this->version,
             'statut' => $this->statut,
             'facture_emise' => $this->factureEmise,
@@ -250,7 +327,7 @@ final class DossierClient
                 'envoye_le' => $this->questionnaireEnvoyeLe,
                 'recu_le' => $this->questionnaireRecuLe,
                 'nb_reponses_equipe' => $this->nbReponsesEquipe,
-            ],
+            ] + $questionnaire,
             'contacts' => $this->contacts,
         ];
     }
@@ -318,11 +395,129 @@ final class DossierClient
         return $valeur === '' ? null : $valeur;
     }
 
-    /** @return array{0: ?string, 1: ?string, 2: ?int} */
+    /**
+     * Les clés FACULTATIVES de la fiche complète, validées une à une ; une clé
+     * absente ou nulle n'apparaît pas dans le résultat.
+     *
+     * @param  array<mixed>  $dossier
+     * @return array<string, mixed>
+     */
+    private static function complements(array $dossier): array
+    {
+        $ou = 'payload.dossier';
+        $c = [];
+
+        foreach (['etape' => self::ETAPES, 'sante' => self::SANTES] as $cle => $permises) {
+            $v = self::dansListe($dossier[$cle] ?? null, $permises, "{$ou}.{$cle}");
+            if ($v !== null) {
+                $c[$cle] = $v;
+            }
+        }
+        $jour = self::jour($dossier['cloture_prevue'] ?? null, "{$ou}.cloture_prevue");
+        if ($jour !== null) {
+            $c['cloture_prevue'] = $jour;
+        }
+
+        $action = self::objet($dossier['prochaine_action'] ?? null, ['type', 'date'], "{$ou}.prochaine_action");
+        if ($action !== null) {
+            $type = self::dansListe($action['type'] ?? null, self::ACTIONS, "{$ou}.prochaine_action.type");
+            if ($type === null) {
+                throw SiteSyncRejection::invalid('missing_field', "« {$ou}.prochaine_action.type » est obligatoire.");
+            }
+            $c['prochaine_action'] = ['type' => $type, 'date' => self::jour($action['date'] ?? null, "{$ou}.prochaine_action.date")];
+        }
+
+        $taches = self::objet($dossier['taches_ouvertes'] ?? null, ['nb', 'prochaine_le'], "{$ou}.taches_ouvertes");
+        if ($taches !== null) {
+            $nb = self::entier($taches['nb'] ?? null, "{$ou}.taches_ouvertes.nb");
+            if ($nb === null) {
+                throw SiteSyncRejection::invalid('missing_field', "« {$ou}.taches_ouvertes.nb » est obligatoire.");
+            }
+            $c['taches_ouvertes'] = ['nb' => $nb, 'prochaine_le' => self::jour($taches['prochaine_le'] ?? null, "{$ou}.taches_ouvertes.prochaine_le")];
+        }
+
+        foreach (['nb_emails_console', 'nb_notes_console'] as $cle) {
+            $n = self::entier($dossier[$cle] ?? null, "{$ou}.{$cle}");
+            if ($n !== null) {
+                $c[$cle] = $n;
+            }
+        }
+
+        return $c;
+    }
+
+    /** @param  list<string>  $permises */
+    private static function dansListe(mixed $valeur, array $permises, string $ou): ?string
+    {
+        if ($valeur === null) {
+            return null;
+        }
+        if (! is_string($valeur) || ! in_array($valeur, $permises, true)) {
+            throw SiteSyncRejection::invalid('invalid_enum', "« {$ou} » doit valoir l'une de : " . implode(', ', $permises) . '.');
+        }
+
+        return $valeur;
+    }
+
+    private static function entier(mixed $valeur, string $ou): ?int
+    {
+        if ($valeur === null) {
+            return null;
+        }
+        if (! is_int($valeur) || $valeur < 0) {
+            throw SiteSyncRejection::invalid('invalid_type', "« {$ou} » doit être un entier ≥ 0.");
+        }
+
+        return $valeur;
+    }
+
+    /**
+     * @param  list<string>  $permises
+     * @return ?array<mixed>
+     */
+    private static function objet(mixed $valeur, array $permises, string $ou): ?array
+    {
+        if ($valeur === null) {
+            return null;
+        }
+        if (! is_array($valeur) || (array_is_list($valeur) && $valeur !== [])) {
+            throw SiteSyncRejection::invalid('invalid_type', "« {$ou} » doit être un objet.");
+        }
+        self::seulement($valeur, $permises, $ou);
+
+        return $valeur;
+    }
+
+    /** Un JOUR (AAAA-MM-JJ), ou un instant ISO 8601 ramené à son jour (fuseau de l'application). */
+    private static function jour(mixed $valeur, string $ou): ?string
+    {
+        if ($valeur === null || $valeur === '') {
+            return null;
+        }
+        if (! is_string($valeur)) {
+            throw SiteSyncRejection::invalid('invalid_date', "« {$ou} » doit être une date AAAA-MM-JJ.");
+        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $valeur, $m) === 1) {
+            if (! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+                throw SiteSyncRejection::invalid('invalid_date', "« {$ou} » n'est pas une date valide.");
+            }
+
+            return $valeur;
+        }
+        try {
+            $date = new DateTimeImmutable($valeur);
+        } catch (Exception) {
+            throw SiteSyncRejection::invalid('invalid_date', "« {$ou} » n'est pas une date valide (AAAA-MM-JJ).");
+        }
+
+        return $date->setTimezone(new DateTimeZone((string) config('app.timezone', 'UTC')))->format('Y-m-d');
+    }
+
+    /** @return array{0: ?string, 1: ?string, 2: ?int, 3: array<string, mixed>} */
     private static function questionnaire(mixed $q): array
     {
         if ($q === null) {
-            return [null, null, null];
+            return [null, null, null, []];
         }
         if (! is_array($q) || (array_is_list($q) && $q !== [])) {
             throw SiteSyncRejection::invalid('invalid_type', '« payload.dossier.questionnaire » doit être un objet.');
@@ -334,7 +529,17 @@ final class DossierClient
             throw SiteSyncRejection::invalid('invalid_type', '« payload.dossier.questionnaire.nb_reponses_equipe » doit être un entier ≥ 0.');
         }
 
-        return [self::date($q, 'envoye_le'), self::date($q, 'recu_le'), $nb];
+        $complet = [];
+        $attendus = self::entier($q['attendus'] ?? null, 'payload.dossier.questionnaire.attendus');
+        if ($attendus !== null) {
+            $complet['attendus'] = $attendus;
+        }
+        $limite = self::jour($q['date_limite'] ?? null, 'payload.dossier.questionnaire.date_limite');
+        if ($limite !== null) {
+            $complet['date_limite'] = $limite;
+        }
+
+        return [self::date($q, 'envoye_le'), self::date($q, 'recu_le'), $nb, $complet];
     }
 
     /** @param  array<mixed>  $q */
@@ -359,7 +564,7 @@ final class DossierClient
     }
 
     /**
-     * @return list<array{ref: string, prenom: ?string, nom: ?string, email: ?string, telephone: ?string, fonction: ?string, person_key: ?string}>
+     * @return list<array{ref: string, prenom: ?string, nom: ?string, email: ?string, telephone: ?string, fonction: ?string, person_key: ?string, role_decision: ?string}>
      */
     private static function contacts(mixed $liste): array
     {
@@ -411,6 +616,7 @@ final class DossierClient
                 'telephone' => self::texte($contact, 'telephone', 32, $ou),
                 'fonction' => self::texte($contact, 'fonction', 120, $ou),
                 'person_key' => $cle,
+                'role_decision' => self::dansListe($contact['role_decision'] ?? null, self::ROLES_DECISION, "{$ou}.role_decision"),
             ];
         }
 

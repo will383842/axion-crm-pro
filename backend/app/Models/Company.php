@@ -142,6 +142,8 @@ class Company extends Model
      */
     public function attributesToArray(): array
     {
+        // `url_console` est retiré de toute sortie JSON/array, donc aussi de `toArray()` utilisé par
+        // `AutoTagApplier::resolveField` : aucune règle ne la lit.
         $a = parent::attributesToArray();
         if (is_array($a['metadata']['console'] ?? null)) {
             unset($a['metadata']['console']['url_console']);

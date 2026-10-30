@@ -155,4 +155,18 @@ describe('RecuDeLaConsoleCard', () => {
     rerender(<RecuDeLaConsoleCard console={{ statut: 'client', sante: 'inventee' }} />);
     expect(screen.queryByText('Santé du compte')).toBeNull();
   });
+
+  it.each([
+    [1, '1 attendu'],
+    [5, '5 attendus'],
+  ])('accorde « attendu » au pluriel (%i)', (attendus, attendu) => {
+    render(<RecuDeLaConsoleCard console={{ questionnaire: { attendus } }} />);
+    expect(screen.getByText(attendu)).toBeInTheDocument();
+  });
+
+  it('ne dit jamais « 0 sur 0 » avec attendus à 0', () => {
+    render(<RecuDeLaConsoleCard console={{ questionnaire: { nb_reponses_equipe: 0, attendus: 0 } }} />);
+    expect(screen.queryByText(/sur 0/)).toBeNull();
+    expect(screen.getByText('0 réponse d’équipe reçue')).toBeInTheDocument();
+  });
 });

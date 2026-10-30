@@ -754,6 +754,9 @@ test('fiche complète : une valeur hors liste fermée ou mal formée = 422 expli
     'attendus à zéro' => [['questionnaire' => ['attendus' => 0]], 'invalid_type'],
     'attendus au-delà de 1000' => [['questionnaire' => ['attendus' => 1001]], 'invalid_type'],
     'attendus décimal' => [['questionnaire' => ['attendus' => 2.5]], 'invalid_type'],
+    'attendus négatif' => [['questionnaire' => ['attendus' => -3]], 'invalid_type'],
+    'attendus booléen' => [['questionnaire' => ['attendus' => true]], 'invalid_type'],
+    'attendus chaîne numérique' => [['questionnaire' => ['attendus' => '5']], 'invalid_type'],
     'date limite fausse' => [['questionnaire' => ['date_limite' => 'bientôt']], 'invalid_date'],
     'rôle inconnu' => [['contacts' => [['ref' => 'c-1', 'nom' => 'ZZ', 'role_decision' => 'chef']]], 'invalid_enum'],
 ]);

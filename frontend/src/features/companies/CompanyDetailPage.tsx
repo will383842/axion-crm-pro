@@ -41,6 +41,7 @@ interface CompanyDetail {
   id: number;
   siren: string;
   denomination?: string | null;
+  archive_reason?: string | null;
   naf?: string | null;
   naf_label?: string | null;
   legal_form?: string | null;
@@ -361,7 +362,7 @@ export function CompanyDetailPage() {
 
         {/* RIGHT COLUMN (1/3) */}
         <aside className="space-y-6">
-          <RecuDeLaConsoleCard console={c.metadata?.console} contacts={c.contacts} />
+          <RecuDeLaConsoleCard console={c.metadata?.console} contacts={c.contacts} archiveIci={!!c.archive_reason} />
           <RelationCard
             key={`${c.relation_type ?? 'prospect'}-${c.lifecycle_stage ?? 'nouveau'}-${c.relation_saisie_manuelle_at ?? ''}`}
             companyId={c.id}

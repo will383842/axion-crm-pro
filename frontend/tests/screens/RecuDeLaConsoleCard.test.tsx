@@ -33,7 +33,7 @@ describe('RecuDeLaConsoleCard', () => {
     );
     expect(screen.getByText('Client')).toBeInTheDocument();
     expect(screen.getByText('AXI-CLI-0042')).toBeInTheDocument();
-    expect(screen.getByText('2 sur 5, avant le 5 nov.')).toBeInTheDocument();
+    expect(screen.getByText('2 réponses d’équipe sur 5, avant le 5 nov.')).toBeInTheDocument();
     expect(screen.getByText('1 décideur')).toBeInTheDocument();
     expect(screen.getByText(/peut inclure des personnes parties/)).toBeInTheDocument();
     expect(screen.queryByText(/Anne|Martin|Paul|Durand/)).toBeNull();
@@ -48,15 +48,15 @@ describe('RecuDeLaConsoleCard', () => {
   });
 
   it('signale un client archivé et n’affiche aucun lien', () => {
-    render(<RecuDeLaConsoleCard console={{ etape: 'archive', url_console: 'https://secret.example' } as never} />);
+    render(<RecuDeLaConsoleCard console={{ etape: 'archive', url_console: 'https://secret.example' } as never} archiveIci={false} />);
     expect(screen.getByText('Ce client est archivé dans la console.')).toBeInTheDocument();
     expect(screen.queryByText(/il l’est aussi ici/)).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.queryByText(/secret\.example/)).toBeNull();
   });
 
-  it('affirme l’archivage ici seulement avec archive_reason', () => {
-    render(<RecuDeLaConsoleCard console={{ etape: 'archive', archive_reason: 'perdu' }} />);
+  it('affirme l’archivage ici seulement avec archiveIci', () => {
+    render(<RecuDeLaConsoleCard console={{ etape: 'archive' }} archiveIci />);
     expect(screen.getByText('Ce client est archivé dans la console : il l’est aussi ici.')).toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe('RecuDeLaConsoleCard', () => {
 
   it('questionnaire partiel : seulement les réponses, seulement les attendus', () => {
     const { unmount } = render(<RecuDeLaConsoleCard console={{ questionnaire: { nb_reponses_equipe: 1 } }} />);
-    expect(screen.getByText('1 reçu')).toBeInTheDocument();
+    expect(screen.getByText('1 réponse d’équipe reçue')).toBeInTheDocument();
     unmount();
     render(<RecuDeLaConsoleCard console={{ questionnaire: { attendus: 4 } }} />);
     expect(screen.getByText('4 attendus')).toBeInTheDocument();
@@ -89,6 +89,12 @@ describe('RecuDeLaConsoleCard', () => {
     unmount();
     render(<RecuDeLaConsoleCard console={{ questionnaire: { envoye_le: '2026-10-12', recu_le: '2026-10-20' } }} />);
     expect(screen.getByText('reçu le 20 oct.')).toBeInTheDocument();
+  });
+
+  it('questionnaire reçu avec zéro réponse d’équipe : la date reste visible', () => {
+    render(<RecuDeLaConsoleCard console={{ questionnaire: { recu_le: '2026-10-20', nb_reponses_equipe: 0 } }} />);
+    expect(screen.getByText(/reçu le 20 oct\./)).toBeInTheDocument();
+    expect(screen.getByText(/0 réponse d’équipe reçue/)).toBeInTheDocument();
   });
 
   it('zéro tâche ouverte', () => {
@@ -112,6 +118,8 @@ describe('RecuDeLaConsoleCard', () => {
 
   it('ne rend pas de liste vide', () => {
     render(<RecuDeLaConsoleCard console={{ statut: 'zzz' }} />);
+    expect(screen.getByText('Données reçues, non reconnues par cet écran')).toBeInTheDocument();
+    expect(screen.queryByText('Rien reçu pour l’instant')).toBeNull();
     expect(document.querySelector('dl')).toBeNull();
   });
 });

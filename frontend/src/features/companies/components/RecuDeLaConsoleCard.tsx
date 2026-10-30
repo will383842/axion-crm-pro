@@ -11,7 +11,6 @@ export interface RecuConsole {
   etape?: string | null;
   axi_cli?: string | null;
   cloture_prevue?: string | null;
-  archive_reason?: string | null;
   questionnaire?: {
     envoye_le?: string | null;
     recu_le?: string | null;
@@ -60,7 +59,11 @@ const CLES_CONNUES = new Set([
   'etape',
   'axi_cli',
   'cloture_prevue',
-  'archive_reason',
+  'client_ref',
+  'version',
+  'facture_emise',
+  'effectif_tranche',
+  'sante',
   'questionnaire',
   'prochaine_action',
   'taches_ouvertes',
@@ -92,9 +95,12 @@ function Ligne({ label, children }: { label: string; children: React.ReactNode }
 export function RecuDeLaConsoleCard({
   console: recu,
   contacts = [],
+  archiveIci = false,
 }: {
   console?: RecuConsole | null | undefined;
   contacts?: ContactAvecRole[] | undefined;
+  /** `companies.archive_reason` est renseigné : le client est archivé ici aussi. */
+  archiveIci?: boolean;
 }) {
   const lignes: React.ReactNode[] = [];
   if (recu) {
@@ -115,22 +121,23 @@ export function RecuDeLaConsoleCard({
     const q = recu.questionnaire;
     if (q) {
       const limite = jour(q.date_limite);
+      const nbEq = q.nb_reponses_equipe;
+      let date: string | null = null;
+      if (jour(q.recu_le)) date = `reçu le ${jour(q.recu_le)}`;
+      else if (jour(q.envoye_le)) date = `envoyé le ${jour(q.envoye_le)}`;
       let compte: string | null = null;
-      if (nombre(q.nb_reponses_equipe) && nombre(q.attendus)) {
-        compte = `${q.nb_reponses_equipe} sur ${q.attendus}`;
-      } else if (nombre(q.nb_reponses_equipe)) {
-        compte = `${q.nb_reponses_equipe} reçu${q.nb_reponses_equipe > 1 ? 's' : ''}`;
+      if (nombre(nbEq) && nombre(q.attendus)) {
+        compte = `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe sur ${q.attendus}`;
+      } else if (nombre(nbEq)) {
+        compte = `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe reçue${nbEq > 1 ? 's' : ''}`;
       } else if (nombre(q.attendus)) {
         compte = `${q.attendus} attendus`;
-      } else if (jour(q.recu_le)) {
-        compte = `reçu le ${jour(q.recu_le)}`;
-      } else if (jour(q.envoye_le)) {
-        compte = `envoyé le ${jour(q.envoye_le)}`;
       }
-      if (compte) {
+      const texte = [date, compte].filter(Boolean).join(' · ');
+      if (texte) {
         lignes.push(
           <Ligne key="questionnaire" label="Questionnaire">
-            {compte}
+            {texte}
             {limite ? `, avant le ${limite}` : ''}
           </Ligne>,
         );
@@ -206,7 +213,8 @@ export function RecuDeLaConsoleCard({
   }
 
   const archive = recu?.etape === 'archive';
-  const nonReconnu = !!recu && Object.keys(recu).some((k) => !CLES_CONNUES.has(k));
+  const valeurs = (recu ?? {}) as Record<string, unknown>;
+  const nonReconnu = Object.keys(valeurs).some((k) => !CLES_CONNUES.has(k) || valeurs[k] != null);
 
   return (
     <Card padding="md">
@@ -225,7 +233,7 @@ export function RecuDeLaConsoleCard({
           {lignes.length > 0 ? <dl className="space-y-3">{lignes}</dl> : null}
           {archive ? (
             <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-              {recu?.archive_reason
+              {archiveIci
                 ? 'Ce client est archivé dans la console : il l’est aussi ici.'
                 : 'Ce client est archivé dans la console.'}
             </p>

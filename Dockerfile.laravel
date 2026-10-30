@@ -39,11 +39,15 @@ RUN composer install \
 # -----------------------------------------------------------------------------
 FROM php:${PHP_VERSION}-fpm-alpine AS php-base
 
+# curl/libcurl : la base (Alpine 3.24.3) embarque encore 8.22.0-r0
+# (CVE-2026-92392, HIGH, corrige en 8.23.0-r0). On monte ces deux paquets
+# seulement (`apk upgrade`), pas tout le systeme.
 RUN apk add --no-cache \
         bash curl git icu-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
         oniguruma-dev libzip-dev libxml2-dev postgresql-dev nodejs npm \
         fcgi \
         autoconf g++ make linux-headers \
+    && apk upgrade --no-cache curl libcurl \
     && docker-php-ext-configure intl \
     && docker-php-ext-install -j$(nproc) \
         intl pdo pdo_pgsql pgsql opcache bcmath pcntl exif zip gd mbstring \

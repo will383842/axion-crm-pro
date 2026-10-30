@@ -133,6 +133,23 @@ class Company extends Model
         ];
     }
 
+    /**
+     * L'adresse de la console (`metadata.console.url_console`) est SECRETE :
+     * on la retire à la mise en JSON/tableau, pour toutes les routes, sans
+     * jamais toucher à la valeur stockée en base.
+     *
+     * @return array<string, mixed>
+     */
+    public function attributesToArray(): array
+    {
+        $a = parent::attributesToArray();
+        if (is_array($a['metadata']['console'] ?? null)) {
+            unset($a['metadata']['console']['url_console']);
+        }
+
+        return $a;
+    }
+
     /** @return BelongsTo<Workspace, $this> */
     public function workspace(): BelongsTo
     {

@@ -11,7 +11,10 @@ export interface RecuConsole {
   etape?: string | null;
   axi_cli?: string | null;
   cloture_prevue?: string | null;
+  archive_reason?: string | null;
   questionnaire?: {
+    envoye_le?: string | null;
+    recu_le?: string | null;
     nb_reponses_equipe?: number | null;
     attendus?: number | null;
     date_limite?: string | null;
@@ -43,15 +46,28 @@ const ACTIONS: Record<string, string> = {
   rendez_vous: 'Rendez-vous',
   autre: 'Autre action',
 };
-const ROLES: Record<string, string> = {
-  decideur: 'Décideur',
-  financeur: 'Financeur',
-  influenceur: 'Influenceur',
-  utilisateur: 'Utilisateur',
-  referent: 'Référent',
-  bloqueur: 'Bloqueur',
-  autre: 'Autre',
+const ROLES: Record<string, [string, string]> = {
+  decideur: ['décideur', 'décideurs'],
+  financeur: ['financeur', 'financeurs'],
+  influenceur: ['influenceur', 'influenceurs'],
+  utilisateur: ['utilisateur', 'utilisateurs'],
+  referent: ['référent', 'référents'],
+  bloqueur: ['bloqueur', 'bloqueurs'],
+  autre: ['autre', 'autres'],
 };
+const CLES_CONNUES = new Set([
+  'statut',
+  'etape',
+  'axi_cli',
+  'cloture_prevue',
+  'archive_reason',
+  'questionnaire',
+  'prochaine_action',
+  'taches_ouvertes',
+  'nb_emails_console',
+  'nb_notes_console',
+  'url_console',
+]);
 
 /** `AAAA-MM-JJ` (ou ISO 8601) → « 5 nov. » ; `null` si illisible. */
 function jour(date?: string | null): string | null {
@@ -83,48 +99,56 @@ export function RecuDeLaConsoleCard({
   const lignes: React.ReactNode[] = [];
   if (recu) {
     const statut = recu.statut ? (STATUTS[recu.statut] ?? null) : null;
-    if (statut) {
+    if (statut || recu.axi_cli) {
       lignes.push(
         <Ligne key="statut" label="Statut">
           {statut}
           {recu.axi_cli ? (
-            <span className="ml-2 font-mono text-xs text-slate-500 dark:text-slate-400">{recu.axi_cli}</span>
+            <span className={`${statut ? 'ml-2 ' : ''}font-mono text-xs text-slate-500 dark:text-slate-400`}>
+              {recu.axi_cli}
+            </span>
           ) : null}
         </Ligne>,
       );
     }
 
     const q = recu.questionnaire;
-    if (q && (nombre(q.nb_reponses_equipe) || nombre(q.attendus))) {
+    if (q) {
       const limite = jour(q.date_limite);
-      const compte =
-        nombre(q.nb_reponses_equipe) && nombre(q.attendus)
-          ? `${q.nb_reponses_equipe} sur ${q.attendus}`
-          : nombre(q.nb_reponses_equipe)
-            ? `${q.nb_reponses_equipe} reçu${q.nb_reponses_equipe > 1 ? 's' : ''}`
-            : `${q.attendus} attendus`;
-      lignes.push(
-        <Ligne key="questionnaire" label="Questionnaire">
-          {compte}
-          {limite ? `, avant le ${limite}` : ''}
-        </Ligne>,
-      );
+      let compte: string | null = null;
+      if (nombre(q.nb_reponses_equipe) && nombre(q.attendus)) {
+        compte = `${q.nb_reponses_equipe} sur ${q.attendus}`;
+      } else if (nombre(q.nb_reponses_equipe)) {
+        compte = `${q.nb_reponses_equipe} reçu${q.nb_reponses_equipe > 1 ? 's' : ''}`;
+      } else if (nombre(q.attendus)) {
+        compte = `${q.attendus} attendus`;
+      } else if (jour(q.recu_le)) {
+        compte = `reçu le ${jour(q.recu_le)}`;
+      } else if (jour(q.envoye_le)) {
+        compte = `envoyé le ${jour(q.envoye_le)}`;
+      }
+      if (compte) {
+        lignes.push(
+          <Ligne key="questionnaire" label="Questionnaire">
+            {compte}
+            {limite ? `, avant le ${limite}` : ''}
+          </Ligne>,
+        );
+      }
     }
 
-    const roles = contacts.filter((ct) => ct.metadata?.role_decision && ROLES[ct.metadata.role_decision]);
-    if (roles.length > 0) {
+    const decompte = new Map<string, number>();
+    for (const ct of contacts) {
+      const r = ct.metadata?.role_decision;
+      if (r && ROLES[r]) decompte.set(r, (decompte.get(r) ?? 0) + 1);
+    }
+    if (decompte.size > 0) {
+      const texte = [...decompte.entries()]
+        .map(([r, n]) => `${n} ${n > 1 ? ROLES[r]?.[1] : ROLES[r]?.[0]}`)
+        .join(', ');
       lignes.push(
-        <Ligne key="personnes" label="Personnes actives">
-          <ul className="space-y-0.5">
-            {roles.map((ct) => (
-              <li key={ct.id}>
-                {[ct.first_name, ct.last_name].filter(Boolean).join(' ') || '—'}
-                <span className="ml-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  {ROLES[ct.metadata?.role_decision ?? '']}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <Ligne key="roles" label="Rôles connus de la console (peut inclure des personnes parties)">
+          {texte}
         </Ligne>,
       );
     }
@@ -182,6 +206,7 @@ export function RecuDeLaConsoleCard({
   }
 
   const archive = recu?.etape === 'archive';
+  const nonReconnu = !!recu && Object.keys(recu).some((k) => !CLES_CONNUES.has(k));
 
   return (
     <Card padding="md">
@@ -192,18 +217,22 @@ export function RecuDeLaConsoleCard({
         </div>
       </CardHeader>
       {lignes.length === 0 && !archive ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">Rien reçu pour l’instant</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {nonReconnu ? 'Données reçues, non reconnues par cet écran' : 'Rien reçu pour l’instant'}
+        </p>
       ) : (
         <>
-          <dl className="space-y-3">{lignes}</dl>
+          {lignes.length > 0 ? <dl className="space-y-3">{lignes}</dl> : null}
           {archive ? (
             <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-              Ce client est archivé dans la console : il l’est aussi ici.
+              {recu?.archive_reason
+                ? 'Ce client est archivé dans la console : il l’est aussi ici.'
+                : 'Ce client est archivé dans la console.'}
             </p>
           ) : null}
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Aucun montant, aucun texte de note ne passe.</p>
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-800">
-            <span className="font-semibold">À faire dans la console :</span> la relance se valide dans la console d’Axion IA.
+            Les actions se font dans la console d’Axion IA.
           </p>
         </>
       )}

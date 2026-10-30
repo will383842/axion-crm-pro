@@ -132,7 +132,7 @@ export function RecuDeLaConsoleCard({
       if (jour(q.recu_le)) date = `reçu le ${jour(q.recu_le)}`;
       else if (jour(q.envoye_le)) date = `envoyé le ${jour(q.envoye_le)}`;
       let compte: string | null = null;
-      if (nombre(nbEq) && nombre(q.attendus)) {
+      if (nombre(nbEq) && nombre(q.attendus) && q.attendus > 0) {
         // Reçues sur attendues ; si plus de réponses que d'attendus, le seul nombre reçu.
         compte =
           nbEq > q.attendus
@@ -141,7 +141,7 @@ export function RecuDeLaConsoleCard({
       } else if (nombre(nbEq)) {
         compte = `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe reçue${nbEq > 1 ? 's' : ''}`;
       } else if (nombre(q.attendus)) {
-        compte = `${q.attendus} attendus`;
+        compte = `${q.attendus} attendu${q.attendus > 1 ? 's' : ''}`;
       }
       const texte = [date, compte].filter(Boolean).join(' · ');
       if (texte) {

@@ -278,7 +278,10 @@ test('aucune route ne renvoie url_console, la valeur stockée reste intacte', fu
         expect($r->getContent())->not->toContain('url_console', $nom)->not->toContain('console.example.test', $nom);
         expect(Company::find($c->id)->metadata['console']['url_console'])->toBe('https://console.example.test/x', $nom);
     }
-    expect($reponses['show']->json('metadata.console.statut'))->toBe('client');
+    expect(collect($reponses['index']->json('data'))->pluck('id'))->toContain($c->id);
+    foreach (['show', 'update', 'relation', 'recompute'] as $nom) {
+        expect($reponses[$nom]->json('metadata.console.statut'))->toBe('client', $nom);
+    }
     expect($reponses['show']->json('metadata.console.sante'))->toBe('bonne');
 });
 

@@ -9,6 +9,7 @@ import { Card, CardEyebrow, CardHeader, CardTitle } from '@/components/ui';
 export interface RecuConsole {
   statut?: string | null;
   etape?: string | null;
+  sante?: string | null;
   axi_cli?: string | null;
   cloture_prevue?: string | null;
   questionnaire?: {
@@ -37,6 +38,11 @@ const ETAPES: Record<string, string> = {
   devis_envoye: 'Devis envoyé',
   client: 'Client',
   archive: 'Archivé',
+};
+const SANTES: Record<string, string> = {
+  bonne: 'Bonne',
+  a_surveiller: 'À surveiller',
+  a_risque: 'À risque',
 };
 const ACTIONS: Record<string, string> = {
   relance: 'Relance',
@@ -192,6 +198,15 @@ export function RecuDeLaConsoleCard({
         <Ligne key="etape" label="Étape">
           {etape ?? '—'}
           {cloture ? ` · clôture prévue le ${cloture}` : ''}
+        </Ligne>,
+      );
+    }
+
+    const sante = recu.sante ? (SANTES[recu.sante] ?? null) : null;
+    if (sante) {
+      lignes.push(
+        <Ligne key="sante" label="Santé du compte">
+          {sante}
         </Ligne>,
       );
     }

@@ -764,6 +764,14 @@ class CompaniesController extends ApiController
         // tant que rien n'est connu pour cette fiche.
         $company->setAttribute('opco', LectureOpco::pourEntreprise((int) $company->getKey(), (string) $company->workspace_id));
 
+        // L'adresse de la console est SECRETE : on la retire de la réponse
+        // seulement (attribut en mémoire, jamais enregistré).
+        $metadata = $company->metadata;
+        if (is_array($metadata) && is_array($metadata['console'] ?? null)) {
+            unset($metadata['console']['url_console']);
+            $company->setAttribute('metadata', $metadata);
+        }
+
         return $this->ok(MasquageCoordonnees::masquerSiRequis($company->load($relations)));
     }
 

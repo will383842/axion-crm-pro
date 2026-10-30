@@ -230,3 +230,25 @@ test('une fiche protegee ne part pas a la corbeille depuis la console, le temoin
     $this->deleteJson('/api/v1/companies/' . $temoin->id)->assertNoContent();
     expect(DB::table('companies')->where('id', $temoin->id)->value('deleted_at'))->not->toBeNull();
 });
+
+test('show ne renvoie jamais url_console mais garde le reste de metadata.console', function () {
+    $c = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => '123456789',
+        'denomination' => 'Test Corp', 'signals' => [],
+        'metadata' => ['console' => [
+            'statut' => 'client',
+            'sante' => 'bonne',
+            'url_console' => 'https://console.example.test/secret/42',
+        ]],
+    ]);
+
+    $r = $this->getJson("/api/v1/companies/{$c->id}");
+
+    $r->assertOk();
+    expect($r->getContent())->not->toContain('url_console')->not->toContain('console.example.test');
+    $r->assertJsonPath('metadata.console.statut', 'client');
+    $r->assertJsonPath('metadata.console.sante', 'bonne');
+    // La donnée stockée n'est pas modifiée.
+    expect(Company::find($c->id)->metadata['console']['url_console'])->toBe('https://console.example.test/secret/42');
+});

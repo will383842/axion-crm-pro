@@ -122,4 +122,17 @@ describe('RecuDeLaConsoleCard', () => {
     expect(screen.queryByText('Rien reçu pour l’instant')).toBeNull();
     expect(document.querySelector('dl')).toBeNull();
   });
+
+  it('affiche la santé du compte quand elle est connue', () => {
+    render(<RecuDeLaConsoleCard console={{ statut: 'client', sante: 'a_surveiller' }} />);
+    expect(screen.getByText('Santé du compte')).toBeInTheDocument();
+    expect(screen.getByText('À surveiller')).toBeInTheDocument();
+  });
+
+  it('n’affiche aucune ligne de santé si absente ou inconnue', () => {
+    const { rerender } = render(<RecuDeLaConsoleCard console={{ statut: 'client' }} />);
+    expect(screen.queryByText('Santé du compte')).toBeNull();
+    rerender(<RecuDeLaConsoleCard console={{ statut: 'client', sante: 'inventee' }} />);
+    expect(screen.queryByText('Santé du compte')).toBeNull();
+  });
 });

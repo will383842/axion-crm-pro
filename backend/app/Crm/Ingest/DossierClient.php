@@ -63,7 +63,9 @@ use Exception;
  *   taches_ouvertes  { nb: entier ≥ 0 (obligatoire), prochaine_le? }
  *   nb_emails_console, nb_notes_console   entiers ≥ 0 (des nombres, pas des textes)
  *   sante            "bonne" | "a_surveiller" | "a_risque"
- *   questionnaire.attendus     entier ≥ 0
+ *   questionnaire.attendus     entier de 1 à 1000 (personnes attendues) ; hors
+ *                    bornes ou non entier = 422 `invalid_type`, comme les
+ *                    autres nombres du questionnaire ; absent ou null = sans effet
  *   questionnaire.date_limite  date
  *   contacts[].role_decision   "decideur" | "financeur" | "influenceur" |
  *                    "utilisateur" | "referent" | "bloqueur" | "autre"
@@ -530,7 +532,10 @@ final class DossierClient
         }
 
         $complet = [];
-        $attendus = self::entier($q['attendus'] ?? null, 'payload.dossier.questionnaire.attendus');
+        $attendus = $q['attendus'] ?? null;
+        if ($attendus !== null && (! is_int($attendus) || $attendus < 1 || $attendus > 1000)) {
+            throw SiteSyncRejection::invalid('invalid_type', '« payload.dossier.questionnaire.attendus » doit être un entier de 1 à 1000.');
+        }
         if ($attendus !== null) {
             $complet['attendus'] = $attendus;
         }

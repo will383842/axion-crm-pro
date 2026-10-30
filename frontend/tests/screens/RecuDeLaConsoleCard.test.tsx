@@ -33,7 +33,7 @@ describe('RecuDeLaConsoleCard', () => {
     );
     expect(screen.getByText('Client')).toBeInTheDocument();
     expect(screen.getByText('AXI-CLI-0042')).toBeInTheDocument();
-    expect(screen.getByText('2 réponses d’équipe sur 5, avant le 5 nov.')).toBeInTheDocument();
+    expect(screen.getByText('2 sur 5, avant le 5 nov.')).toBeInTheDocument();
     expect(screen.getByText('1 décideur')).toBeInTheDocument();
     expect(screen.getByText(/peut inclure des personnes parties/)).toBeInTheDocument();
     expect(screen.queryByText(/Anne|Martin|Paul|Durand/)).toBeNull();
@@ -81,6 +81,26 @@ describe('RecuDeLaConsoleCard', () => {
     unmount();
     render(<RecuDeLaConsoleCard console={{ questionnaire: { attendus: 4 } }} />);
     expect(screen.getByText('4 attendus')).toBeInTheDocument();
+  });
+
+  it('questionnaire : « X sur N » avec attendus, texte inchangé sans, seul le reçu si dépassé', () => {
+    const { unmount } = render(
+      <RecuDeLaConsoleCard console={{ questionnaire: { recu_le: '2026-10-29', nb_reponses_equipe: 1, attendus: 5 } }} />,
+    );
+    expect(screen.getByText('reçu le 29 oct. · 1 sur 5')).toBeInTheDocument();
+    unmount();
+    const sans = render(
+      <RecuDeLaConsoleCard console={{ questionnaire: { recu_le: '2026-10-29', nb_reponses_equipe: 1 } }} />,
+    );
+    expect(screen.getByText('reçu le 29 oct. · 1 réponse d’équipe reçue')).toBeInTheDocument();
+    sans.unmount();
+    const trop = render(
+      <RecuDeLaConsoleCard console={{ questionnaire: { nb_reponses_equipe: 6, attendus: 5 } }} />,
+    );
+    expect(screen.getByText('6 réponses d’équipe reçues')).toBeInTheDocument();
+    trop.unmount();
+    render(<RecuDeLaConsoleCard console={{ questionnaire: { nb_reponses_equipe: 2, attendus: 'x' as unknown as number } }} />);
+    expect(screen.getByText('2 réponses d’équipe reçues')).toBeInTheDocument();
   });
 
   it('questionnaire sans compte : envoyé le / reçu le', () => {

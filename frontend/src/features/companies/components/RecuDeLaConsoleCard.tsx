@@ -133,7 +133,11 @@ export function RecuDeLaConsoleCard({
       else if (jour(q.envoye_le)) date = `envoyé le ${jour(q.envoye_le)}`;
       let compte: string | null = null;
       if (nombre(nbEq) && nombre(q.attendus)) {
-        compte = `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe sur ${q.attendus}`;
+        // Reçues sur attendues ; si plus de réponses que d'attendus, le seul nombre reçu.
+        compte =
+          nbEq > q.attendus
+            ? `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe reçue${nbEq > 1 ? 's' : ''}`
+            : `${nbEq} sur ${q.attendus}`;
       } else if (nombre(nbEq)) {
         compte = `${nbEq} réponse${nbEq > 1 ? 's' : ''} d’équipe reçue${nbEq > 1 ? 's' : ''}`;
       } else if (nombre(q.attendus)) {

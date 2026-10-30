@@ -751,6 +751,9 @@ test('fiche complète : une valeur hors liste fermée ou mal formée = 422 expli
     'clôture mal écrite' => [['cloture_prevue' => '15/12/2026'], 'invalid_date'],
     'clôture impossible' => [['cloture_prevue' => '2026-02-31'], 'invalid_date'],
     'attendus en texte' => [['questionnaire' => ['attendus' => 'cinq']], 'invalid_type'],
+    'attendus à zéro' => [['questionnaire' => ['attendus' => 0]], 'invalid_type'],
+    'attendus au-delà de 1000' => [['questionnaire' => ['attendus' => 1001]], 'invalid_type'],
+    'attendus décimal' => [['questionnaire' => ['attendus' => 2.5]], 'invalid_type'],
     'date limite fausse' => [['questionnaire' => ['date_limite' => 'bientôt']], 'invalid_date'],
     'rôle inconnu' => [['contacts' => [['ref' => 'c-1', 'nom' => 'ZZ', 'role_decision' => 'chef']]], 'invalid_enum'],
 ]);
@@ -846,3 +849,18 @@ test('fiche complète : l étape « client » de la console ne change jamais le 
     dcsPost(dcsEvenement(['version' => 3, 'etape' => 'client', 'statut' => 'client', 'facture_emise' => true]))->assertOk();
     expect(dcsFiche()->lifecycle_stage)->toBe('qualifie');
 });
+
+test('questionnaire sans attendus (ancienne console) : accepté, la clé n\'est pas inventée', function () {
+    dcsPost(dcsEvenement(['questionnaire' => ['envoye_le' => '2026-10-18T09:00:00+02:00', 'recu_le' => null, 'nb_reponses_equipe' => 1]]))
+        ->assertOk()->assertJsonPath('result.status', 'created');
+
+    $meta = json_decode(dcsFiche()->metadata, true)['console'];
+    expect($meta['questionnaire']['nb_reponses_equipe'])->toBe(1)
+        ->and($meta['questionnaire'])->not->toHaveKey('attendus');
+});
+
+test('questionnaire.attendus : les bornes 1 et 1000 sont acceptées', function (int $n) {
+    dcsPost(dcsEvenement(['questionnaire' => ['nb_reponses_equipe' => 1, 'attendus' => $n]]))->assertOk();
+
+    expect(json_decode(dcsFiche()->metadata, true)['console']['questionnaire']['attendus'])->toBe($n);
+})->with([1, 1000]);

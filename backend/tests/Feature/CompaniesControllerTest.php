@@ -230,3 +230,71 @@ test('une fiche protegee ne part pas a la corbeille depuis la console, le temoin
     $this->deleteJson('/api/v1/companies/' . $temoin->id)->assertNoContent();
     expect(DB::table('companies')->where('id', $temoin->id)->value('deleted_at'))->not->toBeNull();
 });
+
+test('show ne renvoie jamais url_console mais garde le reste de metadata.console', function () {
+    $c = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => '123456789',
+        'denomination' => 'Test Corp', 'signals' => [],
+        'metadata' => ['console' => [
+            'statut' => 'client',
+            'sante' => 'bonne',
+            'url_console' => 'https://console.example.test/secret/42',
+        ]],
+    ]);
+
+    $r = $this->getJson("/api/v1/companies/{$c->id}");
+
+    $r->assertOk();
+    expect($r->getContent())->not->toContain('url_console')->not->toContain('console.example.test');
+    $r->assertJsonPath('metadata.console.statut', 'client');
+    $r->assertJsonPath('metadata.console.sante', 'bonne');
+    // La donnée stockée n'est pas modifiée.
+    expect(Company::find($c->id)->metadata['console']['url_console'])->toBe('https://console.example.test/secret/42');
+});
+
+test('aucune route ne renvoie url_console, la valeur stockée reste intacte', function () {
+    $c = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => '123456780',
+        'denomination' => 'Console Corp', 'signals' => [],
+        'metadata' => ['console' => [
+            'statut' => 'client',
+            'sante' => 'bonne',
+            'url_console' => 'https://console.example.test/x',
+        ]],
+    ]);
+
+    $reponses = [
+        'index' => $this->getJson('/api/v1/companies'),
+        'show' => $this->getJson("/api/v1/companies/{$c->id}"),
+        'update' => $this->putJson("/api/v1/companies/{$c->id}", ['denomination' => 'Console Corp 2']),
+        'relation' => $this->putJson("/api/v1/companies/{$c->id}/relation", ['relation_type' => 'prospect']),
+        'recompute' => $this->postJson("/api/v1/companies/{$c->id}/recompute-score"),
+    ];
+
+    foreach ($reponses as $nom => $r) {
+        expect($r->getStatusCode())->toBeLessThan(300, $nom);
+        expect($r->getContent())->not->toContain('url_console', $nom)->not->toContain('console.example.test', $nom);
+        expect(Company::find($c->id)->metadata['console']['url_console'])->toBe('https://console.example.test/x', $nom);
+    }
+    expect($reponses['show']->json('metadata.console.statut'))->toBe('client');
+    expect($reponses['show']->json('metadata.console.sante'))->toBe('bonne');
+});
+
+test('la mise en JSON du modèle retire url_console (cas de enrich) sans toucher au stockage', function () {
+    $c = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'siren' => '123456781',
+        'denomination' => 'Json Corp', 'signals' => [],
+        'metadata' => ['console' => ['statut' => 'client', 'url_console' => 'https://console.example.test/x']],
+    ]);
+
+    $json = $c->fresh()->toJson();
+    expect($json)->not->toContain('url_console')->not->toContain('console.example.test');
+    expect($c->fresh()->toArray()['metadata']['console']['statut'])->toBe('client');
+    expect(Company::find($c->id)->metadata['console']['url_console'])->toBe('https://console.example.test/x');
+
+    expect((new Company)->toArray())->not->toHaveKey('metadata');
+    expect((new Company(['metadata' => null]))->toJson())->toBeString();
+});

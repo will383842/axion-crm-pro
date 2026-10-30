@@ -22,6 +22,7 @@ import {
 } from '@/components/ui';
 import { api, qualifierErreur } from '@/lib/api';
 import { ContactsCard, type ContactItem } from './components/ContactsCard';
+import { RecuDeLaConsoleCard, type ContactAvecRole, type RecuConsole } from './components/RecuDeLaConsoleCard';
 import { QualityScoreCard } from './components/QualityScoreCard';
 import { EnrichmentTimeline, deriveTimelineFromSignals } from './components/EnrichmentTimeline';
 import { EvenementsCard } from './components/EvenementsCard';
@@ -65,7 +66,7 @@ interface CompanyDetail {
   signals?: Record<string, unknown>;
   created_at?: string | null;
   enriched_at?: string | null;
-  contacts?: ContactItem[];
+  contacts?: (ContactItem & ContactAvecRole)[];
   tags?: EtiquetteFiche[];
   // Chantiers B et D (2026-10-01).
   relation_type?: RelationType;
@@ -74,6 +75,8 @@ interface CompanyDetail {
   joignabilite?: string | null;
   // Lot O14 (05/10/2026) — IDCC et OPCO, en lecture seule (`companies_opco`).
   opco?: CompanyOpco | null;
+  // Lot C2 — ce que la console envoie (`metadata.console`), en lecture seule.
+  metadata?: { console?: RecuConsole | null } | null;
 }
 
 interface CompanyOpco {
@@ -358,6 +361,7 @@ export function CompanyDetailPage() {
 
         {/* RIGHT COLUMN (1/3) */}
         <aside className="space-y-6">
+          <RecuDeLaConsoleCard console={c.metadata?.console} contacts={c.contacts} />
           <RelationCard
             key={`${c.relation_type ?? 'prospect'}-${c.lifecycle_stage ?? 'nouveau'}-${c.relation_saisie_manuelle_at ?? ''}`}
             companyId={c.id}

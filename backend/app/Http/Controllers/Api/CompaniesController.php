@@ -767,7 +767,7 @@ class CompaniesController extends ApiController
         // L'adresse de la console est SECRETE : on la retire de la réponse
         // seulement (attribut en mémoire, jamais enregistré).
         $metadata = $company->metadata;
-        if (is_array($metadata) && is_array($metadata['console'] ?? null)) {
+        if (is_array($metadata['console'] ?? null)) {
             unset($metadata['console']['url_console']);
             $company->setAttribute('metadata', $metadata);
         }

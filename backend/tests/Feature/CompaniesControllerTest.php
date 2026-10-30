@@ -269,7 +269,7 @@ test('aucune route ne renvoie url_console, la valeur stockée reste intacte', fu
         'index' => $this->getJson('/api/v1/companies'),
         'show' => $this->getJson("/api/v1/companies/{$c->id}"),
         'update' => $this->putJson("/api/v1/companies/{$c->id}", ['denomination' => 'Console Corp 2']),
-        'relation' => $this->putJson("/api/v1/companies/{$c->id}/relation", ['lifecycle_stage' => 'customer']),
+        'relation' => $this->putJson("/api/v1/companies/{$c->id}/relation", ['relation_type' => 'prospect']),
         'recompute' => $this->postJson("/api/v1/companies/{$c->id}/recompute-score"),
     ];
 

@@ -27,7 +27,7 @@ const DOSSIERS = [path.join(RACINE_FRONT, 'src'), path.join(RACINE_DEPOT, 'backe
  * appartient à un autre lot. Signalé dans la PR DM0-DEMO.
  */
 const EXCEPTIONS: Record<string, string> = {
-  'frontend/src/features/campaigns/fr-zones.ts': 'référentiel INSEE des communes (ciblage géographique)',
+  'frontend/src/features/collectes/fr-zones.ts': 'référentiel INSEE des communes (ciblage géographique)',
 };
 
 export const MOTIF_INTERDIT =

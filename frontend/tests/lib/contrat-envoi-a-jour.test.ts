@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * GARDE — le contrat d'API d'Envoi et ses types générés ne divergent jamais.
  *

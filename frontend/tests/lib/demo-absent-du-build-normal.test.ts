@@ -1,4 +1,3 @@
-// @vitest-environment node
 /**
  * GARDE — le build NORMAL ne contient aucun octet de la démo (DM0-DEMO).
  *

@@ -9,15 +9,20 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:demo": "vite --mode demo",
     "build": "tsc --noEmit && vite build",
+    "build:demo": "tsc --noEmit && vite build --mode demo --outDir dist-demo",
     "preview": "vite preview",
+    "preview:demo": "vite preview --mode demo --outDir dist-demo",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:demo": "playwright test --config playwright.demo.config.ts tests/e2e/demo/",
+    "api:envoi": "node scripts/generer-api-envoi.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

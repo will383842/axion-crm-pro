@@ -1,0 +1,361 @@
+openapi: 3.1.0
+info:
+  title: Envoi — infrastructure
+  version: 0.1.0
+  description: |
+    Boîtes d'envoi, domaines (fiche sur 30 jours, enregistrements DNS, DMARC
+    progressif), serveurs et adresses IP (« ajouter et appliquer »),
+    configuration versionnée, chauffe, listes noires. En démo : domaines en
+    `.example`, adresses IP des plages de documentation. Lot : DM2-INF.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/boites:
+    get:
+      operationId: listerBoites
+      summary: Boîtes d'envoi
+      responses:
+        '200':
+          description: Boîtes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+    post:
+      operationId: ajouterBoite
+      summary: Ajouter une boîte (lance une chauffe de 30 jours)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adresse, domaine_id, nom_affiche]
+              properties:
+                adresse: { type: string, format: email }
+                domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                nom_affiche: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Boite' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/boites/{id}:
+    get:
+      operationId: lireBoite
+      summary: Fiche d'une boîte
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Boîte, 30 jours d'activité et derniers refus.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [boite, jours, derniers_refus]
+                properties:
+                  boite: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+                  jours:
+                    type: array
+                    items: { $ref: '#/components/schemas/JourActivite' }
+                  derniers_refus:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/boites/{id}/suspendre:
+    post:
+      operationId: suspendreBoite
+      summary: Suspendre une boîte
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Boite' }
+  /envoi/boites/{id}/reactiver:
+    post:
+      operationId: reactiverBoite
+      summary: Réactiver une boîte suspendue
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Boite' }
+  /envoi/domaines:
+    get:
+      operationId: listerDomaines
+      summary: Domaines d'envoi
+      responses:
+        '200':
+          description: Domaines.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+    post:
+      operationId: ajouterDomaine
+      summary: Ajouter un domaine (rend les enregistrements DNS à créer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string }
+      responses:
+        '201':
+          description: Domaine et enregistrements à créer.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [domaine, dns]
+                properties:
+                  domaine: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  dns:
+                    type: array
+                    items: { $ref: '#/components/schemas/EnregistrementDns' }
+  /envoi/domaines/{id}:
+    get:
+      operationId: lireDomaine
+      summary: Fiche d'un domaine sur 30 jours
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Domaine, DNS, 30 jours, listes noires.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [domaine, dns, jours, listes_noires]
+                properties:
+                  domaine: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  dns:
+                    type: array
+                    items: { $ref: '#/components/schemas/EnregistrementDns' }
+                  jours:
+                    type: array
+                    items: { $ref: '#/components/schemas/JourActivite' }
+                  listes_noires:
+                    type: array
+                    items: { $ref: '#/components/schemas/ListeNoire' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/domaines/{id}/dns/verifier:
+    post:
+      operationId: verifierDns
+      summary: Vérifier les enregistrements DNS
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: État de chaque enregistrement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dns]
+                properties:
+                  dns:
+                    type: array
+                    items: { $ref: '#/components/schemas/EnregistrementDns' }
+  /envoi/domaines/{id}/dmarc:
+    post:
+      operationId: avancerDmarc
+      summary: DMARC progressif — passer à la politique suivante ou poser un rappel
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [politique]
+              properties:
+                politique: { $ref: './commun.yaml#/components/schemas/PolitiqueDmarc' }
+                rappel_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+      responses:
+        '200':
+          description: Domaine après le geste.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+  /envoi/serveurs:
+    get:
+      operationId: listerServeurs
+      summary: Serveurs et adresses IP
+      responses:
+        '200':
+          description: Serveurs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/ServeurResume' }
+  /envoi/serveurs/{id}/adresses-ip:
+    post:
+      operationId: ajouterAdresseIp
+      summary: Ajouter une adresse IP (prépare une nouvelle version de configuration)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adresse, flux, domaine_id]
+              properties:
+                adresse: { type: string }
+                flux: { $ref: './commun.yaml#/components/schemas/FluxEnvoi' }
+                domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200': { $ref: '#/components/responses/Configuration' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/configuration:
+    get:
+      operationId: lireConfiguration
+      summary: Configuration versionnée (courante et prête)
+      responses:
+        '200': { $ref: '#/components/responses/Configuration' }
+  /envoi/configuration/appliquer:
+    post:
+      operationId: appliquerConfiguration
+      summary: Appliquer la version prête
+      responses:
+        '200': { $ref: '#/components/responses/Configuration' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/configuration/versions/{numero}/revenir:
+    post:
+      operationId: revenirConfiguration
+      summary: Revenir à une version précédente
+      parameters:
+        - name: numero
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/Configuration' }
+  /envoi/chauffe:
+    get:
+      operationId: lireChauffe
+      summary: Chauffe des boîtes et domaines (montée en douceur)
+      responses:
+        '200':
+          description: Boîtes en chauffe et courbe prévue.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [boites, courbe]
+                properties:
+                  boites:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+                  courbe:
+                    type: array
+                    items:
+                      type: object
+                      required: [jour, plafond]
+                      properties:
+                        jour: { type: integer, minimum: 1 }
+                        plafond: { type: integer, minimum: 0 }
+  /envoi/listes-noires:
+    get:
+      operationId: listerListesNoires
+      summary: Présence des domaines et adresses IP sur les listes noires
+      responses:
+        '200':
+          description: Une ligne par liste et par élément surveillé.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ListeNoire' }
+components:
+  schemas:
+    JourActivite:
+      type: object
+      required: [jour, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, reponses]
+      properties:
+        jour: { type: string, format: date }
+        envoyes: { type: integer, minimum: 0 }
+        remis: { type: integer, minimum: 0 }
+        rebonds_durs: { type: integer, minimum: 0 }
+        rebonds_mous: { type: integer, minimum: 0 }
+        plaintes: { type: integer, minimum: 0 }
+        reponses: { type: integer, minimum: 0 }
+    EnregistrementDns:
+      type: object
+      required: [type, nom, valeur, etat]
+      properties:
+        type: { type: string, enum: [TXT, CNAME, MX] }
+        nom: { type: string }
+        valeur: { type: string }
+        etat: { type: string, enum: [ok, absent, different] }
+    ListeNoire:
+      type: object
+      required: [liste, element, present, verifie_le]
+      properties:
+        liste: { type: string }
+        element: { type: string }
+        present: { type: boolean }
+        verifie_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+    VersionConfiguration:
+      type: object
+      required: [numero, creee_le, appliquee_le, changements]
+      properties:
+        numero: { type: integer, minimum: 1 }
+        creee_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        appliquee_le:
+          oneOf:
+            - $ref: './commun.yaml#/components/schemas/Horodatage'
+            - type: 'null'
+        changements:
+          type: array
+          items:
+            type: object
+            required: [sorte, libelle]
+            properties:
+              sorte: { type: string, enum: [ajout, retrait, modification] }
+              libelle: { type: string }
+    Configuration:
+      type: object
+      required: [courante, prete, historique]
+      properties:
+        courante: { $ref: '#/components/schemas/VersionConfiguration' }
+        prete:
+          oneOf:
+            - $ref: '#/components/schemas/VersionConfiguration'
+            - type: 'null'
+        historique:
+          type: array
+          items: { $ref: '#/components/schemas/VersionConfiguration' }
+  responses:
+    Boite:
+      description: Boîte après le geste.
+      content:
+        application/json:
+          schema: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+    Configuration:
+      description: Configuration versionnée.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Configuration' }

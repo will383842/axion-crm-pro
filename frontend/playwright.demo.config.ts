@@ -20,7 +20,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
-  workers: process.env['CI'] ? 2 : undefined,
+  ...(process.env['CI'] ? { workers: 2 } : {}),
   reporter: [['list'], ['html', { outputFolder: 'playwright-report-demo', open: 'never' }]],
   use: {
     baseURL: ORIGINE_DEMO,

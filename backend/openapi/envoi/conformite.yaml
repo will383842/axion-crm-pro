@@ -1,0 +1,354 @@
+openapi: 3.1.0
+info:
+  title: Envoi — conformité et réglages
+  version: 0.1.0
+  description: |
+    Désinscriptions, « Puis-je écrire à… ? », export du registre d'opposition,
+    alertes d'envoi (cloche et e-mail seulement), réglages d'envoi, identité,
+    règles et horaires, connexion au CRM, carnet de destinataires (offre
+    « Envoi seul »), page publique de désinscription. Rien n'est jamais
+    supprimé : on inscrit « ne plus écrire ». Lot : DM2-CNF.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/desinscriptions:
+    get:
+      operationId: listerDesinscriptions
+      summary: Désinscriptions
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Désinscriptions paginées.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/Desinscription' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+  /envoi/opposition:
+    get:
+      operationId: listerOpposition
+      summary: Registre d'opposition (« ne plus écrire »)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Lignes du registre.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/Opposition' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+    post:
+      operationId: inscrireOpposition
+      summary: Inscrire une adresse, une organisation ou un domaine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [portee, valeur, motif]
+              properties:
+                portee: { type: string, enum: [adresse, organisation, domaine] }
+                valeur: { type: string }
+                motif: { type: string }
+      responses:
+        '201':
+          description: Ligne inscrite.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Opposition' }
+  /envoi/opposition/export:
+    get:
+      operationId: exporterOpposition
+      summary: Export du registre (CSV)
+      responses:
+        '200':
+          description: Fichier CSV.
+          content:
+            text/csv:
+              schema: { type: string }
+  /envoi/puis-je-ecrire:
+    get:
+      operationId: puisJeEcrire
+      summary: « Puis-je écrire à… ? »
+      parameters:
+        - name: adresse
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Réponse et raisons.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [adresse, reponse, raisons]
+                properties:
+                  adresse: { type: string }
+                  reponse: { type: string, enum: [oui, non, prudence] }
+                  raisons:
+                    type: array
+                    items: { type: string }
+  /envoi/alertes:
+    get:
+      operationId: listerAlertesEnvoi
+      summary: Alertes d'envoi
+      responses:
+        '200':
+          description: Alertes ouvertes et récentes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AlerteEnvoi' }
+  /envoi/reglages/alertes:
+    get:
+      operationId: listerReglesAlerte
+      summary: Règles d'alerte
+      responses:
+        '200':
+          description: Règles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/RegleAlerte' }
+    put:
+      operationId: enregistrerReglesAlerte
+      summary: Enregistrer les règles d'alerte
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items: { $ref: './commun.yaml#/components/schemas/RegleAlerte' }
+      responses:
+        '200': { $ref: './commun.yaml#/components/responses/Succes' }
+  /envoi/reglages:
+    get:
+      operationId: lireReglagesEnvoi
+      summary: Réglages d'envoi (vue d'ensemble)
+      responses:
+        '200': { $ref: '#/components/responses/Reglages' }
+    put:
+      operationId: enregistrerReglagesEnvoi
+      summary: Enregistrer les réglages d'envoi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Reglages' }
+      responses:
+        '200': { $ref: '#/components/responses/Reglages' }
+  /envoi/reglages/identite:
+    get:
+      operationId: lireIdentite
+      summary: Identité de l'expéditeur (mentions, adresse postale, signature)
+      responses:
+        '200': { $ref: '#/components/responses/Identite' }
+    put:
+      operationId: enregistrerIdentite
+      summary: Enregistrer l'identité
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Identite' }
+      responses:
+        '200': { $ref: '#/components/responses/Identite' }
+  /envoi/reglages/connexion-crm:
+    get:
+      operationId: lireConnexionCrm
+      summary: Connexion au CRM (adaptateur)
+      responses:
+        '200': { $ref: '#/components/responses/ConnexionCrm' }
+  /envoi/reglages/connexion-crm/tester:
+    post:
+      operationId: testerConnexionCrm
+      summary: Tester la connexion au CRM
+      responses:
+        '200': { $ref: '#/components/responses/ConnexionCrm' }
+  /envoi/carnet:
+    get:
+      operationId: listerCarnet
+      summary: Carnet de destinataires (Envoi sans CRM)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Entrées du carnet.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/EntreeCarnet' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+    post:
+      operationId: ajouterAuCarnet
+      summary: Ajouter une entrée au carnet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adresse]
+              properties:
+                adresse: { type: string, format: email }
+                prenom: { type: string }
+                nom: { type: string }
+                organisation: { type: string }
+                etiquettes: { type: array, items: { type: string } }
+      responses:
+        '201':
+          description: Entrée créée.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EntreeCarnet' }
+  /public/desinscription/{jeton}:
+    get:
+      operationId: lirePageDesinscription
+      summary: Page publique de désinscription (sans connexion)
+      security: []
+      parameters:
+        - name: jeton
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Adresse masquée et expéditeur.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [adresse_masquee, expediteur, deja_desinscrit]
+                properties:
+                  adresse_masquee: { type: string }
+                  expediteur: { type: string }
+                  deja_desinscrit: { type: boolean }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+    post:
+      operationId: confirmerDesinscription
+      summary: Confirmer la désinscription (un clic)
+      security: []
+      parameters:
+        - name: jeton
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { $ref: './commun.yaml#/components/responses/Succes' }
+components:
+  schemas:
+    AlerteEnvoi:
+      type: object
+      required: [id, titre, detail, niveau, survenue_le, lien, close]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        titre: { type: string }
+        detail: { type: string }
+        niveau: { type: string, enum: [a_faire, attention, nouveau, fait] }
+        survenue_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        lien: { oneOf: [{ type: string }, { type: 'null' }] }
+        close: { type: boolean }
+    Reglages:
+      type: object
+      required: [plafond_jour, jours, heures, fuseau, pause_si_refus_pct, suivre_ouvertures_par_defaut]
+      properties:
+        plafond_jour: { type: integer, minimum: 1 }
+        jours: { type: array, items: { type: string, enum: [lun, mar, mer, jeu, ven, sam, dim] } }
+        heures:
+          type: object
+          required: [de, a]
+          properties:
+            de: { type: string }
+            a: { type: string }
+        fuseau: { type: string, examples: [Europe/Paris] }
+        pause_si_refus_pct: { type: number, minimum: 0 }
+        suivre_ouvertures_par_defaut:
+          type: boolean
+          description: Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle campagne (faux par défaut).
+    Identite:
+      type: object
+      required: [raison_sociale, forme, adresse_postale, signature, lien_desinscription]
+      properties:
+        raison_sociale: { type: string }
+        forme: { type: string, examples: [SAS] }
+        adresse_postale: { type: string }
+        signature: { type: string }
+        lien_desinscription: { type: boolean, const: true }
+    ConnexionCrm:
+      type: object
+      required: [adaptateur, etat, derniere_synchro_le, contacts_vus]
+      properties:
+        adaptateur: { type: string, enum: [crm_pro, generique, aucun] }
+        etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
+        derniere_synchro_le:
+          oneOf:
+            - $ref: './commun.yaml#/components/schemas/Horodatage'
+            - type: 'null'
+        contacts_vus: { type: integer, minimum: 0 }
+    EntreeCarnet:
+      type: object
+      required: [id, adresse, prenom, nom, organisation, etiquettes, ajoute_le]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        adresse: { type: string, format: email }
+        prenom: { oneOf: [{ type: string }, { type: 'null' }] }
+        nom: { oneOf: [{ type: string }, { type: 'null' }] }
+        organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+        etiquettes: { type: array, items: { type: string } }
+        ajoute_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+  responses:
+    Reglages:
+      description: Réglages d'envoi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Reglages' }
+    Identite:
+      description: Identité de l'expéditeur.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Identite' }
+    ConnexionCrm:
+      description: État de la connexion au CRM.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ConnexionCrm' }

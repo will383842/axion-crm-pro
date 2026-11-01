@@ -9,7 +9,7 @@
  *   src/features/media/MediaListPage.tsx:157           ["media", page, filter]
  *   src/features/contacts/ContactsListPage.tsx:86      ['contacts', …, search]
  *   src/features/media/JournalistsListPage.tsx:51      ["journalists", page, search]
- *   src/features/campaigns/CampaignsListPage.tsx:60    ['campaigns', { search }]
+ *   src/features/collectes/CollectesListePage.tsx:60    ['campaigns', { search }]
  *   src/features/crm-console/CandidatesPage.tsx:65     ['crm','candidates',tab,search]
  *   src/features/crm-console/ContactsHubPage.tsx:78    ['crm','contacts-hub',…,search]
  *   src/components/ui/GlobalSearch.tsx:32              ['global-search', search]

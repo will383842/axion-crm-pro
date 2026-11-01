@@ -65,8 +65,8 @@ test.describe('Phase 2 pages (stubs)', () => {
   });
 
   test('campaigns page loads', async ({ page }) => {
-    await page.goto('/campaigns');
-    await expect(page).toHaveURL(/campaigns/);
+    await page.goto('/collectes');
+    await expect(page).toHaveURL(/collectes/);
   });
 
   // 2026-08-23 — §8.2 de `10_NAVIGATION-CIBLE.md`, et MEME RAISONNEMENT QUE

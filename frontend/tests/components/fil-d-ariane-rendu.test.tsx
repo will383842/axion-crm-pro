@@ -46,10 +46,10 @@ describe('Fil d’Ariane rendu', () => {
   });
 
   it('fiche d’une collecte (UUID)', () => {
-    chemin = '/campaigns/0b9f3c1e-4c2a-4d7e-9a51-2f3b1c0d9e8f';
+    chemin = '/collectes/0b9f3c1e-4c2a-4d7e-9a51-2f3b1c0d9e8f';
     render(<AutoBreadcrumbs />);
     const nav = screen.getByRole('navigation');
-    expect(within(nav).getByRole('link', { name: 'Collectes' })).toHaveAttribute('href', '/campaigns');
+    expect(within(nav).getByRole('link', { name: 'Collectes' })).toHaveAttribute('href', '/collectes');
     expect(within(nav).getByText('Fiche')).toBeInTheDocument();
   });
 });

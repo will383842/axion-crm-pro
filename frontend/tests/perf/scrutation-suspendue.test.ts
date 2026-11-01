@@ -6,7 +6,7 @@
  * l'autre ne s'arrêtait sur un état terminal. Ouverts la nuit sur une liste où
  * plus rien ne bouge, ils interrogeaient le serveur 8 640 fois par jour pour la
  * même réponse. Le patron de la réparation existait déjà à côté :
- * `CampaignDetailPage` pose `refetchInterval` en EXPRESSION depuis G42-007.
+ * `CollecteDetailPage` pose `refetchInterval` en EXPRESSION depuis G42-007.
  *
  * Nuance que le constat portait et qu'il ne faut pas enterrer : la moitié « sur
  * un serveur qui ne sert qu'une requête à la fois » n'est plus vraie —
@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { uneCampagneEnMouvement } from '@/features/campaigns/types';
+import { uneCampagneEnMouvement } from '@/features/collectes/types';
 import { uneCourseEnMouvement } from '@/features/scraping/ScraperRunsPage';
 
 const racine = path.dirname(fileURLToPath(import.meta.url));
@@ -45,7 +45,7 @@ describe('G41-012 — quand la scrutation doit-elle continuer', () => {
       uneCampagneEnMouvement([{ status: 'completed' }, { status: 'failed' }, { status: 'cancelled' }]),
       'G41-012 : la liste continue de se rappeler alors que toutes les campagnes ' +
         'sont dans un état terminal. GESTE : vérifier `ETATS_EN_MOUVEMENT` dans ' +
-        '`src/features/campaigns/types.ts`.',
+        '`src/features/collectes/types.ts`.',
     ).toBe(false);
 
     // Un brouillon ne bouge que si quelqu'un le lance, et le lancement se fait
@@ -78,7 +78,7 @@ describe('G41-012 — les deux écrans appliquent bien cette décision', () => {
   // minuteur et ne mesure aucune requête : elle vérifie que la cadence n'est
   // plus une CONSTANTE. C'est exactement la forme du défaut relevé.
   const ecrans: Array<[string, string]> = [
-    ['campagnes', 'features/campaigns/CampaignsListPage.tsx'],
+    ['campagnes', 'features/collectes/CollectesListePage.tsx'],
     ['journaux de collecte', 'features/scraping/ScraperRunsPage.tsx'],
   ];
 
@@ -92,7 +92,7 @@ describe('G41-012 — les deux écrans appliquent bien cette décision', () => {
           'scrutation redevient inconditionnelle : l’écran laissé ouvert la nuit ' +
           'interroge le serveur 8 640 fois par jour pour la même réponse. ' +
           'GESTE : repasser à une EXPRESSION qui rend `false` quand plus rien ne ' +
-          'bouge, sur le modèle de `CampaignDetailPage` (G42-007).',
+          'bouge, sur le modèle de `CollecteDetailPage` (G42-007).',
       ).toBe(false);
 
       expect(

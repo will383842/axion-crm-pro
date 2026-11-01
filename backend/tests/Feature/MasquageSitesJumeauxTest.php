@@ -684,7 +684,7 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
     // ── Ce que le balayage ne peut PAS prouver, il le COMPTE.
     //
     // Ces routes ont un paramètre que ce jeu de données ne sait pas fabriquer.
-    // Relevé du 2026-08-21, SEPT, et aucune ne rend une fiche nominative :
+    // Relevé du 2026-08-21, SEPT (neuf avec les alias DM0-COL), et aucune ne rend une fiche nominative :
     //   api/v1/rgpd/export/{token}          jeton à usage unique (constat C21)
     //   api/v1/coverage/cells/{cell}        maille géographique, pas de personne
     //   api/v1/scraper-runs/{run}           exécution d'un robot
@@ -692,13 +692,16 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
     //   api/v1/saved-views/{saved_view}     critères de filtre enregistrés
     //   api/v1/campaigns/{campaign}         campagne (l'audience, elle, EST balayée)
     //   api/v1/campaigns/{campaign}/stats   compteurs agrégés
+    // DM0-COL (2026-11-01) : +2, les alias api/v1/collectes/{campaign} et
+    // api/v1/collectes/{campaign}/stats (même contrôleur, même action que les
+    // deux lignes ci-dessus : aucun angle mort nouveau, le plafond passe de 7 à 9).
     //
     // Le chiffre est FIGÉ : une huitième route non visitée rougit ce test et
     // oblige soit à fournir la substitution, soit à dire ici pourquoi on s'en
     // passe. Sans ce gel, l'angle mort grandirait en silence — et c'est
     // exactement comme ça qu'on hérite d'un constat rouvert six mois plus tard.
     $this->assertLessThanOrEqual(
-        7,
+        9,
         count($nonRemplies),
         "Routes GET non visitees faute de substitution de parametre :\n"
         . implode("\n", array_keys($nonRemplies)),

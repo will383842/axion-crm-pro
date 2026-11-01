@@ -104,4 +104,36 @@ final class Instantane
             . 'si le retrait est voulu, régénérez la photo DANS LA MÊME PR (« Filet modifié : pourquoi »).',
         );
     }
+
+    /**
+     * Comparaison « AU PLUS » : la réalité doit rester CONTENUE dans la photo.
+     * Retirer un élément est permis (la liste peut baisser) ; en AJOUTER un fait
+     * rougir. Même geste explicite de régénération.
+     *
+     * @param  list<string>  $valeurs
+     */
+    public static function verifierContenuDans(string $nom, array $valeurs): void
+    {
+        $valeurs = array_values(array_unique($valeurs));
+        sort($valeurs);
+        $chemin = self::chemin($nom);
+
+        if (self::regeneration()) {
+            if (getenv('CI') !== false && getenv('CI') !== '') {
+                throw new RuntimeException('Régénérer un instantané est interdit en CI : faites-le en local et commitez la photo.');
+            }
+            file_put_contents($chemin, self::encoder($valeurs));
+        }
+
+        Assert::assertFileExists($chemin, "Instantané « {$nom} » absent (NR_REGENERER_INSTANTANES=1 pour le créer volontairement).");
+        /** @var list<string> $reference */
+        $reference = json_decode((string) file_get_contents($chemin), true, 512, JSON_THROW_ON_ERROR);
+
+        Assert::assertSame(
+            [],
+            array_values(array_diff($valeurs, $reference)),
+            "De NOUVEAUX éléments sont apparus par rapport à l’instantané « {$nom} » : cette liste ne peut que BAISSER. "
+            . 'Si l’ajout est voulu, régénérez la photo DANS LA MÊME PR (« Filet modifié : pourquoi »).',
+        );
+    }
 }

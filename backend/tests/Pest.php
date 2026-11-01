@@ -17,3 +17,12 @@ function something(): bool
 {
     return true;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILET DE NON-RÉGRESSION (lot R0) — groupe Pest « non-regression ».
+// Les gardes NEUVES vivent dans `Feature/NonRegression/` ; les gardes EXISTANTES
+// que le filet « cite et verrouille » (plan 22 § 3) sont rattachées au groupe
+// ici, sans toucher à leur fichier. Aucune n’est réécrite. La liste figée
+// `Feature/NonRegression/LISTE.json` dit laquelle protège quel risque.
+// ─────────────────────────────────────────────────────────────────────────────
+pest()->group('non-regression')->in('Feature/NonRegression');

@@ -102,6 +102,21 @@ test.describe('socle de démo', () => {
     await passage360(page);
   });
 
+  // Captures de la PR (1440 et 360 px), déposées par `demo.yml` en artefact
+  // « captures-demo » : la description d'une PR ne peut pas recevoir d'image par l'API.
+  test('captures 1440 et 360 px : connexion et tableau de bord', async ({ page }) => {
+    for (const [largeur, hauteur] of [[1440, 900], [360, 780]] as const) {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      await ouvrirDemo(page, '/login', { connecte: false });
+      await expect(page.getByRole('region', { name: 'Démonstration' })).toBeVisible();
+      await page.screenshot({ path: `captures-demo/connexion-${largeur}.png`, fullPage: true });
+      await ouvrirDemo(page, '/');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      await page.screenshot({ path: `captures-demo/tableau-de-bord-${largeur}.png`, fullPage: true });
+    }
+  });
+
   test('aucune requête ne sort du navigateur', async ({ page }) => {
     const sorties: string[] = [];
     page.on('request', (r) => {

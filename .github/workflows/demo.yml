@@ -90,6 +90,12 @@ jobs:
           pnpm exec playwright test --config playwright.demo.config.ts
           tests/e2e/demo/
       - uses: actions/upload-artifact@v4
+        with:
+          name: captures-demo
+          path: frontend/captures-demo/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-demo-report

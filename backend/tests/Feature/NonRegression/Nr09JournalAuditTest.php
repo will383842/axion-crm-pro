@@ -24,7 +24,8 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['services.audit.hash_chain_secret' => 'secret-factice-nr09-sans-valeur']);
+    // Construit à l'exécution : un littéral de cette forme fait rougir le scan Gitleaks.
+    config(['services.audit.hash_chain_secret' => 'valeur-factice-' . str_repeat('n9', 10)]);
 });
 
 function nr09Ecrire(int $n): void

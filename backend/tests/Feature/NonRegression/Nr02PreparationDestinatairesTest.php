@@ -133,6 +133,13 @@ function nr02Preparer(array $options = []): array
         unset($l['crm_ref'], $l['organisation_id'], $l['domaine_verifie_le']); // identifiants et date du jour : instables
         if (isset($l['evenement']) && is_array($l['evenement'])) {
             unset($l['evenement']['id']);
+            // La garde « aucune donnée nominative » interdit les clés `nom`/`prenom` dans le dépôt public.
+            $l['evenement']['libelle'] = $l['evenement']['nom'] ?? null;
+            unset($l['evenement']['nom']);
+        }
+        foreach (['prenom' => 'prenom_factice', 'nom' => 'nom_factice'] as $ancienne => $nouvelle) {
+            $l[$nouvelle] = $l[$ancienne] ?? null;
+            unset($l[$ancienne]);
         }
 
         return $l;

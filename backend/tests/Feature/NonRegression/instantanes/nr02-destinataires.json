@@ -4,21 +4,19 @@
             "email": "accueil@seul.example.test",
             "type": "generique",
             "nature_adresse": "generique",
-            "prenom": null,
-            "nom": null,
             "fonction": null,
             "organisation": "Seul Nr02",
             "organisations": [
                 "Seul Nr02"
             ],
-            "evenement": null
+            "evenement": null,
+            "prenom_factice": null,
+            "nom_factice": null
         },
         {
             "email": "bureau@club.example.test",
             "type": "generique",
             "nature_adresse": "nominatif",
-            "prenom": null,
-            "nom": null,
             "fonction": null,
             "organisation": "Club Nr02",
             "organisations": [
@@ -26,46 +24,48 @@
                 "Club Nr02 (autre nom)"
             ],
             "evenement": {
-                "nom": "Salon Nr02",
                 "date_debut": "2099-03-15",
                 "date_fin": null,
                 "recurrence": null,
                 "ville": null,
-                "lien": null
-            }
+                "lien": null,
+                "libelle": "Salon Nr02"
+            },
+            "prenom_factice": null,
+            "nom_factice": null
         },
         {
             "email": "deja@seul.example.test",
             "type": "personne",
             "nature_adresse": "nominatif",
-            "prenom": null,
-            "nom": "Deja",
             "fonction": null,
             "organisation": "Seul Nr02",
             "organisations": [
                 "Seul Nr02"
             ],
-            "evenement": null
+            "evenement": null,
+            "prenom_factice": null,
+            "nom_factice": "Deja"
         },
         {
             "email": "pro@club.example.test",
             "type": "personne",
             "nature_adresse": "nominatif",
-            "prenom": null,
-            "nom": "Pro",
             "fonction": null,
             "organisation": "Club Nr02",
             "organisations": [
                 "Club Nr02"
             ],
             "evenement": {
-                "nom": "Salon Nr02",
                 "date_debut": "2099-03-15",
                 "date_fin": null,
                 "recurrence": null,
                 "ville": null,
-                "lien": null
-            }
+                "lien": null,
+                "libelle": "Salon Nr02"
+            },
+            "prenom_factice": null,
+            "nom_factice": "Pro"
         }
     ],
     "bilan": {

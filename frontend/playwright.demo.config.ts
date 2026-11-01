@@ -29,7 +29,17 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Poste local dont le Chromium n'est pas celui de cette version de
+        // Playwright : `E2E_CHROMIUM=/chemin/vers/chrome`. Jamais posé en CI.
+        ...(process.env['E2E_CHROMIUM'] ? { launchOptions: { executablePath: process.env['E2E_CHROMIUM'] } } : {}),
+      },
+    },
+  ],
   webServer: {
     command: `pnpm exec vite preview --mode demo --outDir dist-demo --host 127.0.0.1 --port ${PORT_DEMO} --strictPort`,
     url: ORIGINE_DEMO,

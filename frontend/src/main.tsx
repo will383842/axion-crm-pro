@@ -1,4 +1,4 @@
-import { StrictMode, Fragment } from 'react';
+import { StrictMode, Fragment, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { createRouter } from '@tanstack/react-router';
@@ -58,8 +58,28 @@ if (!rootEl) throw new Error('Missing #root element');
 // À réactiver Sprint 19 quand on aura ajouté une vraie protection abort dans FranceCoverageMap.
 const strictModeEnv = import.meta.env['VITE_STRICT_MODE'];
 const Wrapper = strictModeEnv === 'true' ? StrictMode : Fragment;
-createRoot(rootEl).render(
-  <Wrapper>
-    <AppRoot router={router} queryClient={queryClient} />
-  </Wrapper>,
-);
+
+/**
+ * DM0-DEMO — mode démo. En `--mode demo` seulement (`VITE_DEMO=1`, figé au
+ * build par `vite.config.ts`), on démarre le faux serveur MSW AVANT de monter
+ * l'application, et le bandeau de démo passe au-dessus de tout (connexion
+ * comprise). Import DYNAMIQUE derrière une condition connue au build : dans le
+ * build normal, la branche disparaît et aucun octet de démo n'est embarqué
+ * (garde : `tests/lib/demo-absent-du-build-normal.test.ts`).
+ */
+async function chargerDemo(): Promise<ComponentType | null> {
+  if (import.meta.env.VITE_DEMO !== '1') return null;
+  const { demarrerDemo } = await import('./demo/demarrer');
+  const demo = await demarrerDemo();
+  demo.surChangement(() => void queryClient.invalidateQueries());
+  return demo.Bandeau;
+}
+
+void chargerDemo().then((Bandeau) => {
+  createRoot(rootEl).render(
+    <Wrapper>
+      {Bandeau !== null && <Bandeau />}
+      <AppRoot router={router} queryClient={queryClient} />
+    </Wrapper>,
+  );
+});

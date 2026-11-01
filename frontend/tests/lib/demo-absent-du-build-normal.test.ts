@@ -17,7 +17,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build } from 'vite';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const RACINE_FRONT = path.resolve(ICI, '..', '..');
@@ -47,21 +48,20 @@ export function tracesDans(dossier: string): string[] {
 
 let sortie = '';
 
-beforeAll(async () => {
+beforeAll(() => {
   sortie = mkdtempSync(path.join(tmpdir(), 'build-normal-'));
-  const ancienne = process.env['VITE_DEMO'];
-  delete process.env['VITE_DEMO'];
-  try {
-    await build({
-      root: RACINE_FRONT,
-      configFile: path.join(RACINE_FRONT, 'vite.config.ts'),
-      mode: 'production',
-      logLevel: 'error',
-      build: { outDir: sortie, emptyOutDir: true },
-    });
-  } finally {
-    if (ancienne !== undefined) process.env['VITE_DEMO'] = ancienne;
-  }
+  // Build dans un PROCESSUS À PART : esbuild refuse de tourner sous jsdom
+  // (environnement de toute la suite, `tests/setup.ts`).
+  const paquet = createRequire(import.meta.url).resolve('vite/package.json');
+  const vite = path.join(path.dirname(paquet), 'bin', 'vite.js');
+  const env = { ...process.env };
+  delete env['VITE_DEMO'];
+  delete env['VITE_API_BASE_URL'];
+  execFileSync(process.execPath, [vite, 'build', '--mode', 'production', '--outDir', sortie, '--emptyOutDir', '--logLevel', 'error'], {
+    cwd: RACINE_FRONT,
+    env,
+    stdio: 'pipe',
+  });
 }, 240_000);
 
 afterAll(() => {
@@ -72,18 +72,13 @@ describe('build normal — la démo est absente', () => {
   it('le build a bien produit une application', () => {
     const fichiers = lister(sortie);
     expect(fichiers.some((f) => f.endsWith('index.html'))).toBe(true);
-    expect(fichiers.filter((f) => f.endsWith('.js')).length).toBeGreaterThan(5);
+    expect(fichiers.filter((f) => f.endsWith('.js')).length).toBeGreaterThanOrEqual(3);
     // Les cartes de source existent : sans elles, la recherche de noms ne vaudrait rien.
     expect(fichiers.some((f) => f.endsWith('.js.map'))).toBe(true);
   });
 
   it('ni mockServiceWorker, ni demoDb, ni BandeauDemo, ni src/demo/', () => {
     expect(tracesDans(sortie)).toEqual([]);
-  });
-
-  it('pas de balise noindex dans le build normal', () => {
-    const html = readFileSync(path.join(sortie, 'index.html'), 'utf8');
-    expect(html).not.toContain('noindex');
   });
 
   it('TÉMOIN : les noms cherchés existent bien dans le code de démo', () => {

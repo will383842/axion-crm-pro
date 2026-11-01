@@ -10,7 +10,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { HttpHandler } from 'msw';
+import { getResponse } from 'msw';
 import { handlers, rassemblerHandlers, cleRoute } from '@/demo/handlers';
+import { deciderRequeteNonGeree, gardeReseau, MESSAGE_REFUS } from '@/demo/reseau';
 
 const modules = import.meta.glob<Record<string, unknown>>('/src/demo/handlers/**/*.handlers.ts', { eager: true });
 
@@ -127,5 +129,34 @@ describe('handlers du socle — servis au client réel (src/lib/api.ts)', () => 
     const reprise = await client.post<{ etat: string }>('/envoi/reprendre');
     expect(reprise.data.etat).toBe('actif');
     demoDb.reinitialiser();
+  });
+});
+
+describe('garde réseau de la démo — aucune requête ne sort', () => {
+  const ORIGINE = 'http://127.0.0.1:4173';
+
+  it('laisse passer la même origine, refuse tout autre hôte', () => {
+    expect(deciderRequeteNonGeree(`${ORIGINE}/assets/index.js`, ORIGINE)).toBe('laisser');
+    expect(deciderRequeteNonGeree('/mockServiceWorker.js', ORIGINE)).toBe('laisser');
+    expect(deciderRequeteNonGeree('data:image/png;base64,AAAA', ORIGINE)).toBe('laisser');
+    expect(deciderRequeteNonGeree('https://tuiles.example/10/512/360.png', ORIGINE)).toBe('refuser');
+    expect(deciderRequeteNonGeree('https://demo.invalid/autre-chose', ORIGINE)).toBe('refuser');
+    expect(deciderRequeteNonGeree('http://127.0.0.1:9999/', ORIGINE)).toBe('refuser');
+  });
+
+  it('une tuile de carte reçoit une erreur réseau et un avertissement, jamais le réseau', async () => {
+    const avertissements: string[] = [];
+    const garde = gardeReseau(ORIGINE, (m) => avertissements.push(m));
+    const reponse = await getResponse([garde], new Request('https://tuiles.example/10/512/360.png'));
+    expect(reponse?.type).toBe('error');
+    expect(avertissements).toEqual([`${MESSAGE_REFUS} GET https://tuiles.example/10/512/360.png`]);
+  });
+
+  it('la même origine est rendue au navigateur (passthrough), sans avertissement', async () => {
+    const avertissements: string[] = [];
+    const garde = gardeReseau(ORIGINE, (m) => avertissements.push(m));
+    const reponse = await getResponse([garde], new Request(`${ORIGINE}/assets/index.js`));
+    expect(reponse?.headers.get('x-msw-intention')).toBe('passthrough');
+    expect(avertissements).toEqual([]);
   });
 });

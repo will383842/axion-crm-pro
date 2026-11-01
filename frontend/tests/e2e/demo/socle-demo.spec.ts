@@ -119,4 +119,22 @@ test.describe('socle de démo', () => {
     expect(sorties).toEqual([]);
     expect(echecs.filter((u) => u.includes('demo.invalid/sanctum') || u.includes('/auth/me'))).toEqual([]);
   });
+
+  test('une requête vers un autre hôte (tuile de carte) est refusée et signalée', async ({ page }) => {
+    const avertissements: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'warning') avertissements.push(m.text());
+    });
+    await ouvrirDemo(page, '/');
+    const resultat = await page.evaluate(async () => {
+      try {
+        const r = await fetch('https://tuiles.example/10/512/360.png');
+        return `réponse ${r.status}`;
+      } catch {
+        return 'refusée';
+      }
+    });
+    expect(resultat).toBe('refusée');
+    expect(avertissements.some((t) => t.includes('Requête refusée') && t.includes('https://tuiles.example/10/512/360.png'))).toBe(true);
+  });
 });

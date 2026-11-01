@@ -8,7 +8,9 @@
  *    session, puis les retire de l'adresse.
  * 2. Démarre le faux serveur MSW dans le navigateur (`setupWorker`), avec
  *    tous les handlers (`handlers/index.ts`) et, en dernier recours, une
- *    réponse « pas encore servi » : aucune requête d'API ne sort.
+ *    réponse « pas encore servi » : aucune requête d'API ne sort. Tout autre
+ *    hôte que la page (tuiles de carte, services tiers…) est refusé, avec un
+ *    avertissement dans la console (`reseau.ts`).
  * 3. Lance les scénarios rejoués.
  */
 import type { ComponentType } from 'react';
@@ -20,6 +22,7 @@ import { choisirOffre, estOffre } from './offres';
 import { definirEtatForce } from './outils';
 import { definirScenariosActifs, demarrerScenarios } from './scenarios';
 import { ecrireSession } from './session';
+import { gardeReseau, MESSAGE_REFUS } from './reseau';
 
 const PARAMETRES = ['demo-offre', 'demo-etat', 'demo-scenarios', 'demo-session'] as const;
 
@@ -56,10 +59,13 @@ export interface DemoDemarree {
 
 export async function demarrerDemo(): Promise<DemoDemarree> {
   lireReglagesDeLAdresse();
-  const worker = setupWorker(...handlers, pasEncoreServi);
+  const worker = setupWorker(...handlers, pasEncoreServi, gardeReseau(window.location.origin));
   await worker.start({
     serviceWorker: { url: '/mockServiceWorker.js' },
-    onUnhandledRequest: 'bypass',
+    // Ne devrait jamais arriver (la garde réseau prend tout) : on avertit quand même.
+    onUnhandledRequest: (request) => {
+      if (new URL(request.url).origin !== window.location.origin) console.warn(`${MESSAGE_REFUS} ${request.method} ${request.url}`);
+    },
     quiet: true,
   });
   let rappels: Array<() => void> = [];

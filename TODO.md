@@ -148,7 +148,7 @@ Restent ouverts :
 
 ## §4 — Gestes de sécurité en attente
 
-- [ ] Rotation du mot de passe `WJullin1974/*` : à considérer comme brûlé sur
+- [ ] Rotation d'un ancien mot de passe (valeur retirée de ce fichier) : à considérer comme brûlé sur
       **tous** les services. Reste ouvert depuis mai.
 - [ ] Suites de la fuite du 2026-08-19 (Postgres 55432 et Redis 56379 ouverts
       sur internet, 4 295 349 fiches lisibles) : le code est refermé et gardé

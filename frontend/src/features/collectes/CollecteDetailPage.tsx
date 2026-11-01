@@ -1,5 +1,5 @@
 /**
- * Sprint 19.7 — CampaignDetailPage.
+ * Sprint 19.7 — CollecteDetailPage.
  *
  * UX live ultra-claire :
  *  - Breadcrumbs + status pill pulsé
@@ -54,10 +54,10 @@ const TABS: Array<TabItem<DetailTab>> = [
   { id: 'config',  label: 'Configuration',    icon: <SettingsIcon className="h-3.5 w-3.5" /> },
 ];
 
-export function CampaignDetailPage() {
+export function CollecteDetailPage() {
   const params = useParams({ strict: false });
-  const campaignId = (params as { campaignId?: string }).campaignId;
-  const id = Number(campaignId);
+  const collecteId = (params as { collecteId?: string }).collecteId;
+  const id = Number(collecteId);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<DetailTab>('live');
@@ -68,7 +68,7 @@ export function CampaignDetailPage() {
   // soit **24 requêtes par minute**, indéfiniment — y compris sur une
   // campagne `completed` que le serveur ne peut plus faire bouger. Un onglet
   // laissé ouvert sur une collecte finie de la veille interrogeait
-  // `/campaigns/{id}` et `/campaigns/{id}/stats` 1 440 fois par heure pour
+  // `/collectes/{id}` et `/collectes/{id}/stats` 1 440 fois par heure pour
   // recevoir exactement la même réponse.
   //
   // La cadence devient une EXPRESSION : `false` sur un état terminal, 5 s
@@ -89,7 +89,7 @@ export function CampaignDetailPage() {
 
   const { data: campaign, isLoading, error, refetch } = useQuery({
     queryKey: ['campaign', id],
-    queryFn: async () => (await api.get<Campaign>(`/campaigns/${id}`)).data,
+    queryFn: async () => (await api.get<Campaign>(`/collectes/${id}`)).data,
     // Forme FONCTION : cette requête est la seule à connaître son propre
     // statut, et elle ne peut pas se lire elle-même depuis `campaign` (zone
     // morte temporelle — la variable est en cours de déclaration).
@@ -100,7 +100,7 @@ export function CampaignDetailPage() {
 
   const { data: stats } = useQuery({
     queryKey: ['campaign-stats', id],
-    queryFn: async () => (await api.get<CampaignStatsResponse>(`/campaigns/${id}/stats`)).data,
+    queryFn: async () => (await api.get<CampaignStatsResponse>(`/collectes/${id}/stats`)).data,
     // Les statistiques ne portent pas le statut : on lit celui de la requête
     // précédente, déjà résolue à ce point du rendu.
     refetchInterval: estTerminee(campaign?.status) ? false : 5_000,
@@ -108,22 +108,22 @@ export function CampaignDetailPage() {
   });
 
   const pauseMutation = useMutation({
-    mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/pause`)).data,
+    mutationFn: async () => (await api.post<Campaign>(`/collectes/${id}/pause`)).data,
     onSuccess: () => { toast.success('Collecte mise en pause'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
   });
   const resumeMutation = useMutation({
-    mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/resume`)).data,
+    mutationFn: async () => (await api.post<Campaign>(`/collectes/${id}/resume`)).data,
     onSuccess: () => { toast.success('Collecte reprise'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
   });
   const cancelMutation = useMutation({
-    mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/cancel`)).data,
+    mutationFn: async () => (await api.post<Campaign>(`/collectes/${id}/cancel`)).data,
     onSuccess: () => { toast.success('Collecte annulée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
   });
   const startMutation = useMutation({
-    mutationFn: async () => (await api.post<Campaign>(`/campaigns/${id}/start`)).data,
+    mutationFn: async () => (await api.post<Campaign>(`/collectes/${id}/start`)).data,
     onSuccess: () => { toast.success('Collecte lancée'); void qc.invalidateQueries({ queryKey: ['campaign', id] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Démarrage impossible'),
   });
@@ -160,8 +160,8 @@ export function CampaignDetailPage() {
       <div>
         <EmptyState
           title="Adresse de collecte invalide"
-          description={`L’adresse ne contient pas d’identifiant de collecte lisible (« ${String(campaignId ?? '')} »). Le lien est probablement tronqué.`}
-          action={<Link to="/campaigns"><Button variant="secondary" size="sm">Retour aux collectes</Button></Link>}
+          description={`L’adresse ne contient pas d’identifiant de collecte lisible (« ${String(collecteId ?? '')} »). Le lien est probablement tronqué.`}
+          action={<Link to="/collectes"><Button variant="secondary" size="sm">Retour aux collectes</Button></Link>}
         />
       </div>
     );
@@ -207,7 +207,7 @@ export function CampaignDetailPage() {
     <div>
       <PageHeader
         breadcrumbs={[
-          { label: 'Collectes', to: '/campaigns' },
+          { label: 'Collectes', to: '/collectes' },
           { label: campaign.name },
         ]}
         badge={
@@ -358,7 +358,7 @@ export function CampaignDetailPage() {
       {tab === 'config' ? (
         <TabConfig
           campaign={campaign}
-          onDuplicate={() => { void navigate({ to: '/campaigns/new' }); }}
+          onDuplicate={() => { void navigate({ to: '/collectes/new' }); }}
         />
       ) : null}
     </div>

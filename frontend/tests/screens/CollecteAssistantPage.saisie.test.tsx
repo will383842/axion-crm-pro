@@ -1,7 +1,7 @@
 /**
  * L'ASSISTANT DE CAMPAGNE, DU CÔTÉ DE CELUI QUI TAPE — D26-005, D26-008, D26-010.
  *
- * Trois défauts mesurés le 2026-08-22, tous dans `CampaignWizardPage` :
+ * Trois défauts mesurés le 2026-08-22, tous dans `CollecteAssistantPage` :
  *
  *  - D26-005 : les champs numériques bornaient la valeur à CHAQUE frappe.
  *    Sur « Durée max (minutes) » (`min={5}`), taper « 12 » donnait « 1 » →
@@ -43,13 +43,13 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('sonner', () => ({ toast: { success: () => {}, error: () => {} } }));
 
-const { CampaignWizardPage } = await import('@/features/campaigns/CampaignWizardPage');
+const { CollecteAssistantPage } = await import('@/features/collectes/CollecteAssistantPage');
 
 function afficher() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
     <QueryClientProvider client={client}>
-      <CampaignWizardPage />
+      <CollecteAssistantPage />
     </QueryClientProvider>,
   );
 }
@@ -89,7 +89,7 @@ describe('D26-005 — les champs numériques ne corrigent plus la frappe', () =>
         'frappe. Avec `min={5}`, le « 1 » de « 12 » est remonté à 5 et la frappe ' +
         'suivante produit « 52 » : le champ corrige l’utilisateur pendant qu’il ' +
         'écrit. GESTE : garder la saisie en chaîne dans `NumberField` ' +
-        '(`src/features/campaigns/CampaignWizardPage.tsx`) et ne borner que sur ' +
+        '(`src/features/collectes/CollecteAssistantPage.tsx`) et ne borner que sur ' +
         '`onBlur`.',
     ).toBe('12');
   });
@@ -150,7 +150,7 @@ describe('D26-008 — les limites des sources abandonnées ne partent plus', () 
         'où elle est persistée — alors que le panneau ne l’affiche plus, la source ' +
         'n’étant plus retenue. Une valeur transmise que personne ne peut voir est ' +
         'le pire des deux mondes. GESTE : rétablir le filtre sur `sources` dans ' +
-        '`buildPayload()` (`src/features/campaigns/CampaignWizardPage.tsx`).',
+        '`buildPayload()` (`src/features/collectes/CollecteAssistantPage.tsx`).',
     ).toBe(false);
 
     // La limite de la source RETENUE, elle, doit bien partir : filtrer ne doit
@@ -183,7 +183,7 @@ describe('D26-010 — la troncature se voit', () => {
         'tronque un collage SANS RIEN DIRE : 200 caractères collés en laissent ' +
         '120, et rien à l’écran ne l’annonce. GESTE : rétablir le ' +
         '`<CompteurDeSaisie>` du champ « Nom de la campagne » dans ' +
-        '`src/features/campaigns/CampaignWizardPage.tsx`.',
+        '`src/features/collectes/CollecteAssistantPage.tsx`.',
     ).toBe(true);
     // On ne fige pas le nombre de gauche : selon que la couche de saisie
     // applique `maxLength` au collage ou non, il vaut 120 ou 200. Ce qui compte

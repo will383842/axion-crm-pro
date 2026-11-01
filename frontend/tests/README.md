@@ -203,9 +203,9 @@ tests** pour ne plus passer inaperçus.
 | `/audit-logs` | `features/rgpd/AuditLogsPage.tsx` |
 | `/users` | `features/users/UsersPage.tsx` |
 | `/settings` | `features/settings/SettingsPage.tsx` |
-| `/campaigns` | `features/campaigns/CampaignsListPage.tsx` |
-| `/campaigns/new` | `features/campaigns/CampaignWizardPage.tsx` |
-| `/campaigns/$campaignId` | `features/campaigns/CampaignDetailPage.tsx` |
+| `/collectes` | `features/collectes/CollectesListePage.tsx` |
+| `/collectes/new` | `features/collectes/CollecteAssistantPage.tsx` |
+| `/collectes/$collecteId` | `features/collectes/CollecteDetailPage.tsx` |
 | `/tags` | `features/tags/TagsManagerPage.tsx` |
 | `/audiences` | `features/audiences/AudiencesListPage.tsx` |
 | `/audiences/$audienceId` | `features/audiences/AudienceDetailPage.tsx` |

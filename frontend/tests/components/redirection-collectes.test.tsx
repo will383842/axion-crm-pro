@@ -38,7 +38,7 @@ function redirection(chemin: string, params: Record<string, string> = {}) {
     avant({ params });
   } catch (jete: unknown) {
     if (isRedirect(jete)) {
-      return (jete as { options: { to?: string; params?: Record<string, string> } }).options;
+      return (jete as unknown as { options: { to?: string; params?: Record<string, string> } }).options;
     }
     throw jete;
   }

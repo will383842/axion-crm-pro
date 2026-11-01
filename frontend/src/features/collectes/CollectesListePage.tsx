@@ -1,5 +1,5 @@
 /**
- * Sprint 19.7 — CampaignsListPage.
+ * Sprint 19.7 — CollectesListePage.
  *
  * Liste des campagnes de scraping. Card-based, gradient title, KPIs en haut,
  * filter tabs par statut, cards avec progress bar live.
@@ -53,7 +53,7 @@ const FILTER_TABS: Array<{ id: Filter; label: string }> = [
   { id: 'completed', label: 'Terminées' },
 ];
 
-export function CampaignsListPage() {
+export function CollectesListePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
@@ -74,7 +74,7 @@ export function CampaignsListPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['campaigns', { search: rechercheDifferee, voirArchivees }],
     queryFn: async () =>
-      (await api.get<CampaignsListResponse>('/campaigns', {
+      (await api.get<CampaignsListResponse>('/collectes', {
         params: { per_page: 50, search: rechercheDifferee || undefined, archivees: voirArchivees ? 'tous' : undefined },
       })).data,
     /**
@@ -83,7 +83,7 @@ export function CampaignsListPage() {
      * L'écran se rappelait toutes les dix secondes SANS AUCUNE condition :
      * ouvert la nuit sur une liste où plus rien ne bouge, il interrogeait le
      * serveur 8 640 fois par jour pour la même réponse. Le patron de la
-     * réparation existait déjà à côté (`CampaignDetailPage`, constat G42-007) :
+     * réparation existait déjà à côté (`CollecteDetailPage`, constat G42-007) :
      * `refetchInterval` en EXPRESSION, lue à chaque tour.
      *
      * ⚠️ Ce qu'il ne faut SURTOUT pas faire : supprimer la scrutation. Une liste
@@ -123,23 +123,23 @@ export function CampaignsListPage() {
   }, [campaigns, filter]);
 
   const pauseMutation = useMutation({
-    mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/pause`)).data,
+    mutationFn: async (id: number) => (await api.post<Campaign>(`/collectes/${id}/pause`)).data,
     onSuccess: () => { toast.success('Collecte mise en pause'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Pause impossible'),
   });
   const resumeMutation = useMutation({
-    mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/resume`)).data,
+    mutationFn: async (id: number) => (await api.post<Campaign>(`/collectes/${id}/resume`)).data,
     onSuccess: () => { toast.success('Collecte reprise'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Reprise impossible'),
   });
   const cancelMutation = useMutation({
-    mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/cancel`)).data,
+    mutationFn: async (id: number) => (await api.post<Campaign>(`/collectes/${id}/cancel`)).data,
     onSuccess: () => { toast.success('Collecte annulée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Annulation impossible'),
   });
   const archiveMutation = useMutation({
     mutationFn: async ({ id, archiver }: { id: number; archiver: boolean }) =>
-      (await api.post<Campaign>(`/campaigns/${id}/${archiver ? 'archive' : 'unarchive'}`)).data,
+      (await api.post<Campaign>(`/collectes/${id}/${archiver ? 'archive' : 'unarchive'}`)).data,
     onSuccess: (_d, v) => {
       toast.success(v.archiver ? 'Collecte archivée (masquée de la liste)' : 'Collecte désarchivée');
       void qc.invalidateQueries({ queryKey: ['campaigns'] });
@@ -147,7 +147,7 @@ export function CampaignsListPage() {
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Archivage impossible'),
   });
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => api.delete(`/campaigns/${id}`),
+    mutationFn: async (id: number) => api.delete(`/collectes/${id}`),
     onSuccess: () => { toast.success('Collecte supprimée'); void qc.invalidateQueries({ queryKey: ['campaigns'] }); },
     onError: (e) => toast.error(extractApiMessage(e) ?? 'Suppression impossible'),
   });
@@ -169,7 +169,7 @@ export function CampaignsListPage() {
             variant="primary"
             size="md"
             iconLeft={<Plus className="h-4 w-4" />}
-            onClick={() => { void navigate({ to: '/campaigns/new' }); }}
+            onClick={() => { void navigate({ to: '/collectes/new' }); }}
           >
             Nouvelle collecte
           </Button>
@@ -230,7 +230,7 @@ export function CampaignsListPage() {
                 variant="primary"
                 size="md"
                 iconLeft={<Plus className="h-4 w-4" />}
-                onClick={() => { void navigate({ to: '/campaigns/new' }); }}
+                onClick={() => { void navigate({ to: '/collectes/new' }); }}
               >
                 Créer une collecte
               </Button>
@@ -282,7 +282,7 @@ function CampaignCard({
   const moreSources = Math.max(0, (campaign.sources?.length ?? 0) - sources.length);
 
   const menuItems: MenuItem[] = [
-    { id: 'open', label: 'Voir détails', onSelect: () => { window.location.assign(`/campaigns/${campaign.id}`); } },
+    { id: 'open', label: 'Voir détails', onSelect: () => { window.location.assign(`/collectes/${campaign.id}`); } },
   ];
   if (campaign.can_pause) {
     menuItems.push({ id: 'pause', label: 'Mettre en pause', onSelect: onPause });
@@ -307,8 +307,8 @@ function CampaignCard({
     <Card hover padding="md" className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <Link
-          to="/campaigns/$campaignId"
-          params={{ campaignId: String(campaign.id) }}
+          to="/collectes/$collecteId"
+          params={{ collecteId: String(campaign.id) }}
           className="min-w-0 flex-1"
         >
           <h3 className="truncate text-base font-semibold tracking-tight text-slate-900 dark:text-white">
@@ -436,8 +436,8 @@ function CampaignCard({
           </Button>
         ) : null}
         <Link
-          to="/campaigns/$campaignId"
-          params={{ campaignId: String(campaign.id) }}
+          to="/collectes/$collecteId"
+          params={{ collecteId: String(campaign.id) }}
           className="ml-auto text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
         >
           Voir détails →

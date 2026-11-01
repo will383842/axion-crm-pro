@@ -56,6 +56,9 @@ const LABELS: Record<string, string> = {
   '/audiences/new': 'Nouvelle audience',
   '/listes': 'Listes',
   // Alimenter la base
+  '/collectes': 'Collectes',
+  '/collectes/new': 'Nouvelle collecte',
+  // Anciennes adresses (redirigées vers /collectes, gardées jusqu'au 2027-05-01).
   '/campaigns': 'Collectes',
   '/campaigns/new': 'Nouvelle collecte',
   '/coverage': 'Carte de France',

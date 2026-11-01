@@ -40,10 +40,10 @@ import { UsersPage } from '@/features/users/UsersPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
 import { PasEncoreLivrePage } from '@/features/misc/PasEncoreLivrePage';
-// Sprint 19.7 — Scraping Campaigns (live)
-import { CampaignsListPage } from '@/features/campaigns/CampaignsListPage';
-import { CampaignWizardPage } from '@/features/campaigns/CampaignWizardPage';
-import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
+// Sprint 19.7 — Collectes (ex-« campaigns » ; DM0-COL)
+import { CollectesListePage } from '@/features/collectes/CollectesListePage';
+import { CollecteAssistantPage } from '@/features/collectes/CollecteAssistantPage';
+import { CollecteDetailPage } from '@/features/collectes/CollecteDetailPage';
 // Sprint Pipeline 360° — Tags Manager + Audiences
 import { TagsManagerPage } from '@/features/tags/TagsManagerPage';
 import { AudiencesListPage } from '@/features/audiences/AudiencesListPage';
@@ -162,9 +162,37 @@ const usersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/user
 const settingsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/settings', component: SettingsPage });
 
 // Sprint 19.7 — Campagnes de scraping (live)
-const campaignsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns', component: CampaignsListPage });
-const campaignsNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/new', component: CampaignWizardPage });
-const campaignDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/campaigns/$campaignId', component: CampaignDetailPage });
+const collectesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/collectes', component: CollectesListePage });
+const collectesNewRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/collectes/new', component: CollecteAssistantPage });
+const collecteDetailRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/collectes/$collecteId', component: CollecteDetailPage });
+
+// DM0-COL — anciennes adresses `/campaigns…`, gardées 6 mois (jusqu'au
+// 2027-05-01) : elles mènent aux `/collectes…`. Le mot « campagnes » est
+// réservé aux campagnes d'e-mails d'Envoi.
+const campaignsRedirectRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/campaigns',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/collectes', replace: true });
+  },
+});
+const campaignsNewRedirectRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/campaigns/new',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/collectes/new', replace: true });
+  },
+});
+const campaignDetailRedirectRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/campaigns/$campaignId',
+  beforeLoad: ({ params }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/collectes/$collecteId', params: { collecteId: params.campaignId }, replace: true });
+  },
+});
 // Sprint Pipeline 360° — Tags + Audiences
 const tagsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/tags', component: TagsManagerPage });
 const audiencesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audiences', component: AudiencesListPage });
@@ -347,9 +375,12 @@ export const routeTree = rootRoute.addChildren([
     auditRoute,
     usersRoute,
     settingsRoute,
-    campaignsRoute,
-    campaignsNewRoute,
-    campaignDetailRoute,
+    collectesRoute,
+    collectesNewRoute,
+    collecteDetailRoute,
+    campaignsRedirectRoute,
+    campaignsNewRedirectRoute,
+    campaignDetailRedirectRoute,
     tagsRoute,
     audiencesRoute,
     audiencesNewRoute,

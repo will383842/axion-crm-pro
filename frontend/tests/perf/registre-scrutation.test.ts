@@ -9,15 +9,15 @@
  * ⚠️ RECOMPTAGE DU 2026-08-20 : il y en a HUIT, pas neuf. Commande jouee :
  *     grep -rn "refetchInterval" src/
  * Neuf lignes sortent, mais l'une est un COMMENTAIRE
- * (`CampaignDetailPage.tsx:10`, « Refresh 5s via refetchInterval »). Les
+ * (`CollecteDetailPage.tsx:10`, « Refresh 5s via refetchInterval »). Les
  * quatre autres minuteurs du depot (`Tooltip.tsx:26`, `TwoFactorPage.tsx:117`,
  * `OnboardingTour.tsx:103`, `AudienceBuilderPage.tsx:170`) sont des `setTimeout`
  * A UN COUP, pas de la scrutation. Le reste du constat tient : la partie
  * « deux toutes les 5 secondes sur le meme ecran » est exacte.
  *
  * Les huit, releves :
- *   5 000 ms  CampaignDetailPage.tsx:64   GET /campaigns/{id}
- *   5 000 ms  CampaignDetailPage.tsx:71   GET /campaigns/{id}/stats
+ *   5 000 ms  CollecteDetailPage.tsx:64   GET /campaigns/{id}
+ *   5 000 ms  CollecteDetailPage.tsx:71   GET /campaigns/{id}/stats
  *  10 000 ms  CampaignsListPage.tsx:75    GET /campaigns
  *  10 000 ms  ScraperRunsPage.tsx:237     GET /scraper-runs?per_page=50
  *  30 000 ms  DashboardPage.tsx:81        GET /dashboard/stats
@@ -76,7 +76,7 @@ export interface Scrutation {
 /**
  * Releve les `refetchInterval` d'un module.
  *
- * ⚠️ Le commentaire de `CampaignDetailPage.tsx:10` cite `refetchInterval` en
+ * ⚠️ Le commentaire de `CollecteDetailPage.tsx:10` cite `refetchInterval` en
  * prose. C'est LUI qui fait dire « neuf » a l'audit la ou il y en a huit : une
  * garde qui lirait la prose recompterait la meme erreur.
  */
@@ -122,14 +122,14 @@ export function listerModules(dossier: string): string[] {
  */
 const REGISTRE: ReadonlyArray<{ fichier: string; nombre: number; motif: string }> = [
   {
-    fichier: 'src/features/campaigns/CampaignDetailPage.tsx',
+    fichier: 'src/features/collectes/CollecteDetailPage.tsx',
     nombre: 2,
     motif:
       'Suivi live d une collecte : etat de la campagne + statistiques de debit. ' +
       'Les deux DOIVENT s arreter des que la campagne est dans un etat terminal.',
   },
   {
-    fichier: 'src/features/campaigns/CampaignsListPage.tsx',
+    fichier: 'src/features/collectes/CollectesListePage.tsx',
     nombre: 1,
     motif:
       'Liste des collectes : les statuts changent sans action de l operateur, '
@@ -207,10 +207,10 @@ describe('scrutation periodique — la garde a bien le depot sous les yeux', () 
   });
 
   it('ne compte pas la prose comme une scrutation', () => {
-    // `CampaignDetailPage.tsx:10` cite `refetchInterval` en commentaire.
+    // `CollecteDetailPage.tsx:10` cite `refetchInterval` en commentaire.
     // Ce fichier doit en porter DEUX, pas trois.
     const surLaFiche = scrutations.filter(
-      (s) => s.fichier === 'src/features/campaigns/CampaignDetailPage.tsx',
+      (s) => s.fichier === 'src/features/collectes/CollecteDetailPage.tsx',
     );
     expect(surLaFiche).toHaveLength(2);
   });
@@ -275,7 +275,7 @@ describe('scrutation periodique — regle B : la plus rapide sait s arreter', ()
 
 describe('scrutation periodique — TEMOIN de la garde', () => {
   it('voit les deux cadences a 5 s telles qu elles etaient ecrites', () => {
-    // Recopie fidele de `CampaignDetailPage.tsx:61-73` avant reparation.
+    // Recopie fidele de `CollecteDetailPage.tsx:61-73` avant reparation.
     const avant = [
       "  const { data: campaign } = useQuery({",
       "    queryKey: ['campaign', id],",

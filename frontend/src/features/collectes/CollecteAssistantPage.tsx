@@ -1,5 +1,5 @@
 /**
- * Sprint 19.7 — CampaignWizardPage.
+ * Sprint 19.7 — CollecteAssistantPage.
  *
  * Wizard 4 étapes :
  *   1. Identité (nom + description + schedule maintenant/plus tard)
@@ -100,7 +100,7 @@ const SOURCE_STATUS_TONE: Record<DiscoverySourceStatus, 'success' | 'warning' | 
   proxies_required: 'warning',
 };
 
-export function CampaignWizardPage() {
+export function CollecteAssistantPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
 
@@ -168,10 +168,10 @@ export function CampaignWizardPage() {
   // --- Mutation ---
   const createMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) =>
-      (await api.post<Campaign>('/campaigns', payload)).data,
+      (await api.post<Campaign>('/collectes', payload)).data,
   });
   const startMutation = useMutation({
-    mutationFn: async (id: number) => (await api.post<Campaign>(`/campaigns/${id}/start`)).data,
+    mutationFn: async (id: number) => (await api.post<Campaign>(`/collectes/${id}/start`)).data,
   });
 
   function buildPayload(): Record<string, unknown> {
@@ -213,7 +213,7 @@ export function CampaignWizardPage() {
     try {
       const c = await createMutation.mutateAsync(payload);
       toast.success('Collecte créée en brouillon');
-      void navigate({ to: '/campaigns/$campaignId', params: { campaignId: String(c.id) } });
+      void navigate({ to: '/collectes/$collecteId', params: { collecteId: String(c.id) } });
     } catch (err) {
       toast.error(extractApiMessage(err) ?? 'Création impossible');
     }
@@ -229,7 +229,7 @@ export function CampaignWizardPage() {
       } else {
         toast.success('Collecte créée et planifiée');
       }
-      void navigate({ to: '/campaigns/$campaignId', params: { campaignId: String(c.id) } });
+      void navigate({ to: '/collectes/$collecteId', params: { collecteId: String(c.id) } });
     } catch (err) {
       toast.error(extractApiMessage(err) ?? 'Lancement impossible');
     }
@@ -265,7 +265,7 @@ export function CampaignWizardPage() {
         title="Nouvelle collecte"
         subtitle="Quatre étapes : nom, zones, sources, limites."
         breadcrumbs={[
-          { label: 'Collectes', to: '/campaigns' },
+          { label: 'Collectes', to: '/collectes' },
           { label: 'Nouvelle' },
         ]}
       />
@@ -316,7 +316,7 @@ export function CampaignWizardPage() {
             iconLeft={<ChevronLeft className="h-4 w-4" />}
             onClick={() => {
               if (step > 1) setStep((step - 1) as Step);
-              else void navigate({ to: '/campaigns' });
+              else void navigate({ to: '/collectes' });
             }}
           >
             {step === 1 ? 'Annuler' : 'Précédent'}

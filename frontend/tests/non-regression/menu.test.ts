@@ -4,6 +4,9 @@
  * (risque n° 1) : l'écran de Will en production ne change pas sans que ce test
  * le dise. Lecture STATIQUE de `src/components/layout/Sidebar.tsx`.
  *
+ * Filet modifié : pourquoi — le lot DM0-COL (#389) a renommé l'entrée « /campaigns » en « /collectes »
+ * (libellé « Collectes » inchangé ; l'ancienne adresse redirige). Voulu.
+ *
  * Retirer ou renommer une entrée fait rougir ; en AJOUTER est permis (le lot
  * DM0-COQ ajoutera le sélecteur de produit sans toucher aux entrées du CRM).
  */
@@ -15,7 +18,7 @@ const SOURCE = readFileSync(resolve(__dirname, '../../src/components/layout/Side
 
 const ENTREES_ATTENDUES: [string, string][] = [
   ['/', 'Tableau de bord'], ['/admin/observability', 'Santé du système'], ['/audiences', 'Audiences'],
-  ['/audit-logs', 'Journal des actions'], ['/campaigns', 'Collectes'], ['/companies', 'Entreprises'],
+  ['/audit-logs', 'Journal des actions'], ['/collectes', 'Collectes'], ['/companies', 'Entreprises'],
   ['/console/arbitrage', 'Personnes à rattacher'], ['/console/contacts', 'Contacts'],
   ['/console/lettre-et-guide', 'Newsletter et guide'], ['/console/propositions', 'Propositions à valider'],
   ['/console/vivier', 'Candidats'], ['/contacts', 'Contacts'], ['/coverage', 'Carte de France'],

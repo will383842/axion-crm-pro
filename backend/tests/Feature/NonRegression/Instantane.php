@@ -71,4 +71,37 @@ final class Instantane
             . 'et écrivez « Filet modifié : pourquoi » dans sa description (NR_REGENERER_INSTANTANES=1).',
         );
     }
+
+    /**
+     * Comparaison « AU MOINS » : la photo est une liste de références
+     * (`list<string>`) que la réalité doit TOUJOURS contenir. Ajouter un élément
+     * est permis (la photo n’est pas touchée) ; en RETIRER un fait rougir.
+     * Régénération : même geste explicite que `verifier()`.
+     *
+     * @param  list<string>  $valeurs
+     */
+    public static function verifierInclut(string $nom, array $valeurs): void
+    {
+        $valeurs = array_values(array_unique($valeurs));
+        sort($valeurs);
+        $chemin = self::chemin($nom);
+
+        if (self::regeneration()) {
+            if (getenv('CI') !== false && getenv('CI') !== '') {
+                throw new RuntimeException('Régénérer un instantané est interdit en CI : faites-le en local et commitez la photo.');
+            }
+            file_put_contents($chemin, self::encoder($valeurs));
+        }
+
+        Assert::assertFileExists($chemin, "Instantané « {$nom} » absent (NR_REGENERER_INSTANTANES=1 pour le créer volontairement).");
+        /** @var list<string> $reference */
+        $reference = json_decode((string) file_get_contents($chemin), true, 512, JSON_THROW_ON_ERROR);
+
+        Assert::assertSame(
+            [],
+            array_values(array_diff($reference, $valeurs)),
+            "Des éléments de l’instantané « {$nom} » ont DISPARU. Ce qui existait ne doit pas disparaître en silence : "
+            . 'si le retrait est voulu, régénérez la photo DANS LA MÊME PR (« Filet modifié : pourquoi »).',
+        );
+    }
 }

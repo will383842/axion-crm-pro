@@ -1,0 +1,16 @@
+{
+    "MOCK_ANNUAIRE_ENTREPRISES": "garde",
+    "MOCK_BAN": "garde",
+    "MOCK_BODACC": "garde",
+    "MOCK_CAPTCHA": "garde",
+    "MOCK_FRANCE_TRAVAIL": "garde",
+    "MOCK_IGN": "hors_garde",
+    "MOCK_INSEE": "garde",
+    "MOCK_LLM": "garde",
+    "MOCK_MAIL": "hors_garde",
+    "MOCK_MODE": "garde",
+    "MOCK_PROXIES": "garde",
+    "MOCK_RPPS": "hors_garde",
+    "MOCK_SCRAPERS": "garde",
+    "MOCK_SMTP": "garde"
+}

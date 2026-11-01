@@ -33,7 +33,7 @@ async function monterEnvoi() {
 describe('« Tout arrêter » dans l’espace Envoi', () => {
   it('le feu des envois est affiché dans l’en-tête', async () => {
     await monterEnvoi();
-    expect(await screen.findByRole('link', { name: /état des envois : normaux/i })).toHaveAttribute('href', '/envoi/sante');
+    expect(await screen.findByRole('link', { name: /^état des envois : normaux$/i })).toHaveAttribute('href', '/envoi/sante');
   });
 
   it('2 clics + confirmation → bandeau rouge ; « Reprendre les envois » le retire', async () => {
@@ -58,7 +58,7 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
     const bandeau = await screen.findByRole('alert');
     expect(bandeau.textContent).toMatch(/envois arrêtés/i);
     expect(posts).toContain('/api/v1/envoi/tout-arreter');
-    expect(await screen.findByRole('link', { name: /état des envois : arrêtés/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /^état des envois : arrêtés$/i })).toBeInTheDocument();
 
     await userEvent.click(within(bandeau).getByRole('button', { name: /reprendre les envois/i }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
@@ -80,11 +80,12 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
       path: '/envoi/campagnes',
       withLayout: true,
       handlers: [
-        getJson('/config/features', FEATURES_LES_DEUX_PRODUITS),
-        ...handlersEnvoi(),
+        // En tête de liste : avec MSW, le premier handler correspondant gagne.
         http.get(apiUrl('/envoi/etat'), () =>
           HttpResponse.json({ etat: 'arrete', feu: 'rouge', depuis: '2027-01-12T10:42:00+01:00', par: 'Will Test', motif: 'Tout arrêter' }),
         ),
+        getJson('/config/features', FEATURES_LES_DEUX_PRODUITS),
+        ...handlersEnvoi(),
       ],
     });
     const bandeau = await screen.findByRole('alert');

@@ -15,10 +15,13 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 }
 
 const VARIANTS: Record<ButtonVariant, string> = {
+  // DM0-COQ (ADR-13) — le SEUL bouton plein de l'écran prend la couleur du
+  // produit courant (`data-produit` de la coquille) : bleu de marque dans le
+  // CRM et les écrans communs, turquoise pétrole dans Envoi. Écart assumé et
+  // validé dans les maquettes M2 : il était ardoise avant DM0-COQ.
   primary:
-    'bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-sm shadow-slate-900/10 ' +
-    'hover:from-slate-800 hover:to-slate-700 active:scale-[0.98] focus-visible:ring-slate-900 ' +
-    'dark:from-white dark:to-slate-100 dark:text-slate-900 dark:hover:from-slate-100 dark:hover:to-white',
+    'bg-produit text-white shadow-produit ' +
+    'hover:bg-produit-fonce active:scale-[0.98] focus-visible:ring-produit',
   secondary:
     'bg-white text-slate-900 ring-1 ring-slate-200 shadow-sm ' +
     'hover:bg-slate-50 hover:ring-slate-300 active:scale-[0.98] focus-visible:ring-slate-400 ' +

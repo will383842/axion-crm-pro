@@ -45,6 +45,12 @@ import {
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
+import { SelecteurProduit, PastilleProduit } from './SelecteurProduit';
+import { sectionsEnvoi, LIBELLES_COMPTEUR_ENVOI, type CleCompteurEnvoi } from './navigationEnvoi';
+import { useProduitCourant, type Produit } from '@/features/socle/produit/useProduitCourant';
+import { dernierEspace, type EspaceProduit } from '@/features/socle/produit/dernierePage';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
+import { PointDeFeu, feuAffiche, useCompteursEnvoi, useEtatEnvois, type CompteursEnvoi, type FeuEnvois } from '@/features/socle/EtatEnvois';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import type { ConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import { PastilleCompteur } from '@/features/a-traiter/PastilleCompteur';
@@ -70,6 +76,10 @@ export interface NavItem {
    * que le compteur est inconnu, en échec ou nul.
    */
   compteur?: CleCompteur;
+  /** DM0-COQ — pastille de la barre d'Envoi, servie par `GET /envoi/compteurs`. */
+  compteurEnvoi?: CleCompteurEnvoi;
+  /** DM0-COQ — point de feu des envois (« Santé des envois »). */
+  pointDeFeu?: boolean;
 }
 
 export interface NavSection {
@@ -231,6 +241,18 @@ export function sectionsDeNavigation(features: ConsoleFeatures, owner = false): 
   return [SECTION_ACCUEIL, sectionATraiter(features, owner), sectionMaBase(features), ...SECTIONS_FIXES];
 }
 
+/**
+ * DM0-COQ — l'espace dont la barre montre le menu (ADR-14 : un produit à la
+ * fois). Un écran COMMUN (utilisateurs, journal, RGPD, compte) garde la barre
+ * du dernier produit parcouru.
+ */
+export function espaceDeLaBarre(produit: Produit, visibles: Record<EspaceProduit, boolean>, dernier: EspaceProduit | null): EspaceProduit {
+  if (produit === 'envoi' && visibles.envoi) return 'envoi';
+  if (produit === 'commun' && dernier !== null && visibles[dernier]) return dernier;
+  if (visibles.crm) return 'crm';
+  return visibles.envoi ? 'envoi' : 'crm';
+}
+
 export interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -250,7 +272,19 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
   const router = useRouterState({ select: (s) => s.location.pathname });
   const features = useConsoleFeatures();
   const owner = useEstOwner();
-  const sections = sectionsDeNavigation(features, owner);
+  // DM0-COQ — un produit à la fois. Sans Envoi (production d'Axion
+  // aujourd'hui), `identite` est faux et la barre est EXACTEMENT celle d'avant
+  // (empreinte HTML gardée par `tests/components/routes-envoi-gardees.test.tsx`).
+  const produitCourant = useProduitCourant();
+  const visibles = useProduitsVisibles();
+  const espace = espaceDeLaBarre(produitCourant, visibles, dernierEspace());
+  const identite = visibles.envoi;
+  const deuxProduits = visibles.crm && visibles.envoi;
+  const sections = espace === 'envoi' ? sectionsEnvoi(features) : sectionsDeNavigation(features, owner);
+  const dansEnvoi = espace === 'envoi' && visibles.envoi;
+  const { data: compteursEnvoi } = useCompteursEnvoi(dansEnvoi);
+  const { data: etatEnvois } = useEtatEnvois(dansEnvoi);
+  const feu = feuAffiche(etatEnvois);
   // Les pastilles « À traiter » : la route vit derrière le drapeau de la
   // console, on ne la demande donc que console ouverte.
   const { data: compteurs } = useCompteursATraiter(features.console_v2);
@@ -281,15 +315,29 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
   return (
     <aside
       data-tour="sidebar"
+      // DM0-COQ — liseré de 4 px à la couleur de l'espace (ADR-13 § 1). Posé
+      // seulement quand Envoi existe : sans lui, rien ne change.
+      {...(identite ? { 'data-produit': espace, 'data-lisere': '' } : {})}
       className={cn(
         'flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out',
         collapsed ? 'w-16' : pleineLargeur ? 'w-full' : 'w-[260px]',
+        identite && 'border-l-4 border-l-produit',
       )}
       aria-label="Navigation latérale"
     >
       {/* Logo + workspace */}
       <div className={cn('flex flex-col gap-2 border-b border-sidebar-border px-3 py-4', collapsed && 'items-center px-2')}>
-        {collapsed ? (
+        {dansEnvoi ? (
+          // Espace Envoi : la marque d'Envoi (maquette campagnes.html).
+          <Link
+            to="/envoi/campagnes"
+            className={cn('flex items-center gap-2 px-1 py-0.5', collapsed && 'justify-center px-0')}
+            aria-label={collapsed ? 'Axion Envoi — campagnes' : undefined}
+          >
+            <PastilleProduit produit="envoi" />
+            {!collapsed && <span className="text-sm font-bold tracking-tight text-white">Axion Envoi</span>}
+          </Link>
+        ) : collapsed ? (
           <Link
             to="/"
             className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-sm"
@@ -305,9 +353,10 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
               </span>
               <span className="text-sm font-bold tracking-tight text-white">Axion CRM Pro</span>
             </Link>
-            <WorkspaceSelector />
           </>
         )}
+        {deuxProduits && <SelecteurProduit espace={espace} reduit={collapsed} />}
+        {!collapsed && <WorkspaceSelector />}
       </div>
 
       {/* Navigation groups */}
@@ -319,6 +368,9 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
             collapsed={collapsed}
             currentPath={router}
             compteurs={compteurs}
+            compteursEnvoi={compteursEnvoi}
+            feu={feu}
+            identite={identite}
             ouverte={sectionOuverte === section.id}
             onBasculer={() =>
               setSectionOuverte((actuelle) => (actuelle === section.id ? null : section.id))
@@ -353,6 +405,9 @@ function NavSectionBlock({
   collapsed,
   currentPath,
   compteurs,
+  compteursEnvoi,
+  feu,
+  identite,
   ouverte,
   onBasculer,
 }: {
@@ -360,6 +415,9 @@ function NavSectionBlock({
   collapsed: boolean;
   currentPath: string;
   compteurs: CompteursATraiter | undefined;
+  compteursEnvoi: Partial<CompteursEnvoi> | undefined;
+  feu: FeuEnvois;
+  identite: boolean;
   ouverte: boolean;
   onBasculer: () => void;
 }) {
@@ -418,7 +476,15 @@ function NavSectionBlock({
                 item={item}
                 collapsed={collapsed}
                 currentPath={currentPath}
-                nombre={item.compteur === undefined ? undefined : compteurs?.[item.compteur]}
+                nombre={
+                  item.compteur !== undefined
+                    ? compteurs?.[item.compteur]
+                    : item.compteurEnvoi !== undefined
+                      ? compteursEnvoi?.[item.compteurEnvoi]
+                      : undefined
+                }
+                feu={item.pointDeFeu === true ? feu : undefined}
+                identite={identite}
               />
             </li>
           ))}
@@ -433,15 +499,26 @@ function SidebarNavLink({
   collapsed,
   currentPath,
   nombre,
+  feu,
+  identite = false,
 }: {
   item: NavItem;
   collapsed: boolean;
   currentPath: string;
   nombre?: number | null | undefined;
+  /** DM0-COQ — le feu des envois, sur l'entrée qui le porte. */
+  feu?: FeuEnvois | undefined;
+  /** DM0-COQ — Envoi existe : entrée active en fond pâle + barre de 3 px de la couleur du produit. */
+  identite?: boolean;
 }) {
   // Active = exact match for '/', startsWith for others
   const active = item.to === '/' ? currentPath === '/' : currentPath === item.to || currentPath.startsWith(`${item.to}/`);
-  const pastille = item.compteur === undefined ? null : LIBELLES_COMPTEUR[item.compteur];
+  const pastille =
+    item.compteur !== undefined
+      ? LIBELLES_COMPTEUR[item.compteur]
+      : item.compteurEnvoi !== undefined
+        ? LIBELLES_COMPTEUR_ENVOI[item.compteurEnvoi]
+        : null;
 
   const link = (
     <Link
@@ -450,14 +527,16 @@ function SidebarNavLink({
       className={cn(
         'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition',
         active
-          ? 'bg-sidebar-active text-white ring-1 ring-white/15'
+          ? identite
+            ? 'relative bg-produit-pale text-produit-fonce before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-full before:bg-produit [&_[data-pastille-compteur]]:bg-produit'
+            : 'bg-sidebar-active text-white ring-1 ring-white/15'
           : 'text-sidebar-fg hover:bg-white/10 hover:text-white',
         item.locked && 'opacity-60',
         collapsed && 'justify-center px-2',
       )}
       aria-current={active ? 'page' : undefined}
     >
-      <span className={cn('relative shrink-0', active ? 'text-brand-300' : 'text-sidebar-fg-muted')}>
+      <span className={cn('relative shrink-0', active ? (identite ? 'text-produit' : 'text-brand-300') : 'text-sidebar-fg-muted')}>
         {item.icon}
         {collapsed && pastille !== null && (
           <PastilleCompteur nombre={nombre} libelle={pastille} enExposant />
@@ -466,6 +545,7 @@ function SidebarNavLink({
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{item.label}</span>
+          {feu !== undefined && <PointDeFeu feu={feu} />}
           {pastille !== null && <PastilleCompteur nombre={nombre} libelle={pastille} />}
           {item.locked && (
             <Lock className="h-3 w-3 shrink-0 text-sidebar-fg-muted" aria-label="Bientôt disponible" />

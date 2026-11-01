@@ -50,6 +50,46 @@
 
   /* Transitions */
   --tx-default: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Identité par produit (DM0-COQ, ADR-13 du plan 29) ─────────────────────
+     Valeurs PAR DÉFAUT = CRM Pro (bleu de marque). Les blocs `[data-produit]`
+     plus bas les redéfinissent sur la racine de la coquille (RootLayout) ou
+     sur une pastille qui porte son propre `data-produit`.
+     Utilitaires générés : `bg-produit`, `text-produit`, `bg-produit-pale`,
+     `ring-produit`, `border-produit`, `shadow-produit`…
+     ⚠️ RÈGLE D'OR : jamais sur une pastille, une jauge, un feu ou un graphique
+     qui dit un ÉTAT — les états gardent `StatusPill` et les couleurs de sens
+     (garde `tests/components/identite-produit.test.tsx`). */
+  --color-produit:         var(--color-brand-600);
+  --color-produit-fonce:   var(--color-brand-700);
+  --color-produit-pale:    var(--color-brand-50);
+  --color-produit-vif:     var(--color-brand-400);
+  /* Bandeau d'en-tête et pastilles d'identité : ardoise pour les écrans communs. */
+  --color-produit-bandeau: var(--color-brand-600);
+  --shadow-produit:        0 1px 2px 0 rgb(15 23 42 / 0.10), 0 1px 3px 0 rgb(15 23 42 / 0.12);
+}
+
+/* Les trois identités. Changer une teinte = changer ces lignes, rien d'autre. */
+[data-produit="crm"] {
+  --color-produit: var(--color-brand-600);
+  --color-produit-fonce: var(--color-brand-700);
+  --color-produit-pale: var(--color-brand-50);
+  --color-produit-vif: var(--color-brand-400);
+  --color-produit-bandeau: var(--color-brand-600);
+}
+[data-produit="envoi"] {
+  --color-produit: #0b7285;
+  --color-produit-fonce: #085563;
+  --color-produit-pale: #e3f3f6;
+  --color-produit-vif: #22b8cf;
+  --color-produit-bandeau: #0b7285;
+}
+[data-produit="commun"] {
+  --color-produit: var(--color-brand-600);
+  --color-produit-fonce: var(--color-brand-700);
+  --color-produit-pale: #eef1f6;
+  --color-produit-vif: var(--color-brand-400);
+  --color-produit-bandeau: #334155;
 }
 
 /* Animations 2026 */

@@ -73,8 +73,11 @@ describe('Sélecteur de produit', () => {
     const selecteur = await screen.findByRole('navigation', { name: 'Choisir le produit' });
     const crm = within(selecteur).getByRole('link', { name: /CRM Pro/ });
     const envoi = within(selecteur).getByRole('link', { name: /Envoi/ });
-    expect(crm).toHaveAttribute('aria-current', 'true');
+    // Le produit courant est marqué (`aria-current`), l'autre non.
+    expect(crm).toHaveAttribute('aria-current');
+    expect(crm).toHaveAttribute('data-actif');
     expect(envoi).not.toHaveAttribute('aria-current');
+    expect(envoi).not.toHaveAttribute('data-actif');
     // Pastille d'identité : son PROPRE `data-produit`, couleur par jeton.
     const pastilleE = envoi.querySelector('[data-pastille-produit]');
     expect(pastilleE).toHaveAttribute('data-produit', 'envoi');

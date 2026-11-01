@@ -66,6 +66,41 @@ import { PropositionsPage } from '@/features/propositions/PropositionsPage';
 import { PersonTimelinePage } from '@/features/crm-console/PersonTimelinePage';
 import { PersonnesPage } from '@/features/crm-console/PersonnesPage';
 import { PersonneDetailPage } from '@/features/crm-console/PersonneDetailPage';
+// DM0-COQ — coquille à deux produits : toutes les routes des deux produits,
+// chacune vers SON fichier de page (« en attente » jusqu'au lot qui la remplit).
+import { exigerProduit } from '@/features/socle/exigerProduit';
+import { MesTachesPage } from '@/features/crm/taches/MesTachesPage';
+import { AffairesPage } from '@/features/crm/affaires/AffairesPage';
+import { ComptePage } from '@/features/settings/ComptePage';
+import { CampagnesPage } from '@/features/envoi/campagnes/CampagnesPage';
+import { CalendrierEnvoisPage } from '@/features/envoi/campagnes/CalendrierEnvoisPage';
+import { CampagneSuiviPage } from '@/features/envoi/campagnes/CampagneSuiviPage';
+import { NouvelleCampagnePage } from '@/features/envoi/campagnes/NouvelleCampagnePage';
+import { MessagesTypesPage } from '@/features/envoi/messages/MessagesTypesPage';
+import { MessageEditeurPage } from '@/features/envoi/messages/MessageEditeurPage';
+import { ResultatsPage } from '@/features/envoi/pilotage/ResultatsPage';
+import { DestinatairesPage } from '@/features/envoi/conformite/DestinatairesPage';
+import { ReponsesPage } from '@/features/envoi/reponses/ReponsesPage';
+import { ReponsesARattacherPage } from '@/features/envoi/reponses/ReponsesARattacherPage';
+import { ReponsesTraiteesPage } from '@/features/envoi/reponses/ReponsesTraiteesPage';
+import { BoitesPage } from '@/features/envoi/infrastructure/BoitesPage';
+import { BoitePage } from '@/features/envoi/infrastructure/BoitePage';
+import { DomainesPage } from '@/features/envoi/infrastructure/DomainesPage';
+import { DomainePage } from '@/features/envoi/infrastructure/DomainePage';
+import { ServeursPage } from '@/features/envoi/infrastructure/ServeursPage';
+import { ConfigurationPage } from '@/features/envoi/infrastructure/ConfigurationPage';
+import { ChauffePage } from '@/features/envoi/infrastructure/ChauffePage';
+import { SantePage } from '@/features/envoi/pilotage/SantePage';
+import { ChercherEnvoiPage } from '@/features/envoi/pilotage/ChercherEnvoiPage';
+import { FeuVertPage } from '@/features/envoi/pilotage/FeuVertPage';
+import { DesinscriptionsPage } from '@/features/envoi/conformite/DesinscriptionsPage';
+import { AlertesEnvoiPage } from '@/features/envoi/conformite/AlertesEnvoiPage';
+import { ReglagesEnvoiPage } from '@/features/envoi/reglages/ReglagesEnvoiPage';
+import { IdentitePage } from '@/features/envoi/reglages/IdentitePage';
+import { ReglagesAlertesPage } from '@/features/envoi/reglages/ReglagesAlertesPage';
+import { ReglesPrudencePage } from '@/features/envoi/reglages/ReglesPrudencePage';
+import { ConnexionCrmPage } from '@/features/envoi/reglages/ConnexionCrmPage';
+import { DesinscriptionPubliquePage } from '@/features/envoi/public/DesinscriptionPubliquePage';
 // Phase 2 scaffold stubs
 
 // P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
@@ -341,12 +376,73 @@ const analyticsRedirectRoute = createRoute({
 // n'attrapait rien (voir `notFoundComponent` sur `rootRoute` ci-dessus) et sa
 // seule présence laissait croire le contraire à la lecture.
 
+// ════════════════════════════════════════════════════════════════════════════
+// DM0-COQ — COQUILLE À DEUX PRODUITS (plan 30 § 4.2)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// TOUTES les routes des deux produits sont créées ici, d'un coup : les lots
+// d'écran remplacent le CONTENU de leur fichier de page et ne touchent jamais
+// ce fichier. Chaque route d'Envoi porte `exigerProduit('envoi')` : sans
+// `produits.envoi` posé par la console (le cas d'Axion en production), elle
+// répond « Page introuvable », sans indice.
+
+// CRM Pro — onglets du tableau de bord, et l'écran commun « Mon compte ».
+const tachesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/taches', component: MesTachesPage });
+const affairesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/affaires', component: AffairesPage });
+const compteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/compte', component: ComptePage });
+
+// Envoi — `/envoi` seul mène aux campagnes.
+const envoiRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/envoi',
+  beforeLoad: async (options) => {
+    await exigerProduit('envoi')(options);
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    throw redirect({ to: '/envoi/campagnes', replace: true });
+  },
+});
+const gardeEnvoi = exigerProduit('envoi');
+const envoiCampagnesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes', beforeLoad: gardeEnvoi, component: CampagnesPage });
+const envoiCalendrierRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/calendrier', beforeLoad: gardeEnvoi, component: CalendrierEnvoisPage });
+const envoiNouvelleCampagneRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/nouvelle', beforeLoad: gardeEnvoi, component: NouvelleCampagnePage });
+const envoiMessagesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/messages', beforeLoad: gardeEnvoi, component: MessagesTypesPage });
+const envoiMessageRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/messages/$messageId', beforeLoad: gardeEnvoi, component: MessageEditeurPage });
+const envoiResultatsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/resultats', beforeLoad: gardeEnvoi, component: ResultatsPage });
+// Offre « Envoi seul » : le carnet de destinataires (ADR-11 § 11.5).
+const envoiDestinatairesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/destinataires', beforeLoad: gardeEnvoi, component: DestinatairesPage });
+const envoiCampagneRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/campagnes/$campagneId', beforeLoad: gardeEnvoi, component: CampagneSuiviPage });
+const envoiReponsesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reponses', beforeLoad: gardeEnvoi, component: ReponsesPage });
+const envoiReponsesARattacherRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reponses/a-rattacher', beforeLoad: gardeEnvoi, component: ReponsesARattacherPage });
+const envoiReponsesTraiteesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reponses/traitees', beforeLoad: gardeEnvoi, component: ReponsesTraiteesPage });
+const envoiBoitesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/boites', beforeLoad: gardeEnvoi, component: BoitesPage });
+const envoiBoiteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/boites/$boiteId', beforeLoad: gardeEnvoi, component: BoitePage });
+const envoiDomainesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/domaines', beforeLoad: gardeEnvoi, component: DomainesPage });
+const envoiDomaineRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/domaines/$domaineId', beforeLoad: gardeEnvoi, component: DomainePage });
+const envoiServeursRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/serveurs', beforeLoad: gardeEnvoi, component: ServeursPage });
+const envoiConfigurationRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/serveurs/configuration', beforeLoad: gardeEnvoi, component: ConfigurationPage });
+const envoiChauffeRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/chauffe', beforeLoad: gardeEnvoi, component: ChauffePage });
+const envoiSanteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante', beforeLoad: gardeEnvoi, component: SantePage });
+const envoiChercherRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/chercher', beforeLoad: gardeEnvoi, component: ChercherEnvoiPage });
+const envoiFeuVertRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/feu-vert', beforeLoad: gardeEnvoi, component: FeuVertPage });
+const envoiDesinscriptionsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/desinscriptions', beforeLoad: gardeEnvoi, component: DesinscriptionsPage });
+const envoiAlertesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/alertes', beforeLoad: gardeEnvoi, component: AlertesEnvoiPage });
+const envoiReglagesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages', beforeLoad: gardeEnvoi, component: ReglagesEnvoiPage });
+const envoiIdentiteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/identite', beforeLoad: gardeEnvoi, component: IdentitePage });
+const envoiReglagesAlertesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/alertes', beforeLoad: gardeEnvoi, component: ReglagesAlertesPage });
+const envoiReglesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/regles', beforeLoad: gardeEnvoi, component: ReglesPrudencePage });
+const envoiConnexionCrmRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/connexion-crm', beforeLoad: gardeEnvoi, component: ConnexionCrmPage });
+
+// Page PUBLIQUE de désinscription (lien d'un e-mail) : HORS coquille, sans
+// garde de produit — un destinataire n'est pas un utilisateur de l'espace.
+const desinscriptionPubliqueRoute = createRoute({ getParentRoute: () => rootRoute, path: '/desinscription/$jeton', component: DesinscriptionPubliquePage });
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   twoFactorRoute,
   magicLinkRoute,
   magicLinkVerifyRoute,
   passwordResetRoute,
+  desinscriptionPubliqueRoute,
   layoutRoute.addChildren([
     dashboardRoute,
     companiesRoute,
@@ -398,5 +494,37 @@ export const routeTree = rootRoute.addChildren([
     pasEncoreLivreRoute,
     crmRedirectRoute,
     analyticsRedirectRoute,
+    tachesRoute,
+    affairesRoute,
+    compteRoute,
+    envoiRoute,
+    envoiCampagnesRoute,
+    envoiCalendrierRoute,
+    envoiNouvelleCampagneRoute,
+    envoiMessagesRoute,
+    envoiMessageRoute,
+    envoiResultatsRoute,
+    envoiDestinatairesRoute,
+    envoiCampagneRoute,
+    envoiReponsesRoute,
+    envoiReponsesARattacherRoute,
+    envoiReponsesTraiteesRoute,
+    envoiBoitesRoute,
+    envoiBoiteRoute,
+    envoiDomainesRoute,
+    envoiDomaineRoute,
+    envoiServeursRoute,
+    envoiConfigurationRoute,
+    envoiChauffeRoute,
+    envoiSanteRoute,
+    envoiChercherRoute,
+    envoiFeuVertRoute,
+    envoiDesinscriptionsRoute,
+    envoiAlertesRoute,
+    envoiReglagesRoute,
+    envoiIdentiteRoute,
+    envoiReglagesAlertesRoute,
+    envoiReglesRoute,
+    envoiConnexionCrmRoute,
   ]),
 ]);

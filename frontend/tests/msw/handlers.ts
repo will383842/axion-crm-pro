@@ -176,6 +176,74 @@ export const CONSOLE_FEATURES_CLOSED = {
   universes: { business: false, vivier: false },
 } as const;
 
+/**
+ * DM0-COQ — droits par produit (`produits` de `/config/features`).
+ *
+ * ⚠️ Le défaut de `/config/features` (plus bas) NE CHANGE PAS : il ne porte pas
+ * `produits`, ce qui vaut `{ crm: 'actif', envoi: 'absent' }` — le comportement
+ * d'aujourd'hui. Un test qui porte sur Envoi ouvre le produit explicitement.
+ */
+export const PRODUITS_LES_DEUX = { crm: 'actif', envoi: 'actif' } as const;
+export const PRODUITS_CRM_SEUL = { crm: 'actif', envoi: 'absent' } as const;
+export const PRODUITS_ENVOI_SEUL = { crm: 'absent', envoi: 'actif' } as const;
+
+/** Les deux produits actifs, console v2 fermée (pas de compteurs « À traiter » à simuler). */
+export const FEATURES_LES_DEUX_PRODUITS = {
+  console_v2: false,
+  universes: { business: false, vivier: false },
+  produits: PRODUITS_LES_DEUX,
+} as const;
+
+/** Envoi seul (offre « Envoi seul » de la démo). */
+export const FEATURES_ENVOI_SEUL = {
+  console_v2: false,
+  universes: { business: false, vivier: false },
+  produits: PRODUITS_ENVOI_SEUL,
+} as const;
+
+/** État des envois au repos (contrat `backend/openapi/envoi/socle.yaml`, `EtatEnvois`). */
+export const ETAT_ENVOIS_ACTIF = {
+  etat: 'actif',
+  feu: 'vert',
+  depuis: '2027-01-12T08:00:00+01:00',
+  par: null,
+  motif: null,
+} as const;
+
+/** Compteurs de l'en-tête d'Envoi (`CompteursEnvoi`). */
+export const COMPTEURS_ENVOI = {
+  envoyes_aujourdhui: 168,
+  plafond_jour: 400,
+  en_file: 122,
+  reponses_a_traiter: 7,
+  alertes_ouvertes: 2,
+  campagnes_en_cours: 1,
+  boites_pretes: 6,
+  boites_total: 8,
+} as const;
+
+/**
+ * Les routes du socle d'Envoi (état, « Tout arrêter », « Reprendre »,
+ * compteurs), AVEC un état : « Tout arrêter » puis `GET /envoi/etat` rend bien
+ * « arrêté ». Pas dans les handlers par défaut : sans Envoi, aucun écran ne
+ * doit les appeler (et `onUnhandledRequest: 'error'` le prouve).
+ */
+export function handlersEnvoi(): HttpHandler[] {
+  let etat: Record<string, unknown> = { ...ETAT_ENVOIS_ACTIF };
+  return [
+    http.get(apiUrl('/envoi/etat'), () => HttpResponse.json(etat as never)),
+    http.get(apiUrl('/envoi/compteurs'), () => HttpResponse.json(COMPTEURS_ENVOI as never)),
+    http.post(apiUrl('/envoi/tout-arreter'), () => {
+      etat = { etat: 'arrete', feu: 'rouge', depuis: '2027-01-12T10:42:00+01:00', par: 'Will Test', motif: 'Tout arrêter' };
+      return HttpResponse.json(etat as never);
+    }),
+    http.post(apiUrl('/envoi/reprendre'), () => {
+      etat = { ...ETAT_ENVOIS_ACTIF };
+      return HttpResponse.json(etat as never);
+    }),
+  ];
+}
+
 export const ME_FIXTURE = {
   user: {
     id: 'u-1',

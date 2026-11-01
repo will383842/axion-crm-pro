@@ -230,3 +230,77 @@ describe('D24-002 — la cloche de l’en-tete ouvre un panneau reel', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// DM0-COQ — chaque alerte porte la pastille d'identité de son produit
+// ---------------------------------------------------------------------------
+
+/** La forme du contrat d'Envoi (`Notification` de `commun.yaml`) : `produit`, `lien`, `niveau`. */
+const ALERTES_DEUX_PRODUITS = {
+  data: [
+    {
+      id: 'n-env-1',
+      type: 'envoi.reponse',
+      title: 'Deux reponses interessees',
+      body: 'Organisateurs Rhone-Alpes',
+      action_url: '/envoi/reponses',
+      lien: '/envoi/reponses',
+      produit: 'envoi',
+      niveau: 'a_faire',
+      read_at: null,
+      created_at: '2027-01-12T09:05:00+01:00',
+    },
+    {
+      id: 'n-crm-1',
+      type: 'crm.doublons',
+      title: 'Douze doublons a verifier',
+      body: null,
+      action_url: null,
+      lien: '/doublons',
+      produit: 'crm',
+      niveau: 'attention',
+      read_at: null,
+      created_at: '2027-01-12T08:40:00+01:00',
+    },
+  ],
+  unread_count: 2,
+};
+
+describe('DM0-COQ — la cloche dit de quel produit vient chaque alerte', () => {
+  it('pastille d’identité CARRÉE (produit) + pastille d’état RONDE, et le lien mène à `lien`', async () => {
+    await monterCoquille(ALERTES_DEUX_PRODUITS);
+    const user = userEvent.setup();
+    await user.click(cloche());
+    const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
+
+    const envoi = (await within(panneau).findByText('Deux reponses interessees')).closest('li') as HTMLElement;
+    const identite = envoi.querySelector('[data-marque-produit]') as HTMLElement;
+    expect(identite).toHaveAttribute('data-produit', 'envoi');
+    expect(identite.textContent).toBe('Envoi');
+    // Carrée : jamais `rounded-full`, qui est la forme des pastilles d'état.
+    expect(identite.className).not.toContain('rounded-full');
+    const etat = envoi.querySelector('[data-pastille-etat]') as HTMLElement;
+    expect(etat.className).toContain('rounded-full');
+    expect(etat.className).not.toMatch(/-produit\b/);
+    expect(etat.textContent).toContain('À faire');
+    expect(within(envoi).getByRole('link')).toHaveAttribute('href', '/envoi/reponses');
+
+    const crm = within(panneau).getByText('Douze doublons a verifier').closest('li') as HTMLElement;
+    expect(crm.querySelector('[data-marque-produit]')).toHaveAttribute('data-produit', 'crm');
+    // `lien` prime sur `action_url` (absent ici).
+    expect(within(crm).getByRole('link')).toHaveAttribute('href', '/doublons');
+
+    // La garde « pas de bouton Marquer comme lu tant que 501 » TIENT (S9 l'inversera).
+    expect(within(panneau).queryByRole('button', { name: /marquer/i })).toBeNull();
+  });
+
+  it('TEMOIN — une notification sans `produit` (serveur d’aujourd’hui) ne porte aucune pastille', async () => {
+    await monterCoquille(DEUX_NOTIFICATIONS);
+    const user = userEvent.setup();
+    await user.click(cloche());
+    const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
+    await within(panneau).findByText('Scrape termine');
+    expect(panneau.querySelector('[data-marque-produit]')).toBeNull();
+    expect(panneau.querySelector('[data-pastille-etat]')).toBeNull();
+  });
+});

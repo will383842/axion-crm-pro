@@ -17,7 +17,9 @@
  *  4. UN mot par écran : le libellé du menu = celui du fil d'Ariane = le titre
  *     de la page ;
  *  5. aucun libellé de menu ne contient de jargon ni d'anglais ;
- *  6. le fil d'Ariane n'offre aucun lien vers un segment sans écran.
+ *  6. le fil d'Ariane n'offre aucun lien vers un segment sans écran ;
+ *  7. (DM0-COQ) les DEUX espaces : les 10 entrées d'Envoi tiennent les mêmes
+ *     règles (menu = fil d'Ariane = titre de la page « en attente »).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -46,6 +48,7 @@ vi.mock('@/lib/api', () => ({ api: { get: () => Promise.resolve({ data: {} }) } 
 const { Sidebar, sectionsDeNavigation, SECTION_TECHNIQUE } = await import('@/components/layout/Sidebar');
 const { AutoBreadcrumbs, LIBELLES_DE_CHEMIN } = await import('@/components/layout/AutoBreadcrumbs');
 const { CONSOLE_FEATURES_KEY } = await import('@/features/crm-console/useConsoleFeatures');
+const { sectionsEnvoi } = await import('@/components/layout/navigationEnvoi');
 
 const TOUT_OUVERT = { console_v2: true, universes: { business: true, vivier: true } };
 const CONSOLE_FERMEE = { console_v2: false, universes: { business: true, vivier: false } };
@@ -230,5 +233,94 @@ describe('Navigation cible — fil d’Ariane sans lien mort', () => {
     const { container } = afficherFil('/companies/a1b2c3d4-0000-0000-0000-000000000000');
     expect(container.textContent).toContain('Fiche');
     expect(container.textContent).not.toContain('#a1b2c3d4');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DM0-COQ — l'espace Envoi tient les mêmes règles
+// ---------------------------------------------------------------------------
+
+const LES_DEUX = { ...CONSOLE_FERMEE, produits: { crm: 'actif', envoi: 'actif' } } as const;
+const ENVOI_SEUL = { ...CONSOLE_FERMEE, produits: { crm: 'absent', envoi: 'actif' } } as const;
+
+/** L'écran « en attente » de chaque entrée d'Envoi (plan 30 § 4.2). */
+const ECRAN_ENVOI_DE: Record<string, string> = {
+  '/envoi/campagnes': 'features/envoi/campagnes/CampagnesPage.tsx',
+  '/envoi/reponses': 'features/envoi/reponses/ReponsesPage.tsx',
+  '/envoi/boites': 'features/envoi/infrastructure/BoitesPage.tsx',
+  '/envoi/domaines': 'features/envoi/infrastructure/DomainesPage.tsx',
+  '/envoi/serveurs': 'features/envoi/infrastructure/ServeursPage.tsx',
+  '/envoi/chauffe': 'features/envoi/infrastructure/ChauffePage.tsx',
+  '/envoi/sante': 'features/envoi/pilotage/SantePage.tsx',
+  '/envoi/desinscriptions': 'features/envoi/conformite/DesinscriptionsPage.tsx',
+  '/envoi/alertes': 'features/envoi/conformite/AlertesEnvoiPage.tsx',
+  '/envoi/reglages': 'features/envoi/reglages/ReglagesEnvoiPage.tsx',
+  // Envoi seul : les réglages du socle restent atteignables (ADR-12).
+  '/users': 'features/users/UsersPage.tsx',
+  '/rgpd/requests': 'features/rgpd/RgpdRequestsPage.tsx',
+  '/audit-logs': 'features/rgpd/AuditLogsPage.tsx',
+};
+
+describe('Navigation cible — l’espace Envoi (DM0-COQ)', () => {
+  it('les 10 entrées des maquettes validées, dans l’ordre', () => {
+    const entrees = sectionsEnvoi(LES_DEUX).flatMap((s) => s.items);
+    expect(entrees.map((i) => [i.to, i.label])).toEqual([
+      ['/envoi/campagnes', 'Campagnes'],
+      ['/envoi/reponses', 'Réponses'],
+      ['/envoi/boites', 'Boîtes d’envoi'],
+      ['/envoi/domaines', 'Domaines'],
+      ['/envoi/serveurs', 'Serveurs et adresses IP'],
+      ['/envoi/chauffe', 'Chauffe'],
+      ['/envoi/sante', 'Santé des envois'],
+      ['/envoi/desinscriptions', 'Désinscriptions'],
+      ['/envoi/alertes', 'Alertes d’envoi'],
+      ['/envoi/reglages', 'Réglages d’envoi'],
+    ]);
+  });
+
+  it('Envoi seul : les réglages du socle (équipe, RGPD, journal) restent dans la barre', () => {
+    const chemins = sectionsEnvoi(ENVOI_SEUL).flatMap((s) => s.items.map((i) => i.to));
+    expect(chemins).toEqual(expect.arrayContaining(['/users', '/rgpd/requests', '/audit-logs']));
+  });
+
+  it('le menu du CRM ne change pas quand Envoi est actif (le menu de Will reste à l’identique)', () => {
+    const avec = sectionsDeNavigation(LES_DEUX).map((s) => [s.id, s.items.map((i) => i.to)]);
+    const sans = sectionsDeNavigation(CONSOLE_FERMEE).map((s) => [s.id, s.items.map((i) => i.to)]);
+    expect(avec).toEqual(sans);
+  });
+
+  const entreesEnvoi = [LES_DEUX, ENVOI_SEUL].flatMap((f) => sectionsEnvoi(f).flatMap((s) => s.items));
+
+  it('aucun libellé d’Envoi ne contient de jargon ni d’anglais', () => {
+    for (const item of entreesEnvoi) expect(termeJargon(item.label), `« ${item.label} »`).toBeNull();
+  });
+
+  it('le fil d’Ariane dit le MÊME mot que le menu', () => {
+    for (const item of entreesEnvoi) {
+      expect(LIBELLES_DE_CHEMIN[item.to], `Fil d’Ariane de ${item.to}`).toBe(item.label);
+    }
+  });
+
+  it('le titre de la page dit le MÊME mot que le menu', () => {
+    for (const item of entreesEnvoi) {
+      const fichier = ECRAN_ENVOI_DE[item.to];
+      expect(fichier, `Entrée d’Envoi ${item.to} sans écran déclaré dans ECRAN_ENVOI_DE`).toBeDefined();
+      const chemin = path.join(SRC, fichier as string);
+      expect(existsSync(chemin), chemin).toBe(true);
+      const source = readFileSync(chemin, 'utf8');
+      const titreExact = source.includes(`title="${item.label}"`) || new RegExp(`>\\s*${item.label}\\s*<`).test(source);
+      expect(titreExact, `Le titre de ${fichier} ne dit pas « ${item.label} » comme le menu`).toBe(true);
+    }
+  });
+
+  it('dans Envoi, le fil d’Ariane part d’« Envoi », pas de l’accueil du CRM', () => {
+    cheminCourant = '/envoi/domaines';
+    const { container } = render(<AutoBreadcrumbs />);
+    expect(container.textContent).toContain('Envoi');
+    expect(container.textContent).toContain('Domaines');
+    expect(container.textContent).not.toContain('Accueil');
+    const liens = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(liens).not.toContain('/');
+    expect(liens).not.toContain('/envoi');
   });
 });

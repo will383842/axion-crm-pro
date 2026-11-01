@@ -211,6 +211,20 @@ describe('jeu factice — rien de réel', () => {
   });
 });
 
+describe('jeu factice — rien n’arrive dans le futur', () => {
+  it('réponses, événements d’envoi, ouvertures et clics sont tous passés', () => {
+    const maintenantIso = '2027-01-12T08:30:00.000Z';
+    const dates = [
+      ...demoDb.reponses.tous().map((r) => r.recue_le),
+      ...demoDb.evenementsEnvoi.tous().map((e) => e.survenu_le),
+      ...demoDb.destinataires.tous().flatMap((d) => [d.dernier_evenement_le, d.ouverture?.premiere_le, d.ouverture?.derniere_le, d.clics?.premier_le]),
+      ...demoDb.notifications.tous().map((n) => n.created_at),
+    ].filter((d): d is string => typeof d === 'string');
+    expect(dates.length).toBeGreaterThan(1500);
+    expect(dates.filter((d) => d > maintenantIso)).toEqual([]);
+  });
+});
+
 describe('jeu factice — graine fixe', () => {
   it('deux générations avec la même graine sont identiques à l’octet', () => {
     expect(JSON.stringify(genererJeu())).toBe(JSON.stringify(genererJeu()));

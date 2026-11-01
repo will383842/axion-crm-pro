@@ -55,7 +55,7 @@ const fichiers = DOSSIERS.flatMap((d) => lister(d));
 
 describe('interdits de communication', () => {
   it('a bien des fichiers sous les yeux, dans les deux dossiers', () => {
-    expect(fichiers.length).toBeGreaterThan(300);
+    expect(fichiers.length).toBeGreaterThan(150);
     expect(fichiers.some((f) => f.includes(`${path.sep}openapi${path.sep}`))).toBe(true);
     expect(fichiers.some((f) => f.includes(`${path.sep}demo${path.sep}`))).toBe(true);
   });

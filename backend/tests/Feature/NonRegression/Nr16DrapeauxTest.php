@@ -41,6 +41,7 @@ function nr16Drapeaux(): array
             $offset = $debut;
             if (($m[2][0] ?? '') !== ',') {
                 $drapeaux[$nom] = '(aucun défaut)';
+
                 continue;
             }
             // Avance jusqu’à la parenthèse fermante qui équilibre env(.

@@ -1,0 +1,68 @@
+# Le filet de non-régression (lot R0)
+
+**But.** Dire « ce qui marche aujourd'hui marche encore demain ». Si un lot casse l'existant, la CI devient rouge à son premier job (`filet-non-regression`) et rien ne part en production.
+
+## Où est quoi
+
+| Élément | Emplacement |
+|---|---|
+| Gardes neuves (24 risques NR-01 à NR-24 + horodatages de Paris) | ce dossier, groupe Pest `non-regression` |
+| Gardes existantes « citées et verrouillées » | rattachées au groupe dans `backend/tests/Pest.php` (leur fichier n'est pas touché) |
+| Photos de référence (« instantanés ») | `instantanes/*.json` |
+| Liste figée | `LISTE.json`, vérifiée par `ListeFigeeTest.php` |
+| Gardes du frontend (routes, routeTree, menu) | `frontend/tests/non-regression/*.test.ts` |
+| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend` l'attend) |
+
+## Lancer le filet en local
+
+```bash
+cd backend
+php vendor/bin/pest --group=non-regression --no-coverage      # ≈ 1 minute
+cd ../frontend && pnpm exec vitest run tests/non-regression
+```
+
+Il faut la base de test habituelle (PostGIS, pgvector, pg_partman), exactement comme `php vendor/bin/pest`.
+
+## Les règles
+
+1. **Un test du filet ne se modifie que pour une raison écrite** (décision de Will ou changement voulu par un lot), dans la même PR, avec la ligne **« Filet modifié : pourquoi »** dans la description.
+2. **Jamais de quarantaine, jamais de test sauté**, jamais `continue-on-error`.
+3. **Données factices uniquement** : deux espaces « Espace A » et « Espace B », adresses en `@example.test`, aucune personne réelle, aucun secret (les valeurs de test sont inventées à l'exécution).
+4. **Aucun test ne touche un serveur**, n'envoie un e-mail ou n'appelle un service extérieur (simulateurs `MOCK_*`).
+5. **Le filet constate, il ne corrige pas.** Un défaut trouvé est écrit dans la photo ou dans le test avec la mention « à corriger par le lot X » ; le lot X mettra le test à jour en connaissance de cause.
+
+## Les instantanés
+
+Trois formes de comparaison (classe `Instantane`) :
+
+| Méthode | Sens | Exemples |
+|---|---|---|
+| `verifier` | égalité stricte : tout écart fait rougir | tâches planifiées (NR-07), drapeaux (NR-16), liste de destinataires (NR-02) |
+| `verifierInclut` | la réalité doit CONTENIR la photo : retirer fait rougir, ajouter est permis | routes (NR-20), tables de l'export RGPD (NR-06) |
+| `verifierContenuDans` | la réalité doit rester CONTENUE dans la photo : ajouter fait rougir, retirer est permis | workflows qui touchent un serveur (NR-18), migrations sans retour réel (NR-17) |
+
+**Régénérer une photo est un geste explicite**, jamais un effet de bord, et refusé en CI :
+
+```bash
+NR_REGENERER_INSTANTANES=1 php vendor/bin/pest --group=non-regression
+git diff backend/tests/Feature/NonRegression/instantanes/   # le changement apparaît en clair dans la PR
+```
+
+## Ajouter un test au filet
+
+1. Écrire le test dans ce dossier (il reçoit le groupe automatiquement), avec un titre qui commence par `NR-xx`.
+2. Le déclarer dans `LISTE.json` (`ListeFigeeTest` rougit sinon).
+3. Un test qui constate doit avoir son **témoin** : la preuve que l'instrument sait voir (une garde qui ne trouve rien passerait pour verte).
+
+## Écarts constatés au moment de R0 (à traiter par d'autres lots)
+
+Ils sont aussi écrits en tête des fichiers concernés.
+
+| Constat | Fichier | Lot |
+|---|---|---|
+| Valeur vide de `CRM_SEGMENTS_OUVERTS` : les 3 segments connus sont OUVERTS (le plan écrivait « fermés ») | `Nr05SegmentsFermesTest.php` | S6 |
+| L'opposition (`opt_out`, `email_suppressions`) est globale, pas par espace | `Nr01OppositionDeuxEspacesTest.php` | P2 |
+| `MOCK_MAIL`, `MOCK_IGN`, `MOCK_RPPS` sont lus hors de la garde de production | `Nr15SimulateursTest.php` | S2 |
+| La sonde « non diffusibles » est aveugle sous le rôle de production (RLS) | `Nr23Nr08AudiencesEtRlsTest.php` | S7 |
+| Seules 2 tâches planifiées sont rejouées sous le rôle de production ; les autres sont listées « non jouée » | `instantanes/nr08-taches-sous-rls.json` | S7 |
+| NR-22 (connexion de bout en bout) : seules les gardes Pest sont rattachées ; l'e2e `auth` est hors du périmètre fermé de ce lot | `LISTE.json` | lot e2e |

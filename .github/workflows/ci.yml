@@ -64,6 +64,153 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LOT R0 — FILET DE NON-RÉGRESSION (bloquant). Première porte de la CI.
+  #
+  # « Ce qui marche aujourd'hui marche encore demain » : les 24 gardes NR-01 à
+  # NR-24 (groupe Pest `non-regression`, dossier
+  # `backend/tests/Feature/NonRegression/`) plus les 3 gardes Vitest du dossier
+  # `frontend/tests/non-regression/`. Rouge ici = rien ne part en production
+  # (`deploy-direct-ssh.yml` et `deploy-staging.yml` appellent ce workflow et
+  # ont `needs: [ci]`). Le job `backend` l'attend (`needs`), pour échouer VITE.
+  #
+  # Règles : jamais `continue-on-error`, jamais de test sauté ni mis en
+  # quarantaine ; machine standard gratuite (dépôt public) ; aucun secret (les
+  # valeurs ci-dessous sont des valeurs de test factices, comme dans `backend`).
+  # Retour arrière : retirer ce job ET la ligne `needs: [filet-non-regression]`
+  # du job `backend`. Règles détaillées : backend/tests/Feature/NonRegression/LISEZ-MOI.md
+  # ═══════════════════════════════════════════════════════════════════════════
+  filet-non-regression:
+    name: Filet de non-régression (24 gardes, instantanés)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25  # objectif < 10 min ; plafond anti-gel (F38-008) posé au-dessus de la durée utile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache composer
+        uses: actions/cache@v6
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.json') }}
+
+      - name: Préparer l'arborescence Laravel inscriptible
+        run: |
+          set -euo pipefail
+          mkdir -p backend/bootstrap/cache \
+                   backend/storage/app/private \
+                   backend/storage/framework/cache/data \
+                   backend/storage/framework/sessions \
+                   backend/storage/framework/testing \
+                   backend/storage/framework/views \
+                   backend/storage/logs
+          # Sans `.env`, chaque test émet un warning et `failOnWarning` rougit la suite.
+          cp .env.example backend/.env
+
+      - name: Install (BLOQUANT)
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Démarrage Postgres (PostGIS + pgvector + pg_partman) et Redis
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMG="ghcr.io/${{ github.repository_owner }}/axion-crm-pro-postgres:16-3.5-vector-partman"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          reessayer() { # reessayer <tentatives> <commande...>
+            local n=$1; shift
+            for i in $(seq 1 "$n"); do
+              if "$@"; then return 0; fi
+              echo "::warning::échec de « $* » (tentative $i/$n)"
+              sleep $((i * 10))
+            done
+            return 1
+          }
+          if ! reessayer 3 docker pull "$IMG"; then
+            echo "::notice::Image GHCR indisponible — reconstruction locale depuis Dockerfile.postgres"
+            reessayer 2 docker build -f Dockerfile.postgres -t "$IMG" .
+          fi
+          # Même base que le job `backend` : réseau hôte, locale C, base jetable.
+          docker run -d --name axion-ci-postgres \
+            --network host \
+            --shm-size=1g \
+            -e POSTGRES_USER=axion \
+            -e POSTGRES_PASSWORD=axion_dev_only \
+            -e POSTGRES_DB=axion_crm_test \
+            -e POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C" \
+            "$IMG" \
+            -c fsync=off -c full_page_writes=off -c synchronous_commit=off \
+            -c max_connections=300
+          docker run -d --name axion-ci-redis --network host redis:7.2-alpine
+          for i in $(seq 1 90); do
+            if docker exec -e PGPASSWORD=axion_dev_only axion-ci-postgres \
+                 psql -h 127.0.0.1 -p 5432 -U axion -d axion_crm_test -tAc 'select 1' >/dev/null 2>&1 \
+               && docker logs axion-ci-postgres 2>&1 | grep -q 'database system is ready to accept connections'; then
+              echo "Postgres accepte les connexions TCP après ${i} tentative(s)."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres n'est jamais devenu disponible en TCP"
+          docker logs axion-ci-postgres | tail -50
+          exit 1
+
+      - name: Pest — groupe non-regression (BLOQUANT, migrations aller-retour-aller comprises)
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: '5432'
+          DB_DATABASE: axion_crm_test
+          DB_USERNAME: axion
+          DB_PASSWORD: axion_dev_only
+          DB_APP_USERNAME: axion_app
+          DB_APP_PASSWORD: axion_app_test_only
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+          TELESCOPE_ENABLED: 'false'
+          PULSE_ENABLED: 'false'
+          # Mêmes bascules que le job `backend` (aucun appel réseau réel).
+          MOCK_MODE: 'true'
+          MOCK_LLM: 'true'
+          MOCK_PROXIES: 'true'
+          MOCK_SCRAPERS: 'true'
+          MOCK_SMTP: 'true'
+          MOCK_INSEE: 'true'
+          MOCK_ANNUAIRE_ENTREPRISES: 'true'
+          MOCK_BODACC: 'true'
+          MOCK_BAN: 'true'
+          MOCK_FRANCE_TRAVAIL: 'true'
+        run: php vendor/bin/pest --group=non-regression --colors --configuration phpunit-ci.xml
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend (lockfile figé)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Vitest — gardes du filet (routes, routeTree, menu) (BLOQUANT)
+        working-directory: frontend
+        run: pnpm exec vitest run tests/non-regression
+
   # ⚠️ 2026-08-16 — garde née d'un incident grave et parfaitement silencieux.
   # `infra/scripts/backup-postgres.sh` était committé en `100644` (sans bit
   # d'exécution). La tâche cron de sauvegarde quotidienne de la PRODUCTION
@@ -460,6 +607,7 @@ jobs:
 
   backend:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
+    needs: [filet-non-regression]  # R0 — le filet passe d'abord (retour arrière : retirer cette ligne)
     runs-on: ubuntu-24.04
     timeout-minutes: 60  # F38-008 — le job le plus long de la chaîne (Postgres + suite Pest entière)
     steps:

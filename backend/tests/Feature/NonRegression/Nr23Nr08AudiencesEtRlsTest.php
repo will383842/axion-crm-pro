@@ -18,6 +18,7 @@
  * existant : la connexion `pgsql_app` est celle de la production.
  */
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -203,7 +204,7 @@ test('NR-08 l’inventaire des tâches planifiées sous RLS est celui de la phot
         'crm:sonde-non-diffusibles' => 'jouee : AVEUGLE sous RLS (code 0 malgre des fiches [ND]), a corriger par S7',
     ];
     $inventaire = [];
-    foreach (app(Illuminate\Console\Scheduling\Schedule::class)->events() as $evenement) {
+    foreach (app(Schedule::class)->events() as $evenement) {
         $nom = trim((string) preg_replace("/^.*?['\"]?artisan['\"]?\s+/", '', (string) $evenement->command));
         $base = explode(' ', $nom)[0];
         if ($base === '' || str_starts_with($base, 'crm:planificateur')) {

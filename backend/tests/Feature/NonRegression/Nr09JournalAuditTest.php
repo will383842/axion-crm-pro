@@ -15,6 +15,7 @@
 
 use App\Console\Commands\AuditVerifyChain;
 use App\Services\Audit\AuditHashChain;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -80,7 +81,7 @@ test('NR-09 la maintenance des partitions laisse en place une partition pour le 
 
 test('NR-09 la maintenance des partitions est planifiée chaque jour à 01:30', function () {
     Artisan::call('list', ['--format' => 'txt']);
-    $evenements = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+    $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'db:partman-maintenir'));
 
     expect($evenements)->toHaveCount(1)

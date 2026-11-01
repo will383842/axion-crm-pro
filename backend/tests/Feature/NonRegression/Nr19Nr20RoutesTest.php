@@ -17,8 +17,10 @@
  * `PasDeStub501SousCrmEtAnalyticsTest`.
  */
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route as LaRoute;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Tests\Feature\NonRegression\Instantane;
 use Tests\TestCase;
@@ -83,8 +85,8 @@ test('NR-19 l’adresse « campaigns » ne répond jamais 404 (réponse protég�
 });
 
 test('NR-19 la tâche planifiée « campaigns:start-scheduled » existe toujours (collectes programmées)', function () {
-    Illuminate\Support\Facades\Artisan::call('list', ['--format' => 'txt']);
-    $commandes = array_map(fn ($e) => (string) $e->command, app(Illuminate\Console\Scheduling\Schedule::class)->events());
+    Artisan::call('list', ['--format' => 'txt']);
+    $commandes = array_map(fn ($e) => (string) $e->command, app(Schedule::class)->events());
 
     expect(implode("\n", $commandes))->toContain('campaigns:start-scheduled');
 });

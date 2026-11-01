@@ -15,8 +15,8 @@ info:
     activé campagne par campagne (`suivre_ouvertures`). Une ouverture est une
     ESTIMATION : les ouvertures automatiques (relais d'images des messageries,
     protection de la vie privée d'Apple, antivirus) sont signalées par
-    `automatique_probable`. Les indicateurs principaux restent les réponses et
-    les clics.
+    `automatique_probable`. L'indicateur principal reste les réponses.
+    Aucun suivi des clics (décision de Will : ouvertures seulement).
 paths: {}
 components:
   schemas:
@@ -102,7 +102,7 @@ components:
     CampagneResume:
       type: object
       required:
-        [id, nom, statut, cible, envoyes, total, reponses, reponses_interessees, clics,
+        [id, nom, statut, cible, envoyes, total, reponses, reponses_interessees,
          suivre_ouvertures, ouvertures, ab_objet, prochain_envoi_le, cree_le, boites, etapes]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
@@ -113,10 +113,6 @@ components:
         total: { type: integer, minimum: 0 }
         reponses: { type: integer, minimum: 0 }
         reponses_interessees: { type: integer, minimum: 0 }
-        clics:
-          type: integer
-          minimum: 0
-          description: Destinataires ayant cliqué au moins un lien (indicateur principal).
         suivre_ouvertures:
           type: boolean
           description: Case « Suivre les ouvertures » de la campagne (pixel optionnel, désactivé par défaut).
@@ -246,17 +242,11 @@ components:
             - type: string
               enum: [protection_apple, relais_images, antivirus, ouverture_immediate]
             - type: 'null'
-    Clics:
-      type: object
-      required: [premier_le, nombre]
-      properties:
-        premier_le: { $ref: '#/components/schemas/Horodatage' }
-        nombre: { type: integer, minimum: 1 }
     Destinataire:
       type: object
       required:
         [id, campagne_id, contact_id, adresse, prenom, nom, organisation, etape, etat,
-         dernier_evenement_le, code_serveur, motif, ouverture, clics]
+         dernier_evenement_le, code_serveur, motif, ouverture]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         campagne_id: { $ref: '#/components/schemas/Identifiant' }
@@ -290,13 +280,9 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Ouverture'
             - type: 'null'
-        clics:
-          oneOf:
-            - $ref: '#/components/schemas/Clics'
-            - type: 'null'
     TypeEvenementEnvoi:
       type: string
-      enum: [remis, rebond_dur, rebond_mou, plainte, desinscription, ouverture, clic, reponse]
+      enum: [remis, rebond_dur, rebond_mou, plainte, desinscription, ouverture, reponse]
     EvenementEnvoi:
       type: object
       required:

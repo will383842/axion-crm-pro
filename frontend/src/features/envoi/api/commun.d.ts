@@ -35,8 +35,6 @@ export interface components {
             ab_objet: boolean;
             boites: components["schemas"]["Identifiant"][];
             cible: components["schemas"]["CibleCampagne"];
-            /** @description Destinataires ayant cliqué au moins un lien (indicateur principal). */
-            clics: number;
             cree_le: components["schemas"]["Horodatage"];
             envoyes: number;
             /** @description Nombre de messages de la séquence (1 à 4). */
@@ -72,10 +70,6 @@ export interface components {
         };
         /** @enum {string} */
         ClassementReponse: "interesse" | "pas_maintenant" | "question" | "refus" | "stop" | "absence" | "a_rattacher";
-        Clics: {
-            nombre: number;
-            premier_le: components["schemas"]["Horodatage"];
-        };
         CompteursEnvoi: {
             alertes_ouvertes: number;
             boites_pretes: number;
@@ -98,7 +92,6 @@ export interface components {
             /** Format: email */
             adresse: string;
             campagne_id: components["schemas"]["Identifiant"];
-            clics: components["schemas"]["Clics"] | null;
             /** @description Code renvoyé par le serveur destinataire (ex. « 550 5.1.1 »). */
             code_serveur: string | null;
             /** @description Contact du CRM (adaptateur CRM Pro) ; nul pour le carnet d'Envoi seul. */
@@ -315,7 +308,7 @@ export interface components {
         /** @enum {string} */
         TypeCible: "liste" | "audience" | "etiquette" | "carnet";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "clic" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
         VersionMessage: {
             corps: string;
             modifie_le: components["schemas"]["Horodatage"];

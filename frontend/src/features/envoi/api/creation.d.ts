@@ -244,8 +244,6 @@ export interface components {
             ab_objet: boolean;
             boites: components["schemas"]["Identifiant"][];
             cible: components["schemas"]["CibleCampagne"];
-            /** @description Destinataires ayant cliqué au moins un lien (indicateur principal). */
-            clics: number;
             cree_le: components["schemas"]["Horodatage"];
             envoyes: number;
             /** @description Nombre de messages de la séquence (1 à 4). */

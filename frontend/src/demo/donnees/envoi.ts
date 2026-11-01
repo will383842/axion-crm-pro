@@ -9,8 +9,8 @@
  * destinataire, et marquée `automatique_probable` quand elle vient
  * vraisemblablement d'un relais (protection d'Apple, relais d'images,
  * antivirus, ouverture dans la seconde). Les campagnes qui ne cochent pas la
- * case n'ont aucune ouverture. Réponses et clics restent les indicateurs
- * principaux.
+ * case n'ont aucune ouverture. Aucun clic n'est suivi : l'indicateur
+ * principal reste les réponses.
  */
 import { graine, type Alea } from '../graine';
 import { ilYa, MAINTENANT_ISO } from '../horloge';
@@ -224,7 +224,6 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
         code_serveur: null,
         motif: null,
         ouverture: null,
-        clics: null,
       };
       if (rang >= def.envoyes) {
         destinataires.push(base);
@@ -275,13 +274,6 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
           raison_automatique: automatique ? alea.choisir(['protection_apple', 'protection_apple', 'relais_images', 'antivirus', 'ouverture_immediate'] as const) : null,
         };
         evt({ survenu_le: d.ouverture.premiere_le, type: 'ouverture', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: automatique ? 'Ouverture automatique probable' : 'Ouverture estimée', automatique_probable: automatique });
-      }
-
-      // Clics (indicateur principal, mesurés pour toutes les campagnes).
-      if (d.etat === 'remis' && (repond ? alea.booleen(0.4) : alea.booleen(0.05))) {
-        const premier = envoiMs + alea.entier(20, 60 * 20) * MINUTE;
-        d.clics = { premier_le: instant(premier), nombre: alea.entier(1, 3) };
-        evt({ survenu_le: d.clics.premier_le, type: 'clic', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Lien cliqué', automatique_probable: null });
       }
 
       // Réponses.
@@ -349,7 +341,6 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
       total: def.cible.total,
       reponses: siennes.length,
       reponses_interessees: siennes.filter((r) => r.classement === 'interesse').length,
-      clics: siens.filter((x) => x.clics !== null).length,
       suivre_ouvertures: def.suivre,
       ouvertures: def.suivre && def.envoyes > 0
         ? { estimees, automatiques_probables: automatiques, taux_estime: remis === 0 ? 0 : arrondi1((estimees * 100) / remis), mention: 'estimation' }

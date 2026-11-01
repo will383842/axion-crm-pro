@@ -170,7 +170,6 @@ export interface components {
         Identifiant: string;
         LigneResultat: {
             cle: string;
-            clics: number;
             desinscriptions: number;
             envoyes: number;
             libelle: string;
@@ -207,7 +206,7 @@ export interface components {
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "clic" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
     };
     responses: never;
     parameters: never;
@@ -324,7 +323,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            clics: number;
                             /** Format: date */
                             jour: string;
                             /** @description Nul si aucune campagne de la période ne suit les ouvertures. */

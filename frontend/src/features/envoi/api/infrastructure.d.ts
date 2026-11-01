@@ -390,7 +390,7 @@ export interface components {
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "clic" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
         VersionConfiguration: {
             appliquee_le: components["schemas"]["Horodatage"] | null;
             changements: {

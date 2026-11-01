@@ -212,12 +212,12 @@ describe('jeu factice — rien de réel', () => {
 });
 
 describe('jeu factice — rien n’arrive dans le futur', () => {
-  it('réponses, événements d’envoi, ouvertures et clics sont tous passés', () => {
+  it('réponses, événements d’envoi, et ouvertures sont tous passés', () => {
     const maintenantIso = '2027-01-12T08:30:00.000Z';
     const dates = [
       ...demoDb.reponses.tous().map((r) => r.recue_le),
       ...demoDb.evenementsEnvoi.tous().map((e) => e.survenu_le),
-      ...demoDb.destinataires.tous().flatMap((d) => [d.dernier_evenement_le, d.ouverture?.premiere_le, d.ouverture?.derniere_le, d.clics?.premier_le]),
+      ...demoDb.destinataires.tous().flatMap((d) => [d.dernier_evenement_le, d.ouverture?.premiere_le, d.ouverture?.derniere_le]),
       ...demoDb.notifications.tous().map((n) => n.created_at),
     ].filter((d): d is string => typeof d === 'string');
     expect(dates.length).toBeGreaterThan(1500);
@@ -237,6 +237,13 @@ describe('jeu factice — graine fixe', () => {
 });
 
 describe('jeu factice — mesure des ouvertures (décision de Will)', () => {
+  it('aucun clic n’est suivi : ni champ, ni événement « clic »', () => {
+    expect(demoDb.destinataires.tous().some((d) => 'clics' in d)).toBe(false);
+    expect(demoDb.campagnes.tous().some((c) => 'clics' in c)).toBe(false);
+    expect(demoDb.evenementsEnvoi.tous().some((e) => (e.type as string) === 'clic')).toBe(false);
+    expect(JSON.stringify(genererJeu())).not.toMatch(/clic/i);
+  });
+
   it('une campagne dit si elle suit les ouvertures', () => {
     const campagnes = demoDb.campagnes.tous();
     expect(campagnes.every((c) => typeof c.suivre_ouvertures === 'boolean')).toBe(true);

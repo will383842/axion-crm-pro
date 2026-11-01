@@ -93,7 +93,9 @@ const LABELS: Record<string, string> = {
   '/affaires': 'Affaires',
   '/compte': 'Mon compte et sécurité',
   // DM0-COQ — l'espace Envoi : mêmes mots que sa barre (`navigationEnvoi.tsx`)
-  // et que le titre de ses pages.
+  // et que le titre de ses pages. `/envoi` (redirigé vers les campagnes) est
+  // la racine du fil dans Envoi : il n'y apparaît qu'une fois, en tête.
+  '/envoi': 'Envoi',
   '/envoi/campagnes': 'Campagnes',
   '/envoi/campagnes/calendrier': 'Calendrier',
   '/envoi/campagnes/nouvelle': 'Nouvelle campagne',
@@ -143,9 +145,6 @@ const SEGMENTS_SANS_ECRAN: ReadonlySet<string> = new Set([
   '/console',
   '/console/personnes',
   '/presse',
-  // DM0-COQ — `/envoi` seul redirige vers les campagnes : le fil part de la
-  // racine d'Envoi (« Envoi », lien vers les campagnes), jamais de ce segment.
-  '/envoi',
 ]);
 
 /** Exposé pour la garde : segments omis du fil. */
@@ -200,6 +199,8 @@ export function AutoBreadcrumbs() {
   segments.forEach((seg, idx) => {
     acc += `/${seg}`;
     const isLast = idx === segments.length - 1;
+    // Dans Envoi, la racine du fil EST déjà « Envoi » : on ne la répète pas.
+    if (dansEnvoi && acc === '/envoi') return;
     // Segment sans écran : omis (voir `SEGMENTS_SANS_ECRAN`).
     if (!isLast && SEGMENTS_SANS_ECRAN.has(acc)) return;
     // Sous un écran de liste, un segment sans libellé est l'identifiant d'une

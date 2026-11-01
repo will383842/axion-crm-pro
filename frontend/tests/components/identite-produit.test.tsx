@@ -13,6 +13,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -167,5 +168,28 @@ describe('Jetons d’identité (index.css)', () => {
   it('Commun = bandeau ardoise, bouton bleu de marque', () => {
     expect(bloc('commun')).toMatch(/--color-produit-bandeau:\s*#334155/i);
     expect(bloc('commun')).toMatch(/--color-produit:\s*var\(--color-brand-600\)/);
+  });
+});
+
+describe('Menu utilisateur — « Mon compte et sécurité » (écran commun)', () => {
+  it('avec Envoi, le menu mène à /compte', async () => {
+    const vue = await renderScreen(<p>Contenu</p>, {
+      path: '/companies',
+      withLayout: true,
+      handlers: [getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi()],
+      landingRoutes: ['/compte'],
+    });
+    await waitFor(() => expect(vue.queryClient.getQueryState(['crm', 'features'])?.status).toBe('success'));
+    await userEvent.click(await screen.findByRole('button', { name: /Menu utilisateur/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Mon compte et sécurité/ }));
+    await waitFor(() => expect(vue.router.state.location.pathname).toBe('/compte'));
+  });
+
+  it('sans Envoi (production d’aujourd’hui), le menu est inchangé', async () => {
+    const vue = await renderScreen(<p>Contenu</p>, { path: '/companies', withLayout: true });
+    await waitFor(() => expect(vue.queryClient.getQueryState(['crm', 'features'])?.status).toBe('success'));
+    await userEvent.click(await screen.findByRole('button', { name: /Menu utilisateur/ }));
+    expect(await screen.findByRole('menuitem', { name: /Paramètres/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Mon compte et sécurité/ })).toBeNull();
   });
 });

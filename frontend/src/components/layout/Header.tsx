@@ -15,16 +15,7 @@ import { UserMenu } from './UserMenu';
 import { useProduitCourant } from '@/features/socle/produit/useProduitCourant';
 import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 import { FeuDesEnvois } from '@/features/socle/EtatEnvois';
-import { ToutArreter, TOUT_ARRETER_AUSSI_DANS_LE_CRM } from '@/features/socle/ToutArreter';
-
-/**
- * DM0-COQ — « Tout arrêter » et le feu des envois : dans l'espace Envoi
- * (maquettes validées), et dans le CRM seulement si Will le demande.
- */
-export function montrerToutArreter(produit: string, envoiVisible: boolean): boolean {
-  if (!envoiVisible) return false;
-  return produit === 'envoi' || TOUT_ARRETER_AUSSI_DANS_LE_CRM;
-}
+import { ToutArreter, montrerToutArreter } from '@/features/socle/ToutArreter';
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void;

@@ -26,8 +26,7 @@ import { produitDeChemin } from '@/features/socle/produit/useProduitCourant';
 import { dernierePage, memoriserDernierePage } from '@/features/socle/produit/dernierePage';
 import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 import { useConsoleFeaturesQuery } from '@/features/crm-console/useConsoleFeatures';
-import { BandeauEnvoisArretes } from '@/features/socle/ToutArreter';
-import { montrerToutArreter } from '@/components/layout/Header';
+import { BandeauEnvoisArretes, montrerToutArreter } from '@/features/socle/ToutArreter';
 
 interface MeResponse {
   user: { id: string; current_workspace_id: string | null };

@@ -24,6 +24,12 @@ import { CLE_COMPTEURS_ENVOI, CLE_ETAT_ENVOIS, useEtatEnvois, type EtatEnvois } 
 /** Montrer « Tout arrêter » aussi dans l'espace CRM (si Will le demande). */
 export const TOUT_ARRETER_AUSSI_DANS_LE_CRM = false;
 
+/** Où montrer « Tout arrêter », le feu et le bandeau : dans Envoi, et dans le CRM si la constante le dit. */
+export function montrerToutArreter(produit: string, envoiVisible: boolean): boolean {
+  if (!envoiVisible) return false;
+  return produit === 'envoi' || TOUT_ARRETER_AUSSI_DANS_LE_CRM;
+}
+
 function useChangerEtatEnvois(chemin: '/envoi/tout-arreter' | '/envoi/reprendre', messageErreur: string) {
   const queryClient = useQueryClient();
   return useMutation({

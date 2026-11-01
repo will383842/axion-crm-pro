@@ -30,12 +30,14 @@ import { renderScreen } from '../helpers/renderScreen';
 import { FEATURES_LES_DEUX_PRODUITS, getJson, handlersEnvoi } from '../msw/handlers';
 
 /** Un `commandes.ts` de test, tel que `import.meta.glob(…, { eager: true })` le rend. */
+const MODULE_ENVOI_DE_TEST = {
+  commandes: [
+    { id: 'essai-chercher', libelle: 'Chercher un envoi d’essai', produit: 'envoi', motsCles: ['adresse', 'trace'], aller: '/envoi/sante/chercher' },
+  ] satisfies CommandeRecherche[],
+};
+
 const MODULE_DE_TEST: Record<string, { commandes?: CommandeRecherche[] }> = {
-  '../../envoi/essai/commandes.ts': {
-    commandes: [
-      { id: 'essai-chercher', libelle: 'Chercher un envoi d’essai', produit: 'envoi', motsCles: ['adresse', 'trace'], aller: '/envoi/sante/chercher' },
-    ],
-  },
+  '../../envoi/essai/commandes.ts': MODULE_ENVOI_DE_TEST,
   '../../crm/essai/commandes.ts': {
     commandes: [
       { id: 'essai-contact', libelle: 'Ajouter un contact d’essai', produit: 'crm', motsCles: ['personne'], aller: '/contacts' },
@@ -60,13 +62,13 @@ describe('Registre des commandes — chargement', () => {
   it('refuse une commande sans `aller` ni `agir`', () => {
     expect(() =>
       chargerCommandes({
-        '../../envoi/x/commandes.ts': { commandes: [{ id: 'x', libelle: 'X', produit: 'envoi', motsCles: [] } as CommandeRecherche] },
+        '../../envoi/x/commandes.ts': { commandes: [{ id: 'x', libelle: 'X', produit: 'envoi', motsCles: [] }] },
       }),
     ).toThrow(/aller|agir/);
   });
 
   it('refuse deux commandes de même identifiant', () => {
-    expect(() => chargerCommandes({ ...MODULE_DE_TEST, '../../envoi/autre/commandes.ts': MODULE_DE_TEST['../../envoi/essai/commandes.ts']! })).toThrow(/essai-chercher/);
+    expect(() => chargerCommandes({ ...MODULE_DE_TEST, '../../envoi/autre/commandes.ts': MODULE_ENVOI_DE_TEST })).toThrow(/essai-chercher/);
   });
 
   it('le VRAI chargement (`import.meta.glob`) trouve les commandes du socle', () => {

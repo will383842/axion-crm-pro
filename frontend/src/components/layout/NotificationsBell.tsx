@@ -53,8 +53,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
-import { IconButton, QueryErrorState } from '@/components/ui';
+import { IconButton, QueryErrorState, StatusPill, type StatusTone } from '@/components/ui';
 import { api } from '@/lib/api';
+import { MARQUE_DU_PRODUIT, type Produit } from '@/features/socle/produit/useProduitCourant';
 
 export interface LigneNotification {
   id: string | number;
@@ -64,6 +65,44 @@ export interface LigneNotification {
   action_url: string | null;
   read_at: string | null;
   created_at: string;
+  /**
+   * DM0-COQ — contrat d'Envoi (`Notification` de `backend/openapi/envoi/commun.yaml`).
+   * Absents du serveur d'aujourd'hui : la ligne s'affiche alors comme avant,
+   * sans pastille.
+   */
+  produit?: Produit;
+  /** Chemin de l'écran à ouvrir ; prime sur `action_url` (ancien nom). */
+  lien?: string | null;
+  niveau?: NiveauNotification;
+}
+
+export type NiveauNotification = 'a_faire' | 'attention' | 'nouveau' | 'fait';
+
+/** L'ÉTAT d'une alerte : couleurs de SENS par `StatusPill`, jamais l'identité du produit. */
+const ETAT_DU_NIVEAU: Record<NiveauNotification, { libelle: string; ton: StatusTone }> = {
+  a_faire: { libelle: 'À faire', ton: 'danger' },
+  attention: { libelle: 'Attention', ton: 'warning' },
+  nouveau: { libelle: 'Nouveau', ton: 'info' },
+  fait: { libelle: 'Fait', ton: 'success' },
+};
+
+const PRODUITS_CONNUS: ReadonlySet<string> = new Set(['crm', 'envoi', 'commun']);
+
+/**
+ * DM0-COQ (ADR-13 § 7) — la pastille d'IDENTITÉ d'une alerte : CARRÉE, pour ne
+ * jamais la confondre avec une pastille d'état (ronde). Sa couleur vient de
+ * son propre `data-produit`.
+ */
+function MarqueProduit({ produit }: { produit: Produit }) {
+  return (
+    <span
+      data-marque-produit
+      data-produit={produit}
+      className="inline-flex h-5 shrink-0 items-center rounded-sm bg-produit-bandeau px-1.5 text-xs font-semibold text-white"
+    >
+      {MARQUE_DU_PRODUIT[produit]}
+    </span>
+  );
 }
 
 export interface ReponseNotifications {
@@ -205,8 +244,21 @@ export function NotificationsBell() {
             ) : (
               <ul className="flex flex-col gap-1">
                 {lignes.map((ligne) => {
+                  const produit = typeof ligne.produit === 'string' && PRODUITS_CONNUS.has(ligne.produit) ? ligne.produit : null;
+                  const etat = ligne.niveau !== undefined ? ETAT_DU_NIVEAU[ligne.niveau] : undefined;
+                  const lien = ligne.lien ?? ligne.action_url;
                   const contenu = (
                     <>
+                      {produit !== null ? (
+                        <div className="mb-1 flex items-center gap-1.5">
+                          {etat !== undefined ? (
+                            <span data-pastille-etat className="inline-flex rounded-full">
+                              <StatusPill tone={etat.ton}>{etat.libelle}</StatusPill>
+                            </span>
+                          ) : null}
+                          <MarqueProduit produit={produit} />
+                        </div>
+                      ) : null}
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="text-sm font-medium text-slate-900 dark:text-white">
                           {ligne.title}
@@ -232,14 +284,14 @@ export function NotificationsBell() {
                           : 'rounded-lg px-2.5 py-2'
                       }
                     >
-                      {ligne.action_url === null || ligne.action_url === '' ? (
+                      {lien === null || lien === undefined || lien === '' ? (
                         <div>{contenu}</div>
                       ) : (
                         /* `action_url` vient du serveur : c'est une adresse
                            quelconque, pas un chemin typé du routeur. Un `<a>`
                            ordinaire est la seule forme honnête. */
                         <a
-                          href={ligne.action_url}
+                          href={lien}
                           className="block rounded-md hover:underline"
                           onClick={() => setOuvert(false)}
                         >

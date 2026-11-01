@@ -4,16 +4,16 @@ import { test, expect } from '@playwright/test';
  * Sprint H4 — Smoke E2E sur le Wizard Campagne.
  * Mocks API au niveau page.route pour rester déterministes (pas besoin backend up).
  */
-test.describe('Campaigns wizard (Sprint H4)', () => {
+test.describe('Assistant de collecte (Sprint H4)', () => {
   test('renders 4 steps and reaches the launch button', async ({ page }) => {
-    await page.route('**/api/v1/campaigns', (route) =>
+    await page.route('**/api/v1/collectes', (route) =>
       route.fulfill({ json: { data: { id: 42, status: 'running' } } }),
     );
     await page.route('**/api/v1/companies*', (route) =>
       route.fulfill({ json: { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 50 } } }),
     );
 
-    await page.goto('/campaigns/new');
+    await page.goto('/collectes/new');
 
     // Étape 1 — nom de campagne
     // Lot 2 UX : « Nouvelle collecte » est AUSSI le dernier segment du fil
@@ -25,6 +25,6 @@ test.describe('Campaigns wizard (Sprint H4)', () => {
     }
 
     // Le wizard doit afficher au moins l'amorce d'un step
-    await expect(page).toHaveURL(/\/campaigns\/new/);
+    await expect(page).toHaveURL(/\/collectes\/new/);
   });
 });

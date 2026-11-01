@@ -193,7 +193,7 @@ const SECTIONS_FIXES: NavSection[] = [
     id: 'alimenter',
     title: 'Alimenter la base',
     items: [
-      { to: '/campaigns', label: 'Collectes', icon: icone(Megaphone), dataTour: 'nav-campaigns' },
+      { to: '/collectes', label: 'Collectes', icon: icone(Megaphone), dataTour: 'nav-campaigns' },
       { to: '/coverage', label: 'Carte de France', icon: icone(MapIcon) },
     ],
   },

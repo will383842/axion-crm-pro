@@ -82,7 +82,7 @@ describe('Navigation cible — arborescence', () => {
     const sections = sectionsDeNavigation(TOUT_OUVERT);
     const chemins = (id: string) => sections.find((s) => s.id === id)?.items.map((i) => i.to);
     expect(chemins('ciblage')).toEqual(['/audiences', '/listes']);
-    expect(chemins('alimenter')).toEqual(['/campaigns', '/coverage']);
+    expect(chemins('alimenter')).toEqual(['/collectes', '/coverage']);
     // Audit UX lot 18 (2026-10-03) : la Roumanie quitte « Ma base » pour la
     // section repliée « Technique ».
     expect(chemins('ma-base')).not.toContain('/international/roumanie');
@@ -169,7 +169,7 @@ const ECRAN_DE: Record<string, string> = {
   '/audiences': 'features/audiences/AudiencesListPage.tsx',
   '/listes': 'features/listes/ListesManuellesPage.tsx',
   '/coverage': 'features/coverage/CoveragePage.tsx',
-  '/campaigns': 'features/campaigns/CampaignsListPage.tsx',
+  '/collectes': 'features/collectes/CollectesListePage.tsx',
   '/settings': 'features/settings/SettingsPage.tsx',
   '/users': 'features/users/UsersPage.tsx',
   '/tags': 'features/tags/TagsManagerPage.tsx',

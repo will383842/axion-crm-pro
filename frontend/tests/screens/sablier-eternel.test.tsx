@@ -7,7 +7,7 @@
  * leur indicateur de chargement POUR TOUJOURS, parce que la condition de sortie
  * teste LA DONNEE et non L'ETAT DE LA REQUETE :
  *
- *   src/features/campaigns/CampaignDetailPage.tsx   `if (isLoading || !campaign)`
+ *   src/features/collectes/CollecteDetailPage.tsx   `if (isLoading || !campaign)`
  *   src/features/audiences/AudienceDetailPage.tsx   `if (isLoading || !audience)`
  *   src/features/settings/SettingsPage.tsx          `ws.data ? <form/> : <p>Chargement…</p>`
  *
@@ -56,7 +56,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
+import { CollecteDetailPage } from '@/features/collectes/CollecteDetailPage';
 import { AudienceDetailPage } from '@/features/audiences/AudienceDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
@@ -222,15 +222,15 @@ interface CasEcran {
 
 const ECRANS: CasEcran[] = [
   {
-    nom: '/campaigns/$campaignId',
-    rendre: () => <CampaignDetailPage />,
-    path: '/campaigns/$campaignId',
-    url: '/campaigns/42',
+    nom: '/collectes/$collecteId',
+    rendre: () => <CollecteDetailPage />,
+    path: '/collectes/$collecteId',
+    url: '/collectes/42',
     plein: {
-      '/campaigns/42': CAMPAGNE_PLEINE,
-      '/campaigns/42/stats': STATS_PLEINES,
+      '/collectes/42': CAMPAGNE_PLEINE,
+      '/collectes/42/stats': STATS_PLEINES,
     },
-    cheminBloquant: '/campaigns/42',
+    cheminBloquant: '/collectes/42',
     temoinPlein: 'Collecte Bretagne',
     temoinVide: 'vide du serveur',
   },
@@ -350,10 +350,10 @@ describe.each(ECRANS)('D25-004 — $nom', (cas) => {
  */
 describe.each([
   {
-    nom: '/campaigns/$campaignId',
-    rendre: () => <CampaignDetailPage />,
-    path: '/campaigns/$campaignId',
-    url: '/campaigns/abc',
+    nom: '/collectes/$collecteId',
+    rendre: () => <CollecteDetailPage />,
+    path: '/collectes/$collecteId',
+    url: '/collectes/abc',
   },
   {
     nom: '/audiences/$audienceId',

@@ -1,11 +1,11 @@
 /**
- * Statut d'un passage de collecte en clair — `CampaignDetailPage.tsx`
+ * Statut d'un passage de collecte en clair — `CollecteDetailPage.tsx`
  * (audit UX lot 14, 2026-10-03) : l'onglet des passages affichait `running`,
  * `failed`… tels quels.
  */
 import { describe, expect, it } from 'vitest';
 
-import { libelleStatutPassage } from '@/features/campaigns/CampaignDetailPage';
+import { libelleStatutPassage } from '@/features/collectes/CollecteDetailPage';
 
 describe('libelleStatutPassage', () => {
   it.each([

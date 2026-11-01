@@ -499,6 +499,32 @@ Route::prefix('v1')->group(function () {
         Route::get('/campaigns/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
             ->middleware('throttle:scraper-list');
 
+        // --- Collectes (DM0-COL) : alias de /campaigns, même contrôleur, mêmes droits ----
+        Route::get('/collectes', [ScrapingCampaignsController::class, 'index'])
+            ->middleware('throttle:scraper-list');
+        Route::post('/collectes', [ScrapingCampaignsController::class, 'store'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::get('/collectes/{campaign}', [ScrapingCampaignsController::class, 'show'])
+            ->middleware('throttle:scraper-list');
+        Route::put('/collectes/{campaign}', [ScrapingCampaignsController::class, 'update'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::delete('/collectes/{campaign}', [ScrapingCampaignsController::class, 'destroy'])
+            ->middleware(['throttle:scraper-launch', 'permission:companies.delete']);
+        Route::post('/collectes/{campaign}/start', [ScrapingCampaignsController::class, 'start'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/collectes/{campaign}/pause', [ScrapingCampaignsController::class, 'pause'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/collectes/{campaign}/resume', [ScrapingCampaignsController::class, 'resume'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/collectes/{campaign}/cancel', [ScrapingCampaignsController::class, 'cancel'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/collectes/{campaign}/archive', [ScrapingCampaignsController::class, 'archive'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::post('/collectes/{campaign}/unarchive', [ScrapingCampaignsController::class, 'unarchive'])
+            ->middleware(['throttle:scraper-launch', 'permission:scraping.run']);
+        Route::get('/collectes/{campaign}/stats', [ScrapingCampaignsController::class, 'stats'])
+            ->middleware('throttle:scraper-list');
+
         // --- Lot L6 — Console CRM v2 ---------------------------------------
         //
         // Historique : ces routes devaient impérativement précéder le stub

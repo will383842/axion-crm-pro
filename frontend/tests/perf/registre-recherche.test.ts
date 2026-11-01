@@ -106,7 +106,7 @@ const REGISTRE: ReadonlyArray<{ fichier: string; variableBrute: string }> = [
   { fichier: 'src/features/media/MediaListPage.tsx', variableBrute: 'filter' },
   { fichier: 'src/features/contacts/ContactsListPage.tsx', variableBrute: 'search' },
   { fichier: 'src/features/media/JournalistsListPage.tsx', variableBrute: 'search' },
-  { fichier: 'src/features/campaigns/CampaignsListPage.tsx', variableBrute: 'search' },
+  { fichier: 'src/features/collectes/CollectesListePage.tsx', variableBrute: 'search' },
   { fichier: 'src/features/crm-console/CandidatesPage.tsx', variableBrute: 'search' },
   { fichier: 'src/features/crm-console/ContactsHubPage.tsx', variableBrute: 'search' },
   { fichier: 'src/components/ui/GlobalSearch.tsx', variableBrute: 'search' },

@@ -75,3 +75,57 @@ describe('handlers de démo — TÉMOIN', () => {
     ).toThrow(/deux fois/);
   });
 });
+
+// ── Les handlers du socle répondent au VRAI client de l'application ───────
+// Même tableau qu'en démo, servi ici par le serveur MSW de Vitest
+// (`tests/msw/server.ts`) : preuve que `api('/chemin')` vaut aussi sous Vitest.
+
+describe('handlers du socle — servis au client réel (src/lib/api.ts)', () => {
+  it('connexion : identifiants de démo, code de démo, puis /auth/me', async () => {
+    const { server } = await import('../msw/server');
+    const { api: client } = await import('@/lib/api');
+    const { IDENTIFIANTS_DEMO } = await import('@/demo/donnees');
+    server.use(...handlers);
+
+    await expect(client.get('/auth/me')).rejects.toMatchObject({ response: { status: 401 } });
+    await expect(client.post('/auth/login', { email: 'x@example.test', password: 'non' })).rejects.toMatchObject({ response: { status: 422 } });
+    const login = await client.post<{ requires_2fa: boolean }>('/auth/login', { email: IDENTIFIANTS_DEMO.email, password: IDENTIFIANTS_DEMO.motDePasse });
+    expect(login.data.requires_2fa).toBe(true);
+    await expect(client.post('/auth/2fa/verify', { code: '000000' })).rejects.toMatchObject({ response: { status: 422 } });
+    await client.post('/auth/2fa/verify', { code: IDENTIFIANTS_DEMO.code });
+    const moi = await client.get<{ user: { email: string }; workspace: { name: string } }>('/auth/me');
+    expect(moi.data.user.email).toBe(IDENTIFIANTS_DEMO.email);
+    expect(moi.data.workspace.name).toBe('Axion (démo)');
+  });
+
+  it('features selon l’offre, notifications filtrées, tout arrêter puis reprendre', async () => {
+    const { server } = await import('../msw/server');
+    const { api: client } = await import('@/lib/api');
+    const { choisirOffre } = await import('@/demo/offres');
+    const { demoDb } = await import('@/demo/base');
+    demoDb.reinitialiser();
+    server.use(...handlers);
+
+    const deux = await client.get<{ produits: unknown }>('/config/features');
+    expect(deux.data.produits).toEqual({ crm: 'actif', envoi: 'actif' });
+    const toutes = await client.get<{ data: Array<{ produit: string; lien: string }>; unread_count: number }>('/notifications');
+    expect(toutes.data.data).toHaveLength(6);
+    expect(toutes.data.unread_count).toBe(6);
+    expect(toutes.data.data.every((n) => n.lien.startsWith('/'))).toBe(true);
+
+    choisirOffre('envoi');
+    const envoiSeul = await client.get<{ produits: unknown }>('/config/features');
+    expect(envoiSeul.data.produits).toEqual({ crm: 'absent', envoi: 'actif' });
+    const sansCrm = await client.get<{ data: Array<{ produit: string }> }>('/notifications');
+    expect(sansCrm.data.data.every((n) => n.produit !== 'crm')).toBe(true);
+
+    await expect(client.post('/envoi/reprendre')).rejects.toMatchObject({ response: { status: 409 } });
+    const arret = await client.post<{ etat: string; feu: string }>('/envoi/tout-arreter', { motif: 'Essai' });
+    expect(arret.data).toMatchObject({ etat: 'arrete', feu: 'rouge' });
+    const compteurs = await client.get<{ en_file: number; boites_total: number }>('/envoi/compteurs');
+    expect(compteurs.data).toMatchObject({ en_file: 0, boites_total: 8 });
+    const reprise = await client.post<{ etat: string }>('/envoi/reprendre');
+    expect(reprise.data.etat).toBe('actif');
+    demoDb.reinitialiser();
+  });
+});

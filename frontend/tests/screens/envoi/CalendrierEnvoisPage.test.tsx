@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { CalendrierEnvoisPage } from '@/features/envoi/campagnes/CalendrierEnvoisPage';
 import { handlers } from '@/demo/handlers/envoi/campagnes.handlers';
 import { demoDb } from '@/demo/base';
+import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 async function ouvrir(query = '') {
@@ -19,7 +20,10 @@ async function ouvrir(query = '') {
 }
 
 describe('CalendrierEnvoisPage', () => {
-  beforeEach(() => demoDb.reinitialiser());
+  beforeEach(() => {
+    demoDb.reinitialiser();
+    definirEtatForce(null);
+  });
 
   it('montre les sept jours de la semaine en cours et les messages prévus', async () => {
     await ouvrir();
@@ -49,12 +53,14 @@ describe('CalendrierEnvoisPage', () => {
   });
 
   it('état vide', async () => {
-    await ouvrir('?demo-etat=vide');
+    definirEtatForce('vide');
+    await ouvrir();
     expect(await screen.findByText(/Rien à afficher pour le moment/)).toBeInTheDocument();
   });
 
   it('état d’erreur', async () => {
-    await ouvrir('?demo-etat=erreur');
+    definirEtatForce('erreur');
+    await ouvrir();
     expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeInTheDocument();
   });
 });

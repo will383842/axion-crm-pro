@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { CampagneSuiviPage } from '@/features/envoi/campagnes/CampagneSuiviPage';
 import { handlers } from '@/demo/handlers/envoi/campagnes.handlers';
 import { demoDb } from '@/demo/base';
+import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 async function ouvrir(id: string, query = '') {
@@ -23,7 +24,10 @@ async function ouvrir(id: string, query = '') {
 }
 
 describe('CampagneSuiviPage', () => {
-  beforeEach(() => demoDb.reinitialiser());
+  beforeEach(() => {
+    demoDb.reinitialiser();
+    definirEtatForce(null);
+  });
 
   it('montre la progression et les réponses comme indicateur principal', async () => {
     await ouvrir('cmp-01');
@@ -100,7 +104,8 @@ describe('CampagneSuiviPage', () => {
     await ouvrir('cmp-01');
     await screen.findByRole('heading', { level: 1, name: 'Organisateurs Rhône-Alpes' });
     await user.click(screen.getByRole('button', { name: 'Mettre en pause' }));
-    const dialogue = await screen.findByRole('dialog', { name: 'Mettre en pause ?' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Mettre en pause ?' })).toBeInTheDocument();
     await user.click(within(dialogue).getByRole('button', { name: 'Mettre en pause' }));
     await waitFor(() => expect(demoDb.campagnes.trouver('cmp-01')?.statut).toBe('en_pause'));
   });
@@ -111,7 +116,8 @@ describe('CampagneSuiviPage', () => {
   });
 
   it('état d’erreur : bouton Réessayer', async () => {
-    await ouvrir('cmp-01', '?demo-etat=erreur');
+    definirEtatForce('erreur');
+    await ouvrir('cmp-01');
     expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeInTheDocument();
   });
 });

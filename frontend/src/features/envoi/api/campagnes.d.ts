@@ -339,6 +339,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CampagneResume"][];
+                        /** @description Heure du serveur (sert à proposer « Demain 9:00 »). */
+                        maintenant: components["schemas"]["Horodatage"];
                         meta: components["schemas"]["Pagination"];
                         par_statut: {
                             [key: string]: number;
@@ -399,6 +401,7 @@ export interface operations {
                         };
                         derniers_evenements: components["schemas"]["EvenementEnvoi"][];
                         fin_prevue_le: components["schemas"]["Horodatage"] | null;
+                        maintenant: components["schemas"]["Horodatage"];
                         par_boite: {
                             adresse: string;
                             boite_id: components["schemas"]["Identifiant"];
@@ -450,6 +453,8 @@ export interface operations {
         parameters: {
             query?: {
                 etat?: components["schemas"]["EtatDestinataire"];
+                /** @description Regroupement affiché sous forme de filtres (les états détaillés restent dans `etat`). */
+                groupe?: "en_file" | "partis" | "refuses" | "ont_repondu" | "arretes" | "exclus";
                 /** @description Filtre sur l'ouverture estimée (campagnes qui suivent les ouvertures seulement). */
                 ouvert?: "oui" | "non" | "automatique";
                 page?: components["parameters"]["Page"];
@@ -553,9 +558,10 @@ export interface operations {
     };
     calendrierCampagnes: {
         parameters: {
-            query: {
-                au: string;
-                du: string;
+            query?: {
+                au?: string;
+                /** @description Premier jour (inclus). Sans `du` ni `au`, la semaine en cours (du lundi au dimanche). */
+                du?: string;
             };
             header?: never;
             path?: never;
@@ -570,6 +576,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** Format: date */
+                        au: string;
                         data: {
                             campagne_id: components["schemas"]["Identifiant"];
                             envoyes: number;
@@ -579,6 +587,9 @@ export interface operations {
                             prevus: number;
                             statut: components["schemas"]["StatutCampagne"];
                         }[];
+                        /** Format: date */
+                        du: string;
+                        maintenant: components["schemas"]["Horodatage"];
                     };
                 };
             };

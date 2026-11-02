@@ -29,8 +29,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data, meta, par_statut]
+                required: [data, meta, par_statut, maintenant]
                 properties:
+                  maintenant:
+                    description: Heure du serveur (sert à proposer « Demain 9:00 »).
+                    allOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }]
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
@@ -45,11 +48,12 @@ paths:
       parameters:
         - name: du
           in: query
-          required: true
+          required: false
+          description: Premier jour (inclus). Sans `du` ni `au`, la semaine en cours (du lundi au dimanche).
           schema: { type: string, format: date }
         - name: au
           in: query
-          required: true
+          required: false
           schema: { type: string, format: date }
       responses:
         '200':
@@ -58,8 +62,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [maintenant, du, au, data]
                 properties:
+                  maintenant: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                  du: { type: string, format: date }
+                  au: { type: string, format: date }
                   data:
                     type: array
                     items:
@@ -85,8 +92,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [campagne, sequence, derniers_evenements, compteurs, par_boite, par_jour, ab, fin_prevue_le]
+                required: [maintenant, campagne, sequence, derniers_evenements, compteurs, par_boite, par_jour, ab, fin_prevue_le]
                 properties:
+                  maintenant: { $ref: './commun.yaml#/components/schemas/Horodatage' }
                   campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
                   sequence:
                     type: array
@@ -253,6 +261,11 @@ paths:
           in: query
           required: false
           schema: { $ref: './commun.yaml#/components/schemas/EtatDestinataire' }
+        - name: groupe
+          in: query
+          required: false
+          description: Regroupement affiché sous forme de filtres (les états détaillés restent dans `etat`).
+          schema: { type: string, enum: [en_file, partis, refuses, ont_repondu, arretes, exclus] }
         - name: ouvert
           in: query
           required: false

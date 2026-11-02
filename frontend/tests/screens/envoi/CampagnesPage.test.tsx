@@ -3,12 +3,13 @@
  * de chaque ligne (Pause / Reprendre, Changer la date, Dupliquer, Terminer),
  * tous avec confirmation. Le faux serveur est celui de la démo (`handlers`).
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CampagnesPage } from '@/features/envoi/campagnes/CampagnesPage';
 import { handlers } from '@/demo/handlers/envoi/campagnes.handlers';
 import { demoDb } from '@/demo/base';
+import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 async function ouvrir(url = '/envoi/campagnes') {
@@ -20,10 +21,15 @@ async function ouvrir(url = '/envoi/campagnes') {
   });
 }
 
-const ligne = async (nom: RegExp) => (await screen.findByRole('row', { name: nom })) as HTMLElement;
+const ligne = async (nom: RegExp) => (await screen.findByRole('row', { name: nom }));
+
+afterEach(() => definirEtatForce(null));
 
 describe('CampagnesPage — liste', () => {
-  beforeEach(() => demoDb.reinitialiser());
+  beforeEach(() => {
+    demoDb.reinitialiser();
+    definirEtatForce(null);
+  });
 
   it('affiche les campagnes, le compte par statut et les tuiles', async () => {
     await ouvrir();
@@ -48,7 +54,8 @@ describe('CampagnesPage — liste', () => {
     await ouvrir();
     const org = await ligne(/Organisateurs Rhône-Alpes/);
     await user.click(within(org).getByRole('button', { name: /^Pause/ }));
-    const dialogue = await screen.findByRole('dialog', { name: 'Mettre en pause ?' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Mettre en pause ?' })).toBeInTheDocument();
     expect(dialogue).toHaveTextContent('Rien n’est perdu');
     await user.click(within(dialogue).getByRole('button', { name: 'Mettre en pause' }));
     await waitFor(() => expect(demoDb.campagnes.trouver('cmp-01')?.statut).toBe('en_pause'));
@@ -79,7 +86,8 @@ describe('CampagnesPage — liste', () => {
     await ouvrir();
     const federations = await ligne(/Fédérations — début d’année/);
     await user.click(within(federations).getByRole('button', { name: /^Changer la date/ }));
-    const dialogue = await screen.findByRole('dialog', { name: 'Changer la date' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Changer la date' })).toBeInTheDocument();
     await user.click(within(dialogue).getByRole('button', { name: 'Demain 9:00' }));
     await user.click(within(dialogue).getByRole('button', { name: 'Reprogrammer' }));
     // Aujourd'hui de la démo : mardi 12 janvier 2027 ; demain 9:00 à Paris = 08:00 UTC.
@@ -92,7 +100,8 @@ describe('CampagnesPage — liste', () => {
     const avant = demoDb.campagnes.compter();
     const org = await ligne(/Organisateurs Rhône-Alpes/);
     await user.click(within(org).getByRole('button', { name: /^Dupliquer/ }));
-    const dialogue = await screen.findByRole('dialog', { name: 'Dupliquer la campagne' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Dupliquer la campagne' })).toBeInTheDocument();
     expect(within(dialogue).getByRole('textbox', { name: 'Nom de la copie' })).toHaveValue('Organisateurs Rhône-Alpes (copie)');
     await user.click(within(dialogue).getByRole('button', { name: 'Créer la copie (brouillon)' }));
     await waitFor(() => expect(demoDb.campagnes.compter()).toBe(avant + 1));
@@ -107,7 +116,8 @@ describe('CampagnesPage — liste', () => {
     await ouvrir();
     const vienne = await ligne(/Commerces de Vienne/);
     await user.click(within(vienne).getByRole('button', { name: /^Terminer/ }));
-    const dialogue = await screen.findByRole('dialog', { name: 'Terminer définitivement ?' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Terminer définitivement ?' })).toBeInTheDocument();
     expect(dialogue).toHaveTextContent('On ne peut pas la relancer');
     expect(demoDb.campagnes.trouver('cmp-04')?.statut).toBe('en_pause');
     await user.click(within(dialogue).getByRole('button', { name: 'Terminer la campagne' }));
@@ -125,12 +135,14 @@ describe('CampagnesPage — liste', () => {
   });
 
   it('état vide : propose de créer une campagne', async () => {
-    await ouvrir('/envoi/campagnes?demo-etat=vide');
+    definirEtatForce('vide');
+    await ouvrir();
     expect(await screen.findByText('Aucune campagne pour l’instant')).toBeInTheDocument();
   });
 
   it('état d’erreur : message en français et bouton Réessayer', async () => {
-    await ouvrir('/envoi/campagnes?demo-etat=erreur');
+    definirEtatForce('erreur');
+    await ouvrir();
     expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeInTheDocument();
   });
 });

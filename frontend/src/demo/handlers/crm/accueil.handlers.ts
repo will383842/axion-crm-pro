@@ -4,6 +4,7 @@
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { demoDb } from '../../base';
+import { jourIso } from '../../horloge';
 import { api, delai, repondreEtatForce } from '../../outils';
 
 function statistiques() {
@@ -22,6 +23,7 @@ function statistiques() {
     prospects_joignables_idf: entreprises.filter((e) => e.email_generic !== '' && ['75', '77', '78', '91', '92', '93', '94', '95'].includes(e.department_code)).length,
     quality_avg: qualite,
     quality_a_recalculer_pct: 0,
+    aujourdhui: jourIso(0),
   };
 }
 

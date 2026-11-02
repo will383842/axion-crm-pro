@@ -33,7 +33,6 @@ function LigneTache({ tache, retard, avecDate }: { tache: Tache; retard?: boolea
           type="checkbox"
           className="h-5 w-5 shrink-0 rounded border-slate-300 md:h-4 md:w-4"
           checked={tache.faite}
-          disabled={cocher.isPending}
           onChange={(e) => cocher.mutate({ id: tache.id, faite: e.target.checked })}
         />
         <span className="min-w-0 flex-1">
@@ -84,7 +83,6 @@ function RappelDuMatin({ actif }: { actif: boolean }) {
         role="switch"
         className="mt-1 h-5 w-5 shrink-0"
         checked={actif}
-        disabled={rappel.isPending}
         onChange={(e) => rappel.mutate(e.target.checked)}
       />
     </Card>

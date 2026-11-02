@@ -96,6 +96,15 @@ describe('DashboardPage — rendu des blocs', () => {
     expect(screen.getByRole('navigation', { name: 'Tableau de bord' })).toBeVisible();
   });
 
+  it('la date de l’en-tête suit le « aujourd’hui » du serveur quand il le donne', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/dashboard/stats', { ...STATS, aujourdhui: '2027-01-12' }), ...socle()],
+    });
+
+    expect(await screen.findByText(/Mardi 12 janvier/)).toBeVisible();
+  });
+
   it('dateDuJour : « Samedi 3 octobre » ; nombreCourt : « 4,35 M »', () => {
     expect(dateDuJour(new Date(2026, 9, 3, 9, 0))).toBe('Samedi 3 octobre');
     expect(nombreCourt(4_350_000)).toBe(`4,35${String.fromCharCode(0xa0)}M`);

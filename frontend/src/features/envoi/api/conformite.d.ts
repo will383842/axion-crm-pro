@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/alertes/{id}/regler": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marquer une alerte comme réglée (elle reste dans l'historique) */
+        post: operations["marquerAlerteReglee"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/carnet": {
         parameters: {
             query?: never;
@@ -126,6 +143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/reglages/absence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mode absence (campagnes en pause, réponses en attente) */
+        put: operations["enregistrerModeAbsence"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/reglages/alertes": {
         parameters: {
             query?: never;
@@ -133,10 +167,44 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Règles d'alerte */
+        /** Règles d'alerte (type × canal) */
         get: operations["listerReglesAlerte"];
         /** Enregistrer les règles d'alerte */
         put: operations["enregistrerReglesAlerte"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/reglages/alertes/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Envoyer une alerte de test (cloche et e-mail seulement ; aucun message réel en démo) */
+        post: operations["envoyerAlerteDeTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/reglages/apercu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accueil des réglages d'envoi (résumé et boucles de retour) */
+        get: operations["lireApercuReglages"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -196,6 +264,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/reglages/regles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Règles de prudence et horaires */
+        get: operations["lireRegles"];
+        /** Enregistrer les règles (durcir seulement ; un assouplissement répond 422) */
+        put: operations["enregistrerRegles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/desinscription/{jeton}": {
         parameters: {
             query?: never;
@@ -206,7 +292,7 @@ export interface paths {
         /** Page publique de désinscription (sans connexion) */
         get: operations["lirePageDesinscription"];
         put?: never;
-        /** Confirmer la désinscription (un clic) */
+        /** Confirmer la désinscription (un clic ; aucune connexion) */
         post: operations["confirmerDesinscription"];
         delete?: never;
         options?: never;
@@ -228,6 +314,19 @@ export interface components {
             survenue_le: components["schemas"]["Horodatage"];
             titre: string;
         };
+        ApercuReglages: {
+            absence: components["schemas"]["ModeAbsence"];
+            boucles_de_retour: components["schemas"]["BoucleDeRetour"][];
+            canaux: components["schemas"]["CanalAlerte"][];
+            oppositions: number;
+            regles_actives: number;
+        };
+        BoucleDeRetour: {
+            detail: string;
+            /** @enum {string} */
+            etat: "fait" | "a_faire";
+            nom: string;
+        };
         /**
          * @description Alertes par la cloche de la console et par e-mail seulement.
          * @enum {string}
@@ -236,6 +335,10 @@ export interface components {
         ConnexionCrm: {
             /** @enum {string} */
             adaptateur: "crm_pro" | "generique" | "aucun";
+            /** @description Ce qui ne quitte jamais Envoi ou le CRM. */
+            ce_qui_ne_passe_pas: string[];
+            /** @description Ce que l'adaptateur échange avec le CRM (phrases courtes). */
+            ce_qui_passe: string[];
             contacts_vus: number;
             derniere_synchro_le: components["schemas"]["Horodatage"] | null;
             etat: components["schemas"]["EtatFeu"];
@@ -284,12 +387,30 @@ export interface components {
         Identifiant: string;
         Identite: {
             adresse_postale: string;
-            /** @example SAS */
+            /** @description Bloc d'information des destinataires (art. 14 du RGPD), présent sous chaque message. */
+            bloc_information: string;
+            /**
+             * @description Phrase AJOUTÉE au bloc quand la campagne mesure les ouvertures par pixel
+             *     (décrit le pixel, précise qu'aucun clic n'est suivi). Absente des
+             *     messages des campagnes qui ne mesurent pas les ouvertures.
+             */
+            bloc_information_ouvertures: string;
+            /**
+             * @description Forme juridique de l'entité d'envoi (SAS française).
+             * @example SAS
+             */
             forme: string;
             /** @constant */
             lien_desinscription: true;
+            /** @description Lien de rendez-vous ajouté au message (facultatif). */
+            lien_rendez_vous: string | null;
             raison_sociale: string;
             signature: string;
+        };
+        ModeAbsence: {
+            actif: boolean;
+            au: string | null;
+            du: string | null;
         };
         /** @description Ligne du registre d'opposition (« ne plus écrire »). Jamais supprimée. */
         Opposition: {
@@ -317,8 +438,20 @@ export interface components {
             jours: ("lun" | "mar" | "mer" | "jeu" | "ven" | "sam" | "dim")[];
             pause_si_refus_pct: number;
             plafond_jour: number;
-            /** @description Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle campagne (faux par défaut). */
+            /**
+             * @description Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle
+             *     campagne (faux par défaut). La mesure par pixel est optionnelle,
+             *     décidée par campagne, décrite aux destinataires, jamais pour un contact
+             *     opposé ; aucun suivi des clics.
+             */
             suivre_ouvertures_par_defaut: boolean;
+        };
+        /** @description Règles d'alerte par type et canal (console et e-mail seulement), seconde adresse, regroupement. */
+        ReglagesAlertes: {
+            data: components["schemas"]["RegleAlerte"][];
+            /** @description Les alertes de même type sont regroupées sur cette durée (15 minutes). */
+            regroupement_minutes: number;
+            seconde_adresse: string | null;
         };
         RegleAlerte: {
             actif: boolean;
@@ -328,6 +461,27 @@ export interface components {
             id: components["schemas"]["Identifiant"];
             nom: string;
             seuil: number | null;
+        };
+        /**
+         * @description Règles de prudence et horaires. On ne peut que DURCIR (valeur plus
+         *     prudente) : un seuil plus haut, une fenêtre plus large ou un frein plus
+         *     lâche répond 422 `assouplissement_refuse`.
+         */
+        Regles: {
+            /** @description Au-delà de ce nombre de réponses en attente par jour, les envois ralentissent (15 par défaut). */
+            frein_reponses_par_jour: number;
+            /** @example 17:30 */
+            heure_a: string;
+            /** @example 09:00 */
+            heure_de: string;
+            /** @description Pas de week-end ni de jour férié français. */
+            jours_ouvres_seulement: boolean;
+            pause_si_plaintes_pour_mille: number;
+            pause_si_refus_pct: number;
+            /** @description Nombre maximal de messages vers une même organisation sur 30 jours (pression commerciale). */
+            pression_max_par_organisation_30j: number;
+            /** @constant */
+            test_du_matin_bloquant: true;
         };
         /** @enum {string} */
         SourceDesinscription: "lien" | "reponse_stop" | "plainte" | "manuel";
@@ -374,6 +528,24 @@ export interface components {
                 "application/json": components["schemas"]["Reglages"];
             };
         };
+        /** @description Règles d'alerte. */
+        ReglagesAlertes: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ReglagesAlertes"];
+            };
+        };
+        /** @description Règles de prudence et horaires. */
+        Regles: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Regles"];
+            };
+        };
         /** @description Geste accepté. */
         Succes: {
             headers: {
@@ -416,6 +588,29 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    marquerAlerteReglee: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description L'alerte après changement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlerteEnvoi"];
+                };
+            };
+            404: components["responses"]["Erreur"];
         };
     };
     listerCarnet: {
@@ -601,6 +796,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         adresse: string;
+                        /** @description Faux dès que la réponse est « non » (contact opposé), car jamais de pixel pour lui. */
+                        mesure_ouvertures_permise: boolean;
                         raisons: string[];
                         /** @enum {string} */
                         reponse: "oui" | "non" | "prudence";
@@ -637,6 +834,31 @@ export interface operations {
             200: components["responses"]["Reglages"];
         };
     };
+    enregistrerModeAbsence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModeAbsence"];
+            };
+        };
+        responses: {
+            /** @description Mode absence enregistré. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModeAbsence"];
+                };
+            };
+            422: components["responses"]["Erreur"];
+        };
+    };
     listerReglesAlerte: {
         parameters: {
             query?: never;
@@ -646,17 +868,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Règles. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: components["schemas"]["RegleAlerte"][];
-                    };
-                };
-            };
+            200: components["responses"]["ReglagesAlertes"];
         };
     };
     enregistrerReglesAlerte: {
@@ -668,13 +880,43 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    data: components["schemas"]["RegleAlerte"][];
-                };
+                "application/json": components["schemas"]["ReglagesAlertes"];
             };
         };
         responses: {
+            200: components["responses"]["ReglagesAlertes"];
+        };
+    };
+    envoyerAlerteDeTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
             200: components["responses"]["Succes"];
+        };
+    };
+    lireApercuReglages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Résumé. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApercuReglages"];
+                };
+            };
         };
     };
     lireConnexionCrm: {
@@ -729,6 +971,35 @@ export interface operations {
             200: components["responses"]["Identite"];
         };
     };
+    lireRegles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Regles"];
+        };
+    };
+    enregistrerRegles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Regles"];
+            };
+        };
+        responses: {
+            200: components["responses"]["Regles"];
+            422: components["responses"]["Erreur"];
+        };
+    };
     lirePageDesinscription: {
         parameters: {
             query?: never;
@@ -750,6 +1021,10 @@ export interface operations {
                         adresse_masquee: string;
                         deja_desinscrit: boolean;
                         expediteur: string;
+                        /** @description Nom de l'organisation du destinataire, si connue (option « toute mon organisation »). */
+                        organisation: string | null;
+                        /** @description Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, jamais de suivi des clics). */
+                        pourquoi_ce_message: string;
                     };
                 };
             };
@@ -765,9 +1040,17 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Inscrit aussi l'organisation (portée « organisation » du registre). */
+                    toute_l_organisation?: boolean;
+                };
+            };
+        };
         responses: {
             200: components["responses"]["Succes"];
+            404: components["responses"]["Erreur"];
         };
     };
 }

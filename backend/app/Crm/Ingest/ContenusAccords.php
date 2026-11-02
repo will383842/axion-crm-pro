@@ -75,14 +75,17 @@ final class ContenusAccords
      * Union sans retrait, dédoublonnée sur la valeur entière, triée par date
      * puis valeur : le résultat ne dépend PAS de l'ordre d'arrivée.
      *
-     * @param  list<array<string, string>>  $actuels
-     * @param  list<array<string, string>>|null  $entrants
-     * @return list<array<string, string>>
+     * @param  array<mixed>  $actuels
+     * @param  array<mixed>|null  $entrants
+     * @return list<array<string, mixed>>
      */
     public static function fusionnerListes(array $actuels, ?array $entrants): array
     {
         $tous = [];
         foreach (array_merge($actuels, $entrants ?? []) as $ligne) {
+            if (! is_array($ligne)) {
+                continue;
+            }
             $cle = $ligne;
             ksort($cle);
             $tous[json_encode($cle, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)] = $ligne;
@@ -120,7 +123,7 @@ final class ContenusAccords
      * relue depuis la base. Même si une ligne ancienne portait autre chose, rien
      * d'autre ne sort (jamais de pseudo ni de texte de message).
      *
-     * @return array{origine: array<string, ?string>|null, guides: list<array<string, string>>, consentements: list<array<string, string>>, opposition: array{actif: bool, date: ?string}}
+     * @return array<string, mixed>
      */
     public static function bloc(mixed $origine, mixed $guides, mixed $consentements, mixed $oppositionAt): array
     {

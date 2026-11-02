@@ -204,9 +204,14 @@ paths:
   /envoi/messages:
     get:
       operationId: listerMessagesTypes
-      summary: Messages types
+      summary: Messages types (jamais supprimés, les archivés se montrent sur demande)
       parameters:
         - $ref: './commun.yaml#/components/parameters/Recherche'
+        - name: archives
+          in: query
+          required: false
+          description: Inclure les messages archivés.
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: Messages types.
@@ -214,11 +219,15 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, blocs]
                 properties:
                   data:
                     type: array
-                    items: { $ref: './commun.yaml#/components/schemas/MessageType' }
+                    items: { $ref: '#/components/schemas/MessageTypeEtat' }
+                  blocs:
+                    type: array
+                    description: Blocs réutilisables (signatures, appels, bloc d'information).
+                    items: { $ref: '#/components/schemas/BlocReutilisable' }
     post:
       operationId: creerMessageType
       summary: Créer un message type
@@ -262,6 +271,253 @@ paths:
           schema: { type: integer, minimum: 1 }
       responses:
         '200': { $ref: '#/components/responses/MessageType' }
+  /envoi/creation/contexte:
+    get:
+      operationId: lireContexteCreation
+      summary: Date et heure du serveur et fuseau (pour « demain 9:00 » et les durées estimées)
+      responses:
+        '200':
+          description: Contexte.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [maintenant, fuseau]
+                properties:
+                  maintenant: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                  fuseau: { type: string, examples: [Europe/Paris] }
+  /envoi/creation/cibles:
+    get:
+      operationId: listerCibles
+      summary: Cibles proposables (étiquettes, audiences, listes, entreprise d'origine) avec les joignables
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - name: entreprise
+          in: query
+          required: false
+          description: Identifiant d'une entreprise du CRM (ajoute sa cible « carnet »).
+          schema: { type: string }
+      responses:
+        '200':
+          description: Cibles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/CibleProposee' }
+  /envoi/creation/boites:
+    get:
+      operationId: listerBoitesPourCampagne
+      summary: Boîtes d'envoi choisissables pour une campagne
+      responses:
+        '200':
+          description: Boîtes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/BoiteChoix' }
+  /envoi/creation/destinataires-exemples:
+    get:
+      operationId: listerDestinatairesExemples
+      summary: Destinataires pour l'aperçu réel d'un message
+      responses:
+        '200':
+          description: Destinataires exemples.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/DestinataireExemple' }
+  /envoi/creation/champs:
+    post:
+      operationId: analyserChamps
+      summary: Champs de fusion utilisés par la séquence, personnes sans valeur et blocage si un champ obligatoire manque
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cible, sequence]
+              properties:
+                cible: { $ref: '#/components/schemas/Cible' }
+                sequence:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  items: { $ref: '#/components/schemas/EtapeSequence' }
+                repli:
+                  type: object
+                  additionalProperties: { type: string }
+      responses:
+        '200':
+          description: Champs utilisés.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [champs, bloquants]
+                properties:
+                  champs:
+                    type: array
+                    items: { $ref: '#/components/schemas/ChampUtilise' }
+                  bloquants: { type: integer, minimum: 0 }
+  /envoi/messages/controler:
+    post:
+      operationId: controlerMessage
+      summary: Contrôleur de contenu (mots interdits, liens, bloc d'information art. 14, texte simple, valeurs de repli)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaisieMessage' }
+      responses:
+        '200':
+          description: Résultat de chaque contrôle.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [controles, bloquants]
+                properties:
+                  controles:
+                    type: array
+                    items: { $ref: '#/components/schemas/ControleContenu' }
+                  bloquants: { type: integer, minimum: 0 }
+  /envoi/messages/apercu:
+    post:
+      operationId: apercuMessageType
+      summary: Aperçu réel d'un message pour un destinataire exemple
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objet, corps]
+              properties:
+                objet: { type: string }
+                corps: { type: string }
+                bloc_information: { type: boolean }
+                destinataire_exemple_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200':
+          description: Message rendu.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [objet, corps, de]
+                properties:
+                  objet: { type: string }
+                  corps: { type: string }
+                  de: { type: string }
+  /envoi/messages/test:
+    post:
+      operationId: envoyerTestMessage
+      summary: M'envoyer un test (à mes adresses de test seulement, jamais à un destinataire)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objet, corps]
+              properties:
+                objet: { type: string }
+                objet_b: { oneOf: [{ type: string }, { type: 'null' }] }
+                corps: { type: string }
+                a_moi: { type: boolean }
+                boites_temoins: { type: boolean }
+                deux_versions: { type: boolean }
+                destinataire_exemple_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200':
+          description: Test envoyé.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, adresses]
+                properties:
+                  ok: { type: boolean, const: true }
+                  adresses: { type: integer, minimum: 0 }
+  /envoi/messages/suggestion:
+    post:
+      operationId: suggererSequence
+      summary: Brouillon de séquence proposé par l'IA (une suggestion à relire, jamais envoyée seule)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cible: { type: string }
+      responses:
+        '200':
+          description: Suggestion.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestion, messages]
+                properties:
+                  suggestion: { type: boolean, const: true }
+                  messages:
+                    type: array
+                    minItems: 1
+                    maxItems: 4
+                    items:
+                      type: object
+                      required: [delai_jours, objet, corps]
+                      properties:
+                        delai_jours: { type: integer, minimum: 0 }
+                        objet: { type: string }
+                        corps: { type: string }
+  /envoi/messages/{id}/versions/{numero}/valider:
+    post:
+      operationId: validerVersion
+      summary: Valider une version (elle seule est utilisable dans une campagne)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - name: numero
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/MessageTypeEtat' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/messages/{id}/archivage:
+    post:
+      operationId: archiverMessageType
+      summary: Archiver ou désarchiver un message type (il n'est jamais supprimé)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [archive]
+              properties:
+                archive: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/MessageTypeEtat' }
 components:
   schemas:
     Cible:
@@ -270,11 +526,95 @@ components:
       properties:
         type: { $ref: './commun.yaml#/components/schemas/TypeCible' }
         reference: { type: string }
+        libelle: { type: string }
         exclusions:
           type: array
           items:
             type: string
             enum: [deja_contactes_90j, clients, desinscrits, opposition, rebonds_durs, sans_adresse, autres_campagnes_en_cours]
+        exclusions_libres:
+          type: array
+          description: Adresses, organisations ou domaines à exclure en plus (saisie libre).
+          items: { type: string }
+        reverifier_anciennes:
+          type: boolean
+          description: Revérifier les adresses vues il y a plus de 30 jours avant l'envoi.
+    CibleProposee:
+      type: object
+      required: [type, reference, libelle, total, joignables]
+      properties:
+        type: { $ref: './commun.yaml#/components/schemas/TypeCible' }
+        reference: { type: string }
+        libelle: { type: string }
+        total: { type: integer, minimum: 0 }
+        joignables: { type: integer, minimum: 0 }
+    BoiteChoix:
+      type: object
+      required: [id, adresse, statut, quota_jour]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        adresse: { type: string }
+        statut: { $ref: './commun.yaml#/components/schemas/StatutBoite' }
+        quota_jour: { type: integer, minimum: 0 }
+    DestinataireExemple:
+      type: object
+      required: [id, libelle, prenom, organisation]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        libelle: { type: string }
+        prenom: { oneOf: [{ type: string }, { type: 'null' }] }
+        organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+    ChampUtilise:
+      type: object
+      required: [nom, obligatoire, manquants, repli, bloquant]
+      properties:
+        nom: { type: string, description: 'Nom du champ sans accolades, ex. `prénom`.' }
+        obligatoire: { type: boolean }
+        manquants:
+          type: integer
+          minimum: 0
+          description: Personnes de la cible pour qui ce champ est vide.
+        repli:
+          description: Valeur de repli retenue (saisie ou écrite dans le message).
+          oneOf: [{ type: string }, { type: 'null' }]
+        bloquant:
+          type: boolean
+          description: Champ obligatoire vide pour au moins une personne, sans valeur de repli.
+    BlocReutilisable:
+      type: object
+      required: [id, nom, texte, utilise]
+      properties:
+        id: { type: string }
+        nom: { type: string }
+        texte: { type: string }
+        utilise: { type: integer, minimum: 0 }
+    StatutMessage:
+      type: string
+      enum: [brouillon, a_relire, valide, archive]
+    MessageTypeEtat:
+      description: Un message type de l'espace et son état de validation.
+      allOf:
+        - $ref: './commun.yaml#/components/schemas/MessageType'
+        - type: object
+          required: [statut, version_validee, bloc_information]
+          properties:
+            statut: { $ref: '#/components/schemas/StatutMessage' }
+            version_validee:
+              description: Version validée, la seule utilisable dans une campagne.
+              oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
+            bloc_information:
+              type: boolean
+              description: Bloc d'information (art. 14 du RGPD) et lien de désinscription ajoutés au message.
+    ControleContenu:
+      type: object
+      required: [code, libelle, etat, detail]
+      properties:
+        code:
+          type: string
+          enum: [mots_interdits, liens, bloc_information, texte_simple, valeurs_repli]
+        libelle: { type: string }
+        etat: { type: string, enum: [ok, attention, bloquant] }
+        detail: { oneOf: [{ type: string }, { type: 'null' }] }
     EtapeSequence:
       type: object
       required: [etape, message_id, delai_jours]
@@ -298,13 +638,20 @@ components:
           minItems: 1
           maxItems: 4
           items: { $ref: '#/components/schemas/EtapeSequence' }
+        nom: { type: string }
+        repli:
+          type: object
+          description: Valeur de repli saisie pour chaque champ (`prénom`, `entreprise`, `lien_rdv`…).
+          additionalProperties: { type: string }
+        depart_immediat:
+          type: boolean
+          description: Départ dès la validation (sinon programmé à `debut_le`).
         boites:
           type: array
           items: { $ref: './commun.yaml#/components/schemas/Identifiant' }
         plafond_jour: { type: integer, minimum: 1 }
         suivre_ouvertures:
           type: boolean
-          default: false
           description: Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation.
         debut_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         jours: { type: array, items: { type: string, enum: [lun, mar, mer, jeu, ven, sam, dim] } }
@@ -326,6 +673,12 @@ components:
           items: { type: integer, minimum: 1, maximum: 5 }
         contenu: { $ref: '#/components/schemas/ContenuEtape' }
         mis_a_jour_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        campagne_id:
+          description: Campagne créée par la validation (présent une fois validé).
+          oneOf: [{ $ref: './commun.yaml#/components/schemas/Identifiant' }, { type: 'null' }]
+        annulable_jusqua:
+          description: Fin de la fenêtre d'annulation de 5 minutes (présent une fois validé).
+          oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
     Controle:
       type: object
       required: [code, libelle, etat, detail]
@@ -344,6 +697,9 @@ components:
         objet: { type: string }
         objet_b: { oneOf: [{ type: string }, { type: 'null' }] }
         corps: { type: string }
+        bloc_information:
+          type: boolean
+          description: Ajouter le bloc d'information (art. 14) et le lien de désinscription.
   responses:
     Brouillon:
       description: Brouillon.
@@ -354,4 +710,9 @@ components:
       description: Message type et ses versions.
       content:
         application/json:
-          schema: { $ref: './commun.yaml#/components/schemas/MessageType' }
+          schema: { $ref: '#/components/schemas/MessageTypeEtat' }
+    MessageTypeEtat:
+      description: Message type, ses versions et son état.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/MessageTypeEtat' }

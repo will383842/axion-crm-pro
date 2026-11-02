@@ -40,9 +40,45 @@ paths:
                 adresse: { type: string, format: email }
                 domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
                 nom_affiche: { type: string }
+                signature:
+                  description: Signature ajoutée en bas des messages de cette boîte.
+                  type: string
+                mode_absence: { $ref: '#/components/schemas/ModeAbsence' }
       responses:
         '201': { $ref: '#/components/responses/Boite' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/boites/test-connexion:
+    post:
+      operationId: testerConnexionBoite
+      summary: Tester la connexion d'une boîte avant de l'ajouter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adresse, domaine_id]
+              properties:
+                adresse: { type: string, format: email }
+                domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200':
+          description: Résultat du test, étape par étape.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reussi, etapes]
+                properties:
+                  reussi: { type: boolean }
+                  etapes:
+                    type: array
+                    items:
+                      type: object
+                      required: [libelle, ok]
+                      properties:
+                        libelle: { type: string }
+                        ok: { type: boolean }
   /envoi/boites/{id}:
     get:
       operationId: lireBoite
@@ -56,15 +92,37 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [boite, jours, derniers_refus]
+                required: [boite, jours, derniers_refus, reponses, reglages]
                 properties:
                   boite: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+                  reponses:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/ReponseResume' }
+                  reglages: { $ref: '#/components/schemas/ReglagesBoite' }
                   jours:
                     type: array
                     items: { $ref: '#/components/schemas/JourActivite' }
                   derniers_refus:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/boites/{id}/reglages:
+    put:
+      operationId: enregistrerReglagesBoite
+      summary: Enregistrer la signature et le mode absence d'une boîte
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReglagesBoite' }
+      responses:
+        '200':
+          description: Réglages enregistrés.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReglagesBoite' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/boites/{id}/suspendre:
     post:
@@ -93,11 +151,24 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, garde_dispersion, expirations]
                 properties:
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  garde_dispersion:
+                    description: |
+                      Garde anti-dispersion : nombre de domaines utilisés et limite
+                      (trois domaines par serveur d'envoi). Au-delà, l'ajout est refusé.
+                    type: object
+                    required: [utilises, limite]
+                    properties:
+                      utilises: { type: integer, minimum: 0 }
+                      limite: { type: integer, minimum: 1 }
+                  expirations:
+                    description: Date d'expiration de chaque domaine (identifiant du domaine -> date).
+                    type: object
+                    additionalProperties: { $ref: './commun.yaml#/components/schemas/Horodatage' }
     post:
       operationId: ajouterDomaine
       summary: Ajouter un domaine (rend les enregistrements DNS à créer)
@@ -111,6 +182,7 @@ paths:
               properties:
                 nom: { type: string }
       responses:
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
         '201':
           description: Domaine et enregistrements à créer.
           content:
@@ -136,7 +208,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [domaine, dns, jours, listes_noires]
+                required: [domaine, dns, jours, listes_noires, expire_le]
                 properties:
                   domaine: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
                   dns:
@@ -148,6 +220,7 @@ paths:
                   listes_noires:
                     type: array
                     items: { $ref: '#/components/schemas/ListeNoire' }
+                  expire_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/domaines/{id}/dns/verifier:
     post:
@@ -205,6 +278,32 @@ paths:
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/ServeurResume' }
+  /envoi/serveurs/{id}/sante:
+    get:
+      operationId: lireSanteServeur
+      summary: Santé d'un serveur d'envoi, file et paliers de chauffe de ses adresses IP
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Santé du serveur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SanteServeur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/serveurs/{id}/test:
+    post:
+      operationId: lancerTestServeur
+      summary: Lancer le test du serveur (boîtes témoins internes, aucun envoi réel)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Santé du serveur après le test.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SanteServeur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/serveurs/{id}/adresses-ip:
     post:
       operationId: ajouterAdresseIp
@@ -260,8 +359,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [boites, courbe]
+                required: [boites, courbe, fins_prevues, plafond_boite]
                 properties:
+                  plafond_boite:
+                    description: Plafond d'envois par boîte et par jour (150 en V0).
+                    type: integer
+                    minimum: 1
+                  fins_prevues:
+                    description: Date de fin prévue de la montée de chaque boîte en chauffe (identifiant de la boîte -> date).
+                    type: object
+                    additionalProperties: { type: string, format: date }
                   boites:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
@@ -273,6 +380,15 @@ paths:
                       properties:
                         jour: { type: integer, minimum: 1 }
                         plafond: { type: integer, minimum: 0 }
+  /envoi/chauffe/{id}/reculer:
+    post:
+      operationId: reculerChauffe
+      summary: Reculer la montée en douceur d'un palier (jours effectifs)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Boite' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/listes-noires:
     get:
       operationId: listerListesNoires
@@ -291,6 +407,56 @@ paths:
                     items: { $ref: '#/components/schemas/ListeNoire' }
 components:
   schemas:
+    SanteServeur:
+      type: object
+      required: [serveur_id, en_ligne_depuis_jours, en_file, test, paliers]
+      properties:
+        serveur_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        en_ligne_depuis_jours: { type: integer, minimum: 0 }
+        en_file:
+          description: Messages en attente d'envoi sur ce serveur.
+          type: integer
+          minimum: 0
+        test:
+          type: object
+          required: [fait_le, etapes]
+          properties:
+            fait_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+            etapes:
+              type: array
+              items:
+                type: object
+                required: [libelle, ok]
+                properties:
+                  libelle: { type: string }
+                  ok: { type: boolean }
+        paliers:
+          description: Paliers de chauffe des adresses IP en montée.
+          type: array
+          items:
+            type: object
+            required: [adresse, jour, sur, plafond_aujourdhui]
+            properties:
+              adresse: { type: string }
+              jour: { type: integer, minimum: 1 }
+              sur: { type: integer, minimum: 1 }
+              plafond_aujourdhui: { type: integer, minimum: 0 }
+    ModeAbsence:
+      description: Pendant l'absence, la boîte n'envoie plus et les réponses automatiques sont mises de côté.
+      type: object
+      required: [actif, jusqu_au, message]
+      properties:
+        actif: { type: boolean }
+        jusqu_au:
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+        message:
+          oneOf: [{ type: string }, { type: 'null' }]
+    ReglagesBoite:
+      type: object
+      required: [signature, mode_absence]
+      properties:
+        signature: { type: string }
+        mode_absence: { $ref: '#/components/schemas/ModeAbsence' }
     JourActivite:
       type: object
       required: [jour, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, reponses]
@@ -304,25 +470,41 @@ components:
         reponses: { type: integer, minimum: 0 }
     EnregistrementDns:
       type: object
-      required: [type, nom, valeur, etat]
+      required: [role, type, nom, valeur, etat]
       properties:
-        type: { type: string, enum: [TXT, CNAME, MX] }
+        role:
+          description: Ce que l'enregistrement sert à faire.
+          type: string
+          enum: [spf, dkim, dmarc, ptr, mta_sts]
+        type: { type: string, enum: [TXT, CNAME, MX, PTR] }
         nom: { type: string }
         valeur: { type: string }
         etat: { type: string, enum: [ok, absent, different] }
     ListeNoire:
       type: object
-      required: [liste, element, present, verifie_le]
+      required: [liste, element, present, verifie_le, que_faire, lien_retrait]
       properties:
         liste: { type: string }
+        que_faire:
+          description: Fiche « que faire » en français (vide si l'élément est propre).
+          oneOf: [{ type: string }, { type: 'null' }]
+        lien_retrait:
+          description: Adresse de la demande de retrait de la liste (vide si l'élément est propre).
+          oneOf: [{ type: string, format: uri }, { type: 'null' }]
         element: { type: string }
         present: { type: boolean }
         verifie_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
     VersionConfiguration:
       type: object
-      required: [numero, creee_le, appliquee_le, changements]
+      required: [numero, creee_le, appliquee_le, par, resultat, changements]
       properties:
         numero: { type: integer, minimum: 1 }
+        par:
+          description: Qui a appliqué la version (prénom, ou « Système »).
+          oneOf: [{ type: string }, { type: 'null' }]
+        resultat:
+          type: string
+          enum: [prete, appliquee, remplacee, retour_automatique]
         creee_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         appliquee_le:
           oneOf:

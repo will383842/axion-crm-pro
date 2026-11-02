@@ -10,10 +10,11 @@
  * la base froide (4,29 M de fiches collectées) ne se mélange pas au quotidien —
  * on change de vue, on ne coche pas une case.
  */
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
+  Button,
   Card,
   Champ,
   EmptyState,
@@ -31,6 +32,10 @@ import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import { AjouterAUneListe } from '@/features/listes/AjouterAUneListe';
+import { AjoutRapideContact } from '@/features/contacts/ajout-rapide/AjoutRapideContact';
+import { CorbeilleContacts } from '@/features/contacts/corbeille/CorbeilleContacts';
+import { ImportContacts } from '@/features/contacts/import/ImportContacts';
+import { exporterSelection } from '@/features/contacts/ajout-rapide/exporter';
 import {
   LIFECYCLE_LABELS,
   RELATION_TYPES,
@@ -84,6 +89,19 @@ function ContactsHubContent() {
   // 2026-09-30 — cocher des organisations ou des PERSONNES pour les mettre dans
   // une liste manuelle (« seulement certains contacts »). Des identifiants
   // VISIBLES seulement : jamais « tout ce qui correspond au filtre ».
+  // DM1-CON — trois fenêtres : ajout rapide, import, corbeille. Ctrl K les
+  // ouvre par `?ajouter=1`, `?importer=1`, `?corbeille=1`.
+  const [fenetre, setFenetre] = useState<'ajouter' | 'importer' | 'corbeille' | null>(null);
+  useEffect(() => {
+    const demande = new URLSearchParams(window.location.search);
+    if (demande.has('ajouter')) setFenetre('ajouter');
+    else if (demande.has('importer')) setFenetre('importer');
+    else if (demande.has('corbeille')) setFenetre('corbeille');
+  }, []);
+  const fermerFenetre = () => {
+    setFenetre(null);
+    if (window.location.search !== '') window.history.replaceState(window.history.state, '', window.location.pathname);
+  };
   const [orgsCochees, setOrgsCochees] = useState<Set<number>>(new Set());
   const [personnesCochees, setPersonnesCochees] = useState<Set<number>>(new Set());
   const basculer = (ensemble: Set<number>, id: number): Set<number> => {
@@ -167,13 +185,41 @@ function ContactsHubContent() {
   // lignes seulement.
   const echecListe = list.error !== null && list.data === undefined;
   const echecCompteurs = counts.error !== null && counts.data === undefined;
+  // DM1-CON — les gestes (ajouter, importer, corbeille, export) ne se montrent
+  // que si le serveur les annonce (`gestes_fiches` dans les compteurs). Le vrai
+  // serveur ne l'envoie pas encore : en production, la page reste celle d'avant
+  // (aucun bouton vers une route absente) ; la démo l'annonce.
+  const gestes = (counts.data as (CountsResponse & { gestes_fiches?: boolean }) | undefined)?.gestes_fiches === true;
 
   return (
     <div>
       <PageHeader
+        surTitre="CRM Pro"
         title="Contacts"
         subtitle={`${tab === 'tous' ? 'Tous les types' : RELATION_TYPE_LABELS[tab]} — ${temperatureLabel}`}
+        actions={
+          gestes ? (
+          <>
+            <Button variant="secondary" onClick={() => setFenetre('corbeille')}>
+              Corbeille
+            </Button>
+            <Button variant="secondary" onClick={() => setFenetre('importer')}>
+              Importer
+            </Button>
+            <Button variant="primary" onClick={() => setFenetre('ajouter')}>
+              Ajouter un contact
+            </Button>
+          </>
+          ) : undefined
+        }
       />
+      {gestes ? (
+        <>
+          <AjoutRapideContact open={fenetre === 'ajouter'} onClose={fermerFenetre} />
+          <ImportContacts open={fenetre === 'importer'} onClose={fermerFenetre} />
+          <CorbeilleContacts open={fenetre === 'corbeille'} onClose={fermerFenetre} />
+        </>
+      ) : null}
 
       {echecCompteurs ? (
         <p className="mb-6 text-xs text-slate-500 dark:text-slate-400" role="status">
@@ -298,6 +344,16 @@ function ContactsHubContent() {
                     setPersonnesCochees(new Set());
                   }}
                 />
+                {gestes ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-11 md:h-8"
+                    onClick={() => void exporterSelection([...orgsCochees], [...personnesCochees])}
+                  >
+                    Exporter (CSV)
+                  </Button>
+                ) : null}
               </div>
             ) : null}
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">

@@ -409,13 +409,13 @@ test('une fiche sans SIREN est dans le segment federations, et l effacement RGPD
     EffacementCoordonneesFiches::effacer('contact@zz-ud69.example.invalid', [], [], $this->espace);
 
     $temoin = fssFiche('section:zz-reseau:38');
-    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZSECRETAIRE')->exists())->toBeFalse()
+    // L3c-0 : le contact est MASQUÉ (corbeille douce), jamais supprimé.
+    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZSECRETAIRE')->whereNull('deleted_at')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZSECRETAIRE')->exists())->toBeTrue()
         ->and(DB::table('companies')->where('id', $fiche)->value('email_generic'))->toBeNull()
         ->and(DB::table('companies')->where('id', $fiche)->exists())->toBeTrue()
         ->and($temoin->email_generic)->toBe('contact@zz-ud38.example.invalid')
-        ->and(DB::table('contacts')->where('company_id', $temoin->id)->where('last_name', 'ZZTEMOIN')->exists())->toBeTrue()
-        // L'effacement a laissé une empreinte au registre, par l'ancre.
-        ->and(DB::table('contacts_retires')->where('foreign_id', FSS_ID)->count())->toBe(1);
+        ->and(DB::table('contacts')->where('company_id', $temoin->id)->where('last_name', 'ZZTEMOIN')->exists())->toBeTrue();
 });
 
 test('la question par ancre est SECURITY DEFINER, a search_path fixe, et refusee a PUBLIC', function () {

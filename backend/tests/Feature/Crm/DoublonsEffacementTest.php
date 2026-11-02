@@ -70,10 +70,10 @@ test('l effacement par la CONSOLE retire la ligne de l adresse effacée, et d el
         ->and(dePresente($this->ws, $this->adresses['temoin']))->toBeTrue();
 });
 
-test('l effacement par le SITE retire la ligne de l adresse effacée, et d elle seule', function () {
+test('L3c-0 : la demande d effacement du SITE ne retire aucune ligne d adresse partagée (rien n est effacé)', function () {
     app(SiteGdprService::class)->erase('zz-pk-efface-site', $this->adresses['site'], 'business');
 
-    expect(dePresente($this->ws, $this->adresses['site']))->toBeFalse()
+    expect(dePresente($this->ws, $this->adresses['site']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['console']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['temoin']))->toBeTrue();
 });

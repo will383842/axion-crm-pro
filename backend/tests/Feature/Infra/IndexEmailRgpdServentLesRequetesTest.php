@@ -461,10 +461,12 @@ test('C21-001 — les chemins RGPD (art. 15 et art. 17) EMPLOIENT tous un index'
         app(SiteGdprService::class)->erase(cleSujet(), adresseCible(), 'both');
     });
 
+    // L3c-0 : l'effacement ne supprime plus ; il RELEVE les lignes (select) puis les
+    // masque (update). Les verbes `delete` d'avant sont devenus `select` / `update`.
     // `health_practitioners` -- ARTICLE 9, categorie particuliere. Cette table
     // n'avait AUCUN index sur `email` avant la migration
     // `2026_08_20_150000_index_email_praticiens_sante.php`.
-    $planSante = planDe(requeteEmail($emisErase, 'health_practitioners', verbe: 'delete'));
+    $planSante = planDe(requeteEmail($emisErase, 'health_practitioners', verbe: 'update'));
     $this->assertStringContainsString(
         'idx_health_practitioners_email',
         $planSante,
@@ -480,7 +482,7 @@ Si l'index n'apparait pas, verifier que la migration "
         . 'idempotence (cf. G41-003).',
     );
 
-    $planEffacementVivier = planDe(requeteEmail($emisErase, 'candidates', verbe: 'delete'));
+    $planEffacementVivier = planDe(requeteEmail($emisErase, 'candidates', verbe: 'select'));
     $this->assertStringContainsString(
         'idx_candidates_email',
         $planEffacementVivier,
@@ -489,7 +491,7 @@ Si l'index n'apparait pas, verifier que la migration "
 {$planEffacementVivier}",
     );
 
-    $planEffacementContacts = planDe(requeteEmail($emisErase, 'contacts', verbe: 'delete'));
+    $planEffacementContacts = planDe(requeteEmail($emisErase, 'contacts', verbe: 'select'));
     $this->assertStringContainsString(
         'idx_contacts_email',
         $planEffacementContacts,

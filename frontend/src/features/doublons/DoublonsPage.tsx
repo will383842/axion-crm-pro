@@ -30,6 +30,7 @@ import { QueryErrorState } from "@/components/ui/QueryErrorState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 import { COMPTEURS_A_TRAITER_KEY } from "@/features/a-traiter/compteurs";
+import { useProduitsVisibles } from "@/features/socle/produits/useProduits";
 
 export type FicheDoublon = {
   id: number;
@@ -77,14 +78,6 @@ type Liste = {
 };
 
 const PAR_PAGE = 50;
-
-/**
- * Route d'annulation d'une fusion. Elle n'existe aujourd'hui que dans le faux
- * serveur de la démo (le serveur réel annule par `crm:doublons:fusionner
- * --annuler`) : l'écran ne la propose QUE si la liste annonce `fusions_recentes`.
- * Hors périmètre de ce lot : la route serveur et la ligne du filet NR-20.
- */
-const cheminAnnulation = (fusionId: number): string => `/doublons/fusions/${fusionId}/annuler`;
 
 const NATURES_ADRESSE: Record<string, string> = {
   cabinet_comptable: "cabinet comptable",
@@ -150,9 +143,15 @@ export function DoublonsPage() {
     void qc.invalidateQueries({ queryKey: COMPTEURS_A_TRAITER_KEY });
   };
 
+  // Annulation d'une fusion : la route `POST /doublons/fusions/{id}/annuler`
+  // n'existe aujourd'hui que dans le faux serveur de la démo (le serveur réel
+  // annule par `crm:doublons:fusionner --annuler`). L'écran ne la propose QUE si
+  // la liste annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie
+  // pas : en production, aucun bouton n'appelle cette route. Écart déclaré dans
+  // le filet NR-20 (`ECARTS_CONNUS`), à retirer avec la route serveur.
   const annuler = useMutation({
     mutationFn: async (fusionId: number) =>
-      (await api.post<{ ok: boolean }>(cheminAnnulation(fusionId))).data,
+      (await api.post<{ ok: boolean }>(`/doublons/fusions/${fusionId}/annuler`)).data,
     onSuccess: () => {
       rafraichir();
       toast.success("Fusion annulée : les deux fiches sont rétablies.");
@@ -161,6 +160,9 @@ export function DoublonsPage() {
   });
 
   const annulationOfferte = data?.meta.fusions_recentes !== undefined;
+  // Le sur-titre « CRM Pro » ne sert qu'à distinguer les deux produits : sans
+  // Envoi (le CRM réel aujourd'hui), l'en-tête reste celui d'avant.
+  const envoiVisible = useProduitsVisibles().envoi;
 
   const fusionner = useMutation({
     mutationFn: async (p: PaireDoublon) =>
@@ -199,7 +201,7 @@ export function DoublonsPage() {
     <div>
       <PageHeader
         title="Doublons à vérifier"
-        surTitre="CRM Pro"
+        surTitre={envoiVisible ? "CRM Pro" : undefined}
         subtitle="Des fiches qui se ressemblent. Fusionner met la fiche de droite à la corbeille (jamais supprimée) et rattache tout à celle de gauche ; la fusion reste annulable."
       />
 
@@ -299,7 +301,7 @@ export function DoublonsPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
-                variant="primary"
+                variant="secondary"
                 disabled={occupe}
                 className="max-md:h-11"
                 onClick={() => {

@@ -17,6 +17,7 @@ import type { HttpHandler } from "msw";
 import { DoublonsPage } from "@/features/doublons/DoublonsPage";
 import { demoDb } from "@/demo/base";
 import { handlers as handlersDemo } from "@/demo/handlers/crm/a-traiter.handlers";
+import type { PaireDemo } from "@/demo/donnees/crm/a-traiter";
 import { renderScreen } from "../helpers/renderScreen";
 import { recordGet, recordPost } from "../msw/handlers";
 
@@ -150,6 +151,24 @@ describe("onglet Doublons à vérifier", () => {
   });
 });
 
+describe("production : un serveur qui n'annonce rien ne montre rien de nouveau (DM1-ATR)", () => {
+  it("sans `fusions_recentes` ni Envoi : ni annulation, ni bilan, ni sur-titre, et la fusion ne propose pas « Annuler »", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fusion = recordPost("/doublons/41/fusionner", { fusion_id: 5 });
+    await monter([fusion.handler]);
+
+    expect(screen.queryByRole("button", { name: /Annuler la fusion/ })).toBeNull();
+    expect(screen.queryByText("Fusions récentes")).toBeNull();
+    expect(screen.queryByText("Paires à vérifier")).toBeNull();
+    expect(document.querySelector("[data-sur-titre]")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Fusionner" }));
+    await waitFor(() => expect(notes.succes).toHaveBeenCalledTimes(1));
+    // Aucune action « Annuler » n'accompagne le message : elle appellerait une route absente.
+    expect(notes.succes.mock.calls[0]?.[1]).toBeUndefined();
+  });
+});
+
 describe("Doublons à vérifier avec le faux serveur de démo (DM1-ATR)", () => {
   async function monterDemo() {
     await renderScreen(<DoublonsPage />, {
@@ -192,6 +211,17 @@ describe("Doublons à vérifier avec le faux serveur de démo (DM1-ATR)", () => 
     await monterDemo();
     await userEvent.click(screen.getAllByRole("button", { name: "Fusionner" })[0]!);
     await waitFor(() => expect(paires()).toHaveLength(11));
+    expect(demoDb.entreprises.compter()).toBe(nbFiches);
+    // La fiche absorbée porte le marqueur de corbeille ; « Annuler » le retire.
+    const zonePaires = () => demoDb.zone<PaireDemo>("a-traiter", "paires");
+    const fusionnee = zonePaires().filtrer((p) => p.statut === "fusionnee");
+    expect(fusionnee).toHaveLength(1);
+    expect(fusionnee[0]!.absorbee.a_la_corbeille).toBe(true);
+    expect(fusionnee[0]!.garde.a_la_corbeille).toBe(false);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Annuler la fusion/ }));
+    await waitFor(() => expect(paires()).toHaveLength(12));
+    expect(zonePaires().trouver(fusionnee[0]!.id)?.absorbee.a_la_corbeille).toBe(false);
     expect(demoDb.entreprises.compter()).toBe(nbFiches);
   });
 });

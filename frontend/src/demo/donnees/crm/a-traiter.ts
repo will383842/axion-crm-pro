@@ -33,6 +33,11 @@ export interface FicheDoublonDemo {
   source: string | null;
   nb_contacts: number;
   protegee: boolean;
+  /**
+   * Marqueur de corbeille : vrai tant que la fiche est absorbée par une fusion
+   * non annulée. La fiche n'est JAMAIS supprimée, elle est seulement marquée.
+   */
+  a_la_corbeille: boolean;
 }
 
 export interface PaireDemo {
@@ -164,6 +169,7 @@ export function genererATraiter(alea: Alea): ATraiterDemo {
         source: srcG,
         nb_contacts: nbG,
         protegee,
+        a_la_corbeille: false,
       },
       absorbee: {
         id: idEntreprise(i + 40),
@@ -176,6 +182,7 @@ export function genererATraiter(alea: Alea): ATraiterDemo {
         source: srcA,
         nb_contacts: nbA,
         protegee: false,
+        a_la_corbeille: false,
       },
       statut: 'en_attente',
     };

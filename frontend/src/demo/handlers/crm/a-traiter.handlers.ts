@@ -169,7 +169,8 @@ export const handlers: HttpHandler[] = [
     const paire = z.paires.trouver(paramId(params['id']));
     if (!paire || paire.statut !== 'en_attente') return erreur(404, 'non_trouve', 'Cette paire n’existe plus.');
     const fusionId = PREMIERE_FUSION + z.fusions.compter();
-    z.paires.modifier(paire.id, { statut: 'fusionnee' });
+    // La fiche absorbée passe à la corbeille (marqueur), jamais supprimée.
+    z.paires.modifier(paire.id, { statut: 'fusionnee', absorbee: { ...paire.absorbee, a_la_corbeille: true } });
     z.fusions.ajouter({ id: fusionId, paire_id: paire.id, annulee: false, faite_le: maintenant().toISOString() });
     return HttpResponse.json({ fusion_id: fusionId });
   }),
@@ -180,7 +181,8 @@ export const handlers: HttpHandler[] = [
     const fusion = z.fusions.trouver(paramId(params['id']));
     if (!fusion || fusion.annulee) return erreur(404, 'non_trouve', 'Cette fusion n’existe plus ou est déjà annulée.');
     z.fusions.modifier(fusion.id, { annulee: true });
-    z.paires.modifier(fusion.paire_id, { statut: 'en_attente' });
+    const paire = z.paires.trouver(fusion.paire_id);
+    if (paire) z.paires.modifier(paire.id, { statut: 'en_attente', absorbee: { ...paire.absorbee, a_la_corbeille: false } });
     return HttpResponse.json({ ok: true });
   }),
 

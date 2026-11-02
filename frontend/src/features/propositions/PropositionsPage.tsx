@@ -20,6 +20,7 @@ import { Button, Card, EmptyState, PageHeader, QueryErrorState } from '@/compone
 import { api, messageApiLisible } from '@/lib/api';
 import { ConsoleGate, ConsoleListSkeleton } from '@/features/crm-console/ConsoleGate';
 import { COMPTEURS_A_TRAITER_KEY, formaterNombre } from '@/features/a-traiter/compteurs';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 
 export type OriginePartenaire = 'apporteur' | 'commercial' | 'societe' | 'site-verifie' | 'annuaire-service-public';
 
@@ -69,6 +70,9 @@ export function PropositionsPage() {
 }
 
 function PropositionsContent() {
+  // Sur-titre « CRM Pro » seulement quand Envoi est là : sans Envoi (le CRM réel
+  // aujourd'hui), l'en-tête reste celui d'avant.
+  const envoiVisible = useProduitsVisibles().envoi;
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 
@@ -124,7 +128,7 @@ function PropositionsContent() {
     <div>
       <PageHeader
         title="Propositions à valider"
-        surTitre="CRM Pro"
+        surTitre={envoiVisible ? 'CRM Pro' : undefined}
         subtitle={
           total === undefined
             ? 'Des partenaires proposent de changer des informations. Rien ne change sans votre accord.'

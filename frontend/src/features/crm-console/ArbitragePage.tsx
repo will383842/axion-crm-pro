@@ -21,6 +21,7 @@ import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
 import { COMPTEURS_A_TRAITER_KEY } from '@/features/a-traiter/compteurs';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 
 /** « 12 janv. 2027, 09:30 » : une date lisible plutôt que l'horodatage brut du serveur. */
 function dateLisible(brut: string | null): string {
@@ -39,6 +40,9 @@ export function ArbitragePage() {
 }
 
 function ArbitrageContent() {
+  // Sur-titre « CRM Pro » seulement quand Envoi est là : sans Envoi (le CRM réel
+  // aujourd'hui), l'en-tête reste celui d'avant.
+  const envoiVisible = useProduitsVisibles().envoi;
   const queryClient = useQueryClient();
 
   const list = useQuery<ArbitrageResponse>({
@@ -127,7 +131,7 @@ function ArbitrageContent() {
     <div>
       <PageHeader
         title="Personnes à rattacher"
-        surTitre="CRM Pro"
+        surTitre={envoiVisible ? 'CRM Pro' : undefined}
         subtitle={
           total === undefined
             ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'

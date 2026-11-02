@@ -40,6 +40,10 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM1-ACC (#399) : Mes tâches et Affaires. Ces appels ne partent qu'en démo
+// (`VITE_DEMO`, figé au build) : hors démo, donc en production, /taches et /affaires gardent leur page
+// « en attente » et le tableau de bord n'a pas d'onglets. La démo les sert ; le lot serveur du CRM reprendra
+// le contrat et retirera ces six lignes. La liste reste fermée : tout autre appel sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
 // ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
 // Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
@@ -63,6 +67,12 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/crm/contacts/{p}/retirer',
   'POST /api/v1/crm/persons/{p}/appels',
   'POST /api/v1/crm/persons/{p}/rappel',
+  'GET /api/v1/crm/affaires',
+  'GET /api/v1/crm/taches',
+  'PATCH /api/v1/crm/affaires/{p}',
+  'PATCH /api/v1/crm/taches/{p}',
+  'POST /api/v1/crm/taches',
+  'PUT /api/v1/crm/taches/rappel-matin',
   // DM2-PIL — résultats, santé, chercher un envoi, feu vert.
   'GET /api/v1/envoi/envois/chercher',
   'GET /api/v1/envoi/feu-vert',

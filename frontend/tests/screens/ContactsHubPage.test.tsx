@@ -151,7 +151,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     expect(new URL(urls[0] as string).searchParams.get('temperature')).toBe('actifs');
 
     await user.click(screen.getByRole('button', { name: 'Prospection (base froide)' }));
@@ -178,7 +178,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     expect(new URL(urls[0] as string).searchParams.has('relation_type')).toBe(false);
 
     const onglets = screen.getByRole('tablist');
@@ -203,7 +203,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     const select = screen.getByLabelText('Statut de prospection');
     const option = within(select).getAllByRole('option')[1] as HTMLOptionElement;
 
@@ -213,5 +213,44 @@ describe('ContactsHubPage — parcours', () => {
       const derniere = new URL(urls[urls.length - 1] as string);
       expect(derniere.searchParams.get('filter[prospection_status]')).toBe(option.value);
     });
+  });
+});
+
+describe('ContactsHubPage — gestes DM1-CON (démo)', () => {
+  it('sans annonce du serveur (production), aucun geste : ni ajout, ni import, ni corbeille', async () => {
+    await renderScreen(<ContactsHubPage />, {
+      path: PATH,
+      consoleFeatures: 'open',
+      landingRoutes: LANDING,
+      handlers: [getJson('/crm/contacts-hub/counts', COUNTS), getJson('/crm/contacts-hub', PAGE)],
+    });
+    await screen.findByText(LIGNE.denomination);
+    // Les compteurs sont lus (« Clients 12 ») : l'absence des gestes n'est pas un simple retard.
+    await within(screen.getByRole('tablist')).findByRole('tab', { name: /Clients.*12/ });
+    expect(screen.queryByRole('button', { name: 'Ajouter un contact' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Importer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Corbeille' })).toBeNull();
+  });
+
+  it('propose Ajouter un contact (seul bouton plein), Importer et Corbeille, et ouvre l’ajout rapide', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<ContactsHubPage />, {
+      path: PATH,
+      consoleFeatures: 'open',
+      landingRoutes: LANDING,
+      handlers: [getJson('/crm/contacts-hub/counts', { ...COUNTS, gestes_fiches: true }), getJson('/crm/contacts-hub', PAGE)],
+    });
+    await screen.findByText(LIGNE.denomination);
+    expect(await screen.findByRole('button', { name: 'Importer' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Corbeille' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Ajouter un contact' }));
+    const fenetre = (await screen.findByRole('heading', { name: 'Ajouter un contact' })).closest('[role="dialog"]') as HTMLElement;
+    expect(within(fenetre).getByLabelText(/Provenance/)).toBeVisible();
+    // Sans provenance, rien n'est envoyé : le message le dit.
+    await user.type(within(fenetre).getByLabelText(/^Nom/), 'Delmas');
+    await user.type(within(fenetre).getByLabelText(/E-mail/), 'camille.delmas@example.test');
+    await user.click(within(fenetre).getByRole('button', { name: 'Ajouter ce contact' }));
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent(/provenance est obligatoire/);
   });
 });

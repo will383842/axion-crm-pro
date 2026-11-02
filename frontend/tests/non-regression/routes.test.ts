@@ -44,6 +44,8 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // (`VITE_DEMO`, figé au build) : hors démo, donc en production, /taches et /affaires gardent leur page
 // « en attente » et le tableau de bord n'a pas d'onglets. La démo les sert ; le lot serveur du CRM reprendra
 // le contrat et retirera ces six lignes. La liste reste fermée : tout autre appel sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
+// ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
 // Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
 // liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
 // commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
@@ -68,6 +70,13 @@ const ECARTS_CONNUS: string[] = [
   'PATCH /api/v1/crm/taches/{p}',
   'POST /api/v1/crm/taches',
   'PUT /api/v1/crm/taches/rappel-matin',
+  // DM2-PIL — résultats, santé, chercher un envoi, feu vert.
+  'GET /api/v1/envoi/envois/chercher',
+  'GET /api/v1/envoi/feu-vert',
+  'GET /api/v1/envoi/resultats',
+  'GET /api/v1/envoi/sante',
+  'POST /api/v1/envoi/feu-vert/{p}/fait',
+  'POST /api/v1/envoi/sante/test',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'GET /api/v1/envoi/reponses',

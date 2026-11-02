@@ -24,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Feature\NonRegression\EspacesFactices;
 use Tests\Feature\NonRegression\Instantane;
 use Tests\TestCase;
 
@@ -54,7 +55,7 @@ function nr08Semer(string $espace, int $nombre, string $region = '84'): int
     $o = nr08Proprio();
     for ($i = 1; $i <= $nombre; $i++) {
         $o->table('companies')->insert([
-            'workspace_id' => $espace, 'siren' => '97' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT),
+            'workspace_id' => $espace, 'siren' => EspacesFactices::sirenInvalide(),
             'denomination' => 'NR08 ' . $i, 'region_code' => $region, 'postcode' => '69001',
             'created_at' => now(), 'updated_at' => now(),
         ]);
@@ -174,7 +175,7 @@ test('NR-08 CONSTAT : la sonde « non diffusibles » (06:20) est AVEUGLE sous le
     try {
         foreach ($e as $espace) {
             nr08Proprio()->table('companies')->insert([
-                'workspace_id' => $espace, 'siren' => (string) random_int(100000000, 999999999), 'denomination' => '[ND]',
+                'workspace_id' => $espace, 'siren' => EspacesFactices::sirenInvalide(), 'denomination' => '[ND]',
                 'discovery_source' => 'insee', 'signals' => '{}', 'metadata' => '{}', 'field_origins' => '{}',
                 'created_at' => now(), 'updated_at' => now(),
             ]);

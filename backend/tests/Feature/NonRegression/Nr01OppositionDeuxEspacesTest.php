@@ -34,7 +34,7 @@ function nr01Fiche(string $espace, string $nom, string $courriel): void
 {
     Company::create([
         'workspace_id' => $espace,
-        'siren' => (string) random_int(100000000, 999999999),
+        'siren' => EspacesFactices::sirenInvalide(),
         'denomination' => $nom,
         'email_generic' => $courriel,
         'signals' => [],

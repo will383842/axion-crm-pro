@@ -45,7 +45,7 @@ test('NR-09 une chaîne intacte se vérifie : la commande de 03:00 réussit', fu
 
 test('NR-09 une chaîne falsifiée est détectée : la commande sort en échec avec l’alerte d’intégrité', function () {
     nr09Ecrire(5);
-    $maillon = DB::table('audit_logs')->orderBy('id')->skip(2)->first();
+    $maillon = DB::table('audit_logs')->orderBy('id')->offset(2)->first();
     DB::table('audit_logs')->where('id', $maillon->id)->where('created_at', $maillon->created_at)->update(['path' => '/falsifie']);
 
     expect(Artisan::call('audit:verify-chain'))->toBe(1)

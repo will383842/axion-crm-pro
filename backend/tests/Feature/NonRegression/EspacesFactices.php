@@ -32,4 +32,30 @@ final class EspacesFactices
 
         return $id;
     }
+
+    private static int $compteurSiren = 0;
+
+    /**
+     * Un SIREN FACTICE, déterministe et à clé de Luhn FAUSSE (règle 12) :
+     * 900000001, 900000002… en sautant ceux qui seraient valides.
+     */
+    public static function sirenInvalide(): string
+    {
+        do {
+            $siren = (string) (900000000 + ++self::$compteurSiren);
+        } while (self::luhnValide($siren));
+
+        return $siren;
+    }
+
+    private static function luhnValide(string $nombre): bool
+    {
+        $somme = 0;
+        foreach (array_reverse(str_split($nombre)) as $i => $c) {
+            $d = (int) $c * ($i % 2 === 1 ? 2 : 1);
+            $somme += $d > 9 ? $d - 9 : $d;
+        }
+
+        return $somme % 10 === 0;
+    }
 }

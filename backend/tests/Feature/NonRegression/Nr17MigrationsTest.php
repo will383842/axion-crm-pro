@@ -122,20 +122,11 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
 });
 
 test('NR-17 témoin : l’instrument aller-retour-aller joue sur une migration ancienne réversible', function () {
-    $reversibles = array_values(array_filter(
-        nr17Migrations(),
-        fn (string $f) => nr17ClasseRetour($f) === 'reel' && ! str_contains($f, 'extension') && ! str_contains($f, 'partman') && ! str_contains($f, 'rls') && ! str_contains($f, 'workspace_isolation'),
-    ));
-    // Une table simple et récente dont l’aller-retour est sans danger : on cherche la dernière
-    // dont le fichier ne crée QU’une table.
-    $candidates = array_values(array_filter($reversibles, function (string $f): bool {
-        $src = (string) file_get_contents(database_path('migrations/' . $f));
-
-        return substr_count($src, 'Schema::create(') === 1 && str_contains($src, 'Schema::dropIfExists(');
-    }));
-    expect($candidates)->not->toBe([]);
-
-    $fichier = end($candidates);
+    // Fichier FIGÉ (une table simple, retour réel) : le témoin ne change pas tout seul
+    // quand un lot ajoute une migration.
+    $fichier = '2026_10_04_000010_create_partners_idempotence_table.php';
+    expect(nr17Migrations())->toContain($fichier)
+        ->and(nr17ClasseRetour($fichier))->toBe('reel');
     $src = (string) file_get_contents(database_path('migrations/' . $fichier));
     preg_match("/Schema::create\('([a-z_0-9]+)'/", $src, $m);
     $table = $m[1];

@@ -194,7 +194,7 @@ jobs:
           MOCK_BODACC: 'true'
           MOCK_BAN: 'true'
           MOCK_FRANCE_TRAVAIL: 'true'
-        run: php vendor/bin/pest --group=non-regression --colors --configuration phpunit-ci.xml
+        run: php vendor/bin/pest --group=non-regression --colors --fail-on-skipped --configuration phpunit-ci.xml
 
       - uses: pnpm/action-setup@v4
         with:

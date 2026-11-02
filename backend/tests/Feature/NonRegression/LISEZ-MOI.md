@@ -54,6 +54,16 @@ git diff backend/tests/Feature/NonRegression/instantanes/   # le changement appa
 2. Le déclarer dans `LISTE.json` (`ListeFigeeTest` rougit sinon).
 3. Un test qui constate doit avoir son **témoin** : la preuve que l'instrument sait voir (une garde qui ne trouve rien passerait pour verte).
 
+## Nouvel appel vers une nouvelle route (NR-20)
+
+Le frontend ne peut appeler qu'une route qui existe : si votre lot ajoute un appel vers une route nouvelle, il faut **régénérer `instantanes/nr20-routes.json`** (photo des routes serveur, commande de régénération ci-dessus) et le dire dans la PR avec « Filet modifié : pourquoi ».
+
+## Ce qui est refusé automatiquement (pas de quarantaine)
+
+- `ListeFigeeTest` retire les commentaires de `Pest.php` avant de chercher les rattachements : un rattachement mis en commentaire fait rougir.
+- `ListeFigeeTest` refuse `->skip(`, `->todo(`, `markTestSkipped` et `markTestIncomplete` dans les fichiers de ce dossier.
+- Le job de CI lance le groupe avec `--fail-on-skipped` : tout test sauté du groupe (y compris une garde existante rattachée) fait échouer le job.
+
 ## Écarts constatés au moment de R0 (à traiter par d'autres lots)
 
 Ils sont aussi écrits en tête des fichiers concernés.

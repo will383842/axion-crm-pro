@@ -72,7 +72,9 @@
       "existants": [
         "Rgpd/OppositionInseeNonDiffusibleTest.php",
         "Rgpd/PurgeNonDiffusibleVariantesTest.php",
-        "Rgpd/SondeNonDiffusiblesTest.php"
+        "Rgpd/SondeNonDiffusiblesTest.php",
+        "Crm/InseeNonDiffusiblesHorsProspectionTest.php",
+        "Crm/EntreprisesFermeesExcluesDesEnvoisTest.php"
       ],
       "frontend": []
     },
@@ -224,7 +226,8 @@
       "risque": "webhook transactionnel",
       "nouveaux": {},
       "existants": [
-        "ListeSuppressionTest.php"
+        "ListeSuppressionTest.php",
+        "Email/ZeptoMailWebhookTest.php"
       ],
       "frontend": []
     },
@@ -337,9 +340,17 @@
     {
       "id": "NR-22",
       "risque": "R14 connexion",
-      "nouveaux": {},
+      "nouveaux": {
+        "Nr22DeuxFacteursTest.php": [
+          "NR-22 un mauvais code de double authentification est refusé et n’ouvre rien",
+          "NR-22 le bon code de double authentification est accepté et ouvre les routes métier"
+        ]
+      },
       "existants": [
-        "Auth/LoginTest.php"
+        "Auth/LoginTest.php",
+        "Auth/CourrielAuthentificationTest.php",
+        "Auth/GardesAuthentificationAgent35Test.php",
+        "Auth/ChangementMotDePasseTest.php"
       ],
       "frontend": []
     },

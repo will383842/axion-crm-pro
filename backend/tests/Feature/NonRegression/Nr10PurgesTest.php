@@ -42,7 +42,7 @@ beforeEach(function () {
 function nr10Fiche(object $t, string $nom, bool $console, array $en_plus = []): int
 {
     $id = (int) DB::table('companies')->insertGetId(array_merge([
-        'workspace_id' => $t->espaces['a'], 'siren' => (string) random_int(100000000, 999999999),
+        'workspace_id' => $t->espaces['a'], 'siren' => EspacesFactices::sirenInvalide(),
         'denomination' => $nom, 'legal_form' => null, 'created_at' => now(), 'updated_at' => now(),
     ], $en_plus));
     if ($console) {

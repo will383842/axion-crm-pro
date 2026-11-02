@@ -19,13 +19,13 @@ use Tests\TestCase;
 uses(TestCase::class);
 
 /** @return array{version: int, gardes: list<array<string, mixed>>} */
-function liste(): array
+function nrListe(): array
 {
     return json_decode((string) file_get_contents(__DIR__ . '/LISTE.json'), true, 512, JSON_THROW_ON_ERROR);
 }
 
 /** @return list<string> */
-function titresDe(string $fichier): array
+function nrTitresDe(string $fichier): array
 {
     $source = (string) file_get_contents($fichier);
     $titres = [];
@@ -41,8 +41,26 @@ function titresDe(string $fichier): array
     return $titres;
 }
 
+/** Le code PHP sans ses commentaires (token_get_all). */
+function nrSansCommentaires(string $source): string
+{
+    $code = '';
+    foreach (token_get_all($source) as $jeton) {
+        if (is_array($jeton)) {
+            if (in_array($jeton[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+            $code .= $jeton[1];
+        } else {
+            $code .= $jeton;
+        }
+    }
+
+    return $code;
+}
+
 test('LISTE le filet contient les 24 risques NR-01 à NR-24 et la garde des horodatages de Paris', function () {
-    $ids = array_column(liste()['gardes'], 'id');
+    $ids = array_column(nrListe()['gardes'], 'id');
 
     foreach (range(1, 24) as $n) {
         expect($ids)->toContain(sprintf('NR-%02d', $n));
@@ -51,11 +69,11 @@ test('LISTE le filet contient les 24 risques NR-01 à NR-24 et la garde des horo
 });
 
 test('LISTE chaque fichier neuf listé existe et porte tous les titres listés', function () {
-    foreach (liste()['gardes'] as $garde) {
+    foreach (nrListe()['gardes'] as $garde) {
         foreach ($garde['nouveaux'] as $fichier => $titres) {
             $chemin = __DIR__ . '/' . $fichier;
             expect(is_file($chemin))->toBeTrue("{$garde['id']} : {$fichier} est introuvable");
-            $presents = titresDe($chemin);
+            $presents = nrTitresDe($chemin);
             foreach ($titres as $titre) {
                 expect($presents)->toContain($titre);
             }
@@ -65,7 +83,7 @@ test('LISTE chaque fichier neuf listé existe et porte tous les titres listés',
 
 test('LISTE tous les tests des fichiers neufs sont listés (rien n’est ajouté en silence)', function () {
     $listes = [];
-    foreach (liste()['gardes'] as $garde) {
+    foreach (nrListe()['gardes'] as $garde) {
         foreach ($garde['nouveaux'] as $fichier => $titres) {
             array_push($listes, ...array_map(fn ($t) => $fichier . '::' . $t, $titres));
         }
@@ -77,7 +95,7 @@ test('LISTE tous les tests des fichiers neufs sont listés (rien n’est ajouté
         if ($nom === 'ListeFigeeTest.php') {
             continue; // la liste ne se liste pas elle-même, titre par titre
         }
-        array_push($reels, ...array_map(fn ($t) => $nom . '::' . $t, titresDe($chemin)));
+        array_push($reels, ...array_map(fn ($t) => $nom . '::' . $t, nrTitresDe($chemin)));
     }
 
     sort($listes);
@@ -87,9 +105,11 @@ test('LISTE tous les tests des fichiers neufs sont listés (rien n’est ajouté
 });
 
 test('LISTE chaque garde existante citée existe et est rattachée au groupe non-regression', function () {
-    $pest = (string) file_get_contents(base_path('tests/Pest.php'));
+    // Les COMMENTAIRES de Pest.php sont retirés avant la recherche : un rattachement
+    // mis en commentaire ne compte pas.
+    $pest = nrSansCommentaires((string) file_get_contents(base_path('tests/Pest.php')));
 
-    foreach (liste()['gardes'] as $garde) {
+    foreach (nrListe()['gardes'] as $garde) {
         foreach ($garde['existants'] as $fichier) {
             expect(is_file(base_path('tests/Feature/' . $fichier)))->toBeTrue("{$garde['id']} : {$fichier} est introuvable");
             expect(str_contains($pest, "'Feature/{$fichier}'"))->toBeTrue("{$garde['id']} : {$fichier} n’est pas rattaché au groupe dans tests/Pest.php");
@@ -98,7 +118,7 @@ test('LISTE chaque garde existante citée existe et est rattachée au groupe non
 });
 
 test('LISTE chaque garde du frontend listée existe', function () {
-    foreach (liste()['gardes'] as $garde) {
+    foreach (nrListe()['gardes'] as $garde) {
         foreach ($garde['frontend'] as $fichier) {
             expect(is_file(base_path('../' . $fichier)))->toBeTrue("{$garde['id']} : {$fichier} est introuvable");
         }
@@ -107,4 +127,20 @@ test('LISTE chaque garde du frontend listée existe', function () {
 
 test('LISTE tout fichier de test du filet porte le groupe non-regression (dossier rattaché dans Pest.php)', function () {
     expect((string) file_get_contents(base_path('tests/Pest.php')))->toContain("->in('Feature/NonRegression')");
+});
+
+test('LISTE aucun fichier du filet ne saute, ne reporte ou n’abandonne un test (pas de quarantaine)', function () {
+    // Les fichiers NEUFS du filet (ce dossier) : motifs interdits, commentaires retirés.
+    // Les gardes EXISTANTES rattachées au groupe portent des sauts légitimes hors CI
+    // (jq ou rôle de base absents en local) : elles sont couvertes par l’autre moitié
+    // du contrôle, `--fail-on-skipped` dans le job du filet (ci.yml).
+    foreach (glob(__DIR__ . '/*Test.php') ?: [] as $chemin) {
+        if (basename($chemin) === 'ListeFigeeTest.php') {
+            continue; // il nomme les motifs interdits pour les chercher
+        }
+        $code = nrSansCommentaires((string) file_get_contents($chemin));
+        foreach (['->skip(', '->todo(', 'markTestSkipped', 'markTestIncomplete'] as $interdit) {
+            expect(str_contains($code, $interdit))->toBeFalse(basename($chemin) . " contient « {$interdit} » : un test du filet ne se saute pas");
+        }
+    }
 });

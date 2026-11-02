@@ -3,7 +3,7 @@
  * existent toujours (ou redirigent).
  *
  * Lecture STATIQUE du code (`src/app/routeTree.tsx`), sans rendu. La liste
- * ci-dessous est la photo des 52 chemins littéraux déclarés à la date du filet
+ * ci-dessous est la photo des 55 chemins littéraux déclarés à la date du filet
  * (le relevé du plan 21 en annonçait 54 : l'écart vient du comptage, pas d'une
  * route manquante). Retirer une adresse fait rougir ; en AJOUTER est permis.
  * Une adresse qui devient une redirection reste une adresse déclarée.
@@ -19,7 +19,7 @@ const SOURCE = readFileSync(resolve(__dirname, '../../src/app/routeTree.tsx'), '
 
 const ADRESSES_ATTENDUES = [
   '/', '/2fa', '/admin/observability', '/analytics', '/audiences', '/audiences/$audienceId', '/audiences/new',
-  '/audit-logs', '/campaigns', '/campaigns/$campaignId', '/campaigns/new', '/cold-email', '/companies',
+  '/audit-logs', '/campaigns', '/campaigns/$campaignId', '/campaigns/new', '/cold-email', '/collectes', '/collectes/$collecteId', '/collectes/new', '/companies',
   '/companies/$companyId', '/console/arbitrage', '/console/contacts', '/console/lettre-et-guide',
   '/console/lettre-et-guide/$personneId', '/console/personnes/$personKey', '/console/propositions',
   '/console/vivier', '/contacts', '/coverage', '/crm', '/doublons', '/evenements', '/evenements/$eventId',

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Tests\Feature\NonRegression\EspacesFactices;
 use Tests\Support\ResolveurDnsSimule;
 use Tests\TestCase;
 
@@ -103,7 +104,7 @@ test('NR-04 un contact d’une fiche non diffusible n’est pas contactable non 
 test('NR-04 la sonde de 06:20 sort en échec sur une fiche « [ND] » et ne supprime rien', function () {
     foreach ([false, true] as $corbeille) {
         DB::table('companies')->insert([
-            'workspace_id' => $this->espace, 'siren' => (string) random_int(100000000, 999999999), 'denomination' => '[ND]',
+            'workspace_id' => $this->espace, 'siren' => EspacesFactices::sirenInvalide(), 'denomination' => '[ND]',
             'discovery_source' => 'insee', 'signals' => '{}', 'metadata' => '{}', 'field_origins' => '{}',
             'deleted_at' => $corbeille ? now() : null, 'created_at' => now(), 'updated_at' => now(),
         ]);

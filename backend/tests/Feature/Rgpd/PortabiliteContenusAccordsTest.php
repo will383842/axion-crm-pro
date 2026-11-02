@@ -24,7 +24,7 @@ test('PV-6 — l export de portabilité contient origine, guides, consentements 
     ]);
     DB::table('personnes')->insert([
         'workspace_id' => $espace, 'person_key' => hash('sha256', $courriel), 'email' => $courriel,
-        'premiere_source' => 'guide-ia',
+        'premiere_source' => 'guide-ia', 'premiere_source_at' => now(), 'legal_basis' => 'consent',
         'origine_contenu' => json_encode(['mot' => 'mot-a', 'reseau' => 'reseau-a']),
         'guides_recus' => json_encode([['guide' => 'guide-a', 'date' => '2026-11-02T10:00:00Z']]),
         'consentements' => json_encode([['nature' => 'information', 'version' => 'M1']]),

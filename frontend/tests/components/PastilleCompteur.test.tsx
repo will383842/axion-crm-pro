@@ -39,6 +39,7 @@ const {
   formaterNombre,
   totalDesCompteurs,
   libelleTotalATraiter,
+  totalATraiterCrm,
 } = await import('@/features/a-traiter/compteurs');
 const { Sidebar } = await import('@/components/layout/Sidebar');
 const { CONSOLE_FEATURES_KEY } = await import('@/features/crm-console/useConsoleFeatures');
@@ -185,5 +186,37 @@ describe('Section « À traiter » repliée (03/10/2026)', () => {
     expect(titre).toHaveAttribute('aria-expanded', 'true');
     expect(within(titre).queryByRole('img')).toBeNull();
     expect(screen.getByRole('img', { name: '275 doublons à vérifier' })).toBeInTheDocument();
+  });
+});
+
+describe('Total « À traiter » du CRM (DM1-ATR)', () => {
+  it('additionne les quatre files du CRM : doublons, personnes à rattacher, propositions, tâches en retard', () => {
+    expect(
+      totalATraiterCrm({ doublons: 12, a_rattacher: 7, propositions: 4, taches_en_retard: 3 }),
+    ).toBe(26);
+  });
+
+  it('ne compte AUCUNE file d’Envoi, même si le serveur en glisse dans la réponse', () => {
+    const avecEnvoi = normaliserCompteurs({
+      doublons: 1,
+      a_rattacher: 1,
+      propositions: 1,
+      taches_en_retard: 1,
+      reponses_a_traiter: 40,
+      envoi: 99,
+    });
+    expect(totalATraiterCrm(avecEnvoi)).toBe(4);
+  });
+
+  it('un compteur inconnu vaut « rien », pas zéro ; aucun connu : pas de total', () => {
+    expect(totalATraiterCrm({ doublons: 5, a_rattacher: null })).toBe(5);
+    expect(totalATraiterCrm({ doublons: null, a_rattacher: null })).toBeNull();
+    expect(totalATraiterCrm(undefined)).toBeNull();
+  });
+
+  it('la tâche en retard a sa phrase pour les lecteurs d’écran, au pluriel et au singulier', () => {
+    expect(LIBELLES_COMPTEUR.taches_en_retard(1)).toBe('1 tâche en retard');
+    expect(LIBELLES_COMPTEUR.taches_en_retard(3)).toBe('3 tâches en retard');
+    expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2, taches_en_retard: 3 })).toHaveProperty('taches_en_retard', 3);
   });
 });

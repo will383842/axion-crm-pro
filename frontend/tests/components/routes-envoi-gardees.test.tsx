@@ -199,7 +199,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
   it.each([
     ['/taches', 'DM1-ACC'],
     ['/affaires', 'DM1-ACC'],
-    ['/compte', 'DM1-COM'],
+    // Filet modifié : pourquoi. DM1-COM livre /compte : la page n'est plus « en attente ».
   ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');
@@ -222,6 +222,22 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
   });
 
   it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
+  // Filet modifié : pourquoi. /compte quitte la liste « en attente » (DM1-COM l'a livrée) : cette
+  // vérification positive la remplace, aussi stricte. Avec le serveur d'aujourd'hui (pas de
+  // `two_factor_method: 'email'`), la vraie page s'affiche sans appeler de route absente : MSW
+  // refuse tout appel non servi (`onUnhandledRequest: 'error'`), dont `/compte/appareils`.
+  it('/compte → vraie page « Mon compte et sécurité » (DM1-COM), rien qui appelle une route absente', async () => {
+    server.use(...handlersDemo.filter((h) => cleRoute(h).includes('/auth/password/change')));
+    await monter('/compte');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mon compte et sécurité' }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+    expect(await screen.findByText('Raccourcis clavier')).toBeInTheDocument();
+    expect(screen.queryByText('Appareils de confiance')).toBeNull();
+    expect(screen.queryByText('Codes de secours')).toBeNull();
+  });
+
+  it('/desinscription/$jeton est publique et HORS coquille', async () => {
     await monter('/desinscription/jeton-de-test');
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', 'DM2-CNF');

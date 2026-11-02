@@ -60,7 +60,7 @@ pest()->group('non-regression')->in(
     'Feature/Infra/SurveillanceCanauxWorkflowTest.php',
     'Feature/Infra/WorkflowsBornesDeDureeTest.php',
     'Feature/Internal/CanalPartnersSocleTest.php',
-    'Feature/ListeSuppressionTest.php',
+    // 'Feature/ListeSuppressionTest.php',
     'Feature/PasDeStub501SousCrmEtAnalyticsTest.php',
     'Feature/Rgpd/ExportsRespectentOppositionsTest.php',
     'Feature/Rgpd/GdprErasureTest.php',

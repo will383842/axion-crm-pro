@@ -1,7 +1,8 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
+import { rmSync } from 'node:fs';
 
 /**
  * HMR config — 3 modes :
@@ -73,8 +74,75 @@ function verifierBaseApi(): void {
 
 verifierBaseApi();
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
+/**
+ * DM0-DEMO — GARDE DE CONSTRUCTION DE LA DÉMO (mode `demo` seulement).
+ *
+ * La démo est un site statique montré à des prospects : elle ne doit JAMAIS
+ * pouvoir parler à un serveur réel ni embarquer une clé. On refuse donc de la
+ * construire (ou de la servir) si :
+ *  - `VITE_API_BASE_URL` n'est pas exactement `https://demo.invalid` (domaine
+ *    réservé, qui ne se résout jamais : aucune requête ne peut sortir) ;
+ *  - une variable `VITE_SENTRY_DSN` ou `VITE_REVERB_*` est réglée ;
+ *  - `VITE_BUILD_CIBLE=prod` (le chemin qui expédie le CRM réel) ;
+ *  - `VITE_DEMO` ne vaut pas `1`.
+ * Les valeurs viennent de `.env.demo` ET de l'environnement du processus
+ * (`loadEnv` les fusionne, le processus l'emporte) : une variable de CI ne
+ * peut pas passer en douce.
+ */
+export function verifierDemo(env: Record<string, string>): void {
+  const erreurs: string[] = [];
+  if (env['VITE_DEMO'] !== '1') erreurs.push('VITE_DEMO doit valoir 1');
+  if (env['VITE_API_BASE_URL'] !== 'https://demo.invalid') {
+    erreurs.push(`VITE_API_BASE_URL doit valoir https://demo.invalid (trouvé : ${env['VITE_API_BASE_URL'] ?? 'rien'})`);
+  }
+  if ((env['VITE_SENTRY_DSN'] ?? '') !== '') erreurs.push('VITE_SENTRY_DSN est réglée');
+  for (const cle of Object.keys(env)) {
+    if (cle.startsWith('VITE_REVERB_') && (env[cle] ?? '') !== '') erreurs.push(`${cle} est réglée`);
+  }
+  if (env['VITE_BUILD_CIBLE'] === 'prod') erreurs.push('VITE_BUILD_CIBLE=prod');
+  if (erreurs.length > 0) {
+    throw new Error(['Construction de la démo refusée :', ...erreurs.map((e) => `  - ${e}`)].join('\n'));
+  }
+}
+
+/**
+ * Mode démo : page non indexée. Hors démo : `public/mockServiceWorker.js`
+ * (copié d'office par Vite comme tout `public/`) est RETIRÉ de la sortie — le
+ * build normal ne contient aucun octet de démo.
+ */
+function pluginDemo(estDemo: boolean): Plugin {
+  let sortie = '';
+  return {
+    name: 'axion-demo',
+    configResolved(config) {
+      sortie = path.resolve(config.root, config.build.outDir);
+    },
+    transformIndexHtml(html) {
+      // `index.html` porte déjà `noindex` (CRM privé) ; la démo l'EXIGE, on
+      // l'ajoute donc si quelqu'un venait à le retirer du gabarit.
+      if (!estDemo || /name="robots"[^>]*noindex/.test(html)) return html;
+      return html.replace('<head>', '<head>\n    <meta name="robots" content="noindex, nofollow" />');
+    },
+    closeBundle() {
+      if (!estDemo && sortie !== '') rmSync(path.join(sortie, 'mockServiceWorker.js'), { force: true });
+    },
+  };
+}
+
+/** Mode `demo` : vérifie la garde de construction, puis le signale. */
+function preparerDemo(mode: string): boolean {
+  const estDemo = mode === 'demo';
+  if (estDemo) verifierDemo(loadEnv(mode, __dirname, ''));
+  return estDemo;
+}
+
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), tailwindcss(), pluginDemo(preparerDemo(mode))],
+  define: {
+    // Figé au build : hors démo, `import.meta.env.VITE_DEMO !== '1'` devient
+    // une constante et la branche de démo de `main.tsx` est éliminée.
+    'import.meta.env.VITE_DEMO': JSON.stringify(mode === 'demo' ? '1' : ''),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -93,7 +161,9 @@ export default defineConfig({
   },
   build: {
     target: 'es2023',
-    sourcemap: true,
+    // Démo publique : pas de cartes de source (le code d'origine n'a rien à
+    // faire sur un site de démonstration).
+    sourcemap: mode !== 'demo',
     cssCodeSplit: true,
     rollupOptions: {
       output: {
@@ -131,4 +201,4 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 500,
   },
-});
+}));

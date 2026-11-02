@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Envoi — réponses
+  version: 0.1.0
+  description: |
+    File des réponses, classement (avec suggestion), rattachement d'une
+    adresse inconnue, réponse dans le même fil, raccourcis de réponse.
+    Une réponse « stop » inscrit l'adresse au registre d'opposition et annule
+    les relances. Lot : DM2-REP.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/reponses:
+    get:
+      operationId: listerReponses
+      summary: File des réponses
+      parameters:
+        - name: file
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [a_traiter, a_rattacher, traitees]
+            default: a_traiter
+        - name: classement
+          in: query
+          required: false
+          schema: { $ref: './commun.yaml#/components/schemas/ClassementReponse' }
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Réponses paginées et compte par file.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, par_file]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/ReponseResume' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+                  par_file:
+                    type: object
+                    required: [a_traiter, a_rattacher, traitees]
+                    properties:
+                      a_traiter: { type: integer, minimum: 0 }
+                      a_rattacher: { type: integer, minimum: 0 }
+                      traitees: { type: integer, minimum: 0 }
+  /envoi/reponses/{id}:
+    get:
+      operationId: lireReponse
+      summary: Lire une réponse et son fil
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Réponse et fil complet.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reponse, fil, suggestions_rattachement]
+                properties:
+                  reponse: { $ref: './commun.yaml#/components/schemas/ReponseResume' }
+                  fil:
+                    type: array
+                    items: { $ref: '#/components/schemas/MessageFil' }
+                  suggestions_rattachement:
+                    type: array
+                    items: { $ref: '#/components/schemas/SuggestionRattachement' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/reponses/{id}/classer:
+    post:
+      operationId: classerReponse
+      summary: Classer une réponse
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [classement]
+              properties:
+                classement: { $ref: './commun.yaml#/components/schemas/ClassementReponse' }
+                creer_tache: { type: boolean, default: false }
+                toute_organisation:
+                  type: boolean
+                  default: false
+                  description: Pour « stop » — opposition étendue à toute l'organisation.
+      responses:
+        '200': { $ref: '#/components/responses/Reponse' }
+  /envoi/reponses/{id}/rattacher:
+    post:
+      operationId: rattacherReponse
+      summary: Rattacher une réponse d'adresse inconnue à une fiche
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, reference]
+              properties:
+                type: { type: string, enum: [contact, entreprise, carnet] }
+                reference: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Reponse' }
+  /envoi/reponses/{id}/repondre:
+    post:
+      operationId: repondreReponse
+      summary: Répondre dans le même fil, depuis la même boîte
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [corps]
+              properties:
+                corps: { type: string }
+                raccourci_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200': { $ref: '#/components/responses/Reponse' }
+  /envoi/reponses/raccourcis:
+    get:
+      operationId: listerRaccourcis
+      summary: Raccourcis de réponse
+      responses:
+        '200':
+          description: Raccourcis.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, nom, corps]
+                      properties:
+                        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                        nom: { type: string }
+                        corps: { type: string }
+components:
+  schemas:
+    MessageFil:
+      type: object
+      required: [id, sens, de, le, objet, corps]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        sens: { type: string, enum: [envoye, recu] }
+        de: { type: string }
+        le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        objet: { type: string }
+        corps: { type: string }
+    SuggestionRattachement:
+      type: object
+      required: [type, reference, libelle, raison]
+      properties:
+        type: { type: string, enum: [contact, entreprise] }
+        reference: { type: string }
+        libelle: { type: string }
+        raison: { type: string }
+  responses:
+    Reponse:
+      description: Réponse après le geste.
+      content:
+        application/json:
+          schema: { $ref: './commun.yaml#/components/schemas/ReponseResume' }

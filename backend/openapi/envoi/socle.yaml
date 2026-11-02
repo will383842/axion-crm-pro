@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Envoi — socle
+  version: 0.1.0
+  description: |
+    Routes communes aux deux produits et état global des envois : drapeaux et
+    droits par produit, notifications de la cloche, « Tout arrêter » /
+    « Reprendre », compteurs de l'en-tête d'Envoi. Propriété : DM0-DEMO.
+servers:
+  - url: /api/v1
+paths:
+  /config/features:
+    get:
+      operationId: lireFeatures
+      summary: Drapeaux de la console et droits de l'espace par produit
+      responses:
+        '200':
+          description: Drapeaux et produits (`actif`, `suspendu`, `resilie`, `absent`).
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Features' }
+  /notifications:
+    get:
+      operationId: listerNotifications
+      summary: Notifications de la cloche (deux produits)
+      parameters:
+        - name: produit
+          in: query
+          required: false
+          schema: { $ref: './commun.yaml#/components/schemas/Produit' }
+      responses:
+        '200':
+          description: Notifications, les plus récentes d'abord.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, unread_count]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/Notification' }
+                  unread_count: { type: integer, minimum: 0 }
+                  degraded: { type: boolean }
+  /notifications/{id}/lue:
+    post:
+      operationId: marquerNotificationLue
+      summary: Marquer une notification comme lue
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: './commun.yaml#/components/responses/Succes' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/etat:
+    get:
+      operationId: lireEtatEnvois
+      summary: État global des envois (feu de l'en-tête)
+      responses:
+        '200':
+          description: État des envois.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/EtatEnvois' }
+  /envoi/tout-arreter:
+    post:
+      operationId: toutArreter
+      summary: Tout arrêter — plus aucun message ne part, toutes campagnes et boîtes
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motif: { type: string }
+      responses:
+        '200':
+          description: Envois arrêtés.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/EtatEnvois' }
+  /envoi/reprendre:
+    post:
+      operationId: reprendreEnvois
+      summary: Reprendre les envois après « Tout arrêter »
+      responses:
+        '200':
+          description: Envois repris.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/EtatEnvois' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/compteurs:
+    get:
+      operationId: lireCompteursEnvoi
+      summary: Compteurs de l'en-tête et du tableau de bord d'Envoi
+      responses:
+        '200':
+          description: Compteurs du jour.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/CompteursEnvoi' }

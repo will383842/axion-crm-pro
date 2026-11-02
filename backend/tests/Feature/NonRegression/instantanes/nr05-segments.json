@@ -1,0 +1,13 @@
+{
+    "connus": [
+        "organisateurs-evenements",
+        "federations",
+        "presse"
+    ],
+    "ouverts_par_defaut": [
+        "organisateurs-evenements",
+        "federations",
+        "presse"
+    ],
+    "valeur_pour_tout_fermer": "aucun"
+}

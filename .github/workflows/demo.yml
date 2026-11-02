@@ -1,0 +1,104 @@
+name: Démo
+
+# DM0-DEMO — le mode démo est construit, gardé et joué à chaque PR vers main.
+#
+# Le mode démo (ADR-15, plan 29) est le VRAI frontend branché sur un faux
+# serveur dans le navigateur (MSW) et un jeu factice à graine fixe. Ce job :
+#   1. vérifie que les types du contrat d'Envoi sont à jour (`pnpm api:envoi --verifier`) ;
+#   2. passe la garde des données personnelles du dépôt ;
+#   3. construit la démo (`pnpm build:demo` → `frontend/dist-demo`) — la garde
+#      de construction de `vite.config.ts` refuse tout serveur réel ou clé ;
+#   4. refuse toute URL réelle dans `dist-demo` (domaines du projet, `api.*`) ;
+#   5. joue TOUTES les suites de `tests/e2e/demo/` (Chromium, `vite preview`
+#      de `dist-demo`, contrôle axe, passage à 360 px) ;
+#   6. dépose `dist-demo` en artefact (7 jours). Rien n'est déployé.
+#
+# Aucune clé, aucun secret, machine gratuite standard. BLOQUANT : jamais de
+# `continue-on-error`. Les suites de `tests/e2e/demo/` sont toutes jouées ici
+# (dossier cité) : la garde `frontend/tests/couverture-e2e.test.ts` le sait.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    name: Démo (build, gardes, e2e)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v7
+        with: { node-version: '22', cache: 'pnpm', cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Installation (lockfile figé)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Contrat d'Envoi — types générés à jour
+        working-directory: frontend
+        run: pnpm api:envoi --verifier
+      - name: Garde des données personnelles (témoin puis dépôt)
+        run: |
+          bash infra/scripts/garde-donnees-personnelles.sh --temoin
+          bash infra/scripts/garde-donnees-personnelles.sh
+      - name: Build de la démo
+        working-directory: frontend
+        run: pnpm build:demo
+      - name: Garde — aucune URL réelle dans dist-demo
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          test -f dist-demo/index.html
+          test -f dist-demo/mockServiceWorker.js
+          # Témoin : l'adresse de démo est bien là (sinon la recherche ne vaut rien).
+          grep -rq 'https://demo.invalid' dist-demo/assets
+          grep -q 'noindex' dist-demo/index.html
+          fautes=0
+          if grep -rnoE 'axion-crm-pro\.com|axion-ia\.(com|fr)|api\.localhost' dist-demo; then
+            echo "::error::Domaine réel du projet trouvé dans dist-demo."
+            fautes=1
+          fi
+          if grep -rhoE 'https?://api\.[A-Za-z0-9.-]+' dist-demo | grep -v 'demo\.invalid'; then
+            echo "::error::Adresse d'API réelle trouvée dans dist-demo."
+            fautes=1
+          fi
+          exit "$fautes"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-demo
+          path: frontend/dist-demo/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Navigateur Chromium pour Playwright
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E de démo (BLOQUANT)
+        working-directory: frontend
+        # Rapporteurs pris dans la configuration (liste + html dans
+        # `playwright-report-demo/`) : pas de `--reporter` ici, il les écraserait.
+        run: >-
+          pnpm exec playwright test --config playwright.demo.config.ts
+          tests/e2e/demo/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: captures-demo
+          path: frontend/captures-demo/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-demo-report
+          path: frontend/playwright-report-demo/
+          retention-days: 7
+          if-no-files-found: warn

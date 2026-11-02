@@ -90,8 +90,10 @@ describe('DashboardPage — rendu des blocs', () => {
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
     expect(await screen.findByRole('heading', { level: 1, name: 'Bonjour Will' })).toBeVisible();
     expect(screen.getByText(new RegExp(dateDuJour()))).toBeVisible();
-    // Le mot du menu et du fil d'Ariane reste sur la page.
-    expect(screen.getByText('Tableau de bord')).toBeVisible();
+    // Le mot du menu et du fil d'Ariane reste sur la page : l'en-tête, et
+    // (DM1-ACC) l'onglet « Tableau de bord » de la barre partagée.
+    expect(screen.getAllByText('Tableau de bord')).toHaveLength(2);
+    expect(screen.getByRole('navigation', { name: 'Tableau de bord' })).toBeVisible();
   });
 
   it('dateDuJour : « Samedi 3 octobre » ; nombreCourt : « 4,35 M »', () => {

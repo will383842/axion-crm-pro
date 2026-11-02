@@ -97,7 +97,7 @@ describe('AffairesPage', () => {
 
     const devis = await screen.findByRole('region', { name: /^Devis/ });
     expect(within(devis).getByText(/70 %/)).toBeVisible();
-    expect(within(devis).getByText(/signature prévue/i)).toBeVisible();
+    expect(within(devis).getAllByText(/signature prévue le 22 janv\. 2027/i)).toHaveLength(1);
   });
 
   it('état vide : « Aucune affaire »', async () => {

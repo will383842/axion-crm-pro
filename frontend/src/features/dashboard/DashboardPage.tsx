@@ -5,7 +5,10 @@ import { Link } from '@tanstack/react-router';
 import { Card, EmptyState, QueryErrorState, Skeleton, Tooltip, cn } from '@/components/ui';
 import { api, qualifierErreur } from '@/lib/api';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
+import { useProduits } from '@/features/socle/produits/useProduits';
+import { OngletsTableauDeBord } from './OngletsTableauDeBord';
 import { AFaire } from './components/AFaire';
+import { CarteEnvoiAujourdhui } from './components/CarteEnvoiAujourdhui';
 import { MesAudiences } from './components/MesAudiences';
 import { SizeDistributionChart } from './components/SizeDistributionChart';
 import { etatQualite } from './qualite';
@@ -159,6 +162,8 @@ export function DashboardPage() {
     staleTime: 5 * 60 * 1000,
   });
   const features = useConsoleFeatures();
+  // DM1-ACC — la carte « Envoi aujourd'hui » n'existe que si Envoi est actif pour l'espace.
+  const envoiActif = useProduits().envoi === 'actif';
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -190,6 +195,7 @@ export function DashboardPage() {
           {firstName ? `Bonjour ${firstName}` : 'Bienvenue'}
         </h1>
       </header>
+      <OngletsTableauDeBord />
 
       {sansEspace !== null ? (
         <Card padding="lg">
@@ -198,6 +204,7 @@ export function DashboardPage() {
       ) : (
         <>
           {features.console_v2 ? <AFaire consoleOuverte /> : null}
+          {envoiActif ? <CarteEnvoiAujourdhui /> : null}
 
           {isLoading ? (
             <MaBaseSquelette />

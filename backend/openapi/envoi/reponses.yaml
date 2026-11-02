@@ -128,6 +128,32 @@ paths:
               properties:
                 corps: { type: string }
                 raccourci_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                attribuer_a:
+                  description: Collègue à qui la suite est confiée (facultatif).
+                  oneOf: [{ type: string }, { type: 'null' }]
+      responses:
+        '200': { $ref: '#/components/responses/Reponse' }
+  /envoi/reponses/{id}/creer-fiche:
+    post:
+      operationId: creerFicheDepuisReponse
+      summary: Créer une nouvelle personne à partir d'une réponse sans fiche
+      description: |
+        Crée la personne dans le CRM avec sa provenance, rattache la réponse
+        et la remet dans « À traiter ». Rien n'est jamais supprimé.
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prenom, nom, provenance]
+              properties:
+                prenom: { type: string }
+                nom: { type: string }
+                organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+                provenance: { type: string }
       responses:
         '200': { $ref: '#/components/responses/Reponse' }
   /envoi/reponses/raccourcis:
@@ -154,6 +180,31 @@ paths:
                         corps: { type: string }
 components:
   schemas:
+    ResumeCrm:
+      type: object
+      description: |
+        Résumé envoyé au CRM après un geste (les réponses restent dans Envoi,
+        le CRM n'en reçoit que ce résumé).
+      required: [classement, le, lien, tache]
+      properties:
+        classement: { $ref: './commun.yaml#/components/schemas/ClassementReponse' }
+        le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        lien: { type: string, description: Lien vers la réponse dans Envoi. }
+        tache: { oneOf: [{ type: string }, { type: 'null' }], description: Libellé de la tâche créée dans le CRM. }
+        opposition:
+          type: boolean
+          default: false
+          description: Vrai si le contact est mis à l'écart des envois (données gardées).
+    ReponseApresGeste:
+      allOf:
+        - $ref: './commun.yaml#/components/schemas/ReponseResume'
+        - type: object
+          required: [resume_crm]
+          properties:
+            resume_crm:
+              oneOf:
+                - $ref: '#/components/schemas/ResumeCrm'
+                - type: 'null'
     MessageFil:
       type: object
       required: [id, sens, de, le, objet, corps]
@@ -174,7 +225,7 @@ components:
         raison: { type: string }
   responses:
     Reponse:
-      description: Réponse après le geste.
+      description: Réponse après le geste, avec le résumé envoyé au CRM.
       content:
         application/json:
-          schema: { $ref: './commun.yaml#/components/schemas/ReponseResume' }
+          schema: { $ref: '#/components/schemas/ReponseApresGeste' }

@@ -24,6 +24,11 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM1-CON (#396) : ajout rapide, import, modifier, retirer, restaurer, export, appel et
+// rappel des contacts. Ces appels ne partent que si le serveur annonce les gestes (`gestes_fiches` dans les
+// compteurs du hub, `fiche` dans l'historique d'une personne), ce que le vrai serveur ne fait pas : en production
+// la page reste celle d'avant ; la démo les sert. Les routes serveur sont prévues au lot serveur du CRM, qui
+// retirera ces lignes. Le filet reste strict : tout AUTRE appel sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM2-REP (#394) : boîte des réponses d'Envoi (liste, raccourcis, lecture, classer,
 // rattacher, créer une fiche, répondre). Ces appels ne partent que si Envoi est actif (absent en production :
 // la route répond « Page introuvable », garde `routes-envoi-gardees`) et sont servis par le faux serveur de la
@@ -31,6 +36,17 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
+  'GET /api/v1/crm/contacts/corbeille',
+  'GET /api/v1/crm/contacts/doublons',
+  'PATCH /api/v1/crm/contacts/{p}',
+  'POST /api/v1/crm/contacts',
+  'POST /api/v1/crm/contacts/export',
+  'POST /api/v1/crm/contacts/import',
+  'POST /api/v1/crm/contacts/import/controle',
+  'POST /api/v1/crm/contacts/{p}/restaurer',
+  'POST /api/v1/crm/contacts/{p}/retirer',
+  'POST /api/v1/crm/persons/{p}/appels',
+  'POST /api/v1/crm/persons/{p}/rappel',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'GET /api/v1/envoi/reponses',

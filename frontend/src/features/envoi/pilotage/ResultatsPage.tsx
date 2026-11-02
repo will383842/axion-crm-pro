@@ -85,7 +85,7 @@ export function ResultatsPage() {
             </div>
             <p className="mt-3 text-xs text-slate-600">
               Les réponses sont l’indicateur principal. Les ouvertures, quand une campagne les suit, ne sont qu’une estimation : les ouvertures automatiques probables (Apple, relais) sont retirées.
-              {d.precedent && d.precedent.remis > 0 ? <> <Evolution actuel={part(d.totaux.reponses, d.totaux.remis)} avant={part(d.precedent.reponses, d.precedent.remis)} libelle="point de taux de réponse" />.</> : null}
+              {d.precedent && d.precedent.remis > 0 ? <> <Evolution actuel={part(d.totaux.reponses, d.totaux.remis)} avant={part(d.precedent.reponses, d.precedent.remis)} libelle="point de taux de réponse" />.</> : <> Aucun envoi sur la période d’avant : pas de comparaison possible.</>}
             </p>
 
             {d.entonnoir ? (

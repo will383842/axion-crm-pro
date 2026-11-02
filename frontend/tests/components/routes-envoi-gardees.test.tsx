@@ -236,6 +236,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(screen.queryByText('Codes de secours')).toBeNull();
   });
 
+  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
     await monter('/desinscription/jeton-de-test');
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', 'DM2-CNF');

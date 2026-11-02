@@ -30,6 +30,15 @@ final class SiteSyncEvent
     public const SCHEMA_VERSION = 1;
 
     /**
+     * Versions acceptées. La 2 (PV-6) ajoute quatre champs FACULTATIFS
+     * (`ContenusAccords`) ; une charge en version 1, sans eux, reste valide.
+     * Voir `docs/contrats/synchro-site-crm.md`.
+     *
+     * @var list<int>
+     */
+    public const SCHEMA_VERSIONS_ACCEPTEES = [1, 2];
+
+    /**
      * Types d'événements acceptés. Un type inconnu est refusé : ce sont les
      * 14 points de capture de l'audit §1.1, pas une liste ouverte.
      *
@@ -87,6 +96,8 @@ final class SiteSyncEvent
         'schema_version', 'event_id', 'event_type', 'occurred_at', 'form_type',
         'source_slug', 'subject_ref', 'person', 'company', 'consent',
         'candidate', 'tags', 'payload',
+        // PV-6 (contrat v2) : contenus et accords, tous facultatifs.
+        'origine_contenu', 'guides_recus', 'consentements', 'opposition',
     ];
 
     private const PERSON_KEYS = ['person_key', 'email', 'first_name', 'last_name', 'phone'];
@@ -119,6 +130,7 @@ final class SiteSyncEvent
         public readonly array $tags,
         public readonly array $payload,
         public readonly ?DossierClient $dossier = null,
+        public readonly ?ContenusAccords $contenusAccords = null,
     ) {}
 
     /**
@@ -131,10 +143,10 @@ final class SiteSyncEvent
         self::assertOnlyKeys($raw, self::TOP_LEVEL_KEYS, 'racine');
 
         $version = $raw['schema_version'] ?? null;
-        if ($version !== self::SCHEMA_VERSION) {
+        if (! in_array($version, self::SCHEMA_VERSIONS_ACCEPTEES, true)) {
             throw SiteSyncRejection::invalid(
                 'unsupported_schema_version',
-                'Version de schéma non supportée : ' . var_export($version, true) . ' (attendu : ' . self::SCHEMA_VERSION . ').',
+                'Version de schéma non supportée : ' . var_export($version, true) . ' (attendu : ' . implode(' ou ', self::SCHEMA_VERSIONS_ACCEPTEES) . ').',
             );
         }
 
@@ -194,6 +206,7 @@ final class SiteSyncEvent
             tags: self::assertTags($raw['tags'] ?? []),
             payload: $payload,
             dossier: $dossier,
+            contenusAccords: ContenusAccords::depuisRacine($raw),
         );
     }
 

@@ -1,0 +1,511 @@
+openapi: 3.1.0
+info:
+  title: Envoi — schémas communs
+  version: 0.1.0
+  description: |
+    Schémas partagés par toutes les zones du contrat d'API d'Envoi (lot DM0-DEMO).
+    Chaque zone (`socle.yaml`, `campagnes.yaml`, …) est un document OpenAPI 3.1
+    complet qui référence ce fichier. Les types TypeScript sont générés par
+    `pnpm api:envoi` dans `frontend/src/features/envoi/api/<zone>.d.ts`.
+
+    Propriété : DM0-DEMO. Les lots d'écran ne modifient pas ce fichier ; un
+    besoin nouveau est noté dans leur PR.
+
+    Mesure des ouvertures (décision de Will, 01/11/2026) : un pixel OPTIONNEL,
+    activé campagne par campagne (`suivre_ouvertures`). Une ouverture est une
+    ESTIMATION : les ouvertures automatiques (relais d'images des messageries,
+    protection de la vie privée d'Apple, antivirus) sont signalées par
+    `automatique_probable`. L'indicateur principal reste les réponses.
+    Aucun suivi des clics (décision de Will : ouvertures seulement).
+paths: {}
+components:
+  schemas:
+    Identifiant:
+      type: string
+      description: Identifiant stable, opaque.
+      examples: [cmp-01]
+    Horodatage:
+      type: string
+      format: date-time
+      description: Date et heure ISO 8601 (UTC).
+    Produit:
+      type: string
+      enum: [crm, envoi, commun]
+    EtatProduit:
+      type: string
+      description: Droit d'accès d'un espace à un produit.
+      enum: [actif, suspendu, resilie, absent]
+    EtatFeu:
+      type: string
+      description: Feu de santé (vert bon, ambre attention, rouge arrêté, bleu en montée, gris inconnu).
+      enum: [vert, ambre, rouge, bleu, gris]
+    Pagination:
+      type: object
+      required: [page, par_page, total, pages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        par_page: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        pages: { type: integer, minimum: 0 }
+    Erreur:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Code machine stable (ex. `non_trouve`, `validation`, `envois_arretes`).
+        message:
+          type: string
+          description: Phrase en français, au vouvoiement, affichable telle quelle.
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    Succes:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, const: true }
+        message: { type: string }
+    StatutCampagne:
+      type: string
+      enum: [brouillon, a_valider, programmee, en_cours, en_pause, terminee, arretee]
+    TypeCible:
+      type: string
+      enum: [liste, audience, etiquette, carnet]
+    CibleCampagne:
+      type: object
+      required: [type, reference, libelle, total]
+      properties:
+        type: { $ref: '#/components/schemas/TypeCible' }
+        reference:
+          type: string
+          description: Identifiant de la liste ou de l'audience, ou nom de l'étiquette.
+        libelle: { type: string }
+        total: { type: integer, minimum: 0 }
+    ResumeOuvertures:
+      type: object
+      description: |
+        Ouvertures d'une campagne qui les suit. Toujours affichées comme une
+        « estimation » ; `automatiques_probables` est déjà retiré de `estimees`.
+      required: [estimees, automatiques_probables, taux_estime, mention]
+      properties:
+        estimees: { type: integer, minimum: 0 }
+        automatiques_probables: { type: integer, minimum: 0 }
+        taux_estime:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Pourcentage des messages remis, ouvertures automatiques retirées.
+        mention: { type: string, const: estimation }
+    CampagneResume:
+      type: object
+      required:
+        [id, nom, statut, cible, envoyes, total, reponses, reponses_interessees,
+         suivre_ouvertures, ouvertures, ab_objet, prochain_envoi_le, cree_le, boites, etapes]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        nom: { type: string }
+        statut: { $ref: '#/components/schemas/StatutCampagne' }
+        cible: { $ref: '#/components/schemas/CibleCampagne' }
+        envoyes: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+        reponses: { type: integer, minimum: 0 }
+        reponses_interessees: { type: integer, minimum: 0 }
+        suivre_ouvertures:
+          type: boolean
+          description: Case « Suivre les ouvertures » de la campagne (pixel optionnel, désactivé par défaut).
+        ouvertures:
+          description: Présent seulement si la campagne suit les ouvertures.
+          oneOf:
+            - $ref: '#/components/schemas/ResumeOuvertures'
+            - type: 'null'
+        ab_objet:
+          type: boolean
+          description: Test A/B sur l'objet du premier message.
+        prochain_envoi_le:
+          oneOf:
+            - $ref: '#/components/schemas/Horodatage'
+            - type: 'null'
+        cree_le: { $ref: '#/components/schemas/Horodatage' }
+        boites:
+          type: array
+          items: { $ref: '#/components/schemas/Identifiant' }
+        etapes:
+          type: integer
+          minimum: 1
+          maximum: 4
+          description: Nombre de messages de la séquence (1 à 4).
+    StatutBoite:
+      type: string
+      enum: [prete, ralentie, en_chauffe, suspendue]
+    Chauffe:
+      type: object
+      required: [jour, sur, plafond_aujourdhui]
+      properties:
+        jour: { type: integer, minimum: 1 }
+        sur: { type: integer, minimum: 1 }
+        plafond_aujourdhui: { type: integer, minimum: 0 }
+    BoiteResume:
+      type: object
+      required:
+        [id, adresse, domaine_id, nom_affiche, etat, statut, quota_jour, envoyes_aujourdhui,
+         taux_refus, reponses_7j, chauffe]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        adresse: { type: string, format: email }
+        domaine_id: { $ref: '#/components/schemas/Identifiant' }
+        nom_affiche: { type: string }
+        etat: { $ref: '#/components/schemas/EtatFeu' }
+        statut: { $ref: '#/components/schemas/StatutBoite' }
+        quota_jour: { type: integer, minimum: 0 }
+        envoyes_aujourdhui: { type: integer, minimum: 0 }
+        taux_refus:
+          type: number
+          minimum: 0
+          description: Refus (durs et mous) sur 7 jours, en pourcentage.
+        reponses_7j: { type: integer, minimum: 0 }
+        chauffe:
+          oneOf:
+            - $ref: '#/components/schemas/Chauffe'
+            - type: 'null'
+    PolitiqueDmarc:
+      type: string
+      enum: [none, quarantine, reject]
+    DomaineResume:
+      type: object
+      required: [id, nom, etat, boites, dmarc, dmarc_prochaine_etape, listes_noires, ajoute_le, chauffe]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        nom: { type: string }
+        etat: { $ref: '#/components/schemas/EtatFeu' }
+        boites: { type: integer, minimum: 0 }
+        dmarc: { $ref: '#/components/schemas/PolitiqueDmarc' }
+        dmarc_prochaine_etape:
+          description: DMARC progressif — prochaine politique et date prévue.
+          oneOf:
+            - type: object
+              required: [politique, le]
+              properties:
+                politique: { $ref: '#/components/schemas/PolitiqueDmarc' }
+                le: { $ref: '#/components/schemas/Horodatage' }
+            - type: 'null'
+        listes_noires: { type: integer, minimum: 0 }
+        ajoute_le: { $ref: '#/components/schemas/Horodatage' }
+        chauffe:
+          oneOf:
+            - $ref: '#/components/schemas/Chauffe'
+            - type: 'null'
+    FluxEnvoi:
+      type: string
+      enum: [prospection, lettre]
+    AdresseIp:
+      type: object
+      required: [adresse, flux, domaine_id, statut, envoyes_aujourdhui]
+      properties:
+        adresse:
+          type: string
+          description: Adresse IP. En démo, plages de documentation seulement (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24).
+        flux: { $ref: '#/components/schemas/FluxEnvoi' }
+        domaine_id: { $ref: '#/components/schemas/Identifiant' }
+        statut: { $ref: '#/components/schemas/StatutBoite' }
+        envoyes_aujourdhui: { type: integer, minimum: 0 }
+    ServeurResume:
+      type: object
+      required: [id, nom, etat, adresses_ip, version_configuration]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        nom: { type: string }
+        etat: { $ref: '#/components/schemas/EtatFeu' }
+        adresses_ip:
+          type: array
+          items: { $ref: '#/components/schemas/AdresseIp' }
+        version_configuration: { type: integer, minimum: 1 }
+    EtatDestinataire:
+      type: string
+      enum: [a_envoyer, envoye, remis, rebond_mou, rebond_dur, a_repondu, desinscrit, plainte, exclu, relances_annulees]
+    Ouverture:
+      type: object
+      description: |
+        Ouverture estimée d'un message (pixel). `automatique_probable` vaut vrai
+        quand l'ouverture vient probablement d'un relais (protection de la vie
+        privée d'Apple, relais d'images, antivirus) et non d'une personne.
+      required: [premiere_le, derniere_le, nombre, automatique_probable, raison_automatique]
+      properties:
+        premiere_le: { $ref: '#/components/schemas/Horodatage' }
+        derniere_le: { $ref: '#/components/schemas/Horodatage' }
+        nombre: { type: integer, minimum: 1 }
+        automatique_probable: { type: boolean }
+        raison_automatique:
+          oneOf:
+            - type: string
+              enum: [protection_apple, relais_images, antivirus, ouverture_immediate]
+            - type: 'null'
+    Destinataire:
+      type: object
+      required:
+        [id, campagne_id, contact_id, adresse, prenom, nom, organisation, etape, etat,
+         dernier_evenement_le, code_serveur, motif, ouverture]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        campagne_id: { $ref: '#/components/schemas/Identifiant' }
+        contact_id:
+          description: Contact du CRM (adaptateur CRM Pro) ; nul pour le carnet d'Envoi seul.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        adresse: { type: string, format: email }
+        prenom: { oneOf: [{ type: string }, { type: 'null' }] }
+        nom: { oneOf: [{ type: string }, { type: 'null' }] }
+        organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+        etape:
+          type: integer
+          minimum: 0
+          maximum: 4
+          description: Dernier message de la séquence envoyé (0 = aucun).
+        etat: { $ref: '#/components/schemas/EtatDestinataire' }
+        dernier_evenement_le:
+          oneOf:
+            - $ref: '#/components/schemas/Horodatage'
+            - type: 'null'
+        code_serveur:
+          description: Code renvoyé par le serveur destinataire (ex. « 550 5.1.1 »).
+          oneOf: [{ type: string }, { type: 'null' }]
+        motif:
+          description: Code serveur traduit en français (ex. « Adresse inexistante »).
+          oneOf: [{ type: string }, { type: 'null' }]
+        ouverture:
+          description: Nul si la campagne ne suit pas les ouvertures ou si rien n'a été vu.
+          oneOf:
+            - $ref: '#/components/schemas/Ouverture'
+            - type: 'null'
+    TypeEvenementEnvoi:
+      type: string
+      enum: [remis, rebond_dur, rebond_mou, plainte, desinscription, ouverture, reponse]
+    EvenementEnvoi:
+      type: object
+      required:
+        [id, survenu_le, type, campagne_id, boite_id, destinataire_id, adresse, code_serveur,
+         libelle, automatique_probable]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        survenu_le: { $ref: '#/components/schemas/Horodatage' }
+        type: { $ref: '#/components/schemas/TypeEvenementEnvoi' }
+        campagne_id: { $ref: '#/components/schemas/Identifiant' }
+        boite_id: { $ref: '#/components/schemas/Identifiant' }
+        destinataire_id:
+          oneOf:
+            - $ref: '#/components/schemas/Identifiant'
+            - type: 'null'
+        adresse: { type: string, format: email }
+        code_serveur: { oneOf: [{ type: string }, { type: 'null' }] }
+        libelle:
+          description: Explication en français (code serveur traduit).
+          oneOf: [{ type: string }, { type: 'null' }]
+        automatique_probable:
+          description: Pour une ouverture seulement ; nul pour les autres types.
+          oneOf: [{ type: boolean }, { type: 'null' }]
+    ClassementReponse:
+      type: string
+      enum: [interesse, pas_maintenant, question, refus, stop, absence, a_rattacher]
+    ReponseResume:
+      type: object
+      required:
+        [id, recue_le, campagne_id, destinataire_id, boite_id, de, prenom, nom, organisation,
+         objet, extrait, classement, suggestion, traitee]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        recue_le: { $ref: '#/components/schemas/Horodatage' }
+        campagne_id:
+          oneOf:
+            - $ref: '#/components/schemas/Identifiant'
+            - type: 'null'
+        destinataire_id:
+          oneOf:
+            - $ref: '#/components/schemas/Identifiant'
+            - type: 'null'
+        boite_id: { $ref: '#/components/schemas/Identifiant' }
+        de: { type: string, format: email }
+        prenom: { oneOf: [{ type: string }, { type: 'null' }] }
+        nom: { oneOf: [{ type: string }, { type: 'null' }] }
+        organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+        objet: { type: string }
+        extrait: { type: string }
+        classement: { $ref: '#/components/schemas/ClassementReponse' }
+        suggestion:
+          type: object
+          required: [classement, confiance]
+          properties:
+            classement: { $ref: '#/components/schemas/ClassementReponse' }
+            confiance: { type: integer, minimum: 0, maximum: 100 }
+        traitee: { type: boolean }
+    VersionMessage:
+      type: object
+      required: [numero, objet, corps, modifie_le]
+      properties:
+        numero: { type: integer, minimum: 1 }
+        objet: { type: string }
+        objet_b:
+          description: Objet B du test A/B, s'il y en a un.
+          oneOf: [{ type: string }, { type: 'null' }]
+        corps: { type: string }
+        modifie_le: { $ref: '#/components/schemas/Horodatage' }
+    MessageType:
+      type: object
+      required: [id, nom, version_courante, versions, utilise_par]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        nom: { type: string }
+        version_courante: { type: integer, minimum: 1 }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/VersionMessage' }
+        utilise_par:
+          type: integer
+          minimum: 0
+          description: Nombre de campagnes qui l'utilisent.
+    CanalAlerte:
+      type: string
+      description: Alertes par la cloche de la console et par e-mail seulement.
+      enum: [console, email]
+    RegleAlerte:
+      type: object
+      required: [id, nom, condition, seuil, canaux, actif]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        nom: { type: string }
+        condition:
+          type: string
+          enum: [taux_refus, plainte, liste_noire, boite_ralentie, test_matin, reponse_interessee, quota_atteint]
+        seuil: { oneOf: [{ type: number }, { type: 'null' }] }
+        canaux:
+          type: array
+          items: { $ref: '#/components/schemas/CanalAlerte' }
+        actif: { type: boolean }
+    SourceDesinscription:
+      type: string
+      enum: [lien, reponse_stop, plainte, manuel]
+    Desinscription:
+      type: object
+      required: [id, adresse, survenue_le, source, campagne_id]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        adresse: { type: string, format: email }
+        survenue_le: { $ref: '#/components/schemas/Horodatage' }
+        source: { $ref: '#/components/schemas/SourceDesinscription' }
+        campagne_id:
+          oneOf:
+            - $ref: '#/components/schemas/Identifiant'
+            - type: 'null'
+    Opposition:
+      type: object
+      description: Ligne du registre d'opposition (« ne plus écrire »). Jamais supprimée.
+      required: [id, portee, valeur, motif, inscrite_le, source]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        portee:
+          type: string
+          enum: [adresse, organisation, domaine]
+        valeur: { type: string }
+        motif: { type: string }
+        inscrite_le: { $ref: '#/components/schemas/Horodatage' }
+        source: { $ref: '#/components/schemas/SourceDesinscription' }
+    EtatEnvois:
+      type: object
+      required: [etat, feu, depuis, par, motif]
+      properties:
+        etat:
+          type: string
+          enum: [actif, arrete]
+        feu: { $ref: '#/components/schemas/EtatFeu' }
+        depuis: { $ref: '#/components/schemas/Horodatage' }
+        par: { oneOf: [{ type: string }, { type: 'null' }] }
+        motif: { oneOf: [{ type: string }, { type: 'null' }] }
+    CompteursEnvoi:
+      type: object
+      required:
+        [envoyes_aujourdhui, plafond_jour, en_file, reponses_a_traiter, alertes_ouvertes,
+         campagnes_en_cours, boites_pretes, boites_total]
+      properties:
+        envoyes_aujourdhui: { type: integer, minimum: 0 }
+        plafond_jour: { type: integer, minimum: 0 }
+        en_file: { type: integer, minimum: 0 }
+        reponses_a_traiter: { type: integer, minimum: 0 }
+        alertes_ouvertes: { type: integer, minimum: 0 }
+        campagnes_en_cours: { type: integer, minimum: 0 }
+        boites_pretes: { type: integer, minimum: 0 }
+        boites_total: { type: integer, minimum: 0 }
+    Notification:
+      type: object
+      required: [id, type, title, body, action_url, lien, produit, niveau, read_at, created_at]
+      properties:
+        id: { $ref: '#/components/schemas/Identifiant' }
+        type: { type: string }
+        title: { type: string }
+        body: { oneOf: [{ type: string }, { type: 'null' }] }
+        action_url:
+          description: Ancien nom du lien (lu par la cloche actuelle) ; même valeur que `lien`.
+          oneOf: [{ type: string }, { type: 'null' }]
+        lien:
+          description: Chemin de l'écran à ouvrir.
+          oneOf: [{ type: string }, { type: 'null' }]
+        produit: { $ref: '#/components/schemas/Produit' }
+        niveau:
+          type: string
+          enum: [a_faire, attention, nouveau, fait]
+        read_at:
+          oneOf:
+            - $ref: '#/components/schemas/Horodatage'
+            - type: 'null'
+        created_at: { $ref: '#/components/schemas/Horodatage' }
+    Features:
+      type: object
+      required: [console_v2, universes, produits]
+      properties:
+        console_v2: { type: boolean }
+        universes:
+          type: object
+          required: [business, vivier]
+          properties:
+            business: { type: boolean }
+            vivier: { type: boolean }
+        produits:
+          type: object
+          required: [crm, envoi]
+          properties:
+            crm: { $ref: '#/components/schemas/EtatProduit' }
+            envoi: { $ref: '#/components/schemas/EtatProduit' }
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    ParPage:
+      name: par_page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 200, default: 25 }
+    Recherche:
+      name: q
+      in: query
+      required: false
+      description: Recherche texte (insensible à la casse et aux accents).
+      schema: { type: string }
+    Identifiant:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Identifiant' }
+  responses:
+    Erreur:
+      description: Erreur, avec un message en français.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Erreur' }
+    Succes:
+      description: Geste accepté.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Succes' }

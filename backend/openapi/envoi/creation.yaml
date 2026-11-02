@@ -1,0 +1,357 @@
+openapi: 3.1.0
+info:
+  title: Envoi — création de campagne
+  version: 0.1.0
+  description: |
+    Assistant de création en 5 étapes (cible, messages, boîtes et rythme,
+    programmation, contrôles), brouillon enregistré à chaque étape. Cible par
+    liste, audience ou étiquette, exclusions, séquence de 1 à 4 messages, A/B
+    d'objet, case « Suivre les ouvertures » (désactivée par défaut), 7
+    contrôles, validation par code e-mail, annulation possible pendant 5 min.
+    Messages types versionnés, aperçu, « m'envoyer un test ». Lot : DM2-ASS.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/brouillons:
+    post:
+      operationId: creerBrouillon
+      summary: Créer un brouillon de campagne
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Brouillon' }
+  /envoi/brouillons/{id}:
+    get:
+      operationId: lireBrouillon
+      summary: Lire un brouillon
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Brouillon' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/brouillons/{id}/etapes/{etape}:
+    put:
+      operationId: enregistrerEtape
+      summary: Enregistrer une étape de l'assistant (1 à 5)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - name: etape
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 5 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContenuEtape' }
+      responses:
+        '200': { $ref: '#/components/responses/Brouillon' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/brouillons/{id}/cible/estimation:
+    post:
+      operationId: estimerCible
+      summary: Compter la cible après exclusions
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Cible' }
+      responses:
+        '200':
+          description: Comptes de la cible.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, exclus, restant, exclusions]
+                properties:
+                  total: { type: integer, minimum: 0 }
+                  exclus: { type: integer, minimum: 0 }
+                  restant: { type: integer, minimum: 0 }
+                  exclusions:
+                    type: object
+                    additionalProperties: { type: integer, minimum: 0 }
+  /envoi/brouillons/{id}/controles:
+    get:
+      operationId: lancerControles
+      summary: Les 7 contrôles avant validation
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Résultat de chaque contrôle.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [controles, bloquants]
+                properties:
+                  controles:
+                    type: array
+                    minItems: 7
+                    maxItems: 7
+                    items: { $ref: '#/components/schemas/Controle' }
+                  bloquants: { type: integer, minimum: 0 }
+  /envoi/brouillons/{id}/apercu:
+    post:
+      operationId: apercuMessage
+      summary: Aperçu d'un message pour un destinataire exemple
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [etape]
+              properties:
+                etape: { type: integer, minimum: 1, maximum: 4 }
+                variante: { type: string, enum: [a, b] }
+                destinataire_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200':
+          description: Message rendu.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [objet, corps, de]
+                properties:
+                  objet: { type: string }
+                  corps: { type: string }
+                  de: { type: string }
+  /envoi/brouillons/{id}/test:
+    post:
+      operationId: envoyerTest
+      summary: M'envoyer un test (à mes adresses de test seulement)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [etape]
+              properties:
+                etape: { type: integer, minimum: 1, maximum: 4 }
+                destinataire_exemple_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200': { $ref: './commun.yaml#/components/responses/Succes' }
+  /envoi/brouillons/{id}/validation/code:
+    post:
+      operationId: demanderCodeValidation
+      summary: Envoyer le code de validation par e-mail
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Code envoyé.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [envoye_a, expire_le]
+                properties:
+                  envoye_a: { type: string }
+                  expire_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+  /envoi/brouillons/{id}/valider:
+    post:
+      operationId: validerCampagne
+      summary: Valider avec le code e-mail (annulable 5 minutes)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^\d{6}$' }
+      responses:
+        '200':
+          description: Campagne validée ; annulable jusqu'à `annulable_jusqua`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [campagne, annulable_jusqua]
+                properties:
+                  campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+                  annulable_jusqua: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/annuler-validation:
+    post:
+      operationId: annulerValidation
+      summary: Annuler la validation (dans les 5 minutes)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Brouillon' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/messages:
+    get:
+      operationId: listerMessagesTypes
+      summary: Messages types
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+      responses:
+        '200':
+          description: Messages types.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/MessageType' }
+    post:
+      operationId: creerMessageType
+      summary: Créer un message type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaisieMessage' }
+      responses:
+        '201': { $ref: '#/components/responses/MessageType' }
+  /envoi/messages/{id}:
+    get:
+      operationId: lireMessageType
+      summary: Lire un message type
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/MessageType' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+    put:
+      operationId: enregistrerMessageType
+      summary: Enregistrer (crée une nouvelle version)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaisieMessage' }
+      responses:
+        '200': { $ref: '#/components/responses/MessageType' }
+  /envoi/messages/{id}/versions/{numero}/restaurer:
+    post:
+      operationId: restaurerVersion
+      summary: Restaurer une ancienne version (crée une nouvelle version)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - name: numero
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/MessageType' }
+components:
+  schemas:
+    Cible:
+      type: object
+      required: [type, reference]
+      properties:
+        type: { $ref: './commun.yaml#/components/schemas/TypeCible' }
+        reference: { type: string }
+        exclusions:
+          type: array
+          items:
+            type: string
+            enum: [deja_contactes_90j, clients, desinscrits, opposition, rebonds_durs, sans_adresse, autres_campagnes_en_cours]
+    EtapeSequence:
+      type: object
+      required: [etape, message_id, delai_jours]
+      properties:
+        etape: { type: integer, minimum: 1, maximum: 4 }
+        message_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        delai_jours:
+          type: integer
+          minimum: 0
+          description: Jours après le message précédent (0 pour le premier).
+        objet_b:
+          description: Objet B du test A/B (premier message seulement).
+          oneOf: [{ type: string }, { type: 'null' }]
+    ContenuEtape:
+      type: object
+      description: Contenu d'une étape ; seules les clés de l'étape sont lues.
+      properties:
+        cible: { $ref: '#/components/schemas/Cible' }
+        sequence:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items: { $ref: '#/components/schemas/EtapeSequence' }
+        boites:
+          type: array
+          items: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        plafond_jour: { type: integer, minimum: 1 }
+        suivre_ouvertures:
+          type: boolean
+          default: false
+          description: Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation.
+        debut_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        jours: { type: array, items: { type: string, enum: [lun, mar, mer, jeu, ven, sam, dim] } }
+        heures:
+          type: object
+          required: [de, a]
+          properties:
+            de: { type: string, pattern: '^\d{2}:\d{2}$' }
+            a: { type: string, pattern: '^\d{2}:\d{2}$' }
+    Brouillon:
+      type: object
+      required: [id, nom, etape_courante, etapes_faites, contenu, mis_a_jour_le]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        nom: { type: string }
+        etape_courante: { type: integer, minimum: 1, maximum: 5 }
+        etapes_faites:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 5 }
+        contenu: { $ref: '#/components/schemas/ContenuEtape' }
+        mis_a_jour_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+    Controle:
+      type: object
+      required: [code, libelle, etat, detail]
+      properties:
+        code:
+          type: string
+          enum: [cible_non_vide, opposition_retiree, lien_desinscription, identite_expediteur, boites_pretes, domaines_sains, plafond_respecte]
+        libelle: { type: string }
+        etat: { type: string, enum: [ok, attention, bloquant] }
+        detail: { oneOf: [{ type: string }, { type: 'null' }] }
+    SaisieMessage:
+      type: object
+      required: [nom, objet, corps]
+      properties:
+        nom: { type: string }
+        objet: { type: string }
+        objet_b: { oneOf: [{ type: string }, { type: 'null' }] }
+        corps: { type: string }
+  responses:
+    Brouillon:
+      description: Brouillon.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Brouillon' }
+    MessageType:
+      description: Message type et ses versions.
+      content:
+        application/json:
+          schema: { $ref: './commun.yaml#/components/schemas/MessageType' }

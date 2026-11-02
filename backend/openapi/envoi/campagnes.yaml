@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: Envoi — campagnes
+  version: 0.1.0
+  description: |
+    Liste, fiche et suivi des campagnes : filtres par statut, pause, reprise,
+    terminer, dupliquer, changer la date, destinataires et état par
+    destinataire (ouvertures estimées comprises quand la campagne les suit),
+    calendrier. Lot d'écran : DM2-CAM.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/campagnes:
+    get:
+      operationId: listerCampagnes
+      summary: Liste des campagnes
+      parameters:
+        - name: statut
+          in: query
+          required: false
+          schema: { $ref: './commun.yaml#/components/schemas/StatutCampagne' }
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Campagnes et compte par statut.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, par_statut]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+                  par_statut:
+                    type: object
+                    additionalProperties: { type: integer, minimum: 0 }
+  /envoi/campagnes/calendrier:
+    get:
+      operationId: calendrierCampagnes
+      summary: Calendrier des envois prévus et passés
+      parameters:
+        - name: du
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: au
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Une ligne par jour et par campagne.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [jour, campagne_id, nom, statut, prevus, envoyes]
+                      properties:
+                        jour: { type: string, format: date }
+                        campagne_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                        nom: { type: string }
+                        statut: { $ref: './commun.yaml#/components/schemas/StatutCampagne' }
+                        prevus: { type: integer, minimum: 0 }
+                        envoyes: { type: integer, minimum: 0 }
+  /envoi/campagnes/{id}:
+    get:
+      operationId: lireCampagne
+      summary: Fiche de suivi d'une campagne
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Campagne, séquence et fil des derniers événements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [campagne, sequence, derniers_evenements]
+                properties:
+                  campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+                  sequence:
+                    type: array
+                    items:
+                      type: object
+                      required: [etape, message_id, delai_jours, envoyes]
+                      properties:
+                        etape: { type: integer, minimum: 1, maximum: 4 }
+                        message_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                        delai_jours: { type: integer, minimum: 0 }
+                        envoyes: { type: integer, minimum: 0 }
+                  derniers_evenements:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/pause:
+    post:
+      operationId: mettreCampagneEnPause
+      summary: Mettre en pause (rien n'est perdu)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/reprise:
+    post:
+      operationId: reprendreCampagne
+      summary: Reprendre une campagne en pause
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/terminer:
+    post:
+      operationId: terminerCampagne
+      summary: Terminer définitivement (relances comprises ; les réponses restent traitées)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/dupliquer:
+    post:
+      operationId: dupliquerCampagne
+      summary: Dupliquer une campagne (brouillon)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string }
+                garder_cible: { type: boolean, default: true }
+                garder_messages: { type: boolean, default: true }
+                exclure_deja_recus: { type: boolean, default: false }
+      responses:
+        '201': { $ref: '#/components/responses/Campagne' }
+  /envoi/campagnes/{id}/date:
+    post:
+      operationId: changerDateCampagne
+      summary: Changer la date du prochain envoi
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [le]
+              properties:
+                le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/destinataires:
+    get:
+      operationId: listerDestinatairesCampagne
+      summary: Destinataires et état par destinataire
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - name: etat
+          in: query
+          required: false
+          schema: { $ref: './commun.yaml#/components/schemas/EtatDestinataire' }
+        - name: ouvert
+          in: query
+          required: false
+          description: Filtre sur l'ouverture estimée (campagnes qui suivent les ouvertures seulement).
+          schema:
+            type: string
+            enum: [oui, non, automatique]
+        - $ref: './commun.yaml#/components/parameters/Recherche'
+        - $ref: './commun.yaml#/components/parameters/Page'
+        - $ref: './commun.yaml#/components/parameters/ParPage'
+      responses:
+        '200':
+          description: Destinataires paginés.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/Destinataire' }
+                  meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+components:
+  responses:
+    Campagne:
+      description: Campagne après le geste.
+      content:
+        application/json:
+          schema: { $ref: './commun.yaml#/components/schemas/CampagneResume' }

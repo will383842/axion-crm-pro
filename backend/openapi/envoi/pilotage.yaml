@@ -1,0 +1,181 @@
+openapi: 3.1.0
+info:
+  title: Envoi — pilotage
+  version: 0.1.0
+  description: |
+    Résultats par campagne, boîte, domaine, liste et message ; santé ; chercher
+    un envoi ; feu vert. Indicateur principal : les réponses.
+    Aucun suivi des clics. Les
+    ouvertures ne sont données que pour les campagnes qui les suivent, toujours
+    comme une estimation, ouvertures automatiques probables retirées et
+    comptées à part. Lot : DM2-PIL.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/resultats:
+    get:
+      operationId: lireResultats
+      summary: Résultats regroupés
+      parameters:
+        - name: par
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [campagne, boite, domaine, liste, message]
+        - name: jours
+          in: query
+          required: false
+          schema: { type: integer, enum: [7, 30, 90], default: 30 }
+      responses:
+        '200':
+          description: Une ligne par groupe.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, totaux, periode]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LigneResultat' }
+                  totaux: { $ref: '#/components/schemas/LigneResultat' }
+                  periode:
+                    type: object
+                    required: [du, au]
+                    properties:
+                      du: { type: string, format: date }
+                      au: { type: string, format: date }
+  /envoi/resultats/courbe:
+    get:
+      operationId: lireCourbeResultats
+      summary: Courbe jour par jour (30 jours)
+      parameters:
+        - name: campagne_id
+          in: query
+          required: false
+          schema: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+      responses:
+        '200':
+          description: Points par jour.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [jour, remis, rebonds, reponses, ouvertures_estimees]
+                      properties:
+                        jour: { type: string, format: date }
+                        remis: { type: integer, minimum: 0 }
+                        rebonds: { type: integer, minimum: 0 }
+                        reponses: { type: integer, minimum: 0 }
+                        ouvertures_estimees:
+                          description: Nul si aucune campagne de la période ne suit les ouvertures.
+                          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
+  /envoi/sante:
+    get:
+      operationId: lireSante
+      summary: Santé des envois (vue d'ensemble)
+      responses:
+        '200':
+          description: Feux par boîte, domaine et serveur, et test du matin.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [feu, boites, domaines, serveurs, test_du_matin, alertes]
+                properties:
+                  feu: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
+                  boites:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
+                  domaines:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  serveurs:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/ServeurResume' }
+                  test_du_matin:
+                    type: object
+                    required: [le, temoins_ok, temoins_total, etat]
+                    properties:
+                      le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                      temoins_ok: { type: integer, minimum: 0 }
+                      temoins_total: { type: integer, minimum: 0 }
+                      etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
+                  alertes: { type: integer, minimum: 0 }
+  /envoi/envois/chercher:
+    get:
+      operationId: chercherEnvoi
+      summary: Chercher un envoi par adresse (tous les événements)
+      parameters:
+        - name: adresse
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Événements de cette adresse, et peut-on encore lui écrire.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [adresse, evenements, peut_ecrire, raison]
+                properties:
+                  adresse: { type: string }
+                  evenements:
+                    type: array
+                    items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
+                  peut_ecrire: { type: boolean }
+                  raison: { oneOf: [{ type: string }, { type: 'null' }] }
+  /envoi/feu-vert:
+    get:
+      operationId: lireFeuVert
+      summary: Liste « feu vert » avant le premier envoi réel (15 points)
+      responses:
+        '200':
+          description: Points de contrôle.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points, faits, total]
+                properties:
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, libelle, fait, detail]
+                      properties:
+                        code: { type: string }
+                        libelle: { type: string }
+                        fait: { type: boolean }
+                        detail: { oneOf: [{ type: string }, { type: 'null' }] }
+                  faits: { type: integer, minimum: 0 }
+                  total: { type: integer, minimum: 0 }
+components:
+  schemas:
+    LigneResultat:
+      type: object
+      required: [cle, libelle, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, desinscriptions, reponses, reponses_interessees, ouvertures]
+      properties:
+        cle: { type: string }
+        libelle: { type: string }
+        envoyes: { type: integer, minimum: 0 }
+        remis: { type: integer, minimum: 0 }
+        rebonds_durs: { type: integer, minimum: 0 }
+        rebonds_mous: { type: integer, minimum: 0 }
+        plaintes: { type: integer, minimum: 0 }
+        desinscriptions: { type: integer, minimum: 0 }
+        reponses: { type: integer, minimum: 0 }
+        reponses_interessees: { type: integer, minimum: 0 }
+        ouvertures:
+          description: Estimation ; nul si le groupe ne contient aucune campagne qui suit les ouvertures.
+          oneOf:
+            - $ref: './commun.yaml#/components/schemas/ResumeOuvertures'
+            - type: 'null'

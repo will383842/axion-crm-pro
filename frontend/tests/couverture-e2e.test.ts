@@ -93,14 +93,28 @@ export function argumentsPlaywrightTest(texteYaml: string): string[] {
 
 /**
  * Des arguments d'une commande, deduit les suites jouees.
- * Une commande `playwright test` SANS aucun chemin `*.spec.ts` lance toute la
- * `testDir` : elle joue donc l'ensemble des suites connues.
+ * Une commande `playwright test` SANS aucun chemin `*.spec.ts` ni DOSSIER cite
+ * lance toute la `testDir` : elle joue donc l'ensemble des suites connues.
+ *
+ * DM0-DEMO — une commande peut citer un DOSSIER (`tests/e2e/demo/`, barre
+ * finale obligatoire) : toutes les suites de ce dossier comptent alors comme
+ * jouees, et SEULEMENT elles. `suitesParDossier` dit ce que contient chaque
+ * dossier (cle : `tests/e2e/<nom>/`). Un dossier cite n'est jamais pris pour
+ * « aucun chemin » : sinon `demo.yml` ferait croire que tout `tests/e2e/` est
+ * joue, suites exclues comprises.
  */
-export function suitesJouees(argumentsParCommande: string[], suitesConnues: string[]): Set<string> {
+export function suitesJouees(
+  argumentsParCommande: string[],
+  suitesConnues: string[],
+  suitesParDossier: Record<string, string[]> = {},
+): Set<string> {
   const jouees = new Set<string>();
   for (const args of argumentsParCommande) {
     const chemins = args.match(/[\w./-]+\.spec\.ts/g) ?? [];
-    if (chemins.length === 0) {
+    const dossiers = (args.match(/(?:^|\s)['"]?([\w./-]*tests\/e2e\/[\w-]+\/)['"]?(?=\s|$)/g) ?? []).map((d) =>
+      d.trim().replace(/^['"]|['"]$/g, '').replace(/^(?:\.\/)?(?:frontend\/)?/, ''),
+    );
+    if (chemins.length === 0 && dossiers.length === 0) {
       for (const suite of suitesConnues) jouees.add(suite);
       continue;
     }
@@ -108,8 +122,21 @@ export function suitesJouees(argumentsParCommande: string[], suitesConnues: stri
       const base = chemin.split('/').pop();
       if (base !== undefined && base !== '') jouees.add(base);
     }
+    for (const dossier of dossiers) {
+      for (const suite of suitesParDossier[dossier] ?? []) jouees.add(suite);
+    }
   }
   return jouees;
+}
+
+/** Les sous-dossiers de `tests/e2e/` et leurs suites (cle : `tests/e2e/<nom>/`). */
+export function suitesParSousDossier(dossierE2e: string): Record<string, string[]> {
+  const sortie: Record<string, string[]> = {};
+  for (const entree of readdirSync(dossierE2e)) {
+    const complet = path.join(dossierE2e, entree);
+    if (statSync(complet).isDirectory()) sortie[`tests/e2e/${entree}/`] = listerSuites(complet);
+  }
+  return sortie;
 }
 
 /** Liste recursivement les `*.spec.ts` (nom de base) d'un dossier. */
@@ -140,7 +167,8 @@ for (const fichier of fichiersWorkflow) {
   argumentsTrouves.push(...argumentsPlaywrightTest(sansCommentairesYaml(brut)));
 }
 
-const jouees = suitesJouees(argumentsTrouves, suites);
+const parDossier = suitesParSousDossier(DOSSIER_E2E);
+const jouees = suitesJouees(argumentsTrouves, suites, parDossier);
 
 type Exclusion = { depuis: string; motif: string; reparation_attendue: string };
 const config = JSON.parse(readFileSync(FICHIER_CONFIG, 'utf8')) as {
@@ -307,5 +335,27 @@ describe('couverture e2e — TEMOIN de la garde', () => {
       'b.spec.ts',
     ]);
     expect([...vues].sort()).toEqual(['a.spec.ts', 'b.spec.ts']);
+  });
+  it('compte jouees toutes les suites d un DOSSIER cite, et seulement elles (DM0-DEMO)', () => {
+    const workflow = [
+      '        run: >-',
+      '          pnpm exec playwright test --config playwright.demo.config.ts',
+      '          tests/e2e/demo/',
+      '          --project=chromium',
+    ].join('\n');
+    const connues = ['a11y.spec.ts', 'socle-demo.spec.ts', 'campagnes.spec.ts'];
+    const parDossierFactice = { 'tests/e2e/demo/': ['socle-demo.spec.ts', 'campagnes.spec.ts'] };
+    const vues = suitesJouees(argumentsPlaywrightTest(sansCommentairesYaml(workflow)), connues, parDossierFactice);
+    expect([...vues].sort()).toEqual(['campagnes.spec.ts', 'socle-demo.spec.ts']);
+    // Le dossier cite n'est PAS « aucun chemin » : a11y.spec.ts n'est pas jouee.
+    expect(vues.has('a11y.spec.ts')).toBe(false);
+    // Un dossier inconnu ne joue rien, et ne vaut pas « toute la testDir ».
+    const inconnu = suitesJouees(['pnpm exec playwright test tests/e2e/absent/'], connues, parDossierFactice);
+    expect(inconnu.size).toBe(0);
+  });
+
+  it('trouve le dossier des suites de demo et ses suites', () => {
+    const reel = suitesParSousDossier(DOSSIER_E2E);
+    expect(reel['tests/e2e/demo/']).toContain('socle-demo.spec.ts');
   });
 });

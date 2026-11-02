@@ -45,7 +45,13 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
+// liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
+// commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
+// (`src/demo/handlers/crm/a-traiter.handlers.ts`). La route serveur est prévue au lot serveur du CRM, qui
+// retirera cette ligne. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
+  'POST /api/v1/doublons/fusions/{p}/annuler',
   'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
   'PATCH /api/v1/crm/contacts/{p}',

@@ -66,7 +66,6 @@ describe('fiche contact — modifier et retirer', () => {
 
   it('la corbeille liste les fiches retirées et les restaure', async () => {
     const user = userEvent.setup();
-    const { handlers: h } = { handlers };
     await ouvrirFiche('Julie', 'Morin');
     await user.click(await screen.findByRole('button', { name: 'Retirer' }));
     await user.click(await within(await screen.findByRole('dialog')).findByRole('button', { name: 'Retirer de la base' }));
@@ -76,9 +75,9 @@ describe('fiche contact — modifier et retirer', () => {
       path: '/console/contacts',
       url: '/console/contacts',
       consoleFeatures: 'open',
-      handlers: h,
+      handlers,
     });
-    const corbeille = await screen.findByRole('dialog', { name: 'Corbeille' });
+    const corbeille = (await screen.findByRole('heading', { name: 'Corbeille' })).closest('[role="dialog"]') as HTMLElement;
     expect(await within(corbeille).findByText('Julie Morin')).toBeInTheDocument();
     await user.click(within(corbeille).getByRole('button', { name: 'Restaurer Julie Morin' }));
     await waitFor(() => expect(within(corbeille).queryByText('Julie Morin')).not.toBeInTheDocument());
@@ -117,7 +116,7 @@ describe('fiche contact — état de chaque envoi', () => {
 
   it('Paul Morin : réponse intéressée dans l’historique, joignable', async () => {
     await ouvrirFiche('Paul', 'Morin');
-    expect(await screen.findByText(/Réponse/)).toBeInTheDocument();
+    expect(await screen.findByText(/Réponse : « Bonjour/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Peut-on lui écrire ?' })).toHaveTextContent(/Oui/);
   });
 

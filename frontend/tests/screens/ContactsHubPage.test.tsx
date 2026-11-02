@@ -215,3 +215,27 @@ describe('ContactsHubPage — parcours', () => {
     });
   });
 });
+
+describe('ContactsHubPage — gestes DM1-CON (démo)', () => {
+  it('propose Ajouter un contact (seul bouton plein), Importer et Corbeille, et ouvre l’ajout rapide', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<ContactsHubPage />, {
+      path: PATH,
+      consoleFeatures: 'open',
+      landingRoutes: LANDING,
+      handlers: [getJson('/crm/contacts-hub/counts', COUNTS), getJson('/crm/contacts-hub', PAGE)],
+    });
+    await screen.findByText('ACME GRENOBLE');
+    expect(screen.getByRole('button', { name: 'Importer' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Corbeille' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Ajouter un contact' }));
+    const fenetre = (await screen.findByRole('heading', { name: 'Ajouter un contact' })).closest('[role="dialog"]') as HTMLElement;
+    expect(within(fenetre).getByLabelText(/Provenance/)).toBeVisible();
+    // Sans provenance, rien n'est envoyé : le message le dit.
+    await user.type(within(fenetre).getByLabelText(/^Nom/), 'Delmas');
+    await user.type(within(fenetre).getByLabelText(/E-mail/), 'camille.delmas@example.test');
+    await user.click(within(fenetre).getByRole('button', { name: 'Ajouter ce contact' }));
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent(/provenance est obligatoire/);
+  });
+});

@@ -53,7 +53,7 @@ function Contenu({ config }: { config: Configuration }) {
       {erreur ? <MessageErreur>{erreur}</MessageErreur> : null}
       <section aria-labelledby="histo-titre" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
         <h2 id="histo-titre" className="text-lg font-bold text-slate-900">Historique</h2>
-        <div className="mt-2 overflow-x-auto">
+        <div className="relative mt-2 overflow-x-auto">
           <table className="w-full min-w-[32rem] text-left text-sm">
             <caption className="sr-only">Versions de la configuration</caption>
             <thead><tr className="text-xs text-slate-500">

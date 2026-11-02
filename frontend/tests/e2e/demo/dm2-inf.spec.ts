@@ -36,13 +36,14 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
     });
   }
 
-  test('P5 : Ctrl K, Ajouter une adresse IP, Ajouter et appliquer', async ({ page }) => {
+  test('P5 : la recherche (Ctrl K), Ajouter une adresse IP, Ajouter et appliquer (3 clics)', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/boites', { offre: 'envoi' });
-    await page.keyboard.press('Control+k');
-    await page.getByRole('combobox').or(page.getByPlaceholder(/Rechercher/)).first().fill('adresse IP');
+    // Clic 1 : la recherche (le raccourci Ctrl K ouvre la même palette).
+    await page.getByRole('button', { name: 'Recherche globale' }).click();
+    await page.getByPlaceholder(/Rechercher/).fill('adresse IP');
     await page.getByRole('option', { name: /Ajouter une adresse IP/ }).click();
     await expect(page).toHaveURL(/\/envoi\/serveurs/);
-    const fenetre = page.getByRole('dialog', { name: 'Ajouter une adresse IP' });
+    const fenetre = page.getByRole('dialog');
     await expect(fenetre).toBeVisible();
     await expect(fenetre.getByLabel('Adresse IP')).toHaveValue('192.0.2.12');
     await fenetre.getByRole('button', { name: 'Ajouter et appliquer' }).click();
@@ -57,7 +58,7 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
   test('une adresse hors des plages de documentation est refusée, en français', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/serveurs', { offre: 'envoi' });
     await page.getByRole('button', { name: 'Ajouter une adresse IP' }).click();
-    const fenetre = page.getByRole('dialog', { name: 'Ajouter une adresse IP' });
+    const fenetre = page.getByRole('dialog');
     await fenetre.getByLabel('Adresse IP').fill(['10', '20', '30', '40'].join('.'));
     await fenetre.getByRole('button', { name: 'Ajouter et appliquer' }).click();
     await expect(fenetre.getByRole('alert')).toContainText('plages de documentation');
@@ -66,7 +67,7 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
   test('P9 : Tout arrêter en 2 clics', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/boites', { offre: 'envoi' });
     await page.getByRole('button', { name: 'Tout arrêter' }).click();
-    await page.getByRole('dialog', { name: /Tout arrêter/ }).getByRole('button', { name: /Tout arrêter/ }).click();
+    await page.getByRole('button', { name: 'Arrêter tous les envois' }).click();
     await expect(page.getByRole('button', { name: /Reprendre/ }).first()).toBeVisible();
   });
 
@@ -112,5 +113,19 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
     await expect(page.getByRole('heading', { name: 'Aucune boîte d’envoi' })).toBeVisible();
     await ouvrirDemo(page, '/envoi/domaines', { offre: 'envoi', etat: 'erreur' });
     await expect(page.getByRole('button', { name: /Réessayer/ })).toBeVisible();
+  });
+
+  // Captures de la PR (1440 et 360 px), déposées par `demo.yml` en artefact « captures-demo ».
+  test('captures 1440 et 360 px des sept pages', async ({ page }) => {
+    for (const [largeur, hauteur] of [[1440, 900], [360, 780]] as const) {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      for (const [chemin, titre] of PAGES) {
+        await ouvrirDemo(page, chemin, { offre: 'envoi' });
+        await expect(page.getByRole('heading', { level: 1, name: titre })).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        const nom = chemin.replace(/^\/envoi\//, '').replace(/\//g, '-');
+        await page.screenshot({ path: `captures-demo/dm2-inf-${nom}-${largeur}.png`, fullPage: true });
+      }
+    }
   });
 });

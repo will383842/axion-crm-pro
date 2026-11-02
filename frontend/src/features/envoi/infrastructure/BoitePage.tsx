@@ -114,7 +114,7 @@ function Contenu({ fiche }: { fiche: FicheBoite }) {
         {derniers_refus.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">Aucun refus récent.</p>
         ) : (
-          <div className="mt-2 overflow-x-auto">
+          <div className="relative mt-2 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">Refus</caption>
               <thead><tr className="text-xs text-slate-500"><th scope="col" className="py-1 pr-3 font-medium">Quand</th><th scope="col" className="py-1 pr-3 font-medium">Destinataire</th><th scope="col" className="py-1 font-medium">Raison</th></tr></thead>

@@ -62,7 +62,7 @@ function Contenu({ chauffe }: { chauffe: Chauffe }) {
       </div>
       <section aria-labelledby="toutes" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
         <h2 id="toutes" className="text-lg font-bold text-slate-900">Toutes les boîtes</h2>
-        <div className="mt-2 overflow-x-auto">
+        <div className="relative mt-2 overflow-x-auto">
           <table className="w-full min-w-[30rem] text-left text-sm">
             <caption className="sr-only">Chauffe de toutes les boîtes</caption>
             <thead><tr className="text-xs text-slate-500">

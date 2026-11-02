@@ -35,7 +35,7 @@ function BlocServeur({ serveur }: { serveur: Serveur }) {
           <KpiCard label="Test du matin" value={`${s.test.etapes.filter((e) => e.ok).length}/${s.test.etapes.length}`} sublabel={dateHeure(s.test.fait_le)} tone={s.test.etapes.every((e) => e.ok) ? 'emerald' : 'amber'} />
         </div>
       ) : null}
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[34rem] text-left text-sm">
           <caption className="sr-only">Adresses IP de {serveur.nom}</caption>
           <thead><tr className="text-xs text-slate-500">

@@ -41,7 +41,8 @@ export function GraphiqueJours({ jours, libelle }: { jours: JourActivite[]; libe
         <span className="mr-3 inline-flex items-center gap-1"><span className="inline-block h-2 w-3 rounded-sm bg-sky-600" />Envoyés</span>
         <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-600" />Refus</span>
       </p>
-      <table className="sr-only">
+      <div className="sr-only">
+      <table>
         <caption>{libelle} : 30 derniers jours</caption>
         <thead>
           <tr><th scope="col">Jour</th><th scope="col">Envoyés</th><th scope="col">Refus</th><th scope="col">Plaintes</th><th scope="col">Réponses</th></tr>
@@ -58,6 +59,7 @@ export function GraphiqueJours({ jours, libelle }: { jours: JourActivite[]; libe
           ))}
         </tbody>
       </table>
+      </div>
     </figure>
   );
 }

@@ -13,17 +13,25 @@ export function useTaches() {
 
 export function useCocherTache() {
   const client = useQueryClient();
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async ({ id, faite }: { id: string; faite: boolean }) => (await api.patch<Tache>(`/crm/taches/${id}`, { faite })).data,
-    // La case réagit tout de suite ; le serveur confirme ensuite (et corrige si besoin).
-    onMutate: async ({ id, faite }) => {
-      await client.cancelQueries({ queryKey: CLE_TACHES });
-      client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) =>
-        avant ? { ...avant, data: avant.data.map((t) => (t.id === id ? { ...t, faite, faite_le: faite ? new Date(avant.aujourdhui).toISOString() : null } : t)) } : avant,
-      );
-    },
     onSettled: () => client.invalidateQueries({ queryKey: CLE_TACHES }),
   });
+  return {
+    ...mutation,
+    /**
+     * La case réagit TOUT DE SUITE : le cache est modifié dans le geste même
+     * (une case contrôlée qui attendrait une micro-tâche reviendrait en arrière
+     * le temps d'un rendu) ; le serveur confirme ensuite et corrige si besoin.
+     */
+    cocher: (id: string, faite: boolean) => {
+      void client.cancelQueries({ queryKey: CLE_TACHES });
+      client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) =>
+        avant ? { ...avant, data: avant.data.map((t) => (t.id === id ? { ...t, faite, faite_le: faite ? `${avant.aujourdhui}T12:00:00.000Z` : null } : t)) } : avant,
+      );
+      mutation.mutate({ id, faite });
+    },
+  };
 }
 
 export function useAjouterTache() {
@@ -36,12 +44,16 @@ export function useAjouterTache() {
 
 export function useRappelMatin() {
   const client = useQueryClient();
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (actif: boolean) => (await api.put<{ actif: boolean }>('/crm/taches/rappel-matin', { actif })).data,
-    onMutate: async (actif) => {
-      await client.cancelQueries({ queryKey: CLE_TACHES });
-      client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) => (avant ? { ...avant, rappel_matin: actif } : avant));
-    },
     onSettled: () => client.invalidateQueries({ queryKey: CLE_TACHES }),
   });
+  return {
+    ...mutation,
+    basculer: (actif: boolean) => {
+      void client.cancelQueries({ queryKey: CLE_TACHES });
+      client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) => (avant ? { ...avant, rappel_matin: actif } : avant));
+      mutation.mutate(actif);
+    },
+  };
 }

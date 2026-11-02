@@ -8,12 +8,14 @@
  * pas seulement faire clignoter un statut. Témoin : une demande soldée ne
  * porte aucune mention. Fixtures FICTIVES (dépôt public).
  */
-import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { handlers as handlersCommuns } from '@/demo/handlers/socle/ecrans-communs.handlers';
 
 import { RgpdRequestsPage } from '@/features/rgpd/RgpdRequestsPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { getJson } from '../msw/handlers';
+import { apiUrl, getJson, http, HttpResponse } from '../msw/handlers';
 
 const MOTIF = 'Coordonnees encore presentes apres effacement : a traiter a la main (voir residus).';
 
@@ -64,5 +66,44 @@ describe('RgpdRequestsPage — verdict de la preuve différée', () => {
     expect(screen.getAllByText(MOTIF_ECHEC)).toHaveLength(1);
     expect(screen.getByText('zz.solde@zz-rgpd.example.invalid')).toBeInTheDocument();
     expect(screen.queryByText(/Vérification de l’effacement/)).toBeNull();
+  });
+});
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('Demandes RGPD : registre des oppositions (DM1-COM)', () => {
+  it('« Exporter le registre des oppositions » produit un fichier CSV', async () => {
+    const user = userEvent.setup();
+    const blobs: Blob[] = [];
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: (b: Blob) => { blobs.push(b); return 'blob:demo'; } });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: () => undefined });
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    await renderScreen(<RgpdRequestsPage />, { path: '/rgpd/requests', handlers: handlersCommuns });
+    await user.click(await screen.findByRole('button', { name: 'Exporter le registre des oppositions' }));
+    await waitFor(() => expect(blobs).toHaveLength(1));
+    expect(clic).toHaveBeenCalled();
+    const lu = await new Promise<string>((ok) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => ok(lecteur.result as string);
+      lecteur.readAsText(blobs[0]!);
+    });
+    expect(lu).toMatch(/^Valeur;Portée;Motif;Inscrite le/);
+  });
+
+  it('sans annonce du serveur (`export_oppositions` absent) : pas de bouton d’export', async () => {
+    let servie = false;
+    await renderScreen(<RgpdRequestsPage />, {
+      path: '/rgpd/requests',
+      handlers: [
+        http.get(apiUrl('/rgpd/requests'), () => {
+          servie = true;
+          return HttpResponse.json({ data: DEMANDES.data });
+        }),
+      ],
+    });
+    expect(await screen.findByRole('button', { name: 'Nouvelle requête' })).toBeVisible();
+    await waitFor(() => expect(servie).toBe(true));
+    expect(await screen.findByText('zz.incomplet@zz-rgpd.example.invalid')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Exporter le registre des oppositions' })).toBeNull();
   });
 });

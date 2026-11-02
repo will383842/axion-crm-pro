@@ -4,6 +4,7 @@
     "ci.yml",
     "crm-doublons.yml",
     "crm-presse.yml",
+    "demo.yml",
     "deploy-direct-ssh.yml",
     "deploy-staging.yml",
     "diag-pharmacies-adresses.yml",

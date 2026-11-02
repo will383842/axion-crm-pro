@@ -85,22 +85,98 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [campagne, sequence, derniers_evenements]
+                required: [campagne, sequence, derniers_evenements, compteurs, par_boite, par_jour, ab, fin_prevue_le]
                 properties:
                   campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
                   sequence:
                     type: array
                     items:
                       type: object
-                      required: [etape, message_id, delai_jours, envoyes]
+                      required: [etape, message_id, delai_jours, envoyes, reponses, refus]
                       properties:
                         etape: { type: integer, minimum: 1, maximum: 4 }
                         message_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
                         delai_jours: { type: integer, minimum: 0 }
                         envoyes: { type: integer, minimum: 0 }
+                        reponses: { type: integer, minimum: 0 }
+                        refus: { type: integer, minimum: 0 }
                   derniers_evenements:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
+                  compteurs:
+                    type: object
+                    description: Décompte des destinataires par état, et taux de la campagne.
+                    required:
+                      [en_file, partis, refuses, ont_repondu, exclus, desinscrits, arretes_entreprise,
+                       en_pause_absence, taux_refus, limite_refus, taux_desinscription]
+                    properties:
+                      en_file: { type: integer, minimum: 0 }
+                      partis: { type: integer, minimum: 0 }
+                      refuses: { type: integer, minimum: 0 }
+                      ont_repondu: { type: integer, minimum: 0 }
+                      exclus: { type: integer, minimum: 0 }
+                      desinscrits: { type: integer, minimum: 0 }
+                      arretes_entreprise:
+                        type: integer
+                        minimum: 0
+                        description: Entreprises dont la suite est arrêtée parce qu'un contact a répondu.
+                      en_pause_absence:
+                        type: integer
+                        minimum: 0
+                        description: Destinataires en pause (absence du bureau), reprise au retour.
+                      taux_refus: { type: number, minimum: 0 }
+                      limite_refus: { type: number, minimum: 0 }
+                      taux_desinscription: { type: number, minimum: 0 }
+                  par_boite:
+                    type: array
+                    items:
+                      type: object
+                      required: [boite_id, adresse, envoyes, reponses, refus]
+                      properties:
+                        boite_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+                        adresse: { type: string }
+                        envoyes: { type: integer, minimum: 0 }
+                        reponses: { type: integer, minimum: 0 }
+                        refus: { type: integer, minimum: 0 }
+                  par_jour:
+                    type: array
+                    items:
+                      type: object
+                      required: [jour, envoyes]
+                      properties:
+                        jour: { type: string, format: date }
+                        envoyes: { type: integer, minimum: 0 }
+                  ab:
+                    description: Test A/B sur l'objet ; nul si la campagne n'en fait pas. Le critère est les réponses.
+                    oneOf:
+                      - type: object
+                        required: [versions, gagnant, choix_automatique_le]
+                        properties:
+                          versions:
+                            type: array
+                            items:
+                              type: object
+                              required: [version, objet, envoyes, reponses, taux_reponse, en_tete]
+                              properties:
+                                version: { type: string, enum: [A, B] }
+                                objet: { type: string }
+                                envoyes: { type: integer, minimum: 0 }
+                                reponses: { type: integer, minimum: 0 }
+                                taux_reponse: { type: number, minimum: 0 }
+                                en_tete: { type: boolean }
+                          gagnant:
+                            oneOf:
+                              - { type: string, enum: [A, B] }
+                              - { type: 'null' }
+                          choix_automatique_le:
+                            oneOf:
+                              - { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                              - { type: 'null' }
+                      - { type: 'null' }
+                  fin_prevue_le:
+                    oneOf:
+                      - { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                      - { type: 'null' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/pause:
     post:

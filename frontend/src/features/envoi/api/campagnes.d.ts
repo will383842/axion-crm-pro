@@ -366,13 +366,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Test A/B sur l'objet ; nul si la campagne n'en fait pas. Le critère est les réponses. */
+                        ab: {
+                            choix_automatique_le: components["schemas"]["Horodatage"] | null;
+                            gagnant: ("A" | "B") | null;
+                            versions: {
+                                en_tete: boolean;
+                                envoyes: number;
+                                objet: string;
+                                reponses: number;
+                                taux_reponse: number;
+                                /** @enum {string} */
+                                version: "A" | "B";
+                            }[];
+                        } | null;
                         campagne: components["schemas"]["CampagneResume"];
+                        /** @description Décompte des destinataires par état, et taux de la campagne. */
+                        compteurs: {
+                            /** @description Entreprises dont la suite est arrêtée parce qu'un contact a répondu. */
+                            arretes_entreprise: number;
+                            desinscrits: number;
+                            en_file: number;
+                            /** @description Destinataires en pause (absence du bureau), reprise au retour. */
+                            en_pause_absence: number;
+                            exclus: number;
+                            limite_refus: number;
+                            ont_repondu: number;
+                            partis: number;
+                            refuses: number;
+                            taux_desinscription: number;
+                            taux_refus: number;
+                        };
                         derniers_evenements: components["schemas"]["EvenementEnvoi"][];
+                        fin_prevue_le: components["schemas"]["Horodatage"] | null;
+                        par_boite: {
+                            adresse: string;
+                            boite_id: components["schemas"]["Identifiant"];
+                            envoyes: number;
+                            refus: number;
+                            reponses: number;
+                        }[];
+                        par_jour: {
+                            envoyes: number;
+                            /** Format: date */
+                            jour: string;
+                        }[];
                         sequence: {
                             delai_jours: number;
                             envoyes: number;
                             etape: number;
                             message_id: components["schemas"]["Identifiant"];
+                            refus: number;
+                            reponses: number;
                         }[];
                     };
                 };

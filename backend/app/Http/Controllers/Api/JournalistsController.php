@@ -743,13 +743,12 @@ class JournalistsController extends ApiController
         $email = $journalist->email;
 
         // Harmonisation presse (relecture sécurité #264) : l'effacement atteint
-        // le contact lié (supprimé, inscrit au registre des retraits, même sans
-        // adresse), ses coordonnées entrent dans `opt_out` (anti-réinsertion),
+        // le contact lié (L3c-0 : MASQUÉ et mis à l'écart, jamais supprimé), ses coordonnées entrent dans `opt_out` (anti-réinsertion),
         // et la ligne source est vidée de ses coordonnées comme le fait
         // `GdprErasureService`.
         DB::transaction(function () use ($journalist): void {
             LienJournalisteContact::opposer((int) $journalist->id);
-            LienJournalisteContact::effacerContactsDe([(int) $journalist->id]);
+            LienJournalisteContact::masquerContactsDe([(int) $journalist->id]);
             $journalist->delete();
             DB::table('journalists')->where('id', $journalist->id)
                 ->update(['email' => null, 'phone' => null, 'opt_out' => true]);

@@ -22,7 +22,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type CleCompteur = 'doublons' | 'a_rattacher' | 'propositions' | 'taches_en_retard';
+export type CleCompteur = 'doublons' | 'a_rattacher' | 'propositions' | 'taches_en_retard' | 'demandes_rgpd';
 
 /**
  * `relances` est ABSENT (`undefined`) quand le serveur ne l'envoie pas (image
@@ -35,6 +35,12 @@ export type CompteursATraiter = Record<'doublons' | 'a_rattacher', number | null
   propositions?: number | null;
   /** Tâches du CRM dont l'échéance est passée (DM1-ATR). Absent d'un serveur qui ne les compte pas. */
   taches_en_retard?: number | null;
+  /**
+   * Demandes d'effacement RGPD en attente de la décision de Will (L3c-0). Rôle
+   * owner seulement : `null` pour tout autre. Pastille de « Demandes RGPD »,
+   * hors du total « À traiter » du CRM.
+   */
+  demandes_rgpd?: number | null;
 };
 
 /**
@@ -64,6 +70,7 @@ export function normaliserCompteurs(brut: unknown): CompteursATraiter {
     ...('relances' in objet ? { relances: entierOuNull(objet['relances']) } : {}),
     ...('propositions' in objet ? { propositions: entierOuNull(objet['propositions']) } : {}),
     ...('taches_en_retard' in objet ? { taches_en_retard: entierOuNull(objet['taches_en_retard']) } : {}),
+    ...('demandes_rgpd' in objet ? { demandes_rgpd: entierOuNull(objet['demandes_rgpd']) } : {}),
   };
 }
 
@@ -107,6 +114,7 @@ export const LIBELLES_COMPTEUR: Record<CleCompteur, (n: number) => string> = {
   a_rattacher: (n) => (n === 1 ? '1 personne à rattacher' : `${formaterNombre(n)} personnes à rattacher`),
   propositions: (n) => (n === 1 ? '1 proposition à valider' : `${formaterNombre(n)} propositions à valider`),
   taches_en_retard: (n) => (n === 1 ? '1 tâche en retard' : `${formaterNombre(n)} tâches en retard`),
+  demandes_rgpd: (n) => (n === 1 ? '1 demande d’effacement à traiter' : `${formaterNombre(n)} demandes d’effacement à traiter`),
 };
 
 /**

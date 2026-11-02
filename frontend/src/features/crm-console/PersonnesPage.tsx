@@ -258,7 +258,7 @@ function PersonnesContent() {
                         )}
                       </div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {p.email ?? '—'} · Dernière interaction : {formatDate(p.derniere_interaction_at)}
+                        {p.email ?? '—'} · Dernière interaction : {formatDate(p.derniere_interaction_at)} · Conservée : aucune suppression automatique
                       </div>
                     </li>
                   ))}

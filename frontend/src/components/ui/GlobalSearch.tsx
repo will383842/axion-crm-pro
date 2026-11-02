@@ -7,6 +7,10 @@ import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { usePiegeFocus } from './useFocusTrap';
 import { Search as IconeRecherche } from 'lucide-react';
 import { libelleRaccourciRecherche } from '@/lib/raccourci';
+// DM0-COQ — les actions des lots (`src/features/**/commandes.ts`), marquées par produit.
+import { commandesDuRegistre, filtrerCommandes, type CommandeRecherche } from '@/features/socle/commandes/registre';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
+import { MARQUE_DU_PRODUIT } from '@/features/socle/produit/useProduitCourant';
 
 interface SearchResults {
   companies: { id: number; siren: string; denomination?: string|null }[];
@@ -65,6 +69,11 @@ export function GlobalSearch() {
     enabled: open && rechercheDifferee.length >= 2,
     staleTime: 30_000,
   });
+
+  // DM0-COQ — les commandes du registre, filtrées sur ce qui est tapé et sur
+  // les produits visibles (une commande d'Envoi n'existe pas sans Envoi).
+  const visibles = useProduitsVisibles();
+  const commandes = search.length >= 2 ? filtrerCommandes(commandesDuRegistre(), search, visibles) : [];
 
   const close = useCallback(() => {
     setOpen(false);
@@ -139,7 +148,7 @@ export function GlobalSearch() {
               </Command.Empty>
             )}
 
-            {search.length >= 2 && (!data?.companies?.length && !data?.contacts?.length && !data?.tags?.length) && (
+            {search.length >= 2 && commandes.length === 0 && (!data?.companies?.length && !data?.contacts?.length && !data?.tags?.length) && (
               <Command.Empty className="py-8 text-center text-sm text-slate-500">
                 Aucun résultat pour « {search} ».
                 {conseilEntreprises(data?.indice_entreprises) !== null && (
@@ -152,6 +161,33 @@ export function GlobalSearch() {
               <div role="note" className="px-3 py-1 text-xs text-slate-600">
                 {conseilEntreprises(data?.indice_entreprises)}
               </div>
+            )}
+
+            {commandes.length > 0 && (
+              <Command.Group heading="Actions" className="mt-1 text-xs uppercase text-slate-500">
+                {commandes.map((c: CommandeRecherche) => (
+                  <Command.Item
+                    key={c.id}
+                    value={`cmd-${c.id}`}
+                    onSelect={() => {
+                      if (c.aller !== undefined) void navigate({ to: c.aller });
+                      else c.agir?.();
+                      close();
+                    }}
+                    className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm normal-case aria-selected:bg-slate-100"
+                  >
+                    <span>{c.libelle}</span>
+                    {/* Marque de produit : carrée, comme dans la cloche (ADR-13 § 7). */}
+                    <span
+                      data-marque-produit
+                      data-produit={c.produit}
+                      className="inline-flex h-5 shrink-0 items-center rounded-sm bg-produit-bandeau px-1.5 text-xs font-semibold text-white"
+                    >
+                      {MARQUE_DU_PRODUIT[c.produit]}
+                    </span>
+                  </Command.Item>
+                ))}
+              </Command.Group>
             )}
 
             {data?.companies && data.companies.length > 0 && (

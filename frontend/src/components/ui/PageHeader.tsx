@@ -6,6 +6,11 @@ export interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
+  /**
+   * DM0-COQ (ADR-13) — sur-titre d'identité : « CRM Pro », « Envoi » ou
+   * « Commun », dans la couleur du produit courant. Omis : rien ne change.
+   */
+  surTitre?: ReactNode;
   badge?: ReactNode;
   actions?: ReactNode;
   breadcrumbs?: Crumb[];
@@ -13,12 +18,15 @@ export interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ title, subtitle, eyebrow, badge, actions, breadcrumbs, gradient = true, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, eyebrow, surTitre, badge, actions, breadcrumbs, gradient = true, className }: PageHeaderProps) {
   return (
     <header className={cn('mb-6 flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0 flex-1">
         {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumbs items={breadcrumbs} className="mb-2" /> : null}
         {badge ? <div className="mb-2">{badge}</div> : null}
+        {surTitre ? (
+          <div data-sur-titre className="text-xs font-semibold uppercase tracking-wider text-produit">{surTitre}</div>
+        ) : null}
         {eyebrow ? (
           <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{eyebrow}</div>
         ) : null}

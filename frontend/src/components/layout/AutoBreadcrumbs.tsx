@@ -88,6 +88,38 @@ const LABELS: Record<string, string> = {
   // Anciennes adresses (F7) : elles redirigent, mais restent des routes.
   '/crm': 'Contacts',
   '/analytics': 'Tableau de bord',
+  // DM0-COQ — onglets du tableau de bord et écran commun « Mon compte ».
+  '/taches': 'Mes tâches',
+  '/affaires': 'Affaires',
+  '/compte': 'Mon compte et sécurité',
+  // DM0-COQ — l'espace Envoi : mêmes mots que sa barre (`navigationEnvoi.tsx`)
+  // et que le titre de ses pages. `/envoi` (redirigé vers les campagnes) est
+  // la racine du fil dans Envoi : il n'y apparaît qu'une fois, en tête.
+  '/envoi': 'Envoi',
+  '/envoi/campagnes': 'Campagnes',
+  '/envoi/campagnes/calendrier': 'Calendrier',
+  '/envoi/campagnes/nouvelle': 'Nouvelle campagne',
+  '/envoi/campagnes/messages': 'Messages types',
+  '/envoi/campagnes/resultats': 'Résultats',
+  '/envoi/campagnes/destinataires': 'Destinataires',
+  '/envoi/reponses': 'Réponses',
+  '/envoi/reponses/a-rattacher': 'Réponses à rattacher',
+  '/envoi/reponses/traitees': 'Réponses traitées',
+  '/envoi/boites': 'Boîtes d’envoi',
+  '/envoi/domaines': 'Domaines',
+  '/envoi/serveurs': 'Serveurs et adresses IP',
+  '/envoi/serveurs/configuration': 'Configuration',
+  '/envoi/chauffe': 'Chauffe',
+  '/envoi/sante': 'Santé des envois',
+  '/envoi/sante/chercher': 'Chercher un envoi',
+  '/envoi/sante/feu-vert': 'Feu vert',
+  '/envoi/desinscriptions': 'Désinscriptions',
+  '/envoi/alertes': 'Alertes d’envoi',
+  '/envoi/reglages': 'Réglages d’envoi',
+  '/envoi/reglages/identite': 'Identité',
+  '/envoi/reglages/alertes': 'Alertes et avis',
+  '/envoi/reglages/regles': 'Règles et horaires',
+  '/envoi/reglages/connexion-crm': 'Connexion au CRM',
 };
 
 /**
@@ -127,6 +159,9 @@ export const LIBELLES_DE_CHEMIN: Readonly<Record<string, string>> = LABELS;
  * (D28-014) en particulier. Retombe sur le dernier segment humanisé, comme le
  * fil lui-même : deux façons de nommer le même écran finiraient par diverger.
  */
+/** DM0-COQ — la racine du fil dans l'espace Envoi (et non l'accueil du CRM). */
+const RACINE_ENVOI: Crumb = { label: 'Envoi', to: '/envoi/campagnes' };
+
 export function libelleDeChemin(pathname: string): string {
   if (pathname === '/' || pathname === '') return LABELS['/'] as string;
   const direct = LABELS[pathname];
@@ -150,7 +185,10 @@ function humanize(segment: string): string {
 export function AutoBreadcrumbs() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const crumbs: Crumb[] = [{ label: 'Accueil', to: '/', icon: <Home className="h-3 w-3" /> }];
+  const dansEnvoi = pathname === '/envoi' || pathname.startsWith('/envoi/');
+  const crumbs: Crumb[] = dansEnvoi
+    ? [RACINE_ENVOI]
+    : [{ label: 'Accueil', to: '/', icon: <Home className="h-3 w-3" /> }];
 
   if (pathname === '/' || pathname === '') {
     return <Breadcrumbs items={crumbs} tone="inverse" />;
@@ -161,6 +199,8 @@ export function AutoBreadcrumbs() {
   segments.forEach((seg, idx) => {
     acc += `/${seg}`;
     const isLast = idx === segments.length - 1;
+    // Dans Envoi, la racine du fil EST déjà « Envoi » : on ne la répète pas.
+    if (dansEnvoi && acc === '/envoi') return;
     // Segment sans écran : omis (voir `SEGMENTS_SANS_ECRAN`).
     if (!isLast && SEGMENTS_SANS_ECRAN.has(acc)) return;
     // Sous un écran de liste, un segment sans libellé est l'identifiant d'une

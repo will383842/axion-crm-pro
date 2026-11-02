@@ -13,9 +13,10 @@
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, LogOut, ShieldCheck } from 'lucide-react';
 import { Avatar, DropdownMenu, type MenuItem } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 
 interface MeResponse {
   user: {
@@ -58,7 +59,23 @@ export function UserMenu() {
     void navigate({ to: '/login' });
   };
 
+  // DM0-COQ — « Mon compte et sécurité » (écran commun, `/compte`). Montré
+  // seulement quand Envoi existe : sans lui, le menu d'Axion en production
+  // reste celui d'aujourd'hui tant que l'écran est « en attente » (DM1-COM).
+  const visibles = useProduitsVisibles();
+  const compte: MenuItem[] = visibles.envoi
+    ? [
+        {
+          id: 'compte',
+          label: 'Mon compte et sécurité',
+          icon: <ShieldCheck className="h-4 w-4" />,
+          onSelect: () => void navigate({ to: '/compte' }),
+        },
+      ]
+    : [];
+
   const items: MenuItem[] = [
+    ...compte,
     {
       id: 'settings',
       label: 'Paramètres',

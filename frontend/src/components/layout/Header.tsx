@@ -12,6 +12,10 @@ import { GlobalSearch, IconButton } from '@/components/ui';
 import { AutoBreadcrumbs } from './AutoBreadcrumbs';
 import { NotificationsBell } from './NotificationsBell';
 import { UserMenu } from './UserMenu';
+import { useProduitCourant } from '@/features/socle/produit/useProduitCourant';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
+import { FeuDesEnvois } from '@/features/socle/EtatEnvois';
+import { ToutArreter, montrerToutArreter } from '@/features/socle/ToutArreter';
 
 export interface HeaderProps {
   onOpenMobileSidebar: () => void;
@@ -19,6 +23,12 @@ export interface HeaderProps {
 }
 
 export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps) {
+  // DM0-COQ — sans Envoi (production d'Axion aujourd'hui), rien de ce qui suit
+  // n'est rendu : l'en-tête est EXACTEMENT celui d'avant (empreinte HTML
+  // gardée par `tests/components/routes-envoi-gardees.test.tsx`).
+  const produit = useProduitCourant();
+  const visibles = useProduitsVisibles();
+  const arret = montrerToutArreter(produit, visibles.envoi);
   return (
     <header
       // Bleu profond, comme la barre latérale : navigation et repères se lisent
@@ -26,6 +36,11 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
       className="sticky top-0 z-20 flex items-center gap-2 border-b border-sidebar-border bg-sidebar px-4 py-2.5 md:px-6"
       role="banner"
     >
+      {/* DM0-COQ (ADR-13 § 3) — bande de 4 px de la couleur du produit, posée
+          seulement quand Envoi existe. */}
+      {visibles.envoi ? (
+        <span aria-hidden data-bande-produit className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-produit-bandeau" />
+      ) : null}
       {/* Mobile : hamburger */}
       <IconButton
         label="Ouvrir le menu"
@@ -68,6 +83,13 @@ export function Header({ onOpenMobileSidebar, onOpenMobileSearch }: HeaderProps)
         non-lues, etats d'echec, aveu sur le marquage non implemente) vit
         desormais dans `NotificationsBell`.
       */}
+      {arret ? (
+        <>
+          <FeuDesEnvois />
+          <ToutArreter />
+        </>
+      ) : null}
+
       <NotificationsBell />
 
       {/* Lot 2 UX — le sélecteur clair/sombre est RETIRÉ : pas de mode sombre

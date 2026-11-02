@@ -13,7 +13,7 @@
  * Sous-composants dans `@/components/layout/`.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useRouterState } from '@tanstack/react-router';
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer, GlobalSearch, Modal } from '@/components/ui';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -22,6 +22,11 @@ import { libelleDeChemin } from '@/components/layout/AutoBreadcrumbs';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { api } from '@/lib/api';
 import { subscribeWorkspaceNotifications } from '@/lib/echo';
+import { produitDeChemin } from '@/features/socle/produit/useProduitCourant';
+import { dernierePage, memoriserDernierePage } from '@/features/socle/produit/dernierePage';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
+import { useConsoleFeaturesQuery } from '@/features/crm-console/useConsoleFeatures';
+import { BandeauEnvoisArretes, montrerToutArreter } from '@/features/socle/ToutArreter';
 
 interface MeResponse {
   user: { id: string; current_workspace_id: string | null };
@@ -95,6 +100,39 @@ export function RootLayout() {
   //  - le message n'est écrit que quand le CHEMIN change, pas à chaque rendu ;
   //  - le premier rendu ne dit rien — l'arrivée sur la page est déjà annoncée
   //    par le navigateur, la redire ferait doublon.
+  // ── DM0-COQ — coquille à deux produits (ADR-12, 13, 14) ──────────────────
+  // Le produit courant se lit dans l'adresse ; la racine porte `data-produit`
+  // et les jetons `*-produit` de `styles/index.css` en découlent.
+  const produit = produitDeChemin(cheminCourant);
+  const adresseCourante = useRouterState({ select: (s) => s.location.href });
+  const visibles = useProduitsVisibles();
+  const { data: featuresServeur } = useConsoleFeaturesQuery();
+  const naviguer = useNavigate();
+
+  // Le sélecteur rend la DERNIÈRE page ouverte de chaque produit.
+  useEffect(() => {
+    if (produit !== 'commun') memoriserDernierePage(produit, adresseCourante);
+  }, [produit, adresseCourante]);
+
+  // Onglet du navigateur : « Envoi · Campagnes ». Le CRM garde son titre.
+  useEffect(() => {
+    if (produit !== 'envoi') return;
+    const titreAvant = document.title;
+    document.title = `Envoi · ${libelleDeChemin(cheminCourant)}`;
+    return () => {
+      document.title = titreAvant;
+    };
+  }, [produit, cheminCourant]);
+
+  // Offre « Envoi seul » : une page du CRM mène à Envoi. On attend la VRAIE
+  // réponse du serveur (le défaut, CRM actif, ne redirige jamais).
+  useEffect(() => {
+    if (featuresServeur === undefined) return;
+    if (produit === 'crm' && !visibles.crm && visibles.envoi) {
+      void naviguer({ to: dernierePage('envoi'), replace: true });
+    }
+  }, [featuresServeur, produit, visibles.crm, visibles.envoi, naviguer]);
+
   const [annonceDeRoute, setAnnonceDeRoute] = useState('');
   const premierRendu = useRef(true);
   useEffect(() => {
@@ -106,7 +144,11 @@ export function RootLayout() {
   }, [cheminCourant]);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <div
+      data-coquille
+      data-produit={produit}
+      className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"
+    >
       <a href="#main" className="skip-link">Aller au contenu</a>
 
       {/* D28-014 — la seule région d'annonce du changement d'écran. Invisible à
@@ -137,6 +179,8 @@ export function RootLayout() {
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* DM0-COQ — bandeau rouge persistant tant que les envois sont arrêtés. */}
+        {montrerToutArreter(produit, visibles.envoi) ? <BandeauEnvoisArretes /> : null}
         <Header
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
           onOpenMobileSearch={() => setMobileSearchOpen(true)}

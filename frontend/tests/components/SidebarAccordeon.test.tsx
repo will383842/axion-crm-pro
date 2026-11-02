@@ -128,3 +128,42 @@ describe('Barre latérale — accordéon', () => {
     expect(within(listeContacts as HTMLElement).getByText('Entreprises')).toBeInTheDocument();
   });
 });
+
+// DM0-COQ — l'espace Envoi : dix entrées sous une seule liste toujours
+// dépliée (maquettes validées) ; l'accordéon du CRM n'y a pas cours.
+describe('Barre latérale — espace Envoi', () => {
+  function afficherEnvoi(chemin: string) {
+    cheminCourant = chemin;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    client.setQueryData(CONSOLE_FEATURES_KEY, {
+      console_v2: false,
+      universes: { business: false, vivier: false },
+      produits: { crm: 'actif', envoi: 'actif' },
+    });
+    client.setQueryData(['envoi', 'compteurs'], { reponses_a_traiter: 7, alertes_ouvertes: 2 });
+    client.setQueryData(['envoi', 'etat'], { etat: 'actif', feu: 'vert', depuis: '2027-01-12T08:00:00+01:00', par: null, motif: null });
+    return render(
+      <QueryClientProvider client={client}>
+        <Sidebar collapsed={false} onToggleCollapse={() => {}} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('aucune section à déplier : les dix entrées sont visibles d’un coup', () => {
+    afficherEnvoi('/envoi/campagnes');
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    expect(within(nav).queryAllByRole('button')).toEqual([]);
+    expect(nav.querySelectorAll('[data-to]').length).toBe(10);
+  });
+
+  it('les compteurs de Réponses et d’Alertes d’envoi viennent de `/envoi/compteurs`', () => {
+    afficherEnvoi('/envoi/campagnes');
+    expect(screen.getByRole('img', { name: '7 réponses à traiter' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '2 alertes d’envoi ouvertes' })).toBeInTheDocument();
+  });
+
+  it('« Santé des envois » porte le point de feu, dit en toutes lettres', () => {
+    afficherEnvoi('/envoi/campagnes');
+    expect(screen.getByRole('img', { name: 'État des envois : normaux' })).toBeInTheDocument();
+  });
+});

@@ -43,7 +43,13 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
 // registre des oppositions. Servis par le faux serveur de la démo ; les routes serveur sont prévues aux lots S3 et
 // S12 (authentification par code e-mail) et au lot RGPD, qui retireront ces lignes.
+// Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
+// liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
+// commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
+// (`src/demo/handlers/crm/a-traiter.handlers.ts`). La route serveur est prévue au lot serveur du CRM, qui
+// retirera cette ligne. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
+  'POST /api/v1/doublons/fusions/{p}/annuler',
   'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
   'PATCH /api/v1/crm/contacts/{p}',

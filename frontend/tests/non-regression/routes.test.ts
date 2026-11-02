@@ -24,6 +24,11 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM2-ASS (#404) : création de campagne et messages types d'Envoi. Ces appels ne
+// partent que sur les pages d'Envoi (gardées : introuvables tant qu'Envoi est absent, donc en production) et sont
+// servis par le faux serveur de la démo (`demo/handlers/envoi/creation.handlers.ts`), selon le contrat
+// `backend/openapi/envoi/creation.yaml`. Les routes serveur viennent avec les lots serveur d'Envoi, qui retireront
+// ces lignes. La liste reste exacte : tout AUTRE appel sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM1-CON (#396) : ajout rapide, import, modifier, retirer, restaurer, export, appel et
 // rappel des contacts. Ces appels ne partent que si le serveur annonce les gestes (`gestes_fiches` dans les
 // compteurs du hub, `fiche` dans l'historique d'une personne), ce que le vrai serveur ne fait pas : en production
@@ -57,6 +62,29 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/reponses/{p}/rattacher',
   'POST /api/v1/envoi/reponses/{p}/repondre',
   'POST /api/v1/crm/propositions/{p}/{p}',
+  // DM2-ASS — création de campagne.
+  'GET /api/v1/envoi/creation/boites',
+  'GET /api/v1/envoi/creation/cibles',
+  'GET /api/v1/envoi/creation/contexte',
+  'GET /api/v1/envoi/creation/destinataires-exemples',
+  'POST /api/v1/envoi/creation/champs',
+  'POST /api/v1/envoi/brouillons',
+  'PUT /api/v1/envoi/brouillons/{p}/etapes/{p}',
+  'POST /api/v1/envoi/brouillons/{p}/test',
+  'POST /api/v1/envoi/brouillons/{p}/validation/code',
+  'POST /api/v1/envoi/brouillons/{p}/valider',
+  'POST /api/v1/envoi/campagnes/{p}/annuler-validation',
+  // DM2-ASS — messages types.
+  'GET /api/v1/envoi/messages',
+  'POST /api/v1/envoi/messages',
+  'PUT /api/v1/envoi/messages/{p}',
+  'POST /api/v1/envoi/messages/apercu',
+  'POST /api/v1/envoi/messages/controler',
+  'POST /api/v1/envoi/messages/suggestion',
+  'POST /api/v1/envoi/messages/test',
+  'POST /api/v1/envoi/messages/{p}/archivage',
+  'POST /api/v1/envoi/messages/{p}/versions/{p}/restaurer',
+  'POST /api/v1/envoi/messages/{p}/versions/{p}/valider',
 ];
 
 function fichiers(dossier: string): string[] {

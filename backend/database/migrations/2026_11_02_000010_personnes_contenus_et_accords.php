@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
  *
  * PUREMENT ADDITIVE : `ADD COLUMN IF NOT EXISTS`, tout nullable, aucun défaut
  * coûteux (pas de réécriture de table), aucun DROP, aucune purge. `down()` ne
- * retire rien : on ne supprime jamais de donnée de personne.
+ * retire rien (il ne fait que re-commenter une colonne) : on ne supprime jamais de
+ * donnée de personne.
  *
  * Ni pseudo de réseau ni texte de message : seules des listes de mots, de
  * guides, d'accords (nature, date, source, version) et la date d'opposition.
@@ -30,6 +31,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Volontairement vide : aucune suppression de donnée de personne.
+        // Retour RÉEL (garde NR-17) mais SANS suppression : on ne retire jamais
+        // de donnée de personne. Les colonnes restent ; le retrait, s'il est un
+        // jour voulu, sera une migration à part, décidée à part.
+        DB::statement("COMMENT ON COLUMN personnes.accords_at IS 'PV-6 : instant du dernier evenement qui a porte l origine. Colonnes conservees au retour arriere.'");
     }
 };

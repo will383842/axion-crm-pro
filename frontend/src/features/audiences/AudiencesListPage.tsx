@@ -54,6 +54,11 @@ export interface EmailAudience {
   created_at: string;
   /** 2026-09-30 — à qui écrire dans chaque organisation. */
   destinataires?: ReglageDestinataires;
+  /**
+   * DM1-CIB — vrai si le serveur sert l'onglet « Préparation campagne ».
+   * Absent (le vrai serveur aujourd'hui) : l'onglet reste celui d'avant.
+   */
+  gestes_ciblage?: boolean;
 }
 
 // ---------------------------------------------------------------------------

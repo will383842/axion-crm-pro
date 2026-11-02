@@ -21,8 +21,11 @@ export function NotFoundPage() {
       className="flex min-h-screen flex-col items-center justify-center text-center"
     >
       <p className="text-5xl font-bold text-slate-300">404</p>
-      <h1 className="mt-3 text-xl font-semibold">Page introuvable</h1>
-      <Link to="/" className="mt-4 text-brand-600 hover:underline">Retour au tableau de bord</Link>
+      <h1 className="mt-3 text-2xl font-bold md:text-3xl">Page introuvable</h1>
+      <p className="mt-2 text-sm text-slate-600">Ce lien est ancien ou a changé d’adresse.</p>
+      <Link to="/" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-600 hover:underline md:min-h-0">
+        Retour au tableau de bord
+      </Link>
     </main>
   );
 }

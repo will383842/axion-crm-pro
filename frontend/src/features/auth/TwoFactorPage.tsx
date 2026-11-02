@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Shield, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { AuthShell } from './LoginPage';
+import { CodeEmailPage } from './CodeEmailPage';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -34,10 +35,10 @@ import { toast } from 'sonner';
  * `otpauth://` ouvre l'application directement sur mobile.
  */
 
-type Etape = 'chargement' | 'enrolement' | 'code-a-saisir' | 'codes-de-secours';
+type Etape = 'chargement' | 'enrolement' | 'code-a-saisir' | 'codes-de-secours' | 'code-email';
 
 interface ReponseMoi {
-  user?: { totp_enabled_at?: string | null };
+  user?: { totp_enabled_at?: string | null; two_factor_method?: 'email' | 'totp' };
 }
 
 export function TwoFactorPage() {
@@ -59,7 +60,7 @@ export function TwoFactorPage() {
       .get<ReponseMoi>('/auth/me')
       .then(({ data }) => {
         if (annule) return;
-        setEtape(data.user?.totp_enabled_at ? 'code-a-saisir' : 'enrolement');
+        setEtape(data.user?.two_factor_method === 'email' || import.meta.env.VITE_DEMO === '1' ? 'code-email' : data.user?.totp_enabled_at ? 'code-a-saisir' : 'enrolement');
       })
       .catch(() => {
         if (!annule) setEtape('enrolement');
@@ -139,6 +140,9 @@ export function TwoFactorPage() {
       </AuthShell>
     );
   }
+
+  // Connexion par code reçu par e-mail (DM1-COM) : le serveur l'annonce.
+  if (etape === 'code-email') return <CodeEmailPage />;
 
   // ── Les codes de secours : montrés UNE fois, et on le dit ──────────────────
   if (etape === 'codes-de-secours') {

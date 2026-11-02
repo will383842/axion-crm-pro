@@ -15,6 +15,7 @@ import { Download, Hash, Megaphone, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { misAJour } from '@/lib/fraicheur';
 import { api, messageApiLisible } from '@/lib/api';
+import { telechargerBlob } from '@/features/listes/listes';
 import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 import {
   Button,
@@ -133,12 +134,11 @@ export function TagsManagerPage() {
   }, [tags, choisieSlug]);
 
   const exporter = useMutation({
+    // La route réelle de l'export des entreprises, filtrée par étiquette.
     mutationFn: async (tag: Tag) => {
-      const lignes = (await api.get<{ data: Array<{ denomination: string; siren: string; ville: string; email: string; joignable: boolean }> }>(
-        `/tags/${tag.slug}/fiches`,
-      )).data.data;
-      telechargerCsv(`etiquette-${tag.slug}.csv`, ['Dénomination', 'SIREN', 'Ville', 'E-mail', 'Joignable'], lignes.map((l) => [l.denomination, l.siren, l.ville, l.email, l.joignable ? 'oui' : 'non']));
-      return lignes.length;
+      const r = await api.get<Blob>('/companies/export', { params: { tag: tag.slug }, responseType: 'blob' });
+      telechargerBlob(`etiquette-${tag.slug}.csv`, r.data);
+      return tag.companies_count;
     },
     onSuccess: (n) => toast.success(`${n} fiche${n > 1 ? 's' : ''} exportée${n > 1 ? 's' : ''}.`),
     onError: (err: unknown) => toast.error(extractApiMessage(err) ?? 'Export impossible'),
@@ -476,20 +476,6 @@ function TagPill({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-/** Télécharge un CSV (séparateur « ; », BOM pour Excel) — rien ne quitte le navigateur. */
-function telechargerCsv(nom: string, entetes: string[], lignes: string[][]): void {
-  const cellule = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const corps = [entetes, ...lignes].map((l) => l.map(cellule).join(';')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([`\uFEFF${corps}`], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = nom;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 /** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
   return messageApiLisible(err);

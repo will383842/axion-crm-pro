@@ -159,7 +159,10 @@ function apercuDestinataires(criteres: AudienceCriteria, mode: string) {
     const gen = { email: e.email_generic, type: 'generique' as const, crm_ref: `organisation:${e.id}`, fonction: null, nb_organisations: 1, organisations: organisation };
     const pers = nommes.slice(0, 2).map((c) => ({ email: c.email, type: 'nominative' as const, crm_ref: `contact:${c.id}`, fonction: c.role, nb_organisations: 1, organisations: organisation }));
     if (mode === 'generique') lignes.push(gen);
-    else if (mode === 'nominatives') pers.length > 0 ? lignes.push(...pers) : (sans += 1);
+    else if (mode === 'nominatives') {
+      if (pers.length > 0) lignes.push(...pers);
+      else sans += 1;
+    }
     else if (mode === 'les_deux') lignes.push(gen, ...pers);
     else lignes.push(...(pers.length > 0 ? pers : [gen]));
   }
@@ -345,8 +348,14 @@ function ajouterMembres(listeId: number, companyIds: number[], contactIds: numbe
       bilan.reactives += 1;
     } else bilan.deja_presents += 1;
   };
-  for (const id of companyIds) demoDb.entreprises.trouver(id) ? poser('organisation', id, null) : (bilan.introuvables += 1);
-  for (const id of contactIds) demoDb.contacts.trouver(id) ? poser('personne', null, id) : (bilan.introuvables += 1);
+  for (const id of companyIds) {
+    if (demoDb.entreprises.trouver(id)) poser('organisation', id, null);
+    else bilan.introuvables += 1;
+  }
+  for (const id of contactIds) {
+    if (demoDb.contacts.trouver(id)) poser('personne', null, id);
+    else bilan.introuvables += 1;
+  }
   const l = demoDb.listes.trouver(listeId);
   if (l) demoDb.listes.modifier(listeId, { updated_at: maintenantIso() });
   return bilan;
@@ -588,14 +597,16 @@ const handlersEtiquettes: HttpHandler[] = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // Les fiches d'une étiquette : sert l'export CSV.
-  http.get(api('/tags/:slug/fiches'), async ({ params }) => {
+  // L'export des entreprises (route réelle), filtré par étiquette : CSV.
+  http.get(api('/companies/export'), async ({ request }) => {
     await delai();
-    const slug = String(params['slug']);
+    const slug = new URL(request.url).searchParams.get('tag') ?? '';
+    const cellule = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lignes = demoDb.entreprises
-      .filtrer((e) => e.etiquettes.includes(slug))
-      .map((e) => ({ denomination: e.denomination, siren: e.siren, ville: e.city, email: e.email_generic, joignable: estJoignable(e) }));
-    return HttpResponse.json({ data: lignes });
+      .filtrer((e) => slug === '' || e.etiquettes.includes(slug))
+      .map((e) => [e.denomination, e.siren, e.city, e.email_generic, estJoignable(e) ? 'oui' : 'non'].map(cellule).join(';'));
+    const corps = ['Dénomination;SIREN;Ville;E-mail;Joignable', ...lignes].join('\r\n');
+    return new HttpResponse(`\uFEFF${corps}`, { headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
   }),
 ];
 

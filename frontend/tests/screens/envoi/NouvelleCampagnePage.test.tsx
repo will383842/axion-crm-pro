@@ -9,6 +9,7 @@ import { NouvelleCampagnePage } from '@/features/envoi/campagnes/NouvelleCampagn
 import { handlers } from '@/demo/handlers/envoi/creation.handlers';
 import { demoDb } from '@/demo/base';
 import { IDENTIFIANTS_DEMO } from '@/demo/donnees';
+import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 const CHEMIN = '/envoi/campagnes/nouvelle';
@@ -81,6 +82,7 @@ describe('NouvelleCampagnePage', () => {
     const { user } = await ouvrir();
     await continuer(user, /Continuer : message/);
     await continuer(user, /Continuer : quand/);
+    await user.click(await screen.findByRole('button', { name: 'Demain 9:00' }));
     // Aucune boîte choisie : le contrôle « Boîtes prêtes » est bloquant.
     for (const boite of await screen.findAllByRole('checkbox', { name: /@prospection-/ })) {
       if ((boite as HTMLInputElement).checked) await user.click(boite);
@@ -132,7 +134,12 @@ describe('NouvelleCampagnePage', () => {
   });
 
   it('sans cible dans l’espace : état vide', async () => {
-    await ouvrir(`${CHEMIN}?demo-etat=vide`);
-    expect(await screen.findByText('Rien à cibler')).toBeVisible();
+    definirEtatForce('vide');
+    try {
+      await renderScreen(<NouvelleCampagnePage />, { path: CHEMIN, url: CHEMIN, handlers });
+      expect(await screen.findByText('Rien à cibler')).toBeVisible();
+    } finally {
+      definirEtatForce(null);
+    }
   });
 });

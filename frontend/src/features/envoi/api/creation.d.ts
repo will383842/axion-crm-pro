@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/creation/champs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Champs de fusion utilisés par la séquence, personnes sans valeur et blocage si un champ obligatoire manque */
+        post: operations["analyserChamps"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/creation/cibles": {
         parameters: {
             query?: never;
@@ -200,6 +217,23 @@ export interface paths {
         };
         /** Cibles proposables (étiquettes, audiences, listes, entreprise d'origine) avec les joignables */
         get: operations["listerCibles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/creation/contexte": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Date et heure du serveur et fuseau (pour « demain 9:00 » et les durées estimées) */
+        get: operations["lireContexteCreation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -429,17 +463,25 @@ export interface components {
             suivre_ouvertures: boolean;
             total: number;
         };
+        ChampUtilise: {
+            /** @description Champ obligatoire vide pour au moins une personne, sans valeur de repli. */
+            bloquant: boolean;
+            /** @description Personnes de la cible pour qui ce champ est vide. */
+            manquants: number;
+            /** @description Nom du champ sans accolades, ex. `prénom`. */
+            nom: string;
+            obligatoire: boolean;
+            /** @description Valeur de repli retenue (saisie ou écrite dans le message). */
+            repli: string | null;
+        };
         Cible: {
             exclusions?: ("deja_contactes_90j" | "clients" | "desinscrits" | "opposition" | "rebonds_durs" | "sans_adresse" | "autres_campagnes_en_cours")[];
             /** @description Adresses, organisations ou domaines à exclure en plus (saisie libre). */
             exclusions_libres?: string[];
             libelle?: string;
             reference: string;
-            /**
-             * @description Revérifier les adresses vues il y a plus de 30 jours avant l'envoi.
-             * @default true
-             */
-            reverifier_anciennes: boolean;
+            /** @description Revérifier les adresses vues il y a plus de 30 jours avant l'envoi. */
+            reverifier_anciennes?: boolean;
             type: components["schemas"]["TypeCible"];
         };
         CibleCampagne: {
@@ -475,11 +517,8 @@ export interface components {
                 [key: string]: string;
             };
             sequence?: components["schemas"]["EtapeSequence"][];
-            /**
-             * @description Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation.
-             * @default false
-             */
-            suivre_ouvertures: boolean;
+            /** @description Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation. */
+            suivre_ouvertures?: boolean;
         };
         Controle: {
             /** @enum {string} */
@@ -559,11 +598,8 @@ export interface components {
             taux_estime: number;
         };
         SaisieMessage: {
-            /**
-             * @description Ajouter le bloc d'information (art. 14) et le lien de désinscription.
-             * @default true
-             */
-            bloc_information: boolean;
+            /** @description Ajouter le bloc d'information (art. 14) et le lien de désinscription. */
+            bloc_information?: boolean;
             corps: string;
             nom: string;
             objet: string;
@@ -910,6 +946,39 @@ export interface operations {
             };
         };
     };
+    analyserChamps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cible: components["schemas"]["Cible"];
+                    repli?: {
+                        [key: string]: string;
+                    };
+                    sequence: components["schemas"]["EtapeSequence"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Champs utilisés. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bloquants: number;
+                        champs: components["schemas"]["ChampUtilise"][];
+                    };
+                };
+            };
+        };
+    };
     listerCibles: {
         parameters: {
             query?: {
@@ -932,6 +1001,30 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CibleProposee"][];
+                    };
+                };
+            };
+        };
+    };
+    lireContexteCreation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contexte. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Europe/Paris */
+                        fuseau: string;
+                        maintenant: components["schemas"]["Horodatage"];
                     };
                 };
             };
@@ -1098,7 +1191,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @default true */
                     bloc_information?: boolean;
                     corps: string;
                     destinataire_exemple_id?: components["schemas"]["Identifiant"];
@@ -1193,13 +1285,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @default true */
                     a_moi?: boolean;
-                    /** @default true */
                     boites_temoins?: boolean;
                     corps: string;
                     destinataire_exemple_id?: components["schemas"]["Identifiant"];
-                    /** @default false */
                     deux_versions?: boolean;
                     objet: string;
                     objet_b?: string | null;

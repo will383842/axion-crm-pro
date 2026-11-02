@@ -49,4 +49,19 @@ describe('Utilisateurs : accès par produit', () => {
     expect(screen.queryByRole('button', { name: /Supprimer/ })).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Accès à Envoi pour Moi Meme' })).toBeDisabled();
   });
+
+  it('sans `acces_produits` du serveur (production d’aujourd’hui) : aucune case d’accès', async () => {
+    await renderScreen(<UsersPage />, {
+      path: '/users',
+      handlers: [
+        http.get(apiUrl('/auth/me'), () => HttpResponse.json({ user: MOI })),
+        http.get(apiUrl('/users'), () =>
+          HttpResponse.json({ data: [{ ...MOI, roles: ['owner'] }, { ...AUTRE, roles: ['operator'] }] }),
+        ),
+      ],
+    });
+    expect(await screen.findByText('autre@example.test')).toBeVisible();
+    expect(screen.queryByRole('checkbox', { name: /Accès à/ })).toBeNull();
+    expect(screen.queryByText('Rôles et accès')).toBeNull();
+  });
 });

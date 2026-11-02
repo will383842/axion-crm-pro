@@ -118,8 +118,15 @@ export function RgpdRequestsPage() {
 
   const list = useQuery({
     queryKey: ['rgpd-requests'],
-    queryFn: async () => (await api.get<{ data: RgpdRequest[] }>('/rgpd/requests')).data,
+    queryFn: async () =>
+      (await api.get<{ data: RgpdRequest[]; export_oppositions?: boolean }>('/rgpd/requests')).data,
   });
+
+  // DM1-COM : l'export du registre des oppositions n'est proposé que si le serveur
+  // l'annonce (`export_oppositions: true` dans la réponse de `/rgpd/requests`). La
+  // démo l'annonce ; le vrai serveur pas encore (route prévue au lot RGPD) : en
+  // production, ni bouton ni appel vers une route absente.
+  const exportAnnonce = list.data?.export_oppositions === true;
 
   // H46-008 — la forme des reponses de MUTATION est declaree, comme elle l'est
   // deja en lecture ligne 78.
@@ -186,14 +193,16 @@ export function RgpdRequestsPage() {
         subtitle="Demandes des personnes sur leurs données (accès, suppression…)"
         actions={
           <>
-            <Button
-              variant="secondary"
-              iconLeft={<Download className="h-3.5 w-3.5" />}
-              loading={exportMut.isPending}
-              onClick={() => exportMut.mutate()}
-            >
-              Exporter le registre des oppositions
-            </Button>
+            {exportAnnonce ? (
+              <Button
+                variant="secondary"
+                iconLeft={<Download className="h-3.5 w-3.5" />}
+                loading={exportMut.isPending}
+                onClick={() => exportMut.mutate()}
+              >
+                Exporter le registre des oppositions
+              </Button>
+            ) : null}
             <Button
               variant="primary"
               iconLeft={<FilePlus2 className="h-3.5 w-3.5" />}

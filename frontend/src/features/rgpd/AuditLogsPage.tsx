@@ -47,7 +47,9 @@ const SEVERITY_TONE: Record<Severity, StatusTone> = {
   critical: 'danger',
 };
 
-const GRID = '160px 180px 100px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+const GRID = '160px 180px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+/** Avec la colonne « Produit » : seulement quand le serveur envoie le champ `produit`. */
+const GRID_PRODUIT = '160px 180px 100px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
 
 const NOM_PRODUIT = { crm: 'CRM Pro', envoi: 'Envoi', commun: 'Commun' } as const;
 
@@ -81,6 +83,12 @@ export function AuditLogsPage() {
     },
     onError: () => toast.error('La vérification n’a pas pu aboutir. Réessayez dans un instant.'),
   });
+
+  // DM1-COM : la colonne « Produit » n'apparaît que si le serveur envoie `produit`
+  // sur au moins une ligne (la démo le fait, le vrai serveur pas encore) : en
+  // production, le tableau reste celui d'avant.
+  const avecProduit = (list.data?.data ?? []).some((l) => l.produit != null);
+  const grille = avecProduit ? GRID_PRODUIT : GRID;
 
   const rows = useMemo(() => {
     const all = list.data?.data ?? [];
@@ -173,18 +181,18 @@ export function AuditLogsPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1104 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll template={GRID}>
+          <TableScroll template={grille}>
           <div
             role="row"
             className={cn(
               'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
-            style={{ gridTemplateColumns: GRID }}
+            style={{ gridTemplateColumns: grille }}
           >
             <div>Quand</div>
             <div>Événement</div>
-            <div>Produit</div>
+            {avecProduit ? <div>Produit</div> : null}
             <div>Écran ou action</div>
             <div>Acteur</div>
             <div>Gravité</div>
@@ -200,7 +208,7 @@ export function AuditLogsPage() {
                   role="row"
                   onClick={() => setSelected(l)}
                   className="grid w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
-                  style={{ gridTemplateColumns: GRID }}
+                  style={{ gridTemplateColumns: grille }}
                 >
                   <div className="text-xs text-slate-500">
                     {new Date(l.created_at).toLocaleString('fr-FR')}
@@ -208,9 +216,11 @@ export function AuditLogsPage() {
                   <div className="truncate font-medium text-slate-900 dark:text-white">
                     {l.event_type}
                   </div>
-                  <div className="truncate text-xs text-slate-600">
-                    {l.produit ? NOM_PRODUIT[l.produit] : '—'}
-                  </div>
+                  {avecProduit ? (
+                    <div className="truncate text-xs text-slate-600">
+                      {l.produit ? NOM_PRODUIT[l.produit] : '—'}
+                    </div>
+                  ) : null}
                   <div className="truncate font-mono text-xs text-slate-500">
                     {l.path ?? '—'}
                   </div>

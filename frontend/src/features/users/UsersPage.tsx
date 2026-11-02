@@ -27,7 +27,7 @@ interface UserRow {
   first_login_completed_at?: string | null;
   last_login_at?: string | null;
   roles?: string[];
-  /** Accès par produit (DM1-COM). Absent : serveur pas encore à jour, on suppose les deux. */
+  /** Accès par produit (DM1-COM). Absent : le serveur ne gère pas encore ces accès, les cases ne s'affichent pas. */
   acces_produits?: { crm: boolean; envoi: boolean };
 }
 
@@ -251,6 +251,8 @@ export function UsersPage() {
   });
 
   const rows = data?.data ?? [];
+  // DM1-COM : l'en-tête ne parle d'accès que si le serveur les renvoie.
+  const avecAcces = rows.some((u) => u.acces_produits != null);
 
   /**
    * 🔴 D25-001 — l'écran d'administration où le mensonge coûtait le plus cher.
@@ -336,7 +338,7 @@ export function UsersPage() {
           >
             <div>Utilisateur</div>
             <div>Email</div>
-            <div>Rôles et accès</div>
+            <div>{avecAcces ? 'Rôles et accès' : 'Rôles'}</div>
             {large ? <div>2FA</div> : null}
             {large ? <div>Dernière connexion</div> : null}
             <div>Actions</div>
@@ -367,6 +369,10 @@ export function UsersPage() {
                     ))
                   )}
                 </div>
+                {/* DM1-COM : cases montrées seulement si le serveur renvoie `acces_produits`
+                    (la démo le fait, le vrai serveur pas encore) ; sans lui, une case
+                    enverrait un champ ignoré et un faux « Accès mis à jour ». */}
+                {u.acces_produits ? (
                 <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-700">
                   <legend className="sr-only">Accès aux produits de {u.name}</legend>
                   {(
@@ -391,6 +397,7 @@ export function UsersPage() {
                     );
                   })}
                 </fieldset>
+                ) : null}
                 </div>
                 {large ? (
                   <div>

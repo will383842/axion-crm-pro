@@ -15,7 +15,7 @@ import { handlers as handlersCommuns } from '@/demo/handlers/socle/ecrans-commun
 
 import { RgpdRequestsPage } from '@/features/rgpd/RgpdRequestsPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { getJson } from '../msw/handlers';
+import { apiUrl, getJson, http, HttpResponse } from '../msw/handlers';
 
 const MOTIF = 'Coordonnees encore presentes apres effacement : a traiter a la main (voir residus).';
 
@@ -88,5 +88,22 @@ describe('Demandes RGPD : registre des oppositions (DM1-COM)', () => {
       lecteur.readAsText(blobs[0]!);
     });
     expect(lu).toMatch(/^Valeur;Portée;Motif;Inscrite le/);
+  });
+
+  it('sans annonce du serveur (`export_oppositions` absent) : pas de bouton d’export', async () => {
+    let servie = false;
+    await renderScreen(<RgpdRequestsPage />, {
+      path: '/rgpd/requests',
+      handlers: [
+        http.get(apiUrl('/rgpd/requests'), () => {
+          servie = true;
+          return HttpResponse.json({ data: DEMANDES.data });
+        }),
+      ],
+    });
+    expect(await screen.findByRole('button', { name: 'Nouvelle requête' })).toBeVisible();
+    await waitFor(() => expect(servie).toBe(true));
+    expect(await screen.findByText('zz.incomplet@zz-rgpd.example.invalid')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Exporter le registre des oppositions' })).toBeNull();
   });
 });

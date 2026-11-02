@@ -242,10 +242,14 @@ export const handlers: HttpHandler[] = [
   // ── Demandes RGPD ───────────────────────────────────────────────────────
   http.get(api('/rgpd/requests'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { data: [] });
+    // `export_oppositions` : la démo annonce l'export du registre (absent du vrai serveur).
+    const force = await repondreEtatForce(request, { data: [], export_oppositions: true });
     if (force) return force;
     donnees();
-    return HttpResponse.json({ data: [...demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').tous()].reverse() });
+    return HttpResponse.json({
+      data: [...demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').tous()].reverse(),
+      export_oppositions: true,
+    });
   }),
   http.post(api('/rgpd/requests'), async ({ request }) => {
     await delai();

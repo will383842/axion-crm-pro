@@ -58,7 +58,7 @@ export function DemandeCode({
           aria-label="Code à 6 chiffres"
           autoComplete="one-time-code"
           placeholder="••••••"
-          className="h-11 w-full rounded-lg bg-white px-3 text-center text-xl font-semibold tracking-[0.4em] text-slate-900 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 sm:h-9"
+          className="h-11 w-full rounded-lg bg-white px-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 sm:h-9"
         />
         {erreur !== null ? (
           <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-200">

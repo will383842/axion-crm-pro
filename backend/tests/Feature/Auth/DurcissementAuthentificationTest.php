@@ -177,7 +177,7 @@ test('S1 — les demandes de lien magique sont limitées par compte sans rien r�
 
     for ($i = 0; $i < 4; $i++) {
         appelS1('/api/v1/auth/magic-link', ['email' => $utilisateur->email], '198.51.100.' . ($i + 40))
-            ->assertOk()->assertJsonPath('data.sent', true);
+            ->assertOk()->assertJsonPath('sent', true);
     }
 
     // Seuls les deux premiers liens ont été émis ; les autres demandes sont absorbées en silence.

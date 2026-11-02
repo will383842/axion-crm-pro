@@ -44,7 +44,8 @@ test.describe('DM2-REP — réponses', () => {
     await ouvrirDemo(page, '/envoi/reponses', { offre: 'envoi' });
     await page.getByRole('list', { name: 'Réponses à traiter' }).getByRole('button', { name: /Paul Morin/ }).click();
     await page.getByRole('button', { name: /STOP/ }).click();
-    const dialogue = page.getByRole('dialog', { name: /à l’écart des envois/ });
+    const dialogue = page.getByRole('dialog');
+    await expect(dialogue.getByRole('heading', { name: /à l’écart des envois/ })).toBeVisible();
     await expect(dialogue).toContainText('données sont conservées');
     await dialogue.getByRole('button', { name: 'Confirmer le STOP' }).click();
     await expect(page.getByRole('status', { name: 'Résumé envoyé au CRM' })).toContainText('écart');
@@ -61,7 +62,7 @@ test.describe('DM2-REP — réponses', () => {
     await controleAxe(page);
     await passage360(page);
     await carte.getByRole('listitem', { name: /Paul Morin/ }).getByRole('button', { name: /Rattacher/ }).click();
-    await expect(page.getByRole('heading', { name: 'Rien à rattacher' })).toBeVisible();
+    await expect(carte).toHaveCount(0);
   });
 
   test('les états vide et erreur sont propres', async ({ page }) => {

@@ -43,7 +43,7 @@ describe('ReponsesARattacherPage', () => {
 
     const carte = await screen.findByRole('article', { name: new RegExp(ADRESSE_INCONNUE.replace('.', '\\.')) });
     expect(within(carte).getByText(/Je réponds depuis mon autre adresse/)).toBeInTheDocument();
-    const propositions = within(carte).getByRole('list', { name: 'Fiches proposées' });
+    const propositions = await within(carte).findByRole('list', { name: 'Fiches proposées' });
     expect(within(propositions).getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
 
     const ligne = within(propositions).getByRole('listitem', { name: /Paul Morin/ });
@@ -69,7 +69,8 @@ describe('ReponsesARattacherPage', () => {
     const carte = await screen.findByRole('article', { name: new RegExp(ADRESSE_INCONNUE.replace('.', '\\.')) });
     await user.click(within(carte).getByRole('button', { name: 'Créer une nouvelle fiche dans le CRM' }));
 
-    const dialogue = await screen.findByRole('dialog', { name: 'Nouvelle fiche dans le CRM' });
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Nouvelle fiche dans le CRM' })).toBeInTheDocument();
     await user.clear(within(dialogue).getByRole('textbox', { name: 'Prénom' }));
     await user.type(within(dialogue).getByRole('textbox', { name: 'Prénom' }), 'Pauline');
     await user.clear(within(dialogue).getByRole('textbox', { name: 'Nom' }));

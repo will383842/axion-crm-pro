@@ -167,8 +167,17 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, collegues]
                 properties:
+                  collegues:
+                    type: array
+                    description: Collègues à qui une réponse peut être attribuée.
+                    items:
+                      type: object
+                      required: [id, nom]
+                      properties:
+                        id: { type: string }
+                        nom: { type: string }
                   data:
                     type: array
                     items:

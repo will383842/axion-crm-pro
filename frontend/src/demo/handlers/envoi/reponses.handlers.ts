@@ -60,6 +60,75 @@ interface Raccourci {
 
 const ADRESSE_INCONNUE = 'p.morin@boulangerie-tilleuls.example';
 
+
+/** Réponses ajoutées à la démo (le jeu de base n'en a que trois à traiter) : idempotent, jamais de doublon. */
+const REPONSES_DE_DEMO: Reponse[] = [
+  {
+    id: 'rep-morin-autre',
+    recue_le: ilYa(1, 18, 2),
+    campagne_id: 'cmp-01',
+    destinataire_id: null,
+    boite_id: 'boi-claire',
+    de: ADRESSE_INCONNUE,
+    prenom: 'Paul',
+    nom: 'Morin',
+    organisation: 'Boulangerie des Tilleuls',
+    objet: 'RE: Une idée pour votre prochain salon',
+    extrait: 'Je réponds depuis mon autre adresse : je suis partant pour jeudi.',
+    classement: 'a_rattacher',
+    suggestion: { classement: 'interesse', confiance: 88 },
+    traitee: false,
+  },
+  {
+    id: 'rep-demo-costa',
+    recue_le: ilYa(1, 9, 12),
+    campagne_id: 'cmp-01',
+    destinataire_id: null,
+    boite_id: 'boi-claire',
+    de: 'lina.costa@courrier-rhone.example',
+    prenom: 'Lina',
+    nom: 'Costa',
+    organisation: 'Le Courrier du Rhône',
+    objet: 'RE: Une idée pour votre prochain salon',
+    extrait: 'Je suis absente jusqu’au 12 novembre. Pour toute urgence, contactez l’accueil.',
+    classement: 'absence',
+    suggestion: { classement: 'absence', confiance: 96 },
+    traitee: false,
+  },
+  {
+    id: 'rep-demo-perrin',
+    recue_le: ilYa(2, 14, 40),
+    campagne_id: 'cmp-01',
+    destinataire_id: null,
+    boite_id: 'boi-sophie',
+    de: 'hugo.perrin@federation-btp.example',
+    prenom: 'Hugo',
+    nom: 'Perrin',
+    organisation: 'Fédération BTP Rhône',
+    objet: 'RE: Salon des artisans : on en parle ?',
+    extrait: 'Quels sont vos tarifs pour une petite structure ?',
+    classement: 'question',
+    suggestion: { classement: 'question', confiance: 84 },
+    traitee: false,
+  },
+  {
+    id: 'rep-demo-meyer',
+    recue_le: ilYa(2, 10, 5),
+    campagne_id: 'cmp-01',
+    destinataire_id: null,
+    boite_id: 'boi-lucie',
+    de: 'sonia.meyer@salon-vienne.example',
+    prenom: 'Sonia',
+    nom: 'Meyer',
+    organisation: 'Salon des artisans de Vienne',
+    objet: 'RE: Une idée pour votre prochain salon',
+    extrait: 'Pas pour le moment, recontactez-moi au printemps.',
+    classement: 'pas_maintenant',
+    suggestion: { classement: 'pas_maintenant', confiance: 79 },
+    traitee: false,
+  },
+];
+
 /** Données propres à la zone « réponses » : fil, tâches, rattachements. */
 function fabrique() {
   const raccourcis: Raccourci[] = [
@@ -80,23 +149,8 @@ function fabrique() {
 /** Les collections de la zone, prêtes à l'emploi (et la réponse « adresse inconnue » de Paul Morin). */
 function zone() {
   demoDb.etendre('reponses', fabrique);
-  if (!demoDb.reponses.trouver('rep-morin-autre')) {
-    demoDb.reponses.ajouter({
-      id: 'rep-morin-autre',
-      recue_le: ilYa(1, 18, 2),
-      campagne_id: 'cmp-01',
-      destinataire_id: null,
-      boite_id: 'boi-claire',
-      de: ADRESSE_INCONNUE,
-      prenom: 'Paul',
-      nom: 'Morin',
-      organisation: 'Boulangerie des Tilleuls',
-      objet: 'RE: Une idée pour votre prochain salon',
-      extrait: 'Je réponds depuis mon autre adresse : je suis partant pour jeudi.',
-      classement: 'a_rattacher',
-      suggestion: { classement: 'interesse', confiance: 88 },
-      traitee: false,
-    });
+  for (const r of REPONSES_DE_DEMO) {
+    if (!demoDb.reponses.trouver(r.id)) demoDb.reponses.ajouter(r);
   }
   return {
     raccourcis: demoDb.zone<Raccourci>('reponses', 'raccourcis'),
@@ -147,6 +201,7 @@ function suggestionsPour(r: Reponse): Suggestion[] {
   if (organisation === '') return [];
   const entreprise = demoDb.entreprises.tous().find((e) => e.denomination.trim().toLowerCase() === organisation);
   if (!entreprise) return [];
+  const domaine = r.de.split('@')[1] ?? '';
   const note = (c: { first_name: string; last_name: string }) =>
     c.last_name === r.nom && c.first_name === r.prenom ? 0 : c.last_name === r.nom ? 1 : 2;
   const contacts = demoDb.contacts
@@ -158,9 +213,11 @@ function suggestionsPour(r: Reponse): Suggestion[] {
       reference: String(c.id),
       libelle: `${c.first_name} ${c.last_name}`,
       raison:
-        note(c) === 0 ? `${entreprise.denomination} · même nom et même organisation`
-        : note(c) === 1 ? `${entreprise.denomination} · même nom de famille`
-        : `${entreprise.denomination} · même organisation`,
+        note(c) === 0
+          ? `${entreprise.denomination} · ${c.email.endsWith(`@${domaine}`) ? 'même domaine' : 'même nom et même organisation'}`
+          : note(c) === 1
+            ? `${entreprise.denomination} · même nom de famille`
+            : `${entreprise.denomination} · même organisation`,
     }));
   return [
     ...contacts,
@@ -194,6 +251,10 @@ function apresGeste(r: Reponse, resumeCrm: ResumeCrm | null): ReponseApresGeste 
   return { ...r, resume_crm: resumeCrm };
 }
 
+function texteDe(valeur: unknown): string {
+  return typeof valeur === 'string' ? valeur.trim() : '';
+}
+
 function lireCorps(request: Request): Promise<Record<string, unknown>> {
   return request.json().then((c) => (c ?? {}) as Record<string, unknown>).catch(() => ({}));
 }
@@ -209,7 +270,10 @@ function remettreATraiter(r: Reponse): Reponse | undefined {
 export const handlers: HttpHandler[] = [
   http.get(api('/envoi/reponses/raccourcis'), async () => {
     await delai();
-    return HttpResponse.json({ data: zone().raccourcis.tous() });
+    return HttpResponse.json({
+      data: zone().raccourcis.tous(),
+      collegues: demoDb.utilisateurs.tous().map((u) => ({ id: u.id, nom: u.name })),
+    });
   }),
 
   http.get(api('/envoi/reponses'), async ({ request }) => {
@@ -232,7 +296,7 @@ export const handlers: HttpHandler[] = [
       ['nom_complet', 'de', 'organisation', 'extrait', 'objet'],
     );
     const ordonnee = texte
-      .map(({ nom_complet: _n, ...r }) => r as Reponse)
+      .map(({ nom_complet: _n, ...r }) => r)
       .sort((a, b) => {
         if (file === 'a_traiter') {
           const ia = a.suggestion.classement === 'interesse' ? 0 : 1;
@@ -309,9 +373,9 @@ export const handlers: HttpHandler[] = [
     const r = demoDb.reponses.trouver(String(params['id']));
     if (!r) return erreur(404, 'introuvable', 'Cette réponse n’existe pas.');
     const corps = await lireCorps(request);
-    const prenom = String(corps['prenom'] ?? '').trim();
-    const nom = String(corps['nom'] ?? '').trim();
-    const provenance = String(corps['provenance'] ?? '').trim();
+    const prenom = texteDe(corps['prenom']);
+    const nom = texteDe(corps['nom']);
+    const provenance = texteDe(corps['provenance']);
     if (prenom === '' || nom === '') return erreur(422, 'identite_manquante', 'Indiquez le prénom et le nom.');
     if (provenance === '') return erreur(422, 'provenance_manquante', 'Indiquez d’où vient cette personne.');
     const organisation = typeof corps['organisation'] === 'string' ? corps['organisation'].trim() : (r.organisation ?? '');

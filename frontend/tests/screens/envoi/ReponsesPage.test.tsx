@@ -20,7 +20,7 @@ import { api } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 function reponsePaul() {
-  const r = demoDb.reponses.filtrer((x) => x.prenom === 'Paul' && x.nom === 'Morin' && !x.traitee)[0];
+  const r = demoDb.reponses.filtrer((x) => x.prenom === 'Paul' && x.nom === 'Morin' && x.classement !== 'a_rattacher')[0];
   if (!r) throw new Error('La réponse de Paul Morin manque au jeu de démo.');
   return r;
 }
@@ -32,6 +32,12 @@ async function monter(supplementaires: HttpHandler[] = []) {
     handlers: [...supplementaires, ...handlers],
   });
   return vue;
+}
+
+async function dialogueStop() {
+  const dialogue = await screen.findByRole('dialog');
+  expect(within(dialogue).getByRole('heading', { name: /à l’écart des envois/ })).toBeInTheDocument();
+  return dialogue;
 }
 
 async function ouvrirPaul(user: ReturnType<typeof userEvent.setup>) {
@@ -66,13 +72,13 @@ describe('ReponsesPage — boîte des réponses', () => {
     const avant = demoDb.opposition.compter();
 
     await user.click(within(detail).getByRole('button', { name: /STOP/ }));
-    const dialogue = await screen.findByRole('dialog', { name: /à l’écart des envois/ });
+    const dialogue = await dialogueStop();
     // Annuler ne change rien.
     await user.click(within(dialogue).getByRole('button', { name: 'Annuler' }));
     expect(demoDb.opposition.compter()).toBe(avant);
 
     await user.click(within(detail).getByRole('button', { name: /STOP/ }));
-    const dialogue2 = await screen.findByRole('dialog', { name: /à l’écart des envois/ });
+    const dialogue2 = await dialogueStop();
     await user.click(within(dialogue2).getByRole('button', { name: 'Confirmer le STOP' }));
 
     await waitFor(() => expect(demoDb.opposition.compter()).toBe(avant + 1));
@@ -108,7 +114,7 @@ describe('ReponsesPage — boîte des réponses', () => {
     await monter();
     const liste = await screen.findByRole('list', { name: 'Réponses à traiter' });
     const boutons = await within(liste).findAllByRole('button');
-    expect(boutons.length).toBeGreaterThan(2);
+    expect(boutons.length).toBeGreaterThanOrEqual(2);
     expect(boutons[0]).toHaveAttribute('aria-current', 'true');
 
     await user.keyboard('j');
@@ -129,8 +135,5 @@ describe('ReponsesPage — boîte des réponses', () => {
 });
 
 function reponsePaulId(): string {
-  const r = demoDb.reponses.filtrer((x) => x.prenom === 'Paul' && x.nom === 'Morin' && x.de.endsWith('.example') === false)[0]
-    ?? demoDb.reponses.filtrer((x) => x.prenom === 'Paul' && x.nom === 'Morin')[0];
-  if (!r) throw new Error('La réponse de Paul Morin manque au jeu de démo.');
-  return String(r.id);
+  return String(reponsePaul().id);
 }

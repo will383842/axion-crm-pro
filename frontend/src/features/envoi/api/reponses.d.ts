@@ -421,6 +421,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Collègues à qui une réponse peut être attribuée. */
+                        collegues: {
+                            id: string;
+                            nom: string;
+                        }[];
                         data: {
                             corps: string;
                             id: components["schemas"]["Identifiant"];

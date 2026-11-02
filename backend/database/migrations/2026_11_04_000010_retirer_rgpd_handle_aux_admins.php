@@ -34,7 +34,7 @@ return new class extends Migration
             // Droit posé directement sur un compte administrateur qui n'est
             // PAS aussi propriétaire DANS LE MÊME ESPACE (`team_id`) : être
             // propriétaire de l'espace B ne conserve rien dans l'espace A.
-            $cle = static fn (object $l): string => $l->model_type . '|' . $l->model_id . '|' . (string) ($l->team_id ?? '');
+            $cle = static fn (stdClass $l): string => $l->model_type . '|' . $l->model_id . '|' . (string) ($l->team_id ?? '');
 
             $proprietaires = $ownerIds === []
                 ? []

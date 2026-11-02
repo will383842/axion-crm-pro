@@ -29,10 +29,12 @@ import {
 } from '@/components/ui';
 import type { EmailAudience } from './AudiencesListPage';
 import { criteresLisibles } from './criteres-lisibles';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 import type { ListeManuelle } from '@/features/listes/listes';
 import {
   REGLAGE_PAR_DEFAUT,
   reglageVersApi,
+  MOTIFS_EXCLUSION,
   type ApercuDestinataires,
   type ReglageDestinataires,
 } from './destinataires';
@@ -299,7 +301,7 @@ export function AudienceDetailPage() {
         <CriteriaTab audience={audience} />
       ) : null}
       {tab === 'campaign' ? (
-        <CampaignPlaceholderTab />
+        audience.gestes_ciblage === true ? <PreparationCampagneTab audience={audience} /> : <CampaignPlaceholderTab />
       ) : null}
     </div>
   );
@@ -492,7 +494,8 @@ function CriteriaTab({ audience }: { audience: EmailAudience }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab — Campagne placeholder
+// Tab — Campagne : bouche-trou d'avant, gardé tel quel pour un serveur qui
+// n'annonce pas la préparation de campagne (production sans Envoi).
 // ---------------------------------------------------------------------------
 function CampaignPlaceholderTab() {
   return (
@@ -508,6 +511,95 @@ function CampaignPlaceholderTab() {
         </p>
       </div>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab — Préparation campagne (DM1-CIB), seulement si le serveur l'annonce
+// (`gestes_ciblage` sur l'audience).
+// ---------------------------------------------------------------------------
+/**
+ * Ce que l'audience donnerait à une campagne : combien d'adresses distinctes
+ * on peut joindre, combien sont écartées et POURQUOI, puis le bouton qui
+ * mène à l'assistant d'Envoi. Sans Envoi dans l'offre, le bouton n'existe pas.
+ * Rien n'est envoyé d'ici.
+ */
+function PreparationCampagneTab({ audience }: { audience: EmailAudience }) {
+  const envoiVisible = useProduitsVisibles().envoi;
+  // Même clé que l'onglet « Destinataires » : un seul appel pour les deux.
+  const apercu = useQuery({
+    queryKey: ['audience', audience.id, 'destinataires'],
+    queryFn: async () =>
+      enveloppe<ApercuDestinataires>((await api.get(`/audiences/${audience.id}/destinataires`)).data),
+  });
+
+  if (apercu.isLoading) {
+    return <div className="flex h-24 items-center justify-center"><Spinner /></div>;
+  }
+  if (apercu.error !== null) {
+    return <QueryErrorState error={apercu.error} contexte="la préparation de cette campagne" onRetry={() => void apercu.refetch()} />;
+  }
+  const d = apercu.data;
+  if (!d) {
+    return <ReponseVideState contexte="la préparation de cette campagne" onRetry={() => void apercu.refetch()} />;
+  }
+  const motifs = Object.entries(d.exclues).filter(([, n]) => n > 0);
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <div className="space-y-4">
+        <Card padding="md">
+          <h3 className="mb-3 text-lg font-bold text-slate-900">Taille joignable</h3>
+          <p className="text-2xl font-bold tabular-nums text-slate-900" aria-label="Adresses joignables">
+            {d.destinataires.toLocaleString('fr-FR')}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            adresses distinctes, dans {d.organisations_avec_destinataire.toLocaleString('fr-FR')} organisation(s) sur{' '}
+            {d.organisations.toLocaleString('fr-FR')}. Une adresse n’est jamais comptée deux fois.
+          </p>
+        </Card>
+        <Card padding="md">
+          <h3 className="mb-3 text-lg font-bold text-slate-900">Motifs d’exclusion</h3>
+          {motifs.length === 0 ? (
+            <p className="text-sm text-slate-600">Aucune adresse écartée.</p>
+          ) : (
+            <ul className="space-y-1.5 text-sm text-slate-700" aria-label="Motifs d’exclusion">
+              {motifs.map(([motif, n]) => (
+                <li key={motif} className="flex justify-between gap-3">
+                  <span>{MOTIFS_EXCLUSION[motif] ?? 'Autre motif'}</span>
+                  <span className="font-medium tabular-nums">{n.toLocaleString('fr-FR')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+      <Card padding="md" className="h-fit space-y-3">
+        <div className="flex items-center gap-2">
+          <Send className="h-5 w-5 text-produit" aria-hidden="true" />
+          <h3 className="text-lg font-bold text-slate-900">Lancer une campagne</h3>
+        </div>
+        {envoiVisible ? (
+          <>
+            <p className="text-sm text-slate-600">
+              L’assistant d’Envoi démarre avec cette audience comme cible. Rien ne part avant votre validation.
+            </p>
+            <Link
+              to="/envoi/campagnes/nouvelle"
+              search={{ audience: audience.id } as never}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-produit px-4 text-sm font-medium text-white shadow-produit transition hover:bg-produit-fonce focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-produit focus-visible:ring-offset-1 sm:h-9"
+            >
+              <Send className="h-4 w-4" aria-hidden="true" />
+              Lancer une campagne
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-slate-600">
+            L’envoi d’e-mails n’est pas activé pour votre espace. Les chiffres ci-contre restent valables le jour où il le sera.
+          </p>
+        )}
+      </Card>
+    </div>
   );
 }
 

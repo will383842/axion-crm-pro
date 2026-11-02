@@ -99,3 +99,34 @@ describe('onglet Destinataires', () => {
     });
   });
 });
+
+describe('onglet Préparation campagne (DM1-CIB)', () => {
+  async function monterOnglet(audience: Record<string, unknown>) {
+    await renderScreen(<AudienceDetailPage />, {
+      path: '/audiences/$audienceId',
+      url: '/audiences/5',
+      handlers: [
+        getJson('/audiences/5', { data: audience }),
+        getJson('/audiences/5/members', { data: [] }),
+        getJson('/audiences/5/destinataires', { data: APERCU }),
+      ],
+      landingRoutes: ['/audiences'],
+    });
+    await userEvent.click(await screen.findByRole('tab', { name: /Préparation campagne/ }));
+  }
+
+  it('production : sans annonce du serveur, l’onglet reste celui d’avant', async () => {
+    await monterOnglet(AUDIENCE);
+    expect(await screen.findByText('Bientôt : l’envoi d’e-mails')).toBeInTheDocument();
+    expect(screen.queryByText('Taille joignable')).toBeNull();
+  });
+
+  it('le serveur l’annonce : taille joignable (chiffre en 24 px) et motifs d’exclusion', async () => {
+    await monterOnglet({ ...AUDIENCE, gestes_ciblage: true });
+    const chiffre = await screen.findByLabelText('Adresses joignables');
+    expect(chiffre).toHaveTextContent('3');
+    expect(chiffre.className).toContain('text-2xl');
+    expect(chiffre.className).not.toContain('text-3xl');
+    expect(screen.queryByText('Bientôt : l’envoi d’e-mails')).toBeNull();
+  });
+});

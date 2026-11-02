@@ -15,11 +15,13 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Building, FileUp, Pencil, Trash2, User } from 'lucide-react';
+import { Building, Download, FileUp, Pencil, Trash2, User } from 'lucide-react';
 import { Button, Card, EmptyState, Input, PageHeader, QueryErrorState, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
 import {
   MOTIFS_REJET,
+  chargerTousLesMembres,
+  exporterMembres,
   messageServeur,
   retirerDeLaListe,
   type BilanImport,
@@ -48,12 +50,16 @@ export function ListeManuelleDetailPage() {
     queryKey: ['liste-manuelle', id, 'membres', page],
     queryFn: async () =>
       (
-        await api.get<{ data: MembreListe[]; meta: { total: number } }>(`/listes-manuelles/${id}/membres`, {
+        await api.get<{ data: MembreListe[]; meta: { total: number; gestes_ciblage?: boolean } }>(`/listes-manuelles/${id}/membres`, {
           params: { page, per_page: PAR_PAGE },
         })
       ).data,
     enabled: lisible,
   });
+
+  // DM1-CIB — l'export (liste, sélection) ne paraît que si le serveur l'annonce
+  // (`meta.gestes_ciblage`) ; le vrai serveur ne l'envoie pas : page d'avant.
+  const exportVisible = membres.data?.meta.gestes_ciblage === true;
 
   const rafraichir = () => {
     void qc.invalidateQueries({ queryKey: ['liste-manuelle', id] });
@@ -85,6 +91,17 @@ export function ListeManuelleDetailPage() {
       rafraichir();
     },
     onError: (e) => toast.error(messageServeur(e) ?? 'Retrait impossible.'),
+  });
+
+  // DM1-CIB — export de la liste entière (tous les membres, page après page).
+  const exportListe = useMutation({
+    mutationFn: async () => {
+      const tous = await chargerTousLesMembres(id);
+      exporterMembres(`liste-${id}.csv`, tous);
+      return tous.length;
+    },
+    onSuccess: (n) => toast.success(`${n} fiche(s) exportée(s).`),
+    onError: (e) => toast.error(messageServeur(e) ?? 'Export impossible.'),
   });
 
   const corbeille = useMutation({
@@ -149,6 +166,17 @@ export function ListeManuelleDetailPage() {
             >
               Renommer
             </Button>
+            {exportVisible ? (
+              <Button
+                variant="secondary"
+                size="md"
+                iconLeft={<Download className="h-4 w-4" />}
+                loading={exportListe.isPending}
+                onClick={() => exportListe.mutate()}
+              >
+                Exporter la liste
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               size="md"
@@ -216,6 +244,18 @@ export function ListeManuelleDetailPage() {
             >
               Retirer de la liste
             </Button>
+            {exportVisible ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  exporterMembres(`liste-${id}-selection.csv`, lignes.filter((m) => cochees.has(m.id)));
+                  toast.success(`${cochees.size} fiche(s) exportée(s).`);
+                }}
+              >
+                Exporter la sélection
+              </Button>
+            ) : null}
             <Button size="sm" variant="ghost" onClick={() => setCochees(new Set())}>
               Annuler la sélection
             </Button>

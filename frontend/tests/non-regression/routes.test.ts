@@ -40,7 +40,16 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
+// registre des oppositions. Servis par le faux serveur de la démo ; les routes serveur sont prévues aux lots S3 et
+// S12 (authentification par code e-mail) et au lot RGPD, qui retireront ces lignes.
+// Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
+// liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
+// commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
+// (`src/demo/handlers/crm/a-traiter.handlers.ts`). La route serveur est prévue au lot serveur du CRM, qui
+// retirera cette ligne. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
+  'POST /api/v1/doublons/fusions/{p}/annuler',
   'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
   'PATCH /api/v1/crm/contacts/{p}',
@@ -61,6 +70,13 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/reponses/{p}/creer-fiche',
   'POST /api/v1/envoi/reponses/{p}/rattacher',
   'POST /api/v1/envoi/reponses/{p}/repondre',
+  'GET /api/v1/compte/appareils',
+  'GET /api/v1/compte/codes-secours',
+  'GET /api/v1/rgpd/oppositions/export',
+  'POST /api/v1/auth/code-email/renvoyer',
+  'POST /api/v1/auth/code-email/verifier',
+  'POST /api/v1/compte/appareils/{p}/retirer',
+  'POST /api/v1/compte/codes-secours/regenerer',
   'POST /api/v1/crm/propositions/{p}/{p}',
   // DM2-ASS — création de campagne.
   'GET /api/v1/envoi/creation/boites',

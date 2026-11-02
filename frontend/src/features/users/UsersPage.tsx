@@ -27,6 +27,8 @@ interface UserRow {
   first_login_completed_at?: string | null;
   last_login_at?: string | null;
   roles?: string[];
+  /** Accès par produit (DM1-COM). Absent : le serveur ne gère pas encore ces accès, les cases ne s'affichent pas. */
+  acces_produits?: { crm: boolean; envoi: boolean };
 }
 
 const ROLE_OPTIONS = [
@@ -223,6 +225,17 @@ export function UsersPage() {
     onError: () => toast.error('Impossible de changer le rôle'),
   });
 
+  // Accès par produit (CRM Pro / Envoi) : une case par produit et par personne.
+  const accesMut = useMutation({
+    mutationFn: async (p: { id: string; acces: { crm: boolean; envoi: boolean } }) =>
+      (await api.put<{ data: UserRow }>(`/users/${p.id}`, { acces_produits: p.acces })).data,
+    onSuccess: () => {
+      toast.success('Accès mis à jour');
+      void qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Impossible de changer cet accès'),
+  });
+
   // 🔑 FERMER UN COMPTE. Le serveur REVOQUE l'appartenance (`revoked_at`) et
   // supprime en douceur : rien n'est efface, la trace de qui est passe reste.
   // D'ou « Fermer » et non « Supprimer » — le mot doit dire ce qui se passe.
@@ -238,6 +251,8 @@ export function UsersPage() {
   });
 
   const rows = data?.data ?? [];
+  // DM1-COM : l'en-tête ne parle d'accès que si le serveur les renvoie.
+  const avecAcces = rows.some((u) => u.acces_produits != null);
 
   /**
    * 🔴 D25-001 — l'écran d'administration où le mensonge coûtait le plus cher.
@@ -258,6 +273,7 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Utilisateurs"
         subtitle="Qui a accès à votre CRM, et avec quels droits."
         // 🔴 X39-028 — le bouton disparait quand le serveur a REFUSE la vue.
@@ -314,7 +330,6 @@ export function UsersPage() {
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
           <TableScroll template={GRID}>
           <div
-            role="row"
             className={cn(
               'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
@@ -323,7 +338,7 @@ export function UsersPage() {
           >
             <div>Utilisateur</div>
             <div>Email</div>
-            <div>Rôles</div>
+            <div>{avecAcces ? 'Rôles et accès' : 'Rôles'}</div>
             {large ? <div>2FA</div> : null}
             {large ? <div>Dernière connexion</div> : null}
             <div>Actions</div>
@@ -332,7 +347,6 @@ export function UsersPage() {
             {rows.map((u) => (
               <div
                 key={u.id}
-                role="row"
                 className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >
@@ -343,6 +357,7 @@ export function UsersPage() {
                   </div>
                 </div>
                 <div className="truncate text-slate-600 dark:text-slate-300">{u.email}</div>
+                <div className="space-y-1.5">
                 <div className="flex flex-wrap gap-1">
                   {(u.roles ?? []).length === 0 ? (
                     <span className="text-xs text-slate-400">—</span>
@@ -353,6 +368,36 @@ export function UsersPage() {
                       </StatusPill>
                     ))
                   )}
+                </div>
+                {/* DM1-COM : cases montrées seulement si le serveur renvoie `acces_produits`
+                    (la démo le fait, le vrai serveur pas encore) ; sans lui, une case
+                    enverrait un champ ignoré et un faux « Accès mis à jour ». */}
+                {u.acces_produits ? (
+                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-700">
+                  <legend className="sr-only">Accès aux produits de {u.name}</legend>
+                  {(
+                    [
+                      ['crm', 'CRM Pro'],
+                      ['envoi', 'Envoi'],
+                    ] as const
+                  ).map(([cle, nom]) => {
+                    const acces = u.acces_produits ?? { crm: true, envoi: true };
+                    return (
+                      <label key={cle} className="flex min-h-11 items-center gap-1.5 md:min-h-0">
+                        <input
+                          type="checkbox"
+                          checked={acces[cle]}
+                          disabled={moi?.user.id === u.id || accesMut.isPending}
+                          aria-label={`Accès à ${nom} pour ${u.name}`}
+                          onChange={(e) => accesMut.mutate({ id: u.id, acces: { ...acces, [cle]: e.target.checked } })}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        {nom}
+                      </label>
+                    );
+                  })}
+                </fieldset>
+                ) : null}
                 </div>
                 {large ? (
                   <div>

@@ -9,7 +9,8 @@
  *  3. Envoi actif mais utilisateur sans accès (`acces_produits.envoi: false`) :
  *     introuvable aussi ;
  *  4. Envoi actif : chaque route rend sa page « en attente », au nom du lot
- *     qui la remplira ;
+ *     qui la remplira — ou, une fois ce lot fusionné, SA VRAIE PAGE (titre
+ *     attendu, ni « en attente » ni « introuvable ») ;
  *  5. la page publique de désinscription vit HORS coquille.
  *
  * Monte l'arbre de routes RÉEL (`src/app/routeTree.tsx`), comme
@@ -32,7 +33,10 @@ import { renderScreen } from '../helpers/renderScreen';
 import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
-import { handlers as handlersReponses } from '@/demo/handlers/envoi/reponses.handlers';
+import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
+
+/** Les routes `/envoi/…` du faux serveur de la démo. */
+const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
 
 let arbre: AnyRoute;
 
@@ -67,8 +71,17 @@ async function monter(url: string) {
   return { ...vue, router };
 }
 
-/** Une URL concrète par route d'Envoi, et le lot qui remplira sa page. */
-const ROUTES_ENVOI: ReadonlyArray<readonly [string, string]> = [
+/**
+ * Une URL concrète par route d'Envoi, le lot qui remplit sa page et, dès que
+ * ce lot a livré la page, le titre (h1) qu'elle doit afficher. Sans titre, la
+ * route doit encore rendre sa page « en attente ».
+ *
+ * Filet modifié : pourquoi — un lot qui remplace sa page d'attente ajoute ici
+ * le titre de la vraie page ; la garde reste aussi stricte (la page doit
+ * s'afficher, avec son titre, sans « en attente » ni « introuvable »), et la
+ * garde « Sans Envoi → introuvable » couvre toujours TOUTES les routes.
+ */
+const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes', 'DM2-CAM'],
   ['/envoi/campagnes/calendrier', 'DM2-CAM'],
   ['/envoi/campagnes/c-1', 'DM2-CAM'],
@@ -77,16 +90,16 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string]> = [
   ['/envoi/campagnes/messages/m-1', 'DM2-ASS'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
-  ['/envoi/reponses', 'DM2-REP'],
-  ['/envoi/reponses/a-rattacher', 'DM2-REP'],
-  ['/envoi/reponses/traitees', 'DM2-REP'],
-  ['/envoi/boites', 'DM2-INF'],
-  ['/envoi/boites/b-1', 'DM2-INF'],
-  ['/envoi/domaines', 'DM2-INF'],
-  ['/envoi/domaines/d-1', 'DM2-INF'],
-  ['/envoi/serveurs', 'DM2-INF'],
-  ['/envoi/serveurs/configuration', 'DM2-INF'],
-  ['/envoi/chauffe', 'DM2-INF'],
+  ['/envoi/reponses', 'DM2-REP', 'Réponses'],
+  ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
+  ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
+  ['/envoi/boites', 'DM2-INF', 'Boîtes d’envoi'],
+  ['/envoi/boites/boi-will', 'DM2-INF', 'will@prospection-b.example'],
+  ['/envoi/domaines', 'DM2-INF', 'Domaines'],
+  ['/envoi/domaines/dom-b', 'DM2-INF', 'prospection-b.example'],
+  ['/envoi/serveurs', 'DM2-INF', 'Serveurs et adresses IP'],
+  ['/envoi/serveurs/configuration', 'DM2-INF', 'Configuration'],
+  ['/envoi/chauffe', 'DM2-INF', 'Chauffe'],
   ['/envoi/sante', 'DM2-PIL'],
   ['/envoi/sante/chercher', 'DM2-PIL'],
   ['/envoi/sante/feu-vert', 'DM2-PIL'],
@@ -98,35 +111,6 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string]> = [
   ['/envoi/reglages/regles', 'DM2-CNF'],
   ['/envoi/reglages/connexion-crm', 'DM2-CNF'],
 ];
-
-/**
- * Filet modifié : pourquoi. DM2-REP (#394) a remplacé la page « en attente » des
- * trois routes des réponses par les vraies pages. Ces routes RESTENT dans
- * `ROUTES_ENVOI` : sans Envoi, elles doivent toujours répondre « Page
- * introuvable » (garde inchangée). Le test « en attente » ne porte plus que sur
- * les routes encore à livrer ; les routes livrées ont leur propre test, plus
- * strict : la VRAIE page (son titre), ni page en attente ni « introuvable ».
- * Chaque lot qui livre ses pages ajoute ici ses routes, avec le titre attendu
- * et les handlers de démo de sa zone.
- */
-const PAGES_LIVREES: ReadonlyArray<readonly [string, string, string]> = [
-  ['/envoi/reponses', 'DM2-REP', 'Réponses'],
-  ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
-  ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
-];
-const HANDLERS_DES_PAGES_LIVREES = [...handlersReponses];
-
-const URLS_LIVREES = new Set(PAGES_LIVREES.map(([url]) => url));
-const ROUTES_EN_ATTENTE = ROUTES_ENVOI.filter(([url]) => !URLS_LIVREES.has(url));
-
-describe('Liste des routes livrées — cohérente avec la liste complète', () => {
-  it('chaque route livrée figure dans ROUTES_ENVOI, au nom du même lot', () => {
-    for (const [url, lot] of PAGES_LIVREES) {
-      expect(ROUTES_ENVOI).toContainEqual([url, lot]);
-    }
-    expect(ROUTES_EN_ATTENTE.length + PAGES_LIVREES.length).toBe(ROUTES_ENVOI.length);
-  });
-});
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {
   it.each([['/envoi'], ...ROUTES_ENVOI.map(([url]) => [url])])('%s → « Page introuvable »', async (url) => {
@@ -175,6 +159,23 @@ describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envo
   });
 });
 
+/** Routes dont le lot n'a pas encore livré la page. */
+const ROUTES_EN_ATTENTE = ROUTES_ENVOI.filter(([, , titre]) => titre === undefined).map(([url, lot]) => [url, lot] as const);
+/** Routes dont le lot a livré la vraie page, avec le titre attendu. */
+const ROUTES_LIVREES = ROUTES_ENVOI.flatMap(([url, lot, titre]) => (titre === undefined ? [] : [[url, lot, titre] as const]));
+
+describe('Envoi actif — chaque route livrée rend sa VRAIE page', () => {
+  it.each(ROUTES_LIVREES)('%s → vraie page du lot %s (« %s »)', async (url, _lot, titre) => {
+    // Le faux serveur de la démo (le même que celui des e2e) répond aux appels
+    // de la page ; droits et compte restent ceux du test (Envoi actif).
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersDemoEnvoi);
+    await monter(url);
+    expect(await screen.findByRole('heading', { level: 1, name: titre }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+  });
+});
+
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
   it.each(ROUTES_EN_ATTENTE)('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
@@ -182,14 +183,6 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', lot);
     expect(page.textContent).toContain(lot);
-    expect(screen.queryByText(/page introuvable/i)).toBeNull();
-  });
-
-  it.each(PAGES_LIVREES)('%s → vraie page du lot %s (« %s »), plus de page en attente', async (url, _lot, titre) => {
-    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...HANDLERS_DES_PAGES_LIVREES);
-    await monter(url);
-    expect(await screen.findByRole('heading', { level: 1, name: titre })).toBeInTheDocument();
-    expect(screen.queryByTestId('page-en-attente')).toBeNull();
     expect(screen.queryByText(/page introuvable/i)).toBeNull();
   });
 

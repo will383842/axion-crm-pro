@@ -126,6 +126,11 @@ function formaterDate(iso: string): string {
   });
 }
 
+/** Un chemin interne de l'application (`/…`, mais pas `//…`), sinon `null`. */
+export function cheminInterne(lien: unknown): string | null {
+  return typeof lien === 'string' && lien.startsWith('/') && !lien.startsWith('//') ? lien : null;
+}
+
 export function NotificationsBell() {
   const [ouvert, setOuvert] = useState(false);
   const enveloppe = useRef<HTMLDivElement | null>(null);
@@ -246,7 +251,10 @@ export function NotificationsBell() {
                 {lignes.map((ligne) => {
                   const produit = typeof ligne.produit === 'string' && PRODUITS_CONNUS.has(ligne.produit) ? ligne.produit : null;
                   const etat = ligne.niveau !== undefined ? ETAT_DU_NIVEAU[ligne.niveau] : undefined;
-                  const lien = ligne.lien ?? ligne.action_url;
+                  // `lien` (DM0-COQ) vient du serveur : seul un chemin INTERNE
+                  // est suivi (comme `dernierePage.ts`). `action_url` garde
+                  // son comportement d'avant DM0-COQ.
+                  const lien = cheminInterne(ligne.lien) ?? ligne.action_url;
                   const contenu = (
                     <>
                       {produit !== null ? (

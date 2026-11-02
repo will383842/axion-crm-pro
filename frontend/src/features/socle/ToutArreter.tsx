@@ -1,8 +1,12 @@
 /**
  * DM0-COQ — « TOUT ARRÊTER », LE BOUTON DE SÉCURITÉ D'ENVOI (maquettes M2).
  *
- *  - Rouge, dans l'en-tête de l'espace Envoi. DEUX clics : le bouton, puis
- *    « Oui, tout arrêter » dans la confirmation. Un clic seul n'arrête rien.
+ *  - Bouton en CONTOUR rouge dans l'en-tête de l'espace Envoi (maquette
+ *    `campagnes.html`, `btn btn-danger` ; dans l'en-tête foncé, contour rose
+ *    clair : `.entete .bouton-arret` de `style.css`). Le rouge PLEIN est
+ *    réservé à la fenêtre de confirmation : l'écran garde un seul bouton plein.
+ *  - DEUX clics : le bouton, puis « Arrêter tous les envois » dans la
+ *    confirmation (« Tout arrêter · <espace> ? »). Un clic seul n'arrête rien.
  *  - `POST /envoi/tout-arreter` : plus aucun message ne part, toutes boîtes et
  *    campagnes confondues. Rien n'est perdu.
  *  - Tant que les envois sont arrêtés (`GET /envoi/etat` → `arrete`), un
@@ -14,11 +18,13 @@
  * dans Envoi seulement. La constante ci-dessous tranche, fausse par défaut.
  */
 import { useEffect, useId, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Power } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, usePiegeFocus } from '@/components/ui';
 import { api } from '@/lib/api';
+import { libelleEspace, type MeAvecEspace } from '@/components/layout/WorkspaceSelector';
+import { CLE_ME } from './produits/useProduits';
 import { CLE_COMPTEURS_ENVOI, CLE_ETAT_ENVOIS, useEtatEnvois, type EtatEnvois } from './EtatEnvois';
 
 /** Montrer « Tout arrêter » aussi dans l'espace CRM (si Will le demande). */
@@ -54,16 +60,22 @@ export function ToutArreter() {
 
   return (
     <>
-      <Button
-        variant="destructive"
-        size="sm"
+      {/* Contour, pas plein : un seul bouton plein par écran (le bouton
+          principal de la page). Couleurs de `.entete .bouton-arret`. */}
+      <button
+        type="button"
+        data-variante="contour-danger"
         onClick={() => setConfirmation(true)}
-        iconLeft={<Power className="h-3.5 w-3.5" aria-hidden />}
         aria-label="Tout arrêter"
-        className="shrink-0"
+        className={
+          'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-transparent px-3 text-xs font-medium ' +
+          'text-rose-200 ring-1 ring-inset ring-rose-400 transition-colors hover:bg-rose-500/15 hover:text-white ' +
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300'
+        }
       >
+        <Power className="h-3.5 w-3.5" aria-hidden />
         <span className="hidden sm:inline">Tout arrêter</span>
-      </Button>
+      </button>
       {confirmation ? (
         <ConfirmationToutArreter
           enCours={arreter.isPending}
@@ -90,6 +102,13 @@ function ConfirmationToutArreter({
   onConfirmer: () => void;
 }) {
   const idTitre = useId();
+  // Même clé que la coquille (`['auth', 'me']`) : aucune requête de plus.
+  const { data: me } = useQuery<MeAvecEspace>({
+    queryKey: CLE_ME,
+    queryFn: async () => (await api.get<MeAvecEspace>('/auth/me')).data,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
   const refDialogue = usePiegeFocus<HTMLDivElement>(true);
 
   useEffect(() => {
@@ -111,7 +130,7 @@ function ConfirmationToutArreter({
       <div className="absolute inset-0 bg-slate-950/40" onClick={onAnnuler} aria-hidden />
       <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-[var(--shadow-popover)] ring-1 ring-slate-200">
         <h2 id={idTitre} className="text-lg font-semibold tracking-tight text-slate-900">
-          Tout arrêter ?
+          Tout arrêter · {libelleEspace(me)} ?
         </h2>
         <p className="mt-2 text-sm text-slate-700">
           Plus aucun message ne part, toutes boîtes et campagnes confondues. Rien n’est perdu : les envois
@@ -119,10 +138,10 @@ function ConfirmationToutArreter({
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onAnnuler}>
-            Annuler
+            Ne rien changer
           </Button>
           <Button variant="destructive" loading={enCours} onClick={onConfirmer}>
-            Oui, tout arrêter
+            Arrêter tous les envois
           </Button>
         </div>
       </div>

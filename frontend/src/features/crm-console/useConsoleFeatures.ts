@@ -64,16 +64,16 @@ export const CONSOLE_FEATURES_CLOSED: ConsoleFeatures = {
 
 export const CONSOLE_FEATURES_KEY = ['crm', 'features'] as const;
 
-/**
- * La requête brute — exposée pour distinguer « on SAIT que c'est fermé » de
- * « on ne sait pas ENCORE ». Les deux ferment la console, mais on ne dit pas
- * la même chose à l'écran (cf. `ConsoleGate`).
- */
 /** La lecture elle-même — partagée par le hook et par la garde de route `exigerProduit`. */
 export async function lireConsoleFeatures(): Promise<ConsoleFeatures> {
   return (await api.get<ConsoleFeatures>('/config/features')).data;
 }
 
+/**
+ * La requête brute — exposée pour distinguer « on SAIT que c'est fermé » de
+ * « on ne sait pas ENCORE ». Les deux ferment la console, mais on ne dit pas
+ * la même chose à l'écran (cf. `ConsoleGate`).
+ */
 export function useConsoleFeaturesQuery() {
   return useQuery<ConsoleFeatures>({
     queryKey: CONSOLE_FEATURES_KEY,

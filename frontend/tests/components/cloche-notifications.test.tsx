@@ -303,4 +303,63 @@ describe('DM0-COQ — la cloche dit de quel produit vient chaque alerte', () => 
     expect(panneau.querySelector('[data-marque-produit]')).toBeNull();
     expect(panneau.querySelector('[data-pastille-etat]')).toBeNull();
   });
+
+  it('une valeur de `produit` INCONNUE ne fabrique aucune pastille (filtre `PRODUITS_CONNUS`)', async () => {
+    await monterCoquille({
+      data: [
+        {
+          id: 'n-inconnu-1',
+          type: 'facturation.relance',
+          title: 'Relance de facture',
+          body: null,
+          action_url: null,
+          lien: '/doublons',
+          produit: 'facturation',
+          niveau: 'attention',
+          read_at: null,
+          created_at: '2027-01-12T08:40:00+01:00',
+        },
+      ],
+      unread_count: 1,
+    });
+    const user = userEvent.setup();
+    await user.click(cloche());
+    const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
+    const ligne = (await within(panneau).findByText('Relance de facture')).closest('li') as HTMLElement;
+    expect(ligne.querySelector('[data-marque-produit]')).toBeNull();
+    expect(ligne.querySelector('[data-produit]')).toBeNull();
+    expect(ligne.querySelector('[data-pastille-etat]')).toBeNull();
+    expect(ligne.textContent).not.toMatch(/facturation/i);
+  });
+
+  it('un `lien` qui n’est pas un chemin interne n’est jamais suivi', async () => {
+    const externe = (id: string, lien: string, action_url: string | null) => ({
+      id,
+      type: 'envoi.reponse',
+      title: `Alerte ${id}`,
+      body: null,
+      action_url,
+      lien,
+      produit: 'envoi',
+      niveau: 'a_faire',
+      read_at: null,
+      created_at: '2027-01-12T09:05:00+01:00',
+    });
+    await monterCoquille({
+      data: [
+        externe('a', 'https://piege.example/vol', null),
+        externe('b', '//piege.example/vol', null),
+        externe('c', 'javascript:alert(1)', '/envoi/reponses'),
+      ],
+      unread_count: 3,
+    });
+    const user = userEvent.setup();
+    await user.click(cloche());
+    const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
+    const ligne = async (id: string) => (await within(panneau).findByText(`Alerte ${id}`)).closest('li') as HTMLElement;
+    expect(within(await ligne('a')).queryByRole('link')).toBeNull();
+    expect(within(await ligne('b')).queryByRole('link')).toBeNull();
+    // `action_url` garde son comportement d'avant DM0-COQ.
+    expect(within(await ligne('c')).getByRole('link')).toHaveAttribute('href', '/envoi/reponses');
+  });
 });

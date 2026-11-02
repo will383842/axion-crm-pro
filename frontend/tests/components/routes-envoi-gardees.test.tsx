@@ -29,7 +29,8 @@ import {
 import { createHash } from 'node:crypto';
 
 import { renderScreen } from '../helpers/renderScreen';
-import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, getJson, handlersEnvoi } from '../msw/handlers';
+import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
+import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
 
 let arbre: AnyRoute;
@@ -117,6 +118,33 @@ describe('Envoi actif mais utilisateur SANS accès — introuvable aussi', () =>
   });
 });
 
+/**
+ * La garde est FERMÉE PAR DÉFAUT (`exigerProduit.ts`) : un état des droits
+ * qu'on ne sait pas lire n'ouvre jamais Envoi. Sans ces deux cas, remplacer
+ * `return false` par `return true` dans le `catch` laissait tout vert.
+ */
+describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envoi', () => {
+  it('`/config/features` en erreur 500 → « Page introuvable »', async () => {
+    server.use(
+      http.get(apiUrl('/config/features'), () => HttpResponse.json({ message: 'Erreur serveur' }, { status: 500 })),
+      ...handlersEnvoi(),
+    );
+    await monter('/envoi/campagnes');
+    expect(await screen.findByText(/page introuvable/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+  });
+
+  it('`produits.envoi: \'oui\'` (valeur inconnue) → « Page introuvable »', async () => {
+    server.use(
+      getJson('/config/features', { ...FEATURES_LES_DEUX_PRODUITS, produits: { crm: 'actif', envoi: 'oui' } }),
+      ...handlersEnvoi(),
+    );
+    await monter('/envoi/campagnes');
+    expect(await screen.findByText(/page introuvable/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+  });
+});
+
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
   it.each(ROUTES_ENVOI)('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
@@ -139,14 +167,21 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     ['/taches', 'DM1-ACC'],
     ['/affaires', 'DM1-ACC'],
     ['/compte', 'DM1-COM'],
-  ])('%s → page en attente du lot %s', async (url, lot) => {
+  ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
     await monter(url);
-    expect(await screen.findByTestId('page-en-attente')).toHaveAttribute('data-lot', lot);
+    const page = await screen.findByTestId('page-en-attente');
+    expect(page).toHaveAttribute('data-lot', lot);
+    // Joignable en production par son adresse : aucun code de lot interne affiché.
+    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
+    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
   });
 
   it('/desinscription/$jeton est publique et HORS coquille', async () => {
     await monter('/desinscription/jeton-de-test');
-    expect(await screen.findByTestId('page-en-attente')).toHaveAttribute('data-lot', 'DM2-CNF');
+    const page = await screen.findByTestId('page-en-attente');
+    expect(page).toHaveAttribute('data-lot', 'DM2-CNF');
+    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
+    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
     expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });
@@ -220,6 +255,41 @@ describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', 
     const barre = document.querySelector('aside')?.outerHTML ?? '';
     const enTete = document.querySelector('header[role="banner"]')?.outerHTML ?? '';
     expect(createHash('sha256').update(barre).digest('hex'), 'Barre latérale modifiée sans Envoi').toBe(EMPREINTE_BARRE);
+    expect(createHash('sha256').update(enTete).digest('hex'), 'En-tête modifié sans Envoi').toBe(EMPREINTE_EN_TETE);
+  });
+});
+
+/**
+ * Même garde, console v2 OUVERTE (`console_v2`, deux univers) : les trois
+ * entrées de la console s'ajoutent, rien d'autre. Liste et empreinte de la
+ * barre relevées sur `main` (6dddcf1) avant DM0-COQ ; l'en-tête est le même
+ * que console fermée.
+ */
+/** Les trois entrées de la console, à leur place, puis le reste à l'identique. */
+const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
+  ['/', 'Tableau de bord'],
+  ['/doublons', 'Doublons à vérifier'],
+  ['/console/arbitrage', 'Personnes à rattacher'],
+  ['/companies', 'Entreprises'],
+  ['/console/contacts', 'Contacts'],
+  ['/console/lettre-et-guide', 'Newsletter et guide'],
+  ...MENU_D_AUJOURD_HUI.slice(4),
+];
+const EMPREINTE_BARRE_CONSOLE_OUVERTE = 'cb767ece2deb1d9a9e19155e5bff17405ade84cc788bb34747f475c04f422460';
+
+describe('Sans Envoi, console ouverte — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
+  it('mêmes entrées, même ordre, mêmes libellés ; même HTML de la barre et de l’en-tête', async () => {
+    const vue = await renderScreen(<p>Contenu</p>, { path: '/companies', withLayout: true, consoleFeatures: 'open' });
+    await screen.findAllByText('Will Test');
+    await waitFor(() => expect(vue.queryClient.getQueryState(['crm', 'features'])?.status).toBe('success'));
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' });
+    const entrees = [...nav.querySelectorAll('a')].map((a) => [a.getAttribute('href'), a.textContent?.trim()]);
+    expect(entrees).toEqual(MENU_CONSOLE_OUVERTE.map(([to, libelle]) => [to, libelle]));
+    expect(screen.queryByRole('navigation', { name: 'Choisir le produit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /tout arrêter/i })).toBeNull();
+    const barre = document.querySelector('aside')?.outerHTML ?? '';
+    const enTete = document.querySelector('header[role="banner"]')?.outerHTML ?? '';
+    expect(createHash('sha256').update(barre).digest('hex'), 'Barre latérale modifiée sans Envoi').toBe(EMPREINTE_BARRE_CONSOLE_OUVERTE);
     expect(createHash('sha256').update(enTete).digest('hex'), 'En-tête modifié sans Envoi').toBe(EMPREINTE_EN_TETE);
   });
 });

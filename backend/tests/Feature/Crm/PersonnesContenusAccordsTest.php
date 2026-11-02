@@ -151,6 +151,9 @@ test('PV-6 7 — drapeau fermé : les champs sont ignorés, rien n’est écrit'
 
 test('PV-6 8 — opposition_at : une date future du site est ramenée à maintenant', function () {
     $futur = now()->addDays(30)->utc()->format('Y-m-d\TH:i:s\Z');
+    // La personne existe déjà : une opposition reçue pour une personne inconnue
+    // n'inscrit que la liste d'opposition (empreinte), pas de fiche.
+    pv6Post(pv6Event('2026-11-02T10:00:00Z', pv6Champs()))->assertOk();
     pv6Post(pv6Event(now()->utc()->format('Y-m-d\TH:i:s\Z'), ['opposition' => ['actif' => true, 'date' => $futur]]))->assertOk();
 
     $posee = Carbon\Carbon::parse(pv6Personne()->opposition_at);

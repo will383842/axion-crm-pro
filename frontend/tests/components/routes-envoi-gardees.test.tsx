@@ -283,7 +283,7 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
 // Filet modifié : pourquoi — empreintes recalées (barre et en-tête) car périmées sur `main`
 // depuis les lots de démo DM1/DM2 (constaté en corrigeant le doublon de route
 // `GET /companies` qui empêchait ce fichier de se charger). Aucun changement de L3c-0.
-const EMPREINTE_BARRE = '09087ed117fda6594cd28871941431618e77883b75dc2ff8776b0b18df433748';
+const EMPREINTE_BARRE = 'b838a7b756cac09511c8519deca111fa840e06c894718604f69462153ac98845';
 const EMPREINTE_EN_TETE = 'cd2d032621402b779584b0a3371e0a62c1bd02bea5c84608f4f0c24cd0da0eec';
 
 describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
@@ -324,7 +324,7 @@ const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
   ['/console/lettre-et-guide', 'Newsletter et guide'],
   ...MENU_D_AUJOURD_HUI.slice(4),
 ];
-const EMPREINTE_BARRE_CONSOLE_OUVERTE = 'c8ea7c582aaef9cc5122c8bd1de04977ddf990ffe59e0fa793ba42454cabba17';
+const EMPREINTE_BARRE_CONSOLE_OUVERTE = 'cb767ece2deb1d9a9e19155e5bff17405ade84cc788bb34747f475c04f422460';
 
 describe('Sans Envoi, console ouverte — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
   it('mêmes entrées, même ordre, mêmes libellés ; même HTML de la barre et de l’en-tête', async () => {

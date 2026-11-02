@@ -221,7 +221,6 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });
 
-  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
   // Filet modifié : pourquoi. /compte quitte la liste « en attente » (DM1-COM l'a livrée) : cette
   // vérification positive la remplace, aussi stricte. Avec le serveur d'aujourd'hui (pas de
   // `two_factor_method: 'email'`), la vraie page s'affiche sans appeler de route absente : MSW
@@ -237,7 +236,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(screen.queryByText('Codes de secours')).toBeNull();
   });
 
-  it('/desinscription/$jeton est publique et HORS coquille', async () => {
+  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
     await monter('/desinscription/jeton-de-test');
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', 'DM2-CNF');

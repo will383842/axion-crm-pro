@@ -1,20 +1,51 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { NouvelleTache, ReponseTaches, Tache } from './types';
 
 export const CLE_TACHES = ['crm', 'taches'] as const;
 
+const CLE_COCHER = ['crm', 'taches', 'cocher'] as const;
+
+interface Coche {
+  id: string;
+  faite: boolean;
+}
+
 export function useTaches() {
-  return useQuery({
+  const requete = useQuery({
     queryKey: CLE_TACHES,
     queryFn: async ({ signal }) => (await api.get<ReponseTaches>('/crm/taches', { signal })).data,
   });
+  // Tant qu'un geste n'est pas confirmé par le serveur, il l'emporte sur toute
+  // relecture : une liste partie AVANT l'enregistrement ne peut pas décocher la case.
+  const enCours = useMutationState({
+    filters: { mutationKey: CLE_COCHER, status: 'pending' },
+    select: (m) => m.state.variables as Coche | undefined,
+  });
+  const data = useMemo(() => {
+    const avant = requete.data;
+    if (!avant || enCours.length === 0) return avant;
+    const gestes = new Map(enCours.filter((g): g is Coche => g !== undefined).map((g) => [g.id, g.faite]));
+    return {
+      ...avant,
+      data: avant.data.map((t) => {
+        const faite = gestes.get(t.id);
+        return faite === undefined || faite === t.faite
+          ? t
+          : { ...t, faite, faite_le: faite ? `${avant.aujourdhui}T12:00:00.000Z` : null };
+      }),
+    };
+  }, [requete.data, enCours]);
+  return { ...requete, data };
 }
 
 export function useCocherTache() {
   const client = useQueryClient();
   const mutation = useMutation({
-    mutationFn: async ({ id, faite }: { id: string; faite: boolean }) => (await api.patch<Tache>(`/crm/taches/${id}`, { faite })).data,
+    mutationKey: CLE_COCHER,
+    mutationFn: async ({ id, faite }: Coche) => (await api.patch<Tache>(`/crm/taches/${id}`, { faite })).data,
+    // Le geste reste « en cours » jusqu'à la relecture qui le confirme (promesse attendue).
     onSettled: () => client.invalidateQueries({ queryKey: CLE_TACHES }),
   });
   return {

@@ -21,9 +21,11 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 /** Appels sans route dans la photo à la date du filet (R0). À ne faire que BAISSER. */
 // POST propositions/{id}/{action} : le dernier segment est choisi à l'exécution (accepter ou refuser) ;
 // le relevé statique ne peut pas le résoudre, ce n'est pas une route manquante.
-// Filet modifié : pourquoi. DM2-CNF : écrans de conformité et de réglages d'Envoi. Comme le feu et les compteurs
-// ci-dessous, ces appels ne partent que si Envoi est actif (absent en production) et sont servis par le faux serveur
-// de la démo ; les routes serveur viendront au lot serveur d'Envoi, qui retirera ces lignes.
+// Filet modifié : pourquoi. DM2-CNF : écrans de conformité et de réglages d'Envoi. Les appels `/envoi/…` ne partent
+// que si Envoi est actif (absent en production : routes gardées). Les deux appels `/public/desinscription/{p}` viennent
+// d'une page PUBLIQUE, joignable sans connexion : elle ne les lance que si `/config/features` annonce Envoi ; sinon
+// elle reste la page « en préparation » d'avant et n'appelle rien (test `DesinscriptionPubliquePage`). Tous sont
+// servis par le faux serveur de la démo ; les routes serveur viendront au lot serveur d'Envoi, qui retirera ces lignes.
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.

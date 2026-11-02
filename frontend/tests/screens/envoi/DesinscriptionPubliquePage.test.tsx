@@ -13,13 +13,14 @@ import { DesinscriptionPubliquePage } from '@/features/envoi/public/Desinscripti
 import { handlers, JETON_DEMO } from '@/demo/handlers/envoi/conformite.handlers';
 import { demoDb } from '@/demo/base';
 import { renderScreen } from '../../helpers/renderScreen';
+import { FEATURES_LES_DEUX_PRODUITS, getJson, http, HttpResponse } from '../../msw/handlers';
 
 async function ouvrir(jeton: string = JETON_DEMO) {
   return renderScreen(<DesinscriptionPubliquePage />, {
     path: '/desinscription/$jeton',
     url: `/desinscription/${jeton}`,
     outsideLayout: true,
-    handlers,
+    handlers: [getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlers],
   });
 }
 
@@ -72,5 +73,19 @@ describe('Page publique de désinscription (DM2-CNF)', () => {
   it('un jeton inconnu affiche un message sans rien révéler', async () => {
     await ouvrir('jeton-inconnu');
     expect(await screen.findByRole('alert')).toHaveTextContent(/lien n’est plus valable/i);
+  });
+
+  it('sans Envoi annoncé par le serveur (production), garde la page d’avant et n’appelle aucune route', async () => {
+    let appels = 0;
+    const espion = http.all('*/api/v1/public/desinscription/*', () => { appels += 1; return HttpResponse.json({}, { status: 404 }); });
+    await renderScreen(<DesinscriptionPubliquePage />, {
+      path: '/desinscription/$jeton',
+      url: `/desinscription/${JETON_DEMO}`,
+      outsideLayout: true,
+      handlers: [espion],
+    });
+    expect(await screen.findByTestId('page-en-attente')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Se désinscrire' })).toBeNull();
+    expect(appels).toBe(0);
   });
 });

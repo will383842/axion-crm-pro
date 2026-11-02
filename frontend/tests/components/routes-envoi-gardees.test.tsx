@@ -195,7 +195,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
 
   it('/desinscription/$jeton est publique et HORS coquille', async () => {
     // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot.
-    server.use(...handlersConformite);
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersConformite);
     await monter('/desinscription/demo-tilleuls');
     expect(await screen.findByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeInTheDocument();
     expect(screen.queryByTestId('page-en-attente')).toBeNull();

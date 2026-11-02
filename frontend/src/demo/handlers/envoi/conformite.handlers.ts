@@ -32,7 +32,7 @@ interface Parametres {
 
 /** Phrase ajoutée au bloc d'information seulement si la campagne mesure les ouvertures. */
 const BLOC_OUVERTURES =
-  'Si l’expéditeur a choisi de mesurer les ouvertures pour cette campagne, une image invisible indique si ce message a été ouvert ; aucun clic n’est suivi, et cette mesure n’est jamais appliquée à une personne qui s’est opposée.';
+  'Si l’expéditeur a choisi de mesurer les ouvertures pour cette campagne, une image invisible permet d’estimer si ce message a été ouvert (simple estimation, ouvertures automatiques exclues) ; aucun clic n’est suivi, et cette mesure n’est jamais appliquée à une personne qui s’est opposée.';
 const BLOC_ART_14 =
   'Vous recevez ce message car votre adresse professionnelle est publique. Données : nom, adresse, entreprise. Source : annuaires publics. Se désinscrire en un clic.';
 
@@ -54,10 +54,10 @@ function zone() {
       {
         id: 'unique',
         identite: {
-          raison_sociale: 'Axion-IA (société factice)',
+          raison_sociale: 'Rhône Prospection (société fictive)',
           forme: 'SAS',
           adresse_postale: '1 rue de l’Exemple, 69000 Lyon',
-          signature: 'L’équipe Axion (démo)',
+          signature: 'L’équipe Rhône Prospection',
           lien_desinscription: true,
           lien_rendez_vous: 'https://rdv.example/will',
           bloc_information: BLOC_ART_14,
@@ -416,7 +416,7 @@ export const handlers: HttpHandler[] = [
     const deja = demoDb.opposition.tous().some((o) => o.portee === 'adresse' && o.valeur.toLowerCase() === dest.adresse.toLowerCase());
     return HttpResponse.json({
       adresse_masquee: masquerAdresse(dest.adresse),
-      expediteur: 'Axion-IA',
+      expediteur: 'Rhône Prospection',
       deja_desinscrit: deja,
       organisation: dest.organisation,
       pourquoi_ce_message: `${BLOC_ART_14} ${BLOC_OUVERTURES}`,

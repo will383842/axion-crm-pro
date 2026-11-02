@@ -9,8 +9,29 @@ import { CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useConfirmerDesinscription, usePageDesinscription } from '@/features/envoi/conformite/composants/api';
 import { Chargement, messageDErreur } from '@/features/envoi/conformite/composants/commun';
+import { produitsDe, useConsoleFeaturesQuery } from '@/features/crm-console/useConsoleFeatures';
+import { PagePubliqueEnAttente } from '@/features/socle/PageEnAttente';
 
+/**
+ * Garde de production : le CRM réel est déployé à chaque fusion, et la route
+ * serveur `/public/desinscription/{jeton}` n'existe pas encore. Tant que le
+ * serveur n'annonce pas Envoi (`/config/features` → `produits.envoi`), la page
+ * reste exactement celle d'avant (« en préparation ») et AUCUN appel ne part.
+ */
 export function DesinscriptionPubliquePage() {
+  const features = useConsoleFeaturesQuery();
+  if (features.isPending) {
+    return (
+      <main id="main" className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-4 py-10">
+        <Chargement lignes={3} />
+      </main>
+    );
+  }
+  if (produitsDe(features.data).envoi === 'absent') return <PagePubliqueEnAttente title="Désinscription" lot="DM2-CNF" />;
+  return <PageDesinscription />;
+}
+
+function PageDesinscription() {
   const jeton = useParams({ strict: false }).jeton ?? '';
   const idCase = useId();
   const page = usePageDesinscription(jeton);

@@ -171,7 +171,7 @@ export function EtapeDepart({
       </dl>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        <Button variant="primary" disabled={!pret} onClick={suite}>Continuer : vérification</Button>
+        <Button variant="primary" disabled={!pret || boites.isPending} onClick={suite}>Continuer : vérification</Button>
         <Button variant="ghost" onClick={retour}>Retour</Button>
       </div>
     </Bloc>

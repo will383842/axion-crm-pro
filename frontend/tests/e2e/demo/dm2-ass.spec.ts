@@ -94,16 +94,16 @@ test.describe('messages types et éditeur (DM2-ASS)', () => {
   test('la liste des messages types : valider une version, archiver sans jamais supprimer', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes/messages');
     await expect(page.getByRole('heading', { level: 1, name: 'Messages types' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Relance douce/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toBeVisible();
     await controleAxe(page);
     await passage360(page);
 
     await page.getByRole('button', { name: 'Archiver Relance douce' }).click();
-    await expect(page.getByRole('link', { name: /Relance douce/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('link', { name: /Relance douce/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toHaveCount(0);
     await page.getByRole('checkbox', { name: 'Afficher les messages archivés' }).check();
-    await expect(page.getByRole('link', { name: /Relance douce/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toBeVisible();
   });
 
   test('l’éditeur : mot interdit détecté, nouvelle version, test sans envoi réel', async ({ page }) => {

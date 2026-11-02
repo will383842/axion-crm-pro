@@ -50,6 +50,7 @@ import {
 } from './destinataires';
 import { ReglageDestinatairesChamps } from './ReglageDestinatairesChamps';
 import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
+import { EditeurCriteres, etatVide, versCriteres, type EtatEditeur } from './EditeurCriteres';
 import {
   FORMAT_MEDIA_PRESETS,
   PUBLIC_MEDIA_PRESETS,
@@ -194,8 +195,11 @@ export function AudienceBuilderPage() {
   // Audience presse (01/10/2026) : la presse, et seulement elle.
   const [audiencePresse, setAudiencePresse] = useState<boolean>(false);
 
+  // DM1-CIB — éditeur ET / OU / SAUF : ses lignes s'ajoutent aux puces.
+  const [editeur, setEditeur] = useState<EtatEditeur>(etatVide);
+
   // Build criteria
-  const criteria = useMemo<AudienceCriteria>(() => {
+  const criteresPuces = useMemo<AudienceCriteria>(() => {
     const all: AudienceCondition[] = [];
     if (departments.length > 0) all.push({ field: 'department_code', op: 'in', value: departments });
     if (regions.length > 0)     all.push({ field: 'region_code',     op: 'in', value: regions });
@@ -243,6 +247,17 @@ export function AudienceBuilderPage() {
     typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, secteursMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
     audiencePresse,
   ]);
+  const criteria = useMemo<AudienceCriteria>(() => {
+    const extra = versCriteres(editeur);
+    const fusion: AudienceCriteria = {};
+    const all = [...(criteresPuces.all ?? []), ...(extra.all ?? [])];
+    const any = [...(criteresPuces.any ?? []), ...(extra.any ?? [])];
+    const not = [...(criteresPuces.not ?? []), ...(extra.not ?? [])];
+    if (all.length > 0) fusion.all = all;
+    if (any.length > 0) fusion.any = any;
+    if (not.length > 0) fusion.not = not;
+    return fusion;
+  }, [criteresPuces, editeur]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
     ...(criteria.all ?? []).map((c) => ({ bloc: 'ET', c })),
@@ -351,6 +366,11 @@ export function AudienceBuilderPage() {
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         {/* Colonne gauche : builder */}
         <div className="space-y-5">
+          {/* DM1-CIB — éditeur des critères ET / OU / SAUF */}
+          <Card padding="md" className="space-y-4">
+            <EditeurCriteres valeur={editeur} onChange={setEditeur} />
+          </Card>
+
           {/* Identité */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Sparkles className="h-4 w-4" />} title="Informations" />

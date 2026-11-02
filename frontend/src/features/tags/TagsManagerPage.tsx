@@ -10,10 +10,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Hash, Plus, Trash2 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Download, Hash, Megaphone, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { misAJour } from '@/lib/fraicheur';
 import { api, messageApiLisible } from '@/lib/api';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
 import {
   Button,
   Card,
@@ -41,6 +43,8 @@ type Tag = {
   kind: TagKind;
   description: string | null;
   companies_count: number;
+  /** Fiches de l'étiquette qu'on peut joindre par e-mail (absent : inconnu). */
+  joignables_count?: number;
   created_at?: string;
   updated_at?: string;
 };
@@ -105,6 +109,9 @@ type TagFormValues = z.infer<typeof tagSchema>;
 // ---------------------------------------------------------------------------
 export function TagsManagerPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [choisieSlug, setChoisieSlug] = useState<string | null>(null);
+  // DM1-CIB — le bouton « Campagne vers cette étiquette » n'existe qu'avec Envoi.
+  const envoiVisible = useProduitsVisibles().envoi;
   const qc = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -117,6 +124,25 @@ export function TagsManagerPage() {
 
   const tags = useMemo<Tag[]>(() => data?.data ?? [], [data]);
   const comptesMisAJour = misAJour(data?.meta?.comptes_calcules_le ?? null);
+
+  // L'étiquette choisie : celle qu'on a cliquée, sinon la première étiquette
+  // créée à la main (le salon de la démo en tête).
+  const choisie = useMemo<Tag | null>(() => {
+    const manuelles = tags.filter((t) => t.kind === 'manual');
+    return manuelles.find((t) => t.slug === choisieSlug) ?? manuelles.find((t) => t.slug === 'salon-artisans-2026') ?? manuelles[0] ?? null;
+  }, [tags, choisieSlug]);
+
+  const exporter = useMutation({
+    mutationFn: async (tag: Tag) => {
+      const lignes = (await api.get<{ data: Array<{ denomination: string; siren: string; ville: string; email: string; joignable: boolean }> }>(
+        `/tags/${tag.slug}/fiches`,
+      )).data.data;
+      telechargerCsv(`etiquette-${tag.slug}.csv`, ['Dénomination', 'SIREN', 'Ville', 'E-mail', 'Joignable'], lignes.map((l) => [l.denomination, l.siren, l.ville, l.email, l.joignable ? 'oui' : 'non']));
+      return lignes.length;
+    },
+    onSuccess: (n) => toast.success(`${n} fiche${n > 1 ? 's' : ''} exportée${n > 1 ? 's' : ''}.`),
+    onError: (err: unknown) => toast.error(extractApiMessage(err) ?? 'Export impossible'),
+  });
 
   const counts = useMemo(() => {
     return {
@@ -189,7 +215,7 @@ export function TagsManagerPage() {
         title="Étiquettes"
         subtitle="Pour classer les entreprises : zone, secteur, taille, intérêt, et les vôtres."
         actions={
-          <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
+          <Button variant={envoiVisible ? 'secondary' : 'primary'} size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
             Nouvelle étiquette
           </Button>
         }
@@ -203,6 +229,54 @@ export function TagsManagerPage() {
         <KpiCard tone="violet"  label="Personnalisées" value={counts.manual} sublabel="créées à la main" />
         <KpiCard tone="amber"   label="Proposées par l’IA" value={counts.llm} sublabel="suggérées automatiquement" />
       </div>
+
+      {/* DM1-CIB — l'étiquette choisie : ses fiches, ses joignables, la campagne. */}
+      {choisie !== null ? (
+        <Card padding="md" className="mb-6 border-violet-200 bg-violet-50/40" aria-label="Étiquette choisie">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Hash className="h-4 w-4 text-violet-700" aria-hidden="true" />
+            <h2 className="text-lg font-bold text-slate-900">{choisie.slug}</h2>
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Choisie</span>
+          </div>
+          <p className="mb-3 text-sm text-slate-700">
+            <strong>{choisie.companies_count} fiche{choisie.companies_count > 1 ? 's' : ''}</strong>
+            {choisie.joignables_count !== undefined ? <> · {choisie.joignables_count} joignable{choisie.joignables_count > 1 ? 's' : ''}</> : null}
+          </p>
+          {choisie.joignables_count !== undefined && choisie.companies_count > 0 ? (
+            <div
+              role="meter"
+              aria-valuemin={0}
+              aria-valuemax={choisie.companies_count}
+              aria-valuenow={choisie.joignables_count}
+              aria-label={`Joignables : ${choisie.joignables_count} sur ${choisie.companies_count}`}
+              className="mb-4"
+            >
+              <div className="mb-1 flex justify-between text-xs text-slate-600">
+                <span>Joignables</span>
+                <span>{choisie.joignables_count} sur {choisie.companies_count}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.round((choisie.joignables_count / choisie.companies_count) * 100)}%` }} />
+              </div>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {envoiVisible ? (
+              <Link
+                to="/envoi/campagnes/nouvelle"
+                search={{ etiquette: choisie.slug } as never}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-produit px-4 text-sm font-medium text-white shadow-produit transition hover:bg-produit-fonce focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-produit focus-visible:ring-offset-1 sm:h-9"
+              >
+                <Megaphone className="h-4 w-4" aria-hidden="true" />
+                Campagne vers cette étiquette
+              </Link>
+            ) : null}
+            <Button variant="secondary" size="md" className="h-11 sm:h-9" iconLeft={<Download className="h-4 w-4" />} loading={exporter.isPending} onClick={() => exporter.mutate(choisie)}>
+              Exporter (CSV)
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       {/* Body — P0-3 : une panne n'est jamais « Aucun tag ». */}
       {error !== null && data === undefined ? (
@@ -245,6 +319,9 @@ export function TagsManagerPage() {
                       tag={t}
                       onDelete={() => deleteMutation.mutate(t.id)}
                       deleting={deleteMutation.isPending}
+                      choisie={choisie?.slug === t.slug}
+                      onChoose={() => setChoisieSlug(t.slug)}
+                      avecCampagne={envoiVisible}
                     />
                   ))}
                 </div>
@@ -348,16 +425,39 @@ function TagPill({
   tag,
   onDelete,
   deleting,
+  choisie,
+  onChoose,
+  avecCampagne,
 }: {
   tag: Tag;
   onDelete: () => void;
   deleting: boolean;
+  choisie: boolean;
+  onChoose: () => void;
+  avecCampagne: boolean;
 }) {
   const canEdit = tag.kind === 'manual';
   return (
     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${pillClass(tag.color)}`}>
-      <span className="font-medium">{tag.name}</span>
+      {canEdit ? (
+        <button type="button" onClick={onChoose} aria-pressed={choisie} className="font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
+          {tag.name}
+        </button>
+      ) : (
+        <span className="font-medium">{tag.name}</span>
+      )}
       <span className="opacity-60 tabular-nums">{tag.companies_count}</span>
+      {canEdit && avecCampagne ? (
+        <Link
+          to="/envoi/campagnes/nouvelle"
+          search={{ etiquette: tag.slug } as never}
+          aria-label={`Campagne vers ${tag.slug}`}
+          title="Campagne vers cette étiquette"
+          className="opacity-60 transition hover:opacity-100"
+        >
+          <Megaphone className="h-3 w-3" aria-hidden="true" />
+        </Link>
+      ) : null}
       {canEdit ? (
         <button
           type="button"
@@ -376,6 +476,20 @@ function TagPill({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+/** Télécharge un CSV (séparateur « ; », BOM pour Excel) — rien ne quitte le navigateur. */
+function telechargerCsv(nom: string, entetes: string[], lignes: string[][]): void {
+  const cellule = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const corps = [entetes, ...lignes].map((l) => l.map(cellule).join(';')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([`\uFEFF${corps}`], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nom;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Lot 2 UX — jamais un code brut à l'écran (voir `messageApiLisible`). */
 function extractApiMessage(err: unknown): string | null {
   return messageApiLisible(err);

@@ -42,6 +42,9 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
 // ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
+// Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
+// registre des oppositions. Servis par le faux serveur de la démo ; les routes serveur sont prévues aux lots S3 et
+// S12 (authentification par code e-mail) et au lot RGPD, qui retireront ces lignes.
 // Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
 // liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
 // commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
@@ -76,6 +79,13 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/reponses/{p}/creer-fiche',
   'POST /api/v1/envoi/reponses/{p}/rattacher',
   'POST /api/v1/envoi/reponses/{p}/repondre',
+  'GET /api/v1/compte/appareils',
+  'GET /api/v1/compte/codes-secours',
+  'GET /api/v1/rgpd/oppositions/export',
+  'POST /api/v1/auth/code-email/renvoyer',
+  'POST /api/v1/auth/code-email/verifier',
+  'POST /api/v1/compte/appareils/{p}/retirer',
+  'POST /api/v1/compte/codes-secours/regenerer',
   'POST /api/v1/crm/propositions/{p}/{p}',
   // DM2-ASS — création de campagne.
   'GET /api/v1/envoi/creation/boites',

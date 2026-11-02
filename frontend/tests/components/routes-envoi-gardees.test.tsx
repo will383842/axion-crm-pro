@@ -37,6 +37,8 @@ import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
 
 /** Les routes `/envoi/…` du faux serveur de la démo. */
 const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
+/** Les routes publiques de désinscription du faux serveur de la démo. */
+const handlersDemoPublic = handlersDemo.filter((h) => cleRoute(h).includes('/public/desinscription'));
 
 let arbre: AnyRoute;
 
@@ -89,6 +91,8 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
+  ['/envoi/campagnes/destinataires', 'DM2-CNF', 'Destinataires'],
+  ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP', 'Réponses'],
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
@@ -103,6 +107,16 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/sante', 'DM2-PIL'],
   ['/envoi/sante/chercher', 'DM2-PIL'],
   ['/envoi/sante/feu-vert', 'DM2-PIL'],
+  ['/envoi/desinscriptions', 'DM2-CNF', 'Désinscriptions'],
+  ['/envoi/alertes', 'DM2-CNF', 'Alertes d’envoi'],
+  ['/envoi/reglages', 'DM2-CNF', 'Réglages d’envoi'],
+  ['/envoi/reglages/identite', 'DM2-CNF', 'Identité de l’expéditeur'],
+  ['/envoi/reglages/alertes', 'DM2-CNF', 'Alertes et avis'],
+  ['/envoi/reglages/regles', 'DM2-CNF', 'Règles et horaires'],
+  ['/envoi/reglages/connexion-crm', 'DM2-CNF', 'Connexion au CRM'],
+  ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
+  ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
+  ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
   ['/envoi/desinscriptions', 'DM2-CNF'],
   ['/envoi/alertes', 'DM2-CNF'],
   ['/envoi/reglages', 'DM2-CNF'],
@@ -207,7 +221,19 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
   });
 
-  it('/desinscription/$jeton est publique et HORS coquille', async () => {
+  it('/desinscription/$jeton, Envoi annoncé : la vraie page, publique et HORS coquille', async () => {
+    // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot,
+    // et ne s'affiche (et n'appelle sa route) que si le serveur annonce Envoi.
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersDemoPublic);
+    await monter('/desinscription/demo-tilleuls');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/\bDM\d|\blot\b/i);
+    expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
+    expect(document.querySelector('[data-coquille]')).toBeNull();
+  });
+
+  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
     await monter('/desinscription/jeton-de-test');
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', 'DM2-CNF');

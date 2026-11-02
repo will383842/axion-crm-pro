@@ -17,6 +17,7 @@ use App\Services\Auth\MagicLinkService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -62,7 +63,7 @@ function lienMagiqueS1(User $utilisateur): string
 }
 
 /** Une requête telle que l'émet le SPA : IP propre, Origin « stateful », jeton CSRF fourni. */
-function appelS1(string $chemin, array $corps, ?string $ip = null): Illuminate\Testing\TestResponse
+function appelS1(string $chemin, array $corps, ?string $ip = null): TestResponse
 {
     $domaine = trim((string) (array_values(array_filter((array) config('sanctum.stateful')))[0] ?? 'localhost'));
     $csrf = 's1-csrf';

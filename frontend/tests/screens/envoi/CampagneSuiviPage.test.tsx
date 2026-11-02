@@ -87,6 +87,34 @@ describe('CampagneSuiviPage', () => {
     expect(tuile).toHaveTextContent(/exclues du taux/i);
     await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
     expect(await screen.findByRole('columnheader', { name: /Ouverture \(estimation\)/ })).toBeInTheDocument();
+    // Jamais un chiffre exact d'ouverture par destinataire, jamais de clic.
+    expect(await screen.findAllByText(/Ouverture estimée/)).not.toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/Ouvert \d+ fois/);
+    expect(document.body.textContent).not.toMatch(/\bclics?\b/i);
+  });
+
+  it('contact exclu (opposé) : aucune ouverture, même si la campagne suit les ouvertures', async () => {
+    // Un contact inscrit au registre d'opposition ne reçoit jamais de pixel : même
+    // si une donnée d'ouverture traînait, elle ne doit jamais s'afficher.
+    const cible = demoDb.destinataires.tous().find((d) => d.campagne_id === 'cmp-01' && d.adresse.startsWith('mathilde.bertin@'));
+    expect(cible).toBeDefined();
+    demoDb.destinataires.modifier(cible!.id, {
+      etat: 'exclu',
+      motif: 'Inscrit au registre d’opposition',
+      ouverture: { nombre: 1, premiere_le: '2027-01-11T10:00:00.000Z', automatique_probable: false, raison_automatique: null },
+    });
+    const user = userEvent.setup();
+    await ouvrir('cmp-01');
+    await screen.findByTestId('tuile-ouvertures');
+    await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
+    await user.click(await screen.findByRole('button', { name: /^Exclus/ }));
+    const ligne = await waitFor(() => {
+      const l = screen.queryAllByRole('row').find((r) => /Bertin/.test(r.textContent ?? ''));
+      if (!l) throw new Error('Mathilde Bertin absente de la liste des exclus');
+      return l;
+    });
+    expect(ligne.textContent).toMatch(/Exclu/);
+    expect(ligne.textContent).not.toMatch(/Ouverture estimée|Automatique probable/);
   });
 
   it('Test A/B : deux versions et le critère « réponses »', async () => {

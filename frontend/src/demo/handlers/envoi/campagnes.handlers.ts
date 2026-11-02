@@ -95,10 +95,11 @@ function destinatairesAbsents(campagneId: string): Set<string> {
  * · un contact dont une collègue de la même entreprise a déjà répondu est
  *   « arrêté pour l'entreprise » (ses relances sont annulées) ;
  * · une réponse « absent du bureau » met la suite en pause, sans l'arrêter ;
- * · les ouvertures n'existent que si la campagne les suit.
+ * · les ouvertures n'existent que si la campagne les suit, et JAMAIS pour un
+ *   contact exclu (opposé ou désinscrit avant l'envoi : aucun pixel pour lui).
  */
 function vue(d: Destinataire, campagne: Campagne, repondues: Set<string>, absents: Set<string>): Destinataire {
-  const copie: Destinataire = { ...d, ouverture: campagne.suivre_ouvertures ? d.ouverture : null };
+  const copie: Destinataire = { ...d, ouverture: campagne.suivre_ouvertures && d.etat !== 'exclu' ? d.ouverture : null };
   const reste = d.etat === 'a_envoyer' || ((d.etat === 'remis' || d.etat === 'envoye') && d.etape < campagne.etapes);
   if (reste && d.organisation && repondues.has(d.organisation)) {
     return { ...copie, etat: 'relances_annulees', motif: 'Un autre contact de l’entreprise a répondu' };

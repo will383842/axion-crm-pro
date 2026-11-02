@@ -75,7 +75,7 @@ function Ouverture({ d }: { d: Destinataire }) {
   }
   return (
     <span className="text-slate-700">
-      Ouvert {o.nombre > 1 ? `${o.nombre} fois` : '1 fois'}, le {jourEtMois(o.premiere_le)} à {heureDe(o.premiere_le)}
+      Ouverture estimée, le {jourEtMois(o.premiere_le)} à {heureDe(o.premiere_le)}
     </span>
   );
 }

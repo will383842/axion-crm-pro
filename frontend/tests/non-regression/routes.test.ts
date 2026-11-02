@@ -40,6 +40,9 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM2-CAM (#401) : liste, calendrier et suivi des campagnes d'Envoi. Ces appels ne
+// partent que si Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; le lot
+// serveur d'Envoi retirera ces quatre lignes. La liste reste figée et exacte.
 // Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
 // liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
 // commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
@@ -58,6 +61,11 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/crm/contacts/{p}/retirer',
   'POST /api/v1/crm/persons/{p}/appels',
   'POST /api/v1/crm/persons/{p}/rappel',
+  // DM2-CAM — liste, calendrier et suivi des campagnes.
+  'GET /api/v1/envoi/campagnes',
+  'GET /api/v1/envoi/campagnes/calendrier',
+  'GET /api/v1/envoi/campagnes/{p}',
+  'GET /api/v1/envoi/campagnes/{p}/destinataires',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'GET /api/v1/envoi/reponses',

@@ -3,6 +3,8 @@
  * remise à zéro, accessibilité et téléphone. Jouée par `.github/workflows/demo.yml`
  * sur le build de démo.
  */
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test, expect } from '@playwright/test';
 import { adresseDemo, appelerApi, controleAxe, ouvrirDemo, passage360 } from './outils';
 
@@ -135,21 +137,55 @@ test.describe('socle de démo', () => {
     expect(echecs.filter((u) => u.includes('demo.invalid/sanctum') || u.includes('/auth/me'))).toEqual([]);
   });
 
-  test('une requête vers un autre hôte (tuile de carte) est refusée et signalée', async ({ page }) => {
+  // Hôte qui RÉPOND vraiment (autre port = autre origine) et qui compte ses appels.
+  // Pas de `page.route` : Playwright contournerait le service worker et le test ne
+  // mesurerait plus MSW. Sans la garde réseau, la requête PART et le compteur monte.
+  async function avecHoteJoignable(
+    utiliser: (adresse: string, appels: () => number) => Promise<void>,
+  ): Promise<void> {
+    let appels = 0;
+    const serveur = createServer((_requete, reponse) => {
+      appels += 1;
+      reponse.writeHead(200, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'text/plain' });
+      reponse.end('ok');
+    });
+    await new Promise<void>((ok) => serveur.listen(0, '127.0.0.1', ok));
+    const { port } = serveur.address() as AddressInfo;
+    try {
+      await utiliser(`http://127.0.0.1:${port}/tuile.png`, () => appels);
+    } finally {
+      await new Promise((ok) => serveur.close(ok));
+    }
+  }
+
+  test('aucune requête ne sort : un hôte joignable n’est jamais appelé', async ({ page }) => {
+    await ouvrirDemo(page, '/');
+    await avecHoteJoignable(async (adresse, appels) => {
+      const resultat = await page.evaluate(async (url) => {
+        try {
+          await fetch(url, { mode: 'no-cors' });
+          return 'partie';
+        } catch {
+          return 'refusée';
+        }
+      }, adresse);
+      expect(resultat).toBe('refusée');
+      expect(appels()).toBe(0);
+    });
+  });
+
+  test('une requête vers un autre hôte (tuile de carte) est refusée et signalée par la garde', async ({ page }) => {
     const avertissements: string[] = [];
     page.on('console', (m) => {
       if (m.type() === 'warning') avertissements.push(m.text());
     });
     await ouvrirDemo(page, '/');
-    const resultat = await page.evaluate(async () => {
-      try {
-        const r = await fetch('https://tuiles.example/10/512/360.png');
-        return `réponse ${r.status}`;
-      } catch {
-        return 'refusée';
-      }
+    await avecHoteJoignable(async (adresse, appels) => {
+      await page.evaluate((url) => fetch(url, { mode: 'no-cors' }).catch(() => null), adresse);
+      expect(appels()).toBe(0);
+      // Message de la GARDE (pas celui du filet `onUnhandledRequest`).
+      expect(avertissements.some((t) => t.includes('Requête refusée') && t.includes(adresse))).toBe(true);
+      expect(avertissements.some((t) => t.includes('non gérée'))).toBe(false);
     });
-    expect(resultat).toBe('refusée');
-    expect(avertissements.some((t) => t.includes('Requête refusée') && t.includes('https://tuiles.example/10/512/360.png'))).toBe(true);
   });
 });

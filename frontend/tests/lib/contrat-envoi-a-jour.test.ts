@@ -26,6 +26,9 @@ const SCRIPT = path.join(RACINE_FRONT, 'scripts', 'generer-api-envoi.mjs');
 const SOURCES = path.join(RACINE_DEPOT, 'backend', 'openapi', 'envoi');
 const TYPES = path.join(RACINE_FRONT, 'src', 'features', 'envoi', 'api');
 
+/** Toute forme de mesure de clic : clic, clics, cliqué, cliquable, nombre_clics, liens_cliques, clicks… */
+const MOTIF_CLIC_LIGNE = /^.*(?:cli(?:c|qu)|click).*$/gim;
+
 const ZONES = ['commun', 'socle', 'campagnes', 'creation', 'pilotage', 'reponses', 'infrastructure', 'conformite'];
 
 function lancer(args: string[]): { code: number; sortie: string } {
@@ -77,8 +80,20 @@ describe('contrat d’Envoi — fichiers présents', () => {
       const texte = readFileSync(path.join(SOURCES, `${zone}.yaml`), 'utf8')
         .replace(/aucun suivi des clics/gi, '')
         .replace(/désinscription \(un clic\)/gi, '');
-      expect(texte.match(/^.*\bclic(?:s|que|qu[ée]s?)?\b.*$/gim) ?? [], zone).toEqual([]);
+      expect(texte.match(MOTIF_CLIC_LIGNE) ?? [], zone).toEqual([]);
     }
+  });
+});
+
+describe('garde anti-clic — témoins', () => {
+  it.each(['nombre_clics: 3', 'taux_clic', 'liens_cliques', 'clicks', 'Lien cliqué', 'cliquable'])(
+    'rougit sur « %s »',
+    (forme) => {
+      expect(forme.match(MOTIF_CLIC_LIGNE)).not.toBeNull();
+    },
+  );
+  it('laisse passer le vocabulaire voisin (client, déclinaison)', () => {
+    expect('client: id\ndéclinaison: x'.match(MOTIF_CLIC_LIGNE)).toBeNull();
   });
 });
 

@@ -44,6 +44,8 @@ function champs(valeur: unknown, cle: string, sortie: unknown[] = []): unknown[]
   return sortie;
 }
 
+/** Toute forme de mesure de clic : clic, cliqué, liens_cliques, clicks… */
+const MOTIF_CLIC = /cli(?:c|qu)|click/i;
 const MOTIF_EMAIL = /[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/g;
 const MOTIF_IPV4 = /\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g;
 const MOTIF_IPV6 = /\b([0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b/gi;
@@ -241,8 +243,15 @@ describe('jeu factice — mesure des ouvertures (décision de Will)', () => {
     expect(demoDb.destinataires.tous().some((d) => 'clics' in d)).toBe(false);
     expect(demoDb.campagnes.tous().some((c) => 'clics' in c)).toBe(false);
     expect(demoDb.evenementsEnvoi.tous().some((e) => (e.type as string) === 'clic')).toBe(false);
-    expect(JSON.stringify(genererJeu())).not.toMatch(/clic/i);
+    expect(JSON.stringify(genererJeu())).not.toMatch(MOTIF_CLIC);
   });
+
+  it.each(['liens_cliques', 'Lien cliqué', 'nombre_clics', 'taux_clic', 'clicks'])(
+    'témoin : le motif anti-clic rougit sur « %s »',
+    (forme) => {
+      expect(forme).toMatch(MOTIF_CLIC);
+    },
+  );
 
   it('une campagne dit si elle suit les ouvertures', () => {
     const campagnes = demoDb.campagnes.tous();

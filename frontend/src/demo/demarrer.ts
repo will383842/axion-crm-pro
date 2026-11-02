@@ -22,7 +22,7 @@ import { choisirOffre, estOffre } from './offres';
 import { definirEtatForce } from './outils';
 import { definirScenariosActifs, demarrerScenarios } from './scenarios';
 import { ecrireSession } from './session';
-import { gardeReseau, MESSAGE_REFUS } from './reseau';
+import { gardeReseau } from './reseau';
 
 const PARAMETRES = ['demo-offre', 'demo-etat', 'demo-scenarios', 'demo-session'] as const;
 
@@ -64,7 +64,7 @@ export async function demarrerDemo(): Promise<DemoDemarree> {
     serviceWorker: { url: '/mockServiceWorker.js' },
     // Ne devrait jamais arriver (la garde réseau prend tout) : on avertit quand même.
     onUnhandledRequest: (request) => {
-      if (new URL(request.url).origin !== window.location.origin) console.warn(`${MESSAGE_REFUS} ${request.method} ${request.url}`);
+      if (new URL(request.url).origin !== window.location.origin) console.warn(`[démo] Requête non gérée, filet de secours (la garde réseau aurait dû la prendre) : ${request.method} ${request.url}`);
     },
     quiet: true,
   });

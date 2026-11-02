@@ -14,14 +14,23 @@
  * que `/dashboard/stats` n'a pas répondu, l'écran montre le SQUELETTE. La garde
  * rougit si quelqu'un remet un `placeholderData` dans la requête.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { DashboardPage, dateDuJour, nombreCourt } from '@/features/dashboard/DashboardPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { apiUrl, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
+import {
+  CONSOLE_FEATURES_OPEN,
+  FEATURES_LES_DEUX_PRODUITS,
+  apiUrl,
+  getJson,
+  getPending,
+  getStatus,
+  handlersEnvoi,
+  recordGet,
+} from '../msw/handlers';
 
 const PATH = '/';
 const INDISPONIBLE = 'Chiffre indisponible pour le moment';
@@ -81,8 +90,31 @@ describe('DashboardPage — rendu des blocs', () => {
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
     expect(await screen.findByRole('heading', { level: 1, name: 'Bonjour Will' })).toBeVisible();
     expect(screen.getByText(new RegExp(dateDuJour()))).toBeVisible();
-    // Le mot du menu et du fil d'Ariane reste sur la page.
+    // Le mot du menu et du fil d'Ariane reste sur la page. Hors démo (production),
+    // DM1-ACC n'ajoute PAS la barre d'onglets : un seul « Tableau de bord », comme avant.
     expect(screen.getByText('Tableau de bord')).toBeVisible();
+    expect(screen.queryByRole('navigation', { name: 'Tableau de bord' })).toBeNull();
+  });
+
+  it('en démo (DM1-ACC) : la barre d’onglets Tableau de bord / Mes tâches / Affaires', async () => {
+    vi.stubEnv('VITE_DEMO', '1');
+    try {
+      await renderScreen(<DashboardPage />, { path: PATH, handlers: [getJson('/dashboard/stats', STATS), ...socle()] });
+      const onglets = await screen.findByRole('navigation', { name: 'Tableau de bord' });
+      expect(within(onglets).getByRole('link', { name: 'Mes tâches' })).toHaveAttribute('href', '/taches');
+      expect(within(onglets).getByRole('link', { name: 'Affaires' })).toHaveAttribute('href', '/affaires');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('la date de l’en-tête suit le « aujourd’hui » du serveur quand il le donne', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/dashboard/stats', { ...STATS, aujourdhui: '2027-01-12' }), ...socle()],
+    });
+
+    expect(await screen.findByText(/Mardi 12 janvier/)).toBeVisible();
   });
 
   it('dateDuJour : « Samedi 3 octobre » ; nombreCourt : « 4,35 M »', () => {
@@ -479,5 +511,35 @@ describe('DashboardPage — sans espace de travail (409)', () => {
     expect(screen.getByText(/rattaché à un espace de travail, mais aucun n’est sélectionné/)).toBeVisible();
     expect(screen.queryByText(/n’est rattaché à votre compte/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('tuile-entreprises')).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — carte « Envoi aujourd’hui » (DM1-ACC)', () => {
+  it('n’existe pas quand Envoi est absent : le CRM d’aujourd’hui ne change pas', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/config/features', CONSOLE_FEATURES_OPEN), getJson('/dashboard/stats', STATS), ...socle()],
+    });
+
+    await screen.findByRole('heading', { name: 'Ma base' });
+    expect(screen.queryByTestId('carte-envoi-aujourdhui')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Envoi aujourd.hui/)).not.toBeInTheDocument();
+  });
+
+  it('existe quand Envoi est actif : réponses à traiter, feu des envois, lien vers Envoi', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), getJson('/dashboard/stats', STATS), ...socle(), ...handlersEnvoi()],
+    });
+
+    const carte = await screen.findByTestId('carte-envoi-aujourdhui');
+    expect(within(carte).getByRole('heading', { name: /Envoi aujourd.hui/ })).toBeVisible();
+    await waitFor(() => expect(carte).toHaveTextContent(/7 réponses à traiter/));
+    expect(carte).toHaveTextContent(/État des envois : normaux/);
+    expect(within(carte).getByRole('link', { name: /Ouvrir Envoi/ })).toHaveAttribute('href', '/envoi/campagnes');
+    expect(within(carte).getByRole('link', { name: /réponses à traiter/ })).toHaveAttribute('href', '/envoi/reponses');
+    // Ni ouvertures (estimation réservée aux campagnes avec pixel, dans Envoi) ni clics (jamais).
+    expect(carte).not.toHaveTextContent(/ouvertures?/i);
+    expect(carte).not.toHaveTextContent(/clics?\b/i);
   });
 });

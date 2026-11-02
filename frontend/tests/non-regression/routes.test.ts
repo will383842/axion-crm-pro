@@ -21,6 +21,11 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 /** Appels sans route dans la photo à la date du filet (R0). À ne faire que BAISSER. */
 // POST propositions/{id}/{action} : le dernier segment est choisi à l'exécution (accepter ou refuser) ;
 // le relevé statique ne peut pas le résoudre, ce n'est pas une route manquante.
+// Filet modifié : pourquoi. DM2-CNF : écrans de conformité et de réglages d'Envoi. Les appels `/envoi/…` ne partent
+// que si Envoi est actif (absent en production : routes gardées). Les deux appels `/public/desinscription/{p}` viennent
+// d'une page PUBLIQUE, joignable sans connexion : elle ne les lance que si `/config/features` annonce Envoi ; sinon
+// elle reste la page « en préparation » d'avant et n'appelle rien (test `DesinscriptionPubliquePage`). Tous sont
+// servis par le faux serveur de la démo ; les routes serveur viendront au lot serveur d'Envoi, qui retirera ces lignes.
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
@@ -43,6 +48,12 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM2-CAM (#401) : liste, calendrier et suivi des campagnes d'Envoi. Ces appels ne
 // partent que si Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; le lot
 // serveur d'Envoi retirera ces quatre lignes. La liste reste figée et exacte.
+// Filet modifié : pourquoi. DM1-ACC (#399) : Mes tâches et Affaires. Ces appels ne partent qu'en démo
+// (`VITE_DEMO`, figé au build) : hors démo, donc en production, /taches et /affaires gardent leur page
+// « en attente » et le tableau de bord n'a pas d'onglets. La démo les sert ; le lot serveur du CRM reprendra
+// le contrat et retirera ces six lignes. La liste reste fermée : tout autre appel sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
+// ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
 // Filet modifié : pourquoi. DM1-ATR (#393) : « Annuler la fusion » des doublons. Cet appel ne part que si la
 // liste des doublons annonce `meta.fusions_recentes`, ce que le vrai serveur n'envoie pas (il annule par la
 // commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
@@ -66,6 +77,41 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/campagnes/calendrier',
   'GET /api/v1/envoi/campagnes/{p}',
   'GET /api/v1/envoi/campagnes/{p}/destinataires',
+  // DM2-CNF — conformité, réglages, page publique de désinscription.
+  'GET /api/v1/envoi/alertes',
+  'GET /api/v1/envoi/carnet',
+  'GET /api/v1/envoi/opposition',
+  'GET /api/v1/envoi/opposition/export',
+  'GET /api/v1/envoi/puis-je-ecrire',
+  'GET /api/v1/envoi/reglages/alertes',
+  'GET /api/v1/envoi/reglages/apercu',
+  'GET /api/v1/envoi/reglages/connexion-crm',
+  'GET /api/v1/envoi/reglages/identite',
+  'GET /api/v1/envoi/reglages/regles',
+  'GET /api/v1/public/desinscription/{p}',
+  'POST /api/v1/envoi/alertes/{p}/regler',
+  'POST /api/v1/envoi/carnet',
+  'POST /api/v1/envoi/opposition',
+  'POST /api/v1/envoi/reglages/alertes/test',
+  'POST /api/v1/envoi/reglages/connexion-crm/tester',
+  'POST /api/v1/public/desinscription/{p}',
+  'PUT /api/v1/envoi/reglages/absence',
+  'PUT /api/v1/envoi/reglages/alertes',
+  'PUT /api/v1/envoi/reglages/identite',
+  'PUT /api/v1/envoi/reglages/regles',
+  'GET /api/v1/crm/affaires',
+  'GET /api/v1/crm/taches',
+  'PATCH /api/v1/crm/affaires/{p}',
+  'PATCH /api/v1/crm/taches/{p}',
+  'POST /api/v1/crm/taches',
+  'PUT /api/v1/crm/taches/rappel-matin',
+  // DM2-PIL — résultats, santé, chercher un envoi, feu vert.
+  'GET /api/v1/envoi/envois/chercher',
+  'GET /api/v1/envoi/feu-vert',
+  'GET /api/v1/envoi/resultats',
+  'GET /api/v1/envoi/sante',
+  'POST /api/v1/envoi/feu-vert/{p}/fait',
+  'POST /api/v1/envoi/sante/test',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'GET /api/v1/envoi/reponses',

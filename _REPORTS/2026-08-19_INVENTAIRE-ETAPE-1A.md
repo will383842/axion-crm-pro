@@ -24,7 +24,7 @@
 | **`ContactsHubPage.tsx`** + `/crm/contacts-hub` + `/counts` | frontend + API | Le hub et ses compteurs — pièce 1 déjà livrée et optimisée. |
 | **`tags`** gouvernés (`slug`, `category`, `kind`, `is_locked`, `namespace` généré) + `company_tag` / `candidate_tag` + `TagsManagerPage.tsx` | base + frontend | **Les tags libres du §27 existent déjà**, avec leur gouvernance (`Taxonomy::TAG_NAMESPACES`). Rien à créer. |
 | **`saved_views`** (`entity`, `filters jsonb`, `is_default`) | base | La table des **vues épinglées** est là, à la colonne près. ⚠️ voir §3 : personne ne l'utilise. |
-| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`) | base + cloche in-app | Table **sans écrivain** : lue par `NotificationsController` et l'export RGPD, purgée par la rétention et l'effacement, **jamais alimentée**. ⚠️ voir §3 bis — ce n'est pas une pièce à étendre, c'est un producteur à écrire. |
+| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`, `produit`, `gravite`) | base + cloche in-app | Table **alimentée** depuis le lot S9 : le producteur est `App\Socle\Alertes\Notifier` (alertes console + e-mail) ; `read` et `read-all` sont réels. Lue par `NotificationsController` et l'export RGPD, purgée par la rétention et l'effacement. Historique de l'ancien manque : §3 ter. |
 | **`Taxonomy`** — source de vérité unique, listes fermées, comparées aux `CHECK` réels par `Feature\Crm\SocleCrmTest` | `app/Crm/Taxonomy.php` | **Le patron à suivre** pour toute nouvelle taxonomie de 1a (activités, motifs) : ajouter une valeur sans migration fait ROUGIR la CI. |
 | **`crm-console`** middleware + drapeau `crm.console_v2` | `routes/api.php` | Tout `/v1/crm/*` est déjà derrière un drapeau. `CRM_CONSOLE_V2_ENABLED=true` **vérifié sur la production le 19/08**. |
 | **`ArbitragePage`** + `/crm/arbitrage/*` | frontend + API | Rapprochement / arbitrage des doublons — servira le §1.2 et l'étape 1c. |
@@ -150,7 +150,7 @@ les **noms** et les colonnes qui conviennent, et les étendre par migration
 additive ; ne pas créer `tasks` à côté de `crm_tasks`, ce qui donnerait deux
 tables pour une notion — la faute exacte que le §28.5 cherche à éviter.
 
-### 3 bis. 🟠 `notifications` — lue, exportée, purgée… et jamais alimentée
+### 3 ter. (historique, résolu par le lot S9) `notifications` — était lue, exportée, purgée… et jamais alimentée
 
 Ce document affirmait, jusqu'au 2026-08-22, que `notifications` était
 **« Vivante. Sert les rappels et les notifications de 1a. »** C'est faux, et

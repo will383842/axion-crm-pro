@@ -108,7 +108,7 @@ test('S9 — une anomalie detectee ecrit dans la cloche ET envoie un e-mail, san
         'payload' => '{}',
         'created_at' => now(),
     ]);
-    config(['crm.ingest.personnes_enabled' => true]);
+    config(['crm.ingest.personnes_enabled' => true, 'crm.ingest.business_workspace' => $this->espace->slug]);
 
     expect(Artisan::call('crm:sonde-personnes'))->toBe(1);
 

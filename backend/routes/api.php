@@ -429,7 +429,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/notifications', [NotificationsController::class, 'index']);
         Route::post('/notifications/{n}/read', [NotificationsController::class, 'markRead']);
         Route::post('/notifications/read-all', [NotificationsController::class, 'markAllRead']);
-        Route::post('/notifications/test-alerte', [NotificationsController::class, 'testerAlerte'])->middleware('throttle:6,1');
+        Route::post('/notifications/test-alerte', [NotificationsController::class, 'testerAlerte'])->middleware(['permission:users.manage', 'throttle:6,1']);
 
         // RGPD + AI Act + audit
         //

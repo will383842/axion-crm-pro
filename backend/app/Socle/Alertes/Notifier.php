@@ -41,6 +41,7 @@ final class Notifier
 
         $comptes = DB::table('users')
             ->whereRaw('lower(email) = ?', [$principale])
+            ->whereNull('deleted_at')
             ->whereNotNull('current_workspace_id')
             ->get(['id', 'current_workspace_id']);
 

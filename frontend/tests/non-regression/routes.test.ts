@@ -29,6 +29,12 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // compteurs du hub, `fiche` dans l'historique d'une personne), ce que le vrai serveur ne fait pas : en production
 // la page reste celle d'avant ; la démo les sert. Les routes serveur sont prévues au lot serveur du CRM, qui
 // retirera ces lignes. Le filet reste strict : tout AUTRE appel sans route fait toujours rougir.
+// Filet modifié : pourquoi. DM2-REP (#394) : boîte des réponses d'Envoi (liste, raccourcis, lecture, classer,
+// rattacher, créer une fiche, répondre). Ces appels ne partent que si Envoi est actif (absent en production :
+// la route répond « Page introuvable », garde `routes-envoi-gardees`) et sont servis par le faux serveur de la
+// démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
+// serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
+// sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
   'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
@@ -43,6 +49,13 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/crm/persons/{p}/rappel',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
+  'GET /api/v1/envoi/reponses',
+  'GET /api/v1/envoi/reponses/raccourcis',
+  'GET /api/v1/envoi/reponses/{p}',
+  'POST /api/v1/envoi/reponses/{p}/classer',
+  'POST /api/v1/envoi/reponses/{p}/creer-fiche',
+  'POST /api/v1/envoi/reponses/{p}/rattacher',
+  'POST /api/v1/envoi/reponses/{p}/repondre',
   'POST /api/v1/crm/propositions/{p}/{p}',
 ];
 

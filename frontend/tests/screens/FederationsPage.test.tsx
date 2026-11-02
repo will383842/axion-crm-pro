@@ -10,7 +10,7 @@
  *
  * Fixtures FICTIVES (dépôt public).
  */
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -20,6 +20,8 @@ import { FederationsPage } from '@/features/federations/FederationsPage';
 import { FAMILLES_FEDERATION, NIVEAUX_FEDERATION, SECTEURS } from '@/lib/referentiels.generated';
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, getJson, recordGet } from '../msw/handlers';
+import { demoDb } from '@/demo/base';
+import { handlers as handlersDemo } from '@/demo/handlers/crm/presse-reseaux.handlers';
 
 const LIGNE = {
   id: 7,
@@ -246,5 +248,26 @@ describe('onglet Fédérations — fiche', () => {
     expect(await screen.findByText('900000007')).toBeInTheDocument();
     expect(screen.getByText('SIREN')).toBeInTheDocument();
     expect(screen.queryByText('Identifiant (sans SIREN)')).not.toBeInTheDocument();
+  });
+});
+
+describe('DM1-PRE — fédérations en démo (faux serveur)', () => {
+  beforeEach(() => demoDb.reinitialiser());
+
+  it('la liste montre la Fédération BTP Rhône et le filtre « niveau » restreint la liste', async () => {
+    await renderScreen(<FederationsPage />, { path: '/federations', url: '/federations', handlers: handlersDemo });
+    expect(await screen.findByText('Fédération BTP Rhône')).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Niveau'), 'regional');
+    await waitFor(() => expect(screen.queryByText('Fédération BTP Rhône')).not.toBeInTheDocument());
+    expect(screen.getByText('Syndicat des imprimeurs du Sud-Est')).toBeInTheDocument();
+  });
+
+  it('faire avancer le partenariat enregistre l’étape et l’ajoute à l’historique', async () => {
+    await renderScreen(<FederationDetailPage />, { path: '/federations/$companyId', url: '/federations/1001', handlers: handlersDemo });
+    await screen.findByRole('heading', { name: 'Fédération BTP Rhône' });
+    await userEvent.selectOptions(screen.getByLabelText('Étape'), 'accepte');
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    expect(await screen.findByText('Partenariat accepté')).toBeInTheDocument();
+    expect(demoDb.zone<{ id: number; partenariat: string }>('presse', 'federations').trouver(1001)?.partenariat).toBe('accepte');
   });
 });

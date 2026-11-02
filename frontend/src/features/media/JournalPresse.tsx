@@ -95,6 +95,7 @@ export function ConsignerEchange({
       <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Consigner un échange</h2>
       <div className="space-y-3">
         <select
+          aria-label="Nature"
           value={kind}
           onChange={(e) => setKind(e.target.value)}
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
@@ -106,11 +107,13 @@ export function ConsignerEchange({
           ))}
         </select>
         <Input
+          aria-label="En une ligne"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="En une ligne : ce qui s'est passé"
         />
         <textarea
+          aria-label="Détail"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={3}

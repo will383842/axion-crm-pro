@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseToutePurgeDePersonnes;
 use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\DB;
  */
 class ProspectionPurgeNonCommercial extends Command
 {
+    use RefuseToutePurgeDePersonnes;
     use RefuseUneSuppressionMassive;
 
     protected $signature = 'prospection:purge-non-commercial
@@ -38,6 +40,9 @@ class ProspectionPurgeNonCommercial extends Command
 
     public function handle(): int
     {
+        // L3c-0 : refus sans condition, avant toute lecture.
+        return $this->refuserSansCondition();
+
         $aSupprimer = $this->fichesNonCommerciales()->count();
         $total = DB::table('companies')->count();
 

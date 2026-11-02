@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\RefuseToutePurgeDePersonnes;
 use App\Console\Concerns\RefuseUneSuppressionMassive;
 use App\Crm\Doublons\FusionFiches;
 use App\Crm\FichesProtegees;
@@ -34,6 +35,7 @@ use Illuminate\Support\Facades\DB;
  */
 class RgpdPurgeBusinessProspects extends Command
 {
+    use RefuseToutePurgeDePersonnes;
     use RefuseUneSuppressionMassive;
 
     protected $signature = 'rgpd:purge-business-prospects {--dry-run : Compte sans supprimer} {--force : Passe outre le plafond de proportion}';
@@ -42,6 +44,9 @@ class RgpdPurgeBusinessProspects extends Command
 
     public function handle(AuditHashChain $audit): int
     {
+        // L3c-0 : refus sans condition, avant toute lecture.
+        return $this->refuserSansCondition();
+
         if (! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
             $this->error('CRM_PURGE_ENABLED n\'est pas à true — purge construite mais inerte (activation à la bascule finale).');
 

@@ -25,6 +25,14 @@ return [
     */
     'auth_mailer' => env('MAIL_MAILER_AUTH', env('MAIL_MAILER', 'log')),
 
+    /*
+    | Gardes de démarrage (S2, ADR-08) : drapeau ÉTEINT par défaut. Allumé, la
+    | production refuse de démarrer si le mailer d'authentification est absent,
+    | identique au mailer par défaut, ou si un simulateur est allumé alors que
+    | l'envoi réel l'est. Retour arrière : GARDES_DEMARRAGE_AUTH=false.
+    */
+    'gardes_demarrage' => (bool) env('GARDES_DEMARRAGE_AUTH', false),
+
     'mailers' => [
         'smtp' => [
             'transport' => 'smtp',

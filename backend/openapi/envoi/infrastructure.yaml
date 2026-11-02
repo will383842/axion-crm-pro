@@ -278,6 +278,32 @@ paths:
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/ServeurResume' }
+  /envoi/serveurs/{id}/sante:
+    get:
+      operationId: lireSanteServeur
+      summary: Santé d'un serveur d'envoi, file et paliers de chauffe de ses adresses IP
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Santé du serveur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SanteServeur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/serveurs/{id}/test:
+    post:
+      operationId: lancerTestServeur
+      summary: Lancer le test du serveur (boîtes témoins internes, aucun envoi réel)
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Santé du serveur après le test.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SanteServeur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/serveurs/{id}/adresses-ip:
     post:
       operationId: ajouterAdresseIp
@@ -333,8 +359,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [boites, courbe]
+                required: [boites, courbe, fins_prevues, plafond_boite]
                 properties:
+                  plafond_boite:
+                    description: Plafond d'envois par boîte et par jour (150 en V0).
+                    type: integer
+                    minimum: 1
+                  fins_prevues:
+                    description: Date de fin prévue de la montée de chaque boîte en chauffe (identifiant de la boîte -> date).
+                    type: object
+                    additionalProperties: { type: string, format: date }
                   boites:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
@@ -373,6 +407,40 @@ paths:
                     items: { $ref: '#/components/schemas/ListeNoire' }
 components:
   schemas:
+    SanteServeur:
+      type: object
+      required: [serveur_id, en_ligne_depuis_jours, en_file, test, paliers]
+      properties:
+        serveur_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        en_ligne_depuis_jours: { type: integer, minimum: 0 }
+        en_file:
+          description: Messages en attente d'envoi sur ce serveur.
+          type: integer
+          minimum: 0
+        test:
+          type: object
+          required: [fait_le, etapes]
+          properties:
+            fait_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+            etapes:
+              type: array
+              items:
+                type: object
+                required: [libelle, ok]
+                properties:
+                  libelle: { type: string }
+                  ok: { type: boolean }
+        paliers:
+          description: Paliers de chauffe des adresses IP en montée.
+          type: array
+          items:
+            type: object
+            required: [adresse, jour, sur, plafond_aujourdhui]
+            properties:
+              adresse: { type: string }
+              jour: { type: integer, minimum: 1 }
+              sur: { type: integer, minimum: 1 }
+              plafond_aujourdhui: { type: integer, minimum: 0 }
     ModeAbsence:
       description: Pendant l'absence, la boîte n'envoie plus et les réponses automatiques sont mises de côté.
       type: object

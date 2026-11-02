@@ -58,10 +58,11 @@ describe('ServeursPage — ajout d’une adresse IP', () => {
     await u.click(screen.getByRole('button', { name: 'Ajouter une adresse IP' }));
     const fenetre = await screen.findByRole('dialog');
     // L'adresse proposée est la prochaine adresse libre de documentation.
-    expect((within(fenetre).getByLabelText('Adresse IP') as HTMLInputElement).value).toBe('192.0.2.12');
+    expect(within(fenetre).getByLabelText('Adresse IP')).toHaveValue('192.0.2.12');
     await u.click(within(fenetre).getByRole('button', { name: 'Ajouter et appliquer' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(await screen.findByText('192.0.2.12')).toBeInTheDocument();
+    const tableau = screen.getByRole('table', { name: /Adresses IP de Serveur d’envoi 1/ });
+    expect(await within(tableau).findByText('192.0.2.12')).toBeInTheDocument();
     const apres = demoDb.serveurs.trouver('srv-1')?.version_configuration ?? 0;
     expect(apres).toBeGreaterThan(avant);
   });

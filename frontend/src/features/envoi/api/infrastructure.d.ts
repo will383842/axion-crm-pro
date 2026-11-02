@@ -312,6 +312,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/serveurs/{id}/sante": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Santé d'un serveur d'envoi, file et paliers de chauffe de ses adresses IP */
+        get: operations["lireSanteServeur"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/serveurs/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lancer le test du serveur (boîtes témoins internes, aucun envoi réel) */
+        post: operations["lancerTestServeur"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -471,6 +505,26 @@ export interface components {
                 confiance: number;
             };
             traitee: boolean;
+        };
+        SanteServeur: {
+            /** @description Messages en attente d'envoi sur ce serveur. */
+            en_file: number;
+            en_ligne_depuis_jours: number;
+            /** @description Paliers de chauffe des adresses IP en montée. */
+            paliers: {
+                adresse: string;
+                jour: number;
+                plafond_aujourdhui: number;
+                sur: number;
+            }[];
+            serveur_id: components["schemas"]["Identifiant"];
+            test: {
+                etapes: {
+                    libelle: string;
+                    ok: boolean;
+                }[];
+                fait_le: components["schemas"]["Horodatage"];
+            };
         };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
@@ -722,6 +776,12 @@ export interface operations {
                             jour: number;
                             plafond: number;
                         }[];
+                        /** @description Date de fin prévue de la montée de chaque boîte en chauffe (identifiant de la boîte -> date). */
+                        fins_prevues: {
+                            [key: string]: string;
+                        };
+                        /** @description Plafond d'envois par boîte et par jour (150 en V0). */
+                        plafond_boite: number;
                     };
                 };
             };
@@ -992,6 +1052,52 @@ export interface operations {
         responses: {
             200: components["responses"]["Configuration"];
             422: components["responses"]["Erreur"];
+        };
+    };
+    lireSanteServeur: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Santé du serveur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SanteServeur"];
+                };
+            };
+            404: components["responses"]["Erreur"];
+        };
+    };
+    lancerTestServeur: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Santé du serveur après le test. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SanteServeur"];
+                };
+            };
+            404: components["responses"]["Erreur"];
         };
     };
 }

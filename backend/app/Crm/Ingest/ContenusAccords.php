@@ -112,6 +112,57 @@ final class ContenusAccords
         return $actuelle;
     }
 
+    // ── Lecture (fiche) ─────────────────────────────────────────────────────
+
+    /**
+     * Le bloc « Contenus et accords » de la fiche : une liste BLANCHE de clés,
+     * relue depuis la base. Même si une ligne ancienne portait autre chose, rien
+     * d'autre ne sort (jamais de pseudo ni de texte de message).
+     *
+     * @return array{origine: array<string, ?string>|null, guides: list<array<string, string>>, consentements: list<array<string, string>>, opposition: array{actif: bool, date: ?string}}
+     */
+    public static function bloc(mixed $origine, mixed $guides, mixed $consentements, mixed $oppositionAt): array
+    {
+        $decode = static function (mixed $v): array {
+            if (is_string($v)) {
+                $v = json_decode($v, true);
+            }
+
+            return is_array($v) ? $v : [];
+        };
+        $garder = static function (array $ligne, array $cles): array {
+            $sortie = [];
+            foreach ($cles as $cle) {
+                $valeur = $ligne[$cle] ?? null;
+                $sortie[$cle] = is_string($valeur) ? mb_substr($valeur, 0, 64) : null;
+            }
+
+            return $sortie;
+        };
+        $listes = static function (array $lignes, array $cles) use ($garder): array {
+            $sortie = [];
+            foreach ($lignes as $ligne) {
+                if (is_array($ligne)) {
+                    $sortie[] = $garder($ligne, $cles);
+                }
+            }
+
+            return $sortie;
+        };
+
+        $o = $decode($origine);
+
+        return [
+            'origine' => $o === [] ? null : $garder($o, ['mot', 'reseau', 'guide', 'date']),
+            'guides' => $listes($decode($guides), ['guide', 'date']),
+            'consentements' => $listes($decode($consentements), ['nature', 'date', 'source', 'version']),
+            'opposition' => [
+                'actif' => $oppositionAt !== null,
+                'date' => is_string($oppositionAt) ? $oppositionAt : ($oppositionAt instanceof \DateTimeInterface ? $oppositionAt->format('c') : null),
+            ],
+        ];
+    }
+
     // ── Validation ──────────────────────────────────────────────────────────
 
     /** @return array{mot: ?string, reseau: ?string, guide: ?string, date: ?string}|null */

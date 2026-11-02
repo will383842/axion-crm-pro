@@ -14,6 +14,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
 import { api, messageApiLisible } from '@/lib/api';
+import { ContenusAccordsCard } from './ContenusAccordsCard';
 import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
@@ -125,7 +126,7 @@ function PersonneDetailContent() {
     );
   }
 
-  const { personne, abonnement, entreprise, taches, timeline } = fiche.data;
+  const { personne, abonnement, entreprise, taches, timeline, contenus_accords } = fiche.data;
   const nomAffiche = [personne.first_name, personne.last_name].filter(Boolean).join(' ') || personne.email || 'Personne';
   const nomConnu = (personne.last_name ?? '') !== '';
   const nomManquant = !nomConnu && nom.trim() === '';
@@ -189,6 +190,8 @@ function PersonneDetailContent() {
               </p>
             </div>
           </Card>
+
+          <ContenusAccordsCard bloc={contenus_accords} />
 
           <Card>
             <CardTitle>Entreprise</CardTitle>

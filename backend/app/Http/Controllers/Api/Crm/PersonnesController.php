@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
+use App\Crm\Ingest\ContenusAccords;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
@@ -17,6 +18,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -238,6 +240,9 @@ class PersonnesController extends ConsoleController
             return $this->ok([
                 'personne' => MasquageCoordonnees::masquerTableauSiRequis($this->presenter($personne)),
                 'abonnement' => $abonnement === null ? null : (array) $abonnement,
+                // PV-6 : lecture seule. Colonnes absentes (migration pas encore
+                // passée) ou vides : le bloc est simplement vide.
+                'contenus_accords' => $this->contenusAccords($workspaceId, $id),
                 'entreprise' => $entreprise === null ? null : (array) $entreprise,
                 'taches' => array_values(array_filter($timeline, static fn (array $a): bool => $a['kind'] === 'task')),
                 'timeline' => $timeline,
@@ -755,6 +760,22 @@ class PersonnesController extends ConsoleController
         } catch (\Exception) {
             return null;
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function contenusAccords(string $workspaceId, int $id): array
+    {
+        $ligne = Schema::hasColumn('personnes', 'accords_at')
+            ? DB::table('personnes')->where('workspace_id', $workspaceId)->where('id', $id)
+                ->first(['origine_contenu', 'guides_recus', 'consentements', 'opposition_at'])
+            : null;
+
+        return ContenusAccords::bloc(
+            $ligne->origine_contenu ?? null,
+            $ligne->guides_recus ?? null,
+            $ligne->consentements ?? null,
+            $ligne->opposition_at ?? null,
+        );
     }
 
     private function personne(string $workspaceId, int $id): \stdClass

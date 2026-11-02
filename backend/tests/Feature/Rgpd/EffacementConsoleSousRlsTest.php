@@ -80,7 +80,9 @@ test('sous axion_app, l effacement console fait le travail par espace et ne se d
         DB::setDefaultConnection($precedente);
 
         expect($owner->table('companies')->where('id', $fiche)->value('email_generic'))->toBeNull()
-            ->and($owner->table('contacts')->where('id', $contact)->exists())->toBeFalse()
+            // L3c-0 : le contact est MASQUÉ (corbeille douce), jamais supprimé.
+            ->and($owner->table('contacts')->where('id', $contact)->exists())->toBeTrue()
+            ->and($owner->table('contacts')->where('id', $contact)->value('deleted_at'))->not->toBeNull()
             ->and($verdict)->toHaveKey('perimetre_non_verifie_sous_rls');
     } finally {
         DB::setDefaultConnection($precedente);

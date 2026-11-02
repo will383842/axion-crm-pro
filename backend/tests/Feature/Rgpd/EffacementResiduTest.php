@@ -46,7 +46,7 @@ function espaceResidu(string $prefixe = 'residu'): string
     return $id;
 }
 
-test('B15-006 — apres effacement, ni le telephone ni l adresse ne subsistent', function () {
+test('B15-006 / L3c-0 — apres la demande d effacement, contacts masques et gardes, timeline sans trace en clair', function () {
     $espace = espaceResidu();
     $cle = hash('sha256', COURRIEL_EFFACE);
 
@@ -89,9 +89,11 @@ test('B15-006 — apres effacement, ni le telephone ni l adresse ne subsistent',
 
     app(GdprErasureService::class)->erase(COURRIEL_EFFACE, TEL_EFFACE);
 
-    // Plus aucune trace en clair, dans AUCUNE des tables concernées.
-    expect(DB::table('contacts')->where('email', COURRIEL_EFFACE)->count())->toBe(0);
-    expect(DB::table('candidates')->where('email', COURRIEL_EFFACE)->count())->toBe(0);
+    // L3c-0 : contacts et candidats sont MASQUÉS et gardés (jamais supprimés) ;
+    // les timelines, elles, ne gardent plus de trace en clair.
+    expect(DB::table('contacts')->where('email', COURRIEL_EFFACE)->whereNull('deleted_at')->count())->toBe(0);
+    expect(DB::table('contacts')->where('email', COURRIEL_EFFACE)->count())->toBe(1);
+    expect(DB::table('candidates')->where('email', COURRIEL_EFFACE)->count())->toBe(1);
     expect(DB::table('activities')->whereRaw('payload::text ILIKE ?', ['%' . TEL_EFFACE . '%'])->count())->toBe(0);
     expect(DB::table('activities')->whereRaw('payload::text ILIKE ?', ['%' . COURRIEL_EFFACE . '%'])->count())->toBe(0);
 });

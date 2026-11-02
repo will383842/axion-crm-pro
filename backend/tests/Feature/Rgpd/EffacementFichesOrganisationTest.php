@@ -146,7 +146,7 @@ function efoConnecterAdmin(string $espace): User
         'first_login_completed_at' => now(),
     ]);
     setPermissionsTeamId($espace);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
     test()->actingAs($user);
 
     return $user;
@@ -172,7 +172,7 @@ test('l effacement console atteint les trois emplacements d une fiche PROTEGEE, 
         ->and($canaux['emails'])->toBe(['secretariat@zz-fede.example.invalid'])
         ->and($canaux['phones'])->toBe(['01 00 00 00 10'])
         ->and(array_keys($canaux['details']))->toBe(['secretariat@zz-fede.example.invalid'])
-        ->and(DB::table('contacts')->whereIn('id', [$this->presidente, $this->doublon])->count())->toBe(0)
+        ->and(DB::table('contacts')->whereNull('deleted_at')->whereIn('id', [$this->presidente, $this->doublon])->count())->toBe(0)
         ->and(efoVerdict($resultat))->toBe([])
         // Témoin intact.
         ->and(efoFiche($this->temoin)->email_generic)->toBe('accueil@zz-temoin.example.invalid')
@@ -207,7 +207,7 @@ test('l effacement pose l opposition sur l adresse ET le mobile, et le re-import
         ->and($fiche->phone)->toBeNull()
         ->and($texte)->not->toContain(EFO_EMAIL)
         ->and($texte)->not->toContain('00 00 00 42')
-        ->and(DB::table('contacts')->where('company_id', $this->fede)->where('last_name', 'ZZPRESIDENTE')->exists())->toBeFalse();
+        ->and(DB::table('contacts')->whereNull('deleted_at')->where('company_id', $this->fede)->where('last_name', 'ZZPRESIDENTE')->exists())->toBeFalse();
 });
 
 test('une adresse restee ailleurs dans les signaux rend l effacement INCOMPLET, et il le dit', function () {
@@ -244,7 +244,7 @@ test('l export CSV des entreprises ne rend plus l adresse ni le mobile apres eff
         'first_login_completed_at' => now(),
     ]);
     setPermissionsTeamId($this->espace);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
     $this->actingAs($user);
 
     $avant = $this->get('/api/v1/companies/export')->streamedContent();
@@ -266,7 +266,7 @@ test('l effacement venu du site atteint aussi les fiches d organisation', functi
     expect($fiche->email_generic)->toBeNull()
         ->and($fiche->phone)->toBeNull()
         ->and(efoSignals($this->fede)['contact_channels']['emails'])->toBe(['secretariat@zz-fede.example.invalid'])
-        ->and(DB::table('contacts')->where('id', $this->doublon)->exists())->toBeFalse()
+        ->and(DB::table('contacts')->whereNull('deleted_at')->where('id', $this->doublon)->exists())->toBeFalse()
         ->and(efoFiche($this->temoin)->email_generic)->toBe('accueil@zz-temoin.example.invalid');
 });
 
@@ -304,7 +304,7 @@ test('S3 — un standard d organisation ou un numero partage ne quittent que les
 
     $resultat = app(GdprErasureService::class)->erase('zia@zz-standard.example.invalid');
 
-    expect(DB::table('contacts')->where('email', 'zia@zz-standard.example.invalid')->count())->toBe(0)
+    expect(DB::table('contacts')->whereNull('deleted_at')->where('email', 'zia@zz-standard.example.invalid')->count())->toBe(0)
         // Le standard reste à l'organisation, le portable partagé au collègue.
         ->and(efoFiche($organisation)->phone)->toBe('04 72 00 00 10')
         ->and(DB::table('contacts')->where('id', $collegue)->value('phone'))->toBe('+33 6 11 11 11 11')
@@ -417,7 +417,7 @@ test('S5 — la porte du site releve les numeros par cle de personne, pas seulem
     app(SiteGdprService::class)->erase('zz-pk-s5', 'autre-adresse@zz-pk.example.invalid', 'business');
 
     expect(efoFiche($fiche)->phone)->toBeNull()
-        ->and(DB::table('contacts')->where('person_key', 'zz-pk-s5')->exists())->toBeFalse();
+        ->and(DB::table('contacts')->whereNull('deleted_at')->where('person_key', 'zz-pk-s5')->exists())->toBeFalse();
 });
 
 // ── S1 et S6 : l'export ne rend que les valeurs de la personne ─────────────

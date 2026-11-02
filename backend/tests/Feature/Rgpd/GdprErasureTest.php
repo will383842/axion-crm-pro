@@ -19,7 +19,7 @@ beforeEach(function () {
     ]);
 });
 
-test('erasure deletes contacts matching email', function () {
+test('L3c-0 : erasure MASQUE les contacts de l\'adresse, sans les supprimer', function () {
     $companyId = DB::table('companies')->insertGetId([
         'workspace_id' => $this->workspaceId, 'siren' => '123456789',
         'denomination' => 'Acme', 'signals' => '{}', 'metadata' => '{}',
@@ -37,7 +37,10 @@ test('erasure deletes contacts matching email', function () {
     $result = $service->erase('marie.dupont@example.com');
 
     expect($result['deleted']['contacts'])->toBe(1);
-    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->count())->toBe(0);
+    // La ligne est GARDÉE ; elle est seulement à la corbeille douce, avec sa trace.
+    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->count())->toBe(1);
+    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->whereNull('deleted_at')->count())->toBe(0);
+    expect((string) DB::table('contacts')->where('email', 'marie.dupont@example.com')->value('metadata'))->toContain('mis_a_l_ecart_le');
 });
 
 test('erasure adds opt_out entry', function () {

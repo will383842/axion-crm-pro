@@ -113,7 +113,7 @@ function b14002_operateur(): array
         'first_login_completed_at' => now(),
     ]);
     setPermissionsTeamId($ws->id);
-    $u->assignRole('admin');
+    $u->assignRole('owner');
 
     return [$u, $ws];
 }

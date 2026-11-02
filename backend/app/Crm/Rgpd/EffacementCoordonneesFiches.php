@@ -498,10 +498,16 @@ final class EffacementCoordonneesFiches
             'events.demarche_note' => ['events', 'demarche_note'],
         ];
 
+        // L3c-0 : un contact MASQUÉ (corbeille douce, mis à l'écart) est gardé
+        // exprès et n'est plus un résidu : il n'apparaît plus nulle part.
+        $lire = static fn (string $table): Builder => $table === 'contacts'
+            ? self::table($table, $workspaceId)->whereNull('deleted_at')
+            : self::table($table, $workspaceId);
+
         foreach ($zones as $nom => [$table, $colonne]) {
             $n = 0;
             if ($email !== '' && ! in_array($nom, ['contacts.phone', 'companies.phone'], true)) {
-                $candidats = self::table($table, $workspaceId)
+                $candidats = $lire($table)
                     ->whereRaw("coalesce({$colonne}, '') ILIKE ?", ['%' . self::echapperLike($email) . '%'])
                     ->selectRaw("{$colonne} AS texte")
                     ->pluck('texte')
@@ -514,7 +520,7 @@ final class EffacementCoordonneesFiches
             }
             if ($nom !== 'contacts.email' && $nom !== 'companies.email_generic') {
                 foreach ($motifs as $motif) {
-                    $n += self::table($table, $workspaceId)
+                    $n += $lire($table)
                         ->whereRaw("coalesce({$colonne}, '') ~ ?", [$motif])
                         ->count();
                 }

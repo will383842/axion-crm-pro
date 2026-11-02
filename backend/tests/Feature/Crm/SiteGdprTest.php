@@ -1,8 +1,13 @@
 <?php
 
 use App\Crm\Taxonomy;
+use App\Events\NotificationCreated;
+use App\Models\User;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -87,7 +92,7 @@ function gdprProprietaire(string $espace): string
         'created_at' => now(), 'updated_at' => now(),
     ]);
     setPermissionsTeamId($espace);
-    App\Models\User::findOrFail($id)->assignRole('owner');
+    User::findOrFail($id)->assignRole('owner');
 
     return $id;
 }
@@ -310,7 +315,7 @@ test('scope=vivier ne met à l\'écart QUE le vivier', function () {
 
 test('L3c-0 : un REJEU de la demande ne crée pas de seconde ligne pending, ne re-signale pas, et ne rend aucun identifiant interne', function () {
     gdprSeedPerson();
-    $this->seed(Database\Seeders\PermissionsAndRolesSeeder::class);
+    $this->seed(PermissionsAndRolesSeeder::class);
     $proprietaire = gdprProprietaire(gdprBusinessWorkspaceId());
 
     $premiere = gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL]);
@@ -331,10 +336,10 @@ test('L3c-0 : un REJEU de la demande ne crée pas de seconde ligne pending, ne r
 
 test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille Demandes RGPD)', function () {
     gdprSeedPerson();
-    $this->seed(Database\Seeders\PermissionsAndRolesSeeder::class);
+    $this->seed(PermissionsAndRolesSeeder::class);
     $espace = gdprBusinessWorkspaceId();
     $proprietaire = gdprProprietaire($espace);
-    Illuminate\Support\Facades\Event::fake([App\Events\NotificationCreated::class]);
+    Event::fake([NotificationCreated::class]);
 
     gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL, 'scope' => 'business'])->assertOk();
 
@@ -344,12 +349,12 @@ test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille D
         ->and($notification->action_url)->toBe('/rgpd/requests')
         // Jamais l'adresse de la personne dans le texte.
         ->and(mb_strtolower((string) $notification->title . ' ' . (string) $notification->body))->not->toContain(GDPR_EMAIL);
-    Illuminate\Support\Facades\Event::assertDispatched(App\Events\NotificationCreated::class, fn (App\Events\NotificationCreated $e): bool => $e->userId === $proprietaire && $e->workspaceId === $espace);
+    Event::assertDispatched(NotificationCreated::class, fn (NotificationCreated $e): bool => $e->userId === $proprietaire && $e->workspaceId === $espace);
 
     // La pastille : le propriétaire voit 1 demande ; un compte non propriétaire, rien.
     config(['crm.console_v2' => true]);
-    Illuminate\Support\Facades\Cache::flush();
-    $this->actingAs(App\Models\User::findOrFail($proprietaire))
+    Cache::flush();
+    $this->actingAs(User::findOrFail($proprietaire))
         ->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->assertJsonPath('demandes_rgpd', 1);
 });
 

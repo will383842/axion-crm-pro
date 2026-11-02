@@ -148,11 +148,11 @@ test('le détecteur de suppressions sait reconnaître les gestes cachés (témoi
         "<?php \\App\\Models\\Contact::where('email', \$e)->delete();",
         "<?php Company::query()->whereIn('id', \$ids)->forceDelete();",
         "<?php Candidate::withTrashed()->where('id', 1)->delete();",
-        "<?php Journalist::destroy(\$ids);",
+        '<?php Journalist::destroy($ids);',
         "<?php \$q = DB::table('contacts')->where('email', \$e);\n\$q->delete();",
         "<?php \$q = Contact::where('email', \$e);\n\$n = \$q->delete();",
         "<?php DB::statement('DELETE FROM contacts WHERE email = ?', [\$e]);",
-        "<?php DB::unprepared(\"DELETE FROM public.candidates WHERE 1=1\");",
+        '<?php DB::unprepared("DELETE FROM public.candidates WHERE 1=1");',
         "<?php DB::raw('DELETE FROM journalists');",
         "<?php DB::statement('TRUNCATE TABLE companies');",
         "<?php DB::table('journalists')->where('id', 3)->delete();",
@@ -166,7 +166,7 @@ test('le détecteur de suppressions sait reconnaître les gestes cachés (témoi
         "<?php Contact::where('email', \$e)->update(['deleted_at' => now()]);",
         "<?php DB::table('activities')->where('id', 1)->delete();",
         "<?php DB::table('contacts')->where('id', 1)->update(['deleted_at' => now()]);",
-        "<?php \$jeton->delete();",
+        '<?php $jeton->delete();',
     ];
     foreach ($innocents as $code) {
         expect(aucuneSuppressionDetecter($code))->toBe([], $code);

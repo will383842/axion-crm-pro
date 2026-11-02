@@ -375,7 +375,7 @@ final class SiteGdprService
      * dupliquée (rejeu du site). À appeler DANS `WorkspaceContext::run()` et
      * DANS la transaction : `rgpd_requests` porte une RLS forcée.
      *
-     * @return array{0: int, 1: bool}  [identifiant, vraie si la demande vient d'être créée]
+     * @return array{0: int, 1: bool} [identifiant, vraie si la demande vient d'être créée]
      */
     private function journal(string $workspaceId, string $email): array
     {

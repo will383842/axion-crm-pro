@@ -1,0 +1,23 @@
+[
+    "2026_05_18_000004_fix_scraping_campaigns_workspace_id_type.php",
+    "2026_05_18_000005_add_updated_at_error_message_to_scraper_runs.php",
+    "2026_07_09_000003_backfill_media_website_status_pending.php",
+    "2026_08_18_100001_partman_dans_son_propre_schema.php",
+    "2026_08_20_141000_remplir_cle_personne_sur_le_stock_contacts.php",
+    "2026_09_24_000001_personnes_et_abonnements.php",
+    "2026_09_27_000002_evenements_et_organisateurs.php",
+    "2026_09_29_000001_federations.php",
+    "2026_09_30_000030_brave_quota_mensuel.php",
+    "2026_10_01_000010_presse_harmonisee.php",
+    "2026_10_01_000040_listes_manuelles.php",
+    "2026_10_03_000070_curseurs_traitements.php",
+    "2026_10_03_000080_provenance_tiers.php",
+    "2026_10_04_000010_insee_mise_a_jour_mensuelle.php",
+    "2026_10_04_000020_propositions_champs.php",
+    "2026_10_04_000030_companies_valider_archive_reason_check.php",
+    "2026_10_05_000010_create_companies_opco_table.php",
+    "2026_10_06_000010_insee_imports_familles.php",
+    "2026_10_07_000010_propositions_origine_annuaire.php",
+    "2026_10_08_000010_propositions_origine_site_verifie.php",
+    "2026_10_25_000030_finess_etablissements.php"
+]

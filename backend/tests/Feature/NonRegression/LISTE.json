@@ -1,0 +1,404 @@
+{
+  "version": 1,
+  "note": "Liste figee du filet de non-regression (R0). Retirer un test sans le retirer de cette liste, ou l'inverse, fait rougir ListeFigeeTest.",
+  "gardes": [
+    {
+      "id": "NR-01",
+      "risque": "R3 opposition",
+      "nouveaux": {
+        "Nr01OppositionDeuxEspacesTest.php": [
+          "NR-01 une adresse sans opposition reste éligible dans les deux espaces (témoin)",
+          "NR-01 une opposition retire l’adresse de la liste des DEUX espaces (opposition globale aujourd’hui)",
+          "NR-01 une suppression (rebond dur) retire l’adresse des DEUX espaces",
+          "NR-01 l’opposition est casse-insensible et ignore les espaces autour de l’adresse",
+          "NR-01 une adresse vide n’est jamais autorisée"
+        ]
+      },
+      "existants": [
+        "EligibiliteCampagneTest.php",
+        "Infra/AucunEnvoiSansEligibiliteTest.php",
+        "Rgpd/OppositionCouvreTousLesUniversTest.php",
+        "Rgpd/ExportsRespectentOppositionsTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-02",
+      "risque": "R4 preparation des destinataires",
+      "nouveaux": {
+        "Nr02PreparationDestinatairesTest.php": [
+          "NR-02 la liste et les compteurs d’écart sont ceux de la photo de référence",
+          "NR-02 l’option --non-informes écarte les adresses déjà informées",
+          "NR-02 une opposition ne figure JAMAIS dans la liste, quelle que soit l’option",
+          "NR-02 la préparation n’écrit rien en base"
+        ]
+      },
+      "existants": [
+        "Crm/ResolveurDestinatairesTest.php",
+        "Crm/CampagneAdressesPartageesTest.php",
+        "Crm/CampagnesB2bTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-03",
+      "risque": "R5 retours",
+      "nouveaux": {
+        "Nr03RetoursDeCampagneTest.php": [
+          "NR-03 un fichier de retours complet donne l’état final de la photo de référence",
+          "NR-03 chaque retour fait ce que le plan 21 § 6 annonce",
+          "NR-03 « envoye » ne recule jamais la date du premier message",
+          "NR-03 --dry-run n’écrit RIEN en base",
+          "NR-03 rejouer le même fichier ne change pas l’état (hors compteur de rebonds mous)",
+          "NR-03 la commande ne crée aucune fiche pour une adresse inconnue"
+        ]
+      },
+      "existants": [
+        "Crm/CampagnesB2bTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-04",
+      "risque": "R2 garde Sirene",
+      "nouveaux": {
+        "Nr04GardeSireneTest.php": [
+          "NR-04 une fiche non diffusible ou fermée n’est jamais dans la liste, mais n’est pas supprimée",
+          "NR-04 un contact d’une fiche non diffusible n’est pas contactable non plus",
+          "NR-04 la sonde de 06:20 sort en échec sur une fiche « [ND] » et ne supprime rien",
+          "NR-04 la sonde se tait sur une base saine (témoin)"
+        ]
+      },
+      "existants": [
+        "Rgpd/OppositionInseeNonDiffusibleTest.php",
+        "Rgpd/PurgeNonDiffusibleVariantesTest.php",
+        "Rgpd/SondeNonDiffusiblesTest.php",
+        "Crm/InseeNonDiffusiblesHorsProspectionTest.php",
+        "Crm/EntreprisesFermeesExcluesDesEnvoisTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-05",
+      "risque": "R16 segments",
+      "nouveaux": {
+        "Nr05SegmentsFermesTest.php": [
+          "NR-05 la liste des segments connus est celle de la photo (fermée)",
+          "NR-05 valeur absente ou vide : les trois segments connus sont ouverts (comportement actuel, écart du plan 22)",
+          "NR-05 « aucun » ferme tout",
+          "NR-05 une valeur inconnue ne peut que fermer, jamais ouvrir",
+          "NR-05 une liste explicite n’ouvre que ce qu’elle nomme, dans l’ordre de CONNUS",
+          "NR-05 la commande refuse un segment fermé ou inconnu",
+          "NR-05 un segment inconnu n’a pas de tag : aucune fiche ne peut y être rattachée"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "NR-06",
+      "risque": "R13 export RGPD",
+      "nouveaux": {
+        "Nr06ExportRgpdTest.php": [
+          "NR-06 l’export interroge AU MOINS toutes les tables qu’il interrogeait",
+          "NR-06 l’export d’une personne factice contient AU MOINS les clés de la photo",
+          "NR-06 l’export retrouve la personne, ses contacts et sa timeline (témoin de fond)",
+          "NR-06 l’export d’une personne dans les DEUX espaces la retrouve dans les deux",
+          "NR-06 l’effacement efface partout, laisse une opposition, et l’export suivant est vide de contacts"
+        ]
+      },
+      "existants": [
+        "Rgpd/PortabiliteCompleteTest.php",
+        "Rgpd/GdprErasureTest.php",
+        "Crm/SiteGdprTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-07",
+      "risque": "R1 taches planifiees",
+      "nouveaux": {
+        "Nr07TachesPlanifieesTest.php": [
+          "NR-07 la liste des tâches planifiées est celle de la photo de référence",
+          "NR-07 le planificateur contient au moins les 44 tâches annoncées par le relevé (témoin de couverture)",
+          "NR-07 le battement du planificateur tourne chaque minute",
+          "NR-07 les purges mensuelles portent un saut (le drapeau CRM_PURGE_ENABLED les éteint)"
+        ]
+      },
+      "existants": [
+        "Console/VerrousDuPlanificateurTest.php",
+        "Console/CommentairesDuPlanificateurTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-08",
+      "risque": "R1 taches sous RLS",
+      "nouveaux": {
+        "Nr23Nr08AudiencesEtRlsTest.php": [
+          "NR-08 sous le rôle de production, le rafraîchissement des audiences voit les fiches de CHAQUE espace, et seulement les siennes",
+          "NR-08 témoin : le rôle de production ne contourne PAS la RLS (sans contexte d’espace, zéro ligne)",
+          "NR-08 CONSTAT : la sonde « non diffusibles » (06:20) est AVEUGLE sous le rôle de production (à corriger par S7)",
+          "NR-08 l’inventaire des tâches planifiées sous RLS est celui de la photo de référence"
+        ]
+      },
+      "existants": [
+        "Audiences/RafraichissementNocturneSousRlsTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-09",
+      "risque": "R15 journal d audit",
+      "nouveaux": {
+        "Nr09JournalAuditTest.php": [
+          "NR-09 une chaîne intacte se vérifie : la commande de 03:00 réussit",
+          "NR-09 une chaîne falsifiée est détectée : la commande sort en échec avec l’alerte d’intégrité",
+          "NR-09 sans secret utilisable la chaîne ne répond jamais « valide »",
+          "NR-09 la maintenance des partitions laisse en place une partition pour le mois suivant (hors DEFAULT)",
+          "NR-09 la maintenance des partitions est planifiée chaque jour à 01:30"
+        ]
+      },
+      "existants": [
+        "Database/MaintenancePartitionsAuditTest.php",
+        "Database/AuditLogsPartitionnementTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-10",
+      "risque": "R8 purges",
+      "nouveaux": {
+        "Nr10PurgesTest.php": [
+          "NR-10 purge-non-commercial ne supprime jamais une fiche console, et supprime la fiche ordinaire (témoin)",
+          "NR-10 purge-non-diffusible ne supprime jamais une fiche console, et supprime la fiche [ND] ordinaire (témoin)",
+          "NR-10 les purges d’entreprises refusent sans --force quand la proportion dépasse le plafond",
+          "NR-10 retention:purge --all-workspaces ne supprime aucune fiche ni personne, console ou non",
+          "NR-10 drapeau éteint : la purge des personnes froides refuse et ne supprime rien",
+          "NR-10 drapeau ouvert : une personne froide d’une fiche console n’est PAS purgée, une personne froide ordinaire l’est (témoin)"
+        ]
+      },
+      "existants": [
+        "Commands/AutomatismesDePurgeTest.php",
+        "Infra/PurgesDestructricesTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-11",
+      "risque": "R6 synchro du site",
+      "nouveaux": {
+        "Nr11SynchroSiteTest.php": [
+          "NR-11 drapeau éteint : 503 et rien n’est écrit",
+          "NR-11 signature fausse, secret absent ou horodatage trop vieux : refus, rien n’est écrit",
+          "NR-11 un événement de chaque type connu donne le résultat de la photo de référence",
+          "NR-11 chaque type de formulaire connu est accepté (200), sauf « recrutement » fermé avec les candidats",
+          "NR-11 rejouer le même événement ne crée pas de doublon",
+          "NR-11 un type d’événement inconnu est refusé"
+        ]
+      },
+      "existants": [
+        "Crm/SiteSyncIngestTest.php",
+        "Crm/SiteGdprTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-12",
+      "risque": "R7 CRM vers site",
+      "nouveaux": {},
+      "existants": [
+        "Crm/CrmOutboundTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-13",
+      "risque": "R6 Partners",
+      "nouveaux": {},
+      "existants": [
+        "Internal/CanalPartnersSocleTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-14",
+      "risque": "webhook transactionnel",
+      "nouveaux": {},
+      "existants": [
+        "ListeSuppressionTest.php",
+        "Email/ZeptoMailWebhookTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-15",
+      "risque": "R9 simulateurs",
+      "nouveaux": {
+        "Nr15SimulateursTest.php": [
+          "NR-15 l’inventaire des simulateurs MOCK_* est celui de la photo de référence",
+          "NR-15 le maître MOCK_MODE et les 10 drapeaux de la CI sont tous gardés",
+          "NR-15 aucun simulateur ne peut devenir « gardé » ou « hors garde » en silence",
+          "NR-15 le provider a toujours des simulacres par défaut hors production"
+        ]
+      },
+      "existants": [
+        "Infra/AucunSimulacreEnProductionTest.php",
+        "Infra/DrapeauxMockAlignesTest.php",
+        "Infra/SimulacresLusHorsDeLaGardeTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-16",
+      "risque": "R9 drapeaux",
+      "nouveaux": {
+        "Nr16DrapeauxTest.php": [
+          "NR-16 les drapeaux CRM_* et MOCK_* ont les valeurs par défaut de la photo de référence",
+          "NR-16 tout drapeau booléen lu par la config est ÉTEINT par défaut (sauf les allumés connus)",
+          "NR-16 les drapeaux de lots à venir qui existent déjà sont éteints",
+          "NR-16 la lecture sait voir des drapeaux (témoin de couverture)"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "NR-17",
+      "risque": "R10 migrations",
+      "nouveaux": {
+        "Nr17MigrationsTest.php": [
+          "NR-17 les migrations anciennes sans retour réel sont celles de la photo (la liste ne peut que baisser)",
+          "NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, aller sans erreur",
+          "NR-17 témoin : l’instrument aller-retour-aller joue sur une migration ancienne réversible",
+          "NR-17 le classement voit bien des retours vides, refusés et réels (témoin de couverture)"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "NR-18",
+      "risque": "R11 deploiement",
+      "nouveaux": {
+        "Nr18DeploiementTest.php": [
+          "NR-18 les workflows de déploiement attendent la CI (needs: [ci])",
+          "NR-18 la liste des workflows qui se connectent à un serveur ne peut que baisser",
+          "NR-18 la surveillance de la sauvegarde existe et reste planifiée chaque jour",
+          "NR-18 la surveillance des canaux reste planifiée chaque heure",
+          "NR-18 les 31 workflows sont tous connus (un nouveau workflow se déclare)"
+        ]
+      },
+      "existants": [
+        "Infra/WorkflowsBornesDeDureeTest.php",
+        "Infra/SurveillanceCanauxWorkflowTest.php",
+        "Infra/ImagesConstruitesSontDeployeesTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-19",
+      "risque": "R12 campagnes",
+      "nouveaux": {
+        "Nr19Nr20RoutesTest.php": [
+          "NR-19 les adresses de collecte « campaigns » existent dans la liste des routes",
+          "NR-19 l’adresse « campaigns » ne répond jamais 404 (réponse protégée ou redirection)",
+          "NR-19 la tâche planifiée « campaigns:start-scheduled » existe toujours (collectes programmées)"
+        ]
+      },
+      "existants": [
+        "CampaignsTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-20",
+      "risque": "routes",
+      "nouveaux": {
+        "Nr19Nr20RoutesTest.php": [
+          "NR-20 toutes les routes de la photo existent encore, avec leurs protections",
+          "NR-20 les routes internes signées du relevé existent (6 canaux)"
+        ]
+      },
+      "existants": [
+        "PasDeStub501SousCrmEtAnalyticsTest.php"
+      ],
+      "frontend": [
+        "frontend/tests/non-regression/routes.test.ts"
+      ]
+    },
+    {
+      "id": "NR-21",
+      "risque": "ecrans (frontend)",
+      "nouveaux": {},
+      "existants": [],
+      "frontend": [
+        "frontend/tests/non-regression/routeTree.test.ts",
+        "frontend/tests/non-regression/menu.test.ts"
+      ]
+    },
+    {
+      "id": "NR-22",
+      "risque": "R14 connexion",
+      "nouveaux": {
+        "Nr22DeuxFacteursTest.php": [
+          "NR-22 un mauvais code de double authentification est refusé et n’ouvre rien",
+          "NR-22 le bon code de double authentification est accepté et ouvre les routes métier"
+        ]
+      },
+      "existants": [
+        "Auth/LoginTest.php",
+        "Auth/CourrielAuthentificationTest.php",
+        "Auth/GardesAuthentificationAgent35Test.php",
+        "Auth/ChangementMotDePasseTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "NR-23",
+      "risque": "audiences",
+      "nouveaux": {
+        "Nr23Nr08AudiencesEtRlsTest.php": [
+          "NR-23 une audience factice compte le même nombre de fiches pour chaque espace (photo de référence)"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "NR-24",
+      "risque": "couverture",
+      "nouveaux": {},
+      "existants": [
+        "Database/RafraichissementMatriceCouvertureTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "HORODATAGES-PARIS",
+      "risque": "ancien lot S8, fuseau Paris",
+      "nouveaux": {
+        "HorodatagesParisTest.php": [
+          "le fuseau de l’application est Europe/Paris",
+          "la session PostgreSQL de la connexion par défaut est en Europe/Paris",
+          "chaque connexion nommée (propriétaire, rôle de production) est en Europe/Paris",
+          "un instant d’été et un instant d’hiver gardent le bon décalage de Paris (+02 puis +01)",
+          "un horodatage écrit par l’application revient au même instant et à la même heure murale"
+        ]
+      },
+      "existants": [
+        "HorodatagesFuseauTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "LISTE",
+      "risque": "liste figee du filet",
+      "nouveaux": {
+        "ListeFigeeTest.php": []
+      },
+      "existants": [],
+      "frontend": []
+    }
+  ]
+}

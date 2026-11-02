@@ -1,0 +1,94 @@
+{
+    "lignes": [
+        {
+            "email": "accueil@seul.example.test",
+            "type": "generique",
+            "nature_adresse": "generique",
+            "fonction": null,
+            "organisation": "Seul Nr02",
+            "organisations": [
+                "Seul Nr02"
+            ],
+            "evenement": null,
+            "prenom_factice": null,
+            "nom_factice": null
+        },
+        {
+            "email": "bureau@club.example.test",
+            "type": "generique",
+            "nature_adresse": "nominatif",
+            "fonction": null,
+            "organisation": "Club Nr02",
+            "organisations": [
+                "Club Nr02",
+                "Club Nr02 (autre nom)"
+            ],
+            "evenement": {
+                "date_debut": "2099-03-15",
+                "date_fin": null,
+                "recurrence": null,
+                "ville": null,
+                "lien": null,
+                "libelle": "Salon Nr02"
+            },
+            "prenom_factice": null,
+            "nom_factice": null
+        },
+        {
+            "email": "deja@seul.example.test",
+            "type": "personne",
+            "nature_adresse": "nominatif",
+            "fonction": null,
+            "organisation": "Seul Nr02",
+            "organisations": [
+                "Seul Nr02"
+            ],
+            "evenement": null,
+            "prenom_factice": null,
+            "nom_factice": "Deja"
+        },
+        {
+            "email": "pro@club.example.test",
+            "type": "personne",
+            "nature_adresse": "nominatif",
+            "fonction": null,
+            "organisation": "Club Nr02",
+            "organisations": [
+                "Club Nr02"
+            ],
+            "evenement": {
+                "date_debut": "2099-03-15",
+                "date_fin": null,
+                "recurrence": null,
+                "ville": null,
+                "lien": null,
+                "libelle": "Salon Nr02"
+            },
+            "prenom_factice": null,
+            "nom_factice": "Pro"
+        }
+    ],
+    "bilan": {
+        "adresses_distinctes": 7,
+        "adresses_partagees": 1,
+        "destinataires": 4,
+        "ecartees_adresse_partagee": 0,
+        "ecartees_deja_informees": 0,
+        "ecartees_entreprise_fermee": 0,
+        "ecartees_entreprise_individuelle": 0,
+        "ecartees_fiche_console": 0,
+        "ecartees_information_tiers": 0,
+        "ecartees_invalides": 1,
+        "ecartees_non_diffusibles": 0,
+        "ecartees_non_verifiees": 0,
+        "ecartees_opposition": 1,
+        "ecartees_perso": 1,
+        "ecartees_pertinence_faible": 0,
+        "ecartees_sans_classement": 0,
+        "ecartees_site_non_verifie": 0,
+        "ecartees_source_osm": 0,
+        "ecartees_syndicats_salaries": 0,
+        "fiches": 3,
+        "sans_evenement_a_venir": 2
+    }
+}

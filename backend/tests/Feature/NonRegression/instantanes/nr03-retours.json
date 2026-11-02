@@ -1,0 +1,55 @@
+{
+    "contacts": [
+        {
+            "email": "desinscrit@club.example.test",
+            "statut_email": null,
+            "premier_message_pose": false
+        },
+        {
+            "email": "envoye@club.example.test",
+            "statut_email": null,
+            "premier_message_pose": true
+        },
+        {
+            "email": "mou@club.example.test",
+            "statut_email": null,
+            "premier_message_pose": false
+        },
+        {
+            "email": "plaignant@club.example.test",
+            "statut_email": null,
+            "premier_message_pose": false
+        },
+        {
+            "email": "rebondeur@club.example.test",
+            "statut_email": "invalid",
+            "premier_message_pose": false
+        }
+    ],
+    "organisation_premier_message_pose": true,
+    "evenement_intervention": "proposee",
+    "oppositions": [
+        {
+            "empreinte": "34cce0a922cba23861be6209b40064d0e0a108a829962f382c867c6bb1c635ce",
+            "univers": "business"
+        },
+        {
+            "empreinte": "afbf4a275cb5ffda9a0e6ccd3662a618ee23b0c5cee7886df433f7ebd9f8337c",
+            "univers": "business"
+        }
+    ],
+    "suppressions": [
+        {
+            "empreinte": "34cce0a922cba23861be6209b40064d0e0a108a829962f382c867c6bb1c635ce",
+            "univers": "business",
+            "raison": "complaint",
+            "occurrences": 1
+        },
+        {
+            "empreinte": "f835461dc47cce0b442b2f0da2c92717125fed00b1645f7e3cbfbe418d9576cf",
+            "univers": "business",
+            "raison": "hard_bounce",
+            "occurrences": 1
+        }
+    ]
+}

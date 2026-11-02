@@ -1,0 +1,452 @@
+[
+    {
+        "tache": "anomaly:detect",
+        "horaire": "*/15 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "audiences:full-refresh",
+        "horaire": "0 4 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "audit:verify-chain",
+        "horaire": "0 3 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "blacklists:check",
+        "horaire": "0 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "campaigns:start-scheduled",
+        "horaire": "* * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "closure:crm:planificateur:battement",
+        "horaire": "* * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "companies:rescrape-archives --limit=200",
+        "horaire": "0 2 1 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "companies:retry-google-places --limit=500",
+        "horaire": "0 3 1 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "coverage:refresh-matrix",
+        "horaire": "0 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "crm:emails:verifier",
+        "horaire": "0 5 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 360,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "crm:federations:trouver-sites",
+        "horaire": "30 5 3 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 240,
+        "en_arriere_plan": true,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "crm:flush-outbound",
+        "horaire": "*/5 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "crm:insee:mise-a-jour-mensuelle --duree-max=300",
+        "horaire": "30 9 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 360,
+        "en_arriere_plan": true,
+        "un_seul_serveur": true,
+        "conditions": 2,
+        "sauts": 1
+    },
+    {
+        "tache": "crm:insee:mise-a-jour-mensuelle --duree-max=300",
+        "horaire": "30 9 4 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 360,
+        "en_arriere_plan": true,
+        "un_seul_serveur": true,
+        "conditions": 2,
+        "sauts": 1
+    },
+    {
+        "tache": "crm:public:annuaire-officiel",
+        "horaire": "0 15 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 300,
+        "en_arriere_plan": true,
+        "un_seul_serveur": true,
+        "conditions": 2,
+        "sauts": 1
+    },
+    {
+        "tache": "crm:sonde-cle-personne",
+        "horaire": "10 6 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "crm:sonde-non-diffusibles",
+        "horaire": "20 6 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "crm:sonde-personnes",
+        "horaire": "30 6 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "db:partman-maintenir",
+        "horaire": "30 1 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "journalists:scrape-ours --editorial --limit=300",
+        "horaire": "40 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 180,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:backfill-periodicity",
+        "horaire": "15 3 * * 1",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:clean-emails --threshold=10",
+        "horaire": "5 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:enrich --limit=5000",
+        "horaire": "0 */3 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 180,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:extract-from-companies",
+        "horaire": "0 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-arcom",
+        "horaire": "30 3 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 180,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-blogs",
+        "horaire": "30 3 * * 1",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-emissions-wikidata",
+        "horaire": "0 3 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 180,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-opendatasoft agences",
+        "horaire": "45 2 * * 1",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-opendatasoft cppap",
+        "horaire": "15 2 * * 1",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:import-opendatasoft spel",
+        "horaire": "30 2 * * 1",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:link-emissions-to-channels",
+        "horaire": "30 4 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:link-to-companies",
+        "horaire": "0 4 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 360,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:score-confidence",
+        "horaire": "25 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:sync-emissions-from-parent",
+        "horaire": "20 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:sync-from-companies",
+        "horaire": "15 5 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "media:tag-emissions-status --limit=20000",
+        "horaire": "15 4 * * 0",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 180,
+        "en_arriere_plan": true,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "prospection:score-email-confidence",
+        "horaire": "45 4 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "retention:prune-scraper-runs --days=90",
+        "horaire": "20 4 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "retention:purge --all-workspaces --force",
+        "horaire": "0 4 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "rgpd:anonymize-ips",
+        "horaire": "30 4 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    },
+    {
+        "tache": "rgpd:purge-business-prospects",
+        "horaire": "15 4 2 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 240,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "rgpd:purge-personnes",
+        "horaire": "45 4 2 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 120,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "rgpd:purge-vivier",
+        "horaire": "30 3 2 * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 240,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
+        "tache": "rgpd:verifications-en-attente",
+        "horaire": "10 7 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "signals:nightly-scan",
+        "horaire": "0 2 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": null,
+        "en_arriere_plan": false,
+        "un_seul_serveur": false,
+        "conditions": 0,
+        "sauts": 0
+    }
+]

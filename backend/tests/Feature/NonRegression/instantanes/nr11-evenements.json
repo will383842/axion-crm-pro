@@ -1,0 +1,86 @@
+{
+    "form_submission": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "entreprises": 1,
+            "contacts": 1,
+            "activites": 1
+        }
+    },
+    "calendly_booked": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "calendly_completed": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "calendly_canceled": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "calendly_no_show": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "newsletter_optin": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "newsletter_optout": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1,
+            "oppositions": 1
+        }
+    },
+    "review_posted": {
+        "statut": 200,
+        "erreur": null,
+        "cree": []
+    },
+    "application_submitted": {
+        "statut": 503,
+        "erreur": "candidates_ingest_disabled",
+        "cree": []
+    },
+    "opt_out": {
+        "statut": 200,
+        "erreur": null,
+        "cree": {
+            "activites": 1
+        }
+    },
+    "lead_magnet_requested": {
+        "statut": 503,
+        "erreur": "personnes_ingest_disabled",
+        "cree": []
+    },
+    "email_hard_bounced": {
+        "statut": 503,
+        "erreur": "personnes_ingest_disabled",
+        "cree": []
+    },
+    "dossier_client_synchro": {
+        "statut": 422,
+        "erreur": "invalid_subject_ref",
+        "cree": []
+    }
+}

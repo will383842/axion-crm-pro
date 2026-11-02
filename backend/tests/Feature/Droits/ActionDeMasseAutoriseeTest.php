@@ -29,7 +29,7 @@ beforeEach(function () {
     app(PermissionRegistrar::class)->setPermissionsTeamId($this->espace->id);
 });
 
-function acteurAvecRole(string $espaceId, string $role): User
+function s6ActeurAvecRole(string $espaceId, string $role): User
 {
     $u = User::create([
         'id' => (string) Str::uuid(),
@@ -45,7 +45,7 @@ function acteurAvecRole(string $espaceId, string $role): User
 }
 
 test('un viewer n’a pas le droit d’agir en masse : refus, sans effet', function () {
-    $viewer = acteurAvecRole($this->espace->id, 'viewer');
+    $viewer = s6ActeurAvecRole($this->espace->id, 'viewer');
 
     expect(Gate::forUser($viewer)->allows('actionDeMasse', Company::class))->toBeFalse()
         ->and(Gate::forUser($viewer)->inspect('actionDeMasse', Company::class)->denied())->toBeTrue();
@@ -66,7 +66,7 @@ test('un compte sans aucun rôle n’a pas le droit d’agir en masse', function
 
 test('owner, admin et operator gardent le droit d’agir en masse', function () {
     foreach (['owner', 'admin', 'operator'] as $role) {
-        $u = acteurAvecRole($this->espace->id, $role);
+        $u = s6ActeurAvecRole($this->espace->id, $role);
         expect(Gate::forUser($u)->allows('actionDeMasse', Company::class))->toBeTrue($role);
     }
 });

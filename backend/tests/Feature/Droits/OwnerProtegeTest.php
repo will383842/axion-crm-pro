@@ -23,7 +23,7 @@ beforeEach(function () {
     app(PermissionRegistrar::class)->setPermissionsTeamId($this->espace->id);
 });
 
-function compteAvecRole(string $espaceId, string $role): User
+function s6CompteAvecRole(string $espaceId, string $role): User
 {
     $u = User::create([
         'id' => (string) Str::uuid(),
@@ -39,7 +39,7 @@ function compteAvecRole(string $espaceId, string $role): User
 }
 
 test('un admin qui invite quelqu’un avec le rôle owner reçoit 403, rien n’est créé', function () {
-    $this->actingAs(compteAvecRole($this->espace->id, 'admin'));
+    $this->actingAs(s6CompteAvecRole($this->espace->id, 'admin'));
 
     $this->postJson('/api/v1/users', [
         'email' => 'nouveau@example.test', 'name' => 'Nouveau', 'role' => 'owner',
@@ -49,8 +49,8 @@ test('un admin qui invite quelqu’un avec le rôle owner reçoit 403, rien n’
 });
 
 test('un admin qui promeut un compte au rôle owner reçoit 403, le rôle ne change pas', function () {
-    $this->actingAs(compteAvecRole($this->espace->id, 'admin'));
-    $cible = compteAvecRole($this->espace->id, 'operator');
+    $this->actingAs(s6CompteAvecRole($this->espace->id, 'admin'));
+    $cible = s6CompteAvecRole($this->espace->id, 'operator');
 
     $this->putJson('/api/v1/users/' . $cible->id, ['role' => 'owner'])->assertForbidden();
 
@@ -60,8 +60,8 @@ test('un admin qui promeut un compte au rôle owner reçoit 403, le rôle ne cha
 });
 
 test('un admin ne peut ni rétrograder ni fermer un owner', function () {
-    $this->actingAs(compteAvecRole($this->espace->id, 'admin'));
-    $owner = compteAvecRole($this->espace->id, 'owner');
+    $this->actingAs(s6CompteAvecRole($this->espace->id, 'admin'));
+    $owner = s6CompteAvecRole($this->espace->id, 'owner');
 
     $this->putJson('/api/v1/users/' . $owner->id, ['role' => 'viewer'])->assertForbidden();
     $this->deleteJson('/api/v1/users/' . $owner->id)->assertForbidden();
@@ -72,7 +72,7 @@ test('un admin ne peut ni rétrograder ni fermer un owner', function () {
 });
 
 test('un owner peut toujours nommer un owner (la garde ne bloque pas les ayants droit)', function () {
-    $this->actingAs(compteAvecRole($this->espace->id, 'owner'));
+    $this->actingAs(s6CompteAvecRole($this->espace->id, 'owner'));
 
     $this->postJson('/api/v1/users', [
         'email' => 'second@example.test', 'name' => 'Second', 'role' => 'owner',
@@ -80,7 +80,7 @@ test('un owner peut toujours nommer un owner (la garde ne bloque pas les ayants 
 });
 
 test('un admin peut toujours inviter un operator', function () {
-    $this->actingAs(compteAvecRole($this->espace->id, 'admin'));
+    $this->actingAs(s6CompteAvecRole($this->espace->id, 'admin'));
 
     $this->postJson('/api/v1/users', [
         'email' => 'operateur@example.test', 'name' => 'Operateur', 'role' => 'operator',

@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-function espaceFactice(string $slug): string
+function s6EspaceFactice(string $slug): string
 {
     return (string) Workspace::create([
         'id' => (string) Str::uuid(), 'slug' => $slug, 'name' => $slug, 'settings' => [],
@@ -30,12 +30,12 @@ test('drapeau éteint : le réglage global fait foi, comme aujourd’hui (les tr
     config(['crm.segments_par_espace' => false, 'crm.segments_ouverts' => '']);
 
     expect(config('crm.segments_par_espace'))->toBeFalse()
-        ->and(Segments::ouverts(espaceFactice('ws-a')))->toBe(Segments::CONNUS);
+        ->and(Segments::ouverts(s6EspaceFactice('ws-a')))->toBe(Segments::CONNUS);
 });
 
 test('drapeau allumé : un nouvel espace a TOUT fermé', function () {
     config(['crm.segments_par_espace' => true]);
-    $nouvel = espaceFactice('ws-nouveau');
+    $nouvel = s6EspaceFactice('ws-nouveau');
 
     expect(Segments::ouverts($nouvel))->toBe([])
         ->and(Segments::ouvert(Segments::PRESSE, $nouvel))->toBeFalse()
@@ -51,8 +51,8 @@ test('drapeau allumé : sans espace connu, tout est fermé (échec fermé)', fun
 
 test('drapeau allumé : on ouvre un segment pour UN espace sans toucher aux autres', function () {
     config(['crm.segments_par_espace' => true]);
-    $a = espaceFactice('ws-a');
-    $b = espaceFactice('ws-b');
+    $a = s6EspaceFactice('ws-a');
+    $b = s6EspaceFactice('ws-b');
 
     FonctionsEspace::regler($a, Segments::PRESSE, true);
 
@@ -66,7 +66,7 @@ test('drapeau allumé : on ouvre un segment pour UN espace sans toucher aux autr
 
 test('un segment inconnu ne peut jamais être ouvert par espace', function () {
     config(['crm.segments_par_espace' => true]);
-    $a = espaceFactice('ws-a');
+    $a = s6EspaceFactice('ws-a');
 
     expect(fn () => FonctionsEspace::regler($a, 'prospects-insee', true))
         ->toThrow(InvalidArgumentException::class);
@@ -80,7 +80,7 @@ test('instantané : la migration pose pour l’espace d’Axion exactement l’�
     $etatAujourdhui = Segments::CONNUS;
 
     $migration = require base_path('database/migrations/2026_11_02_000010_fonctions_espace.php');
-    $axion = espaceFactice('axion-ia');
+    $axion = s6EspaceFactice('axion-ia');
     DB::table('fonctions_espace')->where('espace_id', $axion)->delete();
     config(['crm.segments_ouverts' => '']);
     $migration->poserEtatActuelPourAxion();

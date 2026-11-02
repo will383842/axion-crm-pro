@@ -115,6 +115,7 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
 
   // Captures de la PR (1440 et 360 px), déposées par `demo.yml` dans l'artefact « captures-demo ».
   test('captures 1440 et 360 px des pages du lot', async ({ page }) => {
+    test.setTimeout(120_000);
     const pages: ReadonlyArray<readonly [string, string, boolean]> = [
       ['desinscriptions', '/envoi/desinscriptions', true],
       ['alertes', '/envoi/alertes', true],
@@ -131,7 +132,7 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
       for (const [nom, chemin, connecte] of pages) {
         await ouvrirDemo(page, chemin, { offre: nom === 'destinataires' ? 'envoi' : 'les-deux', connecte });
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-        await page.waitForLoadState('networkidle');
+        await expect(page.getByRole('status', { name: 'Chargement' })).toHaveCount(0);
         await page.screenshot({ path: `captures-demo/dm2-cnf-${nom}-${largeur}.png`, fullPage: true });
       }
     }

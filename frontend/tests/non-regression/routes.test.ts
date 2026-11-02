@@ -21,7 +21,14 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 /** Appels sans route dans la photo à la date du filet (R0). À ne faire que BAISSER. */
 // POST propositions/{id}/{action} : le dernier segment est choisi à l'exécution (accepter ou refuser) ;
 // le relevé statique ne peut pas le résoudre, ce n'est pas une route manquante.
-const ECARTS_CONNUS: string[] = ['POST /api/v1/crm/propositions/{p}/{p}'];
+// Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
+// Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
+// prévue au lot S/Envoi, qui retirera ces deux lignes.
+const ECARTS_CONNUS: string[] = [
+  'GET /api/v1/envoi/compteurs',
+  'GET /api/v1/envoi/etat',
+  'POST /api/v1/crm/propositions/{p}/{p}',
+];
 
 function fichiers(dossier: string): string[] {
   return readdirSync(dossier).flatMap((nom) => {

@@ -55,6 +55,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/reponses/{id}/creer-fiche": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Créer une nouvelle personne à partir d'une réponse sans fiche
+         * @description Crée la personne dans le CRM avec sa provenance, rattache la réponse
+         *     et la remet dans « À traiter ». Rien n'est jamais supprimé.
+         */
+        post: operations["creerFicheDepuisReponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/reponses/{id}/rattacher": {
         parameters: {
             query?: never;
@@ -146,6 +167,9 @@ export interface components {
             par_page: number;
             total: number;
         };
+        ReponseApresGeste: components["schemas"]["ReponseResume"] & {
+            resume_crm: components["schemas"]["ResumeCrm"] | null;
+        };
         ReponseResume: {
             boite_id: components["schemas"]["Identifiant"];
             campagne_id: components["schemas"]["Identifiant"] | null;
@@ -166,6 +190,23 @@ export interface components {
             };
             traitee: boolean;
         };
+        /**
+         * @description Résumé envoyé au CRM après un geste (les réponses restent dans Envoi,
+         *     le CRM n'en reçoit que ce résumé).
+         */
+        ResumeCrm: {
+            classement: components["schemas"]["ClassementReponse"];
+            le: components["schemas"]["Horodatage"];
+            /** @description Lien vers la réponse dans Envoi. */
+            lien: string;
+            /**
+             * @description Vrai si le contact est mis à l'écart des envois (données gardées).
+             * @default false
+             */
+            opposition: boolean;
+            /** @description Libellé de la tâche créée dans le CRM. */
+            tache: string | null;
+        };
         SuggestionRattachement: {
             libelle: string;
             raison: string;
@@ -184,13 +225,13 @@ export interface components {
                 "application/json": components["schemas"]["Erreur"];
             };
         };
-        /** @description Réponse après le geste. */
+        /** @description Réponse après le geste, avec le résumé envoyé au CRM. */
         Reponse: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["ReponseResume"];
+                "application/json": components["schemas"]["ReponseApresGeste"];
             };
         };
     };
@@ -296,6 +337,29 @@ export interface operations {
             200: components["responses"]["Reponse"];
         };
     };
+    creerFicheDepuisReponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    nom: string;
+                    organisation?: string | null;
+                    prenom: string;
+                    provenance: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Reponse"];
+        };
+    };
     rattacherReponse: {
         parameters: {
             query?: never;
@@ -330,6 +394,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Collègue à qui la suite est confiée (facultatif). */
+                    attribuer_a?: string | null;
                     corps: string;
                     raccourci_id?: components["schemas"]["Identifiant"];
                 };
@@ -355,6 +421,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Collègues à qui une réponse peut être attribuée. */
+                        collegues: {
+                            id: string;
+                            nom: string;
+                        }[];
                         data: {
                             corps: string;
                             id: components["schemas"]["Identifiant"];

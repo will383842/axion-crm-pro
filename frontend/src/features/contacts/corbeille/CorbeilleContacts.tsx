@@ -2,7 +2,7 @@
  * Corbeille des contacts (DM1-CON) : les personnes retirées, restaurables.
  *
  * Retirer ne supprime jamais une personne (règle de fer n° 2) : la fiche garde
- * son historique et revient d'un clic.
+ * son historique et revient d'un geste.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';

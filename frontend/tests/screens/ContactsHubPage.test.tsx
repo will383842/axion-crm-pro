@@ -151,7 +151,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     expect(new URL(urls[0] as string).searchParams.get('temperature')).toBe('actifs');
 
     await user.click(screen.getByRole('button', { name: 'Prospection (base froide)' }));
@@ -178,7 +178,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     expect(new URL(urls[0] as string).searchParams.has('relation_type')).toBe(false);
 
     const onglets = screen.getByRole('tablist');
@@ -203,7 +203,7 @@ describe('ContactsHubPage — parcours', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), handler],
     });
 
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     const select = screen.getByLabelText('Statut de prospection');
     const option = within(select).getAllByRole('option')[1] as HTMLOptionElement;
 
@@ -225,7 +225,7 @@ describe('ContactsHubPage — gestes DM1-CON (démo)', () => {
       landingRoutes: LANDING,
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), getJson('/crm/contacts-hub', PAGE)],
     });
-    await screen.findByText('ACME GRENOBLE');
+    await screen.findByText(LIGNE.denomination);
     expect(screen.getByRole('button', { name: 'Importer' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Corbeille' })).toBeVisible();
 

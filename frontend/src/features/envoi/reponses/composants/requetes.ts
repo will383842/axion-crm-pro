@@ -65,7 +65,12 @@ function useGeste<V>(appel: (v: V) => Promise<ReponseApresGeste>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: appel,
-    onSuccess: () => client.invalidateQueries({ queryKey: RACINE }),
+    // Sans `return` : la mutation n’attend pas la relecture de la file. Les
+    // rappels passés à `mutate(...)` partent alors AVANT que la réponse traitée
+    // quitte la liste (et démonte l'écran qui les a posés).
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: RACINE });
+    },
   });
 }
 

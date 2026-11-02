@@ -9,7 +9,8 @@
  *  3. Envoi actif mais utilisateur sans accès (`acces_produits.envoi: false`) :
  *     introuvable aussi ;
  *  4. Envoi actif : chaque route rend sa page « en attente », au nom du lot
- *     qui la remplira ;
+ *     qui la remplira — ou, une fois ce lot fusionné, SA VRAIE PAGE (titre
+ *     attendu, ni « en attente » ni « introuvable ») ;
  *  5. la page publique de désinscription vit HORS coquille.
  *
  * Monte l'arbre de routes RÉEL (`src/app/routeTree.tsx`), comme
@@ -32,6 +33,10 @@ import { renderScreen } from '../helpers/renderScreen';
 import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
+import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
+
+/** Les routes `/envoi/…` du faux serveur de la démo. */
+const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
 
 let arbre: AnyRoute;
 
@@ -66,14 +71,23 @@ async function monter(url: string) {
   return { ...vue, router };
 }
 
-/** Une URL concrète par route d'Envoi, et le lot qui remplira sa page. */
-const ROUTES_ENVOI: ReadonlyArray<readonly [string, string]> = [
+/**
+ * Une URL concrète par route d'Envoi, le lot qui remplit sa page et, dès que
+ * ce lot a livré la page, le titre (h1) qu'elle doit afficher. Sans titre, la
+ * route doit encore rendre sa page « en attente ».
+ *
+ * Filet modifié : pourquoi — un lot qui remplace sa page d'attente ajoute ici
+ * le titre de la vraie page ; la garde reste aussi stricte (la page doit
+ * s'afficher, avec son titre, sans « en attente » ni « introuvable »), et la
+ * garde « Sans Envoi → introuvable » couvre toujours TOUTES les routes.
+ */
+const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes', 'DM2-CAM'],
   ['/envoi/campagnes/calendrier', 'DM2-CAM'],
   ['/envoi/campagnes/c-1', 'DM2-CAM'],
-  ['/envoi/campagnes/nouvelle', 'DM2-ASS'],
-  ['/envoi/campagnes/messages', 'DM2-ASS'],
-  ['/envoi/campagnes/messages/m-1', 'DM2-ASS'],
+  ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
+  ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
+  ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP'],
@@ -145,8 +159,25 @@ describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envo
   });
 });
 
+/** Routes dont le lot n'a pas encore livré la page. */
+const ROUTES_EN_ATTENTE = ROUTES_ENVOI.filter(([, , titre]) => titre === undefined).map(([url, lot]) => [url, lot] as const);
+/** Routes dont le lot a livré la vraie page, avec le titre attendu. */
+const ROUTES_LIVREES = ROUTES_ENVOI.flatMap(([url, lot, titre]) => (titre === undefined ? [] : [[url, lot, titre] as const]));
+
+describe('Envoi actif — chaque route livrée rend sa VRAIE page', () => {
+  it.each(ROUTES_LIVREES)('%s → vraie page du lot %s (« %s »)', async (url, _lot, titre) => {
+    // Le faux serveur de la démo (le même que celui des e2e) répond aux appels
+    // de la page ; droits et compte restent ceux du test (Envoi actif).
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersDemoEnvoi);
+    await monter(url);
+    expect(await screen.findByRole('heading', { level: 1, name: titre }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+  });
+});
+
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
-  it.each(ROUTES_ENVOI)('%s → page en attente du lot %s', async (url, lot) => {
+  it.each(ROUTES_EN_ATTENTE)('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');

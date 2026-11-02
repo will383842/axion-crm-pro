@@ -10,7 +10,7 @@ test.describe('entreprises en démo', () => {
   test('T1 : cocher des fiches, poser l’étiquette, exporter la sélection (moins de 3 min)', async ({ page }) => {
     const debut = Date.now();
     await ouvrirDemo(page, '/companies');
-    await expect(page.getByText('Boulangerie des Tilleuls')).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Boulangerie des Tilleuls' })).toBeVisible();
 
     await page.getByRole('checkbox', { name: 'Sélectionner Boulangerie des Tilleuls' }).check();
     await page.getByRole('checkbox', { name: 'Sélectionner Atelier Bois & Forme' }).check();
@@ -35,8 +35,9 @@ test.describe('entreprises en démo', () => {
     await page.getByRole('button', { name: 'Enregistrer cette vue' }).click();
     await page.getByRole('textbox', { name: 'Nom de la vue' }).fill('Priorité haute du mois');
     await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await expect(page.getByText('Vue « Priorité haute du mois » enregistrée.')).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('combobox', { name: 'Vues enregistrées' }).getByRole('option', { name: 'Priorité haute du mois' })).toHaveCount(1);
+    await expect(page.getByRole('combobox', { name: 'Vues enregistrées' }).locator('option', { hasText: 'Priorité haute du mois' })).toHaveCount(1);
   });
 
   test('la fiche montre le suivi, les liens et les envois d’Envoi', async ({ page }) => {
@@ -57,14 +58,14 @@ test.describe('entreprises en démo', () => {
 
   test('les 4 états de la liste', async ({ page }) => {
     await ouvrirDemo(page, '/companies', { etat: 'vide' });
-    await expect(page.getByText('Aucune entreprise')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Aucune entreprise' })).toBeVisible();
     await ouvrirDemo(page, '/companies', { etat: 'erreur' });
     await expect(page.getByText(/momentanément indisponible|n’a pas pu|Réessayer/).first()).toBeVisible();
   });
 
   test('accessibilité et téléphone', async ({ page }) => {
     await ouvrirDemo(page, '/companies');
-    await expect(page.getByText('Boulangerie des Tilleuls')).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Boulangerie des Tilleuls' })).toBeVisible();
     await controleAxe(page);
     await passage360(page);
     await ouvrirDemo(page, '/companies/1');
@@ -78,7 +79,12 @@ test.describe('entreprises en démo', () => {
       for (const largeur of [1440, 360]) {
         await page.setViewportSize({ width: largeur, height: largeur === 1440 ? 900 : 780 });
         await ouvrirDemo(page, chemin);
-        await expect(page.getByText('Boulangerie des Tilleuls').first()).toBeVisible();
+        await expect(
+          nom === 'entreprises'
+            ? page.getByRole('main').getByRole('link', { name: 'Boulangerie des Tilleuls' })
+            : page.getByRole('heading', { level: 1, name: 'Boulangerie des Tilleuls' }),
+        ).toBeVisible();
+        await page.waitForLoadState('networkidle');
         await page.screenshot({ path: `captures-demo/dm1-ent-${nom}-${largeur}.png`, fullPage: true });
       }
     }

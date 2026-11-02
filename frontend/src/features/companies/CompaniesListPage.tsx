@@ -429,6 +429,13 @@ export function CompaniesListPage() {
         />
       </div>
 
+      {/* Résultat de l'action de masse : hors de la barre, qui disparaît avec la sélection. */}
+      {messageMasse !== null && (
+        <p role="status" className="mb-3 text-sm text-slate-700 dark:text-slate-300">
+          {messageMasse}
+        </p>
+      )}
+
       {/* Prospection status tabs */}
       <div className="mb-3 flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800">
         {PROSPECTION_TABS.map((tab) => {
@@ -757,11 +764,6 @@ export function CompaniesListPage() {
               <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
                 Annuler la sélection
               </Button>
-              {messageMasse !== null && (
-                <span role="status" className="text-xs text-slate-600 dark:text-slate-300">
-                  {messageMasse}
-                </span>
-              )}
             </div>
           )}
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 746 px de
@@ -769,7 +771,7 @@ export function CompaniesListPage() {
               fixes, 8 gouttieres de 12, 2x16 de rembourrage) etaient coupes net par
               le `overflow-hidden` de la Card. L en-tete ET le corps virtualise sont
               dedans : sinon ils defileraient separement et ne seraient plus alignes. */}
-          <TableScroll template={GRID}>
+          <TableScroll template={GRID} role="table" aria-label="Entreprises" aria-rowcount={rows.length + 1}>
 
           {/* Sticky header — must share GRID with CompanyRow */}
           <div
@@ -783,7 +785,7 @@ export function CompaniesListPage() {
             {/* Tout cocher ne porte que sur la PAGE affichée : « toutes les
                 fiches du filtre » se compterait en millions et ne pourrait pas
                 être annulé à la main. */}
-            <div className="flex items-center justify-center">
+            <div role="columnheader" className="flex items-center justify-center">
               <input
                 type="checkbox"
                 checked={rows.length > 0 && rows.every((r) => selection.has(r.id))}
@@ -794,13 +796,13 @@ export function CompaniesListPage() {
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
               />
             </div>
-            <div>Entreprise</div>
-            <div>Activité</div>
-            <div>Taille</div>
-            <div>Qualité</div>
-            <div>Ville</div>
-            <div>Enrichi</div>
-            <div className="sr-only">Actions</div>
+            <div role="columnheader">Entreprise</div>
+            <div role="columnheader">Activité</div>
+            <div role="columnheader">Taille</div>
+            <div role="columnheader">Qualité</div>
+            <div role="columnheader">Ville</div>
+            <div role="columnheader">Enrichi</div>
+            <div role="columnheader" className="sr-only">Actions</div>
           </div>
 
           {/* Virtualised body — DO NOT remove the absolute positioning trick,
@@ -809,7 +811,6 @@ export function CompaniesListPage() {
             ref={parentRef}
             className="h-[600px] overflow-auto"
             role="rowgroup"
-            aria-rowcount={rows.length}
           >
             <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((vrow) => {
@@ -818,7 +819,7 @@ export function CompaniesListPage() {
                 return (
                   <div
                     key={c.id}
-                    aria-rowindex={vrow.index + 1}
+                    role="presentation"
                     style={{
                       position: "absolute",
                       top: 0,

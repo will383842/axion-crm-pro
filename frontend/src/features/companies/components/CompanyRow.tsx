@@ -37,7 +37,7 @@ export interface CompanyRowProps {
 // même grille — la modifier d'un seul côté désaligne tout le tableau.
 // Audit UX lot 14 (2026-10-03) : la colonne SIREN a quitté la liste (elle
 // reste sur la fiche) et « NAF » est devenue « Activité », en clair.
-const GRID = '32px 2fr 1.4fr 110px 140px 1.1fr 100px 36px';
+const GRID = '32px minmax(200px, 2fr) minmax(140px, 1.4fr) 110px 140px minmax(100px, 1.1fr) 100px 36px';
 
 /**
  * Single virtualised row in the companies list.
@@ -76,7 +76,7 @@ export function CompanyRow({
       {/* Case de sélection. Rendue même sans gestionnaire (désactivée) : la
           grille est PARTAGÉE avec l'en-tête collant, une colonne qui
           apparaîtrait par intermittence désalignerait le tableau entier. */}
-      <div className="flex items-center justify-center">
+      <div role="cell" className="flex items-center justify-center">
         <input
           type="checkbox"
           checked={selectionnee}
@@ -86,7 +86,7 @@ export function CompanyRow({
           className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-30 dark:border-slate-600"
         />
       </div>
-      <div className="flex min-w-0 items-center gap-3">
+      <div role="cell" className="flex min-w-0 items-center gap-3">
         <Avatar name={name} size="sm" />
         <div className="min-w-0">
           {/* La pastille tient sur la ligne du nom : la hauteur de ligne est
@@ -124,26 +124,27 @@ export function CompanyRow({
           sinon division) ; le code complet en infobulle. Un code sans libellé
           connu reste affiché tel quel plutôt que vide. */}
       <div
+        role="cell"
         className="truncate text-xs text-slate-700 dark:text-slate-300"
         title={naf === '' ? undefined : `Code d’activité : ${naf}`}
       >
         {libelleActivite(c.naf_label, c.naf) ?? (naf === '' ? '—' : naf)}
       </div>
 
-      <div><SizeCategoryBadge size={c.size_category} /></div>
+      <div role="cell"><SizeCategoryBadge size={c.size_category} /></div>
 
-      <div><QualityBadge score={c.quality_score} /></div>
+      <div role="cell"><QualityBadge score={c.quality_score} /></div>
 
-      <div className="truncate text-slate-600 dark:text-slate-400">
+      <div role="cell" className="truncate text-slate-600 dark:text-slate-400">
         {c.city ? <span>{c.city}</span> : <span className="text-slate-400">—</span>}
         {c.postcode ? <span className="ml-1 text-xs text-slate-400">{c.postcode.slice(0, 2)}</span> : null}
       </div>
 
-      <div className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+      <div role="cell" className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
         {c.enriched_at ? new Date(c.enriched_at).toLocaleDateString('fr-FR') : '—'}
       </div>
 
-      <div className="flex justify-end">
+      <div role="cell" className="flex justify-end">
         <DropdownMenu
           align="right"
           trigger={

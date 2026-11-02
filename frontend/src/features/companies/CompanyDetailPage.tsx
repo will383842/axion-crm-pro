@@ -337,8 +337,11 @@ export function CompanyDetailPage() {
 
           <EnrichmentTimeline steps={timeline} />
 
-          <LiensEntreprisesCard liens={c.liens ?? []} />
-          <HistoriqueCard lignes={c.historique ?? []} />
+          {/* DM1-ENT — ces cartes ne s'affichent que si le serveur fournit le
+              champ : le vrai `GET /companies/{id}` ne les sert pas encore, et une
+              carte vide affirmerait à tort « aucun lien », « rien à afficher ». */}
+          {c.liens !== undefined ? <LiensEntreprisesCard liens={c.liens} /> : null}
+          {c.historique !== undefined ? <HistoriqueCard lignes={c.historique} /> : null}
 
           {/* Raw data accordion */}
           <Card padding="md">
@@ -386,8 +389,10 @@ export function CompanyDetailPage() {
             saisieManuelleLe={c.relation_saisie_manuelle_at}
             joignabilite={c.joignabilite}
           />
-          <SuiviCommercialCard responsable={c.responsable} affaire={c.affaire} />
-          {envoiActif ? <EnvoisRecusCard companyId={c.id} envois={c.envois ?? []} /> : null}
+          {c.responsable !== undefined || c.affaire !== undefined ? (
+            <SuiviCommercialCard responsable={c.responsable} affaire={c.affaire} />
+          ) : null}
+          {envoiActif && c.envois !== undefined ? <EnvoisRecusCard companyId={c.id} envois={c.envois} /> : null}
           <ContactsCard contacts={c.contacts ?? []} />
           <EvenementsCard companyId={c.id} />
           <TachesCrmCard companyId={c.id} />

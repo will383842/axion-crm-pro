@@ -31,13 +31,17 @@ export interface CompanyRowProps {
   onExport?: (id: number) => void;
   onDelete?: (id: number) => void;
   className?: string;
+  /** Rang de la ligne pour les lecteurs d'écran (`aria-rowindex`, l'en-tête vaut 1). */
+  rangAria?: number;
 }
 
 // Colonne de sélection EN TÊTE : l'en-tête collant de la liste partage cette
 // même grille — la modifier d'un seul côté désaligne tout le tableau.
 // Audit UX lot 14 (2026-10-03) : la colonne SIREN a quitté la liste (elle
 // reste sur la fiche) et « NAF » est devenue « Activité », en clair.
-const GRID = '32px minmax(200px, 2fr) minmax(140px, 1.4fr) 110px 140px minmax(100px, 1.1fr) 100px 36px';
+// DM1-ENT : les pistes souples ont un minimum (`minmax`) pour rester lisibles
+// à 360 px (le tableau défile alors dans son cadre) : largeur minimale 874 px.
+const GRID = '32px minmax(160px, 2fr) minmax(100px, 1.4fr) 110px 140px minmax(80px, 1.1fr) 100px 36px';
 
 /**
  * Single virtualised row in the companies list.
@@ -51,6 +55,7 @@ export function CompanyRow({
   onExport,
   onDelete,
   className,
+  rangAria,
 }: CompanyRowProps) {
   const c = company;
   const name = c.denomination ?? c.siren;
@@ -61,6 +66,7 @@ export function CompanyRow({
   return (
     <div
       role="row"
+      aria-rowindex={rangAria}
       className={cn(
         'grid items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-sm transition-colors hover:bg-slate-50',
         'dark:border-slate-800 dark:hover:bg-slate-800/60',

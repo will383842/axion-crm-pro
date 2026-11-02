@@ -46,7 +46,7 @@ function espaceResidu(string $prefixe = 'residu'): string
     return $id;
 }
 
-test('B15-006 / L3c-0 — apres la demande d effacement, contacts masques et gardes, timeline sans trace en clair', function () {
+test('B15-006 / L3c-0 — apres la demande d effacement, contacts et candidats masques, timeline GARDEE', function () {
     $espace = espaceResidu();
     $cle = hash('sha256', COURRIEL_EFFACE);
 
@@ -89,16 +89,17 @@ test('B15-006 / L3c-0 — apres la demande d effacement, contacts masques et gar
 
     app(GdprErasureService::class)->erase(COURRIEL_EFFACE, TEL_EFFACE);
 
-    // L3c-0 : contacts et candidats sont MASQUÉS et gardés (jamais supprimés) ;
-    // les timelines, elles, ne gardent plus de trace en clair.
+    // L3c-0 : contacts et candidats sont MASQUÉS (corbeille douce) et gardés
+    // (jamais supprimés) ; la timeline est GARDÉE aussi (aucune donnée de
+    // personne n'est détruite).
     expect(DB::table('contacts')->where('email', COURRIEL_EFFACE)->whereNull('deleted_at')->count())->toBe(0);
     expect(DB::table('contacts')->where('email', COURRIEL_EFFACE)->count())->toBe(1);
     expect(DB::table('candidates')->where('email', COURRIEL_EFFACE)->count())->toBe(1);
-    expect(DB::table('activities')->whereRaw('payload::text ILIKE ?', ['%' . TEL_EFFACE . '%'])->count())->toBe(0);
-    expect(DB::table('activities')->whereRaw('payload::text ILIKE ?', ['%' . COURRIEL_EFFACE . '%'])->count())->toBe(0);
+    expect(DB::table('candidates')->where('email', COURRIEL_EFFACE)->whereNull('deleted_at')->count())->toBe(0);
+    expect(DB::table('activities')->whereRaw('payload::text ILIKE ?', ['%' . TEL_EFFACE . '%'])->count())->toBe(1);
 });
 
-test('B15-006 — le telephone d un contact media est neutralise, pas seulement l adresse', function () {
+test('B15-006 / L3c-0 — le contact media est GARDE tel quel (rien n est vide)', function () {
     $espace = espaceResidu();
     DB::table('media')->insert([
         'workspace_id' => $espace,
@@ -112,8 +113,8 @@ test('B15-006 — le telephone d un contact media est neutralise, pas seulement 
     app(GdprErasureService::class)->erase(COURRIEL_EFFACE, TEL_EFFACE);
 
     $media = DB::table('media')->where('name', 'Journal résidu')->first();
-    expect($media->email)->toBeNull();
-    expect($media->phone)->toBeNull();
+    expect($media->email)->toBe(COURRIEL_EFFACE);
+    expect($media->phone)->toBe(TEL_EFFACE);
 });
 
 test('B15-006 — TEMOIN : ce qui appartient a QUELQU UN D AUTRE n est pas touche', function () {

@@ -79,7 +79,8 @@ test('sous axion_app, l effacement console fait le travail par espace et ne se d
         $verdict = VerifierEffacementRgpd::constater($email, $resultat['personnels']);
         DB::setDefaultConnection($precedente);
 
-        expect($owner->table('companies')->where('id', $fiche)->value('email_generic'))->toBeNull()
+        // L3c-0 : la fiche d'organisation est GARDÉE telle quelle (rien n'est vidé).
+        expect($owner->table('companies')->where('id', $fiche)->value('email_generic'))->toBe($email)
             // L3c-0 : le contact est MASQUÉ (corbeille douce), jamais supprimé.
             ->and($owner->table('contacts')->where('id', $contact)->exists())->toBeTrue()
             ->and($owner->table('contacts')->where('id', $contact)->value('deleted_at'))->not->toBeNull()

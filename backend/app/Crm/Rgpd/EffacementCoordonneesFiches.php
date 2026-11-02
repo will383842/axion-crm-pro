@@ -326,6 +326,38 @@ final class EffacementCoordonneesFiches
     }
 
     /**
+     * L3c-0 — relevé SANS RIEN MODIFIER : ce que `effacerPartout()` calculait
+     * (numéros personnels, numéros opposables) sans plus rien effacer. Sert à
+     * l'anti-réinsertion par téléphone (`opt_out`).
+     *
+     * @param  list<string>  $telephones
+     * @param  list<string>  $clesNom
+     * @return array{personnels: list<string>, opposables: list<string>}
+     */
+    public static function releverPartout(string $email, array $telephones, array $clesNom): array
+    {
+        $email = mb_strtolower(trim($email));
+        $personnels = [];
+        $parEspace = [];
+        foreach (self::espaces() as $espace) {
+            $resultat = WorkspaceContext::run($espace, static function () use ($email, $telephones, $clesNom, $espace): array {
+                $tels = array_values(array_unique(array_merge($telephones, self::telephonesDesContacts($email, $espace))));
+                $cles = array_values(array_unique(array_merge($clesNom, self::clesNomDesContacts($email, $espace))));
+
+                return [
+                    'personnels' => self::numerosPersonnels($tels, $email, $cles, $espace),
+                    'presents' => self::presents($tels, $espace),
+                ];
+            });
+            $personnels = array_merge($personnels, $resultat['personnels']);
+            $parEspace[] = $resultat;
+        }
+        $personnels = array_values(array_unique($personnels));
+
+        return ['personnels' => $personnels, 'opposables' => self::opposables($personnels, $parEspace)];
+    }
+
+    /**
      * Les numéros personnels dans TOUS les espaces où on les trouve, et
      * aucun autre : pas d'union (E2). Un numéro personnel ici mais standard
      * là-bas n'est pas opposé — l'opposition fermerait le standard.

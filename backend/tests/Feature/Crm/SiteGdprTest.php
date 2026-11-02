@@ -77,6 +77,21 @@ function gdprPost(array $payload): TestResponse
 
 const GDPR_EMAIL = 'zz.gdpr@example.invalid';
 
+/** Un compte `owner` de l'espace (celui que la demande d'effacement doit prévenir). */
+function gdprProprietaire(string $espace): string
+{
+    $id = (string) Str::uuid();
+    DB::table('users')->insert([
+        'id' => $id, 'email' => 'owner-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ owner',
+        'current_workspace_id' => $espace, 'first_login_completed_at' => now(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    setPermissionsTeamId($espace);
+    App\Models\User::findOrFail($id)->assignRole('owner');
+
+    return $id;
+}
+
 function gdprPersonKey(): string
 {
     // Person_key SALÉ côté site : n'importe quel sha256 fait l'affaire, il ne
@@ -291,6 +306,70 @@ test('scope=vivier ne met à l\'écart QUE le vivier', function () {
         ->and(DB::table('contacts')->whereNull('deleted_at')->count())->toBe(2)
         ->and(DB::table('opt_out')->where('scope', 'vivier')->count())->toBe(1)
         ->and(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);
+});
+
+test('L3c-0 : un REJEU de la demande ne crée pas de seconde ligne pending, ne re-signale pas, et ne rend aucun identifiant interne', function () {
+    gdprSeedPerson();
+    $this->seed(Database\Seeders\PermissionsAndRolesSeeder::class);
+    $proprietaire = gdprProprietaire(gdprBusinessWorkspaceId());
+
+    $premiere = gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL]);
+    $premiere->assertOk();
+    $rejeu = gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL]);
+    $rejeu->assertOk();
+
+    // Une seule demande en attente par adresse et par espace.
+    expect(DB::table('rgpd_requests')->where('type', 'erasure')->where('status', 'pending')->count())->toBe(2)
+        ->and(DB::table('rgpd_requests')->where('type', 'erasure')->where('workspace_id', gdprBusinessWorkspaceId())->count())->toBe(1)
+        // Une seule notification : la demande a été créée une fois (le rejeu ne re-signale pas).
+        ->and(DB::table('notifications')->where('user_id', $proprietaire)->where('type', 'rgpd.demande_effacement')->count())->toBe(1);
+
+    // La réponse ne porte plus les identifiants internes des demandes.
+    expect($premiere->json())->not->toHaveKey('demandes')
+        ->and($rejeu->json())->not->toHaveKey('demandes');
+});
+
+test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille Demandes RGPD)', function () {
+    gdprSeedPerson();
+    $this->seed(Database\Seeders\PermissionsAndRolesSeeder::class);
+    $espace = gdprBusinessWorkspaceId();
+    $proprietaire = gdprProprietaire($espace);
+    Illuminate\Support\Facades\Event::fake([App\Events\NotificationCreated::class]);
+
+    gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL, 'scope' => 'business'])->assertOk();
+
+    $notification = DB::table('notifications')->where('user_id', $proprietaire)->first();
+    expect($notification)->not->toBeNull()
+        ->and($notification->type)->toBe('rgpd.demande_effacement')
+        ->and($notification->action_url)->toBe('/rgpd/requests')
+        // Jamais l'adresse de la personne dans le texte.
+        ->and(mb_strtolower((string) $notification->title . ' ' . (string) $notification->body))->not->toContain(GDPR_EMAIL);
+    Illuminate\Support\Facades\Event::assertDispatched(App\Events\NotificationCreated::class, fn (App\Events\NotificationCreated $e): bool => $e->userId === $proprietaire && $e->workspaceId === $espace);
+
+    // La pastille : le propriétaire voit 1 demande ; un compte non propriétaire, rien.
+    config(['crm.console_v2' => true]);
+    Illuminate\Support\Facades\Cache::flush();
+    $this->actingAs(App\Models\User::findOrFail($proprietaire))
+        ->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->assertJsonPath('demandes_rgpd', 1);
+});
+
+test('L3c-0 : anti-réinsertion par TELEPHONE côté site — le mobile personnel est opposé, un témoin non', function () {
+    [$ws] = gdprSeedPerson();
+    DB::table('contacts')->where('workspace_id', $ws)->where('person_key', gdprPersonKey())
+        ->update(['phone' => '06 00 00 00 42']);
+    $autre = DB::table('companies')->where('siren', '900000304')->value('id');
+    DB::table('contacts')->insert([
+        'workspace_id' => $ws, 'company_id' => $autre, 'first_name' => 'T', 'last_name' => 'ZZ TEMOIN',
+        'email' => 'zz.temoin@example.invalid', 'phone' => '06 00 00 00 99', 'sources' => '[]', 'metadata' => '{}',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL, 'scope' => 'business'])->assertOk();
+
+    expect(DB::table('opt_out')->where('scope', 'business')->where('phone', '0600000042')->exists())->toBeTrue()
+        ->and(DB::table('opt_out')->where('phone', '0600000099')->exists())->toBeFalse()
+        // Rien n'est supprimé : le numéro reste sur la fiche masquée.
+        ->and(DB::table('contacts')->where('workspace_id', $ws)->where('person_key', gdprPersonKey())->value('phone'))->toBe('06 00 00 00 42');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -21,6 +21,64 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
+const AUCUNE_SUPPRESSION_TABLES = 'contacts|candidates|personnes|abonnements|companies|journalists';
+const AUCUNE_SUPPRESSION_MODELES = 'Company|Contact|Candidate|Journalist|Personne|Abonnement';
+
+/**
+ * Les gestes de suppression dure d'une personne ou de son entreprise dans UN
+ * source PHP : constructeur de requêtes, modèle Eloquent (`Modèle::where()->delete()`,
+ * `forceDelete`), requête rangée dans une variable puis supprimée, SQL brut
+ * (`DB::statement`, `DB::unprepared`, `DB::raw`, `DB::select`) en DELETE/TRUNCATE.
+ *
+ * @return list<string>
+ */
+function aucuneSuppressionDetecter(string $source): array
+{
+    $tables = AUCUNE_SUPPRESSION_TABLES;
+    $modeles = AUCUNE_SUPPRESSION_MODELES;
+    $hits = [];
+
+    // 1. DB::table('x')->…->delete() / forceDelete() / truncate().
+    if (preg_match("/table\\(['\"]({$tables})['\"]\\)[^;]*?->(delete|forceDelete|truncate)\\(/s", $source, $m) === 1) {
+        $hits[] = "suppression dure de {$m[1]}";
+    }
+    // 2. Modèle::where(...)->delete(), Modèle::query()->forceDelete(), Modèle::destroy(), withTrashed()->forceDelete().
+    if (preg_match("/\\b({$modeles})::(?!create|find|first|updateOrCreate|firstOrCreate)\\w+\\([^;]*?->(delete|forceDelete)\\(/s", $source, $m) === 1) {
+        $hits[] = "suppression Eloquent de {$m[1]} par requête";
+    }
+    if (preg_match("/\\b({$modeles})::(destroy|truncate|forceDestroy)\\(/", $source, $m) === 1) {
+        $hits[] = "{$m[1]}::{$m[2]}()";
+    }
+    // 3. Requête RANGÉE EN VARIABLE, puis supprimée plus loin ($q = DB::table('contacts')…; $q->delete()).
+    if (preg_match_all("/\\$(\\w+)\\s*=\\s*(?:DB::table\\(['\"](?:{$tables})['\"]\\)|(?:{$modeles})::(?!create|find|first|updateOrCreate|sole)\\w+\\()/", $source, $vars) > 0) {
+        foreach (array_unique($vars[1]) as $variable) {
+            if (preg_match('/\\$' . preg_quote($variable, '/') . '\\s*(?:->\\s*\\w+\\([^;]*?)*->\\s*(delete|forceDelete|truncate)\\(/s', $source) === 1) {
+                $hits[] = "requête rangée dans \${$variable} puis supprimée";
+            }
+        }
+    }
+    // Idem pour une requête construite par une fonction d'aide (`contactsAuNumero(...)`, `$contacts`).
+    if (preg_match('/\\$contacts->delete\\(|contactsAuNumero\\([^;]*?->delete\\(/s', $source) === 1) {
+        $hits[] = 'suppression de contacts par requête construite';
+    }
+    // 4. SQL brut : DELETE FROM / TRUNCATE, quel que soit le véhicule (statement, unprepared, raw, nowdoc).
+    if (preg_match("/DELETE\\s+FROM\\s+(?:ONLY\\s+)?(?:public\\.)?(?:\"?)({$tables})\\b/i", $source, $m) === 1) {
+        $hits[] = "DELETE FROM {$m[1]}";
+    }
+    if (preg_match("/TRUNCATE\\s+(?:TABLE\\s+)?(?:ONLY\\s+)?(?:public\\.)?(?:\"?)({$tables})\\b/i", $source, $m) === 1) {
+        $hits[] = "TRUNCATE {$m[1]}";
+    }
+    if (preg_match("/DB::(?:statement|unprepared|affectingStatement|select|raw)\\([^;]*?\\bDELETE\\b[^;]*?\\b({$tables})\\b/is", $source, $m) === 1) {
+        $hits[] = "DB::statement/raw DELETE sur {$m[1]}";
+    }
+    // 5. forceDelete, où que ce soit.
+    if (preg_match('/->forceDelete\\(/', $source) === 1) {
+        $hits[] = 'forceDelete';
+    }
+
+    return array_values(array_unique($hits));
+}
+
 const AUCUNE_SUPPRESSION_COMMANDES = [
     'rgpd:purge-vivier',
     'rgpd:purge-business-prospects',
@@ -68,17 +126,8 @@ test('aucun code applicatif ne supprime durement une personne, un contact, un ca
         $source = (string) file_get_contents((string) $fichier);
         $court = str_replace($racine . '/', '', (string) $fichier);
 
-        if (preg_match("/table\\('(contacts|candidates|personnes|abonnements|companies)'\\)[^;]*?->(delete|forceDelete|truncate)\\(/s", $source, $m) === 1) {
-            $hits[] = "{$court} : suppression dure de {$m[1]}";
-        }
-        if (preg_match('/\\$contacts->delete\\(|contactsAuNumero\\([^;]*?->delete\\(/s', $source) === 1) {
-            $hits[] = "{$court} : suppression de contacts par requête construite";
-        }
-        if (preg_match('/DELETE\\s+FROM\\s+(public\\.)?(contacts|candidates|personnes|abonnements|companies)\\b/i', $source, $m) === 1) {
-            $hits[] = "{$court} : DELETE FROM {$m[2]}";
-        }
-        if (preg_match('/->forceDelete\\(/', $source) === 1) {
-            $hits[] = "{$court} : forceDelete";
+        foreach (aucuneSuppressionDetecter($source) as $hit) {
+            $hits[] = "{$court} : {$hit}";
         }
     }
 
@@ -92,4 +141,34 @@ test('DELETE /companies/{id} reste une suppression douce (corbeille), jamais dé
 
     $source = (string) file_get_contents(dirname(__DIR__, 3) . '/app/Http/Controllers/Api/CompaniesController.php');
     expect($source)->not->toContain('forceDelete');
+});
+
+test('le détecteur de suppressions sait reconnaître les gestes cachés (témoins positifs) et épargne les lectures (témoins négatifs)', function () {
+    $fautifs = [
+        "<?php \\App\\Models\\Contact::where('email', \$e)->delete();",
+        "<?php Company::query()->whereIn('id', \$ids)->forceDelete();",
+        "<?php Candidate::withTrashed()->where('id', 1)->delete();",
+        "<?php Journalist::destroy(\$ids);",
+        "<?php \$q = DB::table('contacts')->where('email', \$e);\n\$q->delete();",
+        "<?php \$q = Contact::where('email', \$e);\n\$n = \$q->delete();",
+        "<?php DB::statement('DELETE FROM contacts WHERE email = ?', [\$e]);",
+        "<?php DB::unprepared(\"DELETE FROM public.candidates WHERE 1=1\");",
+        "<?php DB::raw('DELETE FROM journalists');",
+        "<?php DB::statement('TRUNCATE TABLE companies');",
+        "<?php DB::table('journalists')->where('id', 3)->delete();",
+    ];
+    foreach ($fautifs as $code) {
+        expect(aucuneSuppressionDetecter($code))->not->toBe([], $code);
+    }
+
+    $innocents = [
+        "<?php \$q = DB::table('contacts')->where('email', \$e);\n\$n = \$q->count();",
+        "<?php Contact::where('email', \$e)->update(['deleted_at' => now()]);",
+        "<?php DB::table('activities')->where('id', 1)->delete();",
+        "<?php DB::table('contacts')->where('id', 1)->update(['deleted_at' => now()]);",
+        "<?php \$jeton->delete();",
+    ];
+    foreach ($innocents as $code) {
+        expect(aucuneSuppressionDetecter($code))->toBe([], $code);
+    }
 });

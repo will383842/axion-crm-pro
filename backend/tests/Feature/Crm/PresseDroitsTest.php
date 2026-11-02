@@ -135,7 +135,9 @@ test('L3c-0 : l effacement RGPD (GdprErasureService) masque le contact lie par c
 
     expect(DB::table('contacts')->where('id', $contact)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $contact)->value('deleted_at'))->not->toBeNull()
-        ->and(DB::table('journalists')->where('id', $j)->value('email'))->toBeNull();
+        // L3c-0 : le journaliste est masqué, son adresse est GARDÉE.
+        ->and(DB::table('journalists')->where('id', $j)->value('email'))->toBe('zoe.rgpd@zz-droits.example.invalid')
+        ->and(DB::table('journalists')->where('id', $j)->value('deleted_at'))->not->toBeNull();
 });
 
 // ── Sens contact → journaliste (porté par la base) ─────────────────────────

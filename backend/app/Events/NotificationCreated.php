@@ -18,7 +18,7 @@ class NotificationCreated implements ShouldBroadcast
 
     public function __construct(
         public readonly string $workspaceId,
-        public readonly int $notificationId,
+        public readonly int|string $notificationId,
         public readonly string $type,
         public readonly string $title,
         public readonly string $body,

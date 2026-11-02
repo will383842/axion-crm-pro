@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Aucune ligne n'est supprimée. La personne n'est plus jamais contactée
  * (`opposition_at`, abonnements désabonnés, contacts à la corbeille douce,
- * candidats marqués) ; les données sont GARDÉES, c'est Will qui décide ensuite.
+ * candidats à la corbeille douce) ; les données sont GARDÉES, c'est Will qui décide ensuite.
  * À appeler dans le contexte d'espace et la transaction de l'appelant.
  */
 final class MiseAEcart
@@ -37,10 +37,12 @@ final class MiseAEcart
             ]);
 
         // `opposition_at` déjà posée : elle fait foi, on ne la repousse pas.
-        DB::table('personnes')->whereIn('id', $ids)->whereNull('opposition_at')
+        // Le nombre rendu est celui des lignes RÉELLEMENT modifiées : une
+        // personne déjà mise à l'écart n'est pas recomptée.
+        $personnes = DB::table('personnes')->whereIn('id', $ids)->whereNull('opposition_at')
             ->update(['opposition_at' => now(), 'opposition_motif' => $motif, 'updated_at' => now()]);
 
-        return ['personnes' => count($ids), 'abonnements' => $abonnements];
+        return ['personnes' => $personnes, 'abonnements' => $abonnements];
     }
 
     /**
@@ -64,7 +66,8 @@ final class MiseAEcart
     }
 
     /**
-     * Candidats : trace dans `attributes` (la table n'a pas de corbeille).
+     * Candidats : corbeille douce (`deleted_at`, la table et le modèle
+     * `Candidate` portent `SoftDeletes`) + trace dans `attributes`.
      *
      * @param  array<mixed>  $ids
      */
@@ -74,7 +77,8 @@ final class MiseAEcart
             return 0;
         }
 
-        return DB::table('candidates')->whereIn('id', $ids)->update([
+        return DB::table('candidates')->whereIn('id', $ids)->whereNull('deleted_at')->update([
+            'deleted_at' => now(),
             'attributes' => DB::raw(
                 "COALESCE(attributes, '{}'::jsonb) || jsonb_build_object('mis_a_l_ecart_le', to_char(now(), 'YYYY-MM-DD'), 'motif', "
                 . DB::getPdo()->quote($motif) . ')',

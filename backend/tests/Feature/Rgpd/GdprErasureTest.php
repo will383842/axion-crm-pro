@@ -59,12 +59,14 @@ test('erasure runs in atomic transaction (rollback on failure)', function () {
     expect(fn () => $service->erase(''))->not->toThrow(Throwable::class);
 });
 
-test('erasure deletes email_validations entry', function () {
+test('L3c-0 : le traitement d\'une demande NE SUPPRIME PAS le cache email_validations', function () {
     DB::table('email_validations')->insert([
         'email' => 'cached@example.com', 'status' => 'valid', 'score' => 90,
         'expires_at' => now()->addDays(30),
     ]);
     $service = new GdprErasureService(new AuditHashChain, new DeduplicationService);
     $result = $service->erase('cached@example.com');
-    expect($result['deleted']['email_validations'])->toBe(1);
+
+    expect(DB::table('email_validations')->where('email', 'cached@example.com')->count())->toBe(1)
+        ->and($result['deleted'])->not->toHaveKey('email_validations');
 });

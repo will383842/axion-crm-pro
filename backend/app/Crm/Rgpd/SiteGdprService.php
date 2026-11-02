@@ -192,7 +192,7 @@ final class SiteGdprService
      * Par univers, la demande est ENREGISTRÉE dans `rgpd_requests` (statut
      * `pending`, donc visible et signalée dans « Demandes RGPD » de la barre
      * latérale), la personne est MISE À L'ÉCART (`opposition_at` + motif,
-     * abonnements désabonnés, contacts à la corbeille douce, candidats marqués)
+     * abonnements désabonnés, contacts à la corbeille douce, candidats à la corbeille douce)
      * et son empreinte entre dans `opt_out` (plus aucun envoi, anti-réinsertion).
      * Les données sont gardées ; c'est Will qui décide, outil par outil.
      *
@@ -204,14 +204,24 @@ final class SiteGdprService
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
         $ecart = [];
-        $demandes = [];
 
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
             if ($businessId !== null) {
+                // Numéros de la personne et clés de nom, relevés AVANT la mise
+                // à l'écart (ses fiches contacts les portent) : ils servent à
+                // l'anti-réinsertion par téléphone, comme `GdprErasureService`.
+                [$telephones, $clesNom] = WorkspaceContext::run(
+                    $businessId,
+                    static fn (): array => [
+                        EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId, $personKey),
+                        EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId, $personKey),
+                    ],
+                );
+
                 $res = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email): array {
+                    fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones, $clesNom): array {
                         $personnesIds = DB::table('personnes')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
@@ -236,10 +246,16 @@ final class SiteGdprService
                             ->whereNull('deleted_at')
                             ->update(['deleted_at' => now()]);
 
+                        // Numéros PERSONNELS, relevés avant le masquage, sans rien modifier.
+                        $personnels = EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom, $businessId);
+
                         $personnes = MiseAEcart::personnes($personnesIds, self::MOTIF);
+                        [$demande, $nouvelle] = $this->journal($businessId, $email);
 
                         return [
-                            'demande' => $this->journal($businessId, $email),
+                            'demande' => $demande,
+                            'nouvelle' => $nouvelle,
+                            'personnels' => $personnels,
                             'bilan' => [
                                 'contacts' => MiseAEcart::contacts($contactsIds, self::MOTIF),
                                 'personnes' => $personnes['personnes'],
@@ -250,7 +266,19 @@ final class SiteGdprService
                     }),
                 );
                 $ecart['business'] = $res['bilan'];
-                $demandes['business'] = $res['demande'];
+
+                // Anti-réinsertion par téléphone : les numéros PERSONNELS
+                // seulement, et personnels dans CHAQUE espace où on les trouve
+                // (`opt_out.phone` est global : un standard ailleurs n'est pas
+                // opposé).
+                foreach (EffacementCoordonneesFiches::opposablesPartout($email, $res['personnels'], $clesNom, $businessId) as $telephone) {
+                    $this->optOutTelephone($telephone, 'business');
+                }
+
+                // Un rejeu de la même demande ne re-signale pas.
+                if ($res['nouvelle']) {
+                    SignalementDemandeEffacement::signaler($businessId, 'site');
+                }
             }
             $this->optOut($email, $emailHash, 'business');
         }
@@ -270,14 +298,19 @@ final class SiteGdprService
                             ->pluck('id')
                             ->all();
 
+                        [, $nouvelle] = $this->journal($vivierId, $email);
+
                         return [
-                            'demande' => $this->journal($vivierId, $email),
+                            'nouvelle' => $nouvelle,
                             'bilan' => ['candidates' => MiseAEcart::candidats($candidatsIds, self::MOTIF)],
                         ];
                     }),
                 );
                 $ecart['vivier'] = $res['bilan'];
-                $demandes['vivier'] = $res['demande'];
+
+                if ($res['nouvelle']) {
+                    SignalementDemandeEffacement::signaler($vivierId, 'site');
+                }
             }
             $this->optOut($email, $emailHash, 'vivier');
         }
@@ -298,7 +331,6 @@ final class SiteGdprService
             // Clé conservée pour les lecteurs existants : rien n'est supprimé.
             'deleted' => [],
             'mis_a_l_ecart' => $ecart,
-            'demandes' => $demandes,
             'opt_out_scopes' => $scope === 'both' ? ['business', 'vivier'] : [$scope],
             'verification' => 'aucune',
         ];
@@ -338,12 +370,26 @@ final class SiteGdprService
 
     /**
      * Enregistre la DEMANDE d'effacement (`pending` : signalée à Will dans
-     * « Demandes RGPD », qui décide). À appeler DANS `WorkspaceContext::run()`
-     * et DANS la transaction : `rgpd_requests` porte une RLS forcée.
+     * « Demandes RGPD », qui décide). IDEMPOTENT : si une demande en attente
+     * existe déjà pour la même adresse et le même espace, elle est reprise, pas
+     * dupliquée (rejeu du site). À appeler DANS `WorkspaceContext::run()` et
+     * DANS la transaction : `rgpd_requests` porte une RLS forcée.
+     *
+     * @return array{0: int, 1: bool}  [identifiant, vraie si la demande vient d'être créée]
      */
-    private function journal(string $workspaceId, string $email): int
+    private function journal(string $workspaceId, string $email): array
     {
-        return (int) DB::table('rgpd_requests')->insertGetId([
+        $existante = DB::table('rgpd_requests')
+            ->where('workspace_id', $workspaceId)
+            ->where('type', 'erasure')
+            ->where('status', 'pending')
+            ->where('subject_email', $email)
+            ->value('id');
+        if ($existante !== null) {
+            return [(int) $existante, false];
+        }
+
+        $id = (int) DB::table('rgpd_requests')->insertGetId([
             'workspace_id' => $workspaceId,
             'type' => 'erasure',
             'status' => 'pending',
@@ -356,6 +402,30 @@ final class SiteGdprService
             ], JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        return [$id, true];
+    }
+
+    /**
+     * Le mobile d'une personne mise à l'écart ne revient pas par la collecte
+     * suivante (même règle que `DeduplicationService::addOptOut`, qui ôte
+     * espaces, points et tirets).
+     */
+    private function optOutTelephone(string $telephone, string $scope): void
+    {
+        $telephone = (string) preg_replace('/[\s.-]/', '', $telephone);
+        if ($telephone === '' || DB::table('opt_out')->where('scope', $scope)->where('phone', $telephone)->exists()) {
+            return;
+        }
+
+        DB::table('opt_out')->insert([
+            'email' => null,
+            'email_hash' => null,
+            'phone' => $telephone,
+            'scope' => $scope,
+            'source' => 'gdpr_erasure_bisystem',
+            'created_at' => now(),
         ]);
     }
 

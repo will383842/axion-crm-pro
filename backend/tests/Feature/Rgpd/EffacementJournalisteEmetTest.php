@@ -88,12 +88,10 @@ beforeEach(function () {
 
 // ── LES DEUX FORMES DU MEME CONTROLEUR, DANS LE MEME TEST ───────────────────
 
-test('l\'opposition et l\'effacement emettent DEUX types distincts', function () {
-    // C'est le coeur du constat : les deux methodes vivent a quelques lignes
-    // l'une de l'autre et une seule emettait. Les jouer SEPAREMENT laisserait
-    // vert un `destroy()` qui emettrait un `consent_optout` — c'est-a-dire un
-    // canal qui dirait au site « cette personne s'oppose » la ou le CRM a
-    // efface sa fiche. Le site n'en ferait pas la meme chose.
+test('l\'opposition emet, l\'effacement masque SANS rien emettre ni vider', function () {
+    // L3c-0 (ADR contrat v3 § 6) : `destroy()` ne diffuse plus d'`erasure` vers
+    // le site et ne vide ni e-mail ni telephone. Seule l'opposition (`optOut`)
+    // emet un `consent_optout`.
     $oppose = effacementJournalisteFiche($this->workspace->id, 'oppose@example.test');
     $efface = effacementJournalisteFiche($this->workspace->id, 'efface@example.test');
 
@@ -102,29 +100,22 @@ test('l\'opposition et l\'effacement emettent DEUX types distincts', function ()
     $this->postJson("/api/v1/journalists/{$oppose}/opt-out")->assertOk();
     $this->deleteJson("/api/v1/journalists/{$efface}")->assertNoContent();
 
-    // TEMOIN DE COUVERTURE : les deux gestes ont REELLEMENT porte. Sans ces
-    // deux lignes, une route devenue inerte donnerait « rien fait, donc rien
-    // emis » — et le compte a 2 ci-dessous serait la seule chose a rougir.
+    // TEMOIN DE COUVERTURE : les deux gestes ont REELLEMENT porte.
     expect(DB::table('journalists')->where('id', $oppose)->value('opt_out'))->toBeTrue()
-        ->and(DB::table('journalists')->where('id', $efface)->value('deleted_at'))->not->toBeNull();
+        ->and(DB::table('journalists')->where('id', $efface)->value('deleted_at'))->not->toBeNull()
+        ->and(DB::table('journalists')->where('id', $efface)->value('opt_out'))->toBeTrue();
+
+    // Masquage seulement : aucune donnee de la personne n'est videe.
+    $ligne = DB::table('journalists')->where('id', $efface)->first();
+    expect($ligne->email)->toBe('efface@example.test')
+        ->and($ligne->phone)->toBe('+33612345678');
+
+    expect(DB::table('crm_outbound_events')->where('event_type', 'erasure')->count())->toBe(0);
 
     $opposition = DB::table('crm_outbound_events')->where('event_type', 'consent_optout')->first();
-    $effacement = DB::table('crm_outbound_events')->where('event_type', 'erasure')->first();
-
-    expect(DB::table('crm_outbound_events')->count())->toBe(2)
+    expect(DB::table('crm_outbound_events')->count())->toBe(1)
         ->and($opposition)->not->toBeNull()
-        ->and($effacement)->not->toBeNull()
-        // Chaque type porte SA personne : un croisement des deux hash passerait
-        // une garde qui se contenterait de compter les types presents.
-        ->and($opposition->email_hash)->toBe(effacementJournalisteHash('oppose@example.test'))
-        ->and($effacement->email_hash)->toBe(effacementJournalisteHash('efface@example.test'))
-        ->and($effacement->origin)->toBe('crm')
-        ->and($effacement->status)->toBe('pending');
-
-    // La surface est ce qui permet de retrouver, cote site, D'OU vient l'ordre.
-    $payload = json_decode((string) $effacement->payload, true);
-    expect($payload['surface'])->toBe('console:journalists')
-        ->and($payload['journalist_id'])->toBe($efface);
+        ->and($opposition->email_hash)->toBe(effacementJournalisteHash('oppose@example.test'));
 });
 
 // ── TEMOIN NEGATIF ──────────────────────────────────────────────────────────

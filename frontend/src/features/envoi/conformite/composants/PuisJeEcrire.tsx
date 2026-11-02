@@ -48,7 +48,7 @@ export function PuisJeEcrire() {
       </form>
       <Annonce message={erreur} ton="erreur" />
       {reponse && aspect ? (
-        <div role="status" className={cn('mt-3 rounded-xl p-4 text-sm', aspect.classe)}>
+        <div role="status" data-testid="reponse-puis-je-ecrire" className={cn('mt-3 rounded-xl p-4 text-sm', aspect.classe)}>
           <p className="flex items-center gap-2 text-lg font-bold">
             <aspect.icone className="h-5 w-5" aria-hidden />
             <span>{aspect.libelle}</span>

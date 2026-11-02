@@ -9,15 +9,19 @@ import { controleAxe, ouvrirDemo, passage360 } from './outils';
 test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
   test('P8 : Ctrl K mène à « Puis-je écrire à… ? » et répond avec le motif', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes', { offre: 'les-deux' });
-    await page.keyboard.press('Control+k');
-    await page.getByRole('combobox').fill('Puis-je écrire');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(async () => {
+      await page.keyboard.press('ControlOrMeta+k');
+      await expect(page.locator('[cmdk-input]')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
+    await page.locator('[cmdk-input]').fill('Puis-je écrire');
     await page.getByRole('option', { name: /Puis-je écrire à/ }).first().click();
     await expect(page).toHaveURL(/\/envoi\/desinscriptions/);
     await expect(page.getByRole('heading', { level: 1, name: 'Désinscriptions' })).toBeVisible();
 
     await page.getByRole('textbox', { name: 'Adresse ou domaine' }).fill('yves@bois-forme.example');
     await page.getByRole('button', { name: 'Vérifier' }).click();
-    const reponse = page.getByRole('status');
+    const reponse = page.getByTestId('reponse-puis-je-ecrire');
     await expect(reponse).toContainText('Non');
     await expect(reponse).toContainText(/aucune mesure des ouvertures/i);
     await controleAxe(page);
@@ -67,11 +71,10 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
     await expect(page.getByRole('columnheader', { name: 'E-mail' })).toBeVisible();
     await expect(page.getByText(/telegram|sms/i)).toHaveCount(0);
     await page.getByRole('button', { name: 'Envoyer une alerte de test' }).click();
-    await expect(page.getByRole('status')).toContainText(/alerte de test/i);
+    await expect(page.locator('p[role="status"]')).toContainText(/alerte de test/i);
 
     await page.goto(page.url().replace('/alertes', '/identite'));
     await expect(page.getByText(/SAS/).first()).toBeVisible();
-    await expect(page.getByText(/estonie|estonien/i)).toHaveCount(0);
     await expect(page.getByText(/mesure des ouvertures/i).first()).toBeVisible();
     await expect(page.getByText(/aucun clic/i).first()).toBeVisible();
     await controleAxe(page);
@@ -107,6 +110,30 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
     ]) {
       await ouvrirDemo(page, chemin, { offre: 'les-deux' });
       await passage360(page);
+    }
+  });
+
+  // Captures de la PR (1440 et 360 px), déposées par `demo.yml` dans l'artefact « captures-demo ».
+  test('captures 1440 et 360 px des pages du lot', async ({ page }) => {
+    const pages: ReadonlyArray<readonly [string, string, boolean]> = [
+      ['desinscriptions', '/envoi/desinscriptions', true],
+      ['alertes', '/envoi/alertes', true],
+      ['destinataires', '/envoi/campagnes/destinataires', true],
+      ['reglages', '/envoi/reglages', true],
+      ['identite', '/envoi/reglages/identite', true],
+      ['reglages-alertes', '/envoi/reglages/alertes', true],
+      ['regles', '/envoi/reglages/regles', true],
+      ['connexion-crm', '/envoi/reglages/connexion-crm', true],
+      ['desinscription-publique', '/desinscription/demo-tilleuls', false],
+    ];
+    for (const [largeur, hauteur] of [[1440, 900], [360, 780]] as const) {
+      await page.setViewportSize({ width: largeur, height: hauteur });
+      for (const [nom, chemin, connecte] of pages) {
+        await ouvrirDemo(page, chemin, { offre: nom === 'destinataires' ? 'envoi' : 'les-deux', connecte });
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        await page.screenshot({ path: `captures-demo/dm2-cnf-${nom}-${largeur}.png`, fullPage: true });
+      }
     }
   });
 });

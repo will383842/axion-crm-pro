@@ -145,13 +145,13 @@ function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non'
     if (nb > 0 && etat.reponse !== 'non') prudence(`${nb} adresse(s) de ce domaine sont déjà au registre.`);
   }
   const recus = demoDb.destinataires.tous().filter((d) => d.adresse.toLowerCase() === adresse);
-  if (recus.some((d) => d.etat === 'rebond_dur')) prudence('Adresse refusée de façon définitive par la messagerie : elle n’existe plus.');
+  if (recus.some((d) => d.etat === 'rebond_dur')) non('Adresse refusée de façon définitive par la messagerie (adresse inexistante) : aucun message ne doit plus lui être envoyé.');
   if (recus.some((d) => d.etat === 'a_repondu') && etat.reponse !== 'non') prudence('Cette personne a répondu : écrivez-lui à la main, pas par campagne.');
   const sequences = recus.filter((d) => ['a_envoyer', 'envoye', 'remis'].includes(d.etat)).length;
   if (sequences > 0 && etat.reponse !== 'non') prudence('Déjà dans une campagne en cours : attendez la fin de la séquence.');
 
   if (etat.reponse === 'oui') raisons.push('Aucune opposition connue pour cette adresse.');
-  if (etat.reponse === 'non') raisons.push('Aucune mesure des ouvertures ne s’applique à cette personne.');
+  if (etat.reponse === 'non') raisons.push('Aucune mesure des ouvertures ne s’applique : aucun message ne part vers cette adresse.');
   return { adresse: saisie.trim(), reponse: etat.reponse, raisons, mesure_ouvertures_permise: etat.reponse !== 'non' };
 }
 

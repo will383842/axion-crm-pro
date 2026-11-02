@@ -114,7 +114,7 @@ export function CodeEmailPage() {
           iconLeft={<MailCheck className="h-3.5 w-3.5" />}
           disabled={code.length !== LONGUEUR}
         >
-          Valider le code
+          Vérifier le code
         </Button>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">

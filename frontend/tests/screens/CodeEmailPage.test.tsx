@@ -41,7 +41,7 @@ describe('CodeEmailPage', () => {
     await user.click(champ);
     await user.paste('12 01 27 99');
     expect(champ).toHaveValue('120127');
-    expect(screen.getByRole('button', { name: /Valider/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Vérifier le code/ })).toBeEnabled();
   });
 
   it('envoie le code et la case « appareil de confiance 30 jours »', async () => {
@@ -50,7 +50,7 @@ describe('CodeEmailPage', () => {
     const vue = await renderScreen(<CodeEmailPage />, { ...OPTIONS, handlers: faux(recus) });
     await user.type(screen.getByLabelText('Code à 6 chiffres'), '120127');
     await user.click(screen.getByRole('checkbox', { name: /Faire confiance à cet appareil pendant 30 jours/ }));
-    await user.click(screen.getByRole('button', { name: /Valider/ }));
+    await user.click(screen.getByRole('button', { name: /Vérifier le code/ }));
     await waitFor(() => expect(recus).toEqual([{ code: '120127', appareil_confiance: true }]));
     await waitFor(() => expect(vue.router.state.location.pathname).toBe('/'));
   });
@@ -59,7 +59,7 @@ describe('CodeEmailPage', () => {
     const user = userEvent.setup();
     await renderScreen(<CodeEmailPage />, { ...OPTIONS, handlers: faux([]) });
     await user.type(screen.getByLabelText('Code à 6 chiffres'), '000000');
-    await user.click(screen.getByRole('button', { name: /Valider/ }));
+    await user.click(screen.getByRole('button', { name: /Vérifier le code/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Code incorrect/);
   });
 

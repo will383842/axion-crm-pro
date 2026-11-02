@@ -12,7 +12,7 @@ test('connexion de démo avec le code affiché, de bout en bout', async ({ page 
   await expect(page.getByLabel('Code à 6 chiffres')).toBeVisible();
   const code = (await page.getByTestId('code-demo').textContent())?.trim() ?? '';
   await page.getByLabel('Code à 6 chiffres').fill(code);
-  await page.getByRole('button', { name: /Valider/ }).click();
+  await page.getByRole('button', { name: /Vérifier le code/ }).click();
   await expect(page).toHaveURL(/\/$|\/crm|\/envoi/);
 });
 

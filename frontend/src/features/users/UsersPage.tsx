@@ -328,7 +328,6 @@ export function UsersPage() {
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
           <TableScroll template={GRID}>
           <div
-            role="row"
             className={cn(
               'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
@@ -346,7 +345,6 @@ export function UsersPage() {
             {rows.map((u) => (
               <div
                 key={u.id}
-                role="row"
                 className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >

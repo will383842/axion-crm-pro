@@ -62,15 +62,6 @@ function fiche(id: string): FicheEntreprise | undefined {
   return zoneEntreprises().fiches.find((f) => String(f.id) === id);
 }
 
-function csv(liste: readonly Entreprise[]): string {
-  const echapper = (v: string) => (/[",\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
-  const entete = ['SIREN', 'Dénomination', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web'];
-  const lignes = liste.map((e) =>
-    [e.siren, e.denomination, e.naf, e.size_category, e.department_code, e.city, e.email_generic, e.phone, e.website].map(echapper).join(','),
-  );
-  return `\uFEFF${[entete.join(','), ...lignes].join('\n')}\n`;
-}
-
 export const handlers: HttpHandler[] = [
   http.get(api('/referentiels/geo'), async () => {
     await delai();
@@ -100,21 +91,8 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
-  // L'export précède la fiche (`/companies/export` ne doit pas être pris pour un identifiant).
-  http.get(api('/companies/export'), async ({ request }) => {
-    await delai();
-    const url = new URL(request.url);
-    // Export de la sélection : `filter[ids]` présent mais vide = refusé (jamais toute la liste).
-    let liste;
-    if (url.searchParams.has('filter[ids]')) {
-      const ids = lire(request, 'filter[ids]').split(',').filter((v) => v !== '');
-      if (ids.length === 0) return erreur(422, 'selection_vide', 'Aucune fiche sélectionnée.');
-      liste = demoDb.entreprises.filtrer((e) => ids.includes(String(e.id)));
-    } else {
-      liste = filtrer(request);
-    }
-    return new HttpResponse(csv(liste), { headers: { 'Content-Type': 'text/csv; charset=UTF-8' } });
-  }),
+  // `GET /companies/export` : route déclarée par DM1-CIB (`ciblage.handlers.ts`), une seule par adresse.
+  // L'export de la SÉLECTION (`filter[ids]`) en dépend : voir la section « Hors périmètre » de la PR.
 
   http.post(api('/companies/tags/bulk'), async ({ request }) => {
     await delai();

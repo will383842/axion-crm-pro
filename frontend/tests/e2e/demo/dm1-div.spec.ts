@@ -32,9 +32,23 @@ test.describe('collectes en démo', () => {
     await ouvrirDemo(page, '/collectes');
     await page.getByRole('link', { name: /Rhône — PME artisanat/ }).first().click();
     await page.getByRole('button', { name: 'Pause' }).first().click();
-    await expect(page.getByText('En pause').first()).toBeVisible();
+    await expect(page.getByText('Collecte mise en pause')).toBeVisible();
     await page.reload();
     await expect(page.getByText('En pause').first()).toBeVisible();
+  });
+
+  test('créer une collecte en brouillon avec l’assistant : elle est dans la liste après rechargement', async ({ page }) => {
+    await ouvrirDemo(page, '/collectes/new');
+    await page.getByLabel(/Nom de la collecte/).fill('Loire — boulangeries');
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByText(/42\s+Loire\b/).first().click();
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    // INSEE Sirene est déjà choisie par défaut.
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByRole('button', { name: 'Créer en brouillon' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: /Loire — boulangeries/ })).toBeVisible();
+    await ouvrirDemo(page, '/collectes');
+    await expect(page.getByText('Loire — boulangeries').first()).toBeVisible();
   });
 
   test('la liste montre tous les statuts, et l’état vide est propre', async ({ page }) => {
@@ -89,10 +103,11 @@ test.describe('newsletter et guide en démo', () => {
   test('poser une tâche : elle se voit après rechargement', async ({ page }) => {
     await ouvrirDemo(page, '/console/lettre-et-guide');
     await page.getByRole('link', { name: 'Hugo Marchand' }).click();
-    await page.getByLabel(/Tâche/).first().fill('Retrouver l’entreprise de Hugo');
+    await page.getByLabel('Titre de la tâche').fill('Retrouver l’entreprise de Hugo');
     await page.getByRole('button', { name: 'Poser' }).click();
+    await expect(page.getByText('Tâche posée.')).toBeVisible();
     await page.reload();
-    await expect(page.getByText('Retrouver l’entreprise de Hugo')).toBeVisible();
+    await expect(page.getByText(/Retrouver l’entreprise de Hugo/)).toBeVisible();
   });
 
   test('état vide, accessibilité et 360 px', async ({ page }) => {

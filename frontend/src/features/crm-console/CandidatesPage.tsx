@@ -46,8 +46,11 @@ function formatDate(value: string | null): string {
 }
 
 export function CandidatesPage() {
+  // Démo : le compte de démonstration a accès à la base des candidats (le droit « vivier »
+  // est un réglage serveur que le faux serveur ne porte pas). `VITE_DEMO` est figé à vide
+  // hors démo : en production, la garde reste entière.
   return (
-    <ConsoleGate requiresVivier>
+    <ConsoleGate requiresVivier={import.meta.env.VITE_DEMO !== '1'}>
       <CandidatesContent />
     </ConsoleGate>
   );

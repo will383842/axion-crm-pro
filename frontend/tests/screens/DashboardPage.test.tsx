@@ -14,7 +14,7 @@
  * que `/dashboard/stats` n'a pas répondu, l'écran montre le SQUELETTE. La garde
  * rougit si quelqu'un remet un `placeholderData` dans la requête.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -90,10 +90,22 @@ describe('DashboardPage — rendu des blocs', () => {
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
     expect(await screen.findByRole('heading', { level: 1, name: 'Bonjour Will' })).toBeVisible();
     expect(screen.getByText(new RegExp(dateDuJour()))).toBeVisible();
-    // Le mot du menu et du fil d'Ariane reste sur la page : l'en-tête, et
-    // (DM1-ACC) l'onglet « Tableau de bord » de la barre partagée.
-    expect(screen.getAllByText('Tableau de bord')).toHaveLength(2);
-    expect(screen.getByRole('navigation', { name: 'Tableau de bord' })).toBeVisible();
+    // Le mot du menu et du fil d'Ariane reste sur la page. Hors démo (production),
+    // DM1-ACC n'ajoute PAS la barre d'onglets : un seul « Tableau de bord », comme avant.
+    expect(screen.getByText('Tableau de bord')).toBeVisible();
+    expect(screen.queryByRole('navigation', { name: 'Tableau de bord' })).toBeNull();
+  });
+
+  it('en démo (DM1-ACC) : la barre d’onglets Tableau de bord / Mes tâches / Affaires', async () => {
+    vi.stubEnv('VITE_DEMO', '1');
+    try {
+      await renderScreen(<DashboardPage />, { path: PATH, handlers: [getJson('/dashboard/stats', STATS), ...socle()] });
+      const onglets = await screen.findByRole('navigation', { name: 'Tableau de bord' });
+      expect(within(onglets).getByRole('link', { name: 'Mes tâches' })).toHaveAttribute('href', '/taches');
+      expect(within(onglets).getByRole('link', { name: 'Affaires' })).toHaveAttribute('href', '/affaires');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('la date de l’en-tête suit le « aujourd’hui » du serveur quand il le donne', async () => {

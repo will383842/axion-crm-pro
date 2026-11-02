@@ -16,6 +16,8 @@ import { NOM_DU_PRODUIT, useProduitCourant } from '@/features/socle/produit/useP
 import { useAffaires, useDeplacerAffaire } from './api';
 import { dateLongue, euros, resumer, totalColonne } from './calculs';
 import { ETAPES, RAISONS_DE_PERTE, type Affaire, type EtapeAffaire } from './etapes';
+import { tachesEtAffairesDisponibles } from '@/features/crm/taches/disponible';
+import { PageEnAttente } from '@/features/socle/PageEnAttente';
 
 const CLASSE_CHAMP = 'h-11 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm md:h-9';
 
@@ -102,7 +104,7 @@ function FenetreRaison({ affaire, onFermer }: { affaire: Affaire | null; onFerme
   );
 }
 
-export function AffairesPage() {
+function AffairesPageDemo() {
   const produit = useProduitCourant();
   const { data, isLoading, error, refetch } = useAffaires();
   const deplacer = useDeplacerAffaire();
@@ -181,4 +183,15 @@ export function AffairesPage() {
       <FenetreRaison affaire={aPerdre} onFermer={() => setAPerdre(null)} />
     </div>
   );
+}
+
+/**
+ * Hors démo (donc en production), la page reste « en attente », comme avant ce lot :
+ * le serveur n'a pas encore ses routes (voir `disponible.ts`).
+ */
+export function AffairesPage() {
+  if (!tachesEtAffairesDisponibles()) {
+    return <PageEnAttente title="Affaires" lot="DM1-ACC" onglets={<OngletsTableauDeBord />} />;
+  }
+  return <AffairesPageDemo />;
 }

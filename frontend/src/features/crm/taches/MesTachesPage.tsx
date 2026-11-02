@@ -14,6 +14,8 @@ import { NOM_DU_PRODUIT, useProduitCourant } from '@/features/socle/produit/useP
 import { useAjouterTache, useCocherTache, useRappelMatin, useTaches } from './api';
 import { dateCourte, grouper } from './groupes';
 import type { Tache } from './types';
+import { tachesEtAffairesDisponibles } from './disponible';
+import { PageEnAttente } from '@/features/socle/PageEnAttente';
 
 function phrase(aujourdhui: number, enRetard: number): string {
   const jour = aujourdhui + enRetard;
@@ -141,7 +143,7 @@ function FormulaireTache({ ouvert, onFermer }: { ouvert: boolean; onFermer: () =
   );
 }
 
-export function MesTachesPage() {
+function MesTachesPageDemo() {
   const produit = useProduitCourant();
   const { data, isLoading, error, refetch } = useTaches();
   const [formulaire, setFormulaire] = useState(false);
@@ -235,4 +237,15 @@ export function MesTachesPage() {
       <FormulaireTache ouvert={formulaire} onFermer={() => setFormulaire(false)} />
     </div>
   );
+}
+
+/**
+ * Hors démo (donc en production), la page reste « en attente », comme avant ce lot :
+ * le serveur n'a pas encore ses routes (voir `disponible.ts`).
+ */
+export function MesTachesPage() {
+  if (!tachesEtAffairesDisponibles()) {
+    return <PageEnAttente title="Mes tâches" lot="DM1-ACC" onglets={<OngletsTableauDeBord />} />;
+  }
+  return <MesTachesPageDemo />;
 }

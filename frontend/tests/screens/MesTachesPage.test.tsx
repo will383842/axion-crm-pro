@@ -5,7 +5,7 @@
  * Ces tests rejouent les handlers de la démo : le même faux serveur que le
  * navigateur. « Aujourd'hui » est fixe : mardi 12 janvier 2027.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -13,6 +13,7 @@ import { MesTachesPage } from '@/features/crm/taches/MesTachesPage';
 import { demoDb } from '@/demo/base';
 import { handlers } from '@/demo/handlers/crm/taches.handlers';
 import { renderScreen } from '../helpers/renderScreen';
+import { apiUrl, http, HttpResponse } from '../msw/handlers';
 
 const PATH = '/taches';
 
@@ -23,6 +24,11 @@ function groupe(nom: RegExp): HTMLElement {
 describe('MesTachesPage', () => {
   beforeEach(() => {
     demoDb.reinitialiser();
+    // Ces écrans ne vivent qu'en démo (`disponible.ts`) : le build de démo pose VITE_DEMO=1.
+    vi.stubEnv('VITE_DEMO', '1');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('range les tâches en trois groupes : en retard, aujourd’hui, cette semaine', async () => {
@@ -112,6 +118,26 @@ describe('MesTachesPage', () => {
       expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeVisible();
     } finally {
       window.sessionStorage.removeItem('axion-demo:etat');
+    }
+  });
+});
+
+describe('MesTachesPage hors démo (production : le serveur n’a pas encore ses routes)', () => {
+  it('reste « en attente », texte neutre, et n’appelle pas /crm/taches', async () => {
+    vi.stubEnv('VITE_DEMO', '');
+    const appels: string[] = [];
+    const espion = http.get(apiUrl('/crm/taches'), () => {
+      appels.push('/crm/taches');
+      return HttpResponse.json({ data: [] });
+    });
+    try {
+      await renderScreen(<MesTachesPage />, { path: PATH, handlers: [espion] });
+      const page = await screen.findByTestId('page-en-attente');
+      expect(page).toHaveAttribute('data-lot', 'DM1-ACC');
+      expect(screen.getByRole('heading', { level: 1, name: 'Mes tâches' })).toBeVisible();
+      expect(appels).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 });

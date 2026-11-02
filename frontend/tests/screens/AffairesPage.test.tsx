@@ -4,7 +4,7 @@
  * Les affaires reposent sur l'étape de la fiche (`lifecycle_stage` étendu) :
  * les sept étapes de Will, du premier contact au gain ou à la perte.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -12,6 +12,7 @@ import { AffairesPage } from '@/features/crm/affaires/AffairesPage';
 import { demoDb } from '@/demo/base';
 import { handlers } from '@/demo/handlers/crm/affaires.handlers';
 import { renderScreen } from '../helpers/renderScreen';
+import { apiUrl, http, HttpResponse } from '../msw/handlers';
 
 const PATH = '/affaires';
 const ETAPES = ['À contacter', 'Contacté', 'Répondu', 'Rendez-vous', 'Devis', 'Gagné', 'Perdu'];
@@ -23,6 +24,11 @@ function colonne(nom: string): HTMLElement {
 describe('AffairesPage', () => {
   beforeEach(() => {
     demoDb.reinitialiser();
+    // Ces écrans ne vivent qu'en démo (`disponible.ts`) : le build de démo pose VITE_DEMO=1.
+    vi.stubEnv('VITE_DEMO', '1');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('montre les 7 colonnes de Will, dans l’ordre', async () => {
@@ -117,6 +123,26 @@ describe('AffairesPage', () => {
       expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeVisible();
     } finally {
       window.sessionStorage.removeItem('axion-demo:etat');
+    }
+  });
+});
+
+describe('AffairesPage hors démo (production : le serveur n’a pas encore ses routes)', () => {
+  it('reste « en attente », texte neutre, et n’appelle pas /crm/affaires', async () => {
+    vi.stubEnv('VITE_DEMO', '');
+    const appels: string[] = [];
+    const espion = http.get(apiUrl('/crm/affaires'), () => {
+      appels.push('/crm/affaires');
+      return HttpResponse.json({ data: [] });
+    });
+    try {
+      await renderScreen(<AffairesPage />, { path: PATH, handlers: [espion] });
+      const page = await screen.findByTestId('page-en-attente');
+      expect(page).toHaveAttribute('data-lot', 'DM1-ACC');
+      expect(screen.getByRole('heading', { level: 1, name: 'Affaires' })).toBeVisible();
+      expect(appels).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 });

@@ -7,6 +7,7 @@ import { api, qualifierErreur } from '@/lib/api';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
 import { useProduits } from '@/features/socle/produits/useProduits';
 import { OngletsTableauDeBord } from './OngletsTableauDeBord';
+import { tachesEtAffairesDisponibles } from '@/features/crm/taches/disponible';
 import { AFaire } from './components/AFaire';
 import { CarteEnvoiAujourdhui } from './components/CarteEnvoiAujourdhui';
 import { MesAudiences } from './components/MesAudiences';
@@ -203,7 +204,8 @@ export function DashboardPage() {
           {firstName ? `Bonjour ${firstName}` : 'Bienvenue'}
         </h1>
       </header>
-      <OngletsTableauDeBord />
+      {/* DM1-ACC — onglets seulement en démo : hors démo, Mes tâches et Affaires restent « en attente ». */}
+      {tachesEtAffairesDisponibles() ? <OngletsTableauDeBord /> : null}
 
       {sansEspace !== null ? (
         <Card padding="lg">

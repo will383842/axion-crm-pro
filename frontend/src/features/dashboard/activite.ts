@@ -31,6 +31,7 @@ export const EVENEMENTS: Record<string, string> = {
   COMBLER_TROUS_FIN: 'Complétion des fiches terminée',
   RELATIONS_IMPORT_FIN: 'Import des relations terminé',
   GDPR_ERASURE_BISYSTEM: 'Effacement de données personnelles (site et CRM)',
+  GDPR_ERASURE_REQUEST_BISYSTEM: 'Demande d’effacement reçue du site (personne mise à l’écart, rien supprimé)',
   GDPR_PURGE_VIVIER: 'Purge du vivier de candidats (RGPD)',
   GDPR_ERASURE: 'Effacement de données personnelles',
   GDPR_PURGE_PERSONNES: 'Effacement RGPD de personnes',

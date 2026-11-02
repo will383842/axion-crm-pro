@@ -604,23 +604,4 @@ export const handlers: HttpHandler[] = [
     if (patch.intervention !== undefined && patch.intervention !== avant.intervention && patch.intervention !== 'aucune') noterEtape('evenement', id, `intervention_${patch.intervention}`);
     return HttpResponse.json(ficheEvenement(id));
   }),
-
-  // Onglet « Organisateurs » des événements : les fédérations qui en organisent.
-  // Ne répond que pour ce filtre ; toute autre recherche passe au faux serveur des entreprises.
-  http.get(api('/companies'), async ({ request }) => {
-    const p = new URL(request.url).searchParams;
-    if (p.get('filter[tag]') !== 'src:scraping-evenements-pro') return undefined;
-    await delai();
-    const force = await repondreEtatForce(request, { data: [], meta: { total: 0 } });
-    if (force) return force;
-    const ids = new Set(demoDb.evenements.tous().map((e) => e.organisateur_id).filter((x): x is number => x !== null));
-    const nature = p.get('filter[entity_nature]') ?? '';
-    const liste = demoDb.federations
-      .tous()
-      .filter((f) => ids.has(f.id))
-      .map((f) => ({ id: f.id, denomination: f.denomination, city: f.city, entity_nature: federations().trouver(f.id)?.entity_nature ?? 'federation', email_generic: f.email_generic, website: f.website }))
-      .filter((f) => nature === '' || f.entity_nature === nature);
-    const page = paginer(liste, request, 50);
-    return HttpResponse.json({ data: page.data, meta: { total: page.meta.total } });
-  }),
 ];

@@ -99,6 +99,10 @@ final class SemeurTablesScopees
         // 2026-10-03 (N13) : propositions venues d'un tiers — feuille de
         // `companies` (pas de clé étrangère : un déclencheur vérifie l'espace).
         'propositions_champs',
+        // L3c-0 : marque de mise à l'écart d'une proposition (clé étrangère vers
+        // `propositions_champs`, ON DELETE RESTRICT) : APRÈS elle, pour que le nettoyage
+        // (ordre inverse) la vide d'abord.
+        'propositions_champs_ecartees',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -433,12 +437,17 @@ final class SemeurTablesScopees
             'information_tiers_version' => 'information-article-14/v5',
         ]);
 
-        $inserer('propositions_champs', [
+        $id['propositions_champs'] = $insererAvecId('propositions_champs', [
             'entite' => 'entreprise',
             'entite_id' => $id['companies'],
             'champ' => 'city',
             'valeur_proposee' => 'ZZ Etancheite',
             'origine' => 'apporteur',
+        ]);
+
+        $inserer('propositions_champs_ecartees', [
+            'proposition_id' => $id['propositions_champs'],
+            'motif' => 'demande_effacement',
         ]);
 
         $inserer('listes_manuelles_membres', [

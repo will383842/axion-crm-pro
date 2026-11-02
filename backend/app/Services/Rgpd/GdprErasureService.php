@@ -4,17 +4,26 @@ namespace App\Services\Rgpd;
 
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
+use App\Crm\Rgpd\MiseAEcart;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Effacement RGPD art. 17 — transaction multi-tables atomique.
- * Toutes les données PII d'un sujet (email/phone) sont supprimées en cascade,
- * un opt-out cross-workspace est créé pour bloquer toute future collecte.
+ *
+ * ⚠️ L3c-0 (ADR contrat v3 § 6, I3 — règle de Will : AUCUNE suppression de
+ * personne ni de données de personne) : `erase()` ne détruit, n'anonymise et
+ * n'écrase RIEN. Personnes, abonnements, contacts, candidats, journalistes,
+ * praticiens et comptes sont MASQUÉS de façon réversible (opposition,
+ * `deleted_at` doux, `App\Crm\Rgpd\MiseAEcart`) ; un opt-out cross-workspace
+ * bloque tout envoi et toute réinsertion. L'effacement définitif n'est pas
+ * codé : Will décide. Les commentaires historiques du fichier décrivent
+ * l'ancien comportement.
  */
 class GdprErasureService
 {
@@ -24,98 +33,88 @@ class GdprErasureService
     ) {}
 
     /**
-     * L'effacement est SYNCHRONE et n'emploie, sur `companies` et `contacts`,
-     * que des recherches servies par un index (relecture P1). Sa PREUVE — la
-     * recherche des résidus, et le balayage de la timeline par les numéros
-     * personnels — est DIFFÉRÉE : l'appelant met en file
-     * `App\Jobs\VerifierEffacementRgpd` avec `personnels`, qui ne doit
-     * jamais être archivé ni rendu (ce sont des numéros en clair).
+     * Traitement d'une demande d'effacement (bouton « traiter ») : MISE À
+     * L'ÉCART réversible, aucune donnée détruite. Aucune preuve différée n'est
+     * due : rien n'est supprimé, il n'y a pas de résidu à rechercher.
+     * `personnels` (numéros en clair) n'est jamais archivé ni rendu.
      *
      * @return array{deleted: array<string,int>, opt_out_added: bool, verification: string, personnels: list<string>}
      */
     public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
     {
         return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
-            // Effacement art. 17 : les contacts supprimés ici emportent leur
-            // ligne `journalists` liée (déclencheur, harmonisation presse).
-            LienJournalisteContact::marquerEffacement();
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
 
             // Les numéros de la personne : celui de la demande, et ceux que
-            // portent SES fiches personnes — relevés AVANT leur suppression.
-            // Une demande de la console ne cite que l'adresse ; le mobile de la
-            // personne n'en est pas moins une de ses coordonnées.
+            // portent SES fiches personnes — relevés AVANT la mise à l'écart.
             $telephones = array_values(array_unique(array_filter(array_merge(
                 [$phone ?? ''],
                 EffacementCoordonneesFiches::telephonesDesContacts($email),
             ), static fn (string $t): bool => trim($t) !== '')));
             $clesNom = EffacementCoordonneesFiches::clesNomDesContacts($email);
 
-            // On releve les `person_key` AVANT de supprimer : c'est par elles que
-            // la timeline (`activities`) est rattachee a la personne. Les
-            // supprimer d'abord rendrait leurs activites orphelines et
-            // introuvables - or ce sont elles qui portent le telephone en clair.
-            $clesPersonne = array_values(array_filter(array_unique(array_merge(
-                DB::table('contacts')->where('email', $email)->pluck('person_key')->all(),
-                DB::table('candidates')->where('email', $email)->pluck('person_key')->all(),
-                self::personnesDe($email)->pluck('person_key')->all(), // lot L4-C
-            ))));
-
-            // ── PROPOSITIONS VENUES D'UN TIERS (N13, relecture sécurité #316) ──
-            // Avant la suppression des fiches personnes : c'est par elles que la
-            // fonction retrouve les propositions de la personne. Rien n'y est
-            // supprimé (on garde la trace de la proposition et de sa décision) :
-            // ses valeurs sont NEUTRALISÉES (`[effacé]`). Chemin UNIQUE et
-            // borné : la fonction SECURITY DEFINER dédiée, seule à pouvoir
-            // passer le déclencheur qui fige une proposition — tous espaces
-            // confondus, y compris sous le rôle applicatif (RLS). Ses numéros
-            // PERSONNELS proposés par un tiers sur une autre fiche (celle de son
-            // organisation) le sont aussi ; un standard partagé reste à
-            // l'organisation, comme sur les fiches — relevés ici, avant que ses
-            // fiches personnes ne disparaissent.
-            $deleted['propositions_champs_neutralisees'] = self::neutraliserPropositions(
+            // Propositions de tiers (N13) : MISES À L'ÉCART par espace (marque
+            // réversible, aucune valeur écrasée), relevées AVANT le masquage des
+            // fiches personnes.
+            $deleted['propositions_champs_ecartees'] = self::ecarterPropositions(
                 $email,
                 EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom),
             );
 
-            // Lot L4-C — `abonnements` part en cascade avec sa personne ; on
-            // le compte à part pour que le bilan dise ce qui a disparu.
-            $personnesIds = self::personnesDe($email)->pluck('id')->all();
-            $deleted['abonnements'] = DB::table('abonnements')->whereIn('personne_id', $personnesIds)->delete();
-            $deleted['personnes'] = DB::table('personnes')->whereIn('id', $personnesIds)->delete();
+            // Numéros PERSONNELS et numéros opposables (anti-réinsertion),
+            // relevés SANS RIEN MODIFIER, avant le masquage des contacts.
+            $releve = EffacementCoordonneesFiches::releverPartout($email, $telephones, $clesNom);
+            $personnels = $releve['personnels'];
+            $opposables = $releve['opposables'];
 
-            $deleted['contacts'] = DB::table('contacts')->where('email', $email)->delete();
-            $deleted['email_validations'] = DB::table('email_validations')->where('email', $email)->delete();
+            // L3c-0 (ADR contrat v3 § 6, I3) : la personne est MISE À L'ÉCART,
+            // jamais supprimée. Les clés du bilan sont conservées (nombre de
+            // lignes mises à l'écart).
+            //
+            // ESPACE PAR ESPACE : `personnes`, `abonnements`, `candidates` et
+            // `contacts` sont sous RLS forcée ; une lecture ou un masquage sans
+            // contexte ne verrait aucune ligne (masquage silencieusement vide).
+            $deleted['abonnements'] = 0;
+            $deleted['personnes'] = 0;
+            $deleted['contacts'] = 0;
+            $deleted['candidates'] = 0;
+            $conditionCandidat = static function ($q) use ($email, $phone): void {
+                $q->where('email', $email);
+                if ($phone !== null && $phone !== '') {
+                    $q->orWhere('phone', $phone);
+                }
+            };
+            foreach (EffacementCoordonneesFiches::espaces() as $espace) {
+                $r = WorkspaceContext::run($espace, static function () use ($espace, $email, $conditionCandidat): array {
+                    $ecart = MiseAEcart::personnes(
+                        self::personnesDe($email)->where('workspace_id', $espace)->pluck('id')->all(),
+                        'demande_effacement',
+                    );
 
-            // 🔴 LE JUMEAU D'`email_validations` (B10-004, mesure 2026-08-20).
-            //
-            // Deux tables portent le verdict de delivrabilite d'une adresse :
-            // `email_validations` (cache 30 j de la deduplication) et
-            // `email_verification_logs` (journal du fournisseur Hunter, ecrit
-            // par `HunterEmailVerifier::journaliser`). La premiere etait
-            // effacee et exportee ; la seconde ne l'etait NI l'une NI l'autre,
-            // alors qu'elle garde en plus la reponse BRUTE du fournisseur
-            // (`raw_response` JSONB), c'est-a-dire tout ce que le prestataire a
-            // dit de cette personne.
-            //
-            // C'est le patron A-011 : le correctif existait sur une table et
-            // n'avait jamais ete porte sur sa jumelle.
-            $deleted['email_verification_logs'] = DB::table('email_verification_logs')
-                ->whereRaw('lower(email::text) = ?', [$email])
-                ->delete();
-            $deleted['rgpd_requests'] = DB::table('rgpd_requests')->where('subject_email', $email)->where('type', '!=', 'erasure')->delete();
-            $deleted['notifications'] = DB::table('notifications')->whereRaw('body ILIKE ?', ['%' . $email . '%'])->delete();
-            $deleted['magic_links'] = DB::table('magic_links')->where('email', $email)->delete();
+                    return [
+                        'abonnements' => $ecart['abonnements'],
+                        'personnes' => $ecart['personnes'],
+                        'contacts' => MiseAEcart::contacts(
+                            DB::table('contacts')->where('workspace_id', $espace)->where('email', $email)->pluck('id')->all(),
+                            'demande_effacement',
+                        ),
+                        // Candidats : corbeille douce + trace (`MiseAEcart::candidats`).
+                        'candidates' => MiseAEcart::candidats(
+                            DB::table('candidates')->where('workspace_id', $espace)->where($conditionCandidat)->pluck('id')->all(),
+                            'demande_effacement',
+                        ),
+                    ];
+                });
+                foreach ($r as $cle => $n) {
+                    $deleted[$cle] += $n;
+                }
+            }
 
-            // Journalistes (données personnelles B2B) : anonymisation + opt-out + soft-delete
-            // plutôt que suppression dure, pour conserver la traçabilité de l'effacement.
-            //
-            // Harmonisation presse (relecture sécurité #264) : le CONTACT lié à
-            // chacun de ces journalistes (`journalists.contact_id`) est supprimé
-            // lui aussi — même sans adresse, il porte le nom et la fonction de la
-            // personne — et inscrit au registre des retraits.
-            $journalistesEffaces = array_values(array_map('intval', DB::table('journalists')
+            // Journalistes : MASQUÉS (corbeille douce + opposition), jamais
+            // vidés de leurs coordonnées. Le CONTACT lié est mis à l'écart
+            // lui aussi et inscrit au registre des retraits.
+            $journalistesMasques = array_values(array_map('intval', DB::table('journalists')
                 ->whereNull('deleted_at')
                 ->where(function ($q) use ($email, $phone) {
                     $q->where('email', $email);
@@ -124,114 +123,15 @@ class GdprErasureService
                     }
                 })
                 ->pluck('id')->all()));
-            $deleted['contacts'] += LienJournalisteContact::effacerContactsDe($journalistesEffaces);
+            $deleted['contacts'] += LienJournalisteContact::masquerContactsDe($journalistesMasques, 'demande_effacement');
             $deleted['journalists'] = DB::table('journalists')
-                ->whereIn('id', $journalistesEffaces)
+                ->whereIn('id', $journalistesMasques)
                 ->update([
-                    'email' => null,
-                    'phone' => null,
                     'opt_out' => true,
                     'deleted_at' => now(),
                 ]);
 
-            // Médias : neutralise l'email ET LE TELEPHONE du contact redaction.
-            // Le telephone restait en clair : neutraliser la seule adresse laissait
-            // un moyen de joindre la personne (B15-006).
-            $deleted['media_email'] = DB::table('media')->where('email', $email)->update([
-                'email' => null,
-                'phone' => null,
-            ]);
-
-            // ── CANDIDATS ────────────────────────────────────────────────────
-            // `candidates` porte `email`, `phone`, nom et prenom. Le service
-            // d'effacement du CANAL (SiteGdprService) les supprimait pour le
-            // vivier ; celui-ci, appele depuis la console et l'API, ne les
-            // touchait pas du tout. Une meme personne etait donc effacee ou non
-            // selon la porte par laquelle la demande arrivait (B15-006).
-            $deleted['candidates'] = DB::table('candidates')
-                ->where(function ($q) use ($email, $phone) {
-                    $q->where('email', $email);
-                    if ($phone !== null && $phone !== '') {
-                        $q->orWhere('phone', $phone);
-                    }
-                })
-                ->delete();
-
-            // ── LA TIMELINE, ET C'EST LA QUE LE TELEPHONE SURVIVAIT ──────────
-            //
-            // 🔴 `activities.payload` est un JSONB qui garde `{"tel":"+33…",
-            // "email":"jean.dupont@…"}` EN CLAIR. La cle etrangere vers le
-            // contact est en `SET NULL` : supprimer le contact laissait donc la
-            // ligne d'activite, et avec elle le telephone et l'adresse de la
-            // personne qui venait de demander son effacement. Mesure le
-            // 2026-08-19 (audit 360, B15-006, S0).
-            //
-            // On supprime par `person_key` - le lien stable - ET par contenu,
-            // parce qu'une activite nee de la COLLECTE peut porter l'adresse sans
-            // porter la cle. Le balayage est couteux ; un effacement est rare, et
-            // la justesse prime ici sur la vitesse.
-            $requeteActivites = DB::table('activities')->where(function ($q) use ($clesPersonne, $email, $phone) {
-                if ($clesPersonne !== []) {
-                    $q->orWhereIn('person_key', $clesPersonne);
-                }
-                $q->orWhereRaw('payload::text ILIKE ?', ['%' . $email . '%'])
-                    ->orWhereRaw("coalesce(content, '') ILIKE ?", ['%' . $email . '%'])
-                    ->orWhereRaw("coalesce(title, '') ILIKE ?", ['%' . $email . '%']);
-                if ($phone !== null && $phone !== '') {
-                    $q->orWhereRaw('payload::text ILIKE ?', ['%' . $phone . '%']);
-                }
-            });
-            $deleted['activities'] = $requeteActivites->delete();
-
-            // ── COURRIELS ECHANGES ───────────────────────────────────────────
-            // `email_messages` garde l'expediteur et les destinataires en clair.
-            $deleted['email_messages'] = DB::table('email_messages')
-                ->where(function ($q) use ($email) {
-                    $q->whereRaw('lower(from_address::text) = ?', [$email])
-                        ->orWhereRaw('to_addresses::text ILIKE ?', ['%' . $email . '%']);
-                })
-                ->delete();
-
-            // ── LES FICHES D'ORGANISATION (relecture de la PR #255, 2026-09-29)
-            // L'adresse et le mobile d'une personne vivent aussi sur la fiche de
-            // son organisation : e-mail générique, téléphone, canaux collectés,
-            // et fiches personnes qui portent son numéro sans son adresse. Mis à
-            // NULL — y compris sur une fiche PROTÉGÉE, qui survit. Espace par
-            // espace (RLS) ; seuls les numéros PERSONNELS sortent des fiches
-            // d'organisation (un standard partagé reste à l'organisation).
-            $fiches = EffacementCoordonneesFiches::effacerPartout($email, $telephones, $clesNom);
-            foreach ($fiches['bilan'] as $emplacement => $n) {
-                $deleted['fiches_' . $emplacement] = $n;
-            }
-            $personnels = $fiches['personnels'];
-            $opposables = $fiches['opposables'];
-
-            // ── CE QU'ON NE SUPPRIME **PAS**, ET POURQUOI ────────────────────
-            //
-            // `opt_out` et `dnc_entries` ne sont PAS purgees, et ce n'est pas un
-            // oubli : ce sont les listes qui EMPECHENT de recontacter la personne.
-            // Les effacer ferait exactement l'inverse de ce que la personne
-            // demande - elle redeviendrait joignable a la prochaine collecte.
-            // `opt_out` ne conserve d'ailleurs qu'un HACHAGE d'adresse, jamais
-            // l'adresse elle-meme (cf. SiteGdprService::optOut).
-            // Le journal d'audit garde de meme la PREUVE de l'effacement, sous
-            // forme de hachage : detruire la preuve d'un effacement rendrait
-            // l'effacement indemontrable.
-
-            // 🔴 PRATICIENS DE SANTÉ — DONNÉE DE L'ARTICLE 9 (catégorie particulière).
-            //
-            // Cette table était visée par AUCUN des deux services d'effacement,
-            // AUCUNE purge, AUCUNE politique de rétention. Constaté le
-            // 2026-08-16. Sa propre migration l'annonce pourtant :
-            // « ⚠️ Donnée nominative de SANTÉ (RGPD art. 9) ».
-            //
-            // SUPPRESSION FERME, et non anonymisation comme pour `journalists` :
-            // la ligne porte `nom`, `prenom`, `specialite`, `address`,
-            // `postcode`, `city` et `rpps`. Nullifier l'email et le téléphone
-            // laisserait un praticien parfaitement identifiable — nom + spécialité
-            // + adresse, c'est-à-dire précisément la donnée de santé.
-            // Le modèle utilise `SoftDeletes` ; on passe donc par le
-            // constructeur de requêtes, qui supprime réellement la ligne.
+            // Praticiens de santé (art. 9) : corbeille douce, ligne gardée.
             $deleted['health_practitioners'] = DB::table('health_practitioners')
                 ->where(function ($q) use ($email, $phone) {
                     $q->where('email', $email);
@@ -239,109 +139,24 @@ class GdprErasureService
                         $q->orWhere('phone', $phone);
                     }
                 })
-                ->delete();
+                ->whereNull('deleted_at')
+                ->update(['deleted_at' => now()]);
 
-            // ── LES TITULAIRES DE COMPTE DU CRM (B10-004, ce qui en restait) ──
-            //
-            // `users`, `invitations` et `password_reset_tokens` n'etaient vises
-            // par AUCUNE procedure d'effacement — ni par cette porte, ni par
-            // celle du site. Le tableau de decision du 2026-08-20
-            // (`tests/Feature/Rgpd/PortabiliteCompleteTest.php`) les EXCLUAIT au
-            // motif « autre registre de traitement ». Un registre distinct
-            // change la base legale et la duree de conservation ; il ne suspend
-            // pas l'article 17. Ce sont des personnes IDENTIFIEES : les
-            // utilisateurs du CRM, et les gens qu'on a invites a le devenir.
-            //
-            // 🔴 POURQUOI ON ANONYMISE `users` AU LIEU DE LE SUPPRIMER — ET CE
-            //    N'EST PAS UN GOUT, C'EST LE CATALOGUE QUI LE DIT.
-            //
-            //   SELECT conrelid::regclass, confdeltype FROM pg_constraint
-            //    WHERE contype = 'f' AND confrelid = 'users'::regclass;
-            //
-            // Mesure du 2026-08-21 sur `axion_crm_test_lot8` : 33 contraintes
-            // pointent vers `users`. SEPT d'entre elles BLOQUENT une suppression
-            //   `a` (NO ACTION) — deal_history.changed_by,
-            //     duplicate_flags.reviewed_by, invitations.invited_by,
-            //     invitations.accepted_by, prompt_template_versions.created_by,
-            //     rgpd_requests.processed_by ;
-            //   `r` (RESTRICT)  — scraping_campaigns.created_by.
-            // Un `DELETE` leve donc une violation de cle etrangere des que la
-            // personne a agi une seule fois dans le CRM — et un titulaire de
-            // compte a agi, par definition. Une demande d'effacement se
-            // solderait par une exception, pas par un effacement.
-            //
-            // Les 21 restantes sont en `SET NULL`, et c'est PIRE que le blocage :
-            // `audit_logs.user_id` en fait partie, sur la table mere et ses
-            // douze partitions. Supprimer la ligne DETACHERAIT silencieusement
-            // de son auteur chaque maillon de la chaine d'audit — c'est-a-dire
-            // detruirait la preuve de qui a fait quoi, y compris la preuve de
-            // cet effacement-ci.
-            //
-            // LE DEPOT A DEJA TRANCHE CE CAS, QUARANTE LIGNES PLUS HAUT :
-            // `journalists` est anonymise puis soft-delete « pour conserver la
-            // tracabilite de l'effacement ». On fait pareil. `users` porte
-            // `SoftDeletes` depuis B10-016 et `config/auth.php` rend
-            // `deleted_at` OPPOSABLE : le compte ferme perd ses sessions comme
-            // ses jetons Sanctum deja emis.
-            $comptes = DB::table('users')->where('email', $email)->pluck('id')->all();
-            $deleted['users'] = 0;
-            foreach ($comptes as $idCompte) {
-                $deleted['users'] += DB::table('users')->where('id', $idCompte)->update([
-                    // `email` est NOT NULL **et** UNIQUE (citext) : on ne peut
-                    // ni la vider ni ecrire deux fois la meme valeur. Le TLD
-                    // `.invalid` est reserve par le RFC 2606 — aucune adresse
-                    // n'y sera jamais livrable, et l'identifiant du compte suffit
-                    // a garantir l'unicite.
-                    'email' => 'efface-' . $idCompte . '@compte-efface.invalid',
-                    'name' => 'Compte efface',
-                    'password_hash' => null,
-                    'avatar_url' => null,
-                    'totp_secret' => null,
-                    'totp_recovery_codes' => null,
-                    'totp_enabled_at' => null,
-                    'remember_token' => null,
-                    'last_login_ip' => null,
-                    'last_login_user_agent' => null,
-                    'deleted_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            // Comptes du CRM : compte FERMÉ (`deleted_at`, que `config/auth.php`
+            // rend opposable : sessions et jetons Sanctum perdent leur effet).
+            // Rien n'est anonymisé ni écrasé : adresse, nom, secrets restent
+            // en base ; rouvrir le compte = remettre `deleted_at` à NULL.
+            $deleted['users'] = DB::table('users')->where('email', $email)->whereNull('deleted_at')
+                ->update(['deleted_at' => now(), 'updated_at' => now()]);
 
-            // Les SESSIONS ouvertes gardent `ip_address` et `user_agent` : le
-            // residu le plus direct qui survit a l'anonymisation de la ligne
-            // `users`. La cle etrangere est bien en CASCADE — mais on ne
-            // supprime PAS la ligne `users`, donc la cascade ne se declenche
-            // JAMAIS ici. C'est exactement le genre de securite qu'on croit
-            // avoir sans l'avoir.
-            $deleted['sessions'] = $comptes === []
-                ? 0
-                : DB::table('sessions')->whereIn('user_id', $comptes)->delete();
-
-            // L'INVITATION porte l'adresse de la personne INVITEE, son role
-            // prevu, et un `token_hash` qui ouvre un compte. Rien n'y refere
-            // (mesure : aucune contrainte `f` de `confrelid = 'invitations'`),
-            // et la ligne n'a aucune valeur une fois la personne effacee :
-            // suppression ferme.
-            //
-            // ⚠️ `invitations` porte FORCE ROW LEVEL SECURITY et une policy
-            // d'isolation par `workspace_id`. Ce service efface a travers TOUS
-            // les espaces, sans contexte pose : il depend donc, ici comme pour
-            // les neuf autres tables a RLS forcee qu'il touche deja (contacts,
-            // activities, candidates, notifications, journalists, media,
-            // health_practitioners, email_verification_logs, rgpd_requests), du
-            // fait que la connexion par defaut porte le role `axion`, qui est
-            // BYPASSRLS. Cet etat est fige par
-            // `tests/Feature/Rgpd/RolePorteurDeLaRlsTest.php` : le jour ou
-            // `CRM_DB_APP_ROLE_ENABLED` passe a vrai, ce fichier-la rougit et
-            // renvoie ici.
-            $deleted['invitations'] = DB::table('invitations')->where('email', $email)->delete();
-
-            // Le jeton de reinitialisation est ephemere et sans valeur pour la
-            // personne — mais la LIGNE, elle, est indexee par son adresse en
-            // clair : elle dit qu'un compte existe a ce nom. Suppression ferme.
-            $deleted['password_reset_tokens'] = DB::table('password_reset_tokens')
-                ->where('email', $email)
-                ->delete();
+            // CE QUI N'EST PAS TOUCHÉ, ET C'EST VOULU (règle de Will) :
+            // `activities`, `email_messages`, `email_verification_logs`,
+            // `email_validations`, `notifications`, `rgpd_requests`,
+            // `magic_links`, `media`, `sessions`, `invitations`,
+            // `password_reset_tokens` et les fiches d'organisation gardent
+            // leurs lignes. Aucun envoi ne part vers la personne (opposition,
+            // `opt_out`, contacts et personnes masqués) ; l'effacement
+            // définitif de ces tables n'est PAS codé, Will décide.
 
             // Audit log — la suppression elle-même
             $this->audit->record([
@@ -397,32 +212,52 @@ class GdprErasureService
 
             // La preuve (« plus rien ne reste ») est DIFFÉRÉE : elle parcourt des
             // tables entières. Le journal ne porte JAMAIS l'adresse en clair.
-            Log::info('GDPR erasure executed, verification deferred', ['email_hash' => hash('sha256', $email), 'deleted' => $deleted]);
+            Log::info('GDPR erasure request executed as masking (nothing deleted)', ['email_hash' => hash('sha256', $email), 'deleted' => $deleted]);
 
-            return ['deleted' => $deleted, 'opt_out_added' => true, 'verification' => 'differee', 'personnels' => $personnels];
+            return ['deleted' => $deleted, 'opt_out_added' => true, 'verification' => 'aucune', 'personnels' => $personnels];
         });
     }
 
     /**
-     * N13 — neutralise (`[effacé]`) les propositions de tiers de cette adresse
-     * et/ou de ces numéros, par la fonction dédiée `propositions_champs_effacer`
-     * (aucune ligne supprimée). Rend le nombre de propositions neutralisées.
+     * N13 — met à l'écart les propositions de tiers de cette adresse et/ou de
+     * ces numéros : une MARQUE (`propositions_champs_ecartees`), jamais un
+     * écrasement des valeurs ni une suppression. Espace par espace (RLS).
+     * Rend le nombre de propositions nouvellement écartées.
      *
      * @param  list<string>  $telephones
      */
-    private static function neutraliserPropositions(string $email, array $telephones): int
+    private static function ecarterPropositions(string $email, array $telephones): int
     {
         $variantes = [];
         foreach ($telephones as $t) {
             array_push($variantes, ...ListeSuppression::variantesTelephone($t));
         }
-        // Des chiffres seulement : le littéral de tableau ne demande aucun échappement.
         $chiffres = array_values(array_unique(array_filter($variantes, static fn (string $v): bool => ctype_digit($v))));
+        $courriel = mb_strtolower(trim($email));
 
-        return (int) (DB::selectOne(
-            'SELECT public.propositions_champs_effacer(?, ?::text[]) AS n',
-            [$email, '{' . implode(',', $chiffres) . '}'],
-        )->n ?? 0);
+        $total = 0;
+        foreach (EffacementCoordonneesFiches::espaces() as $espace) {
+            $total += WorkspaceContext::run($espace, static fn (): int => DB::affectingStatement(
+                "INSERT INTO propositions_champs_ecartees (proposition_id, workspace_id, motif)
+                 SELECT pc.id, pc.workspace_id, 'demande_effacement'
+                   FROM propositions_champs pc
+                  WHERE pc.workspace_id = ?::uuid
+                    AND (
+                        (? <> '' AND pc.entite = 'personne' AND pc.entite_id IN (
+                            SELECT ct.id FROM contacts ct WHERE ct.workspace_id = ?::uuid AND lower(ct.email::TEXT) = ?
+                        ))
+                        OR (cardinality(?::text[]) > 0 AND (
+                            regexp_replace(pc.valeur_proposee, '\D', '', 'g') = ANY (?::text[])
+                            OR regexp_replace(coalesce(pc.valeur_actuelle, ''), '\D', '', 'g') = ANY (?::text[])
+                            OR regexp_replace(coalesce(pc.valeur_remplacee, ''), '\D', '', 'g') = ANY (?::text[])
+                        ))
+                    )
+                 ON CONFLICT (proposition_id) DO NOTHING",
+                [$espace, $courriel, $espace, $courriel, '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}'],
+            ));
+        }
+
+        return $total;
     }
 
     /**

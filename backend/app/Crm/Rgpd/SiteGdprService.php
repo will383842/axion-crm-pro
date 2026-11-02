@@ -2,9 +2,7 @@
 
 namespace App\Crm\Rgpd;
 
-use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Taxonomy;
-use App\Jobs\VerifierEffacementRgpd;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * VOLET RGPD de la synchro site → CRM (plan §2.8.2) : art. 15 / art. 17 en
  * UNE action sur les DEUX systèmes.
+ *
+ * ⚠️ L3c-0 (ADR contrat v3 § 6) : `erase()` NE SUPPRIME PLUS RIEN. Il enregistre
+ * la demande, met la personne à l'écart et la signale ; le texte historique
+ * ci-dessous décrit l'ancien effacement.
  *
  * Le site est le point d'entrée du self-service (export/effacement, réparés
  * le 2026-08-13) ; après exécution LOCALE, il appelle
@@ -82,6 +84,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class SiteGdprService
 {
+    private const MOTIF = 'demande_effacement';
+
     public function __construct(private readonly AuditHashChain $audit) {}
 
     /**
@@ -182,7 +186,15 @@ final class SiteGdprService
     }
 
     /**
-     * Art. 17 — effacement par univers.
+     * Art. 17 — demande d'effacement venue du site (L3c-0, ADR contrat v3 § 6
+     * et B2) : ELLE NE SUPPRIME RIEN.
+     *
+     * Par univers, la demande est ENREGISTRÉE dans `rgpd_requests` (statut
+     * `pending`, donc visible et signalée dans « Demandes RGPD » de la barre
+     * latérale), la personne est MISE À L'ÉCART (`opposition_at` + motif,
+     * abonnements désabonnés, contacts à la corbeille douce, candidats à la corbeille douce)
+     * et son empreinte entre dans `opt_out` (plus aucun envoi, anti-réinsertion).
+     * Les données sont gardées ; c'est Will qui décide, outil par outil.
      *
      * @param  'both'|'business'|'vivier'  $scope
      * @return array<string, mixed>
@@ -191,54 +203,25 @@ final class SiteGdprService
     {
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
-        $deleted = [];
-        $clesNom = [];
+        $ecart = [];
 
         if (in_array($scope, ['both', 'business'], true)) {
             $businessId = $this->workspaceId((string) config('crm.ingest.business_workspace', 'axion-ia'));
             if ($businessId !== null) {
-                // Les numéros de la personne, relevés AVANT la suppression de
-                // ses fiches (cf. EffacementCoordonneesFiches) — dans le
-                // contexte de l'espace, sans quoi la RLS ne montrerait rien.
+                // Numéros de la personne et clés de nom, relevés AVANT la mise
+                // à l'écart (ses fiches contacts les portent) : ils servent à
+                // l'anti-réinsertion par téléphone, comme `GdprErasureService`.
                 [$telephones, $clesNom] = WorkspaceContext::run(
                     $businessId,
-                    fn (): array => [
-                        // Par clé de personne OU par adresse, comme la
-                        // suppression juste après (relecture S5).
+                    static fn (): array => [
                         EffacementCoordonneesFiches::telephonesDesContacts($email, $businessId, $personKey),
                         EffacementCoordonneesFiches::clesNomDesContacts($email, $businessId, $personKey),
                     ],
                 );
-                $deleted['business'] = WorkspaceContext::run(
+
+                $res = WorkspaceContext::run(
                     $businessId,
                     fn (): array => DB::transaction(function () use ($businessId, $personKey, $email, $telephones, $clesNom): array {
-                        // Effacement art. 17 : emporte aussi la ligne `journalists`
-                        // liée aux contacts supprimés (harmonisation presse).
-                        LienJournalisteContact::marquerEffacement();
-                        $contacts = DB::table('contacts')
-                            ->where('workspace_id', $businessId)
-                            ->where(function ($q) use ($personKey, $email): void {
-                                $q->where('person_key', $personKey)
-                                    ->orWhere('email', $email);
-                            })
-                            ->delete();
-
-                        // 🔴 PRATICIENS DE SANTÉ — ARTICLE 9.
-                        // Table visée par aucun effacement jusqu'au 2026-08-16.
-                        // Suppression ferme : `nom`, `prenom`, `specialite`,
-                        // `address` et `rpps` rendent la personne identifiable
-                        // même sans email ni téléphone — et c'est justement la
-                        // donnée de santé. Rattachée par `workspace_id`, donc
-                        // couverte par le contexte posé ci-dessus.
-                        $praticiens = DB::table('health_practitioners')
-                            ->where('workspace_id', $businessId)
-                            ->where('email', $email)
-                            ->delete();
-
-                        // Lot L4-C — la personne et ses abonnements. Suppression
-                        // FERME : l'empreinte reste dans `opt_out` (portées
-                        // `business` posée ci-dessous et `lettre` si elle
-                        // existait), c'est l'anti-réinsertion.
                         $personnesIds = DB::table('personnes')
                             ->where('workspace_id', $businessId)
                             ->where(function ($q) use ($personKey, $email): void {
@@ -248,97 +231,95 @@ final class SiteGdprService
                             ->pluck('id')
                             ->all();
 
-                        $abonnements = DB::table('abonnements')
+                        $contactsIds = DB::table('contacts')
                             ->where('workspace_id', $businessId)
-                            ->whereIn('personne_id', $personnesIds)
-                            ->delete();
-                        $personnes = DB::table('personnes')
+                            ->where(function ($q) use ($personKey, $email): void {
+                                $q->where('person_key', $personKey)
+                                    ->orWhere('email', $email);
+                            })
+                            ->pluck('id')
+                            ->all();
+
+                        $praticiens = DB::table('health_practitioners')
                             ->where('workspace_id', $businessId)
-                            ->whereIn('id', $personnesIds)
-                            ->delete();
+                            ->where('email', $email)
+                            ->whereNull('deleted_at')
+                            ->update(['deleted_at' => now()]);
 
-                        $activites = $this->deleteActivities($businessId, $personKey);
+                        // Numéros PERSONNELS, relevés avant le masquage, sans rien modifier.
+                        $personnels = EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom, $businessId);
 
-                        // Les fiches d'ORGANISATION qui portent son adresse ou son
-                        // mobile (e-mail générique, téléphone, canaux) — même
-                        // définition que l'effacement console (PR #255).
-                        $fiches = EffacementCoordonneesFiches::effacer($email, $telephones, $clesNom, $businessId);
-                        $personnels = $fiches['personnels'];
+                        $personnes = MiseAEcart::personnes($personnesIds, self::MOTIF);
+                        [$demande, $nouvelle] = $this->journal($businessId, $email);
 
-                        // 🔴 Le journal DANS le contexte ET dans la transaction —
-                        // cf. `journal()`. La demande reste « en cours » jusqu'au
-                        // verdict de la preuve DIFFÉRÉE (relectures P1, P2) :
-                        // un effacement incomplet reste VISIBLE dans la console.
-                        $demande = $this->journal($businessId, $email, verifier: true);
-
-                        return $fiches['bilan'] + [
-                            'personnels' => $personnels,
+                        return [
                             'demande' => $demande,
-                            'contacts' => $contacts,
-                            'personnes' => $personnes,
-                            'abonnements' => $abonnements,
-                            'health_practitioners' => $praticiens,
-                            'activities' => $activites,
+                            'nouvelle' => $nouvelle,
+                            'personnels' => $personnels,
+                            'bilan' => [
+                                'contacts' => MiseAEcart::contacts($contactsIds, self::MOTIF),
+                                'personnes' => $personnes['personnes'],
+                                'abonnements' => $personnes['abonnements'],
+                                'health_practitioners' => $praticiens,
+                            ],
                         ];
                     }),
                 );
-            }
-            $this->optOut($email, $emailHash, 'business');
-            $personnels = is_array($deleted['business']['personnels'] ?? null) ? $deleted['business']['personnels'] : [];
-            $demande = is_int($deleted['business']['demande'] ?? null) ? $deleted['business']['demande'] : null;
-            unset($deleted['business']['personnels'], $deleted['business']['demande']);
+                $ecart['business'] = $res['bilan'];
 
-            if ($businessId !== null) {
-                // Les numéros PERSONNELS seulement, et personnels dans CHAQUE
-                // espace où on les trouve : `opt_out.phone` est global, un
-                // standard ailleurs n'est pas opposé (relectures S3, E2).
-                foreach (EffacementCoordonneesFiches::opposablesPartout($email, $personnels, $clesNom, $businessId) as $telephone) {
+                // Anti-réinsertion par téléphone : les numéros PERSONNELS
+                // seulement, et personnels dans CHAQUE espace où on les trouve
+                // (`opt_out.phone` est global : un standard ailleurs n'est pas
+                // opposé).
+                foreach (EffacementCoordonneesFiches::opposablesPartout($email, $res['personnels'], $clesNom, $businessId) as $telephone) {
                     $this->optOutTelephone($telephone, 'business');
                 }
 
-                // La preuve, APRÈS la transaction : elle parcourt des tables
-                // entières, le site n'attend pas (il coupe à 10 s).
-                dispatch((new VerifierEffacementRgpd($email, $personnels, $demande, $businessId))->pourEspace($businessId));
+                // Un rejeu de la même demande ne re-signale pas.
+                if ($res['nouvelle']) {
+                    SignalementDemandeEffacement::signaler($businessId, 'site');
+                }
             }
+            $this->optOut($email, $emailHash, 'business');
         }
 
         if (in_array($scope, ['both', 'vivier'], true)) {
             $vivierId = $this->workspaceId(Taxonomy::VIVIER_WORKSPACE_SLUG);
             if ($vivierId !== null) {
-                $deleted['vivier'] = WorkspaceContext::run(
+                $res = WorkspaceContext::run(
                     $vivierId,
                     fn (): array => DB::transaction(function () use ($vivierId, $personKey, $email): array {
-                        // candidate_tag part avec la fiche (FK ON DELETE CASCADE).
-                        // Le CV vit côté SITE (cv_ref n'est qu'une référence) :
-                        // c'est l'effacement site, déjà exécuté avant cet appel,
-                        // qui a purgé le fichier.
-                        $candidates = DB::table('candidates')
+                        $candidatsIds = DB::table('candidates')
                             ->where('workspace_id', $vivierId)
                             ->where(function ($q) use ($personKey, $email): void {
                                 $q->where('person_key', $personKey)
                                     ->orWhere('email', $email);
                             })
-                            ->delete();
+                            ->pluck('id')
+                            ->all();
 
-                        $activites = $this->deleteActivities($vivierId, $personKey);
-
-                        $this->journal($vivierId, $email);
+                        [, $nouvelle] = $this->journal($vivierId, $email);
 
                         return [
-                            'candidates' => $candidates,
-                            'activities' => $activites,
+                            'nouvelle' => $nouvelle,
+                            'bilan' => ['candidates' => MiseAEcart::candidats($candidatsIds, self::MOTIF)],
                         ];
                     }),
                 );
+                $ecart['vivier'] = $res['bilan'];
+
+                if ($res['nouvelle']) {
+                    SignalementDemandeEffacement::signaler($vivierId, 'site');
+                }
             }
             $this->optOut($email, $emailHash, 'vivier');
         }
 
-        // La chaîne d'audit porte la PREUVE de l'effacement — hash, jamais l'email.
+        // La chaîne d'audit porte la PREUVE de la demande — hash, jamais l'email.
         $this->audit->record([
             'workspace_id' => null,
             'user_id' => null,
-            'method' => 'GDPR_ERASURE_BISYSTEM',
+            'method' => 'GDPR_ERASURE_REQUEST_BISYSTEM',
             'path' => '/internal/site-sync/gdpr',
             'status' => 200,
             'ip' => null,
@@ -347,11 +328,11 @@ final class SiteGdprService
         ]);
 
         return [
-            'deleted' => $deleted,
+            // Clé conservée pour les lecteurs existants : rien n'est supprimé.
+            'deleted' => [],
+            'mis_a_l_ecart' => $ecart,
             'opt_out_scopes' => $scope === 'both' ? ['business', 'vivier'] : [$scope],
-            // La preuve (« plus rien ne reste ») est différée : son verdict
-            // vit sur la demande `rgpd_requests`, visible dans la console.
-            'verification' => 'differee',
+            'verification' => 'aucune',
         ];
     }
 
@@ -366,39 +347,6 @@ final class SiteGdprService
             ->get(['kind', 'occurred_at', 'title', 'payload', 'external_ref'])
             ->map(fn (object $row): array => (array) $row)
             ->all());
-    }
-
-    private function deleteActivities(string $workspaceId, string $personKey): int
-    {
-        // La timeline d'une personne effacée part avec elle : les payloads
-        // portent des PII (messages, téléphones). Les activités d'entreprise
-        // (person_key NULL, ex. `scraped`) ne sont pas concernées.
-        return DB::table('activities')
-            ->where('workspace_id', $workspaceId)
-            ->where('person_key', $personKey)
-            ->delete();
-    }
-
-    /**
-     * Le mobile d'une personne effacée ne revient pas par la collecte suivante
-     * (même règle que `DeduplicationService::addOptOut`, qui ôte espaces,
-     * points et tirets).
-     */
-    private function optOutTelephone(string $telephone, string $scope): void
-    {
-        $telephone = (string) preg_replace('/[\s.-]/', '', $telephone);
-        if ($telephone === '' || DB::table('opt_out')->where('scope', $scope)->where('phone', $telephone)->exists()) {
-            return;
-        }
-
-        DB::table('opt_out')->insert([
-            'email' => null,
-            'email_hash' => null,
-            'phone' => $telephone,
-            'scope' => $scope,
-            'source' => 'gdpr_erasure_bisystem',
-            'created_at' => now(),
-        ]);
     }
 
     private function optOut(string $email, string $emailHash, string $scope): void
@@ -421,40 +369,69 @@ final class SiteGdprService
     }
 
     /**
-     * 🔴 À appeler DANS `WorkspaceContext::run()` et DANS la transaction de
-     * l'effacement — jamais après (constaté en production le 2026-09-25).
+     * Enregistre la DEMANDE d'effacement (`pending` : signalée à Will dans
+     * « Demandes RGPD », qui décide). IDEMPOTENT : si une demande en attente
+     * existe déjà pour la même adresse et le même espace, elle est reprise, pas
+     * dupliquée (rejeu du site). À appeler DANS `WorkspaceContext::run()` et
+     * DANS la transaction : `rgpd_requests` porte une RLS forcée.
      *
-     * `rgpd_requests` porte une RLS FORCÉE : sans `app.current_workspace_id`,
-     * l'insertion est refusée (« new row violates row-level security policy »).
-     * L'appel vivait APRÈS `WorkspaceContext::run()`, donc hors contexte : sous
-     * le rôle de production `axion_app`, CHAQUE effacement venu du site levait
-     * ici. Et comme la suppression avait déjà été validée dans sa propre
-     * transaction, l'effacement restait PARTIEL : fiches business supprimées,
-     * mais ni journal, ni opposition anti-réinsertion, ni univers vivier, ni
-     * preuve d'audit — et le site recevait un 500. Mesuré en production :
-     * 0 journal `site-sync-gdpr`, 0 opposition `gdpr_erasure_bisystem`.
-     *
-     * La suite ne l'avait pas vu parce qu'elle tourne sous le rôle `axion`
-     * (SUPERUSER, BYPASSRLS). `SiteGdprSousRlsTest` rejoue l'effacement sous
-     * `axion_app`.
+     * @return array{0: int, 1: bool} [identifiant, vraie si la demande vient d'être créée]
      */
-    private function journal(string $workspaceId, string $email, bool $verifier = false): int
+    private function journal(string $workspaceId, string $email): array
     {
-        $metadata = ['origin' => 'site-sync-gdpr'];
-        if ($verifier) {
-            $metadata['verification'] = 'en_attente';
+        // M3 : deux rejeux SIMULTANÉS du site liraient tous deux « aucune
+        // demande » puis créeraient chacun la leur. Un verrou consultatif de
+        // transaction, propre à (espace, adresse), sérialise le « lire puis
+        // créer » ; il tombe tout seul à la fin de la transaction de l'appelant.
+        DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['rgpd_requests.pending.erasure|' . $workspaceId . '|' . $email]);
+
+        $existante = DB::table('rgpd_requests')
+            ->where('workspace_id', $workspaceId)
+            ->where('type', 'erasure')
+            ->where('status', 'pending')
+            ->where('subject_email', $email)
+            ->value('id');
+        if ($existante !== null) {
+            return [(int) $existante, false];
         }
 
-        return (int) DB::table('rgpd_requests')->insertGetId([
+        $id = (int) DB::table('rgpd_requests')->insertGetId([
             'workspace_id' => $workspaceId,
             'type' => 'erasure',
-            'status' => $verifier ? 'processing' : 'done',
+            'status' => 'pending',
             'subject_email' => $email,
             'requested_at' => now(),
-            'processed_at' => now(),
-            'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
+            'metadata' => json_encode([
+                'origin' => 'site-sync-gdpr',
+                'mise_a_l_ecart' => true,
+                'decision' => 'en_attente_de_will',
+            ], JSON_THROW_ON_ERROR),
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        return [$id, true];
+    }
+
+    /**
+     * Le mobile d'une personne mise à l'écart ne revient pas par la collecte
+     * suivante (même règle que `DeduplicationService::addOptOut`, qui ôte
+     * espaces, points et tirets).
+     */
+    private function optOutTelephone(string $telephone, string $scope): void
+    {
+        $telephone = (string) preg_replace('/[\s.-]/', '', $telephone);
+        if ($telephone === '' || DB::table('opt_out')->where('scope', $scope)->where('phone', $telephone)->exists()) {
+            return;
+        }
+
+        DB::table('opt_out')->insert([
+            'email' => null,
+            'email_hash' => null,
+            'phone' => $telephone,
+            'scope' => $scope,
+            'source' => 'gdpr_erasure_bisystem',
+            'created_at' => now(),
         ]);
     }
 

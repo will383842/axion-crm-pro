@@ -126,12 +126,12 @@ function canalCompte(string $slug): array
     //
     // Cette suite mesure le METIER, pas les droits, et son utilisateur n'en
     // avait aucun. Tant qu'aucune route ne portait `permission:`, cela ne se
-    // voyait pas ; depuis, elle recevait 403. On lui donne `admin` : le geste
-    // teste ICI est celui d'un administrateur, et le lui refuser reviendrait a
+    // voyait pas ; depuis, elle recevait 403. On lui donne `owner` (seul porteur de
+    // `rgpd.handle` depuis L3c-0) : le geste teste ICI est celui du proprietaire, et le lui refuser reviendrait a
     // mesurer la garde au lieu du produit. Les droits sont mesures a leur
     // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
     setPermissionsTeamId($user->current_workspace_id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
 
     return [$workspace, $user];
 }
@@ -297,7 +297,7 @@ test('B14-005 : un 422 abandonne toujours immediatement', function () {
 // B14-010 — L'EFFACEMENT N'EMETTAIT RIEN
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('B14-010 : effacer un journaliste met un evenement erasure en file', function () {
+test('B14-010 (L3c-0) : effacer un journaliste le MASQUE et n\'emet AUCUN erasure vers le site', function () {
     [$workspace, $user] = canalCompte('ws-effacement');
     $this->actingAs($user);
 
@@ -305,17 +305,15 @@ test('B14-010 : effacer un journaliste met un evenement erasure en file', functi
 
     $this->deleteJson("/api/v1/journalists/{$id}")->assertStatus(204);
 
-    // TEMOIN D'ANTI-VIDE : l'effacement a REELLEMENT eu lieu. Sans lui, une
-    // route qui rendrait 404 sans rien faire laisserait aussi zero ligne.
-    expect(Journalist::withTrashed()->find($id)?->deleted_at)->not->toBeNull();
+    // TEMOIN D'ANTI-VIDE : le masquage a REELLEMENT eu lieu, et l'e-mail est
+    // GARDE (aucune donnee de personne n'est videe).
+    $fiche = Journalist::withTrashed()->find($id);
+    expect($fiche?->deleted_at)->not->toBeNull()
+        ->and($fiche?->email)->toBe('a-effacer@example.test');
 
-    $row = DB::table('crm_outbound_events')->first();
-
-    expect($row)->not->toBeNull()
-        ->and($row->event_type)->toBe('erasure')
-        ->and($row->origin)->toBe('crm')
-        ->and($row->scope)->toBe('business')
-        ->and($row->email_hash)->toBe(canalHash('a-effacer@example.test'));
+    // Regle de Will : le site n'est plus jamais invite a effacer.
+    expect(DB::table('crm_outbound_events')->where('event_type', 'erasure')->count())->toBe(0)
+        ->and(DB::table('crm_outbound_events')->count())->toBe(0);
 });
 
 test('B14-010 : un journaliste SANS email s\'efface quand meme, sans message inexploitable', function () {

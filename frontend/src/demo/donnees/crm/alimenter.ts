@@ -79,7 +79,6 @@ function creerPersonne(
 ): PersonneDemo {
   const arrivee = ilYa(p.jours + 10, 10, 15);
   const interaction = ilYa(p.jours, 9, 0);
-  const purge = ilYa(-1095 + p.jours, 0, 0).slice(0, 10);
   return {
     ...personneBase(id),
     first_name: p.prenom,
@@ -97,7 +96,7 @@ function creerPersonne(
     contact_id: p.entreprise !== null ? 5000 + id : null,
     company_id: p.entreprise !== null ? 7000 + id : null,
     entreprise: p.entreprise,
-    purge_prevue_le: p.entreprise === null ? purge : null,
+    purge_prevue_le: null,
     abonnement:
       p.statut === null
         ? null
@@ -177,7 +176,7 @@ function creerCandidat(
     consent_version: 'v2',
     consent_vivier_at: ilYa(jours, 11, 0),
     derniere_interaction_at: ilYa(jours, 11, 0),
-    purge_prevue_le: ilYa(-730 + jours, 0, 0).slice(0, 10),
+    purge_prevue_le: null,
     cv_ref: `cv-${String(id).padStart(4, '0')}`,
     opt_out: opposition,
     person_key: null,

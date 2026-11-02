@@ -57,6 +57,7 @@ function pcrNettoyer(string ...$espaces): void
     $o->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
     $o->transaction(function () use ($o, $espaces): void {
         foreach ($espaces as $ws) {
+            $o->table('propositions_champs_ecartees')->where('workspace_id', $ws)->delete();
             $o->table('propositions_champs')->where('workspace_id', $ws)->delete();
             $o->table('contacts')->where('workspace_id', $ws)->delete();
             $o->table('contacts_retires')->where('workspace_id', $ws)->delete();
@@ -124,7 +125,7 @@ test('sous axion_app : proposer, refuser, accepter dans l espace visé seulement
     }
 });
 
-test('sous axion_app : l effacement RGPD neutralise les propositions de la personne par son chemin dédié, sans supprimer une ligne', function () {
+test('sous axion_app : l effacement RGPD met à l écart les propositions de la personne (marque réversible), sans rien écraser ni supprimer', function () {
     $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
     $a = pcrEspace();
     $o = pcrProprio();
@@ -144,26 +145,19 @@ test('sous axion_app : l effacement RGPD neutralise les propositions de la perso
     try {
         DB::setDefaultConnection('pgsql_app');
 
-        // Le drapeau seul n'ouvre rien : l'exception du déclencheur figé
-        // exige AUSSI l'identité du propriétaire de la fonction dédiée.
-        expect(fn () => WorkspaceContext::run($a['id'], fn () => DB::transaction(function () use ($id): void {
-            DB::select("SELECT set_config('axion.propositions_effacement', 'on', true)");
-            DB::table('propositions_champs')->where('id', $id)->update([
-                'valeur_proposee' => '[effacé]', 'statut' => 'effacee', 'decidee_le' => now(), 'effacee_le' => now(),
-            ]);
-        })))->toThrow(QueryException::class);
-
+        // Plus aucune réécriture de valeur n'est possible pour le rôle applicatif.
         $bilan = app(GdprErasureService::class)->erase($email);
         DB::setDefaultConnection($precedente);
 
         $p = $o->table('propositions_champs')->where('id', $id)->first();
-        expect($bilan['deleted']['propositions_champs_neutralisees'])->toBe(1)
+        expect($bilan['deleted']['propositions_champs_ecartees'])->toBe(1)
             ->and($o->table('propositions_champs')->where('workspace_id', $a['id'])->count())->toBe(1)
-            ->and($p->valeur_proposee)->toBe('[effacé]')
-            ->and($p->valeur_actuelle)->toBe('[effacé]')
-            ->and($p->reference_externe)->toBe('[effacé]')
-            ->and($p->statut)->toBe('effacee')
-            ->and($p->effacee_le)->not->toBeNull();
+            ->and($p->valeur_proposee)->toBe('Présidente')
+            ->and($p->valeur_actuelle)->toBe('Gérante')
+            ->and($p->reference_externe)->toBe('zz-ref-pcr')
+            ->and($p->statut)->toBe('en_attente')
+            ->and($p->effacee_le)->toBeNull()
+            ->and($o->table('propositions_champs_ecartees')->where('proposition_id', $id)->where('workspace_id', $a['id'])->exists())->toBeTrue();
     } finally {
         DB::setDefaultConnection($precedente);
         $o->table('opt_out')->where('email_hash', hash('sha256', $email))->delete();

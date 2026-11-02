@@ -560,8 +560,8 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
         'app/Crm/Rgpd/MiseAEcart.php:59',
         'app/Crm/Rgpd/MiseAEcart.php:80',
         'app/Crm/Rgpd/SiteGdprService.php:243',
-        'app/Services/Rgpd/GdprErasureService.php:101',
-        'app/Services/Rgpd/GdprErasureService.php:133',
+        'app/Services/Rgpd/GdprErasureService.php:127',
+        'app/Services/Rgpd/GdprErasureService.php:149',
     ]);
 });
 

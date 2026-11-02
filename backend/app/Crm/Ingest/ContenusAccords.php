@@ -83,8 +83,9 @@ final class ContenusAccords
     {
         $tous = [];
         foreach (array_merge($actuels, $entrants ?? []) as $ligne) {
-            ksort($ligne);
-            $tous[json_encode($ligne, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)] = $ligne;
+            $cle = $ligne;
+            ksort($cle);
+            $tous[json_encode($cle, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)] = $ligne;
         }
         ksort($tous);
         $liste = array_values($tous);

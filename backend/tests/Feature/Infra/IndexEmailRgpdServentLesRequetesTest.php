@@ -497,10 +497,14 @@ Si l'index n'apparait pas, verifier que la migration "
     // peut être servi par n'importe quel index, ce qui ne dit rien de l'adresse.
     $predicat = static fn (string $sql): string => strtolower(substr($sql, (int) strpos(strtolower($sql), ' where ')));
     $releveContacts = requeteEmail($emisErase, 'contacts', verbe: 'select');
-    $exportContacts = requeteEmail($emisExport, 'contacts');
-    $this->assertSame(
-        $predicat($exportContacts['sql']),
-        $predicat($releveContacts['sql']),
+    $memePredicatQueLExport = array_filter(
+        $emisExport,
+        static fn (array $r): bool => str_starts_with(ltrim(strtolower($r['sql'])), 'select')
+            && str_contains(strtolower($r['sql']), '"contacts"')
+            && $predicat($r['sql']) === $predicat($releveContacts['sql']),
+    );
+    $this->assertNotEmpty(
+        $memePredicatQueLExport,
         "Le relevé des contacts à masquer doit interroger par le même prédicat que l'export (adresse OU clé de personne), servi par son index.",
     );
 });

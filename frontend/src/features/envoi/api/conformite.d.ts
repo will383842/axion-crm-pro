@@ -305,12 +305,15 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         AlerteEnvoi: {
+            ce_que_le_systeme_a_fait: string;
+            ce_qui_se_passe: string;
             close: boolean;
             detail: string;
             id: components["schemas"]["Identifiant"];
             lien: string | null;
             /** @enum {string} */
             niveau: "a_faire" | "attention" | "nouveau" | "fait";
+            que_faire: string;
             survenue_le: components["schemas"]["Horodatage"];
             titre: string;
         };
@@ -723,6 +726,14 @@ export interface operations {
                     "application/json": {
                         data: components["schemas"]["Opposition"][];
                         meta: components["schemas"]["Pagination"];
+                        /** @description Chiffres du registre entier (indépendants de la page affichée). */
+                        resume: {
+                            ce_mois: number;
+                            ce_mois_par_lien: number;
+                            domaines_entiers: number;
+                            organisations: number;
+                            total: number;
+                        };
                     };
                 };
             };

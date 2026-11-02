@@ -57,12 +57,22 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data, meta]
+                required: [data, meta, resume]
                 properties:
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/Opposition' }
                   meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+                  resume:
+                    type: object
+                    description: Chiffres du registre entier (indépendants de la page affichée).
+                    required: [total, ce_mois, ce_mois_par_lien, domaines_entiers, organisations]
+                    properties:
+                      total: { type: integer, minimum: 0 }
+                      ce_mois: { type: integer, minimum: 0 }
+                      ce_mois_par_lien: { type: integer, minimum: 0 }
+                      domaines_entiers: { type: integer, minimum: 0 }
+                      organisations: { type: integer, minimum: 0 }
     post:
       operationId: inscrireOpposition
       summary: Inscrire une adresse, une organisation ou un domaine
@@ -425,11 +435,14 @@ components:
           description: Pas de week-end ni de jour férié français.
     AlerteEnvoi:
       type: object
-      required: [id, titre, detail, niveau, survenue_le, lien, close]
+      required: [id, titre, detail, ce_qui_se_passe, ce_que_le_systeme_a_fait, que_faire, niveau, survenue_le, lien, close]
       properties:
         id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
         titre: { type: string }
         detail: { type: string }
+        ce_qui_se_passe: { type: string }
+        ce_que_le_systeme_a_fait: { type: string }
+        que_faire: { type: string }
         niveau: { type: string, enum: [a_faire, attention, nouveau, fait] }
         survenue_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         lien: { oneOf: [{ type: string }, { type: 'null' }] }

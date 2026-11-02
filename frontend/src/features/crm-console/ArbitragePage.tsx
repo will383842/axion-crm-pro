@@ -237,7 +237,7 @@ function ArbitrageCard({
           erreur={erreurEntreprise}
           disabled={busy}
         />
-        <Button variant="primary" size="sm" disabled={busy} onClick={rattacher}>
+        <Button variant="primary" size="sm" className="max-md:h-11" disabled={busy} onClick={rattacher}>
           Rattacher
         </Button>
 
@@ -252,6 +252,7 @@ function ArbitrageCard({
         <Button
           variant="secondary"
           size="sm"
+          className="max-md:h-11"
           disabled={busy || reason.trim().length < 3}
           onClick={() => onDismiss(reason.trim())}
         >

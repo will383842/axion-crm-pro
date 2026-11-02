@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /
+
+# Console admin interne — non indexable.

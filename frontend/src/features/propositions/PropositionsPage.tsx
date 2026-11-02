@@ -157,13 +157,13 @@ function PropositionsContent() {
           </ul>
           {pages > 1 ? (
             <nav className="mt-4 flex items-center justify-between gap-2" aria-label="Pages">
-              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
+              <Button variant="secondary" size="sm" className="max-md:h-11" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
                 Page précédente
               </Button>
               <span className="text-xs text-slate-500 dark:text-slate-400">
                 Page {page} sur {pages}
               </span>
-              <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage((n) => n + 1)}>
+              <Button variant="secondary" size="sm" className="max-md:h-11" disabled={page >= pages} onClick={() => setPage((n) => n + 1)}>
                 Page suivante
               </Button>
             </nav>
@@ -233,7 +233,7 @@ function CarteProposition({
             <Button
               variant="primary"
               size="sm"
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-md:h-11 sm:flex-none"
               disabled={occupe}
               onClick={onAccepter}
               aria-label={`Accepter : ${p.libelle_champ} de ${p.fiche ?? 'la fiche'}`}
@@ -244,7 +244,7 @@ function CarteProposition({
           <Button
             variant="secondary"
             size="sm"
-            className="flex-1 sm:flex-none"
+            className="flex-1 max-md:h-11 sm:flex-none"
             disabled={occupe}
             onClick={onRefuser}
             aria-label={`Refuser : ${p.libelle_champ} de ${p.fiche ?? 'la fiche'}`}

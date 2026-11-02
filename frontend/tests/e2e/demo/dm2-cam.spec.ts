@@ -27,13 +27,13 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     // 1. Pause depuis la ligne : 2 clics + confirmation.
     const org = page.getByRole('row', { name: /Organisateurs Rhône-Alpes/ });
     await org.getByRole('button', { name: /^Pause/ }).click();
-    await page.getByRole('dialog', { name: 'Mettre en pause ?' }).getByRole('button', { name: 'Mettre en pause' }).click();
+    await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Mettre en pause ?' }) }).getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(org.getByText('En pause')).toBeVisible();
 
     // 2. Changer la date d'une campagne programmée : « Demain 9:00 » en un clic.
     const federations = page.getByRole('row', { name: /Fédérations — début d’année/ });
     await federations.getByRole('button', { name: /^Changer la date/ }).click();
-    const dialogue = page.getByRole('dialog', { name: 'Changer la date' });
+    const dialogue = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Changer la date' }) });
     await dialogue.getByRole('button', { name: 'Demain 9:00' }).click();
     await dialogue.getByRole('button', { name: 'Reprogrammer' }).click();
     await expect(dialogue).toBeHidden();
@@ -60,7 +60,7 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
   test('P3 · dupliquer crée une copie en brouillon', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes', { offre: 'les-deux' });
     await page.getByRole('row', { name: /Clubs d’entreprises Savoie/ }).getByRole('button', { name: /^Dupliquer/ }).click();
-    const dialogue = page.getByRole('dialog', { name: 'Dupliquer la campagne' });
+    const dialogue = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Dupliquer la campagne' }) });
     await expect(dialogue.getByRole('textbox', { name: 'Nom de la copie' })).toHaveValue('Clubs d’entreprises Savoie (copie)');
     await dialogue.getByRole('button', { name: 'Créer la copie (brouillon)' }).click();
     const copie = page.getByRole('row', { name: /Clubs d’entreprises Savoie \(copie\)/ });

@@ -5,6 +5,7 @@
  * rien n'est jamais perdu (on met en pause, on termine, on duplique).
  */
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { isAxiosError } from 'axios';
 import { CalendarClock, Copy, Pause, Play, Square } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
@@ -96,12 +97,17 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
         </p>
       ) : null}
 
-      {dialogue === 'pause' ? (
-        <DialoguePause campagne={campagne} onClose={fermer} />
-      ) : null}
-      {dialogue === 'date' ? <DialogueDate campagne={campagne} maintenant={maintenant} onClose={fermer} /> : null}
-      {dialogue === 'dupliquer' ? <DialogueDupliquer campagne={campagne} onClose={fermer} /> : null}
-      {dialogue === 'terminer' ? <DialogueTerminer campagne={campagne} onClose={fermer} /> : null}
+      {dialogue !== null
+        ? createPortal(
+            <>
+              {dialogue === 'pause' ? <DialoguePause campagne={campagne} onClose={fermer} /> : null}
+              {dialogue === 'date' ? <DialogueDate campagne={campagne} maintenant={maintenant} onClose={fermer} /> : null}
+              {dialogue === 'dupliquer' ? <DialogueDupliquer campagne={campagne} onClose={fermer} /> : null}
+              {dialogue === 'terminer' ? <DialogueTerminer campagne={campagne} onClose={fermer} /> : null}
+            </>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

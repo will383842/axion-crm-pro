@@ -224,24 +224,50 @@ test('contrat strict : champ inconnu, action inconnue, clé invalide → 422', f
 // 2. ART. 17 — effacement bi-clés, bi-univers
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('l\'effacement atteint la fiche SYNCHRO (person_key) ET la fiche COLLECTE (email), les deux univers, timeline comprise', function () {
+test('L3c-0 : erase ne supprime RIEN — demande enregistrée, fiches SYNCHRO et COLLECTE mises à l\'écart, les deux univers', function () {
     gdprSeedPerson();
-
-    expect(DB::table('contacts')->count())->toBe(2)
-        ->and(DB::table('candidates')->count())->toBe(1)
-        ->and(DB::table('activities')->count())->toBe(2);
 
     $response = gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL]);
     $response->assertOk();
 
-    expect(DB::table('contacts')->count())->toBe(0)
-        ->and(DB::table('candidates')->count())->toBe(0)
-        ->and(DB::table('activities')->count())->toBe(0)
-        // Les personnes MORALES restent : une entreprise n'est pas une PII.
+    // Rien n'est supprimé : contacts, candidats, timelines, entreprises.
+    expect(DB::table('contacts')->count())->toBe(2)
+        ->and(DB::table('candidates')->count())->toBe(1)
+        ->and(DB::table('activities')->count())->toBe(2)
         ->and(DB::table('companies')->count())->toBe(2);
 
-    // Journal d'exécution dans les deux workspaces.
-    expect(DB::table('rgpd_requests')->where('type', 'erasure')->where('status', 'done')->count())->toBe(2);
+    // Les contacts sont masqués (corbeille douce) et le candidat est marqué.
+    expect(DB::table('contacts')->whereNull('deleted_at')->count())->toBe(0)
+        ->and(DB::table('candidates')->whereRaw("attributes ? 'mis_a_l_ecart_le'")->count())->toBe(1);
+
+    // La demande est ENREGISTRÉE (en attente de Will) dans les deux univers.
+    expect(DB::table('rgpd_requests')->where('type', 'erasure')->where('status', 'pending')->count())->toBe(2)
+        ->and(DB::table('rgpd_requests')->where('status', 'done')->count())->toBe(0);
+});
+
+test('L3c-0 : erase met la personne à l\'écart (opposition_at + motif) et désabonne', function () {
+    $ws = gdprBusinessWorkspaceId();
+    $id = DB::table('personnes')->insertGetId([
+        'workspace_id' => $ws,
+        'email' => GDPR_EMAIL,
+        'email_hash' => hash('sha256', GDPR_EMAIL),
+        'person_key' => gdprPersonKey(),
+        'premiere_source' => 'newsletter',
+        'premiere_source_at' => now(),
+        'legal_basis' => 'consent',
+    ]);
+    DB::table('abonnements')->insert([
+        'workspace_id' => $ws, 'personne_id' => $id, 'canal' => 'lettre', 'statut' => 'abonne',
+        'dernier_evenement_at' => now(),
+    ]);
+
+    gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL])->assertOk();
+
+    $p = DB::table('personnes')->where('id', $id)->first();
+    expect($p)->not->toBeNull()
+        ->and($p->opposition_at)->not->toBeNull()
+        ->and($p->opposition_motif)->toBe('demande_effacement')
+        ->and(DB::table('abonnements')->where('personne_id', $id)->value('statut'))->toBe('desabonne');
 });
 
 test('l\'effacement laisse le HASH en opposition par univers, jamais l\'email en clair', function () {
@@ -255,13 +281,14 @@ test('l\'effacement laisse le HASH en opposition par univers, jamais l\'email en
         ->and($rows->pluck('email')->filter()->all())->toBe([]);
 });
 
-test('scope=vivier n\'efface QUE le vivier', function () {
+test('scope=vivier ne met à l\'écart QUE le vivier', function () {
     gdprSeedPerson();
 
     gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL, 'scope' => 'vivier'])->assertOk();
 
-    expect(DB::table('candidates')->count())->toBe(0)
-        ->and(DB::table('contacts')->count())->toBe(2)
+    expect(DB::table('candidates')->count())->toBe(1)
+        ->and(DB::table('candidates')->whereRaw("attributes ? 'mis_a_l_ecart_le'")->count())->toBe(1)
+        ->and(DB::table('contacts')->whereNull('deleted_at')->count())->toBe(2)
         ->and(DB::table('opt_out')->where('scope', 'vivier')->count())->toBe(1)
         ->and(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);
 });
@@ -298,93 +325,17 @@ test('l\'export agrège contacts, candidats, timelines et oppositions des deux u
 // 4. PURGES par univers
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('les purges refusent tant que CRM_PURGE_ENABLED est à OFF', function () {
-    config(['crm.purges_enabled' => false]);
+test('L3c-0 : les commandes de purge refusent, drapeau éteint comme ouvert, et ne suppriment personne', function () {
+    gdprSeedPerson();
 
-    test()->artisan('rgpd:purge-vivier')->assertFailed();
-    test()->artisan('rgpd:purge-business-prospects')->assertFailed();
-});
+    foreach ([false, true] as $ouvert) {
+        config(['crm.purges_enabled' => $ouvert]);
 
-test('purge vivier : 2 ans après la dernière interaction, refusés à J+90 — et personne d\'autre', function () {
-    config(['crm.purges_enabled' => true]);
-    gdprBusinessWorkspaceId();
-    $vivier = gdprVivierWorkspaceId();
+        test()->artisan('rgpd:purge-vivier', ['--force' => true])->assertFailed();
+        test()->artisan('rgpd:purge-business-prospects', ['--force' => true])->assertFailed();
+        test()->artisan('rgpd:purge-personnes', ['--force' => true])->assertFailed();
+    }
 
-    $mk = function (string $lastName, string $stage, $interactionAt, $updatedAt) use ($vivier): void {
-        DB::table('candidates')->insert([
-            'workspace_id' => $vivier,
-            'last_name' => $lastName,
-            'relation_type' => 'candidat_autre',
-            'lifecycle_stage' => $stage,
-            'legal_basis' => 'consent',
-            'consent_version' => 'careers-v2-2026-08-13',
-            'derniere_interaction_at' => $interactionAt,
-            'created_at' => now()->subYears(3),
-            'updated_at' => $updatedAt,
-        ]);
-    };
-
-    $mk('ZZ Périmé', 'vivier', now()->subYears(2)->subDay(), now());          // > 2 ans → purgé
-    $mk('ZZ Frais', 'vivier', now()->subMonths(6), now());                    // frais → conservé
-    $mk('ZZ Refusé vieux', 'refuse', now()->subMonths(6), now()->subDays(91)); // refusé J+91 → purgé
-    $mk('ZZ Refusé récent', 'refuse', now()->subMonths(6), now()->subDays(10)); // refusé J+10 → conservé
-
-    test()->artisan('rgpd:purge-vivier')->assertSuccessful();
-
-    $rest = DB::table('candidates')->pluck('last_name')->sort()->values()->all();
-    expect($rest)->toBe(['ZZ Frais', 'ZZ Refusé récent']);
-});
-
-test('purge business : 3 ans sans interaction — jamais une personne qui a interagi', function () {
-    config(['crm.purges_enabled' => true]);
-    $ws = gdprBusinessWorkspaceId();
-
-    $companyId = DB::table('companies')->insertGetId([
-        'workspace_id' => $ws,
-        'siren' => '900000305',
-        'denomination' => 'ZZ PURGE SAS',
-        'signals' => '{}',
-        'metadata' => '{}',
-        'quality_score' => 0,
-        'relation_type' => 'prospect',
-        'lifecycle_stage' => 'nouveau',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    $mk = function (string $lastName, ?string $legalBasis, $createdAt, ?string $personKey = null) use ($ws, $companyId): void {
-        DB::table('contacts')->insert([
-            'workspace_id' => $ws,
-            'company_id' => $companyId,
-            'last_name' => $lastName,
-            'person_key' => $personKey,
-            'sources' => '[]',
-            'metadata' => '{}',
-            'legal_basis' => $legalBasis,
-            'created_at' => $createdAt,
-            'updated_at' => now(),
-        ]);
-    };
-
-    $interacted = hash('sha256', 'interacted');
-    $mk('ZZ Vieux froid', 'legitimate_interest_b2b', now()->subYears(4));            // → purgé
-    $mk('ZZ Récent froid', 'legitimate_interest_b2b', now()->subYears(1));           // → conservé
-    $mk('ZZ Vieux entrant', 'precontractual', now()->subYears(4));                   // base entrante → conservé
-    $mk('ZZ Vieux actif', 'legitimate_interest_b2b', now()->subYears(4), $interacted); // a une timeline → conservé
-    DB::table('activities')->insert([
-        'workspace_id' => $ws,
-        'type' => 'form_submission',
-        'kind' => 'form_submission',
-        'occurred_at' => now()->subYears(2),
-        'person_key' => $interacted,
-        'external_ref' => 'site:event:' . Str::uuid(),
-        'title' => 'test',
-        'payload' => '{}',
-        'created_at' => now(),
-    ]);
-
-    test()->artisan('rgpd:purge-business-prospects')->assertSuccessful();
-
-    $rest = DB::table('contacts')->pluck('last_name')->sort()->values()->all();
-    expect($rest)->toBe(['ZZ Récent froid', 'ZZ Vieux actif', 'ZZ Vieux entrant']);
+    expect(DB::table('contacts')->count())->toBe(2)
+        ->and(DB::table('candidates')->count())->toBe(1);
 });

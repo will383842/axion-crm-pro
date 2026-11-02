@@ -24,7 +24,16 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM1-ACC (#399) : Mes tâches et Affaires, servies par le faux serveur de la démo ;
+// le serveur n'a pas encore ces routes (contrat à reprendre par le lot serveur, qui retirera ces six lignes).
+// La liste reste figée et exacte : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
+  'GET /api/v1/crm/affaires',
+  'GET /api/v1/crm/taches',
+  'PATCH /api/v1/crm/affaires/{p}',
+  'PATCH /api/v1/crm/taches/{p}',
+  'POST /api/v1/crm/taches',
+  'PUT /api/v1/crm/taches/rappel-matin',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'POST /api/v1/crm/propositions/{p}/{p}',

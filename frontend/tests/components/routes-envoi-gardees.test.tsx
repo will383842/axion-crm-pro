@@ -163,11 +163,9 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
 });
 
 describe('Routes du CRM et des écrans communs créées « en attente »', () => {
-  it.each([
-    ['/taches', 'DM1-ACC'],
-    ['/affaires', 'DM1-ACC'],
-    ['/compte', 'DM1-COM'],
-  ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
+  // Filet modifié : pourquoi. DM1-ACC (#399) remplit /taches et /affaires : elles ne sont plus « en attente »
+  // et ont leurs propres tests (MesTachesPage, AffairesPage). Seules restent ici les routes encore en attente.
+  it.each([['/compte', 'DM1-COM']])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', lot);

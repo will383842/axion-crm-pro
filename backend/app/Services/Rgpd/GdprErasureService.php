@@ -8,6 +8,7 @@ use App\Crm\Rgpd\MiseAEcart;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -74,10 +75,15 @@ class GdprErasureService
             $deleted['abonnements'] = $ecart['abonnements'];
             $deleted['personnes'] = $ecart['personnes'];
 
-            $deleted['contacts'] = MiseAEcart::contacts(
-                DB::table('contacts')->where('email', $email)->pluck('id')->all(),
-                'demande_effacement',
-            );
+            // Par ESPACE : sous un rôle soumis à la RLS, une lecture sans contexte
+            // ne voit aucun contact (le masquage serait silencieusement vide).
+            $deleted['contacts'] = 0;
+            foreach (EffacementCoordonneesFiches::espaces() as $espace) {
+                $deleted['contacts'] += WorkspaceContext::run($espace, static fn (): int => MiseAEcart::contacts(
+                    DB::table('contacts')->where('workspace_id', $espace)->where('email', $email)->pluck('id')->all(),
+                    'demande_effacement',
+                ));
+            }
 
             // Journalistes : MASQUÉS (corbeille douce + opposition), jamais
             // vidés de leurs coordonnées. Le CONTACT lié est mis à l'écart

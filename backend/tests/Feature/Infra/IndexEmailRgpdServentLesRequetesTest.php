@@ -491,14 +491,17 @@ Si l'index n'apparait pas, verifier que la migration "
 {$planEffacementVivier}",
     );
 
-    $planEffacementContacts = planDe(requeteEmail($emisErase, 'contacts', verbe: 'select'));
-    $this->assertStringContainsString(
-        'idx_contacts_email',
-        $planEffacementContacts,
-        "Une demande d'effacement ne doit pas balayer la base de contacts. Plan obtenu :
-
-"
-        . $planEffacementContacts,
+    // L3c-0 : le relevé des contacts à masquer porte EXACTEMENT le même prédicat que
+    // l'export (dont le plan emploie `idx_contacts_email`, vérifié plus haut). On
+    // compare les prédicats plutôt qu'un plan : sur un petit banc, un `select id`
+    // peut être servi par n'importe quel index, ce qui ne dit rien de l'adresse.
+    $predicat = static fn (string $sql): string => strtolower(substr($sql, (int) strpos(strtolower($sql), ' where ')));
+    $releveContacts = requeteEmail($emisErase, 'contacts', verbe: 'select');
+    $exportContacts = requeteEmail($emisExport, 'contacts');
+    $this->assertSame(
+        $predicat($exportContacts['sql']),
+        $predicat($releveContacts['sql']),
+        "Le relevé des contacts à masquer doit interroger par le même prédicat que l'export (adresse OU clé de personne), servi par son index.",
     );
 });
 

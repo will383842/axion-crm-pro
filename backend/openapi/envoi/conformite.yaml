@@ -17,7 +17,7 @@ info:
     décrit aux destinataires dans le bloc d'information (art. 14 du RGPD, voir
     `Identite.bloc_information_ouvertures`) et n'est JAMAIS posé dans un message
     destiné à un contact opposé (« Puis-je écrire à… ? » répond alors « non »).
-    AUCUN suivi des clics : les liens des messages ne sont pas réécrits.
+    Règle sur les liens : aucun suivi des clics, les liens des messages ne sont pas réécrits.
 servers:
   - url: /api/v1
 paths:
@@ -340,11 +340,11 @@ paths:
                     oneOf: [{ type: string }, { type: 'null' }]
                   pourquoi_ce_message:
                     type: string
-                    description: Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, jamais de suivi des clics).
+                    description: Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, et aucun suivi des clics).
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
     post:
       operationId: confirmerDesinscription
-      summary: Confirmer la désinscription (un clic ; aucune connexion)
+      summary: Confirmer la désinscription (un clic)
       security: []
       parameters:
         - name: jeton
@@ -492,7 +492,7 @@ components:
           type: string
           description: |
             Phrase AJOUTÉE au bloc quand la campagne mesure les ouvertures par pixel
-            (décrit le pixel, précise qu'aucun clic n'est suivi). Absente des
+            (décrit le pixel et rappelle : aucun suivi des clics). Absente des
             messages des campagnes qui ne mesurent pas les ouvertures.
     ConnexionCrm:
       type: object

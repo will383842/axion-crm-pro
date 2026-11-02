@@ -292,7 +292,7 @@ export interface paths {
         /** Page publique de désinscription (sans connexion) */
         get: operations["lirePageDesinscription"];
         put?: never;
-        /** Confirmer la désinscription (un clic ; aucune connexion) */
+        /** Confirmer la désinscription (un clic) */
         post: operations["confirmerDesinscription"];
         delete?: never;
         options?: never;
@@ -394,7 +394,7 @@ export interface components {
             bloc_information: string;
             /**
              * @description Phrase AJOUTÉE au bloc quand la campagne mesure les ouvertures par pixel
-             *     (décrit le pixel, précise qu'aucun clic n'est suivi). Absente des
+             *     (décrit le pixel et rappelle : aucun suivi des clics). Absente des
              *     messages des campagnes qui ne mesurent pas les ouvertures.
              */
             bloc_information_ouvertures: string;
@@ -1034,7 +1034,7 @@ export interface operations {
                         expediteur: string;
                         /** @description Nom de l'organisation du destinataire, si connue (option « toute mon organisation »). */
                         organisation: string | null;
-                        /** @description Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, jamais de suivi des clics). */
+                        /** @description Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, et aucun suivi des clics). */
                         pourquoi_ce_message: string;
                     };
                 };

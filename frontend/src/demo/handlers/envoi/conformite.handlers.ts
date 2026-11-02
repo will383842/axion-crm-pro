@@ -152,7 +152,7 @@ function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non'
 
   if (etat.reponse === 'oui') raisons.push('Aucune opposition connue pour cette adresse.');
   if (etat.reponse === 'non') raisons.push('Aucune mesure des ouvertures ne s’applique à cette personne.');
-  return { adresse: saisie.trim(), reponse, raisons, mesure_ouvertures_permise: etat.etat.reponse !== 'non' };
+  return { adresse: saisie.trim(), reponse: etat.reponse, raisons, mesure_ouvertures_permise: etat.reponse !== 'non' };
 }
 
 function resumeRegistre() {

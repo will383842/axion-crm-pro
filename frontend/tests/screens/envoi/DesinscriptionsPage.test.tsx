@@ -12,7 +12,18 @@ import userEvent from '@testing-library/user-event';
 import { DesinscriptionsPage } from '@/features/envoi/conformite/DesinscriptionsPage';
 import { handlers } from '@/demo/handlers/envoi/conformite.handlers';
 import { demoDb } from '@/demo/base';
+import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
+
+/** jsdom n'a pas `Blob.text()` : on lit le fichier comme le ferait un navigateur. */
+function lireBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const lecteur = new FileReader();
+    lecteur.onload = () => resolve(typeof lecteur.result === 'string' ? lecteur.result : '');
+    lecteur.onerror = () => reject(new Error('lecture impossible'));
+    lecteur.readAsText(blob);
+  });
+}
 
 async function ouvrir(url = '/envoi/desinscriptions') {
   return renderScreen(<DesinscriptionsPage />, { path: '/envoi/desinscriptions', url, handlers });
@@ -21,6 +32,7 @@ async function ouvrir(url = '/envoi/desinscriptions') {
 describe('Désinscriptions (DM2-CNF)', () => {
   beforeEach(() => {
     demoDb.reinitialiser();
+    definirEtatForce(null);
   });
 
   it('affiche le registre des oppositions avec le nombre de lignes', async () => {
@@ -28,7 +40,7 @@ describe('Désinscriptions (DM2-CNF)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Désinscriptions' })).toBeVisible();
     const premiere = demoDb.opposition.tous()[0]!;
     expect(await screen.findByText(premiere.valeur)).toBeVisible();
-    expect(screen.getByText(/jamais effacées/i)).toBeVisible();
+    expect(screen.getAllByText(/jamais effacées/i).length).toBeGreaterThan(0);
   });
 
   it('« Puis-je écrire à… ? » répond « non » avec le motif pour une adresse opposée', async () => {
@@ -67,7 +79,7 @@ describe('Désinscriptions (DM2-CNF)', () => {
     await user.click(await screen.findByRole('button', { name: /Exporter le registre/ }));
     await waitFor(() => expect(creer).toHaveBeenCalledTimes(1));
     expect(clic).toHaveBeenCalled();
-    const texte = await blobs[0]!.text();
+    const texte = await lireBlob(blobs[0]!);
     expect(texte.split('\n')[0]).toContain('valeur');
     expect(texte).toContain(demoDb.opposition.tous()[0]!.valeur);
     clic.mockRestore();
@@ -91,7 +103,8 @@ describe('Désinscriptions (DM2-CNF)', () => {
   });
 
   it('affiche l’état vide', async () => {
-    await ouvrir('/envoi/desinscriptions?demo-etat=vide');
+    definirEtatForce('vide');
+    await ouvrir();
     expect(await screen.findByText('Rien à afficher pour le moment')).toBeVisible();
   });
 });

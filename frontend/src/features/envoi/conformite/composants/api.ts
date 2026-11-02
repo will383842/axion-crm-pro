@@ -95,7 +95,7 @@ export function useEnregistrerReglesAlertes() {
 }
 
 export function useAlerteDeTest() {
-  return useMutation({ mutationFn: async () => (await api.post('/envoi/reglages/alertes/test')).data as unknown });
+  return useMutation({ mutationFn: async () => (await api.post<unknown>('/envoi/reglages/alertes/test')).data });
 }
 
 export function useApercu() {
@@ -178,7 +178,7 @@ export function useConfirmerDesinscription(jeton: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (toute_l_organisation: boolean) =>
-      (await api.post(`/public/desinscription/${encodeURIComponent(jeton)}`, { toute_l_organisation })).data as unknown,
+      (await api.post<unknown>(`/public/desinscription/${encodeURIComponent(jeton)}`, { toute_l_organisation })).data,
     onSuccess: () => client.invalidateQueries({ queryKey: CLES.publique(jeton) }),
   });
 }

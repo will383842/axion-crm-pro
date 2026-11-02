@@ -32,6 +32,7 @@ import { renderScreen } from '../helpers/renderScreen';
 import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
+import { handlers as handlersConformite } from '@/demo/handlers/envoi/conformite.handlers';
 
 let arbre: AnyRoute;
 
@@ -145,8 +146,13 @@ describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envo
   });
 });
 
+// Filet modifié : pourquoi. DM2-CNF remplit ses 8 pages d'Envoi : elles ne sont plus « en attente ».
+// Chacune est vérifiée à part ci-dessous (titre réel, plus de page d'attente) ; les autres lots
+// retirent leurs routes de cette liste en remplissant leurs pages.
+const LOT_REMPLI = 'DM2-CNF';
+
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
-  it.each(ROUTES_ENVOI)('%s → page en attente du lot %s', async (url, lot) => {
+  it.each(ROUTES_ENVOI.filter(([, lot]) => lot !== LOT_REMPLI))('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');
@@ -154,6 +160,17 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
     expect(page.textContent).toContain(lot);
     expect(screen.queryByText(/page introuvable/i)).toBeNull();
   });
+
+  it.each(ROUTES_ENVOI.filter(([, lot]) => lot === LOT_REMPLI).map(([url]) => [url]))(
+    '%s → la vraie page du lot DM2-CNF (plus de page en attente)',
+    async (url) => {
+      server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersConformite);
+      await monter(url);
+      expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(screen.queryByTestId('page-en-attente')).toBeNull();
+      expect(screen.queryByText(/page introuvable/i)).toBeNull();
+    },
+  );
 
   it('/envoi redirige vers /envoi/campagnes', async () => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
@@ -177,11 +194,12 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
   });
 
   it('/desinscription/$jeton est publique et HORS coquille', async () => {
-    await monter('/desinscription/jeton-de-test');
-    const page = await screen.findByTestId('page-en-attente');
-    expect(page).toHaveAttribute('data-lot', 'DM2-CNF');
-    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
-    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
+    // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot.
+    server.use(...handlersConformite);
+    await monter('/desinscription/demo-tilleuls');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/\bDM\d|\blot\b/i);
     expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });

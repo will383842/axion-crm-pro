@@ -126,8 +126,8 @@ export function SantePage() {
                 <h2 id="h-file" className="mb-3 text-lg font-bold text-slate-900">File d’attente et envoyés sur 14 jours</h2>
                 <ul aria-label="Envoyés sur 14 jours" className="flex h-28 items-end gap-1">
                   {s.envoyes_14_jours.map((j) => (
-                    <li key={j.jour} className="flex-1" title={`${j.jour} : ${j.envoyes}`}>
-                      <div className="rounded-t bg-slate-500" style={{ height: `${Math.max(2, (j.envoyes / maxJour) * 100)}%`, minHeight: 2 }} />
+                    <li key={j.jour} className="flex h-full flex-1 items-end" title={`${j.jour} : ${j.envoyes}`}>
+                      <div className="w-full rounded-t bg-slate-500" style={{ height: `${Math.max(2, (j.envoyes / maxJour) * 100)}%`, minHeight: 2 }} />
                       <span className="sr-only">{j.jour} : {j.envoyes} envoyés</span>
                     </li>
                   ))}

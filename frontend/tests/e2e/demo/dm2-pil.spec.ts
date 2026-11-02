@@ -17,14 +17,16 @@ test.describe('pilotage des envois (démo)', () => {
   test('P10 : une adresse refusée s’explique en français', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/sante/chercher', { offre: 'les-deux' });
     await page.getByRole('searchbox', { name: 'Adresse e-mail' }).fill('yves');
-    await page.getByRole('button', { name: 'Chercher' }).click();
+    await page.getByRole('button', { name: 'Chercher', exact: true }).click();
     await expect(page.getByText(/Refusé : adresse inexistante \(550 5\.1\.1\)/)).toBeVisible();
   });
 
   test('Ctrl K « Chercher un envoi » ouvre la page', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes', { offre: 'les-deux' });
-    await page.keyboard.press('Control+k');
-    await page.getByRole('combobox').first().fill('Chercher un envoi');
+    await expect(page.getByRole('button', { name: 'Recherche globale' })).toBeVisible();
+    await page.locator('body').press('Control+k');
+    await expect(page.getByRole('dialog', { name: 'Recherche globale' })).toBeVisible();
+    await page.getByRole('dialog', { name: 'Recherche globale' }).getByPlaceholder(/Rechercher/).fill('Chercher un envoi');
     await page.getByRole('option', { name: /Chercher un envoi/ }).first().click();
     await expect(page).toHaveURL(/\/envoi\/sante\/chercher/);
   });

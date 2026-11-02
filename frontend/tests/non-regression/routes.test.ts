@@ -24,7 +24,15 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
+// ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
 const ECARTS_CONNUS: string[] = [
+  'GET /api/v1/envoi/envois/chercher',
+  'GET /api/v1/envoi/feu-vert',
+  'GET /api/v1/envoi/resultats',
+  'GET /api/v1/envoi/sante',
+  'POST /api/v1/envoi/feu-vert/{p}/fait',
+  'POST /api/v1/envoi/sante/test',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'POST /api/v1/crm/propositions/{p}/{p}',

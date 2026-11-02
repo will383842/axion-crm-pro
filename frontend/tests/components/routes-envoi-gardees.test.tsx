@@ -32,6 +32,7 @@ import { renderScreen } from '../helpers/renderScreen';
 import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
+import { handlers as handlersPilotage } from '@/demo/handlers/envoi/pilotage.handlers';
 
 let arbre: AnyRoute;
 
@@ -145,8 +146,22 @@ describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envo
   });
 });
 
+// Filet modifié : pourquoi. Les pages du lot DM2-PIL sont livrées : elles ne sont plus « en attente »
+// (elles ont leurs propres tests dans tests/screens/envoi/). Chaque lot livré rejoint cette liste.
+const LOTS_LIVRES: ReadonlySet<string> = new Set(['DM2-PIL']);
+
+describe('Envoi actif — chaque route d’un lot livré rend sa vraie page', () => {
+  it.each(ROUTES_ENVOI.filter(([, lot]) => LOTS_LIVRES.has(lot)))('%s → page du lot %s, plus « en attente »', async (url) => {
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersPilotage);
+    await monter(url);
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+  });
+});
+
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
-  it.each(ROUTES_ENVOI)('%s → page en attente du lot %s', async (url, lot) => {
+  it.each(ROUTES_ENVOI.filter(([, lot]) => !LOTS_LIVRES.has(lot)))('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');

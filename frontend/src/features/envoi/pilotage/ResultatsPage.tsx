@@ -78,14 +78,14 @@ export function ResultatsPage() {
         {requete.isLoading ? <Chargement libelle="Chargement des résultats" /> : requete.isError && d === undefined ? <Panne onReessayer={() => void requete.refetch()} /> : vide || !d || !d.totaux ? <Vide /> : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiCard label={`Envoyés (${jours} j)`} value={formaterNombre(d.totaux.envoyes)} sublabel={d.precedent ? `${formaterNombre(d.precedent.envoyes)} sur la période d’avant` : ''} />
+              <KpiCard label={`Envoyés (${jours} j)`} value={formaterNombre(d.totaux.envoyes)} sublabel={d.precedent && d.precedent.envoyes > 0 ? `${formaterNombre(d.precedent.envoyes)} sur la période d’avant` : ''} />
               <KpiCard label="Taux de réponse" value={formaterPourcent(part(d.totaux.reponses, d.totaux.remis))} sublabel={`${formaterNombre(d.totaux.reponses)} réponses`} tone="emerald" />
               <KpiCard label="Refusés" value={formaterPourcent(refus(d.totaux))} sublabel="limite 2 %" tone={refus(d.totaux) > 2 ? 'rose' : 'slate'} />
               <KpiCard label="Plaintes" value={formaterPourcent(part(d.totaux.plaintes, d.totaux.remis))} sublabel="limite 0,1 %" tone="slate" />
             </div>
             <p className="mt-3 text-xs text-slate-600">
               Les réponses sont l’indicateur principal. Les ouvertures, quand une campagne les suit, ne sont qu’une estimation : les ouvertures automatiques probables (Apple, relais) sont retirées.
-              {d.precedent ? <> <Evolution actuel={part(d.totaux.reponses, d.totaux.remis)} avant={part(d.precedent.reponses, d.precedent.remis)} libelle="point de taux de réponse" />.</> : null}
+              {d.precedent && d.precedent.remis > 0 ? <> <Evolution actuel={part(d.totaux.reponses, d.totaux.remis)} avant={part(d.precedent.reponses, d.precedent.remis)} libelle="point de taux de réponse" />.</> : null}
             </p>
 
             {d.entonnoir ? (

@@ -46,10 +46,11 @@ test.describe('section Technique en démo', () => {
   test('collectes : annuler un passage en cours se voit après rechargement', async ({ page }) => {
     await ouvrirDemo(page, '/scraper-runs');
     await page.getByRole('tab', { name: /^En cours/ }).click();
+    await expect(page.getByTestId('run-cancel').first()).toBeVisible();
     const avant = await page.getByTestId('run-cancel').count();
-    expect(avant).toBeGreaterThan(0);
     await page.getByTestId('run-cancel').first().click();
-    await page.getByRole('dialog').getByRole('button', { name: /Annuler le passage|Confirmer|Oui/ }).first().click();
+    await page.getByTestId('scraper-runs-cancel-confirm').click();
+    await expect(page.getByText(/Passage n° \d+ annulé/)).toBeVisible();
     await page.reload();
     await page.getByRole('tab', { name: /^En cours/ }).click();
     await expect(page.getByTestId('run-cancel')).toHaveCount(avant - 1);

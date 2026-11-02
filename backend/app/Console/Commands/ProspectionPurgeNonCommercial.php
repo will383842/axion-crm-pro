@@ -3,76 +3,26 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseToutePurgeDePersonnes;
-use App\Console\Concerns\RefuseUneSuppressionMassive;
-use App\Crm\Doublons\FusionFiches;
-use App\Crm\FichesProtegees;
 use Illuminate\Console\Command;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Ne garde que les SOCIÉTÉS commerciales (cat. jur. 5xxx : SARL, SAS, SA, SNC, SCA…).
- * Supprime les entrepreneurs individuels/auto-entrepreneurs (1xxx), SCI (65xx),
- * associations (9xxx), administrations (7xxx), mutuelles/coopératives (6xxx), etc.
- * → base de prospection B2B propre. Suppression DÉFINITIVE.
+ * L3c-0 (ADR contrat v3 § 6 et F1, « AUCUNE PURGE ») — commande NEUTRALISÉE.
  *
- * 🔴 CETTE COMMANDE SUPPRIMAIT SANS AUCUNE GARDE (audit 360, B15-004).
- *
- * Sa condition est `legal_form IS NULL OR left(legal_form, 1) <> '5'`. Le
- * `IS NULL` est le piège : sur la base de volume, la forme juridique est
- * inconnue pour l'essentiel des lignes — un `artisan
- * prospection:purge-non-commercial` lancé sans y penser effaçait donc
- * **presque toute la base**, sans confirmation ni retour possible.
- *
- * Le plafond de proportion refuse désormais ce cas et l'explique. Une purge
- * légitime reste faisable avec `--force` : elle devient un geste volontaire.
+ * Elle supprimait des personnes, des contacts ou des candidats (ou des fiches
+ * d'entrepreneurs individuels, dont les contacts partaient en cascade). Elle
+ * refuse désormais sans condition, même avec `--force` ; son ancien code a été
+ * retiré. Les options sont gardées pour ne pas casser un appel existant.
  */
 class ProspectionPurgeNonCommercial extends Command
 {
     use RefuseToutePurgeDePersonnes;
-    use RefuseUneSuppressionMassive;
 
-    protected $signature = 'prospection:purge-non-commercial
-                            {--dry-run : Montre ce qui serait supprimé, sans rien supprimer}
-                            {--force : Assume la suppression, y compris au-delà du plafond}';
+    protected $signature = 'prospection:purge-non-commercial {--dry-run : Ignoré (commande neutralisée)} {--force : Ignoré (commande neutralisée)}';
 
-    protected $description = 'Ne garde que les sociétés commerciales (5xxx). Supprime EI/AE, SCI, assos…';
+    protected $description = "Neutralisée (L3c-0) : l'ancienne suppression des fiches non commerciales est refusée sans condition";
 
     public function handle(): int
     {
-        // L3c-0 : refus sans condition, avant toute lecture.
         return $this->refuserSansCondition();
-
-        $aSupprimer = $this->fichesNonCommerciales()->count();
-        $total = DB::table('companies')->count();
-
-        if (! $this->suppressionAutorisee('companies', $aSupprimer, $total)) {
-            return self::SUCCESS;
-        }
-
-        $supprimees = $this->fichesNonCommerciales()->delete();
-        $this->info("✅ {$supprimees} entités non-sociétés (auto-entrepreneurs, EI, SCI, associations…) supprimées.");
-
-        return self::SUCCESS;
-    }
-
-    /**
-     * Une SEULE définition pour le comptage et la suppression (cf. la jumelle
-     * `ProspectionPurgeNonDiffusible`). Les fiches protégées en sont exclues :
-     * les organisateurs d'événements (associations, CCI, clubs) n'ont jamais
-     * de forme `5xxx` et tombaient TOUS sous `legal_form IS NULL`.
-     */
-    private function fichesNonCommerciales(): Builder
-    {
-        $query = DB::table('companies')->whereRaw("(legal_form IS NULL OR left(legal_form, 1) <> '5')");
-        FichesProtegees::exclure($query);
-        // Les deux fiches d'une fusion en cours (l'ABSORBÉE, à la corbeille,
-        // et la GARDÉE, qui porte ce qui a été rattaché) ne se suppriment
-        // jamais en dur : sinon la fusion ne serait plus annulable (chantier
-        // 5 ; le déclencheur `companies_refuser_suppression_absorbee` ferait
-        // aussi échouer toute la purge).
-        $query->whereRaw(FusionFiches::conditionSql('companies.id'));
-
-        return $query;
     }
 }

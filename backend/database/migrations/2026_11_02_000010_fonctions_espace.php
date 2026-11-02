@@ -60,7 +60,7 @@ return new class extends Migration
             return;
         }
 
-        $ouverts = Segments::ouverts();
+        $ouverts = Segments::ouvertsGlobalement();
         foreach (Segments::CONNUS as $segment) {
             DB::table('fonctions_espace')->updateOrInsert(
                 ['espace_id' => $axion, 'fonction' => 'segment.' . $segment],

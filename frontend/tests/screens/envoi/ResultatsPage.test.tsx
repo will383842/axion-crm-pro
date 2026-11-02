@@ -47,6 +47,29 @@ describe('ResultatsPage — Résultats', () => {
     expect(container.textContent ?? '').not.toMatch(/aucun pixel/i);
   });
 
+  it('montre la colonne « Ouvertures (estimation) » quand une campagne a activé le pixel', async () => {
+    await monter();
+    const tableau = await screen.findByRole('table', { name: 'Par boîte' });
+    const entetes = within(tableau).getAllByRole('columnheader').map((c) => c.textContent ?? '');
+    expect(entetes).toContain('Ouvertures (estimation)');
+    // Jamais un chiffre d'ouverture sans le mot « estimation » dans son en-tête.
+    expect(entetes.filter((t) => /ouvert/i.test(t)).every((t) => /estimation/i.test(t))).toBe(true);
+  });
+
+  it('n’affiche aucune ouverture quand aucune campagne n’a activé le pixel', async () => {
+    for (const c of demoDb.campagnes.tous()) demoDb.campagnes.modifier(c.id, { suivre_ouvertures: false });
+    const user = userEvent.setup();
+    await monter();
+    await screen.findByRole('table', { name: 'Par boîte' });
+    for (const nom of ['Par boîte', 'Par domaine', 'Par liste', 'Par message type']) {
+      await user.click(screen.getByRole('tab', { name: nom }));
+      const tableau = await screen.findByRole('table', { name: nom });
+      for (const colonne of within(tableau).getAllByRole('columnheader')) {
+        expect(colonne.textContent ?? '').not.toMatch(/ouvert/i);
+      }
+    }
+  });
+
   it('montre l’entonnoir et la comparaison avec la période d’avant', async () => {
     await monter();
     expect(await screen.findByRole('list', { name: 'Entonnoir' })).toBeVisible();

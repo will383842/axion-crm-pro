@@ -71,14 +71,31 @@ function calculer(par: Regroupement, depuisMs: number, jusquaMs: number) {
   const lignes = new Map<string, Ligne>();
   const interessees = new Set(demoDb.reponses.filtrer((r) => r.classement === 'interesse').map((r) => r.destinataire_id));
   const suivies = new Set(demoDb.campagnes.filtrer((c) => c.suivre_ouvertures).map((c) => c.id));
-  const ouv = new Map<string, { estimees: number; auto: number }>();
+  // Jamais de pixel pour un contact déjà opposé : une « ouverture » postérieure à
+  // l'inscription au registre d'opposition n'est pas comptée.
+  const opposeLe = new Map<string, number>();
+  for (const o of demoDb.opposition.tous()) {
+    if (o.portee !== 'adresse') continue;
+    const cle = adresseSansAccent(o.valeur);
+    const t = Date.parse(o.inscrite_le);
+    if (!opposeLe.has(cle) || t < opposeLe.get(cle)!) opposeLe.set(cle, t);
+  }
+  // Le taux estimé se rapporte aux seuls messages remis des campagnes qui suivent les ouvertures.
+  const ouv = new Map<string, { estimees: number; auto: number; remisSuivis: number }>();
   for (const e of demoDb.evenementsEnvoi.tous()) {
     const t = Date.parse(e.survenu_le);
     if (t < depuisMs || t >= jusquaMs) continue;
     const g = groupe(par, e.campagne_id, e.boite_id);
     const l = lignes.get(g.cle) ?? vide(g.cle, g.libelle, g.version);
     lignes.set(g.cle, l);
-    if (e.type === 'remis') { l.remis += 1; l.envoyes += 1; }
+    if (e.type === 'remis') {
+      l.remis += 1; l.envoyes += 1;
+      if (suivies.has(e.campagne_id)) {
+        const o = ouv.get(g.cle) ?? { estimees: 0, auto: 0, remisSuivis: 0 };
+        o.remisSuivis += 1;
+        ouv.set(g.cle, o);
+      }
+    }
     else if (e.type === 'rebond_dur') { l.rebonds_durs += 1; l.envoyes += 1; }
     else if (e.type === 'rebond_mou') l.rebonds_mous += 1;
     else if (e.type === 'plainte') l.plaintes += 1;
@@ -86,15 +103,15 @@ function calculer(par: Regroupement, depuisMs: number, jusquaMs: number) {
     else if (e.type === 'reponse') {
       l.reponses += 1;
       if (e.destinataire_id !== null && interessees.has(e.destinataire_id)) l.reponses_interessees += 1;
-    } else if (e.type === 'ouverture' && suivies.has(e.campagne_id)) {
-      const o = ouv.get(g.cle) ?? { estimees: 0, auto: 0 };
+    } else if (e.type === 'ouverture' && suivies.has(e.campagne_id) && !(t >= (opposeLe.get(adresseSansAccent(e.adresse)) ?? Infinity))) {
+      const o = ouv.get(g.cle) ?? { estimees: 0, auto: 0, remisSuivis: 0 };
       if (e.automatique_probable === true) o.auto += 1; else o.estimees += 1;
       ouv.set(g.cle, o);
     }
   }
   for (const [cle, l] of lignes) {
     const o = ouv.get(cle);
-    if (o) l.ouvertures = { estimees: o.estimees, automatiques_probables: o.auto, taux_estime: l.remis === 0 ? 0 : Math.round((o.estimees / l.remis) * 1000) / 10, mention: 'estimation' };
+    if (o) l.ouvertures = { estimees: o.estimees, automatiques_probables: o.auto, taux_estime: o.remisSuivis === 0 ? 0 : Math.round((o.estimees / o.remisSuivis) * 1000) / 10, mention: 'estimation' };
   }
   const data = [...lignes.values()].sort((a, b) => b.envoyes - a.envoyes);
   const totaux = data.reduce<Ligne>((t, l) => ({

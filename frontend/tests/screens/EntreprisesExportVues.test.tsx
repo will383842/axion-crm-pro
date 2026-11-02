@@ -15,7 +15,9 @@ import { handlers } from '@/demo/handlers/crm/entreprises.handlers';
 import { handlers as handlersSocle } from '@/demo/handlers/socle/config.handlers';
 import { demoDb } from '@/demo/base';
 import { api } from '@/demo/outils';
+import { exporterSelection } from '@/features/companies/export/exporterSelection';
 import { renderScreen } from '../helpers/renderScreen';
+import { server } from '../msw/server';
 
 const requetesExport: string[] = [];
 const creerUrl = vi.fn((_blob: Blob | MediaSource) => 'blob:demo');
@@ -64,9 +66,44 @@ describe('Entreprises : exporter la sélection', () => {
     await user.click(screen.getByRole('button', { name: 'Exporter la sélection' }));
 
     await waitFor(() => expect(requetesExport).toHaveLength(1));
-    const ids = new URL(requetesExport[0]!).searchParams.get('ids');
+    const ids = new URL(requetesExport[0]!).searchParams.get('filter[ids]');
     expect(ids?.split(',')).toHaveLength(3);
     await waitFor(() => expect(creerUrl).toHaveBeenCalledTimes(1));
+  });
+
+  it('serveur qui n’annonce pas l’export de sélection (le vrai, aujourd’hui) : pas de bouton, même avec des fiches cochées', async () => {
+    // Réponse au format du vrai `GET /companies` : pas de `meta.export_selection`.
+    // Le vrai `/companies/export` ignore `filter[ids]` : montrer le bouton
+    // exporterait TOUTE la liste.
+    const listeReelle = http.get(api('/companies'), () =>
+      HttpResponse.json({
+        data: [
+          { id: 9001, siren: '000000001', denomination: 'Boulangerie des Tilleuls' },
+          { id: 9002, siren: '000000002', denomination: 'Atelier Vernet' },
+        ],
+        meta: { total: 2, last_page: 1, current_page: 1, per_page: 100 },
+      }),
+    );
+    const user = userEvent.setup();
+    await renderScreen(<CompaniesListPage />, {
+      path: '/companies',
+      url: '/companies',
+      handlers: [espion, listeReelle, ...handlers, ...voisins],
+    });
+    await screen.findByText('Boulangerie des Tilleuls');
+    const cases = screen.getAllByRole('checkbox', { name: /^Sélectionner (?!toutes)/ });
+    await user.click(cases[0]!);
+    await user.click(cases[1]!);
+    expect(await screen.findByText('2 sélectionnées')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Exporter la sélection' })).not.toBeInTheDocument();
+    expect(requetesExport).toHaveLength(0);
+  });
+
+  it('une sélection vide ne part jamais (sinon l’export porterait sur toute la liste)', async () => {
+    // L'espion répond : seule la garde du code peut empêcher la requête.
+    server.use(espion);
+    await expect(exporterSelection([])).rejects.toThrow();
+    expect(requetesExport).toHaveLength(0);
   });
 
   it('sans sélection, le bouton n’existe pas', async () => {
@@ -145,6 +182,27 @@ describe('Fiche entreprise : ce qui vient d’Envoi', () => {
     expect(screen.getByText('Société mère')).toBeInTheDocument();
     expect(screen.getByText('Responsable', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Historique' })).toBeInTheDocument();
+  });
+
+  it('serveur qui ne sert pas ces champs (le vrai, aujourd’hui) : aucune carte vide ni trompeuse', async () => {
+    const ficheReelle = http.get(api('/companies/:id'), ({ params }) =>
+      HttpResponse.json({ id: Number(params['id']), siren: '000000001', denomination: 'Boulangerie des Tilleuls', contacts: [], tags: [] }),
+    );
+    const features = http.get(api('/config/features'), () =>
+      HttpResponse.json({ console_v2: true, universes: { business: true, vivier: false }, produits: { crm: 'actif', envoi: 'actif' } }),
+    );
+    await renderScreen(<CompanyDetailPage />, {
+      path: '/companies/$companyId',
+      url: `/companies/${idTilleuls()}`,
+      handlers: [ficheReelle, features, ...handlers, ...voisins],
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Boulangerie des Tilleuls' });
+    expect(screen.queryByRole('heading', { name: 'Liens entre entreprises' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Historique' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Suivi commercial' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Envois reçus' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Non attribué')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aucune affaire en cours')).not.toBeInTheDocument();
   });
 
   it('l’étape posée à la main est annoncée comme définitive pour l’import (elle ne recule jamais seule)', async () => {

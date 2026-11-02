@@ -50,6 +50,7 @@ import { Pagination } from "./components/Pagination";
 import { FERMEES_INCLURE, FERMEES_SEULES } from "./fermees";
 import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
 import { ExporterLaSelection } from "./export/ExporterLaSelection";
+import { exportSelectionAnnonce } from "./export/exporterSelection";
 import { VuesSauvegardees } from "./vues/VuesSauvegardees";
 
 type Company = CompanyRowData & {
@@ -65,6 +66,8 @@ interface CompaniesResponse {
     last_page: number;
     current_page?: number;
     per_page?: number;
+    /** DM1-ENT — le serveur sait exporter une sélection (`filter[ids]`). */
+    export_selection?: boolean;
   };
 }
 
@@ -431,7 +434,7 @@ export function CompaniesListPage() {
 
       {/* Résultat de l'action de masse : hors de la barre, qui disparaît avec la sélection. */}
       {messageMasse !== null && (
-        <p role="status" className="mb-3 text-sm text-slate-700 dark:text-slate-300">
+        <p role="status" className="mb-3 text-sm text-slate-700">
           {messageMasse}
         </p>
       )}
@@ -759,16 +762,18 @@ export function CompaniesListPage() {
               </Button>
               {/* 2026-09-30 — les fiches cochées vont dans une liste manuelle. */}
               <AjouterAUneListe companyIds={[...selection]} onAjoute={() => setSelection(new Set())} />
-              {/* DM1-ENT — un CSV des seules fiches cochées. */}
-              <ExporterLaSelection ids={[...selection]} />
+              {/* DM1-ENT — un CSV des seules fiches cochées, seulement si le
+                  serveur annonce `filter[ids]` : sinon l'export rendrait toute la liste. */}
+              {exportSelectionAnnonce(data?.meta) ? <ExporterLaSelection ids={[...selection]} /> : null}
               <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
                 Annuler la sélection
               </Button>
             </div>
           )}
-          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 746 px de
-              largeur minimale de ce tableau (32+110+90+110+140+100+36 de colonnes
-              fixes, 8 gouttieres de 12, 2x16 de rembourrage) etaient coupes net par
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 874 px de
+              largeur minimale de ce tableau (DM1-ENT : 32+160+100+110+140+80+100+36
+              de colonnes, minima des `minmax` compris, 7 gouttieres de 12, 2x16 de
+              rembourrage ; calcul de `largeurMinimaleGrille`) seraient coupes net par
               le `overflow-hidden` de la Card. L en-tete ET le corps virtualise sont
               dedans : sinon ils defileraient separement et ne seraient plus alignes. */}
           <TableScroll template={GRID} role="table" aria-label="Entreprises" aria-rowcount={rows.length + 1}>
@@ -776,6 +781,7 @@ export function CompaniesListPage() {
           {/* Sticky header — must share GRID with CompanyRow */}
           <div
             role="row"
+            aria-rowindex={1}
             className={cn(
               "sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold tracking-wider text-slate-600 uppercase backdrop-blur",
               "dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400",
@@ -833,6 +839,7 @@ export function CompaniesListPage() {
                       company={c}
                       selectionnee={selection.has(c.id)}
                       onBasculerSelection={basculerSelection}
+                      rangAria={vrow.index + 2}
                     />
                   </div>
                 );

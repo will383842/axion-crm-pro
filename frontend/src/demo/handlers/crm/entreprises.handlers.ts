@@ -103,10 +103,16 @@ export const handlers: HttpHandler[] = [
   // L'export précède la fiche (`/companies/export` ne doit pas être pris pour un identifiant).
   http.get(api('/companies/export'), async ({ request }) => {
     await delai();
-    const ids = lire(request, 'ids').split(',').filter((v) => v !== '');
-    const liste = ids.length > 0
-      ? demoDb.entreprises.filtrer((e) => ids.includes(String(e.id)))
-      : filtrer(request);
+    const url = new URL(request.url);
+    // Export de la sélection : `filter[ids]` présent mais vide = refusé (jamais toute la liste).
+    let liste;
+    if (url.searchParams.has('filter[ids]')) {
+      const ids = lire(request, 'filter[ids]').split(',').filter((v) => v !== '');
+      if (ids.length === 0) return erreur(422, 'selection_vide', 'Aucune fiche sélectionnée.');
+      liste = demoDb.entreprises.filtrer((e) => ids.includes(String(e.id)));
+    } else {
+      liste = filtrer(request);
+    }
     return new HttpResponse(csv(liste), { headers: { 'Content-Type': 'text/csv; charset=UTF-8' } });
   }),
 
@@ -141,7 +147,8 @@ export const handlers: HttpHandler[] = [
     const force = await repondreEtatForce(request, PAGE_VIDE);
     if (force) return force;
     const page = paginer(filtrer(request).map(ligne), request, 100);
-    return HttpResponse.json({ data: page.data, meta: { total: page.meta.total, last_page: page.meta.last_page, current_page: page.meta.current_page, per_page: page.meta.per_page } });
+    // `export_selection` : la démo annonce l'export d'une sélection ; le vrai serveur pas encore.
+    return HttpResponse.json({ data: page.data, meta: { total: page.meta.total, last_page: page.meta.last_page, current_page: page.meta.current_page, per_page: page.meta.per_page, export_selection: true } });
   }),
 
   http.get(api('/companies/:id'), async ({ request, params }) => {

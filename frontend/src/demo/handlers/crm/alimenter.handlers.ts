@@ -293,17 +293,6 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json({ contact_created: true });
   }),
 
-  http.get(api('/crm/entreprises/choix'), async ({ request }) => {
-    await delai();
-    const q = normaliser(new URL(request.url).searchParams.get('q') ?? '');
-    if (q.length < 2) return HttpResponse.json({ data: [], indice: 'trop_court' });
-    const data = demoDb.entreprises
-      .filtrer((e) => normaliser(`${e.denomination} ${e.city} ${e.siren}`).includes(q))
-      .slice(0, 8)
-      .map((e) => ({ id: e.id, denomination: e.denomination, siren: e.siren, siret: null, code_postal: e.postcode, ville: e.city }));
-    return HttpResponse.json({ data, indice: null });
-  }),
-
   // Candidats
   http.get(api('/crm/candidates/counts'), async ({ request }) => {
     await delai();

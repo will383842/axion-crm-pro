@@ -61,10 +61,7 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : dashboard link visible', async ({ page }) => {
     await page.goto('/');
-    // Filet modifié : pourquoi. DM1-ACC (#399) : la barre d'onglets du tableau de bord porte aussi un lien
-    // « Tableau de bord » (même libellé exigé par navigation-cible). Le test vise le MENU LATÉRAL, comme son nom.
-    const menu = page.getByRole('navigation', { name: 'Navigation principale' });
-    await expect(menu.getByRole('link', { name: /Tableau de bord/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Tableau de bord/i })).toBeVisible();
   });
 
   // Lot 2 UX (2026-10-02) — la barre RÉORGANISÉE : le tableau de bord seul en

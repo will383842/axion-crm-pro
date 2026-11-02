@@ -903,8 +903,14 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // des horodatages, jamais une valeur. `contacts` est COUVERTE (la colonne
     // part avec la ligne) ; `companies` est hors de portée comme le reste de
     // la personne morale.
+    // 48 -> 51 le 2026-11-02 (PV-6, contenus et accords) : `personnes.origine_contenu`,
+    // `personnes.guides_recus` et `personnes.consentements`. `personnes` est
+    // COUVERTE : les colonnes partent avec la ligne à l'EFFACEMENT, mais pour
+    // l'EXPORT la requête liste ses colonnes explicitement (SiteGdprService) :
+    // elles y sont ajoutées et vérifiées par `PortabiliteContenusAccordsTest`.
+    // Le compte « hors de portée » ne bouge pas.
     expect($colonnes->count())->toBe(
-        48,
+        51,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(

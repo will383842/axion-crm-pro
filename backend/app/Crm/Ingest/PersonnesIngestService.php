@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * BRANCHE « PERSONNES » DE L'INGESTION — la lettre et le guide (lot L4-C).
@@ -134,11 +135,127 @@ final class PersonnesIngestService
 
     public function ingerer(SiteSyncEvent $event, string $workspaceId, string $activityRef): IngestOutcome
     {
-        return match ($event->eventType) {
+        $accords = $event->contenusAccords;
+
+        // PV-6 : l'opposition reçue gagne AVANT tout le reste — elle est
+        // inscrite à la liste d'opposition d'abord, donc l'inscription qui suit
+        // dans le même événement la rencontre et s'arrête.
+        if ($accords !== null && $accords->oppose()) {
+            $this->poserOpposition($event, $workspaceId);
+        }
+
+        $outcome = match ($event->eventType) {
             'email_hard_bounced' => $this->rebondDur($event, $workspaceId, $activityRef),
             'newsletter_optout' => $this->desabonnement($event, $workspaceId, $activityRef),
             default => $this->inscriptionOuDemande($event, $workspaceId, $activityRef),
         };
+
+        if ($accords !== null && self::colonnesAccordsPresentes()) {
+            $this->enregistrerAccords($event, $workspaceId, $accords, $outcome);
+        }
+
+        return $outcome;
+    }
+
+    /** Vrai si la migration PV-6 est passée (fenêtre de déploiement : sinon, on ignore les champs). */
+    private static function colonnesAccordsPresentes(): bool
+    {
+        // Seul un résultat POSITIF est gardé : un worker démarré avant `migrate`
+        // ne doit pas ignorer les champs pour toujours.
+        static $presentes = false;
+
+        return $presentes = $presentes || Schema::hasColumn('personnes', 'accords_at');
+    }
+
+    /**
+     * Opposition reçue par la synchro : liste d'opposition `business` (empreinte
+     * seule, jamais l'adresse) et désabonnement de tous les canaux. Aucune donnée
+     * n'est supprimée. Une opposition déjà posée n'est jamais levée.
+     */
+    private function poserOpposition(SiteSyncEvent $event, string $workspaceId): void
+    {
+        $hash = $event->emailHash();
+        if ($hash === null) {
+            return;
+        }
+
+        if (! $this->opposee($hash, 'business')) {
+            DB::table('opt_out')->insert([
+                'email' => null,
+                'email_hash' => $hash,
+                'scope' => 'business',
+                'source' => 'site-sync:accords',
+                'reason' => 'opposition_synchro',
+                'created_at' => now(),
+            ]);
+        }
+
+        $this->desabonnerSurOpposition($workspaceId, $hash, $event->occurredAt, 'opposition_generale');
+    }
+
+    /**
+     * Stockage ADDITIF et règles de la synchro : listes en union (rien ne se
+     * retire), origine la plus récente, opposition posée une fois pour toutes.
+     */
+    private function enregistrerAccords(SiteSyncEvent $event, string $workspaceId, ContenusAccords $accords, IngestOutcome $outcome): void
+    {
+        $personne = $outcome->subjectType === 'personne' && $outcome->subjectId !== null
+            ? DB::table('personnes')->where('id', $outcome->subjectId)->first()
+            : $this->trouver($workspaceId, $event);
+
+        if ($personne === null) {
+            return;
+        }
+
+        $update = [];
+
+        $update['origine_contenu'] = $this->json(ContenusAccords::fusionnerOrigine(
+            $this->decoder($personne->origine_contenu ?? null),
+            $this->date($personne->accords_at ?? null),
+            $accords->origine,
+            $event->occurredAt,
+        ));
+        if ($accords->origine !== null) {
+            $deja = $this->date($personne->accords_at ?? null);
+            if ($deja === null || $this->plusRecent($event->occurredAt, $deja)) {
+                $update['accords_at'] = $event->occurredAt;
+            }
+        }
+
+        if ($accords->guides !== null) {
+            $update['guides_recus'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->guides_recus ?? null) ?? [], $accords->guides));
+        }
+        if ($accords->consentements !== null) {
+            $update['consentements'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->consentements ?? null) ?? [], $accords->consentements));
+        }
+
+        if ($accords->oppose() && ($personne->opposition_at ?? null) === null) {
+            $dateSite = ($accords->opposition['date'] ?? null) ? new DateTimeImmutable((string) $accords->opposition['date']) : $event->occurredAt;
+            $maintenant = new DateTimeImmutable('now');
+            // Une date future n'a pas de sens : bornée à maintenant.
+            $update['opposition_at'] = $dateSite > $maintenant ? $maintenant : $dateSite;
+        }
+
+        DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);
+    }
+
+    private function json(mixed $valeur): ?string
+    {
+        return $valeur === null ? null : json_encode($valeur, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @return array<mixed>|null */
+    private function decoder(mixed $brut): ?array
+    {
+        if (is_array($brut)) {
+            return $brut;
+        }
+        if (! is_string($brut) || $brut === '') {
+            return null;
+        }
+        $d = json_decode($brut, true);
+
+        return is_array($d) ? $d : null;
     }
 
     /**

@@ -124,7 +124,7 @@ final class SiteGdprService
                         $q->where('person_key', $personKey)
                             ->orWhere('email', $email);
                     })
-                    ->get(['id', 'email', 'first_name', 'last_name', 'email_nature', 'locale', 'premiere_source', 'premiere_source_at', 'derniere_interaction_at', 'legal_basis', 'rattachee_at', 'created_at'])
+                    ->get(['id', 'email', 'first_name', 'last_name', 'email_nature', 'locale', 'premiere_source', 'premiere_source_at', 'derniere_interaction_at', 'legal_basis', 'rattachee_at', 'origine_contenu', 'guides_recus', 'consentements', 'opposition_at', 'created_at'])
                     ->map(fn (object $row): array => (array) $row)
                     ->all();
 

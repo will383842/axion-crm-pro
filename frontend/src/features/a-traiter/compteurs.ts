@@ -22,7 +22,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export type CleCompteur = 'doublons' | 'a_rattacher' | 'propositions';
+export type CleCompteur = 'doublons' | 'a_rattacher' | 'propositions' | 'taches_en_retard';
 
 /**
  * `relances` est ABSENT (`undefined`) quand le serveur ne l'envoie pas (image
@@ -33,7 +33,15 @@ export type CompteursATraiter = Record<'doublons' | 'a_rattacher', number | null
   relances?: number | null;
   /** Absent d'une image serveur antérieure à N13 ; `null` pour tout rôle autre que owner. */
   propositions?: number | null;
+  /** Tâches du CRM dont l'échéance est passée (DM1-ATR). Absent d'un serveur qui ne les compte pas. */
+  taches_en_retard?: number | null;
 };
+
+/**
+ * Les QUATRE files du CRM que compte « À traiter ». Aucune file d'Envoi
+ * (réponses, alertes…) n'y entre : elles ont leur propre pastille, côté Envoi.
+ */
+export const CLES_A_TRAITER_CRM: ReadonlyArray<CleCompteur> = ['doublons', 'a_rattacher', 'propositions', 'taches_en_retard'];
 
 export const COMPTEURS_A_TRAITER_KEY = ['crm', 'a-traiter', 'compteurs'] as const;
 
@@ -55,6 +63,7 @@ export function normaliserCompteurs(brut: unknown): CompteursATraiter {
     a_rattacher: entierOuNull(objet['a_rattacher']),
     ...('relances' in objet ? { relances: entierOuNull(objet['relances']) } : {}),
     ...('propositions' in objet ? { propositions: entierOuNull(objet['propositions']) } : {}),
+    ...('taches_en_retard' in objet ? { taches_en_retard: entierOuNull(objet['taches_en_retard']) } : {}),
   };
 }
 
@@ -97,6 +106,7 @@ export const LIBELLES_COMPTEUR: Record<CleCompteur, (n: number) => string> = {
   doublons: (n) => (n === 1 ? '1 doublon à vérifier' : `${formaterNombre(n)} doublons à vérifier`),
   a_rattacher: (n) => (n === 1 ? '1 personne à rattacher' : `${formaterNombre(n)} personnes à rattacher`),
   propositions: (n) => (n === 1 ? '1 proposition à valider' : `${formaterNombre(n)} propositions à valider`),
+  taches_en_retard: (n) => (n === 1 ? '1 tâche en retard' : `${formaterNombre(n)} tâches en retard`),
 };
 
 /**
@@ -121,4 +131,9 @@ export function totalDesCompteurs(
 /** Ce que dit la pastille du TITRE de section repliée. */
 export function libelleTotalATraiter(n: number): string {
   return n === 1 ? '1 élément à traiter' : `${formaterNombre(n)} éléments à traiter`;
+}
+
+/** Total « À traiter » du CRM : doublons + personnes à rattacher + propositions + tâches en retard. */
+export function totalATraiterCrm(compteurs: CompteursATraiter | undefined): number | null {
+  return totalDesCompteurs(compteurs, CLES_A_TRAITER_CRM);
 }

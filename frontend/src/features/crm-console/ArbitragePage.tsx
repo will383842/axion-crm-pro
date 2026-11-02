@@ -22,6 +22,14 @@ import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
 import { COMPTEURS_A_TRAITER_KEY } from '@/features/a-traiter/compteurs';
 
+/** « 12 janv. 2027, 09:30 » : une date lisible plutôt que l'horodatage brut du serveur. */
+function dateLisible(brut: string | null): string {
+  if (brut === null) return '—';
+  const date = new Date(brut);
+  if (Number.isNaN(date.getTime())) return brut;
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(date);
+}
+
 export function ArbitragePage() {
   return (
     <ConsoleGate>
@@ -119,6 +127,7 @@ function ArbitrageContent() {
     <div>
       <PageHeader
         title="Personnes à rattacher"
+        surTitre="CRM Pro"
         subtitle={
           total === undefined
             ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'
@@ -207,7 +216,7 @@ function ArbitrageCard({
         {match.denomination ?? 'Entreprise non nommée'}
       </div>
       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        {row.title ?? row.kind} · {row.occurred_at ?? '—'}
+        {row.title ?? row.kind} · {dateLisible(row.occurred_at)}
       </div>
       <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-600 sm:grid-cols-2 dark:text-slate-300">
         <Field label="Personne" value={[match.first_name, match.last_name].filter(Boolean).join(' ')} />

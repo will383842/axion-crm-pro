@@ -124,6 +124,7 @@ function PropositionsContent() {
     <div>
       <PageHeader
         title="Propositions à valider"
+        surTitre="CRM Pro"
         subtitle={
           total === undefined
             ? 'Des partenaires proposent de changer des informations. Rien ne change sans votre accord.'

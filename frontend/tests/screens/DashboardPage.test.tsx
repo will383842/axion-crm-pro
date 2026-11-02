@@ -21,7 +21,16 @@ import { http, HttpResponse } from 'msw';
 
 import { DashboardPage, dateDuJour, nombreCourt } from '@/features/dashboard/DashboardPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { apiUrl, getJson, getPending, getStatus, recordGet } from '../msw/handlers';
+import {
+  CONSOLE_FEATURES_OPEN,
+  FEATURES_LES_DEUX_PRODUITS,
+  apiUrl,
+  getJson,
+  getPending,
+  getStatus,
+  handlersEnvoi,
+  recordGet,
+} from '../msw/handlers';
 
 const PATH = '/';
 const INDISPONIBLE = 'Chiffre indisponible pour le moment';
@@ -479,5 +488,34 @@ describe('DashboardPage — sans espace de travail (409)', () => {
     expect(screen.getByText(/rattaché à un espace de travail, mais aucun n’est sélectionné/)).toBeVisible();
     expect(screen.queryByText(/n’est rattaché à votre compte/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('tuile-entreprises')).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — carte « Envoi aujourd’hui » (DM1-ACC)', () => {
+  it('n’existe pas quand Envoi est absent : le CRM d’aujourd’hui ne change pas', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/config/features', CONSOLE_FEATURES_OPEN), getJson('/dashboard/stats', STATS), ...socle()],
+    });
+
+    await screen.findByRole('heading', { name: 'Ma base' });
+    expect(screen.queryByTestId('carte-envoi-aujourdhui')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Envoi aujourd.hui/)).not.toBeInTheDocument();
+  });
+
+  it('existe quand Envoi est actif : réponses à traiter, feu des envois, lien vers Envoi', async () => {
+    await renderScreen(<DashboardPage />, {
+      path: PATH,
+      handlers: [getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), getJson('/dashboard/stats', STATS), ...socle(), ...handlersEnvoi()],
+    });
+
+    const carte = await screen.findByTestId('carte-envoi-aujourdhui');
+    expect(within(carte).getByRole('heading', { name: /Envoi aujourd.hui/ })).toBeVisible();
+    await waitFor(() => expect(carte).toHaveTextContent(/7 réponses à traiter/));
+    expect(carte).toHaveTextContent(/État des envois : normaux/);
+    expect(within(carte).getByRole('link', { name: /Ouvrir Envoi/ })).toHaveAttribute('href', '/envoi/campagnes');
+    expect(within(carte).getByRole('link', { name: /réponses à traiter/ })).toHaveAttribute('href', '/envoi/reponses');
+    // Les ouvertures ne sont jamais mesurées : la carte n'en parle pas.
+    expect(carte).not.toHaveTextContent(/ouvertures?/i);
   });
 });

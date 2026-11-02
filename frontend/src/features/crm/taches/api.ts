@@ -55,14 +55,14 @@ export function useCocherTache() {
      * (une case contrôlée qui attendrait une micro-tâche reviendrait en arrière
      * le temps d'un rendu) ; le serveur confirme ensuite et corrige si besoin.
      */
-    cocher: (id: string, faite: boolean) => {
+    cocher: (id: string, faite: boolean, apres?: () => void) => {
       // `revert: false` : sans cela, l'annulation d'une requête en vol RESTAURE l'ancien état
       // après notre mise à jour et la défait (la case resterait décochée).
       void client.cancelQueries({ queryKey: CLE_TACHES }, { revert: false });
       client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) =>
         avant ? { ...avant, data: avant.data.map((t) => (t.id === id ? { ...t, faite, faite_le: faite ? `${avant.aujourdhui}T12:00:00.000Z` : null } : t)) } : avant,
       );
-      mutation.mutate({ id, faite });
+      mutation.mutate({ id, faite }, apres ? { onSettled: apres } : undefined);
     },
   };
 }
@@ -83,12 +83,12 @@ export function useRappelMatin() {
   });
   return {
     ...mutation,
-    basculer: (actif: boolean) => {
+    basculer: (actif: boolean, apres?: () => void) => {
       // `revert: false` : sans cela, l'annulation d'une requête en vol RESTAURE l'ancien état
       // après notre mise à jour et la défait (la case resterait décochée).
       void client.cancelQueries({ queryKey: CLE_TACHES }, { revert: false });
       client.setQueryData<ReponseTaches>(CLE_TACHES, (avant) => (avant ? { ...avant, rappel_matin: actif } : avant));
-      mutation.mutate(actif);
+      mutation.mutate(actif, apres ? { onSettled: apres } : undefined);
     },
   };
 }

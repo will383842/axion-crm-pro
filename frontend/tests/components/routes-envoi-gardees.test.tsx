@@ -92,6 +92,8 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF', 'Destinataires'],
+  ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
+  ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP', 'Réponses'],
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
   ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
@@ -112,6 +114,16 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/reglages/alertes', 'DM2-CNF', 'Alertes et avis'],
   ['/envoi/reglages/regles', 'DM2-CNF', 'Règles et horaires'],
   ['/envoi/reglages/connexion-crm', 'DM2-CNF', 'Connexion au CRM'],
+  ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
+  ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
+  ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
+  ['/envoi/desinscriptions', 'DM2-CNF'],
+  ['/envoi/alertes', 'DM2-CNF'],
+  ['/envoi/reglages', 'DM2-CNF'],
+  ['/envoi/reglages/identite', 'DM2-CNF'],
+  ['/envoi/reglages/alertes', 'DM2-CNF'],
+  ['/envoi/reglages/regles', 'DM2-CNF'],
+  ['/envoi/reglages/connexion-crm', 'DM2-CNF'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {

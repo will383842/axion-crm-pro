@@ -25,6 +25,11 @@ function phrase(aujourdhui: number, enRetard: number): string {
 
 function LigneTache({ tache, retard, avecDate }: { tache: Tache; retard?: boolean; avecDate?: boolean }) {
   const cocher = useCocherTache();
+  // État LOCAL, changé dans le geste même : le cache de requêtes prévient React par un
+  // `setTimeout(0)`, trop tard pour une case contrôlée (elle reviendrait en arrière le
+  // temps d'un rendu). Le serveur confirme ensuite ; au retour, c'est la liste qui parle.
+  const [local, setLocal] = useState<boolean | null>(null);
+  const coche = local ?? tache.faite;
   const detail = [tache.contexte, avecDate ? dateCourte(tache.echeance) : null, tache.origine === 'reponse' ? 'créée par une réponse' : null]
     .filter((x): x is string => x !== null && x !== '')
     .join(' · ');
@@ -34,11 +39,14 @@ function LigneTache({ tache, retard, avecDate }: { tache: Tache; retard?: boolea
         <input
           type="checkbox"
           className="h-5 w-5 shrink-0 rounded border-slate-300 md:h-4 md:w-4"
-          checked={tache.faite}
-          onChange={(e) => cocher.cocher(tache.id, e.target.checked)}
+          checked={coche}
+          onChange={(e) => {
+            setLocal(e.target.checked);
+            cocher.cocher(tache.id, e.target.checked, () => setLocal(null));
+          }}
         />
         <span className="min-w-0 flex-1">
-          <span className={cn('block text-sm font-medium text-slate-900', tache.faite && 'text-slate-500 line-through')}>{tache.titre}</span>
+          <span className={cn('block text-sm font-medium text-slate-900', coche && 'text-slate-500 line-through')}>{tache.titre}</span>
           {detail !== '' ? <span className="block text-xs text-slate-500">{detail}</span> : null}
         </span>
         {retard ? (
@@ -69,6 +77,7 @@ function Groupe({ id, titre, mot, children }: { id: string; titre: string; mot?:
 
 function RappelDuMatin({ actif }: { actif: boolean }) {
   const rappel = useRappelMatin();
+  const [local, setLocal] = useState<boolean | null>(null);
   return (
     <Card padding="lg" className="flex items-start gap-3">
       <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-produit" aria-hidden />
@@ -84,8 +93,11 @@ function RappelDuMatin({ actif }: { actif: boolean }) {
         type="checkbox"
         role="switch"
         className="mt-1 h-5 w-5 shrink-0"
-        checked={actif}
-        onChange={(e) => rappel.basculer(e.target.checked)}
+        checked={local ?? actif}
+        onChange={(e) => {
+          setLocal(e.target.checked);
+          rappel.basculer(e.target.checked, () => setLocal(null));
+        }}
       />
     </Card>
   );

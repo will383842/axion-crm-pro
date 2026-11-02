@@ -166,7 +166,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
   it.each([
     ['/taches', 'DM1-ACC'],
     ['/affaires', 'DM1-ACC'],
-    ['/compte', 'DM1-COM'],
+    // Filet modifié : pourquoi. DM1-COM livre /compte : la page n'est plus « en attente ».
   ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');

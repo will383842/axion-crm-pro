@@ -31,6 +31,8 @@ interface AuditLog {
   user_agent?: string | null;
   created_at: string;
   current_hash: string;
+  /** Produit concerné par l'action (DM1-COM). */
+  produit?: 'crm' | 'envoi' | 'commun' | null;
   actor?: string | null;
   target?: string | null;
   severity?: Severity | null;
@@ -45,7 +47,9 @@ const SEVERITY_TONE: Record<Severity, StatusTone> = {
   critical: 'danger',
 };
 
-const GRID = '160px 180px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+const GRID = '160px 180px 100px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+
+const NOM_PRODUIT = { crm: 'CRM Pro', envoi: 'Envoi', commun: 'Commun' } as const;
 
 function severityFromStatus(l: AuditLog): Severity {
   if (l.severity) return l.severity;
@@ -93,6 +97,7 @@ export function AuditLogsPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Journal des actions"
         subtitle="Qui a fait quoi, et quand. Rien ne peut y être effacé."
         actions={
@@ -179,6 +184,7 @@ export function AuditLogsPage() {
           >
             <div>Quand</div>
             <div>Événement</div>
+            <div>Produit</div>
             <div>Écran ou action</div>
             <div>Acteur</div>
             <div>Gravité</div>
@@ -201,6 +207,9 @@ export function AuditLogsPage() {
                   </div>
                   <div className="truncate font-medium text-slate-900 dark:text-white">
                     {l.event_type}
+                  </div>
+                  <div className="truncate text-xs text-slate-600">
+                    {l.produit ? NOM_PRODUIT[l.produit] : '—'}
                   </div>
                   <div className="truncate font-mono text-xs text-slate-500">
                     {l.path ?? '—'}

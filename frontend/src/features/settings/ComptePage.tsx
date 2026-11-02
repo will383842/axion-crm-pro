@@ -1,6 +1,24 @@
-/** Page « en attente » créée par DM0-COQ : le lot DM1-COM remplace ce contenu (plan 30 § 4.2). */
-import { PageEnAttente } from '@/features/socle/PageEnAttente';
+import { PageHeader } from '@/components/ui';
+import { ChangerMotDePasse } from './ChangerMotDePasse';
+import { AppareilsDeConfiance } from './securite/AppareilsDeConfiance';
+import { CodesDeSecours } from './securite/CodesDeSecours';
+import { RaccourcisClavier } from './securite/RaccourcisClavier';
 
+/** Mon compte et sécurité : écran commun aux deux produits (DM1-COM). */
 export function ComptePage() {
-  return <PageEnAttente title="Mon compte et sécurité" lot="DM1-COM" />;
+  return (
+    <div>
+      <PageHeader
+        surTitre="Commun"
+        title="Mon compte et sécurité"
+        subtitle="Votre mot de passe, vos appareils de confiance et vos codes de secours."
+      />
+      <div className="space-y-4">
+        <ChangerMotDePasse />
+        <AppareilsDeConfiance />
+        <CodesDeSecours />
+        <RaccourcisClavier />
+      </div>
+    </div>
+  );
 }

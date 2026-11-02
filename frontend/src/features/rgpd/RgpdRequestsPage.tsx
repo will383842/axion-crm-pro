@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, FilePlus2, ShieldCheck } from 'lucide-react';
+import { ClipboardList, Download, FilePlus2, ShieldCheck } from 'lucide-react';
 import {
   Button,
   Card,
@@ -84,6 +84,18 @@ const TYPE_OPTIONS: Array<{ id: RgpdType | 'all'; label: string; article?: strin
 
 const GRID = 'minmax(140px,1fr) minmax(240px,1.4fr) 130px 180px 180px 140px';
 
+/** Télécharge un texte comme fichier, sans passer par une adresse du serveur. */
+function telecharger(nom: string, contenu: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([contenu], { type }));
+  const lien = document.createElement('a');
+  lien.href = url;
+  lien.download = nom;
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function RgpdRequestsPage() {
   const qc = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<RgpdType | 'all'>('all');
@@ -92,6 +104,17 @@ export function RgpdRequestsPage() {
   const [newType, setNewType] = useState<RgpdType>('erasure');
   const [newEmail, setNewEmail] = useState('');
   const [processNote, setProcessNote] = useState('');
+
+  // Registre des oppositions : un fichier CSV (la liste de ceux à qui on n'écrit plus).
+  const exportMut = useMutation({
+    mutationFn: async () =>
+      (await api.get<string>('/rgpd/oppositions/export', { responseType: 'text', transformResponse: (d: string) => d })).data,
+    onSuccess: (csv) => {
+      telecharger('registre-des-oppositions.csv', csv, 'text/csv;charset=utf-8');
+      toast.success('Registre des oppositions exporté');
+    },
+    onError: () => toast.error('L’export n’a pas pu aboutir. Réessayez dans un instant.'),
+  });
 
   const list = useQuery({
     queryKey: ['rgpd-requests'],
@@ -158,16 +181,27 @@ export function RgpdRequestsPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Demandes RGPD"
         subtitle="Demandes des personnes sur leurs données (accès, suppression…)"
         actions={
-          <Button
-            variant="primary"
-            iconLeft={<FilePlus2 className="h-3.5 w-3.5" />}
-            onClick={() => setNewOpen(true)}
-          >
-            Nouvelle requête
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              iconLeft={<Download className="h-3.5 w-3.5" />}
+              loading={exportMut.isPending}
+              onClick={() => exportMut.mutate()}
+            >
+              Exporter le registre des oppositions
+            </Button>
+            <Button
+              variant="primary"
+              iconLeft={<FilePlus2 className="h-3.5 w-3.5" />}
+              onClick={() => setNewOpen(true)}
+            >
+              Nouvelle requête
+            </Button>
+          </>
         }
       />
 

@@ -82,6 +82,11 @@ describe('Demandes RGPD : registre des oppositions (DM1-COM)', () => {
     await user.click(await screen.findByRole('button', { name: 'Exporter le registre des oppositions' }));
     await waitFor(() => expect(blobs).toHaveLength(1));
     expect(clic).toHaveBeenCalled();
-    expect(await blobs[0]!.text()).toMatch(/^Valeur;Portée;Motif;Inscrite le/);
+    const lu = await new Promise<string>((ok) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => ok(lecteur.result as string);
+      lecteur.readAsText(blobs[0]!);
+    });
+    expect(lu).toMatch(/^Valeur;Portée;Motif;Inscrite le/);
   });
 });

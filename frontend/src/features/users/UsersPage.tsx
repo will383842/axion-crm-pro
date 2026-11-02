@@ -27,6 +27,8 @@ interface UserRow {
   first_login_completed_at?: string | null;
   last_login_at?: string | null;
   roles?: string[];
+  /** Accès par produit (DM1-COM). Absent : serveur pas encore à jour, on suppose les deux. */
+  acces_produits?: { crm: boolean; envoi: boolean };
 }
 
 const ROLE_OPTIONS = [
@@ -223,6 +225,17 @@ export function UsersPage() {
     onError: () => toast.error('Impossible de changer le rôle'),
   });
 
+  // Accès par produit (CRM Pro / Envoi) : une case par produit et par personne.
+  const accesMut = useMutation({
+    mutationFn: async (p: { id: string; acces: { crm: boolean; envoi: boolean } }) =>
+      (await api.put<{ data: UserRow }>(`/users/${p.id}`, { acces_produits: p.acces })).data,
+    onSuccess: () => {
+      toast.success('Accès mis à jour');
+      void qc.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: () => toast.error('Impossible de changer cet accès'),
+  });
+
   // 🔑 FERMER UN COMPTE. Le serveur REVOQUE l'appartenance (`revoked_at`) et
   // supprime en douceur : rien n'est efface, la trace de qui est passe reste.
   // D'ou « Fermer » et non « Supprimer » — le mot doit dire ce qui se passe.
@@ -258,6 +271,7 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Utilisateurs"
         subtitle="Qui a accès à votre CRM, et avec quels droits."
         // 🔴 X39-028 — le bouton disparait quand le serveur a REFUSE la vue.
@@ -323,7 +337,7 @@ export function UsersPage() {
           >
             <div>Utilisateur</div>
             <div>Email</div>
-            <div>Rôles</div>
+            <div>Rôles et accès</div>
             {large ? <div>2FA</div> : null}
             {large ? <div>Dernière connexion</div> : null}
             <div>Actions</div>
@@ -343,6 +357,7 @@ export function UsersPage() {
                   </div>
                 </div>
                 <div className="truncate text-slate-600 dark:text-slate-300">{u.email}</div>
+                <div className="space-y-1.5">
                 <div className="flex flex-wrap gap-1">
                   {(u.roles ?? []).length === 0 ? (
                     <span className="text-xs text-slate-400">—</span>
@@ -353,6 +368,31 @@ export function UsersPage() {
                       </StatusPill>
                     ))
                   )}
+                </div>
+                <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-700">
+                  <legend className="sr-only">Accès aux produits de {u.name}</legend>
+                  {(
+                    [
+                      ['crm', 'CRM Pro'],
+                      ['envoi', 'Envoi'],
+                    ] as const
+                  ).map(([cle, nom]) => {
+                    const acces = u.acces_produits ?? { crm: true, envoi: true };
+                    return (
+                      <label key={cle} className="flex min-h-11 items-center gap-1.5 md:min-h-0">
+                        <input
+                          type="checkbox"
+                          checked={acces[cle]}
+                          disabled={moi?.user.id === u.id || accesMut.isPending}
+                          aria-label={`Accès à ${nom} pour ${u.name}`}
+                          onChange={(e) => accesMut.mutate({ id: u.id, acces: { ...acces, [cle]: e.target.checked } })}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        {nom}
+                      </label>
+                    );
+                  })}
+                </fieldset>
                 </div>
                 {large ? (
                   <div>

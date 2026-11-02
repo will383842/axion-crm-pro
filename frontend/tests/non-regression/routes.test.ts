@@ -24,9 +24,19 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
+// registre des oppositions. Servis par le faux serveur de la démo ; les routes serveur sont prévues aux lots S3 et
+// S12 (authentification par code e-mail) et au lot RGPD, qui retireront ces lignes.
 const ECARTS_CONNUS: string[] = [
+  'GET /api/v1/compte/appareils',
+  'GET /api/v1/compte/codes-secours',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
+  'GET /api/v1/rgpd/oppositions/export',
+  'POST /api/v1/auth/code-email/renvoyer',
+  'POST /api/v1/auth/code-email/verifier',
+  'POST /api/v1/compte/appareils/{p}/retirer',
+  'POST /api/v1/compte/codes-secours/regenerer',
   'POST /api/v1/crm/propositions/{p}/{p}',
 ];
 

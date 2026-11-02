@@ -148,3 +148,11 @@ test('PV-6 7 — drapeau fermé : les champs sont ignorés, rien n’est écrit'
     expect(DB::table('personnes')->count())->toBe(0)
         ->and(DB::table('opt_out')->count())->toBe(0);
 });
+
+test('PV-6 8 — opposition_at : une date future du site est ramenée à maintenant', function () {
+    $futur = now()->addDays(30)->utc()->format('Y-m-d\TH:i:s\Z');
+    pv6Post(pv6Event(now()->utc()->format('Y-m-d\TH:i:s\Z'), ['opposition' => ['actif' => true, 'date' => $futur]]))->assertOk();
+
+    $posee = Carbon\Carbon::parse(pv6Personne()->opposition_at);
+    expect($posee->lessThanOrEqualTo(now()->addMinute()))->toBeTrue();
+});

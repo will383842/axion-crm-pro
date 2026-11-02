@@ -160,9 +160,11 @@ final class PersonnesIngestService
     /** Vrai si la migration PV-6 est passée (fenêtre de déploiement : sinon, on ignore les champs). */
     private static function colonnesAccordsPresentes(): bool
     {
-        static $presentes = null;
+        // Seul un résultat POSITIF est gardé : un worker démarré avant `migrate`
+        // ne doit pas ignorer les champs pour toujours.
+        static $presentes = false;
 
-        return $presentes ??= Schema::hasColumn('personnes', 'accords_at');
+        return $presentes = $presentes || Schema::hasColumn('personnes', 'accords_at');
     }
 
     /**
@@ -228,7 +230,10 @@ final class PersonnesIngestService
         }
 
         if ($accords->oppose() && ($personne->opposition_at ?? null) === null) {
-            $update['opposition_at'] = $accords->opposition['date'] ?? null ? new DateTimeImmutable((string) $accords->opposition['date']) : $event->occurredAt;
+            $dateSite = ($accords->opposition['date'] ?? null) ? new DateTimeImmutable((string) $accords->opposition['date']) : $event->occurredAt;
+            $maintenant = new DateTimeImmutable('now');
+            // Une date future n'a pas de sens : bornée à maintenant.
+            $update['opposition_at'] = $dateSite > $maintenant ? $maintenant : $dateSite;
         }
 
         DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);

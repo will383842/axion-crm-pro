@@ -33,8 +33,9 @@ Tous les champs sont facultatifs et toutes les clés internes sont fermées.
 - **Ancien site → nouveau CRM** : une charge en version 1, sans ces champs, passe sans changement.
 - **Nouveau site → ancien CRM** : l'ancien CRM refuse la version 2 (`unsupported_schema_version`, 422) ;
   la ligne reste côté site. Le site n'émet donc ces champs en version 2 que quand le CRM l'a déployé.
-  Le nouveau CRM accepte aussi ces champs dans une charge en version 1 (ils sont ignorés par un ancien
-  CRM seulement s'il les tolère ; sinon rejet, et la ligne attend).
+  Un ancien CRM REFUSE ces clés (`unknown_field`, HTTP 422), même dans une charge en version 1 :
+  la ligne attend côté site. Le site n'envoie donc les 4 champs qu'une fois ce CRM déployé.
+  Le nouveau CRM, lui, les accepte dans une charge en version 1 comme en version 2.
 - Les champs ne sont lus que par la branche « personnes » (lettre et guide), derrière
   `CRM_INGEST_PERSONNES_ENABLED`. Pour les autres types d'événements ou drapeau fermé, ils sont validés puis ignorés.
 

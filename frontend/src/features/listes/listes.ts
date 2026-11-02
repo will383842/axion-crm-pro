@@ -80,6 +80,16 @@ export async function chargerListes(params: { corbeille?: boolean; company_id?: 
   return data.data ?? [];
 }
 
+/**
+ * DM1-CIB — les listes ET l'annonce des gestes du ciblage (`meta.gestes_ciblage`).
+ * Le vrai serveur ne l'envoie pas encore : `gestes` vaut alors `false` et les
+ * écrans restent ceux d'avant (aucun élément nouveau en production).
+ */
+export async function chargerListesEtAnnonce(): Promise<{ listes: ListeManuelle[]; gestes: boolean }> {
+  const { data } = await api.get<{ data?: ListeManuelle[]; meta?: { gestes_ciblage?: boolean } }>('/listes-manuelles');
+  return { listes: data.data ?? [], gestes: data.meta?.gestes_ciblage === true };
+}
+
 export async function creerListe(nom: string, description?: string): Promise<ListeManuelle> {
   const { data } = await api.post<{ data: ListeManuelle }>('/listes-manuelles', {
     nom,
@@ -123,4 +133,55 @@ export function resumerAjout(b: BilanAjout): string {
   if (b.introuvables > 0) morceaux.push(`${b.introuvables} introuvable(s)`);
   if ((b.presse_refusees ?? 0) > 0) morceaux.push(`${b.presse_refusees ?? 0} de presse refusée(s) (segment presse fermé)`);
   return `${morceaux.join(', ')}.`;
+}
+
+/** Télécharge un CSV (séparateur « ; », BOM pour Excel) — rien ne quitte le navigateur. */
+export function telechargerCsv(nom: string, entetes: string[], lignes: string[][]): void {
+  const cellule = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const corps = [entetes, ...lignes].map((l) => l.map(cellule).join(';')).join('\r\n');
+  telechargerBlob(nom, new Blob([`\uFEFF${corps}`], { type: 'text/csv;charset=utf-8' }));
+}
+
+/** Fait télécharger un fichier déjà en mémoire. */
+export function telechargerBlob(nom: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nom;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const ENTETES_EXPORT = ['Type', 'Organisation', 'SIREN', 'Prénom', 'Nom', 'Fonction', 'E-mail'];
+
+/** Les fiches d'une liste (ou d'une sélection) en CSV : une ligne par fiche. */
+export function exporterMembres(nom: string, membres: readonly MembreListe[]): void {
+  telechargerCsv(
+    nom,
+    ENTETES_EXPORT,
+    membres.map((m) => [
+      m.type === 'organisation' ? 'Organisation' : 'Personne',
+      m.denomination ?? '',
+      m.siren ?? '',
+      m.first_name ?? '',
+      m.last_name ?? '',
+      m.role ?? '',
+      m.email ?? m.email_generic ?? '',
+    ]),
+  );
+}
+
+/** Toutes les fiches de la liste, page après page (200 par appel). */
+export async function chargerTousLesMembres(listeId: number): Promise<MembreListe[]> {
+  const toutes: MembreListe[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const { data } = await api.get<{ data: MembreListe[]; meta: { total: number } }>(`/listes-manuelles/${listeId}/membres`, {
+      params: { page, per_page: 200 },
+    });
+    toutes.push(...data.data);
+    if (toutes.length >= data.meta.total || data.data.length === 0) break;
+  }
+  return toutes;
 }

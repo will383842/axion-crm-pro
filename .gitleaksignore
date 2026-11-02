@@ -90,3 +90,6 @@ af16d86f71e3813908288b45b726157a6224490d:backend/tests/Unit/Auth/NotPwnedPasswor
 7cbc4d5fdc437d38c6ddb26b81b49f7aec9ee805:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-35/greement-navigateur/P12-export-art20-21-collections.json:generic-api-key:1
 8db82299d22cbbacb7a56def81e40edbc3b32992:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-15/02_portabilite-jeton.txt:generic-api-key:3
 c12bf3d32504a8127b359da9e3a4f6e6454160f4:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/agent-35/OU-ON-EN-EST.md:generic-api-key:1009
+
+# R0 (NR-09) : secret factice de test, remplace ensuite par une valeur construite a l execution (faux positif).
+4515b18df51bcd707a132df1dac8e8ba23ea9cea:backend/tests/Feature/NonRegression/Nr09JournalAuditTest.php:generic-api-key:26

@@ -2,7 +2,8 @@ import { AlertTriangle, Send } from 'lucide-react';
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Card, EmptyState, Input, PageHeader, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Input, KpiCard, PageHeader, Spinner } from "@/components/ui";
+import { useProduits } from "@/features/socle/produits/useProduits";
 import { api } from "@/lib/api";
 import { KINDS, dateFr, libelleKind } from "./JournalPresse";
 
@@ -39,10 +40,28 @@ interface EnvoiItem {
 
 interface EnvoisResponse {
   data: EnvoiItem[];
-  meta: { total: number; per_page: number; current_page: number; last_page: number };
+  meta: {
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    /**
+     * Compteurs du trimestre. Annoncés par le serveur de démonstration ; le
+     * vrai serveur ne les envoie pas encore : tant qu'ils manquent, la bande
+     * n'est pas affichée (jamais de zéros inventés).
+     */
+    communiques?: number;
+    relances?: number;
+    reponses?: number;
+    retombees?: number;
+    retombees_semaine?: number;
+  };
 }
 
 export function EnvoisPressePage() {
+  // « Envoyer un communiqué » ouvre une campagne d'Envoi : seulement si le
+  // produit Envoi est actif pour cet espace (absent en production).
+  const produits = useProduits();
   const [kind, setKind] = useState<string>("");
   const [q, setQ] = useState("");
 
@@ -66,10 +85,32 @@ export function EnvoisPressePage() {
       <PageHeader
         title="Communiqués envoyés"
         subtitle="Ce qui est parti à la presse, à qui, et quand — envois, relances, réponses et retombées."
+        actions={
+          produits.envoi === "actif" ? (
+            <Link to="/envoi/campagnes/nouvelle">
+              <Button variant="primary" size="md">Envoyer un communiqué</Button>
+            </Link>
+          ) : undefined
+        }
       />
+
+      {data?.meta.communiques !== undefined ? (
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="compteurs-communiques">
+          <KpiCard tone="sky" label="Communiqués envoyés" value={data.meta.communiques} sublabel="ce trimestre" />
+          <KpiCard tone="amber" label="Relances" value={data.meta.relances ?? 0} />
+          <KpiCard tone="violet" label="Réponses reçues" value={data.meta.reponses ?? 0} />
+          <KpiCard
+            tone="emerald"
+            label="Retombées publiées"
+            value={data.meta.retombees ?? 0}
+            sublabel={data.meta.retombees_semaine ? `+${data.meta.retombees_semaine} cette semaine` : "publiées"}
+          />
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <select
+          aria-label="Geste"
           value={kind}
           onChange={(e) => setKind(e.target.value)}
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
@@ -82,6 +123,7 @@ export function EnvoisPressePage() {
           ))}
         </select>
         <Input
+          aria-label="Recherche"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Rechercher dans l'objet de l'envoi…"

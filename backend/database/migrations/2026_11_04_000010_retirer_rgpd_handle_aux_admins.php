@@ -59,6 +59,8 @@ return new class extends Migration
     public function down(): void
     {
         // Un droit retiré ne se rend pas silencieusement : le retour arrière
-        // ne réattribue rien.
+        // ne réattribue rien. Il reste RÉEL (garde NR-17) : il ne fait que vider
+        // le cache des droits, sans effet de bord et rejouable.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 };

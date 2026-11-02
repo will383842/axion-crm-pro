@@ -9,7 +9,8 @@
  *  3. Envoi actif mais utilisateur sans accès (`acces_produits.envoi: false`) :
  *     introuvable aussi ;
  *  4. Envoi actif : chaque route rend sa page « en attente », au nom du lot
- *     qui la remplira ;
+ *     qui la remplira — ou, une fois ce lot fusionné, SA VRAIE PAGE (titre
+ *     attendu, ni « en attente » ni « introuvable ») ;
  *  5. la page publique de désinscription vit HORS coquille.
  *
  * Monte l'arbre de routes RÉEL (`src/app/routeTree.tsx`), comme
@@ -32,7 +33,12 @@ import { renderScreen } from '../helpers/renderScreen';
 import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
-import { handlers as handlersConformite } from '@/demo/handlers/envoi/conformite.handlers';
+import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
+
+/** Les routes `/envoi/…` du faux serveur de la démo. */
+const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
+/** Les routes publiques de désinscription du faux serveur de la démo. */
+const handlersDemoPublic = handlersDemo.filter((h) => cleRoute(h).includes('/public/desinscription'));
 
 let arbre: AnyRoute;
 
@@ -67,36 +73,45 @@ async function monter(url: string) {
   return { ...vue, router };
 }
 
-/** Une URL concrète par route d'Envoi, et le lot qui remplira sa page. */
-const ROUTES_ENVOI: ReadonlyArray<readonly [string, string]> = [
+/**
+ * Une URL concrète par route d'Envoi, le lot qui remplit sa page et, dès que
+ * ce lot a livré la page, le titre (h1) qu'elle doit afficher. Sans titre, la
+ * route doit encore rendre sa page « en attente ».
+ *
+ * Filet modifié : pourquoi — un lot qui remplace sa page d'attente ajoute ici
+ * le titre de la vraie page ; la garde reste aussi stricte (la page doit
+ * s'afficher, avec son titre, sans « en attente » ni « introuvable »), et la
+ * garde « Sans Envoi → introuvable » couvre toujours TOUTES les routes.
+ */
+const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes', 'DM2-CAM'],
   ['/envoi/campagnes/calendrier', 'DM2-CAM'],
   ['/envoi/campagnes/c-1', 'DM2-CAM'],
-  ['/envoi/campagnes/nouvelle', 'DM2-ASS'],
-  ['/envoi/campagnes/messages', 'DM2-ASS'],
-  ['/envoi/campagnes/messages/m-1', 'DM2-ASS'],
+  ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
+  ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
+  ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
-  ['/envoi/campagnes/destinataires', 'DM2-CNF'],
-  ['/envoi/reponses', 'DM2-REP'],
-  ['/envoi/reponses/a-rattacher', 'DM2-REP'],
-  ['/envoi/reponses/traitees', 'DM2-REP'],
-  ['/envoi/boites', 'DM2-INF'],
-  ['/envoi/boites/b-1', 'DM2-INF'],
-  ['/envoi/domaines', 'DM2-INF'],
-  ['/envoi/domaines/d-1', 'DM2-INF'],
-  ['/envoi/serveurs', 'DM2-INF'],
-  ['/envoi/serveurs/configuration', 'DM2-INF'],
-  ['/envoi/chauffe', 'DM2-INF'],
+  ['/envoi/campagnes/destinataires', 'DM2-CNF', 'Destinataires'],
+  ['/envoi/reponses', 'DM2-REP', 'Réponses'],
+  ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
+  ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
+  ['/envoi/boites', 'DM2-INF', 'Boîtes d’envoi'],
+  ['/envoi/boites/boi-will', 'DM2-INF', 'will@prospection-b.example'],
+  ['/envoi/domaines', 'DM2-INF', 'Domaines'],
+  ['/envoi/domaines/dom-b', 'DM2-INF', 'prospection-b.example'],
+  ['/envoi/serveurs', 'DM2-INF', 'Serveurs et adresses IP'],
+  ['/envoi/serveurs/configuration', 'DM2-INF', 'Configuration'],
+  ['/envoi/chauffe', 'DM2-INF', 'Chauffe'],
   ['/envoi/sante', 'DM2-PIL'],
   ['/envoi/sante/chercher', 'DM2-PIL'],
   ['/envoi/sante/feu-vert', 'DM2-PIL'],
-  ['/envoi/desinscriptions', 'DM2-CNF'],
-  ['/envoi/alertes', 'DM2-CNF'],
-  ['/envoi/reglages', 'DM2-CNF'],
-  ['/envoi/reglages/identite', 'DM2-CNF'],
-  ['/envoi/reglages/alertes', 'DM2-CNF'],
-  ['/envoi/reglages/regles', 'DM2-CNF'],
-  ['/envoi/reglages/connexion-crm', 'DM2-CNF'],
+  ['/envoi/desinscriptions', 'DM2-CNF', 'Désinscriptions'],
+  ['/envoi/alertes', 'DM2-CNF', 'Alertes d’envoi'],
+  ['/envoi/reglages', 'DM2-CNF', 'Réglages d’envoi'],
+  ['/envoi/reglages/identite', 'DM2-CNF', 'Identité de l’expéditeur'],
+  ['/envoi/reglages/alertes', 'DM2-CNF', 'Alertes et avis'],
+  ['/envoi/reglages/regles', 'DM2-CNF', 'Règles et horaires'],
+  ['/envoi/reglages/connexion-crm', 'DM2-CNF', 'Connexion au CRM'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {
@@ -146,13 +161,25 @@ describe('Garde fermée par défaut — un état illisible n’ouvre jamais Envo
   });
 });
 
-// Filet modifié : pourquoi. DM2-CNF remplit ses 8 pages d'Envoi : elles ne sont plus « en attente ».
-// Chacune est vérifiée à part ci-dessous (titre réel, plus de page d'attente) ; les autres lots
-// retirent leurs routes de cette liste en remplissant leurs pages.
-const LOT_REMPLI = 'DM2-CNF';
+/** Routes dont le lot n'a pas encore livré la page. */
+const ROUTES_EN_ATTENTE = ROUTES_ENVOI.filter(([, , titre]) => titre === undefined).map(([url, lot]) => [url, lot] as const);
+/** Routes dont le lot a livré la vraie page, avec le titre attendu. */
+const ROUTES_LIVREES = ROUTES_ENVOI.flatMap(([url, lot, titre]) => (titre === undefined ? [] : [[url, lot, titre] as const]));
+
+describe('Envoi actif — chaque route livrée rend sa VRAIE page', () => {
+  it.each(ROUTES_LIVREES)('%s → vraie page du lot %s (« %s »)', async (url, _lot, titre) => {
+    // Le faux serveur de la démo (le même que celui des e2e) répond aux appels
+    // de la page ; droits et compte restent ceux du test (Envoi actif).
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersDemoEnvoi);
+    await monter(url);
+    expect(await screen.findByRole('heading', { level: 1, name: titre }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+  });
+});
 
 describe('Envoi actif — chaque route rend sa page « en attente »', () => {
-  it.each(ROUTES_ENVOI.filter(([, lot]) => lot !== LOT_REMPLI))('%s → page en attente du lot %s', async (url, lot) => {
+  it.each(ROUTES_EN_ATTENTE)('%s → page en attente du lot %s', async (url, lot) => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');
@@ -160,17 +187,6 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
     expect(page.textContent).toContain(lot);
     expect(screen.queryByText(/page introuvable/i)).toBeNull();
   });
-
-  it.each(ROUTES_ENVOI.filter(([, lot]) => lot === LOT_REMPLI).map(([url]) => [url]))(
-    '%s → la vraie page du lot DM2-CNF (plus de page en attente)',
-    async (url) => {
-      server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...handlersConformite);
-      await monter(url);
-      expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
-      expect(screen.queryByTestId('page-en-attente')).toBeNull();
-      expect(screen.queryByText(/page introuvable/i)).toBeNull();
-    },
-  );
 
   it('/envoi redirige vers /envoi/campagnes', async () => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
@@ -193,13 +209,24 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
   });
 
-  it('/desinscription/$jeton est publique et HORS coquille', async () => {
-    // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot.
-    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersConformite);
+  it('/desinscription/$jeton, Envoi annoncé : la vraie page, publique et HORS coquille', async () => {
+    // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot,
+    // et ne s'affiche (et n'appelle sa route) que si le serveur annonce Envoi.
+    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersDemoPublic);
     await monter('/desinscription/demo-tilleuls');
     expect(await screen.findByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeInTheDocument();
     expect(screen.queryByTestId('page-en-attente')).toBeNull();
     expect(document.body.textContent).not.toMatch(/\bDM\d|\blot\b/i);
+    expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
+    expect(document.querySelector('[data-coquille]')).toBeNull();
+  });
+
+  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
+    await monter('/desinscription/jeton-de-test');
+    const page = await screen.findByTestId('page-en-attente');
+    expect(page).toHaveAttribute('data-lot', 'DM2-CNF');
+    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
+    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
     expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });

@@ -56,6 +56,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/boites/{id}/reglages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Enregistrer la signature et le mode absence d'une boîte */
+        put: operations["enregistrerReglagesBoite"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/boites/{id}/suspendre": {
         parameters: {
             query?: never;
@@ -73,6 +90,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/boites/test-connexion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tester la connexion d'une boîte avant de l'ajouter */
+        post: operations["testerConnexionBoite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/chauffe": {
         parameters: {
             query?: never;
@@ -84,6 +118,23 @@ export interface paths {
         get: operations["lireChauffe"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/chauffe/{id}/reculer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reculer la montée en douceur d'un palier (jours effectifs) */
+        post: operations["reculerChauffe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -261,6 +312,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/serveurs/{id}/sante": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Santé d'un serveur d'envoi, file et paliers de chauffe de ses adresses IP */
+        get: operations["lireSanteServeur"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/serveurs/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lancer le test du serveur (boîtes témoins internes, aucun envoi réel) */
+        post: operations["lancerTestServeur"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -293,6 +378,8 @@ export interface components {
             plafond_aujourdhui: number;
             sur: number;
         };
+        /** @enum {string} */
+        ClassementReponse: "interesse" | "pas_maintenant" | "question" | "refus" | "stop" | "absence" | "a_rattacher";
         Configuration: {
             courante: components["schemas"]["VersionConfiguration"];
             historique: components["schemas"]["VersionConfiguration"][];
@@ -317,8 +404,13 @@ export interface components {
             /** @enum {string} */
             etat: "ok" | "absent" | "different";
             nom: string;
+            /**
+             * @description Ce que l'enregistrement sert à faire.
+             * @enum {string}
+             */
+            role: "spf" | "dkim" | "dmarc" | "ptr" | "mta_sts";
             /** @enum {string} */
-            type: "TXT" | "CNAME" | "MX";
+            type: "TXT" | "CNAME" | "MX" | "PTR";
             valeur: string;
         };
         Erreur: {
@@ -374,12 +466,66 @@ export interface components {
         };
         ListeNoire: {
             element: string;
+            /** @description Adresse de la demande de retrait de la liste (vide si l'élément est propre). */
+            lien_retrait: string | null;
             liste: string;
             present: boolean;
+            /** @description Fiche « que faire » en français (vide si l'élément est propre). */
+            que_faire: string | null;
             verifie_le: components["schemas"]["Horodatage"];
+        };
+        /** @description Pendant l'absence, la boîte n'envoie plus et les réponses automatiques sont mises de côté. */
+        ModeAbsence: {
+            actif: boolean;
+            jusqu_au: string | null;
+            message: string | null;
         };
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
+        ReglagesBoite: {
+            mode_absence: components["schemas"]["ModeAbsence"];
+            signature: string;
+        };
+        ReponseResume: {
+            boite_id: components["schemas"]["Identifiant"];
+            campagne_id: components["schemas"]["Identifiant"] | null;
+            classement: components["schemas"]["ClassementReponse"];
+            /** Format: email */
+            de: string;
+            destinataire_id: components["schemas"]["Identifiant"] | null;
+            extrait: string;
+            id: components["schemas"]["Identifiant"];
+            nom: string | null;
+            objet: string;
+            organisation: string | null;
+            prenom: string | null;
+            recue_le: components["schemas"]["Horodatage"];
+            suggestion: {
+                classement: components["schemas"]["ClassementReponse"];
+                confiance: number;
+            };
+            traitee: boolean;
+        };
+        SanteServeur: {
+            /** @description Messages en attente d'envoi sur ce serveur. */
+            en_file: number;
+            en_ligne_depuis_jours: number;
+            /** @description Paliers de chauffe des adresses IP en montée. */
+            paliers: {
+                adresse: string;
+                jour: number;
+                plafond_aujourdhui: number;
+                sur: number;
+            }[];
+            serveur_id: components["schemas"]["Identifiant"];
+            test: {
+                etapes: {
+                    libelle: string;
+                    ok: boolean;
+                }[];
+                fait_le: components["schemas"]["Horodatage"];
+            };
+        };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
             etat: components["schemas"]["EtatFeu"];
@@ -400,6 +546,10 @@ export interface components {
             }[];
             creee_le: components["schemas"]["Horodatage"];
             numero: number;
+            /** @description Qui a appliqué la version (prénom, ou « Système »). */
+            par: string | null;
+            /** @enum {string} */
+            resultat: "prete" | "appliquee" | "remplacee" | "retour_automatique";
         };
     };
     responses: {
@@ -475,7 +625,10 @@ export interface operations {
                     /** Format: email */
                     adresse: string;
                     domaine_id: components["schemas"]["Identifiant"];
+                    mode_absence?: components["schemas"]["ModeAbsence"];
                     nom_affiche: string;
+                    /** @description Signature ajoutée en bas des messages de cette boîte. */
+                    signature?: string;
                 };
             };
         };
@@ -505,6 +658,8 @@ export interface operations {
                         boite: components["schemas"]["BoiteResume"];
                         derniers_refus: components["schemas"]["EvenementEnvoi"][];
                         jours: components["schemas"]["JourActivite"][];
+                        reglages: components["schemas"]["ReglagesBoite"];
+                        reponses: components["schemas"]["ReponseResume"][];
                     };
                 };
             };
@@ -525,6 +680,33 @@ export interface operations {
             200: components["responses"]["Boite"];
         };
     };
+    enregistrerReglagesBoite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReglagesBoite"];
+            };
+        };
+        responses: {
+            /** @description Réglages enregistrés. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReglagesBoite"];
+                };
+            };
+            404: components["responses"]["Erreur"];
+        };
+    };
     suspendreBoite: {
         parameters: {
             query?: never;
@@ -537,6 +719,40 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Boite"];
+        };
+    };
+    testerConnexionBoite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    adresse: string;
+                    domaine_id: components["schemas"]["Identifiant"];
+                };
+            };
+        };
+        responses: {
+            /** @description Résultat du test, étape par étape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        etapes: {
+                            libelle: string;
+                            ok: boolean;
+                        }[];
+                        reussi: boolean;
+                    };
+                };
+            };
         };
     };
     lireChauffe: {
@@ -560,9 +776,30 @@ export interface operations {
                             jour: number;
                             plafond: number;
                         }[];
+                        /** @description Date de fin prévue de la montée de chaque boîte en chauffe (identifiant de la boîte -> date). */
+                        fins_prevues: {
+                            [key: string]: string;
+                        };
+                        /** @description Plafond d'envois par boîte et par jour (150 en V0). */
+                        plafond_boite: number;
                     };
                 };
             };
+        };
+    };
+    reculerChauffe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Boite"];
+            409: components["responses"]["Erreur"];
         };
     };
     lireConfiguration: {
@@ -621,6 +858,18 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["DomaineResume"][];
+                        /** @description Date d'expiration de chaque domaine (identifiant du domaine -> date). */
+                        expirations: {
+                            [key: string]: components["schemas"]["Horodatage"];
+                        };
+                        /**
+                         * @description Garde anti-dispersion : nombre de domaines utilisés et limite
+                         *     (trois domaines par serveur d'envoi). Au-delà, l'ajout est refusé.
+                         */
+                        garde_dispersion: {
+                            limite: number;
+                            utilises: number;
+                        };
                     };
                 };
             };
@@ -653,6 +902,7 @@ export interface operations {
                     };
                 };
             };
+            422: components["responses"]["Erreur"];
         };
     };
     lireDomaine: {
@@ -675,6 +925,7 @@ export interface operations {
                     "application/json": {
                         dns: components["schemas"]["EnregistrementDns"][];
                         domaine: components["schemas"]["DomaineResume"];
+                        expire_le: components["schemas"]["Horodatage"];
                         jours: components["schemas"]["JourActivite"][];
                         listes_noires: components["schemas"]["ListeNoire"][];
                     };
@@ -801,6 +1052,52 @@ export interface operations {
         responses: {
             200: components["responses"]["Configuration"];
             422: components["responses"]["Erreur"];
+        };
+    };
+    lireSanteServeur: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Santé du serveur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SanteServeur"];
+                };
+            };
+            404: components["responses"]["Erreur"];
+        };
+    };
+    lancerTestServeur: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Santé du serveur après le test. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SanteServeur"];
+                };
+            };
+            404: components["responses"]["Erreur"];
         };
     };
 }

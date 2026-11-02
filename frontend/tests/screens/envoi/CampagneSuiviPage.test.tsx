@@ -101,7 +101,7 @@ describe('CampagneSuiviPage', () => {
     demoDb.destinataires.modifier(cible!.id, {
       etat: 'exclu',
       motif: 'Inscrit au registre d’opposition',
-      ouverture: { nombre: 1, premiere_le: '2027-01-11T10:00:00.000Z', automatique_probable: false, raison_automatique: null },
+      ouverture: { nombre: 1, premiere_le: '2027-01-11T10:00:00.000Z', derniere_le: '2027-01-11T10:00:00.000Z', automatique_probable: false, raison_automatique: null },
     });
     const user = userEvent.setup();
     await ouvrir('cmp-01');

@@ -24,9 +24,22 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
+// Filet modifié : pourquoi. DM2-REP (#394) : boîte des réponses d'Envoi (liste, raccourcis, lecture, classer,
+// rattacher, créer une fiche, répondre). Ces appels ne partent que si Envoi est actif (absent en production :
+// la route répond « Page introuvable », garde `routes-envoi-gardees`) et sont servis par le faux serveur de la
+// démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
+// serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
+// sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
+  'GET /api/v1/envoi/reponses',
+  'GET /api/v1/envoi/reponses/raccourcis',
+  'GET /api/v1/envoi/reponses/{p}',
+  'POST /api/v1/envoi/reponses/{p}/classer',
+  'POST /api/v1/envoi/reponses/{p}/creer-fiche',
+  'POST /api/v1/envoi/reponses/{p}/rattacher',
+  'POST /api/v1/envoi/reponses/{p}/repondre',
   'POST /api/v1/crm/propositions/{p}/{p}',
 ];
 

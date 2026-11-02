@@ -6,9 +6,8 @@
  */
 
 use App\Socle\Demarrage\GardesDemarrage;
-use Tests\TestCase;
 
-uses(TestCase::class);
+// `Tests\TestCase` est déjà lié au dossier Unit par tests/Pest.php.
 
 function reglerProduction(array $reglages = []): void
 {

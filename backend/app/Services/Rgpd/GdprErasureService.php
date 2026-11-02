@@ -92,7 +92,7 @@ class GdprErasureService
             // jamais supprimée. Les clés du bilan sont conservées (nombre de
             // lignes mises à l'écart).
             $ecart = MiseAEcart::personnes($personnesIds, 'demande_effacement');
-            $deleted['abonnements'] = $ecart['abonnements'];
+            $deleted['abonnements'] = DB::table('abonnements')->whereIn('personne_id', $personnesIds)->where('statut', 'desabonne')->count();
             $deleted['personnes'] = $ecart['personnes'];
 
             $deleted['contacts'] = MiseAEcart::contacts(

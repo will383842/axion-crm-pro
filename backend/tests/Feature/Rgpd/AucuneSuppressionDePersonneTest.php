@@ -71,6 +71,9 @@ test('aucun code applicatif ne supprime durement une personne, un contact, un ca
         if (preg_match("/table\\('(contacts|candidates|personnes|abonnements|companies)'\\)[^;]*?->(delete|forceDelete|truncate)\\(/s", $source, $m) === 1) {
             $hits[] = "{$court} : suppression dure de {$m[1]}";
         }
+        if (preg_match('/\\$contacts->delete\\(|contactsAuNumero\\([^;]*?->delete\\(/s', $source) === 1) {
+            $hits[] = "{$court} : suppression de contacts par requête construite";
+        }
         if (preg_match('/DELETE\\s+FROM\\s+(public\\.)?(contacts|candidates|personnes|abonnements|companies)\\b/i', $source, $m) === 1) {
             $hits[] = "{$court} : DELETE FROM {$m[2]}";
         }

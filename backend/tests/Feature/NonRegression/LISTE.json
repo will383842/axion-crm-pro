@@ -120,9 +120,9 @@
       "nouveaux": {
         "Nr07TachesPlanifieesTest.php": [
           "NR-07 la liste des tâches planifiées est celle de la photo de référence",
-          "NR-07 le planificateur contient au moins les 44 tâches annoncées par le relevé (témoin de couverture)",
+          "NR-07 le planificateur contient au moins les 41 tâches restantes (témoin de couverture)",
           "NR-07 le battement du planificateur tourne chaque minute",
-          "NR-07 les purges mensuelles portent un saut (le drapeau CRM_PURGE_ENABLED les éteint)"
+          "NR-07 (L3c-0) plus aucune purge de personnes n'est planifiée"
         ]
       },
       "existants": [
@@ -170,12 +170,11 @@
       "risque": "R8 purges",
       "nouveaux": {
         "Nr10PurgesTest.php": [
-          "NR-10 purge-non-commercial ne supprime jamais une fiche console, et supprime la fiche ordinaire (témoin)",
-          "NR-10 purge-non-diffusible ne supprime jamais une fiche console, et supprime la fiche [ND] ordinaire (témoin)",
+          "NR-10 (L3c-0) purge-non-commercial refuse sans condition : aucune fiche supprimée, console ou ordinaire",
+          "NR-10 (L3c-0) purge-non-diffusible refuse sans condition : aucune fiche [ND] supprimée",
           "NR-10 les purges d’entreprises refusent sans --force quand la proportion dépasse le plafond",
           "NR-10 retention:purge --all-workspaces ne supprime aucune fiche ni personne, console ou non",
-          "NR-10 drapeau éteint : la purge des personnes froides refuse et ne supprime rien",
-          "NR-10 drapeau ouvert : une personne froide d’une fiche console n’est PAS purgée, une personne froide ordinaire l’est (témoin)"
+          "NR-10 (L3c-0) rgpd:purge-business-prospects refuse sans condition, drapeau éteint ou ouvert"
         ]
       },
       "existants": [

@@ -235,7 +235,8 @@ final class EffacementCoordonneesFiches
             if ($workspaceId !== null) {
                 $contacts->where('workspace_id', $workspaceId);
             }
-            $bilan['contacts_par_email'] = $contacts->delete();
+            // L3c-0 : masqués (corbeille douce + mise à l'écart), jamais supprimés.
+            $bilan['contacts_par_email'] = MiseAEcart::contacts($contacts->pluck('id')->all(), 'demande_effacement');
 
             // La fiche de vérification de l'adresse part avec l'adresse.
             $bilan['companies_email_generic'] = self::fichesALAdresse($email, $workspaceId)
@@ -250,10 +251,14 @@ final class EffacementCoordonneesFiches
         // Un DOUBLON de la personne (même nom, aucune adresse) qui porte l'un
         // de SES numéros — même le standard : c'est une fiche de la personne.
         if ($tous !== [] && $clesNom !== []) {
-            $bilan['contacts_doublons_par_telephone'] = self::contactsAuNumero($tous, $workspaceId)
-                ->whereNull('email')
-                ->whereRaw(self::CLE_NOM . ' IN (' . self::marques($clesNom) . ')', $clesNom)
-                ->delete();
+            // L3c-0 : masqués (corbeille douce + mise à l'écart), jamais supprimés.
+            $bilan['contacts_doublons_par_telephone'] = MiseAEcart::contacts(
+                self::contactsAuNumero($tous, $workspaceId)
+                    ->whereNull('email')
+                    ->whereRaw(self::CLE_NOM . ' IN (' . self::marques($clesNom) . ')', $clesNom)
+                    ->pluck('id')->all(),
+                'demande_effacement',
+            );
         }
 
         // Un numéro PERSONNEL quitte tout : fiche d'organisation, autres fiches.

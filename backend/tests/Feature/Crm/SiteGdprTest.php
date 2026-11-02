@@ -238,7 +238,7 @@ test('L3c-0 : erase ne supprime RIEN — demande enregistrée, fiches SYNCHRO et
 
     // Les contacts sont masqués (corbeille douce) et le candidat est marqué.
     expect(DB::table('contacts')->whereNull('deleted_at')->count())->toBe(0)
-        ->and(DB::table('candidates')->whereRaw("attributes ? 'mis_a_l_ecart_le'")->count())->toBe(1);
+        ->and(DB::table('candidates')->whereRaw("attributes::text LIKE '%mis_a_l_ecart_le%'")->count())->toBe(1);
 
     // La demande est ENREGISTRÉE (en attente de Will) dans les deux univers.
     expect(DB::table('rgpd_requests')->where('type', 'erasure')->where('status', 'pending')->count())->toBe(2)
@@ -287,7 +287,7 @@ test('scope=vivier ne met à l\'écart QUE le vivier', function () {
     gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL, 'scope' => 'vivier'])->assertOk();
 
     expect(DB::table('candidates')->count())->toBe(1)
-        ->and(DB::table('candidates')->whereRaw("attributes ? 'mis_a_l_ecart_le'")->count())->toBe(1)
+        ->and(DB::table('candidates')->whereRaw("attributes::text LIKE '%mis_a_l_ecart_le%'")->count())->toBe(1)
         ->and(DB::table('contacts')->whereNull('deleted_at')->count())->toBe(2)
         ->and(DB::table('opt_out')->where('scope', 'vivier')->count())->toBe(1)
         ->and(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);

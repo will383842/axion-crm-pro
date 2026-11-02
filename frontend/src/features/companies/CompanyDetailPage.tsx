@@ -36,6 +36,11 @@ import { libelleActivite } from '@/lib/naf-divisions';
 import { libelleEffectif } from './effectif';
 import { LibelleEtCode } from './components/LibelleEtCode';
 import { libelleFermeture } from './fermees';
+import { useProduits } from '@/features/socle/produits/useProduits';
+import { SuiviCommercialCard, type AffaireFiche } from './components/SuiviCommercialCard';
+import { HistoriqueCard, type LigneHistorique } from './components/HistoriqueCard';
+import { LiensEntreprisesCard, type LienFiche } from './components/LiensEntreprisesCard';
+import { EnvoisRecusCard, type EnvoiFiche } from './components/EnvoisRecusCard';
 
 interface CompanyDetail {
   id: number;
@@ -78,6 +83,12 @@ interface CompanyDetail {
   opco?: CompanyOpco | null;
   // Lot C2 — ce que la console envoie (`metadata.console`), en lecture seule.
   metadata?: { console?: RecuConsole | null } | null;
+  // DM1-ENT — suivi commercial, groupe et envois venus d'Envoi.
+  responsable?: string | null;
+  affaire?: AffaireFiche | null;
+  historique?: LigneHistorique[];
+  liens?: LienFiche[];
+  envois?: EnvoiFiche[];
 }
 
 interface CompanyOpco {
@@ -95,6 +106,7 @@ export function CompanyDetailPage() {
   const qc = useQueryClient();
   const { companyId } = useParams({ strict: false }) as { companyId?: string };
   const [showRaw, setShowRaw] = useState(false);
+  const envoiActif = useProduits().envoi === 'actif';
 
   const { data: c, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['company', companyId],
@@ -325,6 +337,9 @@ export function CompanyDetailPage() {
 
           <EnrichmentTimeline steps={timeline} />
 
+          <LiensEntreprisesCard liens={c.liens ?? []} />
+          <HistoriqueCard lignes={c.historique ?? []} />
+
           {/* Raw data accordion */}
           <Card padding="md">
             <button
@@ -371,6 +386,8 @@ export function CompanyDetailPage() {
             saisieManuelleLe={c.relation_saisie_manuelle_at}
             joignabilite={c.joignabilite}
           />
+          <SuiviCommercialCard responsable={c.responsable} affaire={c.affaire} />
+          {envoiActif ? <EnvoisRecusCard companyId={c.id} envois={c.envois ?? []} /> : null}
           <ContactsCard contacts={c.contacts ?? []} />
           <EvenementsCard companyId={c.id} />
           <TachesCrmCard companyId={c.id} />

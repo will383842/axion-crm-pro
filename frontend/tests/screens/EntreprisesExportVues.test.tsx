@@ -18,6 +18,7 @@ import { api } from '@/demo/outils';
 import { renderScreen } from '../helpers/renderScreen';
 
 const requetesExport: string[] = [];
+const creerUrl = vi.fn((_blob: Blob | MediaSource) => 'blob:demo');
 const espion = http.get(api('/companies/export'), ({ request }) => {
   requetesExport.push(request.url);
   return new HttpResponse('SIREN,Dénomination\n', { headers: { 'Content-Type': 'text/csv' } });
@@ -29,9 +30,14 @@ const voisins = [
 ];
 
 beforeEach(() => {
+  // jsdom ne mesure rien : sans hauteur, la liste virtualisée n'affiche aucune ligne.
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600);
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1000);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 1000, height: 600, top: 0, left: 0, right: 1000, bottom: 600, x: 0, y: 0, toJSON: () => ({}) });
   demoDb.reinitialiser();
   requetesExport.length = 0;
-  URL.createObjectURL = vi.fn(() => 'blob:demo');
+  creerUrl.mockClear();
+  URL.createObjectURL = creerUrl;
   URL.revokeObjectURL = vi.fn();
 });
 afterEach(() => vi.restoreAllMocks());
@@ -49,7 +55,7 @@ describe('Entreprises : exporter la sélection', () => {
     const user = userEvent.setup();
     await listeAffichee();
     await screen.findByText('Boulangerie des Tilleuls');
-    const cases = screen.getAllByRole('checkbox', { name: /Sélectionner la fiche/ });
+    const cases = screen.getAllByRole('checkbox', { name: /^Sélectionner (?!toutes)/ });
     await user.click(cases[0]!);
     await user.click(cases[1]!);
     await user.click(cases[2]!);
@@ -60,7 +66,7 @@ describe('Entreprises : exporter la sélection', () => {
     await waitFor(() => expect(requetesExport).toHaveLength(1));
     const ids = new URL(requetesExport[0]!).searchParams.get('ids');
     expect(ids?.split(',')).toHaveLength(3);
-    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(creerUrl).toHaveBeenCalledTimes(1));
   });
 
   it('sans sélection, le bouton n’existe pas', async () => {
@@ -78,8 +84,7 @@ describe('Entreprises : vues sauvegardées', () => {
       url: '/companies?department_code=69',
       handlers: [...handlers, ...voisins],
     });
-    await screen.findByText('Boulangerie des Tilleuls');
-    await user.click(screen.getByRole('button', { name: 'Enregistrer cette vue' }));
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer cette vue' }));
     await user.type(screen.getByRole('textbox', { name: 'Nom de la vue' }), 'Rhône, à relancer');
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
@@ -138,7 +143,7 @@ describe('Fiche entreprise : ce qui vient d’Envoi', () => {
     expect(await screen.findByRole('heading', { name: 'Liens entre entreprises' })).toBeInTheDocument();
     expect(screen.getByText('Groupe Tilleuls Holding')).toBeInTheDocument();
     expect(screen.getByText('Société mère')).toBeInTheDocument();
-    expect(screen.getByText(/Responsable/)).toBeInTheDocument();
+    expect(screen.getByText('Responsable', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Historique' })).toBeInTheDocument();
   });
 

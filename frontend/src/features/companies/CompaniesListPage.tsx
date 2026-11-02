@@ -49,6 +49,8 @@ import {
 import { Pagination } from "./components/Pagination";
 import { FERMEES_INCLURE, FERMEES_SEULES } from "./fermees";
 import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
+import { ExporterLaSelection } from "./export/ExporterLaSelection";
+import { VuesSauvegardees } from "./vues/VuesSauvegardees";
 
 type Company = CompanyRowData & {
   discovery_source?: string | null;
@@ -551,6 +553,15 @@ export function CompaniesListPage() {
                 </Button>
               </>
             ) : null}
+            {/* DM1-ENT — vues sauvegardées (SavedViewsController). */}
+            <VuesSauvegardees
+              filtre={filter}
+              onAppliquer={(f) => {
+                setFilter(f);
+                setFiltreImpose(f);
+                setPage(1);
+              }}
+            />
           </div>
         </div>
 
@@ -741,6 +752,8 @@ export function CompaniesListPage() {
               </Button>
               {/* 2026-09-30 — les fiches cochées vont dans une liste manuelle. */}
               <AjouterAUneListe companyIds={[...selection]} onAjoute={() => setSelection(new Set())} />
+              {/* DM1-ENT — un CSV des seules fiches cochées. */}
+              <ExporterLaSelection ids={[...selection]} />
               <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
                 Annuler la sélection
               </Button>

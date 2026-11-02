@@ -301,7 +301,7 @@ export function AudienceDetailPage() {
         <CriteriaTab audience={audience} />
       ) : null}
       {tab === 'campaign' ? (
-        <PreparationCampagneTab audience={audience} />
+        audience.gestes_ciblage === true ? <PreparationCampagneTab audience={audience} /> : <CampaignPlaceholderTab />
       ) : null}
     </div>
   );
@@ -494,7 +494,29 @@ function CriteriaTab({ audience }: { audience: EmailAudience }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab — Préparation campagne (DM1-CIB)
+// Tab — Campagne : bouche-trou d'avant, gardé tel quel pour un serveur qui
+// n'annonce pas la préparation de campagne (production sans Envoi).
+// ---------------------------------------------------------------------------
+function CampaignPlaceholderTab() {
+  return (
+    <Card padding="lg" variant="glass" className="border border-amber-200/60 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20">
+      <div className="flex flex-col items-start gap-3">
+        <div className="flex items-center gap-2">
+          <Send className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Bientôt : l’envoi d’e-mails</h3>
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          L’envoi d’e-mails à cette audience arrivera plus tard, avec le suivi des ouvertures
+          et les relances automatiques.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab — Préparation campagne (DM1-CIB), seulement si le serveur l'annonce
+// (`gestes_ciblage` sur l'audience).
 // ---------------------------------------------------------------------------
 /**
  * Ce que l'audience donnerait à une campagne : combien d'adresses distinctes
@@ -528,7 +550,7 @@ function PreparationCampagneTab({ audience }: { audience: EmailAudience }) {
       <div className="space-y-4">
         <Card padding="md">
           <h3 className="mb-3 text-lg font-bold text-slate-900">Taille joignable</h3>
-          <p className="text-3xl font-bold tabular-nums text-slate-900" aria-label="Adresses joignables">
+          <p className="text-2xl font-bold tabular-nums text-slate-900" aria-label="Adresses joignables">
             {d.destinataires.toLocaleString('fr-FR')}
           </p>
           <p className="mt-1 text-sm text-slate-600">

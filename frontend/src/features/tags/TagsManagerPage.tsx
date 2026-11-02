@@ -120,18 +120,25 @@ export function TagsManagerPage() {
     // Lot 3 — la réponse entière : `meta.comptes_calcules_le` date les
     // comptes par étiquette (servis depuis un cache serveur).
     queryFn: async () =>
-      (await api.get<{ data: Tag[]; meta?: { comptes_calcules_le?: string | null } }>('/tags')).data,
+      (await api.get<{ data: Tag[]; meta?: { comptes_calcules_le?: string | null; gestes_ciblage?: boolean } }>('/tags')).data,
   });
 
   const tags = useMemo<Tag[]>(() => data?.data ?? [], [data]);
   const comptesMisAJour = misAJour(data?.meta?.comptes_calcules_le ?? null);
+  // DM1-CIB — l'étiquette choisie, son export et ses liens de campagne ne
+  // paraissent que si le serveur les annonce (`meta.gestes_ciblage`). Le vrai
+  // serveur ne l'envoie pas : en production, la page reste celle d'avant.
+  const gestes = data?.meta?.gestes_ciblage === true;
+  // La campagne exige en plus Envoi dans l'offre.
+  const campagne = gestes && envoiVisible;
 
   // L'étiquette choisie : celle qu'on a cliquée, sinon la première étiquette
   // créée à la main (le salon de la démo en tête).
   const choisie = useMemo<Tag | null>(() => {
+    if (!gestes) return null;
     const manuelles = tags.filter((t) => t.kind === 'manual');
     return manuelles.find((t) => t.slug === choisieSlug) ?? manuelles.find((t) => t.slug === 'salon-artisans-2026') ?? manuelles[0] ?? null;
-  }, [tags, choisieSlug]);
+  }, [tags, choisieSlug, gestes]);
 
   const exporter = useMutation({
     // La route réelle de l'export des entreprises, filtrée par étiquette.
@@ -215,7 +222,7 @@ export function TagsManagerPage() {
         title="Étiquettes"
         subtitle="Pour classer les entreprises : zone, secteur, taille, intérêt, et les vôtres."
         actions={
-          <Button variant={envoiVisible ? 'secondary' : 'primary'} size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
+          <Button variant={campagne ? 'secondary' : 'primary'} size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={openCreateModal}>
             Nouvelle étiquette
           </Button>
         }
@@ -321,7 +328,8 @@ export function TagsManagerPage() {
                       deleting={deleteMutation.isPending}
                       choisie={choisie?.slug === t.slug}
                       onChoose={() => setChoisieSlug(t.slug)}
-                      avecCampagne={envoiVisible}
+                      avecChoix={gestes}
+                      avecCampagne={campagne}
                     />
                   ))}
                 </div>
@@ -427,6 +435,7 @@ function TagPill({
   deleting,
   choisie,
   onChoose,
+  avecChoix,
   avecCampagne,
 }: {
   tag: Tag;
@@ -434,13 +443,15 @@ function TagPill({
   deleting: boolean;
   choisie: boolean;
   onChoose: () => void;
+  /** Le nom devient un bouton « choisir » seulement si le serveur annonce les gestes du ciblage. */
+  avecChoix: boolean;
   avecCampagne: boolean;
 }) {
   const canEdit = tag.kind === 'manual';
   return (
     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${pillClass(tag.color)}`}>
-      {canEdit ? (
-        <button type="button" onClick={onChoose} aria-pressed={choisie} className="font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
+      {canEdit && avecChoix ? (
+        <button type="button" onClick={onChoose} aria-pressed={choisie} className="font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 max-sm:min-h-11">
           {tag.name}
         </button>
       ) : (
@@ -453,9 +464,9 @@ function TagPill({
           search={{ etiquette: tag.slug } as never}
           aria-label={`Campagne vers ${tag.slug}`}
           title="Campagne vers cette étiquette"
-          className="opacity-60 transition hover:opacity-100"
+          className="-my-1 inline-flex items-center justify-center rounded-full opacity-60 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 max-sm:h-11 max-sm:w-11"
         >
-          <Megaphone className="h-3 w-3" aria-hidden="true" />
+          <Megaphone className="h-4 w-4" aria-hidden="true" />
         </Link>
       ) : null}
       {canEdit ? (

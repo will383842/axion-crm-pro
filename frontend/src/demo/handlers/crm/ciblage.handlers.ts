@@ -135,8 +135,14 @@ function versAudience(a: (typeof demoDb.audiences extends { tous(): readonly (in
       personnes_listees: false,
       avec_adresses_partagees: false,
     },
+    // La démo ANNONCE les gestes du ciblage (préparation de campagne) ; le vrai
+    // serveur ne le fait pas encore, et l'écran reste alors celui d'avant.
+    gestes_ciblage: true,
   };
 }
+
+/** Annonce des gestes du ciblage (export, étiquette choisie, éditeur), servie par la démo seulement. */
+const ANNONCE = { gestes_ciblage: true } as const;
 
 function apercuDestinataires(criteres: AudienceCriteria, mode: string) {
   const orgs = correspondances(criteres);
@@ -380,7 +386,7 @@ const handlersListes: HttpHandler[] = [
           : false;
         return versListe(l, contient);
       });
-    return HttpResponse.json({ data: lignes });
+    return HttpResponse.json({ data: lignes, meta: { ...ANNONCE } });
   }),
 
   http.post(api('/listes-manuelles'), async ({ request }) => {
@@ -438,7 +444,7 @@ const handlersListes: HttpHandler[] = [
     if (force) return force;
     const lignes = zMembres().filtrer((m) => m.liste_id === Number(params['id']) && m.retire_le === null).map(versMembre);
     const page = paginer(lignes, request, 25);
-    return HttpResponse.json({ data: page.data, meta: { ...page.meta } });
+    return HttpResponse.json({ data: page.data, meta: { ...page.meta, ...ANNONCE } });
   }),
 
   http.post(api('/listes-manuelles/:id/membres'), async ({ params, request }) => {
@@ -568,7 +574,7 @@ const handlersEtiquettes: HttpHandler[] = [
     await delai();
     const force = await repondreEtatForce(request, { data: [], meta: { comptes_calcules_le: null } });
     if (force) return force;
-    return HttpResponse.json({ data: etiquettesServies(), meta: { comptes_calcules_le: maintenantIso() } });
+    return HttpResponse.json({ data: etiquettesServies(), meta: { comptes_calcules_le: maintenantIso(), ...ANNONCE } });
   }),
 
   http.post(api('/tags'), async ({ request }) => {

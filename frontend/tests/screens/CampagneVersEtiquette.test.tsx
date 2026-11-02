@@ -45,3 +45,27 @@ describe('Campagne vers cette étiquette', () => {
     expect(c?.produit).toBe('envoi');
   });
 });
+
+describe('production : un serveur qui n’annonce pas les gestes du ciblage (DM1-CIB)', () => {
+  const ETIQUETTES_SANS_ANNONCE = {
+    data: [
+      { id: 1, name: 'ZZ salon', slug: 'zz-salon', color: 'violet', category: 'custom', kind: 'manual', description: null, companies_count: 4 },
+    ],
+    meta: { comptes_calcules_le: null },
+  };
+
+  it('même avec Envoi, la page reste celle d’avant : ni étiquette choisie, ni export, ni lien de campagne', async () => {
+    await renderScreen(<TagsManagerPage />, {
+      path: '/tags',
+      handlers: [getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), getJson('/tags', ETIQUETTES_SANS_ANNONCE)],
+    });
+    await screen.findByText('ZZ salon');
+    expect(screen.queryByLabelText('Étiquette choisie')).toBeNull();
+    expect(screen.queryByText('Choisie')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Exporter/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Campagne vers/ })).toBeNull();
+    // Le nom n'est pas devenu un bouton ; « Nouvelle étiquette » reste le bouton plein.
+    expect(screen.queryByRole('button', { name: 'ZZ salon' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Nouvelle étiquette' }).className).toContain('bg-produit');
+  });
+});

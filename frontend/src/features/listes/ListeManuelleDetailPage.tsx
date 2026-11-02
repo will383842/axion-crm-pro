@@ -50,12 +50,16 @@ export function ListeManuelleDetailPage() {
     queryKey: ['liste-manuelle', id, 'membres', page],
     queryFn: async () =>
       (
-        await api.get<{ data: MembreListe[]; meta: { total: number } }>(`/listes-manuelles/${id}/membres`, {
+        await api.get<{ data: MembreListe[]; meta: { total: number; gestes_ciblage?: boolean } }>(`/listes-manuelles/${id}/membres`, {
           params: { page, per_page: PAR_PAGE },
         })
       ).data,
     enabled: lisible,
   });
+
+  // DM1-CIB — l'export (liste, sélection) ne paraît que si le serveur l'annonce
+  // (`meta.gestes_ciblage`) ; le vrai serveur ne l'envoie pas : page d'avant.
+  const exportVisible = membres.data?.meta.gestes_ciblage === true;
 
   const rafraichir = () => {
     void qc.invalidateQueries({ queryKey: ['liste-manuelle', id] });
@@ -162,15 +166,17 @@ export function ListeManuelleDetailPage() {
             >
               Renommer
             </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              iconLeft={<Download className="h-4 w-4" />}
-              loading={exportListe.isPending}
-              onClick={() => exportListe.mutate()}
-            >
-              Exporter la liste
-            </Button>
+            {exportVisible ? (
+              <Button
+                variant="secondary"
+                size="md"
+                iconLeft={<Download className="h-4 w-4" />}
+                loading={exportListe.isPending}
+                onClick={() => exportListe.mutate()}
+              >
+                Exporter la liste
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               size="md"
@@ -238,16 +244,18 @@ export function ListeManuelleDetailPage() {
             >
               Retirer de la liste
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                exporterMembres(`liste-${id}-selection.csv`, lignes.filter((m) => cochees.has(m.id)));
-                toast.success(`${cochees.size} fiche(s) exportée(s).`);
-              }}
-            >
-              Exporter la sélection
-            </Button>
+            {exportVisible ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  exporterMembres(`liste-${id}-selection.csv`, lignes.filter((m) => cochees.has(m.id)));
+                  toast.success(`${cochees.size} fiche(s) exportée(s).`);
+                }}
+              >
+                Exporter la sélection
+              </Button>
+            ) : null}
             <Button size="sm" variant="ghost" onClick={() => setCochees(new Set())}>
               Annuler la sélection
             </Button>

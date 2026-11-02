@@ -80,6 +80,16 @@ export async function chargerListes(params: { corbeille?: boolean; company_id?: 
   return data.data ?? [];
 }
 
+/**
+ * DM1-CIB — les listes ET l'annonce des gestes du ciblage (`meta.gestes_ciblage`).
+ * Le vrai serveur ne l'envoie pas encore : `gestes` vaut alors `false` et les
+ * écrans restent ceux d'avant (aucun élément nouveau en production).
+ */
+export async function chargerListesEtAnnonce(): Promise<{ listes: ListeManuelle[]; gestes: boolean }> {
+  const { data } = await api.get<{ data?: ListeManuelle[]; meta?: { gestes_ciblage?: boolean } }>('/listes-manuelles');
+  return { listes: data.data ?? [], gestes: data.meta?.gestes_ciblage === true };
+}
+
 export async function creerListe(nom: string, description?: string): Promise<ListeManuelle> {
   const { data } = await api.post<{ data: ListeManuelle }>('/listes-manuelles', {
     nom,

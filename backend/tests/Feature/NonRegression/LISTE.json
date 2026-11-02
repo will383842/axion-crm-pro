@@ -104,7 +104,7 @@
           "NR-06 l’export d’une personne factice contient AU MOINS les clés de la photo",
           "NR-06 l’export retrouve la personne, ses contacts et sa timeline (témoin de fond)",
           "NR-06 l’export d’une personne dans les DEUX espaces la retrouve dans les deux",
-          "NR-06 l’effacement efface partout, laisse une opposition, et l’export suivant est vide de contacts"
+          "NR-06 (L3c-0) l’effacement masque partout sans rien supprimer, laisse une opposition, et l’export suivant garde les contacts masqués"
         ]
       },
       "existants": [
@@ -172,7 +172,6 @@
         "Nr10PurgesTest.php": [
           "NR-10 (L3c-0) purge-non-commercial refuse sans condition : aucune fiche supprimée, console ou ordinaire",
           "NR-10 (L3c-0) purge-non-diffusible refuse sans condition : aucune fiche [ND] supprimée",
-          "NR-10 les purges d’entreprises refusent sans --force quand la proportion dépasse le plafond",
           "NR-10 retention:purge --all-workspaces ne supprime aucune fiche ni personne, console ou non",
           "NR-10 (L3c-0) rgpd:purge-business-prospects refuse sans condition, drapeau éteint ou ouvert"
         ]

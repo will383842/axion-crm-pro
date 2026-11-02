@@ -37,7 +37,6 @@ import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
 
 /** Les routes `/envoi/…` du faux serveur de la démo. */
 const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
-import { handlers as handlersReponses } from '@/demo/handlers/envoi/reponses.handlers';
 
 let arbre: AnyRoute;
 
@@ -91,9 +90,9 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/messages/m-1', 'DM2-ASS'],
   ['/envoi/campagnes/resultats', 'DM2-PIL'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
-  ['/envoi/reponses', 'DM2-REP'],
-  ['/envoi/reponses/a-rattacher', 'DM2-REP'],
-  ['/envoi/reponses/traitees', 'DM2-REP'],
+  ['/envoi/reponses', 'DM2-REP', 'Réponses'],
+  ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
+  ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
   ['/envoi/boites', 'DM2-INF', 'Boîtes d’envoi'],
   ['/envoi/boites/boi-will', 'DM2-INF', 'will@prospection-b.example'],
   ['/envoi/domaines', 'DM2-INF', 'Domaines'],
@@ -112,35 +111,6 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/reglages/regles', 'DM2-CNF'],
   ['/envoi/reglages/connexion-crm', 'DM2-CNF'],
 ];
-
-/**
- * Filet modifié : pourquoi. DM2-REP (#394) a remplacé la page « en attente » des
- * trois routes des réponses par les vraies pages. Ces routes RESTENT dans
- * `ROUTES_ENVOI` : sans Envoi, elles doivent toujours répondre « Page
- * introuvable » (garde inchangée). Le test « en attente » ne porte plus que sur
- * les routes encore à livrer ; les routes livrées ont leur propre test, plus
- * strict : la VRAIE page (son titre), ni page en attente ni « introuvable ».
- * Chaque lot qui livre ses pages ajoute ici ses routes, avec le titre attendu
- * et les handlers de démo de sa zone.
- */
-const PAGES_LIVREES: ReadonlyArray<readonly [string, string, string]> = [
-  ['/envoi/reponses', 'DM2-REP', 'Réponses'],
-  ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
-  ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
-];
-const HANDLERS_DES_PAGES_LIVREES = [...handlersReponses];
-
-const URLS_LIVREES = new Set(PAGES_LIVREES.map(([url]) => url));
-const ROUTES_EN_ATTENTE = ROUTES_ENVOI.filter(([url]) => !URLS_LIVREES.has(url));
-
-describe('Liste des routes livrées — cohérente avec la liste complète', () => {
-  it('chaque route livrée figure dans ROUTES_ENVOI, au nom du même lot', () => {
-    for (const [url, lot] of PAGES_LIVREES) {
-      expect(ROUTES_ENVOI).toContainEqual([url, lot]);
-    }
-    expect(ROUTES_EN_ATTENTE.length + PAGES_LIVREES.length).toBe(ROUTES_ENVOI.length);
-  });
-});
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {
   it.each([['/envoi'], ...ROUTES_ENVOI.map(([url]) => [url])])('%s → « Page introuvable »', async (url) => {
@@ -213,14 +183,6 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
     const page = await screen.findByTestId('page-en-attente');
     expect(page).toHaveAttribute('data-lot', lot);
     expect(page.textContent).toContain(lot);
-    expect(screen.queryByText(/page introuvable/i)).toBeNull();
-  });
-
-  it.each(PAGES_LIVREES)('%s → vraie page du lot %s (« %s »), plus de page en attente', async (url, _lot, titre) => {
-    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi(), ...HANDLERS_DES_PAGES_LIVREES);
-    await monter(url);
-    expect(await screen.findByRole('heading', { level: 1, name: titre })).toBeInTheDocument();
-    expect(screen.queryByTestId('page-en-attente')).toBeNull();
     expect(screen.queryByText(/page introuvable/i)).toBeNull();
   });
 

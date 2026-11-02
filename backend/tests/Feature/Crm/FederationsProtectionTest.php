@@ -114,7 +114,7 @@ test('purge-non-commercial --force epargne la federation et supprime le temoin',
     Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
     expect(DB::table('companies')->where('id', $protegee)->exists())->toBeTrue()
-        ->and(DB::table('companies')->where('id', $temoin)->exists())->toBeFalse();
+        ->and(DB::table('companies')->where('id', $temoin)->exists())->toBeTrue(); // L3c-0 : plus aucune suppression
 });
 
 test('find-websites ne ramasse pas la federation, mais traite le temoin', function () {
@@ -178,5 +178,5 @@ test('la purge RGPD de 3 ans epargne les contacts des fiches protegees (federati
 
     expect(DB::table('contacts')->where('id', $cFederation)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $cOrganisateur)->exists())->toBeTrue()
-        ->and(DB::table('contacts')->where('id', $cTemoin)->exists())->toBeFalse();
+        ->and(DB::table('contacts')->where('id', $cTemoin)->exists())->toBeTrue(); // L3c-0 : plus aucune suppression
 });

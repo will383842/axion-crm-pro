@@ -35,9 +35,6 @@
     "retention:prune-scraper-runs": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "retention:purge": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "rgpd:anonymize-ips": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
-    "rgpd:purge-business-prospects": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
-    "rgpd:purge-personnes": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
-    "rgpd:purge-vivier": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "rgpd:verifications-en-attente": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "signals:nightly-scan": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)"
 }

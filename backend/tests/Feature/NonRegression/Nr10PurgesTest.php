@@ -60,42 +60,29 @@ function nr10Existe(int $id): bool
     return DB::table('companies')->where('id', $id)->exists();
 }
 
-test('NR-10 purge-non-commercial ne supprime jamais une fiche console, et supprime la fiche ordinaire (témoin)', function () {
+test('NR-10 (L3c-0) purge-non-commercial refuse sans condition : aucune fiche supprimée, console ou ordinaire', function () {
     $console = nr10Fiche($this, 'Client console', true);
     $ordinaire = nr10Fiche($this, 'Association ordinaire', false);
     for ($i = 0; $i < 8; $i++) {
         nr10Fiche($this, 'Societe ' . $i, false, ['legal_form' => '5710']);
     }
 
-    Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
+    $code = Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
-    expect(nr10Existe($console))->toBeTrue()
-        ->and(nr10Existe($ordinaire))->toBeFalse();
+    expect($code)->toBe(1)
+        ->and(nr10Existe($console))->toBeTrue()
+        ->and(nr10Existe($ordinaire))->toBeTrue();
 });
 
-test('NR-10 purge-non-diffusible ne supprime jamais une fiche console, et supprime la fiche [ND] ordinaire (témoin)', function () {
+test('NR-10 (L3c-0) purge-non-diffusible refuse sans condition : aucune fiche [ND] supprimée', function () {
     $console = nr10Fiche($this, '[ND]', true, ['legal_form' => '5710']);
     $ordinaire = nr10Fiche($this, '[ND]', false, ['legal_form' => '5710']);
-    for ($i = 0; $i < 8; $i++) {
-        nr10Fiche($this, 'Societe ' . $i, false, ['legal_form' => '5710']);
-    }
 
-    Artisan::call('prospection:purge-non-diffusible', ['--force' => true]);
+    $code = Artisan::call('prospection:purge-non-diffusible', ['--force' => true]);
 
-    expect(nr10Existe($console))->toBeTrue()
-        ->and(nr10Existe($ordinaire))->toBeFalse();
-});
-
-test('NR-10 les purges d’entreprises refusent sans --force quand la proportion dépasse le plafond', function () {
-    foreach (range(1, 9) as $i) {
-        nr10Fiche($this, 'Sans forme ' . $i, false);
-    }
-    nr10Fiche($this, 'Societe', false, ['legal_form' => '5710']);
-
-    Artisan::call('prospection:purge-non-commercial');
-
-    expect(DB::table('companies')->count())->toBe(10)
-        ->and(Artisan::output())->toContain('REFUS');
+    expect($code)->toBe(1)
+        ->and(nr10Existe($console))->toBeTrue()
+        ->and(nr10Existe($ordinaire))->toBeTrue();
 });
 
 test('NR-10 retention:purge --all-workspaces ne supprime aucune fiche ni personne, console ou non', function () {
@@ -112,42 +99,18 @@ test('NR-10 retention:purge --all-workspaces ne supprime aucune fiche ni personn
         ->and(DB::table('contacts')->where('email', 'client@nr10.example.test')->exists())->toBeTrue();
 });
 
-test('NR-10 drapeau éteint : la purge des personnes froides refuse et ne supprime rien', function () {
-    config(['crm.purges_enabled' => false]);
+test('NR-10 (L3c-0) rgpd:purge-business-prospects refuse sans condition, drapeau éteint ou ouvert', function () {
     $console = nr10Fiche($this, 'Client console', true);
     DB::table('contacts')->insert([
         'workspace_id' => $this->espaces['a'], 'company_id' => $console, 'last_name' => 'Ancien',
         'email' => 'ancien@nr10.example.test', 'created_at' => now()->subYears(5), 'updated_at' => now()->subYears(5),
     ]);
 
-    $code = Artisan::call('rgpd:purge-business-prospects', ['--force' => true]);
+    foreach ([false, true] as $ouvert) {
+        config(['crm.purges_enabled' => $ouvert]);
+        $code = Artisan::call('rgpd:purge-business-prospects', ['--force' => true]);
 
-    expect($code)->toBe(1)
-        ->and(Artisan::output())->toContain('CRM_PURGE_ENABLED')
-        ->and(DB::table('contacts')->where('email', 'ancien@nr10.example.test')->exists())->toBeTrue();
-});
-
-test('NR-10 drapeau ouvert : une personne froide d’une fiche console n’est PAS purgée, une personne froide ordinaire l’est (témoin)', function () {
-    config(['crm.purges_enabled' => true]);
-    $console = nr10Fiche($this, 'Client console', true);
-    $ordinaire = nr10Fiche($this, 'Prospect ordinaire', false);
-    foreach ([[$console, 'client-froid'], [$ordinaire, 'prospect-froid']] as [$societe, $nom]) {
-        DB::table('contacts')->insert([
-            'workspace_id' => $this->espaces['a'], 'company_id' => $societe, 'last_name' => $nom,
-            'email' => $nom . '@nr10.example.test', 'legal_basis' => 'legitimate_interest_b2b',
-            'created_at' => now()->subYears(5), 'updated_at' => now()->subYears(5),
-        ]);
+        expect($code)->toBe(1)
+            ->and(DB::table('contacts')->where('email', 'ancien@nr10.example.test')->exists())->toBeTrue();
     }
-    // Des contacts récents pour que la proportion purgée reste sous le plafond.
-    foreach (range(1, 9) as $i) {
-        DB::table('contacts')->insert([
-            'workspace_id' => $this->espaces['a'], 'company_id' => $ordinaire, 'last_name' => 'recent' . $i,
-            'email' => "recent{$i}@nr10.example.test", 'created_at' => now(), 'updated_at' => now(),
-        ]);
-    }
-
-    Artisan::call('rgpd:purge-business-prospects', ['--force' => true]);
-
-    expect(DB::table('contacts')->where('email', 'client-froid@nr10.example.test')->exists())->toBeTrue()
-        ->and(DB::table('contacts')->where('email', 'prospect-froid@nr10.example.test')->exists())->toBeFalse();
 });

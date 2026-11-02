@@ -42,7 +42,7 @@ function personne(overrides: Partial<PersonneRow> = {}): PersonneRow {
     contact_id: null,
     company_id: null,
     entreprise: null,
-    purge_prevue_le: '2029-09-24',
+    purge_prevue_le: null,
     ...overrides,
   };
 }

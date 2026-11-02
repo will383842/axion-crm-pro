@@ -134,7 +134,8 @@ function effacementRlsReste(array $s): array
     $owner = effacementRlsProprio();
 
     return [
-        'contacts' => $owner->table('contacts')->where('workspace_id', $s['business'])->count(),
+        // Contacts VISIBLES : un contact masqué (L3c-0) garde sa ligne mais plus sa visibilité.
+        'contacts' => $owner->table('contacts')->where('workspace_id', $s['business'])->whereNull('deleted_at')->count(),
         'candidates' => $owner->table('candidates')->where('person_key', $s['key'])->count(),
         'activities' => $owner->table('activities')->where('person_key', $s['key'])->count(),
         'journaux' => $owner->table('rgpd_requests')->where('subject_email', $s['email'])->count(),
@@ -176,7 +177,7 @@ test('TÉMOIN — la connexion de ce test est bien le rôle soumis à la RLS', f
         ->and($role->rolbypassrls)->toBeFalse();
 });
 
-test('🔴 sous axion_app, l\'effacement aboutit : fiches, timeline, journal ET opposition, dans les deux univers', function () {
+test('🔴 L3c-0 — sous axion_app, la demande d\'effacement met à l\'écart sans RIEN supprimer : journal ET opposition, dans les deux univers', function () {
     // La preuve d'audit, jamais atteinte en production jusqu'ici.
     $this->mock(AuditHashChain::class)->shouldReceive('record')->once()->andReturn(1);
     $s = effacementRlsSemer();
@@ -189,20 +190,23 @@ test('🔴 sous axion_app, l\'effacement aboutit : fiches, timeline, journal ET 
         $resultat = effacementRlsEffacer($s);
 
         expect(effacementRlsReste($s))->toBe([
-            'contacts' => 0,
-            'candidates' => 0,
-            'activities' => 0,
+            'contacts' => 0,   // masqué (deleted_at), ligne gardée
+            'candidates' => 1, // gardé, marqué
+            'activities' => 2, // gardées
             // Un journal par univers : c'est l'insertion qui levait en production.
             'journaux' => 2,
             // L'anti-réinsertion, jamais atteinte en production jusqu'ici.
             'oppositions' => 2,
         ])->and($resultat['opt_out_scopes'])->toBe(['business', 'vivier']);
+
+        // Aucune ligne supprimée : le contact est là, simplement masqué.
+        expect(effacementRlsProprio()->table('contacts')->where('workspace_id', $s['business'])->count())->toBe(1);
     } finally {
         effacementRlsNettoyer($s);
     }
 });
 
-test('🔴 si le journal échoue, RIEN n\'est effacé — plus jamais d\'effacement partiel', function () {
+test('🔴 si le journal échoue, RIEN n\'est mis à l\'écart — plus jamais de mise à l\'écart partielle', function () {
     $this->mock(AuditHashChain::class)->shouldNotReceive('record');
     $s = effacementRlsSemer();
     // Le journal lève (contrainte violée à la volée) : la suppression de
@@ -275,7 +279,7 @@ function effacementRlsNettoyerLettre(array $s): void
     effacementRlsNettoyer($s);
 }
 
-test('🔴 L4-C — sous axion_app, une personne de la lettre est effacée (personnes + abonnements) ET le journal est écrit', function () {
+test('🔴 L3c-0 — sous axion_app, une personne de la lettre est mise à l\'écart (jamais supprimée) ET le journal est écrit', function () {
     $this->mock(AuditHashChain::class)->shouldReceive('record')->once()->andReturn(1);
     $s = effacementRlsSemer();
     effacementRlsSemerLettre($s);
@@ -288,19 +292,24 @@ test('🔴 L4-C — sous axion_app, une personne de la lettre est effacée (pers
 
         $resultat = effacementRlsEffacer($s);
 
-        // Discriminant POSITIF : le service a bien compté ses suppressions —
-        // pas un « 0 restant » obtenu parce que rien n'a tourné.
-        expect($resultat['deleted']['business']['personnes'] ?? null)->toBe(1)
-            ->and($resultat['deleted']['business']['abonnements'] ?? null)->toBe(1)
+        // Discriminant POSITIF : le service a bien compté ses mises à l'écart.
+        expect($resultat['mis_a_l_ecart']['business']['personnes'] ?? null)->toBe(1)
+            ->and($resultat['mis_a_l_ecart']['business']['abonnements'] ?? null)->toBe(1)
+            ->and($resultat['deleted'])->toBe([])
             ->and(effacementRlsResteLettre($s))->toBe([
-                'personnes' => 0, 'abonnements' => 0, 'journal_business' => 1,
+                'personnes' => 1, 'abonnements' => 1, 'journal_business' => 1,
             ]);
+
+        $p = effacementRlsProprio()->table('personnes')->where('workspace_id', $s['business'])->first();
+        expect($p->opposition_at)->not->toBeNull()
+            ->and($p->opposition_motif)->toBe('demande_effacement')
+            ->and(effacementRlsProprio()->table('abonnements')->where('workspace_id', $s['business'])->value('statut'))->toBe('desabonne');
     } finally {
         effacementRlsNettoyerLettre($s);
     }
 });
 
-test('🔴 L4-C — si le journal échoue, la personne de la lettre et son abonnement RESTENT (même transaction)', function () {
+test('🔴 L4-C — si le journal échoue, la personne de la lettre RESTE sans mise à l\'écart (même transaction)', function () {
     $this->mock(AuditHashChain::class)->shouldNotReceive('record');
     $s = effacementRlsSemer();
     effacementRlsSemerLettre($s);
@@ -313,7 +322,8 @@ test('🔴 L4-C — si le journal échoue, la personne de la lettre et son abonn
 
         expect(effacementRlsResteLettre($s))->toBe([
             'personnes' => 1, 'abonnements' => 1, 'journal_business' => 0,
-        ]);
+        ])->and(effacementRlsProprio()->table('personnes')->where('workspace_id', $s['business'])->value('opposition_at'))->toBeNull()
+            ->and(effacementRlsProprio()->table('abonnements')->where('workspace_id', $s['business'])->value('statut'))->toBe('abonne');
     } finally {
         effacementRlsProprio()->statement('ALTER TABLE rgpd_requests DROP CONSTRAINT IF EXISTS zz_rls_journal_refuse_lettre');
         effacementRlsNettoyerLettre($s);

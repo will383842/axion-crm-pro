@@ -347,64 +347,11 @@ Schedule::command('media:enrich --limit=5000')->everyThreeHours()->withoutOverla
 // Purge des emails médias parasites/sur-partagés (plateformes/parking) — quotidien.
 Schedule::command('media:clean-emails --threshold=10')->dailyAt('05:05')->withoutOverlapping(60)->onOneServer();
 
-// Lot L4 (2026-08-14) — purges RGPD par univers (plan §2.8.3). Construites
-// INERTES : le skip() saute le run tant que CRM_PURGE_ENABLED n'est pas à
-// true (et la commande elle-même refuse, double verrou). Mensuel vivier
-// (CNIL CVthèque 2 ans + refusés J+90), mensuel business (prospection 3 ans).
-//
-// 🔴 B17-009 (S0), mesuré le 2026-08-20 — « LES DEUX SEULES PURGES RGPD
-// CORRECTEMENT CONSTRUITES NE S'EXÉCUTENT JAMAIS ».
-//
-// `CRM_PURGE_ENABLED` vaut `false` aux deux seuls endroits où il est écrit
-// (`config/crm.php:143` par défaut, `.env.example:258`) et n'est écrit NULLE
-// PART ailleurs : ni `docker-compose.prod.yml`, ni `infra/`, ni `.github/`.
-// Recherche jouée sur tout le dépôt : 2 occurrences, toutes deux à `false`.
-// Ces deux purges sont donc sautées à CHAQUE passage mensuel depuis leur
-// écriture, et l'échéance CNIL (CVthèque 2 ans, prospection 3 ans) n'est tenue
-// par AUCUN automatisme.
-//
-// CE QUI EST RÉPARÉ ICI, ET CE QUI NE L'EST PAS.
-// Ouvrir le drapeau déclencherait en production la suppression mensuelle de
-// fiches candidats : c'est une décision d'exploitant, pas un correctif d'audit.
-// Ce qui EST un défaut réparable, en revanche, c'est que le saut était
-// **silencieux** : `->skip()` de Laravel n'écrit rien nulle part. Une échéance
-// légale suspendue sans trace est indistinguable d'une échéance tenue — c'est
-// exactement pour cela que personne ne s'en est aperçu. Le saut se JOURNALISE
-// désormais, en nommant le drapeau qui le retient.
-$purgeRgpdRetenue = function (string $commande): bool {
-    $ferme = ! filter_var(config('crm.purges_enabled', false), FILTER_VALIDATE_BOOLEAN);
-
-    if ($ferme) {
-        Log::warning(
-            "[RGPD] Purge « {$commande} » SAUTEE : CRM_PURGE_ENABLED n'est pas a true. "
-            . "L'echeance CNIL correspondante n'est tenue par aucun automatisme tant que "
-            . 'ce drapeau reste ferme (config crm.purges_enabled).',
-        );
-    }
-
-    return $ferme;
-};
-
-Schedule::command('rgpd:purge-vivier')
-    ->monthlyOn(2, '03:30')
-    ->withoutOverlapping(240)
-    ->onOneServer()
-    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-vivier'));
-
-Schedule::command('rgpd:purge-business-prospects')
-    ->monthlyOn(2, '04:15')
-    ->withoutOverlapping(240)
-    ->onOneServer()
-    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-business-prospects'));
-
-// Lot L4-C (2026-09-24) — personnes de la lettre et du guide NON rattachées,
-// sans abonnement actif, inactives depuis 3 ans. Même gate que les deux purges
-// ci-dessus (`CRM_PURGE_ENABLED`), même saut JOURNALISÉ.
-Schedule::command('rgpd:purge-personnes')
-    ->monthlyOn(2, '04:45')
-    ->withoutOverlapping(120)
-    ->onOneServer()
-    ->skip(fn (): bool => $purgeRgpdRetenue('rgpd:purge-personnes'));
+// L3c-0 (ADR contrat v3 § 6, « AUCUNE PURGE ») — les trois purges mensuelles
+// `rgpd:purge-vivier`, `rgpd:purge-business-prospects` et `rgpd:purge-personnes`
+// ne sont PLUS planifiées. Leurs commandes refusent aussi toute exécution à la main,
+// même avec `--force`. Aucune tâche planifiée ne supprime de personne, de contact
+// ni de candidat (gardé par `AucuneSuppressionDePersonneTest`).
 
 // Lot L4-C — SENTINELLE du flux personnes : des inscriptions ou des demandes du
 // guide reçues en 24 h, et aucune rattachée à une personne, drapeau ouvert.

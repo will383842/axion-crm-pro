@@ -62,7 +62,7 @@ class PermissionsAndRolesSeeder extends Seeder
             'owner' => array_column($permissions, 'name'),
             'admin' => ['companies.view', 'companies.create', 'companies.update', 'companies.delete',
                 'scraping.run', 'scraping.config', 'llm.config', 'llm.view_usage',
-                'proxies.config', 'rgpd.view', 'rgpd.handle', 'users.manage', 'audit.view', 'data.export', 'contacts.view_pii'],
+                'proxies.config', 'rgpd.view', 'users.manage', 'audit.view', 'data.export', 'contacts.view_pii'],
             'operator' => ['companies.view', 'companies.create', 'companies.update',
                 'scraping.run', 'llm.view_usage', 'rgpd.view', 'data.export', 'contacts.view_pii'],
             'viewer' => ['companies.view', 'llm.view_usage', 'rgpd.view'],
@@ -79,6 +79,16 @@ class PermissionsAndRolesSeeder extends Seeder
                     );
                 }
             }
+        }
+
+        // L3c-0 (ADR contrat v3, I3) : `rgpd.handle` n'appartient qu'au propriétaire.
+        // Le seeder n'ajoutant que des lignes, on retire explicitement le droit
+        // aux bases où le rôle admin le portait déjà (lien rôle-permission
+        // seulement : aucune donnée de personne n'est touchée).
+        $adminId = DB::table('roles')->where('name', 'admin')->whereNull('team_id')->value('id');
+        $handleId = DB::table('permissions')->where('name', 'rgpd.handle')->value('id');
+        if ($adminId && $handleId) {
+            DB::table('role_has_permissions')->where('role_id', $adminId)->where('permission_id', $handleId)->delete();
         }
 
         // 🔴 INDISPENSABLE : ce seeder écrit en SQL BRUT, donc Spatie ne voit

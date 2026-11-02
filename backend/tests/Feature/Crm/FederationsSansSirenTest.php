@@ -392,7 +392,7 @@ test('une fiche SANS SIREN supprimee en cascade inscrit son ancre ; un second re
 
 // ── Segment et effacement ───────────────────────────────────────────────────
 
-test('une fiche sans SIREN est dans le segment federations, et l effacement RGPD l atteint ; le temoin reste', function () {
+test('une fiche sans SIREN est dans le segment federations, et l ancien effacement direct est interdit (rien n est supprime)', function () {
     fssImporter([
         fssLigne(),
         fssLigne(['identifiant' => 'section:zz-reseau:38', 'nom' => 'ZZ TEMOIN', 'email_generique' => 'contact@zz-ud38.example.invalid',
@@ -402,20 +402,17 @@ test('une fiche sans SIREN est dans le segment federations, et l effacement RGPD
     $emails = collect(fssDestinataires())->pluck('email')->all();
     expect($emails)->toContain('contact@zz-ud69.example.invalid', 'zoe.zzsecretaire@zz-ud69.example.invalid', 'contact@zz-ud38.example.invalid');
 
-    // Effacement de la secrétaire générale ET de l'adresse générique qu'elle
-    // tient : la fiche survit (protégée), la coordonnée part.
+    // L3c-0 : l'ancien effacement direct est INTERDIT (aucune suppression de
+    // données de personne) ; la fiche et ses contacts restent intacts.
     $fiche = (int) fssFiche(FSS_ID)->id;
-    EffacementCoordonneesFiches::effacer('zoe.zzsecretaire@zz-ud69.example.invalid', [], [], $this->espace);
-    EffacementCoordonneesFiches::effacer('contact@zz-ud69.example.invalid', [], [], $this->espace);
+    expect(fn () => EffacementCoordonneesFiches::effacer('zoe.zzsecretaire@zz-ud69.example.invalid', [], [], $this->espace))
+        ->toThrow(LogicException::class, 'INTERDIT');
 
     $temoin = fssFiche('section:zz-reseau:38');
-    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZSECRETAIRE')->exists())->toBeFalse()
-        ->and(DB::table('companies')->where('id', $fiche)->value('email_generic'))->toBeNull()
+    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZSECRETAIRE')->whereNull('deleted_at')->exists())->toBeTrue()
         ->and(DB::table('companies')->where('id', $fiche)->exists())->toBeTrue()
         ->and($temoin->email_generic)->toBe('contact@zz-ud38.example.invalid')
-        ->and(DB::table('contacts')->where('company_id', $temoin->id)->where('last_name', 'ZZTEMOIN')->exists())->toBeTrue()
-        // L'effacement a laissé une empreinte au registre, par l'ancre.
-        ->and(DB::table('contacts_retires')->where('foreign_id', FSS_ID)->count())->toBe(1);
+        ->and(DB::table('contacts')->where('company_id', $temoin->id)->where('last_name', 'ZZTEMOIN')->exists())->toBeTrue();
 });
 
 test('la question par ancre est SECURITY DEFINER, a search_path fixe, et refusee a PUBLIC', function () {

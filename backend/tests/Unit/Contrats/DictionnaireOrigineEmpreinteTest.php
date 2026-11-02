@@ -7,22 +7,21 @@
  * (SHA-256 du JSON canonique, clés triées, sans espace, Unicode non échappé).
  * Changer le dictionnaire = nouvelle version, décidée côté site d'abord.
  */
-
 const EMPREINTE_DICTIONNAIRE_ORIGINE = '10a65d4d683fbd6fd5d65701c964bd468211352af8dcd5da0a1d8817e75f54af';
 
 function contratsCanonique(mixed $v): string
 {
     if (is_array($v)) {
         if (array_is_list($v)) {
-            return '['.implode(',', array_map('contratsCanonique', $v)).']';
+            return '[' . implode(',', array_map('contratsCanonique', $v)) . ']';
         }
         ksort($v, SORT_STRING);
         $parts = [];
         foreach ($v as $k => $x) {
-            $parts[] = json_encode((string) $k, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).':'.contratsCanonique($x);
+            $parts[] = json_encode((string) $k, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ':' . contratsCanonique($x);
         }
 
-        return '{'.implode(',', $parts).'}';
+        return '{' . implode(',', $parts) . '}';
     }
 
     return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -30,7 +29,7 @@ function contratsCanonique(mixed $v): string
 
 function contratsLire(string $fichier): array
 {
-    return json_decode(file_get_contents(base_path('tests/fixtures/contrats/'.$fichier)), true, 512, JSON_THROW_ON_ERROR);
+    return json_decode(file_get_contents(base_path('tests/fixtures/contrats/' . $fichier)), true, 512, JSON_THROW_ON_ERROR);
 }
 
 it('le dictionnaire d\'origine copié a la même empreinte que celui du site', function () {

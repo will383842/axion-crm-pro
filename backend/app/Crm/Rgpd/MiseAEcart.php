@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 final class MiseAEcart
 {
     /**
-     * @param  list<int|string>  $ids  identifiants `personnes`
+     * @param  array<mixed>  $ids  identifiants `personnes`
      * @return array{personnes: int, abonnements: int}
      */
     public static function personnes(array $ids, string $motif): array
@@ -46,7 +46,7 @@ final class MiseAEcart
     /**
      * Contacts : corbeille douce (`deleted_at`) + trace dans `metadata`.
      *
-     * @param  list<int|string>  $ids
+     * @param  array<mixed>  $ids
      */
     public static function contacts(array $ids, string $motif): int
     {
@@ -66,7 +66,7 @@ final class MiseAEcart
     /**
      * Candidats : trace dans `attributes` (la table n'a pas de corbeille).
      *
-     * @param  list<int|string>  $ids
+     * @param  array<mixed>  $ids
      */
     public static function candidats(array $ids, string $motif): int
     {

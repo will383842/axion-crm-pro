@@ -513,42 +513,22 @@ function evenementPlanifie(string $fragment): ?Event
     return null;
 }
 
-test('B17-009 — les deux purges RGPD sont bien PLANIFIEES', function () {
-    expect(evenementPlanifie('rgpd:purge-vivier'))->not->toBeNull();
-    expect(evenementPlanifie('rgpd:purge-business-prospects'))->not->toBeNull();
-    // TEMOIN : le lecteur d'ordonnanceur trouve aussi une commande dont on sait
-    // qu'elle est planifiee ; s'il rendait null pour tout, les deux lignes
+test('B17-009 / L3c-0 — les trois purges RGPD ne sont PLUS planifiees (aucune purge de personnes)', function () {
+    expect(evenementPlanifie('rgpd:purge-vivier'))->toBeNull();
+    expect(evenementPlanifie('rgpd:purge-business-prospects'))->toBeNull();
+    expect(evenementPlanifie('rgpd:purge-personnes'))->toBeNull();
+    // TEMOIN : le lecteur d'ordonnanceur trouve toujours une commande dont on
+    // sait qu'elle est planifiee ; s'il rendait null pour tout, les lignes
     // ci-dessus ne prouveraient rien.
     expect(evenementPlanifie('retention:purge'))->not->toBeNull();
 });
 
-test('B17-009 — drapeau ferme : la purge est sautee, mais elle le DIT', function () {
-    config()->set('crm.purges_enabled', false);
-
-    $evenement = evenementPlanifie('rgpd:purge-vivier');
-    $journal = [];
-    Log::listen(function ($message) use (&$journal) {
-        $journal[] = $message->message;
-    });
-
-    expect($evenement->filtersPass(app()))->toBeFalse();
-
-    // 🔴 LE CONSTAT B17-009 : le saut etait SILENCIEUX. Une echeance legale
-    // suspendue sans la moindre trace est indistinguable d'une echeance tenue.
-    $this->assertStringContainsString(
-        'CRM_PURGE_ENABLED',
-        implode("\n", $journal),
-        'Le saut d une purge RGPD doit laisser une trace nommant le drapeau qui la retient.',
-    );
-});
-
-test('B17-009 — TEMOIN : drapeau ouvert, la purge N EST PLUS sautee', function () {
+test('L3c-0 — les commandes de purge de personnes refusent meme avec --force et drapeau ouvert', function () {
     config()->set('crm.purges_enabled', true);
 
-    // Ce temoin prouve que le cablage de l'ordonnanceur est bon et qu'il ne
-    // reste qu'UNE variable d'environnement entre le depot et l'echeance CNIL.
-    expect(evenementPlanifie('rgpd:purge-vivier')->filtersPass(app()))->toBeTrue();
-    expect(evenementPlanifie('rgpd:purge-business-prospects')->filtersPass(app()))->toBeTrue();
+    foreach (['rgpd:purge-vivier', 'rgpd:purge-business-prospects', 'rgpd:purge-personnes'] as $commande) {
+        expect(Artisan::call($commande, ['--force' => true]))->toBe(1, $commande);
+    }
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

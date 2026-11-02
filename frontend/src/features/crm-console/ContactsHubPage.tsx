@@ -185,6 +185,11 @@ function ContactsHubContent() {
   // lignes seulement.
   const echecListe = list.error !== null && list.data === undefined;
   const echecCompteurs = counts.error !== null && counts.data === undefined;
+  // DM1-CON — les gestes (ajouter, importer, corbeille, export) ne se montrent
+  // que si le serveur les annonce (`gestes_fiches` dans les compteurs). Le vrai
+  // serveur ne l'envoie pas encore : en production, la page reste celle d'avant
+  // (aucun bouton vers une route absente) ; la démo l'annonce.
+  const gestes = (counts.data as (CountsResponse & { gestes_fiches?: boolean }) | undefined)?.gestes_fiches === true;
 
   return (
     <div>
@@ -193,6 +198,7 @@ function ContactsHubContent() {
         title="Contacts"
         subtitle={`${tab === 'tous' ? 'Tous les types' : RELATION_TYPE_LABELS[tab]} — ${temperatureLabel}`}
         actions={
+          gestes ? (
           <>
             <Button variant="secondary" onClick={() => setFenetre('corbeille')}>
               Corbeille
@@ -204,11 +210,16 @@ function ContactsHubContent() {
               Ajouter un contact
             </Button>
           </>
+          ) : undefined
         }
       />
-      <AjoutRapideContact open={fenetre === 'ajouter'} onClose={fermerFenetre} />
-      <ImportContacts open={fenetre === 'importer'} onClose={fermerFenetre} />
-      <CorbeilleContacts open={fenetre === 'corbeille'} onClose={fermerFenetre} />
+      {gestes ? (
+        <>
+          <AjoutRapideContact open={fenetre === 'ajouter'} onClose={fermerFenetre} />
+          <ImportContacts open={fenetre === 'importer'} onClose={fermerFenetre} />
+          <CorbeilleContacts open={fenetre === 'corbeille'} onClose={fermerFenetre} />
+        </>
+      ) : null}
 
       {echecCompteurs ? (
         <p className="mb-6 text-xs text-slate-500 dark:text-slate-400" role="status">
@@ -333,14 +344,16 @@ function ContactsHubContent() {
                     setPersonnesCochees(new Set());
                   }}
                 />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-11 md:h-8"
-                  onClick={() => void exporterSelection([...orgsCochees], [...personnesCochees])}
-                >
-                  Exporter (CSV)
-                </Button>
+                {gestes ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-11 md:h-8"
+                    onClick={() => void exporterSelection([...orgsCochees], [...personnesCochees])}
+                  >
+                    Exporter (CSV)
+                  </Button>
+                ) : null}
               </div>
             ) : null}
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">

@@ -217,8 +217,7 @@ describe('ContactsHubPage — parcours', () => {
 });
 
 describe('ContactsHubPage — gestes DM1-CON (démo)', () => {
-  it('propose Ajouter un contact (seul bouton plein), Importer et Corbeille, et ouvre l’ajout rapide', async () => {
-    const user = userEvent.setup();
+  it('sans annonce du serveur (production), aucun geste : ni ajout, ni import, ni corbeille', async () => {
     await renderScreen(<ContactsHubPage />, {
       path: PATH,
       consoleFeatures: 'open',
@@ -226,7 +225,23 @@ describe('ContactsHubPage — gestes DM1-CON (démo)', () => {
       handlers: [getJson('/crm/contacts-hub/counts', COUNTS), getJson('/crm/contacts-hub', PAGE)],
     });
     await screen.findByText(LIGNE.denomination);
-    expect(screen.getByRole('button', { name: 'Importer' })).toBeVisible();
+    // Les compteurs sont lus (« Clients 12 ») : l'absence des gestes n'est pas un simple retard.
+    await within(screen.getByRole('tablist')).findByRole('tab', { name: /Clients.*12/ });
+    expect(screen.queryByRole('button', { name: 'Ajouter un contact' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Importer' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Corbeille' })).toBeNull();
+  });
+
+  it('propose Ajouter un contact (seul bouton plein), Importer et Corbeille, et ouvre l’ajout rapide', async () => {
+    const user = userEvent.setup();
+    await renderScreen(<ContactsHubPage />, {
+      path: PATH,
+      consoleFeatures: 'open',
+      landingRoutes: LANDING,
+      handlers: [getJson('/crm/contacts-hub/counts', { ...COUNTS, gestes_fiches: true }), getJson('/crm/contacts-hub', PAGE)],
+    });
+    await screen.findByText(LIGNE.denomination);
+    expect(await screen.findByRole('button', { name: 'Importer' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Corbeille' })).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Ajouter un contact' }));

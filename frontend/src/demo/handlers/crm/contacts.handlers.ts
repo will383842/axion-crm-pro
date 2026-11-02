@@ -452,9 +452,10 @@ export const handlers: HttpHandler[] = [
 
   http.get(api('/crm/contacts-hub/counts'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { total: 0, by_relation_type: {}, by_lifecycle_stage: {} });
+    // `gestes_fiches` : la démo annonce l'ajout, l'import, la corbeille et l'export (absent du vrai serveur).
+    const force = await repondreEtatForce(request, { total: 0, by_relation_type: {}, by_lifecycle_stage: {}, gestes_fiches: true });
     if (force) return force;
-    return HttpResponse.json(compteursHub());
+    return HttpResponse.json({ ...compteursHub(), gestes_fiches: true });
   }),
 
   // Ancienne liste (`/contacts`), gardée en démo pour le retour arrière du drapeau « console v2 ».

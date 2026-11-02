@@ -12,7 +12,9 @@ function ouvrir(geste: 'ajouter' | 'importer' | 'corbeille'): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-export const commandes: CommandeRecherche[] = [
+// Seulement en démo (`VITE_DEMO`, figé au build) : en production, les routes serveur de ces gestes
+// n'existent pas encore et la page Contacts ne les montre pas.
+export const commandes: CommandeRecherche[] = import.meta.env.VITE_DEMO !== '1' ? [] : [
   { id: 'contacts-ajouter', libelle: 'Ajouter un contact', produit: 'crm', motsCles: ['nouveau', 'créer', 'personne', 'ajout rapide'], agir: () => ouvrir('ajouter') },
   { id: 'contacts-importer', libelle: 'Importer des contacts', produit: 'crm', motsCles: ['csv', 'fichier', 'excel'], agir: () => ouvrir('importer') },
   { id: 'contacts-corbeille', libelle: 'Corbeille des contacts', produit: 'crm', motsCles: ['restaurer', 'retirés'], agir: () => ouvrir('corbeille') },

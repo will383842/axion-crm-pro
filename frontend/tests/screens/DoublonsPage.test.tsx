@@ -15,6 +15,8 @@ import userEvent from "@testing-library/user-event";
 import type { HttpHandler } from "msw";
 
 import { DoublonsPage } from "@/features/doublons/DoublonsPage";
+import { demoDb } from "@/demo/base";
+import { handlers as handlersDemo } from "@/demo/handlers/crm/a-traiter.handlers";
 import { renderScreen } from "../helpers/renderScreen";
 import { recordGet, recordPost } from "../msw/handlers";
 
@@ -145,5 +147,51 @@ describe("onglet Doublons à vérifier", () => {
       expect(notes.erreur).toHaveBeenCalledWith("Les deux fiches portent deux SIREN différents."),
     );
     expect(notes.succes).not.toHaveBeenCalled();
+  });
+});
+
+describe("Doublons à vérifier avec le faux serveur de démo (DM1-ATR)", () => {
+  async function monterDemo() {
+    await renderScreen(<DoublonsPage />, {
+      path: "/doublons",
+      handlers: handlersDemo,
+      landingRoutes: ["/companies/$companyId"],
+    });
+    await screen.findAllByTestId(/^paire-/);
+  }
+  const paires = () => screen.queryAllByTestId(/^paire-/);
+
+  afterEach(() => demoDb.reinitialiser());
+
+  it("fusionner une paire puis « Annuler » la rétablit", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await monterDemo();
+    const avant = paires().length;
+    expect(avant).toBe(12);
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Fusionner" })[0]!);
+    await waitFor(() => expect(paires()).toHaveLength(avant - 1));
+
+    const annuler = await screen.findByRole("button", { name: /Annuler la fusion/ });
+    await userEvent.click(annuler);
+    await waitFor(() => expect(paires()).toHaveLength(avant));
+    expect(screen.queryByRole("button", { name: /Annuler la fusion/ })).toBeNull();
+  });
+
+  it("écarter une autre paire la retire de la file", async () => {
+    await monterDemo();
+    const avant = paires().length;
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Ce ne sont pas des doublons" })[1]!);
+    await waitFor(() => expect(paires()).toHaveLength(avant - 1));
+  });
+
+  it("ne supprime aucune fiche : la fiche absorbée est mise à la corbeille, jamais effacée", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const nbFiches = demoDb.entreprises.compter();
+    await monterDemo();
+    await userEvent.click(screen.getAllByRole("button", { name: "Fusionner" })[0]!);
+    await waitFor(() => expect(paires()).toHaveLength(11));
+    expect(demoDb.entreprises.compter()).toBe(nbFiches);
   });
 });

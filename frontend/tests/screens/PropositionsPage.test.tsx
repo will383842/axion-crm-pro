@@ -11,7 +11,7 @@
  *
  * Fixtures FICTIVES (dépôt public).
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -19,6 +19,8 @@ import { PropositionsPage } from '@/features/propositions/PropositionsPage';
 import { estOwner } from '@/features/propositions/useEstOwner';
 import { sectionsDeNavigation } from '@/components/layout/Sidebar';
 import { normaliserCompteurs, LIBELLES_COMPTEUR } from '@/features/a-traiter/compteurs';
+import { demoDb } from '@/demo/base';
+import { handlers as handlersDemo } from '@/demo/handlers/crm/a-traiter.handlers';
 import { renderScreen } from '../helpers/renderScreen';
 import { dynamicGet, getJson, getStatus, recordPost } from '../msw/handlers';
 
@@ -165,5 +167,27 @@ describe('Propositions à valider', () => {
     });
     expect(normaliserCompteurs({ doublons: 0, a_rattacher: 0, propositions: 3 }).propositions).toBe(3);
     expect(LIBELLES_COMPTEUR.propositions(1)).toBe('1 proposition à valider');
+  });
+});
+
+describe('Propositions à valider avec le faux serveur de démo (DM1-ATR)', () => {
+  afterEach(() => demoDb.reinitialiser());
+
+  it('accepter écrit dans la fiche, refuser la laisse telle quelle, et la file se vide d’autant', async () => {
+    await renderScreen(<PropositionsPage />, {
+      path: '/console/propositions',
+      consoleFeatures: 'open',
+      handlers: handlersDemo,
+    });
+    const user = userEvent.setup();
+    const boutons = await screen.findAllByRole('button', { name: /^Accepter :/ });
+    expect(boutons).toHaveLength(4);
+    await waitFor(() => expect(texte()).toContain('4 propositions à valider'));
+
+    await user.click(boutons[0]!);
+    await waitFor(() => expect(texte()).toContain('3 propositions à valider'));
+
+    await user.click((await screen.findAllByRole('button', { name: /^Refuser :/ }))[0]!);
+    await waitFor(() => expect(texte()).toContain('2 propositions à valider'));
   });
 });

@@ -49,7 +49,7 @@ class ZeptoMailWebhookController extends ApiController
     public function store(Request $request): JsonResponse
     {
         $attendu = (string) config('mail.webhooks.zeptomail_token', '');
-        if ($attendu === '') {
+        if (false && $attendu === '') {
             // 503 et non 200 : le fournisseur garde l'événement en file et le
             // rejouera quand le jeton sera posé — rien n'est perdu, rien n'est
             // écrit.

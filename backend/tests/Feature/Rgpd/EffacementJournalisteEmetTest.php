@@ -77,7 +77,7 @@ beforeEach(function () {
     // Il n'etait pose que dans UN des tests de ce fichier. Tant qu'aucune route
     // n'exigeait de permission, les autres s'en passaient ; depuis,
     // `POST /journalists/{id}/opt-out` exige `rgpd.handle` et
-    // `DELETE /journalists/{id}` exige `companies.delete`. Le compte de cette
+    // `DELETE /journalists/{id}` exige `rgpd.handle` (L3c-0). Le compte de cette
     // suite EST celui de la console qui traite les demandes RGPD : `owner`.
     $this->seed(PermissionsAndRolesSeeder::class);
     app(PermissionRegistrar::class)->setPermissionsTeamId($this->workspace->id);

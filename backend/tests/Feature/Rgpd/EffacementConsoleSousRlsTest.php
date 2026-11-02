@@ -134,3 +134,58 @@ test('E3 — sous axion_app, l export des articles 15 et 20 trouve les fiches d 
         $owner->table('workspaces')->where('id', $espace)->delete();
     }
 });
+
+test('L3c-0 (I2) — sous axion_app, la mise à l ecart atteint personnes et abonnements dans CHAQUE espace, rien n est supprime', function () {
+    $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
+
+    $owner = efrProprio();
+    $espaces = [(string) Str::uuid(), (string) Str::uuid()];
+    $marque = substr(str_replace('-', '', $espaces[0]), 0, 8);
+    $email = 'zz.multi.' . $marque . '@zz-rls.example.invalid';
+    $temoinEmail = 'zz.temoin.' . $marque . '@zz-rls.example.invalid';
+    $personnes = [];
+    foreach ($espaces as $i => $espace) {
+        $owner->table('workspaces')->insert([
+            'id' => $espace, 'slug' => "zz-efr-i2-{$i}-{$marque}", 'name' => 'ZZ I2 ' . $i, 'settings' => '{}',
+            'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach ([$email, $temoinEmail] as $j => $adresse) {
+            $id = (int) $owner->table('personnes')->insertGetId([
+                'workspace_id' => $espace, 'person_key' => hash('sha256', "zz-i2-{$i}-{$j}-{$marque}"),
+                'email' => $adresse, 'email_hash' => hash('sha256', $adresse),
+                'premiere_source' => 'newsletter', 'premiere_source_at' => now(), 'legal_basis' => 'consent',
+            ]);
+            $owner->table('abonnements')->insert([
+                'workspace_id' => $espace, 'personne_id' => $id, 'canal' => 'lettre', 'statut' => 'abonne',
+                'dernier_evenement_at' => now(),
+            ]);
+            $personnes[$adresse][] = $id;
+        }
+    }
+
+    $precedente = DB::getDefaultConnection();
+    try {
+        DB::setDefaultConnection('pgsql_app');
+        $bilan = app(GdprErasureService::class)->erase($email);
+        DB::setDefaultConnection($precedente);
+
+        expect($bilan['deleted']['personnes'])->toBe(2)
+            ->and($bilan['deleted']['abonnements'])->toBe(2);
+        // Les DEUX espaces : personne à l'écart, abonnement désabonné, lignes gardées.
+        expect($owner->table('personnes')->whereIn('id', $personnes[$email])->whereNotNull('opposition_at')->count())->toBe(2)
+            ->and($owner->table('personnes')->whereIn('id', $personnes[$email])->count())->toBe(2)
+            ->and($owner->table('abonnements')->whereIn('personne_id', $personnes[$email])->where('statut', 'desabonne')->count())->toBe(2)
+            ->and($owner->table('abonnements')->whereIn('personne_id', $personnes[$email])->count())->toBe(2);
+        // Le témoin (autre adresse) n'est pas touché.
+        expect($owner->table('personnes')->whereIn('id', $personnes[$temoinEmail])->whereNull('opposition_at')->count())->toBe(2)
+            ->and($owner->table('abonnements')->whereIn('personne_id', $personnes[$temoinEmail])->where('statut', 'abonne')->count())->toBe(2);
+    } finally {
+        DB::setDefaultConnection($precedente);
+        foreach ($espaces as $espace) {
+            $owner->table('abonnements')->where('workspace_id', $espace)->delete();
+            $owner->table('personnes')->where('workspace_id', $espace)->delete();
+            $owner->table('opt_out')->where('email_hash', hash('sha256', $email))->delete();
+            $owner->table('workspaces')->where('id', $espace)->delete();
+        }
+    }
+});

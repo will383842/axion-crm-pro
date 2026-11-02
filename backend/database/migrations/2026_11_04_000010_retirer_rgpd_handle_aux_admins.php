@@ -32,22 +32,26 @@ return new class extends Migration
                 ->delete();
 
             // Droit posé directement sur un compte administrateur qui n'est
-            // PAS aussi propriétaire (un propriétaire le garde).
+            // PAS aussi propriétaire DANS LE MÊME ESPACE (`team_id`) : être
+            // propriétaire de l'espace B ne conserve rien dans l'espace A.
+            $cle = static fn (object $l): string => $l->model_type . '|' . $l->model_id . '|' . (string) ($l->team_id ?? '');
+
             $proprietaires = $ownerIds === []
                 ? []
-                : DB::table('model_has_roles')->whereIn('role_id', $ownerIds)->get(['model_id', 'model_type'])
-                    ->map(static fn (object $l): string => $l->model_type . '|' . $l->model_id)->all();
+                : DB::table('model_has_roles')->whereIn('role_id', $ownerIds)->get(['model_id', 'model_type', 'team_id'])
+                    ->map($cle)->all();
 
-            $administrateurs = DB::table('model_has_roles')->whereIn('role_id', $adminIds)->get(['model_id', 'model_type']);
+            $administrateurs = DB::table('model_has_roles')->whereIn('role_id', $adminIds)->get(['model_id', 'model_type', 'team_id']);
             foreach ($administrateurs as $a) {
-                if (in_array($a->model_type . '|' . $a->model_id, $proprietaires, true)) {
+                if (in_array($cle($a), $proprietaires, true)) {
                     continue;
                 }
-                DB::table('model_has_permissions')
+                $requete = DB::table('model_has_permissions')
                     ->where('permission_id', $handleId)
                     ->where('model_id', $a->model_id)
-                    ->where('model_type', $a->model_type)
-                    ->delete();
+                    ->where('model_type', $a->model_type);
+                $a->team_id === null ? $requete->whereNull('team_id') : $requete->where('team_id', $a->team_id);
+                $requete->delete();
             }
         }
 

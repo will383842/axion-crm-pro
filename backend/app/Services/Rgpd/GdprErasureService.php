@@ -54,9 +54,10 @@ class GdprErasureService
             ), static fn (string $t): bool => trim($t) !== '')));
             $clesNom = EffacementCoordonneesFiches::clesNomDesContacts($email);
 
-            // Propositions de tiers (N13) : valeurs neutralisées par la fonction
-            // dédiée, relevées AVANT le masquage des fiches personnes.
-            $deleted['propositions_champs_neutralisees'] = self::neutraliserPropositions(
+            // Propositions de tiers (N13) : MISES À L'ÉCART par espace (marque
+            // réversible, aucune valeur écrasée), relevées AVANT le masquage des
+            // fiches personnes.
+            $deleted['propositions_champs_ecartees'] = self::ecarterPropositions(
                 $email,
                 EffacementCoordonneesFiches::numerosPersonnels($telephones, $email, $clesNom),
             );
@@ -67,22 +68,47 @@ class GdprErasureService
             $personnels = $releve['personnels'];
             $opposables = $releve['opposables'];
 
-            $personnesIds = self::personnesDe($email)->pluck('id')->all();
             // L3c-0 (ADR contrat v3 § 6, I3) : la personne est MISE À L'ÉCART,
             // jamais supprimée. Les clés du bilan sont conservées (nombre de
             // lignes mises à l'écart).
-            $ecart = MiseAEcart::personnes($personnesIds, 'demande_effacement');
-            $deleted['abonnements'] = $ecart['abonnements'];
-            $deleted['personnes'] = $ecart['personnes'];
-
-            // Par ESPACE : sous un rôle soumis à la RLS, une lecture sans contexte
-            // ne voit aucun contact (le masquage serait silencieusement vide).
+            //
+            // ESPACE PAR ESPACE : `personnes`, `abonnements`, `candidates` et
+            // `contacts` sont sous RLS forcée ; une lecture ou un masquage sans
+            // contexte ne verrait aucune ligne (masquage silencieusement vide).
+            $deleted['abonnements'] = 0;
+            $deleted['personnes'] = 0;
             $deleted['contacts'] = 0;
+            $deleted['candidates'] = 0;
+            $conditionCandidat = static function ($q) use ($email, $phone): void {
+                $q->where('email', $email);
+                if ($phone !== null && $phone !== '') {
+                    $q->orWhere('phone', $phone);
+                }
+            };
             foreach (EffacementCoordonneesFiches::espaces() as $espace) {
-                $deleted['contacts'] += WorkspaceContext::run($espace, static fn (): int => MiseAEcart::contacts(
-                    DB::table('contacts')->where('workspace_id', $espace)->where('email', $email)->pluck('id')->all(),
-                    'demande_effacement',
-                ));
+                $r = WorkspaceContext::run($espace, static function () use ($espace, $email, $conditionCandidat): array {
+                    $ecart = MiseAEcart::personnes(
+                        self::personnesDe($email)->where('workspace_id', $espace)->pluck('id')->all(),
+                        'demande_effacement',
+                    );
+
+                    return [
+                        'abonnements' => $ecart['abonnements'],
+                        'personnes' => $ecart['personnes'],
+                        'contacts' => MiseAEcart::contacts(
+                            DB::table('contacts')->where('workspace_id', $espace)->where('email', $email)->pluck('id')->all(),
+                            'demande_effacement',
+                        ),
+                        // Candidats : corbeille douce + trace (`MiseAEcart::candidats`).
+                        'candidates' => MiseAEcart::candidats(
+                            DB::table('candidates')->where('workspace_id', $espace)->where($conditionCandidat)->pluck('id')->all(),
+                            'demande_effacement',
+                        ),
+                    ];
+                });
+                foreach ($r as $cle => $n) {
+                    $deleted[$cle] += $n;
+                }
             }
 
             // Journalistes : MASQUÉS (corbeille douce + opposition), jamais
@@ -104,16 +130,6 @@ class GdprErasureService
                     'opt_out' => true,
                     'deleted_at' => now(),
                 ]);
-
-            // Candidats : corbeille douce + trace (`MiseAEcart::candidats`).
-            $deleted['candidates'] = MiseAEcart::candidats(DB::table('candidates')
-                ->where(function ($q) use ($email, $phone) {
-                    $q->where('email', $email);
-                    if ($phone !== null && $phone !== '') {
-                        $q->orWhere('phone', $phone);
-                    }
-                })
-                ->pluck('id')->all(), 'demande_effacement');
 
             // Praticiens de santé (art. 9) : corbeille douce, ligne gardée.
             $deleted['health_practitioners'] = DB::table('health_practitioners')
@@ -203,29 +219,45 @@ class GdprErasureService
     }
 
     /**
-     * N13 — neutralise (`[effacé]`) les propositions de tiers de cette adresse
-     * et/ou de ces numéros, par la fonction dédiée `propositions_champs_effacer`
-     * (aucune ligne supprimée). Rend le nombre de propositions neutralisées.
-     *
-     * ⚠️ À DÉCIDER PAR WILL : cette neutralisation ÉCRASE des valeurs (elle ne
-     * les supprime pas). Conservée telle quelle par L3c-0, hors du périmètre
-     * des corrections ; signalée dans la PR.
+     * N13 — met à l'écart les propositions de tiers de cette adresse et/ou de
+     * ces numéros : une MARQUE (`propositions_champs_ecartees`), jamais un
+     * écrasement des valeurs ni une suppression. Espace par espace (RLS).
+     * Rend le nombre de propositions nouvellement écartées.
      *
      * @param  list<string>  $telephones
      */
-    private static function neutraliserPropositions(string $email, array $telephones): int
+    private static function ecarterPropositions(string $email, array $telephones): int
     {
         $variantes = [];
         foreach ($telephones as $t) {
             array_push($variantes, ...ListeSuppression::variantesTelephone($t));
         }
-        // Des chiffres seulement : le littéral de tableau ne demande aucun échappement.
         $chiffres = array_values(array_unique(array_filter($variantes, static fn (string $v): bool => ctype_digit($v))));
+        $courriel = mb_strtolower(trim($email));
 
-        return (int) (DB::selectOne(
-            'SELECT public.propositions_champs_effacer(?, ?::text[]) AS n',
-            [$email, '{' . implode(',', $chiffres) . '}'],
-        )->n ?? 0);
+        $total = 0;
+        foreach (EffacementCoordonneesFiches::espaces() as $espace) {
+            $total += WorkspaceContext::run($espace, static fn (): int => DB::affectingStatement(
+                "INSERT INTO propositions_champs_ecartees (proposition_id, workspace_id, motif)
+                 SELECT pc.id, pc.workspace_id, 'demande_effacement'
+                   FROM propositions_champs pc
+                  WHERE pc.workspace_id = ?::uuid
+                    AND (
+                        (? <> '' AND pc.entite = 'personne' AND pc.entite_id IN (
+                            SELECT ct.id FROM contacts ct WHERE ct.workspace_id = ?::uuid AND lower(ct.email::TEXT) = ?
+                        ))
+                        OR (cardinality(?::text[]) > 0 AND (
+                            regexp_replace(pc.valeur_proposee, '\D', '', 'g') = ANY (?::text[])
+                            OR regexp_replace(coalesce(pc.valeur_actuelle, ''), '\D', '', 'g') = ANY (?::text[])
+                            OR regexp_replace(coalesce(pc.valeur_remplacee, ''), '\D', '', 'g') = ANY (?::text[])
+                        ))
+                    )
+                 ON CONFLICT (proposition_id) DO NOTHING",
+                [$espace, $courriel, $espace, $courriel, '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}', '{' . implode(',', $chiffres) . '}'],
+            ));
+        }
+
+        return $total;
     }
 
     /**

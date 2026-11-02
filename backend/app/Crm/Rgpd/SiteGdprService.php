@@ -379,6 +379,12 @@ final class SiteGdprService
      */
     private function journal(string $workspaceId, string $email): array
     {
+        // M3 : deux rejeux SIMULTANÉS du site liraient tous deux « aucune
+        // demande » puis créeraient chacun la leur. Un verrou consultatif de
+        // transaction, propre à (espace, adresse), sérialise le « lire puis
+        // créer » ; il tombe tout seul à la fin de la transaction de l'appelant.
+        DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['rgpd_requests.pending.erasure|' . $workspaceId . '|' . $email]);
+
         $existante = DB::table('rgpd_requests')
             ->where('workspace_id', $workspaceId)
             ->where('type', 'erasure')

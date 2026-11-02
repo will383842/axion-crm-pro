@@ -21,8 +21,8 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-const AUCUNE_SUPPRESSION_TABLES = 'contacts|candidates|personnes|abonnements|companies|journalists';
-const AUCUNE_SUPPRESSION_MODELES = 'Company|Contact|Candidate|Journalist|Personne|Abonnement';
+const AUCUNE_SUPPRESSION_TABLES = 'contacts|candidates|personnes|abonnements|companies|journalists|activities|email_messages|email_verification_logs|notifications|users';
+const AUCUNE_SUPPRESSION_MODELES = 'Company|Contact|Candidate|Journalist|Personne|Abonnement|Activity|EmailMessage|EmailVerificationLog|User';
 
 /**
  * Les gestes de suppression dure d'une personne ou de son entreprise dans UN
@@ -52,7 +52,7 @@ function aucuneSuppressionDetecter(string $source): array
     // 3. Requête RANGÉE EN VARIABLE, puis supprimée plus loin ($q = DB::table('contacts')…; $q->delete()).
     if (preg_match_all("/\\$(\\w+)\\s*=\\s*(?:DB::table\\(['\"](?:{$tables})['\"]\\)|(?:{$modeles})::(?!create|find|first|updateOrCreate|sole)\\w+\\()/", $source, $vars) > 0) {
         foreach (array_unique($vars[1]) as $variable) {
-            if (preg_match('/\\$' . preg_quote($variable, '/') . '\\s*(?:->\\s*\\w+\\([^;]*?)*->\\s*(delete|forceDelete|truncate)\\(/s', $source) === 1) {
+            if (preg_match('/\\$' . preg_quote($variable, '/') . '(?!\\s*->\\s*tokens\\()\\s*(?:->\\s*\\w+\\([^;]*?)*->\\s*(delete|forceDelete|truncate)\\(/s', $source) === 1) {
                 $hits[] = "requête rangée dans \${$variable} puis supprimée";
             }
         }
@@ -114,7 +114,10 @@ test('les 5 commandes de purge refusent sans condition, même avec --force', fun
 
 test('aucun code applicatif ne supprime durement une personne, un contact, un candidat ou une entreprise', function () {
     $racine = dirname(__DIR__, 3) . '/app';
-    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($racine, FilesystemIterator::SKIP_DOTS));
+    $it = new AppendIterator;
+    foreach ([$racine, dirname(__DIR__, 3) . '/routes'] as $dossier) {
+        $it->append(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dossier, FilesystemIterator::SKIP_DOTS)));
+    }
 
     $fichiers = 0;
     $hits = [];
@@ -124,9 +127,15 @@ test('aucun code applicatif ne supprime durement une personne, un contact, un ca
         }
         $fichiers++;
         $source = (string) file_get_contents((string) $fichier);
-        $court = str_replace($racine . '/', '', (string) $fichier);
+        $court = str_replace([$racine . '/', dirname(__DIR__, 3) . '/'], '', (string) $fichier);
 
         foreach (aucuneSuppressionDetecter($source) as $hit) {
+            // Seule exception : la purge des notifications ANCIENNES, qui exclut
+            // le signalement RGPD (jamais purgé).
+            if ($court === 'Console/Commands/RetentionPurge.php' && $hit === 'suppression dure de notifications'
+                && str_contains($source, "where('type', '<>', SignalementDemandeEffacement::TYPE)")) {
+                continue;
+            }
             $hits[] = "{$court} : {$hit}";
         }
     }
@@ -156,6 +165,10 @@ test('le détecteur de suppressions sait reconnaître les gestes cachés (témoi
         "<?php DB::raw('DELETE FROM journalists');",
         "<?php DB::statement('TRUNCATE TABLE companies');",
         "<?php DB::table('journalists')->where('id', 3)->delete();",
+        "<?php DB::table('activities')->where('id', 1)->delete();",
+        "<?php DB::table('email_messages')->where('id', 1)->delete();",
+        "<?php DB::statement('DELETE FROM notifications WHERE 1=1');",
+        "<?php User::where('id', 1)->delete();",
     ];
     foreach ($fautifs as $code) {
         expect(aucuneSuppressionDetecter($code))->not->toBe([], $code);
@@ -164,7 +177,7 @@ test('le détecteur de suppressions sait reconnaître les gestes cachés (témoi
     $innocents = [
         "<?php \$q = DB::table('contacts')->where('email', \$e);\n\$n = \$q->count();",
         "<?php Contact::where('email', \$e)->update(['deleted_at' => now()]);",
-        "<?php DB::table('activities')->where('id', 1)->delete();",
+        "<?php DB::table('activities')->where('id', 1)->count();",
         "<?php DB::table('contacts')->where('id', 1)->update(['deleted_at' => now()]);",
         '<?php $jeton->delete();',
     ];

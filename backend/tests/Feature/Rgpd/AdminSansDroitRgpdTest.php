@@ -98,6 +98,49 @@ test('un admin DÉJÀ en base (droit hérité) reçoit 403 sur les trois routes 
     expect($this->postJson("/api/v1/journalists/{$this->journaliste}/opt-out")->status())->not->toBe(403);
 });
 
+test('I1 — DELETE /journalists/{id} exige rgpd.handle : admin 403, owner 204 ; la ligne est masquée, jamais supprimée', function () {
+    $admin = asdrCompte('admin', $this->espace);
+    $this->actingAs($admin)->deleteJson("/api/v1/journalists/{$this->journaliste}")->assertForbidden();
+    expect(DB::table('journalists')->where('id', $this->journaliste)->whereNull('deleted_at')->exists())->toBeTrue();
+
+    $proprietaire = asdrCompte('owner', $this->espace);
+    $reponse = $this->actingAs($proprietaire)->deleteJson("/api/v1/journalists/{$this->journaliste}");
+    expect($reponse->status())->toBe(204);
+    expect(DB::table('journalists')->where('id', $this->journaliste)->exists())->toBeTrue();
+});
+
+test('M1 — la migration ne garde le droit direct qu au owner DU MÊME espace : admin en A + owner en B perd le droit en A', function () {
+    $handle = (int) DB::table('permissions')->where('name', 'rgpd.handle')->value('id');
+    $espaceB = (string) Workspace::create([
+        'id' => (string) Str::uuid(), 'slug' => 'asdr-b-' . Str::random(6), 'name' => 'Espace B',
+    ])->id;
+
+    // Un seul compte : admin de l'espace A, owner de l'espace B.
+    $compte = asdrCompte('admin', $this->espace);
+    setPermissionsTeamId($espaceB);
+    $compte->assignRole('owner');
+    DB::table('model_has_permissions')->insert([
+        'permission_id' => $handle, 'model_type' => User::class, 'model_id' => $compte->id, 'team_id' => $this->espace,
+    ]);
+    DB::table('model_has_permissions')->insert([
+        'permission_id' => $handle, 'model_type' => User::class, 'model_id' => $compte->id, 'team_id' => $espaceB,
+    ]);
+
+    // Témoin : un compte admin ET owner du MÊME espace garde son droit direct.
+    $double = asdrCompte('admin', $this->espace);
+    setPermissionsTeamId($this->espace);
+    $double->assignRole('owner');
+    DB::table('model_has_permissions')->insert([
+        'permission_id' => $handle, 'model_type' => User::class, 'model_id' => $double->id, 'team_id' => $this->espace,
+    ]);
+
+    asdrMigration();
+
+    expect(DB::table('model_has_permissions')->where('permission_id', $handle)->where('model_id', $compte->id)->where('team_id', $this->espace)->count())->toBe(0)
+        ->and(DB::table('model_has_permissions')->where('permission_id', $handle)->where('model_id', $compte->id)->where('team_id', $espaceB)->count())->toBe(1)
+        ->and(DB::table('model_has_permissions')->where('permission_id', $handle)->where('model_id', $double->id)->where('team_id', $this->espace)->count())->toBe(1);
+});
+
 test('la migration retire aussi le droit posé DIRECTEMENT sur un admin, mais pas sur un owner', function () {
     $handle = (int) DB::table('permissions')->where('name', 'rgpd.handle')->value('id');
     $admin = asdrCompte('admin', $this->espace);

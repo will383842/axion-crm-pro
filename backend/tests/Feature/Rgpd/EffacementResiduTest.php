@@ -14,6 +14,8 @@
  * recontacter la personne.
  */
 
+use App\Crm\Rgpd\EffacementCoordonneesFiches;
+use App\Jobs\VerifierEffacementRgpd;
 use App\Services\Rgpd\GdprErasureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -159,4 +161,27 @@ test('B15-006 — TEMOIN : les listes d opposition SURVIVENT a l effacement', fu
     // survie de la ligne d'origine.
     expect(DB::table('opt_out')->where('email_hash', hash('sha256', COURRIEL_EFFACE))->count())
         ->toBeGreaterThan(0);
+});
+
+test('B1 / L3c-0 — la preuve différée (constater) est une LECTURE : elle ne supprime aucune ligne de timeline', function () {
+    $espace = espaceResidu();
+    DB::table('activities')->insert([
+        'workspace_id' => $espace,
+        'person_key' => hash('sha256', COURRIEL_EFFACE),
+        'type' => 'inbound',
+        'kind' => 'form_submission',
+        'title' => 'Demande de contact',
+        'payload' => json_encode(['tel' => TEL_EFFACE]),
+        'occurred_at' => now(),
+        'created_at' => now(),
+    ]);
+
+    VerifierEffacementRgpd::constater(COURRIEL_EFFACE, [TEL_EFFACE]);
+    VerifierEffacementRgpd::constater(COURRIEL_EFFACE, [TEL_EFFACE], $espace);
+
+    expect(DB::table('activities')->where('workspace_id', $espace)->count())->toBe(1);
+    // Et les anciens gestes de suppression sont interdits, pas seulement inutilisés.
+    expect(fn () => EffacementCoordonneesFiches::effacer(COURRIEL_EFFACE, [TEL_EFFACE]))->toThrow(LogicException::class);
+    expect(fn () => EffacementCoordonneesFiches::effacerPartout(COURRIEL_EFFACE, [TEL_EFFACE], []))->toThrow(LogicException::class);
+    expect(method_exists(EffacementCoordonneesFiches::class, 'effacerTimeline'))->toBeFalse();
 });

@@ -423,3 +423,19 @@ test('L3c-0 : les commandes de purge refusent, drapeau éteint comme ouvert, et 
     expect(DB::table('contacts')->count())->toBe(2)
         ->and(DB::table('candidates')->count())->toBe(1);
 });
+
+test('M3 : la création de la demande pending est sérialisée par un verrou consultatif (rejeux simultanés du site)', function () {
+    $source = (string) file_get_contents(base_path('app/Crm/Rgpd/SiteGdprService.php'));
+    $debut = strpos($source, 'private function journal(');
+
+    expect($debut)->not->toBeFalse();
+    // Le verrou est pris AVANT la lecture « une demande en attente existe-t-elle ? ».
+    $verrou = strpos($source, 'pg_advisory_xact_lock', (int) $debut);
+    $lecture = strpos($source, "->where('status', 'pending')", (int) $debut);
+    expect($verrou)->not->toBeFalse()
+        ->and($verrou)->toBeLessThan($lecture);
+
+    // Et le verrou s'exécute réellement (dans une transaction, comme l'appelant).
+    $lignes = DB::transaction(fn () => DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0)) AS v', ['rgpd_requests.pending.erasure|x|y@z.test']));
+    expect($lignes)->toHaveCount(1);
+});

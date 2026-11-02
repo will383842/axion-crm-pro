@@ -58,6 +58,7 @@
  *     donc tenue par aucun automatisme, et rien ne le dit jamais a personne.
  */
 
+use App\Crm\Rgpd\SignalementDemandeEffacement;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -403,6 +404,25 @@ test('B17-001 — TEMOIN POSITIF : sans --dry-run, la purge FAIT son travail', f
     expect(DB::table('notifications')->count())->toBe(0);
     // La ligne de run SURVIT : la retention efface la charge utile, pas la meta.
     expect(DB::table('scraper_runs')->where('id', $run)->exists())->toBeTrue();
+});
+
+test('L3c-0 — le signalement RGPD (rgpd.demande_effacement) n est JAMAIS purge, même ancien ; les autres notifications anciennes le sont', function () {
+    $espace = espaceAutomatisme();
+    $utilisateur = utilisateurAutomatisme();
+
+    notificationAncienne($espace, $utilisateur, 400);
+    DB::table('notifications')->insert([
+        'workspace_id' => $espace,
+        'user_id' => $utilisateur,
+        'type' => SignalementDemandeEffacement::TYPE,
+        'title' => 'Demande d effacement',
+        'created_at' => now()->subDays(400),
+    ]);
+
+    Artisan::call('retention:purge', ['--workspace' => $espace, '--force' => true]);
+
+    expect(DB::table('notifications')->where('type', 'test')->count())->toBe(0)
+        ->and(DB::table('notifications')->where('type', SignalementDemandeEffacement::TYPE)->count())->toBe(1);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

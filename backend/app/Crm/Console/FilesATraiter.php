@@ -100,6 +100,11 @@ final class FilesATraiter
     {
         return DB::table('propositions_champs')
             ->where('workspace_id', $espace)
-            ->where('statut', 'en_attente');
+            ->where('statut', 'en_attente')
+            // L3c-0 : une proposition mise à l'écart (demande d'effacement)
+            // n'est plus à valider ; sa valeur reste intacte en base.
+            ->whereNotExists(static fn (Builder $q) => $q->selectRaw('1')
+                ->from('propositions_champs_ecartees as pe')
+                ->whereColumn('pe.proposition_id', 'propositions_champs.id'));
     }
 }

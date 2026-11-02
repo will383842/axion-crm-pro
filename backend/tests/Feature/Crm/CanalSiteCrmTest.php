@@ -126,12 +126,12 @@ function canalCompte(string $slug): array
     //
     // Cette suite mesure le METIER, pas les droits, et son utilisateur n'en
     // avait aucun. Tant qu'aucune route ne portait `permission:`, cela ne se
-    // voyait pas ; depuis, elle recevait 403. On lui donne `admin` : le geste
-    // teste ICI est celui d'un administrateur, et le lui refuser reviendrait a
+    // voyait pas ; depuis, elle recevait 403. On lui donne `owner` (seul porteur de
+    // `rgpd.handle` depuis L3c-0) : le geste teste ICI est celui du proprietaire, et le lui refuser reviendrait a
     // mesurer la garde au lieu du produit. Les droits sont mesures a leur
     // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
     setPermissionsTeamId($user->current_workspace_id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
 
     return [$workspace, $user];
 }

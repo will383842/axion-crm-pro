@@ -259,7 +259,6 @@ function PersonnesContent() {
                       </div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {p.email ?? '—'} · Dernière interaction : {formatDate(p.derniere_interaction_at)}
-                        {p.purge_prevue_le !== null && <> · Purge prévue le {formatDate(p.purge_prevue_le)}</>}
                       </div>
                     </li>
                   ))}

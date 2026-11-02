@@ -4,6 +4,7 @@ namespace App\Services\Rgpd;
 
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
+use App\Crm\Rgpd\MiseAEcart;
 use App\Services\Audit\AuditHashChain;
 use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Effacement RGPD art. 17 — transaction multi-tables atomique.
+ *
+ * ⚠️ L3c-0 (ADR contrat v3 § 6, I3) : personnes, abonnements, contacts, candidats
+ * et praticiens ne sont PLUS supprimés ; ils sont MASQUÉS et mis à l'écart
+ * (`App\Crm\Rgpd\MiseAEcart`). Le texte historique ci-dessous décrit l'ancien
+ * comportement.
  * Toutes les données PII d'un sujet (email/phone) sont supprimées en cascade,
  * un opt-out cross-workspace est créé pour bloquer toute future collecte.
  */
@@ -82,10 +88,17 @@ class GdprErasureService
             // Lot L4-C — `abonnements` part en cascade avec sa personne ; on
             // le compte à part pour que le bilan dise ce qui a disparu.
             $personnesIds = self::personnesDe($email)->pluck('id')->all();
-            $deleted['abonnements'] = DB::table('abonnements')->whereIn('personne_id', $personnesIds)->delete();
-            $deleted['personnes'] = DB::table('personnes')->whereIn('id', $personnesIds)->delete();
+            // L3c-0 (ADR contrat v3 § 6, I3) : la personne est MISE À L'ÉCART,
+            // jamais supprimée. Les clés du bilan sont conservées (nombre de
+            // lignes mises à l'écart).
+            $ecart = MiseAEcart::personnes($personnesIds, 'demande_effacement');
+            $deleted['abonnements'] = $ecart['abonnements'];
+            $deleted['personnes'] = $ecart['personnes'];
 
-            $deleted['contacts'] = DB::table('contacts')->where('email', $email)->delete();
+            $deleted['contacts'] = MiseAEcart::contacts(
+                DB::table('contacts')->where('email', $email)->pluck('id')->all(),
+                'demande_effacement',
+            );
             $deleted['email_validations'] = DB::table('email_validations')->where('email', $email)->delete();
 
             // 🔴 LE JUMEAU D'`email_validations` (B10-004, mesure 2026-08-20).
@@ -124,7 +137,7 @@ class GdprErasureService
                     }
                 })
                 ->pluck('id')->all()));
-            $deleted['contacts'] += LienJournalisteContact::effacerContactsDe($journalistesEffaces);
+            $deleted['contacts'] += LienJournalisteContact::masquerContactsDe($journalistesEffaces, 'demande_effacement');
             $deleted['journalists'] = DB::table('journalists')
                 ->whereIn('id', $journalistesEffaces)
                 ->update([
@@ -148,14 +161,14 @@ class GdprErasureService
             // vivier ; celui-ci, appele depuis la console et l'API, ne les
             // touchait pas du tout. Une meme personne etait donc effacee ou non
             // selon la porte par laquelle la demande arrivait (B15-006).
-            $deleted['candidates'] = DB::table('candidates')
+            $deleted['candidates'] = MiseAEcart::candidats(DB::table('candidates')
                 ->where(function ($q) use ($email, $phone) {
                     $q->where('email', $email);
                     if ($phone !== null && $phone !== '') {
                         $q->orWhere('phone', $phone);
                     }
                 })
-                ->delete();
+                ->pluck('id')->all(), 'demande_effacement');
 
             // ── LA TIMELINE, ET C'EST LA QUE LE TELEPHONE SURVIVAIT ──────────
             //
@@ -239,7 +252,8 @@ class GdprErasureService
                         $q->orWhere('phone', $phone);
                     }
                 })
-                ->delete();
+                ->whereNull('deleted_at')
+                ->update(['deleted_at' => now()]);
 
             // ── LES TITULAIRES DE COMPTE DU CRM (B10-004, ce qui en restait) ──
             //

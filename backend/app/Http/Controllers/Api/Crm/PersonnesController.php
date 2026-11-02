@@ -738,28 +738,10 @@ class PersonnesController extends ConsoleController
             'contact_id' => $p->contact_id === null ? null : (int) $p->contact_id,
             'company_id' => $p->company_id === null ? null : (int) $p->company_id,
             'entreprise' => ($p->denomination ?? null) ?? ($p->siren ?? null),
-            // Horloge de conservation AFFICHÉE : 3 ans sans interaction pour une
-            // personne non rattachée et non abonnée (purge `rgpd:purge-personnes`).
-            'purge_prevue_le' => $this->purgePrevue($p),
+            // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée pour
+            // les lecteurs existants, valeur toujours `null`.
+            'purge_prevue_le' => null,
         ];
-    }
-
-    private function purgePrevue(\stdClass $p): ?string
-    {
-        if ($p->contact_id !== null || ($p->statut_lettre ?? null) === 'abonne') {
-            return null;
-        }
-
-        $base = $p->derniere_interaction_at ?? $p->premiere_source_at ?? null;
-        if (! is_string($base) || $base === '') {
-            return null;
-        }
-
-        try {
-            return (new \DateTimeImmutable($base))->modify('+3 years')->format('Y-m-d');
-        } catch (\Exception) {
-            return null;
-        }
     }
 
     /** @return array<string, mixed> */

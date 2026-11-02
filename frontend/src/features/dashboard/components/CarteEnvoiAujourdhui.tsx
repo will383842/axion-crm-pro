@@ -1,8 +1,9 @@
 /**
  * « Envoi aujourd'hui » — la carte de l'accueil du CRM, présente SEULEMENT si
  * Envoi est actif pour l'espace (le CRM seul ne change pas). Elle dit : les
- * réponses à traiter, le feu des envois, et mène à Envoi. Les ouvertures ne
- * sont jamais mesurées : la carte n'en parle pas.
+ * réponses à traiter, le feu des envois, et mène à Envoi. Elle ne parle ni
+ * d'ouvertures (au plus une estimation, campagne par campagne quand le pixel est
+ * activé, montrée dans Envoi) ni de clics (jamais mesurés).
  */
 import { Link } from '@tanstack/react-router';
 import { Send } from 'lucide-react';

@@ -538,7 +538,8 @@ describe('DashboardPage — carte « Envoi aujourd’hui » (DM1-ACC)', () => {
     expect(carte).toHaveTextContent(/État des envois : normaux/);
     expect(within(carte).getByRole('link', { name: /Ouvrir Envoi/ })).toHaveAttribute('href', '/envoi/campagnes');
     expect(within(carte).getByRole('link', { name: /réponses à traiter/ })).toHaveAttribute('href', '/envoi/reponses');
-    // Les ouvertures ne sont jamais mesurées : la carte n'en parle pas.
+    // Ni ouvertures (estimation réservée aux campagnes avec pixel, dans Envoi) ni clics (jamais).
     expect(carte).not.toHaveTextContent(/ouvertures?/i);
+    expect(carte).not.toHaveTextContent(/clics?\b/i);
   });
 });

@@ -31,8 +31,12 @@ return new class extends Migration
         }
     }
 
-    /** Retour arrière INERTE : on ne retire ni colonne ni donnée. */
+    /**
+     * Retour arrière INERTE mais réel (NR-17 : aller, retour, aller sans erreur) :
+     * on ne retire ni colonne ni marqueur, on ne fait que le consigner.
+     */
     public function down(): void
     {
+        DB::statement("COMMENT ON COLUMN personne_origines_archive.masque_le IS 'Mise a l ecart (ADR 7, I5) : conservee au retour arriere.'");
     }
 };

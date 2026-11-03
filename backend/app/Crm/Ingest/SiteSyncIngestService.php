@@ -48,6 +48,7 @@ final class SiteSyncIngestService
         private readonly ContactUpserter $contacts,
         private readonly PersonnesIngestService $personnes,
         private readonly DossierClientIngest $dossiers,
+        private readonly LimiteOrigines $limiteOrigines,
     ) {}
 
     public function ingest(SiteSyncEvent $event): IngestOutcome
@@ -136,17 +137,21 @@ final class SiteSyncIngestService
             );
         }
 
+        // Contrat v3 : une charge qui porte des `origines` et qui ne peut pas les
+        // écrire (migration absente, branche « personnes » fermée, type
+        // d'événement hors « personnes ») n'est JAMAIS acquittée : 503, aucune
+        // valeur reçue dans la réponse, le site renverra la charge.
+        // CE CONTRÔLE VIENT AVANT LA BRANCHE « DOSSIER CLIENT » : le dossier
+        // n'écrit pas d'`origines`, et une charge qui en porte ne doit pas
+        // recevoir un 2xx qui les perdrait en silence.
+        $this->personnes->assurerOriginesEcrivables($event);
+        $this->limiteOrigines->controler($event);
+
         // Dossier client de la console : son propre chemin, ses propres
         // garde-fous (`DossierClientIngest`) — jamais `upsertBusiness`.
         if ($event->eventType === DossierClient::EVENT_TYPE) {
             return $this->dossiers->ingerer($event, $workspaceId, $activityRef);
         }
-
-        // Contrat v3 : une charge qui porte des `origines` et qui ne peut pas les
-        // écrire (migration absente, branche « personnes » fermée, type
-        // d'événement hors « personnes ») n'est JAMAIS acquittée : 503, aucune
-        // valeur reçue dans la réponse, le site renverra la charge.
-        $this->personnes->assurerOriginesEcrivables($event);
 
         // Lot L4-C — la lettre et le guide vers `personnes`, AVANT
         // `upsertBusiness` : sans cela, un abonné sans SIREN retombait dans

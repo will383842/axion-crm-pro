@@ -268,6 +268,8 @@ final class PersonnesIngestService
 
             $fusion = ContenusAccords::fusionnerOrigines($this->decoder($ligne->origines ?? null) ?? [], $entrantes);
 
+            $archiveAvant = $fusion['archive'] === [] ? 0 : DB::table('personne_origines_archive')->where('personne_id', $personneId)->count();
+
             foreach ($fusion['archive'] as $entree) {
                 DB::table('personne_origines_archive')->insertOrIgnore([
                     'workspace_id' => $workspaceId,
@@ -281,6 +283,16 @@ final class PersonnesIngestService
             DB::table('personnes')->where('id', $personneId)->update([
                 'origines' => $this->json($fusion['garde']),
             ]);
+
+            // ADR I3 : l'archive d'une personne dépasse 200 entrées → alerte (une fois).
+            if ($fusion['archive'] !== []) {
+                AlerteArchiveOrigines::siFranchi(
+                    $workspaceId,
+                    $personneId,
+                    $archiveAvant,
+                    DB::table('personne_origines_archive')->where('personne_id', $personneId)->count(),
+                );
+            }
         });
     }
 

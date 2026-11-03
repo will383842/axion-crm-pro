@@ -222,3 +222,149 @@ test('OV3 10 — interrupteur éteint : ni champ ni filtre dans l\'API', functio
         ->and($liste->json('data.0'))->not->toHaveKey('origine');
     expect($this->getJson("/api/v1/crm/personnes/{$id}")->assertOk()->json())->not->toHaveKey('origines');
 });
+
+// ── Corrections de revue (PR #416) ─────────────────────────────────────────
+
+/** Charge v3 d'un type NON « personnes » (chemin entreprise) — jamais écrite dans `personnes`. */
+function ov3Business(array $origines): array
+{
+    return [
+        'schema_version' => 3,
+        'event_id' => (string) Str::uuid(),
+        'event_type' => 'form_submission',
+        'form_type' => 'audit',
+        'occurred_at' => '2026-11-01T10:00:00Z',
+        'subject_ref' => 'site:submission:' . Str::uuid(),
+        'person' => ['person_key' => hash('sha256', 'ov3b|' . OV3_EMAIL), 'email' => OV3_EMAIL, 'first_name' => 'Jean', 'last_name' => 'ZZ TEST'],
+        'company' => ['siren' => '900000101', 'name' => 'ZZ TEST SAS', 'postcode' => '38000', 'city' => 'Grenoble'],
+        'consent' => ['version' => 'v1-2026-05-24', 'at' => '2026-11-01T09:59:00Z', 'text_ref' => 'unified-contact-form'],
+        'origines' => $origines,
+    ];
+}
+
+function ov3AssertRienEcrit(): void
+{
+    expect(DB::table('personnes')->count())->toBe(0)
+        ->and(DB::table('activities')->count())->toBe(0);
+}
+
+test('OV3 11 — perte silencieuse : personnes fermé, interrupteur allumé → 503 sans valeur reçue, rien d\'écrit', function () {
+    config(['crm.ingest.personnes_enabled' => false]);
+
+    $r = ov3Post(ov3Evenement('2026-11-01T10:00:00Z', [ov3Entree(['commentaire_ref' => str_repeat('b', 64)])]));
+
+    $r->assertStatus(503);
+    expect($r->getContent())->not->toContain(str_repeat('b', 64))->not->toContain('post_ref_test_01')->not->toContain(OV3_EMAIL);
+    ov3AssertRienEcrit();
+});
+
+test('OV3 12 — perte silencieuse : type d\'événement non « personnes » portant des origines → 503', function () {
+    $r = ov3Post(ov3Business([ov3Entree()]));
+
+    $r->assertStatus(503);
+    expect($r->getContent())->not->toContain('post_ref_test_01')->not->toContain(OV3_EMAIL);
+    ov3AssertRienEcrit();
+    expect(DB::table('companies')->count())->toBe(0);
+});
+
+test('OV3 13 — perte silencieuse : colonne origines absente → 503, rien d\'écrit', function () {
+    DB::statement('DROP INDEX IF EXISTS idx_personnes_origines_gin');
+    DB::statement('ALTER TABLE personnes DROP COLUMN origines');
+
+    $r = ov3Post(ov3Evenement('2026-11-01T10:00:00Z', [ov3Entree()]));
+
+    $r->assertStatus(503);
+    expect($r->getContent())->not->toContain('post_ref_test_01');
+    ov3AssertRienEcrit();
+});
+
+test('OV3 14 — perte silencieuse : table d\'archive absente → 503, rien d\'écrit', function () {
+    DB::statement('DROP TABLE personne_origines_archive');
+
+    ov3Post(ov3Evenement('2026-11-01T10:00:00Z', [ov3Entree()]))->assertStatus(503);
+
+    ov3AssertRienEcrit();
+});
+
+test('OV3 15 — charge v3 SANS origines sur un type non « personnes » : inchangé (pas de 503)', function () {
+    $e = ov3Business([]);
+    ov3Post($e)->assertOk();
+    expect(DB::table('activities')->count())->toBe(1);
+});
+
+test('OV3 16 — activities.payload : aucun commentaire_ref ni origines en clair (personnes et entreprise)', function () {
+    $ref = str_repeat('c', 64);
+    $entree = ov3Entree(['commentaire_ref' => $ref]);
+
+    // Personnes : la fixture v3 porte `origines` et `origine_contenu` dans `payload`.
+    $e = ov3Evenement('2026-11-01T10:00:00Z', [$entree]);
+    $e['payload'] = ['origines' => [$entree], 'origine_contenu' => ['mot' => 'guide', 'reseau' => 'instagram', 'guide' => 'guide-ia', 'date' => '2026-11-01T10:00:00Z'], 'source' => 'guide'];
+    ov3Post($e)->assertOk();
+
+    // Entreprise (v1) : le payload libre est recopié tel quel — il doit être filtré, y compris en profondeur.
+    $b = ov3Business([]);
+    unset($b['origines']);
+    $b['schema_version'] = 1;
+    $b['payload'] = ['origines' => [$entree], 'origine_contenu' => ['mot' => 'guide'], 'imbrique' => ['commentaire_ref' => $ref], 'besoin' => 'audit'];
+    ov3Post($b)->assertOk();
+
+    $lignes = DB::table('activities')->pluck('payload')->all();
+    expect($lignes)->toHaveCount(2);
+    foreach ($lignes as $brut) {
+        expect($brut)->not->toContain('commentaire_ref')->not->toContain($ref)->not->toContain('origines')->not->toContain('origine_contenu');
+    }
+    // Le reste du payload est conservé.
+    expect(DB::table('activities')->where('kind', 'form_submission')->value('payload'))->toContain('besoin');
+});
+
+test('OV3 17 — fusion de doublons de personnes : union sans retrait de origines + archive', function () {
+    $ws = $this->workspace->id;
+    $garde = ov3Fiche('zz.garde@exemple.test', [ov3Entree(['post_ref' => 'post_ref_garde_01', 'date' => '2026-11-01T10:00:00Z'])]);
+    $abs = ov3Fiche('zz.absorbee@exemple.test', [ov3Entree(['post_ref' => 'post_ref_abs_001', 'date' => '2026-11-02T10:00:00Z'])]);
+    foreach ([[$abs, 'post_ref_abs_old1', '2026-10-01T10:00:00Z']] as [$id, $pr, $d]) {
+        DB::table('personne_origines_archive')->insert([
+            'workspace_id' => $ws, 'personne_id' => $id, 'cle' => \App\Crm\Ingest\ContenusAccords::cleOrigine(ov3Entree(['post_ref' => $pr, 'date' => $d])),
+            'origine' => json_encode(ov3Entree(['post_ref' => $pr, 'date' => $d])), 'archive_le' => now(),
+        ]);
+    }
+
+    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
+    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs); // idempotent
+
+    $gardeRefs = collect(json_decode((string) DB::table('personnes')->where('id', $garde)->value('origines'), true))->pluck('post_ref')->all();
+    expect($gardeRefs)->toBe(['post_ref_garde_01', 'post_ref_abs_001'])
+        ->and(DB::table('personne_origines_archive')->where('personne_id', $garde)->count())->toBe(1)
+        // Rien n'est retiré de la fiche absorbée ni de son archive.
+        ->and(json_decode((string) DB::table('personnes')->where('id', $abs)->value('origines'), true))->toHaveCount(1)
+        ->and(DB::table('personne_origines_archive')->where('personne_id', $abs)->count())->toBe(1)
+        ->and(DB::table('personnes')->count())->toBe(2);
+});
+
+test('OV3 18 — fusion : au-delà de 50, la plus ancienne passe dans l\'archive (plafond puis archive), rien de supprimé', function () {
+    $ws = $this->workspace->id;
+    $mk = fn (int $debut, int $n) => array_map(fn ($i) => ov3Entree(['post_ref' => sprintf('post_ref_%04d', $i), 'date' => gmdate('Y-m-d\TH:i:s\Z', 1_793_000_000 + $i * 60)]), range($debut, $debut + $n - 1));
+    $garde = ov3Fiche('zz.garde2@exemple.test', $mk(0, 30));
+    $abs = ov3Fiche('zz.absorbee2@exemple.test', $mk(30, 30));
+
+    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
+
+    $origines = json_decode((string) DB::table('personnes')->where('id', $garde)->value('origines'), true);
+    expect($origines)->toHaveCount(50)
+        ->and(DB::table('personne_origines_archive')->where('personne_id', $garde)->count())->toBe(10)
+        ->and(collect($origines)->pluck('post_ref')->first())->toBe('post_ref_0010');
+});
+
+test('OV3 19 — interrupteur éteint : une famille de plus de 80 caractères n\'est PAS refusée (comportement inchangé)', function () {
+    config(['origines.v3_enabled' => false]);
+    $this->actingAs(ov3Admin());
+
+    $this->getJson('/api/v1/crm/personnes?origine_famille=' . str_repeat('x', 100))->assertOk();
+    $this->getJson('/api/v1/crm/personnes?origine_detail=' . str_repeat('x', 100))->assertOk();
+});
+
+test('OV3 20 — interrupteur allumé : famille ou détail de plus de 80 caractères refusé (422)', function () {
+    $this->actingAs(ov3Admin());
+
+    $this->getJson('/api/v1/crm/personnes?origine_famille=' . str_repeat('x', 100))->assertStatus(422);
+    $this->getJson('/api/v1/crm/personnes?origine_famille=guide_reseau&origine_detail=' . str_repeat('x', 100))->assertStatus(422);
+});

@@ -360,6 +360,16 @@
         "sauts": 1
     },
     {
+        "tache": "origines:masquer-commentaire-ref",
+        "horaire": "40 3 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
         "tache": "prospection:score-email-confidence",
         "horaire": "45 4 * * *",
         "fuseau": "Europe/Paris",

@@ -33,7 +33,7 @@ final class LimiteOrigines
 
         $cles = [];
         foreach ($origines as $o) {
-            if (is_array($o) && isset($o['post_ref'], $o['canal'])) {
+            if (isset($o['post_ref'], $o['canal'])) {
                 $cles['origines:pc:' . sha1($o['post_ref'] . '|' . $o['canal'])] = true;
             }
         }

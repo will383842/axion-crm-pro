@@ -77,6 +77,9 @@ class OriginesMasquerCommentaireRef extends Command
             foreach ($ids as $id) {
                 $total += DB::transaction(function () use ($id, $limite): int {
                     $ligne = DB::table('personnes')->where('id', $id)->lockForUpdate()->first(['origines']);
+                    if ($ligne === null) {
+                        return 0;
+                    }
                     $liste = is_string($ligne->origines ?? null) ? json_decode($ligne->origines, true) : ($ligne->origines ?? null);
                     if (! is_array($liste)) {
                         return 0;

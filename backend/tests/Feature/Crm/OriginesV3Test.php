@@ -1,5 +1,7 @@
 <?php
 
+use App\Crm\Ingest\ContenusAccords;
+use App\Crm\Ingest\FusionOriginesPersonnes;
 use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
@@ -323,13 +325,13 @@ test('OV3 17 — fusion de doublons de personnes : union sans retrait de origine
     $abs = ov3Fiche('zz.absorbee@exemple.test', [ov3Entree(['post_ref' => 'post_ref_abs_001', 'date' => '2026-11-02T10:00:00Z'])]);
     foreach ([[$abs, 'post_ref_abs_old1', '2026-10-01T10:00:00Z']] as [$id, $pr, $d]) {
         DB::table('personne_origines_archive')->insert([
-            'workspace_id' => $ws, 'personne_id' => $id, 'cle' => \App\Crm\Ingest\ContenusAccords::cleOrigine(ov3Entree(['post_ref' => $pr, 'date' => $d])),
+            'workspace_id' => $ws, 'personne_id' => $id, 'cle' => ContenusAccords::cleOrigine(ov3Entree(['post_ref' => $pr, 'date' => $d])),
             'origine' => json_encode(ov3Entree(['post_ref' => $pr, 'date' => $d])), 'archive_le' => now(),
         ]);
     }
 
-    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
-    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs); // idempotent
+    app(FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
+    app(FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs); // idempotent
 
     $gardeRefs = collect(json_decode((string) DB::table('personnes')->where('id', $garde)->value('origines'), true))->pluck('post_ref')->all();
     expect($gardeRefs)->toBe(['post_ref_garde_01', 'post_ref_abs_001'])
@@ -346,7 +348,7 @@ test('OV3 18 — fusion : au-delà de 50, la plus ancienne passe dans l\'archive
     $garde = ov3Fiche('zz.garde2@exemple.test', $mk(0, 30));
     $abs = ov3Fiche('zz.absorbee2@exemple.test', $mk(30, 30));
 
-    app(\App\Crm\Ingest\FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
+    app(FusionOriginesPersonnes::class)->fusionner($ws, $garde, $abs);
 
     $origines = json_decode((string) DB::table('personnes')->where('id', $garde)->value('origines'), true);
     expect($origines)->toHaveCount(50)

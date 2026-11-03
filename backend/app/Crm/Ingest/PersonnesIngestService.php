@@ -335,13 +335,6 @@ final class PersonnesIngestService
             && Schema::hasTable('personne_origines_archive');
     }
 
-    private static function colonneOriginesPresente(): bool
-    {
-        static $presente = false;
-
-        return $presente = $presente || Schema::hasColumn('personnes', 'origines');
-    }
-
     private function json(mixed $valeur): ?string
     {
         return $valeur === null ? null : json_encode($valeur, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);

@@ -142,6 +142,12 @@ final class SiteSyncIngestService
             return $this->dossiers->ingerer($event, $workspaceId, $activityRef);
         }
 
+        // Contrat v3 : une charge qui porte des `origines` et qui ne peut pas les
+        // écrire (migration absente, branche « personnes » fermée, type
+        // d'événement hors « personnes ») n'est JAMAIS acquittée : 503, aucune
+        // valeur reçue dans la réponse, le site renverra la charge.
+        $this->personnes->assurerOriginesEcrivables($event);
+
         // Lot L4-C — la lettre et le guide vers `personnes`, AVANT
         // `upsertBusiness` : sans cela, un abonné sans SIREN retombait dans
         // l'arbitrage. Drapeau fermé : cette branche est sautée et tout ce qui
@@ -687,7 +693,10 @@ final class SiteSyncIngestService
         ?int $contactId,
         string $activityRef,
     ): int {
-        $payload = $event->payload;
+        // `origines`, `origine_contenu` et `commentaire_ref` ne vont jamais en
+        // clair dans la timeline : ils vivent dans `personnes` (le jeton de
+        // commentaire y est stocké en empreinte).
+        $payload = self::sansOrigines($event->payload);
         $payload['source_slug'] = $event->sourceSlug;
         $payload['subject_ref'] = $event->subjectRef;
 
@@ -741,6 +750,25 @@ final class SiteSyncIngestService
             'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * Retire, à toute profondeur, les clés d'origine (contrat v3) d'un payload.
+     *
+     * @param  array<mixed>  $payload
+     * @return array<mixed>
+     */
+    private static function sansOrigines(array $payload): array
+    {
+        $sortie = [];
+        foreach ($payload as $cle => $valeur) {
+            if (in_array($cle, ['origines', 'origine_contenu', 'commentaire_ref'], true)) {
+                continue;
+            }
+            $sortie[$cle] = is_array($valeur) ? self::sansOrigines($valeur) : $valeur;
+        }
+
+        return $sortie;
     }
 
     private function activityTitle(SiteSyncEvent $event): string

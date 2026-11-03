@@ -626,9 +626,11 @@ class PersonnesController extends ConsoleController
             'nature' => ['nullable', 'string', 'in:' . implode(',', Taxonomy::PERSONNE_EMAIL_NATURES)],
             'rattachee' => ['nullable', 'string', 'in:oui,non'],
             'q' => ['nullable', 'string', 'max:120'],
-            // Contrat v3 de l'origine : filtre par famille / détail du dictionnaire fermé.
-            'origine_famille' => ['nullable', 'string', 'max:80'],
-            'origine_detail' => ['nullable', 'string', 'max:80'],
+            // Contrat v3 de l'origine : filtre par famille / détail du dictionnaire
+            // fermé. Plafond de 80 caractères SEULEMENT interrupteur allumé :
+            // éteint, comportement historique inchangé.
+            'origine_famille' => ['nullable', 'string', ...($this->origineV3Active() ? ['max:80'] : [])],
+            'origine_detail' => ['nullable', 'string', ...($this->origineV3Active() ? ['max:80'] : [])],
         ]);
 
         [$origineFamille, $origineDetail] = $this->filtreOrigine($v['origine_famille'] ?? null, $v['origine_detail'] ?? null);

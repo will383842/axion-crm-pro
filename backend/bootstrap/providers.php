@@ -9,6 +9,7 @@ use App\Providers\MockServicesProvider;
 use App\Providers\ProvenanceTiersServiceProvider;
 use App\Providers\RouteServiceProvider;
 use App\Providers\TelescopeServiceProvider;
+use App\Socle\Demarrage\GardesDemarrage;
 
 return [
     CanauxSignesServiceProvider::class,
@@ -20,4 +21,5 @@ return [
     MockServicesProvider::class,
     TelescopeServiceProvider::class,
     RouteServiceProvider::class,
+    GardesDemarrage::class,
 ];

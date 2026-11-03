@@ -24,7 +24,7 @@
 | **`ContactsHubPage.tsx`** + `/crm/contacts-hub` + `/counts` | frontend + API | Le hub et ses compteurs — pièce 1 déjà livrée et optimisée. |
 | **`tags`** gouvernés (`slug`, `category`, `kind`, `is_locked`, `namespace` généré) + `company_tag` / `candidate_tag` + `TagsManagerPage.tsx` | base + frontend | **Les tags libres du §27 existent déjà**, avec leur gouvernance (`Taxonomy::TAG_NAMESPACES`). Rien à créer. |
 | **`saved_views`** (`entity`, `filters jsonb`, `is_default`) | base | La table des **vues épinglées** est là, à la colonne près. ⚠️ voir §3 : personne ne l'utilise. |
-| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`, `produit`, `gravite`) | base + cloche in-app | Table **alimentée** depuis le lot S9 : le producteur est `App\Socle\Alertes\Notifier` (alertes console + e-mail) ; `read` et `read-all` sont réels. Lue par `NotificationsController` et l'export RGPD, purgée par la rétention et l'effacement. Historique de l'ancien manque : §3 ter. |
+| **`notifications`** (`type`, `title`, `body`, `action_url`, `read_at`, `produit`, `gravite`) | base + cloche in-app | Table alimentée : lue par `NotificationsController` et l'export RGPD, purgée par la rétention. **Producteurs** : `App\Crm\Rgpd\SignalementDemandeEffacement` (lot L3c-0, signalement à Will d'une demande d'effacement) et `App\Socle\Alertes\Notifier` (lot S9, alertes console + e-mail) ; `POST /notifications/{n}/read` et `read-all` sont réels (lot S9). |
 | **`Taxonomy`** — source de vérité unique, listes fermées, comparées aux `CHECK` réels par `Feature\Crm\SocleCrmTest` | `app/Crm/Taxonomy.php` | **Le patron à suivre** pour toute nouvelle taxonomie de 1a (activités, motifs) : ajouter une valeur sans migration fait ROUGIR la CI. |
 | **`crm-console`** middleware + drapeau `crm.console_v2` | `routes/api.php` | Tout `/v1/crm/*` est déjà derrière un drapeau. `CRM_CONSOLE_V2_ENABLED=true` **vérifié sur la production le 19/08**. |
 | **`ArbitragePage`** + `/crm/arbitrage/*` | frontend + API | Rapprochement / arbitrage des doublons — servira le §1.2 et l'étape 1c. |
@@ -149,37 +149,6 @@ pas de rattachement à une **activité**, que le §2.4 rend obligatoire.
 les **noms** et les colonnes qui conviennent, et les étendre par migration
 additive ; ne pas créer `tasks` à côté de `crm_tasks`, ce qui donnerait deux
 tables pour une notion — la faute exacte que le §28.5 cherche à éviter.
-
-### 3 ter. (historique, résolu par le lot S9) `notifications` — était lue, exportée, purgée… et jamais alimentée
-
-Ce document affirmait, jusqu'au 2026-08-22, que `notifications` était
-**« Vivante. Sert les rappels et les notifications de 1a. »** C'est faux, et
-c'est la sorte de phrase qui coûte cher : elle range la table au §1 (« à
-étendre »), et l'auteur de la pièce découvre l'absence de producteur au milieu
-du travail.
-
-**Mesure du 2026-08-22** (constat I48-006), `grep` de `'notifications'` sur
-`backend/app`, `backend/routes`, `backend/config`, `backend/database/seeders` :
-
-| Rôle | Qui | Où |
-|---|---|---|
-| Lecture | cloche in-app | `NotificationsController::index` (`DB::table('notifications')`) |
-| Lecture | export RGPD art. 15/20 | `GdprPortabilityService` |
-| Suppression | rétention > 90 j | `RetentionPurge` |
-| Suppression | droit à l'effacement | `GdprErasureService` |
-| Surveillance | inventaire de sécurité | `PentestSelfCheck` |
-| **Écriture** | **personne** | **aucun `insert`, aucun modèle Eloquent `Notification`, aucun `->notify()`** |
-
-Le trait `Notifiable` est bien déclaré sur `App\Models\User`, et n'est appelé
-nulle part. Et `POST /notifications/{n}/read` comme `POST /notifications/read-all`
-répondent encore **501**.
-
-Autrement dit : la cloche est câblée de bout en bout **sauf** au bout qui
-compte. La table n'est pas à étendre — **le producteur est à écrire**, et les
-deux `501` avec lui. La garde
-`Feature\Infra\InventaireEtape1aNeMentPasSurNotificationsTest` tient les deux
-bouts : le jour où un écrivain apparaît, elle rougit et renvoie ici pour
-reclasser la ligne en §1.
 
 ---
 

@@ -75,17 +75,19 @@ class MagicLinkService
     public function consume(string $token): ?User
     {
         $tokenHash = hash('sha256', $token);
-        $row = DB::table('magic_links')
-            ->where('token_hash', $tokenHash)
-            ->whereNull('consumed_at')
-            ->where('expires_at', '>', now())
-            ->first();
+
+        // 🔴 ANTI-REJEU ATOMIQUE (lot S1). « Lire puis marquer consommé » laissait deux
+        // requêtes simultanées lire toutes deux la ligne libre, et ouvrir deux sessions
+        // avec un seul lien. Un seul UPDATE conditionnel désigne UN gagnant : la base
+        // sérialise les écritures, les perdants ne modifient aucune ligne.
+        $row = DB::selectOne(
+            'UPDATE magic_links SET consumed_at = ? WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ? RETURNING user_id',
+            [now(), $tokenHash, now()],
+        );
 
         if (! $row) {
             return null;
         }
-
-        DB::table('magic_links')->where('id', $row->id)->update(['consumed_at' => now()]);
 
         // On resout par `user_id`, jamais par adresse : un lien vaut pour LE compte
         // auquel il a ete emis, pas pour le compte qui portera cette adresse plus

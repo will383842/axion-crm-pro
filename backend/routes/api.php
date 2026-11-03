@@ -308,8 +308,11 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:companies.update');
         Route::post('/journalists/{journalist}/opt-out', [JournalistsController::class, 'optOut'])
             ->middleware('permission:rgpd.handle');
+        // L3c-0 : cette route pose désormais une OPPOSITION RGPD (mise à
+        // l'écart, plus aucune suppression) : elle exige `rgpd.handle`, comme
+        // `opt-out`, et non plus seulement `companies.delete`.
         Route::delete('/journalists/{journalist}', [JournalistsController::class, 'destroy'])
-            ->middleware('permission:companies.delete');
+            ->middleware('permission:rgpd.handle');
 
         // Coverage
         Route::get('/coverage', [CoverageController::class, 'index']);
@@ -440,8 +443,9 @@ Route::prefix('v1')->group(function () {
         // Mesure le 2026-08-19 (audit 360, B15-010, S0).
         //
         // Les permissions existaient deja et le modele etait juste : `viewer` et
-        // `operator` ont `rgpd.view` (consulter), seuls `owner` et `admin` ont
-        // `rgpd.handle` (agir). Elles n'etaient simplement jamais exigees.
+        // `operator` ont `rgpd.view` (consulter) ; depuis L3c-0, SEUL `owner` a
+        // `rgpd.handle` (agir) : il est retire du role `admin`. Elles
+        // n'etaient simplement jamais exigees.
         Route::get('/rgpd/requests', [RgpdRequestsController::class, 'index'])
             ->middleware('permission:rgpd.view');
         Route::post('/rgpd/requests', [RgpdRequestsController::class, 'store'])

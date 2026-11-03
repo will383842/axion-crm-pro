@@ -170,8 +170,11 @@ test('F36-001 — combien de controleurs invoquent REELLEMENT la couche : le com
         "Seulement {$inspectes} controleurs inspectes : le balayage ne voit pas ce qu'il croit voir.",
     );
 
+    // S6 (2026-11-02) : `UsersController` invoque la couche d'autorisation
+    // (`nommerRole`, `gererCompte`) pour qu'un admin ne nomme ni ne touche
+    // jamais un owner ; la garde est mesurée par `tests/Feature/Droits/OwnerProtegeTest.php`.
     expect($avecAppel)->toBe(
-        [],
+        ['Api/UsersController.php'],
         '🟢 BONNE NOUVELLE, ET IL FAUT AGIR EN CONSEQUENCE : des controleurs invoquent desormais '
         . "la couche d'autorisation, alors que le compte fige ici est ZERO.\n\n"
         . "Ce test n'est pas une interdiction : c'est un COMPTEUR. Le constat F36-001 (« aucune "

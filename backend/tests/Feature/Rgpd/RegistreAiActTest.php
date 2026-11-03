@@ -48,7 +48,7 @@ function espaceRegistreIa(string $marque): Workspace
 }
 
 /** Un compte rattache a cet espace, portant le role demande. */
-function compteRegistreIa(Workspace $espace, string $role = 'admin'): User
+function compteRegistreIa(Workspace $espace, string $role = 'owner'): User
 {
     test()->seed(PermissionsAndRolesSeeder::class);
 

@@ -132,6 +132,9 @@ class UsersController extends ApiController
             'timezone' => ['sometimes', 'string', 'max:64'],
         ]);
 
+        // S6 : un admin ne nomme JAMAIS un owner (403, rien n'est créé).
+        $this->authorize('nommerRole', [User::class, $valide['role']]);
+
         // `users.email` est `CITEXT NOT NULL UNIQUE` : la casse ne distingue
         // pas deux adresses. On compare donc sans casse, et AVANT d'ecrire,
         // pour rendre un 422 qui nomme le champ au lieu d'une `QueryException`
@@ -338,6 +341,9 @@ class UsersController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($user, 'current_workspace_id');
 
+        // S6 : un owner est protégé ; seul un owner le modifie.
+        $this->authorize('gererCompte', $user);
+
         // 🔑 G43-005 — VERROU OPTIMISTE. La garde `VerrouOptimisteEtenduTest`
         // avait ANTICIPE ce moment : « un update() qui rend 501 n'ecrit rien :
         // il n'y a pas de saisie a perdre. Le jour ou il est cable, il
@@ -355,6 +361,11 @@ class UsersController extends ApiController
             'timezone' => ['sometimes', 'string', 'max:64'],
             'role' => ['sometimes', Rule::in(self::ROLES)],
         ]);
+
+        // S6 : un admin ne nomme JAMAIS un owner.
+        if (array_key_exists('role', $valide)) {
+            $this->authorize('nommerRole', [User::class, $valide['role']]);
+        }
 
         $espace = (string) $user->current_workspace_id;
 
@@ -409,6 +420,9 @@ class UsersController extends ApiController
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($user, 'current_workspace_id');
+
+        // S6 : un owner est protégé ; seul un owner ferme son compte.
+        $this->authorize('gererCompte', $user);
 
         $moi = $r->user();
 

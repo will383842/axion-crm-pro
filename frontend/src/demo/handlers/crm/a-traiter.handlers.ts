@@ -41,6 +41,7 @@ export function compteursATraiter() {
     a_rattacher: z.arbitrages.filtrer((a) => a.statut === 'en_attente').length,
     propositions: z.propositions.filtrer((p) => p.statut === 'en_attente').length,
     taches_en_retard: nombreTachesEnRetard(),
+    demandes_rgpd: 0,
   };
 }
 
@@ -149,7 +150,7 @@ function projeter(p: PropositionDemo) {
 export const handlers: HttpHandler[] = [
   http.get(api('/crm/a-traiter/compteurs'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { doublons: 0, a_rattacher: 0, propositions: 0, taches_en_retard: 0 });
+    const force = await repondreEtatForce(request, { doublons: 0, a_rattacher: 0, propositions: 0, taches_en_retard: 0, demandes_rgpd: 0 });
     if (force) return force;
     return HttpResponse.json(compteursATraiter());
   }),

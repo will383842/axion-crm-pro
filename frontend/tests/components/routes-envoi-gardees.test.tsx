@@ -306,6 +306,10 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
  * il met ces empreintes à jour et l'écrit dans sa PR (« Filet modifié :
  * pourquoi »).
  */
+// Filet modifié : pourquoi — empreintes recalées (barre et en-tête) car périmées sur `main`
+// depuis les lots de démo DM1/DM2 (constaté en corrigeant le doublon de route
+// `GET /companies` qui empêchait ce fichier de se charger), puis la barre à nouveau recalée
+// pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
 const EMPREINTE_BARRE = 'b838a7b756cac09511c8519deca111fa840e06c894718604f69462153ac98845';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 

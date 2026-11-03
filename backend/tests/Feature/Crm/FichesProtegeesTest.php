@@ -119,7 +119,7 @@ test('purge-non-commercial --force epargne la fiche protegee et supprime le temo
     Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
     expect(fpExiste($protegee))->toBeTrue()
-        ->and(fpExiste($temoin))->toBeFalse();
+        ->and(fpExiste($temoin))->toBeTrue(); // L3c-0 : plus aucune suppression
 });
 
 test('purge-non-diffusible --force epargne la fiche protegee et supprime le temoin', function () {
@@ -133,7 +133,7 @@ test('purge-non-diffusible --force epargne la fiche protegee et supprime le temo
     Artisan::call('prospection:purge-non-diffusible', ['--force' => true]);
 
     expect(fpExiste($protegee))->toBeTrue()
-        ->and(fpExiste($temoin))->toBeFalse();
+        ->and(fpExiste($temoin))->toBeTrue(); // L3c-0 : plus aucune suppression
 });
 
 test('la base refuse la suppression physique de chaque tag protege, et laisse passer le temoin', function () {

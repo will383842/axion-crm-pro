@@ -237,6 +237,102 @@ final class PersonnesIngestService
         }
 
         DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);
+
+        if ($accords->origines !== null) {
+            $this->enregistrerOrigines((int) $personne->id, $workspaceId, $accords->origines);
+        }
+    }
+
+    /**
+     * Contrat v3 : union SANS RETRAIT de l'historique des origines. L'écriture
+     * de l'archive et la réduction du tableau se font dans UNE transaction,
+     * sous verrou de ligne (ADR I4) : une entrée n'est retirée du tableau que
+     * si elle est déjà dans l'archive. Rien n'est jamais supprimé.
+     *
+     * @param  list<array<string, string>>  $entrantes
+     */
+    private function enregistrerOrigines(int $personneId, string $workspaceId, array $entrantes): void
+    {
+        // Jamais d'abandon silencieux : une charge qui porte des origines et qui
+        // ne peut pas les écrire n'est PAS acquittée. `assurerOriginesEcrivables()`
+        // le refuse en amont (503, la charge reste en attente côté site) ; ce
+        // garde-fou refuse de même, dans la transaction, si l'état a changé entre
+        // les deux (interrupteur éteint ou migration retirée en cours de route).
+        $this->assurerOriginesEcrivablesOuRefuser();
+
+        DB::transaction(function () use ($personneId, $workspaceId, $entrantes): void {
+            $ligne = DB::table('personnes')->where('id', $personneId)->lockForUpdate()->first(['origines']);
+            if ($ligne === null) {
+                return;
+            }
+
+            $fusion = ContenusAccords::fusionnerOrigines($this->decoder($ligne->origines ?? null) ?? [], $entrantes);
+
+            foreach ($fusion['archive'] as $entree) {
+                DB::table('personne_origines_archive')->insertOrIgnore([
+                    'workspace_id' => $workspaceId,
+                    'personne_id' => $personneId,
+                    'cle' => ContenusAccords::cleOrigine($entree),
+                    'origine' => $this->json($entree),
+                    'archive_le' => now(),
+                ]);
+            }
+
+            DB::table('personnes')->where('id', $personneId)->update([
+                'origines' => $this->json($fusion['garde']),
+            ]);
+        });
+    }
+
+    /**
+     * Vrai si une charge qui porte des `origines` peut les ÉCRIRE : interrupteur
+     * v3 allumé, branche « personnes » ouverte pour ce type d'événement, colonne
+     * `origines`, colonnes d'accords et table d'archive présentes.
+     */
+    public function originesEcrivables(SiteSyncEvent $event): bool
+    {
+        return $this->prendEnCharge($event) && $this->stockageOriginesPresent();
+    }
+
+    /**
+     * Le site garde sa ligne tant qu'il ne reçoit pas de 2xx : une charge avec
+     * des `origines` qu'on ne peut pas écrire reçoit donc un 503 (code sans
+     * valeur reçue), jamais un accusé de réception qui les perdrait en silence.
+     * Sans `origines` (v1/v2, ou liste vide), rien n'est exigé : inchangé.
+     *
+     * @throws SiteSyncRejection
+     */
+    public function assurerOriginesEcrivables(SiteSyncEvent $event): void
+    {
+        $origines = $event->contenusAccords?->origines;
+        if ($origines === null || $origines === [] || ! (bool) config('origines.v3_enabled', false)) {
+            return;
+        }
+        if (! $this->originesEcrivables($event)) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function assurerOriginesEcrivablesOuRefuser(): void
+    {
+        if (! (bool) config('origines.v3_enabled', false) || ! $this->stockageOriginesPresent()) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function refusOriginesNonEcrivables(): SiteSyncRejection
+    {
+        return SiteSyncRejection::unavailable(
+            'origines_v3_non_ecrivables',
+            'Contrat v3 de l\'origine : stockage indisponible, la charge reste en attente côté site.',
+        );
+    }
+
+    private function stockageOriginesPresent(): bool
+    {
+        return Schema::hasColumn('personnes', 'origines')
+            && Schema::hasColumn('personnes', 'accords_at')
+            && Schema::hasTable('personne_origines_archive');
     }
 
     private function json(mixed $valeur): ?string

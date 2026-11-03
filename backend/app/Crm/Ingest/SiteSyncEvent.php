@@ -32,11 +32,13 @@ final class SiteSyncEvent
     /**
      * Versions acceptées. La 2 (PV-6) ajoute quatre champs FACULTATIFS
      * (`ContenusAccords`) ; une charge en version 1, sans eux, reste valide.
+     * La 3 (ADR-CONTRAT-V3-ORIGINE) ajoute `origines` ; elle n'est TRAITÉE que
+     * si l'interrupteur `origines.v3_enabled` est allumé (éteint : 503).
      * Voir `docs/contrats/synchro-site-crm.md`.
      *
      * @var list<int>
      */
-    public const SCHEMA_VERSIONS_ACCEPTEES = [1, 2];
+    public const SCHEMA_VERSIONS_ACCEPTEES = [1, 2, 3];
 
     /**
      * Types d'événements acceptés. Un type inconnu est refusé : ce sont les
@@ -140,7 +142,11 @@ final class SiteSyncEvent
      */
     public static function fromArray(array $raw): self
     {
-        self::assertOnlyKeys($raw, self::TOP_LEVEL_KEYS, 'racine');
+        // `origines` n'existe qu'en v3 ; en v1/v2 c'est un champ inconnu (422).
+        // Le tri v3 se fait AVANT l'interrupteur : éteint, une charge v3 valide
+        // doit recevoir un 503 (reprise), pas un 422 d'abandon.
+        $v3 = ($raw['schema_version'] ?? null) === 3;
+        self::assertOnlyKeys($raw, $v3 ? [...self::TOP_LEVEL_KEYS, 'origines'] : self::TOP_LEVEL_KEYS, 'racine');
 
         $version = $raw['schema_version'] ?? null;
         if (! in_array($version, self::SCHEMA_VERSIONS_ACCEPTEES, true)) {
@@ -148,6 +154,10 @@ final class SiteSyncEvent
                 'unsupported_schema_version',
                 'Version de schéma non supportée : ' . var_export($version, true) . ' (attendu : ' . implode(' ou ', self::SCHEMA_VERSIONS_ACCEPTEES) . ').',
             );
+        }
+
+        if ($v3 && ! (bool) config('origines.v3_enabled', false)) {
+            throw SiteSyncRejection::unavailable('origines_v3_disabled', 'Contrat v3 de l\'origine non activé : la charge reste en attente côté site.');
         }
 
         $eventId = self::requiredString($raw, 'event_id');
@@ -206,8 +216,31 @@ final class SiteSyncEvent
             tags: self::assertTags($raw['tags'] ?? []),
             payload: $payload,
             dossier: $dossier,
-            contenusAccords: ContenusAccords::depuisRacine($raw),
+            contenusAccords: ContenusAccords::depuisRacine(self::racineAccords($raw, $payload, $v3), $v3),
         );
+    }
+
+    /**
+     * Racine lue par `ContenusAccords`. En v3, la fixture partagée du contrat
+     * (`tests/fixtures/contrats/charge-crm-v3.json`) porte `origine_contenu` et
+     * `origines` dans `payload` : on les lit là si la racine ne les porte pas.
+     *
+     * @param  array<mixed>  $raw
+     * @param  array<string, mixed>  $payload
+     * @return array<mixed>
+     */
+    private static function racineAccords(array $raw, array $payload, bool $v3): array
+    {
+        if (! $v3) {
+            return $raw;
+        }
+        foreach (['origine_contenu', 'origines'] as $cle) {
+            if (! array_key_exists($cle, $raw) && array_key_exists($cle, $payload)) {
+                $raw[$cle] = $payload[$cle];
+            }
+        }
+
+        return $raw;
     }
 
     public function personKey(): string

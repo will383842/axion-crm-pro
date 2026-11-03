@@ -82,3 +82,25 @@ Colonnes ajoutées à `personnes` : `origine_contenu`, `guides_recus`, `consente
 
 La fiche d'une personne montre un bloc « Contenus et accords » en lecture seule : d'où vient la personne,
 quels guides, quels accords et versions de texte, et l'opposition en bandeau d'alerte. Texte échappé, rien d'autre que ces champs.
+
+## Version 3 — historique des origines (ADR-CONTRAT-V3-ORIGINE)
+
+`schema_version` accepte 1, 2 et 3 (4 refusée). Tout le traitement v3 est derrière l'interrupteur
+`ORIGINES_V3_ENABLED` (`config/origines.php`), **éteint par défaut** : éteint, une charge v3 reçoit un
+**503** `origines_v3_disabled` (la ligne reste en attente côté site) ; v1 et v2 sont inchangées.
+
+Champ ajouté (v3 seulement ; en v1/v2 c'est un champ inconnu, 422) : `origines`, liste de 20 entrées au plus
+(`too_many_origines` au-delà). Clés fermées : `mot`, `reseau`, `guide`, `date` (requise), `post_ref`, `post_url`,
+`canal` (`commentaire` | `message_prive`, ce dernier refusé pour LinkedIn et TikTok), `famille` + `detail`
+(paire du dictionnaire `backend/resources/dictionnaire-origine.v1.json`, test d'empreinte), `compte`,
+`version_texte`, `utm_campaign`, `commentaire_ref` (stocké en empreinte HMAC, jamais en clair). Toute autre clé
+(pseudo, nom, texte…) est refusée `unknown_field`. `origine_contenu` reste « la plus récente gagne ».
+
+Stockage (additif) : `personnes.origines` (jsonb) en **union sans retrait**, dédoublonnée sur
+(`post_ref`, `canal`, `date`) — sans `post_ref` : (`mot`, `reseau`, `guide`, `date`). Au-delà de 50 entrées par
+personne, la plus ancienne est **déplacée** (même transaction, verrou de ligne) vers `personne_origines_archive`
+(ajout seul : ni UPDATE, ni DELETE, ni TRUNCATE pour le rôle applicatif). Rien n'est supprimé.
+
+API des personnes (lecture seule, présente seulement si l'interrupteur est allumé) : `origine` (la plus
+récente) et `origines_nombre` dans la liste ; `origines` (historique) dans la fiche ; filtres
+`origine_famille` et `origine_detail` (422 si hors dictionnaire).

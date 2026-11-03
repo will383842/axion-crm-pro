@@ -76,6 +76,9 @@ final class SemeurTablesScopees
         'events',
         // ── Feuilles ─────────────────────────────────────────────────────────
         'abonnements',
+        // 2026-11-03 (contrat v3 de l'origine) : origines archivées d'une personne —
+        // feuille de `personnes` (ajout seul pour le rôle applicatif).
+        'personne_origines_archive',
         'activities',
         // 2026-09-30 (chantier 5) : adresses generiques partagees (empreintes).
         'adresses_partagees',
@@ -292,6 +295,12 @@ final class SemeurTablesScopees
             'canal' => 'lettre',
             'statut' => 'abonne',
             'dernier_evenement_at' => now(),
+        ]);
+
+        $inserer('personne_origines_archive', [
+            'personne_id' => $id['personnes'],
+            'cle' => 'zz-origine-' . $marque,
+            'origine' => json_encode(['mot' => 'guide', 'date' => '2026-11-01T10:00:00Z']),
         ]);
 
         $id['events'] = $insererAvecId('events', [

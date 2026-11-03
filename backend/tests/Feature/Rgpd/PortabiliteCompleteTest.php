@@ -912,12 +912,19 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // l'EXPORT la requête liste ses colonnes explicitement (SiteGdprService) :
     // elles y sont ajoutées et vérifiées par `PortabiliteContenusAccordsTest`.
     // Le compte « hors de portée » ne bouge pas.
+    // 51 -> 53 et 33 -> 34 le 2026-11-03 (contrat v3 de l'origine, lot E2) :
+    // `personnes.origines` (table COUVERTE : la colonne part avec la ligne) et
+    // `personne_origines_archive.origine`. Hors de portée PAR CONSTRUCTION pour
+    // l'archive : des clés fermées du dictionnaire, des jetons et des dates —
+    // jamais de pseudo, de nom ni de texte (`ContenusAccords::origines`). Aucune
+    // adresse, aucun identifiant de profil. L'export et le masquage de ces deux
+    // colonnes relèvent du lot RGPD (ADR § 8, I3), pas de ce lot.
     expect($colonnes->count())->toBe(
-        51,
+        53,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        33,
+        34,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Rgpd\GdprPortabilityService;
 use Database\Seeders\PermissionsAndRolesSeeder;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -263,7 +264,7 @@ test('OAA 4b — au bout de 12 mois, commentaire_ref passe à null ; le reste de
 });
 
 test('OAA 4c — la commande est idempotente et la tâche est planifiée, sans aucun DELETE dans son code', function () {
-    $evenements = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+    $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'origines:masquer-commentaire-ref'));
     expect($evenements)->toHaveCount(1);
 

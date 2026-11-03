@@ -27,8 +27,9 @@
 | dépasse ce nombre d'entrées, le propriétaire est alerté une fois (cloche).
 |
 | `masquage_commentaire_ref_enabled` (ADR § 7, I5) : interrupteur PROPRE, ÉTEINT
-| par défaut, de la tâche qui passe `commentaire_ref` à null au bout de
-| `commentaire_ref_mois` mois. Elle ne supprime rien (aucun DELETE) et ne
+| par défaut, de la tâche qui met à l'écart (marqueur `masque_le`, valeur de
+| `commentaire_ref` CONSERVÉE) les entrées de plus de `commentaire_ref_mois`
+| mois. Elle ne supprime rien (aucun DELETE, aucune mise à null) et ne
 | tourne que si `v3_enabled` est aussi allumé. Jamais `CRM_PURGE_ENABLED`.
 */
 return [

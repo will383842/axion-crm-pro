@@ -158,6 +158,9 @@ test('OV3 7 — le rôle applicatif ne peut ni modifier ni supprimer l\'archive'
     foreach (['UPDATE', 'DELETE', 'TRUNCATE'] as $droit) {
         expect(DB::selectOne('SELECT has_table_privilege(?, ?, ?) AS ok', [$role, 'personne_origines_archive', $droit])->ok)->toBeFalse();
     }
+    // Seule la colonne `masque_le` (mise à l'écart, ADR § 7) est modifiable : jamais `origine`.
+    expect(DB::selectOne('SELECT has_column_privilege(?, ?, ?, ?) AS ok', [$role, 'personne_origines_archive', 'masque_le', 'UPDATE'])->ok)->toBeTrue()
+        ->and(DB::selectOne('SELECT has_column_privilege(?, ?, ?, ?) AS ok', [$role, 'personne_origines_archive', 'origine', 'UPDATE'])->ok)->toBeFalse();
 });
 
 // ── API ─────────────────────────────────────────────────────────────────────

@@ -157,6 +157,9 @@ final class ContenusAccords
             $cle = self::cleOrigine($ligne);
             if (! array_key_exists($cle, $parCle)) {
                 $parCle[$cle] = $ligne;
+            } elseif (! isset($parCle[$cle]['masque_le']) && isset($ligne['masque_le'])) {
+                // Une mise à l'écart (ADR § 7) ne se perd pas à la fusion de deux fiches.
+                $parCle[$cle]['masque_le'] = $ligne['masque_le'];
             }
         }
         uksort($parCle, static function (string $a, string $b) use ($parCle): int {
@@ -186,8 +189,20 @@ final class ContenusAccords
     }
 
     /**
+     * Mise à l'écart (ADR § 7) : l'entrée porte un `masque_le`. Elle reste en
+     * base et à l'export art. 15, mais n'est jamais montrée aux écrans ni à l'API.
+     *
+     * @param  array<mixed>  $o
+     */
+    public static function estMasquee(array $o): bool
+    {
+        return isset($o['masque_le']) && $o['masque_le'] !== '';
+    }
+
+    /**
      * Lecture (API) d'une entrée : liste BLANCHE de clés, relue depuis la base.
-     * `commentaire_ref` (empreinte) ne sort jamais.
+     * `commentaire_ref` (empreinte) et `masque_le` ne sortent jamais ; une entrée
+     * masquée est écartée AVANT (voir `estMasquee`), jamais présentée.
      *
      * @param  array<mixed>  $o
      * @return array<string, ?string>

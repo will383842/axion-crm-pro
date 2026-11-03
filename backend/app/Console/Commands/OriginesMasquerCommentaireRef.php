@@ -11,19 +11,23 @@ use Illuminate\Support\Facades\Schema;
  * Contrat v3 de l'origine (ADR § 7, I5) — MASQUE `commentaire_ref` (l'empreinte
  * du commentaire) au bout de `origines.commentaire_ref_mois` (12) mois.
  *
- * Masquer = passer la valeur à `null` dans l'entrée d'`origines` de la fiche.
- * RIEN d'autre n'est modifié et RIEN n'est supprimé : ni entrée, ni personne,
- * ni ligne d'archive (aucun DELETE, aucun TRUNCATE dans ce fichier). L'âge est
- * celui de la `date` de l'entrée. Idempotente. L'export d'accès (art. 15) est
- * lu sur ce qui reste : l'empreinte masquée n'y est plus.
+ * Masquer = MISE À L'ÉCART RÉVERSIBLE : on pose un marqueur horodaté `masque_le`
+ * (UTC, ISO) sur l'entrée d'`origines` de la fiche ET sur la ligne d'archive
+ * correspondante (colonne `masque_le`), pour qu'elles restent alignées. La
+ * VALEUR de `commentaire_ref` n'est JAMAIS touchée (ni null, ni effacée) ; aucune
+ * suppression et aucune mise à null dans ce fichier. Les écrans et
+ * l'API ne renvoient jamais une entrée masquée (elle est retirée de la sortie,
+ * pas de la base) ; l'export d'accès (art. 15) la RESTITUE avec son marqueur
+ * (ADR I5). L'âge est celui de la `date` de l'entrée. Idempotente : une entrée
+ * déjà masquée garde son premier `masque_le`. Retirer le marqueur lève la mise à l'écart.
  *
  * Inerte tant que l'interrupteur PROPRE `origines.masquage_commentaire_ref_enabled`
  * est éteint (défaut) ou que `origines.v3_enabled` l'est : elle sort alors en
  * succès sans rien lire. Jamais `CRM_PURGE_ENABLED`.
  *
- * Limite assumée : `personne_origines_archive` est en AJOUT SEUL (le rôle
- * applicatif n'a ni UPDATE ni DELETE) ; ses entrées ne sont donc pas masquées
- * ici — c'est une décision de droits à prendre à part.
+ * `personne_origines_archive` reste en AJOUT SEUL pour le rôle applicatif : il n'a
+ * que l'UPDATE de la colonne `masque_le` (migration 2026_11_07_000010), jamais
+ * celui de `origine`, ni suppression.
  */
 class OriginesMasquerCommentaireRef extends Command
 {
@@ -31,7 +35,7 @@ class OriginesMasquerCommentaireRef extends Command
 
     protected $signature = self::SIGNATURE;
 
-    protected $description = 'Masque (null) commentaire_ref des origines de plus de 12 mois — rien n\'est supprimé, derrière son interrupteur';
+    protected $description = 'Met à l\'écart (masque_le) les origines de plus de 12 mois — commentaire_ref conservé, rien n\'est supprimé, derrière son interrupteur';
 
     public function handle(): int
     {
@@ -46,9 +50,10 @@ class OriginesMasquerCommentaireRef extends Command
 
         $limite = now()->subMonths(max(1, (int) config('origines.commentaire_ref_mois', 12)))->utc();
         $masquees = 0;
+        $maintenant = now()->utc()->format('Y-m-d\TH:i:s\Z');
 
         foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $workspaceId) {
-            $masquees += WorkspaceContext::run((string) $workspaceId, fn (): int => $this->masquerEspace((string) $workspaceId, $limite));
+            $masquees += WorkspaceContext::run((string) $workspaceId, fn (): int => $this->masquerEspace((string) $workspaceId, $limite, $maintenant));
         }
 
         $this->info("Entrées masquées : {$masquees}.");
@@ -56,7 +61,48 @@ class OriginesMasquerCommentaireRef extends Command
         return self::SUCCESS;
     }
 
-    private function masquerEspace(string $workspaceId, \DateTimeInterface $limite): int
+    private function masquerEspace(string $workspaceId, \DateTimeInterface $limite, string $maintenant): int
+    {
+        return $this->masquerFiches($workspaceId, $limite, $maintenant) + $this->masquerArchive($workspaceId, $limite, $maintenant);
+    }
+
+    /** Ligne d'archive alignée : seul `masque_le` est écrit, `origine` n'est jamais réécrite. */
+    private function masquerArchive(string $workspaceId, \DateTimeInterface $limite, string $maintenant): int
+    {
+        if (! Schema::hasTable('personne_origines_archive') || ! Schema::hasColumn('personne_origines_archive', 'masque_le')) {
+            return 0;
+        }
+        $total = 0;
+        $dernier = 0;
+
+        while (true) {
+            $lignes = DB::table('personne_origines_archive')
+                ->where('workspace_id', $workspaceId)
+                ->where('id', '>', $dernier)
+                ->whereNull('masque_le')
+                ->orderBy('id')
+                ->limit(200)
+                ->get(['id', 'origine']);
+            if ($lignes->isEmpty()) {
+                return $total;
+            }
+            $dernier = (int) $lignes->last()->id;
+
+            foreach ($lignes as $ligne) {
+                $o = is_string($ligne->origine) ? json_decode($ligne->origine, true) : $ligne->origine;
+                if (! is_array($o) || ! is_string($o['commentaire_ref'] ?? null) || $o['commentaire_ref'] === '') {
+                    continue;
+                }
+                $date = $this->date($o['date'] ?? null);
+                if ($date !== null && $date < $limite) {
+                    $total += DB::table('personne_origines_archive')->where('id', $ligne->id)->whereNull('masque_le')
+                        ->update(['masque_le' => $maintenant]);
+                }
+            }
+        }
+    }
+
+    private function masquerFiches(string $workspaceId, \DateTimeInterface $limite, string $maintenant): int
     {
         $total = 0;
         $dernier = 0;
@@ -75,7 +121,7 @@ class OriginesMasquerCommentaireRef extends Command
             $dernier = (int) $ids->last();
 
             foreach ($ids as $id) {
-                $total += DB::transaction(function () use ($id, $limite): int {
+                $total += DB::transaction(function () use ($id, $limite, $maintenant): int {
                     $ligne = DB::table('personnes')->where('id', $id)->lockForUpdate()->first(['origines']);
                     if ($ligne === null) {
                         return 0;
@@ -90,9 +136,12 @@ class OriginesMasquerCommentaireRef extends Command
                         if (! is_array($entree) || ! is_string($entree['commentaire_ref'] ?? null) || $entree['commentaire_ref'] === '') {
                             continue;
                         }
+                        if (is_string($entree['masque_le'] ?? null) && $entree['masque_le'] !== '') {
+                            continue; // déjà mise à l'écart : le premier horodatage fait foi
+                        }
                         $date = $this->date($entree['date'] ?? null);
                         if ($date !== null && $date < $limite) {
-                            $liste[$i]['commentaire_ref'] = null;
+                            $liste[$i]['masque_le'] = $maintenant;
                             $n++;
                         }
                     }

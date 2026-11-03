@@ -49,10 +49,10 @@ final class FusionOriginesPersonnes
             );
 
             // L'archive déjà acquise de la fiche absorbée suit la fiche gardée.
-            foreach (DB::table('personne_origines_archive')->where('workspace_id', $workspaceId)->where('personne_id', $absorbeeId)->get(['cle', 'origine', 'archive_le']) as $a) {
+            foreach (DB::table('personne_origines_archive')->where('workspace_id', $workspaceId)->where('personne_id', $absorbeeId)->get(['cle', 'origine', 'archive_le', 'masque_le']) as $a) {
                 DB::table('personne_origines_archive')->insertOrIgnore([
                     'workspace_id' => $workspaceId, 'personne_id' => $gardeId,
-                    'cle' => $a->cle, 'origine' => $a->origine, 'archive_le' => $a->archive_le,
+                    'cle' => $a->cle, 'origine' => $a->origine, 'archive_le' => $a->archive_le, 'masque_le' => $a->masque_le,
                 ]);
             }
             foreach ($fusion['archive'] as $entree) {
@@ -61,6 +61,7 @@ final class FusionOriginesPersonnes
                     'cle' => ContenusAccords::cleOrigine($entree),
                     'origine' => json_encode($entree, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
                     'archive_le' => now(),
+                    'masque_le' => $entree['masque_le'] ?? null,
                 ]);
             }
 

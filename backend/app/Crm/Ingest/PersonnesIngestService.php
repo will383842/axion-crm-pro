@@ -277,6 +277,7 @@ final class PersonnesIngestService
                     'cle' => ContenusAccords::cleOrigine($entree),
                     'origine' => $this->json($entree),
                     'archive_le' => now(),
+                    'masque_le' => $entree['masque_le'] ?? null,
                 ]);
             }
 

@@ -214,7 +214,7 @@ const SECTIONS_FIXES: NavSection[] = [
       { to: '/settings', label: 'Paramètres', icon: icone(SettingsIcon), dataTour: 'nav-settings' },
       { to: '/users', label: 'Utilisateurs', icon: icone(UserCog) },
       { to: '/tags', label: 'Étiquettes', icon: icone(Hash) },
-      { to: '/rgpd/requests', label: 'Demandes RGPD', icon: icone(ShieldCheck) },
+      { to: '/rgpd/requests', label: 'Demandes RGPD', icon: icone(ShieldCheck), compteur: 'demandes_rgpd' },
     ],
   },
   {

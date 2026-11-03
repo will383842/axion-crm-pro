@@ -14,6 +14,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
 import { api, messageApiLisible } from '@/lib/api';
+import { ContenusAccordsCard } from './ContenusAccordsCard';
 import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
@@ -125,7 +126,7 @@ function PersonneDetailContent() {
     );
   }
 
-  const { personne, abonnement, entreprise, taches, timeline } = fiche.data;
+  const { personne, abonnement, entreprise, taches, timeline, contenus_accords } = fiche.data;
   const nomAffiche = [personne.first_name, personne.last_name].filter(Boolean).join(' ') || personne.email || 'Personne';
   const nomConnu = (personne.last_name ?? '') !== '';
   const nomManquant = !nomConnu && nom.trim() === '';
@@ -157,9 +158,7 @@ function PersonneDetailContent() {
               <div>{personne.email ?? '—'}</div>
               <div className="text-slate-400">{NATURE_EMAIL_LABELS[personne.email_nature]}</div>
               <div className="text-slate-400">Base légale : {baseLegale(personne.legal_basis)}</div>
-              {personne.purge_prevue_le !== null && (
-                <div className="text-slate-400">Purge prévue le {formatDate(personne.purge_prevue_le)}</div>
-              )}
+              <div className="text-slate-400">Conservée : aucune suppression automatique</div>
               <Link
                 to="/console/personnes/$personKey"
                 params={{ personKey: personne.person_key }}
@@ -189,6 +188,8 @@ function PersonneDetailContent() {
               </p>
             </div>
           </Card>
+
+          <ContenusAccordsCard bloc={contenus_accords} />
 
           <Card>
             <CardTitle>Entreprise</CardTitle>

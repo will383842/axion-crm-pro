@@ -113,7 +113,7 @@ test('B15-003 — TEMOIN : l export ne contient PAS les donnees de quelqu un d a
     expect($contenu['contacts'])->toHaveCount(0);
 });
 
-test('B15-003 — INVARIANT : tout ce que l effacement supprime, l export le connait', function () {
+test('B15-003 — INVARIANT : tout ce que l effacement touche (masque), l export le connait ; l export lit aussi ce qui est conserve', function () {
     // Les deux services doivent se répondre table pour table. Si l'un apprend
     // une table et pas l'autre, on effacerait une donnée qu'on aurait refusé de
     // montrer — ou l'inverse.
@@ -141,6 +141,11 @@ test('B15-003 — INVARIANT : tout ce que l effacement supprime, l export le con
         'personnes', 'abonnements',
     ];
 
+    // L3c-0 : l'effacement ne MASQUE plus que ces tables ; les autres (timeline,
+    // courriels, notifications, jetons…) sont GARDÉES intactes, mais l'export
+    // les lit toujours.
+    $tablesMasquees = ['contacts', 'candidates', 'journalists', 'health_practitioners', 'users', 'personnes', 'abonnements'];
+
     foreach ($tablesSensibles as $table) {
         // 🔴 ON CHERCHE `DB::table('x')`, PAS `'x'`.
         //
@@ -153,7 +158,9 @@ test('B15-003 — INVARIANT : tout ce que l effacement supprime, l export le con
         // `assertStringContainsString` et non `expect()->toContain()` : ce
         // dernier est VARIADIQUE chez Pest, un message y deviendrait une
         // seconde aiguille à trouver.
-        $this->assertStringContainsString("DB::table('{$table}')", $effacement, "l’effacement n’interroge pas « {$table} »");
+        if (in_array($table, $tablesMasquees, true)) {
+            $this->assertStringContainsString("DB::table('{$table}')", $effacement . file_get_contents(base_path('app/Crm/Rgpd/MiseAEcart.php')), "l’effacement n’interroge pas « {$table} »");
+        }
         $this->assertStringContainsString("DB::table('{$table}')", $export, "l’export n’interroge pas « {$table} »");
     }
 });
@@ -428,7 +435,7 @@ test('B10-004 — TEMOIN : les listes de QUELQU UN D AUTRE ne sortent pas dans l
     expect($contenu['listes_ne_pas_appeler'])->toHaveCount(0);
 });
 
-test('B10-004 — le VERDICT DE DELIVRABILITE porte sur son adresse : il est exporte, et il est efface', function () {
+test('B10-004 — le VERDICT DE DELIVRABILITE porte sur son adresse : il est exporte, et il est CONSERVE (L3c-0)', function () {
     Storage::fake('local');
     $espace = espacePort('verdict');
 
@@ -451,10 +458,10 @@ test('B10-004 — le VERDICT DE DELIVRABILITE porte sur son adresse : il est exp
     expect($contenu['email_verification_logs'])->toHaveCount(1);
     expect($contenu['email_verification_logs'][0]['status'])->toBe('valid');
 
-    // Puis l'effacement : le verdict s'en va avec le reste.
+    // Puis le traitement de la demande (L3c-0) : mise à l'écart, RIEN supprimé.
     app(GdprErasureService::class)->erase(COURRIEL_EXPORT);
 
-    expect(DB::table('email_verification_logs')->where('email', COURRIEL_EXPORT)->count())->toBe(0);
+    expect(DB::table('email_verification_logs')->where('email', COURRIEL_EXPORT)->count())->toBe(1);
     // TEMOIN : la ligne de la voisine, elle, est intacte.
     expect(DB::table('email_verification_logs')->where('email', 'marie@voisine.test')->count())->toBe(1);
 });
@@ -615,7 +622,7 @@ test('B10-004 — MESURE : le CATALOGUE interdit de SUPPRIMER une ligne users', 
     $this->assertStringContainsString('rgpd_requests_processed_by_fkey', (string) $refus);
 });
 
-test('B10-004 — le compte CRM est ANONYMISE, ses secrets detruits, et la chaine d audit garde son auteur', function () {
+test('B10-004 — le compte CRM est FERME (corbeille douce) sans rien anonymiser ni detruire, et la chaine d audit garde son auteur', function () {
     Storage::fake('local');
     $idCompte = b10004Compte(COURRIEL_EXPORT, [
         'name' => 'Jeanne Titulaire',
@@ -647,34 +654,31 @@ test('B10-004 — le compte CRM est ANONYMISE, ses secrets detruits, et la chain
 
     $apres = DB::table('users')->where('id', $idCompte)->first();
 
-    // 1. LA LIGNE EXISTE ENCORE — c'est tout l'objet de l'anonymisation.
+    // 1. LA LIGNE EXISTE ENCORE.
     expect($apres)->not->toBeNull('la ligne `users` a disparu : la chaîne d’audit est orpheline');
 
-    // 2. ELLE NE LA DESIGNE PLUS.
-    expect((string) $apres->email)->not->toBe(COURRIEL_EXPORT);
-    $this->assertStringContainsString('@compte-efface.invalid', (string) $apres->email);
-    expect($apres->name)->not->toBe('Jeanne Titulaire');
+    // 2. L3c-0 (règle de Will) : RIEN n'est anonymisé ni détruit — adresse, nom
+    //    et secrets sont gardés tels quels ; la mise à l'écart est réversible.
+    expect((string) $apres->email)->toBe(COURRIEL_EXPORT);
+    expect($apres->name)->toBe('Jeanne Titulaire');
+    expect($apres->password_hash)->toBe('$2y$04$HACHAGEMOTDEPASSETEMOIN');
+    expect($apres->totp_secret)->toBe('SECRETTOTPTEMOIN');
+    expect($apres->last_login_ip)->toBe('192.0.2.44');
 
-    // 3. LES SECRETS SONT DETRUITS, UN PAR UN. Un compte anonymisé dont le
-    //    hachage de mot de passe survit reste un compte réutilisable.
-    expect($apres->password_hash)->toBeNull();
-    expect($apres->totp_secret)->toBeNull();
-    expect($apres->totp_recovery_codes)->toBeNull();
-    expect($apres->remember_token)->toBeNull();
-    expect($apres->avatar_url)->toBeNull();
-    expect($apres->last_login_ip)->toBeNull();
-    expect($apres->last_login_user_agent)->toBeNull();
-
-    // 4. LE COMPTE EST FERME. `users` porte `SoftDeletes` depuis B10-016 et
-    //    `config/auth.php` rend `deleted_at` opposable : sans cette pose, la
-    //    ligne anonymisée resterait un compte ouvert.
+    // 3. LE COMPTE EST FERME : `config/auth.php` rend `deleted_at` opposable,
+    //    le compte ne peut plus se connecter.
     expect($apres->deleted_at)->not->toBeNull();
+
+    // 4. Rouvrir le compte = remettre `deleted_at` à NULL (réversible).
+    DB::table('users')->where('id', $idCompte)->update(['deleted_at' => null]);
+    expect(DB::table('users')->where('id', $idCompte)->value('deleted_at'))->toBeNull();
+    DB::table('users')->where('id', $idCompte)->update(['deleted_at' => now()]);
 
     // 5. LA CHAINE D'AUDIT GARDE SON AUTEUR.
     expect(DB::table('audit_logs')->where('user_id', $idCompte)->count())
         ->toBeGreaterThanOrEqual(1, 'le maillon d’audit a perdu son auteur');
 
-    // 6. TEMOIN : la voisine est intacte — l'effacement n'est pas une purge.
+    // 5. TEMOIN : la voisine est intacte.
     $voisine = DB::table('users')->where('id', $idVoisine)->first();
     expect((string) $voisine->email)->toBe('marie@voisine.test');
     expect($voisine->password_hash)->toBe('$2y$04$HACHAGEVOISINE');
@@ -682,7 +686,7 @@ test('B10-004 — le compte CRM est ANONYMISE, ses secrets detruits, et la chain
     expect($voisine->deleted_at)->toBeNull();
 });
 
-test('B10-004 — les SESSIONS ouvertes du compte efface sont fermees, avec leur IP et leur navigateur', function () {
+test('B10-004 — les SESSIONS ouvertes du compte mis a l ecart sont CONSERVEES (aucune donnee detruite)', function () {
     Storage::fake('local');
     $espace = espacePort('session');
     $idCompte = b10004Compte(COURRIEL_EXPORT);
@@ -708,15 +712,14 @@ test('B10-004 — les SESSIONS ouvertes du compte efface sont fermees, avec leur
 
     app(GdprErasureService::class)->erase(COURRIEL_EXPORT);
 
-    // 🔴 La clé étrangère `sessions.user_id` est en CASCADE — et elle ne se
-    // déclenche JAMAIS ici, puisqu'on ne supprime pas la ligne `users`. Sans
-    // suppression explicite, l'IP et le navigateur survivaient à l'effacement.
-    expect(DB::table('sessions')->where('user_id', $idCompte)->count())->toBe(0);
+    // L3c-0 : aucune suppression de donnée de personne — la session reste en
+    // base ; c'est la fermeture du compte (`deleted_at`) qui la rend inopérante.
+    expect(DB::table('sessions')->where('user_id', $idCompte)->count())->toBe(1);
     // TEMOIN : la session de la voisine tient.
     expect(DB::table('sessions')->where('user_id', $idVoisine)->count())->toBe(1);
 });
 
-test('B10-004 — les INVITATIONS envoyees a son adresse sont exportees, puis effacees', function () {
+test('B10-004 — les INVITATIONS envoyees a son adresse sont exportees, et conservees (L3c-0)', function () {
     Storage::fake('local');
     $espace = espacePort('invit');
     $idHote = b10004Compte('hote@axion.test');
@@ -743,12 +746,12 @@ test('B10-004 — les INVITATIONS envoyees a son adresse sont exportees, puis ef
 
     app(GdprErasureService::class)->erase(COURRIEL_EXPORT);
 
-    expect(DB::table('invitations')->where('email', COURRIEL_EXPORT)->count())->toBe(0);
+    expect(DB::table('invitations')->where('email', COURRIEL_EXPORT)->count())->toBe(1);
     // TEMOIN : l'invitation de la voisine tient.
     expect(DB::table('invitations')->where('email', 'marie@voisine.test')->count())->toBe(1);
 });
 
-test('B10-004 — le jeton de REINITIALISATION est efface, et l export n en rend que la date', function () {
+test('B10-004 — le jeton de REINITIALISATION est conserve (L3c-0), et l export n en rend que la date', function () {
     Storage::fake('local');
 
     DB::table('password_reset_tokens')->insert([
@@ -765,7 +768,7 @@ test('B10-004 — le jeton de REINITIALISATION est efface, et l export n en rend
 
     app(GdprErasureService::class)->erase(COURRIEL_EXPORT);
 
-    expect(DB::table('password_reset_tokens')->where('email', COURRIEL_EXPORT)->count())->toBe(0);
+    expect(DB::table('password_reset_tokens')->where('email', COURRIEL_EXPORT)->count())->toBe(1);
     // TEMOIN : la ligne de la voisine tient.
     expect(DB::table('password_reset_tokens')->where('email', 'marie@voisine.test')->count())->toBe(1);
 });
@@ -903,12 +906,25 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // des horodatages, jamais une valeur. `contacts` est COUVERTE (la colonne
     // part avec la ligne) ; `companies` est hors de portée comme le reste de
     // la personne morale.
+    // 48 -> 51 le 2026-11-02 (PV-6, contenus et accords) : `personnes.origine_contenu`,
+    // `personnes.guides_recus` et `personnes.consentements`. `personnes` est
+    // COUVERTE : les colonnes partent avec la ligne à l'EFFACEMENT, mais pour
+    // l'EXPORT la requête liste ses colonnes explicitement (SiteGdprService) :
+    // elles y sont ajoutées et vérifiées par `PortabiliteContenusAccordsTest`.
+    // Le compte « hors de portée » ne bouge pas.
+    // 51 -> 53 et 33 -> 34 le 2026-11-03 (contrat v3 de l'origine, lot E2) :
+    // `personnes.origines` (table COUVERTE : la colonne part avec la ligne) et
+    // `personne_origines_archive.origine`. Hors de portée PAR CONSTRUCTION pour
+    // l'archive : des clés fermées du dictionnaire, des jetons et des dates —
+    // jamais de pseudo, de nom ni de texte (`ContenusAccords::origines`). Aucune
+    // adresse, aucun identifiant de profil. L'export et le masquage de ces deux
+    // colonnes relèvent du lot RGPD (ADR § 8, I3), pas de ce lot.
     expect($colonnes->count())->toBe(
-        48,
+        53,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        33,
+        34,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

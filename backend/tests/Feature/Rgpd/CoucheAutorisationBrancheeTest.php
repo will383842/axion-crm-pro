@@ -115,11 +115,16 @@ test('F36-001 — un compte LECTURE SEULE ne supprime PAS un journaliste', funct
     );
 });
 
-test('F36-001 — TEMOIN : un ADMIN supprime bien, lui', function () {
+test('F36-001 — TEMOIN : le OWNER (rgpd.handle) met bien le journaliste à l\'écart ; un ADMIN, non (L3c-0)', function () {
     $admin = f36bCompte('admin');
-    $id = f36bJournaliste($admin->current_workspace_id);
+    $idAdmin = f36bJournaliste($admin->current_workspace_id);
+    $this->actingAs($admin)->deleteJson("/api/v1/journalists/{$idAdmin}")->assertForbidden();
+    expect((int) DB::table('journalists')->where('id', $idAdmin)->whereNull('deleted_at')->count())->toBe(1);
 
-    $this->actingAs($admin)->deleteJson("/api/v1/journalists/{$id}")->assertNoContent();
+    $owner = f36bCompte('owner');
+    $id = f36bJournaliste($owner->current_workspace_id);
+
+    $this->actingAs($owner)->deleteJson("/api/v1/journalists/{$id}")->assertNoContent();
 
     // Sans ce temoin, un correctif qui refuserait TOUT LE MONDE passerait pour
     // une reussite. C'est la faute que la garde F36-003 nomme deja.

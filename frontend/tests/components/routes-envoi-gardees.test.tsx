@@ -88,7 +88,7 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
   ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
-  ['/envoi/campagnes/resultats', 'DM2-PIL'],
+  ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP', 'Réponses'],
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
@@ -100,9 +100,9 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/serveurs', 'DM2-INF', 'Serveurs et adresses IP'],
   ['/envoi/serveurs/configuration', 'DM2-INF', 'Configuration'],
   ['/envoi/chauffe', 'DM2-INF', 'Chauffe'],
-  ['/envoi/sante', 'DM2-PIL'],
-  ['/envoi/sante/chercher', 'DM2-PIL'],
-  ['/envoi/sante/feu-vert', 'DM2-PIL'],
+  ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
+  ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
+  ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
   ['/envoi/desinscriptions', 'DM2-CNF'],
   ['/envoi/alertes', 'DM2-CNF'],
   ['/envoi/reglages', 'DM2-CNF'],
@@ -280,6 +280,10 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
  * il met ces empreintes à jour et l'écrit dans sa PR (« Filet modifié :
  * pourquoi »).
  */
+// Filet modifié : pourquoi — empreintes recalées (barre et en-tête) car périmées sur `main`
+// depuis les lots de démo DM1/DM2 (constaté en corrigeant le doublon de route
+// `GET /companies` qui empêchait ce fichier de se charger), puis la barre à nouveau recalée
+// pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
 const EMPREINTE_BARRE = 'b838a7b756cac09511c8519deca111fa840e06c894718604f69462153ac98845';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 

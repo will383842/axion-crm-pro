@@ -62,23 +62,23 @@ test('les trois adresses partagées sont inscrites, par une empreinte SALÉE (pa
     }
 });
 
-test('l effacement par la CONSOLE retire la ligne de l adresse effacée, et d elle seule', function () {
+test('L3c-0 : le traitement par la CONSOLE ne retire aucune ligne d adresse partagée (rien n est effacé)', function () {
     app(GdprErasureService::class)->erase($this->adresses['console']);
 
-    expect(dePresente($this->ws, $this->adresses['console']))->toBeFalse()
+    expect(dePresente($this->ws, $this->adresses['console']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['site']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['temoin']))->toBeTrue();
 });
 
-test('l effacement par le SITE retire la ligne de l adresse effacée, et d elle seule', function () {
+test('L3c-0 : la demande d effacement du SITE ne retire aucune ligne d adresse partagée (rien n est effacé)', function () {
     app(SiteGdprService::class)->erase('zz-pk-efface-site', $this->adresses['site'], 'business');
 
-    expect(dePresente($this->ws, $this->adresses['site']))->toBeFalse()
+    expect(dePresente($this->ws, $this->adresses['site']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['console']))->toBeTrue()
         ->and(dePresente($this->ws, $this->adresses['temoin']))->toBeTrue();
 });
 
-test('l effacement retire AUSSI du journal des fusions les empreintes de l adresse et du mobile effacés', function () {
+test('L3c-0 : le traitement console GARDE les empreintes du journal des fusions (rien n est efface)', function () {
     $email = 'zoe.journal@zz-efface.example.invalid';
     $garde = F::fiche($this->ws, 'ZZ Journal Efface', ['postcode' => '69060']);
     $absorbee = F::sansSiren($this->ws, 'ZZ Journal Efface', ['postcode' => '69060', 'email_generic' => $email, 'phone' => '06 12 34 56 78', 'website' => 'https://zz-journal.example.invalid']);
@@ -99,8 +99,7 @@ test('l effacement retire AUSSI du journal des fusions les empreintes de l adres
 
     app(GdprErasureService::class)->erase($email);
 
-    // TÉMOIN : le site, qui n'est pas une donnée de la personne, reste. Le
-    // journal lui-même n'est pas réécrit (réserve B).
-    expect($chemins())->toBe(['champs.website'])
+    // Rien n'est supprimé : les empreintes restent, le journal n'est pas réécrit.
+    expect($chemins())->toBe(['champs.email_generic', 'champs.phone', 'champs.website'])
         ->and((string) DB::table('fusions_fiches')->where('id', $fusion)->value('journal'))->toBe($journalAvant);
 });

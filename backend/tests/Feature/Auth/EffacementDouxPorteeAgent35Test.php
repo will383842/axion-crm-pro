@@ -535,7 +535,15 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // nouveau. La lecture aveugle de `journalists` (plafond 1 ci-dessus) est la
     // portabilité (`GdprPortabilityService`), qui DOIT rendre aussi la ligne
     // effacée : elle n'est pas concernée par la corbeille.
-    expect($posantes)->toBe(['journalists', 'media', 'users']);
+    // L3c-0 (2026-11-03) : `contacts` et `health_practitioners` entrent dans la
+    // liste. L'effacement n'est plus une suppression : il MASQUE (corbeille douce
+    // `deleted_at`, `MiseAEcart`). ⚠️ À AUDITER (signalé dans la PR) : les lectures
+    // aveugles de `contacts` ne filtrent pas `deleted_at` ; l'exclusion de l'envoi
+    // repose sur `opt_out`, pas sur la corbeille.
+    // L3c-0 (correctifs de la PR #414) : `candidates` entre aussi (`MiseAEcart::candidats`,
+    // corbeille douce) ; `GdprErasureService` masque désormais `users` et `journalists`
+    // sans rien anonymiser.
+    expect($posantes)->toBe(['candidates', 'contacts', 'health_practitioners', 'journalists', 'media', 'users']);
     // 216 -> 224 le 2026-09-24 : le lot L4-C a inséré huit lignes AU-DESSUS
     // (effacement de `personnes` et `abonnements`) dans GdprErasureService. Le
     // site est le même geste, sur `users` ; seule sa ligne a bougé.
@@ -548,8 +556,12 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // gestes (`journalists`, `users`) ; seules leurs lignes ont bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Services/Rgpd/GdprErasureService.php:128',
-        'app/Services/Rgpd/GdprErasureService.php:289',
+        'app/Crm/Presse/LienJournalisteContact.php:110',
+        'app/Crm/Rgpd/MiseAEcart.php:59',
+        'app/Crm/Rgpd/MiseAEcart.php:80',
+        'app/Crm/Rgpd/SiteGdprService.php:243',
+        'app/Services/Rgpd/GdprErasureService.php:127',
+        'app/Services/Rgpd/GdprErasureService.php:149',
     ]);
 });
 

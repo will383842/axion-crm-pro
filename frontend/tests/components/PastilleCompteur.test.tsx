@@ -220,3 +220,16 @@ describe('Total « À traiter » du CRM (DM1-ATR)', () => {
     expect(normaliserCompteurs({ doublons: 1, a_rattacher: 2, taches_en_retard: 3 })).toHaveProperty('taches_en_retard', 3);
   });
 });
+
+describe('Pastille « Demandes RGPD » (L3c-0)', () => {
+  it('la demande d’effacement a sa phrase, et le compteur est normalisé', () => {
+    expect(LIBELLES_COMPTEUR.demandes_rgpd(1)).toBe('1 demande d’effacement à traiter');
+    expect(LIBELLES_COMPTEUR.demandes_rgpd(2)).toBe('2 demandes d’effacement à traiter');
+    expect(normaliserCompteurs({ doublons: 0, a_rattacher: 0, demandes_rgpd: 2 })).toHaveProperty('demandes_rgpd', 2);
+    expect(normaliserCompteurs({ doublons: 0, a_rattacher: 0, demandes_rgpd: null })).toHaveProperty('demandes_rgpd', null);
+  });
+
+  it('n’entre pas dans le total « À traiter » du CRM', () => {
+    expect(totalATraiterCrm({ doublons: 1, a_rattacher: 1, demandes_rgpd: 5 })).toBe(2);
+  });
+});

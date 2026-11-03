@@ -24,7 +24,10 @@ class GardesDemarrage extends ServiceProvider
         self::verifier($this->app);
     }
 
-    /** @param array<string, mixed> $catalogue */
+    /**
+     * @param  array<array-key, mixed>  $catalogue
+     * @param  array<array-key, mixed>  $liste
+     */
     private static function failoverContientLog(array $catalogue, array $liste): bool
     {
         foreach ($liste as $nom) {
@@ -73,7 +76,8 @@ class GardesDemarrage extends ServiceProvider
 
         $envoiReel = ! in_array($transport, self::TRANSPORTS_SANS_ENVOI, true);
 
-        if ($envoiReel && (config('crm.mock_mode') || config('crm.mock_mail'))) {
+        // MOCK_MODE est déjà refusé plus haut : il reste MOCK_MAIL.
+        if ($envoiReel && config('crm.mock_mail')) {
             throw new RuntimeException("Démarrage refusé : un simulateur (MOCK_MODE, MOCK_MAIL) est allumé alors que l'envoi réel l'est.");
         }
     }

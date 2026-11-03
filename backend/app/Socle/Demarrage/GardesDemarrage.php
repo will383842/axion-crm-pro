@@ -24,6 +24,18 @@ class GardesDemarrage extends ServiceProvider
         self::verifier($this->app);
     }
 
+    /** @param array<string, mixed> $catalogue */
+    private static function failoverContientLog(array $catalogue, array $liste): bool
+    {
+        foreach ($liste as $nom) {
+            if ($nom === 'log' || (($catalogue[$nom]['transport'] ?? null) === 'log')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function verifier(Application $app): void
     {
         if (! $app->environment('production') || ! config('mail.gardes_demarrage', false)) {
@@ -42,6 +54,23 @@ class GardesDemarrage extends ServiceProvider
         }
 
         $transport = (string) ($catalogue[$auth]['transport'] ?? '');
+
+        // Un transport `log` écrirait le lien magique / de réinitialisation EN CLAIR
+        // dans les journaux (valable 15 min) : refusé en production.
+        if ($transport === 'log') {
+            throw new RuntimeException("Démarrage refusé : le mailer d'authentification écrirait les liens dans les journaux (MAIL_MAILER_AUTH).");
+        }
+
+        // `failover` retombe sur le mailer suivant : s'il contient `log`, même fuite.
+        if ($transport === 'failover' && self::failoverContientLog($catalogue, (array) ($catalogue[$auth]['mailers'] ?? []))) {
+            throw new RuntimeException("Démarrage refusé : le mailer d'authentification de secours peut retomber sur l'écriture dans les journaux (MAIL_MAILER_AUTH).");
+        }
+
+        // Le simulateur général neutralise l'envoi d'authentification : refusé quel que soit le transport.
+        if (config('crm.mock_mode')) {
+            throw new RuntimeException('Démarrage refusé : le simulateur MOCK_MODE est allumé.');
+        }
+
         $envoiReel = ! in_array($transport, self::TRANSPORTS_SANS_ENVOI, true);
 
         if ($envoiReel && (config('crm.mock_mode') || config('crm.mock_mail'))) {

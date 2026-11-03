@@ -96,3 +96,38 @@ test('hors production : aucune garde', function () {
 
     expect(true)->toBeTrue();
 });
+
+test('production avec un mailer d authentification de transport log : refusé sans valeur de configuration', function () {
+    reglerProduction([
+        'mail.auth_mailer' => 'authlog',
+        'mail.mailers.authlog' => ['transport' => 'log'],
+    ]);
+
+    $message = '';
+    try {
+        verifierEnProduction();
+    } catch (RuntimeException $e) {
+        $message = $e->getMessage();
+    }
+
+    expect($message)->not->toBe('')->and($message)->not->toContain('authlog');
+});
+
+test('production avec un mailer d authentification failover contenant log : refusé', function () {
+    reglerProduction([
+        'mail.auth_mailer' => 'authbasc',
+        'mail.mailers.authbasc' => ['transport' => 'failover', 'mailers' => ['smtp', 'log']],
+    ]);
+
+    expect(fn () => verifierEnProduction())->toThrow(RuntimeException::class);
+});
+
+test('production avec MOCK_MODE allumé : refusé même avec un transport sans envoi', function () {
+    reglerProduction([
+        'mail.auth_mailer' => 'authlog',
+        'mail.mailers.authlog' => ['transport' => 'array'],
+        'crm.mock_mode' => true,
+    ]);
+
+    expect(fn () => verifierEnProduction())->toThrow(RuntimeException::class);
+});

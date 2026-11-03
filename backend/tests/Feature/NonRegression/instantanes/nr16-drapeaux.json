@@ -43,6 +43,7 @@
     "CRM_SCRAPE_FUNNEL_ENABLED": "false",
     "CRM_SCRAPE_VALIDATE_MX": "true",
     "CRM_SEGMENTS_OUVERTS": "''",
+    "CRM_SEGMENTS_PAR_ESPACE": "false",
     "CRM_STRICT_WORKSPACE_SCOPE": "false",
     "CRM_SYNC_DOSSIER_CLIENT_STAGE": "false",
     "MOCK_MAIL": "env('MOCK_MODE', true)",

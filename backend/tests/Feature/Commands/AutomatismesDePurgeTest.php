@@ -58,12 +58,12 @@
  *     donc tenue par aucun automatisme, et rien ne le dit jamais a personne.
  */
 
+use App\Crm\Rgpd\SignalementDemandeEffacement;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -406,6 +406,25 @@ test('B17-001 — TEMOIN POSITIF : sans --dry-run, la purge FAIT son travail', f
     expect(DB::table('scraper_runs')->where('id', $run)->exists())->toBeTrue();
 });
 
+test('L3c-0 — le signalement RGPD (rgpd.demande_effacement) n est JAMAIS purge, même ancien ; les autres notifications anciennes le sont', function () {
+    $espace = espaceAutomatisme();
+    $utilisateur = utilisateurAutomatisme();
+
+    notificationAncienne($espace, $utilisateur, 400);
+    DB::table('notifications')->insert([
+        'workspace_id' => $espace,
+        'user_id' => $utilisateur,
+        'type' => SignalementDemandeEffacement::TYPE,
+        'title' => 'Demande d effacement',
+        'created_at' => now()->subDays(400),
+    ]);
+
+    Artisan::call('retention:purge', ['--workspace' => $espace, '--force' => true]);
+
+    expect(DB::table('notifications')->where('type', 'test')->count())->toBe(0)
+        ->and(DB::table('notifications')->where('type', SignalementDemandeEffacement::TYPE)->count())->toBe(1);
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // B11-003 — la purge sans filtre d'espace
 // ═════════════════════════════════════════════════════════════════════════════
@@ -513,42 +532,22 @@ function evenementPlanifie(string $fragment): ?Event
     return null;
 }
 
-test('B17-009 — les deux purges RGPD sont bien PLANIFIEES', function () {
-    expect(evenementPlanifie('rgpd:purge-vivier'))->not->toBeNull();
-    expect(evenementPlanifie('rgpd:purge-business-prospects'))->not->toBeNull();
-    // TEMOIN : le lecteur d'ordonnanceur trouve aussi une commande dont on sait
-    // qu'elle est planifiee ; s'il rendait null pour tout, les deux lignes
+test('B17-009 / L3c-0 — les trois purges RGPD ne sont PLUS planifiees (aucune purge de personnes)', function () {
+    expect(evenementPlanifie('rgpd:purge-vivier'))->toBeNull();
+    expect(evenementPlanifie('rgpd:purge-business-prospects'))->toBeNull();
+    expect(evenementPlanifie('rgpd:purge-personnes'))->toBeNull();
+    // TEMOIN : le lecteur d'ordonnanceur trouve toujours une commande dont on
+    // sait qu'elle est planifiee ; s'il rendait null pour tout, les lignes
     // ci-dessus ne prouveraient rien.
     expect(evenementPlanifie('retention:purge'))->not->toBeNull();
 });
 
-test('B17-009 — drapeau ferme : la purge est sautee, mais elle le DIT', function () {
-    config()->set('crm.purges_enabled', false);
-
-    $evenement = evenementPlanifie('rgpd:purge-vivier');
-    $journal = [];
-    Log::listen(function ($message) use (&$journal) {
-        $journal[] = $message->message;
-    });
-
-    expect($evenement->filtersPass(app()))->toBeFalse();
-
-    // 🔴 LE CONSTAT B17-009 : le saut etait SILENCIEUX. Une echeance legale
-    // suspendue sans la moindre trace est indistinguable d'une echeance tenue.
-    $this->assertStringContainsString(
-        'CRM_PURGE_ENABLED',
-        implode("\n", $journal),
-        'Le saut d une purge RGPD doit laisser une trace nommant le drapeau qui la retient.',
-    );
-});
-
-test('B17-009 — TEMOIN : drapeau ouvert, la purge N EST PLUS sautee', function () {
+test('L3c-0 — les commandes de purge de personnes refusent meme avec --force et drapeau ouvert', function () {
     config()->set('crm.purges_enabled', true);
 
-    // Ce temoin prouve que le cablage de l'ordonnanceur est bon et qu'il ne
-    // reste qu'UNE variable d'environnement entre le depot et l'echeance CNIL.
-    expect(evenementPlanifie('rgpd:purge-vivier')->filtersPass(app()))->toBeTrue();
-    expect(evenementPlanifie('rgpd:purge-business-prospects')->filtersPass(app()))->toBeTrue();
+    foreach (['rgpd:purge-vivier', 'rgpd:purge-business-prospects', 'rgpd:purge-personnes'] as $commande) {
+        expect(Artisan::call($commande, ['--force' => true]))->toBe(1, $commande);
+    }
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

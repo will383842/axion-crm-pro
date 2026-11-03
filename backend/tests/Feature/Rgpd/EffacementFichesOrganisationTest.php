@@ -146,7 +146,7 @@ function efoConnecterAdmin(string $espace): User
         'first_login_completed_at' => now(),
     ]);
     setPermissionsTeamId($espace);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
     test()->actingAs($user);
 
     return $user;
@@ -160,113 +160,54 @@ function efoOppose(string $abonne): bool
         ->exists();
 }
 
-test('l effacement console atteint les trois emplacements d une fiche PROTEGEE, qui survit ; le temoin ne bouge pas', function () {
+test('L3c-0 : le traitement console MASQUE les contacts de la personne et GARDE les fiches d organisation intactes', function () {
+    $avant = efoFiche($this->fede);
+    $signalsAvant = efoSignals($this->fede);
+
     $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
 
     $fiche = efoFiche($this->fede);
-    $canaux = efoSignals($this->fede)['contact_channels'];
-    expect($fiche)->not->toBeNull()
-        ->and($fiche->email_generic)->toBeNull()
-        ->and($fiche->phone)->toBeNull()
-        ->and(efoSignals($this->fede))->not->toHaveKey('email_generic_verification')
-        ->and($canaux['emails'])->toBe(['secretariat@zz-fede.example.invalid'])
-        ->and($canaux['phones'])->toBe(['01 00 00 00 10'])
-        ->and(array_keys($canaux['details']))->toBe(['secretariat@zz-fede.example.invalid'])
-        ->and(DB::table('contacts')->whereIn('id', [$this->presidente, $this->doublon])->count())->toBe(0)
-        ->and(efoVerdict($resultat))->toBe([])
+    // Contacts de la personne : corbeille douce, lignes gardées.
+    expect(DB::table('contacts')->whereNull('deleted_at')->where('id', $this->presidente)->count())->toBe(0)
+        ->and(DB::table('contacts')->where('id', $this->presidente)->count())->toBe(1)
+        // Fiche d'organisation : adresse, mobile et canaux NON touchés.
+        ->and($fiche->email_generic)->toBe($avant->email_generic)
+        ->and($fiche->phone)->toBe($avant->phone)
+        ->and(efoSignals($this->fede))->toBe($signalsAvant)
         // Témoin intact.
         ->and(efoFiche($this->temoin)->email_generic)->toBe('accueil@zz-temoin.example.invalid')
-        ->and(efoFiche($this->temoin)->phone)->toBe('06 00 00 00 99')
-        ->and(DB::table('contacts')->where('id', $this->contactTemoin)->exists())->toBeTrue();
+        ->and(DB::table('contacts')->whereNull('deleted_at')->where('id', $this->contactTemoin)->exists())->toBeTrue()
+        ->and($resultat['verification'])->toBe('aucune');
 });
 
-test('l effacement pose l opposition sur l adresse ET le mobile, et le re-import ne les remet pas', function () {
+test('le traitement console pose l opposition sur l adresse ET le mobile (anti-reinsertion)', function () {
     app(GdprErasureService::class)->erase(EFO_EMAIL);
 
     expect(DB::table('opt_out')->where('scope', 'business')->where('email_hash', hash('sha256', EFO_EMAIL))->exists())->toBeTrue()
         ->and(DB::table('opt_out')->where('scope', 'business')->whereNotNull('phone')->exists())->toBeTrue();
-
-    $fichier = (string) tempnam(sys_get_temp_dir(), 'zz-efo-');
-    file_put_contents($fichier, json_encode([
-        'siren' => '900000501', 'nom' => 'ZZ Fede effacement', 'famille' => 'federation_syndicat_pro',
-        'niveau' => 'national', 'pertinence' => 'haute', 'contactabilite' => 'email_verifie',
-        'email_generique' => EFO_EMAIL, 'telephone' => EFO_MOBILE,
-        'emails_autres' => [['email' => EFO_EMAIL, 'type' => 'nominatif', 'domaine_verifie' => true, 'verifie_le' => '2026-09-28']],
-        'telephones_autres' => [EFO_MOBILE_AUTRE_FORME],
-        'personnes' => [['prenom' => 'Zoe', 'nom' => 'ZZPRESIDENTE', 'fonction' => 'Présidente', 'email' => EFO_EMAIL, 'linkedin' => null]],
-    ]) . "\n");
-    try {
-        Artisan::call('crm:import-federations', ['file' => $fichier]);
-    } finally {
-        @unlink($fichier);
-    }
-
-    $fiche = efoFiche($this->fede);
-    $texte = mb_strtolower((string) $fiche->signals);
-    expect($fiche->email_generic)->toBeNull()
-        ->and($fiche->phone)->toBeNull()
-        ->and($texte)->not->toContain(EFO_EMAIL)
-        ->and($texte)->not->toContain('00 00 00 42')
-        ->and(DB::table('contacts')->where('company_id', $this->fede)->where('last_name', 'ZZPRESIDENTE')->exists())->toBeFalse();
 });
 
-test('une adresse restee ailleurs dans les signaux rend l effacement INCOMPLET, et il le dit', function () {
-    DB::table('companies')->where('id', $this->temoin)->update([
-        'signals' => json_encode(['mentions_legales' => ['contact' => EFO_EMAIL]]),
-    ]);
-
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-
-    expect(efoVerdict($resultat))->toHaveKey('companies.signals');
-});
-
-test('le journal de l effacement ne porte JAMAIS l adresse en clair', function () {
+test('le journal du traitement ne porte JAMAIS l adresse en clair', function () {
     $messages = [];
     Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$messages): void {
         $messages[] = $m->message . ' ' . json_encode($m->context);
     });
 
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-    // Le verdict est journalisé par la preuve différée : elle aussi.
-    VerifierEffacementRgpd::dispatchSync(EFO_EMAIL, $resultat['personnels']);
+    app(GdprErasureService::class)->erase(EFO_EMAIL);
 
-    expect(implode("\n", $messages))->toContain('GDPR erasure complete');
+    expect(implode("\n", $messages))->toContain('GDPR erasure request executed');
     foreach ($messages as $ligne) {
         expect(mb_strtolower($ligne))->not->toContain(EFO_EMAIL);
     }
 });
 
-test('l export CSV des entreprises ne rend plus l adresse ni le mobile apres effacement', function () {
-    $this->seed(PermissionsAndRolesSeeder::class);
-    $user = User::create([
-        'id' => (string) Str::uuid(), 'email' => 'admin-' . Str::random(6) . '@example.invalid', 'name' => 'ZZ admin',
-        'password_hash' => Hash::make('PasswordTest12345!'), 'current_workspace_id' => $this->espace,
-        'first_login_completed_at' => now(),
-    ]);
-    setPermissionsTeamId($this->espace);
-    $user->assignRole('admin');
-    $this->actingAs($user);
-
-    $avant = $this->get('/api/v1/companies/export')->streamedContent();
-    // Témoin de l'instrument : AVANT, l'export porte bien l'adresse.
-    expect($avant)->toContain(EFO_EMAIL);
-
-    app(GdprErasureService::class)->erase(EFO_EMAIL);
-
-    $apres = $this->get('/api/v1/companies/export')->streamedContent();
-    expect($apres)->not->toContain(EFO_EMAIL)
-        ->and($apres)->not->toContain(EFO_MOBILE)
-        ->and($apres)->toContain('accueil@zz-temoin.example.invalid');
-});
-
-test('l effacement venu du site atteint aussi les fiches d organisation', function () {
+test('L3c-0 : la demande d effacement du site NE TOUCHE PAS les fiches d organisation (rien n est efface)', function () {
+    $avant = efoFiche($this->fede);
     app(SiteGdprService::class)->erase(hash('sha256', 'zz-efo'), EFO_EMAIL, 'business');
 
     $fiche = efoFiche($this->fede);
-    expect($fiche->email_generic)->toBeNull()
-        ->and($fiche->phone)->toBeNull()
-        ->and(efoSignals($this->fede)['contact_channels']['emails'])->toBe(['secretariat@zz-fede.example.invalid'])
-        ->and(DB::table('contacts')->where('id', $this->doublon)->exists())->toBeFalse()
+    expect($fiche->email_generic)->toBe($avant->email_generic)
+        ->and($fiche->phone)->toBe($avant->phone)
         ->and(efoFiche($this->temoin)->email_generic)->toBe('accueil@zz-temoin.example.invalid');
 });
 
@@ -302,89 +243,32 @@ test('S3 — un standard d organisation ou un numero partage ne quittent que les
         'email' => 'zed@zz-standard.example.invalid', 'phone' => '+33 6 11 11 11 11', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    $resultat = app(GdprErasureService::class)->erase('zia@zz-standard.example.invalid');
+    app(GdprErasureService::class)->erase('zia@zz-standard.example.invalid');
 
-    expect(DB::table('contacts')->where('email', 'zia@zz-standard.example.invalid')->count())->toBe(0)
+    expect(DB::table('contacts')->whereNull('deleted_at')->where('email', 'zia@zz-standard.example.invalid')->count())->toBe(0)
         // Le standard reste à l'organisation, le portable partagé au collègue.
         ->and(efoFiche($organisation)->phone)->toBe('04 72 00 00 10')
         ->and(DB::table('contacts')->where('id', $collegue)->value('phone'))->toBe('+33 6 11 11 11 11')
         // Aucune opposition globale sur ces numéros.
         ->and(efoOppose('472000010'))->toBeFalse()
-        ->and(efoOppose('611111111'))->toBeFalse()
-        ->and(efoVerdict($resultat, 'zia@zz-standard.example.invalid'))->toBe([]);
+        ->and(efoOppose('611111111'))->toBeFalse();
 });
 
 // ── S4 : la preuve lit plus large que l'effacement ─────────────────────────
 
-test('S4 — une adresse dans une note de Will ou dans metadata, un numero mal forme : l effacement est INCOMPLET', function (string $zone) {
-    match ($zone) {
-        'federations.partenariat_note' => DB::table('federations')->insert([
-            'company_id' => $this->temoin, 'workspace_id' => $this->espace, 'famille' => 'ordre', 'niveau' => 'national',
-            'pertinence' => 'haute', 'contactabilite' => 'aucun_contact', 'partenariat_note' => 'Rappeler ' . strtoupper(EFO_EMAIL),
-        ]),
-        'events.demarche_note' => DB::table('events')->insert([
-            'workspace_id' => $this->espace, 'external_ref' => 'zz-efo-note', 'nom' => 'ZZ salon', 'type' => 'salon',
-            'demarche_note' => 'Contact : ' . EFO_EMAIL, 'created_at' => now(), 'updated_at' => now(),
-        ]),
-        'companies.metadata' => DB::table('companies')->where('id', $this->temoin)->update([
-            // Numéro mal formé : la normalisation de l'effacement ne le lit pas,
-            // la recherche par chiffres, si.
-            'metadata' => json_encode(['standard' => '06.00.00.00.42 (poste 3)']),
-        ]),
-    };
-
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-
-    expect(efoVerdict($resultat))->toHaveKey($zone);
-})->with(['federations.partenariat_note', 'events.demarche_note', 'companies.metadata']);
-
-test('S4, P2 — la porte du site dit « incomplet », et la demande le montre : en cours, motif, journal, console', function () {
-    DB::table('companies')->where('id', $this->temoin)->update([
-        'metadata' => json_encode(['contact' => EFO_EMAIL]),
-    ]);
-    $messages = [];
-    Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$messages): void {
-        $messages[] = ['niveau' => $m->level, 'texte' => $m->message . ' ' . json_encode($m->context)];
-    });
-
+test('L3c-0 : la demande du site reste EN ATTENTE de Will (pending), sans preuve différée', function () {
     $resultat = app(SiteGdprService::class)->erase(hash('sha256', 'zz-efo'), EFO_EMAIL, 'business');
 
     $demande = efoDemandeSite();
     $metadata = (array) json_decode((string) $demande->metadata, true);
-    expect($resultat['verification'])->toBe('differee')
+    expect($resultat['verification'])->toBe('aucune')
         ->and($resultat)->not->toHaveKey('personnels')
-        // La demande reste EN COURS, avec le motif et l'emplacement.
-        ->and($demande->status)->toBe('processing')
-        ->and($metadata['verification'])->toBe('incomplete')
-        ->and($metadata['motif'])->toBe(VerifierEffacementRgpd::MOTIF_INCOMPLET)
-        ->and($metadata['residus'])->toHaveKey('companies.metadata');
-
-    // Le journal le dit, sans l'adresse.
-    $alertes = array_values(array_filter($messages, fn (array $m): bool => $m['niveau'] === 'warning' && str_contains($m['texte'], 'INCOMPLETE')));
-    expect($alertes)->toHaveCount(1)
-        ->and(mb_strtolower($alertes[0]['texte']))->not->toContain(EFO_EMAIL)
-        ->and($alertes[0]['texte'])->toContain(hash('sha256', EFO_EMAIL));
-
-    // La console la liste, en cours, avec son motif.
-    efoConnecterAdmin($this->espace);
-    $ligne = collect($this->getJson('/api/v1/rgpd/requests')->assertOk()->json('data'))->firstWhere('id', $demande->id);
-    expect($ligne)->not->toBeNull()
-        ->and($ligne['status'])->toBe('processing')
-        ->and($ligne['metadata']['motif'])->toBe(VerifierEffacementRgpd::MOTIF_INCOMPLET);
+        ->and($demande->status)->toBe('pending')
+        ->and($metadata['mise_a_l_ecart'])->toBeTrue()
+        ->and($metadata['decision'])->toBe('en_attente_de_will');
 });
 
-test('P2 — temoin : un effacement du site sans residu solde sa demande (done, complete)', function () {
-    app(SiteGdprService::class)->erase(hash('sha256', 'zz-efo'), EFO_EMAIL, 'business');
-
-    $demande = efoDemandeSite();
-    expect($demande->status)->toBe('done')
-        ->and(json_decode((string) $demande->metadata, true)['verification'])->toBe('complete');
-});
-
-test('P1 — la console met la demande EN COURS puis la preuve differee la solde, ou la laisse en cours', function (bool $residu) {
-    if ($residu) {
-        DB::table('companies')->where('id', $this->temoin)->update(['metadata' => json_encode(['contact' => EFO_EMAIL])]);
-    }
+test('P1 / L3c-0 — la console solde la demande par une mise a l ecart : done, sans preuve differee, sans erasure vers le site', function () {
     efoConnecterAdmin($this->espace);
     $id = (int) DB::table('rgpd_requests')->insertGetId([
         'workspace_id' => $this->espace, 'type' => 'erasure', 'status' => 'pending', 'subject_email' => EFO_EMAIL,
@@ -393,18 +277,20 @@ test('P1 — la console met la demande EN COURS puis la preuve differee la solde
 
     $reponse = $this->postJson("/api/v1/rgpd/requests/{$id}/process")->assertOk();
 
-    // En file `sync`, la preuve a déjà tourné : la réponse relit son verdict.
     $metadata = (array) json_decode((string) DB::table('rgpd_requests')->where('id', $id)->value('metadata'), true);
-    expect($reponse->json('request.status'))->toBe($residu ? 'processing' : 'done')
-        ->and($metadata['verification'])->toBe($residu ? 'incomplete' : 'complete')
+    expect($reponse->json('request.status'))->toBe('done')
+        ->and($metadata['verification'])->toBe('aucune')
+        ->and($metadata['mise_a_l_ecart'])->toBeTrue()
         // Les numéros personnels ne sont ni rendus ni archivés.
         ->and($reponse->json('result'))->not->toHaveKey('personnels')
-        ->and(json_encode($metadata))->not->toContain('00 00 00 42');
-})->with(['sans residu' => false, 'avec residu' => true]);
+        ->and(json_encode($metadata))->not->toContain('00 00 00 42')
+        // Le site n'est jamais invité à effacer.
+        ->and(DB::table('crm_outbound_events')->where('event_type', 'erasure')->count())->toBe(0);
+});
 
 // ── S5 : la porte du site relève par clé de personne ───────────────────────
 
-test('S5 — la porte du site releve les numeros par cle de personne, pas seulement par adresse', function () {
+test('S5 / L3c-0 — la porte du site met a l ecart par cle de personne, pas seulement par adresse ; la fiche garde son numero', function () {
     $fiche = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $this->espace, 'siren' => '900000530', 'denomination' => 'ZZ Club PK',
         'phone' => '06 00 00 00 77', 'created_at' => now(), 'updated_at' => now(),
@@ -416,8 +302,9 @@ test('S5 — la porte du site releve les numeros par cle de personne, pas seulem
 
     app(SiteGdprService::class)->erase('zz-pk-s5', 'autre-adresse@zz-pk.example.invalid', 'business');
 
-    expect(efoFiche($fiche)->phone)->toBeNull()
-        ->and(DB::table('contacts')->where('person_key', 'zz-pk-s5')->exists())->toBeFalse();
+    expect(efoFiche($fiche)->phone)->toBe('06 00 00 00 77')
+        ->and(DB::table('contacts')->whereNull('deleted_at')->where('person_key', 'zz-pk-s5')->exists())->toBeFalse()
+        ->and(DB::table('contacts')->where('person_key', 'zz-pk-s5')->exists())->toBeTrue();
 });
 
 // ── S1 et S6 : l'export ne rend que les valeurs de la personne ─────────────
@@ -459,34 +346,6 @@ test('S6 — l export venu du site rend aussi les fiches d organisation, sans va
 
 // ── E1 : un numéro a des frontières ────────────────────────────────────────
 
-test('E1 — un SIREN suivi d une date ne forment pas le numero par hasard : l effacement est complet', function () {
-    // Les chiffres collés de ce texte contiennent « 0600000042 »
-    // (906000000|4200…) : une recherche de sous-suite de chiffres criait au
-    // résidu. Le numéro, lui, n'y est pas. ⚠️ `jsonb` range ses clés (les
-    // plus courtes d'abord) : « siren » passe bien AVANT « cree_le » dans le
-    // texte lu, sans quoi la suite de chiffres n'existerait pas (témoin
-    // ci-dessous).
-    DB::table('companies')->where('id', $this->temoin)->update([
-        'metadata' => json_encode(['siren' => '906000000', 'cree_le' => '4200-01-01']),
-    ]);
-    $texte = (string) DB::table('companies')->where('id', $this->temoin)->value('metadata');
-    expect((string) preg_replace('/\D/', '', $texte))->toContain('0600000042');
-
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-
-    expect(efoVerdict($resultat))->toBe([]);
-});
-
-test('E1 — temoin : le numero ecrit autrement, avec separateurs, est toujours trouve', function (string $ecriture) {
-    DB::table('companies')->where('id', $this->temoin)->update([
-        'metadata' => json_encode(['note' => 'Joindre au ' . $ecriture . ' (poste 3)']),
-    ]);
-
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-
-    expect(efoVerdict($resultat))->toHaveKey('companies.metadata');
-})->with(['06.00.00.00.42', '+33 (0)6 00 00 00 42', '0033-6-00-00-00-42', '0600000042']);
-
 // ── E2 : standard des canaux, et opposition jamais par union ───────────────
 
 test('E2 — une ligne fixe des CANAUX d une organisation est un standard : ni effacee de ses canaux, ni opposee', function () {
@@ -523,8 +382,8 @@ test('E2 — un numero personnel ici mais porte par un autre dans un autre espac
         ? app(GdprErasureService::class)->erase(EFO_EMAIL)
         : app(SiteGdprService::class)->erase(hash('sha256', 'zz-efo'), EFO_EMAIL, 'business');
 
-    // Ici, effacé ; là-bas, intact ; et AUCUNE opposition globale.
-    expect(efoFiche($this->fede)->phone)->toBeNull()
+    // L3c-0 : rien n'est effacé (console comme site). Là-bas, intact ; et AUCUNE opposition globale.
+    expect(efoFiche($this->fede)->phone)->not->toBeNull()
         ->and(DB::table('contacts')->where('id', $collegue)->value('phone'))->toBe(EFO_MOBILE)
         ->and(efoOppose('600000042'))->toBeFalse();
 })->with(['console', 'site']);
@@ -559,28 +418,6 @@ test('E3 — GdprPortabilityService exporte les fiches d organisation de la pers
 });
 
 // ── E4 : la timeline, par les numéros personnels ───────────────────────────
-
-test('E4 — la preuve differee efface la timeline qui porte un numero PERSONNEL, pas seulement celui de la demande', function () {
-    $activite = (int) DB::table('activities')->insertGetId([
-        'workspace_id' => $this->espace, 'type' => 'call', 'kind' => 'call', 'occurred_at' => now(),
-        'external_ref' => 'zz-efo-e4', 'title' => 'ZZ appel', 'payload' => json_encode(['tel' => '06 00 00 00 42']),
-        'created_at' => now(),
-    ]);
-    // TÉMOIN : l'appel d'une autre personne.
-    $temoin = (int) DB::table('activities')->insertGetId([
-        'workspace_id' => $this->espace, 'type' => 'call', 'kind' => 'call', 'occurred_at' => now(),
-        'external_ref' => 'zz-efo-e4-temoin', 'title' => 'ZZ appel', 'payload' => json_encode(['tel' => '06 00 00 00 98']),
-        'created_at' => now(),
-    ]);
-
-    // La console ne cite que l'adresse : le numéro n'est connu que par la
-    // fiche de la personne.
-    $resultat = app(GdprErasureService::class)->erase(EFO_EMAIL);
-    VerifierEffacementRgpd::dispatchSync(EFO_EMAIL, $resultat['personnels']);
-
-    expect(DB::table('activities')->where('id', $activite)->exists())->toBeFalse()
-        ->and(DB::table('activities')->where('id', $temoin)->exists())->toBeTrue();
-});
 
 // ── R6, R7 : l'échec de la preuve ──────────────────────────────────────────
 

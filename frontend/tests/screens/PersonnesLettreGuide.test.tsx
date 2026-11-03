@@ -17,6 +17,7 @@ import userEvent from '@testing-library/user-event';
 import { PersonnesPage } from '@/features/crm-console/PersonnesPage';
 import { PersonneDetailPage } from '@/features/crm-console/PersonneDetailPage';
 import type { PersonneFiche, PersonneRow, PersonnesCounts } from '@/features/crm-console/types';
+import { handlers as fauxServeur } from '@/demo/handlers/crm/alimenter.handlers';
 import { renderScreen } from '../helpers/renderScreen';
 import { getJson, recordGet, recordPost } from '../msw/handlers';
 
@@ -41,7 +42,7 @@ function personne(overrides: Partial<PersonneRow> = {}): PersonneRow {
     contact_id: null,
     company_id: null,
     entreprise: null,
-    purge_prevue_le: '2029-09-24',
+    purge_prevue_le: null,
     ...overrides,
   };
 }
@@ -150,5 +151,35 @@ describe('PersonneDetailPage — rattacher', () => {
     expect(await screen.findByText('Adresse personnelle sans consentement : aucune prospection.')).toBeVisible();
     expect(screen.getByText('Intérêt légitime B2B', { exact: false })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Rattacher à cette entreprise' })).toBeNull();
+  });
+});
+
+describe('Faux serveur de la démo (DM1-DIV) — Newsletter et guide', () => {
+  it('liste, filtre « À rattacher », puis pose une tâche sur la fiche', async () => {
+    await renderScreen(<PersonnesPage />, {
+      path: '/console/lettre-et-guide',
+      url: '/console/lettre-et-guide',
+      consoleFeatures: 'open',
+      handlers: fauxServeur,
+    });
+    expect(await screen.findByText('Camille Brun')).toBeVisible();
+    expect(screen.getByText('Hugo Marchand')).toBeVisible();
+
+    await userEvent.selectOptions(screen.getByLabelText('Rattachement'), 'non');
+    await waitFor(() => expect(screen.queryByText('Camille Brun')).toBeNull());
+    expect(screen.getByText('Hugo Marchand')).toBeVisible();
+  });
+
+  it('une tâche posée sur la fiche se retrouve à la lecture suivante', async () => {
+    await renderScreen(<PersonneDetailPage />, {
+      path: '/console/lettre-et-guide/$personneId',
+      url: '/console/lettre-et-guide/2',
+      consoleFeatures: 'open',
+      handlers: fauxServeur,
+    });
+    expect(await screen.findByText(/Retrouver l’entreprise/)).toBeVisible();
+    await userEvent.type(screen.getByLabelText('Titre de la tâche'), 'Appeler le cabinet Alpha');
+    await userEvent.click(screen.getByRole('button', { name: 'Poser' }));
+    expect(await screen.findByText('Appeler le cabinet Alpha')).toBeVisible();
   });
 });

@@ -54,6 +54,7 @@ class TriageAutoService
         // email_generic suffit pour passer ready_for_outreach.
         $hasContactableContact = DB::table('contacts')
             ->where('company_id', $company->id)
+            ->whereNull('deleted_at') // L3c-0 : un contact mis à l'écart ne rend pas la fiche contactable
             ->whereIn('email_status', self::CONTACTABLE_EMAIL_STATUSES)
             ->exists();
         $hasGenericEmail = ! empty($company->email_generic);

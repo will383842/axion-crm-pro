@@ -212,11 +212,26 @@ export function FranceCoverageMap({
       // son code (« 01 », « 2A », « 971 »), le même que celui des cellules de
       // l'API. On le colore donc directement, sans balayer la source — c'est
       // ce balayage qui laissait toute la carte grise en production.
+      // Démo (DM1-DIV) : le fond de carte vient du faux serveur local, lu ici dans
+      // la page (le faux serveur ne voit pas les requêtes d'un worker). Jamais une
+      // tuile ni un service extérieur. Hors démo, `VITE_DEMO` est figé à vide au
+      // build : ce bloc disparaît et la source reste l'adresse ci-dessus.
+      const enDemo = import.meta.env.VITE_DEMO === '1';
       map.addSource('departements', {
         type: 'geojson',
-        data: geojsonUrl,
+        data: enDemo ? { type: 'FeatureCollection', features: [] } : geojsonUrl,
         promoteId: 'code',
       });
+      if (enDemo) {
+        void fetch(String(geojsonUrl))
+          .then((r) => r.json() as Promise<GeoJSON.FeatureCollection>)
+          .then((fond) => {
+            if (cancelled) return;
+            const source = map.getSource('departements') as unknown as { setData?: (donnees: GeoJSON.FeatureCollection) => void } | undefined;
+            source?.setData?.(fond);
+          })
+          .catch(() => undefined);
+      }
 
       // Les cellules arrivent souvent AVANT la fin du chargement du GeoJSON :
       // on colore dès que la source est prête, avec les cellules les plus

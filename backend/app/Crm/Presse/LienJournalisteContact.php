@@ -81,13 +81,16 @@ final class LienJournalisteContact
     }
 
     /**
-     * Effacement d'un ou plusieurs journalistes : leurs contacts liés sont
-     * supprimés (et inscrits au registre des retraits).
+     * L3c-0 (ADR contrat v3 § 6 et F2) — opposition ou effacement d'un ou
+     * plusieurs journalistes : leurs contacts liés sont MASQUÉS (corbeille
+     * douce `deleted_at` + trace `mis_a_l_ecart_le` et `motif` dans `metadata`),
+     * JAMAIS supprimés. Les coordonnées sont gardées ; l'anti-réinsertion passe
+     * par `opt_out` (voir `opposer()`).
      *
      * @param  list<int>  $journalisteIds
-     * @return int contacts supprimés
+     * @return int contacts masqués
      */
-    public static function effacerContactsDe(array $journalisteIds): int
+    public static function masquerContactsDe(array $journalisteIds, string $motif = 'opposition_presse'): int
     {
         if ($journalisteIds === []) {
             return 0;
@@ -99,14 +102,16 @@ final class LienJournalisteContact
         }
 
         // Le registre (`contacts_memoriser_retrait`) retient les personnes dont
-        // `sources` cite `presse-2026` : on s'en assure avant la suppression.
+        // `sources` cite `presse-2026` : on s'en assure avant la mise à l'écart.
         DB::table('contacts')->whereIn('id', $contacts)
             ->whereRaw("NOT (COALESCE(sources, '[]'::jsonb) @> '[\"presse-2026\"]'::jsonb)")
             ->update(['sources' => DB::raw("COALESCE(sources, '[]'::jsonb) || '[\"presse-2026\"]'::jsonb")]);
 
-        self::marquerEffacement();
-
-        return DB::table('contacts')->whereIn('id', $contacts)->delete();
+        return DB::table('contacts')->whereIn('id', $contacts)->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => now(),
+                'metadata' => DB::raw("COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('mis_a_l_ecart_le', to_char(now(), 'YYYY-MM-DD'), 'motif', " . DB::getPdo()->quote($motif) . ')'),
+            ]);
     }
 
     private static function opposerEmail(string $email): void

@@ -7,6 +7,7 @@ use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * EFFACEMENT (art. 17) DES COORDONNÉES D'UNE PERSONNE LÀ OÙ LES FICHES
@@ -39,8 +40,8 @@ use Illuminate\Support\Facades\DB;
  *    à l'identique : sinon le planificateur ne s'en sert pas.
  * 2. Le temps DIFFÉRÉ — `App\Jobs\VerifierEffacementRgpd` : la preuve
  *    (`residus()`, qui lit TOUT : texte de `signals` et `metadata`, notes
- *    libres) et le balayage de la timeline par les numéros personnels
- *    (`effacerTimeline()`). Il met la demande à jour et journalise.
+ *    libres), en lecture seule (`constater()`) : la timeline n'est plus effacée.
+ *    Il met la demande à jour et journalise.
  *
  * ── Quel numéro est celui de la PERSONNE (relectures S3, E2) ────────────────
  *
@@ -195,94 +196,7 @@ final class EffacementCoordonneesFiches
      */
     public static function effacer(string $email, array $telephones, array $clesNom = [], ?string $workspaceId = null): array
     {
-        $email = mb_strtolower(trim($email));
-        $personnels = self::numerosPersonnels($telephones, $email, $clesNom, $workspaceId);
-        $presents = self::presents($telephones, $workspaceId);
-        $tous = self::variantes($telephones);
-        $variantes = self::variantes($personnels);
-        $bilan = [
-            'contacts_par_email' => 0,
-            'companies_email_generic' => 0,
-            'companies_phone' => 0,
-            'companies_canaux' => 0,
-            'contacts_doublons_par_telephone' => 0,
-            'contacts_telephone_retire' => 0,
-            'adresses_partagees' => 0,
-        ];
-
-        // Chantier 5 : l'empreinte salée de l'adresse (si elle était partagée)
-        // et celles de l'adresse et des numéros PERSONNELS dans le journal des
-        // fusions partent avec eux — `doublons_effacer`, bornée à l'espace du
-        // contexte (le rôle applicatif ne calcule pas d'empreinte). AVANT la
-        // suppression des personnes : la fonction retrouve celles de l'espace
-        // à cette adresse et retire TOUTES leurs empreintes (LinkedIn, statut…),
-        // pas seulement l'adresse et les numéros. Appelée après, la cascade
-        // `fusions_empreintes.contact_id` fait le même travail.
-        $espace = $workspaceId ?? WorkspaceContext::current();
-        if ($espace !== null && ($email !== '' || $variantes !== [])) {
-            // Dans le contexte de CET espace : la fonction refuse tout autre.
-            $r = WorkspaceContext::run($espace, static fn (): mixed => DB::selectOne(
-                'SELECT public.doublons_effacer(?::uuid, ?, ?::jsonb) AS n',
-                [$espace, $email, json_encode($variantes, JSON_THROW_ON_ERROR)],
-            ));
-            $bilan['adresses_partagees'] = (int) ($r->n ?? 0);
-        }
-
-        if ($email !== '') {
-            // Déjà fait par les services quand le rôle voit tout ; ici pour le
-            // travail par espace sous RLS (S8).
-            $contacts = DB::table('contacts')->where('email', $email);
-            if ($workspaceId !== null) {
-                $contacts->where('workspace_id', $workspaceId);
-            }
-            $bilan['contacts_par_email'] = $contacts->delete();
-
-            // La fiche de vérification de l'adresse part avec l'adresse.
-            $bilan['companies_email_generic'] = self::fichesALAdresse($email, $workspaceId)
-                ->update([
-                    'email_generic' => null,
-                    'signals' => DB::raw("signals - 'email_generic_verification'"),
-                    'updated_at' => now(),
-                ]);
-
-        }
-
-        // Un DOUBLON de la personne (même nom, aucune adresse) qui porte l'un
-        // de SES numéros — même le standard : c'est une fiche de la personne.
-        if ($tous !== [] && $clesNom !== []) {
-            $bilan['contacts_doublons_par_telephone'] = self::contactsAuNumero($tous, $workspaceId)
-                ->whereNull('email')
-                ->whereRaw(self::CLE_NOM . ' IN (' . self::marques($clesNom) . ')', $clesNom)
-                ->delete();
-        }
-
-        // Un numéro PERSONNEL quitte tout : fiche d'organisation, autres fiches.
-        if ($variantes !== []) {
-            $bilan['companies_phone'] = self::fichesAuNumero($variantes, $workspaceId)
-                ->update(['phone' => null, 'updated_at' => now()]);
-            $bilan['contacts_telephone_retire'] = self::contactsAuNumero($variantes, $workspaceId)
-                ->update(['phone' => null, 'updated_at' => now()]);
-        }
-
-        $adresses = $email !== '' ? [$email] : [];
-        foreach (self::fichesAuxCanaux($adresses, $variantes, $workspaceId)->get(['id', 'signals']) as $fiche) {
-            $signals = json_decode((string) $fiche->signals, true);
-            if (! is_array($signals) || ! is_array($signals['contact_channels'] ?? null)) {
-                continue;
-            }
-            $canaux = self::nettoyerCanaux($signals['contact_channels'], $email, $variantes);
-            if ($canaux === $signals['contact_channels']) {
-                continue;
-            }
-            $signals['contact_channels'] = $canaux;
-            DB::table('companies')->where('id', $fiche->id)->update([
-                'signals' => json_encode($signals, JSON_THROW_ON_ERROR),
-                'updated_at' => now(),
-            ]);
-            $bilan['companies_canaux']++;
-        }
-
-        return ['bilan' => $bilan, 'personnels' => $personnels, 'presents' => $presents];
+        throw new LogicException('EffacementCoordonneesFiches::effacer() est INTERDIT : aucune suppression de données de personne (ADR contrat v3, § 6). Utiliser MiseAEcart (masquage réversible).');
     }
 
     /**
@@ -299,7 +213,21 @@ final class EffacementCoordonneesFiches
      */
     public static function effacerPartout(string $email, array $telephones, array $clesNom): array
     {
-        $bilan = [];
+        throw new LogicException('EffacementCoordonneesFiches::effacerPartout() est INTERDIT : aucune suppression de données de personne (ADR contrat v3, § 6). Utiliser releverPartout() puis MiseAEcart.');
+    }
+
+    /**
+     * L3c-0 — relevé SANS RIEN MODIFIER : ce que `effacerPartout()` calculait
+     * (numéros personnels, numéros opposables) sans plus rien effacer. Sert à
+     * l'anti-réinsertion par téléphone (`opt_out`).
+     *
+     * @param  list<string>  $telephones
+     * @param  list<string>  $clesNom
+     * @return array{personnels: list<string>, opposables: list<string>}
+     */
+    public static function releverPartout(string $email, array $telephones, array $clesNom): array
+    {
+        $email = mb_strtolower(trim($email));
         $personnels = [];
         $parEspace = [];
         foreach (self::espaces() as $espace) {
@@ -307,17 +235,17 @@ final class EffacementCoordonneesFiches
                 $tels = array_values(array_unique(array_merge($telephones, self::telephonesDesContacts($email, $espace))));
                 $cles = array_values(array_unique(array_merge($clesNom, self::clesNomDesContacts($email, $espace))));
 
-                return self::effacer($email, $tels, $cles, $espace);
+                return [
+                    'personnels' => self::numerosPersonnels($tels, $email, $cles, $espace),
+                    'presents' => self::presents($tels, $espace),
+                ];
             });
-            foreach ($resultat['bilan'] as $cle => $n) {
-                $bilan[$cle] = ($bilan[$cle] ?? 0) + $n;
-            }
             $personnels = array_merge($personnels, $resultat['personnels']);
             $parEspace[] = $resultat;
         }
         $personnels = array_values(array_unique($personnels));
 
-        return ['bilan' => $bilan, 'personnels' => $personnels, 'opposables' => self::opposables($personnels, $parEspace)];
+        return ['personnels' => $personnels, 'opposables' => self::opposables($personnels, $parEspace)];
     }
 
     /**
@@ -498,10 +426,16 @@ final class EffacementCoordonneesFiches
             'events.demarche_note' => ['events', 'demarche_note'],
         ];
 
+        // L3c-0 : un contact MASQUÉ (corbeille douce, mis à l'écart) est gardé
+        // exprès et n'est plus un résidu : il n'apparaît plus nulle part.
+        $lire = static fn (string $table): Builder => $table === 'contacts'
+            ? self::table($table, $workspaceId)->whereNull('deleted_at')
+            : self::table($table, $workspaceId);
+
         foreach ($zones as $nom => [$table, $colonne]) {
             $n = 0;
             if ($email !== '' && ! in_array($nom, ['contacts.phone', 'companies.phone'], true)) {
-                $candidats = self::table($table, $workspaceId)
+                $candidats = $lire($table)
                     ->whereRaw("coalesce({$colonne}, '') ILIKE ?", ['%' . self::echapperLike($email) . '%'])
                     ->selectRaw("{$colonne} AS texte")
                     ->pluck('texte')
@@ -514,7 +448,7 @@ final class EffacementCoordonneesFiches
             }
             if ($nom !== 'contacts.email' && $nom !== 'companies.email_generic') {
                 foreach ($motifs as $motif) {
-                    $n += self::table($table, $workspaceId)
+                    $n += $lire($table)
                         ->whereRaw("coalesce({$colonne}, '') ~ ?", [$motif])
                         ->count();
                 }
@@ -551,25 +485,6 @@ final class EffacementCoordonneesFiches
         }
 
         return $residus;
-    }
-
-    /**
-     * La timeline (`activities.payload`), balayée par les numéros PERSONNELS
-     * (relecture E4) — pas seulement par le numéro de la demande. Un parcours
-     * complet de `activities` : temps différé seulement.
-     *
-     * @param  list<string>  $telephonesPersonnels
-     */
-    public static function effacerTimeline(array $telephonesPersonnels, ?string $workspaceId = null): int
-    {
-        $supprimees = 0;
-        foreach (self::motifsTelephones($telephonesPersonnels) as $motif) {
-            $supprimees += self::table('activities', $workspaceId)
-                ->whereRaw("coalesce(payload::text, '') ~ ?", [$motif])
-                ->delete();
-        }
-
-        return $supprimees;
     }
 
     /** Le rôle de la connexion voit-il toutes les lignes (propriétaire, BYPASSRLS) ? */

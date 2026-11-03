@@ -217,9 +217,9 @@ class CandidatesController extends ConsoleController
             'consent_version' => $candidate->consent_version,
             'consent_vivier_at' => $candidate->consent_vivier_at,
             'derniere_interaction_at' => $candidate->derniere_interaction_at,
-            // Horloge CNIL « CVthèque » : 2 ans après la dernière interaction.
-            // Affichée, jamais subie (conception §2.3).
-            'purge_prevue_le' => $candidate->derniere_interaction_at?->copy()->addYears(2),
+            // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée,
+            // valeur toujours `null`.
+            'purge_prevue_le' => null,
             // ⚠️ `$candidate->attributes` renverrait le tableau d'attributs
             // BRUTS d'Eloquent (propriété `Model::$attributes`), pas la colonne
             // JSONB du wizard. Le seul accès correct est `getAttribute()`.

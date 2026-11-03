@@ -360,6 +360,16 @@
         "sauts": 1
     },
     {
+        "tache": "origines:masquer-commentaire-ref",
+        "horaire": "40 3 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 60,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
         "tache": "prospection:score-email-confidence",
         "horaire": "45 4 * * *",
         "fuseau": "Europe/Paris",
@@ -398,36 +408,6 @@
         "un_seul_serveur": false,
         "conditions": 0,
         "sauts": 0
-    },
-    {
-        "tache": "rgpd:purge-business-prospects",
-        "horaire": "15 4 2 * *",
-        "fuseau": "Europe/Paris",
-        "verrou_minutes": 240,
-        "en_arriere_plan": false,
-        "un_seul_serveur": true,
-        "conditions": 0,
-        "sauts": 2
-    },
-    {
-        "tache": "rgpd:purge-personnes",
-        "horaire": "45 4 2 * *",
-        "fuseau": "Europe/Paris",
-        "verrou_minutes": 120,
-        "en_arriere_plan": false,
-        "un_seul_serveur": true,
-        "conditions": 0,
-        "sauts": 2
-    },
-    {
-        "tache": "rgpd:purge-vivier",
-        "horaire": "30 3 2 * *",
-        "fuseau": "Europe/Paris",
-        "verrou_minutes": 240,
-        "en_arriere_plan": false,
-        "un_seul_serveur": true,
-        "conditions": 0,
-        "sauts": 2
     },
     {
         "tache": "rgpd:verifications-en-attente",

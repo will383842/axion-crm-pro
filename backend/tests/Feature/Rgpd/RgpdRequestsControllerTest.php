@@ -21,8 +21,8 @@ uses(TestCase::class, RefreshDatabase::class);
  * mesure le 2026-08-19, et ces tests le garantissaient en vert.
  *
  * Les routes exigent desormais `rgpd.view` et `rgpd.handle` - des permissions qui
- * existaient deja dans le seeder, et que seuls `owner` et `admin` portent. Le
- * compte de test recoit donc `admin` : le test verifie que l'endpoint FONCTIONNE,
+ * existaient deja dans le seeder, et que seul `owner` porte (L3c-0 : retire du role admin). Le
+ * compte de test recoit donc `owner` : le test verifie que l'endpoint FONCTIONNE,
  * pas qu'il est ouvert a tous. La garde du droit, elle, est dans
  * `PermissionsRoutesRgpdTest`.
  */
@@ -45,7 +45,7 @@ function makeRgpdUser(): array
     ]);
 
     setPermissionsTeamId($workspace->id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
 
     return [$user, $workspace];
 }

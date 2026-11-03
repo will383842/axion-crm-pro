@@ -552,7 +552,6 @@ test('C21-001/twins — inventaire fige de lower(colonne::text) dans tout app/',
     // Ce tableau doit BAISSER, jamais monter. S'il monte, quelqu'un vient de
     // reintroduire le defaut ; s'il baisse, mettez-le a jour DELIBEREMENT.
     $attendu = [
-        'app/Services/Rgpd/GdprErasureService.php' => 2,
         'app/Services/Rgpd/GdprPortabilityService.php' => 4,
     ];
 

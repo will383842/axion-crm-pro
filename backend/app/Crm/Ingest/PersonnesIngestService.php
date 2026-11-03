@@ -237,6 +237,57 @@ final class PersonnesIngestService
         }
 
         DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);
+
+        if ($accords->origines !== null) {
+            $this->enregistrerOrigines((int) $personne->id, $workspaceId, $accords->origines);
+        }
+    }
+
+    /**
+     * Contrat v3 : union SANS RETRAIT de l'historique des origines. L'écriture
+     * de l'archive et la réduction du tableau se font dans UNE transaction,
+     * sous verrou de ligne (ADR I4) : une entrée n'est retirée du tableau que
+     * si elle est déjà dans l'archive. Rien n'est jamais supprimé.
+     *
+     * @param  list<array<string, string>>  $entrantes
+     */
+    private function enregistrerOrigines(int $personneId, string $workspaceId, array $entrantes): void
+    {
+        // Interrupteur éteint ou migration pas encore passée : on ignore (la
+        // charge v3 n'arrive de toute façon pas, `SiteSyncEvent` la refuse en 503).
+        if (! config('origines.v3_enabled') || ! self::colonneOriginesPresente()) {
+            return;
+        }
+
+        DB::transaction(function () use ($personneId, $workspaceId, $entrantes): void {
+            $ligne = DB::table('personnes')->where('id', $personneId)->lockForUpdate()->first(['origines']);
+            if ($ligne === null) {
+                return;
+            }
+
+            $fusion = ContenusAccords::fusionnerOrigines($this->decoder($ligne->origines ?? null) ?? [], $entrantes);
+
+            foreach ($fusion['archive'] as $entree) {
+                DB::table('personne_origines_archive')->insertOrIgnore([
+                    'workspace_id' => $workspaceId,
+                    'personne_id' => $personneId,
+                    'cle' => ContenusAccords::cleOrigine($entree),
+                    'origine' => $this->json($entree),
+                    'archive_le' => now(),
+                ]);
+            }
+
+            DB::table('personnes')->where('id', $personneId)->update([
+                'origines' => $this->json($fusion['garde']),
+            ]);
+        });
+    }
+
+    private static function colonneOriginesPresente(): bool
+    {
+        static $presente = false;
+
+        return $presente = $presente || Schema::hasColumn('personnes', 'origines');
     }
 
     private function json(mixed $valeur): ?string

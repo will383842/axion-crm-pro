@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\ContenusAccords;
+use App\Crm\Ingest\OrigineDictionnaire;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
@@ -19,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -243,6 +245,8 @@ class PersonnesController extends ConsoleController
                 // PV-6 : lecture seule. Colonnes absentes (migration pas encore
                 // passée) ou vides : le bloc est simplement vide.
                 'contenus_accords' => $this->contenusAccords($workspaceId, $id),
+                // Contrat v3 : historique complet, lecture seule (absent si l'interrupteur est éteint).
+                ...($this->origineV3Active() ? ['origines' => $this->origineHistorique($personne)] : []),
                 'entreprise' => $entreprise === null ? null : (array) $entreprise,
                 'taches' => array_values(array_filter($timeline, static fn (array $a): bool => $a['kind'] === 'task')),
                 'timeline' => $timeline,
@@ -612,7 +616,7 @@ class PersonnesController extends ConsoleController
     // ── Internes ────────────────────────────────────────────────────────────
 
     /**
-     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string}
+     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille: ?string, origine_detail: ?string}
      */
     private function filtres(Request $request): array
     {
@@ -622,9 +626,16 @@ class PersonnesController extends ConsoleController
             'nature' => ['nullable', 'string', 'in:' . implode(',', Taxonomy::PERSONNE_EMAIL_NATURES)],
             'rattachee' => ['nullable', 'string', 'in:oui,non'],
             'q' => ['nullable', 'string', 'max:120'],
+            // Contrat v3 de l'origine : filtre par famille / détail du dictionnaire fermé.
+            'origine_famille' => ['nullable', 'string', 'max:80'],
+            'origine_detail' => ['nullable', 'string', 'max:80'],
         ]);
 
+        [$origineFamille, $origineDetail] = $this->filtreOrigine($v['origine_famille'] ?? null, $v['origine_detail'] ?? null);
+
         return [
+            'origine_famille' => $origineFamille,
+            'origine_detail' => $origineDetail,
             'source' => $this->texte($v['source'] ?? null),
             'statut_lettre' => $this->texte($v['statut_lettre'] ?? null),
             'nature' => $this->texte($v['nature'] ?? null),
@@ -635,7 +646,40 @@ class PersonnesController extends ConsoleController
     }
 
     /**
-     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string}  $f
+     * Filtre d'origine (contrat v3). Interrupteur éteint : ignoré, comme si le
+     * paramètre n'existait pas. Allumé : doit nommer une famille (et un détail
+     * de CETTE famille) du dictionnaire, sinon 422.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function filtreOrigine(mixed $famille, mixed $detail): array
+    {
+        $famille = $this->texte(is_string($famille) ? $famille : null);
+        $detail = $this->texte(is_string($detail) ? $detail : null);
+        if (! $this->origineV3Active() || ($famille === null && $detail === null)) {
+            return [null, null];
+        }
+
+        $valide = match (true) {
+            $famille !== null && $detail !== null => OrigineDictionnaire::valide($famille, $detail),
+            $famille !== null => OrigineDictionnaire::familleConnue($famille),
+            default => false, // un détail seul est ambigu (« autre_non_classe » existe dans chaque famille)
+        };
+        if (! $valide) {
+            throw ValidationException::withMessages(['origine_famille' => 'Famille ou détail d\'origine inconnu du dictionnaire.']);
+        }
+
+        return [$famille, $detail];
+    }
+
+    /** Contrat v3 : interrupteur allumé ET colonne présente (fenêtre de déploiement). */
+    private function origineV3Active(): bool
+    {
+        return (bool) config('origines.v3_enabled') && Schema::hasColumn('personnes', 'origines');
+    }
+
+    /**
+     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille?: ?string, origine_detail?: ?string}  $f
      */
     private function requete(string $workspaceId, array $f): Builder
     {
@@ -669,6 +713,19 @@ class PersonnesController extends ConsoleController
                 'companies.denomination',
                 'companies.siren',
             ]);
+
+        // Contrat v3 : l'historique des origines, en LECTURE SEULE.
+        if ($this->origineV3Active()) {
+            $requete->addSelect('personnes.origines');
+            if (($f['origine_famille'] ?? null) !== null) {
+                $motif = ['famille' => $f['origine_famille']];
+                if (($f['origine_detail'] ?? null) !== null) {
+                    $motif['detail'] = $f['origine_detail'];
+                }
+                // Confinement jsonb (index GIN) : au moins une entrée de l'historique correspond.
+                $requete->whereRaw('personnes.origines @> ?::jsonb', [json_encode([$motif], JSON_THROW_ON_ERROR)]);
+            }
+        }
 
         // FERMÉES INSEE (décision du 27/10/2026) : la personne d'une fiche
         // fermée n'apparaît ni dans la liste ni dans l'export par défaut ;
@@ -741,7 +798,41 @@ class PersonnesController extends ConsoleController
             // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée pour
             // les lecteurs existants, valeur toujours `null`.
             'purge_prevue_le' => null,
-        ];
+        ] + $this->origineLecture($p);
+    }
+
+    /**
+     * Historique des origines (contrat v3), liste blanche de clés, du plus
+     * ancien au plus récent. Vide si l'interrupteur est éteint.
+     *
+     * @return list<array<string, ?string>>
+     */
+    private function origineHistorique(\stdClass $p): array
+    {
+        if (! property_exists($p, 'origines')) {
+            return [];
+        }
+        $brut = is_string($p->origines) ? json_decode($p->origines, true) : $p->origines;
+
+        return is_array($brut)
+            ? array_values(array_map(static fn (array $o): array => ContenusAccords::presenterOrigine($o), array_filter($brut, 'is_array')))
+            : [];
+    }
+
+    /**
+     * Champs d'origine (contrat v3), LECTURE SEULE : `origine` (la plus récente)
+     * et `origines_nombre`. Absents tant que l'interrupteur est éteint.
+     *
+     * @return array<string, mixed>
+     */
+    private function origineLecture(\stdClass $p): array
+    {
+        if (! property_exists($p, 'origines')) {
+            return [];
+        }
+        $liste = $this->origineHistorique($p);
+
+        return ['origine' => $liste === [] ? null : $liste[array_key_last($liste)], 'origines_nombre' => count($liste)];
     }
 
     /** @return array<string, mixed> */

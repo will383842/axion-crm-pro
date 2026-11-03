@@ -107,11 +107,11 @@ class GdprPortabilityService
             // Contrat v3 de l'origine : l'archive des origines au-delà de 50
             // (lecture seule) fait partie de ce qu'on sait d'elle, y compris
             // `commentaire_ref` (empreinte) : l'article 15 inclut les éléments
-            // masqués (ADR I5). Ajout seul : rien de l'existant n'est retiré.
+            // masqués (ADR I5), avec leur marqueur `masque_le`. Ajout seul : rien de l'existant n'est retiré.
             'personne_origines_archive' => DB::table('personne_origines_archive')
                 ->whereIn('personne_id', $personnes()->select('id'))
                 ->orderBy('id')
-                ->get(['personne_id', 'cle', 'origine', 'archive_le'])
+                ->get(['personne_id', 'cle', 'origine', 'archive_le', 'masque_le'])
                 ->toArray(),
             'abonnements' => DB::table('abonnements')
                 ->whereIn('personne_id', $personnes()->select('id'))

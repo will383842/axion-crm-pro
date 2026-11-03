@@ -94,8 +94,9 @@ function oaaCreerPersonne(string $workspaceId, string $email = OAA_EMAIL, ?array
         'person_key' => hash('sha256', 'oaa|' . $email),
         'email' => $email,
         'email_hash' => hash('sha256', $email),
-        'premiere_source' => 'guide-ia', 'premiere_source_at' => now(), 'legal_basis' => 'consent',
         'origines' => $origines === null ? null : json_encode($origines, JSON_UNESCAPED_UNICODE),
+        'email_nature' => 'pro', 'premiere_source' => 'guide', 'premiere_source_at' => now(), 'derniere_interaction_at' => now(),
+        'legal_basis' => 'consent',
         'created_at' => now(), 'updated_at' => now(),
     ]);
 
@@ -244,11 +245,35 @@ test('OAA 4 — interrupteur de masquage éteint (défaut) : la commande ne touc
     expect(json_decode((string) DB::table('personnes')->where('id', $p->id)->value('origines'), true)[0]['commentaire_ref'])->toBe(str_repeat('a', 64));
 });
 
-test('OAA 4b — au bout de 12 mois, commentaire_ref passe à null ; le reste de l\'entrée et les entrées récentes sont intacts, rien n\'est supprimé', function () {
-    config(['origines.masquage_commentaire_ref_enabled' => true]);
-    $vieille = oaaEntree(['post_ref' => 'post_vieux_0001', 'date' => now()->subMonths(13)->utc()->format('Y-m-d\TH:i:s\Z'), 'commentaire_ref' => str_repeat('b', 64)]);
+function oaaAdmin(): User
+{
+    $user = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'oaa.admin@exemple.test', 'name' => 'Opérateur',
+        'password_hash' => Hash::make('PasswordTest12345!'),
+        'current_workspace_id' => test()->workspace->id, 'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($user->current_workspace_id);
+    $user->assignRole('admin');
+    DB::table('user_workspaces')->insertOrIgnore([
+        'user_id' => $user->id, 'workspace_id' => test()->workspace->id, 'role_slug' => 'owner',
+        'invited_at' => now(), 'joined_at' => now(),
+    ]);
+
+    return $user;
+}
+
+/** Une fiche avec une entrée de 13 mois (à masquer) et une de 2 mois (à garder visible). */
+function oaaFicheAMasquer(string $workspaceId): object
+{
+    $vieille = oaaEntree(['post_ref' => 'post_vieux_0001', 'famille' => 'carrousel', 'detail' => 'autre_non_classe', 'date' => now()->subMonths(13)->utc()->format('Y-m-d\TH:i:s\Z'), 'commentaire_ref' => str_repeat('b', 64)]);
     $recente = oaaEntree(['post_ref' => 'post_recent_0001', 'date' => now()->subMonths(2)->utc()->format('Y-m-d\TH:i:s\Z'), 'commentaire_ref' => str_repeat('c', 64)]);
-    $p = oaaCreerPersonne($this->workspace->id, OAA_EMAIL, [$vieille, $recente]);
+
+    return oaaCreerPersonne($workspaceId, OAA_EMAIL, [$vieille, $recente]);
+}
+
+test('OAA 4b — au bout de 12 mois, l\'entrée reçoit masque_le (UTC) ; commentaire_ref est CONSERVÉ tel quel, rien n\'est supprimé', function () {
+    config(['origines.masquage_commentaire_ref_enabled' => true]);
+    $p = oaaFicheAMasquer($this->workspace->id);
     $autre = oaaCreerPersonne($this->workspace->id, 'zz.autre@exemple.test', null);
     $avant = DB::table('personnes')->count();
 
@@ -256,29 +281,119 @@ test('OAA 4b — au bout de 12 mois, commentaire_ref passe à null ; le reste de
 
     $apres = json_decode((string) DB::table('personnes')->where('id', $p->id)->value('origines'), true);
     expect($apres)->toHaveCount(2)
-        ->and($apres[0]['commentaire_ref'])->toBeNull()
+        ->and($apres[0]['commentaire_ref'])->toBe(str_repeat('b', 64))
+        ->and($apres[0]['masque_le'])->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/')
         ->and($apres[0]['post_ref'])->toBe('post_vieux_0001')
-        ->and($apres[0]['famille'])->toBe('guide_reseau')
+        ->and($apres[0]['famille'])->toBe('carrousel')
         ->and($apres[1]['commentaire_ref'])->toBe(str_repeat('c', 64))
+        ->and($apres[1])->not->toHaveKey('masque_le')
         ->and(DB::table('personnes')->count())->toBe($avant)
         ->and(DB::table('personnes')->where('id', $autre->id)->value('origines'))->toBeNull();
 });
 
-test('OAA 4c — la commande est idempotente et la tâche est planifiée, sans aucun DELETE dans son code', function () {
+test('OAA 4c — idempotente : un rejeu ne change rien (masque_le gardé, pas réécrit) ; tâche planifiée ; aucun DELETE ni mise à null dans le code', function () {
     $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'origines:masquer-commentaire-ref'));
     expect($evenements)->toHaveCount(1);
 
     $source = (string) file_get_contents(base_path('app/Console/Commands/OriginesMasquerCommentaireRef.php'));
-    expect(preg_match('/->delete\(|DELETE\s+FROM|TRUNCATE|forceDelete|->truncate\(/i', $source))->toBe(0);
+    expect(preg_match('/->delete\(|DELETE\s+FROM|TRUNCATE|forceDelete|->truncate\(/i', $source))->toBe(0)
+        ->and(preg_match('/\[.commentaire_ref.\]\s*=\s*null|commentaire_ref.\s*=>\s*null/i', $source))->toBe(0);
 
     config(['origines.masquage_commentaire_ref_enabled' => true]);
-    $p = oaaCreerPersonne($this->workspace->id, OAA_EMAIL, [oaaEntree(['date' => '2024-01-01T00:00:00Z', 'commentaire_ref' => str_repeat('d', 64)])]);
+    $p = oaaFicheAMasquer($this->workspace->id);
+    $archive = oaaEntree(['post_ref' => 'archive_vieille_01', 'date' => '2024-01-01T00:00:00Z', 'commentaire_ref' => str_repeat('e', 64)]);
+    DB::table('personne_origines_archive')->insert([
+        'workspace_id' => $this->workspace->id, 'personne_id' => $p->id,
+        'cle' => ContenusAccords::cleOrigine($archive), 'origine' => json_encode($archive), 'archive_le' => now(),
+    ]);
+
     Artisan::call('origines:masquer-commentaire-ref');
     $un = DB::table('personnes')->where('id', $p->id)->value('origines');
+    $uneArchive = DB::table('personne_origines_archive')->where('personne_id', $p->id)->first();
     Artisan::call('origines:masquer-commentaire-ref');
 
-    expect(DB::table('personnes')->where('id', $p->id)->value('origines'))->toBe($un);
+    expect(DB::table('personnes')->where('id', $p->id)->value('origines'))->toBe($un)
+        ->and(DB::table('personne_origines_archive')->where('personne_id', $p->id)->first()->masque_le)->toBe($uneArchive->masque_le);
+});
+
+test('OAA 4d — la ligne d\'archive est alignée sur la fiche : masque_le posé, origine (dont commentaire_ref) intacte, aucune ligne perdue', function () {
+    config(['origines.masquage_commentaire_ref_enabled' => true]);
+    $p = oaaCreerPersonne($this->workspace->id, OAA_EMAIL, [oaaEntree()]);
+    $vieille = oaaEntree(['post_ref' => 'archive_vieille_01', 'date' => '2024-01-01T00:00:00Z', 'commentaire_ref' => str_repeat('e', 64)]);
+    $recente = oaaEntree(['post_ref' => 'archive_recente_01', 'date' => now()->subMonths(1)->utc()->format('Y-m-d\TH:i:s\Z'), 'commentaire_ref' => str_repeat('f', 64)]);
+    foreach ([$vieille, $recente] as $e) {
+        DB::table('personne_origines_archive')->insert([
+            'workspace_id' => $this->workspace->id, 'personne_id' => $p->id,
+            'cle' => ContenusAccords::cleOrigine($e), 'origine' => json_encode($e), 'archive_le' => now(),
+        ]);
+    }
+
+    Artisan::call('origines:masquer-commentaire-ref');
+
+    $lignes = DB::table('personne_origines_archive')->where('personne_id', $p->id)->orderBy('id')->get();
+    expect($lignes)->toHaveCount(2)
+        ->and($lignes[0]->masque_le)->not->toBeNull()
+        ->and(json_decode($lignes[0]->origine, true)['commentaire_ref'])->toBe(str_repeat('e', 64))
+        ->and($lignes[1]->masque_le)->toBeNull()
+        ->and(json_decode($lignes[1]->origine, true)['commentaire_ref'])->toBe(str_repeat('f', 64));
+});
+
+test('OAA 4e — un élément masqué n\'est JAMAIS renvoyé par l\'API (fiche, liste, compteur, filtre) mais reste en base', function () {
+    config(['origines.masquage_commentaire_ref_enabled' => true]);
+    $this->actingAs(oaaAdmin());
+    $p = oaaFicheAMasquer($this->workspace->id);
+    Artisan::call('origines:masquer-commentaire-ref');
+
+    $fiche = $this->getJson("/api/v1/crm/personnes/{$p->id}")->assertOk();
+    expect($fiche->json('origines'))->toHaveCount(1)
+        ->and($fiche->json('origines.0.post_ref'))->toBe('post_recent_0001')
+        ->and(json_encode($fiche->json()))->not->toContain('post_vieux_0001')->not->toContain(str_repeat('b', 64))->not->toContain('masque_le');
+
+    $liste = $this->getJson('/api/v1/crm/personnes')->assertOk();
+    expect($liste->json('data.0.origines_nombre'))->toBe(1)
+        ->and($liste->json('data.0.origine.post_ref'))->toBe('post_recent_0001');
+
+    // Le filtre ne retrouve pas la personne par une entrée masquée (« carrousel » n'existe que là)…
+    expect($this->getJson('/api/v1/crm/personnes?origine_famille=carrousel')->assertOk()->json('data'))->toHaveCount(0);
+    // …mais la retrouve par l'entrée visible.
+    expect($this->getJson('/api/v1/crm/personnes?origine_famille=guide_reseau')->assertOk()->json('data'))->toHaveCount(1);
+
+    $brut = json_decode((string) DB::table('personnes')->where('id', $p->id)->value('origines'), true);
+    expect($brut)->toHaveCount(2)->and($brut[0]['commentaire_ref'])->toBe(str_repeat('b', 64));
+});
+
+test('OAA 4f — l\'export art. 15 RESTITUE l\'élément masqué, avec commentaire_ref et masque_le (fiche et archive)', function () {
+    Storage::fake('local');
+    config(['origines.masquage_commentaire_ref_enabled' => true]);
+    $p = oaaFicheAMasquer($this->workspace->id);
+    $archive = oaaEntree(['post_ref' => 'archive_vieille_01', 'date' => '2024-01-01T00:00:00Z', 'commentaire_ref' => str_repeat('e', 64)]);
+    DB::table('personne_origines_archive')->insert([
+        'workspace_id' => $this->workspace->id, 'personne_id' => $p->id,
+        'cle' => ContenusAccords::cleOrigine($archive), 'origine' => json_encode($archive), 'archive_le' => now(),
+    ]);
+    Artisan::call('origines:masquer-commentaire-ref');
+
+    $r = app(GdprPortabilityService::class)->export(OAA_EMAIL);
+    $contenu = json_decode(Crypt::decryptString(Storage::disk('local')->get('gdpr-exports/' . $r['token'] . '.enc')), true, 512, JSON_THROW_ON_ERROR);
+
+    $origines = $contenu['personnes'][0]['origines'];
+    $origines = is_string($origines) ? json_decode($origines, true) : $origines;
+    expect($origines)->toHaveCount(2)
+        ->and($origines[0]['commentaire_ref'])->toBe(str_repeat('b', 64))
+        ->and($origines[0]['masque_le'])->not->toBeNull()
+        ->and($contenu['personne_origines_archive'])->toHaveCount(1)
+        ->and($contenu['personne_origines_archive'][0]['masque_le'])->not->toBeNull()
+        ->and(json_encode($contenu['personne_origines_archive']))->toContain(str_repeat('e', 64));
+});
+
+test('OAA 4g — interrupteur v3 éteint : la commande ne masque rien non plus', function () {
+    config(['origines.masquage_commentaire_ref_enabled' => true, 'origines.v3_enabled' => false]);
+    $p = oaaFicheAMasquer($this->workspace->id);
+    $avant = DB::table('personnes')->where('id', $p->id)->value('origines');
+
+    expect(Artisan::call('origines:masquer-commentaire-ref'))->toBe(0)
+        ->and(DB::table('personnes')->where('id', $p->id)->value('origines'))->toBe($avant);
 });
 
 // ── (5) Export RGPD art. 15 : l'archive d'origines y figure ──────────────────

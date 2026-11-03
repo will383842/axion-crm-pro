@@ -45,55 +45,45 @@ function creerEntreprises(string $espace, int $nombre, ?string $formeJuridique):
     }
 }
 
-test('B15-004 — la purge REFUSE d effacer la quasi-totalite de la base', function () {
+// L3c-0 (ADR contrat v3 § 6, F1) : les deux commandes de purge d'entreprises
+// refusent SANS CONDITION, car les fiches [ND] sont des entrepreneurs
+// individuels (des personnes) et `contacts.company_id` est en cascade.
+
+test('B15-004 / L3c-0 — la purge refuse, meme avec --force, et ne supprime RIEN', function () {
     $espace = espacePurge();
-    // Le cas réel : la forme juridique est inconnue pour l'essentiel des lignes.
-    creerEntreprises($espace, 9, null);
-    creerEntreprises($espace, 1, '5710');
-
-    Artisan::call('prospection:purge-non-commercial', ['--force' => false]);
-
-    // 90 % dépasse le plafond : la commande refuse, et RIEN n'est supprimé.
-    expect(DB::table('companies')->count())->toBe(10);
-    expect(Artisan::output())->toContain('REFUS');
-});
-
-test('B15-004 — l essai a blanc ne supprime RIEN', function () {
-    $espace = espacePurge();
-    creerEntreprises($espace, 3, null);
-
-    Artisan::call('prospection:purge-non-commercial', ['--dry-run' => true]);
-
-    expect(DB::table('companies')->count())->toBe(3);
-    expect(Artisan::output())->toContain('Essai à blanc');
-});
-
-test('B15-004 — TEMOIN : sous le plafond et avec --force, la purge FAIT son travail', function () {
-    $espace = espacePurge();
-    // 2 non-commerciales sur 10 = 20 %, sous le plafond de 30 %.
     creerEntreprises($espace, 2, '1000');
     creerEntreprises($espace, 8, '5710');
 
-    Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
+    $code = Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
-    // Sans ce témoin, une garde qui refuserait TOUT passerait pour une réussite
-    // — et la commande deviendrait inutile.
-    expect(DB::table('companies')->count())->toBe(8);
+    expect($code)->toBe(1);
+    expect(DB::table('companies')->count())->toBe(10);
+    expect(Artisan::output())->toContain('neutralisée');
 });
 
-test('B15-004 — la purge des non diffusibles porte la MEME garde', function () {
+test('B15-004 / L3c-0 — l essai a blanc ne supprime RIEN non plus', function () {
     $espace = espacePurge();
-    for ($i = 0; $i < 9; $i++) {
+    creerEntreprises($espace, 3, null);
+
+    $code = Artisan::call('prospection:purge-non-commercial', ['--dry-run' => true]);
+
+    expect($code)->toBe(1);
+    expect(DB::table('companies')->count())->toBe(3);
+});
+
+test('B15-004 / L3c-0 — la purge des non diffusibles refuse aussi, meme avec --force', function () {
+    $espace = espacePurge();
+    for ($i = 0; $i < 2; $i++) {
         DB::table('companies')->insert([
             'workspace_id' => $espace, 'denomination' => '[ND]',
             'siren' => (string) random_int(100000000, 999999999),
             'created_at' => now(), 'updated_at' => now(),
         ]);
     }
-    creerEntreprises($espace, 1, '5710');
+    creerEntreprises($espace, 8, '5710');
 
-    Artisan::call('prospection:purge-non-diffusible');
+    $code = Artisan::call('prospection:purge-non-diffusible', ['--force' => true]);
 
+    expect($code)->toBe(1);
     expect(DB::table('companies')->count())->toBe(10);
-    expect(Artisan::output())->toContain('REFUS');
 });

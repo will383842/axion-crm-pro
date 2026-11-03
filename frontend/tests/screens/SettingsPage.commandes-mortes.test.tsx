@@ -298,3 +298,25 @@ describe('P1-12 · Paramètres pour un humain', () => {
     expect(texte).toContain('Horizon');
   });
 });
+
+/**
+ * DM1-COM — carte « Envoi : activer depuis la console ». Chaque fusion déploie
+ * le CRM réel, dont le serveur n'annonce pas encore `produits` : la carte ne doit
+ * pas s'y voir. Elle n'apparaît que si le serveur annonce les produits ET
+ * qu'Envoi est absent (offre « CRM seul » de la démo).
+ */
+describe('SettingsPage — carte Envoi absent (DM1-COM)', () => {
+  it('serveur d’aujourd’hui (sans `produits`) : aucune carte Envoi', async () => {
+    await monter();
+    expect(await screen.findByDisplayValue('Axion IA')).toBeInTheDocument();
+    expect(screen.queryByTestId('carte-envoi-absent')).toBeNull();
+  });
+
+  it('produits annoncés, Envoi absent : la carte grisée s’affiche', async () => {
+    await monter([
+      getJson('/workspace', WORKSPACE),
+      getJson('/config/features', { console_v2: false, universes: { business: false, vivier: false }, produits: { crm: 'actif', envoi: 'absent' } }),
+    ]);
+    expect(await screen.findByTestId('carte-envoi-absent')).toHaveTextContent(/activer depuis la console/);
+  });
+});

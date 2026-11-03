@@ -22,7 +22,7 @@ import userEvent from '@testing-library/user-event';
 
 import { AudienceBuilderPage } from '@/features/audiences/AudienceBuilderPage';
 import { renderScreen } from '../helpers/renderScreen';
-import { postStatus, recordPost } from '../msw/handlers';
+import { getJson, postStatus, recordPost } from '../msw/handlers';
 
 const PATH = '/audiences/new';
 const LANDING = [{ path: '/audiences' }, { path: '/audiences/$audienceId' }];
@@ -412,5 +412,27 @@ describe('AudienceBuilderPage — bornes de saisie (D26-010 / D26-012)', () => {
         'retirer la règle de `register(...)` dans ' +
         '`src/features/audiences/AudienceBuilderPage.tsx`.',
     ).toBe(0);
+  });
+});
+
+describe('AudienceBuilderPage — éditeur ET / OU / SAUF (DM1-CIB)', () => {
+  it('production : sans annonce du serveur, l’éditeur n’apparaît pas', async () => {
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [getJson('/listes-manuelles', { data: [{ id: 3, nom: 'ZZ liste témoin' }] })],
+    });
+    // Les listes sont chargées (la réponse est arrivée) : l'éditeur aurait eu le temps de paraître.
+    expect((await screen.findAllByText('ZZ liste témoin')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Éditeur des critères (ET / OU / SAUF)')).toBeNull();
+  });
+
+  it('le serveur l’annonce (`meta.gestes_ciblage` des listes) : l’éditeur apparaît', async () => {
+    await renderScreen(<AudienceBuilderPage />, {
+      path: PATH,
+      landingRoutes: LANDING,
+      handlers: [getJson('/listes-manuelles', { data: [], meta: { gestes_ciblage: true } })],
+    });
+    expect(await screen.findByText('Éditeur des critères (ET / OU / SAUF)')).toBeInTheDocument();
   });
 });

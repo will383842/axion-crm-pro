@@ -24,6 +24,7 @@ import { delay, http, HttpResponse } from 'msw';
 
 import { CoveragePage } from '@/features/coverage/CoveragePage';
 import type { Cell } from '@/features/coverage/statsCouverture';
+import { handlers as fauxServeur } from '@/demo/handlers/crm/alimenter.handlers';
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, dynamicGet } from '../msw/handlers';
 
@@ -242,5 +243,14 @@ describe('Carte de France — aucun clic dangereux', () => {
     await screen.findByTestId('landing');
     expect(vue.router.state.location.pathname).toBe('/companies');
     expect(vue.router.state.location.search).toEqual({ department_code: '69' });
+  });
+});
+
+describe('Faux serveur de la démo (DM1-DIV) — Carte de France', () => {
+  it('sert les départements, puis les régions, sans appel extérieur', async () => {
+    await renderScreen(<CoveragePage />, { path: '/coverage', handlers: fauxServeur, landingRoutes: ['/companies'] });
+    expect(await screen.findByRole('button', { name: 'zone 69' })).toBeVisible();
+    // Le Rhône est le premier de « Top zones » (4 120 entreprises dans le jeu de démo).
+    expect(await screen.findByText(/4\s?120/)).toBeVisible();
   });
 });

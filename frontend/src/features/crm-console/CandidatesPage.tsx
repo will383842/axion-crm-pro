@@ -6,8 +6,8 @@
  * prospect « d'un autre type » — c'est une autre base légale, une autre horloge
  * de conservation, un autre écran.
  *
- * L'horloge CNIL est AFFICHÉE (conception §2.3) : la conformité se pilote à
- * vue, pas dans un cron invisible.
+ * Aucune suppression automatique (L3c-0) : `purge_prevue_le` vaut toujours
+ * `null` et n'est plus affiché.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -46,8 +46,11 @@ function formatDate(value: string | null): string {
 }
 
 export function CandidatesPage() {
+  // Démo : le compte de démonstration a accès à la base des candidats (le droit « vivier »
+  // est un réglage serveur que le faux serveur ne porte pas). `VITE_DEMO` est figé à vide
+  // hors démo : en production, la garde reste entière.
   return (
-    <ConsoleGate requiresVivier>
+    <ConsoleGate requiresVivier={import.meta.env.VITE_DEMO !== '1'}>
       <CandidatesContent />
     </ConsoleGate>
   );
@@ -201,9 +204,7 @@ function CandidatesContent() {
 
                   <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Dernière interaction : {formatDate(candidate.derniere_interaction_at)}
-                    {candidate.consent_vivier_at !== null && (
-                      <> · Horloge CNIL : purge prévue le {formatDate(candidate.purge_prevue_le)}</>
-                    )}
+                    {candidate.consent_vivier_at !== null && <> · Conservé : aucune suppression automatique</>}
                     {candidate.cv_ref !== null && <> · CV stocké sur le site</>}
                   </div>
 

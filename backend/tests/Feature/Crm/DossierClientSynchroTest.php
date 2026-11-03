@@ -610,7 +610,7 @@ test('CRM_PURGE_ENABLED ouvert : ni la fiche ni les personnes d un client de la 
     Artisan::call('rgpd:purge-business-prospects', ['--force' => true]);
     Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
-    expect(DB::table('contacts')->where('id', $contactTemoin)->exists())->toBeFalse()
+    expect(DB::table('contacts')->where('id', $contactTemoin)->exists())->toBeTrue() // L3c-0 : plus aucune suppression
         ->and(DB::table('companies')->where('id', $fiche->id)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('company_id', $fiche->id)->count())->toBe(1);
     // Et la base elle-même refuse la suppression physique de la fiche.

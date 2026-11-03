@@ -45,7 +45,7 @@ function operateurRgpd(): User
     ]);
 
     setPermissionsTeamId($workspace->id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
 
     return $user;
 }

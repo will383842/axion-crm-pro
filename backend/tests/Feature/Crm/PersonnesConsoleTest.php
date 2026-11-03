@@ -359,28 +359,19 @@ test('L4-C commande — la sentinelle crie quand le flux reçoit sans rattacher,
     expect(Artisan::call('crm:sonde-personnes'))->toBe(0);
 });
 
-test('L4-C commande — la purge à 3 ans ne vise que les personnes non rattachées, sans abonnement actif, inactives', function () {
-    config(['crm.purges_enabled' => true]);
-
+test('L3c-0 commande — la purge à 3 ans refuse sans condition : aucune personne ni abonnement supprimé, drapeau ouvert ou fermé', function () {
     $vieille = l4cPersonne($this->workspace->id, 'zz.vieille@example.invalid', ['derniere_interaction_at' => now()->subYears(4)], 'desabonne');
-    $vieilleAbonnee = l4cPersonne($this->workspace->id, 'zz.fidele@example.invalid', ['derniere_interaction_at' => now()->subYears(4)]);
-    $recente = l4cPersonne($this->workspace->id, 'zz.recente@example.invalid', [], null);
+    l4cPersonne($this->workspace->id, 'zz.fidele@example.invalid', ['derniere_interaction_at' => now()->subYears(4)]);
+    l4cPersonne($this->workspace->id, 'zz.recente@example.invalid', [], null);
 
-    Artisan::call('rgpd:purge-personnes', ['--dry-run' => true]);
-    expect(DB::table('personnes')->count())->toBe(3);
+    foreach ([true, false] as $ouvert) {
+        config(['crm.purges_enabled' => $ouvert]);
 
-    Artisan::call('rgpd:purge-personnes');
-
-    expect(DB::table('personnes')->pluck('id')->sort()->values()->all())->toBe([$vieilleAbonnee, $recente])
-        ->and(DB::table('abonnements')->where('personne_id', $vieille)->count())->toBe(0);
-});
-
-test('L4-C commande — la purge est inerte tant que CRM_PURGE_ENABLED est fermé', function () {
-    config(['crm.purges_enabled' => false]);
-    l4cPersonne($this->workspace->id, 'zz.inerte@example.invalid', ['derniere_interaction_at' => now()->subYears(4)], null);
-
-    expect(Artisan::call('rgpd:purge-personnes'))->toBe(1)
-        ->and(DB::table('personnes')->count())->toBe(1);
+        expect(Artisan::call('rgpd:purge-personnes', ['--dry-run' => true]))->toBe(1)
+            ->and(Artisan::call('rgpd:purge-personnes', ['--force' => true]))->toBe(1)
+            ->and(DB::table('personnes')->count())->toBe(3)
+            ->and(DB::table('abonnements')->where('personne_id', $vieille)->count())->toBe(1);
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

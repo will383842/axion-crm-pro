@@ -135,9 +135,9 @@ test('par la SUPPRESSION de la personne, quel qu en soit le chemin : ses emprein
         ->and(depChemins($this->fusion))->toBe(['jumeaux.1.linkedin_url']);
 });
 
-test('de bout en bout (console) : aucune empreinte du journal ne correspond plus à la personne', function () {
+test('L3c-0 de bout en bout (console) : le traitement GARDE les empreintes du journal (rien n est efface)', function () {
+    $avant = depChemins($this->fusion);
     app(GdprErasureService::class)->erase(DEP_EMAIL);
 
-    expect(depCellesDeLaPersonne())->toBe([])
-        ->and(depChemins($this->fusion))->toBe(['jumeaux.1.linkedin_url']);
+    expect(depChemins($this->fusion))->toBe($avant);
 });

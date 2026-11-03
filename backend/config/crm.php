@@ -507,6 +507,17 @@ return [
     'segments_ouverts' => env('CRM_SEGMENTS_OUVERTS', ''),
 
     /*
+    | Segments réglés PAR ESPACE (lot S6) — ÉTEINT par défaut.
+    |
+    | Éteint : `segments_ouverts` ci-dessus fait foi, pour tous les espaces
+    | (comportement d'avant S6). Allumé : l'ouverture se lit dans la table
+    | `fonctions_espace` ; un espace sans réglage a TOUT FERMÉ, l'espace d'Axion
+    | garde l'état d'aujourd'hui (posé par la migration de données).
+    | Retour arrière : CRM_SEGMENTS_PAR_ESPACE=false (puis `config:clear`).
+    */
+    'segments_par_espace' => (bool) env('CRM_SEGMENTS_PAR_ESPACE', false),
+
+    /*
     | Vérification des e-mails — `crm:emails:verifier` (2026-09-29).
     |
     | Syntaxe, jetables, webmails, type, partage, et « le domaine reçoit-il du

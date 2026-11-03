@@ -40,4 +40,13 @@ final class SiteSyncRejection extends RuntimeException
     {
         return new self($code, $message, 503);
     }
+
+    /**
+     * 429 : trop de charges pour un même (post, canal) dans la fenêtre. Comme le
+     * 503, c'est TEMPORAIRE : l'outbox du site garde la ligne et la renvoie.
+     */
+    public static function tropDeCharges(string $code, string $message): self
+    {
+        return new self($code, $message, 429);
+    }
 }

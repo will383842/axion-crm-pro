@@ -31,6 +31,7 @@
     "media:sync-emissions-from-parent": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:sync-from-companies": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:tag-emissions-status": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
+    "origines:masquer-commentaire-ref": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "prospection:score-email-confidence": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "retention:prune-scraper-runs": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "retention:purge": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

@@ -510,3 +510,11 @@ Schedule::command(CrmPublicAnnuaireOfficiel::SIGNATURE_PLANIFIEE)
 Schedule::call(static fn () => BattementPlanificateur::battre())
     ->name(BattementPlanificateur::NOM_TACHE)
     ->everyMinute();
+
+// Contrat v3 de l'origine (ADR § 7, I5) — met `commentaire_ref` à l'écart (marqueur `masque_le`,
+// valeur conservée) au bout de 12 mois. Ne supprime RIEN ; inerte tant que son interrupteur propre
+// `ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED` (et `ORIGINES_V3_ENABLED`) est éteint.
+Schedule::command('origines:masquer-commentaire-ref')
+    ->dailyAt('03:40')
+    ->withoutOverlapping(60)
+    ->onOneServer();

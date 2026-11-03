@@ -725,7 +725,13 @@ class PersonnesController extends ConsoleController
                     $motif['detail'] = $f['origine_detail'];
                 }
                 // Confinement jsonb (index GIN) : au moins une entrée de l'historique correspond.
+                // Une entrée masquée (`masque_le`) ne compte pas : le préfiltre GIN reste,
+                // puis on exige une entrée correspondante NON masquée.
                 $requete->whereRaw('personnes.origines @> ?::jsonb', [json_encode([$motif], JSON_THROW_ON_ERROR)]);
+                $requete->whereRaw(
+                    'EXISTS (SELECT 1 FROM jsonb_array_elements(personnes.origines) AS e(v) WHERE e.v @> ?::jsonb AND (e.v -> \'masque_le\') IS NULL)',
+                    [json_encode($motif, JSON_THROW_ON_ERROR)],
+                );
             }
         }
 
@@ -817,7 +823,10 @@ class PersonnesController extends ConsoleController
         $brut = is_string($p->origines) ? json_decode($p->origines, true) : $p->origines;
 
         return is_array($brut)
-            ? array_values(array_map(static fn (array $o): array => ContenusAccords::presenterOrigine($o), array_filter($brut, 'is_array')))
+            ? array_values(array_map(
+                static fn (array $o): array => ContenusAccords::presenterOrigine($o),
+                array_filter($brut, static fn (mixed $o): bool => is_array($o) && ! ContenusAccords::estMasquee($o)),
+            ))
             : [];
     }
 

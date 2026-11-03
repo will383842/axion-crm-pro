@@ -168,7 +168,11 @@ final class ContenusAccords
         return ['garde' => array_slice($liste, $trop), 'archive' => array_slice($liste, 0, $trop)];
     }
 
-    /** Clé de dédoublonnage d'une entrée (publique : la table d'archive la stocke). */
+    /**
+     * Clé de dédoublonnage d'une entrée (publique : la table d'archive la stocke).
+     *
+     * @param  array<mixed>  $o
+     */
     public static function cleOrigine(array $o): string
     {
         $postRef = $o['post_ref'] ?? null;
@@ -185,6 +189,7 @@ final class ContenusAccords
      * Lecture (API) d'une entrée : liste BLANCHE de clés, relue depuis la base.
      * `commentaire_ref` (empreinte) ne sort jamais.
      *
+     * @param  array<mixed>  $o
      * @return array<string, ?string>
      */
     public static function presenterOrigine(array $o): array

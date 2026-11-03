@@ -192,18 +192,14 @@ class VerifierEffacementRgpd implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Le travail lui-même : la timeline, puis les résidus. Vide : complet.
+     * Le travail lui-même : un simple constat des résidus, qui ne supprime RIEN (la
+     * timeline n'est plus effacée). Vide : complet.
      *
      * @param  list<string>  $personnels
      * @return array<string, int>
      */
     public static function constater(string $email, array $personnels, ?string $seulEspace = null): array
     {
-        $espaces = $seulEspace !== null ? [$seulEspace] : EffacementCoordonneesFiches::espaces();
-        foreach ($espaces as $espace) {
-            WorkspaceContext::run($espace, static fn (): int => EffacementCoordonneesFiches::effacerTimeline($personnels, $espace));
-        }
-
         if ($seulEspace === null) {
             return EffacementCoordonneesFiches::residusPartout($email, $personnels);
         }

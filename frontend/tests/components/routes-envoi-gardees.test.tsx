@@ -88,7 +88,7 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
   ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
-  ['/envoi/campagnes/resultats', 'DM2-PIL'],
+  ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP', 'Réponses'],
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
@@ -100,9 +100,9 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/serveurs', 'DM2-INF', 'Serveurs et adresses IP'],
   ['/envoi/serveurs/configuration', 'DM2-INF', 'Configuration'],
   ['/envoi/chauffe', 'DM2-INF', 'Chauffe'],
-  ['/envoi/sante', 'DM2-PIL'],
-  ['/envoi/sante/chercher', 'DM2-PIL'],
-  ['/envoi/sante/feu-vert', 'DM2-PIL'],
+  ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
+  ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
+  ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
   ['/envoi/desinscriptions', 'DM2-CNF'],
   ['/envoi/alertes', 'DM2-CNF'],
   ['/envoi/reglages', 'DM2-CNF'],
@@ -197,7 +197,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
   it.each([
     ['/taches', 'DM1-ACC'],
     ['/affaires', 'DM1-ACC'],
-    ['/compte', 'DM1-COM'],
+    // Filet modifié : pourquoi. DM1-COM livre /compte : la page n'est plus « en attente ».
   ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
     await monter(url);
     const page = await screen.findByTestId('page-en-attente');
@@ -205,6 +205,21 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     // Joignable en production par son adresse : aucun code de lot interne affiché.
     expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
     expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
+  });
+
+  // Filet modifié : pourquoi. /compte quitte la liste « en attente » (DM1-COM l'a livrée) : cette
+  // vérification positive la remplace, aussi stricte. Avec le serveur d'aujourd'hui (pas de
+  // `two_factor_method: 'email'`), la vraie page s'affiche sans appeler de route absente : MSW
+  // refuse tout appel non servi (`onUnhandledRequest: 'error'`), dont `/compte/appareils`.
+  it('/compte → vraie page « Mon compte et sécurité » (DM1-COM), rien qui appelle une route absente', async () => {
+    server.use(...handlersDemo.filter((h) => cleRoute(h).includes('/auth/password/change')));
+    await monter('/compte');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mon compte et sécurité' }, { timeout: 5_000 })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
+    expect(screen.queryByText(/page introuvable/i)).toBeNull();
+    expect(await screen.findByText('Raccourcis clavier')).toBeInTheDocument();
+    expect(screen.queryByText('Appareils de confiance')).toBeNull();
+    expect(screen.queryByText('Codes de secours')).toBeNull();
   });
 
   it('/desinscription/$jeton est publique et HORS coquille', async () => {
@@ -265,6 +280,10 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
  * il met ces empreintes à jour et l'écrit dans sa PR (« Filet modifié :
  * pourquoi »).
  */
+// Filet modifié : pourquoi — empreintes recalées (barre et en-tête) car périmées sur `main`
+// depuis les lots de démo DM1/DM2 (constaté en corrigeant le doublon de route
+// `GET /companies` qui empêchait ce fichier de se charger), puis la barre à nouveau recalée
+// pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
 const EMPREINTE_BARRE = 'b838a7b756cac09511c8519deca111fa840e06c894718604f69462153ac98845';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 

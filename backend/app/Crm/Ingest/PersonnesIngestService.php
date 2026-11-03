@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * BRANCHE « PERSONNES » DE L'INGESTION — la lettre et le guide (lot L4-C).
@@ -134,11 +135,236 @@ final class PersonnesIngestService
 
     public function ingerer(SiteSyncEvent $event, string $workspaceId, string $activityRef): IngestOutcome
     {
-        return match ($event->eventType) {
+        $accords = $event->contenusAccords;
+
+        // PV-6 : l'opposition reçue gagne AVANT tout le reste — elle est
+        // inscrite à la liste d'opposition d'abord, donc l'inscription qui suit
+        // dans le même événement la rencontre et s'arrête.
+        if ($accords !== null && $accords->oppose()) {
+            $this->poserOpposition($event, $workspaceId);
+        }
+
+        $outcome = match ($event->eventType) {
             'email_hard_bounced' => $this->rebondDur($event, $workspaceId, $activityRef),
             'newsletter_optout' => $this->desabonnement($event, $workspaceId, $activityRef),
             default => $this->inscriptionOuDemande($event, $workspaceId, $activityRef),
         };
+
+        if ($accords !== null && self::colonnesAccordsPresentes()) {
+            $this->enregistrerAccords($event, $workspaceId, $accords, $outcome);
+        }
+
+        return $outcome;
+    }
+
+    /** Vrai si la migration PV-6 est passée (fenêtre de déploiement : sinon, on ignore les champs). */
+    private static function colonnesAccordsPresentes(): bool
+    {
+        // Seul un résultat POSITIF est gardé : un worker démarré avant `migrate`
+        // ne doit pas ignorer les champs pour toujours.
+        static $presentes = false;
+
+        return $presentes = $presentes || Schema::hasColumn('personnes', 'accords_at');
+    }
+
+    /**
+     * Opposition reçue par la synchro : liste d'opposition `business` (empreinte
+     * seule, jamais l'adresse) et désabonnement de tous les canaux. Aucune donnée
+     * n'est supprimée. Une opposition déjà posée n'est jamais levée.
+     */
+    private function poserOpposition(SiteSyncEvent $event, string $workspaceId): void
+    {
+        $hash = $event->emailHash();
+        if ($hash === null) {
+            return;
+        }
+
+        if (! $this->opposee($hash, 'business')) {
+            DB::table('opt_out')->insert([
+                'email' => null,
+                'email_hash' => $hash,
+                'scope' => 'business',
+                'source' => 'site-sync:accords',
+                'reason' => 'opposition_synchro',
+                'created_at' => now(),
+            ]);
+        }
+
+        $this->desabonnerSurOpposition($workspaceId, $hash, $event->occurredAt, 'opposition_generale');
+    }
+
+    /**
+     * Stockage ADDITIF et règles de la synchro : listes en union (rien ne se
+     * retire), origine la plus récente, opposition posée une fois pour toutes.
+     */
+    private function enregistrerAccords(SiteSyncEvent $event, string $workspaceId, ContenusAccords $accords, IngestOutcome $outcome): void
+    {
+        $personne = $outcome->subjectType === 'personne' && $outcome->subjectId !== null
+            ? DB::table('personnes')->where('id', $outcome->subjectId)->first()
+            : $this->trouver($workspaceId, $event);
+
+        if ($personne === null) {
+            return;
+        }
+
+        $update = [];
+
+        $update['origine_contenu'] = $this->json(ContenusAccords::fusionnerOrigine(
+            $this->decoder($personne->origine_contenu ?? null),
+            $this->date($personne->accords_at ?? null),
+            $accords->origine,
+            $event->occurredAt,
+        ));
+        if ($accords->origine !== null) {
+            $deja = $this->date($personne->accords_at ?? null);
+            if ($deja === null || $this->plusRecent($event->occurredAt, $deja)) {
+                $update['accords_at'] = $event->occurredAt;
+            }
+        }
+
+        if ($accords->guides !== null) {
+            $update['guides_recus'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->guides_recus ?? null) ?? [], $accords->guides));
+        }
+        if ($accords->consentements !== null) {
+            $update['consentements'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->consentements ?? null) ?? [], $accords->consentements));
+        }
+
+        if ($accords->oppose() && ($personne->opposition_at ?? null) === null) {
+            $dateSite = ($accords->opposition['date'] ?? null) ? new DateTimeImmutable((string) $accords->opposition['date']) : $event->occurredAt;
+            $maintenant = new DateTimeImmutable('now');
+            // Une date future n'a pas de sens : bornée à maintenant.
+            $update['opposition_at'] = $dateSite > $maintenant ? $maintenant : $dateSite;
+        }
+
+        DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);
+
+        if ($accords->origines !== null) {
+            $this->enregistrerOrigines((int) $personne->id, $workspaceId, $accords->origines);
+        }
+    }
+
+    /**
+     * Contrat v3 : union SANS RETRAIT de l'historique des origines. L'écriture
+     * de l'archive et la réduction du tableau se font dans UNE transaction,
+     * sous verrou de ligne (ADR I4) : une entrée n'est retirée du tableau que
+     * si elle est déjà dans l'archive. Rien n'est jamais supprimé.
+     *
+     * @param  list<array<string, string>>  $entrantes
+     */
+    private function enregistrerOrigines(int $personneId, string $workspaceId, array $entrantes): void
+    {
+        // Jamais d'abandon silencieux : une charge qui porte des origines et qui
+        // ne peut pas les écrire n'est PAS acquittée. `assurerOriginesEcrivables()`
+        // le refuse en amont (503, la charge reste en attente côté site) ; ce
+        // garde-fou refuse de même, dans la transaction, si l'état a changé entre
+        // les deux (interrupteur éteint ou migration retirée en cours de route).
+        $this->assurerOriginesEcrivablesOuRefuser();
+
+        DB::transaction(function () use ($personneId, $workspaceId, $entrantes): void {
+            $ligne = DB::table('personnes')->where('id', $personneId)->lockForUpdate()->first(['origines']);
+            if ($ligne === null) {
+                return;
+            }
+
+            $fusion = ContenusAccords::fusionnerOrigines($this->decoder($ligne->origines ?? null) ?? [], $entrantes);
+
+            $archiveAvant = $fusion['archive'] === [] ? 0 : DB::table('personne_origines_archive')->where('personne_id', $personneId)->count();
+
+            foreach ($fusion['archive'] as $entree) {
+                DB::table('personne_origines_archive')->insertOrIgnore([
+                    'workspace_id' => $workspaceId,
+                    'personne_id' => $personneId,
+                    'cle' => ContenusAccords::cleOrigine($entree),
+                    'origine' => $this->json($entree),
+                    'archive_le' => now(),
+                    'masque_le' => $entree['masque_le'] ?? null,
+                ]);
+            }
+
+            DB::table('personnes')->where('id', $personneId)->update([
+                'origines' => $this->json($fusion['garde']),
+            ]);
+
+            // ADR I3 : l'archive d'une personne dépasse 200 entrées → alerte (une fois).
+            if ($fusion['archive'] !== []) {
+                AlerteArchiveOrigines::siFranchi(
+                    $workspaceId,
+                    $personneId,
+                    $archiveAvant,
+                    DB::table('personne_origines_archive')->where('personne_id', $personneId)->count(),
+                );
+            }
+        });
+    }
+
+    /**
+     * Vrai si une charge qui porte des `origines` peut les ÉCRIRE : interrupteur
+     * v3 allumé, branche « personnes » ouverte pour ce type d'événement, colonne
+     * `origines`, colonnes d'accords et table d'archive présentes.
+     */
+    public function originesEcrivables(SiteSyncEvent $event): bool
+    {
+        return $this->prendEnCharge($event) && $this->stockageOriginesPresent();
+    }
+
+    /**
+     * Le site garde sa ligne tant qu'il ne reçoit pas de 2xx : une charge avec
+     * des `origines` qu'on ne peut pas écrire reçoit donc un 503 (code sans
+     * valeur reçue), jamais un accusé de réception qui les perdrait en silence.
+     * Sans `origines` (v1/v2, ou liste vide), rien n'est exigé : inchangé.
+     *
+     * @throws SiteSyncRejection
+     */
+    public function assurerOriginesEcrivables(SiteSyncEvent $event): void
+    {
+        $origines = $event->contenusAccords?->origines;
+        if ($origines === null || $origines === [] || ! (bool) config('origines.v3_enabled', false)) {
+            return;
+        }
+        if (! $this->originesEcrivables($event)) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function assurerOriginesEcrivablesOuRefuser(): void
+    {
+        if (! (bool) config('origines.v3_enabled', false) || ! $this->stockageOriginesPresent()) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function refusOriginesNonEcrivables(): SiteSyncRejection
+    {
+        return SiteSyncRejection::unavailable(
+            'origines_v3_non_ecrivables',
+            'Contrat v3 de l\'origine : stockage indisponible, la charge reste en attente côté site.',
+        );
+    }
+
+    private function stockageOriginesPresent(): bool
+    {
+        return Schema::hasColumn('personnes', 'origines')
+            && Schema::hasColumn('personnes', 'accords_at')
+            && Schema::hasTable('personne_origines_archive');
+    }
+
+    private function json(mixed $valeur): ?string
+    {
+        return $valeur === null ? null : json_encode($valeur, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @return array<mixed>|null */
+    private function decoder(mixed $brut): ?array
+    {
+        if (is_array($brut)) {
+            return $brut;
+        }
+        if (! is_string($brut) || $brut === '') {
+            return null;
+        }
+        $d = json_decode($brut, true);
+
+        return is_array($d) ? $d : null;
     }
 
     /**

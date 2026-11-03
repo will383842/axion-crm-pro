@@ -40,7 +40,7 @@ import type {
   EmailAudience,
 } from './AudiencesListPage';
 import { METIER_PRESETS, critereMetiers } from './metiers';
-import { chargerListes } from '@/features/listes/listes';
+import { chargerListesEtAnnonce } from '@/features/listes/listes';
 import { PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import {
   REGLAGE_PAR_DEFAUT,
@@ -50,6 +50,7 @@ import {
 } from './destinataires';
 import { ReglageDestinatairesChamps } from './ReglageDestinatairesChamps';
 import { ApercuDestinatairesCarte } from './ApercuDestinatairesCarte';
+import { EditeurCriteres, etatVide, versCriteres, type EtatEditeur } from './EditeurCriteres';
 import {
   FORMAT_MEDIA_PRESETS,
   PUBLIC_MEDIA_PRESETS,
@@ -167,9 +168,12 @@ export function AudienceBuilderPage() {
   const [listesExclues, setListesExclues] = useState<string[]>([]);
   // 2026-09-30 — à qui écrire dans chaque organisation.
   const [reglage, setReglage] = useState<ReglageDestinataires>(REGLAGE_PAR_DEFAUT);
-  const listes = useQuery({ queryKey: ['listes-manuelles'], queryFn: () => chargerListes() });
+  // Même appel qu'avant (`GET /listes-manuelles`) ; il porte aussi l'annonce
+  // `gestes_ciblage` qui fait paraître l'éditeur ET / OU / SAUF (DM1-CIB).
+  const listes = useQuery({ queryKey: ['listes-manuelles', 'avec-annonce'], queryFn: chargerListesEtAnnonce });
+  const editeurVisible = listes.data?.gestes === true;
   const LISTE_PRESETS = useMemo(
-    () => (listes.data ?? []).map((l) => ({ code: String(l.id), label: l.nom })),
+    () => (listes.data?.listes ?? []).map((l) => ({ code: String(l.id), label: l.nom })),
     [listes.data],
   );
   // Chantiers B, C, D (2026-10-01) — relation, pays, joignabilité. Les
@@ -194,8 +198,11 @@ export function AudienceBuilderPage() {
   // Audience presse (01/10/2026) : la presse, et seulement elle.
   const [audiencePresse, setAudiencePresse] = useState<boolean>(false);
 
+  // DM1-CIB — éditeur ET / OU / SAUF : ses lignes s'ajoutent aux puces.
+  const [editeur, setEditeur] = useState<EtatEditeur>(etatVide);
+
   // Build criteria
-  const criteria = useMemo<AudienceCriteria>(() => {
+  const criteresPuces = useMemo<AudienceCriteria>(() => {
     const all: AudienceCondition[] = [];
     if (departments.length > 0) all.push({ field: 'department_code', op: 'in', value: departments });
     if (regions.length > 0)     all.push({ field: 'region_code',     op: 'in', value: regions });
@@ -243,6 +250,18 @@ export function AudienceBuilderPage() {
     typesMedia, zonesMedia, themesMedia, publicsMedia, formatsMedia, secteursMedia, exclNatures, exclTypesMedia, listesIncluses, listesExclues,
     audiencePresse,
   ]);
+  const criteria = useMemo<AudienceCriteria>(() => {
+    // Éditeur caché (serveur qui ne l'annonce pas) : ses lignes ne comptent pas.
+    const extra = editeurVisible ? versCriteres(editeur) : {};
+    const fusion: AudienceCriteria = {};
+    const all = [...(criteresPuces.all ?? []), ...(extra.all ?? [])];
+    const any = [...(criteresPuces.any ?? []), ...(extra.any ?? [])];
+    const not = [...(criteresPuces.not ?? []), ...(extra.not ?? [])];
+    if (all.length > 0) fusion.all = all;
+    if (any.length > 0) fusion.any = any;
+    if (not.length > 0) fusion.not = not;
+    return fusion;
+  }, [criteresPuces, editeur, editeurVisible]);
   const aDesCriteres = aUnCriterePositif(criteria);
   const conditionsRecap = [
     ...(criteria.all ?? []).map((c) => ({ bloc: 'ET', c })),
@@ -351,6 +370,13 @@ export function AudienceBuilderPage() {
       <form onSubmit={onSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         {/* Colonne gauche : builder */}
         <div className="space-y-5">
+          {/* DM1-CIB — éditeur des critères ET / OU / SAUF, seulement si le serveur l'annonce. */}
+          {editeurVisible ? (
+            <Card padding="md" className="space-y-4">
+              <EditeurCriteres valeur={editeur} onChange={setEditeur} />
+            </Card>
+          ) : null}
+
           {/* Identité */}
           <Card padding="md" className="space-y-4">
             <SectionHeading icon={<Sparkles className="h-4 w-4" />} title="Informations" />

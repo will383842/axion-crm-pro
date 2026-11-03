@@ -123,7 +123,7 @@ test('B15-001 — une personne effacee par la CONSOLE ne revient PAS au vivier a
     app(GdprErasureService::class)->erase($courriel, '+33600000011');
 
     expect(DB::table('candidates')->where('email', $courriel)->count())
-        ->toBe(0, 'l’effacement console n’a meme pas supprime la fiche candidat');
+        ->toBe(1, 'L3c-0 : la fiche candidat est GARDEE (mise a l ecart), jamais supprimee');
 
     // ── LA CANDIDATURE SUIVANTE ──────────────────────────────────────────
     $resultat = deposerCandidature($courriel);
@@ -133,7 +133,7 @@ test('B15-001 — une personne effacee par la CONSOLE ne revient PAS au vivier a
         'la candidature suivante a ete INGEREE : la personne effacee revient au vivier',
     );
     expect(DB::table('candidates')->where('email', $courriel)->count())
-        ->toBe(0, 'une fiche candidat a ete recreee pour une personne effacee');
+        ->toBe(1, 'une fiche candidat a ete recreee pour une personne mise a l ecart');
     // La timeline non plus ne doit rien garder : une activite `application`
     // porte le message de candidature, donc des PII.
     expect(DB::table('activities')->where('person_key', hash('sha256', $courriel))->count())->toBe(0);

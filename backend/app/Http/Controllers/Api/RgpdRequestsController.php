@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
-use App\Jobs\VerifierEffacementRgpd;
+use App\Crm\Rgpd\SignalementDemandeEffacement;
+use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
@@ -113,6 +114,12 @@ class RgpdRequestsController extends ApiController
             'metadata' => $validated['metadata'] ?? [],
         ]);
 
+        // L3c-0 : une demande d'effacement venue de la console est SIGNALÉE à
+        // Will (notification + pastille « Demandes RGPD »), qui décide.
+        if ($validated['type'] === 'erasure' && $req->workspace_id !== null) {
+            SignalementDemandeEffacement::signaler((string) $req->workspace_id, 'console');
+        }
+
         return $this->ok($req, 201);
     }
 
@@ -217,12 +224,11 @@ class RgpdRequestsController extends ApiController
         };
 
         if ($req->type === 'erasure') {
-            // Lot L5 — l'effacement décidé DANS la console CRM doit remonter au
-            // site : sinon le site continue d'adresser une personne que le CRM
-            // a effacée. Mise en file locale, jamais un POST synchrone : la
-            // réussite d'un droit art. 17 ne dépend pas de la disponibilité du
-            // site (l'émission est portée par `crm:flush-outbound`).
-            $this->queueOutbound('erasure', $req->subject_email, $req->id);
+            // L3c-0 (règle de Will) : « traiter » met la personne à l'écart, il
+            // ne supprime rien — le site n'est donc PAS invité à effacer. On lui
+            // transmet l'opposition (`consent_optout`) : il cesse de la contacter.
+            // Mise en file locale, jamais un POST synchrone (`crm:flush-outbound`).
+            $this->queueOutbound('consent_optout', $req->subject_email, $req->id);
         }
 
         // 🔴 LE JETON DE TELECHARGEMENT NE SE PERSISTE PAS EN CLAIR.
@@ -237,9 +243,8 @@ class RgpdRequestsController extends ApiController
         //
         // Le jeton reste rendu a l'operateur qui declenche le traitement - il
         // doit bien le transmettre a la personne - mais il n'est plus ECRIT.
-        // Les numéros PERSONNELS d'un effacement ne servent qu'à sa preuve
-        // différée : ni archivés, ni rendus (ce sont des numéros en clair).
-        $personnels = is_array($result['personnels'] ?? null) ? array_values(array_map('strval', $result['personnels'])) : [];
+        // Les numéros PERSONNELS relevés par un effacement ne sont ni archivés
+        // ni rendus (ce sont des numéros en clair).
         unset($result['personnels']);
 
         $resultatArchive = $result;
@@ -250,25 +255,21 @@ class RgpdRequestsController extends ApiController
             $archive['note'] = $note;
         }
 
-        // Un effacement n'est soldé que par sa PREUVE, différée (relecture
-        // P1) : la demande reste « en cours » jusqu'à ce que
-        // `VerifierEffacementRgpd` ne retrouve plus rien — sinon elle y reste,
-        // avec le motif et les emplacements.
+        // L3c-0 : rien n'est supprimé, donc aucune preuve différée à attendre.
         if ($req->type === 'erasure') {
-            $archive['verification'] = 'en_attente';
+            $archive['verification'] = 'aucune';
+            $archive['mise_a_l_ecart'] = true;
         }
 
         $req->update([
-            'status' => $req->type === 'erasure' ? 'processing' : 'done',
+            'status' => 'done',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
             'metadata' => array_merge((array) $req->metadata, $archive),
         ]);
 
-        if ($req->type === 'erasure') {
-            // APRÈS la mise à jour : le verdict de la vérification l'écrase.
-            dispatch((new VerifierEffacementRgpd((string) $req->subject_email, $personnels, (int) $req->id))
-                ->pourEspace((string) $req->workspace_id));
+        if ($req->workspace_id !== null) {
+            ATraiterController::oublier((string) $req->workspace_id); // la pastille suit
         }
 
         return $this->ok(['request' => $req->fresh(), 'result' => $result]);

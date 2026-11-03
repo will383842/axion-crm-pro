@@ -103,14 +103,17 @@ test('NR-06 l’export d’une personne dans les DEUX espaces la retrouve dans l
     expect(nr06Exporter()['contacts'])->toHaveCount(2);
 });
 
-test('NR-06 l’effacement efface partout, laisse une opposition, et l’export suivant est vide de contacts', function () {
+test('NR-06 (L3c-0) l’effacement masque partout sans rien supprimer, laisse une opposition, et l’export suivant garde les contacts masqués', function () {
     nr06Semer($this->espaces['a']);
     nr06Semer($this->espaces['b']);
 
     $resultat = (new GdprErasureService(new AuditHashChain, new DeduplicationService))->erase(NR06_COURRIEL);
 
     expect($resultat['deleted']['contacts'])->toBe(2)
-        ->and(DB::table('contacts')->where('email', NR06_COURRIEL)->count())->toBe(0)
+        // Rien n'est supprimé : les lignes restent, masquées (corbeille douce).
+        ->and(DB::table('contacts')->where('email', NR06_COURRIEL)->count())->toBe(2)
+        ->and(DB::table('contacts')->where('email', NR06_COURRIEL)->whereNull('deleted_at')->count())->toBe(0)
         ->and(DB::table('opt_out')->where('email_hash', hash('sha256', NR06_COURRIEL))->exists())->toBeTrue()
-        ->and(nr06Exporter()['contacts'])->toBe([]);
+        // L'export d'accès (art. 15) inclut quand même les éléments masqués.
+        ->and(nr06Exporter()['contacts'])->toHaveCount(2);
 });

@@ -80,7 +80,7 @@ class ATraiterController extends ConsoleController
     {
         // `v2` (03/10/2026) : la charge utile gagne `relances` ; `v3` (N13) :
         // `propositions`.
-        return 'crm:a-traiter:compteurs:v3:' . $espace;
+        return 'crm:a-traiter:compteurs:v4:' . $espace;
     }
 
     /**
@@ -123,12 +123,14 @@ class ATraiterController extends ConsoleController
         $charge = is_array($charge) ? array_merge(self::inconnus(), $charge) : self::inconnus();
         if (! ProvenanceTiers::lisiblePar($user)) {
             $charge['propositions'] = null;
+            // Seul le propriétaire décide d'une demande d'effacement.
+            $charge['demandes_rgpd'] = null;
         }
 
         return $this->ok($charge);
     }
 
-    /** @return array{doublons: int|null, a_rattacher: int|null, relances: int|null, propositions: int|null} */
+    /** @return array{doublons: int|null, a_rattacher: int|null, relances: int|null, propositions: int|null, demandes_rgpd: int|null} */
     private function calculer(string $espace, bool $vivier): array
     {
         return WorkspaceContext::run($espace, fn (): array => [
@@ -136,6 +138,13 @@ class ATraiterController extends ConsoleController
             'a_rattacher' => $vivier ? null : $this->compter('a_rattacher', FilesATraiter::aRattacher(...), $espace),
             'relances' => $this->compter('relances', FilesATraiter::relancesEvenements(...), $espace),
             'propositions' => $vivier ? null : $this->compter('propositions', FilesATraiter::propositions(...), $espace),
+            // L3c-0 : demandes d'effacement en attente de la décision de Will.
+            'demandes_rgpd' => $this->compter(
+                'demandes_rgpd',
+                static fn (string $e): Builder => DB::table('rgpd_requests')
+                    ->where('workspace_id', $e)->where('type', 'erasure')->where('status', 'pending'),
+                $espace,
+            ),
         ]);
     }
 
@@ -168,9 +177,9 @@ class ATraiterController extends ConsoleController
         return ['exception' => $e::class, 'sqlstate' => $sqlstate];
     }
 
-    /** @return array{doublons: null, a_rattacher: null, relances: null, propositions: null} */
+    /** @return array{doublons: null, a_rattacher: null, relances: null, propositions: null, demandes_rgpd: null} */
     private static function inconnus(): array
     {
-        return ['doublons' => null, 'a_rattacher' => null, 'relances' => null, 'propositions' => null];
+        return ['doublons' => null, 'a_rattacher' => null, 'relances' => null, 'propositions' => null, 'demandes_rgpd' => null];
     }
 }

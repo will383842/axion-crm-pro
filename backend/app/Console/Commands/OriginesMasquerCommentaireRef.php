@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Masquer = passer la valeur à `null` dans l'entrée d'`origines` de la fiche.
  * RIEN d'autre n'est modifié et RIEN n'est supprimé : ni entrée, ni personne,
- * ni ligne d'archive (aucun DELETE, aucun TRUNCATE dans ce fichier). L'âge est
+ * ni ligne d'archive (aucune suppression d'aucune sorte dans ce fichier). L'âge est
  * celui de la `date` de l'entrée. Idempotente. L'export d'accès (art. 15) est
  * lu sur ce qui reste : l'empreinte masquée n'y est plus.
  *
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Schema;
  * succès sans rien lire. Jamais `CRM_PURGE_ENABLED`.
  *
  * Limite assumée : `personne_origines_archive` est en AJOUT SEUL (le rôle
- * applicatif n'a ni UPDATE ni DELETE) ; ses entrées ne sont donc pas masquées
+ * applicatif n'a ni modification ni suppression) ; ses entrées ne sont donc pas masquées
  * ici — c'est une décision de droits à prendre à part.
  */
 class OriginesMasquerCommentaireRef extends Command

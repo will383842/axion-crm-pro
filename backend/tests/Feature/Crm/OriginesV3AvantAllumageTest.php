@@ -94,6 +94,7 @@ function oaaCreerPersonne(string $workspaceId, string $email = OAA_EMAIL, ?array
         'person_key' => hash('sha256', 'oaa|' . $email),
         'email' => $email,
         'email_hash' => hash('sha256', $email),
+        'premiere_source' => 'guide-ia', 'premiere_source_at' => now(), 'legal_basis' => 'consent',
         'origines' => $origines === null ? null : json_encode($origines, JSON_UNESCAPED_UNICODE),
         'created_at' => now(), 'updated_at' => now(),
     ]);

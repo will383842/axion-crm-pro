@@ -182,7 +182,7 @@ test('la provenance n’est jamais « newsletter » : formulaire ou rendez-vous'
 test('rejeu du même événement : une seule fiche ; nouvelle demande de la même personne : toujours une seule', function () {
     $event = pddEvent();
     pddIngerer($event);
-    expect(pddIngerer($event)->status)->toBe('idempotent');
+    expect(pddIngerer($event)->status)->toBe('noop_idempotent');
 
     pddIngerer(pddEvent(['occurred_at' => '2026-11-05T10:00:00+01:00', 'person' => ['phone' => '+33600000002']]));
 

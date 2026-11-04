@@ -10,8 +10,6 @@ use Illuminate\Http\Request;
  * Garde unique des lectures d'origines (L6) : interrupteur général éteint → 404 ;
  * espace non business → 403 ; compte non membre de l'espace → 403 ; fonction
  * d'espace `origines.lecture` absente ou fermée → 404 (on ne confirme pas son existence).
- *
- * @phpstan-require-extends \App\Http\Controllers\Api\Crm\ConsoleController
  */
 trait GardeOrigines
 {

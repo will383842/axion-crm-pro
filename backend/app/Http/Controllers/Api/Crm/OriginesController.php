@@ -50,7 +50,7 @@ class OriginesController extends ConsoleController
             return $this->inactif();
         }
 
-        return WorkspaceContext::run($espace, fn (): JsonResponse => $this->ok(['actif' => true] + RequetesOrigines::apercu($espace, $f)));
+        return WorkspaceContext::run($espace, fn (): JsonResponse => $this->ok(array_merge(['actif' => true], RequetesOrigines::apercu($espace, $f))));
     }
 
     public function parReseau(Request $request): JsonResponse

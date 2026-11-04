@@ -206,3 +206,24 @@ test('une panne de la liste ne laisse PAS le message dans le journal, même via 
 
     expect(implode("\n", $vus))->not->toContain('pierre.durand');
 });
+
+test('la ligne d’une demande d’effacement est masquée pour operator et viewer, en clair pour admin et owner', function () {
+    $a = l5Espace();
+    $d = l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
+    $d->update(['metadata' => ['note' => 'Rappeler Pierre Durand au 0612345678']]);
+    DB::table('rgpd_requests')->where('id', $d->id)->update(['export_token' => 'jeton-secret-xyz']);
+
+    // operator possède contacts.view_pii, mais PAS rgpd.view_pii : il ne doit rien voir.
+    foreach (['operator', 'viewer'] as $role) {
+        $json = $this->actingAs(l5Compte($a, $role))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
+        expect($json)->not->toContain('0612345678', $role)
+            ->not->toContain('Pierre Durand', $role)
+            ->not->toContain('pierre.durand', $role)
+            ->not->toContain('jeton-secret-xyz', $role);
+    }
+
+    foreach (['admin', 'owner'] as $role) {
+        $json = $this->actingAs(l5Compte($a, $role))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
+        expect($json)->toContain('pierre.durand@example.invalid', $role)->toContain('0612345678', $role);
+    }
+});

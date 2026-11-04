@@ -83,7 +83,9 @@ class RgpdRequestsController extends ApiController
             return response()->json(['error' => 'type_invalide'], 422);
         }
         $statutsBase = self::STATUTS_FILTRE_VERS_BASE[$statut] ?? null;
-        $masquer = MasquageCoordonnees::requis();
+        // Ligne RGPD d'effacement : masquée pour TOUT rôle sauf owner/admin (`rgpd.view_pii`).
+        // `contacts.view_pii` ne convient pas : operator le possède et verrait adresse, note et jeton.
+        $masquer = ! (auth()->user()?->can('rgpd.view_pii') ?? false);
 
         try {
             $rows = RgpdRequest::query()

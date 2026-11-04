@@ -33,6 +33,7 @@ class PermissionsAndRolesSeeder extends Seeder
             // les migrations passent. Les deux chemins doivent donner le même
             // résultat, sinon la garde dépend de l'ordre d'installation.
             ['name' => 'contacts.view_pii',     'description' => 'Voir les coordonnées complètes'],
+            ['name' => 'rgpd.view_pii',         'description' => 'Voir en clair les demandes d\'effacement (adresse, note, jeton)'],
         ];
 
         foreach ($permissions as $perm) {
@@ -62,7 +63,7 @@ class PermissionsAndRolesSeeder extends Seeder
             'owner' => array_column($permissions, 'name'),
             'admin' => ['companies.view', 'companies.create', 'companies.update', 'companies.delete',
                 'scraping.run', 'scraping.config', 'llm.config', 'llm.view_usage',
-                'proxies.config', 'rgpd.view', 'users.manage', 'audit.view', 'data.export', 'contacts.view_pii'],
+                'proxies.config', 'rgpd.view', 'users.manage', 'audit.view', 'data.export', 'contacts.view_pii', 'rgpd.view_pii'],
             'operator' => ['companies.view', 'companies.create', 'companies.update',
                 'scraping.run', 'llm.view_usage', 'rgpd.view', 'data.export', 'contacts.view_pii'],
             'viewer' => ['companies.view', 'llm.view_usage', 'rgpd.view'],

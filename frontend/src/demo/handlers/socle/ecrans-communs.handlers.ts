@@ -31,6 +31,14 @@ interface EntreeJournal {
 interface Reglage { id: string; name: string; slug: string; cost_cap_eur: number; settings: Record<string, unknown> }
 interface Secours { id: string; restants: number }
 
+const STATUTS_OUVERTS = ['pending', 'processing'];
+
+/** Demandes d'effacement ouvertes (pastille « Effacements demandés » du menu). */
+export function nombreEffacementsOuverts(): number {
+  donnees();
+  return demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').filtrer((d) => d.type === 'erasure' && STATUTS_OUVERTS.includes(d.status)).length;
+}
+
 const empreinte = (n: number) => `d${String(n).padStart(3, '0')}a9c4e17b2f06835d`;
 
 function donnees() {
@@ -47,6 +55,13 @@ function donnees() {
       { id: 1, type: 'access', status: 'pending', subject_email: 'paul.morin@example.test', requested_at: ilYa(4, 14, 10), processed_at: null, note: null, metadata: null },
       { id: 2, type: 'opposition', status: 'pending', subject_email: 'yves.roche@example.test', requested_at: ilYa(2, 10, 5), processed_at: null, note: null, metadata: null },
       { id: 3, type: 'rectification', status: 'done', subject_email: 'lea.fournier@example.test', requested_at: ilYa(20, 9, 0), processed_at: ilYa(18, 16, 30), note: 'Adresse corrigée.', metadata: null },
+      // Demandes d'EFFACEMENT (exemple) : la personne est déjà mise à l'écart, rien n'est supprimé.
+      { id: 4, type: 'erasure', status: 'expired', subject_email: 'exemple-13@exemple.invalid', requested_at: ilYa(60, 8, 40), processed_at: ilYa(40, 9, 0), note: null, metadata: null },
+      { id: 5, type: 'erasure', status: 'rejected', subject_email: 'exemple-14@exemple.invalid', requested_at: ilYa(40, 14, 22), processed_at: ilYa(38, 9, 0), note: null, metadata: null },
+      { id: 6, type: 'erasure', status: 'done', subject_email: 'exemple-10@exemple.invalid', requested_at: ilYa(23, 16, 52), processed_at: ilYa(22, 8, 0), note: null, metadata: null },
+      { id: 7, type: 'erasure', status: 'processing', subject_email: 'exemple-08@exemple.invalid', requested_at: ilYa(5, 11, 3), processed_at: null, note: null, metadata: null },
+      { id: 8, type: 'erasure', status: 'pending', subject_email: 'exemple-07@exemple.invalid', requested_at: ilYa(2, 19, 40), processed_at: null, note: null, metadata: null },
+      { id: 9, type: 'erasure', status: 'pending', subject_email: 'exemple-01@exemple.invalid', requested_at: ilYa(0, 6, 12), processed_at: null, note: null, metadata: null },
     ];
     const evenements: Array<[string, EntreeJournal['produit'], string, string, string, EntreeJournal['severity']]> = [
       ['Connexion', 'commun', '/login', 'Claire Valette', '192.0.2.10', 'info'],
@@ -246,10 +261,18 @@ export const handlers: HttpHandler[] = [
     const force = await repondreEtatForce(request, { data: [], export_oppositions: true });
     if (force) return force;
     donnees();
-    return HttpResponse.json({
-      data: [...demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').tous()].reverse(),
-      export_oppositions: true,
-    });
+    const url = new URL(request.url);
+    const statut = url.searchParams.get('statut');
+    const type = url.searchParams.get('type');
+    let liste = [...demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').tous()].reverse();
+    if (type) liste = liste.filter((d) => d.type === type);
+    if (statut === 'ouverte') {
+      // « Ouverte » = à traiter + en cours ; la plus ancienne en haut (délai légal).
+      liste = liste.filter((d) => STATUTS_OUVERTS.includes(d.status)).sort((a, b) => a.requested_at.localeCompare(b.requested_at));
+    } else if (statut === 'traitee') {
+      liste = liste.filter((d) => !STATUTS_OUVERTS.includes(d.status));
+    }
+    return HttpResponse.json({ data: liste, export_oppositions: true });
   }),
   http.post(api('/rgpd/requests'), async ({ request }) => {
     await delai();
@@ -269,7 +292,7 @@ export const handlers: HttpHandler[] = [
     const r = demoDb.zone<DemandeRgpd>('ecrans-communs', 'rgpd').modifier(Number(params['id']), {
       status: 'done', processed_at: maintenant().toISOString(), note: c.note || null,
     });
-    return r ? HttpResponse.json({ request: r, result: null }) : erreur(404, 'introuvable', 'Demande introuvable.');
+    return r ? HttpResponse.json({ request: r, result: { mise_a_l_ecart: { personnes: 1, abonnements: 0 }, supprime: 0 } }) : erreur(404, 'introuvable', 'Demande introuvable.');
   }),
   http.get(api('/rgpd/oppositions/export'), async () => {
     await delai();

@@ -117,7 +117,7 @@ final class RequetesOrigines
             'demandes' => (int) ($t->demandes ?? 0),
             'accords' => (int) ($t->accords ?? 0),
             'opposees' => (int) ($t->opposees ?? 0),
-            'par_famille' => array_map(static fn ($r): array => ['famille' => $r->famille, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $familles),
+            'par_famille' => array_values(array_map(static fn ($r): array => ['famille' => $r->famille, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $familles)),
         ];
     }
 
@@ -136,7 +136,7 @@ final class RequetesOrigines
             array_merge($be, $bc),
         );
 
-        return array_map(static fn ($r): array => ['reseau' => $r->reseau, 'canal' => $r->canal, 'compte' => $r->compte, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $rows);
+        return array_values(array_map(static fn ($r): array => ['reseau' => $r->reseau, 'canal' => $r->canal, 'compte' => $r->compte, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $rows));
     }
 
     /**
@@ -157,7 +157,7 @@ final class RequetesOrigines
         );
 
         return [
-            'data' => array_map(static fn ($r): array => ['mot' => $r->mot, 'famille' => $r->famille, 'detail' => $r->detail, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $rows),
+            'data' => array_values(array_map(static fn ($r): array => ['mot' => $r->mot, 'famille' => $r->famille, 'detail' => $r->detail, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $rows)),
             'total' => $total,
         ];
     }
@@ -184,7 +184,7 @@ final class RequetesOrigines
             array_merge($be, $bc, [$debut, $fin]),
         );
 
-        return array_map(static fn ($r): array => ['jour' => (string) $r->jour, 'demandes' => (int) $r->demandes], $rows);
+        return array_values(array_map(static fn ($r): array => ['jour' => (string) $r->jour, 'demandes' => (int) $r->demandes], $rows));
     }
 
     /**

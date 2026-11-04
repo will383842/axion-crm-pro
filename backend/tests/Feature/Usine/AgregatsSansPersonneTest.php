@@ -43,3 +43,49 @@ test('les clés de sortie sont FERMÉES', function () {
 
     expect(array_keys($sortie[0]))->toBe(['jour', 'reseau', 'compte', 'mot', 'demandes', 'guides', 'accords', 'mises_a_l_ecart']);
 });
+
+/** Aucun groupe (ligne OU colonne) ne garde UNE SEULE cellule masquée avec des cellules visibles. */
+function l7SansDifferencePossible(array $sortie, string $metrique): bool
+{
+    $axes = [
+        fn ($l) => 'L|' . $l['jour'] . '|' . $l['reseau'] . '|' . $l['compte'],
+        fn ($l) => 'C|' . $l['jour'] . '|' . $l['mot'],
+    ];
+    foreach ($axes as $cle) {
+        $groupes = [];
+        foreach ($sortie as $l) {
+            $groupes[$cle($l)][] = $l[$metrique] === '<3';
+        }
+        foreach ($groupes as $masques) {
+            $m = count(array_filter($masques));
+            if ($m === 1 && count($masques) > 1) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+test('anti-différence sur DEUX axes : ligne (jour/réseau/compte) ET colonne (mot)', function () {
+    $sortie = AgregatsOrigines::masquer([
+        l7Ligne('a', 1, 9, 9, 9, 'instagram'), l7Ligne('b', 40, 9, 9, 9, 'instagram'), l7Ligne('c', 7, 9, 9, 9, 'instagram'),
+        l7Ligne('a', 50, 9, 9, 9, 'tiktok'), l7Ligne('b', 9, 9, 9, 9, 'tiktok'), l7Ligne('c', 12, 9, 9, 9, 'tiktok'),
+    ], 3);
+
+    expect(l7SansDifferencePossible($sortie, 'demandes'))->toBeTrue();
+    // La colonne « a » : instagram masqué → tiktok/a (50) l'est aussi.
+    $a = collect($sortie)->where('mot', 'a')->pluck('demandes', 'reseau');
+    expect($a['tiktok'])->toBe('<3');
+});
+
+test('anti-différence : le masquage en cascade se stabilise (point fixe) sur toutes les métriques', function () {
+    $sortie = AgregatsOrigines::masquer([
+        l7Ligne('a', 1, 1, 9, 9, 'x'), l7Ligne('b', 5, 6, 9, 9, 'x'), l7Ligne('a', 8, 7, 9, 9, 'y'),
+        l7Ligne('b', 9, 4, 9, 9, 'y'), l7Ligne('c', 20, 20, 9, 9, 'y'),
+    ], 3);
+
+    foreach (['demandes', 'guides', 'accords', 'mises_a_l_ecart'] as $m) {
+        expect(l7SansDifferencePossible($sortie, $m))->toBeTrue();
+    }
+});

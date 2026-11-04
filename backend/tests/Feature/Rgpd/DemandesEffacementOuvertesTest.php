@@ -161,3 +161,48 @@ test('une panne de la liste ne met PAS le message (donc l’adresse) dans le jou
             && ! str_contains(json_encode($contexte), 'pierre.durand');
     })->atLeast()->once();
 });
+
+test('B2 : la réponse de process rapporte la VRAIE mise à l’écart (personnes = 1)', function () {
+    $a = l5Espace();
+    $demande = l5Demande($a, 'pending', email: 'efface2@example.invalid');
+    DB::table('personnes')->insert([
+        'workspace_id' => $a->id, 'person_key' => 'pky', 'email' => 'efface2@example.invalid',
+        'email_hash' => hash('sha256', 'efface2@example.invalid'), 'premiere_source' => 'site',
+        'premiere_source_at' => now(), 'legal_basis' => 'consent',
+    ]);
+    $owner = l5Compte($a, 'owner');
+
+    $rep = $this->actingAs($owner)->postJson("/api/v1/rgpd/requests/{$demande->id}/process")->assertOk();
+
+    expect($rep->json('mise_a_l_ecart.personnes'))->toBe(1)
+        ->and($rep->json('mise_a_l_ecart.abonnements'))->toBeInt()
+        ->and($rep->json('supprime'))->toBe(0);
+});
+
+test('un viewer ne voit ni subject_email ni metadata.note (toute la ligne est masquée)', function () {
+    $a = l5Espace();
+    $d = l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
+    $d->update(['metadata' => ['note' => 'Rappeler Pierre Durand au 0612345678']]);
+    $viewer = l5Compte($a, 'viewer');
+
+    $json = $this->actingAs($viewer)->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
+
+    expect($json)->not->toContain('0612345678')->not->toContain('Pierre Durand')->not->toContain('pierre.durand');
+});
+
+test('une panne de la liste ne laisse PAS le message dans le journal, même via report()', function () {
+    $a = l5Espace();
+    l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
+    $owner = l5Compte($a, 'owner');
+    RgpdRequest::retrieved(function (): void {
+        throw new RuntimeException('SQLSTATE[XX000] ... pierre.durand@example.invalid');
+    });
+    $vus = [];
+    Log::listen(function ($e) use (&$vus): void {
+        $vus[] = $e->message . json_encode($e->context);
+    });
+
+    $this->actingAs($owner)->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk();
+
+    expect(implode("\n", $vus))->not->toContain('pierre.durand');
+});

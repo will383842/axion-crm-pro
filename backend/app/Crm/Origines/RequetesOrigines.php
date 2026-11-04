@@ -172,8 +172,9 @@ final class RequetesOrigines
     {
         [$entrees, $be] = self::entrees($espace);
         [$cond, $bc] = self::conditions($f);
-        $fin = now()->toDateString();
-        $debut = now()->subDays($jours - 1)->toDateString();
+        // UTC, comme les dates enregistrées : pas de décalage à minuit (fuseau de l'application = Paris).
+        $fin = now('UTC')->toDateString();
+        $debut = now('UTC')->subDays($jours - 1)->toDateString();
         $rows = DB::select(
             "WITH x AS ({$entrees}),
                   c AS (SELECT substr(x.o ->> 'date', 1, 10) AS j, count(*) AS n FROM x WHERE {$cond} GROUP BY 1)
@@ -232,28 +233,62 @@ final class RequetesOrigines
     }
 
     /**
-     * Historique COMPLET d'une personne (fiche + archive), du plus récent au plus ancien.
-     *
-     * @return array{total: int, data: list<array<string, ?string>>}
+     * Curseur opaque de l'historique : (date, rang) du DERNIER élément rendu.
+     * Le rang est unique par personne : `archive_id` (positif) pour l'archive,
+     * `-position` (négatif) pour la fiche. Deux entrées identiques ont donc
+     * deux rangs différents : le tri est total et la page suivante ne perd ni
+     * ne double aucune entrée.
      */
-    public static function historique(string $espace, int $personneId, int $decalage, int $limite): array
+    public static function encoderCurseur(string $date, int $rang): string
     {
-        $source = "SELECT e.v AS o, md5(e.v::text) AS k
+        return rtrim(strtr(base64_encode($date . "\x1f" . $rang), '+/', '-_'), '=');
+    }
+
+    /** @return array{0: string, 1: int}|null null si le curseur est illisible */
+    public static function decoderCurseur(string $curseur): ?array
+    {
+        $brut = base64_decode(strtr($curseur, '-_', '+/'), true);
+        if ($brut === false || preg_match('/^([^\x1f]{0,64})\x1f(-?[0-9]{1,18})$/D', $brut, $m) !== 1) {
+            return null;
+        }
+
+        return [$m[1], (int) $m[2]];
+    }
+
+    /**
+     * Historique COMPLET d'une personne (fiche + archive), du plus récent au plus ancien,
+     * paginé par curseur (pas de OFFSET).
+     *
+     * @param  array{0: string, 1: int}|null  $apres  curseur décodé
+     * @return array{total: int, data: list<array<string, ?string>>, suivant: ?string}
+     */
+    public static function historique(string $espace, int $personneId, ?array $apres, int $limite): array
+    {
+        $source = "SELECT e.v AS o, COALESCE(e.v ->> 'date', '') AS d, (-e.n)::bigint AS c
                      FROM personnes p
-                     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(p.origines) = 'array' THEN p.origines ELSE '[]'::jsonb END) AS e(v)
+                     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(p.origines) = 'array' THEN p.origines ELSE '[]'::jsonb END) WITH ORDINALITY AS e(v, n)
                     WHERE p.workspace_id = ?::uuid AND p.id = ? AND p.origines IS NOT NULL AND (e.v -> 'masque_le') IS NULL
                    UNION ALL
-                   SELECT a.origine, md5(a.origine::text) || a.id::text
+                   SELECT a.origine, COALESCE(a.origine ->> 'date', ''), a.id::bigint
                      FROM personne_origines_archive a
                     WHERE a.workspace_id = ?::uuid AND a.personne_id = ? AND a.masque_le IS NULL AND (a.origine -> 'masque_le') IS NULL";
         $b = [$espace, $personneId, $espace, $personneId];
 
         $total = (int) (DB::selectOne("WITH h AS ({$source}) SELECT count(*) AS n FROM h", $b)->n ?? 0);
+
+        $filtre = '';
+        $bp = $b;
+        if ($apres !== null) {
+            $filtre = ' WHERE (h.d COLLATE "C", h.c) < (?::text COLLATE "C", ?::bigint)';
+            $bp = array_merge($b, [$apres[0], $apres[1]]);
+        }
         $rows = DB::select(
-            "WITH h AS ({$source}) SELECT o FROM h ORDER BY (o ->> 'date') COLLATE \"C\" DESC NULLS LAST, k LIMIT ? OFFSET ?",
-            array_merge($b, [$limite, $decalage]),
+            "WITH h AS ({$source}) SELECT h.o, h.d, h.c FROM h{$filtre} ORDER BY h.d COLLATE \"C\" DESC, h.c DESC LIMIT ?",
+            array_merge($bp, [$limite + 1]),
         );
 
+        $plus = count($rows) > $limite;
+        $rows = array_slice($rows, 0, $limite);
         $data = [];
         foreach ($rows as $r) {
             $o = json_decode((string) $r->o, true);
@@ -261,7 +296,12 @@ final class RequetesOrigines
                 $data[] = ContenusAccords::presenterOrigine($o);
             }
         }
+        $dernier = $rows === [] ? null : $rows[count($rows) - 1];
 
-        return ['total' => $total, 'data' => $data];
+        return [
+            'total' => $total,
+            'data' => $data,
+            'suivant' => ($plus && $dernier !== null) ? self::encoderCurseur((string) $dernier->d, (int) $dernier->c) : null,
+        ];
     }
 }

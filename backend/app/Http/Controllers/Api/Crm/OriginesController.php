@@ -8,6 +8,8 @@ use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Http\Controllers\Api\Crm\Concerns\GardeOrigines;
+use App\Http\Middleware\AuditHashChainLogger;
+use App\Services\Audit\AuditHashChain;
 use App\Support\CelluleCsv;
 use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
@@ -40,6 +42,8 @@ class OriginesController extends ConsoleController
 
     private const PAR_PAGE_MOTS = 25;
 
+    private const MAX_PAGE_MOTS = 200;
+
     public function apercu(Request $request): JsonResponse
     {
         $espace = $this->gardeOrigines($request);
@@ -66,7 +70,7 @@ class OriginesController extends ConsoleController
     {
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
-        $page = max(1, min(100000, (int) $request->query('page', '1')));
+        $page = (int) ($request->validate(['page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PAGE_MOTS]])['page'] ?? 1);
         if ($this->actif() === false) {
             return $this->inactif();
         }
@@ -141,30 +145,36 @@ class OriginesController extends ConsoleController
         });
     }
 
-    /** Historique COMPLET d'une personne (fiche + archive), plus récent d'abord. */
-    public function historique(Request $request, int $personneId): JsonResponse
+    /** Historique COMPLET d'une personne (fiche + archive), plus récent d'abord, paginé par curseur. */
+    public function historique(Request $request, string $personneId): JsonResponse
     {
         $espace = $this->gardeOrigines($request);
+        // Au-delà de 18 chiffres : aucun identifiant ne peut exister (et PHP_INT_MAX ferait une erreur 500).
+        abort_unless(ctype_digit($personneId) && strlen($personneId) <= 18, 404);
         $v = $request->validate([
             'par_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'curseur' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'curseur' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,160}$/'],
         ]);
+        $apres = null;
+        if (isset($v['curseur'])) {
+            $apres = RequetesOrigines::decoderCurseur($v['curseur']);
+            if ($apres === null) {
+                throw ValidationException::withMessages(['curseur' => 'Curseur illisible.']);
+            }
+        }
         if ($this->actif() === false) {
             return $this->inactif();
         }
+        $id = (int) $personneId;
 
-        return WorkspaceContext::run($espace, function () use ($espace, $personneId, $v): JsonResponse {
-            $existe = DB::table('personnes')->where('workspace_id', $espace)->where('id', $personneId)->exists();
+        return WorkspaceContext::run($espace, function () use ($espace, $id, $v, $apres): JsonResponse {
+            $existe = DB::table('personnes')->where('workspace_id', $espace)->where('id', $id)->exists();
             abort_unless($existe, 404);
 
             $parPage = (int) ($v['par_page'] ?? 50);
-            $decalage = (int) ($v['curseur'] ?? 0);
-            $r = RequetesOrigines::historique($espace, $personneId, $decalage, $parPage);
-            $prochain = $decalage;
-            $prochain += $parPage;
-            $suivant = $prochain < $r['total'] ? $prochain : null;
+            $r = RequetesOrigines::historique($espace, $id, $apres, $parPage);
 
-            return $this->ok(['actif' => true, 'data' => $r['data'], 'meta' => ['total' => $r['total'], 'par_page' => $parPage, 'suivant' => $suivant]]);
+            return $this->ok(['actif' => true, 'data' => $r['data'], 'meta' => ['total' => $r['total'], 'par_page' => $parPage, 'suivant' => $r['suivant']]]);
         });
     }
 
@@ -178,13 +188,16 @@ class OriginesController extends ConsoleController
     {
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
+        $demandes = array_filter($f, static fn ($v, $k): bool => $v !== null && !($k === 'oppose' && $v === 'tous'), ARRAY_FILTER_USE_BOTH);
         $f['oppose'] = 'non';
         abort_unless($this->actif(), 404);
+        // L'export écrit lui-même UNE ligne d'audit (avec le compte) : le journal HTTP générique s'efface.
+        $request->attributes->set(AuditHashChainLogger::ATTRIBUT_JOURNAL_PROPRE, true);
 
         $entete = ['Adresse', 'Prénom', 'Nom', 'Date', 'Réseau', 'Compte', 'Canal', 'Mot', 'Guide', 'Famille', 'Détail', 'Référence du post'];
 
-        return response()->streamDownload(function () use ($espace, $f, $entete, $personnes): void {
-            WorkspaceContext::run($espace, function () use ($espace, $f, $entete, $personnes): void {
+        return response()->streamDownload(function () use ($request, $demandes, $espace, $f, $entete, $personnes): void {
+            WorkspaceContext::run($espace, function () use ($request, $demandes, $espace, $f, $entete, $personnes): void {
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
@@ -236,11 +249,48 @@ class OriginesController extends ConsoleController
                     PlafondExport::ecrireAvertissement($out, count($entete));
                 }
                 fclose($out);
+                $this->auditer($request, $espace, $demandes, min($etat->lues, $plafond), $etat->tronque);
             });
         }, 'origines-' . now()->format('Y-m-d') . '.csv', array_merge(['Content-Type' => 'text/csv; charset=UTF-8'], PlafondExport::entetes()));
     }
 
+    /**
+     * UNE ligne d'audit, SANS donnée personnelle : compte de lignes et filtres
+     * validés (listes fermées, jetons, dates) — jamais d'adresse, de nom ni de
+     * référence de post.
+     *
+     * @param  array<string, mixed>  $demandes
+     */
+    private function auditer(Request $request, string $espace, array $demandes, int $lignes, bool $tronque): void
+    {
+        try {
+            $filtres = [];
+            foreach ($demandes as $cle => $valeur) {
+                $filtres[] = $cle . '=' . $valeur;
+            }
+            $uid = $request->user()?->id;
+            app(AuditHashChain::class)->record([
+                'workspace_id' => $espace,
+                'user_id' => is_string($uid) ? $uid : null,
+                'method' => 'GET',
+                'path' => 'api/v1/crm/origines/export | lignes=' . $lignes . ' | tronque=' . ($tronque ? 'oui' : 'non')
+                    . ' | filtres: ' . ($filtres === [] ? 'aucun' : implode(' ', $filtres)),
+                'status' => 200,
+                'ip' => $request->ip(),
+                'user_agent' => substr((string) $request->userAgent(), 0, 255),
+                'payload_hash' => hash('sha256', json_encode($demandes, JSON_THROW_ON_ERROR)),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     // ── Internes ────────────────────────────────────────────────────────────
+
+    private function jours(string $a, string $b): int
+    {
+        return (int) (new \DateTimeImmutable($a))->diff(new \DateTimeImmutable($b))->format('%r%a');
+    }
 
     private function actif(): bool
     {
@@ -280,8 +330,20 @@ class OriginesController extends ConsoleController
         }
         $du = $v['du'] ?? null;
         $au = $v['au'] ?? null;
-        if ($du !== null && $au !== null && (new \DateTimeImmutable($du))->diff(new \DateTimeImmutable($au))->days > 366) {
-            throw ValidationException::withMessages(['du' => 'Période trop longue (366 jours au plus).']);
+        if ($du !== null && $au !== null && $du > $au) {
+            throw ValidationException::withMessages(['du' => 'La date de début suit la date de fin.']);
+        }
+        // Période ≤ 366 jours. Une borne seule est comparée à aujourd'hui (UTC, comme les dates enregistrées).
+        $aujourdhui = now('UTC')->toDateString();
+        $debut = $du ?? $au;
+        $fin = $au ?? $du;
+        if ($debut !== null && $fin !== null) {
+            $ecart = ($du !== null && $au !== null)
+                ? $this->jours($debut, $fin)
+                : max($this->jours($debut, $aujourdhui), $this->jours($aujourdhui, $debut));
+            if ($ecart > 366) {
+                throw ValidationException::withMessages(['du' => 'Période trop longue (366 jours au plus).']);
+            }
         }
 
         return [

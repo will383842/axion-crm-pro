@@ -582,15 +582,15 @@ Route::prefix('v1')->group(function () {
             // PR-A (L2-back) — API de LECTURE des origines. Derrière l'interrupteur
             // `origines.lecture_enabled` (éteint → 404) ET la fonction d'espace
             // `origines.lecture` (L6). Segments fixes AVANT `{personneId}`.
-            Route::get('/origines/apercu', [OriginesController::class, 'apercu'])->middleware('delai-sql:120');
-            Route::get('/origines/par-reseau', [OriginesController::class, 'parReseau'])->middleware('delai-sql:120');
-            Route::get('/origines/par-mot', [OriginesController::class, 'parMot'])->middleware('delai-sql:120');
-            Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware('delai-sql:120');
-            Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware('delai-sql:120');
+            Route::get('/origines/apercu', [OriginesController::class, 'apercu'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-reseau', [OriginesController::class, 'parReseau'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-mot', [OriginesController::class, 'parMot'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/export', [OriginesController::class, 'export'])
                 ->middleware(['throttle:scraper-list', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
             Route::get('/personnes/{personneId}/origines', [OriginesController::class, 'historique'])
-                ->whereNumber('personneId')->middleware('delai-sql:120');
+                ->whereNumber('personneId')->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

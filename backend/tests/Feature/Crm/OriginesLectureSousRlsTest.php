@@ -27,8 +27,8 @@ test('OLR 1 — sous axion_app, l’historique d’une personne d’un autre esp
 
     DB::statement('SET LOCAL ROLE axion_app');
     try {
-        $propre = WorkspaceContext::run($a->id, fn () => RequetesOrigines::historique($a->id, $pa, 0, 50));
-        $etranger = WorkspaceContext::run($a->id, fn () => RequetesOrigines::historique($a->id, $pb, 0, 50));
+        $propre = WorkspaceContext::run($a->id, fn () => RequetesOrigines::historique($a->id, $pa, null, 50));
+        $etranger = WorkspaceContext::run($a->id, fn () => RequetesOrigines::historique($a->id, $pb, null, 50));
         $agregat = WorkspaceContext::run($a->id, fn () => RequetesOrigines::apercu($a->id, RequetesOrigines::filtresVides()));
     } finally {
         DB::statement('RESET ROLE');

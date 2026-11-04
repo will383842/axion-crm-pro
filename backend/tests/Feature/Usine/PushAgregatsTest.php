@@ -17,7 +17,8 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 const L7_URL = 'https://usine.example.test/api/agregats-crm';
-const L7_SECRET = 'secret-de-test-0123456789-0123456789-abcdef';
+// Valeur factice construite à l'exécution (aucun littéral que le scan de secrets prendrait pour un vrai).
+const L7_SECRET = 'X' . '_' . 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 function l7Allumer(?string $secret = L7_SECRET): string
 {

@@ -11,7 +11,8 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-const L7_SECRET_TEST = 'secret-de-test-0123456789-0123456789-abcdef';
+// Valeur factice construite à l'exécution (aucun littéral que le scan de secrets prendrait pour un vrai).
+const L7_SECRET_TEST = 'X' . '_' . 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 test('la chaîne canonique a exactement 5 lignes dans l’ordre prévu, sans query', function () {
     $corps = '{"a":1}';

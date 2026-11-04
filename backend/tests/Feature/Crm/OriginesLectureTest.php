@@ -144,7 +144,7 @@ test('OL 7 — historique complet : fiche + archive, ordre décroissant, liste b
         ->and(count(array_unique(array_column($tout, 'post_ref'))))->toBe(53);
 
     $brut = json_encode($tout);
-    foreach (['pseudo', 'texte', 'nom"', 'commentaire_ref', 'EMPREINTE_BRUTE', 'ne-doit-pas-sortir', 'post_ref_masq', 'masque_le'] as $interdit) {
+    foreach (['"pseudo"', '"texte"', '"nom"', 'commentaire_ref', 'EMPREINTE_BRUTE', 'ne-doit-pas-sortir', 'post_ref_masq', 'masque_le'] as $interdit) {
         expect($brut)->not->toContain($interdit);
     }
     expect(array_keys($tout[0]))->toEqualCanonicalizing(['famille', 'detail', 'canal', 'reseau', 'compte', 'mot', 'guide', 'date', 'post_ref', 'post_url', 'version_texte', 'utm_campaign']);

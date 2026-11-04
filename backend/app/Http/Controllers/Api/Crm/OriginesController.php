@@ -188,7 +188,7 @@ class OriginesController extends ConsoleController
     {
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
-        $demandes = array_filter($f, static fn ($v, $k): bool => $v !== null && !($k === 'oppose' && $v === 'tous'), ARRAY_FILTER_USE_BOTH);
+        $demandes = array_filter($f, static fn ($v, $k): bool => $v !== null && ($k !== 'oppose' || $v !== 'tous'), ARRAY_FILTER_USE_BOTH);
         $f['oppose'] = 'non';
         abort_unless($this->actif(), 404);
         // L'export écrit lui-même UNE ligne d'audit (avec le compte) : le journal HTTP générique s'efface.

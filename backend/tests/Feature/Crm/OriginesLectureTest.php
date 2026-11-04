@@ -8,6 +8,7 @@
 
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\OriginesJeu;
 use Tests\TestCase;
@@ -254,13 +255,13 @@ test('OL 16 — limite de débit sur les six routes de lecture', function () {
 
 test('OL 17 — tendance : jours calculés en UTC, comme les dates enregistrées (pas de décalage à minuit)', function () {
     // 00 h 30 à Paris le 4 novembre = 23 h 30 UTC le 3 novembre.
-    \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-11-04 00:30:00', 'Europe/Paris'));
+    Carbon::setTestNow(Carbon::parse('2026-11-04 00:30:00', 'Europe/Paris'));
     OriginesJeu::personne($this->axion->id, 'ol.minuit@example.invalid', [
         OriginesJeu::entree(['post_ref' => 'post_ref_minuit', 'date' => '2026-11-03T23:15:00Z']),
     ]);
 
     $r = $this->getJson('/api/v1/crm/origines/tendance?jours=7')->assertOk()->json('data');
-    \Illuminate\Support\Carbon::setTestNow();
+    Carbon::setTestNow();
 
     expect($r)->toHaveCount(7)
         ->and(end($r)['jour'])->toBe('2026-11-03')

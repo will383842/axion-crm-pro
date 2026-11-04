@@ -16,13 +16,16 @@ import {
   carteStylisee,
   droitsCollecte,
   genererAlimenterDemo,
+  genererOriginesDemo,
   nomDeSource,
   type CelluleDemo,
   type CollecteDemo,
+  type OrigineDemo,
+  type PersonneOrigineDemo,
   type PersonneDemo,
   type TacheDemo,
 } from '../../donnees/crm/alimenter';
-import { maintenant } from '../../horloge';
+import { ilYa, maintenant } from '../../horloge';
 import { api, delai, erreur, normaliser, paginer, repondreEtatForce } from '../../outils';
 import type { Campaign, CampaignStatsResponse } from '@/features/collectes/types';
 import type { CandidateRow, CountsResponse, PersonneFiche, PersonneTimelineEntry, PersonnesCounts } from '@/features/crm-console/types';
@@ -218,7 +221,116 @@ const NIVEAUX = ['region', 'department', 'city'] as const;
 
 // ── Les routes ────────────────────────────────────────────────────────────
 
+// ── Origines des contacts (exemple) ───────────────────────────────────────
+// Lecture seule, calculée sur quatorze personnes « exemple » (adresses en `exemple.invalid`).
+
+let originesDemo: PersonneOrigineDemo[] | null = null;
+const origines = (): PersonneOrigineDemo[] => (originesDemo ??= genererOriginesDemo());
+const adresseOrigine = (p: PersonneOrigineDemo): string => `exemple-${p.numero}@exemple.invalid`;
+const parOrdreRecent = (a: OrigineDemo, b: OrigineDemo): number => b.date.localeCompare(a.date);
+
+function entreesOrigines(url: URL): Array<{ p: PersonneOrigineDemo; o: OrigineDemo }> {
+  const s = (k: string): string => url.searchParams.get(k) ?? '';
+  const [famille, detail, reseau, mot, oppose, du, au] = ['famille', 'detail', 'reseau', 'mot', 'oppose', 'du', 'au'].map(s) as [string, string, string, string, string, string, string];
+  const sortie: Array<{ p: PersonneOrigineDemo; o: OrigineDemo }> = [];
+  for (const p of origines()) {
+    if (oppose === 'oui' && !p.opposee) continue;
+    if (oppose === 'non' && p.opposee) continue;
+    for (const o of p.origines) {
+      const jour = o.date.slice(0, 10);
+      if ((famille && o.famille !== famille) || (detail && o.detail !== detail) || (reseau && o.reseau !== reseau) || (mot && o.mot !== mot)) continue;
+      if ((du && jour < du) || (au && jour > au)) continue;
+      sortie.push({ p, o });
+    }
+  }
+  return sortie;
+}
+
+const grouper = <T,>(liste: T[], cle: (x: T) => string): Map<string, T[]> => {
+  const m = new Map<string, T[]>();
+  for (const x of liste) m.set(cle(x), [...(m.get(cle(x)) ?? []), x]);
+  return m;
+};
+const distinctes = (l: Array<{ p: PersonneOrigineDemo }>): number => new Set(l.map((x) => x.p.id)).size;
+const sansUrl = (o: OrigineDemo) => o; // `post_url` n'existe pas dans la démo : le plan ne prévoit que `post_ref`.
+
+export const handlersOrigines: HttpHandler[] = [
+  http.get(api('/crm/origines/apercu'), async ({ request }) => {
+    await delai();
+    const force = await repondreEtatForce(request, { actif: true, personnes: 0, demandes: 0, accords: 0, opposees: 0, par_famille: [] });
+    if (force) return force;
+    const e = entreesOrigines(new URL(request.url));
+    return HttpResponse.json({
+      actif: true,
+      personnes: distinctes(e),
+      demandes: e.length,
+      accords: distinctes(e.filter((x) => !x.p.opposee && x.o.guide !== null)),
+      opposees: distinctes(e.filter((x) => x.p.opposee)),
+      par_famille: [...grouper(e, (x) => x.o.famille ?? '').entries()]
+        .map(([famille, l]) => ({ famille: famille === '' ? null : famille, demandes: l.length, personnes: distinctes(l) }))
+        .sort((a, b) => b.demandes - a.demandes),
+    });
+  }),
+  http.get(api('/crm/origines/par-reseau'), async ({ request }) => {
+    await delai();
+    const e = entreesOrigines(new URL(request.url));
+    const data = [...grouper(e, (x) => `${x.o.reseau ?? ''}|${x.o.canal ?? ''}|${x.o.compte ?? ''}`).values()]
+      .map((l) => ({ reseau: l[0]!.o.reseau, canal: l[0]!.o.canal, compte: l[0]!.o.compte, demandes: l.length, personnes: distinctes(l) }))
+      .sort((a, b) => b.demandes - a.demandes);
+    return HttpResponse.json({ actif: true, data });
+  }),
+  http.get(api('/crm/origines/par-mot'), async ({ request }) => {
+    await delai();
+    const url = new URL(request.url);
+    const e = entreesOrigines(url).filter((x) => x.o.mot !== null);
+    const lignes = [...grouper(e, (x) => `${x.o.mot}|${x.o.famille}|${x.o.detail}`).values()]
+      .map((l) => ({ mot: l[0]!.o.mot, famille: l[0]!.o.famille, detail: l[0]!.o.detail, demandes: l.length, personnes: distinctes(l) }))
+      .sort((a, b) => b.demandes - a.demandes);
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+    return HttpResponse.json({ actif: true, data: lignes.slice((page - 1) * 25, page * 25), meta: { per_page: 25, page, total: lignes.length, has_more: page * 25 < lignes.length } });
+  }),
+  http.get(api('/crm/origines/tendance'), async ({ request }) => {
+    await delai();
+    const url = new URL(request.url);
+    const jours = Math.min(90, Math.max(7, Number(url.searchParams.get('jours') ?? '30')));
+    const e = entreesOrigines(url);
+    const data = Array.from({ length: jours }, (_, i) => {
+      const jour = ilYa(jours - 1 - i).slice(0, 10);
+      return { jour, demandes: e.filter((x) => x.o.date.slice(0, 10) === jour).length };
+    });
+    return HttpResponse.json({ actif: true, data });
+  }),
+  http.get(api('/crm/origines/personnes'), async ({ request }) => {
+    await delai();
+    const e = entreesOrigines(new URL(request.url));
+    const data = [...grouper(e, (x) => String(x.p.id)).values()].map((l) => {
+      const triees = l.map((x) => x.o).sort(parOrdreRecent);
+      const p = l[0]!.p;
+      return { id: p.id, email: adresseOrigine(p), first_name: 'Personne', last_name: `exemple ${p.numero}`, entreprise: null, demandes: triees.length, derniere_origine: sansUrl(triees[0]!) };
+    });
+    return HttpResponse.json({ actif: true, data, meta: { per_page: 25, next_cursor: null, has_more: false } });
+  }),
+  http.get(api('/crm/origines/export'), async ({ request }) => {
+    await delai();
+    const e = entreesOrigines(new URL(request.url)).filter((x) => !x.p.opposee);
+    const lignes = e.map(({ p, o }) => [adresseOrigine(p), 'Personne', `exemple ${p.numero}`, o.date.slice(0, 10), o.reseau ?? '', o.compte ?? '', o.canal ?? '', o.mot ?? '', o.guide ?? '', o.famille ?? '', o.detail ?? '', o.post_ref ?? ''].join(','));
+    return new HttpResponse(['Adresse,Prénom,Nom,Date,Réseau,Compte,Canal,Mot,Guide,Famille,Détail,Référence du post', ...lignes].join('\n'), { headers: { 'Content-Type': 'text/csv; charset=UTF-8' } });
+  }),
+  http.get(api('/crm/personnes/:id/origines'), async ({ params, request }) => {
+    await delai();
+    const p = origines().find((x) => String(x.id) === String(params['id']));
+    if (!p) return erreur(404, 'introuvable', 'Introuvable.');
+    const url = new URL(request.url);
+    const parPage = Math.min(100, Math.max(1, Number(url.searchParams.get('par_page') ?? '50')));
+    const debut = Math.max(0, Number(url.searchParams.get('curseur') ?? '0'));
+    const triees = [...p.origines].sort(parOrdreRecent).map(sansUrl);
+    const suivant = debut + parPage < triees.length ? debut + parPage : null;
+    return HttpResponse.json({ actif: true, data: triees.slice(debut, debut + parPage), meta: { total: triees.length, par_page: parPage, suivant } });
+  }),
+];
+
 export const handlers: HttpHandler[] = [
+  ...handlersOrigines,
   // Newsletter et guide
   http.get(api('/crm/personnes/counts'), async ({ request }) => {
     await delai();

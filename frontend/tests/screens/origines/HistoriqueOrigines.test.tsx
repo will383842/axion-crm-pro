@@ -4,10 +4,11 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HistoriqueOrigines } from '@/features/origines/HistoriqueOrigines';
 import { renderScreen } from '../../helpers/renderScreen';
+import type { HttpHandler } from 'msw';
 import { dynamicGet, getJson, getPending, getStatus } from '../../msw/handlers';
 import { HISTORIQUE } from './fixtures';
 
-type Hs = NonNullable<Parameters<typeof renderScreen>[1]>['handlers'];
+type Hs = HttpHandler[];
 const monter = (handlers: Hs) =>
   renderScreen(<HistoriqueOrigines personneId="2" />, { path: '/p/$personneId', url: '/p/2', handlers });
 

@@ -24,7 +24,7 @@ export function HistoriqueOrigines({ personneId, bloc, integre = false }: { pers
   const q = useInfiniteQuery({
     queryKey: ['crm', 'personne', personneId, 'origines'],
     queryFn: ({ pageParam }) => lire<Historique>(`/crm/personnes/${personneId}/origines`, { par_page: PAR_PAGE, ...(pageParam !== undefined ? { curseur: pageParam } : {}) }),
-    initialPageParam: undefined as number | undefined,
+    initialPageParam: undefined as string | number | undefined,
     getNextPageParam: (derniere) => derniere.meta.suivant ?? undefined,
     retry: false,
   });

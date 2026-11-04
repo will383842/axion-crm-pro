@@ -191,3 +191,80 @@ test('OL 11 — aucun journal avec filtres ni corps de requête', function () {
     $source = file_get_contents(app_path('Http/Controllers/Api/Crm/OriginesController.php')) . file_get_contents(app_path('Crm/Origines/RequetesOrigines.php'));
     expect($source)->not->toMatch('/Log::/');
 });
+
+test('OL 12 — période : la borne de 366 jours vaut aussi pour du seul ou au seul ; du > au → 422', function () {
+    $ancien = now('UTC')->subDays(400)->toDateString();
+    $lointain = now('UTC')->addDays(400)->toDateString();
+    $recent = now('UTC')->subDays(30)->toDateString();
+
+    $this->getJson('/api/v1/crm/origines/apercu?du=' . $ancien)->assertStatus(422);
+    $this->getJson('/api/v1/crm/origines/apercu?au=' . $lointain)->assertStatus(422);
+    $this->getJson('/api/v1/crm/origines/apercu?du=2026-11-04&au=2026-11-01')->assertStatus(422);
+    $this->getJson('/api/v1/crm/origines/apercu?du=' . $recent)->assertOk();
+    $this->getJson('/api/v1/crm/origines/apercu?au=' . $recent)->assertOk();
+    // Le message d'erreur n'écho pas la valeur reçue.
+    expect($this->getJson('/api/v1/crm/origines/apercu?du=' . $ancien)->getContent())->not->toContain($ancien);
+});
+
+test('OL 13 — historique : curseur opaque (pas de décalage), entrées identiques ni perdues ni doublées', function () {
+    $ws = $this->axion->id;
+    $identique = OriginesJeu::entree(['post_ref' => 'post_ref_jumeau', 'date' => '2026-10-15T10:00:00Z']);
+    $id = OriginesJeu::personne($ws, 'ol.jumeaux@example.invalid', [$identique, $identique, $identique]);
+    OriginesJeu::archive($ws, $id, $identique);
+
+    $vues = [];
+    $curseur = null;
+    for ($tour = 0; $tour < 10; $tour++) {
+        $url = "/api/v1/crm/personnes/{$id}/origines?par_page=1" . ($curseur === null ? '' : '&curseur=' . urlencode($curseur));
+        $r = $this->getJson($url)->assertOk();
+        expect($r->json('data'))->toHaveCount(1);
+        $curseur = $r->json('meta.suivant');
+        $vues[] = $curseur;
+        if ($curseur === null) {
+            break;
+        }
+        expect($curseur)->toBeString();
+    }
+    expect($vues)->toHaveCount(4)->and(end($vues))->toBeNull();
+
+    // Plus de décalage numérique : l'ancien plafond à 1 000 000 n'existe plus, un curseur forgé donne 422.
+    $this->getJson("/api/v1/crm/personnes/{$id}/origines?curseur=forge;drop")->assertStatus(422);
+    $this->getJson("/api/v1/crm/personnes/{$id}/origines?curseur=999999999")->assertStatus(422);
+});
+
+test('OL 14 — par-mot : page bornée à 200, au-delà → 422', function () {
+    $this->getJson('/api/v1/crm/origines/par-mot?page=200')->assertOk();
+    $this->getJson('/api/v1/crm/origines/par-mot?page=201')->assertStatus(422);
+    $this->getJson('/api/v1/crm/origines/par-mot?page=0')->assertStatus(422);
+});
+
+test('OL 15 — identifiant au-delà de PHP_INT_MAX : 404, jamais 500', function () {
+    $this->getJson('/api/v1/crm/personnes/99999999999999999999/origines')->assertNotFound();
+    $this->getJson('/api/v1/crm/personnes/9223372036854775808/origines')->assertNotFound();
+});
+
+test('OL 16 — limite de débit sur les six routes de lecture', function () {
+    $chemins = ['origines/apercu', 'origines/par-reseau', 'origines/par-mot', 'origines/tendance', 'origines/personnes', 'personnes/{personneId}/origines'];
+    foreach ($chemins as $chemin) {
+        $route = app('router')->getRoutes()->match(request()->create('/api/v1/crm/' . str_replace('{personneId}', '1', $chemin), 'GET'));
+        $limite = collect($route->gatherMiddleware())->contains(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:'));
+        expect($limite)->toBeTrue("pas de throttle sur {$chemin}");
+    }
+});
+
+test('OL 17 — tendance : jours calculés en UTC, comme les dates enregistrées (pas de décalage à minuit)', function () {
+    // 00 h 30 à Paris le 4 novembre = 23 h 30 UTC le 3 novembre.
+    \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-11-04 00:30:00', 'Europe/Paris'));
+    OriginesJeu::personne($this->axion->id, 'ol.minuit@example.invalid', [
+        OriginesJeu::entree(['post_ref' => 'post_ref_minuit', 'date' => '2026-11-03T23:15:00Z']),
+    ]);
+
+    $r = $this->getJson('/api/v1/crm/origines/tendance?jours=7')->assertOk()->json('data');
+    \Illuminate\Support\Carbon::setTestNow();
+
+    expect($r)->toHaveCount(7)
+        ->and(end($r)['jour'])->toBe('2026-11-03')
+        ->and($r[0]['jour'])->toBe('2026-10-28');
+    $du3 = collect($r)->firstWhere('jour', '2026-11-03');
+    expect($du3['demandes'])->toBeGreaterThanOrEqual(1);
+});

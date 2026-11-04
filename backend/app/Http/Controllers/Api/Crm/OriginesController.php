@@ -272,7 +272,7 @@ class OriginesController extends ConsoleController
             app(AuditHashChain::class)->record([
                 'workspace_id' => $espace,
                 'user_id' => is_string($uid) ? $uid : null,
-                'method' => 'GET',
+                'method' => $request->method(),
                 'path' => 'api/v1/crm/origines/export | lignes=' . $lignes . ' | tronque=' . ($tronque ? 'oui' : 'non')
                     . ' | filtres: ' . ($filtres === [] ? 'aucun' : implode(' ', $filtres)),
                 'status' => 200,

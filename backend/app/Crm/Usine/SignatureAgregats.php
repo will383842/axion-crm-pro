@@ -21,7 +21,7 @@ final class SignatureAgregats
         return strtoupper($methode) . "\n" . $chemin . "\n" . $horodatage . "\n" . $nonce . "\n" . hash('sha256', $corps);
     }
 
-    public static function signer(string $secret, string $methode, string $chemin, string $horodatage, string $nonce, string $corps): string
+    public static function signer(#[\SensitiveParameter] string $secret, string $methode, string $chemin, string $horodatage, string $nonce, string $corps): string
     {
         if (strlen($secret) < self::SECRET_MIN) {
             throw new InvalidArgumentException('Secret de signature absent ou trop court.');

@@ -54,21 +54,28 @@ class CrmUsinePousserAgregats extends Command
             return self::SUCCESS;
         }
 
-        $hier = now()->subDay()->format('Y-m-d');
-        $plancher = now()->subDays(7)->format('Y-m-d');
-        $recus = [];
+        // Tout en UTC : le jour d'une origine est son jour UTC (date ISO en Z), pas celui de l'appli (Europe/Paris).
+        $maintenant = now()->utc();
+        $hier = $maintenant->copy()->subDay()->format('Y-m-d');
+        $plancher = $maintenant->copy()->subDays(7)->format('Y-m-d');
+        $recus = null;
         try {
-            $recus = $client->joursRecus() ?? [];
+            $recus = $client->joursRecus();
         } catch (\Throwable $e) {
             Log::warning('usine.agregats: jours reçus indisponibles', ['exception' => $e::class]);
         }
 
-        // Les 7 derniers jours que l'Usine n'a pas, plus J-1 (toujours renvoyé : il se complète).
+        // Jours reçus inconnus (l'Usine n'a pas répondu proprement) : on n'envoie que J-1, pas 7 jours à l'aveugle.
+        // Sinon : les jours des 7 derniers que l'Usine n'a pas, plus J-1 (toujours renvoyé : il se complète).
         $jours = [];
-        for ($i = 7; $i >= 1; $i--) {
-            $jour = now()->subDays($i)->format('Y-m-d');
-            if ($jour >= $plancher && $jour <= $hier && ($jour === $hier || ! in_array($jour, $recus, true))) {
-                $jours[] = $jour;
+        if ($recus === null) {
+            $jours[] = $hier;
+        } else {
+            for ($i = 7; $i >= 1; $i--) {
+                $jour = $maintenant->copy()->subDays($i)->format('Y-m-d');
+                if ($jour >= $plancher && $jour <= $hier && ($jour === $hier || ! in_array($jour, $recus, true))) {
+                    $jours[] = $jour;
+                }
             }
         }
 

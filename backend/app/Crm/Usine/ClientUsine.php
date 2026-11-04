@@ -15,7 +15,7 @@ final class ClientUsine
 {
     public function __construct(
         private readonly string $url,
-        private readonly string $secret,
+        #[\SensitiveParameter] private readonly string $secret,
         private readonly int $delai = 10,
     ) {
         $h = parse_url($url);

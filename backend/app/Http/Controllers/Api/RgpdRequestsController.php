@@ -104,6 +104,10 @@ class RgpdRequestsController extends ApiController
             if ($masquer) {
                 $rows->getCollection()->transform(function ($ligne) {
                     $ligne->setAttribute('subject_email', MasquageCoordonnees::email($ligne->subject_email));
+                    // Toute la ligne : `metadata` porte la note libre de l'opérateur et le bilan du
+                    // traitement (texte libre, parfois nominatif). On n'en laisse que deux drapeaux sans PII.
+                    $ligne->setAttribute('metadata', array_intersect_key((array) $ligne->metadata, ['mise_a_l_ecart' => 1, 'verification' => 1]));
+                    $ligne->setAttribute('export_token', null);
 
                     return $ligne;
                 });
@@ -112,8 +116,8 @@ class RgpdRequestsController extends ApiController
             return $this->ok($rows);
         } catch (\Throwable $e) {
             // Jamais `getMessage()` : un message SQL peut citer `subject_email` (PII dans les journaux).
+            // Pas de `report($e)` non plus : il journalise le message complet. Seule la classe sort.
             Log::error('rgpd.requests.index failed', ['exception' => $e::class]);
-            report($e);
 
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
@@ -311,8 +315,8 @@ class RgpdRequestsController extends ApiController
         if ($req->type === 'erasure') {
             // L5 : dit noir sur blanc que rien n'est supprimé.
             $reponse['mise_a_l_ecart'] = [
-                'personnes' => (int) ($result['personnes'] ?? 0),
-                'abonnements' => (int) ($result['abonnements'] ?? 0),
+                'personnes' => (int) ($result['deleted']['personnes'] ?? 0),
+                'abonnements' => (int) ($result['deleted']['abonnements'] ?? 0),
             ];
             $reponse['supprime'] = 0;
         }

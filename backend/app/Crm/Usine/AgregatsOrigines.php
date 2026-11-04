@@ -43,6 +43,11 @@ final class AgregatsOrigines
     /**
      * Comptages bruts d'un jour (sans masquage), lecture seule.
      *
+     * Chaque métrique compte des PERSONNES DISTINCTES (COUNT(DISTINCT p.id)), jamais des
+     * entrées : une personne qui commente 3 fois le même jour vaut 1, pas 3. « accords » =
+     * `consentements` non vide, comme RequetesOrigines (PR-A). Le jour est le jour UTC de
+     * `date` (ISO 8601, suffixe Z).
+     *
      * @return list<array<string, mixed>>
      */
     public static function pourJour(string $espaceId, string $jour): array
@@ -53,12 +58,11 @@ final class AgregatsOrigines
                 SELECT e->>'reseau' AS reseau,
                        e->>'compte' AS compte,
                        e->>'mot'    AS mot,
-                       COUNT(*)::int AS demandes,
-                       COUNT(*) FILTER (WHERE COALESCE(e->>'guide', '') <> '')::int AS guides,
-                       COUNT(*) FILTER (WHERE EXISTS (
-                           SELECT 1 FROM jsonb_array_elements(COALESCE(p.consentements, '[]'::jsonb)) c
-                           WHERE c->>'nature' = 'optin'))::int AS accords,
-                       COUNT(*) FILTER (WHERE COALESCE(e->>'masque_le', '') <> '')::int AS mises_a_l_ecart
+                       COUNT(DISTINCT p.id)::int AS demandes,
+                       COUNT(DISTINCT p.id) FILTER (WHERE COALESCE(e->>'guide', '') <> '')::int AS guides,
+                       COUNT(DISTINCT p.id) FILTER (WHERE jsonb_typeof(p.consentements) = 'array'
+                                                      AND jsonb_array_length(p.consentements) > 0)::int AS accords,
+                       COUNT(DISTINCT p.id) FILTER (WHERE COALESCE(e->>'masque_le', '') <> '')::int AS mises_a_l_ecart
                 FROM personnes p
                 CROSS JOIN LATERAL jsonb_array_elements(
                     CASE WHEN jsonb_typeof(p.origines) = 'array' THEN p.origines ELSE '[]'::jsonb END
@@ -93,12 +97,14 @@ final class AgregatsOrigines
     }
 
     /**
-     * Seuil + masquage secondaire (anti-différence).
+     * Seuil + masquage secondaire (anti-différence), sur DEUX axes.
      *
      * 1. une cellule < seuil devient "<3" ;
-     * 2. dans un groupe (jour, reseau, compte) où UNE SEULE cellule d'une
-     *    métrique est masquée, la plus petite autre cellule du groupe l'est aussi
-     *    (sinon la différence avec un total connu la révélerait) ;
+     * 2. pour chaque métrique, dans chaque LIGNE (jour, reseau, compte → les mots) et chaque
+     *    COLONNE (jour, mot → les réseaux/comptes), si UNE SEULE cellule est masquée et qu'il en
+     *    reste de visibles, la plus petite visible l'est aussi (sinon la différence avec un total
+     *    connu la révélerait) ; répété jusqu'à stabilité, car un masquage peut en créer un seul
+     *    dans l'autre axe ;
      * 3. une ligne dont toutes les cellules sont masquées est retirée.
      *
      * @param  list<array<string, mixed>>  $lignes
@@ -115,24 +121,32 @@ final class AgregatsOrigines
         }
         unset($l);
 
-        $groupes = [];
+        $axes = [];
         foreach ($lignes as $i => $l) {
-            $groupes[$l['jour'] . '|' . $l['reseau'] . '|' . $l['compte']][] = $i;
+            $axes['L'][$l['jour'] . '|' . $l['reseau'] . '|' . $l['compte']][] = $i;
+            $axes['C'][$l['jour'] . '|' . $l['mot']][] = $i;
         }
-        foreach ($groupes as $indices) {
-            foreach (self::METRIQUES as $m) {
-                $masquees = array_filter($indices, static fn (int $i): bool => $masque($lignes[$i][$m]));
-                if (count($masquees) !== 1) {
-                    continue;
+
+        do {
+            $change = false;
+            foreach ($axes as $groupes) {
+                foreach ($groupes as $indices) {
+                    foreach (self::METRIQUES as $m) {
+                        $masquees = array_filter($indices, static fn (int $i): bool => $masque($lignes[$i][$m]));
+                        if (count($masquees) !== 1) {
+                            continue;
+                        }
+                        $visibles = array_values(array_filter($indices, static fn (int $i): bool => ! $masque($lignes[$i][$m])));
+                        if ($visibles === []) {
+                            continue;
+                        }
+                        usort($visibles, static fn (int $a, int $b): int => $lignes[$a][$m] <=> $lignes[$b][$m]);
+                        $lignes[$visibles[0]][$m] = '<3';
+                        $change = true;
+                    }
                 }
-                $visibles = array_filter($indices, static fn (int $i): bool => ! $masque($lignes[$i][$m]));
-                if ($visibles === []) {
-                    continue;
-                }
-                usort($visibles, static fn (int $a, int $b): int => $lignes[$a][$m] <=> $lignes[$b][$m]);
-                $lignes[$visibles[0]][$m] = '<3';
             }
-        }
+        } while ($change);
 
         $sortie = [];
         foreach ($lignes as $l) {
@@ -143,10 +157,10 @@ final class AgregatsOrigines
                 }
             }
             if (! $tout) {
-                $sortie[] = array_intersect_key($l, array_flip(self::CLES)) + [];
+                $sortie[] = array_replace(array_flip(self::CLES), array_intersect_key($l, array_flip(self::CLES)));
             }
         }
 
-        return array_map(static fn (array $l): array => array_replace(array_flip(self::CLES), $l), $sortie);
+        return $sortie;
     }
 }

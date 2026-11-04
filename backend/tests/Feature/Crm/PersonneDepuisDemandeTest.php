@@ -2,12 +2,14 @@
 
 use App\Console\Commands\CrmPersonnesDepuisDemandes;
 use App\Crm\Console\FilesATraiter;
+use App\Crm\Ingest\IngestOutcome;
 use App\Crm\Ingest\PersonnesIngestService;
 use App\Crm\Ingest\SiteSyncEvent;
 use App\Crm\Ingest\SiteSyncIngestService;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Crm\Rgpd\SiteGdprService;
+use App\Crm\Taxonomy;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Audit\AuditHashChain;
@@ -16,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -105,7 +108,7 @@ function pddEvent(array $overrides = [], string $email = PDD_EMAIL): array
 }
 
 /** @param  array<string, mixed>  $event */
-function pddIngerer(array $event): \App\Crm\Ingest\IngestOutcome
+function pddIngerer(array $event): IngestOutcome
 {
     return app(SiteSyncIngestService::class)->ingest(SiteSyncEvent::fromArray($event));
 }
@@ -265,7 +268,7 @@ test('un candidat (univers vivier) n’entre jamais dans personnes par ce chemin
     config(['crm.ingest.candidates_enabled' => true]);
     DB::table('workspaces')->insertOrIgnore([
         'id' => (string) Str::uuid(),
-        'slug' => \App\Crm\Taxonomy::VIVIER_WORKSPACE_SLUG,
+        'slug' => Taxonomy::VIVIER_WORKSPACE_SLUG,
         'name' => 'Vivier',
         'settings' => '{}',
         'cost_cap_eur' => 0,
@@ -348,8 +351,8 @@ test('la migration refuse son retour arrière quand une personne porte une valeu
     $migration = require database_path('migrations/2026_11_08_000010_personnes_demandes.php');
     $migration->down();
 
-    expect(\Illuminate\Support\Facades\Schema::hasColumn('personnes', 'phone'))->toBeTrue()
-        ->and(\Illuminate\Support\Facades\Schema::hasColumn('personnes', 'entreprise_declaree'))->toBeTrue()
+    expect(Schema::hasColumn('personnes', 'phone'))->toBeTrue()
+        ->and(Schema::hasColumn('personnes', 'entreprise_declaree'))->toBeTrue()
         ->and(pddPersonne()->phone)->toBe('+33600000001')
         ->and(pddPersonne()->entreprise_declaree)->toBe('ZZ SOCIETE DECLAREE');
 });

@@ -166,7 +166,7 @@ class CrmPersonnesDepuisDemandes extends Command
      *
      * @param  array<string, mixed>  $payload
      */
-    private function evenement(object $ligne, array $payload): ?SiteSyncEvent
+    private function evenement(\stdClass $ligne, array $payload): ?SiteSyncEvent
     {
         $pending = is_array($payload['pending_match'] ?? null) ? $payload['pending_match'] : [];
         $texte = static fn (string $cle): ?string => is_string($pending[$cle] ?? null) && trim((string) $pending[$cle]) !== '' ? trim((string) $pending[$cle]) : null;

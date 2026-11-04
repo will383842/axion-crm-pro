@@ -6,7 +6,6 @@
  */
 
 use App\Models\Workspace;
-use App\Socle\Alertes\Alerte;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -52,20 +51,19 @@ test('éteint par défaut (config) et aucune requête HTTP quand éteint', funct
 test('secret absent ou trop court : rien n’est envoyé et une alerte "secret absent" part', function (?string $secret) {
     l7Allumer($secret);
     Http::fake();
-    $alerte = Mockery::mock(Alerte::class);
-    $alerte->shouldReceive('envoyer')->once()->withArgs(fn (string $t, string $c) => str_contains($t, 'secret') || str_contains($c, 'secret'))->andReturn(false);
-    app()->instance(Alerte::class, $alerte);
+    Log::spy();
 
     $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
 
     Http::assertNothingSent();
+    Log::shouldHaveReceived('critical')->withArgs(fn ($m, $c = []) => str_contains($m, 'Chiffres CRM → Usine') && str_contains((string) ($c['corps'] ?? ''), 'secret'))->once();
 })->with([[null], [''], ['trop-court']]);
 
 test('pousse les jours manquants + J-1, avec les en-têtes signés et un corps agrégé', function () {
     l7Allumer();
     $hier = now()->subDay()->format('Y-m-d');
     Http::fake([
-        L7_URL => Http::sequence()->push(['jours' => []], 200)->push(['ok' => true], 200),
+        L7_URL => Http::sequence()->push(['jours' => []], 200)->whenEmpty(Http::response(['ok' => true], 200)),
     ]);
 
     $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
@@ -103,15 +101,15 @@ test('rattrapage : les jours déjà reçus par l’Usine ne sont pas renvoyés, 
 test('non-2xx : alerte "attention", journal sans corps ni signature, ligne d’envoi écrite', function () {
     l7Allumer();
     Http::fake([L7_URL => Http::response('boom ' . L7_SECRET, 500)]);
-    $alerte = Mockery::mock(Alerte::class);
-    $alerte->shouldReceive('envoyer')->atLeast()->once()->withArgs(fn (string $t, string $c, string $p, string $g) => $p === 'crm' && $g === 'attention')->andReturn(false);
-    app()->instance(Alerte::class, $alerte);
     Log::spy();
 
     $this->artisan('crm:usine:pousser-agregats');
 
     expect(DB::table('usine_agregats_envois')->where('statut_http', 500)->exists())->toBeTrue();
-    Log::shouldNotHaveReceived('error', fn ($m, $ctx = []) => str_contains(json_encode([$m, $ctx]), L7_SECRET) || str_contains(json_encode([$m, $ctx]), 'X-Axion-Signature'));
+    Log::shouldHaveReceived('critical')->withArgs(fn ($m, $c = []) => str_contains($m, 'Chiffres CRM → Usine non envoyés'))->atLeast()->once();
+    foreach (['error', 'info', 'warning', 'critical'] as $niveau) {
+        Log::shouldHaveReceived($niveau)->withArgs(fn ($m, $ctx = []) => str_contains(json_encode([$m, $ctx]), L7_SECRET) || str_contains(json_encode([$m, $ctx]), 'X-Axion-Signature'))->never();
+    }
     expect(json_encode(DB::table('usine_agregats_envois')->get()))->not->toContain(L7_SECRET);
 });
 

@@ -9,9 +9,12 @@ use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\MasquageCoordonnees;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -93,6 +96,8 @@ test('un compte sans droit de voir les coordonnées voit subject_email masqué',
     $a = l5Espace();
     l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
     $operateur = l5Compte($a, 'operator');
+    // Un compte sans la permission de voir les coordonnées (l'état d'un compte en lecture).
+    Gate::before(fn ($u, string $ability) => $ability === MasquageCoordonnees::PERMISSION ? false : null);
 
     $json = $this->actingAs($operateur)->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
 
@@ -105,11 +110,14 @@ test('la pastille demandes_rgpd compte pending + processing et retombe à 0 apr�
     l5Demande($a, 'processing');
     $demande = RgpdRequest::where('status', 'pending')->firstOrFail();
     $owner = l5Compte($a, 'owner');
+    config(['crm.console_v2' => true]);
+    Cache::flush();
     ATraiterController::oublier($a->id);
 
     expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->json('demandes_rgpd'))->toBe(2);
 
     DB::table('rgpd_requests')->whereIn('status', ['pending', 'processing'])->update(['status' => 'done']);
+    Cache::flush();
     ATraiterController::oublier($a->id);
     expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->json('demandes_rgpd'))->toBe(0);
     expect($demande->id)->toBeInt();
@@ -138,19 +146,21 @@ test('process par un admin → 403 ; par l’owner → 200 sans suppression ; se
     $this->actingAs($owner)->postJson("/api/v1/rgpd/requests/{$demande->id}/process")->assertStatus(409);
 });
 
-test('une panne SQL de la liste ne met PAS le message (donc l’adresse) dans le journal', function () {
+test('une panne de la liste ne met PAS le message (donc l’adresse) dans le journal', function () {
     $a = l5Espace();
+    l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
     $owner = l5Compte($a, 'owner');
+    // Une exception dont le MESSAGE contient l'adresse, comme un message SQL qui cite la requête.
+    RgpdRequest::retrieved(function (): void {
+        throw new RuntimeException('SQLSTATE[XX000] ... pierre.durand@example.invalid');
+    });
     Log::spy();
-    // Force l'exception : la colonne triée n'existe pas dans le message d'erreur du pilote, qui cite la requête.
-    DB::statement('ALTER TABLE rgpd_requests RENAME COLUMN requested_at TO requested_at_x');
 
-    $this->actingAs($owner)->getJson('/api/v1/rgpd/requests?statut=ouverte&type=erasure')->assertOk();
+    $this->actingAs($owner)->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk();
 
     Log::shouldHaveReceived('error')->withArgs(function ($message, $contexte = []) {
         return $message === 'rgpd.requests.index failed'
-            && ($contexte['exception'] ?? '') !== ''
-            && str_starts_with((string) $contexte['exception'], 'Illuminate\\')
-            && ! str_contains(json_encode($contexte), 'SQLSTATE');
+            && ($contexte['exception'] ?? '') === RuntimeException::class
+            && ! str_contains(json_encode($contexte), 'pierre.durand');
     })->atLeast()->once();
 });

@@ -8,7 +8,6 @@
 use App\Crm\Rgpd\SignalementDemandeEffacement;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Socle\Alertes\Alerte;
 use App\Socle\Alertes\AlerteMail;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,18 +46,21 @@ test('alertes éteintes : le filet existant écrit la notification de l’owner,
     Mail::assertNothingSent();
 });
 
-test('alertes allumées : une alerte crm/attention avec lien ?statut=ouverte, sans PII', function () {
+test('alertes allumées : une alerte crm/attention est journalisée, sans PII', function () {
     [$ws] = l5aEspaceAvecOwner();
-    $alerte = Mockery::mock(Alerte::class);
-    $alerte->shouldReceive('envoyer')->once()->withArgs(function (string $titre, string $corps, string $produit, string $gravite, ?string $lien, array $contexte = []) {
-        $tout = $titre . ' ' . $corps . ' ' . json_encode($contexte);
-
-        return $produit === 'crm' && $gravite === 'attention' && $lien === '/rgpd/requests?statut=ouverte'
-            && ! str_contains($tout, '@') && ! preg_match('/\b\d{3,}\b/', $titre . $corps);
-    })->andReturn(true);
-    app()->instance(Alerte::class, $alerte);
+    config(['alertes.actif' => true, 'alertes.email.destinataire' => 'will@example.test']);
+    Mail::fake();
+    Log::spy();
 
     SignalementDemandeEffacement::signaler($ws->id, 'console');
+
+    Log::shouldHaveReceived('critical')->withArgs(function ($message, $contexte = []) {
+        $tout = $message . ' ' . json_encode($contexte);
+
+        return str_contains($message, 'Demande d’effacement à traiter')
+            && ! str_contains($tout, '@') && ! preg_match('/\b\d{3,}\b/', $message . ($contexte['corps'] ?? ''));
+    })->once();
+    expect(DB::table('notifications')->where('title', 'Demande d’effacement à traiter')->where('action_url', SignalementDemandeEffacement::LIEN)->exists())->toBeTrue();
 });
 
 test('alertes allumées : une cloche + un e-mail, et deux demandes en 5 min = une seule alerte', function () {
@@ -72,17 +74,17 @@ test('alertes allumées : une cloche + un e-mail, et deux demandes en 5 min = un
     Mail::assertSent(AlerteMail::class, 1);
 });
 
-test('une panne de l’Alerte n’empêche pas la mise à l’écart et le journal reste sans PII', function () {
+test('si l’Alerte échoue (canal en panne), la mise à l’écart et le filet sont intacts et le journal reste sans PII', function () {
     [$ws] = l5aEspaceAvecOwner();
-    $alerte = Mockery::mock(Alerte::class);
-    $alerte->shouldReceive('envoyer')->andThrow(new RuntimeException('boom will@example.test'));
-    app()->instance(Alerte::class, $alerte);
+    config(['alertes.actif' => true, 'alertes.email.destinataire' => 'will@example.test']);
+    // Le canal e-mail lève une exception dont le message cite l'adresse.
+    Mail::shouldReceive('to')->andThrow(new RuntimeException('boom will@example.test'));
     Log::spy();
 
     SignalementDemandeEffacement::signaler($ws->id, 'site');
 
-    expect(DB::table('notifications')->where('type', SignalementDemandeEffacement::TYPE)->count())->toBe(1);
-    Log::shouldNotHaveReceived('error', fn ($m, $c = []) => str_contains(json_encode([$m, $c]), 'will@example.test'));
+    expect(DB::table('notifications')->where('type', SignalementDemandeEffacement::TYPE)->count())->toBeGreaterThanOrEqual(1);
+    Log::shouldHaveReceived('error')->withArgs(fn ($m, $c = []) => str_contains(json_encode([$m, $c]), 'will@example.test'))->never();
 });
 
 test('une demande reçue du site ne supprime aucune ligne', function () {

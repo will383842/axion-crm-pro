@@ -46,7 +46,7 @@ class OriginesController extends ConsoleController
     {
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -57,7 +57,7 @@ class OriginesController extends ConsoleController
     {
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -69,7 +69,7 @@ class OriginesController extends ConsoleController
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
         $page = max(1, min(100000, (int) $request->query('page', '1')));
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -90,7 +90,7 @@ class OriginesController extends ConsoleController
         $jours = $request->validate([
             'jours' => ['nullable', 'integer', 'min:' . self::MIN_JOURS, 'max:' . self::MAX_JOURS],
         ])['jours'] ?? 30;
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -103,7 +103,7 @@ class OriginesController extends ConsoleController
         $espace = $this->gardeOrigines($request);
         $f = $this->filtres($request);
         $parPage = $this->perPage($request);
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -151,7 +151,7 @@ class OriginesController extends ConsoleController
             'par_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'curseur' => ['nullable', 'integer', 'min:0', 'max:1000000'],
         ]);
-        if (! $this->actif()) {
+        if ($this->actif() === false) {
             return $this->inactif();
         }
 
@@ -162,7 +162,8 @@ class OriginesController extends ConsoleController
             $parPage = (int) ($v['par_page'] ?? 50);
             $decalage = (int) ($v['curseur'] ?? 0);
             $r = RequetesOrigines::historique($espace, $personneId, $decalage, $parPage);
-            $prochain = $decalage + $parPage;
+            $prochain = $decalage;
+            $prochain += $parPage;
             $suivant = $prochain < $r['total'] ? $prochain : null;
 
             return $this->ok(['actif' => true, 'data' => $r['data'], 'meta' => ['total' => $r['total'], 'par_page' => $parPage, 'suivant' => $suivant]]);
@@ -238,7 +239,7 @@ class OriginesController extends ConsoleController
                 }
                 fclose($out);
             });
-        }, 'origines-' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8'] + PlafondExport::entetes());
+        }, 'origines-' . now()->format('Y-m-d') . '.csv', array_merge(['Content-Type' => 'text/csv; charset=UTF-8'], PlafondExport::entetes()));
     }
 
     // ── Internes ────────────────────────────────────────────────────────────
@@ -276,7 +277,7 @@ class OriginesController extends ConsoleController
             $famille !== null => OrigineDictionnaire::familleConnue($famille),
             default => $detail === null, // un détail seul est ambigu
         };
-        if (! $valide) {
+        if ($valide === false) {
             throw ValidationException::withMessages(['famille' => 'Famille ou détail d\'origine inconnu du dictionnaire.']);
         }
         $du = $v['du'] ?? null;

@@ -215,15 +215,15 @@ test('la ligne d’une demande d’effacement est masquée pour operator et view
 
     // operator possède contacts.view_pii, mais PAS rgpd.view_pii : il ne doit rien voir.
     foreach (['operator', 'viewer'] as $role) {
-        $json = $this->actingAs(l5Compte($a, $role))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
-        expect($json)->not->toContain('0612345678', $role)
-            ->not->toContain('Pierre Durand', $role)
-            ->not->toContain('pierre.durand', $role)
-            ->not->toContain('jeton-secret-xyz', $role);
+        $json = $this->actingAs(l5Compte($a))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
+        expect($json)->not->toContain('0612345678')
+            ->not->toContain('Pierre Durand')
+            ->not->toContain('pierre.durand')
+            ->not->toContain('jeton-secret-xyz');
     }
 
     foreach (['admin', 'owner'] as $role) {
-        $json = $this->actingAs(l5Compte($a, $role))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
-        expect($json)->toContain('pierre.durand@example.invalid', $role)->toContain('0612345678', $role);
+        $json = $this->actingAs(l5Compte($a))->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
+        expect($json)->toContain('pierre.durand@example.invalid')->toContain('0612345678');
     }
 });

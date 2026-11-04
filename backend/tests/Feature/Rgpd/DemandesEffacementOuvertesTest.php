@@ -107,11 +107,11 @@ test('la pastille demandes_rgpd compte pending + processing et retombe Ã  0 aprÃ
     $owner = l5Compte($a, 'owner');
     ATraiterController::oublier($a->id);
 
-    expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter')->assertOk()->json('demandes_rgpd'))->toBe(2);
+    expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->json('demandes_rgpd'))->toBe(2);
 
     DB::table('rgpd_requests')->whereIn('status', ['pending', 'processing'])->update(['status' => 'done']);
     ATraiterController::oublier($a->id);
-    expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter')->assertOk()->json('demandes_rgpd'))->toBe(0);
+    expect($this->actingAs($owner)->getJson('/api/v1/crm/a-traiter/compteurs')->assertOk()->json('demandes_rgpd'))->toBe(0);
     expect($demande->id)->toBeInt();
 });
 

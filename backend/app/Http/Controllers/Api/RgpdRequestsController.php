@@ -6,6 +6,7 @@ use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Crm\Rgpd\SignalementDemandeEffacement;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
+use App\Support\MasquageCoordonnees;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
 use App\Services\Rgpd\GdprPortabilityService;
@@ -29,6 +30,15 @@ class RgpdRequestsController extends ApiController
      * fera rougir la garde au lieu de tomber dans un `default` muet.
      */
     public const TYPES = ['access', 'portability', 'erasure', 'rectification', 'opposition'];
+
+    /** Filtre `statut` de la liste (L5) : calculé, jamais stocké. */
+    public const STATUTS_FILTRE_VERS_BASE = [
+        'ouverte' => ['pending', 'processing'],
+        'traitee' => ['done', 'rejected', 'expired'],
+        'toutes' => null,
+    ];
+
+    private const STATUTS_FILTRE = ['ouverte', 'traitee', 'toutes'];
 
     public function __construct(
         private readonly GdprErasureService $erasure,
@@ -62,6 +72,19 @@ class RgpdRequestsController extends ApiController
         // demande de deviner un identifiant, la liste les donne tous.
         $espaceCourant = $this->espaceCourantOuNull();
 
+        // L5 : filtre CALCULÉ (aucune valeur stockée `ouverte`) — `ouverte` = en
+        // attente de la décision de Will (pending + processing).
+        $statut = $r->query('statut');
+        if ($statut !== null && ! in_array($statut, self::STATUTS_FILTRE, true)) {
+            return response()->json(['error' => 'statut_invalide', 'valeurs' => array_keys(self::STATUTS_FILTRE_VERS_BASE)], 422);
+        }
+        $type = $r->query('type');
+        if ($type !== null && ! in_array($type, self::TYPES, true)) {
+            return response()->json(['error' => 'type_invalide'], 422);
+        }
+        $statutsBase = self::STATUTS_FILTRE_VERS_BASE[$statut] ?? null;
+        $masquer = MasquageCoordonnees::requis();
+
         try {
             $rows = RgpdRequest::query()
                 ->when(
@@ -72,12 +95,24 @@ class RgpdRequestsController extends ApiController
                     fn ($q) => $q->whereRaw('1 = 0'),
                 )
                 ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
-                ->orderByDesc('requested_at')
+                ->when($statutsBase !== null, fn ($q) => $q->whereIn('status', $statutsBase))
+                ->when($type !== null, fn ($q) => $q->where('type', $type))
+                // Les demandes ouvertes : la plus ancienne d'abord (elle attend depuis le plus longtemps).
+                ->when($statut === 'ouverte', fn ($q) => $q->orderBy('requested_at'), fn ($q) => $q->orderByDesc('requested_at'))
                 ->paginate(25);
+
+            if ($masquer) {
+                $rows->getCollection()->transform(function ($ligne) {
+                    $ligne->subject_email = MasquageCoordonnees::email($ligne->subject_email);
+
+                    return $ligne;
+                });
+            }
 
             return $this->ok($rows);
         } catch (\Throwable $e) {
-            Log::error('rgpd.requests.index failed', ['exception' => $e->getMessage()]);
+            // Jamais `getMessage()` : un message SQL peut citer `subject_email` (PII dans les journaux).
+            Log::error('rgpd.requests.index failed', ['exception' => $e::class]);
             report($e);
 
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
@@ -272,7 +307,17 @@ class RgpdRequestsController extends ApiController
             ATraiterController::oublier((string) $req->workspace_id); // la pastille suit
         }
 
-        return $this->ok(['request' => $req->fresh(), 'result' => $result]);
+        $reponse = ['request' => $req->fresh(), 'result' => $result];
+        if ($req->type === 'erasure') {
+            // L5 : dit noir sur blanc que rien n'est supprimé.
+            $reponse['mise_a_l_ecart'] = [
+                'personnes' => (int) ($result['personnes'] ?? 0),
+                'abonnements' => (int) ($result['abonnements'] ?? 0),
+            ];
+            $reponse['supprime'] = 0;
+        }
+
+        return $this->ok($reponse);
     }
 
     /**

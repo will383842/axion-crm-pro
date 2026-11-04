@@ -8,6 +8,7 @@ use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * BRANCHE « PERSONNES » DE L'INGESTION — la lettre et le guide (lot L4-C).
@@ -109,6 +110,158 @@ final class PersonnesIngestService
     public static function drapeauOuvert(): bool
     {
         return filter_var(config('crm.ingest.personnes_enabled', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * FICHE DEMANDE (lot C1) : types d'événement dont une demande SANS SIREN
+     * fait une personne. Liste FERMÉE et explicite : jamais `opt_out`,
+     * `newsletter_optout` ni `review_posted` (une opposition ou un avis ne
+     * crée pas de fiche), jamais un futur `calendly_*` non listé ici.
+     *
+     * @var list<string>
+     */
+    public const DEMANDE_EVENT_TYPES = [
+        'form_submission',
+        'calendly_booked',
+        'calendly_completed',
+        'calendly_no_show',
+        'calendly_canceled',
+    ];
+
+    /** Mot qui, dans le nom du type d'événement Calendly, désigne un échange apporteur. */
+    private const MOT_CLE_ECHANGE_APPORTEUR = 'apporteur';
+
+    /** Fiche demande : drapeau fermé par défaut, indépendant de la lettre et du guide. */
+    public static function drapeauDemandesOuvert(): bool
+    {
+        return filter_var(config('crm.ingest.demandes_personne_enabled', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Cet événement, privé de SIREN, doit-il faire une personne ?
+     *
+     * AUCUNE requête avant d'avoir répondu : drapeau fermé, on rend `false`
+     * sans toucher à la base (retour arrière et fenêtre de déploiement).
+     *
+     * Jamais pour :
+     *  - un autre univers que `business` (candidats : pas de fiche ici) ;
+     *  - un formulaire de recrutement ;
+     *  - un échange apporteur (nom du type d'événement Calendly, même règle
+     *    que le site : le site ne l'envoie pas, le CRM le refuse aussi) ;
+     *  - un événement sans adresse (rien n'identifie la personne).
+     */
+    public function concerneUneDemande(SiteSyncEvent $event, string $universe): bool
+    {
+        return self::drapeauDemandesOuvert() && $this->estUneDemande($event, $universe);
+    }
+
+    /**
+     * Les mêmes règles que `concerneUneDemande`, SANS le drapeau : le
+     * rattrapage (`crm:personnes-depuis-demandes`) est un geste délibéré, il ne
+     * dépend pas de l'ouverture du flux en direct. Aucune requête.
+     */
+    public function estUneDemande(SiteSyncEvent $event, string $universe): bool
+    {
+        if ($universe !== 'business' || ! in_array($event->eventType, self::DEMANDE_EVENT_TYPES, true)) {
+            return false;
+        }
+        if ($event->eventType === 'form_submission' && $event->formType === 'recrutement') {
+            return false;
+        }
+        if (self::estEchangeApporteur($event)) {
+            return false;
+        }
+
+        return $event->email() !== null;
+    }
+
+    /** Vrai si le type d'événement Calendly est un échange avec un candidat apporteur. */
+    public static function estEchangeApporteur(SiteSyncEvent $event): bool
+    {
+        $nom = $event->payload['eventTypeName'] ?? null;
+        if (! is_string($nom) || $nom === '') {
+            return false;
+        }
+
+        return str_contains(Str::lower(Str::ascii($nom)), self::MOT_CLE_ECHANGE_APPORTEUR);
+    }
+
+    public const DEMANDE_A_CREER = 'a_creer';
+
+    public const DEMANDE_EXISTANTE = 'existante';
+
+    public const DEMANDE_ECARTEE = 'ecartee';
+
+    /**
+     * Ce que ferait `assurerDepuisDemande`, SANS RIEN ÉCRIRE : une personne à
+     * créer, une personne déjà là, ou une demande écartée (opposition
+     * générale reçue, ou personne mise à l'écart). Sert au rattrapage à blanc.
+     */
+    public function evaluerDemande(SiteSyncEvent $event, string $workspaceId): string
+    {
+        $hash = $event->emailHash();
+        if ($hash !== null && $this->opposee($hash, 'business')) {
+            return self::DEMANDE_ECARTEE;
+        }
+
+        $existante = $this->trouver($workspaceId, $event);
+        if ($existante === null) {
+            return self::DEMANDE_A_CREER;
+        }
+
+        return ($existante->opposition_at ?? null) !== null ? self::DEMANDE_ECARTEE : self::DEMANDE_EXISTANTE;
+    }
+
+    /**
+     * Une demande SANS SIREN fait (ou retrouve) une PERSONNE.
+     *
+     * Ne rend JAMAIS un sujet, exprès : l'appelant garde son retour
+     * `PENDING_MATCH` sans sujet. Un sujet non nul ferait écrire à
+     * `attachTags` un id de personne dans `company_tag`. La valeur rendue est
+     * l'ÉTAT (`DEMANDE_*`), que l'appelant en direct ignore.
+     *
+     * Ce que cette méthode ne fait JAMAIS : abonnement (donc jamais éligible à
+     * une diffusion), opposition, suppression, écrasement d'une valeur saisie
+     * à la main, nom fabriqué depuis l'adresse. Une personne mise à l'écart
+     * n'est pas touchée.
+     *
+     * @throws SiteSyncRejection 503 si les colonnes de la migration manquent :
+     *                           la ligne reste en attente côté site.
+     */
+    public function assurerDepuisDemande(SiteSyncEvent $event, string $workspaceId): string
+    {
+        if (! self::colonnesDemandePresentes()) {
+            throw SiteSyncRejection::unavailable(
+                'demandes_personne_non_ecrivables',
+                'Fiche demande : colonnes absentes (migration non passée). La ligne reste en attente côté site.',
+            );
+        }
+
+        $etat = $this->evaluerDemande($event, $workspaceId);
+        if ($etat === self::DEMANDE_ECARTEE) {
+            return $etat;
+        }
+
+        $this->upsertPersonne($event, $workspaceId, $this->trouver($workspaceId, $event), true, null, [
+            'phone' => $this->borne($event->str('person', 'phone'), 40),
+            'entreprise_declaree' => $this->borne($event->str('company', 'name'), 200),
+        ]);
+
+        return $etat;
+    }
+
+    /** Seul un résultat POSITIF est gardé : un worker démarré avant `migrate` ne reste pas aveugle. */
+    public static function colonnesDemandePresentes(): bool
+    {
+        static $presentes = false;
+
+        return $presentes = $presentes
+            || (Schema::hasColumn('personnes', 'phone') && Schema::hasColumn('personnes', 'entreprise_declaree'));
+    }
+
+    private function borne(?string $valeur, int $max): ?string
+    {
+        return $valeur === null ? null : mb_substr($valeur, 0, $max);
     }
 
     public function prendEnCharge(SiteSyncEvent $event): bool
@@ -578,6 +731,8 @@ final class PersonnesIngestService
     }
 
     /**
+     * @param  array<string, ?string>  $demande  fiche demande : `phone` et `entreprise_declaree`
+     *                                           déclarés ([] hors fiche demande : colonnes jamais touchées)
      * @return array{0: \stdClass, 1: bool} [la personne relue, créée ?]
      */
     private function upsertPersonne(
@@ -586,6 +741,7 @@ final class PersonnesIngestService
         ?\stdClass $existante,
         bool $avecIdentite = true,
         ?string $baseInscription = null,
+        array $demande = [],
     ): array {
         // Sans identité (désabonnement) : ni adresse ni nom ne sont écrits.
         $email = $avecIdentite ? $event->email() : null;
@@ -609,11 +765,11 @@ final class PersonnesIngestService
 
         if ($existante === null) {
             $declares = array_keys(array_filter(
-                ['email' => $email, 'first_name' => $firstName, 'last_name' => $lastName],
+                ['email' => $email, 'first_name' => $firstName, 'last_name' => $lastName] + $demande,
                 static fn (?string $v): bool => $v !== null,
             ));
 
-            $id = (int) DB::table('personnes')->insertGetId([
+            $id = (int) DB::table('personnes')->insertGetId($demande + [
                 'workspace_id' => $workspaceId,
                 'person_key' => $event->personKey(),
                 'email' => $email,
@@ -683,6 +839,19 @@ final class PersonnesIngestService
         // Le DÉCLARÉ gagne ; l'absence d'un nom n'efface jamais un nom connu.
         foreach (['first_name' => $firstName, 'last_name' => $lastName] as $colonne => $valeur) {
             if ($valeur !== null) {
+                $update[$colonne] = $valeur;
+                $origins[$colonne] = 'declared';
+            }
+        }
+
+        // Fiche demande : une valeur saisie À LA MAIN (ou par un autre chemin
+        // que la déclaration) n'est jamais écrasée ; seule une valeur absente
+        // ou elle-même déclarée est remplacée.
+        foreach ($demande as $colonne => $valeur) {
+            if ($valeur === null) {
+                continue;
+            }
+            if (($existante->{$colonne} ?? null) === null || ($origins[$colonne] ?? null) === 'declared') {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';
             }
@@ -861,8 +1030,12 @@ final class PersonnesIngestService
      */
     private function source(SiteSyncEvent $event): string
     {
-        return $event->sourceSlug ?? match ($event->eventType) {
-            'lead_magnet_requested' => 'guide-ia',
+        // Jamais `newsletter` par défaut pour une demande : une personne née
+        // d'un formulaire ou d'un rendez-vous n'a rien demandé à la lettre.
+        return $event->sourceSlug ?? match (true) {
+            $event->eventType === 'lead_magnet_requested' => 'guide-ia',
+            $event->eventType === 'form_submission' => 'formulaire',
+            str_starts_with($event->eventType, 'calendly_') => 'rendez-vous',
             default => 'newsletter',
         };
     }

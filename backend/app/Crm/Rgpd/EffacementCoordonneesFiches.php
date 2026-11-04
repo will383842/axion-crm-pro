@@ -2,6 +2,7 @@
 
 namespace App\Crm\Rgpd;
 
+use App\Crm\Ingest\PersonnesIngestService;
 use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -85,10 +86,52 @@ final class EffacementCoordonneesFiches
             return [];
         }
 
-        return array_values(array_unique(array_filter(
+        // Fiche demande : le téléphone déclaré dans une demande vit sur la
+        // PERSONNE (`personnes.phone`), pas sur un contact. Il compte comme
+        // celui d'un contact pour la mise à l'écart et l'anti-réinsertion.
+        $telephones = array_merge(
             array_map('strval', $requete->whereNotNull('phone')->pluck('phone')->all()),
+            self::telephonesDesPersonnes($email, $personKey, $workspaceId),
+        );
+
+        return array_values(array_unique(array_filter(
+            $telephones,
             static fn (string $t): bool => trim($t) !== '',
         )));
+    }
+
+    /**
+     * Les téléphones déclarés par les PERSONNES de cette adresse (en clair, ou
+     * par son empreinte quand la personne n'a pas gardé l'adresse) ou de cette
+     * clé de personne. Vide tant que la migration n'est pas passée.
+     *
+     * @return list<string>
+     */
+    private static function telephonesDesPersonnes(string $email, ?string $personKey, ?string $workspaceId): array
+    {
+        if (! PersonnesIngestService::colonnesDemandePresentes()) {
+            return [];
+        }
+
+        $email = mb_strtolower(trim($email));
+        $personKey = $personKey !== null && trim($personKey) !== '' ? $personKey : null;
+        if ($email === '' && $personKey === null) {
+            return [];
+        }
+
+        $requete = DB::table('personnes')->whereNotNull('phone')->where(function (Builder $q) use ($email, $personKey): void {
+            if ($email !== '') {
+                $q->orWhere('email', $email)->orWhere('email_hash', hash('sha256', $email));
+            }
+            if ($personKey !== null) {
+                $q->orWhere('person_key', $personKey);
+            }
+        });
+        if ($workspaceId !== null) {
+            $requete->where('workspace_id', $workspaceId);
+        }
+
+        return array_values(array_map('strval', $requete->pluck('phone')->all()));
     }
 
     /**

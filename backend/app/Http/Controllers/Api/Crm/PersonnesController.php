@@ -6,6 +6,7 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\ContenusAccords;
 use App\Crm\Ingest\OrigineDictionnaire;
+use App\Crm\Ingest\PersonnesIngestService;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
@@ -534,6 +535,12 @@ class PersonnesController extends ConsoleController
                     ->addSelect('companies.legal_form');
                 if (! $tous) {
                     $requete = Abonnements::limiterAuxProspectables($requete);
+                    // Fiche demande : une personne née d'une DEMANDE (base
+                    // précontractuelle) n'a rien demandé à la lettre. Tant
+                    // qu'elle n'y est pas abonnée, elle ne sort jamais dans
+                    // le fichier « prospectable » : sa demande appelle une
+                    // réponse, pas une diffusion.
+                    $requete->whereRaw("NOT (personnes.legal_basis = 'precontractual' AND COALESCE(abonnements.statut, '') <> 'abonne')");
                     // Même règle qu'`EligibiliteAdresse::estEntrepriseIndividuelle`
                     // (forme juridique, espaces retirés, commençant par 1), posée
                     // sur la jointure déjà restreinte aux personnes de l'espace :
@@ -716,6 +723,13 @@ class PersonnesController extends ConsoleController
                 'companies.siren',
             ]);
 
+        // Fiche demande : téléphone et entreprise DÉCLARÉS dans la demande.
+        // Colonnes lues seulement si la migration est passée (le téléphone est
+        // masqué comme tout `phone` par `MasquageCoordonnees`).
+        if (PersonnesIngestService::colonnesDemandePresentes()) {
+            $requete->addSelect(['personnes.phone', 'personnes.entreprise_declaree']);
+        }
+
         // Contrat v3 : l'historique des origines, en LECTURE SEULE.
         if ($this->origineV3Active()) {
             $requete->addSelect('personnes.origines');
@@ -803,6 +817,8 @@ class PersonnesController extends ConsoleController
             'contact_id' => $p->contact_id === null ? null : (int) $p->contact_id,
             'company_id' => $p->company_id === null ? null : (int) $p->company_id,
             'entreprise' => ($p->denomination ?? null) ?? ($p->siren ?? null),
+            'phone' => $p->phone ?? null,
+            'entreprise_declaree' => $p->entreprise_declaree ?? null,
             // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée pour
             // les lecteurs existants, valeur toujours `null`.
             'purge_prevue_le' => null,

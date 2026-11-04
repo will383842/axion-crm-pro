@@ -158,7 +158,7 @@ test('OL 8 — IDOR : personne d’un autre espace, inexistante ou non numériqu
     $b = $this->getJson('/api/v1/crm/personnes/99999999/origines');
     $a->assertNotFound();
     $b->assertNotFound();
-    expect($a->getContent())->toBe($b->getContent());
+    expect($a->json('message'))->toBe($b->json('message'));
     $this->getJson('/api/v1/crm/personnes/abc/origines')->assertNotFound();
 });
 

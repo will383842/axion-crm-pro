@@ -16,7 +16,9 @@ final class OriginesJeu
 {
     public static function espace(string $slug): Workspace
     {
-        return Workspace::create(['id' => (string) Str::uuid(), 'slug' => $slug, 'name' => $slug, 'settings' => []]);
+        // Certains espaces (ex. `vivier-candidats`) sont déjà posés par les migrations : on les réutilise.
+        return Workspace::query()->where('slug', $slug)->first()
+            ?? Workspace::create(['id' => (string) Str::uuid(), 'slug' => $slug, 'name' => $slug, 'settings' => []]);
     }
 
     public static function ouvrir(string $espaceId, bool $ouverte = true): void

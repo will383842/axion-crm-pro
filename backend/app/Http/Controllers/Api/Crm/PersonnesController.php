@@ -394,6 +394,8 @@ class PersonnesController extends ConsoleController
                     ->where('personne_id', $id)
                     ->where('canal', 'lettre')
                     ->value('statut');
+                // Sans la base légale, exprès : rattacher une demande à son
+                // entreprise est un geste humain qui répond à la demande.
                 if (! Abonnements::prospectionAutorisee(
                     is_string($personne->email_nature ?? null) ? $personne->email_nature : null,
                     is_string($statutLettre) ? $statutLettre : null,
@@ -535,12 +537,6 @@ class PersonnesController extends ConsoleController
                     ->addSelect('companies.legal_form');
                 if (! $tous) {
                     $requete = Abonnements::limiterAuxProspectables($requete);
-                    // Fiche demande : une personne née d'une DEMANDE (base
-                    // précontractuelle) n'a rien demandé à la lettre. Tant
-                    // qu'elle n'y est pas abonnée, elle ne sort jamais dans
-                    // le fichier « prospectable » : sa demande appelle une
-                    // réponse, pas une diffusion.
-                    $requete->whereRaw("NOT (personnes.legal_basis = 'precontractual' AND COALESCE(abonnements.statut, '') <> 'abonne')");
                     // Même règle qu'`EligibiliteAdresse::estEntrepriseIndividuelle`
                     // (forme juridique, espaces retirés, commençant par 1), posée
                     // sur la jointure déjà restreinte aux personnes de l'espace :
@@ -592,6 +588,7 @@ class PersonnesController extends ConsoleController
                         ! $ei && Abonnements::prospectionAutorisee(
                             is_string($p->email_nature) ? $p->email_nature : null,
                             is_string($p->statut_lettre) ? $p->statut_lettre : null,
+                            is_string($p->legal_basis ?? null) ? $p->legal_basis : null,
                         ) ? 'oui' : 'non',
                         $p->contact_id === null ? 'non' : 'oui',
                         $p->siren,
@@ -811,6 +808,7 @@ class PersonnesController extends ConsoleController
             'prospection_autorisee' => Abonnements::prospectionAutorisee(
                 is_string($p->email_nature ?? null) ? $p->email_nature : null,
                 is_string($p->statut_lettre ?? null) ? $p->statut_lettre : null,
+                is_string($p->legal_basis ?? null) ? $p->legal_basis : null,
             ),
             'placement' => $p->placement ?? null,
             'rattachee' => $p->contact_id !== null,

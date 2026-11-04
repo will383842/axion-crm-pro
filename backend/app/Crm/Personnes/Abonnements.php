@@ -52,13 +52,25 @@ final class Abonnements
      *   - adresse `perso` → seulement si elle est ABONNÉE à la lettre (elle a
      *     coché la case : consentement) ;
      *   - adresse `inconnue` (aucune adresse connue, p. ex. une fiche née d'un
-     *     désabonnement) → non.
+     *     désabonnement) → non ;
+     *   - base légale `precontractual` (personne née d'une DEMANDE du site) sans
+     *     abonnement → non, quelle que soit l'adresse : elle a demandé une
+     *     réponse, pas une prospection. Le paramètre est facultatif : le
+     *     rattachement humain d'une demande à une entreprise ne le passe pas.
      *
      * Les oppositions et adresses mortes se retirent en plus, par
      * `exclureOpposees()`. Jumelle SQL : `limiterAuxProspectables()`.
      */
-    public static function prospectionAutorisee(?string $nature, ?string $statutLettre): bool
+    public static function prospectionAutorisee(?string $nature, ?string $statutLettre, ?string $baseLegale = null): bool
     {
+        // Une personne née d'une DEMANDE (base précontractuelle) a demandé qu'on
+        // lui réponde, pas qu'on la prospecte : sans abonnement, jamais. Les
+        // appelants qui ne connaissent pas la base (rattachement humain d'une
+        // demande à une entreprise) ne la passent pas.
+        if ($baseLegale === 'precontractual' && $statutLettre !== 'abonne') {
+            return false;
+        }
+
         return $nature === 'pro' || ($nature === 'perso' && $statutLettre === 'abonne');
     }
 
@@ -68,6 +80,9 @@ final class Abonnements
      */
     public static function limiterAuxProspectables(Builder $requete): Builder
     {
+        // Même règle « précontractuelle sans abonnement » que la version PHP.
+        $requete->whereRaw("NOT (personnes.legal_basis = 'precontractual' AND COALESCE(abonnements.statut, '') <> 'abonne')");
+
         return $requete->where(function (Builder $q): void {
             $q->where('personnes.email_nature', 'pro')
                 ->orWhere(function (Builder $perso): void {

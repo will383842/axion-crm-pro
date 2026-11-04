@@ -128,6 +128,15 @@ final class PersonnesIngestService
         'calendly_canceled',
     ];
 
+    /**
+     * Types de formulaire qui ne font JAMAIS une personne par ce chemin (même
+     * liste que la fiche console du site) : ce ne sont pas des demandes
+     * commerciales. Le recrutement est déjà écarté par l'univers vivier.
+     *
+     * @var list<string>
+     */
+    public const FORMULAIRES_EXCLUS = ['partenariat', 'presse', 'speaker', 'investisseur', 'support_client', 'recrutement'];
+
     /** Mot qui, dans le nom du type d'événement Calendly, désigne un échange apporteur. */
     private const MOT_CLE_ECHANGE_APPORTEUR = 'apporteur';
 
@@ -165,7 +174,7 @@ final class PersonnesIngestService
         if ($universe !== 'business' || ! in_array($event->eventType, self::DEMANDE_EVENT_TYPES, true)) {
             return false;
         }
-        if ($event->eventType === 'form_submission' && $event->formType === 'recrutement') {
+        if ($event->eventType === 'form_submission' && in_array($event->formType, self::FORMULAIRES_EXCLUS, true)) {
             return false;
         }
         if (self::estEchangeApporteur($event)) {
@@ -242,12 +251,36 @@ final class PersonnesIngestService
             return $etat;
         }
 
+        // Un numéro déjà opposé (anti-réinsertion, variantes comprises) n'est
+        // jamais enregistré ; la personne, elle, reste.
+        $telephone = $this->borne($event->str('person', 'phone'), 40);
+        if ($telephone !== null && $this->telephoneOppose($telephone)) {
+            $telephone = null;
+        }
+
         $this->upsertPersonne($event, $workspaceId, $this->trouver($workspaceId, $event), true, null, [
-            'phone' => $this->borne($event->str('person', 'phone'), 40),
+            'phone' => $telephone,
             'entreprise_declaree' => $this->borne($event->str('company', 'name'), 200),
         ]);
 
         return $etat;
+    }
+
+    /** Opposition (univers business) sur ce numéro, quelle que soit son écriture. */
+    private function telephoneOppose(string $telephone): bool
+    {
+        $variantes = ListeSuppression::variantesTelephone($telephone);
+        if ($variantes === []) {
+            return false;
+        }
+
+        return DB::table('opt_out')
+            ->where('scope', 'business')
+            ->whereRaw(
+                "regexp_replace(phone, '[^0-9]', '', 'g') IN (" . implode(', ', array_fill(0, count($variantes), '?')) . ')',
+                $variantes,
+            )
+            ->exists();
     }
 
     /** Seul un résultat POSITIF est gardé : un worker démarré avant `migrate` ne reste pas aveugle. */
@@ -838,6 +871,12 @@ final class PersonnesIngestService
 
         // Le DÉCLARÉ gagne ; l'absence d'un nom n'efface jamais un nom connu.
         foreach (['first_name' => $firstName, 'last_name' => $lastName] as $colonne => $valeur) {
+            // Chemin des demandes (formulaire public, rejoué par le rattrapage de
+            // la plus ancienne à la plus récente) : un nom déjà connu n'est
+            // JAMAIS remplacé par celui d'un formulaire.
+            if ($demande !== [] && ($existante->{$colonne} ?? null) !== null) {
+                continue;
+            }
             if ($valeur !== null) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';

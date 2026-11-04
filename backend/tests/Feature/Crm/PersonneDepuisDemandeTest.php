@@ -9,7 +9,6 @@ use App\Crm\Ingest\SiteSyncIngestService;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Crm\Rgpd\SiteGdprService;
-use App\Crm\Taxonomy;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Audit\AuditHashChain;
@@ -264,26 +263,63 @@ test('jamais pour un échange apporteur, un recrutement ni un autre univers', fu
         ->and(DB::table('personnes')->count())->toBe(0);
 });
 
-test('un candidat (univers vivier) n’entre jamais dans personnes par ce chemin', function () {
+test('un candidat (univers vivier) est bien parcouru par l’ingestion et n’entre jamais dans personnes', function () {
     config(['crm.ingest.candidates_enabled' => true]);
-    DB::table('workspaces')->insertOrIgnore([
-        'id' => (string) Str::uuid(),
-        'slug' => Taxonomy::VIVIER_WORKSPACE_SLUG,
-        'name' => 'Vivier',
-        'settings' => '{}',
-        'cost_cap_eur' => 0,
-        'is_active' => true,
+
+    $sortie = pddIngerer(pddEvent([
+        'form_type' => 'recrutement',
+        'consent' => ['version' => 'careers-v2-2026-08-13', 'vivier_at' => '2026-11-04T09:29:00+01:00'],
+    ], 'zz.candidat@example.invalid'));
+
+    // Le chemin vivier a réellement tourné : une fiche candidat existe.
+    expect($sortie->subjectType)->toBe('candidate')
+        ->and(DB::table('candidates')->count())->toBe(1)
+        ->and(DB::table('personnes')->count())->toBe(0);
+});
+
+test('partenariat, presse, speaker, investisseur, support_client : jamais une personne', function (string $type) {
+    $sortie = pddIngerer(pddEvent(['form_type' => $type], 'zz.' . $type . '@example.invalid'));
+
+    expect($sortie->status)->toBe('pending_match')
+        ->and(DB::table('personnes')->count())->toBe(0);
+})->with(['partenariat', 'presse', 'speaker', 'investisseur', 'support_client']);
+
+test('un numéro déjà opposé n’est pas enregistré, la personne reste', function () {
+    DB::table('opt_out')->insert([
+        'email' => null,
+        'email_hash' => null,
+        'phone' => '0600000001',
+        'scope' => 'business',
+        'source' => 'test',
         'created_at' => now(),
-        'updated_at' => now(),
     ]);
 
-    try {
-        pddIngerer(pddEvent(['form_type' => 'recrutement'], 'zz.candidat@example.invalid'));
-    } catch (Throwable) {
-        // Refusé faute de consentement v2 : c'est précisément la garde candidats.
-    }
+    // Même numéro, écriture internationale : les variantes comptent.
+    pddIngerer(pddEvent());
 
-    expect(DB::table('personnes')->count())->toBe(0);
+    $personne = pddPersonne();
+    expect($personne)->not->toBeNull()
+        ->and($personne->phone)->toBeNull()
+        ->and($personne->entreprise_declaree)->toBe('ZZ SOCIETE DECLAREE');
+});
+
+test('un nom déjà connu n’est jamais remplacé par celui d’un formulaire', function () {
+    pddIngerer(pddEvent());
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-06T10:00:00+01:00',
+        'person' => ['first_name' => 'Intrus', 'last_name' => 'ZZ AUTRE NOM'],
+    ]));
+
+    $personne = pddPersonne();
+    expect($personne->first_name)->toBe('Jeanne')->and($personne->last_name)->toBe('ZZ DEMANDE');
+
+    // Un nom absent, lui, est rempli.
+    DB::table('personnes')->update(['first_name' => null]);
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-07T10:00:00+01:00',
+        'person' => ['first_name' => 'Marie'],
+    ]));
+    expect(pddPersonne()->first_name)->toBe('Marie')->and(pddPersonne()->last_name)->toBe('ZZ DEMANDE');
 });
 
 test('valeur saisie à la main jamais écrasée ; valeur absente ou déclarée remplacée', function () {
@@ -504,4 +540,111 @@ test('rattrapage : une opposition ou une demande écartée par l’opérateur ne
     Artisan::call(CrmPersonnesDepuisDemandes::SIGNATURE, ['--appliquer' => true]);
 
     expect(DB::table('personnes')->count())->toBe(0);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Corrections de l'audit : B1 (solde), B2 (noms, rattrapage), N1 (règle unique)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Événement en attente inséré à la main, de la même personne. */
+function pddEnAttente(string $workspaceId, string $kind, string $email = PDD_EMAIL): int
+{
+    return (int) DB::table('activities')->insertGetId([
+        'workspace_id' => $workspaceId,
+        'type' => $kind,
+        'kind' => $kind,
+        'occurred_at' => now(),
+        'person_key' => hash('sha256', 'pdd|' . $email),
+        'external_ref' => 'site:event:' . Str::uuid(),
+        'title' => $kind,
+        'payload' => json_encode(['pending_match' => ['email' => $email, 'last_name' => 'ZZ DEMANDE']]),
+        'created_at' => now(),
+    ]);
+}
+
+test('B1 : un newsletter_optin et un opt_out de la même personne ne sont jamais soldés', function () {
+    $formulaire = pddIngerer(pddEvent())->activityId;
+    $lettre = pddEnAttente((string) $this->workspace->id, 'newsletter_optin');
+    $opposition = pddEnAttente((string) $this->workspace->id, 'opt_out');
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$formulaire}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('soldes', []);
+
+    $apres = fn (int $id) => DB::table('activities')->where('id', $id)->value('subject_id');
+    expect($apres($lettre))->toBeNull()->and($apres($opposition))->toBeNull();
+});
+
+test('B1 : drapeau fermé, rattacher ne solde aucun autre événement', function () {
+    $formulaire = pddIngerer(pddEvent())->activityId;
+    $rendezVous = pddIngerer(pddEvent(['event_type' => 'calendly_booked', 'form_type' => null]))->activityId;
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$formulaire}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('soldes', []);
+
+    expect(DB::table('activities')->where('id', $rendezVous)->value('subject_id'))->toBeNull();
+});
+
+test('B2 : le rattrapage ne remplace jamais un nom déjà connu, même rejoué dans le désordre', function () {
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    // Demande ancienne (nom A) puis récente (nom B), toutes deux sans personne.
+    pddIngerer(pddEvent(['occurred_at' => '2026-10-01T10:00:00+01:00', 'person' => ['first_name' => 'Ancien', 'last_name' => 'ZZ NOM A']]));
+    pddIngerer(pddEvent(['occurred_at' => '2026-10-20T10:00:00+01:00', 'person' => ['first_name' => 'Recent', 'last_name' => 'ZZ NOM B']]));
+    expect(DB::table('personnes')->count())->toBe(0);
+
+    // La personne existe déjà, avec un nom connu (saisi à la main, par exemple).
+    $this->artisan(CrmPersonnesDepuisDemandes::SIGNATURE, ['--appliquer' => true])->assertExitCode(0);
+    $nomApresPremier = pddPersonne()->last_name;
+    DB::table('personnes')->update(['first_name' => 'Connu', 'last_name' => 'ZZ NOM CONNU']);
+
+    // Rejeu (ordre chronologique du rattrapage) : le nom connu reste.
+    $this->artisan(CrmPersonnesDepuisDemandes::SIGNATURE, ['--appliquer' => true])->assertExitCode(0);
+
+    expect($nomApresPremier)->toBe('ZZ NOM A')
+        ->and(pddPersonne()->first_name)->toBe('Connu')
+        ->and(pddPersonne()->last_name)->toBe('ZZ NOM CONNU');
+});
+
+test('rattrapage : le type de formulaire est relu dans le titre, les types exclus ne créent rien, nature et langue recopiées', function () {
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    pddIngerer(pddEvent(['form_type' => 'presse'], 'zz.presse@example.invalid'));
+    pddIngerer(pddEvent([
+        'payload' => ['email_nature' => 'perso', 'locale' => 'en'],
+    ]));
+
+    $this->artisan(CrmPersonnesDepuisDemandes::SIGNATURE, ['--appliquer' => true])->assertExitCode(0);
+
+    expect(DB::table('personnes')->where('email', 'zz.presse@example.invalid')->count())->toBe(0)
+        ->and(DB::table('personnes')->count())->toBe(1)
+        ->and(pddPersonne()->email_nature)->toBe('perso')
+        ->and(pddPersonne()->locale)->toBe('en');
+});
+
+test('N1 : une seule règle de prospection, précontractuelle sans abonnement jamais prospectable', function () {
+    expect(Abonnements::prospectionAutorisee('pro', null))->toBeTrue()
+        ->and(Abonnements::prospectionAutorisee('pro', null, 'consent'))->toBeTrue()
+        ->and(Abonnements::prospectionAutorisee('pro', null, 'precontractual'))->toBeFalse()
+        ->and(Abonnements::prospectionAutorisee('pro', 'desabonne', 'precontractual'))->toBeFalse()
+        ->and(Abonnements::prospectionAutorisee('pro', 'abonne', 'precontractual'))->toBeTrue()
+        ->and(Abonnements::prospectionAutorisee('perso', 'abonne', 'precontractual'))->toBeTrue()
+        ->and(Abonnements::prospectionAutorisee('perso', null, 'consent'))->toBeFalse();
+});
+
+test('N1 : la liste de la console dit « prospection non autorisée » pour une demande, et le rattachement humain reste possible', function () {
+    pddIngerer(pddEvent());
+    $id = (int) pddPersonne()->id;
+
+    $liste = $this->getJson('/api/v1/crm/personnes')->assertOk()->json('data');
+    $ligne = collect($liste)->firstWhere('id', $id);
+    expect($ligne['prospection_autorisee'])->toBeFalse()
+        ->and($ligne['phone'])->toBe('+33600000001')
+        ->and($ligne['entreprise_declaree'])->toBe('ZZ SOCIETE DECLAREE');
+
+    // Rattacher la demande à son entreprise est un geste humain : permis.
+    $this->postJson("/api/v1/crm/personnes/{$id}/rattacher", ['company_id' => pddEntreprise((string) $this->workspace->id)])
+        ->assertOk();
 });

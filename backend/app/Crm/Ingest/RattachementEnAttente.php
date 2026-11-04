@@ -141,7 +141,9 @@ final class RattachementEnAttente
             $payload,
         );
 
-        $soldes = $personKey === null || ($activity->kind ?? null) === DossierClient::EVENT_TYPE
+        // Drapeau fermé : comportement d'avant, un seul événement rattaché.
+        $soldes = $personKey === null || ! PersonnesIngestService::drapeauDemandesOuvert()
+            || ($activity->kind ?? null) === DossierClient::EVENT_TYPE
             ? []
             : $this->solderLesAutres($workspaceId, $activityId, $personKey, $companyId, $contactId, $parUtilisateur);
 
@@ -170,7 +172,9 @@ final class RattachementEnAttente
         $autres = FilesATraiter::aRattacher($workspaceId)
             ->where('person_key', $personKey)
             ->where('id', '!=', $principal)
-            ->where('kind', '!=', DossierClient::EVENT_TYPE)
+            // Seulement des DEMANDES : jamais une inscription à la lettre, une
+            // opposition ni un dossier client, que d'autres gestes traitent.
+            ->whereIn('kind', PersonnesIngestService::DEMANDE_EVENT_TYPES)
             ->orderBy('id')
             ->lockForUpdate()
             ->get();

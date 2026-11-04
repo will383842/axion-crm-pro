@@ -193,19 +193,30 @@ class CrmPersonnesDepuisDemandes extends Command
                 'phone' => $texte('phone'),
             ], static fn (?string $v): bool => $v !== null),
             'company' => array_filter(['name' => $texte('denomination')], static fn (?string $v): bool => $v !== null),
-            'payload' => array_filter(
-                ['eventTypeName' => is_string($payload['eventTypeName'] ?? null) ? $payload['eventTypeName'] : null],
-                static fn (?string $v): bool => $v !== null,
-            ),
+            // Recopiés tels que le site les a émis (jamais recalculés) : la nature
+            // de l'adresse décidée côté serveur, la langue, le nom du type de
+            // rendez-vous.
+            'payload' => array_filter([
+                'eventTypeName' => is_string($payload['eventTypeName'] ?? null) ? $payload['eventTypeName'] : null,
+                'email_nature' => is_string($payload['email_nature'] ?? null) ? $payload['email_nature'] : null,
+                'locale' => is_string($payload['locale'] ?? null) ? $payload['locale'] : null,
+            ], static fn (?string $v): bool => $v !== null),
         ];
         if ($slug !== null) {
             $brut['source_slug'] = $slug;
         }
-        // Le type de formulaire n'est pas conservé dans l'activité : `autre`
-        // suffit, la fiche demande ne s'en sert pas (le recrutement n'a jamais
-        // de `pending_match`, il passe par l'univers vivier).
+        // Le type de formulaire vit dans le TITRE de l'activité (« Formulaire —
+        // <type> », `SiteSyncIngestService::activityTitle`). On le relit pour
+        // appliquer la MÊME règle que le flux direct (partenariat, presse,
+        // speaker, investisseur, support client exclus). Titre illisible ou type
+        // inconnu : l'activité est comptée « illisible », jamais devinée.
         if ($brut['event_type'] === 'form_submission') {
-            $brut['form_type'] = 'autre';
+            $titre = is_string($ligne->title ?? null) ? $ligne->title : '';
+            if (preg_match('/^Formulaire\s+\x{2014}\s+([a-z_]+)$/u', trim($titre), $m) !== 1
+                || ! in_array($m[1], SiteSyncEvent::FORM_TYPES, true)) {
+                return null;
+            }
+            $brut['form_type'] = $m[1];
         }
 
         try {

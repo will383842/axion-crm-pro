@@ -7,6 +7,7 @@
 
 use App\Models\Workspace;
 use App\Socle\Alertes\Alerte;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -125,7 +126,7 @@ test('un espace dont origines.lecture est fermé est exclu des agrégats', funct
 });
 
 test('la tâche est planifiée une seule fois, sans chevauchement, et ne supprime rien', function () {
-    $evenements = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+    $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'crm:usine:pousser-agregats'));
 
     expect($evenements)->toHaveCount(1)

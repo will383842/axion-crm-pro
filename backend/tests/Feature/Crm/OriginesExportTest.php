@@ -54,8 +54,25 @@ test('OE 3 — avec les deux : CSV, opposées et entrées masquées exclues, aud
         ->and($csv)->not->toContain('post_ref_exp003')
         ->and($csv)->not->toContain('commentaire_ref');
 
-    $audit = DB::table('audit_logs')->orderByDesc('id')->limit(5)->get()->map(fn ($l) => json_encode($l))->implode('|');
-    expect($audit)->not->toContain('oe.ok@example.invalid');
+    // UNE seule ligne d'audit pour cet export, avec le compte de lignes et les filtres, SANS donnée personnelle.
+    $lignes = DB::table('audit_logs')->where('path', 'like', '%origines/export%')->get();
+    expect($lignes)->toHaveCount(1);
+    $brut = json_encode($lignes[0]);
+    expect($lignes[0]->path)->toContain('lignes=1')
+        ->and($brut)->not->toContain('oe.ok@example.invalid')
+        ->and($brut)->not->toContain('post_ref_exp001')
+        ->and($brut)->not->toContain('Zoé');
+    $tout = DB::table('audit_logs')->get()->map(fn ($l) => json_encode($l))->implode('|');
+    expect($tout)->not->toContain('oe.ok@example.invalid');
+});
+
+test('OE 3 bis — l’audit porte les filtres validés et le compte, jamais d’adresse', function () {
+    $this->actingAs(OriginesJeu::utilisateur($this->axion->id, 'owner', 'oe.owner3@example.invalid'));
+    $this->get('/api/v1/crm/origines/export?reseau=instagram&du=2026-10-01')->assertOk()->streamedContent();
+
+    $ligne = DB::table('audit_logs')->where('path', 'like', '%origines/export%')->first();
+    expect($ligne)->not->toBeNull()
+        ->and($ligne->path)->toContain('reseau=instagram')->toContain('du=2026-10-01')->toContain('lignes=');
 });
 
 test('OE 4 — plafond : l’export tronqué le dit', function () {

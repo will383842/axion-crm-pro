@@ -162,7 +162,8 @@ class OriginesController extends ConsoleController
             $parPage = (int) ($v['par_page'] ?? 50);
             $decalage = (int) ($v['curseur'] ?? 0);
             $r = RequetesOrigines::historique($espace, $personneId, $decalage, $parPage);
-            $suivant = $decalage + $parPage < $r['total'] ? $decalage + $parPage : null;
+            $prochain = $decalage + $parPage;
+            $suivant = $prochain < $r['total'] ? $prochain : null;
 
             return $this->ok(['actif' => true, 'data' => $r['data'], 'meta' => ['total' => $r['total'], 'par_page' => $parPage, 'suivant' => $suivant]]);
         });
@@ -204,10 +205,11 @@ class OriginesController extends ConsoleController
                 $requete->whereRaw($cond, $bindings);
 
                 $plafond = PlafondExport::lignes();
-                $lues = 0;
-                $tronque = false;
+                $etat = new \stdClass;
+                $etat->lues = 0;
+                $etat->tronque = false;
                 $masquer = MasquageCoordonnees::requis();
-                $requete->chunkById(200, function ($lot) use ($espace, $f, $out, &$lues, &$tronque, $plafond, $masquer): bool {
+                $requete->chunkById(200, function ($lot) use ($espace, $f, $out, $etat, $plafond, $masquer): bool {
                     $ids = [];
                     foreach ($lot as $p) {
                         $ids[] = (int) $p->id;
@@ -215,9 +217,9 @@ class OriginesController extends ConsoleController
                     $entrees = RequetesOrigines::entreesDesPersonnes($espace, $ids, $f);
                     foreach ($lot as $p) {
                         foreach ($entrees[(int) $p->id] ?? [] as $o) {
-                            $lues++;
-                            if ($lues > $plafond) {
-                                $tronque = true;
+                            $etat->lues = $etat->lues + 1;
+                            if ($etat->lues > $plafond) {
+                                $etat->tronque = true;
 
                                 return false;
                             }
@@ -231,7 +233,7 @@ class OriginesController extends ConsoleController
 
                     return true;
                 }, 'personnes.id', 'id');
-                if ($tronque) {
+                if ($etat->tronque) {
                     PlafondExport::ecrireAvertissement($out, count($entete));
                 }
                 fclose($out);
@@ -279,7 +281,7 @@ class OriginesController extends ConsoleController
         }
         $du = $v['du'] ?? null;
         $au = $v['au'] ?? null;
-        if ($du !== null && $au !== null && strtotime($au) - strtotime($du) > 366 * 86400) {
+        if ($du !== null && $au !== null && (new \DateTimeImmutable($du))->diff(new \DateTimeImmutable($au))->days > 366) {
             throw ValidationException::withMessages(['du' => 'Période trop longue (366 jours au plus).']);
         }
 

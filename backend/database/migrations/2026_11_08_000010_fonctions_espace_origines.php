@@ -30,9 +30,13 @@ return new class extends Migration
         );
     }
 
-    /** Retour arrière INERTE : on ne retire aucune ligne de réglage. */
+    /**
+     * Retour arrière INERTE mais réel (NR-17 : aller, retour, aller sans erreur) :
+     * la ligne de réglage reste (fermer la fonction se fait par `ouverte = false`),
+     * on ne fait que le consigner. Aucune suppression.
+     */
     public function down(): void
     {
-        // Rien : la ligne reste, fermer la fonction se fait par `ouverte = false`.
+        DB::statement("COMMENT ON TABLE fonctions_espace IS 'Fonctions sensibles ouvertes par espace (S6). Sans ligne = fermee. Ligne origines.lecture conservee au retour arriere.'");
     }
 };

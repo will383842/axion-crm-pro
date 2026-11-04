@@ -9,12 +9,10 @@ use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\MasquageCoordonnees;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -95,9 +93,8 @@ test('le filtre type=erasure est appliqué', function () {
 test('un compte sans droit de voir les coordonnées voit subject_email masqué', function () {
     $a = l5Espace();
     l5Demande($a, 'pending', email: 'pierre.durand@example.invalid');
-    $operateur = l5Compte($a, 'operator');
-    // Un compte sans la permission de voir les coordonnées (l'état d'un compte en lecture).
-    Gate::before(fn ($u, string $ability) => $ability === MasquageCoordonnees::PERMISSION ? false : null);
+    // `viewer` : rgpd.view mais pas contacts.view_pii (lecture seule).
+    $operateur = l5Compte($a, 'viewer');
 
     $json = $this->actingAs($operateur)->getJson('/api/v1/rgpd/requests?statut=ouverte')->assertOk()->getContent();
 

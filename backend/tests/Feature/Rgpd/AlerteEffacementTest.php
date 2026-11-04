@@ -79,12 +79,15 @@ test('si l’Alerte échoue (canal en panne), la mise à l’écart et le filet 
     config(['alertes.actif' => true, 'alertes.email.destinataire' => 'will@example.test']);
     // Le canal e-mail lève une exception dont le message cite l'adresse.
     Mail::shouldReceive('to')->andThrow(new RuntimeException('boom will@example.test'));
-    Log::spy();
+    $vus = [];
+    Log::listen(function ($e) use (&$vus): void {
+        $vus[] = json_encode([$e->level, $e->message, $e->context], JSON_UNESCAPED_UNICODE);
+    });
 
     SignalementDemandeEffacement::signaler($ws->id, 'site');
 
     expect(DB::table('notifications')->where('type', SignalementDemandeEffacement::TYPE)->count())->toBeGreaterThanOrEqual(1);
-    Log::shouldHaveReceived('error')->withArgs(fn ($m, $c = []) => str_contains(json_encode([$m, $c]), 'will@example.test'))->never();
+    expect(implode("\n", $vus))->not->toContain('will@example.test');
 });
 
 test('une demande reçue du site ne supprime aucune ligne', function () {

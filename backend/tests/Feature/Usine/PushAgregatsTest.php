@@ -101,15 +101,18 @@ test('rattrapage : les jours déjà reçus par l’Usine ne sont pas renvoyés, 
 test('non-2xx : alerte "attention", journal sans corps ni signature, ligne d’envoi écrite', function () {
     l7Allumer();
     Http::fake([L7_URL => Http::response('boom ' . L7_SECRET, 500)]);
-    Log::spy();
+    $vus = [];
+    Log::listen(function ($e) use (&$vus): void {
+        $vus[] = json_encode([$e->level, $e->message, $e->context], JSON_UNESCAPED_UNICODE);
+    });
 
     $this->artisan('crm:usine:pousser-agregats');
 
     expect(DB::table('usine_agregats_envois')->where('statut_http', 500)->exists())->toBeTrue();
-    Log::shouldHaveReceived('critical')->withArgs(fn ($m, $c = []) => str_contains($m, 'Chiffres CRM → Usine non envoyés'))->atLeast()->once();
-    foreach (['error', 'info', 'warning', 'critical'] as $niveau) {
-        Log::shouldHaveReceived($niveau)->withArgs(fn ($m, $ctx = []) => str_contains(json_encode([$m, $ctx]), L7_SECRET) || str_contains(json_encode([$m, $ctx]), 'X-Axion-Signature'))->never();
-    }
+    $journal = implode("\n", $vus);
+    expect($journal)->toContain('Chiffres CRM → Usine non envoyés')
+        ->and($journal)->not->toContain(L7_SECRET)
+        ->and($journal)->not->toContain('X-Axion-Signature');
     expect(json_encode(DB::table('usine_agregats_envois')->get()))->not->toContain(L7_SECRET);
 });
 

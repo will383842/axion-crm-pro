@@ -113,7 +113,7 @@ function pddIngerer(array $event): IngestOutcome
     return app(SiteSyncIngestService::class)->ingest(SiteSyncEvent::fromArray($event));
 }
 
-function pddPersonne(string $email = PDD_EMAIL): ?\stdClass
+function pddPersonne(string $email = PDD_EMAIL): ?stdClass
 {
     return DB::table('personnes')->where('email', $email)->first();
 }
@@ -279,7 +279,7 @@ test('un candidat (univers vivier) n’entre jamais dans personnes par ce chemin
 
     try {
         pddIngerer(pddEvent(['form_type' => 'recrutement'], 'zz.candidat@example.invalid'));
-    } catch (\Throwable) {
+    } catch (Throwable) {
         // Refusé faute de consentement v2 : c'est précisément la garde candidats.
     }
 

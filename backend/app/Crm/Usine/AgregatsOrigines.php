@@ -29,7 +29,7 @@ final class AgregatsOrigines
     {
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
 
-        return DB::table('workspaces')
+        return array_values(DB::table('workspaces')
             ->join('fonctions_espace as f', 'f.espace_id', '=', 'workspaces.id')
             ->where('workspaces.slug', $slug)
             ->whereNull('workspaces.deleted_at')
@@ -37,7 +37,7 @@ final class AgregatsOrigines
             ->where('f.ouverte', true)
             ->pluck('workspaces.id')
             ->map(static fn ($id): string => (string) $id)
-            ->all();
+            ->all());
     }
 
     /**

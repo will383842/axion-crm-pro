@@ -8,6 +8,7 @@
 use App\Models\Workspace;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -150,13 +151,13 @@ test('joursRecus en échec : seul J-1 est poussé (pas 7 jours d’un coup)', fu
 test('J-1 est calculé en UTC, pas à l’heure de l’appli (Europe/Paris)', function () {
     l7Allumer();
     // 23:30 UTC le 4 = 00:30 le 5 à Paris : J-1 en UTC est le 3, pas le 4.
-    Illuminate\Support\Carbon::setTestNow('2026-11-04 23:30:00 UTC');
+    Carbon::setTestNow('2026-11-04 23:30:00 UTC');
     Http::fake([L7_URL => Http::sequence()->push(['jours' => []], 200)->whenEmpty(Http::response(['ok' => true], 200))]);
 
     $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
 
     $jours = Http::recorded()->filter(fn ($p) => $p[0]->method() === 'POST')
         ->map(fn ($p) => json_decode($p[0]->body(), true)['jour'])->values()->all();
-    Illuminate\Support\Carbon::setTestNow();
+    Carbon::setTestNow();
     expect(end($jours))->toBe('2026-11-03')->and($jours)->not->toContain('2026-11-04');
 });

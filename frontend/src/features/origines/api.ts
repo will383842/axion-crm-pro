@@ -58,7 +58,8 @@ export interface LignePersonne {
 export interface Historique {
   actif: boolean;
   data: OrigineEntree[];
-  meta: { total: number; par_page: number; suivant: number | null };
+  /** `suivant` : curseur OPAQUE rendu par le serveur, renvoyé tel quel dans `curseur`. */
+  meta: { total: number; par_page: number; suivant: string | number | null };
 }
 
 export const statutHttp = (e: unknown): number | null => (isAxiosError(e) ? (e.response?.status ?? null) : null);

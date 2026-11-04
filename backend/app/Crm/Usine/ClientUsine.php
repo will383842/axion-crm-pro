@@ -33,7 +33,11 @@ final class ClientUsine
         );
     }
 
-    /** Dates déjà reçues par l'Usine (≤ 7), ou null si l'Usine n'a pas répondu proprement. */
+    /**
+     * Dates déjà reçues par l'Usine (≤ 7), ou null si l'Usine n'a pas répondu proprement.
+     *
+     * @return list<string>|null
+     */
     public function joursRecus(): ?array
     {
         $reponse = $this->envoyer('GET', '');

@@ -103,7 +103,7 @@ class RgpdRequestsController extends ApiController
 
             if ($masquer) {
                 $rows->getCollection()->transform(function ($ligne) {
-                    $ligne->subject_email = MasquageCoordonnees::email($ligne->subject_email);
+                    $ligne->setAttribute('subject_email', MasquageCoordonnees::email($ligne->subject_email));
 
                     return $ligne;
                 });

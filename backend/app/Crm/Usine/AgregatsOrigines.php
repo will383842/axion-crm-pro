@@ -20,7 +20,11 @@ final class AgregatsOrigines
 
     private const METRIQUES = ['demandes', 'guides', 'accords', 'mises_a_l_ecart'];
 
-    /** Espaces où l'Usine a le droit de voir les chiffres : le business d'Axion, fonction ouverte. */
+    /**
+     * Espaces où l'Usine a le droit de voir les chiffres : le business d'Axion, fonction ouverte.
+     *
+     * @return list<string>
+     */
     public static function espaces(): array
     {
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
@@ -103,7 +107,6 @@ final class AgregatsOrigines
     public static function masquer(array $lignes, int $seuil = 3): array
     {
         $masque = static fn (int|string $v): bool => $v === '<3';
-        $lignes = array_values($lignes);
 
         foreach ($lignes as &$l) {
             foreach (self::METRIQUES as $m) {

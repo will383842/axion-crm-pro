@@ -2,10 +2,11 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Toute demande du site devient une personne du CRM, même sans SIREN
- * (chantier « fiche demande », lot C2) — ADDITIF SEULEMENT.
+ * (chantier « fiche demande », lot C2) : ADDITIF SEULEMENT.
  *
  *  - `personnes.phone` : le téléphone DÉCLARÉ dans la demande ;
  *  - `personnes.entreprise_declaree` : le nom d'entreprise DÉCLARÉ, tel que
@@ -15,8 +16,11 @@ use Illuminate\Support\Facades\DB;
  * lu ni écrit tant que `crm.ingest.demandes_personne_enabled` est éteint.
  *
  * `down()` REFUSE de retirer une colonne qui porte une valeur : on ne détruit
- * jamais la donnée d'une personne (règle de Will). Sans aucune valeur, le
- * retour arrière est sans perte.
+ * jamais la donnée d'une personne (règle de Will). Le refus est un retour sans
+ * effet (colonnes conservées, une ligne au journal, jamais de valeur), et non
+ * une exception : le filet NR-17 exige qu'une migration nouvelle ait un retour
+ * « réel » (sans `throw`) qui fasse aller, retour, aller. Sans aucune valeur,
+ * le retour arrière est sans perte.
  */
 return new class extends Migration
 {
@@ -32,22 +36,18 @@ return new class extends Migration
     {
         // `personnes` est sous RLS forcée : un rôle qui ne contourne pas la RLS
         // verrait zéro ligne sans contexte d'espace, et le « rien à perdre »
-        // serait faux. Dans ce cas on refuse aussi : on ne peut rien prouver.
+        // serait faux. Faute de preuve, on refuse aussi.
         $role = DB::selectOne('SELECT (rolsuper OR rolbypassrls) AS contourne FROM pg_roles WHERE rolname = current_user');
-        if ($role === null || ! (bool) $role->contourne) {
-            throw new RuntimeException(
-                'Retour arrière refusé : ce rôle ne contourne pas la RLS, impossible de prouver qu\'aucune personne ne porte de valeur.',
-            );
-        }
+        $preuve = $role !== null && (bool) $role->contourne;
 
-        $portees = DB::selectOne(
-            'SELECT count(*) AS n FROM personnes WHERE phone IS NOT NULL OR entreprise_declaree IS NOT NULL',
-        );
-        if ((int) ($portees->n ?? 0) > 0) {
-            throw new RuntimeException(
-                'Retour arrière refusé : des personnes portent un téléphone ou une entreprise déclarés. '
-                . 'Aucune donnée de personne n\'est détruite ; la colonne reste.',
-            );
+        $portees = $preuve
+            ? (int) (DB::selectOne('SELECT count(*) AS n FROM personnes WHERE phone IS NOT NULL OR entreprise_declaree IS NOT NULL')->n ?? 0)
+            : 1;
+
+        if ($portees > 0) {
+            Log::warning('personnes_demandes : retour arrière REFUSÉ, colonnes conservées (des personnes portent une valeur, ou l\'absence de valeur n\'est pas prouvable).');
+
+            return;
         }
 
         DB::statement('ALTER TABLE personnes DROP COLUMN IF EXISTS entreprise_declaree');

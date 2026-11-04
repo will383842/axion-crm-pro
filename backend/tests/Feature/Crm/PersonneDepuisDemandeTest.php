@@ -342,13 +342,16 @@ test('l’export « prospectable » ne contient pas la personne née d’une dem
 // C2 : migration, export, mise à l'écart
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('la migration refuse son retour arrière quand une personne porte une valeur', function () {
+test('la migration refuse son retour arrière quand une personne porte une valeur : colonnes et valeur conservées', function () {
     pddIngerer(pddEvent());
 
     $migration = require database_path('migrations/2026_11_08_000010_personnes_demandes.php');
+    $migration->down();
 
-    expect(fn () => $migration->down())->toThrow(\RuntimeException::class);
-    expect(pddPersonne()->phone)->toBe('+33600000001');
+    expect(\Illuminate\Support\Facades\Schema::hasColumn('personnes', 'phone'))->toBeTrue()
+        ->and(\Illuminate\Support\Facades\Schema::hasColumn('personnes', 'entreprise_declaree'))->toBeTrue()
+        ->and(pddPersonne()->phone)->toBe('+33600000001')
+        ->and(pddPersonne()->entreprise_declaree)->toBe('ZZ SOCIETE DECLAREE');
 });
 
 test('l’export de portabilité couvre le téléphone et l’entreprise déclarée', function () {

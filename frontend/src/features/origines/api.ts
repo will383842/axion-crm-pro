@@ -15,11 +15,42 @@ export const FILTRES_VIDES: Filtres = { famille: '', detail: '', reseau: '', mot
 
 export const filtresActifs = (f: Filtres): boolean => Object.keys(parametres(f)).length > 0;
 
+const JOUR_MS = 86_400_000;
+const MAX_JOURS = 366;
+/** Motif du serveur pour « Mot » : ^[a-z0-9][a-z0-9._-]{0,63}$ */
+export const MOT_VALIDE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
 /** Plus de 366 jours entre « Du » et « Au » : le serveur répondrait 422. */
 export function periodeTropLongue(du: string, au: string): boolean {
   if (du === '' || au === '') return false;
-  const jours: number = (Date.parse(au) - Date.parse(du)) / 86_400_000;
-  return Number.isFinite(jours) && jours > 366;
+  const jours: number = (Date.parse(au) - Date.parse(du)) / JOUR_MS;
+  return Number.isFinite(jours) && jours > MAX_JOURS;
+}
+
+/**
+ * Les règles que le serveur applique (sinon 422), reproduites ICI pour n'envoyer
+ * aucune requête perdue : (a) une borne seule à plus de 366 jours d'aujourd'hui,
+ * (b) « Du » postérieur à « Au », (c) « Mot » hors du motif du serveur, et
+ * (d) Du/Au à plus de 366 jours l'un de l'autre. Rend le message, ou null.
+ */
+export function erreurFiltres(f: Filtres, aujourdhui: Date = new Date()): string | null {
+  if (f.mot !== '' && !MOT_VALIDE.test(f.mot)) {
+    return 'Mot refusé : lettres minuscules sans accent, chiffres, point, tiret ou tiret bas, 64 signes au maximum, sans espace.';
+  }
+  if (f.du !== '' && f.au !== '' && Date.parse(f.du) > Date.parse(f.au)) {
+    return 'Période incohérente : la date « Du » doit être avant la date « Au ».';
+  }
+  if (periodeTropLongue(f.du, f.au)) {
+    return 'Période trop longue : 366 jours au maximum entre « Du » et « Au ». Le serveur refuserait la demande (erreur 422).';
+  }
+  for (const borne of [f.du, f.au]) {
+    if (borne === '') continue;
+    const jours = Math.abs(Date.parse(borne) - aujourdhui.getTime()) / JOUR_MS;
+    if (Number.isFinite(jours) && jours > MAX_JOURS) {
+      return 'Date trop éloignée : 366 jours au maximum avant ou après aujourd’hui. Le serveur refuserait la demande (erreur 422).';
+    }
+  }
+  return null;
 }
 
 export function parametres(f: Filtres): Record<string, string> {
@@ -27,10 +58,6 @@ export function parametres(f: Filtres): Record<string, string> {
   for (const k of Object.keys(f) as Array<keyof Filtres>) {
     const v = f[k];
     if (v !== '' && !(k === 'oppose' && v === 'tous')) sortie[k] = v;
-  }
-  if (periodeTropLongue(f.du, f.au)) {
-    delete sortie['du'];
-    delete sortie['au'];
   }
   if (sortie['detail'] !== undefined && sortie['famille'] === undefined) delete sortie['detail'];
   return sortie;

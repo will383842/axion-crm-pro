@@ -14,7 +14,7 @@ import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Button, Card, PageHeader, Tabs, TableScroll } from '@/components/ui';
 import {
-  FILTRES_VIDES, estRefuse, exporterCsv, filtresActifs, lire, parametres, periodeTropLongue,
+  FILTRES_VIDES, erreurFiltres, estRefuse, exporterCsv, filtresActifs, lire, parametres, statutHttp,
   type Apercu, type Filtres, type LignePersonne, type LigneMot, type LigneReseau, type PointTendance,
 } from './api';
 import { raisonExportRefuse, useDroits } from './droits';
@@ -36,16 +36,19 @@ const champ = 'h-9 rounded-lg bg-white px-3 text-sm text-slate-900 ring-1 ring-s
 export function OriginesPage() {
   const [onglet, setOnglet] = useState<Onglet>('ensemble');
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
-  const trop = periodeTropLongue(filtres.du, filtres.au);
+  const erreurLocale = erreurFiltres(filtres);
   const params = useMemo(() => parametres(filtres), [filtres]);
   const maj = (p: Partial<Filtres>) => setFiltres((f) => ({ ...f, ...p }));
 
-  const apercu = useQuery({ queryKey: ['crm', 'origines', 'apercu', params], queryFn: () => lire<Apercu>('/crm/origines/apercu', params), retry: false });
+  const apercu = useQuery({ queryKey: ['crm', 'origines', 'apercu', params], queryFn: () => lire<Apercu>('/crm/origines/apercu', params), retry: false, enabled: erreurLocale === null });
 
   let corps;
-  if (apercu.isLoading) corps = <Chargement texte="Chargement des origines des contacts…" />;
+  if (erreurLocale !== null) corps = null; // aucun appel tant que le filtre serait refusé
+  else if (apercu.isLoading) corps = <Chargement texte="Chargement des origines des contacts…" />;
   else if (apercu.error !== null && apercu.data === undefined) {
-    corps = estRefuse(apercu.error) ? (
+    corps = statutHttp(apercu.error) === 422 ? (
+      <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">Filtre refusé : vérifiez les dates et le mot.</p>
+    ) : estRefuse(apercu.error) ? (
       <AccesRefuse>Cet écran n’est pas disponible pour le moment. Si vous en avez besoin, demandez l’accès au propriétaire.</AccesRefuse>
     ) : (
       <Erreur onRetry={() => void apercu.refetch()} />
@@ -55,7 +58,6 @@ export function OriginesPage() {
   } else if (apercu.data !== undefined) {
     corps = (
       <>
-        <Filtrage filtres={filtres} maj={maj} trop={trop} reinit={() => setFiltres(FILTRES_VIDES)} />
         <div className="mb-4"><Tabs items={ONGLETS} value={onglet} onChange={setOnglet} variant="pills" /></div>
         {onglet === 'ensemble' && <VueEnsemble apercu={apercu.data} params={params} />}
         {onglet === 'reseau' && <ParReseau params={params} />}
@@ -73,12 +75,13 @@ export function OriginesPage() {
         title="Origines des contacts"
         subtitle="D’où viennent vos contacts : famille d’origine, réseau, mot en commentaire. Chaque contact garde TOUTES ses origines."
       />
+      <Filtrage filtres={filtres} maj={maj} erreur={erreurLocale} reinit={() => setFiltres(FILTRES_VIDES)} />
       {corps}
     </div>
   );
 }
 
-function Filtrage({ filtres, maj, trop, reinit }: { filtres: Filtres; maj: (p: Partial<Filtres>) => void; trop: boolean; reinit: () => void }) {
+function Filtrage({ filtres, maj, erreur, reinit }: { filtres: Filtres; maj: (p: Partial<Filtres>) => void; erreur: string | null; reinit: () => void }) {
   const details = filtres.famille !== '' ? Object.entries(FAMILLES[filtres.famille]?.details ?? {}) : [];
   return (
     <Card className="mb-4">
@@ -119,10 +122,8 @@ function Filtrage({ filtres, maj, trop, reinit }: { filtres: Filtres; maj: (p: P
         </label>
         <Button variant="secondary" size="sm" onClick={reinit}>Réinitialiser</Button>
       </div>
-      {trop ? (
-        <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">
-          Période trop longue : 366 jours au maximum entre « Du » et « Au ». Le serveur refuserait la demande (erreur 422).
-        </p>
+      {erreur !== null ? (
+        <p role="alert" className="mt-3 text-sm text-rose-700 dark:text-rose-300">{erreur}</p>
       ) : (
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Période : 366 jours au maximum. Les filtres s’appliquent à tous les onglets.</p>
       )}

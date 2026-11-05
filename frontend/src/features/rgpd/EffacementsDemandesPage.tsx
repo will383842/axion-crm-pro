@@ -36,6 +36,15 @@ interface Demande {
   origine?: string | null;
 }
 
+/** Réponse paginée de Laravel (25 par page) ; `degraded` = le serveur n'a pas pu lire la base. */
+interface ReponseListe {
+  data: Demande[];
+  degraded?: boolean;
+  current_page?: number;
+  last_page?: number;
+  meta?: { current_page?: number; last_page?: number };
+}
+
 export const LIBELLE_ADRESSE_MASQUEE = 'adresse masquée (réservée à l’administrateur)';
 export const LIBELLE_ACTION = 'Marquer comme traité (mise à l’écart faite)';
 const STATUTS: Record<Statut, string> = { pending: 'À traiter', processing: 'En cours', done: 'Traitée', rejected: 'Rejetée', expired: 'Expirée' };
@@ -55,10 +64,12 @@ export function EffacementsDemandesPage() {
   const qc = useQueryClient();
   const [groupe, setGroupe] = useState<Groupe>('ouverte');
   const [aTraiter, setATraiter] = useState<Demande | null>(null);
+  const [page, setPage] = useState(1);
+  const choisirGroupe = (g: Groupe) => { setGroupe(g); setPage(1); };
 
   const q = useQuery({
-    queryKey: ['rgpd-requests', 'effacements', groupe],
-    queryFn: () => lire<{ data: Demande[] }>('/rgpd/requests', { statut: groupe, type: 'erasure' }),
+    queryKey: ['rgpd-requests', 'effacements', groupe, page],
+    queryFn: () => lire<ReponseListe>('/rgpd/requests', { statut: groupe, type: 'erasure', page }),
     retry: false,
   });
 
@@ -73,28 +84,36 @@ export function EffacementsDemandesPage() {
     onError: () => toast.error('Le traitement n’a pas pu aboutir (déjà traitée ou droit manquant).'),
   });
 
-  // Plus ancienne en haut (délai légal de réponse), quelle que soit la réponse du serveur.
+  // Même ordre que le serveur, sur TOUTES les pages : « Ouvertes » = la plus ancienne en haut
+  // (délai légal de réponse) ; « Traitées » et « Toutes » = la plus récente en haut.
+  const ancienneEnHaut = groupe === 'ouverte';
   const lignes = useMemo(
-    () => (q.data?.data ?? []).filter((d) => d.type === 'erasure').sort((a, b) => Date.parse(a.requested_at) - Date.parse(b.requested_at)),
-    [q.data],
+    () => (q.data?.data ?? []).filter((d) => d.type === 'erasure').sort((a, b) => (Date.parse(a.requested_at) - Date.parse(b.requested_at)) * (ancienneEnHaut ? 1 : -1)),
+    [q.data, ancienneEnHaut],
   );
+  const pageCourante = q.data?.current_page ?? q.data?.meta?.current_page ?? page;
+  const derniere = q.data?.last_page ?? q.data?.meta?.last_page ?? pageCourante;
 
   let corps;
   if (q.isLoading) corps = <Chargement texte="Chargement des demandes d’effacement…" />;
   else if (q.error !== null && q.data === undefined) {
     corps = estRefuse(q.error) ? (
       <AccesRefuse>
-        Vous n’avez aucun droit sur les demandes d’effacement. Le propriétaire les voit et les traite ; les rôles de lecture (viewer, admin) peuvent seulement consulter la liste. Si vous pensez que c’est une erreur, parlez-en au propriétaire.
+        Vous n’avez aucun droit sur les demandes d’effacement. Le propriétaire les voit et les traite ; les rôles de lecture (viewer, operator, admin) peuvent seulement consulter la liste. Si vous pensez que c’est une erreur, parlez-en au propriétaire.
       </AccesRefuse>
     ) : (
       <Erreur onRetry={() => void q.refetch()} />
     );
-  } else if (lignes.length === 0 && groupe === 'ouverte') {
+  } else if (q.data?.degraded === true) {
+    corps = <Vide titre="Données momentanément indisponibles" description="Le serveur n’a pas pu lire les demandes. Cela ne veut pas dire qu’il n’y en a aucune : réessayez dans un instant." />;
+  } else if (lignes.length === 0 && groupe === 'ouverte' && page === 1) {
     corps = <Vide titre="Aucune demande d’effacement ouverte" description="Quand une personne en fera une, elle sera mise à l’écart des envois et vous serez alerté ici. Rien n’est supprimé." />;
   } else {
     corps = (
       <Card padding="none" className="overflow-hidden">
-        <p className="px-4 pt-3 text-xs text-slate-500 dark:text-slate-400">Tri : date de réception croissante, la plus ancienne en haut, à cause du délai légal de réponse.</p>
+        <p className="px-4 pt-3 text-xs text-slate-500 dark:text-slate-400">{ancienneEnHaut
+          ? 'Tri : date de réception croissante sur toutes les pages, la plus ancienne en haut, à cause du délai légal de réponse.'
+          : 'Tri : la plus récente en haut, sur toutes les pages.'} 25 demandes par page.</p>
         <TableScroll template="8rem 1fr 1fr 9rem 22rem">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="px-4 py-2">Demande</th><th>Personne</th><th>Origine</th><th>Statut</th><th>Action</th></tr></thead>
@@ -132,6 +151,13 @@ export function EffacementsDemandesPage() {
             </tbody>
           </table>
         </TableScroll>
+        <div className="flex items-center justify-between px-4 py-3 text-xs text-slate-500">
+          <span>Page {pageCourante} sur {Math.max(derniere, 1)}</span>
+          <span className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Précédent</Button>
+            <Button size="sm" variant="secondary" disabled={pageCourante >= derniere} onClick={() => setPage(page + 1)}>Suivant</Button>
+          </span>
+        </div>
       </Card>
     );
   }
@@ -146,7 +172,7 @@ export function EffacementsDemandesPage() {
         <SegmentedControl
           options={[{ id: 'ouverte', label: 'Ouvertes' }, { id: 'traitee', label: 'Traitées' }, { id: 'toutes', label: 'Toutes' }]}
           value={groupe}
-          onChange={(v) => setGroupe(v)}
+          onChange={choisirGroupe}
         />
         <p className="mt-1 text-xs text-slate-500">« Ouverte » = à traiter + en cours. « Traitée » = traitée + rejetée + expirée.</p>
       </div>

@@ -100,9 +100,44 @@ describe('EffacementsDemandesPage', () => {
   });
 
   it('un « stop » n’est pas une mise à l’écart d’effacement : libellé distinct', async () => {
-    await monter(OWNER, [getJson('/rgpd/requests', { data: [{ ...LIGNES.data[0], type: 'opposition' }] })]);
-    await screen.findByText('EFF-0007').catch(() => null);
-    expect(screen.queryByText(/mise à l’écart faite/)).toBeNull();
+    const { container } = await monter(OWNER, [getJson('/rgpd/requests', { data: [{ ...LIGNES.data[0], type: 'opposition' }] })]);
+    expect(await screen.findByText('Aucune demande d’effacement ouverte')).toBeVisible();
+    expect(screen.queryByText('EFF-0007')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Marquer comme traité/ })).toBeNull();
+    expect(container.textContent).toMatch(/« stop » n’est pas une demande d’effacement/);
+  });
+
+  it('réponse degraded:true : « Données momentanément indisponibles », pas « Aucune demande »', async () => {
+    await monter(OWNER, [getJson('/rgpd/requests', { data: [], meta: { total: 0 }, degraded: true })]);
+    expect(await screen.findByText('Données momentanément indisponibles')).toBeVisible();
+    expect(screen.queryByText('Aucune demande d’effacement ouverte')).toBeNull();
+  });
+
+  it('accès refusé : operator cité parmi les rôles de lecture', async () => {
+    await monter(AUCUN, [getStatus('/rgpd/requests', 403)]);
+    expect(await screen.findByText(/viewer, operator, admin/)).toBeVisible();
+  });
+
+  it('pagination : Suivant demande la page 2, Précédent revient', async () => {
+    const liste = dynamicGet('/rgpd/requests', (_n, url) => ({ ...LIGNES, current_page: Number(url.searchParams.get('page') ?? 1), last_page: 2 }));
+    await monter(OWNER, [liste.handler]);
+    await screen.findAllByText(/EFF-0007/);
+    expect(screen.getByText(/Page 1 sur 2/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Précédent' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
+    expect(await screen.findByText(/Page 2 sur 2/)).toBeVisible();
+    expect(new URL(liste.urls[liste.urls.length - 1] as string).searchParams.get('page')).toBe('2');
+    expect(screen.getByRole('button', { name: 'Suivant' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Précédent' }));
+    expect(await screen.findByText(/Page 1 sur 2/)).toBeVisible();
+  });
+
+  it('la phrase de tri reste vraie : ouvertes = plus ancienne en haut, traitées = plus récente en haut', async () => {
+    await monter(OWNER);
+    expect(await screen.findByText(/la plus ancienne en haut/)).toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'Traitées' }));
+    expect(await screen.findByText(/la plus récente en haut/)).toBeVisible();
+    expect(screen.queryByText(/la plus ancienne en haut/)).toBeNull();
   });
 
   describe('masquage serveur (hors owner/admin : rgpd.view_pii)', () => {

@@ -7,7 +7,7 @@ use App\Crm\Guides\LienGuide;
  * vient UNIQUEMENT de la table fermée `config/guides.php`, jamais d'une donnée.
  * Adresses en `exemple.invalid` seulement (dépôt PUBLIC, aucune vraie URL).
  */
-function tableGuides(array $publics = null, bool $actif = true): void
+function tableGuides(?array $publics = null, bool $actif = true): void
 {
     config([
         'guides.lien_enabled' => $actif,

@@ -852,7 +852,7 @@ final class PersonnesIngestService
         // Garde de date (À LA SECONDE, voir `plusRecent` : l'égalité n'est pas « plus
         // récent ») : un événement pas plus récent que la dernière interaction connue ne remplace pas une valeur
         // déjà connue ; il ne fait que combler un vide.
-        $ancien = $derniere !== null && ! $this->plusRecent($event->occurredAt, $derniere);
+        $ancien = $derniere !== null && ! $this->plusRecent($event->occurredAt, $existante->derniere_interaction_at ?? null);
 
         // Une personne retrouvée par son adresse reçoit la clé du site : c'est
         // elle qui rattache ensuite la timeline et l'effacement.

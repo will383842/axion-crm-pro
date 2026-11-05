@@ -198,58 +198,65 @@ class OriginesController extends ConsoleController
 
         return response()->streamDownload(function () use ($request, $demandes, $espace, $f, $entete, $personnes): void {
             WorkspaceContext::run($espace, function () use ($request, $demandes, $espace, $f, $entete, $personnes): void {
+                // Un export de données personnelles ne part JAMAIS sans trace : l'audit est écrit dans `finally`
+                // (exception, délai SQL, coupure du client) avec le nombre de lignes déjà lues.
+                ignore_user_abort(true);
+                $plafond = PlafondExport::lignes();
+                $etat = new \stdClass;
+                $etat->lues = 0;
+                $etat->tronque = false;
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
                 }
                 fwrite($out, "\xEF\xBB\xBF");
-                fputcsv($out, $entete);
 
-                $requete = $personnes->requete($espace, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null, 'fermees' => EntreprisesFermees::mode(null)]);
-                $requete = Abonnements::exclureOpposees($requete);
-                if (Schema::hasColumn('personnes', 'opposition_at')) {
-                    $requete->whereNull('personnes.opposition_at');
-                }
-                $requete->whereNull('companies.insee_non_diffusible_le');
-                $requete->whereRaw('NOT ' . QuarantaineSite::personneLettreSql('personnes', 'companies'));
-                $requete->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('personnes', 'contact_id'));
-                [$cond, $bindings] = RequetesOrigines::conditionPersonnes($espace, $f);
-                $requete->whereRaw($cond, $bindings);
+                try {
+                    fputcsv($out, $entete);
 
-                $plafond = PlafondExport::lignes();
-                $etat = new \stdClass;
-                $etat->lues = 0;
-                $etat->tronque = false;
-                $masquer = MasquageCoordonnees::requis();
-                $requete->chunkById(200, function ($lot) use ($espace, $f, $out, $etat, $plafond, $masquer): bool {
-                    $ids = [];
-                    foreach ($lot as $p) {
-                        $ids[] = (int) $p->id;
+                    $requete = $personnes->requete($espace, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null, 'fermees' => EntreprisesFermees::mode(null)]);
+                    $requete = Abonnements::exclureOpposees($requete);
+                    if (Schema::hasColumn('personnes', 'opposition_at')) {
+                        $requete->whereNull('personnes.opposition_at');
                     }
-                    $entrees = RequetesOrigines::entreesDesPersonnes($espace, $ids, $f);
-                    foreach ($lot as $p) {
-                        foreach ($entrees[(int) $p->id] ?? [] as $o) {
-                            $etat->lues = $etat->lues + 1;
-                            if ($etat->lues > $plafond) {
-                                $etat->tronque = true;
+                    $requete->whereNull('companies.insee_non_diffusible_le');
+                    $requete->whereRaw('NOT ' . QuarantaineSite::personneLettreSql('personnes', 'companies'));
+                    $requete->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('personnes', 'contact_id'));
+                    [$cond, $bindings] = RequetesOrigines::conditionPersonnes($espace, $f);
+                    $requete->whereRaw($cond, $bindings);
 
-                                return false;
-                            }
-                            fputcsv($out, CelluleCsv::ligne([
-                                $masquer ? MasquageCoordonnees::email($p->email) : $p->email,
-                                $p->first_name, $p->last_name,
-                                $o['date'], $o['reseau'], $o['compte'], $o['canal'], $o['mot'], $o['guide'], $o['famille'], $o['detail'], $o['post_ref'],
-                            ]));
+                    $masquer = MasquageCoordonnees::requis();
+                    $requete->chunkById(200, function ($lot) use ($espace, $f, $out, $etat, $plafond, $masquer): bool {
+                        $ids = [];
+                        foreach ($lot as $p) {
+                            $ids[] = (int) $p->id;
                         }
-                    }
+                        $entrees = RequetesOrigines::entreesDesPersonnes($espace, $ids, $f);
+                        foreach ($lot as $p) {
+                            foreach ($entrees[(int) $p->id] ?? [] as $o) {
+                                $etat->lues = $etat->lues + 1;
+                                if ($etat->lues > $plafond) {
+                                    $etat->tronque = true;
 
-                    return true;
-                }, 'personnes.id', 'id');
-                if ($etat->tronque) {
-                    PlafondExport::ecrireAvertissement($out, count($entete));
+                                    return false;
+                                }
+                                fputcsv($out, CelluleCsv::ligne([
+                                    $masquer ? MasquageCoordonnees::email($p->email) : $p->email,
+                                    $p->first_name, $p->last_name,
+                                    $o['date'], $o['reseau'], $o['compte'], $o['canal'], $o['mot'], $o['guide'], $o['famille'], $o['detail'], $o['post_ref'],
+                                ]));
+                            }
+                        }
+
+                        return true;
+                    }, 'personnes.id', 'id');
+                    if ($etat->tronque) {
+                        PlafondExport::ecrireAvertissement($out, count($entete));
+                    }
+                } finally {
+                    fclose($out);
+                    $this->auditer($request, $espace, $demandes, min($etat->lues, $plafond), $etat->tronque);
                 }
-                fclose($out);
-                $this->auditer($request, $espace, $demandes, min($etat->lues, $plafond), $etat->tronque);
             });
         }, 'origines-' . now()->format('Y-m-d') . '.csv', array_merge(['Content-Type' => 'text/csv; charset=UTF-8'], PlafondExport::entetes()));
     }

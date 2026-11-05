@@ -75,6 +75,27 @@ test('OE 3 bis — l’audit porte les filtres validés et le compte, jamais d�
         ->and($ligne->path)->toContain('reseau=instagram')->toContain('du=2026-10-01')->toContain('lignes=');
 });
 
+test('OE 3 ter — flux interrompu par une exception : la ligne d’audit existe quand même', function () {
+    $this->actingAs(OriginesJeu::utilisateur($this->axion->id, 'owner', 'oe.owner4@example.invalid'));
+    // Panne simulée pendant le flux : la lecture par lots (chunkById sur personnes.id) échoue.
+    DB::listen(function ($requete) {
+        if (str_contains($requete->sql, 'personnes.id') && str_contains($requete->sql, 'limit')) {
+            throw new RuntimeException('panne simulée pendant le flux');
+        }
+    });
+
+    try {
+        $this->get('/api/v1/crm/origines/export?reseau=instagram')->streamedContent();
+    } catch (Throwable) {
+        // l'interruption est voulue
+    }
+
+    $lignes = DB::table('audit_logs')->where('path', 'like', '%origines/export%')->get();
+    expect($lignes)->toHaveCount(1)
+        ->and($lignes[0]->path)->toContain('lignes=0')->toContain('reseau=instagram')
+        ->and(json_encode($lignes[0]))->not->toContain('oe.ok@example.invalid');
+});
+
 test('OE 4 — plafond : l’export tronqué le dit', function () {
     config(['exports.plafond_lignes' => 1]);
     OriginesJeu::personne($this->axion->id, 'oe.deux@example.invalid', [OriginesJeu::entree(['post_ref' => 'post_ref_exp010'])]);

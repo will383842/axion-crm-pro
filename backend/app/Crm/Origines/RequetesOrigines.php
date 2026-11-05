@@ -3,6 +3,7 @@
 namespace App\Crm\Origines;
 
 use App\Crm\Ingest\ContenusAccords;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -293,7 +294,7 @@ final class RequetesOrigines
         foreach ($rows as $r) {
             $o = json_decode((string) $r->o, true);
             if (is_array($o)) {
-                $data[] = ContenusAccords::presenterOrigine($o);
+                $data[] = ContenusAccords::presenterOrigine($o, ! MasquageCoordonnees::requis());
             }
         }
         $dernier = $rows === [] ? null : $rows[count($rows) - 1];

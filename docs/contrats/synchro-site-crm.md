@@ -83,6 +83,13 @@ Colonnes ajoutées à `personnes` : `origine_contenu`, `guides_recus`, `consente
 La fiche d'une personne montre un bloc « Contenus et accords » en lecture seule : d'où vient la personne,
 quels guides, quels accords et versions de texte, et l'opposition en bandeau d'alerte. Texte échappé, rien d'autre que ces champs.
 
+### Lien du guide (le contrat ne transporte pas d'URL)
+
+Le contrat porte seulement l'**identifiant** public du guide (ex. `guide-ia`). Le CRM le traduit en lien à la lecture,
+grâce à la table fermée `backend/config/guides.php` : aucune adresse ne vient d'une donnée reçue, rien n'est écrit en base,
+et le lien personnel de l'e-mail (`?t=`) n'est jamais affiché ni stocké. Interrupteur `CRM_GUIDE_LIEN_ENABLED`, éteint par
+défaut (allumer = déployer). Identifiant inconnu ou profil en lecture seule (sans `contacts.view_pii`) : pas de lien.
+
 ## Version 3 — historique des origines (ADR-CONTRAT-V3-ORIGINE)
 
 `schema_version` accepte 1, 2 et 3 (4 refusée). Tout le traitement v3 est derrière l'interrupteur

@@ -4,6 +4,7 @@ namespace App\Crm\Usine;
 
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Agrégats d'origines à destination de l'Usine (L7) — AUCUNE donnée de personne.
@@ -17,6 +18,9 @@ final class AgregatsOrigines
     public const FONCTION = 'origines.lecture';
 
     public const CLES = ['jour', 'reseau', 'compte', 'mot', 'demandes', 'guides', 'accords', 'mises_a_l_ecart'];
+
+    /** Plafond du récepteur : au-delà, il refuse tout le push (400). */
+    public const LIGNES_MAX = 500;
 
     private const METRIQUES = ['demandes', 'guides', 'accords', 'mises_a_l_ecart'];
 
@@ -56,7 +60,7 @@ final class AgregatsOrigines
             $lignes = DB::select(
                 <<<'SQL'
                 SELECT e->>'reseau' AS reseau,
-                       e->>'compte' AS compte,
+                       left(CASE WHEN n.compte ~ '^[a-z]' THEN n.compte ELSE 'c' || n.compte END, 40) AS compte,
                        e->>'mot'    AS mot,
                        COUNT(DISTINCT p.id)::int AS demandes,
                        COUNT(DISTINCT p.id) FILTER (WHERE COALESCE(e->>'guide', '') <> '')::int AS guides,
@@ -67,6 +71,9 @@ final class AgregatsOrigines
                 CROSS JOIN LATERAL jsonb_array_elements(
                     CASE WHEN jsonb_typeof(p.origines) = 'array' THEN p.origines ELSE '[]'::jsonb END
                 ) AS e
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(lower(trim(COALESCE(e->>'compte', ''))), '[^a-z0-9_]', '_', 'g') AS compte
+                ) AS n
                 WHERE p.workspace_id = ?
                   AND (e->>'date') IS NOT NULL
                   AND substr(e->>'date', 1, 10) = ?
@@ -118,12 +125,13 @@ final class AgregatsOrigines
      * @param  list<array<string, mixed>>  $lignes
      * @return list<array<string, mixed>>
      */
-    private static function compteValide(array $lignes): array
+    private static function lignesValides(array $lignes): array
     {
         $sortie = [];
         foreach ($lignes as $l) {
             $compte = self::normaliserCompte((string) ($l['compte'] ?? ''));
-            if ($compte !== null) {
+            // Compte ou mot hors format du récepteur : la ligne n'est jamais envoyée.
+            if ($compte !== null && preg_match('/^[A-Za-z0-9_-]{2,40}$/D', (string) ($l['mot'] ?? '')) === 1) {
                 $l['compte'] = $compte;
                 $sortie[] = $l;
             }
@@ -148,7 +156,7 @@ final class AgregatsOrigines
      */
     public static function masquer(array $lignes, int $seuil = 3): array
     {
-        $lignes = self::compteValide($lignes);
+        $lignes = self::lignesValides($lignes);
 
         $masque = static fn (int|string $v): bool => $v === '<3';
 
@@ -197,6 +205,16 @@ final class AgregatsOrigines
             if (! $tout) {
                 $sortie[] = array_replace(array_flip(self::CLES), array_intersect_key($l, array_flip(self::CLES)));
             }
+        }
+
+        if (count($sortie) > self::LIGNES_MAX) {
+            // Aucune donnée de personne : seulement des volumes.
+            Log::warning('usine.agregats: trop de lignes, troncature', [
+                'lignes' => count($sortie), 'maximum' => self::LIGNES_MAX,
+            ]);
+            usort($sortie, static fn (array $a, array $b): int => [$a['jour'], $a['reseau'], $a['compte'], $a['mot']]
+                <=> [$b['jour'], $b['reseau'], $b['compte'], $b['mot']]);
+            $sortie = array_slice($sortie, 0, self::LIGNES_MAX);
         }
 
         return $sortie;

@@ -255,7 +255,8 @@ final class RequetesOrigines
     public static function decoderCurseur(string $curseur): ?array
     {
         $brut = base64_decode(strtr($curseur, '-_', '+/'), true);
-        if ($brut === false) {
+        // Tableau JSON `[date, rang]` uniquement (un objet `{"0":…}` se décoderait aussi en liste).
+        if ($brut === false || ! str_starts_with($brut, '[')) {
             return null;
         }
         $v = json_decode($brut, true);

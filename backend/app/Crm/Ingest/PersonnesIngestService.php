@@ -849,10 +849,10 @@ final class PersonnesIngestService
         if ($derniere === null || $event->occurredAt > $derniere) {
             $update['derniere_interaction_at'] = $event->occurredAt;
         }
-        // Garde de date (À LA SECONDE, voir `plusRecent`) : un événement plus
-        // ancien que la dernière interaction connue ne remplace pas une valeur
+        // Garde de date (À LA SECONDE, voir `plusRecent` : l'égalité n'est pas « plus
+        // récent ») : un événement pas plus récent que la dernière interaction connue ne remplace pas une valeur
         // déjà connue ; il ne fait que combler un vide.
-        $ancien = $derniere !== null && (int) $event->occurredAt->format('U') < (int) $derniere->format('U');
+        $ancien = $derniere !== null && ! $this->plusRecent($event->occurredAt, $derniere);
 
         // Une personne retrouvée par son adresse reçoit la clé du site : c'est
         // elle qui rattache ensuite la timeline et l'effacement.

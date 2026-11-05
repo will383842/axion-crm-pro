@@ -759,7 +759,8 @@ test('N6 : une adresse personnelle ne crée pas de contact au rattachement (l’
 
     $this->postJson("/api/v1/crm/arbitrage/{$activite}/attach", ['company_id' => $companyId])
         ->assertOk()
-        ->assertJsonPath('contact_created', false);
+        ->assertJsonPath('contact_created', false)
+        ->assertJsonPath('contact_motif', 'adresse_personnelle');
 
     expect(DB::table('contacts')->count())->toBe(0)
         ->and(DB::table('activities')->where('id', $activite)->value('subject_id'))->toBe($companyId);
@@ -805,4 +806,94 @@ test('le nom d’un autre événement de la même personne sert à créer le con
 
     $contact = DB::table('contacts')->first();
     expect($contact->last_name)->toBe('ZZ AUTRE EVT')->and($contact->first_name)->toBe('Marie');
+});
+
+test('drapeau fermé : une adresse personnelle sans abonnement crée son contact comme avant (N6 inactive)', function () {
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    $activite = pddIngerer(pddEvent([], 'zz.perso.ferme@gmail.com'))->activityId;
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$activite}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', true)
+        ->assertJsonPath('contact_motif', null);
+
+    expect(DB::table('contacts')->count())->toBe(1);
+});
+
+test('drapeau fermé : le nom d’un autre événement n’est pas repris (aucun effet)', function () {
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    $principal = pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-01T10:00:00+01:00',
+        'person' => ['first_name' => null, 'last_name' => null, 'phone' => null],
+    ]))->activityId;
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-03T10:00:00+01:00',
+        'event_type' => 'calendly_booked', 'form_type' => null,
+        'person' => ['first_name' => 'Marie', 'last_name' => 'ZZ AUTRE EVT', 'phone' => '+33600000077'],
+    ]));
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$principal}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', false)
+        ->assertJsonPath('contact_motif', null);
+
+    expect(DB::table('contacts')->count())->toBe(0);
+});
+
+test('le nom d’un événement écarté par l’opérateur n’est pas repris', function () {
+    $principal = pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-01T10:00:00+01:00',
+        'person' => ['first_name' => null, 'last_name' => null, 'phone' => null],
+    ]))->activityId;
+    $autre = pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-03T10:00:00+01:00',
+        'event_type' => 'calendly_booked', 'form_type' => null,
+        'person' => ['first_name' => 'Marie', 'last_name' => 'ZZ ECARTE', 'phone' => null],
+    ]))->activityId;
+    DB::table('activities')->where('id', $autre)->update([
+        'payload' => DB::raw("payload || '{\"arbitrage_dismissed\": {\"reason\": \"test\"}}'::jsonb"),
+    ]);
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$principal}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', false);
+
+    expect(DB::table('contacts')->count())->toBe(0);
+});
+
+test('plusieurs autres événements portent un nom : le plus récent l’emporte', function () {
+    $principal = pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-01T10:00:00+01:00',
+        'person' => ['first_name' => null, 'last_name' => null, 'phone' => null],
+    ]))->activityId;
+    foreach ([['2026-11-02', 'ZZ ANCIEN'], ['2026-11-04', 'ZZ RECENT'], ['2026-11-03', 'ZZ MILIEU']] as [$jour, $nom]) {
+        pddIngerer(pddEvent([
+            'occurred_at' => $jour . 'T10:00:00+01:00',
+            'event_type' => 'calendly_booked', 'form_type' => null,
+            'person' => ['first_name' => 'Marie', 'last_name' => $nom, 'phone' => null],
+        ]));
+    }
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$principal}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', true);
+
+    expect(DB::table('contacts')->value('last_name'))->toBe('ZZ RECENT');
+});
+
+test('garde de date : à la même seconde, la demande n’est pas « plus récente » et ne remplace rien', function () {
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-10T10:00:00+01:00',
+        'person' => ['phone' => '+33600000010'],
+    ]));
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-10T10:00:00.500+01:00',
+        'person' => ['phone' => '+33600000011'],
+    ]));
+
+    expect(pddPersonne()->phone)->toBe('+33600000010');
 });

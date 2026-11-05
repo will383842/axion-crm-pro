@@ -88,11 +88,11 @@ final class RattachementEnAttente
             $pending = $this->completerDepuisLesAutres($workspaceId, $activityId, $personKey, $pending);
         }
 
-        // Une adresse PERSONNELLE sans consentement ne crée pas de contact : même
+        // Drapeau ouvert seulement (fermé : comportement de main, contact créé). Une adresse PERSONNELLE sans consentement ne crée pas de contact : même
         // garde que `PersonnesController::rattacher` (`prospectionAutorisee`).
         // L'événement reste rattaché à l'entreprise (timeline), sans interlocuteur.
         $creerContact = $personKey !== null
-            && (($activity->kind ?? null) === DossierClient::EVENT_TYPE || ! $this->adressePersonnelleSansAccord($workspaceId, $personKey, $payload, $pending));
+            && (($activity->kind ?? null) === DossierClient::EVENT_TYPE || ! PersonnesIngestService::drapeauDemandesOuvert() || ! $this->adressePersonnelleSansAccord($workspaceId, $personKey, $payload, $pending));
 
         if ($creerContact) {
             $upserted = $this->contacts->upsert(
@@ -170,6 +170,8 @@ final class RattachementEnAttente
             // depuis une adresse électronique. L'événement reste dans la
             // timeline de l'entreprise.
             'contact_created' => $contactId !== null,
+            // Pourquoi aucun contact : l'opérateur doit lire la vraie cause.
+            'contact_motif' => $contactId === null && $personKey !== null && ! $creerContact ? 'adresse_personnelle' : null,
             'soldes' => $soldes,
         ];
     }

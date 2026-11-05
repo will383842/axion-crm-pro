@@ -81,7 +81,18 @@ Colonnes ajoutées à `personnes` : `origine_contenu`, `guides_recus`, `consente
 ## Affichage
 
 La fiche d'une personne montre un bloc « Contenus et accords » en lecture seule : d'où vient la personne,
-quels guides, quels accords et versions de texte, et l'opposition en bandeau d'alerte. Texte échappé, rien d'autre que ces champs.
+quels guides, les consentements d'information (« Information reçue », avec source et version du texte, ex. M1), l'accord
+pour de futures campagnes (dernier choix, avec version du texte) et l'opposition en bandeau d'alerte. Texte échappé, rien d'autre que ces champs.
+
+### Lien du guide (le contrat ne transporte pas d'URL)
+
+Le contrat porte seulement l'**identifiant** public du guide (ex. `guide-ia`). Le CRM le traduit en lien à la lecture,
+grâce à la table fermée `backend/config/guides.php` : aucune adresse ne vient d'une donnée reçue, rien n'est écrit en base,
+et le lien personnel de l'e-mail (`?t=`) n'est jamais affiché ni stocké. Interrupteur `CRM_GUIDE_LIEN_ENABLED`, éteint par
+défaut (allumer = déployer). Identifiant inconnu ou profil en lecture seule (sans `contacts.view_pii`) : pas de lien. Seul l'hôte `guides.hote_autorise`
+(`CRM_GUIDE_HOTE`, par défaut `axion-ia.com`) est accepté ; l'hôte de test `exemple.invalid` ne l'est qu'en testing, local et
+demo. Avant d'allumer l'interrupteur en production, poser la vraie adresse publique dans `config/guides.php`.
+Le message « Aucun lien disponible pour ce guide » est propre à la ligne concernée.
 
 ## Version 3 — historique des origines (ADR-CONTRAT-V3-ORIGINE)
 

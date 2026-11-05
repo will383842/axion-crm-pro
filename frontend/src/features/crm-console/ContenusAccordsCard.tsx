@@ -1,17 +1,16 @@
 /**
  * Bloc « Contenus et accords » de la fiche d'une personne (PV-6), en LECTURE.
- * D'où vient la personne, quels guides reçus, quels accords et quelles
- * versions de texte ; l'opposition est une mise à l'écart bien visible.
+ * D'où vient la personne, quels guides reçus, quel accord pour de futures
+ * campagnes ; l'opposition est une mise à l'écart bien visible.
  * Tout est rendu en texte (échappé par React) : aucun HTML brut.
+ *
+ * Lien du guide : « Voir le guide » n'apparaît que si le CRM a calculé un lien
+ * (table fermée côté serveur) ET qu'il passe la seconde garde ci-dessous.
+ * Nouvel onglet, `noopener noreferrer nofollow`. Jamais le lien personnel de l'e-mail.
  */
 import { Card, CardTitle, StatusPill } from '@/components/ui';
-import type { ContenusAccords } from './types';
-
-const NATURE_LABELS: Record<string, string> = {
-  information: 'Information',
-  optin: 'Accord pour de futures campagnes',
-  retrait: 'Retrait',
-};
+import { libelleReseau } from '@/features/origines/libelles';
+import type { ContenusAccords, LienGuide as LienGuideDonnee } from './types';
 
 function date(value: string | null | undefined): string {
   if (value === null || value === undefined) return '—';
@@ -19,9 +18,58 @@ function date(value: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('fr-FR');
 }
 
+/** Seconde garde (navigateur) : https seulement, sans identifiant, port, paramètre ni fragment. */
+function lienSur(lien: LienGuideDonnee | null | undefined): LienGuideDonnee | null {
+  if (lien === null || lien === undefined || typeof lien.url !== 'string' || typeof lien.libelle !== 'string') return null;
+  if (!lien.url.startsWith('https://') || /[?#@\s\\]/.test(lien.url)) return null;
+  try {
+    const u = new URL(lien.url);
+    if (u.protocol !== 'https:' || u.port !== '' || u.username !== '' || u.password !== '' || u.search !== '' || u.hash !== '') return null;
+  } catch {
+    return null;
+  }
+  return lien;
+}
+
+function VoirLeGuide({ lien, envoye }: { lien: LienGuideDonnee; envoye?: string }) {
+  const suffixe = envoye === undefined ? '' : ` envoyé le ${envoye}`;
+  return (
+    <a
+      href={lien.url}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      aria-label={`Voir le guide « ${lien.libelle} »${suffixe} (nouvel onglet)`}
+      data-testid="voir-le-guide"
+      style={{ marginLeft: 10 }}
+    >
+      Voir le guide
+    </a>
+  );
+}
+
+/** Nom connu du guide ; à défaut l'identifiant brut, en texte. */
+function NomGuide({ nom, guide }: { nom: string | null | undefined; guide: string | null }) {
+  if (nom !== null && nom !== undefined && nom !== '') return <>{nom}</>;
+  return guide === null ? <>—</> : <code>{guide}</code>;
+}
+
 export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefined }) {
   const b = bloc;
   const vide = b === undefined || (b.origine === null && b.guides.length === 0 && b.consentements.length === 0 && !b.opposition.actif);
+
+  // Accord pour de futures campagnes : le dernier choix (accord ou retrait).
+  const accords = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'optin' || c.nature === 'retrait');
+  const accord = accords.length === 0 ? null : accords.reduce((a, c) => ((c.date ?? '') >= (a.date ?? '') ? c : a));
+
+  // Consentements d'information (texte reçu à l'inscription) : lisibles en plus de l'accord.
+  const informations = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'information');
+
+  const lienOrigine = lienSur(b?.origine?.lien);
+  const liensGuides = (b?.guides ?? []).map((g) => lienSur(g.lien));
+  const disponible = b?.lien_statut === 'disponible';
+  // Mention « aucun lien » propre à chaque ligne qui a un identifiant mais pas de lien.
+  const origineSansLien = disponible && b?.origine?.guide != null && lienOrigine === null;
+  const publique = disponible && (lienOrigine !== null || liensGuides.some((l) => l !== null));
 
   return (
     <Card>
@@ -36,46 +84,97 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
         <p>Aucune information de contenu ou d’accord reçue pour cette personne.</p>
       ) : (
         <div>
-          <div>
-            <strong>Origine</strong>
-            {b.origine === null ? (
-              <div>—</div>
-            ) : (
+          <p>Origine du contenu et guides reçus.</p>
+          <dl>
+            <div>
+              <dt>Origine</dt>
+              <dd>
+                {b.origine === null ? (
+                  '—'
+                ) : (
+                  <>
+                    Mot « {b.origine.mot ?? '—'} » · {libelleReseau(b.origine.reseau) ?? '—'} · {b.origine.guide === null ? '—' : <code>{b.origine.guide}</code>}
+                    {b.origine.guide == null && b.origine.date != null && (
+                      <span data-testid="origine-date" style={{ marginLeft: 10 }}>
+                        reçu le {date(b.origine.date)}
+                      </span>
+                    )}
+                  </>
+                )}
+              </dd>
+            </div>
+            {b.origine?.guide != null && (
               <div>
-                Mot : {b.origine.mot ?? '—'} · Réseau : {b.origine.reseau ?? '—'} · Guide : {b.origine.guide ?? '—'} ·{' '}
-                {date(b.origine.date)}
+                <dt>Guide d’origine</dt>
+                <dd>
+                  <NomGuide nom={b.origine.nom} guide={b.origine.guide} />
+                  {lienOrigine !== null && <VoirLeGuide lien={lienOrigine} />}
+                  <span style={{ marginLeft: 10 }}>envoyé le {date(b.origine.date)}</span>
+                  {origineSansLien && <span style={{ marginLeft: 10 }}>Aucun lien disponible pour ce guide.</span>}
+                </dd>
               </div>
             )}
-          </div>
-          <div>
-            <strong>Guides reçus</strong>
-            {b.guides.length === 0 ? (
-              <div>—</div>
-            ) : (
-              <ul>
-                {b.guides.map((g, i) => (
-                  <li key={`${g.guide ?? ''}-${g.date ?? ''}-${i}`}>
-                    {g.guide ?? '—'} · {date(g.date)}
-                  </li>
-                ))}
-              </ul>
+            <div>
+              <dt>Guides reçus</dt>
+              <dd>
+                {b.guides.length === 0 ? (
+                  '—'
+                ) : (
+                  <ul>
+                    {b.guides.map((g, i) => {
+                      const lien = liensGuides[i] ?? null;
+                      return (
+                        <li key={`${g.guide ?? ''}-${g.date ?? ''}-${i}`}>
+                          <NomGuide nom={g.nom} guide={g.guide} /> · envoyé le {date(g.date)}
+                          {lien !== null && <VoirLeGuide lien={lien} envoye={date(g.date)} />}
+                          {lien === null && disponible && g.guide != null && <span style={{ marginLeft: 10 }}>Aucun lien disponible pour ce guide.</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </dd>
+            </div>
+            {informations.length > 0 && (
+              <div>
+                <dt>Information reçue</dt>
+                <dd>
+                  <ul>
+                    {informations.map((c, i) => (
+                      <li key={`${c.date ?? ''}-${c.version ?? ''}-${i}`}>
+                        le {date(c.date)}
+                        <span style={{ marginLeft: 10 }}>
+                          source {c.source ?? '—'} · texte version {c.version ?? '—'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
             )}
-          </div>
-          <div>
-            <strong>Accords</strong>
-            {b.consentements.length === 0 ? (
-              <div>—</div>
-            ) : (
-              <ul>
-                {b.consentements.map((c, i) => (
-                  <li key={`${c.nature ?? ''}-${c.date ?? ''}-${i}`}>
-                    {NATURE_LABELS[c.nature ?? ''] ?? c.nature ?? '—'} · {date(c.date)} · source {c.source ?? '—'} · texte version{' '}
-                    {c.version ?? '—'}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+            <div>
+              <dt>Accord pour de futures campagnes</dt>
+              <dd>
+                {accord === null ? (
+                  '—'
+                ) : (
+                  <>
+                    {accord.nature === 'retrait' ? 'retiré' : 'donné'} le {date(accord.date)}
+                    <span style={{ marginLeft: 10 }}>
+                      source {accord.source ?? '—'} · texte version {accord.version ?? '—'}
+                    </span>
+                  </>
+                )}
+              </dd>
+            </div>
+          </dl>
+          {b.lien_statut === 'eteint' && <p data-testid="lien-guide-etat">Le lien du guide n’est pas affiché pour le moment.</p>}
+          {b.lien_statut === 'refuse' && <p data-testid="lien-guide-etat">Le lien du guide n’est pas disponible avec votre profil.</p>}
+          {publique && (
+            <p data-testid="lien-guide-etat">
+              C’est la version publique du guide, la même pour tout le monde : l’ouvrir ne signale rien sur la personne.
+            </p>
+          )}
         </div>
       )}
     </Card>

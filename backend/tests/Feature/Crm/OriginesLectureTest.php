@@ -148,7 +148,7 @@ test('OL 7 — historique complet : fiche + archive, ordre décroissant, liste b
     foreach (['"pseudo"', '"texte"', '"nom"', 'commentaire_ref', 'EMPREINTE_BRUTE', 'ne-doit-pas-sortir', 'post_ref_masq', 'masque_le'] as $interdit) {
         expect($brut)->not->toContain($interdit);
     }
-    expect(array_keys($tout[0]))->toEqualCanonicalizing(['famille', 'detail', 'canal', 'reseau', 'compte', 'mot', 'guide', 'date', 'post_ref', 'post_url', 'version_texte', 'utm_campaign']);
+    expect(array_keys($tout[0]))->toEqualCanonicalizing(['famille', 'detail', 'canal', 'reseau', 'compte', 'mot', 'guide', 'date', 'post_ref', 'post_url', 'version_texte', 'utm_campaign', 'lien_guide']);
 });
 
 test('OL 8 — IDOR : personne d’un autre espace, inexistante ou non numérique → 404 au même corps', function () {

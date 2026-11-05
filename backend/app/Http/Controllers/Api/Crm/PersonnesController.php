@@ -827,7 +827,7 @@ class PersonnesController extends ConsoleController
      * Historique des origines (contrat v3), liste blanche de clés, du plus
      * ancien au plus récent. Vide si l'interrupteur est éteint.
      *
-     * @return list<array<string, ?string>>
+     * @return list<array<string, mixed>>
      */
     private function origineHistorique(\stdClass $p): array
     {
@@ -835,10 +835,11 @@ class PersonnesController extends ConsoleController
             return [];
         }
         $brut = is_string($p->origines) ? json_decode($p->origines, true) : $p->origines;
+        $droitLien = ! MasquageCoordonnees::requis();
 
         return is_array($brut)
             ? array_values(array_map(
-                static fn (array $o): array => ContenusAccords::presenterOrigine($o),
+                static fn (array $o): array => ContenusAccords::presenterOrigine($o, $droitLien),
                 array_filter($brut, static fn (mixed $o): bool => is_array($o) && ! ContenusAccords::estMasquee($o)),
             ))
             : [];
@@ -873,6 +874,7 @@ class PersonnesController extends ConsoleController
             $ligne->guides_recus ?? null,
             $ligne->consentements ?? null,
             $ligne->opposition_at ?? null,
+            ! MasquageCoordonnees::requis(), // lecture seule (sans contacts.view_pii) : pas de lien
         );
     }
 

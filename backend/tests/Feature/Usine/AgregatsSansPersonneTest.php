@@ -89,3 +89,36 @@ test('anti-différence : le masquage en cascade se stabilise (point fixe) sur to
         expect(l7SansDifferencePossible($sortie, $m))->toBeTrue();
     }
 });
+
+test('le compte est normalisé au format exigé par le récepteur de l\'Usine', function () {
+    $sortie = AgregatsOrigines::masquer([
+        l7Ligne('a', 9, 9, 9, 9, 'instagram', 'Axion IA'),
+        l7Ligne('b', 9, 9, 9, 9, 'linkedin', 'LinkedIn.Page'),
+    ], 3);
+
+    expect(array_column($sortie, 'compte', 'mot'))->toBe(['a' => 'axion_ia', 'b' => 'linkedin_page']);
+});
+
+test('un compte vide ou irrécupérable exclut la ligne du push, il n\'est jamais envoyé', function () {
+    $sortie = AgregatsOrigines::masquer([
+        l7Ligne('vide', 9, 9, 9, 9, 'instagram', ''),
+        l7Ligne('blanc', 9, 9, 9, 9, 'instagram', '   '),
+        l7Ligne('ok', 9, 9, 9, 9, 'instagram', 'axion'),
+    ], 3);
+
+    expect(array_column($sortie, 'mot'))->toBe(['ok']);
+});
+
+test('un compte très long est tronqué à 40 caractères et reste valide', function () {
+    $sortie = AgregatsOrigines::masquer([l7Ligne('long', 9, 9, 9, 9, 'instagram', str_repeat('Ab', 50))], 3);
+
+    expect($sortie)->toHaveCount(1)
+        ->and(strlen($sortie[0]['compte']))->toBe(40)
+        ->and($sortie[0]['compte'])->toMatch('/^[a-z][a-z0-9_]{1,39}$/');
+});
+
+test('un compte commençant par un chiffre reçoit un préfixe lettre', function () {
+    $sortie = AgregatsOrigines::masquer([l7Ligne('n', 9, 9, 9, 9, 'instagram', '123abc')], 3);
+
+    expect($sortie[0]['compte'])->toMatch('/^[a-z][a-z0-9_]{1,39}$/');
+});

@@ -97,6 +97,42 @@ final class AgregatsOrigines
     }
 
     /**
+     * Normalise le compte au format exigé par le récepteur de l'Usine (^[a-z][a-z0-9_]{1,39}$),
+     * ou null s'il reste invalide : la ligne est alors exclue du push, jamais envoyée.
+     */
+    public static function normaliserCompte(string $compte): ?string
+    {
+        $c = preg_replace('/[^a-z0-9_]/', '_', strtolower(trim($compte))) ?? '';
+        if ($c === '' || trim($c, '_') === '') {
+            return null;
+        }
+        if (! preg_match('/^[a-z]/', $c)) {
+            $c = 'c' . $c;
+        }
+        $c = substr($c, 0, 40);
+
+        return preg_match('/^[a-z][a-z0-9_]{1,39}$/', $c) === 1 ? $c : null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lignes
+     * @return list<array<string, mixed>>
+     */
+    private static function compteValide(array $lignes): array
+    {
+        $sortie = [];
+        foreach ($lignes as $l) {
+            $compte = self::normaliserCompte((string) ($l['compte'] ?? ''));
+            if ($compte !== null) {
+                $l['compte'] = $compte;
+                $sortie[] = $l;
+            }
+        }
+
+        return $sortie;
+    }
+
+    /**
      * Seuil + masquage secondaire (anti-différence), sur DEUX axes.
      *
      * 1. une cellule < seuil devient "<3" ;
@@ -112,6 +148,8 @@ final class AgregatsOrigines
      */
     public static function masquer(array $lignes, int $seuil = 3): array
     {
+        $lignes = self::compteValide($lignes);
+
         $masque = static fn (int|string $v): bool => $v === '<3';
 
         foreach ($lignes as &$l) {

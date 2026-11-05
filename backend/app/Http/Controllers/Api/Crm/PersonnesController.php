@@ -687,7 +687,7 @@ class PersonnesController extends ConsoleController
     /**
      * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille?: ?string, origine_detail?: ?string}  $f
      */
-    private function requete(string $workspaceId, array $f): Builder
+    public function requete(string $workspaceId, array $f): Builder
     {
         $requete = DB::table('personnes')
             ->leftJoin('abonnements', function ($join): void {

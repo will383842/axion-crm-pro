@@ -8,6 +8,7 @@ use App\Console\Commands\CrmPublicAnnuaireOfficiel;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
+use App\Console\Commands\CrmUsinePousserAgregats;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
@@ -516,5 +517,12 @@ Schedule::call(static fn () => BattementPlanificateur::battre())
 // `ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED` (et `ORIGINES_V3_ENABLED`) est éteint.
 Schedule::command('origines:masquer-commentaire-ref')
     ->dailyAt('03:40')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
+// L7 — push AGRÉGÉ CRM → Usine (comptages seulement, aucune donnée de personne). Sort
+// aussitôt tant que `USINE_AGREGATS_CRM_ENABLED` est éteint. Ne supprime RIEN.
+Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
+    ->dailyAt('05:30')
     ->withoutOverlapping(60)
     ->onOneServer();

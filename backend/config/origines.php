@@ -31,9 +31,18 @@
 | `commentaire_ref` CONSERVÉE) les entrées de plus de `commentaire_ref_mois`
 | mois. Elle ne supprime rien (aucun DELETE, aucune mise à null) et ne
 | tourne que si `v3_enabled` est aussi allumé. Jamais `CRM_PURGE_ENABLED`.
+*
+| `lecture_enabled` (PR-A, L6 + L2-back) : interrupteur de l'API de LECTURE des
+| origines (`/api/v1/crm/origines/*`), ÉTEINT par défaut. Éteint : ces routes
+| répondent 404 (une fusion ne change rien en production). Allumé, il faut
+| ENCORE que la fonction d'espace `origines.lecture` soit ouverte pour l'espace
+| (table `fonctions_espace`, sans ligne = fermée) ET que `v3_enabled` le soit
+| (sinon 200 `{"actif": false}`). Lecture seule : aucune écriture, aucune
+| suppression. Se pose par un DÉPLOIEMENT (un `restart` ne relit pas l'environnement).
 */
 return [
     'v3_enabled' => (bool) env('ORIGINES_V3_ENABLED', false),
+    'lecture_enabled' => (bool) env('ORIGINES_LECTURE_ENABLED', false),
     'cle_hmac' => env('ORIGINES_HMAC_KEY', ''),
     'limite_par_post_canal' => [
         'max' => (int) env('ORIGINES_LIMITE_MAX', 600),

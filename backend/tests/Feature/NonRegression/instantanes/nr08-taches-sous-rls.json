@@ -15,6 +15,7 @@
     "crm:sonde-cle-personne": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "crm:sonde-non-diffusibles": "jouee : AVEUGLE sous RLS (code 0 malgre des fiches [ND]), a corriger par S7",
     "crm:sonde-personnes": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
+    "crm:usine:pousser-agregats": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "db:partman-maintenir": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "journalists:scrape-ours": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:backfill-periodicity": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

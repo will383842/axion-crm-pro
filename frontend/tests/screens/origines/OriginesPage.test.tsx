@@ -31,7 +31,7 @@ describe('OriginesPage', () => {
 
   it('vue d’ensemble : « Demandes » vient du serveur et dit que la page guide en fait partie', async () => {
     await monter(TOUTES);
-    const carte = (await screen.findByText('Demandes')).closest('[data-testid="carte-demandes"]') as HTMLElement;
+    const carte = (await screen.findByText('Demandes enregistrées')).closest('[data-testid="carte-demandes"]') as HTMLElement;
     expect(within(carte).getByText('1 322')).toBeVisible();
     expect(carte.textContent).toMatch(/page guide/);
     expect(screen.getByText('Non classé')).toBeVisible();
@@ -95,10 +95,10 @@ describe('OriginesPage', () => {
       expect(screen.getByRole('button', { name: /Réessayer/ })).toBeVisible();
     });
 
-    it.each([403, 404])('accès refusé (%i) : espace non business ou fonction fermée', async (code) => {
+    it.each([403, 404])('accès refusé (%i) : écran non disponible', async (code) => {
       await monter(TOUTES, [getStatus('/crm/origines/apercu', code)]);
       expect(await screen.findByText('Accès refusé')).toBeVisible();
-      expect(screen.getByText(/espace business/)).toBeVisible();
+      expect(screen.queryByText(/espace business/)).toBeNull();
     });
   });
 

@@ -19,10 +19,12 @@ interface Moi {
 export const PERMISSION_PII = 'contacts.view_pii';
 export const PERMISSION_EXPORT = 'data.export';
 export const PERMISSION_TRAITER = 'rgpd.handle';
+/** Voir adresse, note et jeton des demandes RGPD : owner et admin seulement. */
+export const PERMISSION_RGPD_PII = 'rgpd.view_pii';
 
 const PAR_ROLE: Record<string, string[]> = {
-  owner: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_TRAITER],
-  admin: [PERMISSION_PII, PERMISSION_EXPORT],
+  owner: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_TRAITER, PERMISSION_RGPD_PII],
+  admin: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_RGPD_PII],
   operator: [PERMISSION_PII, PERMISSION_EXPORT],
   viewer: [],
 };
@@ -38,6 +40,7 @@ export interface Droits {
   voirPii: boolean;
   exporter: boolean;
   traiter: boolean;
+  voirAdresseRgpd: boolean;
 }
 
 export function useDroits(): Droits {
@@ -48,7 +51,7 @@ export function useDroits(): Droits {
     staleTime: 5 * 60 * 1000,
   });
   const p = permissionsDe(data);
-  return { connus: data !== undefined, voirPii: p.has(PERMISSION_PII), exporter: p.has(PERMISSION_EXPORT), traiter: p.has(PERMISSION_TRAITER) };
+  return { connus: data !== undefined, voirPii: p.has(PERMISSION_PII), exporter: p.has(PERMISSION_EXPORT), traiter: p.has(PERMISSION_TRAITER), voirAdresseRgpd: p.has(PERMISSION_RGPD_PII) };
 }
 
 /** Raison affichée sous le bouton d'export grisé ; `null` si l'export est permis. */

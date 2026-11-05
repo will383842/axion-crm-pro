@@ -104,4 +104,40 @@ describe('EffacementsDemandesPage', () => {
     await screen.findByText('EFF-0007').catch(() => null);
     expect(screen.queryByText(/mise à l’écart faite/)).toBeNull();
   });
+
+  describe('masquage serveur (hors owner/admin : rgpd.view_pii)', () => {
+    const MASQUEES = {
+      data: [
+        { id: 9, type: 'erasure', status: 'pending', subject_email: null, requested_at: '2026-11-04T06:12:00Z', processed_at: null, metadata: { mise_a_l_ecart: true }, export_token: null },
+        { id: 8, type: 'erasure', status: 'done', requested_at: '2026-11-01T06:12:00Z', processed_at: '2026-11-02T06:12:00Z', metadata: { verification: 'ok' }, export_token: null },
+      ],
+    };
+
+    it('adresse retirée ou absente : libellé « adresse masquée », aucun plantage', async () => {
+      await monter(VIEWER, [getJson('/rgpd/requests', MASQUEES)]);
+      expect(await screen.findByText('EFF-0009')).toBeVisible();
+      expect(screen.getAllByText('adresse masquée (réservée à l’administrateur)')).toHaveLength(2);
+    });
+
+    it('même adresse partiellement masquée par le serveur : le libellé remplace la valeur pour un lecteur', async () => {
+      await monter(VIEWER);
+      await screen.findAllByText(/EFF-0007/);
+      expect(screen.queryByText(/exe•••@/)).toBeNull();
+      expect(screen.getAllByText(/adresse masquée/).length).toBe(3);
+    });
+
+    it('owner/admin (rgpd.view_pii) : adresse affichée telle que le serveur la rend', async () => {
+      const admin = ME(['rgpd.view', 'rgpd.view_pii'], ['admin']);
+      await monter(admin, [getJson('/rgpd/requests', { data: [{ ...LIGNES.data[0], subject_email: 'personne@exemple.invalid' }] })]);
+      expect(await screen.findByText('personne@exemple.invalid')).toBeVisible();
+      expect(screen.queryByText(/adresse masquée/)).toBeNull();
+    });
+
+    it('un « stop » n’est pas une demande d’effacement : la note le dit, aucun bouton Supprimer', async () => {
+      const { container } = await monter(VIEWER, [getJson('/rgpd/requests', MASQUEES)]);
+      await screen.findByText('EFF-0009');
+      expect(container.textContent).toMatch(/« stop » n’est pas une demande d’effacement/);
+      expect(screen.queryByRole('button', { name: /supprim/i })).toBeNull();
+    });
+  });
 });

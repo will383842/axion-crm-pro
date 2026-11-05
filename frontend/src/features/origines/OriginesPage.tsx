@@ -46,7 +46,7 @@ export function OriginesPage() {
   if (apercu.isLoading) corps = <Chargement texte="Chargement des origines des contacts…" />;
   else if (apercu.error !== null && apercu.data === undefined) {
     corps = estRefuse(apercu.error) ? (
-      <AccesRefuse>Cet écran n’est pas disponible dans cet espace : il est réservé à l’espace business. Si vous en avez besoin, demandez l’accès au propriétaire.</AccesRefuse>
+      <AccesRefuse>Cet écran n’est pas disponible pour le moment. Si vous en avez besoin, demandez l’accès au propriétaire.</AccesRefuse>
     ) : (
       <Erreur onRetry={() => void apercu.refetch()} />
     );
@@ -146,7 +146,7 @@ function useListe<T>(cle: string, chemin: string, params: Record<string, string 
 
 function Etat({ q, children }: { q: { isLoading: boolean; error: unknown; data: unknown; refetch: () => unknown }; children: React.ReactNode }) {
   if (q.isLoading) return <Chargement texte="Chargement…" />;
-  if (q.error !== null && q.data === undefined) return estRefuse(q.error) ? <AccesRefuse>Cet écran n’est pas disponible dans cet espace : il est réservé à l’espace business.</AccesRefuse> : <Erreur onRetry={() => void q.refetch()} />;
+  if (q.error !== null && q.data === undefined) return estRefuse(q.error) ? <AccesRefuse>Cet écran n’est pas disponible pour le moment.</AccesRefuse> : <Erreur onRetry={() => void q.refetch()} />;
   return <>{children}</>;
 }
 
@@ -159,9 +159,9 @@ function VueEnsemble({ apercu, params }: { apercu: Apercu; params: Record<string
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Carte titre="Contacts avec une origine" valeur={nombre(apercu.personnes)} aide="au moins une origine enregistrée" />
         {nouveaux !== undefined && <Carte titre="Nouveaux sur 30 jours" valeur={`+${nombre(nouveaux)}`} aide="origines enregistrées sur 30 jours (voir l’onglet Tendance)" />}
-        <Carte id="carte-demandes" titre="Demandes" valeur={nombre(apercu.demandes)} aide="arrivées par un mot, un message privé, une publication ou la page guide" />
+        <Carte id="carte-demandes" titre="Demandes enregistrées" valeur={nombre(apercu.demandes)} aide="arrivées par un mot, un message privé, une publication ou la page guide" />
         <Carte titre="Accords" valeur={nombre(apercu.accords)} aide="accord pour de futures campagnes" />
-        <Carte titre="Mis à l’écart (opposés)" valeur={nombre(apercu.opposees)} aide="effacements demandés et « stop » · données gardées, plus aucun envoi" />
+        <Carte titre="Mis à l’écart (opposés)" valeur={nombre(apercu.opposees)} aide="personnes mises à l’écart : effacement demandé ou « stop » (un « stop » coupe les envois, ce n’est pas une demande d’effacement) · données gardées" />
       </div>
       <Card>
         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Par origine</h2>

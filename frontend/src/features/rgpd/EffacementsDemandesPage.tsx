@@ -27,7 +27,8 @@ interface Demande {
   id: number;
   type: string;
   status: Statut;
-  subject_email: string;
+  /** Masqué ou absent (null) pour tout rôle sauf owner/admin (rgpd.view_pii). */
+  subject_email?: string | null;
   requested_at: string;
   processed_at?: string | null;
   /** Facultatifs : le plan ne les prévoit pas encore (voir PR) ; affichés seulement s'ils sont envoyés. */
@@ -35,6 +36,7 @@ interface Demande {
   origine?: string | null;
 }
 
+export const LIBELLE_ADRESSE_MASQUEE = 'adresse masquée (réservée à l’administrateur)';
 export const LIBELLE_ACTION = 'Marquer comme traité (mise à l’écart faite)';
 const STATUTS: Record<Statut, string> = { pending: 'À traiter', processing: 'En cours', done: 'Traitée', rejected: 'Rejetée', expired: 'Expirée' };
 const OUVERTES: Statut[] = ['pending', 'processing'];
@@ -43,6 +45,10 @@ const quand = (iso: string): string => {
   const d = new Date(iso);
   return `${d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' })} · ${d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' })}`;
 };
+
+/** Adresse affichée : le serveur masque ou retire l'adresse hors owner/admin ; jamais de plantage. */
+const adresse = (d: Demande, voir: boolean): string =>
+  voir && typeof d.subject_email === 'string' && d.subject_email !== '' ? d.subject_email : LIBELLE_ADRESSE_MASQUEE;
 
 export function EffacementsDemandesPage() {
   const droits = useDroits();
@@ -99,7 +105,10 @@ export function EffacementsDemandesPage() {
                 return (
                   <tr key={d.id} className="border-t border-slate-100 align-top dark:border-slate-800">
                     <td className="px-4 py-2"><div className="font-medium">{reference(d.id)}</div><div className="text-xs text-slate-500">reçue le {quand(d.requested_at)}</div></td>
-                    <td>{d.subject_email}</td>
+                    <td>
+                      {adresse(d, droits.voirAdresseRgpd)}
+                      <div className="text-xs text-slate-500">Effacement demandé</div>
+                    </td>
                     <td>{d.origine ?? '—'}</td>
                     <td><StatusPill tone={ouverte ? 'warning' : 'neutral'}>{STATUTS[d.status] ?? d.status}</StatusPill></td>
                     <td className="py-2 pr-4">
@@ -129,9 +138,9 @@ export function EffacementsDemandesPage() {
 
   return (
     <div>
-      <PageHeader surTitre="À traiter" title="Effacements demandés" subtitle="Les personnes qui ont demandé que leurs données soient effacées." />
+      <PageHeader surTitre="À traiter" title="Effacements demandés" subtitle="Les personnes qui ont demandé que leurs données soient effacées (hors simples « stop »)." />
       <div role="note" className="mb-4 rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-800">
-        <strong>Rien n’est supprimé. Jamais.</strong> Quand une personne demande l’effacement, elle est mise à l’écart de tous les envois tout de suite : plus aucun message ne lui part. Ses données sont gardées (corbeille douce). Le propriétaire reçoit toujours une notification dans la cloche ; une alerte regroupée (cloche et e-mail) part en plus si les alertes sont allumées.
+        <strong>Rien n’est supprimé. Jamais.</strong> Un « stop » n’est pas une demande d’effacement : il coupe les envois et met la personne à l’écart, sans rien demander d’autre ; il n’apparaît pas dans cette liste. Quand une personne demande l’effacement, elle est mise à l’écart de tous les envois tout de suite : plus aucun message ne lui part. Ses données sont gardées (corbeille douce). Le propriétaire reçoit toujours une notification dans la cloche ; une alerte regroupée (cloche et e-mail) part en plus si les alertes sont allumées.
       </div>
       <div className="mb-4">
         <SegmentedControl

@@ -217,6 +217,16 @@ final class SiteSyncIngestService
         // dénomination est une proposition, jamais une certitude (4,29 M fiches
         // INSEE en face). L'événement est conservé pour l'écran d'arbitrage.
         if ($siren === null) {
+            // Fiche demande (lot C1) : la demande fait AUSSI une personne, sans
+            // jamais deviner l'entreprise. Le retour reste EXACTEMENT
+            // `[null, null, PENDING_MATCH, null]` : un sujet non nul ferait
+            // écrire à `attachTags` un id de personne dans `company_tag`, et
+            // sortirait la demande de la file d'arbitrage. Drapeau fermé :
+            // `concerneUneDemande` rend `false` sans aucune requête.
+            if ($this->personnes->concerneUneDemande($event, 'business')) {
+                $this->personnes->assurerDepuisDemande($event, $workspaceId);
+            }
+
             return [null, null, IngestOutcome::PENDING_MATCH, null];
         }
 

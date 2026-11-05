@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Ingest\OrigineDictionnaire;
+use App\Crm\Origines\GardeAuditExport;
 use App\Crm\Origines\RequetesOrigines;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
@@ -153,7 +154,7 @@ class OriginesController extends ConsoleController
         abort_unless(ctype_digit($personneId) && strlen($personneId) <= 18, 404);
         $v = $request->validate([
             'par_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'curseur' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,160}$/'],
+            'curseur' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,2200}$/'],
         ]);
         $apres = null;
         if (isset($v['curseur'])) {
@@ -205,6 +206,14 @@ class OriginesController extends ConsoleController
                 $etat = new \stdClass;
                 $etat->lues = 0;
                 $etat->tronque = false;
+                // Filet : si le script meurt (erreur fatale, délai dépassé), le `finally` ne s'exécute pas ;
+                // l'arrêt écrit alors la ligne, marquée « interrompu », une seule fois, sans donnée de personne.
+                $garde = new GardeAuditExport(
+                    fn (int $lignes, bool $interrompu) => $this->auditer($request, $espace, $demandes, $lignes, $etat->tronque, $interrompu, $plafond),
+                    $etat,
+                    $plafond,
+                );
+                register_shutdown_function($garde);
                 $out = fopen('php://output', 'w');
                 if ($out === false) {
                     throw new RuntimeException("Export CSV : impossible d'ouvrir php://output.");
@@ -255,7 +264,7 @@ class OriginesController extends ConsoleController
                     }
                 } finally {
                     fclose($out);
-                    $this->auditer($request, $espace, $demandes, min($etat->lues, $plafond), $etat->tronque);
+                    $garde->terminer();
                 }
             });
         }, 'origines-' . now()->format('Y-m-d') . '.csv', array_merge(['Content-Type' => 'text/csv; charset=UTF-8'], PlafondExport::entetes()));
@@ -268,7 +277,7 @@ class OriginesController extends ConsoleController
      *
      * @param  array<string, mixed>  $demandes
      */
-    private function auditer(Request $request, string $espace, array $demandes, int $lignes, bool $tronque): void
+    private function auditer(Request $request, string $espace, array $demandes, int $lignes, bool $tronque, bool $interrompu = false, ?int $prevu = null): void
     {
         try {
             $filtres = [];
@@ -281,6 +290,7 @@ class OriginesController extends ConsoleController
                 'user_id' => is_string($uid) ? $uid : null,
                 'method' => $request->method(),
                 'path' => 'api/v1/crm/origines/export | lignes=' . $lignes . ' | tronque=' . ($tronque ? 'oui' : 'non')
+                    . ($interrompu ? ' | interrompu=oui | prevu=' . ($prevu ?? 0) : '')
                     . ' | filtres: ' . ($filtres === [] ? 'aucun' : implode(' ', $filtres)),
                 'status' => 200,
                 'ip' => $request->ip(),

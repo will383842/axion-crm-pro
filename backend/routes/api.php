@@ -588,9 +588,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/export', [OriginesController::class, 'export'])
-                ->middleware(['throttle:scraper-list', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
+                ->middleware(['throttle:origines-export', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
             Route::get('/personnes/{personneId}/origines', [OriginesController::class, 'historique'])
-                ->whereNumber('personneId')->middleware(['throttle:scraper-list', 'delai-sql:120']);
+                ->whereNumber('personneId')->middleware(['throttle:origines-historique', 'delai-sql:120']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

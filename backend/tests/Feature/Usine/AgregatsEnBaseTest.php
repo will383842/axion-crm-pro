@@ -142,3 +142,40 @@ test('501 lignes : 500 envoyées, avertissement journalisé sans donnée de pers
         static fn (string $msg, array $ctx = []): bool => ! str_contains(json_encode($ctx), 'compte') && ! str_contains($msg, 'compte'),
     );
 });
+
+test('un compte sans caractère [a-z0-9] est exclu au lieu de fusionner en « c__ »', function () {
+    $ws = espaceAgregats();
+    foreach ([1, 2, 3] as $i) {
+        personneAvecOrigines($ws, $i, [['compte' => '@@']]);
+    }
+    foreach ([4, 5, 6] as $i) {
+        personneAvecOrigines($ws, $i, [['compte' => '__']]);
+    }
+    foreach ([7, 8, 9] as $i) {
+        personneAvecOrigines($ws, $i, [['compte' => 'Axion']]);
+    }
+
+    $brut = AgregatsOrigines::pourJour($ws, '2026-11-03');
+
+    expect(array_column($brut, 'compte'))->toBe(['axion']);
+});
+
+test('le trim SQL du compte est aligné sur PHP (espace, tabulation, saut de ligne)', function () {
+    $ws = espaceAgregats();
+    personneAvecOrigines($ws, 1, [['compte' => "\tAxion \n"]]);
+    personneAvecOrigines($ws, 2, [['compte' => 'axion']]);
+
+    $brut = AgregatsOrigines::pourJour($ws, '2026-11-03');
+
+    expect($brut)->toHaveCount(1)->and($brut[0]['compte'])->toBe('axion')->and($brut[0]['demandes'])->toBe(2);
+});
+
+test('un réseau hors format est exclu côté CRM', function () {
+    $ws = espaceAgregats();
+    personneAvecOrigines($ws, 1, [['compte' => 'axion', 'reseau' => 'Insta gram!']]);
+    personneAvecOrigines($ws, 2, [['compte' => 'axion', 'reseau' => 'instagram']]);
+
+    $brut = AgregatsOrigines::pourJour($ws, '2026-11-03');
+
+    expect(array_column($brut, 'reseau'))->toBe(['instagram']);
+});

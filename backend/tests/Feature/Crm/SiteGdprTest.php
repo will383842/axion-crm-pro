@@ -346,7 +346,7 @@ test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille D
     $notification = DB::table('notifications')->where('user_id', $proprietaire)->first();
     expect($notification)->not->toBeNull()
         ->and($notification->type)->toBe('rgpd.demande_effacement')
-        ->and($notification->action_url)->toBe('/rgpd/requests')
+        ->and($notification->action_url)->toBe('/rgpd/requests?statut=ouverte')
         // Jamais l'adresse de la personne dans le texte.
         ->and(mb_strtolower((string) $notification->title . ' ' . (string) $notification->body))->not->toContain(GDPR_EMAIL);
     Event::assertDispatched(NotificationCreated::class, fn (NotificationCreated $e): bool => $e->userId === $proprietaire && $e->workspaceId === $espace);

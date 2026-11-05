@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OriginesPage } from '@/features/origines/OriginesPage';
 import { renderScreen } from '../../helpers/renderScreen';
@@ -128,6 +128,38 @@ describe('OriginesPage', () => {
       expect(apercu.urls).toHaveLength(avant);
       expect(screen.getByLabelText('Du')).toBeVisible();
       expect(screen.getByRole('button', { name: 'Réinitialiser' })).toBeVisible();
+    });
+
+    it('Du et Au anciens mais à moins de 366 jours l’un de l’autre : la requête part', async () => {
+      const apercu = await avecCompteur();
+      const avant = apercu.urls.length;
+      await userEvent.type(screen.getByLabelText('Du'), '2024-01-01');
+      await userEvent.type(screen.getByLabelText('Au'), '2024-06-30');
+      await waitFor(() =>
+        expect(apercu.urls.slice(avant).some((u) => {
+          const p = new URL(u).searchParams;
+          return p.get('du') === '2024-01-01' && p.get('au') === '2024-06-30';
+        })).toBe(true));
+      expect(screen.queryByText(/Date trop éloignée/)).toBeNull();
+    });
+
+    it('borne seule à plus de 366 jours : message, aucun appel', async () => {
+      const apercu = await avecCompteur();
+      const avant = apercu.urls.length;
+      const iso = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
+      await userEvent.type(screen.getByLabelText('Au'), iso);
+      expect(await screen.findByText(/Date trop éloignée/)).toBeVisible();
+      expect(apercu.urls).toHaveLength(avant);
+    });
+
+    it('borne seule à exactement 366 jours : la requête part', async () => {
+      const apercu = await avecCompteur();
+      const avant = apercu.urls.length;
+      const iso = new Date(Date.now() - 366 * 86_400_000).toISOString().slice(0, 10);
+      await userEvent.type(screen.getByLabelText('Du'), iso);
+      await waitFor(() =>
+        expect(apercu.urls.slice(avant).some((u) => new URL(u).searchParams.get('du') === iso)).toBe(true));
+      expect(screen.queryByText(/Date trop éloignée/)).toBeNull();
     });
 
     it('Du après Au : message, aucune requête', async () => {

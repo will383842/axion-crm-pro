@@ -29,7 +29,7 @@ export function periodeTropLongue(du: string, au: string): boolean {
 
 /**
  * Les règles que le serveur applique (sinon 422), reproduites ICI pour n'envoyer
- * aucune requête perdue : (a) une borne seule à plus de 366 jours d'aujourd'hui,
+ * aucune requête perdue : (a) une borne SEULE à plus de 366 jours d'aujourd'hui,
  * (b) « Du » postérieur à « Au », (c) « Mot » hors du motif du serveur, et
  * (d) Du/Au à plus de 366 jours l'un de l'autre. Rend le message, ou null.
  */
@@ -43,9 +43,11 @@ export function erreurFiltres(f: Filtres, aujourdhui: Date = new Date()): string
   if (periodeTropLongue(f.du, f.au)) {
     return 'Période trop longue : 366 jours au maximum entre « Du » et « Au ». Le serveur refuserait la demande (erreur 422).';
   }
-  for (const borne of [f.du, f.au]) {
-    if (borne === '') continue;
-    const jours = Math.abs(Date.parse(borne) - aujourdhui.getTime()) / JOUR_MS;
+  // Comme le serveur : la comparaison à aujourd'hui ne vaut que pour UNE borne seule
+  // (si Du et Au sont remplis, seul l'écart entre eux compte), en jours entiers UTC.
+  if ((f.du === '') !== (f.au === '')) {
+    const borne = f.du !== '' ? f.du : f.au;
+    const jours = Math.abs(Date.parse(borne) - Date.parse(aujourdhui.toISOString().slice(0, 10))) / JOUR_MS;
     if (Number.isFinite(jours) && jours > MAX_JOURS) {
       return 'Date trop éloignée : 366 jours au maximum avant ou après aujourd’hui. Le serveur refuserait la demande (erreur 422).';
     }

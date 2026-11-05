@@ -3,6 +3,8 @@
 namespace App\Crm\Ingest;
 
 use App\Crm\Console\FilesATraiter;
+use App\Crm\Personnes\Abonnements;
+use App\Crm\Personnes\NatureEmail;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -80,7 +82,19 @@ final class RattachementEnAttente
         $contactId = null;
         $personKey = is_string($activity->person_key) ? $activity->person_key : null;
 
-        if ($personKey !== null) {
+        // Drapeau ouvert : un autre événement en attente de la même personne peut
+        // porter le nom que celui-ci n'a pas ; il sert à créer le contact.
+        if ($personKey !== null && PersonnesIngestService::drapeauDemandesOuvert()) {
+            $pending = $this->completerDepuisLesAutres($workspaceId, $activityId, $personKey, $pending);
+        }
+
+        // Une adresse PERSONNELLE sans consentement ne crée pas de contact : même
+        // garde que `PersonnesController::rattacher` (`prospectionAutorisee`).
+        // L'événement reste rattaché à l'entreprise (timeline), sans interlocuteur.
+        $creerContact = $personKey !== null
+            && (($activity->kind ?? null) === DossierClient::EVENT_TYPE || ! $this->adressePersonnelleSansAccord($workspaceId, $personKey, $payload, $pending));
+
+        if ($creerContact) {
             $upserted = $this->contacts->upsert(
                 workspaceId: $workspaceId,
                 companyId: $companyId,
@@ -158,6 +172,75 @@ final class RattachementEnAttente
             'contact_created' => $contactId !== null,
             'soldes' => $soldes,
         ];
+    }
+
+    /**
+     * Adresse personnelle (le site OU la liste du CRM le dit, le doute protège)
+     * dont la personne n'est pas abonnée à la lettre. Sans adresse, ou adresse
+     * professionnelle : faux, le comportement d'avant est inchangé.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<mixed>  $pending
+     */
+    private function adressePersonnelleSansAccord(string $workspaceId, string $personKey, array $payload, array $pending): bool
+    {
+        $email = $this->texte($pending, 'email');
+        if ($email === null) {
+            return false;
+        }
+
+        $declaree = $payload['email_nature'] ?? null;
+        $nature = NatureEmail::de($email) === 'perso' || $declaree === 'perso' ? 'perso' : 'pro';
+
+        $statut = DB::table('abonnements')
+            ->join('personnes', 'personnes.id', '=', 'abonnements.personne_id')
+            ->where('personnes.workspace_id', $workspaceId)
+            ->where('personnes.person_key', $personKey)
+            ->where('abonnements.canal', 'lettre')
+            ->value('abonnements.statut');
+
+        return ! Abonnements::prospectionAutorisee($nature, is_string($statut) ? $statut : null);
+    }
+
+    /**
+     * Complète le `pending_match` de l'événement principal avec le NOM (prénom
+     * et nom pris ensemble, jamais mélangés) et le téléphone d'un autre
+     * événement en attente de la même personne, le plus récent d'abord. Rien
+     * n'est écrit dans la ligne d'activité : c'est la matière du contact.
+     *
+     * @param  array<mixed>  $pending
+     * @return array<mixed>
+     */
+    private function completerDepuisLesAutres(string $workspaceId, int $principal, string $personKey, array $pending): array
+    {
+        $manque = $this->texte($pending, 'last_name') === null || $this->texte($pending, 'phone') === null;
+        if (! $manque) {
+            return $pending;
+        }
+
+        $autres = FilesATraiter::aRattacher($workspaceId)
+            ->where('person_key', $personKey)
+            ->where('id', '!=', $principal)
+            ->whereIn('kind', PersonnesIngestService::DEMANDE_EVENT_TYPES)
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->get(['payload']);
+
+        foreach ($autres as $autre) {
+            $autrePending = $this->decoder($autre->payload ?? null)['pending_match'] ?? null;
+            if (! is_array($autrePending)) {
+                continue;
+            }
+            if ($this->texte($pending, 'last_name') === null && $this->texte($autrePending, 'last_name') !== null) {
+                $pending['last_name'] = $this->texte($autrePending, 'last_name');
+                $pending['first_name'] = $this->texte($autrePending, 'first_name');
+            }
+            if ($this->texte($pending, 'phone') === null && $this->texte($autrePending, 'phone') !== null) {
+                $pending['phone'] = $this->texte($autrePending, 'phone');
+            }
+        }
+
+        return $pending;
     }
 
     /**

@@ -827,22 +827,36 @@ final class PersonnesIngestService
             return [$this->relire($id), true];
         }
 
-        $update = [
-            'legal_basis' => $this->fusionnerBaseLegale(
-                is_string($existante->legal_basis ?? null) ? $existante->legal_basis : null,
-                $legalBasis,
-            ),
-            'updated_at' => now(),
-        ];
+        $update = ['updated_at' => now()];
+
+        // N5 : une demande ne change JAMAIS la base légale d'une personne
+        // EXISTANTE (seule une personne créée par une demande est
+        // précontractuelle). Hors demande, la base monte de rang, jamais ne
+        // descend, avec UNE exception : une personne née d'une demande
+        // (précontractuelle, donc hors prospection tant qu'elle n'est pas
+        // abonnée) qui demande ensuite le guide prend la base du guide
+        // (intérêt légitime B2B), comme tout demandeur du guide. Rien de plus :
+        // l'adresse personnelle reste exclue de toute prospection sans
+        // abonnement (`Abonnements::prospectionAutorisee`).
+        if ($demande === []) {
+            $actuelle = is_string($existante->legal_basis ?? null) ? $existante->legal_basis : null;
+            $update['legal_basis'] = $actuelle === 'precontractual' && $legalBasis === 'legitimate_interest_b2b'
+                ? $legalBasis
+                : $this->fusionnerBaseLegale($actuelle, $legalBasis);
+        }
 
         $derniere = $this->date($existante->derniere_interaction_at ?? null);
         if ($derniere === null || $event->occurredAt > $derniere) {
             $update['derniere_interaction_at'] = $event->occurredAt;
         }
+        // Garde de date (À LA SECONDE, voir `plusRecent`) : un événement plus
+        // ancien que la dernière interaction connue ne remplace pas une valeur
+        // déjà connue ; il ne fait que combler un vide.
+        $ancien = $derniere !== null && (int) $event->occurredAt->format('U') < (int) $derniere->format('U');
 
         // Une personne retrouvée par son adresse reçoit la clé du site : c'est
         // elle qui rattache ensuite la timeline et l'effacement.
-        if (($existante->person_key ?? null) !== $event->personKey()) {
+        if ($demande === [] && ($existante->person_key ?? null) !== $event->personKey()) {
             $collision = DB::table('personnes')
                 ->where('workspace_id', $workspaceId)
                 ->where('person_key', $event->personKey())
@@ -890,13 +904,13 @@ final class PersonnesIngestService
             if ($valeur === null) {
                 continue;
             }
-            if (($existante->{$colonne} ?? null) === null || ($origins[$colonne] ?? null) === 'declared') {
+            if (($existante->{$colonne} ?? null) === null || (($origins[$colonne] ?? null) === 'declared' && ! $ancien)) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';
             }
         }
 
-        if ($locale !== null) {
+        if ($locale !== null && ($demande === [] || ! $ancien || ($existante->locale ?? null) === null)) {
             $update['locale'] = $locale;
         }
 

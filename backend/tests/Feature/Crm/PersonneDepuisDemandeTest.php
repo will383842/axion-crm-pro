@@ -648,3 +648,161 @@ test('N1 : la liste de la console dit « prospection non autorisée » pour une 
     $this->postJson("/api/v1/crm/personnes/{$id}/rattacher", ['company_id' => pddEntreprise((string) $this->workspace->id)])
         ->assertOk();
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N5 (base légale), N6 (adresse personnelle), garde de date, nom d'un autre événement
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** @param  array<string, mixed>  $overrides */
+function pddGuide(array $overrides = [], string $email = PDD_EMAIL): array
+{
+    return array_replace_recursive([
+        'schema_version' => 1,
+        'event_id' => (string) Str::uuid(),
+        'event_type' => 'lead_magnet_requested',
+        'occurred_at' => '2026-11-06T10:00:00Z',
+        'subject_ref' => 'site:guide_request:' . Str::uuid(),
+        'source_slug' => 'guide-ia',
+        'person' => ['person_key' => hash('sha256', 'pdd|' . $email), 'email' => $email],
+        'payload' => ['aimant' => 'guide-ia-entreprise', 'edition' => '2026-09', 'placement' => 'guide-ia-haut', 'locale' => 'fr', 'verifie' => true],
+    ], $overrides);
+}
+
+test('N5 : une demande ne change ni la base légale ni la clé d’une personne existante', function () {
+    config(['crm.ingest.personnes_enabled' => true]);
+    // La personne existe déjà par le guide (intérêt légitime B2B), avec une clé du site.
+    pddIngerer(pddGuide());
+    $avant = pddPersonne();
+    expect($avant->legal_basis)->toBe('legitimate_interest_b2b');
+
+    // Une demande arrive avec la même adresse mais une AUTRE clé de personne.
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-07T10:00:00Z',
+        'person' => ['person_key' => hash('sha256', 'autre-cle-pdd')],
+    ]));
+
+    $apres = pddPersonne();
+    expect($apres->legal_basis)->toBe('legitimate_interest_b2b')
+        ->and($apres->person_key)->toBe($avant->person_key)
+        ->and(DB::table('personnes')->count())->toBe(1)
+        // Mais la demande a bien rempli ce qui manquait.
+        ->and($apres->phone)->toBe('+33600000001');
+});
+
+test('N5 : seule une personne créée par une demande est précontractuelle', function () {
+    pddIngerer(pddEvent());
+
+    expect(pddPersonne()->legal_basis)->toBe('precontractual');
+});
+
+test('N5 : une personne née d’une demande qui demande ensuite le guide prend la base du guide, sans élargir la prospection', function () {
+    config(['crm.ingest.personnes_enabled' => true]);
+    pddIngerer(pddEvent());
+    pddIngerer(pddEvent([], 'zz.perso.demande@gmail.com'));
+    expect(pddPersonne()->legal_basis)->toBe('precontractual');
+
+    pddIngerer(pddGuide(['occurred_at' => '2026-11-08T10:00:00Z']));
+    pddIngerer(pddGuide(['occurred_at' => '2026-11-08T10:00:00Z'], 'zz.perso.demande@gmail.com'));
+
+    // Adresse professionnelle : comme tout demandeur du guide (intérêt légitime B2B).
+    $pro = pddPersonne();
+    expect($pro->legal_basis)->toBe('legitimate_interest_b2b')
+        ->and(Abonnements::prospectionAutorisee($pro->email_nature, null, $pro->legal_basis))->toBeTrue();
+
+    // Adresse personnelle : toujours exclue sans abonnement.
+    $perso = pddPersonne('zz.perso.demande@gmail.com');
+    expect(Abonnements::prospectionAutorisee($perso->email_nature, null, $perso->legal_basis))->toBeFalse()
+        ->and(DB::table('abonnements')->count())->toBe(0);
+});
+
+test('garde de date : une demande plus ancienne ne remplace ni téléphone, ni entreprise, ni langue, mais comble un vide', function () {
+    // La plus RÉCENTE arrive d'abord.
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-10T10:00:00+01:00',
+        'person' => ['phone' => '+33600000010'],
+        'company' => ['name' => 'ZZ NOM RECENT'],
+        'payload' => ['locale' => 'en'],
+    ]));
+    // La plus ANCIENNE arrive ensuite (désordre de l'outbox).
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-01T10:00:00+01:00',
+        'person' => ['phone' => '+33600000001'],
+        'company' => ['name' => 'ZZ NOM ANCIEN'],
+        'payload' => ['locale' => 'fr'],
+    ]));
+
+    $personne = pddPersonne();
+    expect($personne->phone)->toBe('+33600000010')
+        ->and($personne->entreprise_declaree)->toBe('ZZ NOM RECENT')
+        ->and($personne->locale)->toBe('en');
+
+    // Un vide, lui, est comblé même par un événement ancien.
+    DB::table('personnes')->update(['phone' => null]);
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-02T10:00:00+01:00',
+        'person' => ['phone' => '+33600000002'],
+    ]));
+    expect(pddPersonne()->phone)->toBe('+33600000002');
+
+    // Et une demande plus récente remplace bien une valeur déclarée.
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-12T10:00:00+01:00',
+        'person' => ['phone' => '+33600000012'],
+    ]));
+    expect(pddPersonne()->phone)->toBe('+33600000012');
+});
+
+test('N6 : une adresse personnelle ne crée pas de contact au rattachement (l’événement est rattaché quand même)', function () {
+    $perso = 'zz.perso.rattache@gmail.com';
+    $activite = pddIngerer(pddEvent([], $perso))->activityId;
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$activite}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', false);
+
+    expect(DB::table('contacts')->count())->toBe(0)
+        ->and(DB::table('activities')->where('id', $activite)->value('subject_id'))->toBe($companyId);
+});
+
+test('N6 : une adresse personnelle abonnée à la lettre, ou une adresse professionnelle, crée toujours son contact', function () {
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    // Professionnelle : inchangé.
+    $pro = pddIngerer(pddEvent())->activityId;
+    $this->postJson("/api/v1/crm/arbitrage/{$pro}/attach", ['company_id' => $companyId])
+        ->assertOk()->assertJsonPath('contact_created', true);
+
+    // Personnelle mais abonnée (elle a coché la case) : permis.
+    $perso = 'zz.perso.abonne@gmail.com';
+    $activite = pddIngerer(pddEvent([], $perso))->activityId;
+    $pid = (int) pddPersonne($perso)->id;
+    DB::table('abonnements')->insert([
+        'workspace_id' => $this->workspace->id, 'personne_id' => $pid, 'canal' => 'lettre', 'statut' => 'abonne',
+        'consent_version' => 'v1', 'consent_at' => now(), 'dernier_evenement_at' => now(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $this->postJson("/api/v1/crm/arbitrage/{$activite}/attach", ['company_id' => $companyId])
+        ->assertOk()->assertJsonPath('contact_created', true);
+});
+
+test('le nom d’un autre événement de la même personne sert à créer le contact quand l’événement principal n’en a pas', function () {
+    // Principal : sans nom (le plus ancien) ; l'autre porte le nom.
+    $principal = pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-01T10:00:00+01:00',
+        'person' => ['first_name' => null, 'last_name' => null, 'phone' => null],
+    ]))->activityId;
+    pddIngerer(pddEvent([
+        'occurred_at' => '2026-11-03T10:00:00+01:00',
+        'event_type' => 'calendly_booked', 'form_type' => null,
+        'person' => ['first_name' => 'Marie', 'last_name' => 'ZZ AUTRE EVT', 'phone' => '+33600000077'],
+    ]));
+    $companyId = pddEntreprise((string) $this->workspace->id);
+
+    $this->postJson("/api/v1/crm/arbitrage/{$principal}/attach", ['company_id' => $companyId])
+        ->assertOk()
+        ->assertJsonPath('contact_created', true);
+
+    $contact = DB::table('contacts')->first();
+    expect($contact->last_name)->toBe('ZZ AUTRE EVT')->and($contact->first_name)->toBe('Marie');
+});

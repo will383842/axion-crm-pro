@@ -25,6 +25,10 @@ describe('ContenusAccordsCard', () => {
     expect(screen.getByText(/Reseau a/)).toBeTruthy();
     expect(screen.getByText(/Accord pour de futures campagnes/)).toBeTruthy();
     expect(screen.getByText(/version M2/)).toBeTruthy();
+    // Consentement de nature « information » et sa version de texte (M1) : toujours lisibles.
+    expect(screen.getByText('Information reçue')).toBeTruthy();
+    expect(screen.getByText(/version M1/)).toBeTruthy();
+    expect(screen.getByText(/mot-guide-ia:reseau-a/)).toBeTruthy();
     expect(screen.queryByTestId('bandeau-opposition')).toBeNull();
   });
 
@@ -95,7 +99,8 @@ describe('ContenusAccordsCard — lien du guide', () => {
     const { container } = render(<ContenusAccordsCard bloc={avecLien('disponible', null, null)} />);
     expect(container.querySelector('a')).toBeNull();
     expect(screen.getAllByText('guide-ia').length).toBeGreaterThan(0);
-    expect(screen.getByText('Aucun lien disponible pour ce guide.')).toBeTruthy();
+    // Message propre à chaque ligne concernée (origine + guide reçu).
+    expect(screen.getAllByText('Aucun lien disponible pour ce guide.')).toHaveLength(2);
   });
 
   it('cas 4 · profil lecture seule : aucun lien, mention « votre profil »', () => {
@@ -117,5 +122,41 @@ describe('ContenusAccordsCard — lien du guide', () => {
     expect(container.querySelector('a')).toBeNull();
     expect(container.textContent).not.toContain('Le lien du guide');
     expect(container.textContent).not.toContain('Aucun lien disponible');
+  });
+});
+
+describe('ContenusAccordsCard — date d’origine et lignes sans lien', () => {
+  it('la date d’origine reste affichée quand l’origine n’a pas de guide', () => {
+    const bloc: ContenusAccords = {
+      origine: { mot: 'exemple', reseau: 'instagram', guide: null, date: '2026-11-02T09:58:00Z' },
+      guides: [],
+      consentements: [],
+      opposition: { actif: false, date: null },
+    };
+    render(<ContenusAccordsCard bloc={bloc} />);
+    expect(screen.getByTestId('origine-date').textContent).toContain('02/11/2026');
+  });
+
+  it('une ancienne ligne de guide sans identifiant ne masque pas la mention « version publique » des autres', () => {
+    const base = avecLien('disponible', LIEN);
+    const bloc: ContenusAccords = {
+      ...base,
+      guides: [...base.guides, { guide: null, date: '2026-10-01T10:00:00Z', nom: null, lien: null }],
+    };
+    render(<ContenusAccordsCard bloc={bloc} />);
+    expect(screen.getByText(/la même pour tout le monde/)).toBeTruthy();
+    expect(screen.queryByText('Aucun lien disponible pour ce guide.')).toBeNull();
+  });
+
+  it('« Aucun lien disponible » ne s’affiche que sur la ligne sans lien', () => {
+    const base = avecLien('disponible', LIEN);
+    const bloc: ContenusAccords = {
+      ...base,
+      guides: [...base.guides, { guide: 'guide-inconnu', date: '2026-10-01T10:00:00Z', nom: null, lien: null }],
+    };
+    render(<ContenusAccordsCard bloc={bloc} />);
+    expect(screen.getAllByText('Aucun lien disponible pour ce guide.')).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: /Voir le guide/ })).toHaveLength(2);
+    expect(screen.getByText(/la même pour tout le monde/)).toBeTruthy();
   });
 });

@@ -23,6 +23,14 @@
 | `url` (https seulement, sans port, identifiant, paramètre ni fragment : la
 | garde de `LienGuide` est réappliquée même sur cette table écrite à la main).
 |
+| `hote_autorise` : seul hôte accepté pour les liens (par défaut `axion-ia.com`,
+| surchargeable par `CRM_GUIDE_HOTE`). L'hôte de test `exemple.invalid` n'est
+| accepté QUE dans les environnements testing, local et demo, jamais en production.
+|
+| ⚠️ AVANT D'ALLUMER `CRM_GUIDE_LIEN_ENABLED` : poser la VRAIE adresse publique du
+| guide (sur `hote_autorise`) dans `publics`. Tant que l'entrée de test
+| `exemple.invalid` reste en place, la production n'affiche aucun lien.
+|
 | ⚠️ À REMPLACER PAR WILL : l'entrée `guide-ia` ci-dessous est un guide de TEST
 | en `exemple.invalid` (domaine réservé, qui ne résout jamais). Ne jamais y
 | inventer une vraie adresse : Will y met l'adresse publique réelle du guide
@@ -30,6 +38,7 @@
 */
 return [
     'lien_enabled' => (bool) env('CRM_GUIDE_LIEN_ENABLED', false),
+    'hote_autorise' => (string) env('CRM_GUIDE_HOTE', 'axion-ia.com'),
     'publics' => [
         // À REMPLACER PAR WILL : adresse de test, pas une vraie adresse.
         'guide-ia' => [

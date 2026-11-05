@@ -61,10 +61,15 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
   const accords = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'optin' || c.nature === 'retrait');
   const accord = accords.length === 0 ? null : accords.reduce((a, c) => ((c.date ?? '') >= (a.date ?? '') ? c : a));
 
+  // Consentements d'information (texte reçu à l'inscription) : lisibles en plus de l'accord.
+  const informations = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'information');
+
   const lienOrigine = lienSur(b?.origine?.lien);
   const liensGuides = (b?.guides ?? []).map((g) => lienSur(g.lien));
-  const sansLien = b?.lien_statut === 'disponible' && ((b.origine?.guide != null && lienOrigine === null) || liensGuides.some((l) => l === null));
-  const tousLiens = b?.lien_statut === 'disponible' && !sansLien && (lienOrigine !== null || liensGuides.some((l) => l !== null));
+  const disponible = b?.lien_statut === 'disponible';
+  // Mention « aucun lien » propre à chaque ligne qui a un identifiant mais pas de lien.
+  const origineSansLien = disponible && b?.origine?.guide != null && lienOrigine === null;
+  const publique = disponible && (lienOrigine !== null || liensGuides.some((l) => l !== null));
 
   return (
     <Card>
@@ -89,6 +94,11 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
                 ) : (
                   <>
                     Mot « {b.origine.mot ?? '—'} » · {libelleReseau(b.origine.reseau) ?? '—'} · {b.origine.guide === null ? '—' : <code>{b.origine.guide}</code>}
+                    {b.origine.guide == null && b.origine.date != null && (
+                      <span data-testid="origine-date" style={{ marginLeft: 10 }}>
+                        reçu le {date(b.origine.date)}
+                      </span>
+                    )}
                   </>
                 )}
               </dd>
@@ -100,6 +110,7 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
                   <NomGuide nom={b.origine.nom} guide={b.origine.guide} />
                   {lienOrigine !== null && <VoirLeGuide lien={lienOrigine} />}
                   <span style={{ marginLeft: 10 }}>envoyé le {date(b.origine.date)}</span>
+                  {origineSansLien && <span style={{ marginLeft: 10 }}>Aucun lien disponible pour ce guide.</span>}
                 </dd>
               </div>
             )}
@@ -116,6 +127,7 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
                         <li key={`${g.guide ?? ''}-${g.date ?? ''}-${i}`}>
                           <NomGuide nom={g.nom} guide={g.guide} /> · envoyé le {date(g.date)}
                           {lien !== null && <VoirLeGuide lien={lien} envoye={date(g.date)} />}
+                          {lien === null && disponible && g.guide != null && <span style={{ marginLeft: 10 }}>Aucun lien disponible pour ce guide.</span>}
                         </li>
                       );
                     })}
@@ -123,6 +135,23 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
                 )}
               </dd>
             </div>
+            {informations.length > 0 && (
+              <div>
+                <dt>Information reçue</dt>
+                <dd>
+                  <ul>
+                    {informations.map((c, i) => (
+                      <li key={`${c.date ?? ''}-${c.version ?? ''}-${i}`}>
+                        le {date(c.date)}
+                        <span style={{ marginLeft: 10 }}>
+                          source {c.source ?? '—'} · texte version {c.version ?? '—'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Accord pour de futures campagnes</dt>
               <dd>
@@ -141,8 +170,7 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
           </dl>
           {b.lien_statut === 'eteint' && <p data-testid="lien-guide-etat">Le lien du guide n’est pas affiché pour le moment.</p>}
           {b.lien_statut === 'refuse' && <p data-testid="lien-guide-etat">Le lien du guide n’est pas disponible avec votre profil.</p>}
-          {sansLien && <p data-testid="lien-guide-etat">Aucun lien disponible pour ce guide.</p>}
-          {tousLiens && (
+          {publique && (
             <p data-testid="lien-guide-etat">
               C’est la version publique du guide, la même pour tout le monde : l’ouvrir ne signale rien sur la personne.
             </p>

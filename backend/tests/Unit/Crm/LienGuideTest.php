@@ -70,3 +70,26 @@ test('statut : éteint avant tout, puis refusé sans droit, sinon disponible', f
     tableGuides();
     expect(LienGuide::statut(false))->toBe('refuse')->and(LienGuide::statut(true))->toBe('disponible');
 });
+
+test('hôte autorisé : par défaut axion-ia.com, un autre hôte est refusé', function () {
+    expect(config('guides.hote_autorise'))->toBe('axion-ia.com');
+    tableGuides(['guide-ia' => ['url' => 'https://axion-ia.com/guides/guide-ia.pdf', 'libelle' => 'x']]);
+    expect(LienGuide::pour('guide-ia'))->not->toBeNull();
+    tableGuides(['guide-ia' => ['url' => 'https://autre-site.example/guides/guide-ia.pdf', 'libelle' => 'x']]);
+    expect(LienGuide::pour('guide-ia'))->toBeNull();
+    tableGuides(['guide-ia' => ['url' => 'https://axion-ia.com.evil.example/g.pdf', 'libelle' => 'x']]);
+    expect(LienGuide::pour('guide-ia'))->toBeNull();
+});
+
+test('l’hôte de test exemple.invalid n’est accepté qu’en test, local ou démo, jamais en production', function () {
+    tableGuides();
+    foreach (['testing', 'local', 'demo'] as $env) {
+        app()->detectEnvironment(fn () => $env);
+        expect(LienGuide::pour('guide-ia'))->not->toBeNull();
+    }
+    foreach (['production', 'staging'] as $env) {
+        app()->detectEnvironment(fn () => $env);
+        expect(LienGuide::pour('guide-ia'))->toBeNull();
+    }
+    app()->detectEnvironment(fn () => 'testing');
+});

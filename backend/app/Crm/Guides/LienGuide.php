@@ -25,6 +25,14 @@ final class LienGuide
 
     private const CHEMIN = '#^/[A-Za-z0-9/._-]*$#';
 
+    /** Hôte public autorisé par défaut (surchargeable par `guides.hote_autorise`). */
+    public const HOTE_AUTORISE_DEFAUT = 'axion-ia.com';
+
+    /** Hôte de test (domaine réservé) : accepté seulement dans ces environnements. */
+    public const HOTE_TEST = 'exemple.invalid';
+
+    private const ENVIRONNEMENTS_TEST = ['testing', 'local', 'demo'];
+
     public static function actif(): bool
     {
         return (bool) config('guides.lien_enabled', false);
@@ -92,6 +100,19 @@ final class LienGuide
             return false;
         }
 
-        return preg_match(self::HOTE, $p['host']) === 1 && ! str_contains($p['host'], 'xn--') && preg_match(self::CHEMIN, $p['path']) === 1;
+        return preg_match(self::HOTE, $p['host']) === 1 && ! str_contains($p['host'], 'xn--')
+            && self::hoteAutorise(strtolower($p['host'])) && preg_match(self::CHEMIN, $p['path']) === 1;
+    }
+
+    /** Hôte exact autorisé ; l'hôte de test seulement hors production. */
+    private static function hoteAutorise(string $hote): bool
+    {
+        $autorise = config('guides.hote_autorise', self::HOTE_AUTORISE_DEFAUT);
+        $autorise = is_string($autorise) && $autorise !== '' ? strtolower($autorise) : self::HOTE_AUTORISE_DEFAUT;
+        if ($hote === $autorise) {
+            return true;
+        }
+
+        return $hote === self::HOTE_TEST && app()->environment(self::ENVIRONNEMENTS_TEST);
     }
 }

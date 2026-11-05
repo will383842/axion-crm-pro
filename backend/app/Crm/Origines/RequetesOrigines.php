@@ -233,6 +233,9 @@ final class RequetesOrigines
         return $sortie;
     }
 
+    /** Longueur maximale (octets) d'une date dans un curseur ; le contrôleur borne le curseur en conséquence. */
+    public const DATE_MAX = 255;
+
     /**
      * Curseur opaque de l'historique : (date, rang) du DERNIER élément rendu.
      * Le rang est unique par personne : `archive_id` (positif) pour l'archive,
@@ -242,18 +245,25 @@ final class RequetesOrigines
      */
     public static function encoderCurseur(string $date, int $rang): string
     {
-        return rtrim(strtr(base64_encode($date . "\x1f" . $rang), '+/', '-_'), '=');
+        // JSON : toute date (longueur, octets de contrôle, UTF-8 invalide compris) reste encodable.
+        $json = json_encode([$date, $rang], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES);
+
+        return rtrim(strtr(base64_encode($json === false ? '[\"\",0]' : $json), '+/', '-_'), '=');
     }
 
     /** @return array{0: string, 1: int}|null null si le curseur est illisible */
     public static function decoderCurseur(string $curseur): ?array
     {
         $brut = base64_decode(strtr($curseur, '-_', '+/'), true);
-        if ($brut === false || preg_match('/^([^\x1f]{0,64})\x1f(-?[0-9]{1,18})$/D', $brut, $m) !== 1) {
+        if ($brut === false) {
+            return null;
+        }
+        $v = json_decode($brut, true);
+        if (! is_array($v) || count($v) !== 2 || ! array_is_list($v) || ! is_string($v[0]) || strlen($v[0]) > self::DATE_MAX || ! is_int($v[1])) {
             return null;
         }
 
-        return [$m[1], (int) $m[2]];
+        return [$v[0], $v[1]];
     }
 
     /**

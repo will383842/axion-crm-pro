@@ -72,13 +72,15 @@ final class AgregatsOrigines
                     CASE WHEN jsonb_typeof(p.origines) = 'array' THEN p.origines ELSE '[]'::jsonb END
                 ) AS e
                 CROSS JOIN LATERAL (
-                    SELECT regexp_replace(lower(trim(COALESCE(e->>'compte', ''))), '[^a-z0-9_]', '_', 'g') AS compte
+                    SELECT regexp_replace(lower(btrim(COALESCE(e->>'compte', ''), E' \t\n\r')), '[^a-z0-9_]', '_', 'g') AS compte
                 ) AS n
                 WHERE p.workspace_id = ?
                   AND (e->>'date') IS NOT NULL
                   AND substr(e->>'date', 1, 10) = ?
                   AND COALESCE(e->>'reseau', '') <> ''
                   AND COALESCE(e->>'mot', '') <> ''
+                  AND lower(btrim(COALESCE(e->>'compte', ''), E' \t\n\r')) ~ '[a-z0-9]'
+                  AND e->>'reseau' ~ '^[a-z0-9][a-z0-9._-]{0,63}$'
                 GROUP BY 1, 2, 3
                 ORDER BY 1, 2, 3
                 SQL,

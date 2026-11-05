@@ -13,9 +13,8 @@ final class GardeAuditExport
 
     /**
      * @param  \Closure(int, bool): void  $ecrire  (lignes lues, interrompu)
-     * @param  object{lues: int}  $etat
      */
-    public function __construct(private readonly \Closure $ecrire, private readonly object $etat, private readonly int $plafond) {}
+    public function __construct(private readonly \Closure $ecrire, private readonly \stdClass $etat, private readonly int $plafond) {}
 
     public function terminer(): void
     {

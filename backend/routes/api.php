@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
 use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
+use App\Http\Controllers\Api\Crm\OriginesController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\Crm\PropositionsController;
@@ -578,6 +579,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/personnes/counts', [PersonnesController::class, 'counts'])->middleware('delai-sql:120');
             Route::get('/personnes/export', [PersonnesController::class, 'export'])
                 ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
+            // PR-A (L2-back) — API de LECTURE des origines. Derrière l'interrupteur
+            // `origines.lecture_enabled` (éteint → 404) ET la fonction d'espace
+            // `origines.lecture` (L6). Segments fixes AVANT `{personneId}`.
+            Route::get('/origines/apercu', [OriginesController::class, 'apercu'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-reseau', [OriginesController::class, 'parReseau'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-mot', [OriginesController::class, 'parMot'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/export', [OriginesController::class, 'export'])
+                ->middleware(['throttle:scraper-list', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
+            Route::get('/personnes/{personneId}/origines', [OriginesController::class, 'historique'])
+                ->whereNumber('personneId')->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

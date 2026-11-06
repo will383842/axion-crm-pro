@@ -152,10 +152,10 @@ final class EnvoiAutorise
         if (($m = EligibiliteAdresse::motif(mb_strtolower(trim($d->email)), $d->occurrences, $d->nonInformes)) !== null) {
             return new VerdictEnvoi($m);
         }
-        if (! EligibiliteCampagne::peutRecevoir($d->email, 'business')) {
+        if (EligibiliteCampagne::peutRecevoir($d->email, 'business') === false) {
             return new VerdictEnvoi(EligibiliteAdresse::OPPOSITION);
         }
-        if (! self::verdictRecent($d, $maintenant)) {
+        if (self::verdictRecent($d, $maintenant) === false) {
             return new VerdictEnvoi(self::VERDICT_ABSENT);
         }
         if (($m = self::garderDomaine($d, $maintenant)) !== null) {
@@ -191,7 +191,7 @@ final class EnvoiAutorise
                 return self::SEGMENT_SENSIBLE;
             }
         }
-        if (! in_array($segment, Segments::CONNUS, true)) {
+        if (in_array($segment, Segments::CONNUS, true) === false) {
             return self::SEGMENT_INCONNU;
         }
 

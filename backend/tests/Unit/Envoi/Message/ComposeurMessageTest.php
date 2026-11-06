@@ -126,7 +126,12 @@ it('contient texte ET HTML en UTF-8 avec accents, pied légal et art. 14', funct
 
 it('utilise la valeur de repli quand la variable est absente', function () {
     $msg = l2Composeur()->composer(l2Demande());
-    expect(quoted_printable_decode($msg))->toContain('Bonjour cher contact,');
+    preg_match('/boundary="([^"]+)"/', $msg, $b);
+    $parties = array_values(array_filter(explode('--' . $b[1], explode("\r\n\r\n", $msg, 2)[1]), fn ($p) => str_contains($p, 'Content-Type')));
+    expect($parties)->toHaveCount(2);
+    foreach ($parties as $p) {
+        expect(quoted_printable_decode(explode("\r\n\r\n", $p, 2)[1]))->toContain('Bonjour cher contact,');
+    }
 });
 
 it('relance dans le même fil : In-Reply-To et References', function () {
@@ -135,6 +140,42 @@ it('relance dans le même fil : In-Reply-To et References', function () {
     [$premier] = l2Analyse(l2Composeur()->composer(l2Demande()));
     expect($premier)->not->toHaveKey('in-reply-to');
 });
+
+it('sujet ASCII avec virgule : aucun guillemet, valeur brute', function () {
+    $msg = l2Composeur()->composer(l2Demande());
+    [$h, , $tete] = l2Analyse($msg);
+    expect($h['subject'])->toBe('Bonjour cher contact, une proposition')->and($h['subject'])->not->toContain('"');
+    $sujet = l2Composeur()->composer(l2Demande(['sujet' => 'Re: (offre) <a@b> ; [x] "ok"']));
+    [$h2] = l2Analyse($sujet);
+    expect($h2['subject'])->toBe('Re: (offre) <a@b> ; [x] "ok"');
+});
+
+it('plie les en-têtes > 78 caractères et n\'en dépasse jamais 998', function () {
+    $long = implode(' ', array_fill(0, 200, 'proposition')); // ~2 400 car.
+    $refs = array_map(fn ($i) => '<' . str_repeat('x', 30) . $i . '@exemple-envoi.test>', range(1, 40));
+    foreach ([['sujet' => $long], ['sujet' => str_repeat('a', 1200)], ['inReplyTo' => $refs[0], 'references' => $refs]] as $o) {
+        $msg = l2Composeur(new DkimSigneur('exemple-envoi.test', 'crm1', l2CleTest()))->composer(l2Demande($o));
+        $tete = explode("\r\n\r\n", $msg, 2)[0];
+        foreach (explode("\r\n", $tete) as $ligne) {
+            expect(strlen($ligne))->toBeLessThanOrEqual(78);
+        }
+        [$h] = l2Analyse($msg);
+        if (isset($o['references'])) {
+            expect(explode(' ', $h['references']))->toBe($refs);
+        } else {
+            expect(iconv_mime_decode($h['subject'], 0, 'UTF-8'))->toBe($o['sujet']);
+        }
+    }
+});
+
+it('refuse > ou saut de ligne dans les liens de désinscription', function (array $o) {
+    l2Composeur()->composer(l2Demande($o));
+})->with([
+    [['urlDesinscription' => 'https://exemple-envoi.test/a>, <https://evil.test/']],
+    [['mailtoDesinscription' => 'mailto:a@exemple-envoi.test>, <mailto:b@evil.test']],
+    [['urlDesinscription' => "https://exemple-envoi.test/a\nBcc: x@y.test"]],
+    [['mailtoDesinscription' => "mailto:a@exemple-envoi.test\r\nBcc: x@y.test"]],
+])->throws(InvalidArgumentException::class);
 
 it('refuse un saut de ligne dans un en-tête (injection)', function () {
     l2Composeur()->composer(l2Demande(['sujet' => "x\r\nBcc: a@b.test"]));
@@ -152,6 +193,23 @@ dataset('refus', [
     'pixel 1x1' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.gif" width="1" height="1">'], 'Pixel'],
     'pixel style' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.gif" style="width:1px;height:1px">'], 'Pixel'],
     'pixel de suivi' => [fn () => ['html' => '<img src="https://exemple-envoi.test/pixel/abc.gif">'], 'Pixel'],
+    'img display:none' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.gif" style="display:none">'], 'Pixel'],
+    'img visibility:hidden' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.png" style="visibility:hidden">'], 'Pixel'],
+    'img opacity:0' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.png" style="opacity:0">'], 'Pixel'],
+    'img max-height:0' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.png" style="max-height:0">'], 'Pixel'],
+    'img !important' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.png" style="width:1px !important;height:1px !important">'], 'Pixel'],
+    'img 2x2' => [fn () => ['html' => '<img src="https://exemple-envoi.test/a.png" width="2" height="2">'], 'Pixel'],
+    'img distante taille normale' => [fn () => ['html' => '<img src="https://exemple-envoi.test/logo.png" width="300" height="100">'], 'Pixel'],
+    'img sans taille' => [fn () => ['html' => '<img src="http://exemple-envoi.test/logo.png">'], 'Pixel'],
+    'img data:' => [fn () => ['html' => '<img src="data:image/png;base64,AAAA">'], 'Pixel'],
+    'style url(' => [fn () => ['html' => '<div style="background:url(https://exemple-envoi.test/a.png)">x</div>'], 'Pixel'],
+    'img en entités' => [fn () => ['html' => '<im&#103; src="https://exemple-envoi.test/a.png">'], 'Pixel'],
+    'Grenoble en entité' => [fn () => ['texte' => 'Nous sommes à Gren&#111;ble.'], 'Grenoble'],
+    'Grenoble coupé par balises' => [fn () => ['html' => '<p>Gre<b></b>noble</p>'], 'Grenoble'],
+    'axion-ia entité' => [fn () => ['html' => '<a href="https://axion-ia&#46;com/x">x</a>'], 'axion-ia.com'],
+    'redirection &amp;' => [fn () => ['html' => '<a href="https://exemple.test/r?x=1&amp;url=https://cible.test">x</a>'], 'traqueur'],
+    'redirection q=' => [fn () => ['html' => '<a href="https://exemple.test/r?q=https://cible.test">x</a>'], 'traqueur'],
+    'redirection q= encodée' => [fn () => ['html' => '<a href="https://exemple.test/r?q=https%3A%2F%2Fcible.test">x</a>'], 'traqueur'],
     'lien traqueur' => [fn () => ['html' => '<a href="https://click.tracker.test/c/abc">x</a>'], 'traqueur'],
     'lien redirigé' => [fn () => ['html' => '<a href="https://exemple.test/r?url=https://cible.test">x</a>'], 'traqueur'],
 ]);
@@ -167,6 +225,10 @@ it('refuse avec un motif lisible', function (Closure $o, string $motif) {
 
 it('le contrôleur accepte un contenu propre', function () {
     expect((new ControleurContenu)->analyser(['<p>Bonjour {{a|b}}</p><a href="https://exemple.test/x">x</a>']))->toBe([]);
+});
+
+it('le contrôleur n\'a pas de faux positif sur open.spotify.com ni sur un lien simple', function () {
+    expect((new ControleurContenu)->analyser(['<a href="https://open.spotify.com/track/abc?si=1">x</a> <a href="https://links.exemple.test/a">y</a>']))->toBe([]);
 });
 
 it('le contrôleur refuse une pièce jointe vue dans le MIME brut', function () {
@@ -219,6 +281,50 @@ it('signe en DKIM avec le sélecteur dédié et la signature se vérifie', funct
     $altere = str_replace('contact@exemple-envoi.test', 'autre@exemple-envoi.test', $aVerifier);
     expect(openssl_verify($altere, $sig, $pub, OPENSSL_ALGO_SHA256))->toBe(0);
 });
+
+it('DKIM : vérification indépendante sur message figé (canonisation écrite à la main)', function () {
+    $pem = l2CleTest();
+    $pub = openssl_pkey_get_details(openssl_pkey_get_private($pem))['key'];
+    $entetes = [
+        'From' => 'A <contact@exemple-envoi.test>', 'To' => 'cible@exemple.test', 'Subject' => 'Sujet  de   test',
+        'Date' => 'Mon, 02 Nov 2026 10:00:00 +0000', 'Message-ID' => '<fixe@exemple-envoi.test>', 'MIME-Version' => '1.0',
+        'Content-Type' => 'text/plain; charset=UTF-8', 'List-Unsubscribe' => '<https://exemple-envoi.test/u>',
+        'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+    ];
+    $corps = "Ligne un  \r\nLigne   deux\r\n\r\n\r\n";
+    $ligne = (new DkimSigneur('exemple-envoi.test', 'crm1', $pem))->signer($entetes, $corps, 1780000000);
+
+    // Valeurs figées, calculées hors du code testé : corps canonisé = « Ligne un\r\nLigne deux\r\n ».
+    expect(base64_encode(hash('sha256', "Ligne un\r\nLigne deux\r\n", true)))
+        ->toBe('igz4sVfZ9caY86e4xaF+p7WfJZNye3GseYFQ/wC1vaU=');
+    $unfold = preg_replace('/\r\n[ \t]+/', ' ', $ligne);
+    preg_match('/ bh=([^;]+);/', $unfold, $bh);
+    expect($bh[1])->toBe('igz4sVfZ9caY86e4xaF+p7WfJZNye3GseYFQ/wC1vaU=');
+    preg_match('/ b=(.*)$/', $unfold, $b);
+    $sansB = substr($unfold, strlen('DKIM-Signature: '), -strlen($b[1]));
+    $attendu = "from:A <contact@exemple-envoi.test>\r\nto:cible@exemple.test\r\nsubject:Sujet de test\r\n"
+        . "date:Mon, 02 Nov 2026 10:00:00 +0000\r\nmessage-id:<fixe@exemple-envoi.test>\r\nmime-version:1.0\r\n"
+        . "content-type:text/plain; charset=UTF-8\r\nlist-unsubscribe:<https://exemple-envoi.test/u>\r\n"
+        . "list-unsubscribe-post:List-Unsubscribe=One-Click\r\ndkim-signature:" . preg_replace('/\s+/', ' ', trim($sansB));
+    expect(openssl_verify($attendu, base64_decode(preg_replace('/\s+/', '', $b[1])), $pub, OPENSSL_ALGO_SHA256))->toBe(1);
+});
+
+it('DKIM : refuse un d= différent du domaine d\'envoi du message', function () {
+    $s = new DkimSigneur('autre-domaine.test', 'crm1', l2CleTest());
+    l2Composeur($s)->composer(l2Demande());
+})->throws(InvalidArgumentException::class);
+
+it('DKIM : le signeur refuse un From d\'un autre domaine', function () {
+    $e = ['From' => 'A <x@autre.test>', 'To' => 'a@b.test', 'Subject' => 's', 'Date' => 'd', 'Message-ID' => '<m@exemple-envoi.test>',
+        'MIME-Version' => '1.0', 'Content-Type' => 'text/plain', 'List-Unsubscribe' => '<https://x.test>', 'List-Unsubscribe-Post' => 'x'];
+    (new DkimSigneur('exemple-envoi.test', 'crm1', l2CleTest()))->signer($e, "a\r\n");
+})->throws(InvalidArgumentException::class);
+
+it('DKIM : refuse une clé RSA de moins de 2048 bits', function () {
+    $k = openssl_pkey_new(['private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+    openssl_pkey_export($k, $pem);
+    new DkimSigneur('exemple-envoi.test', 'crm1', $pem);
+})->throws(InvalidArgumentException::class);
 
 it('refuse une clé DKIM illisible', function () {
     new DkimSigneur('exemple-envoi.test', 'crm1', 'pas une clé');

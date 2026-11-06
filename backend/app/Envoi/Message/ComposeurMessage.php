@@ -20,6 +20,9 @@ final class ComposeurMessage
         if (preg_match('/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i', $domaineEnvoi) !== 1) {
             throw new InvalidArgumentException('Domaine d\'envoi invalide.');
         }
+        if ($dkim !== null && strcasecmp($dkim->domaine(), $domaineEnvoi) !== 0) {
+            throw new InvalidArgumentException('Le d= DKIM doit être le domaine d\'envoi du message.');
+        }
     }
 
     /** @throws MessageRefuse */
@@ -37,6 +40,11 @@ final class ComposeurMessage
         foreach ([$d->replyTo, $d->destinataire] as $adresse) {
             if (filter_var($adresse, FILTER_VALIDATE_EMAIL) === false) {
                 throw new InvalidArgumentException('Adresse invalide.');
+            }
+        }
+        foreach ([$d->urlDesinscription, $d->mailtoDesinscription] as $lien) {
+            if (preg_match('/[<>\s]/', $lien) === 1) {
+                throw new InvalidArgumentException('Lien de désinscription invalide : « < », « > » et espaces interdits.');
             }
         }
         if (! str_starts_with($d->urlDesinscription, 'https://')) {
@@ -79,7 +87,7 @@ final class ComposeurMessage
             'From' => $this->encoderMot($d->nomAffiche) . ' <' . $adresseFrom . '>',
             'Reply-To' => $d->replyTo,
             'To' => $d->destinataire,
-            'Subject' => $this->encoderMot($sujet),
+            'Subject' => $this->encoderSujet($sujet),
             'Date' => $date,
             'Message-ID' => '<' . bin2hex(random_bytes(16)) . '@' . $this->domaineEnvoi . '>',
             'MIME-Version' => '1.0',
@@ -95,7 +103,7 @@ final class ComposeurMessage
 
         $tete = '';
         foreach ($entetes as $nom => $valeur) {
-            $tete .= $nom . ': ' . $valeur . "\r\n";
+            $tete .= self::plier($nom . ': ' . $valeur) . "\r\n";
         }
         if ($this->dkim !== null) {
             $tete = $this->dkim->signer($entetes, $corps) . "\r\n" . $tete;
@@ -134,13 +142,50 @@ final class ComposeurMessage
             . quoted_printable_encode($contenu) . "\r\n";
     }
 
-    /** Mot encodé RFC 2047 si non ASCII (nom affiché, sujet). */
+    /** Plie une ligne d'en-tête aux espaces (78 car. visés, RFC 5322 §2.2.3). Neutre pour DKIM relaxed. */
+    public static function plier(string $ligne): string
+    {
+        $ligne = preg_replace('/\r\n(?=[ \t])/', '', $ligne) ?? $ligne;
+        if (strlen($ligne) <= 78) {
+            return $ligne;
+        }
+        $sortie = '';
+        $cur = '';
+        foreach (explode(' ', $ligne) as $mot) {
+            if ($cur !== '' && strlen($cur) + 1 + strlen($mot) > 78) {
+                $sortie .= $cur . "\r\n";
+                $cur = ' ' . $mot;
+            } else {
+                $cur = $cur === '' ? $mot : $cur . ' ' . $mot;
+            }
+        }
+
+        return $sortie . $cur;
+    }
+
+    /** Sujet : champ libre, jamais de guillemets ; RFC 2047 si non ASCII ou mot infiniment long. */
+    private function encoderSujet(string $v): string
+    {
+        if (preg_match('/^[\x20-\x7e]*$/', $v) === 1 && preg_match('/\S{60,}/', $v) !== 1) {
+            return $v;
+        }
+
+        return $this->motsEncodes($v);
+    }
+
+    /** Nom affiché : entre guillemets si ASCII avec caractères spéciaux, RFC 2047 sinon. */
     private function encoderMot(string $v): string
     {
         if (preg_match('/^[\x20-\x7e]*$/', $v) === 1) {
             return str_contains($v, '"') || preg_match('/[(),:;<>@\[\]\\\\]/', $v) === 1
                 ? '"' . addcslashes($v, '"\\') . '"' : $v;
         }
+
+        return $this->motsEncodes($v);
+    }
+
+    private function motsEncodes(string $v): string
+    {
         $mots = [];
         foreach (mb_str_split($v) as $c) {
             $mots[] = $c;

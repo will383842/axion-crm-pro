@@ -30,10 +30,19 @@ final class DkimSigneur
         if ($cle === false) {
             throw new InvalidArgumentException('Clé privée DKIM illisible.');
         }
+        $d = openssl_pkey_get_details($cle);
+        if ($d === false || ($d['type'] ?? null) !== OPENSSL_KEYTYPE_RSA || ($d['bits'] ?? 0) < 2048) {
+            throw new InvalidArgumentException('Clé DKIM : RSA d\'au moins 2048 bits exigée.');
+        }
         $this->cle = $cle;
         if (preg_match('/^[a-z0-9.-]+$/i', $domaine . $selecteur) !== 1) {
             throw new InvalidArgumentException('Domaine ou sélecteur DKIM invalide.');
         }
+    }
+
+    public function domaine(): string
+    {
+        return $this->domaine;
     }
 
     public static function depuisFichier(string $domaine, string $selecteur, string $chemin): self
@@ -57,6 +66,10 @@ final class DkimSigneur
             $parNom[strtolower($nom)] = $valeur;
         }
 
+        if (preg_match('/@([^>\s]+)>?\s*$/', $parNom['from'] ?? '', $mf) !== 1 || strcasecmp($mf[1], $this->domaine) !== 0) {
+            throw new InvalidArgumentException('Le d= DKIM doit être le domaine d\'envoi du From.');
+        }
+
         $h = [];
         $canon = '';
         foreach (self::ENTETES_SIGNES as $nom) {
@@ -69,14 +82,15 @@ final class DkimSigneur
 
         $bh = base64_encode(hash('sha256', self::canonCorps($corps), true));
         $sig = 'v=1; a=rsa-sha256; c=relaxed/relaxed; d=' . $this->domaine . '; s=' . $this->selecteur
-            . '; t=' . ($horodatage ?? time()) . '; h=' . implode(':', $h) . '; bh=' . $bh . '; b=';
+            . '; t=' . ($horodatage ?? time()) . '; h=' . implode(': ', $h) . '; bh=' . $bh . '; b=';
 
         $aSigner = $canon . self::canonEntete('DKIM-Signature', $sig);
         if (! openssl_sign($aSigner, $signature, $this->cle, OPENSSL_ALGO_SHA256)) {
             throw new InvalidArgumentException('Échec de la signature DKIM.');
         }
 
-        return 'DKIM-Signature: ' . $sig . rtrim(chunk_split(base64_encode($signature), 72, "\r\n\t"));
+        return ComposeurMessage::plier('DKIM-Signature: ' . $sig)
+            . "\r\n\t" . rtrim(chunk_split(base64_encode($signature), 70, "\r\n\t"));
     }
 
     public static function canonEntete(string $nom, string $valeur): string

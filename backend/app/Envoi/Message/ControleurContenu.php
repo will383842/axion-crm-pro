@@ -8,11 +8,17 @@ namespace App\Envoi\Message;
  */
 final class ControleurContenu
 {
-    /** @var list<string> hôtes/fragments typiques de traqueurs de clics ou d'ouvertures */
+    /**
+     * Traqueurs de liens : sous-domaines typiques (préfixe de hôte, finissant par « . ») ou domaines
+     * entiers. « open. » et « links. » seuls sont trop larges (open.spotify.com) : retirés ; les
+     * pixels d'ouverture sont de toute façon couverts par le refus de toute image.
+     *
+     * @var list<string>
+     */
     private const TRACEURS = [
-        'click.', 'clicks.', 'track.', 'tracking.', 'trk.', 'links.', 'redirect.', 'open.',
-        'mandrillapp.com', 'sendgrid.net', 'list-manage.com', 'mailchi.mp', 'hubspotlinks',
-        'mailtrack', 'mixmax', 'yesware', 'bit.ly', 'tinyurl.com',
+        'click.', 'clicks.', 'track.', 'tracking.', 'trk.', 'redirect.', 'email-tracking.',
+        'mandrillapp.com', 'sendgrid.net', 'list-manage.com', 'mailchi.mp', 'hubspotlinks.com',
+        'mailtrack.io', 'mixmax.com', 'yesware.com', 'bit.ly', 'tinyurl.com', 'ct.sendgrid.net',
     ];
 
     /**
@@ -22,14 +28,17 @@ final class ControleurContenu
      */
     public function analyser(array $contenus, array $piecesJointes = []): array
     {
-        $tout = implode("\n", $contenus);
+        $brut = implode("\n", $contenus);
+        // Anti-contournement : entités HTML décodées (deux fois), puis version sans balises.
+        $tout = self::decoder($brut);
+        $sansBalises = self::decoder((string) preg_replace('/<[^>]*>/', '', $tout));
         $motifs = [];
 
         if ($piecesJointes !== [] || preg_match('/content-disposition\s*:\s*attachment/i', $tout) === 1) {
             $motifs[] = 'Pièce jointe interdite : le message ne doit contenir aucune pièce jointe.';
         }
 
-        if (preg_match_all('/\{\{(.*?)\}\}/s', $tout, $m) > 0) {
+        if (preg_match_all('/\{\{(.*?)\}\}/s', $brut, $m) > 0) {
             foreach ($m[1] as $interieur) {
                 $morceaux = explode('|', $interieur, 2);
                 $nom = trim($morceaux[0]);
@@ -39,16 +48,17 @@ final class ControleurContenu
             }
         }
 
-        if (preg_match('/(?<![a-z0-9-])axion-ia\.com/i', $tout) === 1) {
+        if (preg_match('/(?<![a-z0-9-])axion-ia\.com/i', $tout) === 1
+            || preg_match('/(?<![a-z0-9-])axion-ia\.com/i', $sansBalises) === 1) {
             $motifs[] = 'Lien ou adresse vers axion-ia.com (domaine principal) interdit : utiliser le domaine d\'envoi.';
         }
 
-        if (preg_match('/grenoble/iu', $tout) === 1) {
+        if (preg_match('/grenoble/iu', $tout) === 1 || preg_match('/grenoble/iu', $sansBalises) === 1) {
             $motifs[] = 'Le mot « Grenoble » est interdit dans le message.';
         }
 
         if ($this->aPixelDeSuivi($tout)) {
-            $motifs[] = 'Pixel ou balise de suivi interdit (image 1x1, image de suivi d\'ouverture).';
+            $motifs[] = 'Pixel ou image interdits : aucune image (distante, intégrée, masquée ou de suivi d\'ouverture) ni ressource externe dans un message du palier 0, aucune mesure d\'ouverture.';
         }
 
         if ($this->aLienTraque($tout)) {
@@ -70,19 +80,20 @@ final class ControleurContenu
         }
     }
 
-    private function aPixelDeSuivi(string $html): bool
+    private static function decoder(string $v): string
     {
-        if (preg_match_all('/<img\b[^>]*>/i', $html, $imgs) > 0) {
-            foreach ($imgs[0] as $img) {
-                if (preg_match('/\b(width|height)\s*=\s*["\']?\s*[01]\s*(px)?\s*["\'\s>\/]/i', $img) === 1
-                    || preg_match('/(width|height)\s*:\s*[01]\s*(px)?\s*(;|["\'])/i', $img) === 1
-                    || preg_match('/(pixel|beacon|track|open(ed)?\.(gif|png)|\/o\/|spacer)/i', $img) === 1) {
-                    return true;
-                }
-            }
+        for ($i = 0; $i < 2; $i++) {
+            $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        return preg_match('/<(img|link|iframe|script)\b[^>]*(tracking|beacon|pixel)/i', $html) === 1;
+        return $v;
+    }
+
+    /** Palier 0 : AUCUNE image ni ressource externe (donc aucun pixel, quelle que soit sa dissimulation). */
+    private function aPixelDeSuivi(string $html): bool
+    {
+        return preg_match('/<\s*(img|image|picture|source|video|audio|embed|object|iframe|script|link|input)\b/i', $html) === 1
+            || preg_match('/\burl\s*\(|@import|\bbackground\s*=|\bsrcset\s*=/i', $html) === 1;
     }
 
     private function aLienTraque(string $contenu): bool
@@ -93,13 +104,16 @@ final class ControleurContenu
         foreach ($urls[0] as $url) {
             $hote = strtolower((string) parse_url($url, PHP_URL_HOST));
             foreach (self::TRACEURS as $t) {
-                if ($hote !== '' && str_contains($hote . '/', $t)) {
+                $prefixe = str_ends_with($t, '.');
+                if ($hote !== '' && ($prefixe
+                    ? (str_starts_with($hote, $t) || str_contains($hote, '.' . $t))
+                    : ($hote === $t || str_ends_with($hote, '.' . $t)))) {
                     return true;
                 }
             }
             $requete = (string) parse_url($url, PHP_URL_QUERY);
-            // Paramètre portant une autre URL : signature d'une redirection.
-            if (preg_match('/(^|&)(url|u|redirect|redirect_uri|target|dest|link|r)=(https?(%3a|:)|%2f%2f)/i', $requete) === 1) {
+            // Tout paramètre dont la valeur est une autre URL : signature d'une redirection.
+            if (preg_match('/(^|&)[^=&]*=(https?(%3a|:)|%2f%2f)/i', $requete) === 1) {
                 return true;
             }
         }

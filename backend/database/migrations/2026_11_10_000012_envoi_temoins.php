@@ -27,6 +27,17 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Volontairement vide (REGLES-SOCLE S8 : aucun effacement de données).
+        // Retour PRUDENT (REGLES-SOCLE S8 : aucun effacement de données) : la table
+        // n'est retirée que si elle est VIDE ; sinon le retour est refusé.
+        DB::unprepared(<<<'SQL'
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM envoi_temoins) THEN
+                    RAISE EXCEPTION 'envoi_temoins contient des lignes : retour refusé (aucun effacement)';
+                END IF;
+            END $$;
+            DROP TABLE IF EXISTS envoi_temoins;
+            SELECT 1;
+                    SQL);
     }
 };

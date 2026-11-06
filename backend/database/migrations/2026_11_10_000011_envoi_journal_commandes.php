@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Envoi P0 L0 — journal des commandes, AJOUT SEUL : un trigger refuse UPDATE
- * et DELETE. down() ne supprime rien.
+ * et DELETE. down() ne retire la table que si elle est vide.
  */
 return new class extends Migration
 {
@@ -17,7 +17,7 @@ return new class extends Migration
                 workspace_id UUID NOT NULL REFERENCES workspaces(id),
                 commande     TEXT NOT NULL,
                 auteur       TEXT NOT NULL,
-                details      JSONB NOT NULL DEFAULT '{}'::jsonb,
+                details      TEXT NOT NULL DEFAULT '{}',
                 jour         DATE NOT NULL DEFAULT CURRENT_DATE,
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now()
             );
@@ -43,6 +43,17 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Volontairement vide (REGLES-SOCLE S8 : aucun effacement de données).
+        // Retour PRUDENT (REGLES-SOCLE S8 : aucun effacement de données) : la table
+        // n'est retirée que si elle est VIDE ; sinon le retour est refusé.
+        DB::unprepared(<<<'SQL'
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM envoi_journal_commandes) THEN
+                    RAISE EXCEPTION 'envoi_journal_commandes contient des lignes : retour refusé (aucun effacement)';
+                END IF;
+            END $$;
+            DROP TABLE IF EXISTS envoi_journal_commandes;
+            DROP FUNCTION IF EXISTS envoi_journal_commandes_ajout_seul();
+        SQL);
     }
 };

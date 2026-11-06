@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Envoi P0 L0 — drapeaux du socle local, par workspace. AJOUT SEUL.
  * `feu_vert_date` + `feu_vert_signature` : feu vert signé (utilisé par un lot
- * ultérieur). down() ne supprime rien : aucune donnée n'est jamais effacée.
+ * ultérieur). down() ne retire la table que si elle est vide.
  */
 return new class extends Migration
 {
@@ -32,6 +32,17 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Volontairement vide (REGLES-SOCLE S8 : aucun effacement de données).
+        // Retour PRUDENT (REGLES-SOCLE S8 : aucun effacement de données) : la table
+        // n'est retirée que si elle est VIDE ; sinon le retour est refusé.
+        DB::unprepared(<<<'SQL'
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM envoi_drapeaux) THEN
+                    RAISE EXCEPTION 'envoi_drapeaux contient des lignes : retour refusé (aucun effacement)';
+                END IF;
+            END $$;
+            DROP TABLE IF EXISTS envoi_drapeaux;
+            SELECT 1;
+                    SQL);
     }
 };

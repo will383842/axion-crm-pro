@@ -64,8 +64,17 @@ function envoiDemande(object $t, array $sur = []): DemandeEnvoi
     ], $sur);
 
     return new DemandeEnvoi(
-        $t->ws, $a['email'], [['verification' => 'valide']], $a['pays'], $a['siren'], $a['domaine'],
-        $a['entite'], $a['collecte'], $a['info'], $a['segment'], $a['premier'],
+        $t->ws,
+        $a['email'],
+        [['verification' => 'valide']],
+        $a['pays'],
+        $a['siren'],
+        $a['domaine'],
+        $a['entite'],
+        $a['collecte'],
+        $a['info'],
+        $a['segment'],
+        $a['premier'],
     );
 }
 
@@ -93,7 +102,7 @@ test('opposition : l\'éligibilité enveloppée refuse', function () {
         'created_at' => now(), 'updated_at' => now(),
     ]);
     expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBe('opposition');
-})->skip(fn () => ! DB::getSchemaBuilder()->hasTable('opt_out'), 'opt_out absente');
+})->skip(fn () => DB::getSchemaBuilder()->hasTable('opt_out') === false, 'opt_out absente');
 
 test('verdict d\'adresse : 29 jours passe, 30 et 31 refusent, absent refuse, invalide récent annule', function () {
     envoiEspaceNeuf($this, false, true);

@@ -14,7 +14,7 @@ return new class extends Migration
         DB::unprepared(<<<'SQL'
             CREATE TABLE IF NOT EXISTS envoi_journal_commandes (
                 id           BIGSERIAL PRIMARY KEY,
-                workspace_id UUID NOT NULL REFERENCES workspaces(id),
+                workspace_id UUID NOT NULL, -- pas de clé étrangère : le journal survit à tout, il ne se vide jamais
                 commande     TEXT NOT NULL,
                 auteur       TEXT NOT NULL,
                 details      TEXT NOT NULL DEFAULT '{}',
@@ -27,7 +27,7 @@ return new class extends Migration
             BEGIN
                 RAISE EXCEPTION 'envoi_journal_commandes : ajout seulement (UPDATE/DELETE refusés)';
             END;
-            $f$ LANGUAGE plpgsql;
+            $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
             DROP TRIGGER IF EXISTS envoi_journal_commandes_ajout_seul ON envoi_journal_commandes;
             CREATE TRIGGER envoi_journal_commandes_ajout_seul
                 BEFORE UPDATE OR DELETE ON envoi_journal_commandes

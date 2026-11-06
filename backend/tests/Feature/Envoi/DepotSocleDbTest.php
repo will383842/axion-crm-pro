@@ -26,8 +26,8 @@ test('journal en ajout seul : UPDATE et DELETE refusés', function () {
     $ws = espaceEnvoi();
     app(DepotSocle::class)->journaliser($ws, 'x', 'test');
     WorkspaceContext::run($ws, function () {
-        expect(fn () => DB::table('envoi_journal_commandes')->update(['auteur' => 'z']))->toThrow(QueryException::class);
-        expect(fn () => DB::table('envoi_journal_commandes')->delete())->toThrow(QueryException::class);
+        expect(fn () => DB::transaction(fn () => DB::table('envoi_journal_commandes')->update(['auteur' => 'z'])))->toThrow(QueryException::class);
+        expect(fn () => DB::transaction(fn () => DB::table('envoi_journal_commandes')->delete()))->toThrow(QueryException::class);
     });
 });
 

@@ -53,11 +53,11 @@ test('drapeau éteint : lectures neutres, aucune délégation', function () {
 });
 
 test('le drapeau est relu à chaque injection (closure)', function () {
-    $etat = true;
+    $etat = new ArrayObject(['actif' => true]);
     $faux = new FauxServeurEnvoi;
-    $p = passerelle($faux, reel: fn () => $etat);
+    $p = passerelle($faux, reel: fn () => $etat['actif']);
     expect($p->injecter(msg())->accepte)->toBeTrue();
-    $etat = false;
+    $etat['actif'] = false;
     expect(fn () => $p->injecter(msg(cle: 'c2')))->toThrow(EnvoiRefuse::class);
     expect($faux->appels)->toBe(1);
 });

@@ -247,3 +247,29 @@ test('B15-009 — tout écrivain de `email_sends` passe par EligibiliteCampagne:
         implode("\n  - ", $fautifs),
     ));
 });
+
+// ── LE CHEMIN D'ENVOI P0 (lot L3) : la porte unique `EnvoiAutorise` ─────────
+
+test('envoi P0 L3 — la porte EnvoiAutorise enveloppe peutRecevoir et EligibiliteAdresse::motif', function () {
+    $fichier = app_path('Envoi/Gardes/EnvoiAutorise.php');
+    $this->assertFileExists($fichier);
+
+    $code = eligibiliteCodeSansCommentaires((string) file_get_contents($fichier));
+    $this->assertStringContainsString('EligibiliteCampagne::peutRecevoir(', $code);
+    $this->assertStringContainsString('EligibiliteAdresse::motif(', $code);
+});
+
+test('envoi P0 L3 — tout écrivain de `email_sends` sous app/Envoi passe par EnvoiAutorise', function () {
+    $racine = (string) realpath(app_path('Envoi'));
+    $fautifs = [];
+
+    foreach (eligibiliteFichiersPhp($racine) as $chemin) {
+        $code = eligibiliteCodeSansCommentaires((string) file_get_contents($chemin));
+        if (eligibiliteEcrituresEmailSends($code) > 0 && ! str_contains($code, 'EnvoiAutorise::verifier(')) {
+            $fautifs[] = substr($chemin, strlen($racine) + 1);
+        }
+    }
+
+    sort($fautifs);
+    $this->assertSame([], $fautifs, "Écrit dans email_sends sans EnvoiAutorise::verifier() :\n  - " . implode("\n  - ", $fautifs));
+});

@@ -6,9 +6,11 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Personnes\NatureEmail;
 use App\Support\EligibiliteCampagne;
+use App\Socle\Espace\FonctionsEspace;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -60,6 +62,75 @@ final class EnvoiAutorise
 
     public const SEGMENT_FERME = 'segment_ferme';
 
+    public const SEGMENT_INCONNU = 'segment_inconnu';
+
+    public const SEGMENT_SENSIBLE = 'segment_sensible_refuse';
+
+    public const DOMAINE_LISTE_NOIRE = 'domaine_envoi_sur_liste_noire';
+
+    public const DATE_FUTURE = 'date_de_collecte_dans_le_futur';
+
+    public const FUSEAU = 'Europe/Paris';
+
+    /**
+     * Segments sensibles de la spec 26 § 6.4 : refusés EXPLICITEMENT (jamais
+     * ouverts par cette porte, quel que soit le réglage). Comparaison par
+     * radical, sur le nom en minuscules.
+     *
+     * @var list<string>
+     */
+    public const SEGMENTS_SENSIBLES = ['syndicat', 'sante', 'santé', 'insee', 'roumanie'];
+
+    /** Domaines de messagerie grand public, sous-domaines compris (`mail.yahoo.com`). */
+    private static function estWebmail(string $email): bool
+    {
+        if (NatureEmail::de($email) === 'perso') {
+            return true;
+        }
+        $domaine = mb_strtolower(trim(substr($email, (int) strrpos($email, '@') + 1)));
+        $libelles = explode('.', $domaine);
+        while (count($libelles) > 2) {
+            array_shift($libelles);
+            if (NatureEmail::estGrandPublic(implode('.', $libelles))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Jours CALENDAIRES (fuseau Paris, indépendant de l'heure d'été) de $depuis à $jusqua. */
+    private static function joursCalendaires(DateTimeInterface $depuis, DateTimeInterface $jusqua): int
+    {
+        $paris = new DateTimeZone(self::FUSEAU);
+        $a = DateTimeImmutable::createFromInterface($depuis)->setTimezone($paris)->setTime(0, 0);
+        $b = DateTimeImmutable::createFromInterface($jusqua)->setTimezone($paris)->setTime(0, 0);
+
+        return (int) $a->diff($b)->format('%r%a');
+    }
+
+    /** SIREN valide = 9 chiffres ET clé de Luhn correcte (et pas « 000000000 »). */
+    private static function sirenValide(?string $siren): bool
+    {
+        $s = $siren === null ? '' : trim($siren);
+        if (preg_match('/^\d{9}$/', $s) !== 1 || $s === '000000000') {
+            return false;
+        }
+        $somme = 0;
+        for ($i = 0; $i < 9; $i++) {
+            $c = (int) $s[8 - $i];
+            if ($i % 2 === 1) {
+                $c *= 2;
+                if ($c > 9) {
+                    $c -= 9;
+                }
+            }
+            $somme += $c;
+        }
+
+        return $somme % 10 === 0;
+    }
+
     /** Fiche prête à injecter : la photo du figement ne doit pas dater de plus de 15 minutes. */
     public static function photoEncoreValable(DateTimeInterface $figeeLe, DateTimeInterface $maintenant): bool
     {
@@ -75,7 +146,7 @@ final class EnvoiAutorise
         if (($m = self::garderPays($d)) !== null) {
             return new VerdictEnvoi($m);
         }
-        if ($d->premierContact && NatureEmail::de($d->email) === 'perso') {
+        if ($d->premierContact && self::estWebmail($d->email)) {
             return new VerdictEnvoi(self::WEBMAIL_PREMIER_CONTACT);
         }
         if (($m = EligibiliteAdresse::motif(mb_strtolower(trim($d->email)), $d->occurrences, $d->nonInformes)) !== null) {
@@ -96,12 +167,35 @@ final class EnvoiAutorise
         if ($d->entiteLegaleExpeditrice === null || trim($d->entiteLegaleExpeditrice) === '') {
             return new VerdictEnvoi(self::ENTITE_ABSENTE, $alertes);
         }
-        // Segments sensibles : fermés par défaut ; un segment inconnu ou non ouvert est refusé.
-        if ($d->segment !== null && ! Segments::ouvert($d->segment, $d->workspaceId)) {
-            return new VerdictEnvoi(self::SEGMENT_FERME, $alertes);
+        if (($m = self::garderSegment($d)) !== null) {
+            return new VerdictEnvoi($m, $alertes);
         }
 
         return new VerdictEnvoi(null, $alertes);
+    }
+
+    /**
+     * FAIL CLOSED (spec 26 § 6.4) : segment absent/vide = refus ; segment
+     * sensible = refus explicite ; segment non listé = refus ; segment connu =
+     * ouvert SEULEMENT si le réglage PAR ESPACE (`fonctions_espace`) l'ouvre.
+     * Ni `crm.segments_ouverts` ni `Segments::OUVERTS_PAR_DEFAUT` ne comptent ici.
+     */
+    private static function garderSegment(DemandeEnvoi $d): ?string
+    {
+        $segment = $d->segment === null ? '' : mb_strtolower(trim($d->segment));
+        if ($segment === '') {
+            return self::SEGMENT_INCONNU;
+        }
+        foreach (self::SEGMENTS_SENSIBLES as $radical) {
+            if (str_contains($segment, $radical)) {
+                return self::SEGMENT_SENSIBLE;
+            }
+        }
+        if (! in_array($segment, Segments::CONNUS, true)) {
+            return self::SEGMENT_INCONNU;
+        }
+
+        return in_array($segment, FonctionsEspace::segmentsOuverts($d->workspaceId), true) ? null : self::SEGMENT_FERME;
     }
 
     private static function garderPays(DemandeEnvoi $d): ?string
@@ -111,13 +205,12 @@ final class EnvoiAutorise
             return $pays === 'FR' ? null : self::PAYS_HORS_FRANCE;
         }
 
-        // Pays non renseigné : seul un SIREN valide (9 chiffres) prouve la France.
-        return $d->siren !== null && preg_match('/^\d{9}$/', trim($d->siren)) === 1 ? null : self::PAYS_INCONNU;
+        // Pays non renseigné : seul un SIREN valide (9 chiffres + clé de Luhn) prouve la France.
+        return self::sirenValide($d->siren) ? null : self::PAYS_INCONNU;
     }
 
     private static function verdictRecent(DemandeEnvoi $d, DateTimeImmutable $maintenant): bool
     {
-        $limite = $maintenant->modify('-' . self::VERDICT_MAX_JOURS . ' days');
         $ligne = DB::table('envoi_verdicts_adresse')
             ->where('workspace_id', $d->workspaceId)
             ->where('empreinte_adresse', ListeSuppression::empreinte(mb_strtolower(trim($d->email))))
@@ -129,7 +222,14 @@ final class EnvoiAutorise
             return false;
         }
 
-        return (new DateTimeImmutable((string) $ligne->verifie_le))->getTimestamp() > $limite->getTimestamp();
+        // Jours CALENDAIRES de Paris : ni décalage d'heure d'été, ni fuseau de l'appelant.
+        // Un verdict daté du FUTUR n'est pas une preuve : refusé.
+        $verifieLe = new DateTimeImmutable((string) $ligne->verifie_le);
+        if ($verifieLe->getTimestamp() > $maintenant->getTimestamp()) {
+            return false;
+        }
+
+        return self::joursCalendaires($verifieLe, $maintenant) < self::VERDICT_MAX_JOURS;
     }
 
     private static function garderDomaine(DemandeEnvoi $d, DateTimeImmutable $maintenant): ?string
@@ -142,15 +242,20 @@ final class EnvoiAutorise
             return self::DOMAINE_INCONNU;
         }
 
-        $age = (int) (new DateTimeImmutable((string) $dom->achete_le, $maintenant->getTimezone()))->setTime(0, 0)->diff($maintenant->setTime(0, 0))->format('%r%a');
+        if (filter_var($dom->liste_noire ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return self::DOMAINE_LISTE_NOIRE;
+        }
+
+        $age = self::joursCalendaires(new DateTimeImmutable((string) $dom->achete_le, new DateTimeZone(self::FUSEAU)), $maintenant);
         if ($age < self::DOMAINE_AGE_MIN_JOURS) {
             return self::DOMAINE_TROP_JEUNE;
         }
 
-        $jour = $maintenant->format('Y-m-d');
+        $paris = new DateTimeZone(self::FUSEAU);
+        $jour = $maintenant->setTimezone($paris)->format('Y-m-d');
         foreach (['dmarc_verifie_le', 'spf_verifie_le', 'dkim_verifie_le'] as $col) {
             if ($dom->{$col} === null
-                || (new DateTimeImmutable((string) $dom->{$col}))->setTimezone($maintenant->getTimezone())->format('Y-m-d') !== $jour) {
+                || (new DateTimeImmutable((string) $dom->{$col}))->setTimezone($paris)->format('Y-m-d') !== $jour) {
                 return self::DOMAINE_DNS_NON_VERIFIE;
             }
         }
@@ -161,12 +266,17 @@ final class EnvoiAutorise
     /** @param  list<string>  $alertes */
     private static function garderArt14(DemandeEnvoi $d, DateTimeImmutable $maintenant, array &$alertes): ?string
     {
-        if ($d->premiereInfoLe !== null) {
+        if ($d->donneesCollecteesLe !== null && $d->donneesCollecteesLe->getTimestamp() > $maintenant->getTimestamp()) {
+            return self::DATE_FUTURE;
+        }
+        // Une « première information » datée du FUTUR n'a pas eu lieu : elle ne vaut pas information donnée.
+        if ($d->premiereInfoLe !== null && $d->premiereInfoLe->getTimestamp() <= $maintenant->getTimestamp()) {
             return null;
         }
         if ($d->donneesCollecteesLe === null) {
             return self::ART14_DATE_INCONNUE;
         }
+
         $debut = DateTimeImmutable::createFromInterface($d->donneesCollecteesLe)->setTimezone($maintenant->getTimezone())->setTime(0, 0);
         $jours = (int) $debut->diff($maintenant->setTime(0, 0))->format('%r%a');
         if ($jours >= self::ART14_LIMITE_JOURS) {

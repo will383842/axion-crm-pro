@@ -5,9 +5,12 @@
  * Fixtures FICTIVES (dépôt public) : domaines `.example.invalid`.
  */
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise as P;
+use App\Socle\Espace\FonctionsEspace;
 use App\Support\ListeSuppression;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\DoublonsFixtures as F;
@@ -23,12 +26,14 @@ beforeEach(function () {
     // État nominal : tout est en règle ; chaque test casse UNE garde.
     envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', $this->now->modify('-5 days'));
     envoiDomaine($this->ws, 'zz-envoi.example.invalid', $this->now->modify('-30 days'), $this->now);
+    FonctionsEspace::regler($this->ws, 'federations', true);
 });
 
 /** Un espace NEUF (rien n'est effacé) avec seulement ce qu'on demande. */
 function envoiEspaceNeuf(object $t, bool $verdict, bool $domaine): void
 {
     $t->ws = F::espace('zz-envoi-l3');
+    FonctionsEspace::regler($t->ws, 'federations', true);
     if ($verdict) {
         envoiVerdict($t->ws, ENVOI_ADRESSE, 'valide', $t->now->modify('-5 days'));
     }
@@ -60,7 +65,7 @@ function envoiDemande(object $t, array $sur = []): DemandeEnvoi
     $a = array_merge([
         'email' => ENVOI_ADRESSE, 'pays' => 'FR', 'siren' => null, 'domaine' => 'zz-envoi.example.invalid',
         'entite' => 'ZZ Expediteur SAS', 'collecte' => $t->now->modify('-5 days'), 'info' => null,
-        'segment' => null, 'premier' => true,
+        'segment' => 'federations', 'premier' => true,
     ], $sur);
 
     return new DemandeEnvoi(
@@ -86,7 +91,7 @@ test('France : pays étranger refusé, pays inconnu refusé, SIREN seul accepté
     expect(P::verifier(envoiDemande($this, ['pays' => 'BE']), $this->now)->refus)->toBe(P::PAYS_HORS_FRANCE);
     expect(P::verifier(envoiDemande($this, ['pays' => null]), $this->now)->refus)->toBe(P::PAYS_INCONNU);
     expect(P::verifier(envoiDemande($this, ['pays' => '']), $this->now)->refus)->toBe(P::PAYS_INCONNU);
-    expect(P::verifier(envoiDemande($this, ['pays' => null, 'siren' => '940000001']), $this->now)->refus)->toBeNull();
+    expect(P::verifier(envoiDemande($this, ['pays' => null, 'siren' => '732829320']), $this->now)->refus)->toBeNull();
     expect(P::verifier(envoiDemande($this, ['pays' => null, 'siren' => '12']), $this->now)->refus)->toBe(P::PAYS_INCONNU);
 });
 
@@ -157,12 +162,125 @@ test('entité légale expéditrice absente refusée', function () {
     }
 });
 
-test('segments sensibles fermés par défaut : espace sans réglage, segment inconnu', function () {
-    config(['crm.segments_par_espace' => true]);
+test('segments : configuration PAR DÉFAUT, espace client => presse refusée ; espace réglé ouvert => acceptée', function () {
+    // Aucune configuration forcée : on teste ce qui part en production par défaut.
+    expect(config('crm.segments_ouverts'))->toBe('');
+    expect(config('crm.segments_par_espace'))->toBeFalse();
+    $client = F::espace('zz-envoi-client');
+    envoiVerdict($client, ENVOI_ADRESSE, 'valide', $this->now->modify('-5 days'));
+    envoiDomaine($client, 'zz-envoi.example.invalid', $this->now->modify('-30 days'), $this->now);
+    $this->ws = $client;
+    foreach (['presse', 'federations', 'organisateurs-evenements'] as $seg) {
+        expect(P::verifier(envoiDemande($this, ['segment' => $seg]), $this->now)->refus)->toBe(P::SEGMENT_FERME, $seg);
+    }
+    FonctionsEspace::regler($client, 'presse', true);
+    expect(P::verifier(envoiDemande($this, ['segment' => 'presse']), $this->now)->refus)->toBeNull();
+    expect(P::verifier(envoiDemande($this, ['segment' => 'federations']), $this->now)->refus)->toBe(P::SEGMENT_FERME);
+});
+
+test('segments : le réglage global n\'ouvre rien pour la porte', function () {
+    config(['crm.segments_par_espace' => false, 'crm.segments_ouverts' => 'presse,federations']);
+    $this->ws = F::espace('zz-envoi-global');
+    envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', $this->now->modify('-5 days'));
+    envoiDomaine($this->ws, 'zz-envoi.example.invalid', $this->now->modify('-30 days'), $this->now);
     expect(P::verifier(envoiDemande($this, ['segment' => 'presse']), $this->now)->refus)->toBe(P::SEGMENT_FERME);
-    config(['crm.segments_par_espace' => false, 'crm.segments_ouverts' => 'aucun']);
-    expect(P::verifier(envoiDemande($this, ['segment' => 'presse']), $this->now)->refus)->toBe(P::SEGMENT_FERME);
-    expect(P::verifier(envoiDemande($this, ['segment' => 'inconnu']), $this->now)->refus)->toBe(P::SEGMENT_FERME);
+});
+
+test('segments : absent ou vide => segment inconnu (fail closed)', function () {
+    foreach ([null, '', '   '] as $vide) {
+        expect(P::verifier(envoiDemande($this, ['segment' => $vide]), $this->now)->refus)->toBe(P::SEGMENT_INCONNU);
+    }
+});
+
+test('segments : sensibles nommés refusés, même si un réglage existerait', function () {
+    foreach (['syndicats-salaries', 'syndicat_salaries', 'sante', 'santé', 'insee', 'prospects-insee', 'roumanie'] as $seg) {
+        expect(P::verifier(envoiDemande($this, ['segment' => $seg]), $this->now)->refus)->toBe(P::SEGMENT_SENSIBLE, $seg);
+    }
+});
+
+test('segments : segment non listé refusé', function () {
+    expect(P::verifier(envoiDemande($this, ['segment' => 'inconnu']), $this->now)->refus)->toBe(P::SEGMENT_INCONNU);
+    expect(P::verifier(envoiDemande($this, ['segment' => 'vivier-candidats']), $this->now)->refus)->toBe(P::SEGMENT_INCONNU);
+});
+
+test('SIREN : clé de Luhn exigée (000000000 et 9 chiffres faux refusés)', function () {
+    foreach (['000000000', '123456789', '732829321'] as $faux) {
+        expect(P::verifier(envoiDemande($this, ['pays' => null, 'siren' => $faux]), $this->now)->refus)->toBe(P::PAYS_INCONNU, $faux);
+    }
+    expect(P::verifier(envoiDemande($this, ['pays' => null, 'siren' => '732829320']), $this->now)->refus)->toBeNull();
+});
+
+test('dates dans le FUTUR refusées (collecte, verdict) ; information future ne vaut pas information donnée', function () {
+    expect(P::verifier(envoiDemande($this, ['collecte' => $this->now->modify('+2 days')]), $this->now)->refus)->toBe(P::DATE_FUTURE);
+    expect(P::verifier(envoiDemande($this, ['collecte' => $this->now->modify('+2 days'), 'info' => $this->now->modify('-1 day')]), $this->now)->refus)->toBe(P::DATE_FUTURE);
+    expect(P::verifier(envoiDemande($this, ['collecte' => $this->now->modify('-40 days'), 'info' => $this->now->modify('+3 days')]), $this->now)->refus)->toBe(P::ART14_DEPASSE);
+    envoiEspaceNeuf($this, false, true);
+    envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', $this->now->modify('+1 day'));
+    expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBe(P::VERDICT_ABSENT);
+});
+
+test('verdict 30 jours : jours calendaires de Paris, aux bornes de changement d\'heure et avec une heure UTC', function () {
+    $paris = new DateTimeZone('Europe/Paris');
+    // Fin d'heure d'été le 2026-10-25 : le 30e jour tombe après le changement d'heure.
+    $cas = [
+        ['2026-09-27 00:30', '2026-10-26 00:10', null],                 // 29 jours calendaires
+        ['2026-09-26 23:50', '2026-10-26 00:10', P::VERDICT_ABSENT],    // 30 jours calendaires (23h20 d'écart réel de moins)
+        ['2026-09-26 00:30', '2026-10-26 23:50', P::VERDICT_ABSENT],
+    ];
+    foreach ($cas as [$verdictLe, $nowLe, $attendu]) {
+        $now = new DateTimeImmutable($nowLe, $paris);
+        envoiEspaceNeuf($this, false, false);
+        envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', new DateTimeImmutable($verdictLe, $paris));
+        envoiDomaine($this->ws, 'zz-envoi.example.invalid', $now->modify('-60 days'), $now);
+        expect(P::verifier(envoiDemande($this, ['collecte' => $now->modify('-5 days')]), $now)->refus)->toBe($attendu, "{$verdictLe} -> {$nowLe}");
+    }
+    // Heure UTC passée par l'appelant : 23:30 UTC le 26/10 = 00:30 à Paris le 27/10 => 30 jours calendaires.
+    $nowUtc = new DateTimeImmutable('2026-10-26 23:30:00', new DateTimeZone('UTC'));
+    envoiEspaceNeuf($this, false, false);
+    envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', new DateTimeImmutable('2026-09-27 12:00', $paris));
+    envoiDomaine($this->ws, 'zz-envoi.example.invalid', $nowUtc->modify('-60 days'), $nowUtc->setTimezone($paris));
+    expect(P::verifier(envoiDemande($this, ['collecte' => $nowUtc->modify('-5 days')]), $nowUtc)->refus)->toBe(P::VERDICT_ABSENT);
+});
+
+test('contrôle DNS du jour : le jour est celui de Paris même si l\'appelant passe une heure UTC', function () {
+    $paris = new DateTimeZone('Europe/Paris');
+    $nowUtc = new DateTimeImmutable('2026-10-26 23:30:00', new DateTimeZone('UTC')); // = 27/10 00:30 Paris
+    // Contrôle fait le 26/10 à 22:30 Paris (21:30 UTC) : même jour que « now » en UTC, MAIS pas à Paris.
+    envoiEspaceNeuf($this, true, false);
+    envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', $nowUtc->modify('-2 days'));
+    envoiDomaine($this->ws, 'zz-envoi.example.invalid', $nowUtc->modify('-60 days'), new DateTimeImmutable('2026-10-26 22:30', $paris));
+    expect(P::verifier(envoiDemande($this, ['collecte' => $nowUtc->modify('-5 days')]), $nowUtc)->refus)->toBe(P::DOMAINE_DNS_NON_VERIFIE);
+    DB::table('envoi_domaines')->update(['dmarc_verifie_le' => '2026-10-27 00:10:00+01', 'spf_verifie_le' => '2026-10-27 00:10:00+01', 'dkim_verifie_le' => '2026-10-27 00:10:00+01']);
+    expect(P::verifier(envoiDemande($this, ['collecte' => $nowUtc->modify('-5 days')]), $nowUtc)->refus)->toBeNull();
+});
+
+test('webmail : les sous-domaines (mail.yahoo.com) sont reconnus, un domaine pro non', function () {
+    foreach (['x@mail.yahoo.com', 'x@fr.mail.gmail.com', 'x@secure.hotmail.fr'] as $mail) {
+        expect(P::verifier(envoiDemande($this, ['email' => $mail]), $this->now)->refus)->toBe(P::WEBMAIL_PREMIER_CONTACT, $mail);
+    }
+    expect(P::verifier(envoiDemande($this, ['email' => 'x@live.example.fr']), $this->now)->refus)->not->toBe(P::WEBMAIL_PREMIER_CONTACT);
+    expect(P::verifier(envoiDemande($this, ['email' => 'x@mail.entreprise.example.invalid']), $this->now)->refus)->not->toBe(P::WEBMAIL_PREMIER_CONTACT);
+});
+
+test('suppression : adresse dans email_suppressions (sans opt_out) => refus, preuve de l\'appel à peutRecevoir', function () {
+    // `EligibiliteAdresse::motif` ne lit pas la base et les occurrences fournies sont vierges :
+    // seul `EligibiliteCampagne::peutRecevoir` (opt_out + email_suppressions) peut refuser ici.
+    expect(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(ENVOI_ADRESSE))->exists())->toBeFalse();
+    expect(EligibiliteAdresse::motif(ENVOI_ADRESSE, [['verification' => 'valide']], false))->toBeNull();
+    expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBeNull();
+    ListeSuppression::inscrire(ENVOI_ADRESSE, 'complaint', 'zz-test');
+    expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBe(EligibiliteAdresse::OPPOSITION);
+});
+
+test('domaine d\'envoi sur liste noire refusé (relevé DNS), et nom en minuscules imposé en base', function () {
+    DB::table('envoi_domaines')->update(['liste_noire' => true]);
+    expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBe(P::DOMAINE_LISTE_NOIRE);
+    DB::table('envoi_domaines')->update(['liste_noire' => false]);
+    expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBeNull();
+
+    expect(fn () => DB::table('envoi_domaines')->insert([
+        'workspace_id' => $this->ws, 'nom' => 'ZZ-Majuscules.example.invalid', 'achete_le' => '2026-01-01',
+    ]))->toThrow(QueryException::class);
 });
 
 test('la photo du figement ne vaut que 15 minutes avant l\'injection', function () {

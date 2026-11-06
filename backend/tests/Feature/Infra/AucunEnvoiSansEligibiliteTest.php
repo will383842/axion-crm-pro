@@ -259,17 +259,66 @@ test('envoi P0 L3 — la porte EnvoiAutorise enveloppe peutRecevoir et Eligibili
     $this->assertStringContainsString('EligibiliteAdresse::motif(', $code);
 });
 
-test('envoi P0 L3 — tout écrivain de `email_sends` sous app/Envoi passe par EnvoiAutorise', function () {
+/**
+ * Combien d'appels à `EnvoiAutorise::verifier(` dont le RÉSULTAT est utilisé ?
+ * Reconnaît le nom court, un alias d'import (`use …\EnvoiAutorise as P;`) et le
+ * nom pleinement qualifié. Un appel en instruction nue (résultat jeté) ne compte pas.
+ */
+function envoiAppelsVerifierUtilises(string $code): int
+{
+    $noms = ['\\App\\Envoi\\Gardes\\EnvoiAutorise'];
+    if (preg_match('/namespace\s+App\\\\Envoi\\\\Gardes\s*;/', $code) === 1) {
+        $noms[] = 'EnvoiAutorise';
+    }
+    if (preg_match_all('/use\s+\\\\?App\\\\Envoi\\\\Gardes\\\\EnvoiAutorise(?:\s+as\s+(\w+))?\s*;/i', $code, $m) > 0) {
+        foreach ($m[1] as $alias) {
+            $noms[] = $alias !== '' ? $alias : 'EnvoiAutorise';
+        }
+    }
+
+    $n = 0;
+    foreach (array_unique($noms) as $nom) {
+        $motif = '/(?<![\w\\\\])' . preg_quote($nom, '/') . '\s*::\s*verifier\s*\(/';
+        if (preg_match_all($motif, $code, $trouves, PREG_OFFSET_CAPTURE) === 0) {
+            continue;
+        }
+        foreach ($trouves[0] as [, $pos]) {
+            $avant = rtrim(substr($code, 0, $pos));
+            $dernier = $avant === '' ? '' : substr($avant, -1);
+            // Début d'instruction (`;`, `{`, `}`, ouverture `<?php`) = résultat jeté.
+            if ($dernier === '' || in_array($dernier, [';', '{', '}'], true) || str_ends_with($avant, '<?php')) {
+                continue;
+            }
+            $n++;
+        }
+    }
+
+    return $n;
+}
+
+test('envoi P0 L3 — TÉMOIN : le détecteur d\'appel à EnvoiAutorise::verifier reconnaît alias, nom qualifié, et rejette l\'appel jeté', function () {
+    $this->assertSame(1, envoiAppelsVerifierUtilises('<?php use App\Envoi\Gardes\EnvoiAutorise; $v = EnvoiAutorise::verifier($d);'));
+    $this->assertSame(1, envoiAppelsVerifierUtilises('<?php use App\Envoi\Gardes\EnvoiAutorise as P; if (! P::verifier($d)->autorise()) {}'));
+    $this->assertSame(1, envoiAppelsVerifierUtilises('<?php $v = \App\Envoi\Gardes\EnvoiAutorise::verifier($d);'));
+    $this->assertSame(0, envoiAppelsVerifierUtilises('<?php use App\Envoi\Gardes\EnvoiAutorise as P; P::verifier($d);'));
+    $this->assertSame(0, envoiAppelsVerifierUtilises('<?php use App\Envoi\Gardes\EnvoiAutorise; $x = 1; EnvoiAutorise::verifier($d);'));
+    $this->assertSame(0, envoiAppelsVerifierUtilises('<?php $v = Autre::verifier($d);'));
+});
+
+test('envoi P0 L3 — tout écrivain de `email_sends` sous app/Envoi utilise le résultat de EnvoiAutorise::verifier', function () {
     $racine = (string) realpath(app_path('Envoi'));
+    $this->assertNotSame('', $racine);
+    $fichiers = eligibiliteFichiersPhp($racine);
+    $this->assertNotEmpty($fichiers, 'app/Envoi : aucun fichier lu, la garde serait creuse.');
     $fautifs = [];
 
-    foreach (eligibiliteFichiersPhp($racine) as $chemin) {
+    foreach ($fichiers as $chemin) {
         $code = eligibiliteCodeSansCommentaires((string) file_get_contents($chemin));
-        if (eligibiliteEcrituresEmailSends($code) > 0 && ! str_contains($code, 'EnvoiAutorise::verifier(')) {
+        if (eligibiliteEcrituresEmailSends($code) > 0 && envoiAppelsVerifierUtilises($code) === 0) {
             $fautifs[] = substr($chemin, strlen($racine) + 1);
         }
     }
 
     sort($fautifs);
-    $this->assertSame([], $fautifs, "Écrit dans email_sends sans EnvoiAutorise::verifier() :\n  - " . implode("\n  - ", $fautifs));
+    $this->assertSame([], $fautifs, "Écrit dans email_sends sans utiliser le résultat de EnvoiAutorise::verifier() :\n  - " . implode("\n  - ", $fautifs));
 });

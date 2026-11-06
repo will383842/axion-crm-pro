@@ -11,13 +11,13 @@ final class DepotSocleDb implements DepotSocle
 {
     public function toutArreter(string $workspaceId): bool
     {
-        return $this->ligne($workspaceId)?->tout_arreter === true;
+        return ($this->ligne($workspaceId)['tout_arreter'] ?? false) === true;
     }
 
     public function modeTemoins(string $workspaceId): bool
     {
         // Fermé par défaut : sans ligne, le mode témoins est ALLUMÉ.
-        return ($this->ligne($workspaceId)?->mode_temoins ?? true) === true;
+        return ($this->ligne($workspaceId)['mode_temoins'] ?? true) === true;
     }
 
     public function estTemoin(string $workspaceId, string $adresse): bool
@@ -67,9 +67,13 @@ final class DepotSocleDb implements DepotSocle
         });
     }
 
-    private function ligne(string $workspaceId): ?object
+    /** @return array<string, mixed>|null */
+    private function ligne(string $workspaceId): ?array
     {
-        return WorkspaceContext::run($workspaceId, fn (): ?object => DB::table('envoi_drapeaux')
-            ->where('workspace_id', $workspaceId)->first());
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId): ?array {
+            $ligne = DB::table('envoi_drapeaux')->where('workspace_id', $workspaceId)->first();
+
+            return $ligne === null ? null : (array) $ligne;
+        });
     }
 }

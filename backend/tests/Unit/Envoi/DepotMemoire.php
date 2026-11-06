@@ -3,6 +3,8 @@
 namespace Tests\Unit\Envoi;
 
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\EmpreinteTemoin;
+use Closure;
 use DateTimeImmutable;
 
 final class DepotMemoire implements DepotSocle
@@ -32,7 +34,7 @@ final class DepotMemoire implements DepotSocle
 
     public function estTemoin(string $workspaceId, string $adresse): bool
     {
-        return in_array($adresse, $this->temoins, true);
+        return in_array(EmpreinteTemoin::normaliser($adresse), $this->temoins, true);
     }
 
     public function injectesLe(string $workspaceId, DateTimeImmutable $jour): int
@@ -40,9 +42,41 @@ final class DepotMemoire implements DepotSocle
         return $this->compteurs[$jour->format('Y-m-d')] ?? 0;
     }
 
-    public function noterInjection(string $workspaceId, DateTimeImmutable $jour): void
+    /** @var list<string> */
+    public array $cles = [];
+
+    public int $verrous = 0;
+
+    public function injectesLeGlobal(DateTimeImmutable $jour): int
     {
+        return $this->compteurs[$jour->format('Y-m-d')] ?? 0;
+    }
+
+    public function dejaInjecte(string $workspaceId, string $cleIdempotence): bool
+    {
+        return in_array($cleIdempotence, $this->cles, true);
+    }
+
+    public function sousVerrouInjection(DateTimeImmutable $jour, Closure $f): mixed
+    {
+        $this->verrous++;
+
+        return $f();
+    }
+
+    public function noterInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): void
+    {
+        if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
+            return;
+        }
+        $this->cles[] = $cleIdempotence;
         $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
+    }
+
+    public function armerToutArreter(string $workspaceId, string $auteur): void
+    {
+        $this->arret = true;
+        $this->journaliser($workspaceId, 'tout_arreter', $auteur);
     }
 
     public function eteindreTemoins(string $workspaceId, string $auteur): void

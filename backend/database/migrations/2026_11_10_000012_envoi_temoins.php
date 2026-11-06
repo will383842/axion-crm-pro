@@ -3,7 +3,12 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-/** Envoi P0 L0 — adresses témoins autorisées en mode témoins. AJOUT SEUL. */
+/**
+ * Envoi P0 L0 — témoins autorisés en mode témoins. AJOUT SEUL.
+ * Jamais d'adresse en clair : `empreinte` = HMAC-SHA256 (clé d'application
+ * `envoi.cle_empreinte`, hors dépôt) de l'adresse normalisée (minuscules, sans
+ * espaces). `libelle` est un texte libre d'affichage (« Gmail perso »), jamais l'adresse.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -12,10 +17,11 @@ return new class extends Migration
             CREATE TABLE IF NOT EXISTS envoi_temoins (
                 id           BIGSERIAL PRIMARY KEY,
                 workspace_id UUID NOT NULL REFERENCES workspaces(id),
-                adresse      TEXT NOT NULL,
+                empreinte    TEXT NOT NULL CHECK (empreinte ~ '^[0-9a-f]{64}$'),
+                libelle      TEXT NOT NULL DEFAULT '',
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now()
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS envoi_temoins_ws_adresse ON envoi_temoins (workspace_id, lower(adresse));
+            CREATE UNIQUE INDEX IF NOT EXISTS envoi_temoins_ws_empreinte ON envoi_temoins (workspace_id, empreinte);
             ALTER TABLE envoi_temoins ENABLE ROW LEVEL SECURITY;
             ALTER TABLE envoi_temoins FORCE ROW LEVEL SECURITY;
             DROP POLICY IF EXISTS envoi_temoins_workspace_isolation ON envoi_temoins;

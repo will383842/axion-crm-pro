@@ -6,9 +6,11 @@ use Tests\TestCase;
 uses(TestCase::class);
 
 test('aucune route (API ou web) ne touche au mode témoins', function () {
+    // Garde contre le passage à vide : sans route chargée, la boucle ne prouverait rien.
+    expect(count(Route::getRoutes()->getRoutes()))->toBeGreaterThan(10);
     foreach (Route::getRoutes() as $route) {
         $texte = strtolower($route->uri() . ' ' . ($route->getActionName()));
-        expect($texte)->not->toContain('temoins')->and($texte)->not->toContain('temoin-off');
+        expect($texte)->not->toContain('temoins')->and($texte)->not->toContain('temoin-off')->and($texte)->not->toContain('tout-arreter');
     }
 });
 

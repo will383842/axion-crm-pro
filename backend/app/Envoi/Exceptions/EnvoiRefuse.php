@@ -21,4 +21,19 @@ final class EnvoiRefuse extends RuntimeException
     {
         return new self('Mode témoins : destinataire hors de la liste des témoins.');
     }
+
+    public static function cleEmpreinteAbsente(): self
+    {
+        return new self('Clé d\'empreinte des témoins absente (ENVOI_CLE_EMPREINTE) : refus.');
+    }
+
+    public static function autreEspace(): self
+    {
+        return new self('Le message appartient à un autre espace que le contexte courant : refus.');
+    }
+
+    public static function plafondInvalide(int $valeur, int $max): self
+    {
+        return new self("Plafond d'injection invalide ({$valeur}) : attendu entre 0 et {$max}.");
+    }
 }

@@ -16,15 +16,23 @@ use DateTimeImmutable;
 /**
  * Le « socle local » : enveloppe du contrat. Ordre des portes, à chaque
  * injection, lues À CHAQUE FOIS (jamais mises en cache) :
- *   1. ENVOI_REEL_ACTIF éteint  => exception, zéro appel au serveur ;
- *   2. Tout arrêter             => exception ;
- *   3. mode témoins             => refuse toute adresse hors liste ;
- *   4. plafond dur du jour      => report au lendemain ;
- *   5. seulement alors, le serveur est appelé.
+ *   1. ENVOI_REEL_ACTIF éteint  => exception, zéro appel au serveur, zéro accès base ;
+ *   2. message d'un autre espace que le contexte courant => exception ;
+ *   puis, SOUS UN VERROU PAR JOUR (transaction + pg_advisory_xact_lock) :
+ *   3. Tout arrêter             => exception ;
+ *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
+ *   5. rejeu idempotent (même clé) => passe sans recompter ;
+ *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
+ *   7. seulement alors, le serveur est appelé, et l'injection acceptée est notée
+ *      dans la même transaction : deux workers ne peuvent pas dépasser le plafond.
+ * Le jour est le jour civil d'Europe/Paris (JourEnvoi).
  * Le mode témoins ne s'éteint que par `envoi:temoins-off` (voir DepotSocle).
  */
 final class PasserelleLocale implements ServeurEnvoi
 {
+    /** Borne haute V0 des plafonds (par espace et global) : au-delà, la configuration est rejetée. */
+    public const PLAFOND_MAX = 300;
+
     public function __construct(
         private readonly ServeurEnvoi $serveur,
         private readonly DepotSocle $depot,
@@ -32,31 +40,47 @@ final class PasserelleLocale implements ServeurEnvoi
         private readonly int|\Closure $plafondJour,
         private readonly ?\Closure $maintenant = null,
         private readonly string $espaceDefaut = '',
+        private readonly int|\Closure|null $plafondGlobal = null,
+        private readonly ?\Closure $contexteCourant = null,
     ) {}
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
     {
+        // Porte 1, sans aucun accès base : drapeau éteint => rien ne se passe.
         if (! $this->reel()) {
             throw EnvoiRefuse::envoiReelInactif();
         }
         $ws = $message->workspaceId;
-        if ($this->depot->toutArreter($ws)) {
-            throw EnvoiRefuse::toutArreter();
-        }
-        if ($this->depot->modeTemoins($ws) && ! $this->depot->estTemoin($ws, $message->destinataire)) {
-            throw EnvoiRefuse::horsTemoins();
+        if ($this->contexteCourant !== null && ($this->contexteCourant)() !== $ws) {
+            throw EnvoiRefuse::autreEspace();
         }
         $jour = $this->jour();
-        if ($this->depot->injectesLe($ws, $jour) >= $this->plafond()) {
-            return ResultatInjection::reporte($jour->modify('+1 day'));
-        }
+        $plafond = $this->plafond($this->plafondJour);
+        $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
-        $resultat = $this->serveur->injecter($message);
-        if ($resultat->accepte) {
-            $this->depot->noterInjection($ws, $jour);
-        }
+        // Les autres portes, le comptage, l'appel et la note sont sous UN verrou.
+        return $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global): ResultatInjection {
+            if ($this->depot->toutArreter($ws)) {
+                throw EnvoiRefuse::toutArreter();
+            }
+            if ($this->depot->modeTemoins($ws) && ! $this->depot->estTemoin($ws, $message->destinataire)) {
+                throw EnvoiRefuse::horsTemoins();
+            }
+            // Rejeu idempotent (même clé) : le serveur renvoie le même résultat, rien n'est recompté.
+            if ($this->depot->dejaInjecte($ws, $message->cleIdempotence)) {
+                return $this->serveur->injecter($message);
+            }
+            if ($this->depot->injectesLe($ws, $jour) >= $plafond || $this->depot->injectesLeGlobal($jour) >= $global) {
+                return ResultatInjection::reporte($jour->modify('+1 day'));
+            }
 
-        return $resultat;
+            $resultat = $this->serveur->injecter($message);
+            if ($resultat->accepte) {
+                $this->depot->noterInjection($ws, $jour, $message->cleIdempotence);
+            }
+
+            return $resultat;
+        });
     }
 
     public function etatEnvoi(string $idInjection): EtatMessage
@@ -103,15 +127,18 @@ final class PasserelleLocale implements ServeurEnvoi
         return $this->reelActif instanceof \Closure ? (bool) ($this->reelActif)() : $this->reelActif;
     }
 
-    private function plafond(): int
+    private function plafond(int|\Closure $valeur): int
     {
-        return $this->plafondJour instanceof \Closure ? (int) ($this->plafondJour)() : $this->plafondJour;
+        $n = $valeur instanceof \Closure ? (int) $valeur() : $valeur;
+        if ($n < 0 || $n > self::PLAFOND_MAX) {
+            throw EnvoiRefuse::plafondInvalide($n, self::PLAFOND_MAX);
+        }
+
+        return $n;
     }
 
     private function jour(): DateTimeImmutable
     {
-        $maintenant = $this->maintenant === null ? new DateTimeImmutable : ($this->maintenant)();
-
-        return $maintenant->setTime(0, 0);
+        return JourEnvoi::de($this->maintenant === null ? null : ($this->maintenant)());
     }
 }

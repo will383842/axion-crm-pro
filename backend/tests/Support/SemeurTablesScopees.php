@@ -37,6 +37,14 @@ use Throwable;
 final class SemeurTablesScopees
 {
     /**
+     * Tables en ajout seul (trigger qui refuse DELETE) : `nettoyer()` les saute.
+     * Leurs lignes de test restent, sans clé étrangère vers `workspaces`.
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL = ['envoi_journal_commandes'];
+
+    /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
      * celles dont ses clés étrangères dépendent. Le nettoyage parcourt cette
      * liste à l'envers.
@@ -48,14 +56,6 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    /**
-     * Tables en ajout seul (trigger qui refuse DELETE) : `nettoyer()` les saute.
-     * Leurs lignes de test restent, sans clé étrangère vers `workspaces`.
-     *
-     * @var list<string>
-     */
-    public const APPEND_SEUL = ['envoi_journal_commandes'];
-
     public const ORDRE = [
         // ── Racines ──────────────────────────────────────────────────────────
         // 2026-09-29 (chantier 3) : registre des personnes retirees, sans cle
@@ -643,7 +643,8 @@ final class SemeurTablesScopees
             'auteur' => 'zz',
         ]);
         $inserer('envoi_temoins', [
-            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'empreinte' => hash('sha256', 'zz-' . $marque),
+            'libelle' => 'zz',
         ]);
 
         $inserer('proxy_providers_config', [

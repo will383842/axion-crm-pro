@@ -58,7 +58,10 @@ final class ControleurContenu
         return $motifs;
     }
 
-    /** @param list<string> $contenus @param list<string> $piecesJointes */
+    /**
+     * @param list<string> $contenus
+     * @param list<string> $piecesJointes
+     */
     public function exiger(array $contenus, array $piecesJointes = []): void
     {
         $motifs = $this->analyser($contenus, $piecesJointes);

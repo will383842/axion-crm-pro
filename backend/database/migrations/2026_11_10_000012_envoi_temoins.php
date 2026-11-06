@@ -37,7 +37,6 @@ return new class extends Migration
                 END IF;
             END $$;
             DROP TABLE IF EXISTS envoi_temoins;
-            SELECT 1;
-                    SQL);
+        SQL);
     }
 };

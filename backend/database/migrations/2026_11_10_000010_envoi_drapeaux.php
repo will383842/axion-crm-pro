@@ -42,7 +42,6 @@ return new class extends Migration
                 END IF;
             END $$;
             DROP TABLE IF EXISTS envoi_drapeaux;
-            SELECT 1;
-                    SQL);
+        SQL);
     }
 };

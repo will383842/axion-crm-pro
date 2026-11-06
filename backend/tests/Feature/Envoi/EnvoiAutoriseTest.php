@@ -98,8 +98,8 @@ test('webmail refusé en premier contact', function () {
 
 test('opposition : l\'éligibilité enveloppée refuse', function () {
     DB::table('opt_out')->insert([
-        'workspace_id' => $this->ws, 'scope' => 'business', 'email_hash' => ListeSuppression::empreinte(ENVOI_ADRESSE),
-        'created_at' => now(), 'updated_at' => now(),
+        'scope' => 'business', 'email_hash' => ListeSuppression::empreinte(ENVOI_ADRESSE),
+        'source' => 'zz-test', 'created_at' => now(),
     ]);
     expect(P::verifier(envoiDemande($this), $this->now)->refus)->toBe('opposition');
 })->skip(fn () => DB::getSchemaBuilder()->hasTable('opt_out') === false, 'opt_out absente');

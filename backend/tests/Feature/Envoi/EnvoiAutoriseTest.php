@@ -246,7 +246,7 @@ test('contrôle DNS du jour : le jour est celui de Paris même si l\'appelant pa
     $paris = new DateTimeZone('Europe/Paris');
     $nowUtc = new DateTimeImmutable('2026-10-26 23:30:00', new DateTimeZone('UTC')); // = 27/10 00:30 Paris
     // Contrôle fait le 26/10 à 22:30 Paris (21:30 UTC) : même jour que « now » en UTC, MAIS pas à Paris.
-    envoiEspaceNeuf($this, true, false);
+    envoiEspaceNeuf($this, false, false); // le verdict nominal serait daté du FUTUR par rapport à $nowUtc
     envoiVerdict($this->ws, ENVOI_ADRESSE, 'valide', $nowUtc->modify('-2 days'));
     envoiDomaine($this->ws, 'zz-envoi.example.invalid', $nowUtc->modify('-60 days'), new DateTimeImmutable('2026-10-26 22:30', $paris));
     expect(P::verifier(envoiDemande($this, ['collecte' => $nowUtc->modify('-5 days')]), $nowUtc)->refus)->toBe(P::DOMAINE_DNS_NON_VERIFIE);

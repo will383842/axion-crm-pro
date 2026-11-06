@@ -47,7 +47,7 @@ final class DkimSigneur
     }
 
     /**
-     * @param array<string,string> $entetes nom => valeur (non pliée), doit contenir les ENTETES_SIGNES
+     * @param  array<string,string>  $entetes  nom => valeur (non pliée), doit contenir les ENTETES_SIGNES
      * @return string ligne « DKIM-Signature: … » (sans CRLF final)
      */
     public function signer(array $entetes, string $corps, ?int $horodatage = null): string

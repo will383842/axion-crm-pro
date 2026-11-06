@@ -16,8 +16,8 @@ final class ControleurContenu
     ];
 
     /**
-     * @param list<string> $contenus  textes à contrôler (sujet, texte, HTML, pied, adresses, liens)
-     * @param list<string> $piecesJointes
+     * @param  list<string>  $contenus  textes à contrôler (sujet, texte, HTML, pied, adresses, liens)
+     * @param  list<string>  $piecesJointes
      * @return list<string> motifs de refus ; vide = accepté
      */
     public function analyser(array $contenus, array $piecesJointes = []): array
@@ -59,8 +59,8 @@ final class ControleurContenu
     }
 
     /**
-     * @param list<string> $contenus
-     * @param list<string> $piecesJointes
+     * @param  list<string>  $contenus
+     * @param  list<string>  $piecesJointes
      */
     public function exiger(array $contenus, array $piecesJointes = []): void
     {

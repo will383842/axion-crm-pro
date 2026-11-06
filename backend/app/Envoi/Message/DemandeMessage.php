@@ -16,9 +16,9 @@ use DateTimeImmutable;
 final class DemandeMessage
 {
     /**
-     * @param array<string,string> $variables valeurs des variables des gabarits
-     * @param list<string> $references identifiants du fil (relance)
-     * @param list<string> $piecesJointes toujours refusées : présent pour que le refus soit explicite
+     * @param  array<string,string>  $variables  valeurs des variables des gabarits
+     * @param  list<string>  $references  identifiants du fil (relance)
+     * @param  list<string>  $piecesJointes  toujours refusées : présent pour que le refus soit explicite
      */
     public function __construct(
         public readonly string $partieLocale,

@@ -170,7 +170,7 @@ it('le contrôleur accepte un contenu propre', function () {
 });
 
 it('le contrôleur refuse une pièce jointe vue dans le MIME brut', function () {
-    expect((new ControleurContenu)->analyser(["Content-Disposition: attachment; filename=a.pdf"]))->not->toBe([]);
+    expect((new ControleurContenu)->analyser(['Content-Disposition: attachment; filename=a.pdf']))->not->toBe([]);
 });
 
 // ---- DKIM ---------------------------------------------------------------------------

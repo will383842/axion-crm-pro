@@ -107,7 +107,7 @@ final class ComposeurMessage
     /**
      * `{{nom|repli}}` : la valeur fournie si non vide, sinon le repli.
      *
-     * @param array<string,string> $variables
+     * @param  array<string,string>  $variables
      */
     public function rendre(string $gabarit, array $variables, bool $html = false): string
     {

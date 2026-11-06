@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Envoi P0 L0 — journal des commandes, AJOUT SEUL : un trigger refuse UPDATE
- * et DELETE. down() ne retire la table que si elle est vide.
+ * et DELETE. down() ne retire que la protection (trigger), jamais la table ni ses lignes.
  */
 return new class extends Migration
 {
@@ -43,16 +43,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Retour PRUDENT (REGLES-SOCLE S8 : aucun effacement de données) : la table
-        // n'est retirée que si elle est VIDE ; sinon le retour est refusé.
+        // Retour PRUDENT (REGLES-SOCLE S8 : aucun effacement de données) : on retire
+        // seulement la protection « ajout seul » (trigger + fonction). La table et
+        // ses lignes RESTENT ; up() repose la protection (aller-retour-aller sûr).
         DB::unprepared(<<<'SQL'
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM envoi_journal_commandes) THEN
-                    RAISE EXCEPTION 'envoi_journal_commandes contient des lignes : retour refusé (aucun effacement)';
-                END IF;
-            END $$;
-            DROP TABLE IF EXISTS envoi_journal_commandes;
+            DROP TRIGGER IF EXISTS envoi_journal_commandes_ajout_seul ON envoi_journal_commandes;
             DROP FUNCTION IF EXISTS envoi_journal_commandes_ajout_seul();
         SQL);
     }

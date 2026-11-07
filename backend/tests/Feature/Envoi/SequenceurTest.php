@@ -78,7 +78,13 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    WorkspaceContext::clear();
+    // Un test qui attend une exception SQL laisse la transaction de RefreshDatabase avortée : le
+    // `set_config` de `clear()` y échoue, mais l'état PHP est déjà remis à zéro et le rollback défait le reste.
+    try {
+        WorkspaceContext::clear();
+    } catch (Throwable) {
+        // transaction avortée : rien d'autre à nettoyer
+    }
 });
 
 /** Une séquence de $etapes étapes (délais 0, 2, 3 jours ouvrés) ; retourne son id. */
@@ -229,6 +235,7 @@ test('arrêt par ENTREPRISE : une réponse arrête les autres personnes, même i
 
     $i3 = seqInscrire($this, $sid, $c3); // inscrite APRÈS la réponse : arrêtée au moment d'envoyer
     $bilan = ($this->seq)()->executer($this->ws, $this->maintenant);
+    ksort($bilan); // l'ordre de traitement n'est pas garanti : on compare le bilan, pas la séquence
     expect($bilan)->toBe([Sequenceur::ARRETEE => 1, Sequenceur::ENVOYE => 1])
         ->and(seqMessages($i2))->toBe([])->and(seqMessages($i3))->toBe([])
         ->and(count(seqMessages($iAutre)))->toBe(1); // l'autre entreprise n'est pas touchée

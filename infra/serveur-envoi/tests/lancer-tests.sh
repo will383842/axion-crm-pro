@@ -225,7 +225,8 @@ chk  "C-N1 garde de marqueur : motif ferme <[a-z][a-z0-9-]*>" grep -qF '<[a-z][a
 # Installateur reel, a blanc : rend vraiment les 4 modeles (pre-vol) et valide la forme.
 vals="$tmpd/valeurs.env"
 ( valeurs_doc; for v in IP_ENVOI IP_GESTION IP_CRM_PROD IP_RESOLVEUR IP_TUNNEL IP_TUNNEL_ADMIN PORT_WG CLE_PUBLIQUE_ADMIN; do printf '%s=%s\n' "$v" "${!v}"; done ) >"$vals"
-bl() { AXION_VALEURS="$1" bash "$I" 2>&1; }
+printf 'ID=ubuntu\nVERSION_ID="24.04"\n' >"$tmpd/os-release.ubuntu"
+bl() { AXION_VALEURS="$1" OS_RELEASE="$tmpd/os-release.ubuntu" bash "$I" 2>&1; }
 out="$(bl "$vals")"; rc=$?
 [[ $rc == 0 && "$out" == *"termine."* && "$out" != *"marqueur non remplace"* ]] && ok "C-N1 installateur a blanc : pre-vol de rendu OK (4 modeles)" || bad "C-N1 installateur a blanc rc=$rc: $out"
 for cas in 'IP_ENVOI=192.0.2.0/24' "IP_ENVOI=$Z4" "IP_CRM_PROD=$Z4/0" 'IP_GESTION=192.0.2.1-192.0.2.9' 'IP_RESOLVEUR=192.0.2.1,192.0.2.2' \
@@ -234,6 +235,9 @@ for cas in 'IP_ENVOI=192.0.2.0/24' "IP_ENVOI=$Z4" "IP_CRM_PROD=$Z4/0" 'IP_GESTIO
   { cat "$vals"; echo "$cas"; } >"$tmpd/v2.env"; out="$(bl "$tmpd/v2.env")"; rc=$?
   [[ $rc -ne 0 && "$out" == *"${cas%%=*}"* ]] && ok "m1 valeur refusee : $cas" || bad "m1 valeur NON refusee : $cas (rc=$rc)"
 done
+rm -f "$tmpd/pwned"; { cat "$vals"; echo "IP_ENVOI=\$(touch $tmpd/pwned)"; echo "IP_TUNNEL=192.0.2.9;touch $tmpd/pwned"; } >"$tmpd/v4.env"; out="$(bl "$tmpd/v4.env")"; rc=$?
+[[ $rc -ne 0 && ! -e "$tmpd/pwned" ]] && ok "m1 le fichier de valeurs n'est JAMAIS execute (\$(...) ; inertes)" || bad "m1 le fichier de valeurs a execute du code (rc=$rc)"
+printf '# commentaire\nIP_INCONNUE=192.0.2.5\n' >>"$tmpd/v5.env"; { cat "$vals" "$tmpd/v5.env"; } >"$tmpd/v6.env"; out="$(bl "$tmpd/v6.env")"; [[ $? -ne 0 && "$out" == *IP_INCONNUE* ]] && ok "m1 cle inconnue refusee (faute de frappe)" || bad "m1 cle inconnue acceptee"
 { cat "$vals"; echo 'IP_GESTION=192.0.2.10'; } >"$tmpd/v3.env"; out="$(bl "$tmpd/v3.env")"; [[ $? -ne 0 ]] && ok "m1 IP_ENVOI et IP_GESTION identiques refusees" || bad "m1 IP identiques acceptees"
 # Le fichier RENDU repasse par verifier-nftables.sh (mode --rendu) avant nft -c.
 verif_rendu() ( valeurs_doc; bash "$V" --rendu "$1" )

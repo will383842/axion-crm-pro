@@ -4,11 +4,20 @@
 # ligne autorisee de SA chaine ; toute autre ligne (sous-chaine, variante, jump, goto,
 # chaine ou table supplementaire, include...) est une violation. Toutes les chaines
 # du fichier sont lues. Chaque regle autorisee doit aussi etre presente.
-# Usage : verifier-nftables.sh [fichier]   (defaut : ../nftables.conf)
-# Code 0 = conforme ; 1 = violation ; 2 = fichier illisible.
+# Usage : verifier-nftables.sh [fichier]            (modele ; defaut : ../nftables.conf)
+#         verifier-nftables.sh --rendu <fichier>    (fichier RENDU par l'installateur : les
+#           lignes `define` doivent valoir EXACTEMENT les valeurs IP_ENVOI IP_GESTION IP_CRM_PROD
+#           PORT_WG IP_RESOLVEUR de l'environnement ; aucun marqueur <...> ne doit rester)
+# Code 0 = conforme ; 1 = violation ; 2 = fichier illisible / valeurs absentes.
 set -uo pipefail
+RENDU=0; [[ "${1:-}" == "--rendu" ]] && { RENDU=1; shift; }
 F="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/nftables.conf}"
 [[ -r "$F" ]] || { echo "ILLISIBLE: $F"; exit 2; }
+if [[ $RENDU == 1 ]]; then
+  for v in IP_ENVOI IP_GESTION IP_CRM_PROD PORT_WG IP_RESOLVEUR; do
+    [[ -n "${!v:-}" ]] || { echo "VALEUR ABSENTE (mode --rendu): $v"; exit 2; }
+  done
+fi
 
 ko=0
 err() { echo "VIOLATION: $*"; ko=1; }
@@ -22,6 +31,16 @@ TOP=(
   'define wg_port = <port-wg>'
   'define ip_resolveur = <ip-resolveur>'
 )
+if [[ $RENDU == 1 ]]; then
+  TOP=(
+    'flush ruleset'
+    "define ip_envoi = $IP_ENVOI"
+    "define ip_gestion = $IP_GESTION"
+    "define ip_crm_prod = $IP_CRM_PROD"
+    "define wg_port = $PORT_WG"
+    "define ip_resolveur = $IP_RESOLVEUR"
+  )
+fi
 DECL_INPUT='type filter hook input priority 0; policy drop;'
 DECL_FORWARD='type filter hook forward priority 0; policy drop;'
 DECL_OUTPUT='type filter hook output priority 0; policy drop;'

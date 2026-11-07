@@ -1,6 +1,6 @@
 [Unit]
 Description=KumoMTA (serveur d'envoi propre)
-Requires=docker.service
+Requires=docker.service nftables.service
 After=docker.service wg-quick@wg0.service nftables.service
 
 [Service]

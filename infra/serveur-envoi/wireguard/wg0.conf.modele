@@ -1,4 +1,4 @@
-# Tunnel d'ADMINISTRATION (poste d'administration <-> serveur d'envoi). Decision D7 :
+# Tunnel d'ADMINISTRATION (poste d'administration et serveur d'envoi). Decision D7 :
 # jamais de tunnel vers la prod. Modele : les marqueurs sont remplaces par
 # l'installateur ; la cle privee est generee SUR le serveur, jamais committee.
 [Interface]

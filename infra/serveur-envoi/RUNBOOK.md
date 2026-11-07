@@ -5,18 +5,29 @@ Serveur Hetzner **distinct** de la prod du CRM. Dossier public : aucune IP, aucu
 ## Décision D7 (ADR) — à respecter
 **Aucun tunnel WireGuard vers la prod du CRM, jamais.** Le lien CRM → serveur d'envoi est un **HTTPS signé HMAC**, ouvert par le CRM vers `<ip-gestion>:443` (la passerelle). WireGuard ne sert **qu'à l'administration** : son seul pair est le poste d'administration.
 
+## D5 — quelle IP est la « gestion » (source par défaut)
+`<ip-gestion>` est l'**IPv4 principale** du serveur : c'est l'adresse **source par défaut** de tout le trafic de l'hôte (DNS, NTP, HTTPS 443 pour les images et les paquets, WireGuard). Les règles de sortie sont écrites avec `ip saddr <ip-gestion>` : si `<ip-gestion>` n'était pas l'IP source par défaut, ces flux seraient bloqués. L'**IP flottante d'envoi** (`<ip-envoi>`) est **ajoutée en alias sur l'interface** (jamais en route par défaut) : KumoMTA (`network_mode: host`) s'y lie explicitement pour le SMTP sortant. Vérifier : `ip -4 route get <ip-resolveur>` doit afficher `src <ip-gestion>` (jamais `<ip-envoi>`).
+
 ## Deux IP
 - `<ip-gestion>` : passerelle HTTPS 443 (depuis `<ip-crm-prod>` uniquement) + WireGuard d'administration (UDP).
 - `<ip-envoi>` : **aucune entrée** ; sortie limitée au port 25 TCP (SMTP vers les MX).
 
 ## Installer (une fois)
-1. Créer `/etc/axion-envoi/valeurs.env` (hors dépôt) : `IP_ENVOI IP_GESTION IP_CRM_PROD IP_RESOLVEUR IP_TUNNEL IP_TUNNEL_ADMIN PORT_WG CLE_PUBLIQUE_ADMIN`.
-2. `./installer.sh` (à blanc), relire, puis `./installer.sh --oui`. Relançable sans danger. L'image Docker est tirée **avant** le chargement du pare-feu.
+**Ubuntu 24.04 uniquement** : l'installateur refuse un autre système (le paquet `docker-compose-v2` n'existe pas sous Debian).
+1. Créer `/etc/axion-envoi/valeurs.env` (hors dépôt) : `IP_ENVOI IP_GESTION IP_CRM_PROD IP_RESOLVEUR IP_TUNNEL IP_TUNNEL_ADMIN PORT_WG CLE_PUBLIQUE_ADMIN`. **Forme exigée** (sinon refus, rien n'est modifié) : une **IPv4 unique** par valeur (jamais de `/masque`, de plage, de liste, ni adresse générique), `PORT_WG` entier 1–65535, `CLE_PUBLIQUE_ADMIN` clé WireGuard base64 de 44 caractères ; `IP_ENVOI` ≠ `IP_GESTION`.
+2. `./installer.sh` (à blanc : valide la forme, **rend les 4 modèles** dans un dossier temporaire et repasse le pare-feu rendu par `tests/verifier-nftables.sh --rendu`), relire, puis `./installer.sh --oui` (qui ajoute `nft -c` avant toute charge). Relançable sans danger : sur relance, `kumomta-envoi` est **redémarré** si `init.lua`, `docker-compose.yml` ou l'unité ont changé, et `wg-quick@wg0` est **rechargé** (sans couper le tunnel) si `wg0.conf` a changé. L'image Docker est tirée **avant** le chargement du pare-feu.
 3. Donner au poste d'administration la clé publique du serveur : `wg pubkey < /etc/wireguard/cle-privee` (la clé privée ne quitte jamais le serveur, n'est jamais passée en argument de commande).
 4. **Garder la console de secours Hetzner ouverte** tant que SSH-par-tunnel n'est pas vérifié.
 
 ### SSH et Ubuntu 24.04 (`ssh.socket`)
 Sur Ubuntu 24.04, sshd est lancé par **`ssh.socket`**, qui ignore `ListenAddress`. L'installateur désactive `ssh.socket` et active `ssh.service` (une fois `wg0` monté), et pose un drop-in `After=wg-quick@wg0.service` pour que l'IP du tunnel existe avant le bind de sshd. Vérifier : `ss -ltnp | grep ':22 '` ne doit montrer que `<ip-tunnel>`.
+
+## APT et port 80 sortant (fermé)
+Le **port 80 sortant est fermé** : les dépôts Ubuntu sont par défaut en `http://`, donc `apt` et `unattended-upgrades` seraient bloqués (et une relance de `installer.sh` échouerait). L'installateur passe donc les sources APT en **https** (`/etc/apt/sources.list` et `sources.list.d/*.list|*.sources`) **avant** tout `apt-get update`, de façon idempotente. Si une source tierce n'offre pas https, ne PAS ouvrir le 80 : la retirer. Les miroirs Ubuntu officiels et ceux de l'hébergeur servent le https sur 443, déjà ouvert depuis `<ip-gestion>`. Vérifier : `grep -rE '^(deb|URIs:).*http://' /etc/apt` ne doit rien afficher.
+
+## IPv6 et résolveur DNS
+- **IPv6** : le jeu de règles (`table inet`, politique `drop`, aucune règle ICMPv6/ND) rend **IPv6 inutilisable** : pas de découverte de voisins, donc aucune adresse IPv6 n'est joignable ni utilisable. C'est **voulu** (surface minimale ; IPv4 seul). Ne pas activer l'IPv6 sur l'interface sans ajouter, dans une PR dédiée, seulement l'ICMPv6/ND nécessaire (types 133–137, entrée et sortie).
+- **Résolveur** : seul `IP_RESOLVEUR` est joignable en DNS (UDP/TCP 53, depuis `<ip-gestion>`). Faire pointer le résolveur du système dessus : `systemd-resolved` avec `DNS=<ip-resolveur>` et `Domains=~.` dans `/etc/systemd/resolved.conf.d/10-axion.conf` (le stub local de `systemd-resolved` passe par `lo`, déjà accepté), puis `resolvectl status` doit montrer cette seule IP. Un résolveur non listé serait bloqué en silence.
 
 ## Surface exposée
 Entrée : `<ip-crm-prod>` → `<ip-gestion>:443` ; UDP WireGuard vers `<ip-gestion>` ; SSH (22) uniquement via `wg0` ; **rien** vers `<ip-envoi>`. API KumoMTA : `127.0.0.1:8000` (`trusted_hosts` = localhost).
@@ -48,4 +59,4 @@ Au premier démarrage : `docker inspect --format '{{.HostConfig.CapDrop}}' <cont
 Relever la nouvelle empreinte `sha256:`, la remplacer dans `docker-compose.yml`, relancer `tests/lancer-tests.sh`, PR, puis `installer.sh --oui`.
 
 ## Hors périmètre K3 (restant)
-Passerelle HTTPS HMAC elle-même (écoute 443), injection CRM→KumoMTA, DKIM/SPF/DMARC, réputation et chauffe de l'IP, supervision.
+Passerelle HTTPS HMAC elle-même (écoute 443) et son **AC privée** (autorité de certification interne qui signe le certificat de la passerelle et que le CRM épingle : non livrée ici), injection CRM→KumoMTA, DKIM/SPF/DMARC, réputation et chauffe de l'IP, supervision.

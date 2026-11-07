@@ -577,6 +577,7 @@ jobs:
       - name: Serveur d'envoi K3 — tests statiques (pare-feu, WireGuard d'admin, installateur)
         run: |
           set -euo pipefail
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends nftables
           # Le garde de périmètre compare à origin/main : on s'assure qu'elle existe.
           git fetch --no-tags --prune --unshallow origin 2>/dev/null || true

@@ -391,6 +391,15 @@
       "frontend": []
     },
     {
+      "id": "ENVOI-L5-DESINSCRIPTION",
+      "risque": "envoi P0 L5, desinscription (S22) : aucune ecriture au GET, une seule opposition, jetons refuses sans fuite",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/DesinscriptionTest.php"
+      ],
+      "frontend": []
+    },
+    {
       "id": "LISTE",
       "risque": "liste figee du filet",
       "nouveaux": {

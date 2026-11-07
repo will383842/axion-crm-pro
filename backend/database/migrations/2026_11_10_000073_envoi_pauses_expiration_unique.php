@@ -27,9 +27,11 @@ return new class extends Migration
             DO $$
             BEGIN
                 -- Colonne absente (table recréée par le retour de 000072 dans l'aller-retour NR-17) : rien à vérifier.
-                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'envoi_pauses' AND column_name = 'expire_le')
-                   AND EXISTS (SELECT 1 FROM envoi_pauses WHERE expire_le IS NOT NULL) THEN
-                    RAISE EXCEPTION 'envoi_pauses.expire_le est utilisée : retour refusé (aucun effacement)';
+                -- IF imbriqués : la requête sur expire_le n'est analysée que si la colonne existe.
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'envoi_pauses' AND column_name = 'expire_le') THEN
+                    IF EXISTS (SELECT 1 FROM envoi_pauses WHERE expire_le IS NOT NULL) THEN
+                        RAISE EXCEPTION 'envoi_pauses.expire_le est utilisée : retour refusé (aucun effacement)';
+                    END IF;
                 END IF;
             END $$;
             ALTER TABLE envoi_pauses DROP COLUMN IF EXISTS expire_le;

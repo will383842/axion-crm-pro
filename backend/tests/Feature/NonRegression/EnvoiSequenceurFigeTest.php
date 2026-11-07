@@ -46,3 +46,16 @@ test('ENVOI-L1 le séquenceur passe par la porte EnvoiAutorise et par la Passere
     $src = (string) file_get_contents(base_path('app/Envoi/Sequence/Sequenceur.php'));
     expect($src)->toContain('EnvoiAutorise::verifier(')->and($src)->toContain('ServeurEnvoi $serveur');
 });
+
+test('ENVOI-L1 le séquenceur n\'appelle pas l\'extension PHP calendar (absente de l\'image)', function () {
+    foreach (seqFichiersSequence() as $f) {
+        $code = (string) file_get_contents($f);
+        $nu = '';
+        foreach (token_get_all($code) as $t) {
+            $nu .= is_array($t) ? (in_array($t[0], [T_COMMENT, T_DOC_COMMENT], true) ? '' : $t[1]) : $t;
+        }
+        foreach (['easter_days', 'easter_date', 'cal_days_in_month', 'jdtogregorian', 'gregoriantojd'] as $interdit) {
+            expect(stripos($nu, $interdit))->toBeFalse(basename($f) . " appelle {$interdit}");
+        }
+    }
+});

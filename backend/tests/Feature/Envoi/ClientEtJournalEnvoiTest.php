@@ -26,7 +26,7 @@ test('journal des commande_id : unique, le rejeu est un no-op', function () {
     $j = app(JournalCommandes::class);
     expect($j->enregistrer($this->ws, 'cmd-1', 'pause'))->toBeTrue()
         ->and($j->enregistrer($this->ws, 'cmd-1', 'pause'))->toBeFalse();
-    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_commandes')->count()))->toBe(1);
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->whereNotNull('commande_id')->count()))->toBe(1);
 });
 
 test('commander : requête signée acceptée par le vérificateur ; même commande_id = aucun second appel', function () {

@@ -199,8 +199,11 @@ final class Sequenceur
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
-            'workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang,
-            'statut' => 'reserve', 'message_id' => $messageId,
+            'workspace_id' => $ins->workspace_id,
+            'inscription_id' => $ins->id,
+            'etape' => $rang,
+            'statut' => 'reserve',
+            'message_id' => $messageId,
             'in_reply_to' => $inReplyTo,
         ]);
         if ($lignes === 1) {

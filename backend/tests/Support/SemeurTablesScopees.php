@@ -114,6 +114,9 @@ final class SemeurTablesScopees
         // `propositions_champs`, ON DELETE RESTRICT) : APRÈS elle, pour que le nettoyage
         // (ordre inverse) la vide d'abord.
         'propositions_champs_ecartees',
+        // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
+        'envoi_verdicts_adresse',
+        'envoi_domaines',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -470,6 +473,18 @@ final class SemeurTablesScopees
         $inserer('propositions_champs_ecartees', [
             'proposition_id' => $id['propositions_champs'],
             'motif' => 'demande_effacement',
+        ]);
+
+        $inserer('envoi_verdicts_adresse', [
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'verdict' => 'valide',
+            'verifie_le' => now(),
+            'source' => 'zz-etancheite',
+        ]);
+
+        $inserer('envoi_domaines', [
+            'nom' => 'zz-etancheite.example.invalid',
+            'achete_le' => '2026-01-01',
         ]);
 
         $inserer('listes_manuelles_membres', [

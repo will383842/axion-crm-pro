@@ -203,7 +203,44 @@ dataset('refus', [
     'img sans taille' => [fn () => ['html' => '<img src="http://exemple-envoi.test/logo.png">'], 'Pixel'],
     'img data:' => [fn () => ['html' => '<img src="data:image/png;base64,AAAA">'], 'Pixel'],
     'style url(' => [fn () => ['html' => '<div style="background:url(https://exemple-envoi.test/a.png)">x</div>'], 'Pixel'],
-    'img en entités' => [fn () => ['html' => '<im&#103; src="https://exemple-envoi.test/a.png">'], 'Pixel'],
+    'IMG majuscules' => [fn () => ['html' => '<IMG SRC="https://exemple-envoi.test/a.png">'], 'Pixel'],
+    'balise link' => [fn () => ['html' => '<link rel="stylesheet" href="https://exemple-envoi.test/a.css"><p>x</p>'], 'Pixel'],
+    'attribut srcset' => [fn () => ['html' => '<p srcset="https://exemple-envoi.test/a.png 1x">x</p>'], 'Pixel'],
+    'attribut background' => [fn () => ['html' => '<div background="https://exemple-envoi.test/a.png">x</div>'], 'Pixel'],
+    'entité numérique sans point-virgule' => [fn () => ['html' => '<div style="background:u&#114l(https://exemple-envoi.test/p.gif)">x</div>'], 'Pixel'],
+    'entité hexadécimale sans point-virgule' => [fn () => ['html' => '<p>u&#x72l(https://exemple-envoi.test/p.gif)</p>'], 'entité'],
+    'échappement CSS url' => [fn () => ['html' => '<div style="background:\\75rl(https://exemple-envoi.test/p.gif)">x</div>'], 'Pixel'],
+    'échappement CSS @import' => [fn () => ['html' => '<div style="@\\69mport \'https://exemple-envoi.test/a.css\'">x</div>'], 'Pixel'],
+    'image-set' => [fn () => ['html' => '<div style="background:image-set(\'https://exemple-envoi.test/a.png\' 1x)">x</div>'], 'Pixel'],
+    '-webkit-image-set' => [fn () => ['html' => '<div style="background:-webkit-image-set(\'https://exemple-envoi.test/a.png\' 1x)">x</div>'], 'Pixel'],
+    'VML v:image' => [fn () => ['html' => '<v:image src="https://exemple-envoi.test/a.png"></v:image>'], 'Pixel'],
+    'VML v:fill' => [fn () => ['html' => '<v:fill src="https://exemple-envoi.test/a.png"/>'], 'Pixel'],
+    'SVG feImage' => [fn () => ['html' => '<svg><feImage href="https://exemple-envoi.test/a.png"/></svg>'], 'Pixel'],
+    'SVG use' => [fn () => ['html' => '<p><use href="https://exemple-envoi.test/a.svg#x"/></p>'], 'Pixel'],
+    'commentaire conditionnel Outlook' => [fn () => ['html' => '<!--[if mso]><v:image src="https://exemple-envoi.test/a.png"/><![endif]-->'], 'HTML refusé'],
+    'balise style' => [fn () => ['html' => '<style>p{color:red}</style><p>x</p>'], 'Pixel'],
+    'attribut style seul' => [fn () => ['html' => '<p style="color:red">x</p>'], 'Pixel'],
+    'attribut class' => [fn () => ['html' => '<p class="a">x</p>'], 'HTML refusé'],
+    'href javascript' => [fn () => ['html' => '<a href="javascript:alert(1)">x</a>'], 'HTML refusé'],
+    'href http non sécurisé' => [fn () => ['html' => '<a href="http://exemple.test/x">x</a>'], 'HTML refusé'],
+    'href // sans schéma' => [fn () => ['html' => '<a href="//exemple.test/x">x</a>'], 'HTML refusé'],
+    'href data:' => [fn () => ['html' => '<a href="data:text/html;base64,AAAA">x</a>'], 'HTML refusé'],
+    'balise iframe' => [fn () => ['html' => '<iframe src="https://exemple.test"></iframe>'], 'Pixel'],
+    'balise script' => [fn () => ['html' => '<script>1</script>'], 'Pixel'],
+    'body background' => [fn () => ['html' => '<body background="https://exemple-envoi.test/a.png"><p>x</p>'], 'Pixel'],
+    'balise non fermée' => [fn () => ['html' => '<p>x'], 'HTML refusé'],
+    'esperluette nue' => [fn () => ['html' => '<p>R&D</p>'], 'entité'],
+    'axion-ia entité sans ;' => [fn () => ['html' => '<p>axion-ia&#46com</p>'], 'axion-ia.com'],
+    'axion-ia %2E' => [fn () => ['texte' => 'axion-ia%2Ecom'], 'axion-ia.com'],
+    'axion-ia point idéographique' => [fn () => ['texte' => 'jean@axion-ia。com'], 'axion-ia.com'],
+    'axion-ia largeur nulle' => [fn () => ['texte' => "axion-ia\u{200B}.com"], 'axion-ia.com'],
+    'Grenoble soft-hyphen' => [fn () => ['texte' => "Gre\u{00AD}noble"], 'Grenoble'],
+    'Grenoble largeur nulle' => [fn () => ['texte' => "Gre\u{200B}no\u{2060}ble\u{FEFF}"], 'Grenoble'],
+    'Grenoble entité sans ;' => [fn () => ['texte' => 'Gren&#111ble'], 'Grenoble'],
+    'traqueur // sans schéma' => [fn () => ['html' => '<a href="//bit.ly/x">x</a>'], 'traqueur'],
+    'traqueur antislash' => [fn () => ['texte' => 'voir https:\\\\bit.ly\\x'], 'traqueur'],
+    'traqueur point final' => [fn () => ['html' => '<a href="https://bit.ly./x">x</a>'], 'traqueur'],
+    'traqueur majuscules' => [fn () => ['html' => '<a href="https://BIT.LY/x">x</a>'], 'traqueur'],
     'Grenoble en entité' => [fn () => ['texte' => 'Nous sommes à Gren&#111;ble.'], 'Grenoble'],
     'Grenoble coupé par balises' => [fn () => ['html' => '<p>Gre<b></b>noble</p>'], 'Grenoble'],
     'axion-ia entité' => [fn () => ['html' => '<a href="https://axion-ia&#46;com/x">x</a>'], 'axion-ia.com'],
@@ -213,6 +250,23 @@ dataset('refus', [
     'lien traqueur' => [fn () => ['html' => '<a href="https://click.tracker.test/c/abc">x</a>'], 'traqueur'],
     'lien redirigé' => [fn () => ['html' => '<a href="https://exemple.test/r?url=https://cible.test">x</a>'], 'traqueur'],
 ]);
+
+it('refuse une URL de désinscription de plus de 900 caractères et accepte la limite', function () {
+    $base = 'https://exemple-envoi.test/';
+    expect(fn () => l2Composeur()->composer(l2Demande(['urlDesinscription' => $base . str_repeat('a', 901 - strlen($base))])))
+        ->toThrow(InvalidArgumentException::class);
+    $msg = l2Composeur(new DkimSigneur('exemple-envoi.test', 'crm1', l2CleTest()))
+        ->composer(l2Demande(['urlDesinscription' => $base . str_repeat('a', 900 - strlen($base))]));
+    foreach (explode("\r\n", explode("\r\n\r\n", $msg, 2)[0]) as $ligne) {
+        expect(strlen($ligne))->toBeLessThan(998);
+    }
+});
+
+it('plie List-Unsubscribe long sans le casser', function () {
+    $u = 'https://exemple-envoi.test/' . str_repeat('b', 800);
+    [$h] = l2Analyse(l2Composeur()->composer(l2Demande(['urlDesinscription' => $u])));
+    expect($h['list-unsubscribe'])->toStartWith('<' . $u . '>, <mailto:');
+});
 
 it('refuse avec un motif lisible', function (Closure $o, string $motif) {
     try {
@@ -224,11 +278,15 @@ it('refuse avec un motif lisible', function (Closure $o, string $motif) {
 })->with('refus');
 
 it('le contrôleur accepte un contenu propre', function () {
-    expect((new ControleurContenu)->analyser(['<p>Bonjour {{a|b}}</p><a href="https://exemple.test/x">x</a>']))->toBe([]);
+    expect((new ControleurContenu)->analyser([], [], ['<p>Bonjour <b>{{a|b}}</b></p><ul><li><a href="https://exemple.test/x?a=1&amp;b=2">x</a></li></ul><br><hr/><a href="mailto:a@exemple.test">m</a>']))->toBe([]);
+});
+
+it('le contrôleur ne refuse pas du texte brut avec chevrons ou &', function () {
+    expect((new ControleurContenu)->analyser(['R&D < 5 % et a>b']))->toBe([]);
 });
 
 it('le contrôleur n\'a pas de faux positif sur open.spotify.com ni sur un lien simple', function () {
-    expect((new ControleurContenu)->analyser(['<a href="https://open.spotify.com/track/abc?si=1">x</a> <a href="https://links.exemple.test/a">y</a>']))->toBe([]);
+    expect((new ControleurContenu)->analyser([], [], ['<a href="https://open.spotify.com/track/abc?si=1">x</a> <a href="https://links.exemple.test/a">y</a>']))->toBe([]);
 });
 
 it('le contrôleur refuse une pièce jointe vue dans le MIME brut', function () {

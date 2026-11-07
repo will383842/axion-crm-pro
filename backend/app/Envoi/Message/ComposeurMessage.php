@@ -47,6 +47,11 @@ final class ComposeurMessage
                 throw new InvalidArgumentException('Lien de désinscription invalide : « < », « > » et espaces interdits.');
             }
         }
+        foreach ([$d->urlDesinscription, $d->mailtoDesinscription] as $lien) {
+            if (strlen($lien) > 900) {
+                throw new InvalidArgumentException('Lien de désinscription trop long (maximum 900 caractères).');
+            }
+        }
         if (! str_starts_with($d->urlDesinscription, 'https://')) {
             throw new InvalidArgumentException('Le lien de désinscription doit être en https.');
         }
@@ -68,15 +73,15 @@ final class ComposeurMessage
             . '">Se désinscrire</a></p>';
 
         // Contrôle des gabarits AVANT rendu (variables sans repli), puis du résultat.
-        $gabarits = [$d->sujet, $d->texte, $d->html, $piedTexte, $piedHtml, $adresseFrom, $d->replyTo,
+        $gabarits = [$d->sujet, $d->texte, $piedTexte, $adresseFrom, $d->replyTo,
             $d->destinataire, $d->nomAffiche, $d->urlDesinscription, $d->mailtoDesinscription];
-        $this->controleur->exiger($gabarits, $d->piecesJointes);
+        $this->controleur->exiger($gabarits, $d->piecesJointes, [$d->html, $piedHtml]);
 
         $sujet = $this->rendre($d->sujet, $d->variables);
         $texte = $this->rendre($d->texte, $d->variables) . "\n\n-- \n" . $this->rendre($piedTexte, $d->variables);
-        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>'
-            . $this->rendre($d->html, $d->variables, true) . $piedHtml . '</body></html>';
-        $this->controleur->exiger([$sujet, $texte, $html, $adresseFrom]);
+        $fragmentHtml = $this->rendre($d->html, $d->variables, true) . $piedHtml;
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' . $fragmentHtml . '</body></html>';
+        $this->controleur->exiger([$sujet, $texte, $adresseFrom], [], [$fragmentHtml]);
 
         $date = ($d->date ?? new DateTimeImmutable)->format(DateTimeInterface::RFC2822);
         $boundary = '=_' . bin2hex(random_bytes(12));
@@ -160,7 +165,14 @@ final class ComposeurMessage
             }
         }
 
-        return $sortie . $cur;
+        $sortie .= $cur;
+        foreach (explode("\r\n", $sortie) as $l) {
+            if (strlen($l) > 998) {
+                throw new InvalidArgumentException('En-tête non pliable : une ligne dépasse 998 caractères (RFC 5322).');
+            }
+        }
+
+        return $sortie;
     }
 
     /** Sujet : champ libre, jamais de guillemets ; RFC 2047 si non ASCII ou mot infiniment long. */

@@ -22,16 +22,17 @@ final class ControleurContenu
     ];
 
     /**
-     * @param  list<string>  $contenus  textes à contrôler (sujet, texte, HTML, pied, adresses, liens)
+     * @param  list<string>  $contenus  textes à contrôler (sujet, texte, pied, adresses, liens)
      * @param  list<string>  $piecesJointes
+     * @param  list<string>  $html  fragments HTML : contrôlés par LISTE BLANCHE stricte, refusés (jamais nettoyés)
      * @return list<string> motifs de refus ; vide = accepté
      */
-    public function analyser(array $contenus, array $piecesJointes = []): array
+    public function analyser(array $contenus, array $piecesJointes = [], array $html = []): array
     {
-        $brut = implode("\n", $contenus);
-        // Anti-contournement : entités HTML décodées (deux fois), puis version sans balises.
-        $tout = self::decoder($brut);
-        $sansBalises = self::decoder((string) preg_replace('/<[^>]*>/', '', $tout));
+        $brut = implode("\n", [...$contenus, ...$html]);
+        // Anti-contournement : entités (même sans « ; »), %xx, caractères invisibles, point idéographique.
+        $tout = self::normaliser($brut);
+        $sansBalises = self::normaliser((string) preg_replace('/<[^>]*>/', '', $tout));
         $motifs = [];
 
         if ($piecesJointes !== [] || preg_match('/content-disposition\s*:\s*attachment/i', $tout) === 1) {
@@ -57,52 +58,78 @@ final class ControleurContenu
             $motifs[] = 'Le mot « Grenoble » est interdit dans le message.';
         }
 
-        if ($this->aPixelDeSuivi($tout)) {
-            $motifs[] = 'Pixel ou image interdits : aucune image (distante, intégrée, masquée ou de suivi d\'ouverture) ni ressource externe dans un message du palier 0, aucune mesure d\'ouverture.';
+        foreach ($html as $fragment) {
+            foreach (HtmlListeBlanche::refus($fragment) as $motif) {
+                $motifs[] = $motif;
+            }
         }
 
         if ($this->aLienTraque($tout)) {
             $motifs[] = 'Lien réécrit ou redirigé par un traqueur interdit : les liens doivent pointer directement vers leur destination.';
         }
 
-        return $motifs;
+        return array_values(array_unique($motifs));
     }
 
     /**
      * @param  list<string>  $contenus
      * @param  list<string>  $piecesJointes
+     * @param  list<string>  $html
      */
-    public function exiger(array $contenus, array $piecesJointes = []): void
+    public function exiger(array $contenus, array $piecesJointes = [], array $html = []): void
     {
-        $motifs = $this->analyser($contenus, $piecesJointes);
+        $motifs = $this->analyser($contenus, $piecesJointes, $html);
         if ($motifs !== []) {
             throw new MessageRefuse($motifs);
         }
     }
 
-    private static function decoder(string $v): string
+    /** Forme canonique pour la recherche de motifs interdits (jamais utilisée pour envoyer). */
+    private static function normaliser(string $v): string
     {
-        for ($i = 0; $i < 2; $i++) {
+        for ($i = 0; $i < 3; $i++) {
+            // Entités numériques décodées même sans « ; » final (les clients mail le font), puis nommées.
+            $v = (string) preg_replace_callback('/&#(x[0-9a-f]{1,6}|[0-9]{1,7});?/i', static function (array $m): string {
+                $cp = strtolower($m[1][0]) === 'x' ? hexdec(substr($m[1], 1)) : (int) $m[1];
+
+                return $cp > 0 && $cp <= 0x10FFFF && ($cp < 0xD800 || $cp > 0xDFFF) ? mb_chr($cp, 'UTF-8') : '';
+            }, $v);
             $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $v = rawurldecode($v);
+        }
+        // Soft-hyphen, espaces de largeur nulle, BOM, joiners.
+        $v = (string) preg_replace('/[\x{00AD}\x{200B}-\x{200F}\x{2060}-\x{2064}\x{FEFF}\x{034F}\x{180E}]/u', '', $v);
+        if (class_exists(\Normalizer::class)) {
+            $v = \Normalizer::normalize($v, \Normalizer::FORM_KC) ?: $v;
         }
 
-        return $v;
+        // Points typographiques ou idéographiques équivalents à « . ».
+        return strtr($v, ["\u{3002}" => '.', "\u{FF0E}" => '.', "\u{FF61}" => '.', "\u{FE52}" => '.', "\u{2024}" => '.']);
     }
 
-    /** Palier 0 : AUCUNE image ni ressource externe (donc aucun pixel, quelle que soit sa dissimulation). */
-    private function aPixelDeSuivi(string $html): bool
+    /** Hôte normalisé : minuscules, point final retiré, punycode (IDN). */
+    private static function normaliserHote(string $hote): string
     {
-        return preg_match('/<\s*(img|image|picture|source|video|audio|embed|object|iframe|script|link|input)\b/i', $html) === 1
-            || preg_match('/\burl\s*\(|@import|\bbackground\s*=|\bsrcset\s*=/i', $html) === 1;
+        $hote = rtrim(strtolower(trim($hote)), '.');
+        if ($hote !== '' && function_exists('idn_to_ascii')) {
+            $ascii = idn_to_ascii($hote, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46);
+            if (is_string($ascii) && $ascii !== '') {
+                $hote = rtrim($ascii, '.');
+            }
+        }
+
+        return $hote;
     }
 
     private function aLienTraque(string $contenu): bool
     {
-        if (preg_match_all('#https?://[^\s"\'<>)]+#i', $contenu, $urls) === 0) {
+        // https://x, http://x, //x, https:\\x, \\x : tout ce qui désigne un hôte.
+        if (preg_match_all('#(?:https?:)?[/\\\\]{2}[^\s"\'<>)]+#i', $contenu, $urls) === 0) {
             return false;
         }
-        foreach ($urls[0] as $url) {
-            $hote = strtolower((string) parse_url($url, PHP_URL_HOST));
+        foreach ($urls[0] as $brut) {
+            $url = 'https://' . ltrim((string) preg_replace('#^(?:https?:)?[/\\\\]+#i', '', str_replace('\\', '/', $brut)), '/');
+            $hote = self::normaliserHote((string) parse_url($url, PHP_URL_HOST));
             foreach (self::TRACEURS as $t) {
                 $prefixe = str_ends_with($t, '.');
                 if ($hote !== '' && ($prefixe
@@ -113,7 +140,7 @@ final class ControleurContenu
             }
             $requete = (string) parse_url($url, PHP_URL_QUERY);
             // Tout paramètre dont la valeur est une autre URL : signature d'une redirection.
-            if (preg_match('/(^|&)[^=&]*=(https?(%3a|:)|%2f%2f)/i', $requete) === 1) {
+            if (preg_match('/(^|&)[^=&]*=(https?(%3a|:)|%2f%2f|\/\/)/i', $requete) === 1) {
                 return true;
             }
         }

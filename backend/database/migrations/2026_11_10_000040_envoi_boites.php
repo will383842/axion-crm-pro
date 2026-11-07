@@ -60,7 +60,7 @@ return new class extends Migration
             BEGIN
                 RAISE EXCEPTION '{$table} : aucun effacement (DELETE/TRUNCATE refusés)';
             END;
-            \$f\$ LANGUAGE plpgsql;
+            \$f\$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
             DROP TRIGGER IF EXISTS {$table}_aucun_effacement ON {$table};
             CREATE TRIGGER {$table}_aucun_effacement BEFORE DELETE ON {$table}
                 FOR EACH ROW EXECUTE FUNCTION {$table}_aucun_effacement();

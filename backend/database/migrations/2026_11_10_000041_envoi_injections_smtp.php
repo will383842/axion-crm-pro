@@ -45,7 +45,7 @@ return new class extends Migration
             BEGIN
                 RAISE EXCEPTION 'envoi_injections_smtp : aucun effacement (DELETE/TRUNCATE refusés)';
             END;
-            $f$ LANGUAGE plpgsql;
+            $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
             DROP TRIGGER IF EXISTS envoi_injections_smtp_aucun_effacement ON envoi_injections_smtp;
             CREATE TRIGGER envoi_injections_smtp_aucun_effacement BEFORE DELETE ON envoi_injections_smtp
                 FOR EACH ROW EXECUTE FUNCTION envoi_injections_smtp_aucun_effacement();

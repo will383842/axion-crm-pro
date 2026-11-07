@@ -131,3 +131,41 @@ test('DECOUPAGE — ci.yml : la matrice backend est sans needs, et le verdict po
         }
     }
 });
+
+test('DECOUPAGE — le verdict rend BLOQUANTE l egalite somme jouee = total, et un total absent ou non numerique', function () {
+    $ci = (array) Yaml::parseFile(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
+    $script = '';
+    foreach ((array) $ci['jobs']['backend-verdict']['steps'] as $etape) {
+        $script .= (string) ($etape['run'] ?? '');
+    }
+
+    expect($script)->toContain('"$somme" -ne "$total"');
+    expect($script)->toMatch('~::error::Somme jouée[^\n]*\n?[^\n]*ko=1~u');
+    expect($script)->not->toContain('::warning::Somme jouée');
+    expect($script)->not->toContain('non bloquant');
+    // Total absent ou non numerique : erreur + ko=1 (plus de simple avertissement).
+    expect($script)->toMatch('~::error::[^\n]*total\.txt[^\n]*ko=1~u');
+    expect($script)->not->toContain('::warning::parts/total.txt');
+});
+
+test('DECOUPAGE — un seul job porte le nom exige par la protection de branche, tous workflows confondus', function () {
+    $nom = 'Backend Laravel (install + PHPStan + Pint + Pest)';
+    $occurrences = 0;
+    foreach (glob(dirname(__DIR__, 3) . '/.github/workflows/*.yml') ?: [] as $fichier) {
+        $wf = (array) Yaml::parseFile($fichier);
+        foreach ((array) ($wf['jobs'] ?? []) as $job) {
+            if ((((array) $job)['name'] ?? null) === $nom) {
+                $occurrences++;
+            }
+        }
+    }
+    expect($occurrences)->toBe(1);
+});
+
+test('DECOUPAGE — repli Pint : un merge-base egal a HEAD retombe sur HEAD^ ; parts backend bornees a 20 minutes', function () {
+    $brut = (string) file_get_contents(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
+    expect($brut)->toContain('git merge-base origin/main HEAD');
+    expect($brut)->toContain('git rev-parse HEAD^');
+    $ci = (array) Yaml::parseFile(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
+    expect($ci['jobs']['backend']['timeout-minutes'])->toBe(20);
+});

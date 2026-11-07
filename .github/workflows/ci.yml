@@ -626,7 +626,9 @@ jobs:
       matrix:
         part: [1, 2, 3, 4]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60  # F38-008 — plafond anti-gel (Postgres + 1/4 de la suite Pest)
+    # F38-008 — plafond anti-gel. Durée mesurée ≈ 3-4 min par part (Postgres + 1/4 de la
+    # suite Pest) : 20 min = plus de 5× la durée utile, sans laisser un gel durer 1 h.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -686,6 +688,11 @@ jobs:
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
             base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+            # merge-base == HEAD (workflow_dispatch sur main) : la différence serait
+            # vide et Pint ne contrôlerait plus rien → on se replie sur HEAD^.
+            if [ -n "$base" ] && [ "$base" = "$(git rev-parse HEAD)" ]; then
+              base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+            fi
           fi
           if [ -z "$base" ]; then
             echo "Aucune base de comparaison disponible — rien à contrôler."
@@ -968,11 +975,8 @@ jobs:
           if [ "${#junits[@]}" -ne 4 ]; then
             echo "::error::${#junits[@]} fichier(s) junit trouvé(s), exactement 4 attendus."; ko=1
           fi
-          # Chaque part doit avoir joué au moins un test. L'égalité « somme jouée =
-          # total listé » N'EST PAS bloquante : non étalonnée (la façon dont
-          # `--list-tests` et le junit comptent les datasets n'a pas été mesurée
-          # sur un vrai run). Elle est affichée en avertissement pour étalonnage ;
-          # le partitionnement exact est, lui, vérifié par decouper-suite.php.
+          # Chaque part doit avoir joué au moins un test, et l'égalité « somme jouée =
+          # total listé » est BLOQUANTE (étalonnée sur un vrai run : 4544 = 4544).
           somme=0
           for j in "${junits[@]}"; do
             n=$(grep -o '<testcase ' "$j" | wc -l)
@@ -985,10 +989,10 @@ jobs:
             total=$(cat "$total_fichier")
             echo "Somme jouée : ${somme} — total listé : ${total}"
             if [ "$somme" -ne "$total" ]; then
-              echo "::warning::Somme jouée (${somme}) ≠ total listé (${total}) — à étalonner (non bloquant)."
+              echo "::error::Somme jouée (${somme}) ≠ total listé (${total}) : des tests n'ont pas été joués."; ko=1
             fi
           else
-            echo "::warning::parts/total.txt introuvable (part 1)."
+            echo "::error::parts/total.txt introuvable ou non numérique (part 1) : total non vérifiable."; ko=1
           fi
           exit "$ko"
 

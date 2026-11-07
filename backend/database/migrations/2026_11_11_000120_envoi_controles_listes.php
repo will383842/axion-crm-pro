@@ -52,9 +52,9 @@ return new class extends Migration
         }
     }
 
-    /** Retour arrière INERTE : les contrôles sont conservés. */
+    /** Retour arrière INERTE : les contrôles sont conservés (ajout seul). */
     public function down(): void
     {
-        DB::statement("COMMENT ON TABLE envoi_controles_listes IS 'Envoi K13 : table conservee au retour arriere.'");
+        // Volontairement vide (aucun effacement, aucune protection retirée).
     }
 };

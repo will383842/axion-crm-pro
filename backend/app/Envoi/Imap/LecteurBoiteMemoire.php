@@ -44,6 +44,7 @@ final class LecteurBoiteMemoire implements LecteurBoite
                 $m->statutDsn,
                 $m->messageIdDsn,
                 $m->destinataireDsn,
+                $m->ecarte,
             );
         }
         $this->messages[$boite] = $refaits;
@@ -54,7 +55,7 @@ final class LecteurBoiteMemoire implements LecteurBoite
         return $this->validites[$boite] ?? 1;
     }
 
-    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null): array
+    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): array
     {
         $sortie = array_values(array_filter(
             $this->messages[$boite] ?? [],
@@ -62,6 +63,6 @@ final class LecteurBoiteMemoire implements LecteurBoite
         ));
         usort($sortie, static fn (MessageBrut $a, MessageBrut $b): int => $a->uid <=> $b->uid);
 
-        return $sortie;
+        return array_slice($sortie, 0, $limite);
     }
 }

@@ -18,6 +18,7 @@ final class MessageBrut
      * @param  ?string  $statutDsn  « 5.1.1 », « 4.2.2 »… si c'est un rapport de remise
      * @param  ?string  $messageIdDsn  Message-ID du message d'origine cité par le rapport
      * @param  ?string  $destinataireDsn  Final-Recipient du rapport
+     * @param  ?string  $ecarte  « taille » ou « illisible » : message non lu, classé « à rattacher » sans effet
      */
     public function __construct(
         public readonly int $uid,
@@ -32,5 +33,6 @@ final class MessageBrut
         public readonly ?string $statutDsn = null,
         public readonly ?string $messageIdDsn = null,
         public readonly ?string $destinataireDsn = null,
+        public readonly ?string $ecarte = null,
     ) {}
 }

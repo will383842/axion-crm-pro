@@ -34,6 +34,25 @@ final class AnalyseDsn
         return ['statut' => $statut, 'messageId' => $messageId, 'destinataire' => $destinataire];
     }
 
+    /** Vrai rapport de remise : `report-type=delivery-status`, avec ou sans guillemets. */
+    public static function estRapport(string $contentType): bool
+    {
+        return preg_match('/report-type\s*=\s*"?\s*delivery-status\s*"?/i', $contentType) === 1;
+    }
+
+    /**
+     * N'extrait statut, Message-ID et destinataire QUE d'un vrai rapport : le
+     * Message-ID cité dans une réponse humaine ne doit pas servir au rattachement.
+     *
+     * @return array{statut: ?string, messageId: ?string, destinataire: ?string}
+     */
+    public static function pourContenu(string $contentType, string $brut): array
+    {
+        return self::estRapport($contentType)
+            ? self::depuisBrut($brut)
+            : ['statut' => null, 'messageId' => null, 'destinataire' => null];
+    }
+
     /**
      * Quelques en-têtes utiles, clés en minuscules (dépliés).
      *

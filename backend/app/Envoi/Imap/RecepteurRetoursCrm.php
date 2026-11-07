@@ -14,7 +14,9 @@ use RuntimeException;
  *
  * La commande ne sert que l'espace commercial : pour tout autre espace on
  * REFUSE (exception) plutôt que d'oublier une opposition en silence.
- * L'adresse n'existe que dans un fichier temporaire (0600) supprimé aussitôt.
+ * L'adresse n'existe que dans un fichier temporaire (0600) supprimé dans un `finally`.
+ * Adresse invalide = `RetourInapplicable` (propre au message, isolée par la relève) ;
+ * toute autre exception = indisponibilité, qui interrompt la relève.
  */
 final class RecepteurRetoursCrm implements RecepteurRetours
 {
@@ -45,7 +47,7 @@ final class RecepteurRetoursCrm implements RecepteurRetours
         $lignes = '';
         foreach ($adresses as $adresse) {
             if (filter_var($adresse, FILTER_VALIDATE_EMAIL) === false) {
-                throw new RuntimeException('Arrêt non appliqué : adresse invalide.');
+                throw new RetourInapplicable('Arrêt non appliqué : adresse invalide (revue humaine).');
             }
             $lignes .= json_encode([
                 'type' => $type, 'email' => $adresse, 'campagne' => 'releve-imap', 'date' => now()->toIso8601String(),
@@ -58,10 +60,14 @@ final class RecepteurRetoursCrm implements RecepteurRetours
         }
         try {
             chmod($fichier, 0600);
-            file_put_contents($fichier, $lignes);
+            if (file_put_contents($fichier, $lignes) === false) {
+                throw new RuntimeException('Écriture du fichier temporaire impossible.');
+            }
             $code = Artisan::call('crm:campagne:retours', ['file' => $fichier]);
         } finally {
-            @unlink($fichier);
+            if (is_file($fichier)) {
+                unlink($fichier);
+            }
         }
         if ($code !== 0) {
             throw new RuntimeException('Arrêt non appliqué : crm:campagne:retours a échoué.');

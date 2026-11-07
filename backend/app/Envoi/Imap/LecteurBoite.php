@@ -18,9 +18,10 @@ interface LecteurBoite
 
     /**
      * Messages dont l'UID est strictement supérieur à $uidApres et, si $depuis
-     * est donné, reçus à cette date ou après. Triés par UID croissant.
+     * est donné, reçus (INTERNALDATE) à cette date ou après. Triés par UID
+     * croissant, au plus $limite messages (le reste vient au passage suivant).
      *
      * @return list<MessageBrut>
      */
-    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null): array;
+    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): array;
 }

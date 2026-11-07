@@ -10,6 +10,8 @@ use App\Envoi\Gardes\EnvoiAutorise as P;
 use App\Envoi\Imap\AnalyseDsn;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\Classificateur;
+use App\Envoi\Imap\ExtraitTexte;
+use App\Envoi\Imap\LecteurBoiteWebklex;
 use App\Envoi\Imap\LecteurBoiteMemoire;
 use App\Envoi\Imap\MessageBrut;
 use App\Envoi\Imap\MessageOrigine;
@@ -301,4 +303,117 @@ test('analyse DSN : statut, destinataire et Message-ID d\'origine, sans réseau'
     expect(AnalyseDsn::depuisBrut('Bonjour, merci.')['statut'])->toBeNull();
     expect(AnalyseDsn::enTetes("Auto-Submitted: auto-replied\r\nSubject: x\r\nPrecedence:\r\n bulk\r\n"))
         ->toBe(['auto-submitted' => 'auto-replied', 'precedence' => 'bulk']);
+});
+
+// ───────────────────────── Corrections de l'audit (B1 à B5) ─────────────────────────
+
+test('B1 : un message piégé (From multiple, accentué, mal formé) ne bloque pas la boîte : le STOP suivant est appliqué', function () {
+    $this->registre->noter('envoi-7@zz.example.invalid', new MessageOrigine('inj-7', 'suivant@zz-client.example.invalid'));
+    releveDeposer(
+        $this,
+        releveMsg(1, ['de' => 'A <a@zz-client.example.invalid>, B <b@zz-client.example.invalid>', 'corps' => 'STOP']),
+        releveMsg(2, ['de' => 'Éric <éric@zz-client.example.invalid>', 'corps' => 'STOP']),
+        releveMsg(3, ['de' => '<<pas une adresse', 'corps' => 'STOP']),
+        releveMsg(4, ['mid' => 'r4@zz-client.example.invalid', 'irt' => 'envoi-7@zz.example.invalid', 'de' => 'suivant@zz-client.example.invalid', 'corps' => 'STOP']),
+    );
+    $bilan = $this->releve->relever($this->ws, RELEVE_BOITE);
+
+    expect($bilan->lus)->toBe(4)->and(releveCompte($this->ws))->toBe(4);
+    expect(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte('suivant@zz-client.example.invalid'))->count())->toBeGreaterThan(0);
+    expect((int) DB::table('envoi_curseurs_imap')->value('dernier_uid'))->toBe(4);
+});
+
+test('B1 : un arrêt impossible à appliquer pour UN message (adresse d\'origine invalide) le met « à rattacher » sans effet, la boîte continue', function () {
+    $this->registre->noter('envoi-8@zz.example.invalid', new MessageOrigine('inj-8', 'adresse invalide'));
+    releveDeposer(
+        $this,
+        releveMsg(1, ['irt' => 'envoi-8@zz.example.invalid', 'corps' => 'STOP']),
+        releveMsg(2, ['corps' => 'STOP']),
+    );
+    $bilan = $this->releve->relever($this->ws, RELEVE_BOITE);
+
+    expect($bilan->enErreur)->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher')
+        ->and(DB::table('envoi_evenements')->where('uid', 2)->value('statut'))->toBe('rattache')
+        ->and(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(RELEVE_ADRESSE))->count())->toBeGreaterThan(0);
+});
+
+test('B2 : sans en-tête RFC 3834, un STOP ou un mot hostile du texte non cité prime sur l\'objet « congé »', function () {
+    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Re: Gérez les congés de vos équipes', 'corps' => 'STOP']))) ->toBe(ClasseRetour::Desinscription);
+    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Absent du bureau', 'corps' => 'Je vais porter plainte']))) ->toBe(ClasseRetour::Hostile);
+    // sans mot d'arrêt : l'heuristique d'objet reste une auto-réponse ; l'en-tête normalisé reste prioritaire
+    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Absence du bureau', 'corps' => 'Je reviens lundi.'])))->toBe(ClasseRetour::AutoReponse);
+    expect(Classificateur::classer(releveMsg(1, ['h' => ['auto-submitted' => 'auto-replied'], 'sujet' => 'x', 'corps' => 'STOP'])))->toBe(ClasseRetour::AutoReponse);
+});
+
+test('B3 : message sans texte brut : le HTML débarrassé de ses balises, borné à 4 000 caractères', function () {
+    $html = '<html><head><style>p{color:red}</style><script>alert(1)</script></head><body><p>Merci de me <b>d&eacute;sinscrire</b>.</p>' . str_repeat('<div>x</div>', 3000) . '</body></html>';
+    $texte = ExtraitTexte::depuisHtml($html);
+    expect($texte)->toContain('Merci de me désinscrire')->not->toContain('<')->not->toContain('alert')->not->toContain('color:red');
+    expect(mb_strlen($texte))->toBeLessThanOrEqual(4000);
+    expect(Classificateur::classer(releveMsg(1, ['corps' => $texte])))->toBe(ClasseRetour::Desinscription);
+    expect(ExtraitTexte::choisir('', $html))->toContain('désinscrire')->and(ExtraitTexte::choisir('texte brut', $html))->toBe('texte brut');
+});
+
+test('B4 : lot limité à 200 messages par passage, le curseur avance, le reste vient au passage suivant', function () {
+    for ($i = 1; $i <= 205; $i++) {
+        releveDeposer($this, releveMsg($i));
+    }
+    $a = $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect($a->lus)->toBe(ReleveImap::LIMITE_LOT)->and($a->lotPlein)->toBeTrue()
+        ->and((int) DB::table('envoi_curseurs_imap')->value('dernier_uid'))->toBe(200);
+    $b = $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect($b->lus)->toBe(5)->and($b->lotPlein)->toBeFalse()->and(releveCompte($this->ws))->toBe(205);
+});
+
+test('B4 : un message écarté (trop gros / illisible) est « à rattacher », sans effet, et le curseur avance', function () {
+    releveDeposer($this, new MessageBrut(1, 'gros@zz-client.example.invalid', 'envoi-1@zz.example.invalid', [], RELEVE_ADRESSE, new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('Europe/Paris')), 'x', 'STOP', ecarte: 'taille'));
+    releveDeposer($this, releveMsg(2));
+    $bilan = $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect($bilan->enErreur)->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher')
+        ->and(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(RELEVE_ADRESSE))->count())->toBe(0)
+        ->and((int) DB::table('envoi_curseurs_imap')->value('dernier_uid'))->toBe(2);
+});
+
+test('B4/B5 : le lecteur réel ne lit jamais le message entier, n\'enregistre rien et impose TLS', function () {
+    $code = (string) file_get_contents(app_path('Envoi/Imap/LecteurBoiteWebklex.php'));
+    expect($code)->not->toContain('getRawBody')->not->toContain('->save(')->not->toContain('->saveAttachments')
+        ->and($code)->not->toContain("'validate_cert' => false")->not->toContain("'none'")->not->toContain("'notls'");
+    expect($code)->toContain('MAX_OCTETS');
+    $compo = json_decode((string) file_get_contents(base_path('composer.json')), true);
+    expect($compo['require']['webklex/php-imap'])->toBe('6.2.0');
+    expect(fn () => new LecteurBoiteWebklex(['host' => 'x.example.invalid', 'encryption' => 'tcp', 'username' => 'u', 'password' => 'p']))->toThrow(InvalidArgumentException::class);
+});
+
+test('DSN : report-type entre guillemets accepté ; Message-ID lu seulement dans un vrai rapport', function () {
+    expect(AnalyseDsn::estRapport('multipart/report; report-type=delivery-status; boundary="x"'))->toBeTrue()
+        ->and(AnalyseDsn::estRapport('multipart/report; report-type="delivery-status"; boundary=x'))->toBeTrue()
+        ->and(AnalyseDsn::estRapport('multipart/report; report-type=disposition-notification'))->toBeFalse()
+        ->and(AnalyseDsn::estRapport('text/plain'))->toBeFalse();
+    // une réponse humaine qui cite un en-tête Message-ID ne doit pas servir au rattachement
+    $citation = "Merci.\r\nMessage-ID: <envoi-1@zz.example.invalid>\r\n";
+    expect(AnalyseDsn::pourContenu('text/plain', $citation))->toBe(['statut' => null, 'messageId' => null, 'destinataire' => null]);
+});
+
+test('DSN : Final-Recipient différent de l\'adresse d\'origine = « à rattacher », sans effet ; identique = rebond appliqué', function () {
+    $this->registre->noter('envoi-4@zz.example.invalid', new MessageOrigine('inj-4', 'cible@zz-client.example.invalid'));
+    $dsn = fn (int $uid, string $dest) => new MessageBrut($uid, "d{$uid}@zz.example.invalid", null, [], 'MAILER-DAEMON@zz.example.invalid', new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('Europe/Paris')), 'Undelivered', '', [], '5.1.1', 'envoi-4@zz.example.invalid', $dest);
+    releveDeposer($this, $dsn(1, 'autre-personne@zz-client.example.invalid'));
+    $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher')
+        ->and(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte('cible@zz-client.example.invalid'))->count())->toBe(0);
+
+    releveDeposer($this, $dsn(2, 'CIBLE@zz-client.example.invalid'));
+    $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte('cible@zz-client.example.invalid'))->count())->toBeGreaterThan(0);
+});
+
+test('empreinte synthétique stable : sans Message-ID, une renumération ne crée pas de doublon', function () {
+    $this->lecteur->definirUidValidity(RELEVE_BOITE, 10);
+    releveDeposer($this, releveMsg(1, ['mid' => null]));
+    $this->releve->relever($this->ws, RELEVE_BOITE);
+    $this->lecteur->renumeroter(RELEVE_BOITE, 11);
+    $bilan = $this->releve->relever($this->ws, RELEVE_BOITE);
+    expect($bilan->doublons)->toBe(1)->and(releveCompte($this->ws))->toBe(1);
 });

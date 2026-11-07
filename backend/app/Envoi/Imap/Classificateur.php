@@ -7,10 +7,13 @@ namespace App\Envoi\Imap;
  *
  * Ordre (le premier qui s'applique gagne) :
  *  1. rapport de remise (DSN) : 5.x.x = rebond dur, 4.x.x = rebond mou ;
- *  2. absence / auto-réponse (en-têtes normalisés RFC 3834, ou objet type) ;
+ *  2. auto-réponse déclarée par en-tête normalisé (RFC 3834 : Auto-Submitted…) ;
  *  3. hostile (plainte, menace, « spam »…) — traité comme une plainte ;
  *  4. STOP / désinscription (mots-clés fr/en, texte NON cité seulement) ;
- *  5. sinon : réponse humaine.
+ *  5. auto-réponse devinée à l'objet (« absent », « congé »…) : heuristique FAIBLE,
+ *     donc après 3 et 4 — un objet « Gérez les congés de vos équipes » ne doit
+ *     jamais masquer un STOP écrit par la personne ;
+ *  6. sinon : réponse humaine.
  *
  * Les erreurs vont toujours dans le sens PRUDENT : un faux « STOP » arrête un
  * envoi de trop, un vrai « STOP » manqué enverrait un message de trop.
@@ -49,7 +52,7 @@ final class Classificateur
             return ClasseRetour::AutoReponse; // 2.x.x : accusé de remise, aucun effet
         }
 
-        if (self::estAutoReponse($m)) {
+        if (self::estAutoReponseDeclaree($m)) {
             return ClasseRetour::AutoReponse;
         }
 
@@ -60,11 +63,14 @@ final class Classificateur
         if (self::contient($texte, self::MOTS_STOP)) {
             return ClasseRetour::Desinscription;
         }
+        if (self::contient(self::normaliser($m->sujet), self::OBJETS_AUTO)) {
+            return ClasseRetour::AutoReponse;
+        }
 
         return ClasseRetour::ReponseHumaine;
     }
 
-    private static function estAutoReponse(MessageBrut $m): bool
+    private static function estAutoReponseDeclaree(MessageBrut $m): bool
     {
         $auto = strtolower(trim($m->enTetes['auto-submitted'] ?? ''));
         if ($auto !== '' && $auto !== 'no') {
@@ -76,9 +82,8 @@ final class Classificateur
         if (in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['auto_reply', 'bulk', 'junk'], true)) {
             return true;
         }
-        $objet = self::normaliser($m->sujet);
 
-        return self::contient($objet, self::OBJETS_AUTO);
+        return false;
     }
 
     /** Retire les lignes citées (« > … ») : on classe ce que la personne a ÉCRIT. */

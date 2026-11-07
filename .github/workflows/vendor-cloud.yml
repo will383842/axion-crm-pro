@@ -1,0 +1,56 @@
+name: vendor-cloud
+
+# Fabrique `backend/vendor` et le publie dans la pré-version « vendor-cloud », pour
+# les sessions cloud de Claude Code (le proxy cloud bloque les archives codeload :
+# `composer install` y échoue). Hors chemin de test : ci.yml lance son propre
+# `composer install` et n'utilise JAMAIS cette archive. Aucun secret : GITHUB_TOKEN seul.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/composer.lock'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    name: Fabriquer et publier vendor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          tools: composer:v2
+
+      - name: composer install (sans scripts)
+        working-directory: backend
+        run: composer install --no-scripts --no-interaction --prefer-dist --no-progress
+
+      - name: Archive + somme de contrôle
+        id: archive
+        run: |
+          H="$(sha256sum backend/composer.lock | cut -c1-16)"
+          NOM="vendor-${H}.tar.gz"
+          tar -czf "$NOM" -C backend vendor
+          sha256sum "$NOM" > "$NOM.sha256"
+          echo "nom=$NOM" >> "$GITHUB_OUTPUT"
+
+      - name: Publier dans la pré-version vendor-cloud
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOM: ${{ steps.archive.outputs.nom }}
+        run: |
+          if ! gh release view vendor-cloud >/dev/null 2>&1; then
+            gh release create vendor-cloud --prerelease \
+              --title "vendor-cloud" \
+              --notes "vendor fabriqué par la CI pour les sessions cloud. Ne pas utiliser ailleurs."
+          fi
+          gh release upload vendor-cloud "$NOM" "$NOM.sha256" --clobber

@@ -391,6 +391,28 @@
       "frontend": []
     },
     {
+      "id": "ENVOI-L5-DESINSCRIPTION",
+      "risque": "envoi P0 L5, desinscription (S22) : aucune ecriture au GET, une seule opposition, jetons refuses sans fuite",
+      "nouveaux": {
+        "../Envoi/DesinscriptionTest.php": [
+          "S22 GET (avec ou sans suivi de redirections) : un seul bouton, aucune opposition",
+          "S22 POST du bouton : une opposition, adresse en liste de suppression, événement émis",
+          "S22 POST one-click RFC 8058 : opposition immédiate, sans page",
+          "S22 rejeu du même jeton : une seule opposition, un seul comptage, un seul événement",
+          "jetons invalides, falsifiés ou expirés : même refus, sans fuite, sans écriture",
+          "clé absente : la porte reste fermée, rien n’est émis ni accepté",
+          "aucune donnée de personne dans le lien",
+          "page publique : française, sans image, sans script, sans ressource distante, sans suivi",
+          "effets : retrait des envois en file et arrêt par entreprise déclenchés une seule fois",
+          "effets interrompus : le rejeu du jeton les termine, sans doublon d’opposition",
+          "l’opposition n’efface rien : l’inscription et ses lignes restent",
+          "RLS FORCE sur les deux tables, et étanchéité entre espaces"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
       "id": "LISTE",
       "risque": "liste figee du filet",
       "nouveaux": {

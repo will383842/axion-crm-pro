@@ -20,4 +20,9 @@ return [
     'plafond_global_jour' => (int) env('ENVOI_PLAFOND_GLOBAL_JOUR', 20),
     // Clé HMAC des empreintes de témoins. Jamais dans le dépôt : posée dans l'environnement.
     'cle_empreinte' => (string) env('ENVOI_CLE_EMPREINTE', ''),
+    // Clé HMAC des jetons de désinscription. Jamais dans le dépôt : posée dans l'environnement.
+    // Vide => aucun jeton émis ni accepté (porte fermée).
+    'cle_desinscription' => (string) env('ENVOI_CLE_DESINSCRIPTION', ''),
+    // Durée de validité d'un lien de désinscription (jours).
+    'desinscription_validite_jours' => (int) env('ENVOI_DESINSCRIPTION_VALIDITE_JOURS', 730),
 ];

@@ -6,12 +6,15 @@
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Envoi\Desinscription\ArretParEntreprise;
+use App\Envoi\Desinscription\EffetsOpposition;
 use App\Envoi\Desinscription\InscriptionsEnvoi;
 use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\TerminerEffetsOpposition;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -255,7 +258,7 @@ test('B1 EffetsOpposition tente les DEUX effets même si le premier lève une er
             throw new RuntimeException('panne du retrait');
         }
     };
-    $effets = new App\Envoi\Desinscription\EffetsOpposition($retrait, $arret);
+    $effets = new EffetsOpposition($retrait, $arret);
 
     expect(fn () => $effets->handle(new OppositionEnregistree($this->ws, str_repeat('a', 64), 'business', 'page')))
         ->toThrow(RuntimeException::class, 'panne du retrait');
@@ -293,7 +296,7 @@ test('B1 effets en échec : la commande planifiée les relance SANS nouveau clic
 });
 
 test('B1 la relance est planifiée chaque minute', function () {
-    $evenements = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+    $evenements = collect(app(Schedule::class)->events())
         ->filter(fn ($e) => str_contains((string) $e->command, 'envoi:relancer-effets-opposition'));
     expect($evenements)->toHaveCount(1);
     expect($evenements->first()->expression)->toBe('* * * * *');
@@ -306,7 +309,7 @@ test('deux terminaisons simultanées des effets : un seul événement', function
     WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('id', $id)->update(['effets_termines_le' => null]));
     Event::fake([OppositionEnregistree::class]);
 
-    $t = app(App\Envoi\Desinscription\TerminerEffetsOpposition::class);
+    $t = app(TerminerEffetsOpposition::class);
     $premier = $t->pour($this->ws, $id);
     $second = $t->pour($this->ws, $id);
 

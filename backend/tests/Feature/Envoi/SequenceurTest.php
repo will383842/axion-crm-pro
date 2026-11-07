@@ -53,6 +53,8 @@ beforeEach(function () {
     FonctionsEspace::regler($this->ws, 'federations', true);
     // Le mode témoins ne s'éteint que par la commande locale (déclencheur envoi_drapeaux_garde) : on passe par elle.
     (new DepotSocleDb)->eteindreTemoins($this->ws, 'test-sequenceur'); // le mode témoins est testé ailleurs (PasserelleLocaleTest)
+    // La passerelle refuse tout message dont l'espace n'est pas le contexte courant : l'appelant (worker) l'ouvre.
+    WorkspaceContext::set($this->ws);
     DB::table('envoi_domaines')->insert([
         'workspace_id' => $this->ws, 'nom' => SEQ_DOMAINE, 'achete_le' => '2026-01-01',
         'dmarc_verifie_le' => $this->lundi->format('c'), 'spf_verifie_le' => $this->lundi->format('c'), 'dkim_verifie_le' => $this->lundi->format('c'),
@@ -73,6 +75,10 @@ beforeEach(function () {
             new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'),
         );
     };
+});
+
+afterEach(function () {
+    WorkspaceContext::clear();
 });
 
 /** Une séquence de $etapes étapes (délais 0, 2, 3 jours ouvrés) ; retourne son id. */

@@ -132,7 +132,10 @@ function concLancer(string $mode, string $ws, string $ins): array
         $out = stream_get_contents($pipes[1]);
         $err = stream_get_contents($pipes[2]);
         expect(proc_close($p))->toBe(0, "ouvrier en échec : {$err} {$out}");
-        $sorties[] = json_decode(trim($out), true, 512, JSON_THROW_ON_ERROR);
+        $lignes = array_values(array_filter(array_map('trim', explode("\n", $out)), fn (string $l): bool => $l !== ''));
+        $json = $lignes === [] ? null : json_decode($lignes[array_key_last($lignes)], true);
+        expect(is_array($json))->toBeTrue("sortie d'ouvrier illisible. stdout : {$out} stderr : {$err}");
+        $sorties[] = $json;
     }
 
     return $sorties;

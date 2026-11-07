@@ -7,6 +7,8 @@ use App\Envoi\ListesNoires\ResolveurDns;
 use App\Envoi\ListesNoires\Ressource;
 use App\Envoi\ListesNoires\StatutListe;
 use App\Envoi\ListesNoires\SurveillanceListes;
+use Illuminate\Console\Scheduling\Schedule;
+use Tests\TestCase;
 
 function fauxResolveur(string $adresse, array $reponses, bool $panne = false): ResolveurDns
 {
@@ -123,7 +125,7 @@ test('panne DNS ou code 127.255.255.x : non fiable, pas vert, pas de pause', fun
 });
 
 test('planification : toutes les minutes (< 5 min)', function () {
-    $e = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+    $e = collect(app(Schedule::class)->events())
         ->first(fn ($ev) => str_contains((string) $ev->command, 'envoi:listes-noires:controler'));
     expect($e)->not->toBeNull()->and($e->expression)->toBe('* * * * *');
-})->uses(Tests\TestCase::class);
+})->uses(TestCase::class);

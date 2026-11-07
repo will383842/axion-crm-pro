@@ -919,12 +919,17 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // jamais de pseudo, de nom ni de texte (`ContenusAccords::origines`). Aucune
     // adresse, aucun identifiant de profil. L'export et le masquage de ces deux
     // colonnes relèvent du lot RGPD (ADR § 8, I3), pas de ce lot.
+    // 53 -> 54 et 34 -> 35 le 2026-11-07 (envoi P0 L1) : `envoi_inscriptions.version_figee`,
+    // la version FIGÉE du gabarit d'une séquence (sujets, corps avec variables, délais,
+    // fenêtre horaire). Hors de portée PAR CONSTRUCTION : le gabarit de l'espace, jamais
+    // une valeur de personne — l'adresse n'est conservée qu'en empreinte SHA-256
+    // (`empreinte_adresse`), les valeurs sont relues dans la fiche au moment d'envoyer.
     expect($colonnes->count())->toBe(
-        53,
+        54,
         'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
     );
     expect(count($horsPortee))->toBe(
-        34,
+        35,
         'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
     );
 });

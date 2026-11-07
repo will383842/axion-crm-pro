@@ -1,6 +1,12 @@
 <?php
 
+use App\Envoi\Desinscription\DesinscriptionController;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', fn () => response()->json([
     'name' => config('app.name'),
@@ -11,14 +17,14 @@ Route::get('/', fn () => response()->json([
 // Envoi P0 L5 : désinscription publique. Sans session, sans cookie, sans jeton CSRF :
 // le jeton signé de l'URL est l'autorisation (le POST « one-click » RFC 8058 vient d'un client de messagerie).
 Route::middleware([])->withoutMiddleware([
-    \Illuminate\Cookie\Middleware\EncryptCookies::class,
-    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-    \Illuminate\Session\Middleware\StartSession::class,
-    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    EncryptCookies::class,
+    AddQueuedCookiesToResponse::class,
+    StartSession::class,
+    ShareErrorsFromSession::class,
+    ValidateCsrfToken::class,
 ])->group(function () {
-    Route::get('/desinscription/{jeton}', [\App\Envoi\Desinscription\DesinscriptionController::class, 'page'])
+    Route::get('/desinscription/{jeton}', [DesinscriptionController::class, 'page'])
         ->name('envoi.desinscription.page');
-    Route::post('/desinscription/{jeton}', [\App\Envoi\Desinscription\DesinscriptionController::class, 'confirmer'])
+    Route::post('/desinscription/{jeton}', [DesinscriptionController::class, 'confirmer'])
         ->name('envoi.desinscription.confirmer');
 });

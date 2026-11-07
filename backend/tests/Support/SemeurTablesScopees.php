@@ -117,9 +117,9 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
-        // Envoi P0 L5 : l'opposition porte une clé étrangère vers l'inscription — elle se vide d'abord.
-        'envoi_oppositions',
+        // Envoi P0 L5 : l'opposition (clé étrangère vers l'inscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_inscriptions',
+        'envoi_oppositions',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',

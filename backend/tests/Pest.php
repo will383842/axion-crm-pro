@@ -40,6 +40,7 @@ pest()->group('non-regression')->in(
     'Feature/Crm/CampagneAdressesPartageesTest.php',
     'Feature/Crm/CampagnesB2bTest.php',
     'Feature/Crm/CrmOutboundTest.php',
+    'Feature/Envoi/DesinscriptionTest.php',
     'Feature/Crm/EntreprisesFermeesExcluesDesEnvoisTest.php',
     'Feature/Crm/InseeNonDiffusiblesHorsProspectionTest.php',
     'Feature/Crm/ResolveurDestinatairesTest.php',

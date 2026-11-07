@@ -27,4 +27,10 @@ final class InscriptionsEnvoi
 
         return $reference;
     }
+
+    /** Lecture seule : cette référence existe-t-elle dans cet espace ? */
+    public static function existe(string $workspaceId, string $reference): bool
+    {
+        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_inscriptions')->where('reference', $reference)->exists());
+    }
 }

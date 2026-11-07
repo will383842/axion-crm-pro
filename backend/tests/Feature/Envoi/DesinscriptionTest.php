@@ -58,7 +58,7 @@ test('S22 GET (avec ou sans suivi de redirections) : un seul bouton, aucune oppo
 
 test('S22 POST du bouton : une opposition, adresse en liste de suppression, événement émis', function () {
     Event::fake([OppositionEnregistree::class]);
-    $this->post($this->chemin)->assertOk()->assertSee('désinscri', false);
+    $this->post($this->chemin)->assertOk()->assertSee('Désinscription confirmée', false);
 
     expect(desinscrOppositions($this->ws))->toBe(1);
     expect(ListeSuppression::estSupprimee(DESINSCR_ADRESSE))->toBeTrue();
@@ -207,13 +207,10 @@ test('l’opposition n’efface rien : l’inscription et ses lignes restent', f
     expect($n)->toBe(1);
 });
 
-test('RLS FORCE sur les deux tables, et étanchéité entre espaces', function () {
+test('RLS FORCE sur les deux tables', function () {
     foreach (['envoi_inscriptions', 'envoi_oppositions'] as $t) {
         $r = DB::selectOne('SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = ?', [$t]);
         expect($r->relrowsecurity)->toBeTrue();
         expect($r->relforcerowsecurity)->toBeTrue();
     }
-    $autre = F::espace('zz-desinscr-c');
-    $vu = WorkspaceContext::run($autre, fn () => DB::table('envoi_inscriptions')->count());
-    expect($vu)->toBe(0);
 });

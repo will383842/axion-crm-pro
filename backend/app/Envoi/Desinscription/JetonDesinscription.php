@@ -41,7 +41,7 @@ final class JetonDesinscription
 
     /**
      * @return array{workspace_id: string, reference: string}|null null pour TOUTE
-     *                                                              cause de refus (forme, signature, échéance) : l'appelant ne peut pas les distinguer.
+     *                                                             cause de refus (forme, signature, échéance) : l'appelant ne peut pas les distinguer.
      */
     public static function verifier(string $jeton): ?array
     {

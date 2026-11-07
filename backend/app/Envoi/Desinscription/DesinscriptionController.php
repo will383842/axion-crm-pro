@@ -22,7 +22,8 @@ final class DesinscriptionController
 {
     public function page(string $jeton): Response
     {
-        if (JetonDesinscription::verifier($jeton) === null) {
+        $verifie = JetonDesinscription::verifier($jeton);
+        if ($verifie === null || ! InscriptionsEnvoi::existe($verifie['workspace_id'], $verifie['reference'])) {
             return $this->refus();
         }
         $action = e('/desinscription/' . $jeton);

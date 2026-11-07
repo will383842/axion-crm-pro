@@ -59,7 +59,7 @@ final class EnregistrerOpposition
         });
     }
 
-    private function terminerLesEffets(object $inscription, string $workspaceId): void
+    private function terminerLesEffets(\stdClass $inscription, string $workspaceId): void
     {
         $opposition = DB::table('envoi_oppositions')->where('inscription_id', $inscription->id)->first();
         if ($opposition === null || $opposition->effets_termines_le !== null) {

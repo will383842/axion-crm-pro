@@ -1,0 +1,20 @@
+# Image figee par EMPREINTE (jamais par tag mobile). Empreinte de l'index
+# multi-arch de ghcr.io/kumocorp/kumomta relevee le 2026-11-07 ; pour la
+# changer : relever la nouvelle empreinte, relire le changelog, puis committer.
+services:
+  kumomta:
+    image: ghcr.io/kumocorp/kumomta@sha256:44b4b1da88c506630ac2fa6a064db60b2afe23fca862a52823223045564a839c
+    network_mode: host   # l'IP d'envoi dediee doit etre l'adresse source reelle
+    restart: "no"        # le redemarrage est l'affaire de systemd (kumomta-envoi.service)
+    stop_grace_period: 60s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    volumes:
+      - ./kumomta/init.lua:/opt/kumomta/etc/policy/init.lua:ro
+      - kumo-spool:/var/spool/kumomta
+      - kumo-log:/var/log/kumomta
+volumes:
+  kumo-spool:
+  kumo-log:

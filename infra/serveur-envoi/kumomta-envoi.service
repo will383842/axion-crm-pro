@@ -1,0 +1,18 @@
+[Unit]
+Description=KumoMTA (serveur d'envoi propre)
+Requires=docker.service
+After=docker.service wg-quick@wg0.service nftables.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/axion-envoi
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down --timeout 60
+TimeoutStartSec=120
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

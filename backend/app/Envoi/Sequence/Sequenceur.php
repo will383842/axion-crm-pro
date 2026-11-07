@@ -126,13 +126,24 @@ final class Sequenceur
 
             $sujet = ($rang > 1 && stripos((string) $etape['sujet'], 're:') !== 0) ? 'Re: ' . $etape['sujet'] : (string) $etape['sujet'];
             $brut = $this->composeur->composer(new DemandeComposition(
-                $ws, $fiche->email, $this->expedition->expediteur, $sujet, (string) $etape['corps'],
-                $messageId, $inReplyTo, $references,
+                $ws,
+                $fiche->email,
+                $this->expedition->expediteur,
+                $sujet,
+                (string) $etape['corps'],
+                $messageId,
+                $inReplyTo,
+                $references,
             ));
 
             try {
                 $res = $this->serveur->injecter(new MessageAEnvoyer(
-                    $ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, 'seq-' . $ins->id . '-' . $rang,
+                    $ws,
+                    $fiche->email,
+                    $this->expedition->expediteur,
+                    $sujet,
+                    $brut,
+                    'seq-' . $ins->id . '-' . $rang,
                 ));
             } catch (EnvoiRefuse $e) {
                 return $this->reporter($ins, $rang, $e->getMessage(), $fenetre, $maintenant);
@@ -188,8 +199,11 @@ final class Sequenceur
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
-            'workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang,
-            'statut' => 'reserve', 'message_id' => $messageId,
+            'workspace_id' => $ins->workspace_id,
+            'inscription_id' => $ins->id,
+            'etape' => $rang,
+            'statut' => 'reserve',
+            'message_id' => $messageId,
             'in_reply_to' => $inReplyTo,
         ]);
         if ($lignes === 1) {
@@ -208,8 +222,17 @@ final class Sequenceur
             ->where('m.workspace_id', $ws)->where('i.empreinte_adresse', $empreinte)->where('m.statut', 'envoye')->exists();
 
         return new DemandeEnvoi(
-            $ws, $f->email, $f->occurrences, $f->pays, $f->siren, $this->expedition->domaine, $this->expedition->entiteLegale,
-            $f->collecteeLe, $f->premiereInfoLe, $f->segment, $rang === 1 && ! $dejaEnvoye,
+            $ws,
+            $f->email,
+            $f->occurrences,
+            $f->pays,
+            $f->siren,
+            $this->expedition->domaine,
+            $this->expedition->entiteLegale,
+            $f->collecteeLe,
+            $f->premiereInfoLe,
+            $f->segment,
+            $rang === 1 && ! $dejaEnvoye,
         );
     }
 

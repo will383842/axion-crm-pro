@@ -3,6 +3,7 @@
 use App\Envoi\Dns\ConfigurationDomaine;
 use App\Envoi\Dns\ControleurDns;
 use App\Envoi\Dns\PlanDns;
+use App\Envoi\Dns\RapportControle;
 use Tests\Unit\Envoi\Dns\FauxResolveurDns;
 
 require_once __DIR__ . '/FauxResolveurDns.php';
@@ -12,7 +13,7 @@ function cfg(): ConfigurationDomaine
     return new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10');
 }
 
-function statut(\App\Envoi\Dns\RapportControle $r, string $code): string
+function statut(RapportControle $r, string $code): string
 {
     foreach ($r->resultats as $p) {
         if ($p->code === $code) {

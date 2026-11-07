@@ -2,11 +2,9 @@
 
 use App\Envoi\Dns\ConfigurationDomaine;
 use App\Envoi\Dns\ControleurDns;
-use App\Envoi\Dns\DepotControlesDns;
 use App\Envoi\Dns\DepotControlesDnsDb;
 use App\Envoi\Dns\ResolveurDns;
 use App\Support\WorkspaceContext;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;

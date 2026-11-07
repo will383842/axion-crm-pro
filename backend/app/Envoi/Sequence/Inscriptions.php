@@ -49,7 +49,7 @@ final class Inscriptions
             ->where('sequence_id', $sequenceId)->where('contact_id', $contactId)->value('id');
     }
 
-    /** Arrêt de l'inscription (+ de toute l'entreprise pour réponse/opposition). Retourne le nombre d'inscriptions arrêtées. */
+    /** Arrêt de l'inscription (+ de toute l'adresse pour stop/opposition/rebond dur, + de toute l'entreprise pour réponse/opposition). Retourne le nombre d'inscriptions arrêtées. */
     public function evenement(string $ws, string $inscriptionId, string $evenement, DateTimeImmutable $maintenant): int
     {
         if (! in_array($evenement, Evenement::TOUS, true)) {
@@ -62,6 +62,13 @@ final class Inscriptions
                 return 0;
             }
             $n = $this->arreter($ws, [$inscriptionId], $evenement, $maintenant);
+            if (in_array($evenement, Evenement::VALENT_POUR_L_ADRESSE, true)) {
+                // Ajout seulement : les autres inscriptions de la MÊME adresse passent « arretee » (rien n'est effacé).
+                $memeAdresse = DB::table('envoi_inscriptions')->where('workspace_id', $ws)
+                    ->where('empreinte_adresse', $ins->empreinte_adresse)->where('statut', 'active')
+                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->all();
+                $n += $this->arreter($ws, $memeAdresse, Evenement::MOTIF_ADRESSE, $maintenant);
+            }
             if (in_array($evenement, Evenement::PROPAGENT_A_L_ENTREPRISE, true)) {
                 $autres = DB::table('envoi_inscriptions')->where('workspace_id', $ws)
                     ->where('entreprise_id', $ins->entreprise_id)->where('statut', 'active')

@@ -15,10 +15,34 @@ final class JoursOuvres
 {
     public const FUSEAU = 'Europe/Paris';
 
+    /**
+     * Dimanche de Pâques (calendrier grégorien), algorithme de Meeus/Butcher.
+     * Calcul entier, SANS l'extension PHP `calendar` (absente de l'image : `easter_days()` n'y existe pas).
+     */
+    public static function paques(int $annee): DateTimeImmutable
+    {
+        $a = $annee % 19;
+        $b = intdiv($annee, 100);
+        $c = $annee % 100;
+        $d = intdiv($b, 4);
+        $e = $b % 4;
+        $f = intdiv($b + 8, 25);
+        $g = intdiv($b - $f + 1, 3);
+        $h = (19 * $a + $b - $d - $g + 15) % 30;
+        $i = intdiv($c, 4);
+        $k = $c % 4;
+        $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7;
+        $m = intdiv($a + 11 * $h + 22 * $l, 451);
+        $mois = intdiv($h + $l - 7 * $m + 114, 31);
+        $jour = (($h + $l - 7 * $m + 114) % 31) + 1;
+
+        return new DateTimeImmutable(sprintf('%04d-%02d-%02d', $annee, $mois, $jour), new DateTimeZone('UTC'));
+    }
+
     /** @return list<string> dates Y-m-d des jours fériés de l'année */
     public static function feries(int $annee): array
     {
-        $paques = (new DateTimeImmutable($annee . '-03-21', new DateTimeZone('UTC')))->modify('+' . easter_days($annee) . ' days');
+        $paques = self::paques($annee);
         $liste = [
             sprintf('%04d-01-01', $annee),
             $paques->modify('+1 day')->format('Y-m-d'),

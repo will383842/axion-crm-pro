@@ -397,7 +397,8 @@
         "EnvoiSequenceurFigeTest.php": [
           "ENVOI-L1 les migrations du séquenceur ont des préfixes uniques 000030 à 000039 et n'effacent aucune donnée",
           "ENVOI-L1 le séquenceur n'ouvre aucune connexion réseau et ne mesure aucune ouverture",
-          "ENVOI-L1 le séquenceur passe par la porte EnvoiAutorise et par la PasserelleLocale (ServeurEnvoi)"
+          "ENVOI-L1 le séquenceur passe par la porte EnvoiAutorise et par la PasserelleLocale (ServeurEnvoi)",
+          "ENVOI-L1 le séquenceur n'appelle pas l'extension PHP calendar (absente de l'image)"
         ]
       },
       "existants": [],

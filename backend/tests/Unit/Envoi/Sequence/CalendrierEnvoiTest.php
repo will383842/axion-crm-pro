@@ -65,3 +65,19 @@ test('fenêtre : une heure UTC est lue en heure de Paris', function () {
 test('fenêtre invalide refusée', function () {
     expect(fn () => new FenetreHoraire(17, 9))->toThrow(InvalidArgumentException::class);
 });
+
+test('Pâques calculé sans l\'extension calendar (Meeus/Butcher) : 2025 à 2038', function (int $annee, string $attendu) {
+    expect(JoursOuvres::paques($annee)->format('Y-m-d'))->toBe($attendu);
+})->with([
+    [2025, '2025-04-20'],
+    [2026, '2026-04-05'],
+    [2027, '2027-03-28'],
+    [2028, '2028-04-16'],
+    [2038, '2038-04-25'],
+]);
+
+test('les fériés mobiles dérivent de Pâques calculé : 2038 (Pâques tardif)', function () {
+    // Lundi de Pâques 26/04, Ascension 03/06, lundi de Pentecôte 14/06.
+    expect(array_values(array_intersect(JoursOuvres::feries(2038), ['2038-04-26', '2038-06-03', '2038-06-14'])))
+        ->toBe(['2038-04-26', '2038-06-03', '2038-06-14']);
+});

@@ -396,7 +396,9 @@ test('homme mort : jamais de battement = pause en fenêtre d’envoi, mais pas h
     $faux = new FauxServeurEnvoi;
     $maintenant = paris('2026-11-10 10:00:00');
     $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
-    $p = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);   // aucun sante()
+    $p = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, function () use (&$maintenant) {
+        return $maintenant;
+    }, '', 300, null, $garde);   // aucun sante()
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(0);
     $maintenant = paris('2026-11-10 22:00:00');
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
@@ -682,7 +684,7 @@ test('envoi:lever-pause : la levée et son journal sont dans UNE transaction (jo
     DB::unprepared("CREATE OR REPLACE FUNCTION test_refuse_levee() RETURNS trigger AS \$f\$ BEGIN
             IF NEW.commande = 'pause_levee' THEN RAISE EXCEPTION 'journal indisponible'; END IF; RETURN NEW; END; \$f\$ LANGUAGE plpgsql");
     DB::unprepared('CREATE TRIGGER test_refuse_levee BEFORE INSERT ON envoi_journal_commandes FOR EACH ROW EXECUTE FUNCTION test_refuse_levee()');
-    expect(fn () => Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'will']))->toThrow(Throwable::class)
+    expect(fn () => Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'will']))->toThrow(Exception::class)
         ->and(app(DepotChauffe::class)->pausesActives($ws, $maintenant))->toHaveCount(1);   // la levée a été annulée avec le journal
     DB::unprepared('DROP TRIGGER test_refuse_levee ON envoi_journal_commandes');
     expect(Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'will']))->toBe(0)

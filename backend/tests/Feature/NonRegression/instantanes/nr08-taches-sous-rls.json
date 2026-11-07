@@ -17,6 +17,8 @@
     "crm:sonde-personnes": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "crm:usine:pousser-agregats": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "db:partman-maintenir": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
+    "envoi:evaluer-freins": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
+    "envoi:sante": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "journalists:scrape-ours": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:backfill-periodicity": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:clean-emails": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

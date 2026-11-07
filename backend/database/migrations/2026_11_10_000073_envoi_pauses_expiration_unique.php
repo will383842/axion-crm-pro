@@ -25,12 +25,17 @@ return new class extends Migration
         DB::unprepared(<<<'SQL'
             DROP INDEX IF EXISTS envoi_pauses_active_unique;
             DO $$
+            DECLARE n BIGINT;
             BEGIN
-                IF EXISTS (SELECT 1 FROM envoi_pauses WHERE expire_le IS NOT NULL) THEN
-                    RAISE EXCEPTION 'envoi_pauses.expire_le est utilisée : retour refusé (aucun effacement)';
+                IF EXISTS (SELECT 1 FROM information_schema.columns
+                           WHERE table_schema = current_schema() AND table_name = 'envoi_pauses' AND column_name = 'expire_le') THEN
+                    EXECUTE 'SELECT COUNT(*) FROM envoi_pauses WHERE expire_le IS NOT NULL' INTO n;
+                    IF n > 0 THEN
+                        RAISE EXCEPTION 'envoi_pauses.expire_le est utilisée : retour refusé (aucun effacement)';
+                    END IF;
                 END IF;
             END $$;
-            ALTER TABLE envoi_pauses DROP COLUMN IF EXISTS expire_le;
+            ALTER TABLE IF EXISTS envoi_pauses DROP COLUMN IF EXISTS expire_le;
         SQL);
     }
 };

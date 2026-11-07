@@ -66,7 +66,8 @@ final class Freins
         $taux = array_map(fn (array $f): float => $f['envoyes'] > 0 ? $f['reponses'] / $f['envoyes'] : 0.0, $precedentes);
         $moyenne = array_sum($taux) / count($taux);
 
-        return $courante['reponses'] / $courante['envoyes'] < $moyenne * $ratioMin
+        // arrondi : 5 % pile n'est PAS sous la moitié de 10 % (les flottants ne doivent pas en décider)
+        return round($courante['reponses'] / $courante['envoyes'], 9) < round($moyenne * $ratioMin, 9)
             ? new DecisionFrein(DecisionFrein::REPONSES_EN_BAISSE, $fournisseur) : null;
     }
 

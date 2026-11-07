@@ -20,4 +20,6 @@ return [
     'plafond_global_jour' => (int) env('ENVOI_PLAFOND_GLOBAL_JOUR', 20),
     // Clé HMAC des empreintes de témoins. Jamais dans le dépôt : posée dans l'environnement.
     'cle_empreinte' => (string) env('ENVOI_CLE_EMPREINTE', ''),
+    // K1 — serveur d'envoi : secret HMAC (hors dépôt ; vide = tout refusé).
+    'serveur' => ['secret' => (string) env('ENVOI_SERVEUR_SECRET', '')],
 ];

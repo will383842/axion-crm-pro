@@ -37,6 +37,14 @@ use Throwable;
 final class SemeurTablesScopees
 {
     /**
+     * Tables en ajout seul (trigger qui refuse DELETE) : `nettoyer()` les saute.
+     * Leurs lignes de test restent, sans clé étrangère vers `workspaces`.
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL = ['envoi_journal_commandes'];
+
+    /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
      * celles dont ses clés étrangères dépendent. Le nettoyage parcourt cette
      * liste à l'envers.
@@ -148,6 +156,11 @@ final class SemeurTablesScopees
         'llm_usage',
         'llm_use_cases',
         'notifications',
+        // 2026-11-10 (envoi P0 L0) : socle local d'envoi. Le journal est en AJOUT SEUL
+        // (trigger) : le nettoyage ne peut pas le vider, voir APPEND_SEUL.
+        'envoi_drapeaux',
+        'envoi_journal_commandes',
+        'envoi_temoins',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -639,6 +652,16 @@ final class SemeurTablesScopees
             'title' => 'ZZ',
         ]);
 
+        $inserer('envoi_drapeaux', []);
+        $inserer('envoi_journal_commandes', [
+            'commande' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_temoins', [
+            'empreinte' => hash('sha256', 'zz-' . $marque),
+            'libelle' => 'zz',
+        ]);
+
         $inserer('proxy_providers_config', [
             'slug' => 'zz-' . $marque,
             'type' => 'datacenter',
@@ -720,6 +743,9 @@ final class SemeurTablesScopees
         $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
 
         foreach (array_reverse(self::ORDRE) as $table) {
+            if (in_array($table, self::APPEND_SEUL, true)) {
+                continue;
+            }
             $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
         }
 

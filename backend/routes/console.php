@@ -14,6 +14,7 @@ use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
 use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
+use App\Envoi\Dns\ControleDnsCommande;
 use App\Support\BattementPlanificateur;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -524,5 +525,13 @@ Schedule::command('origines:masquer-commentaire-ref')
 // aussitôt tant que `USINE_AGREGATS_CRM_ENABLED` est éteint. Ne supprime RIEN.
 Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:30')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
+// K12 — contrôle DNS quotidien des domaines d'envoi (PTR/SPF/DKIM/DMARC). Lecture du DNS et
+// ajouts seulement ; n'envoie rien. Un domaine pas prêt n'est pas marqué vérifié ce jour.
+Artisan::starting(static fn ($artisan) => $artisan->resolve(ControleDnsCommande::class));
+Schedule::command(ControleDnsCommande::SIGNATURE_PLANIFIEE)
+    ->dailyAt('05:45')
     ->withoutOverlapping(60)
     ->onOneServer();

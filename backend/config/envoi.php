@@ -27,4 +27,9 @@ return [
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.
     'smtp_boucle_tests' => false,
     'smtp_tolere_transaction_englobante' => false,
+    // K12 — paramètres DNS par domaine d'envoi, posés dans l'environnement (jamais dans le dépôt) :
+    // JSON {"domaine": {"selecteur": "...", "helo": "...", "ip": "..."}}.
+    'dns' => [
+        'domaines' => (array) (json_decode((string) env('ENVOI_DNS_DOMAINES', '{}'), true) ?: []),
+    ],
 ];

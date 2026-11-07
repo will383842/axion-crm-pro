@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<feedback>
+  <report_metadata>
+    <org_name>recepteur-factice.example.test</org_name>
+    <email>rapports@recepteur-factice.example.test</email>
+    <report_id>rapport-factice-0001</report_id>
+    <date_range><begin>1700000000</begin><end>1700086399</end></date_range>
+  </report_metadata>
+  <policy_published>
+    <domain>envoi.example.test</domain>
+    <adkim>r</adkim><aspf>r</aspf><p>none</p><sp>none</sp><pct>100</pct>
+  </policy_published>
+  <record>
+    <row>
+      <source_ip>192.0.2.10</source_ip>
+      <count>40</count>
+      <policy_evaluated><disposition>none</disposition><dkim>pass</dkim><spf>pass</spf></policy_evaluated>
+    </row>
+    <identifiers><header_from>envoi.example.test</header_from></identifiers>
+  </record>
+  <record>
+    <row>
+      <source_ip>192.0.2.99</source_ip>
+      <count>3</count>
+      <policy_evaluated><disposition>quarantine</disposition><dkim>fail</dkim><spf>fail</spf></policy_evaluated>
+    </row>
+    <identifiers><header_from>envoi.example.test</header_from></identifiers>
+  </record>
+  <record>
+    <row>
+      <source_ip>192.0.2.11</source_ip>
+      <count>7</count>
+      <policy_evaluated><disposition>none</disposition><dkim>fail</dkim><spf>pass</spf></policy_evaluated>
+    </row>
+    <identifiers><header_from>envoi.example.test</header_from></identifiers>
+  </record>
+</feedback>

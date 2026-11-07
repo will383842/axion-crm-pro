@@ -64,15 +64,15 @@ final class Inscriptions
             $n = $this->arreter($ws, [$inscriptionId], $evenement, $maintenant);
             if (in_array($evenement, Evenement::VALENT_POUR_L_ADRESSE, true)) {
                 // Ajout seulement : les autres inscriptions de la MÊME adresse passent « arretee » (rien n'est effacé).
-                $memeAdresse = DB::table('envoi_inscriptions')->where('workspace_id', $ws)
+                $memeAdresse = array_values(DB::table('envoi_inscriptions')->where('workspace_id', $ws)
                     ->where('empreinte_adresse', $ins->empreinte_adresse)->where('statut', 'active')
-                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->values()->all();
+                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
                 $n += $this->arreter($ws, $memeAdresse, Evenement::MOTIF_ADRESSE, $maintenant);
             }
             if (in_array($evenement, Evenement::PROPAGENT_A_L_ENTREPRISE, true)) {
-                $autres = DB::table('envoi_inscriptions')->where('workspace_id', $ws)
+                $autres = array_values(DB::table('envoi_inscriptions')->where('workspace_id', $ws)
                     ->where('entreprise_id', $ins->entreprise_id)->where('statut', 'active')
-                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->values()->all();
+                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
                 $n += $this->arreter($ws, $autres, Evenement::MOTIF_ENTREPRISE, $maintenant);
             }
 

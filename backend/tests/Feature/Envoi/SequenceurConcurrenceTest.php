@@ -81,14 +81,22 @@ function concNettoyer(string $ws, string $jour): void
 {
     $owner = DB::connection('pgsql_owner');
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
-    foreach (['envoi_messages', 'envoi_inscriptions', 'envoi_sequence_etapes', 'envoi_sequences', 'envoi_verdicts_adresse', 'envoi_domaines', 'envoi_temoins', 'envoi_drapeaux'] as $table) {
-        $owner->table($table)->where('workspace_id', $ws)->delete();
-    }
-    $owner->table('fonctions_espace')->where('espace_id', $ws)->delete();
-    $owner->table('company_tag')->where('workspace_id', $ws)->delete();
-    $owner->table('contacts')->where('workspace_id', $ws)->delete();
-    $owner->table('tags')->where('workspace_id', $ws)->delete();
-    $owner->table('companies')->where('workspace_id', $ws)->delete();
+    // Une fiche « fédérations » est PROTÉGÉE : sa suppression physique est refusée par la base
+    // (déclencheurs). Levée volontaire, dans la transaction seulement (patron de DoublonsSousRlsTest).
+    $owner->transaction(function () use ($owner, $ws): void {
+        $owner->statement("SET LOCAL app.autoriser_suppression_protegee = 'on'");
+        $owner->statement("SET LOCAL app.autoriser_suppression_absorbee = 'on'");
+        foreach (['envoi_messages', 'envoi_inscriptions', 'envoi_sequence_etapes', 'envoi_sequences', 'envoi_verdicts_adresse', 'envoi_domaines', 'envoi_temoins', 'envoi_drapeaux'] as $table) {
+            $owner->table($table)->where('workspace_id', $ws)->delete();
+        }
+        $owner->table('fonctions_espace')->where('espace_id', $ws)->delete();
+        foreach (['company_tag', 'contacts'] as $table) {
+            $owner->table($table)->where('workspace_id', $ws)->delete();
+        }
+        $owner->table('companies')->where('workspace_id', $ws)->delete();
+        $owner->table('contacts_retires')->where('workspace_id', $ws)->delete();
+        $owner->table('tags')->where('workspace_id', $ws)->delete();
+    });
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
     $owner->table('workspaces')->where('id', $ws)->delete();
     $owner->table('envoi_compteur_global')->where('jour', $jour)->delete(); // compteur agrégé, sans donnée de personne

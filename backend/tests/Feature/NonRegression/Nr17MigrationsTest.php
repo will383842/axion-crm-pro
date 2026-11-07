@@ -41,6 +41,8 @@ const NR17_DERNIERE_ANCIENNE = '2026_11_01_999999';
 const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000011_envoi_journal_commandes.php',
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
+    '2026_11_11_000100_envoi_serveurs.php',
+    '2026_11_11_000104_envoi_commandes.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

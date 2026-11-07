@@ -45,6 +45,16 @@ final class SemeurTablesScopees
     public const APPEND_SEUL = ['envoi_journal_commandes'];
 
     /**
+     * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
+     * de test bloqueraient la suppression du workspace. `nettoyer()` les vide en suspendant le
+     * trigger USER le temps d'une transaction (connexion propriétaire, tests seulement ; le
+     * trigger de production n'est pas touché).
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites'];
+
+    /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
      * celles dont ses clés étrangères dépendent. Le nettoyage parcourt cette
      * liste à l'envers.
@@ -164,6 +174,10 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
+        // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
+        // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
+        'envoi_boites',
+        'envoi_injections_smtp',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -676,6 +690,20 @@ final class SemeurTablesScopees
             'libelle' => 'zz',
         ]);
 
+        $boiteId = (string) Str::uuid();
+        $inserer('envoi_boites', [
+            'id' => $boiteId,
+            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'hote' => 'smtp.exemple.test',
+            'port' => 587,
+            'chiffrement' => 'starttls',
+            'identifiants_chiffres' => 'zz-chiffre',
+        ]);
+        $inserer('envoi_injections_smtp', [
+            'boite_id' => $boiteId,
+            'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
         $inserer('proxy_providers_config', [
             'slug' => 'zz-' . $marque,
             'type' => 'datacenter',
@@ -758,6 +786,15 @@ final class SemeurTablesScopees
 
         foreach (array_reverse(self::ORDRE) as $table) {
             if (in_array($table, self::APPEND_SEUL, true)) {
+                continue;
+            }
+            if (in_array($table, self::APPEND_SEUL_AVEC_FK, true)) {
+                $owner->transaction(function () use ($owner, $table, $workspaceIds): void {
+                    $owner->statement("ALTER TABLE {$table} DISABLE TRIGGER USER");
+                    $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
+                    $owner->statement("ALTER TABLE {$table} ENABLE TRIGGER USER");
+                });
+
                 continue;
             }
             $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();

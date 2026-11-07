@@ -8,13 +8,13 @@ use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Chauffe\ResolveurMx;
 use App\Envoi\Chauffe\ToutArreter;
-use App\Socle\Alertes\Alerte;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\ServiceProvider;
 

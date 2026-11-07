@@ -1,26 +1,28 @@
 <?php
 
+use App\Envoi\Chauffe\CompteurRetours;
 use App\Envoi\Chauffe\CourbeChauffe;
 use App\Envoi\Chauffe\DecisionFrein;
 use App\Envoi\Chauffe\DepotChauffe;
-use App\Envoi\Chauffe\CompteurRetours;
 use App\Envoi\Chauffe\Fournisseur;
+use App\Envoi\Chauffe\Freins;
+use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Chauffe\ResolveurMx;
-use App\Envoi\Contrat\EvenementEnvoi;
-use App\Envoi\Contrat\ServeurEnvoi;
-use App\Envoi\Retours\AppliquerRetour;
-use App\Support\WorkspaceContext;
-use App\Envoi\Chauffe\Freins;
-use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Chauffe\Seuils;
+use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\JourEnvoi;
 use App\Envoi\PasserelleLocale;
+use App\Envoi\Retours\AppliquerRetour;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Socle\Alertes\Alerte;
+use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +61,7 @@ function espaceChauffe(bool $valide = true): string
 /** Validation datée (le journal est en ajout seul : on l'écrit avec sa date, jamais on ne la corrige). */
 function validerTableauLe(string $ws, string $quandParis): void
 {
-    App\Support\WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->insert([
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->insert([
         'workspace_id' => $ws, 'commande' => 'tableau_valide', 'auteur' => 'test', 'details' => '{}',
         'jour' => substr($quandParis, 0, 10), 'cree_le' => paris($quandParis)->format('Y-m-d H:i:sP'),
     ]));
@@ -258,7 +260,11 @@ test('résolveur MX : lecture MX → famille, cache en table (un seul appel DNS)
         ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'panne.fr')->exists())->toBeFalse();
     // un nouveau résolveur relit la table, sans DNS
     $appels = 0;
-    expect((new ResolveurMx(function () use (&$appels): array { $appels++; return []; }))->fournisseurDe('z@ms-hote.fr'))->toBe('microsoft')
+    expect((new ResolveurMx(function () use (&$appels): array {
+        $appels++;
+
+        return [];
+    }))->fournisseurDe('z@ms-hote.fr'))->toBe('microsoft')
         ->and($appels)->toBe(0);
 });
 
@@ -519,7 +525,7 @@ test('évaluation : 2 plaintes en 7 jours = arrêt GLOBAL de 48 h, puis la pause
 
 function JourEnvoi_jour(DateTimeImmutable $t): DateTimeImmutable
 {
-    return App\Envoi\JourEnvoi::de($t);
+    return JourEnvoi::de($t);
 }
 
 test('évaluation : le taux de réponse en baisse met en pause le fournisseur concerné, pour gmail, microsoft ET autre', function () {
@@ -698,7 +704,7 @@ test('index unique partiel : une seule pause active par (espace, motif, fourniss
     $ligne = ['workspace_id' => $ws, 'portee' => 'global', 'fournisseur' => null, 'motif' => 'm'];
     WorkspaceContext::run($ws, function () use ($ligne) {
         DB::table('envoi_pauses')->insert($ligne);
-        expect(fn () => DB::transaction(fn () => DB::table('envoi_pauses')->insert($ligne)))->toThrow(Illuminate\Database\QueryException::class);
+        expect(fn () => DB::transaction(fn () => DB::table('envoi_pauses')->insert($ligne)))->toThrow(QueryException::class);
         $autre = ['portee' => 'fournisseur', 'fournisseur' => 'gmail'] + $ligne;
         DB::table('envoi_pauses')->insert($autre);                       // autre portée : permis
         DB::table('envoi_pauses')->where('motif', 'm')->whereNull('fournisseur')->update(['levee_le' => now()]);

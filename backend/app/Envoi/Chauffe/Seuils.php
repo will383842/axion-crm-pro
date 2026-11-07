@@ -65,6 +65,7 @@ final class Seuils
         if ($reglage === null) {
             return $constante;
         }
+
         // « plus petit = plus strict » sauf le ratio de réponse minimal (plus grand = plus strict).
         return $nom === 'reponse_ratio_min' ? max($constante, $reglage) : min($constante, $reglage);
     }

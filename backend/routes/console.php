@@ -9,6 +9,7 @@ use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\CrmUsinePousserAgregats;
+use App\Console\Commands\EnvoiListesNoiresControler;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
@@ -525,4 +526,11 @@ Schedule::command('origines:masquer-commentaire-ref')
 Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:30')
     ->withoutOverlapping(60)
+    ->onOneServer();
+
+// Envoi K13 — surveillance des listes noires (IP/domaines d'envoi), résolveur DNS LOCAL.
+// Chaque minute : un « listé » met la ressource en pause au même passage (< 5 min) + alerte.
+Schedule::command(EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE)
+    ->everyMinute()
+    ->withoutOverlapping(5)
     ->onOneServer();

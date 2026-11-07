@@ -27,4 +27,13 @@ return [
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.
     'smtp_boucle_tests' => false,
     'smtp_tolere_transaction_englobante' => false,
+    // K13 : surveillance des listes noires. Le résolveur DOIT être local (non public) :
+    // Spamhaus refuse les résolveurs publics, le contrôle est alors « non fiable ».
+    'listes_noires' => [
+        'resolveur' => (string) env('ENVOI_LISTES_RESOLVEUR', '127.0.0.1'),
+        'zones_ip' => ['zen.spamhaus.org'],
+        'zones_domaine' => ['dbl.spamhaus.org'],
+        // « ip@uuid-workspace », séparés par des virgules.
+        'ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('ENVOI_LISTES_IPS', ''))))),
+    ],
 ];

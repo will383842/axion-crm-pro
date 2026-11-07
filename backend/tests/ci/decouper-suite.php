@@ -41,6 +41,22 @@ function decoupageListerFichiers(string $racineBackend): array
 }
 
 /**
+ * Fichiers COUPLES : ils partagent un etat defini dans l'un d'eux (ex. une
+ * constante globale) et doivent rester dans la MEME part. Le decoupage a revele
+ * ce couplage (CI du 2026-11-07) ; tant qu'il n'est pas defait dans les tests,
+ * on le respecte ici plutot que d'affaiblir quoi que ce soit.
+ *
+ * @return list<list<string>>
+ */
+function decoupageGroupesIndissociables(): array
+{
+    return [
+        // AuditHashChainTest lit SECRET_CHAINE_DE_TEST, defini par AuditHashChainExtendedTest.
+        ['tests/Unit/Audit/AuditHashChainExtendedTest.php', 'tests/Unit/Audit/AuditHashChainTest.php'],
+    ];
+}
+
+/**
  * @param  array<string, int>  $fichiers
  * @return array<int, list<string>> numero de part (1..N) => fichiers
  */
@@ -53,19 +69,41 @@ function decoupageRepartir(array $fichiers, int $total): array
         $poids[$i] = 0;
     }
 
-    // Le plus gros d'abord ; a taille egale, ordre alphabetique (deterministe).
-    $chemins = array_keys($fichiers);
-    usort($chemins, fn (string $a, string $b) => [$fichiers[$b], $a] <=> [$fichiers[$a], $b]);
+    // Unites de repartition : un fichier seul, ou un groupe indissociable present.
+    $unites = [];
+    $dansUnGroupe = [];
+    foreach (decoupageGroupesIndissociables() as $groupe) {
+        $presents = array_values(array_filter($groupe, fn (string $c) => isset($fichiers[$c])));
+        if (count($presents) < 2) {
+            continue;
+        }
+        $unites[] = $presents;
+        foreach ($presents as $c) {
+            $dansUnGroupe[$c] = true;
+        }
+    }
+    foreach (array_keys($fichiers) as $chemin) {
+        if (! isset($dansUnGroupe[$chemin])) {
+            $unites[] = [$chemin];
+        }
+    }
 
-    foreach ($chemins as $chemin) {
+    $taille = fn (array $unite): int => array_sum(array_map(fn (string $c) => $fichiers[$c], $unite));
+
+    // La plus grosse d'abord ; a taille egale, ordre alphabetique (deterministe).
+    usort($unites, fn (array $a, array $b) => [$taille($b), $a[0]] <=> [$taille($a), $b[0]]);
+
+    foreach ($unites as $unite) {
         $cible = 1;
         for ($i = 2; $i <= $total; $i++) {
             if ($poids[$i] < $poids[$cible]) {
                 $cible = $i;
             }
         }
-        $parts[$cible][] = $chemin;
-        $poids[$cible] += max(1, $fichiers[$chemin]);
+        foreach ($unite as $chemin) {
+            $parts[$cible][] = $chemin;
+        }
+        $poids[$cible] += max(1, $taille($unite));
     }
 
     foreach ($parts as $i => $liste) {

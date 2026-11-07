@@ -39,6 +39,24 @@ test('DECOUPAGE — les parts couvrent TOUS les fichiers de test, sans recouvrem
     }
 });
 
+test('DECOUPAGE — les fichiers couples restent dans la meme part', function () {
+    $fichiers = decoupageListerFichiers(racineBackendDecoupage());
+    $parts = decoupageRepartir($fichiers, 4);
+
+    foreach (decoupageGroupesIndissociables() as $groupe) {
+        $numeros = [];
+        foreach ($groupe as $chemin) {
+            expect($fichiers)->toHaveKey($chemin);
+            foreach ($parts as $numero => $liste) {
+                if (in_array($chemin, $liste, true)) {
+                    $numeros[$numero] = true;
+                }
+            }
+        }
+        expect(array_keys($numeros))->toHaveCount(1, 'Groupe eclate sur plusieurs parts : ' . implode(', ', $groupe));
+    }
+});
+
 test('DECOUPAGE — la repartition est deterministe', function () {
     $fichiers = decoupageListerFichiers(racineBackendDecoupage());
 

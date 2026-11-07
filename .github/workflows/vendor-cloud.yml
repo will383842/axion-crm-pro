@@ -4,6 +4,16 @@ name: vendor-cloud
 # les sessions cloud de Claude Code (le proxy cloud bloque les archives codeload :
 # `composer install` y échoue). Hors chemin de test : ci.yml lance son propre
 # `composer install` et n'utilise JAMAIS cette archive. Aucun secret : GITHUB_TOKEN seul.
+#
+# Deux jobs, droits déclarés job par job :
+#   - « fabriquer » (contents: read, jeton non conservé) exécute composer, donc du code tiers ;
+#   - « publier » (contents: write) ne fait que télécharger l'artefact et publier : aucun code tiers.
+#
+# RISQUE ACCEPTÉ (décision du responsable) : le .sha256 est publié dans la MÊME pré-version
+# mutable que l'archive. Il prouve l'intégrité de transfert, PAS l'authenticité : qui peut
+# écrire dans la pré-version peut remplacer les deux. Surface équivalente à un accès en
+# écriture au dépôt ; elle ne concerne que les sessions cloud, jamais la CI de test.
+# Actions référencées par tag (v4, v2), comme ci.yml.
 
 on:
   push:
@@ -12,16 +22,22 @@ on:
       - 'backend/composer.lock'
   workflow_dispatch: {}
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  vendor:
-    name: Fabriquer et publier vendor
+  fabriquer:
+    name: Fabriquer vendor
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      nom: ${{ steps.archive.outputs.nom }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -39,18 +55,41 @@ jobs:
         run: |
           H="$(sha256sum backend/composer.lock | cut -c1-16)"
           NOM="vendor-${H}.tar.gz"
-          tar -czf "$NOM" -C backend vendor
-          sha256sum "$NOM" > "$NOM.sha256"
+          mkdir sortie
+          tar -czf "sortie/$NOM" -C backend vendor
+          (cd sortie && sha256sum "$NOM" > "$NOM.sha256")
           echo "nom=$NOM" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vendor-cloud
+          path: sortie/
+          if-no-files-found: error
+          retention-days: 1
+
+  publier:
+    name: Publier dans la pré-version
+    needs: fabriquer
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vendor-cloud
+          path: sortie
 
       - name: Publier dans la pré-version vendor-cloud
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NOM: ${{ steps.archive.outputs.nom }}
+          GH_REPO: ${{ github.repository }}
+          NOM: ${{ needs.fabriquer.outputs.nom }}
         run: |
           if ! gh release view vendor-cloud >/dev/null 2>&1; then
             gh release create vendor-cloud --prerelease \
               --title "vendor-cloud" \
               --notes "vendor fabriqué par la CI pour les sessions cloud. Ne pas utiliser ailleurs."
           fi
-          gh release upload vendor-cloud "$NOM" "$NOM.sha256" --clobber
+          gh release upload vendor-cloud "sortie/$NOM" "sortie/$NOM.sha256" --clobber

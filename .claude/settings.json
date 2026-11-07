@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash infra/scripts/vendor-cloud.sh || true"
+            "command": "bash infra/scripts/vendor-cloud.sh || true",
+            "timeout": 120
           }
         ]
       }

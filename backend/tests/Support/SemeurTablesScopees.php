@@ -161,6 +161,10 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
+        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace.
+        'envoi_chauffe_jours',
+        'envoi_pauses',
+        'envoi_seuils',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -660,6 +664,21 @@ final class SemeurTablesScopees
         $inserer('envoi_temoins', [
             'empreinte' => hash('sha256', 'zz-' . $marque),
             'libelle' => 'zz',
+        ]);
+
+        $inserer('envoi_chauffe_jours', [
+            'boite' => 'zz-etancheite@example.invalid',
+            'jour' => '2026-01-01',
+            'fournisseur' => 'autre',
+        ]);
+        $inserer('envoi_pauses', [
+            'portee' => 'global',
+            'motif' => 'zz',
+        ]);
+        $inserer('envoi_seuils', [
+            'nom' => 'zz',
+            'valeur' => 1,
+            'auteur' => 'zz',
         ]);
 
         $inserer('proxy_providers_config', [

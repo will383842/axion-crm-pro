@@ -88,6 +88,6 @@ final class ResolveurMx implements ResolveurFournisseur
         }
         usort($lignes, fn (array $a, array $b): int => ($a['pri'] ?? 0) <=> ($b['pri'] ?? 0));
 
-        return array_values(array_map(fn (array $l): string => (string) ($l['target'] ?? ''), $lignes));
+        return array_map(fn (array $l): string => (string) ($l['target'] ?? ''), $lignes);
     }
 }

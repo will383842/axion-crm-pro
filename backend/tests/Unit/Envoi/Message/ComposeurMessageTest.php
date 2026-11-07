@@ -400,3 +400,32 @@ it('DKIM : refuse une clé RSA de moins de 2048 bits', function () {
 it('refuse une clé DKIM illisible', function () {
     new DkimSigneur('exemple-envoi.test', 'crm1', 'pas une clé');
 })->throws(InvalidArgumentException::class);
+
+it('refuse un contenu dont le décodage % produit de l\'UTF-8 invalide (contrôles jamais aveugles)', function (array $o) {
+    l2Composeur()->composer(l2Demande($o));
+})->throws(MessageRefuse::class)->with([
+    'Grenoble %FF' => [['texte' => 'Bonjour Grenoble %FF']],
+    'axion-ia.com %C3' => [['texte' => 'Visitez axion-ia.com %C3']],
+    'bit.ly %FF' => [['html' => '<p><a href="https://bit.ly/x">x</a> %FF</p>']],
+    '20%DE Grenoble' => [['texte' => 'remise 20%DE avec Grenoble']],
+    'variable Grenoble %FF' => [['texte' => 'Bonjour {{v|x}}', 'variables' => ['v' => 'Grenoble %FF']]],
+    'html Grenoble %FF lien' => [['html' => '<p>Grenoble %FF <a href="https://bit.ly/x">x</a></p>']],
+]);
+
+it('accepte toujours les contenus légitimes', function (string $texte) {
+    $msg = l2Composeur()->composer(l2Demande(['texte' => $texte]));
+    expect($msg)->toBeString();
+})->with([
+    'R&D < 5 %' => ['R&D < 5 %'],
+    'open.spotify.com' => ['Écoutez open.spotify.com/track/1'],
+    'entité' => ['?a=1&amp;b=2'],
+    'vrai 20 %' => ['Remise de 20 % sur tout'],
+]);
+
+it('refuse un en-tête impossible à plier (inReplyTo de 1000 caractères)', function () {
+    ComposeurMessage::plier('In-Reply-To: ' . str_repeat('x', 1000));
+})->throws(MessageRefuse::class);
+
+it('refuse via le composeur un inReplyTo de 1000 caractères', function () {
+    l2Composeur()->composer(l2Demande(['inReplyTo' => '<' . str_repeat('x', 1000) . '@exemple-envoi.test>']));
+})->throws(MessageRefuse::class);

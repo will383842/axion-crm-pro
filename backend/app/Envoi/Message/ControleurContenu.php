@@ -31,15 +31,41 @@ final class ControleurContenu
     {
         $brut = implode("\n", [...$contenus, ...$html]);
         // Anti-contournement : entités (même sans « ; »), %xx, caractères invisibles, point idéographique.
-        $tout = self::normaliser($brut);
-        $sansBalises = self::normaliser((string) preg_replace('/<[^>]*>/', '', $tout));
+        // En cas de doute (regex en échec, Normalizer absent), on BLOQUE : jamais de contrôle aveugle.
+        try {
+            $tout = self::normaliser($brut);
+            $nu = preg_replace('/<[^>]*>/', '', $tout);
+            if ($nu === null) {
+                throw self::doute();
+            }
+            $sansBalises = self::normaliser($nu);
+        } catch (MessageRefuse $e) {
+            return $e->motifs;
+        }
         $motifs = [];
 
-        if ($piecesJointes !== [] || preg_match('/content-disposition\s*:\s*attachment/i', $tout) === 1) {
+        try {
+            return $this->controler($tout, $sansBalises, $brut, $piecesJointes, $html, $motifs);
+        } catch (MessageRefuse $e) {
+            return $e->motifs;
+        }
+    }
+
+    /**
+     * @param  list<string>  $piecesJointes
+     * @param  list<string>  $html
+     * @param  list<string>  $motifs
+     * @return list<string>
+     */
+    private function controler(string $tout, string $sansBalises, string $brut, array $piecesJointes, array $html, array $motifs): array
+    {
+        if ($piecesJointes !== [] || self::trouve('/content-disposition\s*:\s*attachment/i', $tout)) {
             $motifs[] = 'Pièce jointe interdite : le message ne doit contenir aucune pièce jointe.';
         }
 
-        if (preg_match_all('/\{\{(.*?)\}\}/s', $brut, $m) > 0) {
+        if (($nbVariables = preg_match_all('/\{\{(.*?)\}\}/s', $brut, $m)) === false) {
+            throw self::doute();
+        } elseif ($nbVariables > 0) {
             foreach ($m[1] as $interieur) {
                 $morceaux = explode('|', $interieur, 2);
                 $nom = trim($morceaux[0]);
@@ -49,12 +75,12 @@ final class ControleurContenu
             }
         }
 
-        if (preg_match('/(?<![a-z0-9-])axion-ia\.com/i', $tout) === 1
-            || preg_match('/(?<![a-z0-9-])axion-ia\.com/i', $sansBalises) === 1) {
+        if (self::trouve('/(?<![a-z0-9-])axion-ia\.com/i', $tout)
+            || self::trouve('/(?<![a-z0-9-])axion-ia\.com/i', $sansBalises)) {
             $motifs[] = 'Lien ou adresse vers axion-ia.com (domaine principal) interdit : utiliser le domaine d\'envoi.';
         }
 
-        if (preg_match('/grenoble/iu', $tout) === 1 || preg_match('/grenoble/iu', $sansBalises) === 1) {
+        if (self::trouve('/grenoble/iu', $tout) || self::trouve('/grenoble/iu', $sansBalises)) {
             $motifs[] = 'Le mot « Grenoble » est interdit dans le message.';
         }
 
@@ -84,25 +110,52 @@ final class ControleurContenu
         }
     }
 
+    private static function doute(): MessageRefuse
+    {
+        return new MessageRefuse(['Contenu refusé : analyse impossible (doute = blocage).']);
+    }
+
+    /** preg_match booléen ; un échec de regex (false) refuse le message au lieu de passer. */
+    private static function trouve(string $motif, string $sujet): bool
+    {
+        $r = preg_match($motif, $sujet);
+        if ($r === false) {
+            throw self::doute();
+        }
+
+        return $r === 1;
+    }
+
     /** Forme canonique pour la recherche de motifs interdits (jamais utilisée pour envoyer). */
     private static function normaliser(string $v): string
     {
         for ($i = 0; $i < 3; $i++) {
             // Entités numériques décodées même sans « ; » final (les clients mail le font), puis nommées.
-            $v = (string) preg_replace_callback('/&#(x[0-9a-f]{1,6}|[0-9]{1,7});?/i', static function (array $m): string {
+            $r = preg_replace_callback('/&#(x[0-9a-f]{1,6}|[0-9]{1,7});?/i', static function (array $m): string {
                 $cp = strtolower($m[1][0]) === 'x' ? (int) hexdec(substr($m[1], 1)) : (int) $m[1];
 
-                return $cp > 0 && $cp <= 0x10FFFF && ($cp < 0xD800 || $cp > 0xDFFF) ? mb_chr($cp, 'UTF-8') : '';
+                return $cp > 0 && $cp <= 0x10FFFF && ($cp < 0xD800 || $cp > 0xDFFF)
+                    ? mb_scrub((string) mb_chr($cp, 'UTF-8'), 'UTF-8') : '';
             }, $v);
-            $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $v = rawurldecode($v);
+            if ($r === null) {
+                throw self::doute();
+            }
+            $v = mb_scrub(html_entity_decode($r, ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'UTF-8');
+            $v = mb_scrub(rawurldecode($v), 'UTF-8');
         }
         // NFKC d'abord (compatibilité), puis retrait de tous les invisibles : format (Cf : bidi, joiners,
         // soft-hyphen, tags…), sélecteurs de variante, remplisseurs hangul, CGJ, sélecteurs mongols.
-        if (class_exists(\Normalizer::class)) {
-            $v = \Normalizer::normalize($v, \Normalizer::FORM_KC) ?: $v;
+        if (! class_exists(\Normalizer::class)) {
+            throw new MessageRefuse(['Contenu refusé : extension intl absente, normalisation NFKC impossible.']);
         }
-        $v = (string) preg_replace('/[\p{Cf}\x{FE00}-\x{FE0F}\x{E0100}-\x{E01EF}\x{115F}\x{1160}\x{3164}\x{FFA0}\x{034F}\x{180B}-\x{180F}]/u', '', $v);
+        $n = \Normalizer::normalize($v, \Normalizer::FORM_KC);
+        if ($n === false) {
+            throw new MessageRefuse(['Contenu refusé : normalisation NFKC impossible (doute = blocage).']);
+        }
+        $v = preg_replace('/[\p{Cf}\x{FE00}-\x{FE0F}\x{E0100}-\x{E01EF}\x{115F}\x{1160}\x{3164}\x{FFA0}\x{034F}\x{180B}-\x{180F}]/u', '', $n);
+        if ($v === null) {
+            throw self::doute();
+        }
 
         // Points typographiques ou idéographiques équivalents à « . ».
         return strtr($v, ["\u{3002}" => '.', "\u{FF0E}" => '.', "\u{FF61}" => '.', "\u{FE52}" => '.', "\u{2024}" => '.']);
@@ -125,11 +178,19 @@ final class ControleurContenu
     private function aLienTraque(string $contenu): bool
     {
         // https://x, http://x, //x, https:\\x, \\x : tout ce qui désigne un hôte.
-        if (preg_match_all('#(?:https?:)?[/\\\\]{2}[^\s"\'<>)]+#i', $contenu, $urls) === 0) {
+        $nb = preg_match_all('#(?:https?:)?[/\\\\]{2}[^\s"\'<>)]+#i', $contenu, $urls);
+        if ($nb === false) {
+            throw self::doute();
+        }
+        if ($nb === 0) {
             return false;
         }
         foreach ($urls[0] as $brut) {
-            $url = 'https://' . ltrim((string) preg_replace('#^(?:https?:)?[/\\\\]+#i', '', str_replace('\\', '/', $brut)), '/');
+            $nu = preg_replace('#^(?:https?:)?[/\\\\]+#i', '', str_replace('\\', '/', $brut));
+            if ($nu === null) {
+                throw self::doute();
+            }
+            $url = 'https://' . ltrim($nu, '/');
             $hote = self::normaliserHote((string) parse_url($url, PHP_URL_HOST));
             foreach (self::TRACEURS as $t) {
                 $prefixe = str_ends_with($t, '.');
@@ -141,7 +202,7 @@ final class ControleurContenu
             }
             $requete = (string) parse_url($url, PHP_URL_QUERY);
             // Tout paramètre dont la valeur est une autre URL : signature d'une redirection.
-            if (preg_match('/(^|&)[^=&]*=(https?(%3a|:)|%2f%2f|\/\/)/i', $requete) === 1) {
+            if (self::trouve('/(^|&)[^=&]*=(https?(%3a|:)|%2f%2f|\/\/)/i', $requete)) {
                 return true;
             }
         }

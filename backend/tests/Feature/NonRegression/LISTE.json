@@ -392,6 +392,15 @@
       "frontend": []
     },
     {
+      "id": "ENVOI-P0-L4",
+      "risque": "adaptateur SMTP de la boite : aucun doublon, aucune perte, identifiants chiffres",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/AdaptateurSmtpTest.php"
+      ],
+      "frontend": []
+    },
+    {
       "id": "LISTE",
       "risque": "liste figee du filet",
       "nouveaux": {

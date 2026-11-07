@@ -26,7 +26,7 @@ final class DepotChauffe
             ->where('workspace_id', $ws)->where('boite', $boite)->where('jour', '<', $jour->format('Y-m-d'))
             ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderBy('jour')->pluck('jour'));
 
-        return $jours->map(fn ($j): DateTimeImmutable => new DateTimeImmutable((string) $j, new \DateTimeZone(JourEnvoi::FUSEAU)))->all();
+        return array_values($jours->map(fn ($j): DateTimeImmutable => new DateTimeImmutable((string) $j, new \DateTimeZone(JourEnvoi::FUSEAU)))->all());
     }
 
     public function envoyesBoite(string $ws, string $boite, DateTimeImmutable $jour): int
@@ -61,7 +61,7 @@ final class DepotChauffe
             return $q->selectRaw('COALESCE(SUM(envoyes),0) e, COALESCE(SUM(rebonds_durs),0) r, COALESCE(SUM(plaintes),0) p, COALESCE(SUM(reponses),0) a')->first();
         });
 
-        return ['envoyes' => (int) $l->e, 'rebonds_durs' => (int) $l->r, 'plaintes' => (int) $l->p, 'reponses' => (int) $l->a];
+        return self::totauxDe($l);
     }
 
     /**
@@ -75,15 +75,17 @@ final class DepotChauffe
             ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])
             ->selectRaw('COALESCE(SUM(envoyes),0) e, COALESCE(SUM(rebonds_durs),0) r, COALESCE(SUM(plaintes),0) p, COALESCE(SUM(reponses),0) a')->first());
 
-        return ['envoyes' => (int) $l->e, 'rebonds_durs' => (int) $l->r, 'plaintes' => (int) $l->p, 'reponses' => (int) $l->a];
+        return self::totauxDe($l);
     }
 
     /** Plaintes des 7 jours glissants, en ne comptant que les jours APRÈS $apres (plaintes déjà « consommées » par un arrêt). */
     public function plaintes7Jours(string $ws, DateTimeImmutable $jour, ?DateTimeImmutable $apres = null): int
     {
+        $apresJour = $apres?->format('Y-m-d');
+
         return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)
             ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])
-            ->when($apres !== null, fn ($q) => $q->where('jour', '>', $apres->format('Y-m-d')))
+            ->when($apresJour !== null, fn ($q) => $q->where('jour', '>', $apresJour))
             ->sum('plaintes'));
     }
 
@@ -113,7 +115,7 @@ final class DepotChauffe
             ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderByDesc('jour')->limit($n)
             ->selectRaw('SUM(envoyes) e, SUM(reponses) a')->get());
 
-        return $lignes->map(fn ($l): array => ['envoyes' => (int) $l->e, 'reponses' => (int) $l->a])->all();
+        return array_values($lignes->map(fn ($l): array => ['envoyes' => (int) $l->e, 'reponses' => (int) $l->a])->all());
     }
 
     /**
@@ -123,10 +125,10 @@ final class DepotChauffe
      */
     public function pausesActives(string $ws, DateTimeImmutable $maintenant): array
     {
-        return WorkspaceContext::run($ws, fn () => DB::table('envoi_pauses')
+        return array_values(WorkspaceContext::run($ws, fn () => DB::table('envoi_pauses')
             ->where('workspace_id', $ws)->whereNull('levee_le')
             ->where(fn ($q) => $q->whereNull('expire_le')->orWhere('expire_le', '>', $maintenant->format('Y-m-d H:i:sP')))
-            ->orderBy('id')->get(['id', 'portee', 'fournisseur', 'motif'])->all());
+            ->orderBy('id')->get(['id', 'portee', 'fournisseur', 'motif'])->all()));
     }
 
     /**
@@ -224,7 +226,7 @@ final class DepotChauffe
             ->where('workspace_id', $ws)->whereIn('commande', ['reponse_recue', 'reponse_traitee'])
             ->selectRaw("COUNT(*) FILTER (WHERE commande = 'reponse_recue') r, COUNT(*) FILTER (WHERE commande = 'reponse_traitee') t")->first());
 
-        return max(0, (int) $c->r - (int) $c->t);
+        return max(0, (int) ($c?->r ?? 0) - (int) ($c?->t ?? 0));
     }
 
     public function derniereValidation(string $ws): ?DateTimeImmutable
@@ -252,5 +254,16 @@ final class DepotChauffe
              ON CONFLICT (workspace_id, nom) DO UPDATE SET valeur = EXCLUDED.valeur, auteur = EXCLUDED.auteur, mis_a_jour_le = now()',
             [$ws, $nom, $valeur, $auteur],
         ));
+    }
+
+    /** @return array{envoyes: int, rebonds_durs: int, plaintes: int, reponses: int} */
+    private static function totauxDe(?object $l): array
+    {
+        return [
+            'envoyes' => (int) ($l->e ?? 0),
+            'rebonds_durs' => (int) ($l->r ?? 0),
+            'plaintes' => (int) ($l->p ?? 0),
+            'reponses' => (int) ($l->a ?? 0),
+        ];
     }
 }

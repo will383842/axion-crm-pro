@@ -218,7 +218,7 @@ test('CI-A3 — TÉMOIN : la lecture de `on` voit un déclencheur pull_request a
 test('CI-A3 — le risque accepté (sha256 = intégrité, pas authenticité) est écrit partout', function () {
     $racine = racineVendorCloud();
     foreach (['infra/scripts/vendor-cloud.sh', '.github/workflows/vendor-cloud.yml', 'CONTRIBUTING.md'] as $f) {
-        expect((string) file_get_contents("{$racine}/{$f}"))->toContain('authenticité', "{$f} doit documenter le risque accepté.");
+        $this->assertStringContainsString('authenticité', (string) file_get_contents("{$racine}/{$f}"), "{$f} doit documenter le risque accepté.");
     }
 });
 

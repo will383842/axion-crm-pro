@@ -19,8 +19,10 @@ use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Socle\Espace\FonctionsEspace;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
 
@@ -65,10 +67,10 @@ beforeEach(function () {
         ]);
 
         return new Sequenceur(
-        new PasserelleLocale($this->faux, new DepotSocleDb, true, 300, fn () => $this->maintenant, $this->ws, 300, fn () => WorkspaceContext::current()),
-        new LecteurFicheDb,
-        $this->composeur,
-        new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'),
+            new PasserelleLocale($this->faux, new DepotSocleDb, true, 300, fn () => $this->maintenant, $this->ws, 300, fn () => WorkspaceContext::current()),
+            new LecteurFicheDb,
+            $this->composeur,
+            new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'),
         );
     };
 });
@@ -76,7 +78,7 @@ beforeEach(function () {
 /** Une séquence de $etapes étapes (délais 0, 2, 3 jours ouvrés) ; retourne son id. */
 function seqSequence(object $t, int $etapes = 3, int $debut = 9, int $fin = 17): string
 {
-    $id = (string) Illuminate\Support\Str::uuid();
+    $id = (string) Str::uuid();
     DB::table('envoi_sequences')->insert(['id' => $id, 'workspace_id' => $t->ws, 'nom' => 'Séquence test', 'fenetre_debut' => $debut, 'fenetre_fin' => $fin]);
     foreach (array_slice([0, 2, 3], 0, $etapes) as $i => $delai) {
         DB::table('envoi_sequence_etapes')->insert([
@@ -172,7 +174,7 @@ test('version FIGÉE : modifier la séquence après l\'inscription ne change pas
     ($this->seq)()->executer($this->ws, $this->maintenant);
     expect($this->composeur->vues[0]->sujet)->toBe('Sujet v1 étape 1')
         ->and($this->composeur->vues[0]->corps)->toBe('Corps v1 étape 1');
-    expect(fn () => DB::table('envoi_inscriptions')->where('id', $ins)->update(['version_figee' => '{}']))->toThrow(Illuminate\Database\QueryException::class);
+    expect(fn () => DB::table('envoi_inscriptions')->where('id', $ins)->update(['version_figee' => '{}']))->toThrow(QueryException::class);
 });
 
 test('hors fenêtre / week-end / férié : rien n\'est envoyé, l\'échéance est reportée au prochain créneau', function () {
@@ -290,14 +292,14 @@ test('unicité (inscription, étape) en base : un doublon direct est refusé par
     $ins = seqInscrire($this, $sid, $contact);
     $ligne = ['workspace_id' => $this->ws, 'inscription_id' => $ins, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<a@x>'];
     DB::table('envoi_messages')->insert($ligne);
-    expect(fn () => DB::table('envoi_messages')->insert($ligne))->toThrow(Illuminate\Database\QueryException::class);
+    expect(fn () => DB::table('envoi_messages')->insert($ligne))->toThrow(QueryException::class);
 });
 
 test('une séquence compte de 1 à 3 étapes (la quatrième est refusée en base)', function () {
     $sid = seqSequence($this, 3);
     expect(fn () => DB::table('envoi_sequence_etapes')->insert([
         'workspace_id' => $this->ws, 'sequence_id' => $sid, 'rang' => 4, 'delai_jours_ouvres' => 1, 'sujet' => 's', 'corps' => 'c',
-    ]))->toThrow(Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });
 
 test('aucune adresse en clair dans les tables du séquenceur, aucune mesure d\'ouverture', function () {
@@ -490,5 +492,5 @@ test('clé étrangère composite (workspace_id, inscription_id) : un message ne 
     $ins = seqInscrire($this, $sid, $c);
     expect(fn () => DB::table('envoi_messages')->insert([
         'workspace_id' => $autre, 'inscription_id' => $ins, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<fk@x>',
-    ]))->toThrow(Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });

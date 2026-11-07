@@ -492,12 +492,12 @@ final class SemeurTablesScopees
             'achete_le' => '2026-01-01',
         ]);
 
-        $sequence = (string) \Illuminate\Support\Str::uuid();
+        $sequence = (string) Str::uuid();
         $inserer('envoi_sequences', ['id' => $sequence, 'nom' => 'ZZ Étanchéité']);
         $inserer('envoi_sequence_etapes', [
             'sequence_id' => $sequence, 'rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'ZZ sujet', 'corps' => 'ZZ corps',
         ]);
-        $inscription = (string) \Illuminate\Support\Str::uuid();
+        $inscription = (string) Str::uuid();
         $inserer('envoi_inscriptions', [
             'id' => $inscription, 'sequence_id' => $sequence, 'contact_id' => $id['contacts'], 'entreprise_id' => $id['companies'],
             'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),

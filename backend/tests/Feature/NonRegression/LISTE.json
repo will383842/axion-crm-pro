@@ -269,6 +269,7 @@
           "NR-17 les migrations anciennes sans retour réel sont celles de la photo (la liste ne peut que baisser)",
           "NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, aller sans erreur",
           "NR-17 témoin : l’instrument aller-retour-aller joue sur une migration ancienne réversible",
+          "NR-17 la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels",
           "NR-17 le classement voit bien des retours vides, refusés et réels (témoin de couverture)"
         ]
       },

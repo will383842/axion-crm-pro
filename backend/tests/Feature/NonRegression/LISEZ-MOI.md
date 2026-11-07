@@ -76,3 +76,9 @@ Ils sont aussi écrits en tête des fichiers concernés.
 | La sonde « non diffusibles » est aveugle sous le rôle de production (RLS) | `Nr23Nr08AudiencesEtRlsTest.php` | S7 |
 | Seules 2 tâches planifiées sont rejouées sous le rôle de production ; les autres sont listées « non jouée » | `instantanes/nr08-taches-sous-rls.json` | S7 |
 | NR-22 (connexion de bout en bout) : seules les gardes Pest sont rattachées ; l'e2e `auth` est hors du périmètre fermé de ce lot | `LISTE.json` | lot e2e |
+
+## Journal de la liste figée (ajouts seulement)
+
+| PR | Ajout dans `LISTE.json` | Pourquoi |
+|---|---|---|
+| #433 (envoi P0 L0) | NR-17 « la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels » | Test ajouté dans `Nr17MigrationsTest.php` avec la liste fermée `NR17_RETOUR_INERTE_VOULU` (000011, 000013). Aucun test retiré ni affaibli : toute autre migration nouvelle (dont les 000020-22 de L3, au `down()` non destructif) garde l’exigence d’un retour réel + aller-retour-aller. |

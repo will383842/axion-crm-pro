@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -175,6 +175,9 @@ final class SemeurTablesScopees
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
         'envoi_boites',
         'envoi_injections_smtp',
+        // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
+        'envoi_evenements',
+        'envoi_curseurs_imap',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -688,6 +691,21 @@ final class SemeurTablesScopees
         $inserer('envoi_injections_smtp', [
             'boite_id' => $boiteId,
             'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
+        $inserer('envoi_evenements', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+            'uid' => 1,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'classe' => 'reponse_humaine',
+            'statut' => 'a_rattacher',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recu_le' => now()->toDateTimeString(),
+        ]);
+        $inserer('envoi_curseurs_imap', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
         ]);
 
         $inserer('proxy_providers_config', [

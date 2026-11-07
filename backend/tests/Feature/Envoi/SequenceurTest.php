@@ -274,7 +274,9 @@ test('envoi réel éteint ou plafond atteint : message « reporté », rien n\'e
     $ins = seqInscrire($this, $sid, $contact);
     $eteint = new Sequenceur(
         new PasserelleLocale($this->faux, new DepotSocleDb, false, 300, fn () => $this->maintenant, $this->ws, 300, fn () => WorkspaceContext::current()),
-        new LecteurFicheDb, $this->composeur, new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'),
+        new LecteurFicheDb,
+        $this->composeur,
+        new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'),
     );
 
     expect($eteint->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REPORTE)
@@ -389,12 +391,19 @@ test('article 14 : un contact ajouté SANS information alors que l\'entreprise a
 test('article 14 : la date de collecte est celle du CONTACT (et non de l\'entreprise) ; contact informé = accepté', function () {
     $sid = seqSequence($this, 1);
     // Entreprise ancienne (non informée, créée il y a 90 jours) mais contact récent (hier) : dans le délai.
-    [, $recent] = seqFicheAvec($this, 'recent@zz-client.example.invalid',
+    [, $recent] = seqFicheAvec(
+        $this,
+        'recent@zz-client.example.invalid',
         ['first_info_at' => null, 'created_at' => $this->lundi->modify('-90 days')->format('c')],
-        ['created_at' => $this->lundi->modify('-1 day')->format('c'), 'first_info_at' => null]);
+        ['created_at' => $this->lundi->modify('-1 day')->format('c'), 'first_info_at' => null],
+    );
     // Contact collecté il y a 40 jours MAIS informé il y a 35 jours : accepté.
-    [, $informe] = seqFicheAvec($this, 'informe@zz-client.example.invalid', ['first_info_at' => null],
-        ['created_at' => $this->lundi->modify('-40 days')->format('c'), 'first_info_at' => $this->lundi->modify('-35 days')->format('c')]);
+    [, $informe] = seqFicheAvec(
+        $this,
+        'informe@zz-client.example.invalid',
+        ['first_info_at' => null],
+        ['created_at' => $this->lundi->modify('-40 days')->format('c'), 'first_info_at' => $this->lundi->modify('-35 days')->format('c')],
+    );
     $i1 = seqInscrire($this, $sid, $recent);
     $i2 = seqInscrire($this, $sid, $informe);
 

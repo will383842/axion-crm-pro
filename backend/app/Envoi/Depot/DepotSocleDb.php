@@ -114,6 +114,21 @@ final class DepotSocleDb implements DepotSocle
         });
     }
 
+    public function leverToutArreter(string $workspaceId, string $auteur): bool
+    {
+        return DB::transaction(function () use ($workspaceId, $auteur): bool {
+            if (! $this->toutArreter($workspaceId)) {
+                return false;
+            }
+            $this->journaliser($workspaceId, 'reprise', $auteur);
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId): void {
+                DB::table('envoi_drapeaux')->where('workspace_id', $workspaceId)->update(['tout_arreter' => false, 'mis_a_jour_le' => now()]);
+            });
+
+            return true;
+        });
+    }
+
     public function journaliser(string $workspaceId, string $commande, string $auteur, array $details = [], ?DateTimeImmutable $jour = null): void
     {
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commande, $auteur, $details, $jour): void {

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Depot\DepotSocle;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /** Lever une pause est une décision HUMAINE (la ligne reste, datée). */
 class EnvoiLeverPause extends Command
@@ -17,12 +18,21 @@ class EnvoiLeverPause extends Command
     {
         $ws = (string) $this->argument('workspace');
         $auteur = (string) ($this->option('auteur') ?: get_current_user());
-        if (! $depot->leverPause($ws, (int) $this->argument('pause'), $auteur)) {
+        $pause = (int) $this->argument('pause');
+        // La levée et son journal sont UNE seule transaction : pas de pause levée sans trace.
+        $levee = DB::transaction(function () use ($depot, $socle, $ws, $pause, $auteur): bool {
+            if (! $depot->leverPause($ws, $pause, $auteur)) {
+                return false;
+            }
+            $socle->journaliser($ws, 'pause_levee', $auteur, ['pause' => $pause]);
+
+            return true;
+        });
+        if (! $levee) {
             $this->error('Aucune pause active avec cet identifiant.');
 
             return self::FAILURE;
         }
-        $socle->journaliser($ws, 'pause_levee', $auteur, ['pause' => (int) $this->argument('pause')]);
         $this->info('Pause levée (journalisé).');
 
         return self::SUCCESS;

@@ -23,7 +23,7 @@ use DateTimeImmutable;
  *   3. Tout arrêter             => exception ;
  *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
  *   5. rejeu idempotent (même clé) => passe sans recompter ;
- *   5b. (L7) pauses, freins, quota de chauffe de la boîte => report au lendemain ;
+ *   5b. (L7) homme mort (silence de sante()), pauses, freins, quota de chauffe de la boîte => report au lendemain ;
  *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
  *   7. seulement alors, le serveur est appelé, et l'injection acceptée est notée
  *      dans la même transaction : deux workers ne peuvent pas dépasser le plafond.
@@ -58,6 +58,7 @@ final class PasserelleLocale implements ServeurEnvoi
             throw EnvoiRefuse::autreEspace();
         }
         $jour = $this->jour();
+        $this->chauffe?->preparer($message); // résolution MX (cache) AVANT le verrou : jamais de DNS sous verrou
         $plafond = $this->plafond($this->plafondJour);
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
@@ -123,7 +124,13 @@ final class PasserelleLocale implements ServeurEnvoi
 
     public function sante(): SanteServeur
     {
-        return $this->reel() ? $this->serveur->sante() : new SanteServeur(false, 'envoi réel inactif');
+        if (! $this->reel()) {
+            return new SanteServeur(false, 'envoi réel inactif');
+        }
+        // Homme mort (INF-025, plan 26) : chaque appel est noté ; 15 minutes de silence en fenêtre d'envoi = pause.
+        $this->chauffe?->battre($this->instant());
+
+        return $this->serveur->sante();
     }
 
     public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements

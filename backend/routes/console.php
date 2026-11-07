@@ -526,3 +526,17 @@ Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:30')
     ->withoutOverlapping(60)
     ->onOneServer();
+
+// Envoi P0 L7 — freins automatiques : évalue tous les espaces (rebonds, plaintes, réponses, humain)
+// et ouvre les pauses. Lecture de compteurs + écriture de pauses ; n'envoie rien, ne supprime rien.
+Schedule::command('envoi:evaluer-freins')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// Envoi P0 L7 — battement de l'homme mort (INF-025) : appelle sante() ; sans appel pendant 15 minutes
+// en fenêtre d'envoi, toutes les files passent en pause. Inerte tant que ENVOI_REEL_ACTIF est éteint.
+Schedule::command('envoi:sante')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();

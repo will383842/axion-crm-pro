@@ -7,7 +7,10 @@ final class DecisionFrein
 {
     public const REBONDS = 'rebonds_durs_trop_nombreux';
 
-    public const PLAINTES = 'plaintes_trop_nombreuses';
+    public const PLAINTES_ARRET = 'deux_plaintes_en_sept_jours';
+
+    /** Pas une pause : palier tenu + alerte de relecture. */
+    public const PLAINTE_RELECTURE = 'plainte_a_relire';
 
     public const INDESIRABLE_TEMOIN = 'indesirable_chez_un_temoin';
 
@@ -17,8 +20,13 @@ final class DecisionFrein
 
     public const HOMME_MORT = 'tableau_de_bord_non_valide';
 
+    /** INF-025 : plus aucun appel à sante() depuis 15 minutes en fenêtre d'envoi. */
+    public const SANTE_SILENCIEUSE = 'sante_silencieuse';
+
     public function __construct(
         public readonly string $motif,
         public readonly ?string $fournisseur = null,
+        /** Durée de la pause en heures ; null = jusqu'à levée humaine. */
+        public readonly ?int $dureeHeures = null,
     ) {}
 }

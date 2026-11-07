@@ -11,17 +11,32 @@ use DateTimeImmutable;
  */
 final class Freins
 {
-    /** Rebonds durs : taux strictement supérieur au seuil, échantillon minimum atteint. */
-    public static function rebondsDurs(int $envoyes, int $rebonds, float $tauxMax = Seuils::REBONDS_DURS_TAUX_MAX): ?DecisionFrein
+    /**
+     * Rebonds durs — deux règles, la plus sévère gagne :
+     *  - taux > seuil (2 %) sur 7 jours glissants, échantillon minimum de 100 envois sur ces 7 jours ;
+     *  - règle ABSOLUE : 3 rebonds durs ou plus dans la journée, quel que soit l'échantillon.
+     */
+    public static function rebondsDurs(int $envoyes7j, int $rebonds7j, int $rebondsDuJour, float $tauxMax = Seuils::REBONDS_DURS_TAUX_MAX, int $jourMax = Seuils::REBONDS_DURS_JOUR_MAX): ?DecisionFrein
     {
-        return $envoyes >= Seuils::REBONDS_DURS_ENVOIS_MIN && $rebonds / $envoyes > $tauxMax
+        if ($rebondsDuJour >= $jourMax) {
+            return new DecisionFrein(DecisionFrein::REBONDS);
+        }
+
+        return $envoyes7j >= Seuils::REBONDS_DURS_ENVOIS_MIN && $rebonds7j / $envoyes7j > $tauxMax
             ? new DecisionFrein(DecisionFrein::REBONDS) : null;
     }
 
-    public static function plaintes(int $envoyes, int $plaintes, float $tauxMax = Seuils::PLAINTES_TAUX_MAX): ?DecisionFrein
+    /**
+     * Plaintes sur 7 jours glissants : 1 = palier tenu + alerte de relecture (aucune pause) ;
+     * 2 ou plus = arrêt de 48 h.
+     */
+    public static function plaintes(int $plaintes7j): ?DecisionFrein
     {
-        return $envoyes >= Seuils::PLAINTES_ENVOIS_MIN && $plaintes / $envoyes > $tauxMax
-            ? new DecisionFrein(DecisionFrein::PLAINTES) : null;
+        if ($plaintes7j >= Seuils::PLAINTES_ARRET) {
+            return new DecisionFrein(DecisionFrein::PLAINTES_ARRET, null, Seuils::PLAINTES_ARRET_HEURES);
+        }
+
+        return $plaintes7j >= Seuils::PLAINTES_RELECTURE ? new DecisionFrein(DecisionFrein::PLAINTE_RELECTURE) : null;
     }
 
     /** Frein de remplacement Gmail/Microsoft : un message en indésirables chez un témoin → ce fournisseur seulement. */
@@ -71,7 +86,7 @@ final class Freins
         return $reponsesEnAttente > Seuils::HUMAIN_RALENTIR_AU_DELA ? self::RALENTI : self::NORMAL;
     }
 
-    /** Homme mort : jours CIVILS de Paris depuis la dernière validation (jamais validé = pause). */
+    /** Tableau de bord non validé : jours CIVILS de Paris depuis la dernière validation (jamais validé = oui). ALERTE seulement. */
     public static function hommeMort(?DateTimeImmutable $derniereValidation, DateTimeImmutable $maintenant, int $joursMax = Seuils::HOMME_MORT_JOURS): ?DecisionFrein
     {
         if ($derniereValidation === null) {
@@ -80,5 +95,20 @@ final class Freins
         $jours = (int) JourEnvoi::de($derniereValidation)->diff(JourEnvoi::de($maintenant))->format('%r%a');
 
         return $jours >= $joursMax ? new DecisionFrein(DecisionFrein::HOMME_MORT) : null;
+    }
+
+    /** Homme mort INF-025 : silence de sante() depuis 15 minutes ou plus (jamais appelé = silence). */
+    public static function santeSilencieuse(?DateTimeImmutable $dernierBattement, DateTimeImmutable $maintenant): bool
+    {
+        return $dernierBattement === null
+            || $maintenant->getTimestamp() - $dernierBattement->getTimestamp() >= Seuils::SANTE_SILENCE_MINUTES * 60;
+    }
+
+    /** Fenêtre d'envoi : [08:00, 19:00[ heure de Paris. */
+    public static function dansFenetreEnvoi(DateTimeImmutable $maintenant): bool
+    {
+        $h = (int) $maintenant->setTimezone(new \DateTimeZone(JourEnvoi::FUSEAU))->format('G');
+
+        return $h >= Seuils::FENETRE_ENVOI_DEBUT && $h < Seuils::FENETRE_ENVOI_FIN;
     }
 }

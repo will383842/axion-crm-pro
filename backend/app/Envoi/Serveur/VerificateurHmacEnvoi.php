@@ -7,26 +7,27 @@ use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
- * Vérifie une requête du serveur d'envoi : « horodatage.nonce.corps » signé par
- * `HmacSignature` (patron du dépôt). Rend un statut HTTP : 200 accepté ;
- * 401 secret vide / en-tête absent / horodatage hors 6 min / signature fausse ;
+ * Vérifie une requête du serveur d'envoi : « MÉTHODE, chemin, horodatage, nonce, corps » (voir `SignatureEnvoi`),
+ * signés par `HmacSignature` (patron du dépôt). Rend un statut HTTP : 200 accepté ;
+ * 401 secret vide / en-tête absent / nonce non UUID / horodatage hors 5 min / signature fausse ;
  * 409 nonce rejoué ; 503 mémoire anti-rejeu indisponible (jamais accepté sans contrôle).
  * Le nonce n'est consommé qu'APRÈS une signature valide, par `Cache::add` (SET NX +
  * expiration) sur le même magasin que les autres canaux (`crm.ingest.replay_store`).
  */
 final class VerificateurHmacEnvoi
 {
-    public const FENETRE_SECONDES = 360;
+    public const FENETRE_SECONDES = 300;
 
-    public function verifier(string $secret, string $source, ?string $horodatage, ?string $nonce, ?string $signature, string $corps): int
+    public function verifier(#[\SensitiveParameter] string $secret, string $source, ?string $horodatage, ?string $nonce, ?string $signature, string $corps, string $methode = 'POST', string $chemin = ''): int
     {
-        if ($secret === '' || $nonce === null || $nonce === '' || strlen($nonce) > 128) {
+        if ($secret === '' || $nonce === null || ! SignatureEnvoi::estUuid($nonce)) {
             return 401;
         }
+        [, $signature] = SignatureEnvoi::analyser($signature);
         if (! HmacSignature::timestampWithinWindow($horodatage, self::FENETRE_SECONDES)) {
             return 401;
         }
-        if (! HmacSignature::verify($secret, HmacSignature::signedPayload((string) $horodatage, $nonce . '.' . $corps), $signature)) {
+        if (! HmacSignature::verify($secret, SignatureEnvoi::chargeRequete($methode, $chemin, (string) $horodatage, $nonce, $corps), $signature)) {
             return 401;
         }
 

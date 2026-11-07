@@ -1,0 +1,37 @@
+{
+  "description": "Vecteurs de test HMAC communs CRM/serveur d'envoi (ADR K0 D3). Secret de vecteur : publiable, sans valeur. Requête = HMAC-SHA256 de « METHODE\\nchemin\\nhorodatage\\nnonce\\ncorps » (GET : corps = chaîne de requête) ; réponse = « REPONSE\\nnonce\\nworkspace_id\\nstatut\\ncorps ». En-tête : k=<id>,sha256=<hex>.",
+  "secret": "secret-de-vecteur-NON-SECRET",
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "requetes": [
+    {
+      "nom": "commande_pause",
+      "methode": "POST",
+      "chemin": "/v1/commandes/pause",
+      "horodatage": "1767225600",
+      "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "corps": "{\"commande_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"commande\":\"pause\"}",
+      "signature": "c7b00b24d78226e71ca25f58a41b67727b5664c7f59783bb21b5d43fe9a74218",
+      "entete": "k=1,sha256=c7b00b24d78226e71ca25f58a41b67727b5664c7f59783bb21b5d43fe9a74218"
+    },
+    {
+      "nom": "tirage_evenements",
+      "methode": "GET",
+      "chemin": "/v1/evenements",
+      "horodatage": "1767225600",
+      "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "corps": "curseur=10&depuis=2026-01-01T00%3A00%3A00%2B00%3A00&limite=100",
+      "signature": "bb67056e1c99d5ef17a1613f1fc61e3ee9dec1702c9bfbc4e4411e65be3e4fcd",
+      "entete": "k=1,sha256=bb67056e1c99d5ef17a1613f1fc61e3ee9dec1702c9bfbc4e4411e65be3e4fcd"
+    }
+  ],
+  "reponses": [
+    {
+      "nom": "tirage_vide",
+      "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "workspace_id": "11111111-1111-4111-8111-111111111111",
+      "statut": 200,
+      "corps": "{\"workspace_id\":\"11111111-1111-4111-8111-111111111111\",\"evenements\":[],\"curseur_suivant\":\"10\"}",
+      "signature": "ac023e6953b42124c607191f6ad83228a6bcb8b9344ca5ed0d0e82050d1667bd"
+    }
+  ]
+}

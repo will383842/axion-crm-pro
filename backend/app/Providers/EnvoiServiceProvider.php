@@ -10,6 +10,8 @@ use App\Envoi\Serveur\ClientServeurEnvoiHmac;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Contrat\TireurEvenements;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Envoi\Smtp\ResolveurDns;
+use App\Envoi\Smtp\ResolveurHote;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,7 +23,8 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(DepotSocle::class, DepotSocleDb::class);
         // K1 — client signé HMAC : tirage par curseur et commandes (interfaces NOUVELLES ;
         // `ServeurEnvoi` n'a reçu aucune méthode).
-        $this->app->singleton(ClientServeurEnvoiHmac::class);
+        $this->app->bind(ResolveurHote::class, ResolveurDns::class);
+        $this->app->bind(ClientServeurEnvoiHmac::class);
         $this->app->bind(TireurEvenements::class, ClientServeurEnvoiHmac::class);
         $this->app->bind(CommandeurServeur::class, ClientServeurEnvoiHmac::class);
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(

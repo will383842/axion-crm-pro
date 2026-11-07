@@ -6,7 +6,6 @@ use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 /**
  * Enregistre l'opposition liée à une inscription. IDEMPOTENT : la contrainte
@@ -20,6 +19,8 @@ use Throwable;
  */
 final class EnregistrerOpposition
 {
+    public function __construct(private readonly TerminerEffetsOpposition $effets) {}
+
     public const CANAL_PAGE = 'page';
 
     public const CANAL_ONE_CLICK = 'one_click';
@@ -42,35 +43,24 @@ final class EnregistrerOpposition
                 if ($inseree !== 1) {
                     return;
                 }
-                $adresse = (string) $inscription->adresse;
-                ListeSuppression::inscrire($adresse, ListeSuppression::MANUEL, 'desinscription_lien', (string) $inscription->portee, ['canal' => $canal]);
-                (new ConsentOutboundRecorder)->recordForEmail(
+                // Jamais l'adresse en clair : l'empreinte seule (décision du 2026-08-18).
+                $empreinte = (string) $inscription->empreinte_adresse;
+                ListeSuppression::inscrireEmpreinte($empreinte, ListeSuppression::MANUEL, 'desinscription_lien', (string) $inscription->portee, ['canal' => $canal]);
+                (new ConsentOutboundRecorder)->record(
                     'consent_optout',
-                    $adresse,
+                    $empreinte,
                     (string) $inscription->portee,
                     null,
                     ['motif' => 'desinscription_lien', 'canal' => $canal],
                 );
             });
 
-            $this->terminerLesEffets($inscription, $workspaceId);
+            $opposition = DB::table('envoi_oppositions')->where('inscription_id', $inscription->id)->first();
+            if ($opposition !== null) {
+                $this->effets->pour($workspaceId, (int) $opposition->id);
+            }
 
             return true;
         });
-    }
-
-    private function terminerLesEffets(\stdClass $inscription, string $workspaceId): void
-    {
-        $opposition = DB::table('envoi_oppositions')->where('inscription_id', $inscription->id)->first();
-        if ($opposition === null || $opposition->effets_termines_le !== null) {
-            return;
-        }
-        try {
-            event(new OppositionEnregistree($workspaceId, (string) $inscription->empreinte_adresse, (string) $inscription->portee, (string) $opposition->canal));
-            DB::table('envoi_oppositions')->where('id', $opposition->id)->update(['effets_termines_le' => now()]);
-        } catch (Throwable $e) {
-            // L'opposition est acquise ; les effets seront rejoués au prochain rejeu du jeton.
-            report($e);
-        }
     }
 }

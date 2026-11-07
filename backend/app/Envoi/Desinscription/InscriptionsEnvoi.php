@@ -11,15 +11,16 @@ use Illuminate\Support\Str;
 final class InscriptionsEnvoi
 {
     /** @return string la référence opaque (UUID) à placer dans le jeton */
-    public static function creer(string $workspaceId, string $adresse, string $portee = 'business'): string
+    public static function creer(string $workspaceId, string $adresse, string $portee = 'business', ?int $contactId = null): string
     {
         $adresse = mb_strtolower(trim($adresse));
         $reference = (string) Str::uuid();
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $adresse, $portee, $reference): void {
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $adresse, $portee, $reference, $contactId): void {
             DB::table('envoi_inscriptions')->insert([
                 'workspace_id' => $workspaceId,
                 'reference' => $reference,
-                'adresse' => $adresse,
+                // Jamais l'adresse en clair (décision du 2026-08-18) : empreinte + référence au contact.
+                'contact_id' => $contactId,
                 'empreinte_adresse' => ListeSuppression::empreinte($adresse),
                 'portee' => $portee,
             ]);

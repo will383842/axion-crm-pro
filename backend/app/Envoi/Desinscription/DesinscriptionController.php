@@ -65,8 +65,18 @@ final class DesinscriptionController
     {
         return $this->html(404, $this->gabarit(
             'Lien non valide',
-            '<h1>Lien non valide</h1><p>Ce lien n’est pas valide ou a expiré.</p>',
+            '<h1>Lien non valide</h1><p>Ce lien n’est pas valide ou a expiré.</p>'
+            . '<p>Pour ne plus recevoir de message de notre part, répondez simplement à l’un de nos messages en demandant votre désinscription'
+            . $this->contact() . '.</p>',
         ));
+    }
+
+    /** Moyen de contact générique (adresse de l'exploitant), sans donnée de personne. */
+    private function contact(): string
+    {
+        $c = trim((string) config('envoi.contact_desinscription', ''));
+
+        return $c === '' ? '' : ' ou écrivez à ' . e($c);
     }
 
     private function gabarit(string $titre, string $corps): string

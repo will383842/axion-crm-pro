@@ -105,7 +105,25 @@ final class ListeSuppression
             return;
         }
 
-        $empreinte = self::empreinte($normalise);
+        self::inscrireEmpreinte(self::empreinte($normalise), $raison, $source, $scope, $metadata);
+    }
+
+    /**
+     * Variante par EMPREINTE : pour qui ne détient plus l'adresse en clair
+     * (ex. l'opposition par lien de désinscription). Même comportement.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public static function inscrireEmpreinte(
+        string $empreinte,
+        string $raison,
+        string $source,
+        string $scope = 'business',
+        array $metadata = [],
+    ): void {
+        if (preg_match('/^[0-9a-f]{64}$/', $empreinte) !== 1) {
+            return;
+        }
         $maintenant = now();
 
         $existante = DB::table('email_suppressions')

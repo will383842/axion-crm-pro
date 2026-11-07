@@ -526,3 +526,10 @@ Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:30')
     ->withoutOverlapping(60)
     ->onOneServer();
+
+// Envoi P0 L5 — relance, chaque minute et sans nouveau clic, les effets (retrait de la file,
+// arrêt par entreprise) des oppositions de désinscription restés inachevés. Idempotent ; ne supprime RIEN.
+Schedule::command('envoi:relancer-effets-opposition')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer();

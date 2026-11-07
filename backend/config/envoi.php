@@ -25,4 +25,6 @@ return [
     'cle_desinscription' => (string) env('ENVOI_CLE_DESINSCRIPTION', ''),
     // Durée de validité d'un lien de désinscription (jours).
     'desinscription_validite_jours' => (int) env('ENVOI_DESINSCRIPTION_VALIDITE_JOURS', 730),
+    // Adresse de contact générique affichée sur la page de refus d'un lien expiré (facultative).
+    'contact_desinscription' => (string) env('ENVOI_CONTACT_DESINSCRIPTION', ''),
 ];

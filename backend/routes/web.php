@@ -23,8 +23,11 @@ Route::middleware([])->withoutMiddleware([
     ShareErrorsFromSession::class,
     ValidateCsrfToken::class,
 ])->group(function () {
-    Route::get('/desinscription/{jeton}', [DesinscriptionController::class, 'page'])
-        ->name('envoi.desinscription.page');
-    Route::post('/desinscription/{jeton}', [DesinscriptionController::class, 'confirmer'])
-        ->name('envoi.desinscription.confirmer');
+    // Limitation de débit par IP : 30 requêtes par minute.
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::get('/desinscription/{jeton}', [DesinscriptionController::class, 'page'])
+            ->name('envoi.desinscription.page');
+        Route::post('/desinscription/{jeton}', [DesinscriptionController::class, 'confirmer'])
+            ->name('envoi.desinscription.confirmer');
+    });
 });

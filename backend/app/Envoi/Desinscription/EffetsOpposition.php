@@ -10,9 +10,22 @@ final class EffetsOpposition
         private readonly ArretParEntreprise $arret,
     ) {}
 
+    /** Les DEUX effets sont tentés même si le premier échoue ; la première erreur est relancée ensuite (l'opposition reste « à terminer »). */
     public function handle(OppositionEnregistree $e): void
     {
-        $this->retrait->retirerPour($e->workspaceId, $e->empreinteAdresse);
-        $this->arret->declencher($e->workspaceId, $e->empreinteAdresse);
+        $premiere = null;
+        try {
+            $this->retrait->retirerPour($e->workspaceId, $e->empreinteAdresse);
+        } catch (\Throwable $t) {
+            $premiere = $t;
+        }
+        try {
+            $this->arret->declencher($e->workspaceId, $e->empreinteAdresse);
+        } catch (\Throwable $t) {
+            $premiere ??= $t;
+        }
+        if ($premiere !== null) {
+            throw $premiere;
+        }
     }
 }

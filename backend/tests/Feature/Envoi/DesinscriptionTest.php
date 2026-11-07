@@ -214,3 +214,124 @@ test('RLS FORCE sur les deux tables', function () {
         expect($r->relforcerowsecurity)->toBeTrue();
     }
 });
+
+// ── Correctifs de l'audit sécurité/RGPD (B1, B2, mineurs) ───────────────────────────────────
+
+test('B2 l’adresse en clair n’est écrite nulle part : empreinte seule, liste de suppression sans adresse', function () {
+    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_inscriptions')->where('reference', $this->ref)->first());
+    expect($ligne->adresse)->toBeNull();
+    expect($ligne->empreinte_adresse)->toBe(ListeSuppression::empreinte(DESINSCR_ADRESSE));
+
+    $this->post($this->chemin)->assertOk();
+
+    expect(ListeSuppression::estSupprimee(DESINSCR_ADRESSE))->toBeTrue();
+    $liste = DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte(DESINSCR_ADRESSE))->first();
+    expect($liste->email)->toBeNull();
+    $sortants = json_encode(DB::table('crm_outbound_events')->get()->all());
+    expect($sortants)->not->toContain(DESINSCR_ADRESSE);
+});
+
+test('B2 la référence au contact est conservée à la place de l’adresse', function () {
+    $ref = InscriptionsEnvoi::creer($this->ws, 'autre@zz-desinscription.example.invalid', 'business', 4242);
+    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_inscriptions')->where('reference', $ref)->first());
+    expect((int) $ligne->contact_id)->toBe(4242);
+    expect($ligne->adresse)->toBeNull();
+});
+
+test('B1 EffetsOpposition tente les DEUX effets même si le premier lève une erreur', function () {
+    $arret = new class implements ArretParEntreprise
+    {
+        public int $n = 0;
+
+        public function declencher(string $workspaceId, string $empreinteAdresse): void
+        {
+            $this->n++;
+        }
+    };
+    $retrait = new class implements RetraitEnvoisEnFile
+    {
+        public function retirerPour(string $workspaceId, string $empreinteAdresse): int
+        {
+            throw new RuntimeException('panne du retrait');
+        }
+    };
+    $effets = new App\Envoi\Desinscription\EffetsOpposition($retrait, $arret);
+
+    expect(fn () => $effets->handle(new OppositionEnregistree($this->ws, str_repeat('a', 64), 'business', 'page')))
+        ->toThrow(RuntimeException::class, 'panne du retrait');
+    expect($arret->n)->toBe(1);
+});
+
+test('B1 effets en échec : la commande planifiée les relance SANS nouveau clic, une seule fois', function () {
+    $retrait = new class implements RetraitEnvoisEnFile
+    {
+        public int $n = 0;
+
+        public function retirerPour(string $workspaceId, string $empreinteAdresse): int
+        {
+            $this->n++;
+            if ($this->n === 1) {
+                throw new RuntimeException('panne simulée');
+            }
+
+            return 0;
+        }
+    };
+    app()->instance(RetraitEnvoisEnFile::class, $retrait);
+
+    $this->post($this->chemin)->assertOk();
+    $nonTermines = fn () => WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->whereNull('effets_termines_le')->count());
+    expect($nonTermines())->toBe(1);
+
+    $this->artisan('envoi:relancer-effets-opposition')->assertSuccessful(); // aucun nouveau POST
+    expect($retrait->n)->toBe(2);
+    expect($nonTermines())->toBe(0);
+
+    $this->artisan('envoi:relancer-effets-opposition')->assertSuccessful();
+    expect($retrait->n)->toBe(2);
+    expect(desinscrOppositions($this->ws))->toBe(1);
+});
+
+test('B1 la relance est planifiée chaque minute', function () {
+    $evenements = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+        ->filter(fn ($e) => str_contains((string) $e->command, 'envoi:relancer-effets-opposition'));
+    expect($evenements)->toHaveCount(1);
+    expect($evenements->first()->expression)->toBe('* * * * *');
+});
+
+test('deux terminaisons simultanées des effets : un seul événement', function () {
+    Event::fake([OppositionEnregistree::class]);
+    $this->post($this->chemin)->assertOk(); // l'écouteur est simulé : l'événement part, effets marqués terminés
+    $id = (int) WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->value('id'));
+    WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('id', $id)->update(['effets_termines_le' => null]));
+    Event::fake([OppositionEnregistree::class]);
+
+    $t = app(App\Envoi\Desinscription\TerminerEffetsOpposition::class);
+    $premier = $t->pour($this->ws, $id);
+    $second = $t->pour($this->ws, $id);
+
+    expect([$premier, $second])->toBe([true, false]);
+    Event::assertDispatchedTimes(OppositionEnregistree::class, 1);
+});
+
+test('one-click RFC 8058 envoyé en multipart/form-data', function () {
+    $r = $this->call('POST', $this->chemin, ['List-Unsubscribe' => 'One-Click'], [], [], ['CONTENT_TYPE' => 'multipart/form-data; boundary=----zz']);
+    $r->assertOk();
+    expect($r->getContent())->toBe('');
+    expect(desinscrOppositions($this->ws))->toBe(1);
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->value('canal')))->toBe('one_click');
+});
+
+test('limitation de débit : 30 requêtes par minute et par IP, la 31e reçoit 429', function () {
+    for ($i = 0; $i < 30; $i++) {
+        $this->get($this->chemin)->assertOk();
+    }
+    $this->get($this->chemin)->assertStatus(429);
+});
+
+test('lien expiré : page de refus avec un moyen de contact générique, sans distinguer la cause', function () {
+    config(['envoi.contact_desinscription' => 'desinscription@exemple.invalid']);
+    $r = $this->get('/desinscription/v1.invalide');
+    $r->assertNotFound();
+    expect($r->getContent())->toContain('desinscription@exemple.invalid')->toContain('expiré');
+});

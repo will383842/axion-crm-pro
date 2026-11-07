@@ -104,7 +104,7 @@ final class LecteurBoiteWebklex implements LecteurBoite
         return $sortie;
     }
 
-    /** Message sous le seuil de taille : corps analysé en mémoire, jamais enregistré, jamais `getRawBody()`. */
+    /** Message sous le seuil de taille : corps analysé en mémoire, jamais enregistré, jamais la lecture du corps brut entier. */
     private function lireUn(int $uid, DateTimeImmutable $recuLe, Message $message): MessageBrut
     {
         $message->parseBody(); // borné par MAX_OCTETS, vérifié plus haut

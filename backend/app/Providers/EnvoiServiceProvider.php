@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\ListesNoires\AlerteurJournal;
 use App\Envoi\ListesNoires\DepotControles;
 use App\Envoi\ListesNoires\DepotControlesDb;
@@ -11,7 +12,6 @@ use App\Envoi\ListesNoires\ResolveurSysteme;
 use App\Envoi\ListesNoires\SourceRessources;
 use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\SurveillanceListes;
-use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;

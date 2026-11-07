@@ -3,8 +3,8 @@
 use App\Envoi\ListesNoires\Alerteur;
 use App\Envoi\ListesNoires\DepotControles;
 use App\Envoi\ListesNoires\DetecteurResolveurPublic;
-use App\Envoi\ListesNoires\Ressource;
 use App\Envoi\ListesNoires\ResolveurDns;
+use App\Envoi\ListesNoires\Ressource;
 use App\Envoi\ListesNoires\StatutListe;
 use App\Envoi\ListesNoires\SurveillanceListes;
 

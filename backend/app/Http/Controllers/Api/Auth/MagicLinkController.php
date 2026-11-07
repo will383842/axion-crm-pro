@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Services\Auth\AuthService;
 use App\Services\Auth\MagicLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,17 @@ class MagicLinkController extends ApiController
             ]);
         }
         RateLimiter::hit($key, 600);
+
+        // Limiteur PAR COMPTE (lot S1) : plusieurs adresses ne peuvent pas inonder
+        // une même boîte. La demande est absorbée EN SILENCE, avec la même réponse
+        // qu'une demande normale : rien ne dit si le compte existe ni s'il est limité.
+        if (AuthService::limiteurCompteActif()) {
+            $cleCompte = AuthService::cleCompte('magic-link', (string) $request->input('email'));
+            if (RateLimiter::tooManyAttempts($cleCompte, min(3, AuthService::essaisMaxParCompte()))) {
+                return $this->ok(['sent' => true]);
+            }
+            RateLimiter::hit($cleCompte, 600);
+        }
 
         $this->service->issue((string) $request->input('email'), $request->ip());
 

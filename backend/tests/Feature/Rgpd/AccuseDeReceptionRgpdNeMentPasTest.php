@@ -113,7 +113,7 @@ function b14002_operateur(): array
         'first_login_completed_at' => now(),
     ]);
     setPermissionsTeamId($ws->id);
-    $u->assignRole('admin');
+    $u->assignRole('owner');
 
     return [$u, $ws];
 }
@@ -169,11 +169,13 @@ test('B14-002 — un effacement traite par la console fait DISPARAITRE les ligne
     $this->actingAs($u)->postJson("/api/v1/rgpd/requests/{$id}/process");
 
     // ── L'EFFET, jamais la reponse ──────────────────────────────────────────
-    expect(DB::table('contacts')->where('email', $email)->count())->toBe(
+    // L3c-0 : la fiche n'est plus supprimee, elle est MASQUEE (corbeille douce).
+    expect(DB::table('contacts')->where('email', $email)->whereNull('deleted_at')->count())->toBe(
         0,
-        'La fiche de la personne effacee est toujours en base : l\'accuse de '
+        'La fiche de la personne effacee est toujours visible : l\'accuse de '
         . 'reception ment.',
     );
+    expect(DB::table('contacts')->where('email', $email)->count())->toBe(1);
 
     // TEMOIN NEGATIF : un effacement qui viderait la table entiere passerait
     // pour une reussite.

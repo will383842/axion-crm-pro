@@ -48,6 +48,14 @@ class RouteServiceProvider extends ServiceProvider
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LAUNCH_PER_MINUTE', 10))
                 ->by(optional($r->user())->id ?: $r->ip()),
         );
+        // origines-export / origines-historique : compteurs PROPRES (60/min/user chacun), pour qu'un
+        // changement de filtre ne fasse pas tomber les autres lectures en 429 en cascade.
+        foreach (['origines-export', 'origines-historique'] as $nom) {
+            RateLimiter::for(
+                $nom,
+                fn (Request $r) => Limit::perMinute(60)->by($nom . '|' . (optional($r->user())->id ?: $r->ip())),
+            );
+        }
         RateLimiter::for(
             'scraper-list',
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LIST_PER_MINUTE', 60))

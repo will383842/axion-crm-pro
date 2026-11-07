@@ -7,6 +7,8 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * BRANCHE « PERSONNES » DE L'INGESTION — la lettre et le guide (lot L4-C).
@@ -110,6 +112,191 @@ final class PersonnesIngestService
         return filter_var(config('crm.ingest.personnes_enabled', false), FILTER_VALIDATE_BOOLEAN);
     }
 
+    /**
+     * FICHE DEMANDE (lot C1) : types d'événement dont une demande SANS SIREN
+     * fait une personne. Liste FERMÉE et explicite : jamais `opt_out`,
+     * `newsletter_optout` ni `review_posted` (une opposition ou un avis ne
+     * crée pas de fiche), jamais un futur `calendly_*` non listé ici.
+     *
+     * @var list<string>
+     */
+    public const DEMANDE_EVENT_TYPES = [
+        'form_submission',
+        'calendly_booked',
+        'calendly_completed',
+        'calendly_no_show',
+        'calendly_canceled',
+    ];
+
+    /**
+     * Types de formulaire qui ne font JAMAIS une personne par ce chemin (même
+     * liste que la fiche console du site) : ce ne sont pas des demandes
+     * commerciales. Le recrutement est déjà écarté par l'univers vivier.
+     *
+     * @var list<string>
+     */
+    public const FORMULAIRES_EXCLUS = ['partenariat', 'presse', 'speaker', 'investisseur', 'support_client', 'recrutement'];
+
+    /** Mot qui, dans le nom du type d'événement Calendly, désigne un échange apporteur. */
+    private const MOT_CLE_ECHANGE_APPORTEUR = 'apporteur';
+
+    /** Fiche demande : drapeau fermé par défaut, indépendant de la lettre et du guide. */
+    public static function drapeauDemandesOuvert(): bool
+    {
+        return filter_var(config('crm.ingest.demandes_personne_enabled', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Cet événement, privé de SIREN, doit-il faire une personne ?
+     *
+     * AUCUNE requête avant d'avoir répondu : drapeau fermé, on rend `false`
+     * sans toucher à la base (retour arrière et fenêtre de déploiement).
+     *
+     * Jamais pour :
+     *  - un autre univers que `business` (candidats : pas de fiche ici) ;
+     *  - un formulaire de recrutement ;
+     *  - un échange apporteur (nom du type d'événement Calendly, même règle
+     *    que le site : le site ne l'envoie pas, le CRM le refuse aussi) ;
+     *  - un événement sans adresse (rien n'identifie la personne).
+     */
+    public function concerneUneDemande(SiteSyncEvent $event, string $universe): bool
+    {
+        return self::drapeauDemandesOuvert() && $this->estUneDemande($event, $universe);
+    }
+
+    /**
+     * Les mêmes règles que `concerneUneDemande`, SANS le drapeau : le
+     * rattrapage (`crm:personnes-depuis-demandes`) est un geste délibéré, il ne
+     * dépend pas de l'ouverture du flux en direct. Aucune requête.
+     */
+    public function estUneDemande(SiteSyncEvent $event, string $universe): bool
+    {
+        if ($universe !== 'business' || ! in_array($event->eventType, self::DEMANDE_EVENT_TYPES, true)) {
+            return false;
+        }
+        if ($event->eventType === 'form_submission' && in_array($event->formType, self::FORMULAIRES_EXCLUS, true)) {
+            return false;
+        }
+        if (self::estEchangeApporteur($event)) {
+            return false;
+        }
+
+        return $event->email() !== null;
+    }
+
+    /** Vrai si le type d'événement Calendly est un échange avec un candidat apporteur. */
+    public static function estEchangeApporteur(SiteSyncEvent $event): bool
+    {
+        $nom = $event->payload['eventTypeName'] ?? null;
+        if (! is_string($nom) || $nom === '') {
+            return false;
+        }
+
+        return str_contains(Str::lower(Str::ascii($nom)), self::MOT_CLE_ECHANGE_APPORTEUR);
+    }
+
+    public const DEMANDE_A_CREER = 'a_creer';
+
+    public const DEMANDE_EXISTANTE = 'existante';
+
+    public const DEMANDE_ECARTEE = 'ecartee';
+
+    /**
+     * Ce que ferait `assurerDepuisDemande`, SANS RIEN ÉCRIRE : une personne à
+     * créer, une personne déjà là, ou une demande écartée (opposition
+     * générale reçue, ou personne mise à l'écart). Sert au rattrapage à blanc.
+     */
+    public function evaluerDemande(SiteSyncEvent $event, string $workspaceId): string
+    {
+        $hash = $event->emailHash();
+        if ($hash !== null && $this->opposee($hash, 'business')) {
+            return self::DEMANDE_ECARTEE;
+        }
+
+        $existante = $this->trouver($workspaceId, $event);
+        if ($existante === null) {
+            return self::DEMANDE_A_CREER;
+        }
+
+        return ($existante->opposition_at ?? null) !== null ? self::DEMANDE_ECARTEE : self::DEMANDE_EXISTANTE;
+    }
+
+    /**
+     * Une demande SANS SIREN fait (ou retrouve) une PERSONNE.
+     *
+     * Ne rend JAMAIS un sujet, exprès : l'appelant garde son retour
+     * `PENDING_MATCH` sans sujet. Un sujet non nul ferait écrire à
+     * `attachTags` un id de personne dans `company_tag`. La valeur rendue est
+     * l'ÉTAT (`DEMANDE_*`), que l'appelant en direct ignore.
+     *
+     * Ce que cette méthode ne fait JAMAIS : abonnement (donc jamais éligible à
+     * une diffusion), opposition, suppression, écrasement d'une valeur saisie
+     * à la main, nom fabriqué depuis l'adresse. Une personne mise à l'écart
+     * n'est pas touchée.
+     *
+     * @throws SiteSyncRejection 503 si les colonnes de la migration manquent :
+     *                           la ligne reste en attente côté site.
+     */
+    public function assurerDepuisDemande(SiteSyncEvent $event, string $workspaceId): string
+    {
+        if (! self::colonnesDemandePresentes()) {
+            throw SiteSyncRejection::unavailable(
+                'demandes_personne_non_ecrivables',
+                'Fiche demande : colonnes absentes (migration non passée). La ligne reste en attente côté site.',
+            );
+        }
+
+        $etat = $this->evaluerDemande($event, $workspaceId);
+        if ($etat === self::DEMANDE_ECARTEE) {
+            return $etat;
+        }
+
+        // Un numéro déjà opposé (anti-réinsertion, variantes comprises) n'est
+        // jamais enregistré ; la personne, elle, reste.
+        $telephone = $this->borne($event->str('person', 'phone'), 40);
+        if ($telephone !== null && $this->telephoneOppose($telephone)) {
+            $telephone = null;
+        }
+
+        $this->upsertPersonne($event, $workspaceId, $this->trouver($workspaceId, $event), true, null, [
+            'phone' => $telephone,
+            'entreprise_declaree' => $this->borne($event->str('company', 'name'), 200),
+        ]);
+
+        return $etat;
+    }
+
+    /** Opposition (univers business) sur ce numéro, quelle que soit son écriture. */
+    private function telephoneOppose(string $telephone): bool
+    {
+        $variantes = ListeSuppression::variantesTelephone($telephone);
+        if ($variantes === []) {
+            return false;
+        }
+
+        return DB::table('opt_out')
+            ->where('scope', 'business')
+            ->whereRaw(
+                "regexp_replace(phone, '[^0-9]', '', 'g') IN (" . implode(', ', array_fill(0, count($variantes), '?')) . ')',
+                $variantes,
+            )
+            ->exists();
+    }
+
+    /** Seul un résultat POSITIF est gardé : un worker démarré avant `migrate` ne reste pas aveugle. */
+    public static function colonnesDemandePresentes(): bool
+    {
+        static $presentes = false;
+
+        return $presentes = $presentes
+            || (Schema::hasColumn('personnes', 'phone') && Schema::hasColumn('personnes', 'entreprise_declaree'));
+    }
+
+    private function borne(?string $valeur, int $max): ?string
+    {
+        return $valeur === null ? null : mb_substr($valeur, 0, $max);
+    }
+
     public function prendEnCharge(SiteSyncEvent $event): bool
     {
         if (! self::drapeauOuvert() || ! in_array($event->eventType, Taxonomy::PERSONNES_EVENT_TYPES, true)) {
@@ -134,11 +321,236 @@ final class PersonnesIngestService
 
     public function ingerer(SiteSyncEvent $event, string $workspaceId, string $activityRef): IngestOutcome
     {
-        return match ($event->eventType) {
+        $accords = $event->contenusAccords;
+
+        // PV-6 : l'opposition reçue gagne AVANT tout le reste — elle est
+        // inscrite à la liste d'opposition d'abord, donc l'inscription qui suit
+        // dans le même événement la rencontre et s'arrête.
+        if ($accords !== null && $accords->oppose()) {
+            $this->poserOpposition($event, $workspaceId);
+        }
+
+        $outcome = match ($event->eventType) {
             'email_hard_bounced' => $this->rebondDur($event, $workspaceId, $activityRef),
             'newsletter_optout' => $this->desabonnement($event, $workspaceId, $activityRef),
             default => $this->inscriptionOuDemande($event, $workspaceId, $activityRef),
         };
+
+        if ($accords !== null && self::colonnesAccordsPresentes()) {
+            $this->enregistrerAccords($event, $workspaceId, $accords, $outcome);
+        }
+
+        return $outcome;
+    }
+
+    /** Vrai si la migration PV-6 est passée (fenêtre de déploiement : sinon, on ignore les champs). */
+    private static function colonnesAccordsPresentes(): bool
+    {
+        // Seul un résultat POSITIF est gardé : un worker démarré avant `migrate`
+        // ne doit pas ignorer les champs pour toujours.
+        static $presentes = false;
+
+        return $presentes = $presentes || Schema::hasColumn('personnes', 'accords_at');
+    }
+
+    /**
+     * Opposition reçue par la synchro : liste d'opposition `business` (empreinte
+     * seule, jamais l'adresse) et désabonnement de tous les canaux. Aucune donnée
+     * n'est supprimée. Une opposition déjà posée n'est jamais levée.
+     */
+    private function poserOpposition(SiteSyncEvent $event, string $workspaceId): void
+    {
+        $hash = $event->emailHash();
+        if ($hash === null) {
+            return;
+        }
+
+        if (! $this->opposee($hash, 'business')) {
+            DB::table('opt_out')->insert([
+                'email' => null,
+                'email_hash' => $hash,
+                'scope' => 'business',
+                'source' => 'site-sync:accords',
+                'reason' => 'opposition_synchro',
+                'created_at' => now(),
+            ]);
+        }
+
+        $this->desabonnerSurOpposition($workspaceId, $hash, $event->occurredAt, 'opposition_generale');
+    }
+
+    /**
+     * Stockage ADDITIF et règles de la synchro : listes en union (rien ne se
+     * retire), origine la plus récente, opposition posée une fois pour toutes.
+     */
+    private function enregistrerAccords(SiteSyncEvent $event, string $workspaceId, ContenusAccords $accords, IngestOutcome $outcome): void
+    {
+        $personne = $outcome->subjectType === 'personne' && $outcome->subjectId !== null
+            ? DB::table('personnes')->where('id', $outcome->subjectId)->first()
+            : $this->trouver($workspaceId, $event);
+
+        if ($personne === null) {
+            return;
+        }
+
+        $update = [];
+
+        $update['origine_contenu'] = $this->json(ContenusAccords::fusionnerOrigine(
+            $this->decoder($personne->origine_contenu ?? null),
+            $this->date($personne->accords_at ?? null),
+            $accords->origine,
+            $event->occurredAt,
+        ));
+        if ($accords->origine !== null) {
+            $deja = $this->date($personne->accords_at ?? null);
+            if ($deja === null || $this->plusRecent($event->occurredAt, $deja)) {
+                $update['accords_at'] = $event->occurredAt;
+            }
+        }
+
+        if ($accords->guides !== null) {
+            $update['guides_recus'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->guides_recus ?? null) ?? [], $accords->guides));
+        }
+        if ($accords->consentements !== null) {
+            $update['consentements'] = $this->json(ContenusAccords::fusionnerListes($this->decoder($personne->consentements ?? null) ?? [], $accords->consentements));
+        }
+
+        if ($accords->oppose() && ($personne->opposition_at ?? null) === null) {
+            $dateSite = ($accords->opposition['date'] ?? null) ? new DateTimeImmutable((string) $accords->opposition['date']) : $event->occurredAt;
+            $maintenant = new DateTimeImmutable('now');
+            // Une date future n'a pas de sens : bornée à maintenant.
+            $update['opposition_at'] = $dateSite > $maintenant ? $maintenant : $dateSite;
+        }
+
+        DB::table('personnes')->where('id', $personne->id)->update($update + ['updated_at' => now()]);
+
+        if ($accords->origines !== null) {
+            $this->enregistrerOrigines((int) $personne->id, $workspaceId, $accords->origines);
+        }
+    }
+
+    /**
+     * Contrat v3 : union SANS RETRAIT de l'historique des origines. L'écriture
+     * de l'archive et la réduction du tableau se font dans UNE transaction,
+     * sous verrou de ligne (ADR I4) : une entrée n'est retirée du tableau que
+     * si elle est déjà dans l'archive. Rien n'est jamais supprimé.
+     *
+     * @param  list<array<string, string>>  $entrantes
+     */
+    private function enregistrerOrigines(int $personneId, string $workspaceId, array $entrantes): void
+    {
+        // Jamais d'abandon silencieux : une charge qui porte des origines et qui
+        // ne peut pas les écrire n'est PAS acquittée. `assurerOriginesEcrivables()`
+        // le refuse en amont (503, la charge reste en attente côté site) ; ce
+        // garde-fou refuse de même, dans la transaction, si l'état a changé entre
+        // les deux (interrupteur éteint ou migration retirée en cours de route).
+        $this->assurerOriginesEcrivablesOuRefuser();
+
+        DB::transaction(function () use ($personneId, $workspaceId, $entrantes): void {
+            $ligne = DB::table('personnes')->where('id', $personneId)->lockForUpdate()->first(['origines']);
+            if ($ligne === null) {
+                return;
+            }
+
+            $fusion = ContenusAccords::fusionnerOrigines($this->decoder($ligne->origines ?? null) ?? [], $entrantes);
+
+            $archiveAvant = $fusion['archive'] === [] ? 0 : DB::table('personne_origines_archive')->where('personne_id', $personneId)->count();
+
+            foreach ($fusion['archive'] as $entree) {
+                DB::table('personne_origines_archive')->insertOrIgnore([
+                    'workspace_id' => $workspaceId,
+                    'personne_id' => $personneId,
+                    'cle' => ContenusAccords::cleOrigine($entree),
+                    'origine' => $this->json($entree),
+                    'archive_le' => now(),
+                    'masque_le' => $entree['masque_le'] ?? null,
+                ]);
+            }
+
+            DB::table('personnes')->where('id', $personneId)->update([
+                'origines' => $this->json($fusion['garde']),
+            ]);
+
+            // ADR I3 : l'archive d'une personne dépasse 200 entrées → alerte (une fois).
+            if ($fusion['archive'] !== []) {
+                AlerteArchiveOrigines::siFranchi(
+                    $workspaceId,
+                    $personneId,
+                    $archiveAvant,
+                    DB::table('personne_origines_archive')->where('personne_id', $personneId)->count(),
+                );
+            }
+        });
+    }
+
+    /**
+     * Vrai si une charge qui porte des `origines` peut les ÉCRIRE : interrupteur
+     * v3 allumé, branche « personnes » ouverte pour ce type d'événement, colonne
+     * `origines`, colonnes d'accords et table d'archive présentes.
+     */
+    public function originesEcrivables(SiteSyncEvent $event): bool
+    {
+        return $this->prendEnCharge($event) && $this->stockageOriginesPresent();
+    }
+
+    /**
+     * Le site garde sa ligne tant qu'il ne reçoit pas de 2xx : une charge avec
+     * des `origines` qu'on ne peut pas écrire reçoit donc un 503 (code sans
+     * valeur reçue), jamais un accusé de réception qui les perdrait en silence.
+     * Sans `origines` (v1/v2, ou liste vide), rien n'est exigé : inchangé.
+     *
+     * @throws SiteSyncRejection
+     */
+    public function assurerOriginesEcrivables(SiteSyncEvent $event): void
+    {
+        $origines = $event->contenusAccords?->origines;
+        if ($origines === null || $origines === [] || ! (bool) config('origines.v3_enabled', false)) {
+            return;
+        }
+        if (! $this->originesEcrivables($event)) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function assurerOriginesEcrivablesOuRefuser(): void
+    {
+        if (! (bool) config('origines.v3_enabled', false) || ! $this->stockageOriginesPresent()) {
+            throw $this->refusOriginesNonEcrivables();
+        }
+    }
+
+    private function refusOriginesNonEcrivables(): SiteSyncRejection
+    {
+        return SiteSyncRejection::unavailable(
+            'origines_v3_non_ecrivables',
+            'Contrat v3 de l\'origine : stockage indisponible, la charge reste en attente côté site.',
+        );
+    }
+
+    private function stockageOriginesPresent(): bool
+    {
+        return Schema::hasColumn('personnes', 'origines')
+            && Schema::hasColumn('personnes', 'accords_at')
+            && Schema::hasTable('personne_origines_archive');
+    }
+
+    private function json(mixed $valeur): ?string
+    {
+        return $valeur === null ? null : json_encode($valeur, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @return array<mixed>|null */
+    private function decoder(mixed $brut): ?array
+    {
+        if (is_array($brut)) {
+            return $brut;
+        }
+        if (! is_string($brut) || $brut === '') {
+            return null;
+        }
+        $d = json_decode($brut, true);
+
+        return is_array($d) ? $d : null;
     }
 
     /**
@@ -352,6 +764,8 @@ final class PersonnesIngestService
     }
 
     /**
+     * @param  array<string, ?string>  $demande  fiche demande : `phone` et `entreprise_declaree`
+     *                                           déclarés ([] hors fiche demande : colonnes jamais touchées)
      * @return array{0: \stdClass, 1: bool} [la personne relue, créée ?]
      */
     private function upsertPersonne(
@@ -360,6 +774,7 @@ final class PersonnesIngestService
         ?\stdClass $existante,
         bool $avecIdentite = true,
         ?string $baseInscription = null,
+        array $demande = [],
     ): array {
         // Sans identité (désabonnement) : ni adresse ni nom ne sont écrits.
         $email = $avecIdentite ? $event->email() : null;
@@ -383,11 +798,11 @@ final class PersonnesIngestService
 
         if ($existante === null) {
             $declares = array_keys(array_filter(
-                ['email' => $email, 'first_name' => $firstName, 'last_name' => $lastName],
+                ['email' => $email, 'first_name' => $firstName, 'last_name' => $lastName] + $demande,
                 static fn (?string $v): bool => $v !== null,
             ));
 
-            $id = (int) DB::table('personnes')->insertGetId([
+            $id = (int) DB::table('personnes')->insertGetId($demande + [
                 'workspace_id' => $workspaceId,
                 'person_key' => $event->personKey(),
                 'email' => $email,
@@ -412,22 +827,36 @@ final class PersonnesIngestService
             return [$this->relire($id), true];
         }
 
-        $update = [
-            'legal_basis' => $this->fusionnerBaseLegale(
-                is_string($existante->legal_basis ?? null) ? $existante->legal_basis : null,
-                $legalBasis,
-            ),
-            'updated_at' => now(),
-        ];
+        $update = ['updated_at' => now()];
+
+        // N5 : une demande ne change JAMAIS la base légale d'une personne
+        // EXISTANTE (seule une personne créée par une demande est
+        // précontractuelle). Hors demande, la base monte de rang, jamais ne
+        // descend, avec UNE exception : une personne née d'une demande
+        // (précontractuelle, donc hors prospection tant qu'elle n'est pas
+        // abonnée) qui demande ensuite le guide prend la base du guide
+        // (intérêt légitime B2B), comme tout demandeur du guide. Rien de plus :
+        // l'adresse personnelle reste exclue de toute prospection sans
+        // abonnement (`Abonnements::prospectionAutorisee`).
+        if ($demande === []) {
+            $actuelle = is_string($existante->legal_basis ?? null) ? $existante->legal_basis : null;
+            $update['legal_basis'] = $actuelle === 'precontractual' && $legalBasis === 'legitimate_interest_b2b'
+                ? $legalBasis
+                : $this->fusionnerBaseLegale($actuelle, $legalBasis);
+        }
 
         $derniere = $this->date($existante->derniere_interaction_at ?? null);
         if ($derniere === null || $event->occurredAt > $derniere) {
             $update['derniere_interaction_at'] = $event->occurredAt;
         }
+        // Garde de date (À LA SECONDE, voir `plusRecent` : l'égalité n'est pas « plus
+        // récent ») : un événement pas plus récent que la dernière interaction connue ne remplace pas une valeur
+        // déjà connue ; il ne fait que combler un vide.
+        $ancien = $derniere !== null && ! $this->plusRecent($event->occurredAt, $existante->derniere_interaction_at ?? null);
 
         // Une personne retrouvée par son adresse reçoit la clé du site : c'est
         // elle qui rattache ensuite la timeline et l'effacement.
-        if (($existante->person_key ?? null) !== $event->personKey()) {
+        if ($demande === [] && ($existante->person_key ?? null) !== $event->personKey()) {
             $collision = DB::table('personnes')
                 ->where('workspace_id', $workspaceId)
                 ->where('person_key', $event->personKey())
@@ -456,13 +885,32 @@ final class PersonnesIngestService
 
         // Le DÉCLARÉ gagne ; l'absence d'un nom n'efface jamais un nom connu.
         foreach (['first_name' => $firstName, 'last_name' => $lastName] as $colonne => $valeur) {
+            // Chemin des demandes (formulaire public, rejoué par le rattrapage de
+            // la plus ancienne à la plus récente) : un nom déjà connu n'est
+            // JAMAIS remplacé par celui d'un formulaire.
+            if ($demande !== [] && ($existante->{$colonne} ?? null) !== null) {
+                continue;
+            }
             if ($valeur !== null) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';
             }
         }
 
-        if ($locale !== null) {
+        // Fiche demande : une valeur saisie À LA MAIN (ou par un autre chemin
+        // que la déclaration) n'est jamais écrasée ; seule une valeur absente
+        // ou elle-même déclarée est remplacée.
+        foreach ($demande as $colonne => $valeur) {
+            if ($valeur === null) {
+                continue;
+            }
+            if (($existante->{$colonne} ?? null) === null || (($origins[$colonne] ?? null) === 'declared' && ! $ancien)) {
+                $update[$colonne] = $valeur;
+                $origins[$colonne] = 'declared';
+            }
+        }
+
+        if ($locale !== null && ($demande === [] || ! $ancien || ($existante->locale ?? null) === null)) {
             $update['locale'] = $locale;
         }
 
@@ -635,8 +1083,12 @@ final class PersonnesIngestService
      */
     private function source(SiteSyncEvent $event): string
     {
-        return $event->sourceSlug ?? match ($event->eventType) {
-            'lead_magnet_requested' => 'guide-ia',
+        // Jamais `newsletter` par défaut pour une demande : une personne née
+        // d'un formulaire ou d'un rendez-vous n'a rien demandé à la lettre.
+        return $event->sourceSlug ?? match (true) {
+            $event->eventType === 'lead_magnet_requested' => 'guide-ia',
+            $event->eventType === 'form_submission' => 'formulaire',
+            str_starts_with($event->eventType, 'calendly_') => 'rendez-vous',
             default => 'newsletter',
         };
     }

@@ -3,6 +3,8 @@
 namespace App\Crm\Campagnes;
 
 use App\Crm\FichesProtegees;
+use App\Socle\Espace\FonctionsEspace;
+use App\Support\WorkspaceContext;
 use InvalidArgumentException;
 
 /**
@@ -47,6 +49,11 @@ use InvalidArgumentException;
  * `OUVERTS_PAR_DEFAUT`, `aucun` = tout fermé). Refermer la presse :
  * `CRM_SEGMENTS_OUVERTS=organisateurs-evenements,federations`.
  *
+ * PAR ESPACE (lot S6, drapeau `crm.segments_par_espace`, éteint par défaut) :
+ * allumé, l'ouverture se lit dans `fonctions_espace` ; un nouvel espace a tout
+ * FERMÉ, l'espace d'Axion garde l'état d'aujourd'hui (posé par la migration).
+ * Retour arrière : éteindre le drapeau (`CRM_SEGMENTS_PAR_ESPACE=false`).
+ *
  * Aucune ligne de ce fichier n'envoie quoi que ce soit : le CRM PRÉPARE la
  * liste et ENREGISTRE les retours ; l'envoi appartient à l'outil de Will.
  */
@@ -69,14 +76,40 @@ final class Segments
     public const AUCUN = 'aucun';
 
     /**
-     * Les segments OUVERTS, lus dans la configuration (`crm.segments_ouverts`).
+     * Les segments OUVERTS.
+     *
+     * Deux modes, selon le drapeau `crm.segments_par_espace` (ÉTEINT par défaut) :
+     *  - éteint : le réglage GLOBAL `crm.segments_ouverts` fait foi (comportement
+     *    d'avant le lot S6) ;
+     *  - allumé : le réglage PAR ESPACE (`fonctions_espace`) fait foi, et un
+     *    espace sans réglage — ou l'absence d'espace — a TOUT FERMÉ.
      *
      * Une valeur inconnue est ignorée : une faute de frappe ne peut que
      * FERMER, jamais ouvrir un segment que le CRM ne connaît pas.
      *
+     * @param  string|null  $espaceId  espace visé ; null = espace courant (contexte)
      * @return list<string>
      */
-    public static function ouverts(): array
+    public static function ouverts(?string $espaceId = null): array
+    {
+        if (config('crm.segments_par_espace') === true) {
+            $espaceId ??= WorkspaceContext::current();
+            if ($espaceId === null || $espaceId === '') {
+                return [];
+            }
+
+            return FonctionsEspace::segmentsOuverts($espaceId);
+        }
+
+        return self::ouvertsGlobalement();
+    }
+
+    /**
+     * Les segments ouverts d'après le réglage GLOBAL (`crm.segments_ouverts`).
+     *
+     * @return list<string>
+     */
+    public static function ouvertsGlobalement(): array
     {
         $brut = config('crm.segments_ouverts');
         if (is_array($brut)) {
@@ -92,9 +125,9 @@ final class Segments
         return array_values(array_filter(self::CONNUS, static fn (string $s): bool => in_array($s, $valeurs, true)));
     }
 
-    public static function ouvert(string $segment): bool
+    public static function ouvert(string $segment, ?string $espaceId = null): bool
     {
-        return in_array($segment, self::ouverts(), true);
+        return in_array($segment, self::ouverts($espaceId), true);
     }
 
     /**

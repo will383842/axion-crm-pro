@@ -73,6 +73,8 @@ import {
   Tabs,
   type TabItem,
 } from '@/components/ui';
+import { useProduits } from '@/features/socle/produits/useProduits';
+import { useConsoleFeaturesQuery } from '@/features/crm-console/useConsoleFeatures';
 import { api, qualifierErreur } from '@/lib/api';
 import { appliquerDensite, lireDensite, type Densite } from '@/lib/densite';
 import { toast } from 'sonner';
@@ -136,6 +138,14 @@ function EchecEnregistrement({ erreur }: { erreur: unknown }) {
 export function SettingsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabKey>('workspace');
+  // DM1-COM : carte « Envoi : activer depuis la console » seulement quand le serveur
+  // annonce les produits de l'espace (`produits` dans `/config/features`) ET qu'Envoi
+  // y est absent. Le vrai serveur n'envoie pas encore `produits` : en production, la
+  // page reste celle d'avant (règle « rien de visible tant qu'Envoi est absent ») ;
+  // la démo, elle, l'annonce (offre « CRM seul »).
+  const produitsAnnonces = useConsoleFeaturesQuery().data?.produits != null;
+  const produits = useProduits();
+  const envoiAbsent = produitsAnnonces && produits.envoi === 'absent';
 
   // D26-003 — la densité est lue au montage et APPLIQUÉE au document, pas
   // seulement gardée dans un état local qui ne pilotait que deux boutons.
@@ -222,6 +232,7 @@ export function SettingsPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Paramètres"
         subtitle="Votre entreprise, votre compte, les utilisateurs et l’affichage."
         actions={
@@ -304,6 +315,20 @@ export function SettingsPage() {
           )}
         </Card>
       )}
+
+      {tab === 'workspace' && envoiAbsent ? (
+        <Card className="mt-4 opacity-70" aria-disabled="true" data-testid="carte-envoi-absent">
+          <CardHeader>
+            <div>
+              <CardEyebrow>Envoi</CardEyebrow>
+              <CardTitle className="mt-1 text-lg font-bold">Envoi : activer depuis la console</CardTitle>
+            </div>
+          </CardHeader>
+          <p className="text-sm text-slate-600">
+            Le produit Envoi n’est pas activé sur cet espace. L’activation se fait depuis la console d’administration, pas ici.
+          </p>
+        </Card>
+      ) : null}
 
       {tab === 'compte' && <ChangerMotDePasse />}
 

@@ -11,8 +11,8 @@ use App\Envoi\Imap\AnalyseDsn;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\Classificateur;
 use App\Envoi\Imap\ExtraitTexte;
-use App\Envoi\Imap\LecteurBoiteWebklex;
 use App\Envoi\Imap\LecteurBoiteMemoire;
+use App\Envoi\Imap\LecteurBoiteWebklex;
 use App\Envoi\Imap\MessageBrut;
 use App\Envoi\Imap\MessageOrigine;
 use App\Envoi\Imap\RecepteurRetours;
@@ -339,8 +339,8 @@ test('B1 : un arrêt impossible à appliquer pour UN message (adresse d\'origine
 });
 
 test('B2 : sans en-tête RFC 3834, un STOP ou un mot hostile du texte non cité prime sur l\'objet « congé »', function () {
-    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Re: Gérez les congés de vos équipes', 'corps' => 'STOP']))) ->toBe(ClasseRetour::Desinscription);
-    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Absent du bureau', 'corps' => 'Je vais porter plainte']))) ->toBe(ClasseRetour::Hostile);
+    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Re: Gérez les congés de vos équipes', 'corps' => 'STOP'])))->toBe(ClasseRetour::Desinscription);
+    expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Absent du bureau', 'corps' => 'Je vais porter plainte'])))->toBe(ClasseRetour::Hostile);
     // sans mot d'arrêt : l'heuristique d'objet reste une auto-réponse ; l'en-tête normalisé reste prioritaire
     expect(Classificateur::classer(releveMsg(1, ['sujet' => 'Absence du bureau', 'corps' => 'Je reviens lundi.'])))->toBe(ClasseRetour::AutoReponse);
     expect(Classificateur::classer(releveMsg(1, ['h' => ['auto-submitted' => 'auto-replied'], 'sujet' => 'x', 'corps' => 'STOP'])))->toBe(ClasseRetour::AutoReponse);

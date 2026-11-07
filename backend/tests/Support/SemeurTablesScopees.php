@@ -164,6 +164,10 @@ final class SemeurTablesScopees
         // 2026-11-11 (envoi K1a) : serveurs d'envoi et journal des commande_id.
         'envoi_serveurs',
         'envoi_commandes',
+        // 2026-11-11 (envoi K1b) : réception des événements.
+        'envoi_curseurs_serveur',
+        'envoi_evenements',
+        'envoi_etats_message',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -671,6 +675,20 @@ final class SemeurTablesScopees
         $inserer('envoi_commandes', [
             'commande_id' => 'zz-' . $marque,
             'commande' => 'zz',
+        ]);
+        $inserer('envoi_curseurs_serveur', ['source' => 'zz-' . substr($marque, 0, 8)]);
+        $inserer('envoi_evenements', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'event_id' => 'zz-' . $marque,
+            'seq' => 1,
+            'type' => 'envoye',
+            'id_injection' => 'zz',
+        ]);
+        $inserer('envoi_etats_message', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'id_injection' => 'zz',
+            'etat' => 'envoye',
+            'rang' => 1,
         ]);
 
         $inserer('proxy_providers_config', [

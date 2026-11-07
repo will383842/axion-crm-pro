@@ -903,12 +903,146 @@ test('B10-004 — COMPTE FIGE : la PII en texte libre et en JSONB echappe a l in
     // des horodatages, jamais une valeur. `contacts` est COUVERTE (la colonne
     // part avec la ligne) ; `companies` est hors de portée comme le reste de
     // la personne morale.
-    expect($colonnes->count())->toBe(
-        48,
-        'le nombre de colonnes JSON/JSONB a changé : ré-arbitrer, puis mettre ce chiffre à jour',
+    //
+    // 🔴 PLUS DE NOMBRES EN DUR (lot CI-A7). Chaque lot qui ajoutait une colonne
+    // JSON réécrivait ici la même ligne : conflit garanti avec le lot suivant.
+    // L'inventaire vit désormais dans `colonnes-json/*.json`, UN FRAGMENT PAR LOT
+    // (`{"table.colonne": "couverte" | "hors-portee: motif"}`). Le test exige
+    // l'ÉGALITÉ STRICTE dans les deux sens entre l'union des fragments et la
+    // réalité de la base, et l'égalité entre les « hors-portee » déclarées et
+    // `$horsPortee` : c'est plus fort qu'un compte (une colonne ajoutée ET une
+    // retirée ne se compensent plus). Un même nom dans deux fragments est refusé.
+    $reelles = $colonnes
+        ->map(fn (object $c): string => $c->table_name . '.' . $c->column_name)
+        ->sort()
+        ->values()
+        ->all();
+    $declarees = colonnesJsonUnion(__DIR__ . '/colonnes-json');
+
+    $ecarts = colonnesJsonEcarts($declarees, $reelles, $horsPortee);
+    expect($ecarts)->toBe(
+        [],
+        "inventaire des colonnes JSON/JSONB : ajouter/corriger UN fragment dans tests/Feature/Rgpd/colonnes-json/ (jamais un fragment existant d'un autre lot).\n" . implode("\n", $ecarts),
     );
-    expect(count($horsPortee))->toBe(
-        33,
-        'colonnes JSON/JSONB hors de portée des deux services RGPD : ' . implode(', ', $horsPortee),
-    );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVENTAIRE DES COLONNES JSON/JSONB PAR FRAGMENTS (lot CI-A7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Union des fragments `*.json` d'un dossier : {"table.colonne": "couverte" |
+ * "hors-portee: motif"}. Un même nom dans deux fragments, une valeur invalide ou
+ * un JSON illisible LÈVE : deux lots n'écrivent jamais la même clé.
+ *
+ * @return array<string, string>
+ */
+function colonnesJsonUnion(string $dossier): array
+{
+    $fichiers = glob(rtrim($dossier, '/') . '/*.json') ?: [];
+    sort($fichiers);
+    if ($fichiers === []) {
+        throw new RuntimeException("aucun fragment dans {$dossier} : l'inventaire serait vide");
+    }
+
+    $union = [];
+    $origine = [];
+    foreach ($fichiers as $fichier) {
+        $contenu = json_decode((string) file_get_contents($fichier), true, 512, JSON_THROW_ON_ERROR);
+        if (! is_array($contenu)) {
+            throw new RuntimeException(basename($fichier) . ' : un objet JSON est attendu');
+        }
+        foreach ($contenu as $cle => $statut) {
+            $cle = (string) $cle;
+            if (! is_string($statut) || ($statut !== 'couverte' && ! preg_match('/^hors-portee: \S/', $statut))) {
+                throw new RuntimeException(basename($fichier) . " : « {$cle} » doit valoir « couverte » ou « hors-portee: motif »");
+            }
+            if (isset($origine[$cle])) {
+                throw new RuntimeException("« {$cle} » figure dans deux fragments : {$origine[$cle]} et " . basename($fichier));
+            }
+            $origine[$cle] = basename($fichier);
+            $union[$cle] = $statut;
+        }
+    }
+    ksort($union);
+
+    return $union;
+}
+
+/**
+ * Écarts entre l'inventaire déclaré et la réalité : égalité stricte dans les deux
+ * sens, et égalité des « hors-portee » avec `$horsPortee` calculé par le test.
+ *
+ * @param  array<string, string>  $declarees
+ * @param  list<string>  $reelles
+ * @param  list<string>  $horsPortee
+ * @return list<string>
+ */
+function colonnesJsonEcarts(array $declarees, array $reelles, array $horsPortee): array
+{
+    $ecarts = [];
+    foreach (array_diff($reelles, array_keys($declarees)) as $c) {
+        $ecarts[] = "colonne présente en base mais ABSENTE de l'inventaire : {$c}";
+    }
+    foreach (array_diff(array_keys($declarees), $reelles) as $c) {
+        $ecarts[] = "colonne déclarée dans l'inventaire mais ABSENTE de la base : {$c}";
+    }
+    $declareesHors = array_keys(array_filter($declarees, fn (string $s): bool => str_starts_with($s, 'hors-portee')));
+    foreach (array_diff($horsPortee, $declareesHors) as $c) {
+        $ecarts[] = "hors de portée en réalité mais déclarée « couverte » : {$c}";
+    }
+    foreach (array_diff($declareesHors, $horsPortee) as $c) {
+        $ecarts[] = "déclarée « hors-portee » mais couverte (ou absente) en réalité : {$c}";
+    }
+
+    return $ecarts;
+}
+
+/** Écrit un dossier temporaire de fragments et rend son chemin. */
+function colonnesJsonDossierTemoin(array $fragments): string
+{
+    $dossier = sys_get_temp_dir() . '/colonnes-json-' . bin2hex(random_bytes(6));
+    mkdir($dossier);
+    foreach ($fragments as $nom => $contenu) {
+        file_put_contents("{$dossier}/{$nom}.json", json_encode($contenu, JSON_THROW_ON_ERROR));
+    }
+
+    return $dossier;
+}
+
+test('B10-004 — TEMOIN inventaire JSON : la base de référence passe, une clé en trop ou manquante fait rougir', function () {
+    $dossier = colonnesJsonDossierTemoin([
+        'lot-a' => ['t.a' => 'couverte', 't.b' => 'hors-portee: compteurs'],
+        'lot-b' => ['u.c' => 'hors-portee: identifiants'],
+    ]);
+    $reel = ['t.a', 't.b', 'u.c'];
+    $hors = ['t.b', 'u.c'];
+
+    expect(colonnesJsonEcarts(colonnesJsonUnion($dossier), $reel, $hors))->toBe([]);
+
+    // clé en trop dans l'inventaire
+    expect(colonnesJsonEcarts(colonnesJsonUnion($dossier), ['t.a', 't.b'], ['t.b']))->not->toBe([]);
+    // clé manquante dans l'inventaire
+    expect(colonnesJsonEcarts(colonnesJsonUnion($dossier), [...$reel, 'v.d'], $hors))->not->toBe([]);
+    // même ensemble, mais « hors-portee » qui ne correspond plus à la réalité
+    expect(colonnesJsonEcarts(colonnesJsonUnion($dossier), $reel, ['t.b']))->not->toBe([]);
+    expect(colonnesJsonEcarts(colonnesJsonUnion($dossier), $reel, ['t.a', 't.b', 'u.c']))->not->toBe([]);
+});
+
+test('B10-004 — TEMOIN inventaire JSON : un doublon entre deux fragments fait rougir', function () {
+    $dossier = colonnesJsonDossierTemoin([
+        'lot-a' => ['t.a' => 'couverte'],
+        'lot-b' => ['t.a' => 'couverte'],
+    ]);
+
+    expect(fn () => colonnesJsonUnion($dossier))->toThrow(RuntimeException::class, 'deux fragments');
+});
+
+test('B10-004 — TEMOIN inventaire JSON : un statut invalide ou un dossier vide fait rougir', function () {
+    expect(fn () => colonnesJsonUnion(colonnesJsonDossierTemoin(['x' => ['t.a' => 'peut-etre']])))
+        ->toThrow(RuntimeException::class);
+    expect(fn () => colonnesJsonUnion(colonnesJsonDossierTemoin(['x' => ['t.a' => 'hors-portee: ']])))
+        ->toThrow(RuntimeException::class);
+    expect(fn () => colonnesJsonUnion(colonnesJsonDossierTemoin([])))
+        ->toThrow(RuntimeException::class);
 });

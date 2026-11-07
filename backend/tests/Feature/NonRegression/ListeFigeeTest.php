@@ -3,7 +3,8 @@
 /**
  * LISTE FIGÉE DU FILET (plan 22 § 6, point 2).
  *
- * `LISTE.json` nomme chaque garde du filet. Ce test vérifie que :
+ * `LISTE.json` (base figée) et les fragments `LISTE.d/<date>-<lot>.json` (un par lot)
+ * nomment ensemble chaque garde du filet. Ce test vérifie que :
  *  - les 24 risques NR-01 à NR-24 (et la garde des horodatages de Paris) y figurent ;
  *  - chaque fichier de test NEUF existe, et chaque titre listé s’y trouve ;
  *  - chaque test des fichiers neufs est listé (rien n’est ajouté en silence) ;
@@ -18,10 +19,55 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-/** @return array{version: int, gardes: list<array<string, mixed>>} */
-function nrListe(): array
+/**
+ * Base figée `LISTE.json` + UNION des fragments `LISTE.d/*.json` (un par lot,
+ * `{"gardes": [...]}`). Deux lots n'écrivent plus jamais dans le même fichier.
+ * Refuse un même identifiant de garde, ou un même `fichier::titre`, présent deux
+ * fois (base comprise) : l'égalité stricte de la liste ne s'affaiblit pas.
+ *
+ * @return array{version: int, gardes: list<array<string, mixed>>}
+ */
+function nrListe(?string $base = null, ?string $dossier = null): array
 {
-    return json_decode((string) file_get_contents(__DIR__ . '/LISTE.json'), true, 512, JSON_THROW_ON_ERROR);
+    $base ??= __DIR__ . '/LISTE.json';
+    $dossier ??= __DIR__ . '/LISTE.d';
+
+    $liste = json_decode((string) file_get_contents($base), true, 512, JSON_THROW_ON_ERROR);
+    $fragments = glob(rtrim($dossier, '/') . '/*.json') ?: [];
+    sort($fragments);
+
+    $ids = [];
+    $titres = [];
+    $enregistrer = function (array $garde, string $source) use (&$ids, &$titres): void {
+        $id = (string) ($garde['id'] ?? '');
+        if (isset($ids[$id])) {
+            throw new RuntimeException("garde « {$id} » présente deux fois : {$ids[$id]} et {$source}");
+        }
+        $ids[$id] = $source;
+        foreach ($garde['nouveaux'] ?? [] as $fichier => $titresDuFichier) {
+            foreach ($titresDuFichier as $titre) {
+                $cle = $fichier . '::' . $titre;
+                if (isset($titres[$cle])) {
+                    throw new RuntimeException("titre « {$cle} » présent deux fois : {$titres[$cle]} et {$source}");
+                }
+                $titres[$cle] = $source;
+            }
+        }
+    };
+
+    foreach ($liste['gardes'] as $garde) {
+        $enregistrer($garde, basename($base));
+    }
+    foreach ($fragments as $fragment) {
+        $contenu = json_decode((string) file_get_contents($fragment), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($contenu['gardes'] ?? [] as $garde) {
+            $garde += ['nouveaux' => [], 'existants' => [], 'frontend' => []];
+            $enregistrer($garde, basename($fragment));
+            $liste['gardes'][] = $garde;
+        }
+    }
+
+    return $liste;
 }
 
 /** @return list<string> */
@@ -143,4 +189,33 @@ test('LISTE aucun fichier du filet ne saute, ne reporte ou n’abandonne un test
             expect(str_contains($code, $interdit))->toBeFalse(basename($chemin) . " contient « {$interdit} » : un test du filet ne se saute pas");
         }
     }
+});
+
+test('LISTE TEMOIN fragments : l’union passe, un doublon de titre ou de garde entre fragments fait rougir', function () {
+    $dossier = sys_get_temp_dir() . '/liste-d-' . bin2hex(random_bytes(6));
+    mkdir($dossier);
+    $base = $dossier . '/base.json';
+    file_put_contents($base, json_encode(['version' => 1, 'gardes' => [
+        ['id' => 'B-1', 'nouveaux' => ['A.php' => ['t1']], 'existants' => [], 'frontend' => []],
+    ]]));
+    mkdir("{$dossier}/d");
+    $frag2 = fn (string $nom, array $gardes) => file_put_contents("{$dossier}/d/{$nom}.json", json_encode(['gardes' => $gardes]));
+
+    $frag2('2026-01-lot-a', [['id' => 'X-1', 'nouveaux' => ['B.php' => ['t2']]]]);
+    $frag2('2026-01-lot-b', [['id' => 'X-2', 'nouveaux' => ['C.php' => ['t3']]]]);
+    expect(array_column(nrListe($base, "{$dossier}/d")['gardes'], 'id'))->toBe(['B-1', 'X-1', 'X-2']);
+
+    // même titre dans deux fragments
+    $frag2('2026-01-lot-c', [['id' => 'X-3', 'nouveaux' => ['B.php' => ['t2']]]]);
+    expect(fn () => nrListe($base, "{$dossier}/d"))->toThrow(RuntimeException::class, 'présent deux fois');
+    unlink("{$dossier}/d/2026-01-lot-c.json");
+
+    // même identifiant de garde dans deux fragments
+    $frag2('2026-01-lot-d', [['id' => 'X-1', 'nouveaux' => ['D.php' => ['t4']]]]);
+    expect(fn () => nrListe($base, "{$dossier}/d"))->toThrow(RuntimeException::class, 'présente deux fois');
+    unlink("{$dossier}/d/2026-01-lot-d.json");
+
+    // même titre qu'une garde de la base
+    $frag2('2026-01-lot-e', [['id' => 'X-5', 'nouveaux' => ['A.php' => ['t1']]]]);
+    expect(fn () => nrListe($base, "{$dossier}/d"))->toThrow(RuntimeException::class, 'présent deux fois');
 });

@@ -184,7 +184,7 @@ final class Sequenceur
     }
 
     /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
-    private function reserver(object $ins, int $rang, ?string $inReplyTo): ?string
+    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo): ?string
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
@@ -213,7 +213,7 @@ final class Sequenceur
         );
     }
 
-    private function refuser(object $ins, int $rang, string $motif, DateTimeImmutable $maintenant): string
+    private function refuser(\stdClass $ins, int $rang, string $motif, DateTimeImmutable $maintenant): string
     {
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
             ->update(['statut' => 'refuse', 'refus' => $motif, 'maj_le' => $maintenant->format('c')]);
@@ -222,7 +222,7 @@ final class Sequenceur
         return self::REFUSE;
     }
 
-    private function reporter(object $ins, int $rang, string $motif, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string
+    private function reporter(\stdClass $ins, int $rang, string $motif, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string
     {
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
             ->update(['statut' => 'reporte', 'refus' => $motif, 'maj_le' => $maintenant->format('c')]);
@@ -231,7 +231,7 @@ final class Sequenceur
         return self::REPORTE;
     }
 
-    private function arreter(object $ins, string $motif, DateTimeImmutable $maintenant): string
+    private function arreter(\stdClass $ins, string $motif, DateTimeImmutable $maintenant): string
     {
         DB::table('envoi_inscriptions')->where('id', $ins->id)->update([
             'statut' => 'arretee', 'motif_arret' => $motif, 'arretee_le' => $maintenant->format('c'),
@@ -240,7 +240,7 @@ final class Sequenceur
         return self::ARRETEE;
     }
 
-    private function echeance(object $ins, DateTimeImmutable $quand): void
+    private function echeance(\stdClass $ins, DateTimeImmutable $quand): void
     {
         DB::table('envoi_inscriptions')->where('id', $ins->id)->update(['prochaine_echeance' => $quand->format('c')]);
     }
@@ -249,7 +249,7 @@ final class Sequenceur
      * @param  array<string, mixed>  $version
      * @param  list<string>  $references
      */
-    private function avancer(object $ins, int $rang, array $version, string $messageId, array $references, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): void
+    private function avancer(\stdClass $ins, int $rang, array $version, string $messageId, array $references, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): void
     {
         $fil = $ins->fil_message_id ?? $messageId;
         $refs = trim(implode(' ', [...$references, $messageId]));

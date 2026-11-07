@@ -16,6 +16,7 @@ use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
 use App\Envoi\Dns\ControleDnsCommande;
 use App\Support\BattementPlanificateur;
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -530,7 +531,7 @@ Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
 
 // K12 — contrôle DNS quotidien des domaines d'envoi (PTR/SPF/DKIM/DMARC). Lecture du DNS et
 // ajouts seulement ; n'envoie rien. Un domaine pas prêt n'est pas marqué vérifié ce jour.
-Artisan::starting(static fn ($artisan) => $artisan->resolve(ControleDnsCommande::class));
+ConsoleApplication::starting(static fn (ConsoleApplication $artisan) => $artisan->resolve(ControleDnsCommande::class));
 Schedule::command(ControleDnsCommande::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:45')
     ->withoutOverlapping(60)

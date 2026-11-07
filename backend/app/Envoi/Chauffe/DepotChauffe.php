@@ -121,7 +121,7 @@ final class DepotChauffe
     /**
      * Pauses actives à $maintenant : non levées ET non expirées.
      *
-     * @return list<object{id: int, portee: string, fournisseur: ?string, motif: string}>
+     * @return list<\stdClass> lignes {id, portee, fournisseur, motif}
      */
     public function pausesActives(string $ws, DateTimeImmutable $maintenant): array
     {
@@ -226,7 +226,7 @@ final class DepotChauffe
             ->where('workspace_id', $ws)->whereIn('commande', ['reponse_recue', 'reponse_traitee'])
             ->selectRaw("COUNT(*) FILTER (WHERE commande = 'reponse_recue') r, COUNT(*) FILTER (WHERE commande = 'reponse_traitee') t")->first());
 
-        return max(0, (int) ($c?->r ?? 0) - (int) ($c?->t ?? 0));
+        return max(0, (int) ($c->r ?? 0) - (int) ($c->t ?? 0));
     }
 
     public function derniereValidation(string $ws): ?DateTimeImmutable

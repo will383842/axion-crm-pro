@@ -73,7 +73,6 @@ test('conteneur : la passerelle liée refuse tant que ENVOI_REEL_ACTIF est étei
     expect(fn () => WorkspaceContext::run($ws, fn () => app(ServeurEnvoi::class)->injecter($m)))->toThrow(EnvoiRefuse::class, 'Envoi réel inactif');
 });
 
-
 test('empreinte : HMAC-SHA256 de l’adresse normalisée, jamais l’adresse en clair', function () {
     $e = EmpreinteTemoin::calculer(' Perso@Example.TEST ');
     expect($e)->toBe(hash_hmac('sha256', 'perso@example.test', 'cle-de-test-seulement'))->and($e)->toMatch('/^[0-9a-f]{64}$/');

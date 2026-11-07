@@ -11,10 +11,11 @@ use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;
+use Illuminate\Contracts\Console\Kernel;
 
 require __DIR__ . '/../../vendor/autoload.php';
 $app = require __DIR__ . '/../../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 [, $ws, $jour, $cle, $plafond, $global, $depart] = $argv;
 while (microtime(true) < (float) $depart) {

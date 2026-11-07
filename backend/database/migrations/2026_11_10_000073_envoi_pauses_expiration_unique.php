@@ -26,7 +26,9 @@ return new class extends Migration
             DROP INDEX IF EXISTS envoi_pauses_active_unique;
             DO $$
             BEGIN
-                IF EXISTS (SELECT 1 FROM envoi_pauses WHERE expire_le IS NOT NULL) THEN
+                -- Colonne absente (table recréée par le retour de 000072 dans l'aller-retour NR-17) : rien à vérifier.
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'envoi_pauses' AND column_name = 'expire_le')
+                   AND EXISTS (SELECT 1 FROM envoi_pauses WHERE expire_le IS NOT NULL) THEN
                     RAISE EXCEPTION 'envoi_pauses.expire_le est utilisée : retour refusé (aucun effacement)';
                 END IF;
             END $$;

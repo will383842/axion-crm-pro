@@ -61,7 +61,7 @@ final class DepotChauffe
             return $q->selectRaw('COALESCE(SUM(envoyes),0) e, COALESCE(SUM(rebonds_durs),0) r, COALESCE(SUM(plaintes),0) p, COALESCE(SUM(reponses),0) a')->first();
         });
 
-        return ['envoyes' => (int) ($l->e ?? 0), 'rebonds_durs' => (int) ($l->r ?? 0), 'plaintes' => (int) ($l->p ?? 0), 'reponses' => (int) ($l->a ?? 0)];
+        return self::totauxDe($l);
     }
 
     /**
@@ -75,7 +75,7 @@ final class DepotChauffe
             ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])
             ->selectRaw('COALESCE(SUM(envoyes),0) e, COALESCE(SUM(rebonds_durs),0) r, COALESCE(SUM(plaintes),0) p, COALESCE(SUM(reponses),0) a')->first());
 
-        return ['envoyes' => (int) ($l->e ?? 0), 'rebonds_durs' => (int) ($l->r ?? 0), 'plaintes' => (int) ($l->p ?? 0), 'reponses' => (int) ($l->a ?? 0)];
+        return self::totauxDe($l);
     }
 
     /** Plaintes des 7 jours glissants, en ne comptant que les jours APRÈS $apres (plaintes déjà « consommées » par un arrêt). */
@@ -226,7 +226,7 @@ final class DepotChauffe
             ->where('workspace_id', $ws)->whereIn('commande', ['reponse_recue', 'reponse_traitee'])
             ->selectRaw("COUNT(*) FILTER (WHERE commande = 'reponse_recue') r, COUNT(*) FILTER (WHERE commande = 'reponse_traitee') t")->first());
 
-        return max(0, (int) ($c->r ?? 0) - (int) ($c->t ?? 0));
+        return max(0, (int) ($c?->r ?? 0) - (int) ($c?->t ?? 0));
     }
 
     public function derniereValidation(string $ws): ?DateTimeImmutable
@@ -254,5 +254,16 @@ final class DepotChauffe
              ON CONFLICT (workspace_id, nom) DO UPDATE SET valeur = EXCLUDED.valeur, auteur = EXCLUDED.auteur, mis_a_jour_le = now()',
             [$ws, $nom, $valeur, $auteur],
         ));
+    }
+
+    /** @return array{envoyes: int, rebonds_durs: int, plaintes: int, reponses: int} */
+    private static function totauxDe(?object $l): array
+    {
+        return [
+            'envoyes' => (int) ($l->e ?? 0),
+            'rebonds_durs' => (int) ($l->r ?? 0),
+            'plaintes' => (int) ($l->p ?? 0),
+            'reponses' => (int) ($l->a ?? 0),
+        ];
     }
 }

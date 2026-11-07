@@ -51,6 +51,7 @@ pest()->group('non-regression')->in(
     'Feature/Email/ZeptoMailWebhookTest.php',
     'Feature/EligibiliteCampagneTest.php',
     'Feature/Envoi/ChauffeFreinsTest.php',
+    'Feature/Envoi/AdaptateurSmtpTest.php',
     'Feature/HorodatagesFuseauTest.php',
     'Feature/Infra/AucunEnvoiSansEligibiliteTest.php',
     'Feature/Infra/AucunSimulacreEnProductionTest.php',

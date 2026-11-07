@@ -19,7 +19,7 @@ return new class extends Migration
                 controle_le  TIMESTAMPTZ NOT NULL,
                 pret         BOOLEAN     NOT NULL,
                 pause        BOOLEAN     NOT NULL DEFAULT false,
-                resultats    JSONB       NOT NULL DEFAULT '{}'::jsonb,
+                resultats    TEXT        NOT NULL DEFAULT '{}', -- JSON en texte : pas de nouvelle colonne JSONB (garde RGPD)
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now()
             );
             CREATE INDEX IF NOT EXISTS envoi_controles_dns_ws_domaine
@@ -44,6 +44,6 @@ return new class extends Migration
     /** Retour arrière INERTE : les contrôles sont conservés. */
     public function down(): void
     {
-        DB::statement("COMMENT ON TABLE envoi_controles_dns IS 'Envoi P0 K12 : table conservee au retour arriere.'");
+        // Volontairement vide (aucun effacement, la table et ses lignes sont conservées).
     }
 };

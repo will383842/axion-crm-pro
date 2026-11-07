@@ -8,6 +8,16 @@ info:
     règles et horaires, connexion au CRM, carnet de destinataires (offre
     « Envoi seul »), page publique de désinscription. Rien n'est jamais
     supprimé : on inscrit « ne plus écrire ». Lot : DM2-CNF.
+
+    Entité d'envoi : société par actions simplifiée (SAS) française.
+
+    Mesure des ouvertures : elle est OPTIONNELLE, décidée campagne par campagne
+    (case « Suivre les ouvertures », décochée par défaut). Quand elle est active,
+    une image invisible (pixel) estime l'ouverture d'un message ; ce pixel est
+    décrit aux destinataires dans le bloc d'information (art. 14 du RGPD, voir
+    `Identite.bloc_information_ouvertures`) et n'est JAMAIS posé dans un message
+    destiné à un contact opposé (« Puis-je écrire à… ? » répond alors « non »).
+    Règle sur les liens : aucun suivi des clics, les liens des messages ne sont pas réécrits.
 servers:
   - url: /api/v1
 paths:
@@ -47,12 +57,22 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data, meta]
+                required: [data, meta, resume]
                 properties:
                   data:
                     type: array
                     items: { $ref: './commun.yaml#/components/schemas/Opposition' }
                   meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
+                  resume:
+                    type: object
+                    description: Chiffres du registre entier (indépendants de la page affichée).
+                    required: [total, ce_mois, ce_mois_par_lien, domaines_entiers, organisations]
+                    properties:
+                      total: { type: integer, minimum: 0 }
+                      ce_mois: { type: integer, minimum: 0 }
+                      ce_mois_par_lien: { type: integer, minimum: 0 }
+                      domaines_entiers: { type: integer, minimum: 0 }
+                      organisations: { type: integer, minimum: 0 }
     post:
       operationId: inscrireOpposition
       summary: Inscrire une adresse, une organisation ou un domaine
@@ -99,13 +119,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [adresse, reponse, raisons]
+                required: [adresse, reponse, raisons, mesure_ouvertures_permise]
                 properties:
                   adresse: { type: string }
                   reponse: { type: string, enum: [oui, non, prudence] }
                   raisons:
                     type: array
                     items: { type: string }
+                  mesure_ouvertures_permise:
+                    type: boolean
+                    description: Faux dès que la réponse est « non » (contact opposé), car jamais de pixel pour lui.
   /envoi/alertes:
     get:
       operationId: listerAlertesEnvoi
@@ -122,22 +145,28 @@ paths:
                   data:
                     type: array
                     items: { $ref: '#/components/schemas/AlerteEnvoi' }
+  /envoi/alertes/{id}/regler:
+    post:
+      operationId: marquerAlerteReglee
+      summary: Marquer une alerte comme réglée (elle reste dans l'historique)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: L'alerte après changement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlerteEnvoi' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/reglages/alertes:
     get:
       operationId: listerReglesAlerte
-      summary: Règles d'alerte
+      summary: Règles d'alerte (type × canal)
       responses:
-        '200':
-          description: Règles.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items: { $ref: './commun.yaml#/components/schemas/RegleAlerte' }
+        '200': { $ref: '#/components/responses/ReglagesAlertes' }
     put:
       operationId: enregistrerReglesAlerte
       summary: Enregistrer les règles d'alerte
@@ -145,15 +174,58 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data:
-                  type: array
-                  items: { $ref: './commun.yaml#/components/schemas/RegleAlerte' }
+            schema: { $ref: '#/components/schemas/ReglagesAlertes' }
+      responses:
+        '200': { $ref: '#/components/responses/ReglagesAlertes' }
+  /envoi/reglages/alertes/test:
+    post:
+      operationId: envoyerAlerteDeTest
+      summary: Envoyer une alerte de test (cloche et e-mail seulement ; aucun message réel en démo)
       responses:
         '200': { $ref: './commun.yaml#/components/responses/Succes' }
+  /envoi/reglages/apercu:
+    get:
+      operationId: lireApercuReglages
+      summary: Accueil des réglages d'envoi (résumé et boucles de retour)
+      responses:
+        '200':
+          description: Résumé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApercuReglages' }
+  /envoi/reglages/absence:
+    put:
+      operationId: enregistrerModeAbsence
+      summary: Mode absence (campagnes en pause, réponses en attente)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModeAbsence' }
+      responses:
+        '200':
+          description: Mode absence enregistré.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModeAbsence' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/reglages/regles:
+    get:
+      operationId: lireRegles
+      summary: Règles de prudence et horaires
+      responses:
+        '200': { $ref: '#/components/responses/Regles' }
+    put:
+      operationId: enregistrerRegles
+      summary: Enregistrer les règles (durcir seulement ; un assouplissement répond 422)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Regles' }
+      responses:
+        '200': { $ref: '#/components/responses/Regles' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/reglages:
     get:
       operationId: lireReglagesEnvoi
@@ -258,11 +330,17 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [adresse_masquee, expediteur, deja_desinscrit]
+                required: [adresse_masquee, expediteur, deja_desinscrit, organisation, pourquoi_ce_message]
                 properties:
                   adresse_masquee: { type: string }
                   expediteur: { type: string }
                   deja_desinscrit: { type: boolean }
+                  organisation:
+                    description: Nom de l'organisation du destinataire, si connue (option « toute mon organisation »).
+                    oneOf: [{ type: string }, { type: 'null' }]
+                  pourquoi_ce_message:
+                    type: string
+                    description: Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, et aucun suivi des clics).
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
     post:
       operationId: confirmerDesinscription
@@ -273,17 +351,98 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                toute_l_organisation:
+                  type: boolean
+                  description: Inscrit aussi l'organisation (portée « organisation » du registre).
       responses:
         '200': { $ref: './commun.yaml#/components/responses/Succes' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    ReglagesAlertes:
+      type: object
+      description: Règles d'alerte par type et canal (console et e-mail seulement), seconde adresse, regroupement.
+      required: [data, seconde_adresse, regroupement_minutes]
+      properties:
+        data:
+          type: array
+          items: { $ref: './commun.yaml#/components/schemas/RegleAlerte' }
+        seconde_adresse:
+          oneOf: [{ type: string, format: email }, { type: 'null' }]
+        regroupement_minutes:
+          type: integer
+          description: Les alertes de même type sont regroupées sur cette durée (15 minutes).
+    ModeAbsence:
+      type: object
+      required: [actif, du, au]
+      properties:
+        actif: { type: boolean }
+        du: { oneOf: [{ type: string, format: date }, { type: 'null' }] }
+        au: { oneOf: [{ type: string, format: date }, { type: 'null' }] }
+    BoucleDeRetour:
+      type: object
+      required: [nom, etat, detail]
+      properties:
+        nom: { type: string }
+        etat: { type: string, enum: [fait, a_faire] }
+        detail: { type: string }
+    ApercuReglages:
+      type: object
+      required: [regles_actives, canaux, absence, boucles_de_retour, oppositions]
+      properties:
+        regles_actives: { type: integer, minimum: 0 }
+        canaux:
+          type: array
+          items: { $ref: './commun.yaml#/components/schemas/CanalAlerte' }
+        oppositions: { type: integer, minimum: 0 }
+        absence: { $ref: '#/components/schemas/ModeAbsence' }
+        boucles_de_retour:
+          type: array
+          items: { $ref: '#/components/schemas/BoucleDeRetour' }
+    Regles:
+      type: object
+      description: |
+        Règles de prudence et horaires. On ne peut que DURCIR (valeur plus
+        prudente) : un seuil plus haut, une fenêtre plus large ou un frein plus
+        lâche répond 422 `assouplissement_refuse`.
+      required:
+        [pause_si_refus_pct, pause_si_plaintes_pour_mille, test_du_matin_bloquant,
+         frein_reponses_par_jour, pression_max_par_organisation_30j, heure_de, heure_a,
+         jours_ouvres_seulement]
+      properties:
+        pause_si_refus_pct: { type: number, minimum: 0 }
+        pause_si_plaintes_pour_mille: { type: number, minimum: 0 }
+        test_du_matin_bloquant: { type: boolean, const: true }
+        frein_reponses_par_jour:
+          type: integer
+          minimum: 0
+          description: Au-delà de ce nombre de réponses en attente par jour, les envois ralentissent (15 par défaut).
+        pression_max_par_organisation_30j:
+          type: integer
+          minimum: 1
+          description: Nombre maximal de messages vers une même organisation sur 30 jours (pression commerciale).
+        heure_de: { type: string, examples: ['09:00'] }
+        heure_a: { type: string, examples: ['17:30'] }
+        jours_ouvres_seulement:
+          type: boolean
+          description: Pas de week-end ni de jour férié français.
     AlerteEnvoi:
       type: object
-      required: [id, titre, detail, niveau, survenue_le, lien, close]
+      required: [id, titre, detail, ce_qui_se_passe, ce_que_le_systeme_a_fait, que_faire, niveau, survenue_le, lien, close]
       properties:
         id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
         titre: { type: string }
         detail: { type: string }
+        ce_qui_se_passe: { type: string }
+        ce_que_le_systeme_a_fait: { type: string }
+        que_faire: { type: string }
         niveau: { type: string, enum: [a_faire, attention, nouveau, fait] }
         survenue_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         lien: { oneOf: [{ type: string }, { type: 'null' }] }
@@ -304,20 +463,49 @@ components:
         pause_si_refus_pct: { type: number, minimum: 0 }
         suivre_ouvertures_par_defaut:
           type: boolean
-          description: Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle campagne (faux par défaut).
+          description: |
+            Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle
+            campagne (faux par défaut). La mesure par pixel est optionnelle,
+            décidée par campagne, décrite aux destinataires, jamais pour un contact
+            opposé ; aucun suivi des clics.
     Identite:
       type: object
-      required: [raison_sociale, forme, adresse_postale, signature, lien_desinscription]
+      required:
+        [raison_sociale, forme, adresse_postale, signature, lien_desinscription, lien_rendez_vous,
+         bloc_information, bloc_information_ouvertures]
       properties:
         raison_sociale: { type: string }
-        forme: { type: string, examples: [SAS] }
+        forme:
+          type: string
+          description: Forme juridique de l'entité d'envoi (SAS française).
+          examples: [SAS]
         adresse_postale: { type: string }
         signature: { type: string }
         lien_desinscription: { type: boolean, const: true }
+        lien_rendez_vous:
+          description: Lien de rendez-vous ajouté au message (facultatif).
+          oneOf: [{ type: string }, { type: 'null' }]
+        bloc_information:
+          type: string
+          description: Bloc d'information des destinataires (art. 14 du RGPD), présent sous chaque message.
+        bloc_information_ouvertures:
+          type: string
+          description: |
+            Phrase AJOUTÉE au bloc quand la campagne mesure les ouvertures par pixel
+            (décrit le pixel et rappelle : aucun suivi des clics). Absente des
+            messages des campagnes qui ne mesurent pas les ouvertures.
     ConnexionCrm:
       type: object
-      required: [adaptateur, etat, derniere_synchro_le, contacts_vus]
+      required: [adaptateur, etat, derniere_synchro_le, contacts_vus, ce_qui_passe, ce_qui_ne_passe_pas]
       properties:
+        ce_qui_passe:
+          type: array
+          description: Ce que l'adaptateur échange avec le CRM (phrases courtes).
+          items: { type: string }
+        ce_qui_ne_passe_pas:
+          type: array
+          description: Ce qui ne quitte jamais Envoi ou le CRM.
+          items: { type: string }
         adaptateur: { type: string, enum: [crm_pro, generique, aucun] }
         etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
         derniere_synchro_le:
@@ -337,6 +525,16 @@ components:
         etiquettes: { type: array, items: { type: string } }
         ajoute_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
   responses:
+    ReglagesAlertes:
+      description: Règles d'alerte.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReglagesAlertes' }
+    Regles:
+      description: Règles de prudence et horaires.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Regles' }
     Reglages:
       description: Réglages d'envoi.
       content:

@@ -92,14 +92,16 @@ test('commander : requête signée (méthode+chemin+nonce+corps) acceptée ; sec
 
 test('COMMANDE PERDUE : panne réseau = pas d’acquittement ; renvoi avec le même commande_id', function () {
     $id = envoiCmd();
-    Http::fake(['*' => Http::response('boom', 500)]);
+    $panne = true;
+    $ok = envoiReponseSignee([]);
+    Http::fake(['*' => fn (Request $r) => $panne ? Http::response('boom', 500) : $ok($r)]);
     $client = app(CommandeurServeur::class);
     expect(fn () => $client->commander($this->ws, 'srv1', $id, 'pause'))->toThrow(ServeurEnvoiRefuse::class);
     expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->where('commande', JournalCommandes::ACQUITTEMENT)->count()))->toBe(0);
 
-    Http::fake(['*' => envoiReponseSignee([])]);
+    $panne = false;
     expect($client->commander($this->ws, 'srv1', $id, 'pause'))->toBeTrue();
-    Http::assertSentCount(1);
+    Http::assertSentCount(2);
     Http::assertSent(fn (Request $r) => str_contains($r->body(), $id));
     expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->where('commande', JournalCommandes::ACQUITTEMENT)->count()))->toBe(1);
 });

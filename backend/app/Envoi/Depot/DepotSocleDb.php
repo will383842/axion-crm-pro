@@ -96,6 +96,9 @@ final class DepotSocleDb implements DepotSocle
                      ON CONFLICT (workspace_id) DO UPDATE SET mode_temoins = false, mis_a_jour_le = now()',
                     [$workspaceId],
                 );
+                // Autorisation retirée dès l'écriture faite : si cette transaction est elle-même
+                // imbriquée (SAVEPOINT, tests), le réglage local survivrait sinon au « commit ».
+                DB::select("SELECT set_config('app.envoi_ecriture_gardee', '', true)");
             });
         });
     }
@@ -132,13 +135,15 @@ final class DepotSocleDb implements DepotSocle
     public function journaliser(string $workspaceId, string $commande, string $auteur, array $details = [], ?DateTimeImmutable $jour = null): void
     {
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commande, $auteur, $details, $jour): void {
-            DB::table('envoi_journal_commandes')->insert([
+            // SAVEPOINT propre à l'insertion : si elle échoue, la transaction englobante reste
+            // saine (sinon 25P02 masquerait la vraie exception lors du nettoyage du contexte).
+            DB::transaction(fn () => DB::table('envoi_journal_commandes')->insert([
                 'workspace_id' => $workspaceId,
                 'commande' => $commande,
                 'auteur' => $auteur,
                 'details' => json_encode($details, JSON_THROW_ON_ERROR),
                 'jour' => ($jour ?? JourEnvoi::de())->format('Y-m-d'),
-            ]);
+            ]));
         });
     }
 

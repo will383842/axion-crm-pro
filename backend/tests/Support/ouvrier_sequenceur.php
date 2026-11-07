@@ -40,8 +40,14 @@ $composeur = new class implements ComposeurSequence
     }
 };
 $passerelle = new PasserelleLocale(
-    new FauxServeurEnvoi, new DepotSocleDb, true, 300,
-    fn () => new DateTimeImmutable($maintenant), $ws, 300, fn () => WorkspaceContext::current(),
+    new FauxServeurEnvoi,
+    new DepotSocleDb,
+    true,
+    300,
+    fn () => new DateTimeImmutable($maintenant),
+    $ws,
+    300,
+    fn () => WorkspaceContext::current(),
 );
 $seq = new Sequenceur($passerelle, new LecteurFicheDb, $composeur, new ParametresExpedition('zz-envoi.example.invalid', 'from@zz-envoi.example.invalid', 'ZZ Expediteur SAS'));
 

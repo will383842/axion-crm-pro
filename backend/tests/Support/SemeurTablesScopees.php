@@ -161,6 +161,9 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
+        // 2026-11-11 (envoi K1a) : serveurs d'envoi et journal des commande_id.
+        'envoi_serveurs',
+        'envoi_commandes',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -660,6 +663,14 @@ final class SemeurTablesScopees
         $inserer('envoi_temoins', [
             'empreinte' => hash('sha256', 'zz-' . $marque),
             'libelle' => 'zz',
+        ]);
+        $inserer('envoi_serveurs', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'url_base' => 'https://zz.test.invalid',
+        ]);
+        $inserer('envoi_commandes', [
+            'commande_id' => 'zz-' . $marque,
+            'commande' => 'zz',
         ]);
 
         $inserer('proxy_providers_config', [

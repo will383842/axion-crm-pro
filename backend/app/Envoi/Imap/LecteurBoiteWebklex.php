@@ -10,6 +10,7 @@ use RuntimeException;
 use Throwable;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
+use Webklex\PHPIMAP\Connection\Protocols\ImapProtocol;
 use Webklex\PHPIMAP\Folder;
 use Webklex\PHPIMAP\IMAP;
 use Webklex\PHPIMAP\Message;
@@ -161,8 +162,12 @@ final class LecteurBoiteWebklex implements LecteurBoite
      */
     private function taillesEtDates(array $uids): array
     {
-        $reponse = $this->client()->getConnection()->fetch(['RFC822.SIZE', 'INTERNALDATE'], $uids, null, IMAP::ST_UID);
-        $donnees = is_object($reponse) && method_exists($reponse, 'data') ? $reponse->data() : $reponse;
+        $connexion = $this->client()->getConnection();
+        if (! $connexion instanceof ImapProtocol) {
+            throw new RuntimeException('Protocole IMAP requis (RFC822.SIZE) : relève suspendue.');
+        }
+        $reponse = $connexion->fetch(['RFC822.SIZE', 'INTERNALDATE'], $uids, null, IMAP::ST_UID);
+        $donnees = $reponse->data();
         if (! is_array($donnees)) {
             throw new RuntimeException('RFC822.SIZE illisible : relève suspendue.'); // bruyant, pas de silence
         }

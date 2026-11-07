@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
 use App\Http\Controllers\Api\EvenementsController;
+use App\Http\Controllers\Internal\EnvoiEvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\FederationsController;
 use App\Http\Controllers\Api\GlobalSearchController;
@@ -698,6 +699,11 @@ Route::prefix('internal')->group(function () {
     // Le tri de priorité de Laravel 12 place le limiteur AVANT le
     // vérificateur : `throttle:partners` ne limite donc RIEN en `off`
     // (`RouteServiceProvider`), pour ne poser ni `X-RateLimit-*` ni 429.
+    // Lot K1b — lots d'événements poussés par le serveur d'envoi (HMAC + nonce : 401/409).
+    Route::post('/envoi/evenements', [EnvoiEvenementsController::class, 'store'])
+        ->middleware('throttle:internal')
+        ->name('internal.envoi.evenements');
+
     Route::post('/partners/v1/ping', PartnersPingController::class)
         ->middleware(['throttle:partners', VerificateurCanalPartners::class])
         ->name('internal.partners.ping');

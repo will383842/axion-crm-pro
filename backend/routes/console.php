@@ -526,3 +526,9 @@ Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:30')
     ->withoutOverlapping(60)
     ->onOneServer();
+
+// Envoi K1b — réconciliation quotidienne avec le serveur d'envoi (tirage par curseur, 72 h).
+Schedule::command('envoi:reconcilier')
+    ->dailyAt('02:30')
+    ->withoutOverlapping(60)
+    ->onOneServer();

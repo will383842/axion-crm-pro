@@ -574,6 +574,14 @@ jobs:
             exit 1
           fi
           echo "Tous les scripts d'infra sont en 100755."
+      - name: Serveur d'envoi K3 — tests statiques (pare-feu, WireGuard d'admin, installateur)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends nftables
+          # Le garde de périmètre compare à origin/main : on s'assure qu'elle existe.
+          git fetch --no-tags --prune --unshallow origin 2>/dev/null || true
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          bash infra/serveur-envoi/tests/lancer-tests.sh
 
   donnees-personnelles:
     name: Aucune donnée nominative dans ce dépôt public

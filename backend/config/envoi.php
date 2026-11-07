@@ -20,4 +20,6 @@ return [
     'plafond_global_jour' => (int) env('ENVOI_PLAFOND_GLOBAL_JOUR', 20),
     // Clé HMAC des empreintes de témoins. Jamais dans le dépôt : posée dans l'environnement.
     'cle_empreinte' => (string) env('ENVOI_CLE_EMPREINTE', ''),
+    // Délai (minutes) avant nouvelle tentative après une réponse SMTP 4xx.
+    'smtp_delai_4xx_minutes' => (int) env('ENVOI_SMTP_DELAI_4XX_MINUTES', 15),
 ];

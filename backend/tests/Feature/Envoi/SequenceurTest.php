@@ -49,7 +49,8 @@ beforeEach(function () {
     $this->ws = F::espace('zz-envoi-l1');
     $this->lundi = new DateTimeImmutable('2026-11-16 10:00:00', new DateTimeZone('Europe/Paris'));
     FonctionsEspace::regler($this->ws, 'federations', true);
-    DB::table('envoi_drapeaux')->insert(['workspace_id' => $this->ws, 'mode_temoins' => false]); // le mode témoins est testé ailleurs (PasserelleLocaleTest)
+    // Le mode témoins ne s'éteint que par la commande locale (déclencheur envoi_drapeaux_garde) : on passe par elle.
+    (new DepotSocleDb)->eteindreTemoins($this->ws, 'test-sequenceur'); // le mode témoins est testé ailleurs (PasserelleLocaleTest)
     DB::table('envoi_domaines')->insert([
         'workspace_id' => $this->ws, 'nom' => SEQ_DOMAINE, 'achete_le' => '2026-01-01',
         'dmarc_verifie_le' => $this->lundi->format('c'), 'spf_verifie_le' => $this->lundi->format('c'), 'dkim_verifie_le' => $this->lundi->format('c'),

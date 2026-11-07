@@ -117,6 +117,11 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
+        // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
+        'envoi_sequences',
+        'envoi_sequence_etapes',
+        'envoi_inscriptions',
+        'envoi_messages',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -485,6 +490,21 @@ final class SemeurTablesScopees
         $inserer('envoi_domaines', [
             'nom' => 'zz-etancheite.example.invalid',
             'achete_le' => '2026-01-01',
+        ]);
+
+        $sequence = (string) \Illuminate\Support\Str::uuid();
+        $inserer('envoi_sequences', ['id' => $sequence, 'nom' => 'ZZ Étanchéité']);
+        $inserer('envoi_sequence_etapes', [
+            'sequence_id' => $sequence, 'rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'ZZ sujet', 'corps' => 'ZZ corps',
+        ]);
+        $inscription = (string) \Illuminate\Support\Str::uuid();
+        $inserer('envoi_inscriptions', [
+            'id' => $inscription, 'sequence_id' => $sequence, 'contact_id' => $id['contacts'], 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'prochaine_echeance' => now(), 'version_figee' => '{}',
+        ]);
+        $inserer('envoi_messages', [
+            'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',
         ]);
 
         $inserer('listes_manuelles_membres', [

@@ -36,44 +36,55 @@ function concPreparer(int $etapes): array
     $owner = DB::connection('pgsql_owner');
     $ws = (string) Str::uuid();
     $owner->table('workspaces')->insert(['id' => $ws, 'name' => 'ConcSeq', 'slug' => 'concseq-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
-    $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
-
-    $entreprise = (int) $owner->table('companies')->insertGetId([
-        'workspace_id' => $ws, 'denomination' => 'ZZ Conc', 'discovery_source' => 'insee', 'siren' => '944444444',
-        'country_code' => 'FR', 'created_at' => now(), 'updated_at' => now(),
-    ]);
-    $tag = (int) $owner->table('tags')->insertGetId(['workspace_id' => $ws, 'slug' => FichesProtegees::TAG_FEDERATIONS, 'name' => 'f', 'category' => 'custom', 'kind' => 'auto', 'created_at' => now(), 'updated_at' => now()]);
-    $owner->table('company_tag')->insert(['company_id' => $entreprise, 'tag_id' => $tag, 'workspace_id' => $ws, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
-    // Article 14 : dates du CONTACT.
-    $contact = (int) $owner->table('contacts')->insertGetId([
-        'workspace_id' => $ws, 'company_id' => $entreprise, 'last_name' => 'Conc', 'email' => 'conc@zz-client.example.invalid', 'email_status' => 'valid',
-        'created_at' => '2026-11-10 10:00:00+01', 'first_info_at' => '2026-11-10 10:00:00+01',
-    ]);
-    $owner->table('envoi_verdicts_adresse')->insert(['workspace_id' => $ws, 'empreinte_adresse' => ListeSuppression::empreinte('conc@zz-client.example.invalid'), 'verdict' => 'valide', 'verifie_le' => '2026-11-14 10:00:00+01', 'source' => 'test']);
-    $owner->table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'zz-envoi.example.invalid', 'achete_le' => '2026-01-01', 'dmarc_verifie_le' => CONC_MAINTENANT, 'spf_verifie_le' => CONC_MAINTENANT, 'dkim_verifie_le' => CONC_MAINTENANT]);
-    $owner->table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'mode_temoins' => false]); // sinon la passerelle refuse tout destinataire hors témoins
-    $sid = (string) Str::uuid();
-    $owner->table('envoi_sequences')->insert(['id' => $sid, 'workspace_id' => $ws, 'nom' => 'Conc']);
-    foreach (array_slice([0, 2, 3], 0, $etapes) as $i => $delai) {
-        $owner->table('envoi_sequence_etapes')->insert(['workspace_id' => $ws, 'sequence_id' => $sid, 'rang' => $i + 1, 'delai_jours_ouvres' => $delai, 'sujet' => 's' . ($i + 1), 'corps' => 'c' . ($i + 1)]);
-    }
-    $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-
-    // `Inscriptions` et `FonctionsEspace` écrivent sur la connexion PAR DÉFAUT : on la
-    // bascule sur le propriétaire (auto-commit) le temps de l'inscription.
-    $defaut = DB::getDefaultConnection();
-    DB::setDefaultConnection('pgsql_owner');
     try {
-        $ins = WorkspaceContext::run($ws, function () use ($ws, $sid, $contact): string {
-            FonctionsEspace::regler($ws, 'federations', true); // segment ouvert pour CET espace
+        $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
 
-            return (new Inscriptions(new LecteurFicheDb))->inscrire($ws, $sid, $contact, new DateTimeImmutable('2026-11-16 09:00:00', new DateTimeZone('Europe/Paris')));
+        $entreprise = (int) $owner->table('companies')->insertGetId([
+            'workspace_id' => $ws, 'denomination' => 'ZZ Conc', 'discovery_source' => 'insee', 'siren' => '944444444',
+            'country_code' => 'FR', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $tag = (int) $owner->table('tags')->insertGetId(['workspace_id' => $ws, 'slug' => FichesProtegees::TAG_FEDERATIONS, 'name' => 'f', 'category' => 'custom', 'kind' => 'auto', 'created_at' => now(), 'updated_at' => now()]);
+        $owner->table('company_tag')->insert(['company_id' => $entreprise, 'tag_id' => $tag, 'workspace_id' => $ws, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
+        // Article 14 : dates du CONTACT.
+        $contact = (int) $owner->table('contacts')->insertGetId([
+            'workspace_id' => $ws, 'company_id' => $entreprise, 'last_name' => 'Conc', 'email' => 'conc@zz-client.example.invalid', 'email_status' => 'valid',
+            'created_at' => '2026-11-10 10:00:00+01', 'first_info_at' => '2026-11-10 10:00:00+01',
+        ]);
+        $owner->table('envoi_verdicts_adresse')->insert(['workspace_id' => $ws, 'empreinte_adresse' => ListeSuppression::empreinte('conc@zz-client.example.invalid'), 'verdict' => 'valide', 'verifie_le' => '2026-11-14 10:00:00+01', 'source' => 'test']);
+        $owner->table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'zz-envoi.example.invalid', 'achete_le' => '2026-01-01', 'dmarc_verifie_le' => CONC_MAINTENANT, 'spf_verifie_le' => CONC_MAINTENANT, 'dkim_verifie_le' => CONC_MAINTENANT]);
+        // Sinon la passerelle refuse tout destinataire hors témoins. Le mode témoins ne s'éteint que par la
+        // commande locale (déclencheur envoi_drapeaux_garde) : même autorisation, locale à la transaction.
+        $owner->transaction(function () use ($owner, $ws): void {
+            $owner->select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
+            $owner->table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'mode_temoins' => false]);
         });
-    } finally {
-        DB::setDefaultConnection($defaut);
-    }
+        $sid = (string) Str::uuid();
+        $owner->table('envoi_sequences')->insert(['id' => $sid, 'workspace_id' => $ws, 'nom' => 'Conc']);
+        foreach (array_slice([0, 2, 3], 0, $etapes) as $i => $delai) {
+            $owner->table('envoi_sequence_etapes')->insert(['workspace_id' => $ws, 'sequence_id' => $sid, 'rang' => $i + 1, 'delai_jours_ouvres' => $delai, 'sujet' => 's' . ($i + 1), 'corps' => 'c' . ($i + 1)]);
+        }
+        $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
 
-    return [$ws, $ins, '2026-11-16'];
+        // `Inscriptions` et `FonctionsEspace` écrivent sur la connexion PAR DÉFAUT : on la
+        // bascule sur le propriétaire (auto-commit) le temps de l'inscription.
+        $defaut = DB::getDefaultConnection();
+        DB::setDefaultConnection('pgsql_owner');
+        try {
+            $ins = WorkspaceContext::run($ws, function () use ($ws, $sid, $contact): string {
+                FonctionsEspace::regler($ws, 'federations', true); // segment ouvert pour CET espace
+
+                return (new Inscriptions(new LecteurFicheDb))->inscrire($ws, $sid, $contact, new DateTimeImmutable('2026-11-16 09:00:00', new DateTimeZone('Europe/Paris')));
+            });
+        } finally {
+            DB::setDefaultConnection($defaut);
+        }
+
+        return [$ws, $ins, '2026-11-16'];
+    } catch (Throwable $e) {
+        concNettoyer($ws, '2026-11-16'); // une préparation à moitié faite ne laisse rien en base
+
+        throw $e;
+    }
 }
 
 /** Retire tout ce que le test a écrit en auto-commit (journal des commandes : ajout seul, il reste, sans donnée de personne). */

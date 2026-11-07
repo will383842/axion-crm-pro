@@ -2,6 +2,7 @@
 
 namespace App\Envoi;
 
+use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
@@ -22,6 +23,7 @@ use DateTimeImmutable;
  *   3. Tout arrêter             => exception ;
  *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
  *   5. rejeu idempotent (même clé) => passe sans recompter ;
+ *   5b. (L7) pauses, freins, quota de chauffe de la boîte => report au lendemain ;
  *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
  *   7. seulement alors, le serveur est appelé, et l'injection acceptée est notée
  *      dans la même transaction : deux workers ne peuvent pas dépasser le plafond.
@@ -42,6 +44,7 @@ final class PasserelleLocale implements ServeurEnvoi
         private readonly string $espaceDefaut = '',
         private readonly int|\Closure|null $plafondGlobal = null,
         private readonly ?\Closure $contexteCourant = null,
+        private readonly ?GardeChauffe $chauffe = null,
     ) {}
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
@@ -74,9 +77,15 @@ final class PasserelleLocale implements ServeurEnvoi
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
 
+            // Chauffe et freins (lot L7) : pause ou quota => report, aucune connexion.
+            if ($this->chauffe?->refus($message, $jour, $this->instant()) !== null) {
+                return ResultatInjection::reporte($jour->modify('+1 day'));
+            }
+
             $resultat = $this->serveur->injecter($message);
             if ($resultat->accepte) {
                 $this->depot->noterInjection($ws, $jour, $message->cleIdempotence);
+                $this->chauffe?->noter($message, $jour);
             }
 
             return $resultat;
@@ -135,6 +144,11 @@ final class PasserelleLocale implements ServeurEnvoi
         }
 
         return $n;
+    }
+
+    private function instant(): DateTimeImmutable
+    {
+        return $this->maintenant === null ? new DateTimeImmutable : DateTimeImmutable::createFromInterface(($this->maintenant)());
     }
 
     private function jour(): DateTimeImmutable

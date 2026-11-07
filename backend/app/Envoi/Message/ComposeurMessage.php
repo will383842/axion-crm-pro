@@ -58,6 +58,18 @@ final class ComposeurMessage
         if (! str_starts_with($d->mailtoDesinscription, 'mailto:')) {
             throw new InvalidArgumentException('Le lien de désinscription mailto: est obligatoire.');
         }
+        $hote = parse_url($d->urlDesinscription, PHP_URL_HOST);
+        if (! is_string($hote) || $hote === '') {
+            throw new MessageRefuse(['Le lien de désinscription https n\'a pas d\'hôte.']);
+        }
+        if (trim(substr($d->mailtoDesinscription, 7)) === '') {
+            throw new MessageRefuse(['Le lien de désinscription mailto est vide.']);
+        }
+        foreach ([$d->nomAffiche, $d->urlDesinscription, $d->mailtoDesinscription] as $champ) {
+            if (str_contains($champ, '{{')) {
+                throw new MessageRefuse(['Variable « {{ » interdite dans le nom affiché et les liens de désinscription.']);
+            }
+        }
         if (preg_match('/^[A-Za-z0-9_.-]{8,128}$/', $d->jetonEnvoi) !== 1) {
             throw new InvalidArgumentException('Jeton d\'envoi invalide.');
         }
@@ -168,7 +180,7 @@ final class ComposeurMessage
         $sortie .= $cur;
         foreach (explode("\r\n", $sortie) as $l) {
             if (strlen($l) > 998) {
-                throw new InvalidArgumentException('En-tête non pliable : une ligne dépasse 998 caractères (RFC 5322).');
+                throw new MessageRefuse(['En-tête non pliable : une ligne dépasse 998 caractères (RFC 5322).']);
             }
         }
 

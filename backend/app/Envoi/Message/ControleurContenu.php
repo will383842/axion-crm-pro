@@ -97,11 +97,12 @@ final class ControleurContenu
             $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $v = rawurldecode($v);
         }
-        // Soft-hyphen, espaces de largeur nulle, BOM, joiners.
-        $v = (string) preg_replace('/[\x{00AD}\x{200B}-\x{200F}\x{2060}-\x{2064}\x{FEFF}\x{034F}\x{180E}]/u', '', $v);
+        // NFKC d'abord (compatibilité), puis retrait de tous les invisibles : format (Cf : bidi, joiners,
+        // soft-hyphen, tags…), sélecteurs de variante, remplisseurs hangul, CGJ, sélecteurs mongols.
         if (class_exists(\Normalizer::class)) {
             $v = \Normalizer::normalize($v, \Normalizer::FORM_KC) ?: $v;
         }
+        $v = (string) preg_replace('/[\p{Cf}\x{FE00}-\x{FE0F}\x{E0100}-\x{E01EF}\x{115F}\x{1160}\x{3164}\x{FFA0}\x{034F}\x{180B}-\x{180F}]/u', '', $v);
 
         // Points typographiques ou idéographiques équivalents à « . ».
         return strtr($v, ["\u{3002}" => '.', "\u{FF0E}" => '.', "\u{FF61}" => '.', "\u{FE52}" => '.', "\u{2024}" => '.']);

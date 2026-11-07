@@ -95,10 +95,13 @@ final class HtmlListeBlanche
         if (preg_match_all('/&(?!(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});)/', $texte, $x) > 0) {
             $motifs[] = 'HTML refusé : entité mal formée (« & » nu ou entité numérique sans « ; »). Écrire &amp; pour une esperluette.';
         }
-        if (preg_match('/&#[xX]?[0-9a-fA-F]+;/', $texte, $e) === 1) {
-            $cp = preg_match('/^&#[xX]/', $e[0]) === 1 ? hexdec(substr($e[0], 3, -1)) : (int) substr($e[0], 2, -1);
-            if ($cp < 32 && ! in_array($cp, [9, 10, 13], true) || ($cp >= 0xD800 && $cp <= 0xDFFF) || $cp > 0x10FFFF) {
-                $motifs[] = 'HTML refusé : entité numérique invalide (caractère de contrôle ou hors plage).';
+        if (preg_match_all('/&#[xX]?[0-9a-fA-F]+;/', $texte, $entites) > 0) {
+            foreach ($entites[0] as $e) {
+                $cp = preg_match('/^&#[xX]/', $e) === 1 ? hexdec(substr($e, 3, -1)) : (int) substr($e, 2, -1);
+                if ($cp < 32 && ! in_array($cp, [9, 10, 13], true) || ($cp >= 0xD800 && $cp <= 0xDFFF) || $cp > 0x10FFFF) {
+                    $motifs[] = 'HTML refusé : entité numérique invalide (caractère de contrôle ou hors plage).';
+                    break;
+                }
             }
         }
     }

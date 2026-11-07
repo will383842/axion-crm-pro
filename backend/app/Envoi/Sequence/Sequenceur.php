@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
 /**
  * Séquenceur (envoi P0, lot L1). Pour une inscription échue :
  *   1. verrou de ligne (SELECT … FOR UPDATE) : une seule exécution à la fois par inscription ;
- *   2. arrêt par ENTREPRISE (une autre personne a répondu / s'est opposée) ;
+ *   2. arrêt par ENTREPRISE (une autre personne a répondu / s'est opposée) et par ADRESSE
+ *      (STOP, opposition ou rebond dur sur une autre inscription de la même adresse) ;
  *   3. fenêtre horaire Europe/Paris, jours ouvrés français : sinon l'échéance est reportée ;
  *   4. réservation (inscription, étape) : unicité en base (ON CONFLICT DO NOTHING) ;
  *   5. fiche relue EN BASE, puis `EnvoiAutorise::verifier` ;
@@ -91,7 +92,16 @@ final class Sequenceur
                 return self::HORS_FENETRE;
             }
 
-            $messageId = $this->reserver($ins, $rang);
+            // STOP, opposition, rebond dur : valent pour l'ADRESSE, pas pour une seule inscription.
+            if ($this->adresseArretee($ws, (string) $ins->empreinte_adresse, (string) $ins->id)) {
+                return $this->arreter($ins, Evenement::MOTIF_ADRESSE, $maintenant);
+            }
+
+            // Le fil : « References » = tout le fil dans l'ordre ; « In-Reply-To » = le message PRÉCÉDENT (pas le premier).
+            $references = $ins->fil_references === null || trim((string) $ins->fil_references) === '' ? [] : explode(' ', trim((string) $ins->fil_references));
+            $inReplyTo = $references === [] ? null : $references[array_key_last($references)];
+
+            $messageId = $this->reserver($ins, $rang, $inReplyTo);
             if ($messageId === null) {
                 return self::DEJA;
             }
@@ -100,13 +110,20 @@ final class Sequenceur
             if ($fiche === null || ListeSuppression::empreinte($fiche->email) !== trim((string) $ins->empreinte_adresse)) {
                 return $this->refuser($ins, $rang, 'fiche_introuvable_ou_adresse_changee', $maintenant);
             }
+            if ($fiche->exclusion !== null) {
+                return $this->refuser($ins, $rang, $fiche->exclusion, $maintenant);
+            }
             $verdict = EnvoiAutorise::verifier($this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse), $maintenant);
             if (! $verdict->autorise()) {
-                return $this->refuser($ins, $rang, (string) $verdict->refus, $maintenant);
+                $motif = (string) $verdict->refus;
+                // Refus PASSAGER (DNS du jour non vérifié, verdict d'adresse périmé) : on reporte, on n'arrête pas.
+                if ($this->passager($ws, $motif, $fiche->email)) {
+                    return $this->reporter($ins, $rang, $motif, $fenetre, $maintenant);
+                }
+
+                return $this->refuser($ins, $rang, $motif, $maintenant);
             }
 
-            $references = $ins->fil_references === null || $ins->fil_references === '' ? [] : explode(' ', (string) $ins->fil_references);
-            $inReplyTo = $ins->fil_message_id === null ? null : (string) $ins->fil_message_id;
             $sujet = ($rang > 1 && stripos((string) $etape['sujet'], 're:') !== 0) ? 'Re: ' . $etape['sujet'] : (string) $etape['sujet'];
             $brut = $this->composeur->composer(new DemandeComposition(
                 $ws, $fiche->email, $this->expedition->expediteur, $sujet, (string) $etape['corps'],
@@ -139,21 +156,48 @@ final class Sequenceur
             ->whereIn('motif_arret', [Evenement::REPONSE, Evenement::OPPOSITION, Evenement::MOTIF_ENTREPRISE])->exists();
     }
 
+    private function adresseArretee(string $ws, string $empreinte, string $inscriptionId): bool
+    {
+        return DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('empreinte_adresse', $empreinte)
+            ->where('id', '<>', $inscriptionId)->where('statut', 'arretee')
+            ->whereIn('motif_arret', [...Evenement::VALENT_POUR_L_ADRESSE, Evenement::MOTIF_ADRESSE])->exists();
+    }
+
+    /**
+     * Un refus qui peut se lever sans qu'une personne ait rien décidé : le contrôle DNS du jour n'est pas
+     * fait, ou le verdict d'adresse (« valide ») est périmé/daté du futur. Un verdict « invalide », une
+     * adresse jamais vérifiée, un refus de garde (RGPD, pays, segment…) sont DÉFINITIFS.
+     */
+    private function passager(string $ws, string $motif, string $email): bool
+    {
+        if ($motif === EnvoiAutorise::DOMAINE_DNS_NON_VERIFIE) {
+            return true;
+        }
+        if ($motif !== EnvoiAutorise::VERDICT_ABSENT) {
+            return false;
+        }
+        $dernier = DB::table('envoi_verdicts_adresse')->where('workspace_id', $ws)
+            ->where('empreinte_adresse', ListeSuppression::empreinte(mb_strtolower(trim($email))))
+            ->orderByDesc('verifie_le')->value('verdict');
+
+        return $dernier === 'valide';
+    }
+
     /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
-    private function reserver(object $ins, int $rang): ?string
+    private function reserver(object $ins, int $rang, ?string $inReplyTo): ?string
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
             'workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang,
             'statut' => 'reserve', 'message_id' => $messageId,
-            'in_reply_to' => $ins->fil_message_id,
+            'in_reply_to' => $inReplyTo,
         ]);
         if ($lignes === 1) {
             return $messageId;
         }
         // Une ligne « reporte » (passerelle pleine) peut être reprise ; toute autre est définitive.
         $repris = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reporte')
-            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'maj_le' => now()]);
+            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => now()]);
 
         return $repris === 1 ? $messageId : null;
     }

@@ -142,7 +142,10 @@ final class HtmlListeBlanche
         }
     }
 
-    /** @param list<string> $motifs @return list<string> */
+    /**
+     * @param  list<string>  $motifs
+     * @return list<string>
+     */
     private static function ressourceSiMarque(string $html, int $lt, array $motifs): array
     {
         $morceau = substr($html, $lt, 400);

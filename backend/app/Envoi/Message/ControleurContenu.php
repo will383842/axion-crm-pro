@@ -90,7 +90,7 @@ final class ControleurContenu
         for ($i = 0; $i < 3; $i++) {
             // Entités numériques décodées même sans « ; » final (les clients mail le font), puis nommées.
             $v = (string) preg_replace_callback('/&#(x[0-9a-f]{1,6}|[0-9]{1,7});?/i', static function (array $m): string {
-                $cp = strtolower($m[1][0]) === 'x' ? hexdec(substr($m[1], 1)) : (int) $m[1];
+                $cp = strtolower($m[1][0]) === 'x' ? (int) hexdec(substr($m[1], 1)) : (int) $m[1];
 
                 return $cp > 0 && $cp <= 0x10FFFF && ($cp < 0xD800 || $cp > 0xDFFF) ? mb_chr($cp, 'UTF-8') : '';
             }, $v);

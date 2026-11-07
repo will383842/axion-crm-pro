@@ -19,6 +19,6 @@ final class ResolveurSysteme implements ResolveurDns
             throw new \RuntimeException('Échec DNS pour ' . $nom);
         }
 
-        return array_values(array_map(static fn (array $e): string => (string) $e['ip'], $r));
+        return array_map(static fn (array $e): string => (string) $e['ip'], $r);
     }
 }

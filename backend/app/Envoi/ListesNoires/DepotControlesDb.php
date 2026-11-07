@@ -32,9 +32,10 @@ final class DepotControlesDb implements DepotControles
 
     public function enPause(Ressource $r): bool
     {
-        return WorkspaceContext::run($r->workspaceId, fn (): bool => (bool) ($this->dernier($r)?->pause ?? false));
+        return WorkspaceContext::run($r->workspaceId, fn (): bool => (bool) ($this->dernier($r)->pause ?? false));
     }
 
+    /** @return object{statut: string, zone: string, controle_le: string, pause: bool, pause_le: ?string}|null */
     private function dernier(Ressource $r): ?object
     {
         return DB::table('envoi_controles_listes')->where('workspace_id', $r->workspaceId)

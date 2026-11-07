@@ -29,8 +29,8 @@ class EnvoiServiceProvider extends ServiceProvider
             new ResolveurSysteme((string) config('envoi.listes_noires.resolveur')),
             $app->make(DepotControles::class),
             new AlerteurJournal($app->make(DepotSocle::class)),
-            (array) config('envoi.listes_noires.zones_ip'),
-            (array) config('envoi.listes_noires.zones_domaine'),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_ip'))),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_domaine'))),
             static fn (): \DateTimeImmutable => new \DateTimeImmutable,
         ));
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(

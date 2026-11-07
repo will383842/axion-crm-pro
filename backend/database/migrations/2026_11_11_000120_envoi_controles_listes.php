@@ -15,7 +15,7 @@ return new class extends Migration
             <<<'SQL'
             CREATE TABLE IF NOT EXISTS envoi_controles_listes (
                 id           BIGSERIAL   PRIMARY KEY,
-                workspace_id UUID        NOT NULL REFERENCES workspaces(id),
+                workspace_id UUID        NOT NULL, -- pas de clé étrangère : l'historique survit à tout, il ne se vide jamais
                 type         TEXT        NOT NULL CHECK (type IN ('ip', 'domaine')),
                 ressource    TEXT        NOT NULL,
                 statut       TEXT        NOT NULL CHECK (statut IN ('non_liste', 'liste', 'non_fiable')),
@@ -32,10 +32,12 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION envoi_controles_listes_ajout_seul() RETURNS trigger AS $f$
             BEGIN
                 RAISE EXCEPTION 'envoi_controles_listes : ajout seulement (UPDATE/DELETE refusés)';
-            END $f$ LANGUAGE plpgsql
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public
             SQL);
         DB::statement('DROP TRIGGER IF EXISTS envoi_controles_listes_ajout_seul ON envoi_controles_listes');
         DB::statement('CREATE TRIGGER envoi_controles_listes_ajout_seul BEFORE UPDATE OR DELETE ON envoi_controles_listes FOR EACH ROW EXECUTE FUNCTION envoi_controles_listes_ajout_seul()');
+        DB::statement('DROP TRIGGER IF EXISTS envoi_controles_listes_pas_de_truncate ON envoi_controles_listes');
+        DB::statement('CREATE TRIGGER envoi_controles_listes_pas_de_truncate BEFORE TRUNCATE ON envoi_controles_listes FOR EACH STATEMENT EXECUTE FUNCTION envoi_controles_listes_ajout_seul()');
         DB::statement('ALTER TABLE envoi_controles_listes ENABLE ROW LEVEL SECURITY');
         DB::statement('ALTER TABLE envoi_controles_listes FORCE ROW LEVEL SECURITY');
         DB::statement('DROP POLICY IF EXISTS envoi_controles_listes_workspace_isolation ON envoi_controles_listes');

@@ -39,6 +39,7 @@ import {
   GraduationCap,
   CalendarDays,
   Landmark,
+  Compass,
   CopyCheck,
   ListChecks,
   Inbox,
@@ -150,6 +151,8 @@ function sectionATraiter(features: ConsoleFeatures, owner: boolean): NavSection 
       ...(features.console_v2 && owner
         ? [{ to: '/console/propositions', label: 'Propositions à valider', icon: icone(Inbox), compteur: 'propositions' as const }]
         : []),
+      // Demandes d'effacement ouvertes : rien n'est supprimé, la personne est déjà mise à l'écart.
+      { to: '/rgpd/effacements', label: 'Effacements demandés', icon: icone(ShieldCheck), compteur: 'demandes_rgpd' as const },
     ],
   };
 }
@@ -163,6 +166,7 @@ function sectionMaBase(features: ConsoleFeatures): NavSection {
       { to: '/console/contacts', label: 'Contacts', icon: icone(Users2) },
       // La page porte les abonnés de la lettre ET les demandeurs du guide.
       { to: '/console/lettre-et-guide', label: 'Newsletter et guide', icon: icone(Mail) },
+      { to: '/origines', label: 'Origines des contacts', icon: icone(Compass) },
     );
     if (features.universes.vivier) {
       items.push({ to: '/console/vivier', label: 'Candidats', icon: icone(GraduationCap) });

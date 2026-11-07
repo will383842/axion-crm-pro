@@ -288,8 +288,9 @@ test('P1 — effacement et export, site ET console : chaque requete sur companie
     DB::table('contacts')->where('last_name', 'ZZVOLUME1')->update(['phone' => '06 00 00 00 88']);
     $requetes = array_merge($requetes, esiCapturer(fn () => app(GdprErasureService::class)->erase('p1@zz-volume.example.invalid')));
 
-    // La preuve lourde est partie en file, pas dans la requête.
-    Queue::assertPushed(VerifierEffacementRgpd::class);
+    // L3c-0 : la porte du site ne supprime plus rien, donc ne lance plus de preuve
+    // différée ; la console (service seul ici) non plus.
+    Queue::assertNotPushed(VerifierEffacementRgpd::class);
 
     DB::statement('SET LOCAL enable_seqscan = off');
     $vus = [];

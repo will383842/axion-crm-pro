@@ -182,6 +182,8 @@ class AudienceBuilderService
         $contactableCompanyIds = (clone $query)->select('id');
         $contacts = DB::table('contacts')
             ->whereIn('company_id', $contactableCompanyIds)
+            // L3c-0 : un contact mis à l'écart (corbeille douce) ne reçoit rien.
+            ->whereNull('deleted_at')
             ->whereIn('email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES)
             ->whereRaw(GardePresse::conditionContactsSql('contacts'))
             ->count();
@@ -337,6 +339,8 @@ class AudienceBuilderService
 
         $contacts = DB::table('contacts')
             ->whereIn('contacts.company_id', $companyIds)
+            // L3c-0 : un contact mis à l'écart (corbeille douce) n'entre jamais dans une audience.
+            ->whereNull('contacts.deleted_at')
             ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
         $generiquesFiables = [];
         if ($presse) {
@@ -1067,6 +1071,7 @@ class AudienceBuilderService
                 $q->select(DB::raw(1))
                     ->from('contacts')
                     ->whereColumn('contacts.company_id', 'companies.id')
+                    ->whereNull('contacts.deleted_at')
                     ->whereIn('contacts.email_status', TriageAutoService::CONTACTABLE_EMAIL_STATUSES);
             };
 

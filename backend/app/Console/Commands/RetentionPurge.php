@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Concerns\RefuseUneSuppressionMassive;
+use App\Crm\Rgpd\SignalementDemandeEffacement;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -148,11 +149,14 @@ class RetentionPurge extends Command
             colonneEspace: null,
         );
 
+        // Le signalement d'une demande d'effacement RGPD n'est JAMAIS purgé
+        // (preuve de la demande) : il est exclu de la purge, quel que soit son âge.
         $this->purger(
             'notifications anciennes (>90j)',
             'notifications',
             fn (): Builder => DB::table('notifications')
-                ->where('created_at', '<', now()->subDays(90)),
+                ->where('created_at', '<', now()->subDays(90))
+                ->where('type', '<>', SignalementDemandeEffacement::TYPE),
             fn (Builder $q): int => $q->delete(),
             portee: $portee,
             colonneEspace: 'workspace_id',

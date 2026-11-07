@@ -355,7 +355,7 @@ test('une opposition décidée dans la console met un événement en file', func
     // mesurer la garde au lieu du produit. Les droits sont mesures a leur
     // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
     setPermissionsTeamId($user->current_workspace_id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
     $this->actingAs($user);
 
     $journalistId = DB::table('journalists')->insertGetId([
@@ -399,7 +399,7 @@ test('le résumé d\'observabilité expose les réceptions et le backlog', funct
     // mesurer la garde au lieu du produit. Les droits sont mesures a leur
     // place : `tests/Feature/Rgpd/CoucheAutorisationBrancheeTest.php`.
     setPermissionsTeamId($user->current_workspace_id);
-    $user->assignRole('admin');
+    $user->assignRole('owner');
     $this->actingAs($user);
 
     foreach (['aujourdhui-1', 'aujourdhui-2'] as $ref) {

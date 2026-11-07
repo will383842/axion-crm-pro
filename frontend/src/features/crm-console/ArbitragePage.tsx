@@ -21,6 +21,15 @@ import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import type { ArbitrageResponse, ArbitrageRow } from './types';
 import { COMPTEURS_A_TRAITER_KEY } from '@/features/a-traiter/compteurs';
+import { useProduitsVisibles } from '@/features/socle/produits/useProduits';
+
+/** « 12 janv. 2027, 09:30 » : une date lisible plutôt que l'horodatage brut du serveur. */
+function dateLisible(brut: string | null): string {
+  if (brut === null) return '—';
+  const date = new Date(brut);
+  if (Number.isNaN(date.getTime())) return brut;
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(date);
+}
 
 export function ArbitragePage() {
   return (
@@ -31,6 +40,9 @@ export function ArbitragePage() {
 }
 
 function ArbitrageContent() {
+  // Sur-titre « CRM Pro » seulement quand Envoi est là : sans Envoi (le CRM réel
+  // aujourd'hui), l'en-tête reste celui d'avant.
+  const envoiVisible = useProduitsVisibles().envoi;
   const queryClient = useQueryClient();
 
   const list = useQuery<ArbitrageResponse>({
@@ -48,7 +60,7 @@ function ArbitrageContent() {
   const attach = useMutation({
     mutationFn: async (input: { activityId: number; companyId: number }) =>
       (
-        await api.post<{ contact_created: boolean }>(`/crm/arbitrage/${input.activityId}/attach`, {
+        await api.post<{ contact_created: boolean; contact_motif?: string | null }>(`/crm/arbitrage/${input.activityId}/attach`, {
           company_id: input.companyId,
         })
       ).data,
@@ -56,7 +68,9 @@ function ArbitrageContent() {
       toast.success(
         data.contact_created
           ? 'Rattaché — fiche personne créée ou retrouvée.'
-          : "Rattaché — aucun nom transmis, aucune fiche personne fabriquée.",
+          : data.contact_motif === 'adresse_personnelle'
+            ? 'Rattaché — adresse personnelle sans accord : aucune fiche personne créée.'
+            : "Rattaché — aucun nom transmis, aucune fiche personne fabriquée.",
       );
       invalidate();
     },
@@ -119,6 +133,7 @@ function ArbitrageContent() {
     <div>
       <PageHeader
         title="Personnes à rattacher"
+        surTitre={envoiVisible ? 'CRM Pro' : undefined}
         subtitle={
           total === undefined
             ? 'Événements reçus sans SIREN — à rattacher ou à écarter.'
@@ -207,7 +222,7 @@ function ArbitrageCard({
         {match.denomination ?? 'Entreprise non nommée'}
       </div>
       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        {row.title ?? row.kind} · {row.occurred_at ?? '—'}
+        {row.title ?? row.kind} · {dateLisible(row.occurred_at)}
       </div>
       <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-slate-600 sm:grid-cols-2 dark:text-slate-300">
         <Field label="Personne" value={[match.first_name, match.last_name].filter(Boolean).join(' ')} />
@@ -228,7 +243,7 @@ function ArbitrageCard({
           erreur={erreurEntreprise}
           disabled={busy}
         />
-        <Button variant="primary" size="sm" disabled={busy} onClick={rattacher}>
+        <Button variant="primary" size="sm" className="max-md:h-11" disabled={busy} onClick={rattacher}>
           Rattacher
         </Button>
 
@@ -243,6 +258,7 @@ function ArbitrageCard({
         <Button
           variant="secondary"
           size="sm"
+          className="max-md:h-11"
           disabled={busy || reason.trim().length < 3}
           onClick={() => onDismiss(reason.trim())}
         >

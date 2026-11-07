@@ -179,3 +179,28 @@ describe('listes manuelles', () => {
     expect(notes.succes).not.toHaveBeenCalled();
   });
 });
+
+describe('export de liste (DM1-CIB)', () => {
+  it('production : sans annonce du serveur, ni « Exporter la liste » ni « Exporter la sélection »', async () => {
+    await monterDetail();
+    expect(screen.queryByRole('button', { name: 'Exporter la liste' })).toBeNull();
+    await userEvent.click(within(screen.getByTestId('membre-101')).getByRole('checkbox'));
+    expect(screen.queryByRole('button', { name: 'Exporter la sélection' })).toBeNull();
+  });
+
+  it('le serveur l’annonce (`meta.gestes_ciblage`) : les deux exports paraissent', async () => {
+    await renderScreen(<ListeManuelleDetailPage />, {
+      path: '/listes/$listeId',
+      url: '/listes/7',
+      handlers: [
+        getJson('/listes-manuelles/7', { data: LISTE }),
+        getJson('/listes-manuelles/7/membres', { ...MEMBRES, meta: { ...MEMBRES.meta, gestes_ciblage: true } }),
+      ],
+      landingRoutes: ['/listes', '/companies', '/companies/$companyId'],
+    });
+    await screen.findByTestId('membre-101');
+    expect(await screen.findByRole('button', { name: 'Exporter la liste' })).toBeInTheDocument();
+    await userEvent.click(within(screen.getByTestId('membre-101')).getByRole('checkbox'));
+    expect(await screen.findByRole('button', { name: 'Exporter la sélection' })).toBeInTheDocument();
+  });
+});

@@ -5,7 +5,11 @@ import { Link } from '@tanstack/react-router';
 import { Card, EmptyState, QueryErrorState, Skeleton, Tooltip, cn } from '@/components/ui';
 import { api, qualifierErreur } from '@/lib/api';
 import { useConsoleFeatures } from '@/features/crm-console/useConsoleFeatures';
+import { useProduits } from '@/features/socle/produits/useProduits';
+import { OngletsTableauDeBord } from './OngletsTableauDeBord';
+import { tachesEtAffairesDisponibles } from '@/features/crm/taches/disponible';
 import { AFaire } from './components/AFaire';
+import { CarteEnvoiAujourdhui } from './components/CarteEnvoiAujourdhui';
 import { MesAudiences } from './components/MesAudiences';
 import { SizeDistributionChart } from './components/SizeDistributionChart';
 import { etatQualite } from './qualite';
@@ -50,6 +54,8 @@ interface DashboardStats {
   quality_a_recalculer_pct?: number | null;
   /** Heure du calcul (UTC) : les chiffres sont servis depuis un cache court. */
   computed_at?: string;
+  /** « Aujourd'hui » du serveur (AAAA-MM-JJ) : la démo le fixe ; absent = la date du navigateur. */
+  aujourdhui?: string;
 }
 
 const CHIFFRE_INDISPONIBLE = 'Chiffre indisponible pour le moment';
@@ -96,6 +102,12 @@ function fraicheur(computedAt: string | undefined, maintenant: number = Date.now
 export function dateDuJour(maintenant: Date = new Date()): string {
   const texte = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(maintenant);
   return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
+
+/** La date à écrire en tête : celle du serveur si elle est donnée (midi : à l'abri des fuseaux), sinon aujourd'hui. */
+function jourAffiche(aujourdhui: string | undefined): Date {
+  if (aujourdhui !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(aujourdhui)) return new Date(`${aujourdhui}T12:00:00`);
+  return new Date();
 }
 
 /** Espace insécable entre le nombre et « M » (jamais de retour à la ligne entre les deux). */
@@ -159,6 +171,8 @@ export function DashboardPage() {
     staleTime: 5 * 60 * 1000,
   });
   const features = useConsoleFeatures();
+  // DM1-ACC — la carte « Envoi aujourd'hui » n'existe que si Envoi est actif pour l'espace.
+  const envoiActif = useProduits().envoi === 'actif';
 
   const { data, isLoading, refetch, error } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -184,12 +198,14 @@ export function DashboardPage() {
       <header className="min-w-0">
         {/* « Tableau de bord » : le mot du menu et du fil d'Ariane, sur la ligne de la date. */}
         <p className="text-sm font-medium text-slate-500">
-          <span>Tableau de bord</span> · {dateDuJour()}
+          <span>Tableau de bord</span> · {dateDuJour(jourAffiche(data?.aujourdhui))}
         </p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
           {firstName ? `Bonjour ${firstName}` : 'Bienvenue'}
         </h1>
       </header>
+      {/* DM1-ACC — onglets seulement en démo : hors démo, Mes tâches et Affaires restent « en attente ». */}
+      {tachesEtAffairesDisponibles() ? <OngletsTableauDeBord /> : null}
 
       {sansEspace !== null ? (
         <Card padding="lg">
@@ -198,6 +214,7 @@ export function DashboardPage() {
       ) : (
         <>
           {features.console_v2 ? <AFaire consoleOuverte /> : null}
+          {envoiActif ? <CarteEnvoiAujourdhui /> : null}
 
           {isLoading ? (
             <MaBaseSquelette />

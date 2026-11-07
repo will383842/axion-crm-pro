@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
-use App\Jobs\VerifierEffacementRgpd;
+use App\Crm\Rgpd\SignalementDemandeEffacement;
+use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
 use App\Services\Rgpd\GdprPortabilityService;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +30,15 @@ class RgpdRequestsController extends ApiController
      * fera rougir la garde au lieu de tomber dans un `default` muet.
      */
     public const TYPES = ['access', 'portability', 'erasure', 'rectification', 'opposition'];
+
+    /** Filtre `statut` de la liste (L5) : calculé, jamais stocké. */
+    public const STATUTS_FILTRE_VERS_BASE = [
+        'ouverte' => ['pending', 'processing'],
+        'traitee' => ['done', 'rejected', 'expired'],
+        'toutes' => null,
+    ];
+
+    private const STATUTS_FILTRE = ['ouverte', 'traitee', 'toutes'];
 
     public function __construct(
         private readonly GdprErasureService $erasure,
@@ -61,6 +72,21 @@ class RgpdRequestsController extends ApiController
         // demande de deviner un identifiant, la liste les donne tous.
         $espaceCourant = $this->espaceCourantOuNull();
 
+        // L5 : filtre CALCULÉ (aucune valeur stockée `ouverte`) — `ouverte` = en
+        // attente de la décision de Will (pending + processing).
+        $statut = $r->query('statut');
+        if ($statut !== null && ! in_array($statut, self::STATUTS_FILTRE, true)) {
+            return response()->json(['error' => 'statut_invalide', 'valeurs' => array_keys(self::STATUTS_FILTRE_VERS_BASE)], 422);
+        }
+        $type = $r->query('type');
+        if ($type !== null && ! in_array($type, self::TYPES, true)) {
+            return response()->json(['error' => 'type_invalide'], 422);
+        }
+        $statutsBase = self::STATUTS_FILTRE_VERS_BASE[$statut] ?? null;
+        // Ligne RGPD d'effacement : masquée pour TOUT rôle sauf owner/admin (`rgpd.view_pii`).
+        // `contacts.view_pii` ne convient pas : operator le possède et verrait adresse, note et jeton.
+        $masquer = ! (auth()->user()?->can('rgpd.view_pii') ?? false);
+
         try {
             $rows = RgpdRequest::query()
                 ->when(
@@ -71,13 +97,29 @@ class RgpdRequestsController extends ApiController
                     fn ($q) => $q->whereRaw('1 = 0'),
                 )
                 ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
-                ->orderByDesc('requested_at')
+                ->when($statutsBase !== null, fn ($q) => $q->whereIn('status', $statutsBase))
+                ->when($type !== null, fn ($q) => $q->where('type', $type))
+                // Les demandes ouvertes : la plus ancienne d'abord (elle attend depuis le plus longtemps).
+                ->when($statut === 'ouverte', fn ($q) => $q->orderBy('requested_at'), fn ($q) => $q->orderByDesc('requested_at'))
                 ->paginate(25);
+
+            if ($masquer) {
+                $rows->getCollection()->transform(function ($ligne) {
+                    $ligne->setAttribute('subject_email', MasquageCoordonnees::email($ligne->subject_email));
+                    // Toute la ligne : `metadata` porte la note libre de l'opérateur et le bilan du
+                    // traitement (texte libre, parfois nominatif). On n'en laisse que deux drapeaux sans PII.
+                    $ligne->setAttribute('metadata', array_intersect_key((array) $ligne->metadata, ['mise_a_l_ecart' => 1, 'verification' => 1]));
+                    $ligne->setAttribute('export_token', null);
+
+                    return $ligne;
+                });
+            }
 
             return $this->ok($rows);
         } catch (\Throwable $e) {
-            Log::error('rgpd.requests.index failed', ['exception' => $e->getMessage()]);
-            report($e);
+            // Jamais `getMessage()` : un message SQL peut citer `subject_email` (PII dans les journaux).
+            // Pas de `report($e)` non plus : il journalise le message complet. Seule la classe sort.
+            Log::error('rgpd.requests.index failed', ['exception' => $e::class]);
 
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
@@ -112,6 +154,12 @@ class RgpdRequestsController extends ApiController
             'requested_at' => now(),
             'metadata' => $validated['metadata'] ?? [],
         ]);
+
+        // L3c-0 : une demande d'effacement venue de la console est SIGNALÉE à
+        // Will (notification + pastille « Demandes RGPD »), qui décide.
+        if ($validated['type'] === 'erasure' && $req->workspace_id !== null) {
+            SignalementDemandeEffacement::signaler((string) $req->workspace_id, 'console');
+        }
 
         return $this->ok($req, 201);
     }
@@ -217,12 +265,11 @@ class RgpdRequestsController extends ApiController
         };
 
         if ($req->type === 'erasure') {
-            // Lot L5 — l'effacement décidé DANS la console CRM doit remonter au
-            // site : sinon le site continue d'adresser une personne que le CRM
-            // a effacée. Mise en file locale, jamais un POST synchrone : la
-            // réussite d'un droit art. 17 ne dépend pas de la disponibilité du
-            // site (l'émission est portée par `crm:flush-outbound`).
-            $this->queueOutbound('erasure', $req->subject_email, $req->id);
+            // L3c-0 (règle de Will) : « traiter » met la personne à l'écart, il
+            // ne supprime rien — le site n'est donc PAS invité à effacer. On lui
+            // transmet l'opposition (`consent_optout`) : il cesse de la contacter.
+            // Mise en file locale, jamais un POST synchrone (`crm:flush-outbound`).
+            $this->queueOutbound('consent_optout', $req->subject_email, $req->id);
         }
 
         // 🔴 LE JETON DE TELECHARGEMENT NE SE PERSISTE PAS EN CLAIR.
@@ -237,9 +284,8 @@ class RgpdRequestsController extends ApiController
         //
         // Le jeton reste rendu a l'operateur qui declenche le traitement - il
         // doit bien le transmettre a la personne - mais il n'est plus ECRIT.
-        // Les numéros PERSONNELS d'un effacement ne servent qu'à sa preuve
-        // différée : ni archivés, ni rendus (ce sont des numéros en clair).
-        $personnels = is_array($result['personnels'] ?? null) ? array_values(array_map('strval', $result['personnels'])) : [];
+        // Les numéros PERSONNELS relevés par un effacement ne sont ni archivés
+        // ni rendus (ce sont des numéros en clair).
         unset($result['personnels']);
 
         $resultatArchive = $result;
@@ -250,28 +296,34 @@ class RgpdRequestsController extends ApiController
             $archive['note'] = $note;
         }
 
-        // Un effacement n'est soldé que par sa PREUVE, différée (relecture
-        // P1) : la demande reste « en cours » jusqu'à ce que
-        // `VerifierEffacementRgpd` ne retrouve plus rien — sinon elle y reste,
-        // avec le motif et les emplacements.
+        // L3c-0 : rien n'est supprimé, donc aucune preuve différée à attendre.
         if ($req->type === 'erasure') {
-            $archive['verification'] = 'en_attente';
+            $archive['verification'] = 'aucune';
+            $archive['mise_a_l_ecart'] = true;
         }
 
         $req->update([
-            'status' => $req->type === 'erasure' ? 'processing' : 'done',
+            'status' => 'done',
             'processed_at' => now(),
             'processed_by' => $r->user()?->id,
             'metadata' => array_merge((array) $req->metadata, $archive),
         ]);
 
-        if ($req->type === 'erasure') {
-            // APRÈS la mise à jour : le verdict de la vérification l'écrase.
-            dispatch((new VerifierEffacementRgpd((string) $req->subject_email, $personnels, (int) $req->id))
-                ->pourEspace((string) $req->workspace_id));
+        if ($req->workspace_id !== null) {
+            ATraiterController::oublier((string) $req->workspace_id); // la pastille suit
         }
 
-        return $this->ok(['request' => $req->fresh(), 'result' => $result]);
+        $reponse = ['request' => $req->fresh(), 'result' => $result];
+        if ($req->type === 'erasure') {
+            // L5 : dit noir sur blanc que rien n'est supprimé.
+            $reponse['mise_a_l_ecart'] = [
+                'personnes' => (int) ($result['deleted']['personnes'] ?? 0),
+                'abonnements' => (int) ($result['deleted']['abonnements'] ?? 0),
+            ];
+            $reponse['supprime'] = 0;
+        }
+
+        return $this->ok($reponse);
     }
 
     /**

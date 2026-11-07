@@ -287,6 +287,27 @@ export interface PersonneFiche {
   entreprise: { id: number; denomination: string | null; siren: string | null } | null;
   taches: PersonneTimelineEntry[];
   timeline: PersonneTimelineEntry[];
+  /** PV-6 : absent d'une ancienne API, d'où le facultatif. */
+  contenus_accords?: ContenusAccords;
+}
+
+/** Lien public d'un guide, calculé par le CRM depuis sa table fermée (jamais une URL venue des données). */
+export interface LienGuide {
+  url: string;
+  libelle: string;
+}
+
+/**
+ * Bloc « Contenus et accords » (lecture seule). Jamais de pseudo ni de texte de message.
+ * `lien_statut` : `disponible`, `eteint` (interrupteur) ou `refuse` (profil lecture seule) ;
+ * absent d'une ancienne API. `nom` : nom du guide connu de la table (sans adresse).
+ */
+export interface ContenusAccords {
+  origine: { mot: string | null; reseau: string | null; guide: string | null; date: string | null; nom?: string | null; lien?: LienGuide | null } | null;
+  guides: { guide: string | null; date: string | null; nom?: string | null; lien?: LienGuide | null }[];
+  consentements: { nature: string | null; date: string | null; source: string | null; version: string | null }[];
+  opposition: { actif: boolean; date: string | null };
+  lien_statut?: 'disponible' | 'eteint' | 'refuse';
 }
 
 /**

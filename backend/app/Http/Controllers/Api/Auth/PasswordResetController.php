@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\User;
 use App\Rules\NotPwnedPassword;
+use App\Services\Auth\AuthService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,15 @@ class PasswordResetController extends ApiController
         RateLimiter::hit($key, 900);
 
         $email = (string) $request->input('email');
+
+        // Limiteur PAR COMPTE (lot S1) : demande absorbée en silence, même réponse.
+        if (AuthService::limiteurCompteActif()) {
+            $cleCompte = AuthService::cleCompte('password-reset', $email);
+            if (RateLimiter::tooManyAttempts($cleCompte, min(3, AuthService::essaisMaxParCompte()))) {
+                return $this->ok(['sent' => true]);
+            }
+            RateLimiter::hit($cleCompte, 900);
+        }
         $token = Str::random(64);
         // Pour les journaux seulement : on y écrit l'identifiant, jamais l'adresse.
         $userId = User::query()->where('email', $email)->whereNull('deleted_at')->value('id');
@@ -134,8 +144,20 @@ class PasswordResetController extends ApiController
         $email = (string) $request->input('email');
         $tokenHash = hash('sha256', (string) $request->input('token'));
 
+        // Limiteur PAR COMPTE (lot S1) : on ne devine pas un jeton depuis plusieurs
+        // adresses. Même réponse qu'un jeton invalide.
+        $cleCompte = AuthService::cleCompte('password-reset-essai', $email);
+        $limiteCompte = AuthService::limiteurCompteActif();
+        if ($limiteCompte && RateLimiter::tooManyAttempts($cleCompte, AuthService::essaisMaxParCompte())) {
+            return response()->json(['error' => 'invalid_token'], 401);
+        }
+
         $row = DB::table('password_reset_tokens')->where('email', $email)->first();
         if (! $row || ! hash_equals((string) $row->token, $tokenHash)) {
+            if ($limiteCompte) {
+                RateLimiter::hit($cleCompte, AuthService::FENETRE_LIMITEUR_COMPTE);
+            }
+
             return response()->json(['error' => 'invalid_token'], 401);
         }
 
@@ -152,9 +174,21 @@ class PasswordResetController extends ApiController
             return response()->json(['error' => 'expired_token'], 401);
         }
 
+        // 🔴 ANTI-REJEU ATOMIQUE (lot S1) : le jeton est RÉCLAMÉ par une suppression
+        // conditionnelle AVANT tout effet. Deux requêtes simultanées avec le même jeton
+        // passaient toutes deux les contrôles ci-dessus ; une seule supprime la ligne.
+        $reclame = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->where('token', $tokenHash)
+            ->delete();
+        if ($reclame !== 1) {
+            return response()->json(['error' => 'invalid_token'], 401);
+        }
+
+        // Pas de compte : même réponse qu'un jeton invalide (ne pas révéler l'existence).
         $user = User::query()->where('email', $email)->whereNull('deleted_at')->first();
         if (! $user) {
-            return response()->json(['error' => 'user_not_found'], 404);
+            return response()->json(['error' => 'invalid_token'], 401);
         }
 
         $user->password_hash = Hash::make((string) $request->input('password'));
@@ -162,8 +196,6 @@ class PasswordResetController extends ApiController
         $user->last_failed_login_at = null;
         $user->locked_until = null;
         $user->save();
-
-        DB::table('password_reset_tokens')->where('email', $email)->delete();
 
         // -- Couper tous les acces ouverts avec l'ANCIEN mot de passe ---------
         // La reinitialisation ne revoquait rien. C'est pourtant le geste que fait

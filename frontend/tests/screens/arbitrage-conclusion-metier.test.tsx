@@ -34,10 +34,13 @@
  * ⚠️ Sous-chaines SANS LETTRE ACCENTUEE : on cherche « leur entreprise », pas
  * « ont trouve leur entreprise » (« trouve » porte un accent dans le produit).
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { screen, waitFor } from '@testing-library/react';
 
 import { ArbitragePage } from '@/features/crm-console/ArbitragePage';
+import { demoDb } from '@/demo/base';
+import { handlers as handlersDemo } from '@/demo/handlers/crm/a-traiter.handlers';
 import { renderScreen } from '../helpers/renderScreen';
 import { apiUrl, getJson, getPending, http, HttpResponse } from '../msw/handlers';
 
@@ -135,5 +138,27 @@ describe('D25-003 — la file d’arbitrage ne conclut rien sur ce qu’elle n�
     await waitFor(() => {
       expect(texteEcran()).toMatch(/3\s+\S*nement\(s\)/);
     });
+  });
+});
+
+describe('Personnes à rattacher avec le faux serveur de démo (DM1-ATR)', () => {
+  afterEach(() => demoDb.reinitialiser());
+
+  it('écarter une ligne exige un motif, la retire de la file, et l’écran ne conclut jamais « tout est rattaché »', async () => {
+    await renderScreen(<ArbitragePage />, {
+      path: '/console/arbitrage',
+      consoleFeatures: 'open',
+      handlers: handlersDemo,
+    });
+    const user = userEvent.setup();
+    await waitFor(() => expect(document.body.textContent).toContain('7 événement(s) reçus sans SIREN'));
+
+    const ecarter = (await screen.findAllByRole('button', { name: 'Écarter' }))[0]!;
+    expect(ecarter).toBeDisabled();
+    await user.type(screen.getAllByLabelText('Motif d’écartement')[0]!, 'entreprise introuvable');
+    await user.click(ecarter);
+
+    await waitFor(() => expect(document.body.textContent).toContain('6 événement(s) reçus sans SIREN'));
+    expect(document.body.textContent).not.toContain(CONCLUSION_METIER);
   });
 });

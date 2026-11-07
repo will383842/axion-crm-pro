@@ -33,7 +33,7 @@ function passerelle(?FauxServeurEnvoi $faux = null, ?DepotMemoire $depot = null,
 }
 
 // Le kit tourne aussi sur la passerelle (drapeau ouvert, témoin autorisé).
-kitConformiteServeurEnvoi(fn () => passerelle(plafond: 1000));
+kitConformiteServeurEnvoi(fn () => passerelle(plafond: 300));
 
 test('drapeau éteint : exception et ZÉRO appel au serveur', function () {
     $faux = new FauxServeurEnvoi;

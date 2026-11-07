@@ -531,7 +531,9 @@ Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
 
 // K12 — contrôle DNS quotidien des domaines d'envoi (PTR/SPF/DKIM/DMARC). Lecture du DNS et
 // ajouts seulement ; n'envoie rien. Un domaine pas prêt n'est pas marqué vérifié ce jour.
-ConsoleApplication::starting(static fn (ConsoleApplication $artisan) => $artisan->resolve(ControleDnsCommande::class));
+ConsoleApplication::starting(static function (ConsoleApplication $artisan): void {
+    $artisan->resolve(ControleDnsCommande::class);
+});
 Schedule::command(ControleDnsCommande::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:45')
     ->withoutOverlapping(60)

@@ -58,6 +58,6 @@ final class ResolveurDnsSysteme implements ResolveurDns
     {
         $r = @dns_get_record($nom, $type);
 
-        return is_array($r) ? array_values($r) : [];
+        return is_array($r) ? $r : [];
     }
 }

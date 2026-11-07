@@ -23,17 +23,8 @@ for v in IP_ENVOI IP_GESTION IP_CRM_PROD IP_RESOLVEUR IP_TUNNEL IP_TUNNEL_ADMIN 
   [[ -n "${!v:-}" ]] || { echo "valeur manquante : $v" >&2; exit 1; }
 done
 
-# Rend un modele. Rien de secret en argument de commande : la cle privee du serveur
-# est lue PAR FICHIER (awk getline), jamais via $(...) ni sur une ligne de commande.
-rendre() { # rendre <modele> <sortie>
-  sed -e "s|<ip-envoi>|$IP_ENVOI|g" -e "s|<ip-gestion>|$IP_GESTION|g" \
-      -e "s|<ip-crm-prod>|$IP_CRM_PROD|g" -e "s|<ip-resolveur>|$IP_RESOLVEUR|g" \
-      -e "s|<ip-tunnel-admin>|$IP_TUNNEL_ADMIN|g" -e "s|<ip-tunnel>|$IP_TUNNEL|g" \
-      -e "s|<port-wg>|$PORT_WG|g" -e "s|<cle-publique-admin>|$CLE_PUBLIQUE_ADMIN|g" "$1" \
-    | awk 'BEGIN { if ((getline k < "/etc/wireguard/cle-privee") <= 0) k = "<cle-privee-serveur>" }
-           { gsub(/<cle-privee-serveur>/, k) } 1' >"$2"
-  if grep -q '<[a-z-]\+>' "$2"; then echo "marqueur non remplace dans $2" >&2; return 1; fi
-}
+# shellcheck source=lib/rendu.sh
+source "$SRC/lib/rendu.sh"
 
 agir apt-get install -y --no-install-recommends wireguard nftables docker.io docker-compose-v2
 agir install -d -m 0755 "$CIBLE" "$CIBLE/kumomta"

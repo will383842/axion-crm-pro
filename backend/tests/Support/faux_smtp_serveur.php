@@ -5,6 +5,9 @@
  * Usage : php faux_smtp_serveur.php <mode> <fichier_recu>
  * Modes : ok | coupure_apres_data | 451_apres_data | 550_apres_data
  * Écrit le port sur la 1re ligne de stdout, enregistre le brut reçu (DATA) dans <fichier_recu>.
+ * Enregistre aussi chaque commande reçue (hors DATA) dans <fichier_recu>.cmd, et ANNONCE
+ * AUTH PLAIN LOGIN sans jamais proposer STARTTLS : sert à prouver qu'aucun identifiant
+ * n'est envoyé en clair.
  * Sert une seule connexion puis s'arrête. Aucun accès réseau externe.
  */
 [$_, $mode, $fichier] = $argv;
@@ -45,9 +48,10 @@ while (($ligne = fgets($c)) !== false) {
 
         continue;
     }
+    file_put_contents($fichier . '.cmd', $ligne, FILE_APPEND);
     $cmd = strtoupper(substr($ligne, 0, 4));
     if ($cmd === 'EHLO' || $cmd === 'HELO') {
-        fwrite($c, "250-faux\r\n250 8BITMIME\r\n");
+        fwrite($c, "250-faux\r\n250-AUTH PLAIN LOGIN\r\n250 8BITMIME\r\n");
     } elseif ($cmd === 'DATA') {
         fwrite($c, "354 go\r\n");
         $donnees = true;

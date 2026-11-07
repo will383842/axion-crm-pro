@@ -10,8 +10,21 @@ use Illuminate\Support\Str;
 /** Accès aux boîtes. Identifiants chiffrés (Crypt, clé d'application) ; aucun effacement. */
 final class DepotBoites
 {
-    public function creer(string $workspaceId, string $adresse, string $hote, int $port, string $chiffrement, string $utilisateur, string $secret, int $limiteJour = 20, int $limiteHeure = 5): string
+    private readonly ResolveurHote $resolveur;
+
+    public function __construct(?ResolveurHote $resolveur = null)
     {
+        $this->resolveur = $resolveur ?? new ResolveurDns;
+    }
+
+    /**
+     * Refuse (EnvoiSmtpRefuse) tout hôte/port/chiffrement dangereux AVANT d'écrire quoi que ce soit :
+     * ports hors liste blanche, adresses privées/bouclage/link-local/métadonnées, absence de TLS.
+     */
+    public function creer(string $workspaceId, string $adresse, string $hote, int $port, string $chiffrement, string $utilisateur, #[\SensitiveParameter] string $secret, int $limiteJour = 20, int $limiteHeure = 5): string
+    {
+        $hote = trim($hote);
+        GardeHoteSmtp::controlerBoite($hote, $port, $chiffrement, $this->resolveur);
         $id = (string) Str::uuid();
         $chiffres = Crypt::encryptString((string) json_encode(['u' => $utilisateur, 's' => $secret], JSON_THROW_ON_ERROR));
         WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_boites')->insert([

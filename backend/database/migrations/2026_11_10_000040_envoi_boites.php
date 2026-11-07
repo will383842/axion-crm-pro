@@ -74,6 +74,12 @@ return new class extends Migration
     /** Retour réel : ne touche que la table créée ici. */
     public function down(): void
     {
+        // Les clés étrangères des injections (000041, 000042) dépendent de cette table : on retire
+        // d'abord CES contraintes seulement (la table des injections et ses lignes restent intactes).
+        if (DB::selectOne("SELECT to_regclass('public.envoi_injections_smtp') AS t")->t !== null) {
+            DB::statement('ALTER TABLE envoi_injections_smtp DROP CONSTRAINT IF EXISTS envoi_injections_smtp_boite_workspace_fk');
+            DB::statement('ALTER TABLE envoi_injections_smtp DROP CONSTRAINT IF EXISTS envoi_injections_smtp_boite_id_fkey');
+        }
         DB::statement('DROP TABLE IF EXISTS envoi_boites');
         DB::statement('DROP FUNCTION IF EXISTS envoi_boites_aucun_effacement()');
     }

@@ -21,7 +21,9 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
+use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\RawMessage;
@@ -36,6 +38,14 @@ use Symfony\Component\Mime\RawMessage;
  * JAMAIS de renvoi automatique d'un message dont le sort est incertain.
  * 3 × 5xx en 10 minutes => pause automatique de la boîte + alerte.
  * Aucune mesure d'ouverture. Aucun effacement. Aucun secret journalisé.
+ *
+ * Garanties de sécurité :
+ *  - jamais d'identifiants sans TLS (TLS implicite, ou STARTTLS EXIGÉ), certificat validé ;
+ *  - l'adresse IP de l'hôte est contrôlée (publique) et ÉPINGLÉE à chaque connexion ;
+ *  - injecter() est refusé dans une transaction englobante : l'état « injection_en_cours »
+ *    doit être COMMITÉ avant le réseau, sinon un rollback effacerait la trace d'un envoi parti ;
+ *  - tout ce qui peut être refusé (enveloppe, expéditeur, CR/LF isolés, hôte) l'est AVANT
+ *    le passage à « injection_en_cours ».
  */
 final class AdaptateurSmtp implements ServeurEnvoi
 {
@@ -46,6 +56,8 @@ final class AdaptateurSmtp implements ServeurEnvoi
     /** @var Closure(BoiteSmtp): TransportInterface */
     private readonly Closure $fabriqueTransport;
 
+    private readonly ResolveurHote $resolveur;
+
     /** @param ?Closure(BoiteSmtp): TransportInterface $fabriqueTransport */
     public function __construct(
         private readonly string $workspaceId,
@@ -54,16 +66,45 @@ final class AdaptateurSmtp implements ServeurEnvoi
         private readonly DepotBoites $boites,
         private readonly DepotSocle $depot,
         ?Closure $fabriqueTransport = null,
+        ?ResolveurHote $resolveur = null,
     ) {
-        $this->fabriqueTransport = $fabriqueTransport ?? self::transportParDefaut(...);
+        $this->resolveur = $resolveur ?? new ResolveurDns;
+        $this->fabriqueTransport = $fabriqueTransport ?? fn (BoiteSmtp $b): TransportInterface => self::transportParDefaut($b, $this->resolveur);
     }
 
-    public static function transportParDefaut(BoiteSmtp $boite): TransportInterface
+    /**
+     * Transport réel. Jamais d'identifiants en clair :
+     *  - « tls » : TLS implicite ; « starttls » : STARTTLS EXIGÉ (setRequireTls) ; certificat validé
+     *    contre le NOM de la boîte (peer_name) alors que la connexion vise l'IP contrôlée ;
+     *  - « aucun » : n'existe qu'en boucle locale de test, et n'envoie AUCUN identifiant.
+     * L'adresse est résolue et contrôlée ICI, à la connexion : un nom devenu privé (rebinding) est refusé.
+     */
+    public static function transportParDefaut(BoiteSmtp $boite, ?ResolveurHote $resolveur = null): TransportInterface
     {
-        $t = new EsmtpTransport($boite->hote, $boite->port, $boite->chiffrement === 'tls');
+        $ip = GardeHoteSmtp::controlerBoite($boite->hote, $boite->port, $boite->chiffrement, $resolveur ?? new ResolveurDns);
+
         if ($boite->chiffrement === 'aucun') {
+            $t = new EsmtpTransport($ip, $boite->port, false);
             $t->setAutoTls(false);
+
+            return $t; // jamais d'identifiants sans TLS
         }
+
+        $t = new EsmtpTransport(str_contains($ip, ':') ? '[' . $ip . ']' : $ip, $boite->port, $boite->chiffrement === 'tls');
+        if ($boite->chiffrement === 'starttls') {
+            $t->setAutoTls(true);
+            $t->setRequireTls(true);
+        }
+        $flux = $t->getStream();
+        if (! $flux instanceof SocketStream) {
+            throw EnvoiSmtpRefuse::motif('flux SMTP inattendu : validation du certificat impossible.');
+        }
+        $flux->setStreamOptions(['ssl' => [
+            'peer_name' => $boite->hote,
+            'SNI_enabled' => true,
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ]]);
         if ($boite->utilisateur !== '') {
             $t->setUsername($boite->utilisateur);
             $t->setPassword($boite->secret());
@@ -77,32 +118,17 @@ final class AdaptateurSmtp implements ServeurEnvoi
         if ($message->workspaceId !== $this->workspaceId) {
             throw EnvoiRefuse::autreEspace();
         }
+        self::refuserTransactionEnglobante();
         $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
             ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
 
-        // Idempotence : un sort déjà connu ou incertain ne déclenche JAMAIS un nouvel envoi.
-        $existant = $this->ligne($message->cleIdempotence);
-        if ($existant !== null) {
-            switch ($existant->etat) {
-                case 'accepte':
-                    return ResultatInjection::accepte((string) $existant->id_injection);
-                case 'echec':
-                    throw new RuntimeException('Refus définitif (5xx) déjà enregistré pour cette clé.');
-                case 'injection_en_cours':
-                case 'a_verifier':
-                    return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
-                case 'reporte':
-                    if ($existant->reporte_au !== null && new DateTimeImmutable((string) $existant->reporte_au) > new DateTimeImmutable) {
-                        return ResultatInjection::reporte(new DateTimeImmutable((string) $existant->reporte_au));
-                    }
-                    break;
-            }
-        }
-        if ($boite->enPause) {
-            return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
-        }
-        if ($this->limiteAtteinte()) {
-            return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+        // Tout ce qui peut être refusé l'est ICI, avant le moindre état d'injection.
+        $enveloppe = self::enveloppe($message, $boite);
+
+        // Chemin rapide : un sort déjà connu ne déclenche JAMAIS un nouvel envoi (revérifié sous verrou).
+        $deja = $this->decisionSurExistant($message);
+        if ($deja !== null) {
+            return $deja;
         }
 
         $verrou = 'envoi:boite:' . $this->boiteId;
@@ -110,16 +136,90 @@ final class AdaptateurSmtp implements ServeurEnvoi
             return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
         }
         try {
-            return $this->injecterSousVerrou($message, $boite);
+            return $this->injecterSousVerrou($message, $enveloppe);
         } finally {
             DB::select('SELECT pg_advisory_unlock(hashtextextended(?, 0))', [$verrou]);
         }
     }
 
-    private function injecterSousVerrou(MessageAEnvoyer $message, BoiteSmtp $boite): ResultatInjection
+    /**
+     * Dans une transaction englobante, « injection_en_cours » ne serait pas commité avant le
+     * réseau : un rollback ultérieur effacerait la trace d'un message DÉJÀ parti => doublon au
+     * rejeu. Dérogation de test (RefreshDatabase) : honorée UNIQUEMENT sous APP_ENV=testing.
+     */
+    private static function refuserTransactionEnglobante(): void
     {
-        // Rien n'est parti tant que le brut n'est pas obtenu : une erreur ici n'a aucun effet.
+        if (DB::transactionLevel() > 0
+            && ! ((bool) config('envoi.smtp_tolere_transaction_englobante', false) && app()->environment('testing'))) {
+            throw EnvoiSmtpRefuse::motif('injecter() ne s\'appelle pas dans une transaction englobante (l\'état injection_en_cours doit être commité avant le réseau).');
+        }
+    }
+
+    /** Valide l'enveloppe (adresses RFC) ET que l'expéditeur est l'adresse de la boîte. */
+    private static function enveloppe(MessageAEnvoyer $message, BoiteSmtp $boite): Envelope
+    {
+        try {
+            $expediteur = new Address($message->expediteur);
+            $destinataire = new Address($message->destinataire);
+        } catch (\Throwable) {
+            throw EnvoiSmtpRefuse::motif('enveloppe invalide (adresse expéditeur ou destinataire).');
+        }
+        if (strtolower($expediteur->getAddress()) !== strtolower($boite->adresse)) {
+            throw EnvoiSmtpRefuse::motif('l\'expéditeur n\'est pas l\'adresse de la boîte d\'envoi.');
+        }
+
+        return new Envelope($expediteur, [$destinataire]);
+    }
+
+    /** CR ou LF isolé : contrebande SMTP possible. Seul CRLF est admis. */
+    private static function verifierFinsDeLigne(string $brut): void
+    {
+        if ($brut === '' || preg_match('/\r(?!\n)|(?<!\r)\n/', $brut) === 1) {
+            throw EnvoiSmtpRefuse::motif('message brut vide ou contenant un CR/LF isolé.');
+        }
+    }
+
+    /** Sort déjà connu pour cette clé : résultat à rendre sans rien envoyer, ou null si l'envoi est permis. */
+    private function decisionSurExistant(MessageAEnvoyer $message): ?ResultatInjection
+    {
+        $existant = $this->ligne($message->cleIdempotence);
+        if ($existant === null) {
+            return null;
+        }
+        switch ($existant->etat) {
+            case 'accepte':
+                return ResultatInjection::accepte((string) $existant->id_injection);
+            case 'echec':
+                throw new RuntimeException('Refus définitif (5xx) déjà enregistré pour cette clé.');
+            case 'injection_en_cours':
+            case 'a_verifier':
+                return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+            case 'reporte':
+                if ($existant->reporte_au !== null && new DateTimeImmutable((string) $existant->reporte_au) > new DateTimeImmutable) {
+                    return ResultatInjection::reporte(new DateTimeImmutable((string) $existant->reporte_au));
+                }
+                break;
+        }
+
+        return null;
+    }
+
+    private function injecterSousVerrou(MessageAEnvoyer $message, Envelope $enveloppe): ResultatInjection
+    {
+        // Tout est relu SOUS le verrou : un autre processus a pu agir depuis les lectures précédentes.
+        $deja = $this->decisionSurExistant($message);
+        if ($deja !== null) {
+            return $deja;
+        }
+        $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
+            ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
+        if ($boite->enPause || $this->limiteAtteinte()) {
+            return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+        }
+
+        // Rien n'est parti tant que le brut n'est pas obtenu et validé : une erreur ici n'a aucun effet.
         $brut = $this->source->brut($message);
+        self::verifierFinsDeLigne($brut);
 
         // Un seul envoi à la fois : une autre injection en cours (ou incertaine) bloque la boîte.
         $bloquante = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
@@ -129,23 +229,23 @@ final class AdaptateurSmtp implements ServeurEnvoi
             return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
         }
 
+        // Transport (résolution + contrôle de l'adresse, épinglée) AVANT l'état : un refus d'hôte ne laisse aucune trace.
+        $transport = ($this->fabriqueTransport)($boite);
+
         WorkspaceContext::run($this->workspaceId, fn () => DB::statement(
             "INSERT INTO envoi_injections_smtp (workspace_id, boite_id, cle_idempotence, etat) VALUES (?, ?, ?, 'a_injecter')
              ON CONFLICT (workspace_id, cle_idempotence) DO NOTHING",
             [$this->workspaceId, $this->boiteId, $message->cleIdempotence],
         ));
+        // Hors transaction : chaque instruction est commitée IMMÉDIATEMENT, donc AVANT le réseau.
         $pris = $this->maj($message->cleIdempotence, ['etat' => 'injection_en_cours'], ['a_injecter', 'reporte']);
         if (! $pris) {
             return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
         }
         $id = (string) $this->ligne($message->cleIdempotence)?->id_injection;
 
-        $transport = ($this->fabriqueTransport)($boite);
         try {
-            $transport->send(
-                new RawMessage($brut),
-                new Envelope(new Address($message->expediteur), [new Address($message->destinataire)]),
-            );
+            $transport->send(new RawMessage($brut), $enveloppe);
         } catch (TransportExceptionInterface $e) {
             return $this->classer($message->cleIdempotence, $id, $e);
         } catch (\Throwable) {
@@ -169,8 +269,8 @@ final class AdaptateurSmtp implements ServeurEnvoi
 
     private function classer(string $cle, string $id, TransportExceptionInterface $e): ResultatInjection
     {
-        $texte = $e->getMessage();
-        $code = preg_match('/got code "(\d{3})"/', $texte, $m) === 1 ? (int) $m[1] : null;
+        // Le code SMTP est le code NUMÉRIQUE de la réponse du serveur, jamais celui lu dans un texte.
+        $code = $e instanceof UnexpectedResponseException && $e->getCode() >= 100 && $e->getCode() < 600 ? (int) $e->getCode() : null;
 
         if ($code !== null && $code >= 400 && $code < 500) {
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
@@ -178,12 +278,12 @@ final class AdaptateurSmtp implements ServeurEnvoi
 
             return ResultatInjection::reporte($delai);
         }
-        if ($code !== null && $code >= 500 && $code < 600) {
+        if ($code !== null && $code >= 500) {
             $this->maj($cle, ['etat' => 'echec', 'code_smtp' => $code], ['injection_en_cours']);
             $this->pauseSiTrop5xx();
             throw new RuntimeException('Refus définitif du serveur SMTP (' . $code . ').');
         }
-        if (str_contains($texte, 'Connection could not be established')) {
+        if (str_contains($e->getMessage(), 'Connection could not be established')) {
             // Aucune connexion : rien n'a pu être transmis, report simple.
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
             $this->maj($cle, ['etat' => 'reporte', 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
@@ -234,10 +334,14 @@ final class AdaptateurSmtp implements ServeurEnvoi
             ->update($valeurs + ['maj_le' => now()])) > 0;
     }
 
+    /** @return (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string})|null */
     private function ligne(string $cle): ?object
     {
-        return WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
+        /** @var (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string})|null $ligne */
+        $ligne = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('workspace_id', $this->workspaceId)->where('cle_idempotence', $cle)->first());
+
+        return $ligne;
     }
 
     /** Filet : une injection restée « en cours » (processus tué) devient « à vérifier ». Jamais renvoyée. */
@@ -245,7 +349,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
     {
         return WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('boite_id', $this->boiteId)->where('etat', 'injection_en_cours')
-            ->whereRaw("maj_le < now() - make_interval(mins => ?)", [$minutes])
+            ->whereRaw('maj_le < now() - make_interval(mins => ?)', [$minutes])
             ->update(['etat' => 'a_verifier', 'maj_le' => now()]));
     }
 
@@ -286,7 +390,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $n = (int) WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('boite_id', $this->boiteId)->where('etat', 'accepte')->count());
 
-        return new EtatServeur($boite?->enPause ?? true, $n);
+        return new EtatServeur($boite->enPause ?? true, $n);
     }
 
     /** Aucun ping réseau : la santé reflète l'existence et l'état de la boîte. */

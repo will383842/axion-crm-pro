@@ -36,7 +36,7 @@ async def _couper(w, delai: float, abort: bool) -> None:
 async def _client(cfg, file, ctx, limiteur, etat, r, w):
     if etat["n"] >= cfg.max_connexions:
         w.write(b"421 4.3.2 trop de connexions\r\n")
-        await _couper(w, cfg.delai_ecriture, True)
+        await _couper(w, min(cfg.delai_ecriture, 1.0), True)   # refusée = hors plafond : coupure rapide, comme tout refus
         return
     loop = asyncio.get_running_loop()
     refus_coupure = False                             # vrai si la session finit sur un refus (abort)

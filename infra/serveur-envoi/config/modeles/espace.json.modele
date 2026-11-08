@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "espace": "<uuid-espace>",
+  "domaines": [
+    {
+      "domaine": "<domaine-1>",
+      "debit_heure": "<debit-par-heure>",
+      "plafond_jour": "<plafond-souhaite-par-jour>"
+    }
+  ]
+}

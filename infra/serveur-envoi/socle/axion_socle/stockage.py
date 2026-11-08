@@ -1,7 +1,14 @@
 """État durable en SQLite. Chaque écriture est validée avec fsync (synchronous=FULL) AVANT toute réponse."""
 import os
+import re
 import sqlite3
-import threading
+
+PRAGMAS_AUTORISES = frozenset({"synchronous", "journal_mode", "foreign_keys", "user_version"})
+
+
+def assainir(texte, borne: int = 64) -> str:
+    """Texte à journaliser : borné, sans retour ligne ni caractère de contrôle ou exotique."""
+    return re.sub(r"[^A-Za-z0-9._@-]", "_", str(texte))[:borne]
 
 
 class ErreurStockage(Exception):
@@ -30,21 +37,44 @@ class Stockage:
             if self.c.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ErreurStockage("fichier d'état corrompu")
             self.c.execute("SELECT 1 FROM meta LIMIT 1").fetchall()
-        except sqlite3.Error as e:
+        except (sqlite3.Error, ErreurStockage) as e:
+            self.close()
+            if isinstance(e, ErreurStockage):
+                raise
             raise ErreurStockage(f"fichier d'état illisible: {e}") from e
 
     @classmethod
     def creer(cls, chemin: str) -> None:
         """Installation uniquement. Départ FERMÉ : témoins allumés, aucune santé reçue."""
-        if os.path.exists(chemin):
+        if os.path.lexists(chemin):
             raise ErreurStockage("existe déjà")
+        dossier = os.path.dirname(os.path.abspath(chemin))
+        if not os.path.isdir(dossier):
+            os.makedirs(dossier, mode=0o700)
+            os.chmod(dossier, 0o700)  # indépendant de l'umask
+        try:
+            fd = os.open(chemin, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as e:
+            raise ErreurStockage("existe déjà") from e
+        os.close(fd)
+        os.chmod(chemin, 0o600)  # SQLite crée le journal avec les droits de ce fichier
         c = sqlite3.connect(chemin, isolation_level=None)
-        c.execute("PRAGMA synchronous=FULL")
-        c.executescript(SCHEMA)
-        c.execute("INSERT INTO meta VALUES('temoins','1'),('pause_hm','0')")
-        c.close()
+        try:
+            c.execute("PRAGMA synchronous=FULL")
+            c.executescript(SCHEMA)
+            c.execute("INSERT INTO meta VALUES('temoins','1'),('pause_hm','0')")
+        finally:
+            c.close()
+
+    def close(self) -> None:
+        """Idempotent. Libère le fichier (nécessaire pour le nettoyage sous Windows)."""
+        c, self.c = getattr(self, "c", None), None
+        if c is not None:
+            c.close()
 
     def pragma(self, nom: str) -> int:
+        if nom not in PRAGMAS_AUTORISES:
+            raise ValueError("pragma non autorisé")
         return self.c.execute(f"PRAGMA {nom}").fetchone()[0]
 
     def meta(self, cle, defaut=None):
@@ -86,3 +116,7 @@ class Stockage:
 
     def journal(self):
         return self.c.execute("SELECT type,detail,ts FROM journal ORDER BY n").fetchall()
+
+    def marquer_depose(self, c, jeton):
+        """Déposé : le contenu n'a plus à rester sur disque (on garde l'empreinte pour le rejeu)."""
+        c.execute("UPDATE jetons SET depose=1, contenu=x'' WHERE jeton=?", (jeton,))

@@ -17,6 +17,11 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
+// Horloge figée : le code pousse J-1 en UTC ; sans cela ces tests rougissaient chaque soir
+// entre 22 h et minuit UTC (minuit passé à Paris, `now()` de l'appli étant en Europe/Paris).
+beforeEach(fn () => Carbon::setTestNow('2026-03-15 12:00:00 UTC'));
+afterEach(fn () => Carbon::setTestNow());
+
 const L7_URL = 'https://usine.example.test/api/agregats-crm';
 // Valeur factice construite à l'exécution (aucun littéral que le scan de secrets prendrait pour un vrai).
 const L7_SECRET = 'X' . '_' . 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -27,7 +32,7 @@ function l7Allumer(?string $secret = L7_SECRET): string
     config(['crm.ingest.business_workspace' => 'axion-ia']);
     $ws = (string) Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'axion-ia', 'name' => 'Axion'])->id;
     DB::table('fonctions_espace')->updateOrInsert(['espace_id' => $ws, 'fonction' => 'origines.lecture'], ['ouverte' => true, 'updated_at' => now()]);
-    $hier = now()->subDay()->format('Y-m-d');
+    $hier = now()->utc()->subDay()->format('Y-m-d');
     foreach (range(1, 4) as $i) {
         DB::table('personnes')->insert([
             'workspace_id' => $ws, 'person_key' => 'pk' . $i, 'email' => "p{$i}@example.invalid",
@@ -62,7 +67,7 @@ test('secret absent ou trop court : rien n’est envoyé et une alerte "secret a
 
 test('pousse les jours manquants + J-1, avec les en-têtes signés et un corps agrégé', function () {
     l7Allumer();
-    $hier = now()->subDay()->format('Y-m-d');
+    $hier = now()->utc()->subDay()->format('Y-m-d');
     Http::fake([
         L7_URL => Http::sequence()->push(['jours' => []], 200)->whenEmpty(Http::response(['ok' => true], 200)),
     ]);
@@ -86,8 +91,8 @@ test('pousse les jours manquants + J-1, avec les en-têtes signés et un corps a
 
 test('rattrapage : les jours déjà reçus par l’Usine ne sont pas renvoyés, les dates futures ou > 7 j sont ignorées', function () {
     l7Allumer();
-    $hier = now()->subDay()->format('Y-m-d');
-    Http::fake([L7_URL => Http::sequence()->push(['jours' => [$hier, now()->addDays(3)->format('Y-m-d'), now()->subDays(30)->format('Y-m-d')]], 200)->whenEmpty(Http::response(['ok' => true], 200))]);
+    $hier = now()->utc()->subDay()->format('Y-m-d');
+    Http::fake([L7_URL => Http::sequence()->push(['jours' => [$hier, now()->utc()->addDays(3)->format('Y-m-d'), now()->utc()->subDays(30)->format('Y-m-d')]], 200)->whenEmpty(Http::response(['ok' => true], 200))]);
 
     $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
 
@@ -95,7 +100,7 @@ test('rattrapage : les jours déjà reçus par l’Usine ne sont pas renvoyés, 
         ->map(fn ($p) => json_decode($p[0]->body(), true)['jour'])->values()->all();
     // J-1 est toujours poussé, jamais une date future ni > 7 j.
     foreach ($jours as $j) {
-        expect($j <= $hier)->toBeTrue()->and($j >= now()->subDays(7)->format('Y-m-d'))->toBeTrue();
+        expect($j <= $hier)->toBeTrue()->and($j >= now()->utc()->subDays(7)->format('Y-m-d'))->toBeTrue();
     }
 });
 
@@ -149,15 +154,28 @@ test('joursRecus en échec : seul J-1 est poussé (pas 7 jours d’un coup)', fu
 });
 
 test('J-1 est calculé en UTC, pas à l’heure de l’appli (Europe/Paris)', function () {
-    l7Allumer();
     // 23:30 UTC le 4 = 00:30 le 5 à Paris : J-1 en UTC est le 3, pas le 4.
     Carbon::setTestNow('2026-11-04 23:30:00 UTC');
+    l7Allumer();
     Http::fake([L7_URL => Http::sequence()->push(['jours' => []], 200)->whenEmpty(Http::response(['ok' => true], 200))]);
 
     $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
 
     $jours = Http::recorded()->filter(fn ($p) => $p[0]->method() === 'POST')
         ->map(fn ($p) => json_decode($p[0]->body(), true)['jour'])->values()->all();
-    Carbon::setTestNow();
     expect(end($jours))->toBe('2026-11-03')->and($jours)->not->toContain('2026-11-04');
+});
+
+test('témoin 23:30 UTC : le scénario « jours manquants + J-1 » et le rattrapage tiennent à l’heure qui cassait', function () {
+    Carbon::setTestNow('2026-03-15 23:30:00 UTC');
+    $hier = '2026-03-14';
+    l7Allumer();
+    Http::fake([L7_URL => Http::sequence()->push(['jours' => [$hier, '2026-03-18', '2026-02-13']], 200)->whenEmpty(Http::response(['ok' => true], 200))]);
+
+    $this->artisan('crm:usine:pousser-agregats')->assertExitCode(0);
+
+    $jours = Http::recorded()->filter(fn ($p) => $p[0]->method() === 'POST')
+        ->map(fn ($p) => json_decode($p[0]->body(), true)['jour'])->values()->all();
+    expect($jours)->toContain($hier)->not->toContain('2026-03-18')->not->toContain('2026-02-13')
+        ->and(DB::table('usine_agregats_envois')->where('jour', $hier)->where('statut_http', 200)->exists())->toBeTrue();
 });

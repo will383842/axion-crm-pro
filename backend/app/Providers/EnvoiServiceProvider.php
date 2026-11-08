@@ -11,6 +11,13 @@ use App\Envoi\Desinscription\EffetsOpposition;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
+use App\Envoi\ListesNoires\AlerteurJournal;
+use App\Envoi\ListesNoires\DepotControles;
+use App\Envoi\ListesNoires\DepotControlesDb;
+use App\Envoi\ListesNoires\ResolveurSysteme;
+use App\Envoi\ListesNoires\SourceRessources;
+use App\Envoi\ListesNoires\SourceRessourcesDb;
+use App\Envoi\ListesNoires\SurveillanceListes;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;
@@ -23,6 +30,16 @@ class EnvoiServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(DepotSocle::class, DepotSocleDb::class);
+        $this->app->singleton(DepotControles::class, DepotControlesDb::class);
+        $this->app->singleton(SourceRessources::class, SourceRessourcesDb::class);
+        $this->app->singleton(SurveillanceListes::class, fn ($app) => new SurveillanceListes(
+            new ResolveurSysteme,
+            $app->make(DepotControles::class),
+            new AlerteurJournal($app->make(DepotSocle::class)),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_ip'))),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_domaine'))),
+            static fn (): \DateTimeImmutable => new \DateTimeImmutable,
+        ));
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
             new FauxServeurEnvoi,
             $app->make(DepotSocle::class),

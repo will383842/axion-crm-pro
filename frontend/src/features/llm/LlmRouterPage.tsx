@@ -109,7 +109,7 @@ export function LlmRouterPage() {
             {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 952 px
                 de largeur minimale de ce tableau etaient coupes net par le
                 `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-            <TableScroll template={USE_CASES_GRID}>
+            <TableScroll tableau template={USE_CASES_GRID}>
             <div
               role="row"
               className={cn(
@@ -118,14 +118,14 @@ export function LlmRouterPage() {
               )}
               style={{ gridTemplateColumns: USE_CASES_GRID }}
             >
-              <div>Cas d'usage</div>
-              <div>Fournisseur</div>
-              <div>Modèle</div>
-              <div>Chaîne de repli</div>
-              <div className="text-right">Plafond €</div>
-              <div>État</div>
+              <div role="columnheader">Cas d'usage</div>
+              <div role="columnheader">Fournisseur</div>
+              <div role="columnheader">Modèle</div>
+              <div role="columnheader">Chaîne de repli</div>
+              <div role="columnheader" className="text-right">Plafond €</div>
+              <div role="columnheader">État</div>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
               {useCasesData.map((u) => (
                 <div
                   key={u.id}
@@ -133,18 +133,18 @@ export function LlmRouterPage() {
                   className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                   style={{ gridTemplateColumns: USE_CASES_GRID }}
                 >
-                  <div className="truncate font-mono text-xs text-slate-700 dark:text-slate-200">
+                  <div role="cell" className="truncate font-mono text-xs text-slate-700 dark:text-slate-200">
                     {u.slug}
                   </div>
-                  <div className="capitalize text-slate-700 dark:text-slate-200">
+                  <div role="cell" className="capitalize text-slate-700 dark:text-slate-200">
                     {u.primary_provider}
                   </div>
-                  <div className="truncate font-mono text-xs text-slate-500">{u.model}</div>
-                  <div className="truncate text-xs text-slate-500">
+                  <div role="cell" className="truncate font-mono text-xs text-slate-500">{u.model}</div>
+                  <div role="cell" className="truncate text-xs text-slate-500">
                     {(u.fallback_chain ?? []).join(' → ') || '—'}
                   </div>
-                  <div className="text-right tabular-nums">{u.cost_cap_eur}</div>
-                  <div>
+                  <div role="cell" className="text-right tabular-nums">{u.cost_cap_eur}</div>
+                  <div role="cell">
                     <StatusPill tone={u.enabled ? 'success' : 'neutral'}>
                       {u.enabled ? 'Actif' : 'Arrêté'}
                     </StatusPill>

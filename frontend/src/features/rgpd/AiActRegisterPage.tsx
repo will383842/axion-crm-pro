@@ -139,7 +139,7 @@ export function AiActRegisterPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1002 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll template={GRID}>
+          <TableScroll tableau template={GRID}>
           <div
             role="row"
             className={cn(
@@ -148,14 +148,14 @@ export function AiActRegisterPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Cas d'usage</div>
-            <div>Risque</div>
-            <div>Fournisseur · Modèle</div>
-            <div>Statut</div>
-            <div>Responsable</div>
-            <div>Dernière revue</div>
+            <div role="columnheader">Cas d'usage</div>
+            <div role="columnheader">Risque</div>
+            <div role="columnheader">Fournisseur · Modèle</div>
+            <div role="columnheader">Statut</div>
+            <div role="columnheader">Responsable</div>
+            <div role="columnheader">Dernière revue</div>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((e) => (
               <button
                 key={e.id}
@@ -164,13 +164,13 @@ export function AiActRegisterPage() {
                 className="grid w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >
-                <div className="min-w-0">
+                <div role="cell" className="min-w-0">
                   <div className="truncate font-medium text-slate-900 dark:text-white">
                     {e.system_name}
                   </div>
                   <div className="truncate text-xs text-slate-500">{e.purpose}</div>
                 </div>
-                <div>
+                <div role="cell">
                   <StatusPill tone={RISK_TONE[e.risk_class]}>
                     {e.risk_class === 'high' || e.risk_class === 'prohibited' ? (
                       <AlertTriangle className="-ml-0.5 mr-0.5 h-3 w-3" />
@@ -178,7 +178,7 @@ export function AiActRegisterPage() {
                     {RISK_LABEL[e.risk_class]}
                   </StatusPill>
                 </div>
-                <div className="min-w-0">
+                <div role="cell" className="min-w-0">
                   <div className="truncate text-slate-700 dark:text-slate-200">
                     {e.provider ?? '—'}
                   </div>
@@ -186,17 +186,17 @@ export function AiActRegisterPage() {
                     {e.model ?? '—'}
                   </div>
                 </div>
-                <div>
+                <div role="cell">
                   {e.status ? (
                     <StatusPill tone={STATUS_TONE[e.status] ?? 'neutral'}>{e.status}</StatusPill>
                   ) : (
                     <span className="text-xs text-slate-400">—</span>
                   )}
                 </div>
-                <div className="truncate text-slate-600 dark:text-slate-300">
+                <div role="cell" className="truncate text-slate-600 dark:text-slate-300">
                   {e.responsible ?? '—'}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div role="cell" className="text-xs text-slate-500">
                   {e.last_review_at
                     ? new Date(e.last_review_at).toLocaleDateString('fr-FR')
                     : '—'}

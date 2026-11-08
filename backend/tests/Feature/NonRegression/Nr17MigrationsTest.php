@@ -52,6 +52,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
     '2026_11_11_000120_envoi_controles_listes.php',
+    // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
+    '2026_11_13_000140_envoi_config_versions.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

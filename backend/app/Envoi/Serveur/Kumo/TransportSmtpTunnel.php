@@ -20,11 +20,13 @@ use Symfony\Component\Mime\Email;
  *
  * Classement : « APRÈS DATA » = la réponse 354 à DATA a été reçue (le message a pu partir : sort incertain, jamais
  * renvoyé). AVANT DATA, rien n'a pu partir : un code NUMÉRIQUE 4xx/5xx de MAIL/RCPT est RENDU tel quel (4xx = report,
- * 5xx = échec, comme AdaptateurSmtp::classer de L4) ; connexion, bannière, STARTTLS absent = CoupureTransport(false)
+ * 5xx = échec). Un 5xx reçu AVANT MAIL FROM (bannière, EHLO, STARTTLS) concerne la connexion, pas le message :
+ * RefusConnexion (alerte, pause, report), jamais rendu. Connexion, bannière, STARTTLS absent = CoupureTransport(false)
  * (report) ; AUTH refusé ou certificat refusé = EchecAuthentification, classé À PART (alerte et pause).
  *
- * Contrat serveur K4b : X-Envoi-Source posé, chemin de retour VERP `rb-<jeton>@bounce.<domaine>` (si la clé
- * d'empreinte est configurée). DETTE (voir docs/envoi/K9-adaptateur-kumo.md) : le ComposeurMessage (List-Unsubscribe,
+ * X-Envoi-Source posé ; chemin de retour VERP `rb-<jeton>@bounce.<domaine>` (si la clé d'empreinte est configurée).
+ * ATTENTION : ce VERP n'est PAS accepté par l'écouteur K4 actuel (550 hors registre) : dette I1 et ESCALADE, voir
+ * docs/envoi/K9-adaptateur-kumo.md. DETTE (voir docs/envoi/K9-adaptateur-kumo.md) : le ComposeurMessage (List-Unsubscribe,
  * pied art. 14) n'est pas utilisé ici.
  */
 final class TransportSmtpTunnel implements TransportInjection
@@ -74,8 +76,9 @@ final class TransportSmtpTunnel implements TransportInjection
             && ! ((bool) config('envoi.smtp_tolere_transaction_englobante', false) && app()->environment('testing'))) {
             throw ServeurEnvoiRefuse::motif('aucun appel réseau dans une transaction ouverte.');
         }
-        if (preg_match('/^[0-9a-f]{32,64}$/', $jeton) !== 1) {
-            throw ServeurEnvoiRefuse::motif('jeton d’envoi invalide (32 à 64 caractères hexadécimaux exigés).');
+        if (preg_match('/^[0-9a-f]{32}$/', $jeton) !== 1) {
+            // 32 exactement : au-delà, le VERP ne serait pas posé, en silence.
+            throw ServeurEnvoiRefuse::motif('jeton d’envoi invalide (32 caractères hexadécimaux exigés).');
         }
         if ($source !== '' && preg_match('/^[A-Za-z0-9._-]{1,64}$/', $source) !== 1) {
             throw ServeurEnvoiRefuse::motif('source d’envoi invalide.');
@@ -101,6 +104,10 @@ final class TransportSmtpTunnel implements TransportInjection
             return 250;
         } catch (TransportException $e) {
             $code = $e instanceof UnexpectedResponseException && $e->getCode() >= 100 && $e->getCode() < 600 ? (int) $e->getCode() : 0;
+            // 5xx avant MAIL FROM (bannière, EHLO, STARTTLS) : refus de la connexion, pas du message.
+            if ($code >= 500 && ! $t->donneesEngagees && ! $t->mailEmis) {
+                throw new RefusConnexion;
+            }
             if ($t->donneesEngagees) {
                 if ($code >= 400) {
                     return $code; // réponse claire à la fin de DATA

@@ -16,6 +16,7 @@ use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
 use App\Envoi\Serveur\Kumo\EchecAuthentification;
 use App\Envoi\Serveur\Kumo\InterrogeurEtat;
+use App\Envoi\Serveur\Kumo\RefusConnexion;
 use App\Envoi\Serveur\Kumo\RegistreInjections;
 use App\Envoi\Serveur\Kumo\TransportInjection;
 use App\Envoi\Serveur\Kumo\TransportSmtpTunnel;
@@ -71,6 +72,9 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         private readonly string $jeton,
         ?Closure $horloge = null,
     ) {
+        if (preg_match('/^[A-Za-z0-9._-]{1,64}$/', $source) !== 1) {
+            throw new InvalidArgumentException('Source d’envoi invalide (1 à 64 caractères : lettres, chiffres, . _ -).');
+        }
         if (strlen($jeton) < 16) {
             throw new InvalidArgumentException('Secret de dérivation des jetons d’envoi : 16 caractères au moins.');
         }
@@ -127,11 +131,15 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
             return $this->incertain($cle, $id, $jeton);
         } catch (EchecAuthentification) {
             return $this->authEchouee($cle, $id, $jeton);
+        } catch (RefusConnexion) {
+            // 5xx de bannière/EHLO/STARTTLS : le message n'est pas en cause. Alerte, pause, report ; jamais « echec ».
+            return $this->connexionRefusee($cle, $id, $jeton);
         } catch (ServeurEnvoiRefuse $e) {
-            // Refus LOCAL du transport (jeton, transaction, enveloppe) : rien n'est parti, rien ne se réessaiera seul.
-            $this->noter($cle, $id, 'echec', $jeton);
-            Log::warning('envoi.kumo_refus_local', ['workspace_id' => $this->workspaceId, 'classe' => $e::class]);
-            throw $e;
+            // Refus LOCAL du transport (jeton, source, transaction, flux) : rien n'est parti et le message n'est pas
+            // forcément en cause (l'enveloppe, elle, est vérifiée avant tout état) : report + alerte, JAMAIS « echec ».
+            Log::critical('Envoi : refus local du transport d’injection, message reporté.', ['workspace_id' => $this->workspaceId, 'classe' => $e::class]);
+
+            return $this->incertainSansEnvoi($cle, $id, $jeton);
         } catch (Throwable $e) {
             // Classe seulement : le message d'une exception réseau peut contenir des identifiants.
             Log::error('envoi.kumo_injection_incertaine', ['workspace_id' => $this->workspaceId, 'classe' => $e::class]);
@@ -283,6 +291,23 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         return ResultatInjection::reporte($demain);
     }
 
+    /** 5xx de connexion (IP non autorisée…) : alerte critique, pause, report au plus tôt demain ; pas un refus du message. */
+    private function connexionRefusee(string $cle, string $id, string $jeton): ResultatInjection
+    {
+        Log::critical('Envoi : le serveur d’envoi refuse la connexion (5xx avant MAIL FROM), pause posée.', ['workspace_id' => $this->workspaceId]);
+        $this->registre->fixerPause($this->workspaceId, true);
+
+        return $this->incertainSansEnvoi($cle, $id, $jeton);
+    }
+
+    private function incertainSansEnvoi(string $cle, string $id, string $jeton): ResultatInjection
+    {
+        $demain = ($this->horloge)()->modify('tomorrow');
+        $this->noter($cle, $id, 'reporte', $jeton, $demain->getTimestamp());
+
+        return ResultatInjection::reporte($demain);
+    }
+
     private function noter(string $cle, string $id, string $etat, string $jeton, ?int $reporteAu = null): void
     {
         $ligne = ['id' => $id, 'etat' => $etat, 'reporte_au' => $reporteAu, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton];
@@ -298,7 +323,7 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         $depuis = ($this->horloge)()->getTimestamp() - self::FENETRE_5XX_SECONDES;
         $n = $this->registre->compter5xx($this->workspaceId, $depuis);
         if ($n >= self::SEUIL_5XX) {
-            Log::critical('Envoi : pause automatique du serveur (5xx répétés).', ['nombre_5xx' => $n]);
+            Log::critical('Envoi : pause automatique du serveur (5xx répétés).', ['workspace_id' => $this->workspaceId, 'nombre_5xx' => $n]);
             $this->registre->fixerPause($this->workspaceId, true); // fail-safe : posée AVANT la commande, même si elle échoue
             $this->commander('pause');
         }

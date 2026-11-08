@@ -444,15 +444,37 @@ test('(2) enveloppe invalide : refusée AVANT tout état, zéro connexion, refus
     Log::shouldHaveReceived('warning')->once();
 })->with(['a b@example.test', 'é@example.test', 'a@@x']);
 
-test('(2) refus local du transport (jeton/transaction) : echec journalisé, jamais a_verifier ni 5xx compté', function () {
+// I3 : un refus LOCAL du transport (jeton, transaction, flux, secret) ne concerne pas le message : rien n'est parti,
+// donc report + alerte critique, JAMAIS « echec » terminal (sinon une panne de configuration tuerait toute la file).
+// Le test garde ses garanties d'origine (ni a_verifier, ni 5xx compté, refus journalisé) et prouve en plus l'absence d'échec.
+test('(2) refus local du transport (jeton/transaction) : report + alerte critique, jamais echec ni a_verifier ni 5xx compté', function () {
     Log::spy();
     $t = new FauxTransportKumo;
     $t->scenario = ['envoi_refuse_local'];
     $reg = new RegistreMemoire;
-    expect(fn () => kumoFabrique($t, null, null, $reg)->injecter(msgK9('r1')))->toThrow(ServeurEnvoiRefuse::class);
-    expect($reg->lire(WS_K9, 'r1')['etat'])->toBe('echec')->and($reg->compter5xx(WS_K9, 0))->toBe(0);
-    Log::shouldHaveReceived('warning')->once();
+    $r = kumoFabrique($t, null, null, $reg)->injecter(msgK9('r1'));
+    expect($r->accepte)->toBeFalse();
+    expect($reg->lire(WS_K9, 'r1')['etat'])->toBe('reporte')->and($reg->compter5xx(WS_K9, 0))->toBe(0);
+    Log::shouldHaveReceived('critical')->once()->withArgs(fn (string $m, array $ctx = []) => ($ctx['workspace_id'] ?? null) === WS_K9);
 });
+
+// B1 : 5xx de connexion (bannière) => report + pause + alerte, aucun echec, aucun 5xx compté.
+test('(B1) 5xx de connexion : report et pause, jamais echec', function () {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $t->scenario = ['refus_connexion'];
+    $reg = new RegistreMemoire;
+    $s = kumoFabrique($t, null, null, $reg);
+    $r = $s->injecter(msgK9('b1'));
+    expect($r->accepte)->toBeFalse()->and($reg->lire(WS_K9, 'b1')['etat'])->toBe('reporte')
+        ->and($s->etat()->enPause)->toBeTrue()->and($reg->compter5xx(WS_K9, 0))->toBe(0);
+    Log::shouldHaveReceived('critical')->once();
+});
+
+test('(I3) source mal formée : refusée à la construction', function (string $source) {
+    expect(fn () => new ServeurEnvoiKumo(WS_K9, $source, new FauxTransportKumo, new FauxTransportKumo, new RegistreMemoire, new CommandeurEspion, new DepotMemoire, SECRET_K9))
+        ->toThrow(InvalidArgumentException::class);
+})->with(['', 'a b', "x\r\ny", str_repeat('s', 65)]);
 
 test('(3) X-Envoi-Source : la source de l’adaptateur est transmise au transport', function () {
     $t = new FauxTransportKumo;

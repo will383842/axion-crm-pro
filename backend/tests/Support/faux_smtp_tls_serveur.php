@@ -3,7 +3,7 @@
 /**
  * FAUX serveur SMTP local AVEC STARTTLS (127.0.0.1 uniquement), dérivé de faux_smtp_serveur.php (L4), pour prouver
  * le transport du tunnel K9. Usage : php faux_smtp_tls_serveur.php <mode> <fichier_recu> <pem_cert_et_cle>
- * Modes : ok | coupure_apres_data | muet_apres_data | 451_apres_data | 550_apres_data | rcpt_550 | mail_550 | auth_535 | sans_starttls | banniere_muette
+ * Modes : ok | coupure_apres_data | muet_apres_data | 451_apres_data | 550_apres_data | rcpt_550 | mail_550 | banniere_554 | ehlo_554 | auth_535 | sans_starttls | banniere_muette
  * Port sur la 1re ligne de stdout, brut reçu (DATA) dans <fichier_recu>, commandes dans <fichier_recu>.cmd.
  * Une seule connexion. Aucun accès réseau externe.
  */
@@ -19,6 +19,11 @@ if ($c === false) {
 }
 if ($mode === 'banniere_muette') {
     sleep(8);
+    exit(0);
+}
+if ($mode === 'banniere_554') {
+    fwrite($c, "554 5.7.1 IP non autorisee\r\n");
+    sleep(2);
     exit(0);
 }
 fwrite($c, "220 faux ESMTP\r\n");
@@ -55,7 +60,9 @@ while (($ligne = fgets($c)) !== false) {
     }
     file_put_contents($fichier . '.cmd', $ligne, FILE_APPEND);
     $cmd = strtoupper(substr($ligne, 0, 4));
-    if ($cmd === 'EHLO' || $cmd === 'HELO') {
+    if (($cmd === 'EHLO' || $cmd === 'HELO') && $mode === 'ehlo_554') {
+        fwrite($c, "554 5.7.1 refuse\r\n");
+    } elseif ($cmd === 'EHLO' || $cmd === 'HELO') {
         $ext = '';
         if (! $tls && $mode !== 'sans_starttls') {
             $ext .= "250-STARTTLS\r\n";

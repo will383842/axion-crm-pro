@@ -5,6 +5,7 @@ use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
 use App\Envoi\Serveur\Kumo\EchecAuthentification;
 use App\Envoi\Serveur\Kumo\InterrogeurEtat;
+use App\Envoi\Serveur\Kumo\RefusConnexion;
 use App\Envoi\Serveur\Kumo\TransportInjection;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 
@@ -35,6 +36,9 @@ final class FauxTransportKumo implements InterrogeurEtat, TransportInjection
         }
         if ($suite === 'echec_auth') {
             throw new EchecAuthentification;
+        }
+        if ($suite === 'refus_connexion') {
+            throw new RefusConnexion;
         }
         if ($suite === 'envoi_refuse_local') {
             throw ServeurEnvoiRefuse::motif('enveloppe invalide');

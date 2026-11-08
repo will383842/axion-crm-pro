@@ -8,7 +8,9 @@ use App\Envoi\Serveur\Contrat\LotSuivi;
 use App\Envoi\Serveur\Contrat\TireurEvenements;
 use App\Envoi\Smtp\ResolveurHote;
 use App\Support\WorkspaceContext;
+use Carbon\Carbon;
 use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -18,14 +20,18 @@ use Throwable;
 /**
  * Client signé du serveur d'envoi (ADR K0 D3/D4/D6/D7). TIRAGE seulement : le CRM n'expose aucune route
  * entrante. L'adresse du serveur vient de la CONFIGURATION d'environnement, jamais de la base.
- * Interrupteur `envoi.reel_actif` (faux par défaut) : tout appel est refusé tant qu'il est éteint.
- * Secret vide = refus, aucun appel. Le client ne garde aucun état (non singleton).
+ * Interrupteurs `envoi.reel_actif` ET `envoi.k1_actif` (faux par défaut) : tout appel est refusé tant que l'un est éteint.
+ * Chaque source a SA configuration (URL, secret) : sinon refus, aucun repli global. TLS mutuel + AC privée
+ * obligatoires (voir GardeHoteServeur::optionsHttp). Le client ne garde aucun état (non singleton).
  */
 final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenements
 {
     public const MAX_EVENEMENTS = 500;
 
     public const MAX_CORPS_OCTETS = 1_048_576;
+
+    /** Liste blanche des commandes. « injection » est un nom RÉSERVÉ (journal local) : jamais émis vers le serveur. */
+    public const COMMANDES_AUTORISEES = ['pause', 'reprise', 'retrait'];
 
     private const TYPE_AUTORISE = '/^[a-z][a-z0-9_]{0,63}$/';
 
@@ -34,8 +40,8 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
     public function tirer(string $workspaceId, string $source, ?string $curseur, int $limite, DateTimeImmutable $depuis): LotSuivi
     {
         $limite = max(1, min($limite, self::MAX_EVENEMENTS));
-        $requete = http_build_query(['curseur' => $curseur ?? '', 'depuis' => $depuis->format('c'), 'limite' => $limite]);
-        $json = $this->appeler($workspaceId, $source, 'GET', SignatureEnvoi::CHEMIN_EVENEMENTS, $requete, '');
+        $requete = http_build_query(['curseur' => $curseur ?? '', 'depuis' => DateTimeImmutable::createFromInterface($depuis)->setTimezone(new DateTimeZone('UTC'))->format('c'), 'limite' => $limite]);
+        $json = $this->appeler($this->preparer($workspaceId, $source), $workspaceId, 'GET', SignatureEnvoi::CHEMIN_EVENEMENTS, $requete, '');
 
         $brut = $json['evenements'] ?? null;
         if (! is_array($brut) || ! array_is_list($brut) || count($brut) > self::MAX_EVENEMENTS || count($brut) > $limite) {
@@ -64,28 +70,29 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
 
     public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
     {
-        // Contrôles locaux AVANT toute trace : une erreur de configuration ou d'appel doit se voir tout de suite.
-        $this->controlesGeneraux($source);
+        // TOUS les contrôles locaux (interrupteurs, source active, adresse, garde d'hôte, TLS) AVANT toute trace :
+        // une erreur de configuration ou d'appel doit se voir tout de suite, sans intention orpheline.
+        $prep = $this->preparer($workspaceId, $source);
         if (! SignatureEnvoi::estUuid($commandeId)) {
             throw ServeurEnvoiRefuse::motif('commande_id : UUID aléatoire exigé.');
         }
-        if (preg_match('/^[a-z][a-z0-9_]{0,31}$/', $commande) !== 1) {
-            throw ServeurEnvoiRefuse::motif('nom de commande invalide.');
+        if (! in_array($commande, self::COMMANDES_AUTORISEES, true)) {
+            throw ServeurEnvoiRefuse::motif('commande hors liste blanche.');
         }
-        // Intention journalisée AVANT le réseau : si l'appel échoue, la commande reste « non acquittée » et
-        // peut être renvoyée avec le MÊME commande_id (le serveur est idempotent). Jamais perdue.
-        $this->journal->enregistrer($workspaceId, $commandeId, $commande);
+        // Intention journalisée (avec sa source) AVANT le réseau : si l'appel échoue, la commande reste « non
+        // acquittée » et sera rejouée avec le MÊME commande_id (le serveur est idempotent). Jamais perdue.
+        $this->journal->enregistrer($workspaceId, $commandeId, $commande, $source);
         if ($this->journal->estAcquittee($workspaceId, $commandeId)) {
             return false;
         }
         $corps = json_encode(['commande_id' => $commandeId, 'commande' => $commande], JSON_THROW_ON_ERROR);
-        $this->appeler($workspaceId, $source, 'POST', SignatureEnvoi::PREFIXE_COMMANDES . $commande, $corps, $corps);
+        $this->appeler($prep, $workspaceId, 'POST', SignatureEnvoi::PREFIXE_COMMANDES . $commande, $corps, $corps);
         $this->journal->acquitter($workspaceId, $commandeId);
 
         return true;
     }
 
-    private function controlesGeneraux(string $source): void
+    private function controlesGeneraux(): void
     {
         if (DB::transactionLevel() > 0
             && ! ((bool) config('envoi.serveur.tolere_transaction_englobante', false) && app()->environment('testing'))) {
@@ -94,75 +101,90 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         if (config('envoi.reel_actif') !== true) {
             throw ServeurEnvoiRefuse::motif('envoi réel éteint (ENVOI_REEL_ACTIF), appel refusé.');
         }
-        if ($this->secretPour($source) === '') {
-            throw ServeurEnvoiRefuse::motif('secret HMAC absent, appel refusé.');
+        if (config('envoi.k1_actif') !== true) {
+            throw ServeurEnvoiRefuse::motif('serveur d’envoi K1 éteint (ENVOI_K1_ACTIF), appel refusé.');
         }
     }
 
-    private function secretPour(string $source): string
+    /** Configuration PROPRE à la source, sans aucun repli sur une valeur globale. */
+    private function propre(string $cle, string $source): string
     {
-        $secrets = config('envoi.serveur.secrets', []);
-        $propre = is_array($secrets) ? ($secrets[$source] ?? '') : '';
+        $table = config('envoi.serveur.' . $cle, []);
+        $valeur = is_array($table) ? ($table[$source] ?? '') : '';
 
-        return is_string($propre) && $propre !== '' ? $propre : (string) config('envoi.serveur.secret', '');
+        return is_string($valeur) ? $valeur : '';
     }
 
     private function cleIdPour(string $source): string
     {
-        $cles = config('envoi.serveur.cles', []);
-        $cle = is_array($cles) ? ($cles[$source] ?? null) : null;
+        $cle = $this->propre('cles', $source);
 
-        return is_string($cle) && preg_match('/^[A-Za-z0-9_-]{1,32}$/', $cle) === 1 ? $cle : (string) config('envoi.serveur.cle_id', '1');
+        return preg_match('/^[A-Za-z0-9_-]{1,32}$/', $cle) === 1 ? $cle : (string) config('envoi.serveur.cle_id', '1');
     }
 
-    private function urlPour(string $source): string
+    private static function delai(string $cle, int $defaut): int
     {
-        $urls = config('envoi.serveur.urls', []);
-        $propre = is_array($urls) ? ($urls[$source] ?? '') : '';
-
-        return is_string($propre) && $propre !== '' ? $propre : (string) config('envoi.serveur.url', '');
+        return max(1, min(30, (int) config('envoi.serveur.' . $cle, $defaut))); // jamais 0 (= infini), jamais > 30 s
     }
 
-    /** @return array<string, mixed> */
-    private function appeler(string $workspaceId, string $source, string $methode, string $chemin, string $signe, string $corps): array
+    /**
+     * Tous les contrôles locaux, sans réseau ni écriture.
+     *
+     * @return array{secret: string, cle: string, cible: array{base: string, hote: string, port: int, ip: string}, options: array<string, mixed>}
+     */
+    private function preparer(string $workspaceId, string $source): array
     {
-        $this->controlesGeneraux($source);
-        $secret = $this->secretPour($source);
+        $this->controlesGeneraux();
+        $secret = $this->propre('secrets', $source);
+        if ($secret === '') {
+            throw ServeurEnvoiRefuse::motif('secret HMAC propre à la source absent, appel refusé.');
+        }
         $actif = WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')
             ->where('workspace_id', $workspaceId)->where('source', $source)->where('actif', true)->exists());
         if (! $actif) {
             throw ServeurEnvoiRefuse::motif('source inconnue ou inactive.');
         }
-        $url = $this->urlPour($source);
+        $url = $this->propre('urls', $source);
         if ($url === '') {
-            throw ServeurEnvoiRefuse::motif('adresse du serveur absente de la configuration.');
+            throw ServeurEnvoiRefuse::motif('adresse propre à la source absente de la configuration.');
         }
         $cible = GardeHoteServeur::controler($url, $this->resolveur);
-
-        $ts = (string) time();
-        $nonce = (string) Str::uuid();
-        $cle = $this->cleIdPour($source);
         $max = self::MAX_CORPS_OCTETS;
         $options = GardeHoteServeur::optionsHttp($cible) + [
+            // Plafond en FLUX (compteur d'octets) : vaut aussi sans Content-Length ; l'en-tête sert de coupe-circuit précoce.
+            'sink' => new FluxReponsePlafonne($max),
             'on_headers' => function ($r) use ($max): void {
                 if ((int) $r->getHeaderLine('Content-Length') > $max) {
                     throw new \RuntimeException('corps trop volumineux');
                 }
             },
         ];
-        $requete = Http::connectTimeout((int) config('envoi.serveur.connect_timeout', 5))
-            ->timeout((int) config('envoi.serveur.timeout', 10))
-            ->withOptions($options)
+
+        return ['secret' => $secret, 'cle' => $this->cleIdPour($source), 'cible' => $cible, 'options' => $options];
+    }
+
+    /**
+     * @param  array{secret: string, cle: string, cible: array{base: string, hote: string, port: int, ip: string}, options: array<string, mixed>}  $prep
+     * @return array<string, mixed>
+     */
+    private function appeler(array $prep, string $workspaceId, string $methode, string $chemin, string $signe, string $corps): array
+    {
+        $secret = $prep['secret'];
+        $ts = (string) Carbon::now('UTC')->getTimestamp();
+        $nonce = (string) Str::uuid();
+        $requete = Http::connectTimeout(self::delai('connect_timeout', 5))
+            ->timeout(self::delai('timeout', 10))
+            ->withOptions($prep['options'])
             ->withHeaders([
                 'X-Envoi-Timestamp' => $ts,
                 'X-Envoi-Nonce' => $nonce,
                 'X-Envoi-Workspace' => $workspaceId,
-                'X-Envoi-Signature' => SignatureEnvoi::entete($cle, SignatureEnvoi::signer($secret, SignatureEnvoi::chargeRequete($methode, $chemin, $ts, $nonce, $signe))),
+                'X-Envoi-Signature' => SignatureEnvoi::entete($prep['cle'], SignatureEnvoi::signer($secret, SignatureEnvoi::chargeRequete($methode, $chemin, $ts, $nonce, $workspaceId, $signe))),
             ]);
         try {
             $reponse = $methode === 'GET'
-                ? $requete->get($cible['base'] . $chemin . '?' . $signe)
-                : $requete->withBody($corps, 'application/json')->post($cible['base'] . $chemin);
+                ? $requete->get($prep['cible']['base'] . $chemin . '?' . $signe)
+                : $requete->withBody($corps, 'application/json')->post($prep['cible']['base'] . $chemin);
         } catch (Throwable) {
             throw ServeurEnvoiRefuse::motif('injoignable ou en échec réseau.');
         }

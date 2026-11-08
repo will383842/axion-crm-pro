@@ -17,12 +17,12 @@ final class JournalCommandes
     public const ACQUITTEMENT = 'acquittement-serveur';
 
     /** Pose l'intention. Vrai = nouvelle ligne ; faux = déjà connue (même corps). Corps différent = refus + alerte. */
-    public function enregistrer(string $workspaceId, string $commandeId, string $commande): bool
+    public function enregistrer(string $workspaceId, string $commandeId, string $commande, string $source): bool
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commandeId, $commande): bool {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commandeId, $commande, $source): bool {
             $pose = DB::affectingStatement(
-                'INSERT INTO envoi_journal_commandes (workspace_id, commande_id, commande, auteur, details) VALUES (?, ?, ?, ?, ?) ON CONFLICT (workspace_id, commande_id) DO NOTHING',
-                [$workspaceId, $commandeId, $commande, 'serveur-k1', json_encode(['corps_sha256' => hash('sha256', $commande)], JSON_THROW_ON_ERROR)],
+                'INSERT INTO envoi_journal_commandes (workspace_id, commande_id, commande, source, auteur, details) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (workspace_id, commande_id) DO NOTHING',
+                [$workspaceId, $commandeId, $commande, $source, 'serveur-k1', json_encode(['corps_sha256' => hash('sha256', $commande)], JSON_THROW_ON_ERROR)],
             ) === 1;
             if ($pose) {
                 return true;
@@ -45,15 +45,29 @@ final class JournalCommandes
 
     public function acquitter(string $workspaceId, string $commandeId): void
     {
-        if ($this->estAcquittee($workspaceId, $commandeId)) {
-            return;
-        }
-        WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_journal_commandes')->insert([
-            'workspace_id' => $workspaceId,
-            'commande' => self::ACQUITTEMENT,
-            'auteur' => 'serveur-k1',
-            'details' => json_encode(['commande_id' => $commandeId], JSON_THROW_ON_ERROR),
-            'cle_idempotence' => $commandeId,
-        ]));
+        // ON CONFLICT : deux rejeux concurrents ne produisent qu'UN acquittement (index unique partiel).
+        WorkspaceContext::run($workspaceId, fn () => DB::affectingStatement(
+            'INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, cle_idempotence) VALUES (?, ?, ?, ?, ?) ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = \'acquittement-serveur\' DO NOTHING',
+            [$workspaceId, self::ACQUITTEMENT, 'serveur-k1', json_encode(['commande_id' => $commandeId], JSON_THROW_ON_ERROR), $commandeId],
+        ));
+    }
+
+    /**
+     * Intentions SANS acquittement de l'espace (les plus anciennes d'abord), à rejouer avec le même commande_id.
+     *
+     * @return list<array{commande_id: string, commande: string, source: string}>
+     */
+    public function nonAcquittees(string $workspaceId, int $limite): array
+    {
+        return WorkspaceContext::run($workspaceId, fn (): array => array_values(array_map(
+            fn ($l): array => ['commande_id' => (string) $l->commande_id, 'commande' => (string) $l->commande, 'source' => (string) $l->source],
+            DB::select(
+                'SELECT i.commande_id, i.commande, i.source FROM envoi_journal_commandes i
+                 WHERE i.workspace_id = ? AND i.commande_id IS NOT NULL AND i.source IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM envoi_journal_commandes a WHERE a.workspace_id = i.workspace_id AND a.commande = ? AND a.cle_idempotence = i.commande_id)
+                 ORDER BY i.id LIMIT ?',
+                [$workspaceId, self::ACQUITTEMENT, $limite],
+            ),
+        )));
     }
 }

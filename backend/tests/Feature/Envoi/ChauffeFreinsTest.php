@@ -20,6 +20,7 @@ use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\JourEnvoi;
 use App\Envoi\PasserelleLocale;
@@ -139,6 +140,22 @@ function messageChauffe(string $ws, string $dest = 'x@gmail.com', string $boite 
 }
 
 // ── B1 : la courbe — jours EFFECTIFS, une seule table de vérité ─────────────
+
+/**
+ * Garde M2 de L5 : l'envoi réel reste tenu pour inactif tant que le retrait des envois en file est la liaison
+ * « absente ». Ces tests exercent les freins avec le drapeau allumé : ils branchent donc un retrait de test
+ * (l'état de production réel, une fois la file branchée). La garde elle-même n'est pas modifiée.
+ */
+function retraitEnFileBranche(): void
+{
+    app()->instance(RetraitEnvoisEnFile::class, new class implements RetraitEnvoisEnFile
+    {
+        public function retirerPour(string $workspaceId, string $empreinteAdresse): int
+        {
+            return 0;
+        }
+    });
+}
 
 test('courbe : P1 jours 1-5 (10 par boîte, 20 à deux boîtes), P2 jours 6-10 (18 / 35), P3 jours 11-15 (25 / 50)', function () {
     foreach ([1, 5] as $j) {
@@ -659,6 +676,7 @@ test('envoi:evaluer-freins sans argument évalue tous les espaces (horloge de l�
 
 test('« Tout arrêter » : après la commande, plus AUCUNE injection acceptée (singleton de l’appli, test chronométré < 1 min)', function () {
     config(['envoi.reel_actif' => true, 'envoi.plafond_jour' => 300, 'envoi.plafond_global_jour' => 300]);
+    retraitEnFileBranche();
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;
@@ -700,6 +718,7 @@ test('« Tout arrêter » est PAR ESPACE (drapeau en base) ; la pause du serveur
 
 test('envoi:reprendre : commande locale journalisée, désarme le drapeau, relance le serveur ; refus si rien n’est armé', function () {
     config(['envoi.reel_actif' => true, 'envoi.plafond_jour' => 300, 'envoi.plafond_global_jour' => 300]);
+    retraitEnFileBranche();
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;
@@ -1236,6 +1255,7 @@ test('m6 : le battement n’est noté que si sante() du serveur répond OK', fun
 
 test('fenêtre d’envoi : l’horloge de l’appli figée HORS fenêtre (Paris) reporte l’envoi, figée DEDANS elle l’accepte', function () {
     config(['envoi.reel_actif' => true, 'envoi.plafond_jour' => 300, 'envoi.plafond_global_jour' => 300]);
+    retraitEnFileBranche();
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;

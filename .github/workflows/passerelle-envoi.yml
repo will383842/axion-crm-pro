@@ -5,12 +5,14 @@ on:
   pull_request:
     paths:
       - 'infra/serveur-envoi/passerelle/**'
+      - 'infra/serveur-envoi/tests/conformite/**'
       - 'envoi-serveur/contrat/**'
       - '.github/workflows/passerelle-envoi.yml'
   push:
     branches: [main]
     paths:
       - 'infra/serveur-envoi/passerelle/**'
+      - 'infra/serveur-envoi/tests/conformite/**'
       - 'envoi-serveur/contrat/**'
       - '.github/workflows/passerelle-envoi.yml'
 
@@ -43,3 +45,5 @@ jobs:
       - name: "Tests (aucun envoi réel, KumoMTA est simulé)"
         working-directory: infra/serveur-envoi/passerelle
         run: vendor/bin/phpunit --no-progress
+      - name: "Kit de conformité (26 § 3.5) contre la passerelle locale de test (php -S, faux KumoMTA)"
+        run: bash infra/serveur-envoi/tests/conformite/lancer.sh

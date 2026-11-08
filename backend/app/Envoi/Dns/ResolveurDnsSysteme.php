@@ -28,18 +28,42 @@ final class ResolveurDnsSysteme implements ResolveurDns
         return array_values(array_filter($sortie));
     }
 
+    public function aaaa(string $nom): array
+    {
+        $sortie = [];
+        foreach ($this->interroger($nom, DNS_AAAA) as $e) {
+            $sortie[] = (string) ($e['ipv6'] ?? '');
+        }
+
+        return array_values(array_filter($sortie));
+    }
+
     public function ptr(string $ip): array
     {
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+        $inverse = self::nomInverse($ip);
+        if ($inverse === null) {
             return [];
         }
-        $inverse = implode('.', array_reverse(explode('.', $ip))) . '.in-addr.arpa';
         $sortie = [];
         foreach ($this->interroger($inverse, DNS_PTR) as $e) {
             $sortie[] = rtrim(strtolower((string) ($e['target'] ?? '')), '.');
         }
 
         return array_values(array_filter($sortie));
+    }
+
+    /** Nom de zone inverse (in-addr.arpa / ip6.arpa) d'une IP, ou null si ce n'est pas une IP. */
+    public static function nomInverse(string $ip): ?string
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return implode('.', array_reverse(explode('.', $ip))) . '.in-addr.arpa';
+        }
+        $bin = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? inet_pton($ip) : false;
+        if ($bin === false) {
+            return null;
+        }
+
+        return implode('.', array_reverse(str_split(bin2hex($bin)))) . '.ip6.arpa';
     }
 
     public function politiqueMtaSts(string $domaine): ?string

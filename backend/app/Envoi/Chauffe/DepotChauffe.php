@@ -230,7 +230,7 @@ final class DepotChauffe
     {
         return WorkspaceContext::run($ws, fn (): bool => DB::transaction(function () use ($ws, $motif, $fournisseur, $maintenant, $dureeHeures): bool {
             $instant = $maintenant->format('Y-m-d H:i:sP');
-            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant]); // horloge de référence des triggers de L7
+            self::poserHorloge($instant); // horloge de référence des triggers de L7
             // Une pause expirée du même motif occupe encore l'index unique : on la date « levée » (la ligne reste).
             DB::table('envoi_pauses')->where('workspace_id', $ws)->whereNull('levee_le')
                 ->where('motif', $motif)->whereNotNull('expire_le')->where('expire_le', '<=', $instant)
@@ -264,7 +264,7 @@ final class DepotChauffe
         $instant = now();
 
         return WorkspaceContext::run($ws, fn (): bool => DB::transaction(function () use ($ws, $id, $par, $instant): bool {
-            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant->format('Y-m-d H:i:sP')]); // même horloge que la levée datée
+            self::poserHorloge($instant->format('Y-m-d H:i:sP')); // même horloge que la levée datée
 
             return DB::table('envoi_pauses')
                 ->where('workspace_id', $ws)->where('id', $id)->whereNull('levee_le')
@@ -285,7 +285,7 @@ final class DepotChauffe
         $instant = $maintenant->format('Y-m-d H:i:sP');
         // Le trigger borne le battement à l'horloge de référence (jamais dans le futur) et le rend monotone.
         DB::transaction(function () use ($instant): void {
-            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant]);
+            self::poserHorloge($instant);
             DB::statement(
                 'INSERT INTO envoi_sante_battement (id, dernier_le) VALUES (1, ?)
                  ON CONFLICT (id) DO UPDATE SET dernier_le = EXCLUDED.dernier_le',
@@ -352,11 +352,24 @@ final class DepotChauffe
         if (! in_array($nom, Seuils::NOMS, true)) {
             throw new \InvalidArgumentException('seuil inconnu');
         }
+        if (! is_finite($valeur)) {
+            throw new \InvalidArgumentException('seuil non fini (NaN / infini) refusé');
+        }
         WorkspaceContext::run($ws, fn () => DB::statement(
             'INSERT INTO envoi_seuils (workspace_id, nom, valeur, auteur) VALUES (?, ?, ?, ?)
              ON CONFLICT (workspace_id, nom) DO UPDATE SET valeur = EXCLUDED.valeur, auteur = EXCLUDED.auteur, mis_a_jour_le = now()',
             [$ws, $nom, $valeur, $auteur],
         ));
+    }
+
+    /**
+     * Horloge de référence des triggers (`app.maintenant`, locale à la transaction). Posable UNIQUEMENT en
+     * environnement de test (horloge figée) : ailleurs, le réglage est vidé et les triggers retombent sur
+     * l'horloge de la base, qu'une session ne peut pas reculer.
+     */
+    private static function poserHorloge(string $instant): void
+    {
+        DB::select("SELECT set_config('app.maintenant', ?, true)", [app()->environment('testing') ? $instant : '']);
     }
 
     /** @return array{envoyes: int, rebonds_durs: int, plaintes: int, reponses: int} */

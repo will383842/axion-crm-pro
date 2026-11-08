@@ -11,6 +11,9 @@ interface ResolveurDns
     /** @return list<string> adresses IPv4 */
     public function a(string $nom): array;
 
+    /** @return list<string> adresses IPv6 */
+    public function aaaa(string $nom): array;
+
     /** @return list<string> noms PTR, minuscules, sans point final */
     public function ptr(string $ip): array;
 

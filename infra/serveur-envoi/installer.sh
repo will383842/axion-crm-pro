@@ -14,6 +14,8 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CIBLE=/opt/axion-envoi
 VALEURS="${AXION_VALEURS:-/etc/axion-envoi/valeurs.env}"
 REEL=0; [[ "${1:-}" == "--oui" ]] && REEL=1
+# Log hook K7 : DESACTIVE par defaut (aucun relais en service, K7-D5). Jamais active sans ce drapeau explicite.
+LOGHOOK=0; for a in "$@"; do [[ "$a" == "--avec-loghook" ]] && LOGHOOK=1; done
 agir() { echo "+ $*"; if [[ $REEL == 1 ]]; then "$@"; fi; }
 # shellcheck source=lib/rendu.sh
 source "$SRC/lib/rendu.sh"
@@ -86,6 +88,11 @@ if [[ $REEL == 1 ]]; then
 
   install -m 0644 "$tmpd/init.lua" "$CIBLE/kumomta/init.lua"
   install -m 0644 "$SRC/kumomta/dkim.lua" "$CIBLE/kumomta/dkim.lua"   # K5 : signature DKIM (sans cle)
+  # Interrupteur du log hook : ecrit a chaque passage (0 sans --avec-loghook), lu par docker compose (.env).
+  echo "AXION_LOGHOOK_ACTIF=$LOGHOOK" >"$tmpd/compose.env"
+  cmp -s "$tmpd/compose.env" "$CIBLE/.env" 2>/dev/null || changement_kumo=1
+  install -m 0644 "$tmpd/compose.env" "$CIBLE/.env"
+  install -d -m 0750 /etc/axion-envoi/loghook   # dossier du secret Lua -> relais (le secret lui-meme est pose a la main, jamais ici)
   install -m 0644 "$SRC/kumomta/loghook.lua" "$CIBLE/kumomta/loghook.lua"   # K7 : log hook (require par init.lua)
   # Dossier des cles DKIM (genere par dkim/generer-dkim.sh) : cree vide s'il manque, jamais touche s'il existe.
   install -d -m 0755 /etc/axion-envoi

@@ -24,7 +24,7 @@ class TestIsolation(unittest.TestCase):
 
     def test_services_attendus(self):
         for n in ("dns-banc", "puits-accepte", "puits-4xx", "puits-5xx", "puits-lent",
-                  "imap-banc", "compteur", "sonde"):
+                  "imap-banc", "compteur", "sonde", "temoin-hors-banc", "sonde-temoin"):
             self.assertIn(n, SERVICES)
 
 
@@ -60,7 +60,35 @@ class TestSonde(unittest.TestCase):
     def test_cibles_sont_reservees(self):
         import sonde
         for h, _ in sonde.CIBLES:
+            if (h, _) == sonde.TEMOIN:
+                continue
             self.assertRegex(h, r"^(192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)|\.invalid$|\.test$")
+
+
+class TestTemoinEtDns(unittest.TestCase):
+    def test_temoin_hors_du_reseau_banc(self):
+        t = SERVICES["temoin-hors-banc"]["networks"]
+        self.assertIn("hors-banc", t)
+        self.assertNotIn("banc", t)
+        self.assertIn(sonde_temoin_ip(), str(t))
+        self.assertNotIn("hors-banc", SERVICES["sonde"].get("networks", ["banc"]))
+
+    def test_sonde_banc_vise_le_temoin_et_sonde_temoin_hors_banc(self):
+        import sonde
+        self.assertIn(sonde.TEMOIN, sonde.CIBLES)
+        self.assertEqual(sonde.verifier_temoin(lambda h, p, t: True), {"temoin_joignable": True})
+        self.assertEqual(sonde.verifier_temoin(lambda h, p, t: False), {"temoin_joignable": False})
+        self.assertEqual(SERVICES["sonde-temoin"]["networks"], ["hors-banc"])
+
+    def test_puits_utilisent_dns_banc(self):
+        for n in ("puits-accepte", "puits-4xx", "puits-5xx", "puits-lent"):
+            self.assertEqual(SERVICES[n]["dns"], ["10.99.0.2"], n)
+        self.assertNotIn("dns", SERVICES["sonde"])
+
+
+def sonde_temoin_ip():
+    import sonde
+    return sonde.TEMOIN[0]
 
 
 class TestPuits(unittest.TestCase):

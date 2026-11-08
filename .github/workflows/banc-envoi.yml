@@ -19,14 +19,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Tests statiques (réseau internal, digests, sonde, puits)
         run: |
-          pip install pyyaml
+          pip install pyyaml==6.0.2
           python3 -m unittest discover -s infra/banc-envoi/tests -v
       - name: Démarrer le banc
         run: bash infra/banc-envoi/demarrer-banc.sh
         # pas de healthcheck : --wait attend l'état running
       - name: Sonde — zéro connexion sortante
         working-directory: infra/banc-envoi
-        run: docker compose run --rm sonde
+        run: |
+          docker compose run --rm sonde-temoin   # témoin positif : joignable depuis hors-banc
+          docker compose run --rm sonde          # depuis le banc : zéro connexion, témoin inclus
       - name: Nettoyer
         if: always()
         working-directory: infra/banc-envoi

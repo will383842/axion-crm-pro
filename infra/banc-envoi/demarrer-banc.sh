@@ -9,4 +9,4 @@ if grep -Eq '^[[:space:]]*ports:' docker-compose.yml; then
   echo "ERREUR : le banc ne doit publier aucun port." >&2
   exit 1
 fi
-docker compose up -d --wait --wait-timeout 60 dns-banc puits-accepte puits-4xx puits-5xx puits-lent imap-banc compteur
+docker compose up -d --wait --wait-timeout 60 dns-banc puits-accepte puits-4xx puits-5xx puits-lent imap-banc compteur temoin-hors-banc

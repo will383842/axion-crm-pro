@@ -19,19 +19,23 @@ services:
     networks: { banc: { ipv4_address: 10.99.0.2 } }
   puits-accepte:
     <<: *banc
+    dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: accepte, COMPTEUR_URL: "http://compteur:8080" }
     networks: { banc: { ipv4_address: 10.99.0.10 } }
   puits-4xx:
     <<: *banc
+    dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: 4xx, COMPTEUR_URL: "http://compteur:8080" }
   puits-5xx:
     <<: *banc
+    dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: 5xx, COMPTEUR_URL: "http://compteur:8080" }
   puits-lent:
     <<: *banc
+    dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: lent, COMPTEUR_URL: "http://compteur:8080" }
   imap-banc:
@@ -40,12 +44,28 @@ services:
   compteur:
     <<: *banc
     command: python compteur.py
+  # sonde / imap-banc / compteur : pas de `dns:` volontaire. Les noms de service passent par le DNS
+  # embarqué de Docker ; la sonde doit voir banc-sortie.invalid échouer sans l'aide de dns-banc
+  # (qui répond A à tout nom), sinon elle mesurerait le banc et non l'isolement.
+  temoin-hors-banc:
+    <<: *banc
+    command: python temoin.py
+    networks: { hors-banc: { ipv4_address: 10.98.0.10 } }
+  sonde-temoin:
+    <<: *banc
+    command: python sonde.py --temoin
+    networks: [hors-banc]
+    profiles: [sonde]
+    depends_on: [temoin-hors-banc]
   sonde:
     <<: *banc
     command: python sonde.py
     profiles: [sonde]
     depends_on: [compteur]
 networks:
+  hors-banc:
+    internal: true
+    ipam: { config: [{ subnet: 10.98.0.0/24 }] }
   banc:
     internal: true
     ipam: { config: [{ subnet: 10.99.0.0/24, ip_range: 10.99.0.128/25 }] }  # auto-attribution hors des IP fixes (.2, .10)

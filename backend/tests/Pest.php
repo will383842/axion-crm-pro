@@ -38,6 +38,8 @@ pest()->group('non-regression')->in(
     'Feature/Console/CommentairesDuPlanificateurTest.php',
     'Feature/Console/VerrousDuPlanificateurTest.php',
     'Feature/Crm/CampagneAdressesPartageesTest.php',
+    'Feature/Envoi/ReleveImapAuditTest.php',
+    'Feature/Envoi/ReleveImapTest.php',
     'Feature/Crm/CampagnesB2bTest.php',
     'Feature/Crm/CrmOutboundTest.php',
     'Feature/Envoi/DesinscriptionTest.php',

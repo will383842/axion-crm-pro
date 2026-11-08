@@ -165,7 +165,13 @@ test('le SQL et le miroir PHP disent la même chose, sans rien réécrire', func
     }
     $generiques = DB::table('companies')->where('workspace_id', $ws)
         ->selectRaw('id, ' . QuarantaineSite::generiqueSql('companies') . ' AS q')->pluck('q', 'id')->all();
-    expect($generiques)->toBe([$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false]);
+    // `toBe` compare aussi l'ORDRE des clés, et un SELECT sans ORDER BY ne
+    // garantit aucun ordre (il suit la place physique des lignes) : on compare
+    // donc des tableaux triés par identifiant, le contenu reste strictement égal.
+    ksort($generiques);
+    $attendu = [$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false];
+    ksort($attendu);
+    expect($generiques)->toBe($attendu);
 
     $apres = DB::table('contacts')->where('workspace_id', $ws)->orderBy('id')->get()->toJson()
         . DB::table('companies')->where('workspace_id', $ws)->orderBy('id')->get()->toJson();
@@ -527,7 +533,46 @@ function qsEspaceRls(): array
         'information_tiers_version' => 'information-article-14/v3', 'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    // Statistiques du planificateur posées ICI, une fois : sans cela, le plan
+    // dépend de ce que les tests précédents de la même part ont laissé sur ces
+    // tables (taille, analyse faite ou non), et le test compare deux plans pris
+    // à un état que rien ne maîtrise. `qsNettoyer` rend les pages à la fin.
+    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
+        $owner->statement('ANALYZE ' . $table);
+    }
+
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
+}
+
+/**
+ * Coupe (false) ou rétablit (true) l'autovacuum des tables dont le plan est
+ * mesuré. Sans cela, une analyse automatique peut tomber entre la mesure du plan
+ * « avec le critère » et celle du plan « sans le critère », qui sont alors pris à
+ * des statistiques différentes. Les statistiques sont posées par `qsEspaceRls`.
+ */
+function qsAutovacuum(bool $actif): void
+{
+    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
+        qsProprio()->statement('ALTER TABLE ' . $table . ($actif ? ' RESET (autovacuum_enabled)' : ' SET (autovacuum_enabled = false)'));
+    }
+}
+
+/**
+ * Rend les trois tables à l'état où les autres tests les attendent : vides,
+ * sans page morte et SANS statistique. Les lignes semées sont supprimées, mais
+ * leurs pages restent, et l'`ANALYZE` de `qsEspaceRls` laisse des statistiques
+ * de 2 ou 3 lignes : `EntreprisesVerifierSitesTest`, qui lit un plan, y verrait
+ * un tri au lieu de l'index partiel ordonné. Le rôle propriétaire est
+ * SUPERUSER ; la base est celle des tests.
+ */
+function qsRendreLesTables(): void
+{
+    $owner = qsProprio();
+    foreach (['contacts_provenances_tiers', 'contacts', 'companies'] as $table) {
+        $owner->statement('VACUUM ' . $table);
+        $owner->statement('DELETE FROM pg_statistic WHERE starelid = ?::regclass', [$table]);
+        $owner->statement('UPDATE pg_class SET reltuples = -1, relpages = 0 WHERE oid = ?::regclass', [$table]);
+    }
 }
 
 /** @param  array{id: string}  $e */
@@ -544,6 +589,7 @@ function qsNettoyer(array $e): void
 }
 
 test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
+    qsAutovacuum(false);
     $a = qsEspaceRls();
     $b = qsEspaceRls();
     $precedente = DB::getDefaultConnection();
@@ -633,6 +679,8 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         qsApp()->disconnect();
         qsNettoyer($a);
         qsNettoyer($b);
+        qsAutovacuum(true);
+        qsRendreLesTables();
         qsProprio()->disconnect();
     }
 });

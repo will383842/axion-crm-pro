@@ -222,13 +222,9 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(screen.queryByText('Codes de secours')).toBeNull();
   });
 
-  it('/desinscription/$jeton est publique et HORS coquille', async () => {
+  it('/desinscription/$jeton n\'est PLUS une route du SPA (servie par le backend, que le SPA ne doit pas masquer)', async () => {
     await monter('/desinscription/jeton-de-test');
-    const page = await screen.findByTestId('page-en-attente');
-    expect(page).toHaveAttribute('data-lot', 'DM2-CNF');
-    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
-    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
-    expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });
 });

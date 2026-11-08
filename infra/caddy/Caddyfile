@@ -101,7 +101,7 @@ app.localhost {
     # Poser côté `.env` local, en regard : `VITE_API_BASE_URL=https://app.localhost`
     # et `SESSION_DOMAIN=` (vide → cookie host-only sur `app.localhost`).
     @api {
-        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/* /desinscription/*
     }
     handle @api {
         # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
@@ -156,7 +156,7 @@ app.axion-crm-pro.com {
 
     # Routes API -> backend Laravel
     @api {
-        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/* /desinscription/*
     }
     handle @api {
         # 🔴 FastCGI, et non HTTP — constat A-010 (S0) de l'audit 360.
@@ -268,7 +268,7 @@ staging.axion-crm-pro.com {
     encode zstd gzip
 
     @api {
-        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/*
+        path /api/* /sanctum/* /docs /docs/* /up /broadcasting/* /desinscription/*
     }
     handle @api {
         # FastCGI comme la production — constat A-010. La préproduction publie

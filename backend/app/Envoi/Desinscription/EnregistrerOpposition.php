@@ -28,6 +28,14 @@ final class EnregistrerOpposition
 
     public const CANAL_ONE_CLICK = 'one_click';
 
+    /** Lecture seule : l'opposition de cette inscription est-elle déjà acquise ? */
+    public function dejaEnregistree(string $workspaceId, string $reference): bool
+    {
+        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_oppositions as o')
+            ->join('envoi_liens_desinscription as l', 'l.id', '=', 'o.lien_id')
+            ->where('l.reference', $reference)->exists());
+    }
+
     /** @return bool false si la référence est inconnue de cet espace */
     public function executer(string $workspaceId, string $reference, string $canal): bool
     {

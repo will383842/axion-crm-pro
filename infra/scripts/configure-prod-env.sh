@@ -55,6 +55,11 @@ set_env "MOCK_SCRAPERS"              "true"
 set_env "MOCK_CAPTCHA"               "true"
 set_env "MOCK_SMTP"                  "true"
 
+# --- Désinscription (Envoi) : clé HMAC des liens ---
+# JAMAIS de valeur dans le dépôt, et JAMAIS écrasée si déjà posée : on ajoute la ligne VIDE si elle manque.
+# À renseigner à la main (32 caractères au moins, ex. `openssl rand -hex 32`) : vide = aucun lien émis.
+grep -q "^ENVOI_CLE_DESINSCRIPTION=" "$ENV_FILE" || { echo "ENVOI_CLE_DESINSCRIPTION=" >> "$ENV_FILE"; echo "  ✓ ENVOI_CLE_DESINSCRIPTION (vide : à renseigner)"; }
+
 # --- URLs production ---
 set_env "APP_URL"                    "https://api.axion-crm-pro.com"
 set_env "APP_ENV"                    "production"

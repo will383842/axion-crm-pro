@@ -4,6 +4,7 @@ namespace App\Envoi\Desinscription;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Pages publiques de désinscription. Le jeton signé EST l'autorisation.
@@ -12,8 +13,8 @@ use Illuminate\Http\Response;
  *           lien ne crée aucune opposition).
  *  - POST : l'opposition (bouton), ou « one-click » RFC 8058 (corps
  *           `List-Unsubscribe=One-Click`, réponse vide).
- *  - Le POST accepte un jeton signé mais échu ; le GET (page) le refuse.
- *  - Tout jeton refusé (forme, signature, échéance pour le GET, inconnu) reçoit LA MÊME
+ *  - Le GET et le POST acceptent un jeton signé mais échu (le GET n'écrit rien, l'opposition est un droit).
+ *  - Tout jeton refusé (forme, signature, inconnu) reçoit LA MÊME
  *    réponse 404 : rien ne permet de distinguer les causes.
  *
  * Page sans suivi : pas de cookie, pas de script, pas d'image, pas de
@@ -23,7 +24,7 @@ final class DesinscriptionController
 {
     public function page(string $jeton): Response
     {
-        $verifie = JetonDesinscription::verifier($jeton);
+        $verifie = JetonDesinscription::verifier($jeton, accepterEchu: true);
         if ($verifie === null || ! InscriptionsEnvoi::existe($verifie['workspace_id'], $verifie['reference'])) {
             return $this->refus();
         }
@@ -46,6 +47,13 @@ final class DesinscriptionController
             return $this->refus();
         }
         $unClic = $request->input('List-Unsubscribe') === 'One-Click';
+        // Limite LARGE par jeton (30/min), jamais un 429 : au-delà, si l'opposition est DÉJÀ acquise on répond
+        // pareil sans rien écrire ; sinon elle est enregistrée (une opposition légitime n'est jamais bloquée).
+        $cle = 'desinscription-post:' . hash('sha256', $jeton);
+        RateLimiter::hit($cle, 60);
+        if (RateLimiter::tooManyAttempts($cle, 30) && $opposition->dejaEnregistree($verifie['workspace_id'], $verifie['reference'])) {
+            return $unClic ? $this->entetes(response('', 200)) : $this->confirmation();
+        }
         $connu = $opposition->executer(
             $verifie['workspace_id'],
             $verifie['reference'],
@@ -58,6 +66,11 @@ final class DesinscriptionController
             return $this->entetes(response('', 200));
         }
 
+        return $this->confirmation();
+    }
+
+    private function confirmation(): Response
+    {
         return $this->html(200, $this->gabarit(
             'Désinscription confirmée',
             '<h1>Désinscription confirmée</h1><p>Votre demande est enregistrée. Vous ne recevrez plus de message de notre part.</p>',

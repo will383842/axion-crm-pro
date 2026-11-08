@@ -33,6 +33,6 @@ jobs:
       - name: Dépendances (composer.lock figé)
         working-directory: infra/serveur-envoi/passerelle
         run: composer install --no-interaction --no-progress --prefer-dist
-      - name: Tests (aucun envoi réel : KumoMTA est simulé)
+      - name: "Tests (aucun envoi réel, KumoMTA est simulé)"
         working-directory: infra/serveur-envoi/passerelle
         run: vendor/bin/phpunit --no-progress

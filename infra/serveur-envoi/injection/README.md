@@ -28,5 +28,5 @@ Tests : `cd infra/serveur-envoi/injection && python3 -m unittest discover -s tes
 - Production : `file_production()` lève toujours `ErreurFile` (451) tant que KumoMTA n'est pas branché. `FausseFile` est réservée aux tests.
 - Un second `MAIL FROM` sans `RSET` = 503. `From`, `Sender`, `Reply-To`, `Resent-From`, `Resent-Sender` doivent tous être dans le registre de l'espace.
 - `delai_ecriture` : un client qui ne lit pas est coupé. Compteur de connexions décrémenté dans un `finally`.
-- `ips_autorisees` : refus aussi d'une couverture totale par recouvrement (`0.0.0.0/1` + `128.0.0.0/1`).
+- `ips_autorisees` : refus aussi d'une couverture totale par recouvrement (deux moitiés complémentaires de l'espace IPv4, ou IPv6).
 - Workflow : actions épinglées par SHA ; le workflow lui-même déclenche aussi le push sur `main`.

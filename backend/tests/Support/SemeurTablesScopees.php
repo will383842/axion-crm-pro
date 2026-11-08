@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -178,6 +178,12 @@ final class SemeurTablesScopees
         'envoi_boites',
         'envoi_injections_smtp',
         'envoi_controles_dns',
+        // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
+        'envoi_evenements',
+        'envoi_curseurs_imap',
+        'envoi_rattachements',
+        'envoi_echecs_releve',
+        'envoi_messages_envoyes',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -700,9 +706,42 @@ final class SemeurTablesScopees
             'chiffrement' => 'starttls',
             'identifiants_chiffres' => 'zz-chiffre',
         ]);
+        $idInjection = (string) Str::uuid();
         $inserer('envoi_injections_smtp', [
             'boite_id' => $boiteId,
+            'id_injection' => $idInjection,
             'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
+        $id['envoi_evenements'] = $insererAvecId('envoi_evenements', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+            'uid' => 1,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'classe' => 'reponse_humaine',
+            'statut' => 'a_rattacher',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recu_le' => now()->toDateTimeString(),
+        ]);
+        $inserer('envoi_curseurs_imap', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+        ]);
+        $inserer('envoi_rattachements', [
+            'evenement_id' => $id['envoi_evenements'],
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+            'decide_par' => 'zz-revue',
+        ]);
+        $inserer('envoi_echecs_releve', [
+            'boite' => 'zz-' . $marque,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'motif' => 'RuntimeException',
+        ]);
+        $inserer('envoi_messages_envoyes', [
+            'message_id_empreinte' => hash('sha256', 'zz-mid-' . $marque),
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
         ]);
 
         $inserer('proxy_providers_config', [

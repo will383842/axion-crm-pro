@@ -2,7 +2,7 @@
 
 **Pour qui** : le responsable du projet. **Règle** : cette fiche explique ; elle n'inscrit rien à votre place. Chaque inscription se fait avec VOTRE compte, sur VOTRE ordinateur. Rien ici n'envoie de courrier.
 
-**Quand** : après que le serveur existe, que les domaines d'envoi sont achetés et que le DNS est vert (contrôle K12). Les inscriptions se font **avant** le premier envoi réel : elles montrent votre réputation dès les premiers messages.
+**Quand** : après que le serveur existe, que les domaines d'envoi sont achetés et que le DNS est vert (contrôle K12). Les inscriptions se font **avant** le premier envoi réel : elles sont en place quand les premières données arrivent (il n'y en a pas au tout début : il faut du volume, voir le point 5 de Google Postmaster).
 
 **Ce qu'il faut sous la main** : la liste de vos `<domaine-N>`, l'`<ip-envoi>` (l'adresse du serveur qui envoie, pas celle de gestion), l'accès au DNS de chaque domaine, et la boîte de réception D2 (celle qui reçoit `postmaster@` et `abuse@`).
 
@@ -19,6 +19,7 @@
 
 ## 2. Microsoft SNDS et JMRP (Outlook, Hotmail)
 À quoi ça sert : SNDS montre l'état de votre IP chez Microsoft ; JMRP vous renvoie les plaintes des utilisateurs.
+**Attention** : Microsoft a migré SNDS vers un **nouveau portail** et l'ancien parcours a changé ; les écrans décrits ci-dessous sont à revérifier à l'inscription. SNDS est **facultatif** pour démarrer (JMRP, lui, reçoit les plaintes) ; comme Postmaster, il ne montre rien tant qu'il n'y a pas de volume.
 1. Créez/utilisez un compte Microsoft dédié. Ouvrez **Smart Network Data Services (SNDS)**.
 2. Demandez l'accès pour `<ip-envoi>` (une demande par IP). Microsoft envoie un message de confirmation à une adresse liée à l'IP/au domaine du PTR : c'est la boîte D2 (`postmaster@`). Elle doit donc déjà recevoir du courrier.
 3. Cliquez sur le lien de confirmation reçu. Activez aussi, si proposé, l'accès aux données automatisées (facultatif).

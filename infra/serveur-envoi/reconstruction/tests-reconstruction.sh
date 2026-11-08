@@ -62,6 +62,41 @@ verifie "idempotence: deux passages a blanc identiques" test "$out" = "$out2"
 mkdir -p "$tmpd/dkim/domaine-1.test"; : >"$tmpd/dkim/domaine-1.test/principal"
 out="$(lancer "${BON[@]}" 2>&1)"
 verifie "idempotence: cles DKIM existantes sautees" test "${out#*'deja presentes'}" != "$out"
+# 5b. Droits des cles DKIM (bloquant K16) : 0640 root:axion-dkim, dossiers 0750. Des cles 0600 sont
+# illisibles pour KumoMTA (group_add 10025) : tout serait refuse en 451, et relancer ne reparait rien.
+# shellcheck source=droits-dkim.sh
+source "$D/reconstruction/droits-dkim.sh"
+GR="$(id -gn)"
+mkdir -p "$tmpd/cles/d.test"; : >"$tmpd/cles/d.test/a.pem"; : >"$tmpd/cles/d.test/principal"
+chmod 0600 "$tmpd/cles/d.test/a.pem"; chmod 0700 "$tmpd/cles" "$tmpd/cles/d.test"
+droits_dkim_corriger "$tmpd/cles" "$GR" 0 >/dev/null; rc=$?
+verifie "droits DKIM: cle 0600 signalee a blanc (rouge sans le correctif)" test "$rc" = 3
+verifie "droits DKIM: a blanc ne modifie rien" test "$(stat -c %a "$tmpd/cles/d.test/a.pem")" = 600
+droits_dkim_corriger "$tmpd/cles" "$GR" 1 >/dev/null
+verifie "droits DKIM: cle deja presente 0600 corrigee en 0640" test "$(stat -c %a "$tmpd/cles/d.test/a.pem")" = 640
+verifie "droits DKIM: dossiers corriges en 0750" test "$(stat -c %a "$tmpd/cles/d.test")" = 750
+verifie "droits DKIM: groupe applique" test "$(stat -c %G "$tmpd/cles/d.test/a.pem")" = "$GR"
+droits_dkim_corriger "$tmpd/cles" "$GR" 0 >/dev/null; verifie "droits DKIM: rien a corriger apres correction" test "$?" = 0
+# Le script les verifie aussi pour un domaine DEJA initialise (a blanc : signale, sans variable GROUPE_DKIM).
+mkdir -p "$tmpd/dkim2/domaine-1.test"; : >"$tmpd/dkim2/domaine-1.test/principal"; : >"$tmpd/dkim2/domaine-1.test/n.pem"
+chmod 0600 "$tmpd/dkim2/domaine-1.test/n.pem"
+out="$(env -i PATH="$PATH" AXION_VALEURS="$tmpd/valeurs.env" REP_DKIM="$tmpd/dkim2" "${BON[@]}" bash "$R" 2>&1)"
+verifie "script: cles existantes 0600 signalees (domaine deja initialise)" test "${out#*'droits a corriger'}" != "$out"
+if ! getent group axion-dkim >/dev/null; then
+  verifie "script: cree le groupe axion-dkim GID 10025 sans variable" test "${out#*'groupadd -g 10025 axion-dkim'}" != "$out"
+fi
+verifie "script: --groupe toujours transmis (pas conditionne a une variable)" bash -c "grep -q -- '--groupe \"\$GROUPE\"' '$R' && ! grep -q 'GROUPE_DKIM:+' '$R'"
+# Relance apres echec partiel : serveur non vierge signale (avertissement a blanc), contournement nomme.
+mkdir -p "$tmpd/opt"
+out="$(env -i PATH="$PATH" AXION_VALEURS="$tmpd/valeurs.env" REP_DKIM="$tmpd/dkim" AXION_CIBLE="$tmpd/opt" "${BON[@]}" bash "$R" 2>&1)"
+verifie "relance: non vierge signale avec le contournement nomme" test "${out#*'AXION_FORCER_NON_VIERGE=oui'}" != "$out"
+verifie "relance: contournement documente en tete du script" bash -c "sed -n 1,45p '$R' | grep -q 'AXION_FORCER_NON_VIERGE=oui'"
+# Documents : etapes et dettes exigees par la relecture d'exactitude.
+RB="$D/../../docs/envoi/runbook-serveur-perdu.md"
+for motif in 'AXION_FORCER_NON_VIERGE' 'K16-D4' 'K16-D5' 'envoi:tout-arreter' 'envoi:reprendre' 'RETIRER' 'sans borne' '4 bis' 'axion-dkim' 'PARTIEL'; do
+  verifie "runbook: mentionne « $motif »" grep -q -- "$motif" "$RB"
+done
+verifie "fiche K14: SNDS nouveau portail et donnees absentes au debut" bash -c "grep -q 'nouveau portail' '$D/../../docs/envoi/fiche-inscriptions-reputation.md'"
 # 6. Statique : jamais de trace de commande, aucun envoi reel active, script executable.
 verifie "statique: ni set -x ni ENVOI_REEL_ACTIF=true" bash -c "! grep -Eq 'set -x|ENVOI_REEL_ACTIF *= *true' '$R'"
 verifie "statique: script executable" test -x "$R"

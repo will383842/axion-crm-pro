@@ -16,7 +16,7 @@ return new class extends Migration
                 id           BIGSERIAL PRIMARY KEY,
                 workspace_id UUID NOT NULL REFERENCES workspaces(id),
                 source       TEXT NOT NULL CHECK (source ~ '^[a-z0-9_-]{1,64}$'),
-                url_base     TEXT NOT NULL,
+                url_base     TEXT NOT NULL CHECK (url_base ~ '^https://'), -- indicatif : l'adresse effective vient de la configuration
                 actif        BOOLEAN NOT NULL DEFAULT true,
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now(),
                 UNIQUE (workspace_id, source)

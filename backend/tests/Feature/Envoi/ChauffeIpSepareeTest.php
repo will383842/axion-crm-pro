@@ -61,9 +61,9 @@ test('K8 collision : incrémenter l\'IP alors qu\'une ligne domaine existe pour 
 
 test('K8 la base refuse une ligne dont le type et la clé se contredisent (ip hors préfixe, domaine sous préfixe ip)', function () {
     $ws = espaceIp();
-    $ligne = fn (string $boite, string $type) => WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->insert([
+    $ligne = fn (string $boite, string $type) => WorkspaceContext::run($ws, fn () => DB::transaction(fn () => DB::table('envoi_chauffe_jours')->insert([
         'workspace_id' => $ws, 'boite' => $boite, 'jour' => '2026-12-01', 'fournisseur' => 'gmail', 'ressource_type' => $type, 'envoyes' => 1,
-    ]));
+    ])));
     expect(fn () => $ligne('42', 'ip'))->toThrow(QueryException::class)
         ->and(fn () => $ligne('ip:42', 'domaine'))->toThrow(QueryException::class);
 });
@@ -72,8 +72,9 @@ test('K8 un UPDATE de ressource_type est refusé par le garde (l\'historique d\'
     $ws = espaceIp();
     app(DepotChauffe::class)->incrementer($ws, 'ref-1', new DateTimeImmutable('2026-12-01'), 'gmail', 'plaintes', 1, BudgetChauffe::RESSOURCE_IP);
 
+    // Point de reprise (DB::transaction imbriquée) : sans lui, la transaction avortée masque la vraie erreur (25P02) au nettoyage du contexte.
     // Le garde (BEFORE UPDATE) parle avant le CHECK : sans lui, l'erreur serait « violates check constraint ».
-    expect(fn () => WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->update(['ressource_type' => 'domaine'])))
+    expect(fn () => WorkspaceContext::run($ws, fn () => DB::transaction(fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->update(['ressource_type' => 'domaine']))))
         ->toThrow(QueryException::class, 'identité figée');
     $def = (string) DB::scalar("SELECT pg_get_functiondef('envoi_chauffe_jours_garde'::regproc)");
     expect($def)->toContain('ressource_type');

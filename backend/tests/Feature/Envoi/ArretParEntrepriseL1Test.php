@@ -94,7 +94,7 @@ test('B1 de bout en bout : le clic arrête la personne et ses collègues de la m
     expect(arretEtat($b, $collegueAilleurs))->toBe(['active', null]);
     // La trace d'événement existe pour la personne (elle servira aux inscriptions FUTURES de l'entreprise).
     expect(WorkspaceContext::run($a, fn () => DB::table('envoi_inscriptions_evenements')->where('evenement', Evenement::OPPOSITION)->where('inscription_id', $personne)->count()))->toBe(1);
-    expect(WorkspaceContext::run($b, fn () => DB::table('envoi_inscriptions_evenements')->count()))->toBe(0);
+    expect(WorkspaceContext::run($b, fn () => DB::table('envoi_inscriptions_evenements')->where('workspace_id', $b)->count()))->toBe(0);
 });
 
 test('B1 : une inscription déjà arrêtée par la porte (garde:opposition) propage quand même à ses collègues', function () {
@@ -119,7 +119,7 @@ test('B1 : idempotent — un second déclenchement ne change rien et ne casse ri
     $arret->declencher($ws, ListeSuppression::empreinte(ARRET_ADRESSE));
 
     expect(arretEtat($ws, $collegue))->toBe(['arretee', 'opposition']);
-    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_inscriptions_evenements')->count()))->toBe(1);
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_inscriptions_evenements')->where('workspace_id', $ws)->count()))->toBe(1);
 });
 
 test('B1 : la liaison par défaut est l\'implémentation L1, plus l\'« absente »', function () {

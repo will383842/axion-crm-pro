@@ -206,7 +206,7 @@ export function RgpdRequestsPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1102 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll template={GRID}>
+          <TableScroll tableau template={GRID}>
           <div
             role="row"
             className={cn(
@@ -215,14 +215,14 @@ export function RgpdRequestsPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Type</div>
-            <div>Personne</div>
-            <div>Statut</div>
-            <div>Demande</div>
-            <div>Traitement</div>
-            <div className="text-right">Actions</div>
+            <div role="columnheader">Type</div>
+            <div role="columnheader">Personne</div>
+            <div role="columnheader">Statut</div>
+            <div role="columnheader">Demande</div>
+            <div role="columnheader">Traitement</div>
+            <div role="columnheader" className="text-right">Actions</div>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((r) => (
               <div
                 key={r.id}
@@ -230,11 +230,11 @@ export function RgpdRequestsPage() {
                 className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >
-                <div className="font-medium text-slate-900 dark:text-white">
+                <div role="cell" className="font-medium text-slate-900 dark:text-white">
                   {translateRgpdType(r.type)}
                 </div>
-                <div className="truncate text-slate-700 dark:text-slate-200">{r.subject_email}</div>
-                <div>
+                <div role="cell" className="truncate text-slate-700 dark:text-slate-200">{r.subject_email}</div>
+                <div role="cell">
                   <StatusPill tone={mapStatusToTone(r.status)} pulse={r.status === 'processing'}>
                     {translateRgpdStatus(r.status)}
                   </StatusPill>
@@ -244,13 +244,13 @@ export function RgpdRequestsPage() {
                     </p>
                   ) : null}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div role="cell" className="text-xs text-slate-500">
                   {new Date(r.requested_at).toLocaleString('fr-FR')}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div role="cell" className="text-xs text-slate-500">
                   {r.processed_at ? new Date(r.processed_at).toLocaleString('fr-FR') : '—'}
                 </div>
-                <div className="text-right">
+                <div role="cell" className="text-right">
                   {r.status === 'pending' ? (
                     <Button
                       variant="primary"

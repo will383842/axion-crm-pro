@@ -168,7 +168,7 @@ export function AuditLogsPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1104 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll template={GRID}>
+          <TableScroll tableau template={GRID}>
           <div
             role="row"
             className={cn(
@@ -177,15 +177,15 @@ export function AuditLogsPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Quand</div>
-            <div>Événement</div>
-            <div>Écran ou action</div>
-            <div>Acteur</div>
-            <div>Gravité</div>
-            <div>Adresse IP</div>
-            <div>Empreinte</div>
+            <div role="columnheader">Quand</div>
+            <div role="columnheader">Événement</div>
+            <div role="columnheader">Écran ou action</div>
+            <div role="columnheader">Acteur</div>
+            <div role="columnheader">Gravité</div>
+            <div role="columnheader">Adresse IP</div>
+            <div role="columnheader">Empreinte</div>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((l) => {
               const sev = severityFromStatus(l);
               return (
@@ -196,25 +196,25 @@ export function AuditLogsPage() {
                   className="grid w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                   style={{ gridTemplateColumns: GRID }}
                 >
-                  <div className="text-xs text-slate-500">
+                  <div role="cell" className="text-xs text-slate-500">
                     {new Date(l.created_at).toLocaleString('fr-FR')}
                   </div>
-                  <div className="truncate font-medium text-slate-900 dark:text-white">
+                  <div role="cell" className="truncate font-medium text-slate-900 dark:text-white">
                     {l.event_type}
                   </div>
-                  <div className="truncate font-mono text-xs text-slate-500">
+                  <div role="cell" className="truncate font-mono text-xs text-slate-500">
                     {l.path ?? '—'}
                   </div>
-                  <div className="truncate text-slate-600 dark:text-slate-300">
+                  <div role="cell" className="truncate text-slate-600 dark:text-slate-300">
                     {l.actor ?? '—'}
                   </div>
-                  <div>
+                  <div role="cell">
                     <StatusPill tone={SEVERITY_TONE[sev]}>{sev}</StatusPill>
                   </div>
-                  <div className="truncate text-xs font-mono text-slate-500">
+                  <div role="cell" className="truncate text-xs font-mono text-slate-500">
                     {l.ip ?? '—'}
                   </div>
-                  <div className="truncate font-mono text-xs text-slate-400">
+                  <div role="cell" className="truncate font-mono text-xs text-slate-400">
                     {l.current_hash.slice(0, 12)}…
                   </div>
                 </button>

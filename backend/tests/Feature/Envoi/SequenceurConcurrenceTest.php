@@ -53,8 +53,13 @@ function concPreparer(int $etapes): array
         $owner->table('envoi_verdicts_adresse')->insert(['workspace_id' => $ws, 'empreinte_adresse' => ListeSuppression::empreinte('conc@zz-client.example.invalid'), 'verdict' => 'valide', 'verifie_le' => '2026-11-14 10:00:00+01', 'source' => 'test']);
         $owner->table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'zz-envoi.example.invalid', 'achete_le' => '2026-01-01', 'dmarc_verifie_le' => CONC_MAINTENANT, 'spf_verifie_le' => CONC_MAINTENANT, 'dkim_verifie_le' => CONC_MAINTENANT]);
         // Sinon la passerelle refuse tout destinataire hors témoins. Le mode témoins ne s'éteint que par la
-        // commande locale (déclencheur envoi_drapeaux_garde) : même autorisation, locale à la transaction.
+        // commande locale (déclencheur envoi_drapeaux_garde) : même autorisation, locale à la transaction,
+        // ET trace `temoins_off` au journal dans la même transaction (voie légitime, garde inchangée).
         $owner->transaction(function () use ($owner, $ws): void {
+            $owner->table('envoi_journal_commandes')->insert([
+                'workspace_id' => $ws, 'commande' => 'temoins_off', 'auteur' => 'test-concurrence',
+                'details' => '{}', 'jour' => '2026-11-16',
+            ]);
             $owner->select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
             $owner->table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'mode_temoins' => false]);
         });

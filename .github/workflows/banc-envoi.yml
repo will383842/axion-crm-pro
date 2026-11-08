@@ -22,8 +22,7 @@ jobs:
           pip install pyyaml
           python3 -m unittest discover -s infra/banc-envoi/tests -v
       - name: Démarrer le banc
-        working-directory: infra/banc-envoi
-        run: docker compose up -d --wait --wait-timeout 60 dns-banc puits-accepte puits-4xx puits-5xx puits-lent imap-banc compteur
+        run: bash infra/banc-envoi/demarrer-banc.sh
         # pas de healthcheck : --wait attend l'état running
       - name: Sonde — zéro connexion sortante
         working-directory: infra/banc-envoi

@@ -15,9 +15,16 @@ final class DkimSigneur
 {
     /** En-têtes signés — liste minimale exigée (ordre = ordre de `h=`). */
     public const ENTETES_SIGNES = [
-        'From', 'To', 'Subject', 'Date', 'Message-ID', 'MIME-Version',
+        'From', 'Reply-To', 'To', 'Subject', 'Date', 'Message-ID', 'MIME-Version',
         'Content-Type', 'List-Unsubscribe', 'List-Unsubscribe-Post',
     ];
+
+    /**
+     * En-têtes SUR-SIGNÉS : leur nom est répété à la fin de `h=` pour qu'aucune seconde
+     * occurrence ne puisse être ajoutée après signature. Même liste côté serveur
+     * (infra/serveur-envoi/dkim/entetes-sursignes.txt, test croisé).
+     */
+    public const ENTETES_SURSIGNES = ['From', 'Subject', 'List-Unsubscribe'];
 
     private readonly OpenSSLAsymmetricKey $cle;
 
@@ -78,6 +85,10 @@ final class DkimSigneur
             }
             $h[] = strtolower($nom);
             $canon .= self::canonEntete($nom, $parNom[strtolower($nom)]) . "\r\n";
+        }
+
+        foreach (self::ENTETES_SURSIGNES as $nom) {
+            $h[] = strtolower($nom);   // occurrence absente : ne contribue rien à la canonisation
         }
 
         $bh = base64_encode(hash('sha256', self::canonCorps($corps), true));

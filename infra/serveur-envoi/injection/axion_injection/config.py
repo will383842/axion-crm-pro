@@ -31,6 +31,18 @@ def normaliser_domaine(d: str) -> str:
         return d
 
 
+def _sans_mappee(adresse):
+    """Une IPv6 « mappée » (préfixe ffff sur 96 bits) vaut son IPv4 (règle anti-joker et correspondance)."""
+    return adresse.ipv4_mapped if adresse.version == 6 and adresse.ipv4_mapped else adresse
+
+
+def _reseau_sans_mappe(reseau):
+    """Réseau IPv6 situé dans le préfixe mappé (96 bits) -> le même réseau IPv4 (préfixe - 96)."""
+    if reseau.version == 6 and reseau.prefixlen >= 96 and reseau.network_address.ipv4_mapped is not None:
+        return ipaddress.ip_network((reseau.network_address.ipv4_mapped, reseau.prefixlen - 96))
+    return reseau
+
+
 @dataclass
 class Config:
     ip_ecoute: str                      # IP du tunnel, jamais joker
@@ -50,10 +62,10 @@ class Config:
     delai_ecriture: float = 30.0         # délai max d'un drain() : un client qui ne lit pas est coupé
 
     def __post_init__(self):
-        ip = ipaddress.ip_address(self.ip_ecoute)
+        ip = _sans_mappee(ipaddress.ip_address(self.ip_ecoute))
         if ip.is_unspecified:
             raise ValueError("ip_ecoute ne peut pas être une adresse joker")
-        self.reseaux = [ipaddress.ip_network(n) for n in self.ips_autorisees]
+        self.reseaux = [_reseau_sans_mappe(ipaddress.ip_network(n)) for n in self.ips_autorisees]
         for version in (4, 6):                # réseau joker, seul ou par recouvrement (0/1 + 128/1)
             groupe = [r for r in self.reseaux if r.version == version]
             if any(r.prefixlen == 0 for r in ipaddress.collapse_addresses(groupe)):
@@ -68,7 +80,7 @@ class Config:
 
     def ip_autorisee(self, ip: str) -> bool:
         try:
-            a = ipaddress.ip_address(ip)
+            a = _sans_mappee(ipaddress.ip_address(ip))
         except ValueError:
             return False
         return any(a in r for r in self.reseaux)

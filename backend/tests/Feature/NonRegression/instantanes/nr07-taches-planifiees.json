@@ -30,16 +30,6 @@
         "sauts": 0
     },
     {
-        "tache": "blacklists:check",
-        "horaire": "0 * * * *",
-        "fuseau": "Europe/Paris",
-        "verrou_minutes": null,
-        "en_arriere_plan": false,
-        "un_seul_serveur": false,
-        "conditions": 0,
-        "sauts": 0
-    },
-    {
         "tache": "campaigns:start-scheduled",
         "horaire": "* * * * *",
         "fuseau": "Europe/Paris",
@@ -200,16 +190,20 @@
         "sauts": 1
     },
     {
-        "tache": "envoi:rejouer-commandes",
-        "horaire": "*/5 * * * *",
+        "tache": "envoi:listes-noires:controler",
+        "horaire": "* * * * *",
         "fuseau": "Europe/Paris",
-        "verrou_minutes": 10,
+        "verrou_minutes": 5,
         "en_arriere_plan": false,
         "un_seul_serveur": true,
         "conditions": 0,
         "sauts": 1
     },
     {
+        "tache": "envoi:rejouer-commandes",
+        "horaire": "*/5 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
         "tache": "journalists:scrape-ours --editorial --limit=300",
         "horaire": "40 5 * * *",
         "fuseau": "Europe/Paris",

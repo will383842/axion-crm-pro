@@ -89,7 +89,7 @@ export function RotationsPage() {
                      12 + 2x20 de rembourrage `px-5`) ; l'ecran de reference en
                      fait 343. Le fragment `<>` qui etait ici ne defilait pas
                      et la Card, en `overflow-hidden`, coupait le reste. */
-                  <TableScroll template={ROW_GRID} rembourrageX={20}>
+                  <TableScroll tableau template={ROW_GRID} rembourrageX={20}>
                     <div
                       role="row"
                       className={cn(
@@ -98,13 +98,13 @@ export function RotationsPage() {
                       )}
                       style={{ gridTemplateColumns: ROW_GRID }}
                     >
-                      <div>Identifiant</div>
-                      <div className="text-right">Poids</div>
-                      <div className="text-right">Délai d'attente</div>
-                      <div>État</div>
-                      <div>Dernière utilisation</div>
+                      <div role="columnheader">Identifiant</div>
+                      <div role="columnheader" className="text-right">Poids</div>
+                      <div role="columnheader" className="text-right">Délai d'attente</div>
+                      <div role="columnheader">État</div>
+                      <div role="columnheader">Dernière utilisation</div>
                     </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
                       {items.map((r) => (
                         <div
                           key={r.id}
@@ -112,17 +112,17 @@ export function RotationsPage() {
                           className="grid items-center gap-3 px-5 py-3 text-sm"
                           style={{ gridTemplateColumns: ROW_GRID }}
                         >
-                          <div className="truncate font-mono text-xs">{r.slug}</div>
-                          <div className="text-right tabular-nums">{r.weight}</div>
-                          <div className="text-right tabular-nums text-xs">
+                          <div role="cell" className="truncate font-mono text-xs">{r.slug}</div>
+                          <div role="cell" className="text-right tabular-nums">{r.weight}</div>
+                          <div role="cell" className="text-right tabular-nums text-xs">
                             {r.cooldown_seconds}s
                           </div>
-                          <div>
+                          <div role="cell">
                             <StatusPill tone={r.enabled ? 'success' : 'neutral'}>
                               {r.enabled ? 'Actif' : 'Arrêté'}
                             </StatusPill>
                           </div>
-                          <div className="text-xs text-slate-500">
+                          <div role="cell" className="text-xs text-slate-500">
                             {r.last_used_at
                               ? new Date(r.last_used_at).toLocaleString('fr-FR')
                               : 'Jamais'}

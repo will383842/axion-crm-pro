@@ -42,8 +42,8 @@ test('enregistrer écrit une ligne isolée par workspace', function () {
     $rapport = (new ControleurDns(FauxResolveurDns::conforme()))->controler(new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10'));
     (new DepotControlesDnsDb)->enregistrer($a, $rapport, new DateTimeImmutable('2026-11-11 06:00:00'));
 
-    expect(WorkspaceContext::run($a, fn () => DB::table('envoi_controles_dns')->count()))->toBe(1)
-        ->and(WorkspaceContext::run($b, fn () => DB::table('envoi_controles_dns')->count()))->toBe(0);
+    expect(WorkspaceContext::run($a, fn () => DB::table('envoi_controles_dns')->where('workspace_id', $a)->count()))->toBe(1)
+        ->and(WorkspaceContext::run($b, fn () => DB::table('envoi_controles_dns')->where('workspace_id', $b)->count()))->toBe(0);
 });
 
 test('marquerVerifie pose les trois dates sur le domaine du workspace seulement', function () {
@@ -53,8 +53,8 @@ test('marquerVerifie pose les trois dates sur le domaine du workspace seulement'
     domaineDns($b);
     (new DepotControlesDnsDb)->marquerVerifie($a, 'envoi.example.test', new DateTimeImmutable('2026-11-11 06:00:00'));
 
-    $la = WorkspaceContext::run($a, fn () => DB::table('envoi_domaines')->first());
-    $lb = WorkspaceContext::run($b, fn () => DB::table('envoi_domaines')->first());
+    $la = WorkspaceContext::run($a, fn () => DB::table('envoi_domaines')->where('workspace_id', $a)->first());
+    $lb = WorkspaceContext::run($b, fn () => DB::table('envoi_domaines')->where('workspace_id', $b)->first());
     expect($la->spf_verifie_le)->not->toBeNull()->and($la->dkim_verifie_le)->not->toBeNull()->and($la->dmarc_verifie_le)->not->toBeNull()
         ->and($lb->spf_verifie_le)->toBeNull();
 });
@@ -80,7 +80,7 @@ test('la commande quotidienne contrôle chaque domaine configuré, sans réseau 
 
     expect(Artisan::call('envoi:controle-dns'))->toBe(0);
 
-    $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_controles_dns')->first());
+    $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_controles_dns')->where('workspace_id', $ws)->first());
     expect($ligne)->not->toBeNull()->and($ligne->pret)->toBeTrue()->and($ligne->pause)->toBeFalse();
 });
 
@@ -94,7 +94,7 @@ test('la commande : DMARC absent => pause journalisée', function () {
 
     Artisan::call('envoi:controle-dns');
 
-    $n = WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->where('commande', 'pause_domaine_dmarc_absent')->count());
+    $n = WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_domaine_dmarc_absent')->count());
     expect($n)->toBe(1);
 });
 

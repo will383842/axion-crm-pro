@@ -158,6 +158,8 @@ const SRC = path.resolve(racine, '../../src');
 const ECRAN_DE: Record<string, string> = {
   '/': 'features/dashboard/DashboardPage.tsx',
   '/doublons': 'features/doublons/DoublonsPage.tsx',
+  '/rgpd/effacements': 'features/rgpd/EffacementsDemandesPage.tsx',
+  '/origines': 'features/origines/OriginesPage.tsx',
   '/console/arbitrage': 'features/crm-console/ArbitragePage.tsx',
   '/companies': 'features/companies/CompaniesListPage.tsx',
   '/console/contacts': 'features/crm-console/ContactsHubPage.tsx',

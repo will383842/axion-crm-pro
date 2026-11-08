@@ -72,10 +72,11 @@ test('NR-07 la liste des tâches planifiées est celle de la photo de référenc
     Instantane::verifier('nr07-taches-planifiees', nr07Instantane());
 });
 
-test('NR-07 le planificateur contient au moins les 44 tâches annoncées par le relevé (témoin de couverture)', function () {
-    // Le relevé (plan 21 § 1) parle de 44 tâches + le battement. Un planificateur
-    // qui rendrait une liste vide ferait passer la photo pour « trop courte » ici.
-    expect(count(nr07Evenements()))->toBeGreaterThanOrEqual(44);
+test('NR-07 le planificateur contient au moins les 41 tâches restantes (témoin de couverture)', function () {
+    // Le relevé (plan 21 § 1) parlait de 44 tâches + le battement ; L3c-0 en a
+    // retiré 3 (les purges mensuelles). Un planificateur qui rendrait une liste
+    // vide ferait passer la photo pour « trop courte » ici.
+    expect(count(nr07Evenements()))->toBeGreaterThanOrEqual(41);
 });
 
 test('NR-07 le battement du planificateur tourne chaque minute', function () {
@@ -85,16 +86,12 @@ test('NR-07 le battement du planificateur tourne chaque minute', function () {
         ->and($battement[0]->expression)->toBe('* * * * *');
 });
 
-test('NR-07 les purges mensuelles portent un saut (le drapeau CRM_PURGE_ENABLED les éteint)', function () {
+test('NR-07 (L3c-0) plus aucune purge de personnes n\'est planifiée', function () {
     $purges = array_values(array_filter(
         nr07Evenements(),
-        fn (Event $e) => str_contains(nr07Nom($e), 'rgpd:purge-vivier')
-            || str_contains(nr07Nom($e), 'rgpd:purge-business-prospects')
-            || str_contains(nr07Nom($e), 'rgpd:purge-personnes'),
+        fn (Event $e) => str_contains(nr07Nom($e), 'rgpd:purge-')
+            || str_contains(nr07Nom($e), 'prospection:purge-'),
     ));
 
-    expect($purges)->toHaveCount(3);
-    foreach ($purges as $e) {
-        expect(nr07Compte($e, 'rejects'))->toBeGreaterThanOrEqual(1);
-    }
+    expect($purges)->toBe([]);
 });

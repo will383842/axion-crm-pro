@@ -4,6 +4,7 @@ import { Activity, AlertTriangle, MailCheck, Archive, MapPin } from 'lucide-reac
 import { Card, KpiCard, PageHeader, QueryErrorState } from '@/components/ui';
 import { api } from '@/lib/api';
 import { ReglagesTechniques } from '@/features/settings/ReglagesTechniques';
+import { CarteSauvegardes, type EtatSauvegardes } from './CarteSauvegardes';
 import { elementConcerne, libelleEvenementMetier, libelleMotifArchivage, type ElementConcerne } from './libelles';
 
 interface ObservabilitySummary {
@@ -12,6 +13,8 @@ interface ObservabilitySummary {
   google_places_quota: { used: number; soft_limit: number; percent: number; pending_companies: number };
   archive_reasons: Record<string, number>;
   audience_failures_7d: number;
+  /** Présent seulement quand le serveur annonce les sauvegardes (la carte reste cachée sinon). */
+  sauvegardes?: EtatSauvegardes;
   recent_events: Array<{
     id: number;
     action: string;
@@ -129,6 +132,8 @@ function SanteDuSysteme() {
           tone={data.audience_failures_7d > 0 ? 'amber' : 'emerald'}
         />
       </div>
+
+      {data.sauvegardes !== undefined && <CarteSauvegardes etat={data.sauvegardes} />}
 
       <Card>
         <CardSection title="Archivages par raison">

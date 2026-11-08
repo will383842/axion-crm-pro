@@ -108,32 +108,36 @@ test('une OPPOSITION posee dans la console presse atteint le contact lie et la t
         ->and(json_decode((string) DB::table('contacts')->where('id', $contact)->value('metadata'), true))->toHaveKey('opposition_presse_le');
 });
 
-test('un EFFACEMENT dans la console supprime le contact lie meme SANS adresse, l inscrit au registre ; il ne revient pas', function () {
+test('L3c-0 : un EFFACEMENT dans la console MASQUE le contact lie meme SANS adresse (jamais supprime) ; il ne revient pas', function () {
     [$fiche, $j, $contact] = pdHarmonise($this->espace);
     expect(DB::table('contacts')->where('id', $contact)->value('email'))->toBeNull();
     pdConsole($this, $this->espace);
 
     $this->deleteJson("/api/v1/journalists/{$j}")->assertNoContent();
 
-    expect(DB::table('contacts')->where('id', $contact)->exists())->toBeFalse()
-        ->and(DB::table('contacts_retires')->where('company_id', $fiche)->count())->toBe(1)
+    // La ligne est GARDEE, a la corbeille douce, avec sa trace de mise a l'ecart.
+    expect(DB::table('contacts')->where('id', $contact)->exists())->toBeTrue()
+        ->and(DB::table('contacts')->where('id', $contact)->value('deleted_at'))->not->toBeNull()
+        ->and((string) DB::table('contacts')->where('id', $contact)->value('metadata'))->toContain('mis_a_l_ecart_le')
         ->and(DB::table('journalists')->where('id', $j)->value('deleted_at'))->not->toBeNull()
         ->and(DB::table('journalists')->where('id', $j)->value('opt_out'))->toBeTrue();
 
     Artisan::call('crm:presse:harmoniser');
-    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZDROITS')->exists())->toBeFalse();
+    expect(DB::table('contacts')->where('company_id', $fiche)->where('last_name', 'ZZDROITS')->whereNull('deleted_at')->exists())->toBeFalse();
 });
 
-test('l effacement RGPD (GdprErasureService) atteint le contact lie par contact_id, meme sans adresse', function () {
+test('L3c-0 : l effacement RGPD (GdprErasureService) masque le contact lie par contact_id, meme sans adresse', function () {
     [$fiche, $j, $contact] = pdHarmonise($this->espace, ['email' => 'zoe.rgpd@zz-droits.example.invalid', 'acces' => 'email_redaction']);
     // Le contact n'a plus d'adresse : seul `contact_id` le relie à la personne.
     DB::table('contacts')->where('id', $contact)->update(['email' => null]);
 
     app(GdprErasureService::class)->erase('zoe.rgpd@zz-droits.example.invalid');
 
-    expect(DB::table('contacts')->where('id', $contact)->exists())->toBeFalse()
-        ->and(DB::table('contacts_retires')->where('company_id', $fiche)->count())->toBe(1)
-        ->and(DB::table('journalists')->where('id', $j)->value('email'))->toBeNull();
+    expect(DB::table('contacts')->where('id', $contact)->exists())->toBeTrue()
+        ->and(DB::table('contacts')->where('id', $contact)->value('deleted_at'))->not->toBeNull()
+        // L3c-0 : le journaliste est masqué, son adresse est GARDÉE.
+        ->and(DB::table('journalists')->where('id', $j)->value('email'))->toBe('zoe.rgpd@zz-droits.example.invalid')
+        ->and(DB::table('journalists')->where('id', $j)->value('deleted_at'))->not->toBeNull();
 });
 
 // ── Sens contact → journaliste (porté par la base) ─────────────────────────

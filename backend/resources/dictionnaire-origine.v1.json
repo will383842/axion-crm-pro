@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "familles": {
+    "guide_reseau": {
+      "libelle": "Guide par réseau",
+      "details": {
+        "guide_ia": { "libelle": "Guide IA" },
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    },
+    "cas_concret": {
+      "libelle": "Cas concret",
+      "details": {
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    },
+    "carrousel": {
+      "libelle": "Carrousel",
+      "details": {
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    },
+    "video": {
+      "libelle": "Vidéo",
+      "details": {
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    },
+    "tour_france_ia": {
+      "libelle": "Tour France IA",
+      "details": {
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    },
+    "autre": {
+      "libelle": "Autre",
+      "details": {
+        "autre_non_classe": { "libelle": "Autre, non classé" }
+      }
+    }
+  }
+}

@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/feu-vert/{code}/fait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marquer un point manuel du feu vert comme fait */
+        post: operations["marquerPointFeuVert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/resultats": {
         parameters: {
             query?: never;
@@ -83,6 +100,23 @@ export interface paths {
         get: operations["lireSante"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/sante/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lancer le test des boîtes témoins maintenant */
+        post: operations["lancerTestDuMatin"];
         delete?: never;
         options?: never;
         head?: never;
@@ -181,6 +215,8 @@ export interface components {
             remis: number;
             reponses: number;
             reponses_interessees: number;
+            /** @description Version du message type (regroupement par message). */
+            version?: number;
         };
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
@@ -236,6 +272,12 @@ export interface operations {
                     "application/json": {
                         adresse: string;
                         evenements: components["schemas"]["EvenementEnvoi"][];
+                        /** @description Fiche du CRM quand l'adresse y est connue ; nul sinon. */
+                        personne: {
+                            contact_id: number;
+                            nom: string;
+                            organisation: string | null;
+                        } | null;
                         peut_ecrire: boolean;
                         raison: string | null;
                     };
@@ -272,6 +314,33 @@ export interface operations {
             };
         };
     };
+    marquerPointFeuVert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le point à jour. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                        detail: string | null;
+                        fait: boolean;
+                        libelle: string;
+                    };
+                };
+            };
+        };
+    };
     lireResultats: {
         parameters: {
             query: {
@@ -292,12 +361,20 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["LigneResultat"][];
+                        entonnoir: {
+                            envoyes: number;
+                            gagnes: number;
+                            rendez_vous: number;
+                            reponses: number;
+                        };
                         periode: {
                             /** Format: date */
                             au: string;
                             /** Format: date */
                             du: string;
                         };
+                        /** @description Totaux de la période d'avant, de même durée (pour la comparaison). */
+                        precedent: components["schemas"]["LigneResultat"];
                         totaux: components["schemas"]["LigneResultat"];
                     };
                 };
@@ -355,7 +432,19 @@ export interface operations {
                         alertes: number;
                         boites: components["schemas"]["BoiteResume"][];
                         domaines: components["schemas"]["DomaineResume"][];
+                        envoyes_14_jours: {
+                            envoyes: number;
+                            /** Format: date */
+                            jour: string;
+                        }[];
                         feu: components["schemas"]["EtatFeu"];
+                        rythme_messageries: {
+                            envoyes: number;
+                            /** @enum {string} */
+                            etat: "normal" | "freine";
+                            messagerie: string;
+                            par_heure: number;
+                        }[];
                         serveurs: components["schemas"]["ServeurResume"][];
                         test_du_matin: {
                             etat: components["schemas"]["EtatFeu"];
@@ -363,6 +452,36 @@ export interface operations {
                             temoins_ok: number;
                             temoins_total: number;
                         };
+                        verifie_le: components["schemas"]["Horodatage"];
+                        volume_jour: {
+                            envoyes: number;
+                            possibles: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    lancerTestDuMatin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Résultat du test. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        etat: components["schemas"]["EtatFeu"];
+                        le: components["schemas"]["Horodatage"];
+                        temoins_ok: number;
+                        temoins_total: number;
                     };
                 };
             };

@@ -346,7 +346,7 @@ test('RGPD art. 15/20 : l export rend les propositions qui concernent la personn
         ->and(json_encode($lignes))->not->toContain('Directeur');
 });
 
-test('RGPD art. 17 : l effacement NEUTRALISE les propositions de la personne, sans supprimer une ligne', function () {
+test('RGPD art. 17 : l effacement METS A L ECART les propositions de la personne (marque réversible), sans écraser ni supprimer une ligne', function () {
     $this->seed(PermissionsAndRolesSeeder::class);
     $ws = F::espace('zz-pr-eff');
     $owner = prOwner($ws);
@@ -371,33 +371,32 @@ test('RGPD art. 17 : l effacement NEUTRALISE les propositions de la personne, sa
     $bilan = app(GdprErasureService::class)->erase($email);
 
     expect(DB::table('propositions_champs')->count())->toBe($avant)
-        ->and($bilan['deleted']['propositions_champs_neutralisees'])->toBe(3);
+        ->and($bilan['deleted']['propositions_champs_ecartees'])->toBe(3);
 
+    // Les valeurs sont INTACTES (rien d'écrasé), seule une marque est posée.
     $a = DB::table('propositions_champs')->where('id', $acceptee)->first();
-    expect($a->valeur_proposee)->toBe('[effacé]')
-        ->and($a->valeur_actuelle)->toBe('[effacé]')
-        ->and($a->valeur_remplacee)->toBe('[effacé]')
-        ->and($a->reference_externe)->toBe('[effacé]')
+    expect($a->valeur_proposee)->toBe('Présidente')
+        ->and($a->valeur_actuelle)->toBe('Gérante')
+        ->and($a->reference_externe)->toBe('zz-ref-eff')
         ->and($a->statut)->toBe('acceptee')
-        ->and($a->decidee_par)->toBe($owner->id)
-        ->and($a->effacee_le)->not->toBeNull();
+        ->and($a->effacee_le)->toBeNull();
 
     $e = DB::table('propositions_champs')->where('id', $attente)->first();
-    expect($e->valeur_proposee)->toBe('[effacé]')
-        ->and($e->valeur_actuelle)->toBe('[effacé]')
-        ->and($e->statut)->toBe('effacee')
-        ->and($e->decidee_le)->not->toBeNull();
+    expect($e->valeur_proposee)->toBe('https://zz.example.invalid/zoe-2')
+        ->and($e->statut)->toBe('en_attente');
 
-    expect(DB::table('propositions_champs')->where('id', $surEntreprise)->value('valeur_proposee'))->toBe('[effacé]')
+    expect(DB::table('propositions_champs')->where('id', $surEntreprise)->value('valeur_proposee'))->not->toBe('[effacé]')
+        ->and(DB::table('propositions_champs_ecartees')->whereIn('proposition_id', [$acceptee, $attente, $surEntreprise])->count())->toBe(3)
+        ->and(DB::table('propositions_champs_ecartees')->where('proposition_id', $garde)->exists())->toBeFalse()
         ->and(DB::table('propositions_champs')->where('id', $garde)->value('valeur_proposee'))->toBe('Directeur');
 
-    // Une proposition effacée ne revient pas dans la file.
+    // Une proposition mise à l'écart ne revient pas dans la file.
     $this->actingAs($owner);
     $ids = collect($this->getJson('/api/v1/crm/propositions')->assertOk()->json('data'))->pluck('id')->all();
     expect($ids)->toBe([$garde]);
 });
 
-test('RGPD art. 17 : hors de la fonction d effacement, personne ne réécrit ni ne neutralise une proposition', function () {
+test('RGPD art. 17 : personne ne réécrit ni ne neutralise une proposition, et le service n appelle plus la fonction qui écrase', function () {
     $ws = F::espace('zz-pr-borne');
     $fiche = F::fiche($ws, 'ZZ Borne', ['city' => 'Lyon']);
     prService()->proposer($ws, 'entreprise', $fiche, 'city', 'Bron', 'societe');
@@ -409,7 +408,8 @@ test('RGPD art. 17 : hors de la fonction d effacement, personne ne réécrit ni 
     ])))->toThrow(QueryException::class);
     expect(DB::table('propositions_champs')->where('id', $id)->value('valeur_proposee'))->toBe('Bron');
 
-    // L'effacement passe par la fonction dédiée, et par elle seule.
+    // L3c-0 : le service ne passe plus par la fonction qui écrasait les valeurs.
     $source = file_get_contents(base_path('app/Services/Rgpd/GdprErasureService.php'));
-    expect($source)->toContain('propositions_champs_effacer(');
+    expect($source)->not->toContain('propositions_champs_effacer(')
+        ->and($source)->toContain('propositions_champs_ecartees');
 });

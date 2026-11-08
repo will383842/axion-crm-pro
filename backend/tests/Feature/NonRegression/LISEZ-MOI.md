@@ -12,7 +12,8 @@
 | Liste figée | `LISTE.json` (base figée) + `LISTE.d/<date>-<lot>.json` (un fragment par lot), union vérifiée par `ListeFigeeTest.php` |
 | Colonnes JSON/JSONB (RGPD) | `../Rgpd/colonnes-json/<date>-<lot>.json` (un fragment par lot), union vérifiée par `PortabiliteCompleteTest.php` (B10-004) |
 | Gardes du frontend (routes, routeTree, menu) | `frontend/tests/non-regression/*.test.ts` |
-| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend` l'attend) |
+| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend-verdict` l'attend et échoue si le filet n'est pas vert — le contexte exigé par la protection de `main`) |
+| Verdict et artefacts | `backend-verdict` télécharge `pest-part-*` : il relit les artefacts de TOUTE la run (y compris d'une relance partielle), pas seulement ceux de la tentative en cours |
 
 ## Lancer le filet en local
 
@@ -81,3 +82,9 @@ Ils sont aussi écrits en tête des fichiers concernés.
 ## Ajouter une colonne JSON/JSONB (B10-004)
 
 Une migration qui ajoute une colonne `json`/`jsonb` n'édite plus de nombre en dur : elle ajoute un NOUVEAU fragment `backend/tests/Feature/Rgpd/colonnes-json/<date>-<lot>.json`, au format `{"table.colonne": "couverte" | "hors-portee: motif"}`. Le test exige l'**égalité stricte** entre l'union des fragments et les colonnes réellement présentes en base (dans les deux sens), et entre les « hors-portee » déclarées et celles que le test calcule. Un même nom dans deux fragments est refusé. Deux lots n'écrivent donc plus jamais dans le même fichier.
+
+## Journal de la liste figée (ajouts seulement)
+
+| PR | Ajout dans `LISTE.json` | Pourquoi |
+|---|---|---|
+| #433 (envoi P0 L0) | NR-17 « la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels » | Test ajouté dans `Nr17MigrationsTest.php` avec la liste fermée `NR17_RETOUR_INERTE_VOULU` (000011, 000013). Aucun test retiré ni affaibli : toute autre migration nouvelle (dont les 000020-22 de L3, au `down()` non destructif) garde l’exigence d’un retour réel + aller-retour-aller. |

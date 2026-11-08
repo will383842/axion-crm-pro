@@ -45,11 +45,9 @@
  *  6. `degraded: true` — le controleur repond `200` avec ce drapeau quand sa
  *     requete a leve : la liste est vide SANS QUE CELA VEUILLE DIRE « rien ».
  *     Le panneau doit le dire, jamais conclure a l'absence.
- *  7. HONNETETE SUR CE QUI N'EXISTE PAS — `markRead` et `markAllRead` rendent
- *     `501`. Le panneau ne doit donc offrir AUCUN bouton de marquage (ce serait
- *     recreer D24-002 un cran plus bas), et doit dire que la fonction n'est pas
- *     disponible. ⚠️ Le jour ou le serveur implemente ces deux routes, c'est
- *     CETTE assertion qu'il faut retourner — pas la contourner.
+ *  7. MARQUAGE COMME LU (inverse par S9) — `POST /notifications/read-all` est reel :
+ *     le panneau offre « Tout marquer comme lu » (seulement s'il y a des
+ *     non-lues) et l'appelle. Il ne dit plus « pas encore disponible ».
  *  8. `Echap` referme.
  *
  * ⚠️ Toutes les sous-chaines cherchees sont SANS LETTRE ACCENTUEE et sans
@@ -198,22 +196,45 @@ describe('D24-002 — la cloche de l’en-tete ouvre un panneau reel', () => {
     expect(texteEcran()).not.toContain('Aucune notification');
   });
 
-  it('marquage comme lu : rien n’est offert, et l’ecran DIT pourquoi', async () => {
-    await monterCoquille(DEUX_NOTIFICATIONS);
+  it('marquage comme lu : « Tout marquer comme lu » existe, appelle le serveur et ne ment plus', async () => {
+    let appels = 0;
+    await renderScreen(<p>contenu de page</p>, {
+      path: '/',
+      withLayout: true,
+      handlers: [
+        getJson('/notifications', DEUX_NOTIFICATIONS),
+        http.post(apiUrl('/notifications/read-all'), () => {
+          appels += 1;
+          return HttpResponse.json({ marked: 1 });
+        }),
+      ],
+    });
     const user = userEvent.setup();
 
     await user.click(cloche());
     const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
 
-    // `POST /notifications/{n}/read` et `/read-all` rendent 501. Un bouton qui
-    // les appellerait serait exactement le defaut qu'on ferme, un cran plus bas.
-    //
-    // ⚠️ La recherche est CANTONNEE au panneau : la cloche elle-meme porte
-    // « 1 non lue » dans son nom accessible, et un `queryByRole` global la
-    // trouverait — la garde rougirait sur son propre correctif.
+    // S9 : `POST /notifications/read-all` est reel. La garde « aucun bouton »
+    // du lot DM0-COQ est donc RETOURNEE, comme son commentaire le prevoyait.
+    // La recherche reste cantonnee au panneau (la cloche porte « 1 non lue »).
+    const bouton = await within(panneau).findByRole('button', { name: 'Tout marquer comme lu' });
+    expect(texteEcran()).not.toContain('pas encore disponible');
+
+    await user.click(bouton);
+    await waitFor(() => {
+      expect(appels).toBe(1);
+    });
+  });
+
+  it('TEMOIN — sans notification non lue, le bouton « Tout marquer comme lu » n’est pas offert', async () => {
+    await monterCoquille(AUCUNE_NOTIFICATION);
+    const user = userEvent.setup();
+
+    await user.click(cloche());
+    const panneau = await screen.findByRole('dialog', { name: /Notifications/ });
+    await within(panneau).findByText(/Aucune notification/);
+
     expect(within(panneau).queryByRole('button', { name: /marquer/i })).toBeNull();
-    expect(within(panneau).queryByRole('button', { name: /lue/i })).toBeNull();
-    expect(texteEcran()).toContain('pas encore disponible');
   });
 
   it('Echap referme le panneau', async () => {
@@ -290,8 +311,8 @@ describe('DM0-COQ — la cloche dit de quel produit vient chaque alerte', () => 
     // `lien` prime sur `action_url` (absent ici).
     expect(within(crm).getByRole('link')).toHaveAttribute('href', '/doublons');
 
-    // La garde « pas de bouton Marquer comme lu tant que 501 » TIENT (S9 l'inversera).
-    expect(within(panneau).queryByRole('button', { name: /marquer/i })).toBeNull();
+    // S9 : la garde « pas de bouton Marquer comme lu » est inversee (voir plus haut).
+    expect(within(panneau).getByRole('button', { name: 'Tout marquer comme lu' })).toBeInTheDocument();
   });
 
   it('TEMOIN — une notification sans `produit` (serveur d’aujourd’hui) ne porte aucune pastille', async () => {

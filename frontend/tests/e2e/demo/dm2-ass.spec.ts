@@ -45,7 +45,7 @@ test.describe('création de campagne (DM2-ASS)', () => {
 
     // 3. Quand : demain 9 h.
     await page.getByRole('button', { name: 'Demain 9:00' }).click();
-    await expect(page.getByLabel('Jour')).toHaveValue('2027-01-13');
+    await expect(page.getByLabel('Jour', { exact: true })).toHaveValue('2027-01-13');
     await page.getByRole('button', { name: /Continuer : vérification/ }).click();
 
     // 4. Contrôles au vert.

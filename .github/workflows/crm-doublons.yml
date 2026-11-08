@@ -26,6 +26,12 @@ on:
           - detecter
           - fusionner-a-blanc
           - fusionner-certaines
+          - personnes-demandes-a-blanc
+          - personnes-demandes-appliquer
+      confirmation:
+        description: "Pour personnes-demandes-appliquer : taper SAUVEGARDE-VERIFIEE (sinon le job s'arrête)"
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -48,6 +54,7 @@ jobs:
           USER: ${{ secrets.HETZNER_USER || 'root' }}
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
           MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -euo pipefail
           case "$MODE" in
@@ -55,12 +62,24 @@ jobs:
             detecter)             CMD="crm:doublons:detecter" ;;
             fusionner-a-blanc)    CMD="crm:doublons:fusionner --dry-run" ;;
             fusionner-certaines)  CMD="crm:doublons:fusionner" ;;
+            # Rattrapage de la fiche demande (lot C1) : n'écrit que dans `personnes`
+            # (aucun e-mail, aucun abonnement, aucune suppression) ; des comptes seulement.
+            personnes-demandes-a-blanc)  CMD="crm:personnes-depuis-demandes --a-blanc" ;;
+            personnes-demandes-appliquer)
+              if [ "$CONFIRMATION" != "SAUVEGARDE-VERIFIEE" ]; then
+                echo "::error::Pour appliquer, taper SAUVEGARDE-VERIFIEE après avoir lu le rapport de la sauvegarde."
+                exit 1
+              fi
+              CMD="crm:personnes-depuis-demandes --appliquer" ;;
             *) echo "::error::mode inconnu : $MODE"; exit 1 ;;
           esac
+          # `--compteurs-seulement` pour les doublons ; la commande des personnes n'imprime déjà que des comptes.
+          OPT_COMPTEURS="--compteurs-seulement"
+          case "$MODE" in personnes-demandes-*) OPT_COMPTEURS="" ;; esac
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
             set -euo pipefail
             cd "$PROJECT_PATH"
             # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
             # reste du heredoc comme stdin et avale les commandes suivantes.
-            docker compose exec -u root -T api php artisan $CMD --compteurs-seulement < /dev/null
+            docker compose exec -u root -T api php artisan $CMD $OPT_COMPTEURS < /dev/null
           EOF

@@ -34,6 +34,8 @@ import { LlmRouterPage } from '@/features/llm/LlmRouterPage';
 import { ProxyProvidersPage } from '@/features/llm/ProxyProvidersPage';
 import { RotationsPage } from '@/features/llm/RotationsPage';
 import { RgpdRequestsPage } from '@/features/rgpd/RgpdRequestsPage';
+import { EffacementsDemandesPage } from '@/features/rgpd/EffacementsDemandesPage';
+import { OriginesPage } from '@/features/origines/OriginesPage';
 import { AiActRegisterPage } from '@/features/rgpd/AiActRegisterPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 import { UsersPage } from '@/features/users/UsersPage';
@@ -191,6 +193,8 @@ const llmRouterRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/
 const proxyProvidersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/proxy-providers', component: ProxyProvidersPage });
 const rotationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/rotations', component: RotationsPage });
 const rgpdRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/requests', component: RgpdRequestsPage });
+const effacementsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/effacements', component: EffacementsDemandesPage });
+const originesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/origines', component: OriginesPage });
 const aiActRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/ai-act', component: AiActRegisterPage });
 const auditRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audit-logs', component: AuditLogsPage });
 const usersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/users', component: UsersPage });
@@ -467,6 +471,8 @@ export const routeTree = rootRoute.addChildren([
     proxyProvidersRoute,
     rotationsRoute,
     rgpdRoute,
+    effacementsRoute,
+    originesRoute,
     aiActRoute,
     auditRoute,
     usersRoute,

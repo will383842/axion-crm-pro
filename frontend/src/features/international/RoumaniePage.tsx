@@ -160,7 +160,7 @@ export function RoumaniePage() {
       </div>
 
       {isLoading && <p className="text-sm text-slate-500">Chargement…</p>}
-      {isError && <p className="text-sm text-red-600">Impossible de charger le vivier Roumanie.</p>}
+      {isError && <p role="alert" className="text-sm text-red-600">Impossible de charger le vivier Roumanie.</p>}
 
       {!isLoading && !isError && (
         <>

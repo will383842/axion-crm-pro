@@ -1,0 +1,178 @@
+/**
+ * PR-C — « Effacements demandés ». Règle de fer : AUCUN bouton « Supprimer ».
+ * Un seul geste humain : « Marquer comme traité (mise à l’écart faite) » (route `process` existante).
+ */
+import { describe, it, expect } from 'vitest';
+import { screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { EffacementsDemandesPage } from '@/features/rgpd/EffacementsDemandesPage';
+import { renderScreen } from '../../helpers/renderScreen';
+import { dynamicGet, getJson, getPending, getStatus, recordPost } from '../../msw/handlers';
+import { ME } from './fixtures';
+
+const LIGNES = {
+  data: [
+    { id: 7, type: 'erasure', status: 'pending', subject_email: 'exe•••@•••.invalid', requested_at: '2026-11-04T06:12:00Z', processed_at: null },
+    { id: 5, type: 'erasure', status: 'processing', subject_email: 'exe•••@•••.invalid', requested_at: '2026-10-31T11:03:00Z', processed_at: null },
+    { id: 3, type: 'erasure', status: 'done', subject_email: 'exe•••@•••.invalid', requested_at: '2026-10-12T16:52:00Z', processed_at: '2026-10-13T08:00:00Z' },
+  ],
+};
+
+const OWNER = ME(['rgpd.handle', 'rgpd.view', 'contacts.view_pii'], ['owner']);
+const VIEWER = ME(['rgpd.view'], ['viewer']);
+const AUCUN = ME([], ['viewer']);
+
+const monter = (me: unknown, handlers: unknown[] = [getJson('/rgpd/requests', LIGNES)]) =>
+  renderScreen(<EffacementsDemandesPage />, { path: '/rgpd/effacements', handlers: [getJson('/auth/me', me), ...(handlers as never[])] });
+
+describe('EffacementsDemandesPage', () => {
+  it('AUCUN bouton ni lien « Supprimer » (propriétaire comme lecteur)', async () => {
+    for (const me of [OWNER, VIEWER]) {
+      const { unmount, container } = await monter(me);
+      await screen.findAllByText(/EFF-0007/);
+      expect(screen.queryByRole('button', { name: /supprim|effacer|purger/i })).toBeNull();
+      expect(container.textContent).not.toMatch(/Supprimer/);
+      unmount();
+    }
+  });
+
+  it('propriétaire : UN seul libellé d’action, sur les demandes ouvertes seulement', async () => {
+    await monter(OWNER);
+    await screen.findAllByText(/EFF-0007/);
+    const boutons = screen.getAllByRole('button', { name: 'Marquer comme traité (mise à l’écart faite)' });
+    expect(boutons).toHaveLength(2); // pending + processing, pas la demande traitée
+    boutons.forEach((b) => expect(b).toBeEnabled());
+  });
+
+  it('lecteur (viewer/admin) : liste visible, bouton grisé avec la raison rgpd.handle', async () => {
+    await monter(VIEWER);
+    await screen.findAllByText(/EFF-0007/);
+    screen.getAllByRole('button', { name: 'Marquer comme traité (mise à l’écart faite)' }).forEach((b) => expect(b).toBeDisabled());
+    expect(screen.getAllByText(/rgpd\.handle/).length).toBeGreaterThan(0);
+  });
+
+  it('la plus ancienne en haut', async () => {
+    await monter(OWNER);
+    await screen.findAllByText(/EFF-0007/);
+    const refs = screen.getAllByText(/^EFF-000\d$/).map((e) => e.textContent);
+    expect(refs).toEqual(['EFF-0003', 'EFF-0005', 'EFF-0007']);
+  });
+
+  it('demande par défaut statut=ouverte', async () => {
+    const liste = dynamicGet('/rgpd/requests', () => LIGNES);
+    await monter(OWNER, [liste.handler]);
+    await screen.findAllByText(/EFF-0007/);
+    expect(new URL(liste.urls[0] as string).searchParams.get('statut')).toBe('ouverte');
+  });
+
+  it('confirmation puis POST /rgpd/requests/{id}/process, sans note', async () => {
+    const post = recordPost('/rgpd/requests/7/process', { request: { ...LIGNES.data[0], status: 'done' }, result: { supprime: 0 } });
+    await monter(OWNER, [getJson('/rgpd/requests', LIGNES), post.handler]);
+    const ligne = (await screen.findByText('EFF-0007')).closest('tr, [role="row"]') as HTMLElement;
+    await userEvent.click(within(ligne).getByRole('button', { name: /Marquer comme traité/ }));
+    const dlg = await screen.findByRole('dialog');
+    expect(dlg.textContent).toMatch(/Rien n’est supprimé/);
+    await userEvent.click(within(dlg).getByRole('button', { name: /Marquer comme traité/ }));
+    await waitFor(() => expect(post.bodies).toHaveLength(1));
+    expect(post.bodies[0]).toBeNull();
+  });
+
+  it('états : chargement', async () => {
+    const lent = getPending('/rgpd/requests', LIGNES);
+    await monter(OWNER, [lent.handler]);
+    expect(await screen.findByText(/Chargement des demandes d’effacement/)).toBeVisible();
+    lent.release();
+  });
+
+  it('états : vide', async () => {
+    await monter(OWNER, [getJson('/rgpd/requests', { data: [] })]);
+    expect(await screen.findByText('Aucune demande d’effacement ouverte')).toBeVisible();
+  });
+
+  it('états : erreur', async () => {
+    await monter(OWNER, [getStatus('/rgpd/requests', 500)]);
+    expect(await screen.findByText(/Impossible de charger cet écran/)).toBeVisible();
+  });
+
+  it('états : accès refusé (403) et aucun droit', async () => {
+    await monter(AUCUN, [getStatus('/rgpd/requests', 403)]);
+    expect(await screen.findByText('Accès refusé')).toBeVisible();
+  });
+
+  it('un « stop » n’est pas une mise à l’écart d’effacement : libellé distinct', async () => {
+    const { container } = await monter(OWNER, [getJson('/rgpd/requests', { data: [{ ...LIGNES.data[0], type: 'opposition' }] })]);
+    expect(await screen.findByText('Aucune demande d’effacement ouverte')).toBeVisible();
+    expect(screen.queryByText('EFF-0007')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Marquer comme traité/ })).toBeNull();
+    expect(container.textContent).toMatch(/« stop » n’est pas une demande d’effacement/);
+  });
+
+  it('réponse degraded:true : « Données momentanément indisponibles », pas « Aucune demande »', async () => {
+    await monter(OWNER, [getJson('/rgpd/requests', { data: [], meta: { total: 0 }, degraded: true })]);
+    expect(await screen.findByText('Données momentanément indisponibles')).toBeVisible();
+    expect(screen.queryByText('Aucune demande d’effacement ouverte')).toBeNull();
+  });
+
+  it('accès refusé : operator cité parmi les rôles de lecture', async () => {
+    await monter(AUCUN, [getStatus('/rgpd/requests', 403)]);
+    expect(await screen.findByText(/viewer, operator, admin/)).toBeVisible();
+  });
+
+  it('pagination : Suivant demande la page 2, Précédent revient', async () => {
+    const liste = dynamicGet('/rgpd/requests', (_n, url) => ({ ...LIGNES, current_page: Number(url.searchParams.get('page') ?? 1), last_page: 2 }));
+    await monter(OWNER, [liste.handler]);
+    await screen.findAllByText(/EFF-0007/);
+    expect(screen.getByText(/Page 1 sur 2/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Précédent' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
+    expect(await screen.findByText(/Page 2 sur 2/)).toBeVisible();
+    expect(new URL(liste.urls[liste.urls.length - 1] as string).searchParams.get('page')).toBe('2');
+    expect(screen.getByRole('button', { name: 'Suivant' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Précédent' }));
+    expect(await screen.findByText(/Page 1 sur 2/)).toBeVisible();
+  });
+
+  it('la phrase de tri reste vraie : ouvertes = plus ancienne en haut, traitées = plus récente en haut', async () => {
+    await monter(OWNER);
+    expect(await screen.findByText(/la plus ancienne en haut/)).toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'Traitées' }));
+    expect(await screen.findByText(/la plus récente en haut/)).toBeVisible();
+    expect(screen.queryByText(/la plus ancienne en haut/)).toBeNull();
+  });
+
+  describe('masquage serveur (hors owner/admin : rgpd.view_pii)', () => {
+    const MASQUEES = {
+      data: [
+        { id: 9, type: 'erasure', status: 'pending', subject_email: null, requested_at: '2026-11-04T06:12:00Z', processed_at: null, metadata: { mise_a_l_ecart: true }, export_token: null },
+        { id: 8, type: 'erasure', status: 'done', requested_at: '2026-11-01T06:12:00Z', processed_at: '2026-11-02T06:12:00Z', metadata: { verification: 'ok' }, export_token: null },
+      ],
+    };
+
+    it('adresse retirée ou absente : libellé « adresse masquée », aucun plantage', async () => {
+      await monter(VIEWER, [getJson('/rgpd/requests', MASQUEES)]);
+      expect(await screen.findByText('EFF-0009')).toBeVisible();
+      expect(screen.getAllByText('adresse masquée (réservée à l’administrateur)')).toHaveLength(2);
+    });
+
+    it('même adresse partiellement masquée par le serveur : le libellé remplace la valeur pour un lecteur', async () => {
+      await monter(VIEWER);
+      await screen.findAllByText(/EFF-0007/);
+      expect(screen.queryByText(/exe•••@/)).toBeNull();
+      expect(screen.getAllByText(/adresse masquée/).length).toBe(3);
+    });
+
+    it('owner/admin (rgpd.view_pii) : adresse affichée telle que le serveur la rend', async () => {
+      const admin = ME(['rgpd.view', 'rgpd.view_pii'], ['admin']);
+      await monter(admin, [getJson('/rgpd/requests', { data: [{ ...LIGNES.data[0], subject_email: 'personne@exemple.invalid' }] })]);
+      expect(await screen.findByText('personne@exemple.invalid')).toBeVisible();
+      expect(screen.queryByText(/adresse masquée/)).toBeNull();
+    });
+
+    it('un « stop » n’est pas une demande d’effacement : la note le dit, aucun bouton Supprimer', async () => {
+      const { container } = await monter(VIEWER, [getJson('/rgpd/requests', MASQUEES)]);
+      await screen.findByText('EFF-0009');
+      expect(container.textContent).toMatch(/« stop » n’est pas une demande d’effacement/);
+      expect(screen.queryByRole('button', { name: /supprim/i })).toBeNull();
+    });
+  });
+});

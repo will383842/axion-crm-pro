@@ -611,7 +611,15 @@ test('index : la passe prioritaire et la lecture par SIREN sont indexées sous a
     MiseAJourMensuelle::fichesPrioritaires($espace, '2026-07-06', 100);
     $requete = collect(DB::getQueryLog())->last();
     DB::disableQueryLog();
-    expect(mamPlan($espace, $requete['query'], $requete['bindings']))->toContain('idx_companies_insee_priorite');
+    // Table sans donnée : son plan dépend de ce que les tests précédents ont
+    // laissé (statistiques, pages mortes) et d'une analyse automatique en cours
+    // de route. État normalisé et autovacuum coupé le temps de la mesure.
+    $planPriorite = StatistiquesPlanStables::figer(mamProprio(), ['companies'], static function () use ($espace, $requete): string {
+        StatistiquesPlanStables::rendre(mamProprio(), ['companies']);
+
+        return mamPlan($espace, $requete['query'], $requete['bindings']);
+    }, mamProprio());
+    expect($planPriorite)->toContain('idx_companies_insee_priorite');
 
     // La lecture par SIREN : sur une table vide, le planificateur choisit au
     // hasard. On sème donc un volume (fictif) et des statistiques, et on lit

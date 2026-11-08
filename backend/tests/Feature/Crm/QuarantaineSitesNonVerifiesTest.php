@@ -165,7 +165,13 @@ test('le SQL et le miroir PHP disent la même chose, sans rien réécrire', func
     }
     $generiques = DB::table('companies')->where('workspace_id', $ws)
         ->selectRaw('id, ' . QuarantaineSite::generiqueSql('companies') . ' AS q')->pluck('q', 'id')->all();
-    expect($generiques)->toBe([$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false]);
+    // `toBe` compare aussi l'ORDRE des clés, et un SELECT sans ORDER BY ne
+    // garantit aucun ordre (il suit la place physique des lignes) : on compare
+    // donc des tableaux triés par identifiant, le contenu reste strictement égal.
+    ksort($generiques);
+    $attendu = [$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false];
+    ksort($attendu);
+    expect($generiques)->toBe($attendu);
 
     $apres = DB::table('contacts')->where('workspace_id', $ws)->orderBy('id')->get()->toJson()
         . DB::table('companies')->where('workspace_id', $ws)->orderBy('id')->get()->toJson();
@@ -527,7 +533,23 @@ function qsEspaceRls(): array
         'information_tiers_version' => 'information-article-14/v3', 'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    // Statistiques du planificateur FIGÉES : sans cela, le plan dépend du moment
+    // où l'autovacuum a (ou non) analysé ces tables pendant la suite, et le test
+    // compare deux plans pris à des états de statistiques différents. On analyse
+    // une fois ici, et `qsGelerStatistiques` coupe l'autovacuum le temps du test.
+    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
+        $owner->statement('ANALYZE ' . $table);
+    }
+
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
+}
+
+/** Coupe (true) ou rétablit (false) l'autovacuum des tables dont le plan est mesuré. */
+function qsAutovacuum(bool $actif): void
+{
+    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
+        qsProprio()->statement('ALTER TABLE ' . $table . ($actif ? ' RESET (autovacuum_enabled)' : ' SET (autovacuum_enabled = false)'));
+    }
 }
 
 /** @param  array{id: string}  $e */
@@ -544,6 +566,7 @@ function qsNettoyer(array $e): void
 }
 
 test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
+    qsAutovacuum(false);
     $a = qsEspaceRls();
     $b = qsEspaceRls();
     $precedente = DB::getDefaultConnection();
@@ -633,6 +656,7 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         qsApp()->disconnect();
         qsNettoyer($a);
         qsNettoyer($b);
+        qsAutovacuum(true);
         qsProprio()->disconnect();
     }
 });

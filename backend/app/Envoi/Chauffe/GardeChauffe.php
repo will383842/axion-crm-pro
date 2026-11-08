@@ -48,7 +48,7 @@ final class GardeChauffe
      */
     public function preparer(MessageAEnvoyer $m): string
     {
-        return $this->resolveur->fournisseurDe($m->destinataire);
+        return $this->resolveur->fournisseurDe($m->destinataire, $m->workspaceId);
     }
 
     /** Homme mort INF-025 : la passerelle note chaque appel à sante() qui répond OK. */
@@ -74,7 +74,7 @@ final class GardeChauffe
             return 'pause:' . DecisionFrein::SANTE_SILENCIEUSE;
         }
         $ws = $m->workspaceId;
-        $fournisseur ??= $this->resolveur->fournisseurDe($m->destinataire);
+        $fournisseur ??= $this->resolveur->fournisseurDe($m->destinataire, $m->workspaceId);
         foreach ($this->depot->pausesActives($ws, $maintenant) as $p) {
             // Fournisseur INCONNU (DNS en échec) : toute pause de fournisseur le bloque (fail-closed).
             if ($p->portee === 'global' || $fournisseur === Fournisseur::INCONNU || $p->fournisseur === $fournisseur) {
@@ -110,17 +110,17 @@ final class GardeChauffe
     {
         $boite = $this->depot->boiteId($m->workspaceId, $m->expediteur)
             ?? throw new \LogicException('envoi accepté pour un expéditeur qui n\'est pas une boîte d\'envoi');
-        $this->depot->incrementer($m->workspaceId, $boite, $jour, $fournisseur ?? $this->resolveur->fournisseurDe($m->destinataire), 'envoyes');
+        $this->depot->incrementer($m->workspaceId, $boite, $jour, $fournisseur ?? $this->resolveur->fournisseurDe($m->destinataire, $m->workspaceId), 'envoyes');
     }
 
     /** Un message est arrivé en indésirables chez un témoin : pause vers CE fournisseur seulement. */
-    public function indesirableChezTemoin(string $ws, string $adresseTemoin, ?DateTimeImmutable $maintenant = null): bool
+    public function indesirableChezTemoin(string $ws, string $adresseTemoin, ?DateTimeImmutable $maintenant = null, ?string $auteur = null): bool
     {
-        $f = $this->resolveur->fournisseurDe($adresseTemoin);
+        $f = $this->resolveur->fournisseurDe($adresseTemoin, $ws);
         // Témoin dont le fournisseur est introuvable : on ne peut pas cibler, donc pause GLOBALE (la plus stricte).
         $d = $f === Fournisseur::INCONNU ? new DecisionFrein(DecisionFrein::INDESIRABLE_TEMOIN) : Freins::indesirableTemoin($f);
 
-        return $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable());
+        return $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable(), $auteur);
     }
 
     /**
@@ -184,7 +184,7 @@ final class GardeChauffe
         return $fin === null ? $jc : min($jc, $fin);
     }
 
-    private function declarer(string $ws, DecisionFrein $d, DateTimeImmutable $maintenant): bool
+    private function declarer(string $ws, DecisionFrein $d, DateTimeImmutable $maintenant, ?string $auteur = null): bool
     {
         $manuelle = $this->depot->derniereLeveeManuelle($ws, $d->motif, $d->fournisseur);
         if (! $this->depot->ouvrirPause($ws, $d->motif, $d->fournisseur, $maintenant, $d->dureeHeures)) {
@@ -198,7 +198,7 @@ final class GardeChauffe
         if ($manuelle !== null) {
             $details['rouvert_apres_levee_par'] = $manuelle['par'];
         }
-        $this->socle->journaliser($ws, 'pause_auto', 'freins', $details, JourEnvoi::de($maintenant));
+        $this->socle->journaliser($ws, 'pause_auto', $auteur !== null && $auteur !== '' ? $auteur : 'freins', $details, JourEnvoi::de($maintenant));
         $corps = $d->dureeHeures !== null
             ? "Un frein automatique a mis l’envoi en pause pour {$d->dureeHeures} h (elle expire d’elle-même). Vérifier le tableau de bord."
             : 'Un frein automatique a mis l’envoi en pause. Vérifier le tableau de bord, puis lever la pause par envoi:lever-pause.';

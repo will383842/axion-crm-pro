@@ -72,3 +72,25 @@ test('une erreur de lecture des domaines d un espace compte un échec et passe �
 
     expect($lot->executer())->toBe(1)->and($depot->enregistres)->toBe(['b.example.test']);
 });
+
+test('K12 : un domaine sans configuration ou mal configuré compte comme échec (jamais "tout va bien")', function () {
+    $depot = new DepotQuiCasseSurLePremier;
+    $depot->appels = 1;
+    $controle = new ControleQuotidien(new FauxResolveurDns, $depot, new DepotMemoire, fn () => new DateTimeImmutable('2026-11-11 06:00:00'));
+    $config = lotConfig() + ['mauvais.example.test' => ['selecteur' => '', 'helo' => 'x', 'ip' => 'pas-une-ip']];
+    $lot = new ControleDnsLot($controle, $config, fn () => ['ws1'], fn () => ['a.example.test', 'mauvais.example.test', 'inconnu.example.test'], fn () => null, fn () => null);
+
+    expect($lot->executer())->toBe(2)->and($depot->enregistres)->toBe(['a.example.test']);
+});
+
+test('K12 : la lecture de la liste des espaces est protégée (échec compté + alerte, pas d exception)', function () {
+    $controle = new ControleQuotidien(new FauxResolveurDns, new DepotQuiCasseSurLePremier, new DepotMemoire, fn () => new DateTimeImmutable('2026-11-11 06:00:00'));
+    $avert = [];
+    $lot = new ControleDnsLot($controle, lotConfig(), function () {
+        throw new RuntimeException('base indisponible');
+    }, fn () => [], function (string $m) use (&$avert) {
+        $avert[] = $m;
+    }, fn () => null);
+
+    expect($lot->executer())->toBe(1)->and($avert)->not->toBeEmpty();
+});

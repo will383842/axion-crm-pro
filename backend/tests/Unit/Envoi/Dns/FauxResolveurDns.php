@@ -14,6 +14,9 @@ final class FauxResolveurDns implements ResolveurDns
     public array $a = [];
 
     /** @var array<string, list<string>> */
+    public array $aaaa = [];
+
+    /** @var array<string, list<string>> */
     public array $ptr = [];
 
     /** @var array<string, string> */
@@ -34,6 +37,13 @@ final class FauxResolveurDns implements ResolveurDns
         $this->requetes[] = "A $nom";
 
         return $this->a[$nom] ?? [];
+    }
+
+    public function aaaa(string $nom): array
+    {
+        $this->requetes[] = "AAAA $nom";
+
+        return $this->aaaa[$nom] ?? [];
     }
 
     public function ptr(string $ip): array

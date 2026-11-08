@@ -8,7 +8,7 @@ final class ResolveurEnMemoire implements ResolveurFournisseur
     /** @param array<string, string> $domaines */
     public function __construct(private readonly array $domaines = []) {}
 
-    public function fournisseurDe(string $adresse): string
+    public function fournisseurDe(string $adresse, ?string $workspaceId = null): string
     {
         return $this->domaines[Fournisseur::domaine($adresse)] ?? Fournisseur::AUTRE;
     }

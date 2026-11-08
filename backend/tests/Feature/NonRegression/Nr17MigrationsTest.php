@@ -52,6 +52,11 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
     '2026_11_11_000120_envoi_controles_listes.php',
+    // Filet modifié : pourquoi — K8 : colonne `ressource_type` ajoutée (ajout seul) ; la retirer effacerait la distinction ip/domaine
+    // des compteurs. Le down() de 000070 (table recréée à vide) rend en outre un retour réel non rejouable dans ce test.
+    '2026_11_13_000145_envoi_chauffe_ressource_type.php',
+    // Filet modifié : pourquoi — K8 durcissement : le garde fige aussi ressource_type + CHECK type/clé ; down() inerte (relâcher le garde réouvrirait la falsification).
+    '2026_11_14_000150_envoi_chauffe_garde_ressource_type.php',
     // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
     '2026_11_30_000100_envoi_config_versions.php',
     // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;

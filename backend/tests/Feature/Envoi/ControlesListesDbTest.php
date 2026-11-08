@@ -2,6 +2,7 @@
 
 use App\Envoi\ListesNoires\DepotControlesDb;
 use App\Envoi\ListesNoires\Ressource;
+use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\StatutListe;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
@@ -43,7 +44,7 @@ test('pause enregistrée, reportée, isolée par espace, ajout seul', function (
 test('m2 : IP et UUID validés au chargement — UUID invalide rejeté (et signalé), IP invalide gardée pour être marquée non fiable', function () {
     $ws = espaceListes();
     config(['envoi.listes_noires.ips' => ['203.0.113.7@' . $ws, '203.0.113.8@pas-un-uuid', '999.1.1.1@' . $ws]]);
-    $source = new App\Envoi\ListesNoires\SourceRessourcesDb;
+    $source = new SourceRessourcesDb;
 
     $ips = array_values(array_filter($source->toutes(), fn (Ressource $r): bool => $r->type === Ressource::IP));
 

@@ -45,8 +45,19 @@ beforeEach(function () {
 
 function k13Demande(object $t): DemandeEnvoi
 {
-    return new DemandeEnvoi($t->ws, K13_ADRESSE, [['verification' => 'valide']], 'FR', null, K13_DOMAINE,
-        'ZZ Expediteur SAS', $t->now->modify('-5 days'), null, 'federations', true);
+    return new DemandeEnvoi(
+        $t->ws,
+        K13_ADRESSE,
+        [['verification' => 'valide']],
+        'FR',
+        null,
+        K13_DOMAINE,
+        'ZZ Expediteur SAS',
+        $t->now->modify('-5 days'),
+        null,
+        'federations',
+        true,
+    );
 }
 
 /** Faux résolveur local, répondant à la sonde de contrôle, avec les réponses données. */

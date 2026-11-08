@@ -1,0 +1,39 @@
+{
+    "description": "Vecteurs PROPRES à la passerelle (cas supplémentaires ; le contrat commun est envoi-serveur/contrat/vecteurs-hmac.json de K1). Calculés en Python, indépendamment du code PHP.",
+    "version": "k1-v2",
+    "vecteurs": [
+        {
+            "libelle": "get-evenements",
+            "cle": "cle-vecteur-1",
+            "workspace_id": "11111111-1111-4111-8111-111111111111",
+            "horodatage": "1800000000",
+            "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+            "methode": "GET",
+            "chemin": "/v1/evenements",
+            "corps": "curseur=&depuis=2026-01-01T00%3A00%3A00%2B00%3A00&limite=100",
+            "signature": "7a7a1850905f0f93236fca9e551105751ffd3759d4cf2c63d39134e63f360abb"
+        },
+        {
+            "libelle": "post-pause",
+            "cle": "cle-vecteur-1",
+            "workspace_id": "11111111-1111-4111-8111-111111111111",
+            "horodatage": "1800000000",
+            "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+            "methode": "POST",
+            "chemin": "/v1/commandes/pause",
+            "corps": "{\"commande_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"commande\":\"pause\"}",
+            "signature": "05d1342bba7ad51df75fa72f2020ec34dbc5035923eeedd31f3d94ea91c6b923"
+        },
+        {
+            "libelle": "autre-espace-retrait",
+            "cle": "cle-vecteur-1",
+            "workspace_id": "22222222-2222-4222-8222-222222222222",
+            "horodatage": "1800000100",
+            "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+            "methode": "POST",
+            "chemin": "/v1/commandes/retrait",
+            "corps": "{\"commande_id\":\"cccccccc-cccc-4ccc-8ccc-cccccccccccc\",\"commande\":\"retrait\"}",
+            "signature": "84521a34878d5802f1f0b25cb9224d0d55e267726dc5e281d93d9996256febf0"
+        }
+    ]
+}

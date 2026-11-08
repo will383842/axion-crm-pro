@@ -1,0 +1,48 @@
+{
+  "description": "Vecteurs d'empreintes de témoins communs CRM (PHP, App\\Envoi\\EmpreinteTemoin) / serveur d'envoi (Python). Normalisation : minuscules, espaces retirés, domaine (après le dernier @) sans point final et en punycode (IDNA/UTS46). Empreinte = HMAC-SHA256(adresse normalisée, clé) en hexadécimal. Clé de vecteur : publiable, sans valeur. Calculé indépendamment en Python (hmac+hashlib).",
+  "cle": "cle-empreinte-de-vecteur-NON-SECRETE",
+  "cas": [
+    {
+      "libelle": "minuscules",
+      "adresse": "Temoin@Example.TEST",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "espaces_retires",
+      "adresse": "  temoin @ example.test ",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "tabulation_saut_de_ligne",
+      "adresse": "a\tb@example.test\n",
+      "normalisee": "ab@example.test",
+      "empreinte": "9657aa02ac737bd4a1dfc5eb54fc54f9c1d209dd2108e1082e80fec4d8ad2b09"
+    },
+    {
+      "libelle": "point_final_du_domaine",
+      "adresse": "temoin@example.test.",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "punycode",
+      "adresse": "Temoin@BÜCHER.example",
+      "normalisee": "temoin@xn--bcher-kva.example",
+      "empreinte": "e81fd60c0501e16ba01b2b569f9a330c5f36e1dc144f42d91adb4af3cc3ebfe3"
+    },
+    {
+      "libelle": "punycode_deja_ascii_et_point_final",
+      "adresse": "temoin@xn--bcher-kva.example.",
+      "normalisee": "temoin@xn--bcher-kva.example",
+      "empreinte": "e81fd60c0501e16ba01b2b569f9a330c5f36e1dc144f42d91adb4af3cc3ebfe3"
+    },
+    {
+      "libelle": "partie_locale_accentuee_en_minuscules",
+      "adresse": "ÉLODIE@Example.test",
+      "normalisee": "élodie@example.test",
+      "empreinte": "2f49189f85ba07e8c9c28ab011f3f00ad286eec2c2b32ddeafaa41b984a2c688"
+    }
+  ]
+}

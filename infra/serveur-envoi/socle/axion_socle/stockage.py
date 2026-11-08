@@ -17,9 +17,11 @@ class ErreurStockage(Exception):
 
 SCHEMA = """
 CREATE TABLE meta(cle TEXT PRIMARY KEY, valeur TEXT);
-CREATE TABLE compteur(jour TEXT PRIMARY KEY, n INTEGER NOT NULL);
-CREATE TABLE jetons(jeton TEXT PRIMARY KEY, empreinte TEXT NOT NULL, id TEXT NOT NULL,
-  destinataire TEXT NOT NULL, contenu BLOB NOT NULL, cree_a REAL NOT NULL, depose INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE compteur(jour TEXT NOT NULL, espace TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY(jour, espace));
+CREATE TABLE jetons(jeton_h TEXT PRIMARY KEY, empreinte TEXT NOT NULL, id TEXT NOT NULL UNIQUE, espace TEXT NOT NULL,
+  jour TEXT NOT NULL, etat TEXT NOT NULL CHECK(etat IN ('reserve','confirme')),
+  cree_duree REAL NOT NULL, reserve_duree REAL NOT NULL);
+CREATE TABLE nonces(h TEXT PRIMARY KEY, expire_duree REAL NOT NULL);
 CREATE TABLE journal(n INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, type TEXT, detail TEXT);
 """
 
@@ -45,7 +47,7 @@ class Stockage:
 
     @classmethod
     def creer(cls, chemin: str) -> None:
-        """Installation uniquement. Départ FERMÉ : témoins allumés, aucune santé reçue."""
+        """Installation uniquement. Départ FERMÉ : pause (seule la commande reprise ouvre), témoins allumés, liste vide."""
         if os.path.lexists(chemin):
             raise ErreurStockage("existe déjà")
         dossier = os.path.dirname(os.path.abspath(chemin))
@@ -62,7 +64,7 @@ class Stockage:
         try:
             c.execute("PRAGMA synchronous=FULL")
             c.executescript(SCHEMA)
-            c.execute("INSERT INTO meta VALUES('temoins','1'),('pause_hm','0')")
+            c.execute("INSERT INTO meta VALUES('temoins','1'),('liste_temoins','[]'),('pause_hm','1'),('duree','0')")
         finally:
             c.close()
 
@@ -100,23 +102,13 @@ class Stockage:
     def poser(self, c, cle, valeur):
         c.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (cle, str(valeur)))
 
-    def jeton(self, jeton):
-        return self.c.execute("SELECT empreinte,id,destinataire,contenu,depose FROM jetons WHERE jeton=?",
-                              (jeton,)).fetchone()
+    def jeton(self, jeton_h):
+        return self.c.execute("SELECT empreinte,id,etat,reserve_duree FROM jetons WHERE jeton_h=?",
+                              (jeton_h,)).fetchone()
 
-    def jeton_present(self, jeton) -> bool:
-        return self.jeton(jeton) is not None
-
-    def en_attente(self):
-        return self.c.execute("SELECT jeton,id,destinataire,contenu FROM jetons WHERE depose=0").fetchall()
-
-    def compteur(self, jour) -> int:
-        r = self.c.execute("SELECT n FROM compteur WHERE jour=?", (jour,)).fetchone()
+    def compteur(self, jour, espace="*") -> int:
+        r = self.c.execute("SELECT n FROM compteur WHERE jour=? AND espace=?", (jour, espace)).fetchone()
         return r[0] if r else 0
 
     def journal(self):
         return self.c.execute("SELECT type,detail,ts FROM journal ORDER BY n").fetchall()
-
-    def marquer_depose(self, c, jeton):
-        """Déposé : le contenu n'a plus à rester sur disque (on garde l'empreinte pour le rejeu)."""
-        c.execute("UPDATE jetons SET depose=1, contenu=x'' WHERE jeton=?", (jeton,))

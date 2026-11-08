@@ -1,10 +1,14 @@
--- MODELE, sans valeur reelle, non execute. Le socle (Python) decide ; ce fichier ne fait que relayer.
+-- ESQUISSE POUR K6b. MODELE, sans valeur reelle, NON EXECUTE, non testee.
+-- Relais appele depuis le gestionnaire smtp_server_message_received de K4a : il ne porte aucune logique.
+-- Le socle (service Python local) DECIDE seulement (250 / 451 / 550) ; KumoMTA depose SEUL.
+-- Transport : socket Unix 0660 (jamais un port reseau). Socle injoignable ou reponse illisible => 451 (ferme).
 local kumo = require 'kumo'
-local SOCLE_URL = 'http://127.0.0.1:PORT_SOCLE/recevoir' -- a renseigner a l'installation
+local SOCLE_SOCKET = '/run/axion-socle/socle.sock' -- a renseigner a l'installation (K6b)
 
 kumo.on('smtp_server_message_received', function(msg)
   local ok, reponse = pcall(function()
-    return appeler_socle(SOCLE_URL, msg:get_meta('jeton'), msg:recipient(), msg:get_data())
+    -- appeler_socle (K6b) : envoie workspace_id, jeton, destinataire ; ne transmet JAMAIS le contenu
+    return appeler_socle(SOCLE_SOCKET, msg:get_meta('workspace_id'), msg:get_meta('jeton'), msg:recipient())
   end)
   if not ok or reponse == nil then
     kumo.reject(451, '4.3.0 socle indisponible, report') -- ferme par defaut
@@ -12,4 +16,5 @@ kumo.on('smtp_server_message_received', function(msg)
   if reponse.code ~= 250 then
     kumo.reject(reponse.code, reponse.texte)
   end
+  msg:set_meta('id_message_socle', reponse.id) -- le log hook K7 confirmera ce jeton
 end)

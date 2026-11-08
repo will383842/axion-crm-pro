@@ -2,10 +2,10 @@ name: Serveur envoi K6 socle
 
 on:
   pull_request:
-    paths: ['infra/serveur-envoi/socle/**', '.github/workflows/serveur-envoi-socle.yml']
+    paths: ['infra/serveur-envoi/socle/**', 'envoi-serveur/contrat/**', '.github/workflows/serveur-envoi-socle.yml']
   push:
     branches: [main]
-    paths: ['infra/serveur-envoi/socle/**', '.github/workflows/serveur-envoi-socle.yml']
+    paths: ['infra/serveur-envoi/socle/**', 'envoi-serveur/contrat/**', '.github/workflows/serveur-envoi-socle.yml']
 
 permissions:
   contents: read

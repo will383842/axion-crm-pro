@@ -55,7 +55,7 @@ final class AnalyseDsn
     }
 
     /**
-     * Quelques en-têtes utiles, clés en minuscules (dépliés).
+     * Quelques en-têtes utiles, clés en minuscules (dépliés). Les Delivered-To répétés sont joints par « , ».
      *
      * @return array<string, string>
      */
@@ -66,7 +66,9 @@ final class AnalyseDsn
         $sortie = [];
         foreach (Pcre::decouper('/\r?\n/', $entete) as $ligne) {
             if (($g = Pcre::groupes('/^([A-Za-z0-9-]+):\s*(.*)$/', $ligne)) !== null && in_array(strtolower($g[0]), $utiles, true)) {
-                $sortie[strtolower($g[0])] = trim($g[1]);
+                $nom = strtolower($g[0]);
+                // Delivered-To peut se répéter (un relais par saut) : on les garde TOUS, le VERP peut être dans n'importe lequel.
+                $sortie[$nom] = $nom === 'delivered-to' && isset($sortie[$nom]) ? $sortie[$nom] . ', ' . trim($g[1]) : trim($g[1]);
             }
         }
 

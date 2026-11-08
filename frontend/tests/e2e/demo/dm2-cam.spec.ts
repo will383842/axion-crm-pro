@@ -68,12 +68,13 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     await expect(copie.getByText('Brouillon')).toBeVisible();
   });
 
-  test('P7 · le suivi d’une campagne : réponses en tête, ouvertures estimées, aucun clic', async ({ page }) => {
+  test('P7 · le suivi d’une campagne : réponses en tête, aucune ouverture, aucun clic', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes', { offre: 'les-deux' });
     await page.getByRole('link', { name: 'Organisateurs Rhône-Alpes' }).first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Organisateurs Rhône-Alpes' })).toBeVisible();
     await expect(page.getByTestId('tuile-reponses')).toContainText('9');
-    await expect(page.getByTestId('tuile-ouvertures')).toContainText('estimation');
+    await expect(page.getByTestId('tuile-ouvertures')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText(/ouverture|pixel/i);
     await page.getByRole('tab', { name: 'Test A/B' }).click();
     await expect(page.getByText(/critère : réponses/)).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/\bclics?\b/i);

@@ -1,15 +1,14 @@
 /**
  * DM2-CAM — onglet « Destinataires » du suivi : l'état de CHAQUE destinataire
  * (en file, parti, refusé avec la raison en français, a répondu, arrêté pour
- * l'entreprise, exclu). La colonne « Ouverture (estimation) » n'existe que si la
- * campagne suit les ouvertures ; les ouvertures automatiques sont signalées et
- * ne comptent pas. Aucune colonne de clic, jamais.
+ * l'entreprise, exclu). Aucune colonne de clic ni d'ouverture, jamais (décision
+ * produit).
  */
 import { useDeferredValue, useState } from 'react';
 import { Button, EmptyState, QueryErrorState, SearchInput, Skeleton, StatusPill } from '@/components/ui';
 import { cn } from '@/components/ui/cn';
-import { useDestinataires, type Campagne, type Destinataire, type FicheCampagne, type FiltreOuverture, type GroupeDestinataires } from '../api';
-import { dateRelative, ETAT_LIBELLE, ETAT_TON, GROUPE_LIBELLE, heureDe, jourEtMois, libelleMotifAutomatique } from './libelles';
+import { useDestinataires, type Campagne, type Destinataire, type FicheCampagne, type GroupeDestinataires } from '../api';
+import { dateRelative, ETAT_LIBELLE, ETAT_TON, GROUPE_LIBELLE } from './libelles';
 
 type Compteurs = FicheCampagne['compteurs'];
 
@@ -63,36 +62,15 @@ function detail(d: Destinataire, campagne: Campagne, maintenant: string): string
   }
 }
 
-function Ouverture({ d }: { d: Destinataire }) {
-  const o = d.ouverture;
-  if (o === null) return <span className="text-slate-400">—</span>;
-  if (o.automatique_probable) {
-    return (
-      <span className="text-slate-600">
-        Automatique probable ({libelleMotifAutomatique(o.raison_automatique)}) : non comptée
-      </span>
-    );
-  }
-  return (
-    <span className="text-slate-700">
-      Ouverture estimée, le {jourEtMois(o.premiere_le)} à {heureDe(o.premiere_le)}
-    </span>
-  );
-}
-
 export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
   const { campagne, compteurs, maintenant } = fiche;
   const id = String(campagne.id);
   const [groupe, setGroupe] = useState<GroupeDestinataires | null>(null);
-  const [ouvert, setOuvert] = useState<FiltreOuverture | null>(null);
   const [recherche, setRecherche] = useState('');
   const [page, setPage] = useState(1);
   const q = useDeferredValue(recherche);
-  const requete = useDestinataires(id, { groupe, ouvert, q, page }, true);
-  const avecOuvertures = campagne.suivre_ouvertures;
-  const colonnes = avecOuvertures
-    ? 'md:grid-cols-[minmax(0,2fr)_9rem_6rem_minmax(0,2fr)_minmax(0,2fr)]'
-    : 'md:grid-cols-[minmax(0,2fr)_9rem_6rem_minmax(0,3fr)]';
+  const requete = useDestinataires(id, { groupe, ouvert: null, q, page }, true);
+  const colonnes = 'md:grid-cols-[minmax(0,2fr)_9rem_6rem_minmax(0,3fr)]';
 
   const choisir = (g: GroupeDestinataires | null) => {
     setGroupe(g);
@@ -123,24 +101,6 @@ export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {avecOuvertures ? (
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <span>Ouverture (estimation)</span>
-              <select
-                value={ouvert ?? ''}
-                onChange={(e) => {
-                  setOuvert(e.target.value === '' ? null : (e.target.value as FiltreOuverture));
-                  setPage(1);
-                }}
-                className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm max-md:h-11"
-              >
-                <option value="">Toutes</option>
-                <option value="oui">Ouvertes (hors automatiques)</option>
-                <option value="automatique">Automatiques probables</option>
-                <option value="non">Sans ouverture</option>
-              </select>
-            </label>
-          ) : null}
           <SearchInput
             value={recherche}
             onChange={(v) => {
@@ -171,7 +131,6 @@ export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
               <div role="columnheader">État</div>
               <div role="columnheader">Message</div>
               <div role="columnheader">Détail</div>
-              {avecOuvertures ? <div role="columnheader">Ouverture (estimation)</div> : null}
             </div>
             <div role="rowgroup" className="divide-y divide-slate-100">
               {requete.data.data.map((d) => (
@@ -190,11 +149,6 @@ export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
                   </div>
                   <div role="cell" className="text-slate-700">{libelleMessage(d)}</div>
                   <div role="cell" className="min-w-0 text-slate-700">{detail(d, campagne, maintenant)}</div>
-                  {avecOuvertures ? (
-                    <div role="cell" className="min-w-0 text-xs">
-                      <Ouverture d={d} />
-                    </div>
-                  ) : null}
                 </div>
               ))}
             </div>

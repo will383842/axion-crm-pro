@@ -2,14 +2,11 @@
  * DM2-CAM — suivi d'une campagne : progression, ce qui se passe maintenant,
  * résultats par message et par boîte, état de chaque destinataire, test A/B.
  *
- * Les réponses sont l'indicateur principal. Aucun clic n'est suivi. Les
- * ouvertures n'apparaissent que si la campagne coche « suivre les ouvertures » :
- * elles restent une ESTIMATION, et les ouvertures automatiques (protection de la
- * vie privée d'Apple, relais d'images, antivirus) sont signalées et exclues du taux.
+ * Les réponses sont l'indicateur principal. Aucun clic n'est suivi et aucune
+ * ouverture n'est affichée (décision produit).
  */
 import { useState, type ReactNode } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Info } from 'lucide-react';
 import { Card, EmptyState, KpiCard, PageHeader, QueryErrorState, Skeleton, StatusPill, Tabs } from '@/components/ui';
 import { useCampagne, type FicheCampagne } from './api';
 import { BarreProgression } from './composants/BarreProgression';
@@ -28,7 +25,6 @@ function Tuile({ id, children }: { id: string; children: ReactNode }) {
 function Progression({ fiche }: { fiche: FicheCampagne }) {
   const { campagne: c, compteurs, par_jour: parJour, derniers_evenements: evenements, maintenant } = fiche;
   const maxJour = Math.max(1, ...parJour.map((j) => j.envoyes));
-  const ouvertures = c.ouvertures;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -45,28 +41,6 @@ function Progression({ fiche }: { fiche: FicheCampagne }) {
           <KpiCard label="Désinscriptions" value={nombre(compteurs.desinscrits)} sublabel={pourcentage(compteurs.taux_desinscription)} tone="slate" />
         </Tuile>
       </div>
-
-      {c.suivre_ouvertures ? (
-        <Tuile id="tuile-ouvertures">
-          <Card className="p-4">
-            <div className="flex items-start gap-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-              <div className="min-w-0 text-sm text-slate-700">
-                <p className="font-semibold text-slate-900">Ouvertures (estimation)</p>
-                {ouvertures ? (
-                  <p className="mt-1">
-                    <strong className="font-semibold text-slate-900">{nombre(ouvertures.estimees)}</strong> ouvertures estimées, soit {pourcentage(ouvertures.taux_estime)} des messages remis.{' '}
-                    {nombre(ouvertures.automatiques_probables)} ouvertures automatiques probables (protection d’Apple, relais d’images, antivirus) sont signalées et exclues du taux.
-                  </p>
-                ) : (
-                  <p className="mt-1">Pas encore d’ouverture estimée. Les ouvertures automatiques probables seront signalées et exclues du taux.</p>
-                )}
-                <p className="mt-1 text-xs text-slate-500">Une ouverture ne prouve pas qu’un message a été lu : les réponses restent l’indicateur principal.</p>
-              </div>
-            </div>
-          </Card>
-        </Tuile>
-      ) : null}
 
       <Card className="p-4">
         <h2 className="text-lg font-bold text-slate-900">Progression</h2>
@@ -105,7 +79,7 @@ function Progression({ fiche }: { fiche: FicheCampagne }) {
               {compteurs.en_pause_absence} {compteurs.en_pause_absence > 1 ? 'personnes sont absentes du bureau' : 'personne est absente du bureau'} : la suite est en pause, reprise au retour.
             </li>
           ) : null}
-          {evenements.map((e) => (
+          {evenements.filter((e) => e.type !== 'ouverture').map((e) => (
             <li key={String(e.id)} className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-xs tabular-nums text-slate-500">{dateRelative(e.survenu_le, maintenant)}</span>
               <span>
@@ -126,7 +100,6 @@ function libelleEvenement(e: FicheCampagne['derniers_evenements'][number]): stri
     case 'rebond_mou': return `refus temporaire (${e.libelle ?? 'nouvel essai prévu'})`;
     case 'plainte': return 'a signalé le message comme indésirable';
     case 'desinscription': return 'désinscription';
-    case 'ouverture': return e.automatique_probable ? 'ouverture automatique probable (non comptée)' : 'ouverture estimée';
     default: return e.libelle ?? 'message remis';
   }
 }

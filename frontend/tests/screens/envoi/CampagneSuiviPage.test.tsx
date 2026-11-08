@@ -1,12 +1,10 @@
 /**
  * DM2-CAM — suivi d'une campagne : progression, destinataires et état de chacun,
- * test A/B. Décision de Will : aucun suivi des clics ; les ouvertures ne sont
- * mesurées que si la campagne coche « suivre_ouvertures », affichées comme une
- * ESTIMATION, les ouvertures automatiques exclues du taux ; les réponses sont
- * l'indicateur principal.
+ * test A/B. Décision produit : aucun suivi des clics et aucune ouverture
+ * affichée ; les réponses sont l'indicateur principal.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CampagneSuiviPage } from '@/features/envoi/campagnes/CampagneSuiviPage';
 import { handlers } from '@/demo/handlers/envoi/campagnes.handlers';
@@ -67,35 +65,23 @@ describe('CampagneSuiviPage', () => {
     expect(screen.getAllByText('En file').length).toBeGreaterThan(1);
   });
 
-  it('campagne qui ne suit pas les ouvertures : aucune colonne ni tuile d’ouverture', async () => {
+  it('une campagne n’affiche jamais d’ouverture, qu’elle ait ou non la case cochée', async () => {
     const user = userEvent.setup();
-    await ouvrir('cmp-08');
-    await screen.findByRole('heading', { level: 1, name: /Salon des artisans de Vienne/ });
-    expect(screen.queryByTestId('tuile-ouvertures')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
-    await screen.findAllByRole('row');
-    expect(screen.queryByRole('columnheader', { name: /ouverture/i })).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/\bclics?\b/i);
+    for (const id of ['cmp-08', 'cmp-01']) {
+      cleanup();
+      await ouvrir(id);
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByTestId('tuile-ouvertures')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
+      await screen.findAllByRole('row');
+      expect(screen.queryByRole('columnheader', { name: /ouverture/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: /ouverture/i })).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/ouverture|pixel/i);
+      expect(document.body.textContent).not.toMatch(/\bclics?\b/i);
+    }
   });
 
-  it('campagne qui suit les ouvertures : ESTIMATION, automatiques exclues du taux', async () => {
-    const user = userEvent.setup();
-    await ouvrir('cmp-01');
-    const tuile = await screen.findByTestId('tuile-ouvertures');
-    expect(tuile).toHaveTextContent('estimation');
-    expect(tuile).toHaveTextContent(/ouvertures automatiques/i);
-    expect(tuile).toHaveTextContent(/exclues du taux/i);
-    await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
-    expect(await screen.findByRole('columnheader', { name: /Ouverture \(estimation\)/ })).toBeInTheDocument();
-    // Jamais un chiffre exact d'ouverture par destinataire, jamais de clic.
-    expect(await screen.findAllByText(/Ouverture estimée/)).not.toHaveLength(0);
-    expect(document.body.textContent).not.toMatch(/Ouvert \d+ fois/);
-    expect(document.body.textContent).not.toMatch(/\bclics?\b/i);
-  });
-
-  it('contact exclu (opposé) : aucune ouverture, même si la campagne suit les ouvertures', async () => {
-    // Un contact inscrit au registre d'opposition ne reçoit jamais de pixel : même
-    // si une donnée d'ouverture traînait, elle ne doit jamais s'afficher.
+  it('contact exclu (opposé) : aucune ouverture affichée, même si une donnée traînait', async () => {
     const cible = demoDb.destinataires.tous().find((d) => d.campagne_id === 'cmp-01' && d.adresse.startsWith('mathilde.bertin@'));
     expect(cible).toBeDefined();
     demoDb.destinataires.modifier(cible!.id, {
@@ -105,7 +91,7 @@ describe('CampagneSuiviPage', () => {
     });
     const user = userEvent.setup();
     await ouvrir('cmp-01');
-    await screen.findByTestId('tuile-ouvertures');
+    await screen.findByRole('heading', { level: 1 });
     await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
     await user.click(await screen.findByRole('button', { name: /^Exclus/ }));
     const ligne = await waitFor(() => {
@@ -114,7 +100,7 @@ describe('CampagneSuiviPage', () => {
       return l;
     });
     expect(ligne.textContent).toMatch(/Exclu/);
-    expect(ligne.textContent).not.toMatch(/Ouverture estimée|Automatique probable/);
+    expect(ligne.textContent).not.toMatch(/ouverture|Automatique probable/i);
   });
 
   it('Test A/B : deux versions et le critère « réponses »', async () => {

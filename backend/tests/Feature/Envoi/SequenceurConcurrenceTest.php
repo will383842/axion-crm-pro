@@ -55,6 +55,8 @@ function concPreparer(int $etapes): array
         // Sinon la passerelle refuse tout destinataire hors témoins. Le mode témoins ne s'éteint que par la
         // commande locale (déclencheur envoi_drapeaux_garde) : même autorisation, locale à la transaction.
         $owner->transaction(function () use ($owner, $ws): void {
+            // Durcissement L0 : la garde exige aussi la ligne de journal temoins_off, dans la MÊME transaction.
+            $owner->table('envoi_journal_commandes')->insert(['workspace_id' => $ws, 'commande' => 'temoins_off', 'auteur' => 'test', 'details' => '{}', 'jour' => '2026-11-14']);
             $owner->select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
             $owner->table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'mode_temoins' => false]);
         });

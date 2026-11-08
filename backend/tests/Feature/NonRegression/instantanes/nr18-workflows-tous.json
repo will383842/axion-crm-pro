@@ -33,6 +33,7 @@
     "security.yml",
     "serveur-envoi-injection.yml",
     "serveur-envoi-loghook.yml",
+    "serveur-envoi-shaping.yml",
     "surveillance-canaux.yml",
     "surveillance-sauvegarde.yml",
     "vendor-cloud.yml"

@@ -18,6 +18,9 @@ final class DecisionFrein
 
     public const REPONSES_NON_TRAITEES = 'reponses_non_traitees';
 
+    /** 26 § 4.3 : plus de 20 % de reports sur 1 h => pause IP × CE fournisseur seulement. */
+    public const REPORTS_EN_HAUSSE = 'reports_en_hausse_sur_une_heure';
+
     public const HOMME_MORT = 'tableau_de_bord_non_valide';
 
     /** INF-025 : plus aucun appel à sante() depuis 15 minutes en fenêtre d'envoi. */

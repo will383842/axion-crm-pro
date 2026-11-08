@@ -637,9 +637,9 @@ test('retours : rebond dur, plainte et réponse écrivent les compteurs du bon f
     }
     $depot = app(DepotChauffe::class);
     $jour = JourEnvoi_jour($maintenant);
-    expect($depot->totauxDuJour($ws, $jour, 'gmail'))->toBe(['envoyes' => 0, 'rebonds_durs' => 1, 'plaintes' => 0, 'reponses' => 0])
-        ->and($depot->totauxDuJour($ws, $jour, 'autre'))->toBe(['envoyes' => 0, 'rebonds_durs' => 0, 'plaintes' => 1, 'reponses' => 0])
-        ->and($depot->totauxDuJour($ws, $jour, 'microsoft'))->toBe(['envoyes' => 0, 'rebonds_durs' => 0, 'plaintes' => 0, 'reponses' => 1]);
+    expect($depot->totauxDuJour($ws, $jour, 'domaine', 'gmail'))->toBe(['envoyes' => 0, 'rebonds_durs' => 1, 'plaintes' => 0, 'reponses' => 0])
+        ->and($depot->totauxDuJour($ws, $jour, 'domaine', 'autre'))->toBe(['envoyes' => 0, 'rebonds_durs' => 0, 'plaintes' => 1, 'reponses' => 0])
+        ->and($depot->totauxDuJour($ws, $jour, 'domaine', 'microsoft'))->toBe(['envoyes' => 0, 'rebonds_durs' => 0, 'plaintes' => 0, 'reponses' => 1]);
 });
 
 test('retours → freins : trois rebonds durs reçus dans la journée suffisent à mettre l’envoi en pause', function () {

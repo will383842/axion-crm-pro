@@ -1,0 +1,42 @@
+# MODÈLE de shaping KumoMTA par fournisseur de boîtes (lot K8).
+# Ce fichier décrit la FORME et les garde-fous ; il n'est PAS chargé par le serveur tel quel.
+# Les valeurs ci-dessous sont des exemples prudents à confirmer en banc : aucune valeur réelle,
+# aucun nom de domaine, aucune adresse IP. Le fournisseur « autre » regroupe tout le reste.
+# Validation : python3 valider_shaping.py shaping.modele.toml (CI : serveur-envoi-shaping.yml).
+
+[modele]
+version = 1
+
+[fournisseur.gmail]
+debit_max_par_heure = 100
+debit_max_par_minute = 2
+connexions_simultanees = 2
+messages_par_connexion = 20
+
+[fournisseur.gmail.tsa]
+# TSA : automatisation du shaping. Obligatoire : sur réponse 4xx le débit est réduit, jamais augmenté seul.
+actif = true
+reduction_pourcent = 50
+suspension_minutes = 60
+
+[fournisseur.microsoft]
+debit_max_par_heure = 60
+debit_max_par_minute = 1
+connexions_simultanees = 1
+messages_par_connexion = 10
+
+[fournisseur.microsoft.tsa]
+actif = true
+reduction_pourcent = 50
+suspension_minutes = 120
+
+[fournisseur.autre]
+debit_max_par_heure = 120
+debit_max_par_minute = 2
+connexions_simultanees = 2
+messages_par_connexion = 20
+
+[fournisseur.autre.tsa]
+actif = true
+reduction_pourcent = 50
+suspension_minutes = 60

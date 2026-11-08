@@ -31,6 +31,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\StatistiquesPlanStables;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -209,8 +210,19 @@ test('sous axion_app : le comptage des sites non vérifiés passe par l index pa
     $role = sdnvApp()->selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
     expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
 
+    // Le plan d'une table SANS donnée dépend de ce que les tests précédents ont
+    // laissé (statistiques, pages mortes, analyse automatique en cours de route).
+    // Connexion propriétaire (hors transaction du test) : l'état est normalisé
+    // avant, les statistiques posées avec l'autovacuum coupé, puis rendues.
+    $proprietaire = DB::connection('pgsql_owner');
     $espace = (string) Str::uuid();
-    $plan = sdnvPlan($espace, SiteFiable::fichesNonVerifiees($espace));
+    $plan = StatistiquesPlanStables::figer($proprietaire, ['companies'], function () use ($proprietaire, $espace): string {
+        StatistiquesPlanStables::rendre($proprietaire, ['companies']);
+        StatistiquesPlanStables::analyser($proprietaire, ['companies']);
+
+        return sdnvPlan($espace, SiteFiable::fichesNonVerifiees($espace));
+    }, $proprietaire);
+    $proprietaire->disconnect();
 
     expect($plan)->toContain('idx_companies_site_non_verifie')
         ->and($plan)->not->toContain('Seq Scan');

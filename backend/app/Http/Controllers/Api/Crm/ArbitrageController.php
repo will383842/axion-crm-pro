@@ -4,11 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\ConsoleAccess;
 use App\Crm\Console\FilesATraiter;
-use App\Crm\Ingest\ContactUpserter;
-use App\Crm\Ingest\DossierClient;
-use App\Crm\Ingest\DossierClientIngest;
-use App\Crm\Ingest\SiteSyncClassifier;
-use App\Crm\Ingest\SiteSyncIngestService;
+use App\Crm\Ingest\RattachementEnAttente;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
@@ -39,10 +35,7 @@ use Illuminate\Support\Facades\DB;
 class ArbitrageController extends ConsoleController
 {
     public function __construct(
-        private readonly ContactUpserter $contacts,
-        private readonly SiteSyncClassifier $classifier,
-        private readonly SiteSyncIngestService $ingestion,
-        private readonly DossierClientIngest $dossiers,
+        private readonly RattachementEnAttente $rattachement,
     ) {}
 
     /**
@@ -109,122 +102,15 @@ class ArbitrageController extends ConsoleController
         ]);
         $companyId = (int) $validated['company_id'];
 
-        $reponse = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $companyId, $request): JsonResponse {
-            return DB::transaction(function () use ($workspaceId, $activityId, $companyId, $request): JsonResponse {
-                $activity = $this->lockedActivity($workspaceId, $activityId);
+        $parUtilisateur = (string) $this->currentUser($request)->getKey();
 
-                if ($activity->subject_id !== null) {
-                    abort(409, 'Cet événement est déjà rattaché.');
-                }
-
-                $payload = $this->decodePayload($activity->payload ?? null);
-                $pending = $payload['pending_match'] ?? null;
-                if (! is_array($pending)) {
-                    abort(409, "Cet événement n'est pas en attente de rapprochement.");
-                }
-
-                $company = DB::table('companies')
-                    ->where('workspace_id', $workspaceId)
-                    ->where('id', $companyId)
-                    ->whereNull('deleted_at')
-                    ->first();
-
-                if ($company === null) {
-                    // 404 et non 403 : côté opérateur, une entreprise d'un autre
-                    // workspace et une entreprise inexistante sont la même chose
-                    // — et doivent le rester, sinon la réponse devient un
-                    // oracle d'existence inter-tenants.
-                    abort(404, 'Entreprise introuvable dans cet univers.');
-                }
-
-                $legalBasis = $this->stringOrNull($pending, 'legal_basis') ?? 'precontractual';
-
-                // La base légale enregistrée à l'ingestion l'emporte sur celle
-                // d'une fiche collectée (`legitimate_interest_b2b`) : la
-                // personne s'est manifestée. On ne redescend jamais.
-                DB::table('companies')->where('id', $companyId)->update([
-                    'legal_basis' => $this->classifier->mergeLegalBasis(
-                        is_string($company->legal_basis ?? null) ? $company->legal_basis : null,
-                        $legalBasis,
-                    ),
-                    'updated_at' => now(),
-                ]);
-
-                $contactId = null;
-                $personKey = is_string($activity->person_key) ? $activity->person_key : null;
-
-                if ($personKey !== null) {
-                    $upserted = $this->contacts->upsert(
-                        workspaceId: $workspaceId,
-                        companyId: $companyId,
-                        personKey: $personKey,
-                        externalRef: $this->stringOrNull($pending, 'subject_ref'),
-                        email: $this->stringOrNull($pending, 'email'),
-                        firstName: $this->stringOrNull($pending, 'first_name'),
-                        lastName: $this->stringOrNull($pending, 'last_name'),
-                        phone: $this->stringOrNull($pending, 'phone'),
-                        legalBasis: $legalBasis,
-                        consentVersion: $this->stringOrNull($pending, 'consent_version'),
-                        consentAt: $this->dateOrNull($pending, 'consent_at'),
-                        consentTextRef: $this->stringOrNull($pending, 'consent_text_ref'),
-                        discoverySource: 'site',
-                    );
-
-                    $contactId = $upserted === null ? null : $upserted[0];
-                }
-
-                // Dossier client de la console (25/10/2026) : le rattachement
-                // pose la référence console sur la fiche choisie et applique
-                // le dossier le plus récent, avec les mêmes garde-fous que la
-                // synchro automatique. Le geste est humain : c'est la SEULE
-                // façon de lier un client sans SIREN, jamais une fusion.
-                $dossier = null;
-                if (($activity->kind ?? null) === DossierClient::EVENT_TYPE) {
-                    $refClient = $this->stringOrNull($pending, 'subject_ref');
-                    if ($refClient === null) {
-                        abort(409, "Ce dossier client n'a pas de référence console.");
-                    }
-                    $dossier = $this->dossiers->appliquerApresArbitrage($workspaceId, $companyId, $refClient, $activityId);
-                }
-
-                $payload['arbitrage'] = [
-                    'attached_at' => now()->toIso8601String(),
-                    'attached_by' => (string) $this->currentUser($request)->getKey(),
-                    'company_id' => $companyId,
-                    'contact_id' => $contactId,
-                ];
-                if ($dossier !== null) {
-                    $payload['arbitrage']['dossier'] = $dossier;
-                }
-
-                DB::table('activities')->where('id', $activityId)->update([
-                    'subject_type' => 'company',
-                    'subject_id' => $companyId,
-                    'contact_id' => $contactId,
-                    'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
-                ]);
-
-                // Un rendez-vous d'un prospect inconnu n'a reçu aucune
-                // étiquette à l'ingestion (pas de fiche où la poser) : c'est
-                // maintenant qu'elle trouve sa fiche.
-                $this->ingestion->etiqueterRendezVousRattache(
-                    $workspaceId,
-                    $companyId,
-                    is_string($activity->kind ?? null) ? $activity->kind : '',
-                    $payload,
-                );
-
-                return $this->ok([
-                    'activity_id' => $activityId,
-                    'company_id' => $companyId,
-                    'contact_id' => $contactId,
-                    // `null` ici n'est pas un échec : c'est le cas « aucun nom
-                    // transmis », où l'on refuse de fabriquer un patronyme
-                    // depuis une adresse électronique. L'événement reste dans la
-                    // timeline de l'entreprise.
-                    'contact_created' => $contactId !== null,
-                ]);
-            });
+        // Tout se fait dans UNE transaction (corps dans `RattachementEnAttente`,
+        // partagé avec les autres appelants) : les autres événements en
+        // attente de la même personne sont soldés avec celui-ci.
+        $reponse = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $activityId, $companyId, $parUtilisateur): JsonResponse {
+            return DB::transaction(fn (): JsonResponse => $this->ok(
+                $this->rattachement->rattacher($workspaceId, $activityId, $companyId, $parUtilisateur),
+            ));
         });
 
         // La pastille « Personnes à rattacher » du menu suit le geste (au plus
@@ -324,28 +210,5 @@ class ArbitrageController extends ConsoleController
 
         /** @var array<string, mixed> */
         return is_array($decoded) ? $decoded : [];
-    }
-
-    /** @param  array<mixed>  $data */
-    private function stringOrNull(array $data, string $key): ?string
-    {
-        $value = $data[$key] ?? null;
-
-        return is_string($value) && trim($value) !== '' ? trim($value) : null;
-    }
-
-    /** @param  array<mixed>  $data */
-    private function dateOrNull(array $data, string $key): ?\DateTimeImmutable
-    {
-        $value = $this->stringOrNull($data, $key);
-        if ($value === null) {
-            return null;
-        }
-
-        try {
-            return new \DateTimeImmutable($value);
-        } catch (\Exception) {
-            return null;
-        }
     }
 }

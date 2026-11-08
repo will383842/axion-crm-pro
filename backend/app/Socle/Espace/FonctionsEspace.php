@@ -16,6 +16,9 @@ final class FonctionsEspace
 {
     private const PREFIXE_SEGMENT = 'segment.';
 
+    /** Lecture des origines (API `/crm/origines/*`) : fermée sans ligne, ouverte espace par espace. */
+    public const ORIGINES_LECTURE = 'origines.lecture';
+
     /** La fonction est-elle ouverte pour cet espace ? Sans ligne : non. */
     public static function ouverte(string $espaceId, string $fonction): bool
     {

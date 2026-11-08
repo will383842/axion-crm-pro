@@ -37,8 +37,6 @@ import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
 
 /** Les routes `/envoi/…` du faux serveur de la démo. */
 const handlersDemoEnvoi = handlersDemo.filter((h) => cleRoute(h).includes('/envoi/'));
-/** Les routes publiques de désinscription du faux serveur de la démo. */
-const handlersDemoPublic = handlersDemo.filter((h) => cleRoute(h).includes('/public/desinscription'));
 
 let arbre: AnyRoute;
 
@@ -92,8 +90,6 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
   ['/envoi/campagnes/destinataires', 'DM2-CNF', 'Destinataires'],
   ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
-  ['/envoi/campagnes/resultats', 'DM2-PIL', 'Résultats'],
-  ['/envoi/campagnes/destinataires', 'DM2-CNF'],
   ['/envoi/reponses', 'DM2-REP', 'Réponses'],
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
   ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
@@ -114,16 +110,6 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
   ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
   ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
-  ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
-  ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
-  ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
-  ['/envoi/desinscriptions', 'DM2-CNF'],
-  ['/envoi/alertes', 'DM2-CNF'],
-  ['/envoi/reglages', 'DM2-CNF'],
-  ['/envoi/reglages/identite', 'DM2-CNF'],
-  ['/envoi/reglages/alertes', 'DM2-CNF'],
-  ['/envoi/reglages/regles', 'DM2-CNF'],
-  ['/envoi/reglages/connexion-crm', 'DM2-CNF'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {
@@ -221,18 +207,6 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
   });
 
-  it('/desinscription/$jeton, Envoi annoncé : la vraie page, publique et HORS coquille', async () => {
-    // Filet modifié : pourquoi. DM2-CNF remplit la page ; elle reste publique, hors coquille, sans code de lot,
-    // et ne s'affiche (et n'appelle sa route) que si le serveur annonce Envoi.
-    server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersDemoPublic);
-    await monter('/desinscription/demo-tilleuls');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeInTheDocument();
-    expect(screen.queryByTestId('page-en-attente')).toBeNull();
-    expect(document.body.textContent).not.toMatch(/\bDM\d|\blot\b/i);
-    expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
-    expect(document.querySelector('[data-coquille]')).toBeNull();
-  });
-
   // Filet modifié : pourquoi. /compte quitte la liste « en attente » (DM1-COM l'a livrée) : cette
   // vérification positive la remplace, aussi stricte. Avec le serveur d'aujourd'hui (pas de
   // `two_factor_method: 'email'`), la vraie page s'affiche sans appeler de route absente : MSW
@@ -248,13 +222,9 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
     expect(screen.queryByText('Codes de secours')).toBeNull();
   });
 
-  it('/desinscription/$jeton, sans Envoi (production) : page d’avant, publique et HORS coquille', async () => {
+  it('/desinscription/$jeton n\'est PLUS une route du SPA (servie par le backend, que le SPA ne doit pas masquer)', async () => {
     await monter('/desinscription/jeton-de-test');
-    const page = await screen.findByTestId('page-en-attente');
-    expect(page).toHaveAttribute('data-lot', 'DM2-CNF');
-    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
-    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
-    expect(screen.queryByRole('complementary', { name: 'Navigation latérale' })).toBeNull();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
     expect(document.querySelector('[data-coquille]')).toBeNull();
   });
 });
@@ -271,6 +241,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
 const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
   ['/', 'Tableau de bord'],
   ['/doublons', 'Doublons à vérifier'],
+  ['/rgpd/effacements', 'Effacements demandés'],
   ['/companies', 'Entreprises'],
   ['/contacts', 'Contacts'],
   ['/media', 'Médias'],
@@ -310,7 +281,9 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
 // depuis les lots de démo DM1/DM2 (constaté en corrigeant le doublon de route
 // `GET /companies` qui empêchait ce fichier de se charger), puis la barre à nouveau recalée
 // pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
-const EMPREINTE_BARRE = 'b838a7b756cac09511c8519deca111fa840e06c894718604f69462153ac98845';
+// Filet modifié : pourquoi — PR-C : l'entrée « Effacements demandés » (À traiter, avec la pastille déplacée de « Demandes RGPD »)
+// et, console ouverte, « Origines des contacts » (Ma base). Empreintes recalées ci-dessous.
+const EMPREINTE_BARRE = 'f727efeca75cd33540cf492403a19fd9104f0f5cc4482c878222732634b2400c';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 
 describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
@@ -346,12 +319,14 @@ const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
   ['/', 'Tableau de bord'],
   ['/doublons', 'Doublons à vérifier'],
   ['/console/arbitrage', 'Personnes à rattacher'],
+  ['/rgpd/effacements', 'Effacements demandés'],
   ['/companies', 'Entreprises'],
   ['/console/contacts', 'Contacts'],
   ['/console/lettre-et-guide', 'Newsletter et guide'],
-  ...MENU_D_AUJOURD_HUI.slice(4),
+  ['/origines', 'Origines des contacts'],
+  ...MENU_D_AUJOURD_HUI.slice(5),
 ];
-const EMPREINTE_BARRE_CONSOLE_OUVERTE = 'cb767ece2deb1d9a9e19155e5bff17405ade84cc788bb34747f475c04f422460';
+const EMPREINTE_BARRE_CONSOLE_OUVERTE = '1a490440adcf8051690c98d2d7324e2609706f789d39c5a9d690f49211e7ecee';
 
 describe('Sans Envoi, console ouverte — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
   it('mêmes entrées, même ordre, mêmes libellés ; même HTML de la barre et de l’en-tête', async () => {

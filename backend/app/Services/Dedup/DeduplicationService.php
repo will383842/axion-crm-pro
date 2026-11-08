@@ -324,6 +324,25 @@ class DeduplicationService
         // empreintes — donc une opposition écrite ici que la garde du site ne
         // heurterait jamais, et réciproquement.
         $empreinte = $email !== null && trim($email) !== '' ? ListeSuppression::empreinte($email) : null;
+        $this->addOptOutParEmpreinte($empreinte, $phone, $source, $reason, $scopes);
+    }
+
+    /**
+     * Variante par EMPREINTE, pour qui ne détient plus l'adresse en clair (lien de
+     * désinscription). Même écriture, même idempotence ; `null` = rien à opposer.
+     *
+     * @param  list<string>  $scopes
+     */
+    public function addOptOutParEmpreinte(
+        ?string $empreinte,
+        ?string $phone,
+        string $source,
+        ?string $reason = null,
+        array $scopes = self::UNIVERS_OPPOSITION,
+    ): void {
+        if ($empreinte !== null && preg_match('/^[0-9a-f]{64}$/', $empreinte) !== 1) {
+            throw new \InvalidArgumentException('Empreinte invalide : 64 caractères hexadécimaux minuscules attendus.');
+        }
         $telephone = $phone ? preg_replace('/[\s.-]/', '', $phone) : null;
 
         if ($empreinte === null && $telephone === null) {

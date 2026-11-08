@@ -142,7 +142,7 @@ class ATraiterController extends ConsoleController
             'demandes_rgpd' => $this->compter(
                 'demandes_rgpd',
                 static fn (string $e): Builder => DB::table('rgpd_requests')
-                    ->where('workspace_id', $e)->where('type', 'erasure')->where('status', 'pending'),
+                    ->where('workspace_id', $e)->where('type', 'erasure')->whereIn('status', ['pending', 'processing']),
                 $espace,
             ),
         ]);

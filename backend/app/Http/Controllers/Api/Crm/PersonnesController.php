@@ -6,6 +6,7 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\ContenusAccords;
 use App\Crm\Ingest\OrigineDictionnaire;
+use App\Crm\Ingest\PersonnesIngestService;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
@@ -393,6 +394,8 @@ class PersonnesController extends ConsoleController
                     ->where('personne_id', $id)
                     ->where('canal', 'lettre')
                     ->value('statut');
+                // Sans la base légale, exprès : rattacher une demande à son
+                // entreprise est un geste humain qui répond à la demande.
                 if (! Abonnements::prospectionAutorisee(
                     is_string($personne->email_nature ?? null) ? $personne->email_nature : null,
                     is_string($statutLettre) ? $statutLettre : null,
@@ -585,6 +588,7 @@ class PersonnesController extends ConsoleController
                         ! $ei && Abonnements::prospectionAutorisee(
                             is_string($p->email_nature) ? $p->email_nature : null,
                             is_string($p->statut_lettre) ? $p->statut_lettre : null,
+                            is_string($p->legal_basis ?? null) ? $p->legal_basis : null,
                         ) ? 'oui' : 'non',
                         $p->contact_id === null ? 'non' : 'oui',
                         $p->siren,
@@ -683,7 +687,7 @@ class PersonnesController extends ConsoleController
     /**
      * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille?: ?string, origine_detail?: ?string}  $f
      */
-    private function requete(string $workspaceId, array $f): Builder
+    public function requete(string $workspaceId, array $f): Builder
     {
         $requete = DB::table('personnes')
             ->leftJoin('abonnements', function ($join): void {
@@ -715,6 +719,13 @@ class PersonnesController extends ConsoleController
                 'companies.denomination',
                 'companies.siren',
             ]);
+
+        // Fiche demande : téléphone et entreprise DÉCLARÉS dans la demande.
+        // Colonnes lues seulement si la migration est passée (le téléphone est
+        // masqué comme tout `phone` par `MasquageCoordonnees`).
+        if (PersonnesIngestService::colonnesDemandePresentes()) {
+            $requete->addSelect(['personnes.phone', 'personnes.entreprise_declaree']);
+        }
 
         // Contrat v3 : l'historique des origines, en LECTURE SEULE.
         if ($this->origineV3Active()) {
@@ -797,12 +808,15 @@ class PersonnesController extends ConsoleController
             'prospection_autorisee' => Abonnements::prospectionAutorisee(
                 is_string($p->email_nature ?? null) ? $p->email_nature : null,
                 is_string($p->statut_lettre ?? null) ? $p->statut_lettre : null,
+                is_string($p->legal_basis ?? null) ? $p->legal_basis : null,
             ),
             'placement' => $p->placement ?? null,
             'rattachee' => $p->contact_id !== null,
             'contact_id' => $p->contact_id === null ? null : (int) $p->contact_id,
             'company_id' => $p->company_id === null ? null : (int) $p->company_id,
             'entreprise' => ($p->denomination ?? null) ?? ($p->siren ?? null),
+            'phone' => $p->phone ?? null,
+            'entreprise_declaree' => $p->entreprise_declaree ?? null,
             // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée pour
             // les lecteurs existants, valeur toujours `null`.
             'purge_prevue_le' => null,
@@ -813,7 +827,7 @@ class PersonnesController extends ConsoleController
      * Historique des origines (contrat v3), liste blanche de clés, du plus
      * ancien au plus récent. Vide si l'interrupteur est éteint.
      *
-     * @return list<array<string, ?string>>
+     * @return list<array<string, mixed>>
      */
     private function origineHistorique(\stdClass $p): array
     {
@@ -821,10 +835,11 @@ class PersonnesController extends ConsoleController
             return [];
         }
         $brut = is_string($p->origines) ? json_decode($p->origines, true) : $p->origines;
+        $droitLien = ! MasquageCoordonnees::requis();
 
         return is_array($brut)
             ? array_values(array_map(
-                static fn (array $o): array => ContenusAccords::presenterOrigine($o),
+                static fn (array $o): array => ContenusAccords::presenterOrigine($o, $droitLien),
                 array_filter($brut, static fn (mixed $o): bool => is_array($o) && ! ContenusAccords::estMasquee($o)),
             ))
             : [];
@@ -859,6 +874,7 @@ class PersonnesController extends ConsoleController
             $ligne->guides_recus ?? null,
             $ligne->consentements ?? null,
             $ligne->opposition_at ?? null,
+            ! MasquageCoordonnees::requis(), // lecture seule (sans contacts.view_pii) : pas de lien
         );
     }
 

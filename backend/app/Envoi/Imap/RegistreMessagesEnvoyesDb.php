@@ -15,6 +15,15 @@ final class RegistreMessagesEnvoyesDb implements RegistreMessagesEnvoyes
     /** @param Closure(string, string): ?string $adresseDe (espace, empreinte du destinataire) → adresse, ou null */
     public function __construct(private readonly Closure $adresseDe) {}
 
+    public function retrouverParInjection(string $workspaceId, string $idInjection): ?MessageOrigine
+    {
+        $ligne = DB::table('envoi_messages_envoyes')
+            ->where('workspace_id', $workspaceId)->where('id_injection', $idInjection)->orderBy('id')->first();
+        $adresse = $ligne === null ? null : ($this->adresseDe)($workspaceId, (string) $ligne->empreinte_destinataire);
+
+        return $adresse === null || $adresse === '' ? null : new MessageOrigine($idInjection, $adresse);
+    }
+
     public function retrouver(string $workspaceId, array $messageIds): ?MessageOrigine
     {
         $empreintes = [];

@@ -1,0 +1,56 @@
+# Regles de classification des echecs (K7). Premiere regle qui correspond = gagnante.
+# Validees en CI : un TOML invalide, une classe inconnue ou un defaut absent = CI rouge.
+# Classes : rebond_dur (adresse perdue : Bounce 5.1.x seulement), rebond_mou (a reessayer plus tard, jamais d'opposition),
+# report (4xx), inconnu (Bounce sans regle), alerte_config (SPF/DKIM/DMARC a corriger chez nous, pas la faute de la personne).
+defaut_bounce = "inconnu"   # un Bounce sans regle n'est ni dur ni mou : journalise, a examiner
+defaut_transitoire = "report"
+
+[[regle]]
+nom = "adresse-inexistante"
+classe = "rebond_dur"
+type = "Bounce"
+statut_prefixe = "5.1.1"
+
+[[regle]]
+nom = "domaine-inexistant"
+classe = "rebond_dur"
+type = "Bounce"
+statut_prefixe = "5.1.2"
+
+[[regle]]
+nom = "adresse-invalide"
+classe = "rebond_dur"
+type = "Bounce"
+statut_prefixe = "5.1.3"
+
+[[regle]]
+nom = "boite-desactivee"
+classe = "rebond_dur"
+type = "Bounce"
+statut_prefixe = "5.1.6"
+
+[[regle]]
+nom = "authentification-refusee-config"
+classe = "alerte_config"
+statut_prefixe = "5.7.26"
+
+[[regle]]
+nom = "boite-pleine"
+classe = "rebond_mou"
+statut_prefixe = "5.2.2"
+
+[[regle]]
+nom = "message-trop-gros"
+classe = "rebond_mou"
+statut_prefixe = "5.3.4"
+
+[[regle]]
+nom = "reputation-ou-blocage"
+classe = "rebond_mou"
+statut_prefixe = "5.7"
+contient = ["blocked", "spam", "reputation", "blacklist", "denied"]
+
+[[regle]]
+nom = "expiration-file"
+classe = "rebond_mou"
+type = "Expiration"

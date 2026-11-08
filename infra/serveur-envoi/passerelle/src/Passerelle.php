@@ -324,8 +324,14 @@ final class Passerelle
             'evenements' => array_map(static function (array $e) use ($ws, $epoque): array {
                 $id = is_array($e['donnees']) ? ($e['donnees']['id_injection'] ?? '') : '';
 
-                // Les « donnees » (adresses possibles) ne sortent pas : K1 ne lit que ces quatre champs.
-                return ['event_id' => $ws.':'.$epoque.':'.$e['sequence'], 'seq' => $e['sequence'], 'type' => $e['type'], 'id_injection' => is_string($id) ? $id : ''];
+                // Les « donnees » (adresses possibles) ne sortent pas : K1 ne lit que ces champs. `observation` (K7) :
+                // un rebond dur en observation ne doit alimenter AUCUN frein côté CRM.
+                $obs = is_array($e['donnees']) && ($e['donnees']['observation'] ?? false) === true;
+
+                $sortie = ['event_id' => $ws.':'.$epoque.':'.$e['sequence'], 'seq' => $e['sequence'], 'type' => $e['type'], 'id_injection' => is_string($id) ? $id : ''];
+
+                // Le champ n'existe QUE pour un événement en observation : le format historique (4 champs) est inchangé.
+                return $obs ? $sortie + ['observation' => true] : $sortie;
             }, $ev),
             'curseur_suivant' => (string) $dernier,
         ]);

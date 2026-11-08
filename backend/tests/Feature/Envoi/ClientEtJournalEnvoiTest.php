@@ -552,3 +552,13 @@ test('époque : la migration ne fait qu’ajouter (aucun DROP/DELETE)', function
     expect($f)->toHaveCount(1);
     expect((string) file_get_contents($f[0]))->not->toMatch('/\b(DROP|DELETE|TRUNCATE)\s/i');
 });
+
+test('K7 : le drapeau « observation » de la passerelle est conservé par K1 (faux s’il manque)', function () {
+    Http::fake(['*' => envoiReponseSignee(['evenements' => [
+        ['event_id' => 'e1', 'seq' => 1, 'type' => 'rebond_dur', 'id_injection' => 'm1', 'observation' => true],
+        ['event_id' => 'e2', 'seq' => 2, 'type' => 'rebond_dur', 'id_injection' => 'm2'],
+        ['event_id' => 'e3', 'seq' => 3, 'type' => 'rebond_dur', 'id_injection' => 'm3', 'observation' => 'oui'],
+    ], 'curseur_suivant' => '3'])]);
+    $lot = app(TireurEvenements::class)->tirer($this->ws, 'srv1', '0', 10, new DateTimeImmutable('-1 hour'));
+    expect(array_map(fn ($e) => $e->observation, $lot->evenements))->toBe([true, false, false]);
+});

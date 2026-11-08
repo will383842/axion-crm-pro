@@ -171,6 +171,13 @@ class TestAcceptation(Base):
         self.assertTrue(self.envoyer("b@autre.example.test")[-1].startswith("250"))
         self.assertEqual(self.file.depots[0]["espace"], "ws2")
 
+    def test_k7_le_depot_porte_la_meta_espace_du_compte(self):
+        # Le log hook (K7) relit cette meta : un rebond de ws2 ne doit jamais etre servi a ws1.
+        self.auth("bob")
+        self.envoyer("b@autre.example.test")
+        self.assertEqual(self.file.depots[0]["meta"]["espace"], "ws2")
+        self.assertTrue(self.file.depots[0]["meta"]["id_injection"])
+
 
 @unittest.skipUnless(shutil.which("openssl"), "openssl absent")
 class TestSocket(unittest.TestCase):

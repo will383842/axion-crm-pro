@@ -29,7 +29,7 @@ final class CompteurRetours implements AppliquerRetour
     public function appliquer(string $workspaceId, EvenementEnvoi $evenement): void
     {
         $colonne = self::TYPES[$evenement->type] ?? null;
-        if ($colonne === null) {
+        if ($colonne === null || $evenement->observation) { // observation (K7) : aucun frein tant que le responsable n'a pas décidé
             return;
         }
         $instant = $this->maintenant === null ? now()->toDateTimeImmutable() : DateTimeImmutable::createFromInterface(($this->maintenant)());

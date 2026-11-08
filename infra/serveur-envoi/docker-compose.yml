@@ -19,10 +19,15 @@ services:
     # Cles DKIM : lues par le groupe dedie 10025 (cles 0640 root:10025, dossiers 0750), jamais
     # par « tout le monde ». generer-dkim.sh --groupe <nom du groupe de GID 10025> ; RUNBOOK.
     group_add: ["10025"]
+    # Log hook K7 : DESACTIVE par defaut (aucun relais en service, K7-D5). Active seulement par installer.sh --avec-loghook.
+    environment:
+      AXION_LOGHOOK_ACTIF: ${AXION_LOGHOOK_ACTIF:-0}
     volumes:
       - ./kumomta/init.lua:/opt/kumomta/etc/policy/init.lua:ro
       - ./kumomta/dkim.lua:/opt/kumomta/etc/policy/dkim.lua:ro
+      - ./kumomta/loghook.lua:/opt/kumomta/etc/policy/loghook.lua:ro
       - /etc/axion-envoi/dkim:/etc/axion-envoi/dkim:ro
+      - /etc/axion-envoi/loghook:/etc/axion-envoi/loghook:ro   # secret Lua -> relais (hors depot, 0640 root:10025)
       - kumo-spool:/var/spool/kumomta
       - kumo-log:/var/log/kumomta
 volumes:

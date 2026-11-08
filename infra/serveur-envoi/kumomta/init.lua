@@ -5,6 +5,8 @@ local kumo = require 'kumo'
 -- K5 : signature DKIM par le serveur (dkim.lua monte a cote de ce fichier).
 package.path = '/opt/kumomta/etc/policy/?.lua;' .. package.path
 require 'dkim'
+-- K7 : log hook vers le relais local (classification des rebonds). loghook.lua est monte ET installe comme dkim.lua.
+local loghook = require 'loghook'
 
 kumo.on('init', function()
   kumo.define_spool {
@@ -18,6 +20,7 @@ kumo.on('init', function()
   kumo.configure_local_logs {
     log_dir = '/var/log/kumomta',
   }
+  loghook.configurer() -- un seul handler `init` : c'est celui-ci
   kumo.start_http_listener {
     listen = "127.0.0.1:8000",
     trusted_hosts = { "127.0.0.1", "::1" },

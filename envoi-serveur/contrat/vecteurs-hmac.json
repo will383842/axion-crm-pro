@@ -4,7 +4,7 @@
   "workspace_id": "11111111-1111-4111-8111-111111111111",
   "requetes": [
     {
-      "nom": "commande_pause",
+      "libelle": "commande_pause",
       "methode": "POST",
       "chemin": "/v1/commandes/pause",
       "horodatage": "1767225600",
@@ -14,7 +14,7 @@
       "entete": "k=1,sha256=c7b00b24d78226e71ca25f58a41b67727b5664c7f59783bb21b5d43fe9a74218"
     },
     {
-      "nom": "tirage_evenements",
+      "libelle": "tirage_evenements",
       "methode": "GET",
       "chemin": "/v1/evenements",
       "horodatage": "1767225600",
@@ -26,7 +26,7 @@
   ],
   "reponses": [
     {
-      "nom": "tirage_vide",
+      "libelle": "tirage_vide",
       "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "workspace_id": "11111111-1111-4111-8111-111111111111",
       "statut": 200,

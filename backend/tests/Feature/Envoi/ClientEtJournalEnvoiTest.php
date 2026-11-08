@@ -94,7 +94,10 @@ test('COMMANDE PERDUE : panne réseau = pas d’acquittement ; renvoi avec le m�
     $id = envoiCmd();
     $panne = true;
     $ok = envoiReponseSignee([]);
-    Http::fake(['*' => fn (Request $r) => $panne ? Http::response('boom', 500) : $ok($r)]);
+    // Capture PAR RÉFÉRENCE : une fonction fléchée figerait $panne à true et la « fin de panne » ne serait jamais vue.
+    Http::fake(['*' => function (Request $r) use (&$panne, $ok) {
+        return $panne ? Http::response('boom', 500) : $ok($r);
+    }]);
     $client = app(CommandeurServeur::class);
     expect(fn () => $client->commander($this->ws, 'srv1', $id, 'pause'))->toThrow(ServeurEnvoiRefuse::class);
     expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->where('commande', JournalCommandes::ACQUITTEMENT)->count()))->toBe(0);

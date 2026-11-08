@@ -102,7 +102,6 @@ import { IdentitePage } from '@/features/envoi/reglages/IdentitePage';
 import { ReglagesAlertesPage } from '@/features/envoi/reglages/ReglagesAlertesPage';
 import { ReglesPrudencePage } from '@/features/envoi/reglages/ReglesPrudencePage';
 import { ConnexionCrmPage } from '@/features/envoi/reglages/ConnexionCrmPage';
-import { DesinscriptionPubliquePage } from '@/features/envoi/public/DesinscriptionPubliquePage';
 // Phase 2 scaffold stubs
 
 // P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
@@ -436,9 +435,8 @@ const envoiReglagesAlertesRoute = createRoute({ getParentRoute: () => layoutRout
 const envoiReglesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/regles', beforeLoad: gardeEnvoi, component: ReglesPrudencePage });
 const envoiConnexionCrmRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/connexion-crm', beforeLoad: gardeEnvoi, component: ConnexionCrmPage });
 
-// Page PUBLIQUE de désinscription (lien d'un e-mail) : HORS coquille, sans
-// garde de produit — un destinataire n'est pas un utilisateur de l'espace.
-const desinscriptionPubliqueRoute = createRoute({ getParentRoute: () => rootRoute, path: '/desinscription/$jeton', component: DesinscriptionPubliquePage });
+// La page PUBLIQUE de désinscription (lien d'un e-mail) est servie par le BACKEND
+// (`/desinscription/*` routé par le Caddyfile) : aucune route SPA ne doit la masquer.
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -446,7 +444,6 @@ export const routeTree = rootRoute.addChildren([
   magicLinkRoute,
   magicLinkVerifyRoute,
   passwordResetRoute,
-  desinscriptionPubliqueRoute,
   layoutRoute.addChildren([
     dashboardRoute,
     companiesRoute,

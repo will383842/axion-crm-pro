@@ -22,6 +22,12 @@ Une plainte bloque-t-elle tous les clients ou seulement l'espace concerné ? **D
 
 K11 touche `Envoi/Imap/**` : c'est une extension de L6 (relève IMAP).
 
+## Suite (types ARF, ambiguïté)
+
+- ARF : seuls `abuse`, `fraud`, `virus` sont des plaintes. `not-spam` et `auth-failure` sont mémorisés (rattachés) mais NON transmis (ni plainte, ni auto-réponse). Tout autre type (`other`, inconnu, illisible) : « à rattacher », jamais compté.
+- `retrouverParInjection` ne prend plus la première ligne : si l'injection a plusieurs destinataires différents, résultat ambigu => « à rattacher ». Plusieurs lignes du même destinataire ne sont pas une ambiguïté.
+- Décision B5 (plainte = tous les clients ou l'espace seul) : NON tranchée ; comportement par défaut = l'espace concerné.
+
 ## Dette connue
 
 - **Rotation de `envoi.cle_empreinte`** : elle invalide tous les VERP déjà émis (leurs retours tombent en « à rattacher »). Garder l'ancienne clé quelques jours, ou accepter la revue humaine.

@@ -208,8 +208,8 @@ final class ReleveImap
         // peut être forgé ou recopié : sans VERP signé, « à rattacher », JAMAIS d'opposition automatique.
         // Les autres retours : VERP d'abord (preuve la plus forte), puis le Message-ID cité ou répondu.
         $origine = $this->parVerp($workspaceId, $m);
-        if ($m->typeArf === 'illisible') {
-            $origine = null; // Feedback-Type illisible : jamais d'effet deviné
+        if ($m->typeArf !== null && ! AnalyseArf::typeConnu($m->typeArf)) {
+            $origine = null; // Feedback-Type illisible ou INCONNU : « à rattacher », jamais d'effet deviné
         }
         if ($origine === null && $m->typeArf === null) {
             $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
@@ -235,7 +235,9 @@ final class ReleveImap
         // Effet : seulement si rattaché. Nouveau, ou opposition rejouée en rattrapage.
         $opposition = in_array($classe, self::CLASSES_OPPOSITION, true);
         $rejouer = ! $insere && $rattrapage && $opposition;
-        if ($origine !== null && ($insere || $rejouer)) {
+        // Un ARF « not-spam » / « auth-failure » est mémorisé mais NON transmis : ce n'est ni une plainte ni une auto-réponse.
+        $sansEffetArf = $m->typeArf !== null && ! in_array($m->typeArf, AnalyseArf::TYPES_PLAINTE, true);
+        if ($origine !== null && ! $sansEffetArf && ($insere || $rejouer)) {
             $this->recepteur->recevoir($workspaceId, new RetourDetecte(
                 $classe,
                 $origine->idInjection,

@@ -9,6 +9,7 @@ from .file_kumo import ErreurFile, FileKumo
 ENTETE_RETIRE = re.compile(rb"(?i)^(x-tenant|return-path)[ \t]*:")
 VERBES = frozenset({"EHLO", "HELO", "NOOP", "RSET", "QUIT", "STARTTLS", "AUTH", "MAIL", "RCPT", "DATA"})
 ADRESSE = re.compile(r"^<([^<>\s]+@[^<>\s@]+)>(\s.*)?$")
+EN_TETES_ACCUSE = frozenset({"disposition-notification-to", "return-receipt-to", "errors-to"})   # détournent les retours
 EN_TETES_ADRESSES = ("from", "sender", "reply-to", "resent-from", "resent-sender")
 AVANT_TLS = {"EHLO", "HELO", "NOOP", "QUIT", "STARTTLS", "RSET"}
 
@@ -271,7 +272,12 @@ class Session:
         ent = entetes(msg)
         if any(n == "dkim-signature" for n, _ in ent):    # ADR-K0 D3.3 : le serveur signe seul
             return "550 5.7.1 message deja signe DKIM : le serveur d'envoi signe, refuse"
+        for n, _ in ent:
+            if n in EN_TETES_ACCUSE:                      # accusé/retour vers une adresse choisie par le client
+                return "550 5.7.1 en-tete %s interdit" % n
         froms = [v for n, v in ent if n == "from"]
+        if not froms:
+            return "550 5.7.1 en-tete From exige"
         if len(froms) > 1:
             return "550 5.7.1 plusieurs en-tetes From"
         autorises = self.cfg.domaines_registre(self.cfg.comptes[self.authc]["espace"])

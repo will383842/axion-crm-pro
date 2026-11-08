@@ -16,12 +16,30 @@ def contexte_tls(cfg: Config) -> ssl.SSLContext:
     return ctx
 
 
+async def _couper(w, delai: float, abort: bool) -> None:
+    """Coupe la connexion. Refus : on laisse le temps d'écrire la réponse puis abort() (aucune connexion
+    ne reste ouverte, même si le client ne lit pas) ; départ normal : fermeture propre."""
+    if not abort:
+        w.close()
+        return
+    try:
+        await asyncio.wait_for(w.drain(), delai)
+    except Exception:
+        pass
+    transport = getattr(w, "transport", None)
+    if transport is not None:
+        transport.abort()
+    else:
+        w.close()
+
+
 async def _client(cfg, file, ctx, limiteur, etat, r, w):
     if etat["n"] >= cfg.max_connexions:
         w.write(b"421 4.3.2 trop de connexions\r\n")
-        w.close()
+        await _couper(w, cfg.delai_ecriture, True)
         return
     loop = asyncio.get_running_loop()
+    refus_coupure = False                             # vrai si la session finit sur un refus (abort)
     try:
         etat["n"] += 1                                # décrémenté dans le finally, quoi qu'il arrive
         fin_session = loop.time() + cfg.duree_max_session
@@ -30,22 +48,27 @@ async def _client(cfg, file, ctx, limiteur, etat, r, w):
         while True:
             if act == "starttls" and r._buffer:      # tampon non vide : pipelining interdit
                 rep, act = ["503 5.5.1 commandes apres STARTTLS refusees"], "close"
+                refus_coupure = True
             for l in rep:
                 w.write(l.encode() + b"\r\n")
             try:
                 await asyncio.wait_for(w.drain(), cfg.delai_ecriture)   # client qui ne lit pas : coupé
             except asyncio.TimeoutError:
+                refus_coupure = True
                 break
             if act == "close":
+                refus_coupure = refus_coupure or not (rep and rep[0].startswith("221"))   # QUIT = départ normal
                 break
             if act == "starttls":
                 if r._buffer:       # clair arrivé pendant l'écriture (type CVE-2024-34083)
+                    refus_coupure = True
                     break
                 await w.start_tls(ctx)
                 s.tls_etabli()
             restant = fin_session - loop.time()
             if restant <= 0:
                 w.write(b"421 4.4.2 duree maximale de session atteinte\r\n")
+                refus_coupure = True
                 break
             try:
                 brut = await asyncio.wait_for(r.readuntil(b"\n"), min(300, restant))
@@ -67,7 +90,7 @@ async def _client(cfg, file, ctx, limiteur, etat, r, w):
         pass
     finally:
         etat["n"] -= 1
-        w.close()
+        await _couper(w, 1.0 if refus_coupure else 0.0, refus_coupure)
 
 
 async def demarrer(cfg: Config, file: FileKumo):

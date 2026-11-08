@@ -30,6 +30,7 @@
     "prospection-stats.yml",
     "release-tracking.yml",
     "security.yml",
+    "serveur-envoi-injection.yml",
     "surveillance-canaux.yml",
     "surveillance-sauvegarde.yml",
     "vendor-cloud.yml"

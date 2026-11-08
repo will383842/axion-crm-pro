@@ -8,6 +8,7 @@ use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
+use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
@@ -39,7 +40,11 @@ final class TransportSmtpTunnel implements TransportInjection
         $t->setRequireTls(true); // pas de STARTTLS => échec, jamais d'AUTH en clair
         $t->setUsername($this->utilisateur);
         $t->setPassword($this->secret);
-        $t->getStream()->setTimeout(max(1, min(30, $this->delaiSecondes)));
+        $flux = $t->getStream();
+        if (! $flux instanceof SocketStream) {
+            throw ServeurEnvoiRefuse::motif('flux SMTP inattendu : délai de 30 s impossible à imposer.');
+        }
+        $flux->setTimeout(max(1, min(30, $this->delaiSecondes)));
 
         $courriel = (new Email)->from($message->expediteur)->to($message->destinataire)
             ->subject($message->sujet)->text($message->corps);

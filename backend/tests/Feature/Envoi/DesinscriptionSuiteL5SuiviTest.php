@@ -15,6 +15,7 @@ use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\TerminerEffetsOpposition;
 use App\Providers\EnvoiServiceProvider;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -215,26 +216,20 @@ test('(h) TerminerEffetsOpposition ne termine jamais l’opposition d’un autre
     expect($effets->pour($this->ws, $id))->toBeTrue();
 });
 
-test('(h2) la portée n’est jamais lue sur le lien d’un autre espace (filtre workspace_id du calcul de portée)', function () {
+test('(h2) un lien d’un autre espace ne peut pas porter l’opposition de cet espace (FK composite) : sa portée n’est jamais lue', function () {
     $autre = F::espace('zz-suivi-portee');
     $refAutre = InscriptionsEnvoi::creer($autre, 'h2@zz-suivi.example.invalid');
-    $lienAutre = WorkspaceContext::run($autre, function () use ($refAutre) {
-        DB::table('envoi_liens_desinscription')->where('reference', $refAutre)->update(['portee' => 'portee-autre-espace']);
+    $lienAutre = WorkspaceContext::run($autre, fn () => DB::table('envoi_liens_desinscription')->where('reference', $refAutre)->first());
 
-        return DB::table('envoi_liens_desinscription')->where('reference', $refAutre)->first();
-    });
-    // Opposition de $this->ws dont le lien_id désigne le lien de l'autre espace (id étranger).
-    $id = (int) WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->insertGetId([
+    // La base elle-même refuse l'opposition de $this->ws pointant sur le lien de $autre (clé étrangère composite
+    // (workspace_id, lien_id)) : le scénario de fuite n'existe pas. Le filtre workspace_id de TerminerEffetsOpposition
+    // reste une seconde barrière. Savepoint : la transaction de test survit au refus.
+    $insere = fn () => WorkspaceContext::run($this->ws, fn () => DB::transaction(fn () => DB::table('envoi_oppositions')->insertGetId([
         'workspace_id' => $this->ws, 'lien_id' => $lienAutre->id, 'empreinte_adresse' => $lienAutre->empreinte_adresse, 'canal' => 'page',
-    ]));
-    $portees = [];
-    $effets = new TerminerEffetsOpposition(function (string $ws, string $emp, string $portee) use (&$portees): void {
-        $portees[] = $portee;
-    });
+    ])));
+    expect($insere)->toThrow(QueryException::class);
 
-    $effets->pour($this->ws, $id);
-
-    expect($portees)->not->toContain('portee-autre-espace');
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('lien_id', $lienAutre->id)->count()))->toBe(0);
 });
 
 test('(i) alerte critique après 10 échecs, une seule fois, même si le compteur dépasse 10', function () {

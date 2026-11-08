@@ -10,7 +10,9 @@
  */
 
 use App\Envoi\Desinscription\EnregistrerOpposition;
+use App\Envoi\Desinscription\OppositionEnregistree;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Event;
 
 require __DIR__ . '/../../vendor/autoload.php';
 $app = require __DIR__ . '/../../bootstrap/app.php';
@@ -19,7 +21,7 @@ $app->make(Kernel::class)->bootstrap();
 [, $espace, $reference, $instant] = $argv;
 if (isset($argv[4])) {
     $fichierEffets = $argv[4];
-    Illuminate\Support\Facades\Event::listen(\App\Envoi\Desinscription\OppositionEnregistree::class, static function () use ($fichierEffets): void {
+    Event::listen(OppositionEnregistree::class, static function () use ($fichierEffets): void {
         file_put_contents($fichierEffets, "effet\n", FILE_APPEND | LOCK_EX);
     });
 }

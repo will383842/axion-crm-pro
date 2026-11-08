@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -136,6 +136,7 @@ final class SemeurTablesScopees
         'envoi_messages',
         // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
         'envoi_controles_listes',
+        'envoi_config_versions',
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
@@ -554,6 +555,11 @@ final class SemeurTablesScopees
         ]);
         $inserer('envoi_messages', [
             'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',
+        ]);
+
+        $inserer('envoi_config_versions', [
+            'empreinte' => hash('sha256', 'zz-etancheite'),
+            'statut' => 'invalide',
         ]);
 
         $inserer('envoi_controles_listes', [

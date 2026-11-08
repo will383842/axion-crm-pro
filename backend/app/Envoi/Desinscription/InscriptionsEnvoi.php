@@ -16,7 +16,7 @@ final class InscriptionsEnvoi
         $adresse = mb_strtolower(trim($adresse));
         $reference = (string) Str::uuid();
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $adresse, $portee, $reference, $contactId): void {
-            DB::table('envoi_inscriptions')->insert([
+            DB::table('envoi_liens_desinscription')->insert([
                 'workspace_id' => $workspaceId,
                 'reference' => $reference,
                 // Jamais l'adresse en clair (décision du 2026-08-18) : empreinte + référence au contact.
@@ -32,6 +32,6 @@ final class InscriptionsEnvoi
     /** Lecture seule : cette référence existe-t-elle dans cet espace ? */
     public static function existe(string $workspaceId, string $reference): bool
     {
-        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_inscriptions')->where('reference', $reference)->exists());
+        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_liens_desinscription')->where('reference', $reference)->exists());
     }
 }

@@ -19,14 +19,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE envoi_inscriptions ALTER COLUMN adresse DROP NOT NULL');
-        DB::statement('ALTER TABLE envoi_inscriptions ADD COLUMN IF NOT EXISTS contact_id BIGINT');
-        DB::statement('CREATE INDEX IF NOT EXISTS idx_envoi_inscriptions_contact ON envoi_inscriptions (workspace_id, contact_id) WHERE contact_id IS NOT NULL');
+        DB::statement('ALTER TABLE envoi_liens_desinscription ALTER COLUMN adresse DROP NOT NULL');
+        DB::statement('ALTER TABLE envoi_liens_desinscription ADD COLUMN IF NOT EXISTS contact_id BIGINT');
+        DB::statement('CREATE INDEX IF NOT EXISTS idx_envoi_liens_desinscription_contact ON envoi_liens_desinscription (workspace_id, contact_id) WHERE contact_id IS NOT NULL');
     }
 
     /** Retour arrière INERTE : rien ne s'efface, la colonne reste facultative. */
     public function down(): void
     {
-        DB::statement("COMMENT ON COLUMN envoi_inscriptions.contact_id IS 'Envoi P0 L5 : reference du contact (sans adresse en clair). Conservee au retour arriere.'");
+        DB::statement("COMMENT ON COLUMN envoi_liens_desinscription.contact_id IS 'Envoi P0 L5 : reference du contact (sans adresse en clair). Conservee au retour arriere.'");
     }
 };

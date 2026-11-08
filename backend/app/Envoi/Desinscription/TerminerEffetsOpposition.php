@@ -24,7 +24,7 @@ final class TerminerEffetsOpposition
                     if ($o === null || $o->effets_termines_le !== null) {
                         return false;
                     }
-                    $portee = (string) DB::table('envoi_inscriptions')->where('id', $o->inscription_id)->value('portee');
+                    $portee = (string) DB::table('envoi_liens_desinscription')->where('id', $o->lien_id)->value('portee');
                     event(new OppositionEnregistree($workspaceId, (string) $o->empreinte_adresse, $portee, (string) $o->canal));
                     DB::table('envoi_oppositions')->where('id', $o->id)->update(['effets_termines_le' => now()]);
 

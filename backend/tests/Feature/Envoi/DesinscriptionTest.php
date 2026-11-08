@@ -206,12 +206,12 @@ test('effets interrompus : le rejeu du jeton les termine, sans doublon d’oppos
 
 test('l’opposition n’efface rien : l’inscription et ses lignes restent', function () {
     $this->post($this->chemin)->assertOk();
-    $n = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_inscriptions')->where('reference', $this->ref)->count());
+    $n = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->where('reference', $this->ref)->count());
     expect($n)->toBe(1);
 });
 
 test('RLS FORCE sur les deux tables', function () {
-    foreach (['envoi_inscriptions', 'envoi_oppositions'] as $t) {
+    foreach (['envoi_liens_desinscription', 'envoi_oppositions'] as $t) {
         $r = DB::selectOne('SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = ?', [$t]);
         expect($r->relrowsecurity)->toBeTrue();
         expect($r->relforcerowsecurity)->toBeTrue();
@@ -221,7 +221,7 @@ test('RLS FORCE sur les deux tables', function () {
 // ── Correctifs de l'audit sécurité/RGPD (B1, B2, mineurs) ───────────────────────────────────
 
 test('B2 l’adresse en clair n’est écrite nulle part : empreinte seule, liste de suppression sans adresse', function () {
-    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_inscriptions')->where('reference', $this->ref)->first());
+    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->where('reference', $this->ref)->first());
     expect($ligne->adresse)->toBeNull();
     expect($ligne->empreinte_adresse)->toBe(ListeSuppression::empreinte(DESINSCR_ADRESSE));
 
@@ -236,7 +236,7 @@ test('B2 l’adresse en clair n’est écrite nulle part : empreinte seule, list
 
 test('B2 la référence au contact est conservée à la place de l’adresse', function () {
     $ref = InscriptionsEnvoi::creer($this->ws, 'autre@zz-desinscription.example.invalid', 'business', 4242);
-    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_inscriptions')->where('reference', $ref)->first());
+    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->where('reference', $ref)->first());
     expect((int) $ligne->contact_id)->toBe(4242);
     expect($ligne->adresse)->toBeNull();
 });

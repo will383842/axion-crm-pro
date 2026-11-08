@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Envoi P0 L5 — oppositions recueillies par le lien de désinscription.
- * ADDITIF SEULEMENT. Une inscription = au plus une opposition (UNIQUE) : le
+ * ADDITIF SEULEMENT. Un lien = au plus une opposition (UNIQUE) : le
  * rejeu d'un jeton ne crée jamais de doublon. L'opposition met à l'écart, elle
  * n'efface aucune donnée (règle S8). `effets_termines_le` ne sert qu'à relancer
  * les effets (idempotents) si le premier passage a été interrompu.
@@ -20,7 +20,7 @@ return new class extends Migration
             CREATE TABLE IF NOT EXISTS envoi_oppositions (
                 id                 BIGSERIAL   PRIMARY KEY,
                 workspace_id       UUID        NOT NULL REFERENCES workspaces(id),
-                inscription_id     BIGINT      NOT NULL REFERENCES envoi_inscriptions(id),
+                lien_id     BIGINT      NOT NULL REFERENCES envoi_liens_desinscription(id),
                 empreinte_adresse  CHAR(64)    NOT NULL,
                 canal              TEXT        NOT NULL CHECK (canal IN ('page', 'one_click')),
                 enregistree_le     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -28,7 +28,7 @@ return new class extends Migration
             )
             SQL,
         );
-        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS uq_envoi_oppositions_inscription ON envoi_oppositions (inscription_id)');
+        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS uq_envoi_oppositions_lien ON envoi_oppositions (lien_id)');
         DB::statement('CREATE INDEX IF NOT EXISTS idx_envoi_oppositions_empreinte ON envoi_oppositions (workspace_id, empreinte_adresse)');
         DB::statement('ALTER TABLE envoi_oppositions ENABLE ROW LEVEL SECURITY');
         DB::statement('ALTER TABLE envoi_oppositions FORCE ROW LEVEL SECURITY');

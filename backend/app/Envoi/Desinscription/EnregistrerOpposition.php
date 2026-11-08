@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Enregistre l'opposition liée à une inscription. IDEMPOTENT : la contrainte
- * UNIQUE (inscription) fait qu'un rejeu ne crée ni seconde opposition, ni second
+ * UNIQUE (lien) fait qu'un rejeu ne crée ni seconde opposition, ni second
  * comptage dans la liste de suppression, ni second événement sortant.
  *
  * L'opposition MET À L'ÉCART, elle n'efface rien (règle S8). Elle est acquise
@@ -29,15 +29,15 @@ final class EnregistrerOpposition
     public function executer(string $workspaceId, string $reference, string $canal): bool
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $reference, $canal): bool {
-            $inscription = DB::table('envoi_inscriptions')->where('reference', $reference)->first();
+            $inscription = DB::table('envoi_liens_desinscription')->where('reference', $reference)->first();
             if ($inscription === null) {
                 return false;
             }
 
             DB::transaction(function () use ($inscription, $workspaceId, $canal): void {
                 $inseree = DB::affectingStatement(
-                    'INSERT INTO envoi_oppositions (workspace_id, inscription_id, empreinte_adresse, canal)
-                     VALUES (?, ?, ?, ?) ON CONFLICT (inscription_id) DO NOTHING',
+                    'INSERT INTO envoi_oppositions (workspace_id, lien_id, empreinte_adresse, canal)
+                     VALUES (?, ?, ?, ?) ON CONFLICT (lien_id) DO NOTHING',
                     [$workspaceId, $inscription->id, $inscription->empreinte_adresse, $canal],
                 );
                 if ($inseree !== 1) {
@@ -55,7 +55,7 @@ final class EnregistrerOpposition
                 );
             });
 
-            $opposition = DB::table('envoi_oppositions')->where('inscription_id', $inscription->id)->first();
+            $opposition = DB::table('envoi_oppositions')->where('lien_id', $inscription->id)->first();
             if ($opposition !== null) {
                 $this->effets->pour($workspaceId, (int) $opposition->id);
             }

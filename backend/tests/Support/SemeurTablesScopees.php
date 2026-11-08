@@ -127,8 +127,8 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
-        // Envoi P0 L5 : l'opposition (clé étrangère vers l'inscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
-        'envoi_inscriptions',
+        // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
+        'envoi_liens_desinscription',
         'envoi_oppositions',
         'coverage_zones',
         'crm_notes',
@@ -499,13 +499,12 @@ final class SemeurTablesScopees
             'source' => 'zz-etancheite',
         ]);
 
-        $id['envoi_inscriptions'] = $insererAvecId('envoi_inscriptions', [
-            'adresse' => 'zz-etancheite-l5@example.invalid',
+        $id['envoi_liens_desinscription'] = $insererAvecId('envoi_liens_desinscription', [
             'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
         ]);
 
         $inserer('envoi_oppositions', [
-            'inscription_id' => $id['envoi_inscriptions'],
+            'lien_id' => $id['envoi_liens_desinscription'],
             'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
             'canal' => 'page',
         ]);

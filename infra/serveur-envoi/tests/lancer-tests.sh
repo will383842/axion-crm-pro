@@ -312,5 +312,7 @@ out="$(perim feat/envoi-k3-serveur infra/serveur-envoi/a ligne2)"; rc=$?
 out="$(perim main hors.txt)"; rc=$?
 [[ $rc == 0 ]] && ok "M-N1 main / hors branche K3 : sautee" || bad "M-N1 main rougit : $out"
 nochk "M-N1 lancer-tests.sh n'a plus de garde de perimetre inline" grep -q 'git -C "\$D" diff --name-only' "$T/lancer-tests.sh"
+# K5 : DKIM cote serveur (cle generee dans un dossier temporaire).
+chk "K5: tests DKIM serveur" bash "$D/dkim/tests-dkim.sh"
 echo "--- $n verifications, $([[ $ko = 0 ]] && echo VERT || echo ROUGE)"
 exit "$ko"

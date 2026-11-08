@@ -4,6 +4,7 @@ use App\Envoi\Dns\ConfigurationDomaine;
 use App\Envoi\Dns\ControleurDns;
 use App\Envoi\Dns\PlanDns;
 use App\Envoi\Dns\RapportControle;
+use App\Envoi\Dns\ResolveurDnsSysteme;
 use Tests\Unit\Envoi\Dns\FauxResolveurDns;
 
 require_once __DIR__ . '/FauxResolveurDns.php';
@@ -164,4 +165,27 @@ test('DKIM : v=DKIM1 facultatif', function () {
     $f->txt['sel1._domainkey.envoi.example.test'] = ['k=rsa; p=' . base64_encode(str_repeat('x', 294))];
     $r = (new ControleurDns($f))->controler(new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10'));
     expect(statut($r, 'dkim_present'))->toBe('ok')->and(statut($r, 'dkim_cle_2048'))->toBe('ok');
+});
+
+test('K12 : domaine IDN accepté et normalisé en punycode ; IPv6 acceptée', function () {
+    $c = new ConfigurationDomaine('café.example.test', 'sel1', 'mx.café.example.test', '2001:db8::10');
+    expect($c->domaine)->toBe('xn--caf-dma.example.test')->and($c->helo)->toBe('mx.xn--caf-dma.example.test')->and($c->ip)->toBe('2001:db8::10');
+});
+
+test('K12 : SPF suit redirect= et autorise une IPv6 (ip6:)', function () {
+    $f = FauxResolveurDns::conforme('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10');
+    $f->txt['envoi.example.test'] = ['v=spf1 redirect=_spf.example.test'];
+    $f->txt['_spf.example.test'] = ['v=spf1 ip4:192.0.2.0/24 -all'];
+    $r = (new ControleurDns($f))->controler(cfg());
+    expect(statut($r, 'spf_autorise_ip'))->toBe('ok')->and(statut($r, 'spf_se_termine_par_all'))->toBe('ok');
+
+    $v6 = new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '2001:db8::10');
+    $f->txt['envoi.example.test'] = ['v=spf1 ip6:2001:db8::/32 -all'];
+    expect(statut((new ControleurDns($f))->controler($v6), 'spf_autorise_ip'))->toBe('ok');
+});
+
+test('K12 : nom PTR inversé IPv4 et IPv6 (nibbles)', function () {
+    expect(ResolveurDnsSysteme::nomInverse('192.0.2.10'))->toBe('10.2.0.192.in-addr.arpa')
+        ->and(ResolveurDnsSysteme::nomInverse('2001:db8::1'))->toBe('1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa')
+        ->and(ResolveurDnsSysteme::nomInverse('nimporte'))->toBeNull();
 });

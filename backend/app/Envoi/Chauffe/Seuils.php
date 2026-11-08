@@ -71,7 +71,7 @@ final class Seuils
     /** Valeur effective : celle de l'espace si elle est PLUS STRICTE, sinon la constante. */
     public static function resserre(string $nom, float $constante, ?float $reglage): float
     {
-        if ($reglage === null) {
+        if ($reglage === null || ! is_finite($reglage)) {   // NaN / infini : réglage ignoré (jamais plus lâche)
             return $constante;
         }
 

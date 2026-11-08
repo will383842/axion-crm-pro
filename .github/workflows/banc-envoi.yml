@@ -24,6 +24,8 @@ jobs:
       - name: Démarrer le banc
         run: bash infra/banc-envoi/demarrer-banc.sh
         # pas de healthcheck : --wait attend l'état running
+      - name: Garde des ports publiés (F38-003, contournée par demarrer-banc.sh)
+        run: bash infra/scripts/verifier-ports-publies.sh banc-envoi "" sans-publication
       - name: Sonde — zéro connexion sortante
         working-directory: infra/banc-envoi
         run: |

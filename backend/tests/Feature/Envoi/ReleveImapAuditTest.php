@@ -31,6 +31,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\FauxProtocoleImap;
@@ -458,4 +459,39 @@ test('13 : aucun code réseau hors du lecteur réel, et le lecteur réel ne cré
         }
     }
     expect($vus)->toBeGreaterThan(10)->and(Faux::commandes())->toBe([]);
+});
+
+// ───────────── Réserves L6 (durcissement) ─────────────
+
+test('RÉSERVE L6 : un STOP mis à l\'écart après 3 pannes CRM déclenche une ALERTE (opposition non appliquée), pas un simple journal', function () {
+    $this->lecteur->deposer(AUDIT_BOITE, auditMsg(1, corps: 'STOP'));
+    $releve = new ReleveImap($this->lecteur, $this->registre, auditRecepteurQuiEchoue('a1@zz-client.example.invalid'));
+    Log::spy();
+    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(ReleveIncomplete::class);
+    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(ReleveIncomplete::class);
+    Log::shouldNotHaveReceived('critical');           // pas d'alerte avant la mise à l'écart
+    $releve->relever($this->ws, AUDIT_BOITE);          // 3e panne : à rattacher + alerte
+    expect(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher');
+    Log::shouldHaveReceived('critical')->once()->withArgs(fn (string $m): bool => str_contains($m, '[ALERTE]') && ! str_contains($m, 'zz-client'));
+});
+
+test('RÉSERVE L6 : un message sans effet (réponse humaine) mis à l\'écart n\'alerte pas', function () {
+    $this->lecteur->deposer(AUDIT_BOITE, auditMsg(1, corps: 'Merci, à bientôt.'));
+    $releve = new ReleveImap($this->lecteur, $this->registre, auditRecepteurQuiEchoue('a1@zz-client.example.invalid'));
+    Log::spy();
+    for ($i = 0; $i < 2; $i++) {
+        expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(ReleveIncomplete::class);
+    }
+    $releve->relever($this->ws, AUDIT_BOITE);   // 3e panne : mis à l'écart, mais ce n'est pas une opposition
+    expect(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher');
+    Log::shouldNotHaveReceived('critical');
+});
+
+test('RÉSERVE L6 : un rebond mou déjà appliqué par le CRM n\'est pas recompté quand la relève le relit (échec ultérieur de la chaîne)', function () {
+    $retour = new RetourDetecte(ClasseRetour::RebondMou, (string) Str::uuid(), 'mou@zz-client.example.invalid', null, hash('sha256', 'mid:mou-1'));
+    $crm = new RecepteurRetoursCrm;
+    $crm->recevoir($this->ws, $retour);
+    $crm->recevoir($this->ws, $retour);   // relecture après échec des freins : même clé
+    $cle = 'soft_bounce:business:' . ListeSuppression::empreinte('mou@zz-client.example.invalid');
+    expect((int) cache()->get($cle))->toBe(1);
 });

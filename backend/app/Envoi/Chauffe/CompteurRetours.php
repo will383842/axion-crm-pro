@@ -33,6 +33,6 @@ final class CompteurRetours implements AppliquerRetour
             return;
         }
         $instant = $this->maintenant === null ? now()->toDateTimeImmutable() : DateTimeImmutable::createFromInterface(($this->maintenant)());
-        $this->depot->compterRetour($workspaceId, $evenement->id, $colonne, JourEnvoi::de($instant), $this->resolveur->fournisseurDe($evenement->adresse));
+        $this->depot->compterRetour($workspaceId, $evenement->id, $colonne, JourEnvoi::de($instant), $this->resolveur->fournisseurDe($evenement->adresse, $workspaceId));
     }
 }

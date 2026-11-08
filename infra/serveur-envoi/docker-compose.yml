@@ -16,8 +16,13 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     tmpfs: ["/tmp"]
+    # Cles DKIM : lues par le groupe dedie 10025 (cles 0640 root:10025, dossiers 0750), jamais
+    # par « tout le monde ». generer-dkim.sh --groupe <nom du groupe de GID 10025> ; RUNBOOK.
+    group_add: ["10025"]
     volumes:
       - ./kumomta/init.lua:/opt/kumomta/etc/policy/init.lua:ro
+      - ./kumomta/dkim.lua:/opt/kumomta/etc/policy/dkim.lua:ro
+      - /etc/axion-envoi/dkim:/etc/axion-envoi/dkim:ro
       - kumo-spool:/var/spool/kumomta
       - kumo-log:/var/log/kumomta
 volumes:

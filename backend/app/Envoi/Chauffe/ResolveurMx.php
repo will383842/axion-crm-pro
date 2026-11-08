@@ -5,7 +5,7 @@ namespace App\Envoi\Chauffe;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Résolution MX du domaine du destinataire, avec cache en table (`envoi_fournisseur_domaines`,
+ * Résolution MX du domaine du destinataire, avec cache en table (`envoi_fournisseur_domaines`, clé « espace|domaine »,
  * ajout/mise à jour seulement, aucune donnée de personne : un domaine et sa famille).
  *  - MX en `*.google.com` / `*.googlemail.com`         => gmail
  *  - MX en `*.outlook.com` / `*.protection.outlook.com` / `*.hotmail.com` => microsoft
@@ -28,7 +28,7 @@ final class ResolveurMx implements ResolveurFournisseur
     /** @param  (\Closure(string): list<string>)|null  $dns  domaine => liste des hôtes MX ; lève en cas d'échec */
     public function __construct(private readonly ?\Closure $dns = null) {}
 
-    public function fournisseurDe(string $adresse): string
+    public function fournisseurDe(string $adresse, ?string $workspaceId = null): string
     {
         $domaine = Fournisseur::domaine($adresse);
         if ($domaine === '') {
@@ -37,7 +37,9 @@ final class ResolveurMx implements ResolveurFournisseur
         if (isset(self::PUBLICS[$domaine])) {
             return self::PUBLICS[$domaine];
         }
-        $cache = DB::table('envoi_fournisseur_domaines')->where('domaine', $domaine)
+        // Cache cloisonné par espace : la clé est « espace|domaine » (un espace ne lit ni n'écrase la ligne d'un autre).
+        $cle = ($workspaceId ?? 'sans-espace') . '|' . $domaine;
+        $cache = DB::table('envoi_fournisseur_domaines')->where('domaine', $cle)
             ->where('resolu_le', '>', now()->subDays(self::TTL_JOURS))->value('fournisseur');
         if (is_string($cache)) {
             return $cache;
@@ -53,7 +55,7 @@ final class ResolveurMx implements ResolveurFournisseur
         DB::statement(
             'INSERT INTO envoi_fournisseur_domaines (domaine, fournisseur, resolu_le) VALUES (?, ?, now())
              ON CONFLICT (domaine) DO UPDATE SET fournisseur = EXCLUDED.fournisseur, resolu_le = now()',
-            [$domaine, $f],
+            [$cle, $f],
         );
 
         return $f;

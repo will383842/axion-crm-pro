@@ -206,6 +206,22 @@ class TestEntetesFrom(Base):
         r = self.deposer("From: a@envoi.example.test\r\nFrom: x@principal.example.test")
         self.assertTrue(r.startswith("550")); self.assertEqual(self.file.depots, [])
 
+    def test_message_deja_signe_dkim_refuse(self):
+        # ADR-K0 D3.3 : second verrou, le serveur signe seul ; un message portant deja une
+        # DKIM-Signature (mauvais reglage du CRM) est refuse en 5xx, rien n'est mis en file.
+        for ent in ("DKIM-Signature: v=1; a=rsa-sha256; d=envoi.example.test; s=x; b=AAAA",
+                    "dkim-signature : v=1; d=autre.example.test; b=AAAA",
+                    "DKIM-SIGNATURE:\r\n v=1; d=envoi.example.test; b=AAAA"):
+            self.file.depots.clear()
+            r = self.deposer("From: a@envoi.example.test\r\n" + ent)
+            self.assertTrue(r.startswith("550"), ent)
+            self.assertIn("DKIM", r)
+            self.assertEqual(self.file.depots, [], ent)
+
+    def test_message_non_signe_accepte(self):
+        r = self.deposer("From: a@envoi.example.test\r\nX-Dkim-Signature-Note: ok")
+        self.assertTrue(r.startswith("250"), r)
+
     def test_from_replie_refuse(self):
         r = self.deposer('From: "Nom"\r\n <x@principal.example.test>')
         self.assertTrue(r.startswith("550")); self.assertEqual(self.file.depots, [])

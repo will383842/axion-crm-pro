@@ -170,9 +170,22 @@ final class LecteurBoiteWebklex implements LecteurBoite
                     }
                     $dsn = AnalyseDsn::pourContenu($enTetes['content-type'], $contenu . "\n" . $message->getTextBody());
                 }
+                $arf = ['type' => null, 'destinataire' => null, 'messageId' => null, 'adresses' => []];
+                if (AnalyseArf::estRapport($enTetes['content-type'] ?? '')) {
+                    $contenuArf = '';
+                    foreach ($message->getAttachments() as $piece) {
+                        $contenuArf .= "\n" . mb_substr((string) $piece->getContent(), 0, ExtraitTexte::LIMITE * 4);
+                    }
+                    $arf = AnalyseArf::depuisBrut($contenuArf . "\n" . $message->getTextBody());
+                    $arf['type'] ??= 'illisible'; // rapport ARF sans type lisible : « à rattacher », jamais une plainte devinée
+                }
                 $corps = ExtraitTexte::choisir($message->getTextBody(), $message->getHTMLBody());
             } catch (EchecAnalyse) {
-                return new MessageBrut($uid, $messageId, self::texte($message->getInReplyTo()), $references, $expediteur ?? '', $recuLe, $sujet, '', [], null, null, null, null, $empreinte, true);
+                // RÈGLE DE FER : un ARF dont l'analyse échoue ne doit JAMAIS retomber sur « STOP par prudence » (opposition
+                // via In-Reply-To, sans VERP signé) : type « illisible » => « à rattacher », aucun effet.
+                $typeArf = self::estRapportArf($entete) ? 'illisible' : null;
+
+                return new MessageBrut($uid, $messageId, self::texte($message->getInReplyTo()), $references, $expediteur ?? '', $recuLe, $sujet, '', [], null, null, null, null, $empreinte, true, $typeArf);
             }
 
             return new MessageBrut(
@@ -186,15 +199,29 @@ final class LecteurBoiteWebklex implements LecteurBoite
                 $corps,
                 $enTetes,
                 $dsn['statut'],
-                $dsn['messageId'],
+                $dsn['messageId'] ?? $arf['messageId'],
                 $dsn['destinataire'],
                 null,
                 $empreinte,
+                false,
+                $arf['type'],
+                $arf['destinataire'],
+                [...AnalyseArf::adressesDesEnTetes($enTetes), ...$arf['adresses']],
             );
         } catch (EchecAnalyse) {
             return new MessageBrut($uid, null, null, [], '', $recuLe, '', '', [], null, null, null, null, $empreinte, true);
         } catch (Exception) { // MIME invalide ; une `Error` (bug) ne doit JAMAIS se déguiser en « illisible »
             return self::ecarte($uid, $recuLe, 'illisible', $empreinte);
+        }
+    }
+
+    /** Content-Type d'un rapport ARF, lu SANS PCRE-lourd ni exception (l'analyse a déjà échoué). */
+    private static function estRapportArf(string $entete): bool
+    {
+        try {
+            return AnalyseArf::estRapport(AnalyseDsn::enTetes($entete)['content-type'] ?? '');
+        } catch (EchecAnalyse) {
+            return preg_match('/^content-type:[^\r\n]*report-type\s*=\s*"?feedback-report/im', $entete) !== 0; // erreur PCRE => prudence : illisible
         }
     }
 

@@ -78,11 +78,15 @@ if [[ $REEL == 1 ]]; then
   # Detection des changements (relance) : on compare AVANT d'ecraser.
   cmp -s "$tmpd/wg0.conf" /etc/wireguard/wg0.conf 2>/dev/null || changement_wg=1
   cmp -s "$tmpd/init.lua" "$CIBLE/kumomta/init.lua" 2>/dev/null || changement_kumo=1
+  cmp -s "$SRC/kumomta/dkim.lua" "$CIBLE/kumomta/dkim.lua" 2>/dev/null || changement_kumo=1
   cmp -s "$SRC/kumomta-envoi.service" /etc/systemd/system/kumomta-envoi.service 2>/dev/null || changement_kumo=1
   wg_actif=0; systemctl is-active --quiet wg-quick@wg0.service && wg_actif=1
   kumo_actif=0; systemctl is-active --quiet kumomta-envoi.service && kumo_actif=1
 
   install -m 0644 "$tmpd/init.lua" "$CIBLE/kumomta/init.lua"
+  install -m 0644 "$SRC/kumomta/dkim.lua" "$CIBLE/kumomta/dkim.lua"   # K5 : signature DKIM (sans cle)
+  # Dossier des cles DKIM (genere par dkim/generer-dkim.sh) : cree vide s'il manque, jamais touche s'il existe.
+  install -d -m 0755 /etc/axion-envoi
   install -d -m 0700 /etc/wireguard
   install -m 0600 "$tmpd/wg0.conf" /etc/wireguard/wg0.conf
   install -m 0644 "$tmpd/nftables.conf" /etc/nftables.conf

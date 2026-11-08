@@ -14,7 +14,7 @@ class EnvoiTemoinIndesirable extends Command
 
     public function handle(GardeChauffe $garde): int
     {
-        $ouverte = $garde->indesirableChezTemoin((string) $this->argument('workspace'), (string) $this->argument('adresse'));
+        $ouverte = $garde->indesirableChezTemoin((string) $this->argument('workspace'), (string) $this->argument('adresse'), null, (string) ($this->option('auteur') ?: get_current_user()));
         $this->warn($ouverte ? 'Pause ouverte vers le fournisseur du témoin (journalisé).' : 'Une pause identique est déjà active.');
 
         return self::SUCCESS;

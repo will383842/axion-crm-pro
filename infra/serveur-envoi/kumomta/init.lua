@@ -2,6 +2,10 @@
 -- aucune injection : l'API d'administration est LOCALE seulement.
 local kumo = require 'kumo'
 
+-- K5 : signature DKIM par le serveur (dkim.lua monte a cote de ce fichier).
+package.path = '/opt/kumomta/etc/policy/?.lua;' .. package.path
+require 'dkim'
+
 kumo.on('init', function()
   kumo.define_spool {
     name = 'data',

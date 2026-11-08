@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_chauffe_jours', 'envoi_pauses'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -173,7 +173,8 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
-        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace.
+        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace. Chauffe et pauses :
+        // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
         'envoi_chauffe_jours',
         'envoi_pauses',
         'envoi_seuils',

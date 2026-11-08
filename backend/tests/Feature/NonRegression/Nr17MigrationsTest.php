@@ -41,6 +41,8 @@ const NR17_DERNIERE_ANCIENNE = '2026_11_01_999999';
 const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000011_envoi_journal_commandes.php',
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
+    // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
+    '2026_11_11_000110_envoi_controles_dns.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',

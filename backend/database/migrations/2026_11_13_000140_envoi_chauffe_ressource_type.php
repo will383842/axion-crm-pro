@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
  * `boite` porte la référence de la ressource ; `ressource_type` dit de quelle sorte elle est. Les lignes
  * existantes (boîtes, donc chauffe par domaine) prennent 'domaine'. La clé unique reste valide : une
  * référence d'IP ne peut pas être l'identifiant d'une boîte.
- * down() ne retire la colonne que si aucune ligne 'ip' n'existe (aucun effacement de données).
+ * down() est inerte (ajout seul) ; up() est rejouable.
  */
 return new class extends Migration
 {
@@ -20,14 +20,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::unprepared(<<<'SQL'
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM envoi_chauffe_jours WHERE ressource_type = 'ip') THEN
-                    RAISE EXCEPTION 'envoi_chauffe_jours contient des lignes ip : retour refusé (aucun effacement)';
-                END IF;
-            END $$;
-            ALTER TABLE envoi_chauffe_jours DROP COLUMN IF EXISTS ressource_type;
-        SQL);
+        // Inerte voulu : on ne retire jamais une colonne de compteurs d'envoi (ajout seul, aucun effacement).
     }
 };

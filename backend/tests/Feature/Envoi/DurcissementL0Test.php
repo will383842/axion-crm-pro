@@ -140,8 +140,10 @@ test('réserve 3 : le compteur global ne s’écrit plus directement, seulement 
     $depot->noterInjection($ws, $j, 'cle-compteur');
     $avant = $depot->injectesLeGlobal($j);
     expect($avant)->toBe(1);
-    expect(fn () => sousSavepoint(fn () => DB::table('envoi_compteur_global')->update(['n' => 0])))->toThrow(QueryException::class);
-    expect(fn () => sousSavepoint(fn () => DB::statement("INSERT INTO envoi_compteur_global (jour, n) VALUES ('2031-05-05', 0)")))->toThrow(QueryException::class);
+    // La connexion par défaut des tests est propriétaire : l'écriture directe se tente en rôle applicatif.
+    $app = DB::connection('pgsql_app');
+    expect(fn () => $app->table('envoi_compteur_global')->update(['n' => 0]))->toThrow(QueryException::class, 'permission denied');
+    expect(fn () => $app->statement("INSERT INTO envoi_compteur_global (jour, n) VALUES ('2031-05-05', 0)"))->toThrow(QueryException::class, 'permission denied');
     expect($depot->injectesLeGlobal($j))->toBe($avant);
     $depot->noterInjection($ws, $j, 'cle-compteur'); // même clé : pas recomptée
     $depot->noterInjection($ws, $j, 'cle-compteur-2');

@@ -5,6 +5,7 @@ namespace App\Envoi\Chauffe;
 use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /** Lecture/écriture Postgres (RLS par espace) des compteurs, pauses et seuils. Aucune suppression de ligne. */
@@ -16,13 +17,22 @@ final class DepotChauffe
     public const BOITE_RETOURS = '(retours)';
 
     /**
+     * Seul point d'entrée de lecture de `envoi_chauffe_jours` : K8 sépare la chauffe de l'IP de celle du domaine,
+     * et les compteurs d'IP ne doivent jamais gonfler les totaux, les freins ni les quotas du domaine.
+     */
+    private function lignesChauffe(string $ressourceType = BudgetChauffe::RESSOURCE_DOMAINE): Builder
+    {
+        return DB::table('envoi_chauffe_jours')->where('ressource_type', $ressourceType);
+    }
+
+    /**
      * Jours (Paris) où la boîte a réellement envoyé, STRICTEMENT avant $jour : la matière des jours EFFECTIFS.
      *
      * @return list<DateTimeImmutable>
      */
     public function joursAvecEnvoi(string $ws, string $boite, DateTimeImmutable $jour): array
     {
-        $jours = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+        $jours = WorkspaceContext::run($ws, fn () => $this->lignesChauffe()
             ->where('workspace_id', $ws)->where('boite', $boite)->where('jour', '<', $jour->format('Y-m-d'))
             ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderBy('jour')->pluck('jour'));
 
@@ -35,9 +45,9 @@ final class DepotChauffe
      *
      * @return array<string, int>
      */
-    public function volumesParJour(string $ws, string $boite, DateTimeImmutable $jour): array
+    public function volumesParJour(string $ws, string $boite, DateTimeImmutable $jour, string $ressourceType = BudgetChauffe::RESSOURCE_DOMAINE): array
     {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+        $l = WorkspaceContext::run($ws, fn () => $this->lignesChauffe($ressourceType)
             ->where('workspace_id', $ws)->where('boite', $boite)->where('jour', '<', $jour->format('Y-m-d'))
             ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderBy('jour')
             ->selectRaw('jour, SUM(envoyes) AS n')->get());
@@ -67,19 +77,22 @@ final class DepotChauffe
     {
         return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
             ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.jour', $jour->format('Y-m-d'))
+            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.jour', $jour->format('Y-m-d'))
             ->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [$domaine])->sum('c.envoyes'));
     }
 
     public function envoyesBoite(string $ws, string $boite, DateTimeImmutable $jour): int
     {
-        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+        return (int) WorkspaceContext::run($ws, fn () => $this->lignesChauffe()
             ->where('workspace_id', $ws)->where('boite', $boite)
             ->where('jour', $jour->format('Y-m-d'))->sum('envoyes'));
     }
 
-    public function incrementer(string $ws, string $boite, DateTimeImmutable $jour, string $fournisseur, string $colonne, int $n = 1): void
+    public function incrementer(string $ws, string $boite, DateTimeImmutable $jour, string $fournisseur, string $colonne, int $n = 1, string $ressourceType = BudgetChauffe::RESSOURCE_DOMAINE): void
     {
+        if (! BudgetChauffe::typeValide($ressourceType)) {
+            throw new \InvalidArgumentException('type de ressource inconnu');
+        }
         if ($fournisseur === Fournisseur::INCONNU) {
             $fournisseur = Fournisseur::AUTRE; // résolution impossible : compté sous « autre » (le blocage, lui, est fait par la garde)
         }
@@ -87,10 +100,10 @@ final class DepotChauffe
             throw new \InvalidArgumentException('colonne ou fournisseur inconnu');
         }
         WorkspaceContext::run($ws, fn () => DB::statement(
-            "INSERT INTO envoi_chauffe_jours (workspace_id, boite, jour, fournisseur, {$colonne}) VALUES (?, ?, ?, ?, ?)
+            "INSERT INTO envoi_chauffe_jours (workspace_id, boite, jour, fournisseur, ressource_type, {$colonne}) VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT (workspace_id, boite, jour, fournisseur)
              DO UPDATE SET {$colonne} = envoi_chauffe_jours.{$colonne} + EXCLUDED.{$colonne}, mis_a_jour_le = now()",
-            [$ws, $boite, $jour->format('Y-m-d'), $fournisseur, $n],
+            [$ws, $boite, $jour->format('Y-m-d'), $fournisseur, $ressourceType, $n],
         ));
     }
 
@@ -98,7 +111,7 @@ final class DepotChauffe
     public function totauxDuJour(string $ws, DateTimeImmutable $jour, ?string $fournisseur = null): array
     {
         $l = WorkspaceContext::run($ws, function () use ($ws, $jour, $fournisseur) {
-            $q = DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->where('jour', $jour->format('Y-m-d'));
+            $q = $this->lignesChauffe()->where('workspace_id', $ws)->where('jour', $jour->format('Y-m-d'));
             if ($fournisseur !== null) {
                 $q->where('fournisseur', $fournisseur);
             }
@@ -116,7 +129,7 @@ final class DepotChauffe
      */
     public function totaux7Jours(string $ws, DateTimeImmutable $jour): array
     {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)
+        $l = WorkspaceContext::run($ws, fn () => $this->lignesChauffe()->where('workspace_id', $ws)
             ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])
             ->selectRaw('COALESCE(SUM(envoyes),0) e, COALESCE(SUM(rebonds_durs),0) r, COALESCE(SUM(plaintes),0) p, COALESCE(SUM(reponses),0) a')->first());
 
@@ -132,7 +145,7 @@ final class DepotChauffe
     {
         $debut = $this->debutFenetre($jour)->format('Y-m-d');
         $fin = $jour->format('Y-m-d');
-        $somme = fn (?string $apresJour, ?string $egal = null): int => (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+        $somme = fn (?string $apresJour, ?string $egal = null): int => (int) WorkspaceContext::run($ws, fn () => $this->lignesChauffe()
             ->where('workspace_id', $ws)->whereBetween('jour', [$debut, $fin])
             ->when($apresJour !== null, fn ($q) => $q->where('jour', '>', $apresJour))
             ->when($egal !== null, fn ($q) => $q->where('jour', $egal))
@@ -183,7 +196,7 @@ final class DepotChauffe
     /** Dernier jour (7 jours glissants) où une plainte est arrivée, ou null. */
     public function dernierJourPlainte(string $ws, DateTimeImmutable $jour): ?DateTimeImmutable
     {
-        $j = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->where('plaintes', '>', 0)
+        $j = WorkspaceContext::run($ws, fn () => $this->lignesChauffe()->where('workspace_id', $ws)->where('plaintes', '>', 0)
             ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])->max('jour'));
 
         return $j === null ? null : new DateTimeImmutable((string) $j, new \DateTimeZone(JourEnvoi::FUSEAU));
@@ -201,7 +214,7 @@ final class DepotChauffe
      */
     public function fourneesPrecedentes(string $ws, string $fournisseur, DateTimeImmutable $jour, int $n): array
     {
-        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+        $lignes = WorkspaceContext::run($ws, fn () => $this->lignesChauffe()
             ->where('workspace_id', $ws)->where('fournisseur', $fournisseur)->where('jour', '<', $jour->format('Y-m-d'))
             ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderByDesc('jour')->limit($n)
             ->selectRaw('SUM(envoyes) e, SUM(reponses) a')->get());

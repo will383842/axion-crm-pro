@@ -6,7 +6,8 @@ use App\Support\HmacSignature;
 
 /**
  * Signature des échanges avec le serveur d'envoi (ADR K0 D3).
- * Requête : « MÉTHODE \n chemin \n horodatage \n nonce \n corps » (pour un GET, « corps » = la chaîne de requête).
+ * Requête : « MÉTHODE \n chemin \n horodatage \n nonce \n workspace_id \n corps » (pour un GET, « corps » = la chaîne de
+ * requête). Le workspace_id est SIGNÉ : changer l'espace de l'en-tête invalide la signature (contrat v2).
  * Réponse : « REPONSE \n nonce \n workspace_id \n statut \n corps » — liée au nonce de la requête.
  * En-tête : « k=<identifiant de clé>,sha256=<hex> » ; l'ancienne forme (hex nu ou « sha256=… ») reste lue.
  */
@@ -16,9 +17,9 @@ final class SignatureEnvoi
 
     public const PREFIXE_COMMANDES = '/v1/commandes/';
 
-    public static function chargeRequete(string $methode, string $chemin, string $horodatage, string $nonce, string $corps): string
+    public static function chargeRequete(string $methode, string $chemin, string $horodatage, string $nonce, string $workspaceId, string $corps): string
     {
-        return implode("\n", [strtoupper($methode), $chemin, $horodatage, $nonce, $corps]);
+        return implode("\n", [strtoupper($methode), $chemin, $horodatage, $nonce, $workspaceId, $corps]);
     }
 
     public static function chargeReponse(string $nonce, string $workspaceId, int $statut, string $corps): string

@@ -1,5 +1,5 @@
 {
-  "description": "Vecteurs de test HMAC communs CRM/serveur d'envoi (ADR K0 D3). Secret de vecteur : publiable, sans valeur. Requête = HMAC-SHA256 de « METHODE\\nchemin\\nhorodatage\\nnonce\\ncorps » (GET : corps = chaîne de requête) ; réponse = « REPONSE\\nnonce\\nworkspace_id\\nstatut\\ncorps ». En-tête : k=<id>,sha256=<hex>.",
+  "description": "Vecteurs de test HMAC communs CRM/serveur d'envoi (ADR K0 D3), contrat v2. Secret de vecteur : publiable, sans valeur. Requête = HMAC-SHA256 de « METHODE\\nchemin\\nhorodatage\\nnonce\\nworkspace_id\\ncorps » (GET : corps = chaîne de requête) ; réponse = « REPONSE\\nnonce\\nworkspace_id\\nstatut\\ncorps ». En-tête : k=<id>,sha256=<hex>.",
   "secret": "secret-de-vecteur-NON-SECRET",
   "workspace_id": "11111111-1111-4111-8111-111111111111",
   "requetes": [
@@ -10,8 +10,8 @@
       "horodatage": "1767225600",
       "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "corps": "{\"commande_id\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\",\"commande\":\"pause\"}",
-      "signature": "c7b00b24d78226e71ca25f58a41b67727b5664c7f59783bb21b5d43fe9a74218",
-      "entete": "k=1,sha256=c7b00b24d78226e71ca25f58a41b67727b5664c7f59783bb21b5d43fe9a74218"
+      "signature": "c8f6dffe9a1dd1efbd1a8ff5451e95d1e6668f957df2cdd85be2a371604479f7",
+      "entete": "k=1,sha256=c8f6dffe9a1dd1efbd1a8ff5451e95d1e6668f957df2cdd85be2a371604479f7"
     },
     {
       "libelle": "tirage_evenements",
@@ -20,8 +20,8 @@
       "horodatage": "1767225600",
       "nonce": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "corps": "curseur=10&depuis=2026-01-01T00%3A00%3A00%2B00%3A00&limite=100",
-      "signature": "bb67056e1c99d5ef17a1613f1fc61e3ee9dec1702c9bfbc4e4411e65be3e4fcd",
-      "entete": "k=1,sha256=bb67056e1c99d5ef17a1613f1fc61e3ee9dec1702c9bfbc4e4411e65be3e4fcd"
+      "signature": "b8ec475bfe8e9dd3062274e23cd81f39579b812a6320b5e6fd110db955c799ce",
+      "entete": "k=1,sha256=b8ec475bfe8e9dd3062274e23cd81f39579b812a6320b5e6fd110db955c799ce"
     }
   ],
   "reponses": [

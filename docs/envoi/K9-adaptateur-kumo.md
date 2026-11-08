@@ -1,6 +1,6 @@
 # K9 — adaptateur CRM `ServeurEnvoiKumo`
 
-Fichiers : `backend/app/Envoi/Serveur/ServeurEnvoiKumo.php`, `backend/app/Envoi/Serveur/Kumo/*`, tests `backend/tests/Unit/Envoi/Kumo/*` et `backend/tests/Feature/Envoi/` (`TransportSmtpTunnelTest`, `ServeurEnvoiKumoTransactionTest`, `PauseObsoleteRejeuTest`).
+Fichiers : `backend/app/Envoi/Serveur/ServeurEnvoiKumo.php`, `backend/app/Envoi/Serveur/Kumo/*`, tests `backend/tests/Unit/Envoi/Kumo/*` et `backend/tests/Feature/Envoi/` (`TransportSmtpTunnelTest`, `ServeurEnvoiKumoTransactionTest`).
 
 ## Règles
 - Verrou : sans `ENVOI_REEL_ACTIF` ET `ENVOI_K1_ACTIF`, zéro connexion (injection reportée, interrogation = `inconnu`).
@@ -33,4 +33,4 @@ et écarte tout tunnel vers la prod (modification de la prod = ESCALADE). L'adap
 6. **ComposeurMessage non utilisé** par le transport : ni `List-Unsubscribe` ni pied art. 14 ; seuls sujet/corps bruts, `X-Envoi-Jeton`, `X-Envoi-Source` et le VERP sont posés. À brancher avant toute ouverture du verrou.
 7. **`reconcilierOrphelines()` n'est appelée par aucun appel planifié** : tant qu'elle n'est pas planifiée (toutes les 5 minutes), une injection tuée en cours reste `injection_en_cours` (jamais renvoyée, mais jamais rapprochée).
 8. Séquence des événements : l'attribution `lire` puis `ecrire` du `seq` n'est atomique que dans un registre durable (à garantir par `INSERT … ON CONFLICT`).
-9. `commande_id` neuf à chaque appel : le correctif écarte les `pause`/`reprise` périmées au rejeu ; une idempotence par intention (même `commande_id` tant que l'état voulu est inchangé) reste à décider avec le journal.
+9. `commande_id` neuf à chaque appel : le rejeu des `pause` non acquittées après une reprise acquittée reste une dette (lot K1-suite) ; une idempotence par intention (même `commande_id` tant que l'état voulu est inchangé) reste à décider avec le journal.

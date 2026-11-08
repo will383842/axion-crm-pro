@@ -34,4 +34,4 @@ Tests : `cd infra/serveur-envoi/injection && python3 -m unittest discover -s tes
 ## Suite K4 (2)
 - Tout refus qui coupe la session (pipelining après STARTTLS, client qui ne lit pas, durée maximale, trop de connexions, fin de ligne invalide) finit par `transport.abort()` après l'écriture de la réponse ; seul `QUIT` ferme proprement.
 - En-têtes `Disposition-Notification-To`, `Return-Receipt-To`, `Errors-To` : refus 550 (ils détourneraient accusés et retours). L'en-tête `From` est EXIGÉ (550 sinon).
-- Une IPv6 mappée `::ffff:a.b.c.d` vaut son IPv4 : adresse du pair, `ips_autorisees` et `ip_ecoute` (règle anti-joker comprise : `::ffff:0.0.0.0/96` est refusé comme `0.0.0.0/0`).
+- Une IPv6 « mappée » sur IPv4 (préfixe ffff, 96 bits) vaut son IPv4 : adresse du pair, `ips_autorisees` et `ip_ecoute`, règle anti-joker comprise (le réseau mappé qui couvre tout l'IPv4 est refusé comme un réseau IPv4 complet).

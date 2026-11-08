@@ -32,12 +32,12 @@ def normaliser_domaine(d: str) -> str:
 
 
 def _sans_mappee(adresse):
-    """Une IPv6 mappée ::ffff:a.b.c.d vaut son IPv4 a.b.c.d (règle anti-joker et correspondance)."""
+    """Une IPv6 « mappée » (préfixe ffff sur 96 bits) vaut son IPv4 (règle anti-joker et correspondance)."""
     return adresse.ipv4_mapped if adresse.version == 6 and adresse.ipv4_mapped else adresse
 
 
 def _reseau_sans_mappe(reseau):
-    """Réseau IPv6 situé dans ::ffff:0:0/96 -> le même réseau IPv4 (préfixe - 96)."""
+    """Réseau IPv6 situé dans le préfixe mappé (96 bits) -> le même réseau IPv4 (préfixe - 96)."""
     if reseau.version == 6 and reseau.prefixlen >= 96 and reseau.network_address.ipv4_mapped is not None:
         return ipaddress.ip_network((reseau.network_address.ipv4_mapped, reseau.prefixlen - 96))
     return reseau

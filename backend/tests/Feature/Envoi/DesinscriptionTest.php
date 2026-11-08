@@ -5,6 +5,8 @@
  */
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Desinscription\ArretParEntreprise;
@@ -498,6 +500,7 @@ test('M2 la garde s’efface quand un vrai retrait est branché (l’envoi reste
         }
     });
     config(['envoi.reel_actif' => true]);
+    app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire); // aucun réseau en test (L7)
     $m = new MessageAEnvoyer($this->ws, 'a@example.test', 'f@example.test', 'S', 'C', 'k');
     try {
         WorkspaceContext::run($this->ws, fn () => app(ServeurEnvoi::class)->injecter($m));

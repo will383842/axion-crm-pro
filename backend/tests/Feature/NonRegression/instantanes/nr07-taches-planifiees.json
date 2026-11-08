@@ -200,6 +200,16 @@
         "sauts": 1
     },
     {
+        "tache": "envoi:evaluer-freins",
+        "horaire": "*/5 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
         "tache": "envoi:listes-noires:controler",
         "horaire": "* * * * *",
         "fuseau": "Europe/Paris",
@@ -214,6 +224,16 @@
         "horaire": "* * * * *",
         "fuseau": "Europe/Paris",
         "verrou_minutes": 5,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
+        "tache": "envoi:sante",
+        "horaire": "*/5 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
         "en_arriere_plan": false,
         "un_seul_serveur": true,
         "conditions": 0,

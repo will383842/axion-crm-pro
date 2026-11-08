@@ -364,6 +364,31 @@ class TestSocketDurci(unittest.TestCase):
             w1.close(); w2.close(); srv.close()
         asyncio.run(run())
 
+    def test_refus_trop_de_connexions_coupe_vite_sans_attendre_delai_ecriture(self):
+        # Une connexion REFUSEE ne compte pas dans le plafond : l'attendre delai_ecriture (30 s) permettrait
+        # d'en accumuler sans limite avec des clients qui ne lisent pas. Coupure en 1 s au plus (comme les autres refus).
+        from axion_injection import serveur as mod
+        delais = []
+        reel = mod._couper
+
+        async def espion(w, delai, abort):
+            delais.append((delai, abort))
+            await reel(w, delai, abort)
+
+        async def run():
+            srv, port = await self.serveur(max_connexions=1, delai_ecriture=30.0)
+            r1, w1 = await asyncio.open_connection("127.0.0.1", port); await r1.readline()
+            r2, w2 = await asyncio.open_connection("127.0.0.1", port)
+            self.assertTrue((await asyncio.wait_for(r2.readline(), 5)).startswith(b"421"))
+            w1.close(); w2.close(); srv.close()
+        mod._couper = espion
+        try:
+            asyncio.run(run())
+        finally:
+            mod._couper = reel
+        self.assertTrue(any(d[1] and d[0] <= 1.0 for d in delais), delais)
+        self.assertEqual(len([d for d in delais if d[1] and d[0] > 1.0]), 0, delais)
+
     def test_duree_maximale_de_session(self):
         async def run():
             srv, port = await self.serveur(duree_max_session=0.6)
@@ -537,6 +562,7 @@ class TestSocketSuiteK4(unittest.TestCase):
                 durees.append(loop.time() - t)
             self.assertGreaterEqual(durees[0], 0.045)       # 0,05 s au 1er echec
             self.assertGreaterEqual(durees[1], 0.095)       # 0,1 s au 2e echec
+            self.assertGreaterEqual(loop.time() - t0, 0.145)  # cumul : 0,05 + 0,1 s (t0 etait calcule sans etre lu)
             w.close(); srv.close()
         asyncio.run(run())
 

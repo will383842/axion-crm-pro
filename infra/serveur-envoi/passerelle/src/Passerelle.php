@@ -28,23 +28,47 @@ final class Passerelle
     /** @var \Closure():int */
     private \Closure $horloge;
 
+    /** @var array<string,array<string,string>> clés par espace puis par identifiant (`k=<id>`) */
+    private array $cles;
+
+    private ?Stockage $stockage = null;
+
+    /** @var \Closure(string,array<string,string>):mixed */
+    private \Closure $alerte;
+
     /** @var \Closure(int):mixed */
     private \Closure $dormir;
 
     /**
-     * @param array<string,string>   $cles    clé HMAC par espace (UUID), lues de l'environnement par Configuration
+     * @param Stockage|\Closure():Stockage $base   la base, ou sa fabrique : ouverte à la demande, dans le try de traiter()
+     * @param array<string,string|array<string,string>> $cles clés HMAC par espace (UUID) : une clé (id « 1 ») ou {id: clé}
      * @param \Closure():int|null    $horloge
      * @param \Closure(int):mixed|null $dormir pause en millisecondes (injectable pour les tests)
+     * @param \Closure(string,array<string,string>):mixed|null $alerte alerte de dérive (26 § 1.8) ; défaut : error_log
      */
     public function __construct(
-        private readonly Stockage $stockage,
+        private readonly Stockage|\Closure $base,
         private readonly Kumo $kumo,
-        private readonly array $cles,
+        array $cles,
         ?\Closure $horloge = null,
         ?\Closure $dormir = null,
+        ?\Closure $alerte = null,
     ) {
+        $this->cles = [];
+        foreach ($cles as $ws => $v) {
+            $v = is_string($v) ? ['1' => $v] : $v;
+            $this->cles[(string) $ws] = array_slice(array_filter($v, static fn ($c): bool => is_string($c) && $c !== ''), 0, Configuration::CLES_ACTIVES_MAX, true);
+        }
+        $this->alerte = $alerte ?? static function (string $code, array $ctx): void {
+            error_log('passerelle: ALERTE derive '.$code.' '.json_encode($ctx));
+        };
         $this->horloge = $horloge ?? static fn (): int => time();
         $this->dormir = $dormir ?? static fn (int $ms) => usleep($ms * 1000);
+    }
+
+    private function stockage(): Stockage
+    {
+        return $this->stockage ??= ($this->base instanceof \Closure ? ($this->base)() : $this->base);
     }
 
     public static function empreinte(string $operation, string $commandeId): string
@@ -68,7 +92,13 @@ final class Passerelle
             ) {
                 return $this->nonAutorise();
             }
-            $cle = $this->cles[$ws];
+            // Rotation : la clé est choisie par `k=<id>`. Sans `k` (formes héritées), seulement s'il n'y a qu'une clé active.
+            $cles = $this->cles[$ws];
+            $cleId = Signature::analyser($sig)[0] ?? (count($cles) === 1 ? (string) array_key_first($cles) : null);
+            if ($cleId === null || ! isset($cles[$cleId])) {
+                return $this->nonAutorise();
+            }
+            $cle = $cles[$cleId];
 
             // Chemin SANS requête ; pour un GET, le « corps » signé est la chaîne de requête exacte (comme K1).
             [$chemin, $requete] = array_pad(explode('?', $r->chemin, 2), 2, '');
@@ -79,14 +109,25 @@ final class Passerelle
             if (abs(($this->horloge)() - (int) $ts) > self::FENETRE_HORODATAGE) {
                 return $this->nonAutorise();
             }
-            if (! $this->stockage->retenirNonce($ws, $nonce)) {
-                return $this->nonAutorise(); // rejeu
-            }
-
-            return $this->signer($this->router($r, $chemin, $requete, $ws), $cle, $ws, $nonce, Signature::analyser($sig)[0] ?? '1');
         } catch (\Throwable) {
-            return Reponse::erreur(503, 'indisponible'); // jamais de trace dans la réponse
+            return Reponse::erreur(500, 'erreur_interne'); // jamais de trace dans la réponse
         }
+
+        // Authentifié : toute panne suivante (ouverture de la base comprise) donne un 500 SIGNÉ et propre.
+        try {
+            $stockage = $this->stockage();
+        } catch (\Throwable) {
+            return $this->signer(Reponse::erreur(500, 'erreur_interne'), $cle, $ws, $nonce, (string) $cleId);
+        }
+        try {
+            $rep = $stockage->retenirNonce($ws, $nonce)
+                ? $this->router($r, $chemin, $requete, $ws)
+                : Reponse::erreur(409, 'nonce_rejoue'); // contrat 26 § 1.5 (VerificateurHmacEnvoi) : 409, pas 401
+        } catch (\Throwable) {
+            $rep = Reponse::erreur(503, 'indisponible');
+        }
+
+        return $this->signer($rep, $cle, $ws, $nonce, (string) $cleId);
     }
 
     private function nonAutorise(): Reponse
@@ -123,6 +164,13 @@ final class Passerelle
             return Reponse::erreur(400, 'requete');
         }
         if (in_array($operation, self::OPERATIONS_INTERDITES, true)) {
+            // Dérive (26 § 1.8) : une commande interdite signée valablement est un signal à ne pas perdre.
+            try {
+                ($this->alerte)('commande_interdite', ['workspace_id' => $ws, 'operation' => $operation]);
+            } catch (\Throwable) {
+                // l'alerte ne doit jamais changer la réponse
+            }
+
             return Reponse::erreur(403, 'interdit');
         }
         if (! in_array($operation, self::OPERATIONS, true)) {
@@ -143,7 +191,7 @@ final class Passerelle
 
         // Réservation AVANT l'appel Kumo : une seule requête exécute ; les concurrentes attendent puis rejouent la réponse.
         for ($essai = 0; ; $essai++) {
-            $res = $this->stockage->reserverCommande($ws, $id, $operation, $empreinte);
+            $res = $this->stockage()->reserverCommande($ws, $id, $operation, $empreinte);
             if ($res['action'] === 'conflit') {
                 return Reponse::erreur(409, 'commande_id_deja_utilise');
             }
@@ -163,16 +211,48 @@ final class Passerelle
         try {
             $resultat = $this->kumo->executer($ws, $operation, []);
         } catch (\RuntimeException) {
-            $this->stockage->echouerCommande($ws, $id); // le commande_id reste utilisable : K1 rejoue
+            $this->stockage()->echouerCommande($ws, $id); // le commande_id reste utilisable : K1 rejoue
             return Reponse::json(502, ['commande_id' => $id, 'statut' => 'echec']);
         } catch (\Throwable $e) {
-            $this->stockage->echouerCommande($ws, $id);
+            $this->stockage()->echouerCommande($ws, $id);
             throw $e;
         }
         $rep = Reponse::json(200, ['workspace_id' => $ws, 'commande_id' => $id, 'statut' => 'ok', 'resultat' => $resultat]);
-        $this->stockage->terminerCommande($ws, $id, $operation, $rep->statut, $rep->corps);
+        $this->stockage()->terminerCommande($ws, $id, $operation, $rep->statut, $rep->corps);
 
         return $rep;
+    }
+
+    /** ISO 8601 strict « AAAA-MM-JJThh:mm:ss[.fraction](Z|±hh:mm) » ; rien d'autre (« demain », « @123 », dates débordantes). */
+    private static function horodatageIso(string $v): ?int
+    {
+        if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/', $v, $m) !== 1) {
+            return null;
+        }
+        $norm = $m[1].($m[2] === 'Z' ? '+00:00' : $m[2]);
+        $d = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:sP', $norm);
+        $e = \DateTimeImmutable::getLastErrors();
+        if ($d === false || ($e !== false && ($e['warning_count'] > 0 || $e['error_count'] > 0))) {
+            return null;
+        }
+
+        return $d->getTimestamp();
+    }
+
+    private function desynchronise(string $ws, string $epoque): Reponse
+    {
+        $this->alerteSilencieuse('curseur_desynchronise', ['workspace_id' => $ws, 'epoque' => $epoque]);
+
+        return Reponse::json(409, ['erreur' => 'curseur_desynchronise', 'epoque' => $epoque, 'dernier' => $this->stockage()->dernierSequence($ws)]);
+    }
+
+    /** @param array<string,string> $ctx */
+    private function alerteSilencieuse(string $code, array $ctx): void
+    {
+        try {
+            ($this->alerte)($code, $ctx);
+        } catch (\Throwable) {
+        }
     }
 
     private function evenements(string $ws, string $requete): Reponse
@@ -182,7 +262,7 @@ final class Passerelle
         if (count($noms) !== count(array_unique($noms))) {
             return Reponse::erreur(400, 'curseur'); // paramètre en double : ambigu
         }
-        if ($requete === '' || array_diff(array_keys($q), ['curseur', 'depuis', 'limite']) !== []
+        if ($requete === '' || array_diff(array_keys($q), ['curseur', 'depuis', 'limite', 'epoque']) !== []
             || ! isset($q['curseur']) || ! is_string($q['curseur']) || ($q['curseur'] !== '' && preg_match('/^\d{1,15}$/', $q['curseur']) !== 1)) {
             return Reponse::erreur(400, 'curseur');
         }
@@ -194,13 +274,18 @@ final class Passerelle
             }
             $limite = (int) $q['limite'];
         }
+        $epoque = $this->stockage()->epoque();
+        if (isset($q['epoque'])) {
+            if (! is_string($q['epoque']) || preg_match('/^[0-9a-f]{16}$/', $q['epoque']) !== 1) {
+                return Reponse::erreur(400, 'epoque');
+            }
+            if (! hash_equals($epoque, $q['epoque'])) {
+                return $this->desynchronise($ws, $epoque); // le client parle d'une autre base
+            }
+        }
         $depuis = null;
         if (isset($q['depuis']) && $q['depuis'] !== '') {
-            try {
-                $depuis = is_string($q['depuis']) ? (new \DateTimeImmutable($q['depuis']))->getTimestamp() : null;
-            } catch (\Exception) {
-                $depuis = null;
-            }
+            $depuis = is_string($q['depuis']) ? self::horodatageIso($q['depuis']) : null;
             if ($depuis === null) {
                 return Reponse::erreur(400, 'depuis');
             }
@@ -208,29 +293,35 @@ final class Passerelle
 
         if ($q['curseur'] === '') {
             // Premier tirage : tout ce qui reste après la borne de purge ; « depuis » n'a d'effet que dans ce cas.
-            $depart = $this->stockage->dernierPurge($ws);
+            $depart = $this->stockage()->dernierPurge($ws);
             if ($depuis !== null) {
-                $depart = max($depart, $this->stockage->curseurDepuis($ws, $depuis));
+                $depart = max($depart, $this->stockage()->curseurDepuis($ws, $depuis));
             }
         } else {
             $depart = (int) $q['curseur'];
-            $min = $this->stockage->curseurMinimal($ws, self::REJEU_EVENEMENTS);
+            if ($depart > $this->stockage()->dernierSequence($ws)) {
+                // Curseur au-delà du dernier numéro : base recréée ou client désynchronisé. Jamais un 200 vide qui
+                // ferait perdre sans signal des désinscriptions ou des rebonds durs.
+                return $this->desynchronise($ws, $epoque);
+            }
+            $min = $this->stockage()->curseurMinimal($ws, self::REJEU_EVENEMENTS);
             if ($depart < $min) {
                 return Reponse::json(410, ['erreur' => 'rejeu_hors_fenetre', 'curseur_minimal' => $min]);
             }
         }
-        if ($this->stockage->trous($ws) !== []) {
+        if ($this->stockage()->trous($ws) !== []) {
             return Reponse::erreur(500, 'sequence_incoherente'); // alerte : on ne sert jamais une séquence trouée
         }
-        $ev = $this->stockage->evenementsApres($ws, $depart, $limite);
+        $ev = $this->stockage()->evenementsApres($ws, $depart, $limite);
         $dernier = $ev === [] ? $depart : $ev[array_key_last($ev)]['sequence'];
 
         return Reponse::json(200, [
-            'evenements' => array_map(static function (array $e) use ($ws): array {
+            'epoque' => $epoque,
+            'evenements' => array_map(static function (array $e) use ($ws, $epoque): array {
                 $id = is_array($e['donnees']) ? ($e['donnees']['id_injection'] ?? '') : '';
 
                 // Les « donnees » (adresses possibles) ne sortent pas : K1 ne lit que ces quatre champs.
-                return ['event_id' => $ws.':'.$e['sequence'], 'seq' => $e['sequence'], 'type' => $e['type'], 'id_injection' => is_string($id) ? $id : ''];
+                return ['event_id' => $ws.':'.$epoque.':'.$e['sequence'], 'seq' => $e['sequence'], 'type' => $e['type'], 'id_injection' => is_string($id) ? $id : ''];
             }, $ev),
             'curseur_suivant' => (string) $dernier,
         ]);

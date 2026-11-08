@@ -32,15 +32,37 @@ final class Stockage
     public function __construct(string $fichier, private readonly \Closure $horloge, ?bool $purgeActive = null)
     {
         $this->purgeActive = $purgeActive ?? Configuration::purgeActive();
-        $this->pdo = new PDO('sqlite:'.$fichier);
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-        $this->pdo->exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
-        $this->migrer();
+        // Droits 0600 posés par le code (fichier, -wal et -shm héritent du mode du fichier) : umask restrictif à la création.
+        $ancienUmask = umask(0077);
+        try {
+            $this->pdo = new PDO('sqlite:'.$fichier);
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $this->pdo->exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
+            $this->migrer();
+        } finally {
+            umask($ancienUmask);
+        }
+        foreach (['', '-wal', '-shm'] as $suffixe) {
+            if (is_file($fichier.$suffixe)) {
+                @chmod($fichier.$suffixe, 0600);
+            }
+        }
+    }
+
+    /**
+     * Identifiant d'ÉPOQUE de la base, tiré au hasard à sa création (16 hexadécimaux). Une base recréée a une autre
+     * époque : les event_id changent et les curseurs de l'ancienne base ne sont plus crus (409).
+     */
+    public function epoque(): string
+    {
+        return (string) $this->pdo->query("SELECT valeur FROM meta WHERE cle='epoque'")->fetchColumn();
     }
 
     private function migrer(): void
     {
+        $this->pdo->exec('CREATE TABLE IF NOT EXISTS meta (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL) WITHOUT ROWID');
+        $this->pdo->prepare("INSERT OR IGNORE INTO meta (cle, valeur) VALUES ('epoque', ?)")->execute([bin2hex(random_bytes(8))]);
         $this->pdo->exec(<<<'SQL'
 CREATE TABLE IF NOT EXISTS nonces (
   workspace_id TEXT NOT NULL, nonce TEXT NOT NULL, vu_le INTEGER NOT NULL,

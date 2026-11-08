@@ -12,6 +12,7 @@ on:
     paths:
       - 'infra/serveur-envoi/passerelle/**'
       - 'envoi-serveur/contrat/**'
+      - '.github/workflows/passerelle-envoi.yml'
 
 permissions:
   contents: read
@@ -26,9 +27,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10  # anti-gel
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Setup PHP 8.3
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # 2.37.0
         with:
           php-version: '8.3'
           extensions: pdo_sqlite

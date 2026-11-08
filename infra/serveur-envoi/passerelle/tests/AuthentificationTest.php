@@ -62,7 +62,7 @@ final class AuthentificationTest extends PasserelleTestCase
     {
         $r = $this->commande('pause');
         $this->assertSame(200, $this->envoyer($r)->statut);
-        $this->assertSame(401, $this->envoyer($r)->statut);
+        $this->assertSame(409, $this->envoyer($r)->statut, 'contrat 26 § 1.5 (VerificateurHmacEnvoi) : nonce rejoué = 409');
         $this->assertCount(1, $this->kumo->appels);
     }
 
@@ -182,9 +182,8 @@ final class AuthentificationTest extends PasserelleTestCase
         $this->assertSame('c082c428c22b1ad13ad108d7683f98c37970a1d338c320857a9e3210ff21233a', hash_file('sha256', $k1));
         // Dès que K1 est fusionné, le fichier partagé du dépôt doit être IDENTIQUE à la copie.
         $partage = __DIR__.'/../../../../envoi-serveur/contrat/vecteurs-hmac.json';
-        if (is_file($partage)) {
-            $this->assertSame(hash_file('sha256', $k1), hash_file('sha256', $partage), 'la copie dérive du fichier de K1');
-        }
+        $this->assertFileExists($partage, 'le fichier de contrat partagé est obligatoire');
+        $this->assertSame(hash_file('sha256', $k1), hash_file('sha256', $partage), 'la copie dérive du fichier de K1');
     }
 
     public function test_vecteurs_communs_hmac(): void

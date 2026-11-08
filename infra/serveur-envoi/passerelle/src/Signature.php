@@ -15,7 +15,7 @@ final class Signature
 {
     public static function chargeRequete(string $methode, string $chemin, string $horodatage, string $nonce, string $workspaceId, string $corps): string
     {
-        return implode("\n", [strtoupper($methode), $chemin, $horodatage, $nonce, $workspaceId, $corps]);
+        return implode("\n", [$methode, $chemin, $horodatage, $nonce, $workspaceId, $corps]);
     }
 
     public static function chargeReponse(string $nonce, string $workspaceId, int $statut, string $corps): string

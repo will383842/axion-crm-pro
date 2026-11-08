@@ -63,7 +63,7 @@ final class CommandesTest extends PasserelleTestCase
         $r = $this->commande('pause');
         $a = $this->envoyer($r);
         $this->demarrer();
-        $this->assertSame(401, $this->envoyer($r)->statut, 'nonce rejoué après redémarrage');
+        $this->assertSame(409, $this->envoyer($r)->statut, 'nonce rejoué après redémarrage');
         $b = $this->envoyer($this->commande('pause'));
         $this->assertSame($a->corps, $b->corps, 'même réponse après redémarrage');
         $this->assertCount(1, $this->kumo->appels);

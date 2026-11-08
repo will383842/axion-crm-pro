@@ -142,6 +142,8 @@ final class SemeurTablesScopees
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
+        // Envoi P0 L5 (suivi) : état de la relance des effets d'opposition (sans clé étrangère vers l'opposition).
+        'envoi_relances_effets',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -533,6 +535,12 @@ final class SemeurTablesScopees
             'lien_id' => $id['envoi_liens_desinscription'],
             'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
             'canal' => 'page',
+        ]);
+
+        $inserer('envoi_relances_effets', [
+            'cle' => 'opposition:1',
+            'essais' => 1,
+            'pas_avant' => now(),
         ]);
 
         $inserer('envoi_domaines', [

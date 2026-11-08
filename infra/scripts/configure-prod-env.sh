@@ -59,6 +59,11 @@ set_env "MOCK_SMTP"                  "true"
 # JAMAIS de valeur dans le dépôt, et JAMAIS écrasée si déjà posée : on ajoute la ligne VIDE si elle manque.
 # À renseigner à la main (32 caractères au moins, ex. `openssl rand -hex 32`) : vide = aucun lien émis.
 grep -q "^ENVOI_CLE_DESINSCRIPTION=" "$ENV_FILE" || { echo "ENVOI_CLE_DESINSCRIPTION=" >> "$ENV_FILE"; echo "  ✓ ENVOI_CLE_DESINSCRIPTION (vide : à renseigner)"; }
+# Hôte et adresses des liens : lignes VIDES ajoutées si absentes, jamais écrasées. À renseigner à la main
+# (adresses sans chemin, en https). Vide = aucun lien émis (JetonDesinscription::url() refuse).
+for v in ENVOI_DESINSCRIPTION_HOTE ENVOI_DESINSCRIPTION_URL_APP ENVOI_DESINSCRIPTION_URL_API; do
+  grep -q "^${v}=" "$ENV_FILE" || { echo "${v}=" >> "$ENV_FILE"; echo "  ✓ ${v} (vide : à renseigner à la main)"; }
+done
 
 # --- URLs production ---
 set_env "APP_URL"                    "https://api.axion-crm-pro.com"

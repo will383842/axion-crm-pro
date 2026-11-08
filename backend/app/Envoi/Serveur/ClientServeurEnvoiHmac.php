@@ -105,7 +105,9 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
     {
         $ligne = WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')->where('workspace_id', $workspaceId)->where('source', $source)->first(['epoque_passerelle', 'tirage_bloque_le']));
 
-        return ['epoque' => is_string($ligne->epoque_passerelle ?? null) ? $ligne->epoque_passerelle : null, 'bloque' => ($ligne->tirage_bloque_le ?? null) !== null];
+        $epoque = $ligne?->epoque_passerelle;
+
+        return ['epoque' => is_string($epoque) ? $epoque : null, 'bloque' => $ligne?->tirage_bloque_le !== null];
     }
 
     /** Alerte critique, arrêt du tirage de CE serveur (persistant), puis exception : le lot n'est jamais utilisé. */

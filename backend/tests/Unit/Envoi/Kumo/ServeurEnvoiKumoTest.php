@@ -2,9 +2,11 @@
 
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\RegistreMemoire;
 use App\Envoi\Serveur\ServeurEnvoiKumo;
+use Tests\Unit\Envoi\DepotMemoire;
 
 require_once __DIR__ . '/../../../Envoi/KitConformiteServeurEnvoi.php';
 require_once __DIR__ . '/FauxTransportKumo.php';
@@ -26,7 +28,7 @@ final class CommandeurEspion implements CommandeurServeur
 
 function kumoFabrique(?FauxTransportKumo $t = null, ?CommandeurEspion $c = null, ?DateTimeImmutable $maintenant = null): ServeurEnvoiKumo
 {
-    $depot = new \Tests\Unit\Envoi\DepotMemoire;
+    $depot = new DepotMemoire;
     $t ??= new FauxTransportKumo;
     $horloge = $maintenant ?? new DateTimeImmutable('2026-11-08 10:00:00');
 
@@ -60,7 +62,7 @@ test('verrou fermé : zéro connexion, rien enregistré', function () {
 
 test('hors liste blanche des témoins : refus, zéro connexion', function () {
     $t = new FauxTransportKumo;
-    expect(fn () => kumoFabrique($t)->injecter(msgK9('h', 'inconnu@example.test')))->toThrow(\App\Envoi\Exceptions\EnvoiRefuse::class);
+    expect(fn () => kumoFabrique($t)->injecter(msgK9('h', 'inconnu@example.test')))->toThrow(EnvoiRefuse::class);
     expect($t->connexions)->toBe(0);
 });
 

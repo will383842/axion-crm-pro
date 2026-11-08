@@ -59,7 +59,8 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         private readonly RegistreInjections $registre,
         private readonly CommandeurServeur $commandeur,
         private readonly DepotSocle $depot,
-        #[\SensitiveParameter] private readonly string $jeton,
+        #[\SensitiveParameter]
+        private readonly string $jeton,
         ?Closure $horloge = null,
     ) {
         $this->horloge = $horloge ?? fn (): DateTimeImmutable => new DateTimeImmutable;

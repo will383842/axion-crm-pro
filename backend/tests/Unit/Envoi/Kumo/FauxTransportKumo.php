@@ -1,13 +1,13 @@
 <?php
 
+use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
 use App\Envoi\Serveur\Kumo\InterrogeurEtat;
 use App\Envoi\Serveur\Kumo\TransportInjection;
-use App\Envoi\Contrat\EtatMessage;
 
 /** Faux serveur de test : scénarios scriptés (code SMTP ou coupure), compte les connexions. Aucun réseau. */
-final class FauxTransportKumo implements TransportInjection, InterrogeurEtat
+final class FauxTransportKumo implements InterrogeurEtat, TransportInjection
 {
     public int $connexions = 0;
 

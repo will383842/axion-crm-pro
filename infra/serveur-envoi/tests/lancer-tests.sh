@@ -146,8 +146,9 @@ chk  "D7 documente (aucun tunnel vers la prod)" grep -q 'D7' "$D/RUNBOOK.md"
 # seules les adresses de DOCUMENTATION (RFC 5737 : 192.0.2/24, 198.51.100/24, 203.0.113/24 ;
 # RFC 3849 : 2001:db8::/32) en plus de 127.0.0.1 et ::1.
 litteraux() { # litteraux <dossier> [strict|doc] : une ligne par trouvaille
-  local d="$1" mode="${2:-strict}" ex=(--exclude-dir=tests)
-  [[ $mode == doc ]] && ex=()
+  # Tiers exclus (K2) : vendor/ et composer.lock de la passerelle (URLs de paquets, versions).
+  local d="$1" mode="${2:-strict}" ex=(--exclude-dir=tests --exclude-dir=vendor --exclude=composer.lock)
+  [[ $mode == doc ]] && ex=(--exclude-dir=vendor --exclude=composer.lock)
   { grep -rEno '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' "$d" "${ex[@]}" | grep -Ev ':127\.0\.0\.1$' \
       | { if [[ $mode == doc ]]; then grep -Ev ':(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]{1,3}$'; else cat; fi; } || true
     grep -rPno '(?<![0-9A-Za-z:])[0-9A-Fa-f:]*:[0-9A-Fa-f]*:[0-9A-Fa-f:]*(?![0-9A-Za-z:])' "$d" "${ex[@]}" | grep -Ev ':::1$' \

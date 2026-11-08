@@ -72,4 +72,19 @@ return [
         // « ip@uuid-workspace », séparés par des virgules.
         'ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('ENVOI_LISTES_IPS', ''))))),
     ],
+    // K15 — supervision. Interrupteur PROPRE (faux par défaut) en plus de `reel_actif` et `k1_actif` : tant que la
+    // route `/v1/sante` n'existe pas côté passerelle, l'allumer mettrait les files en pause (homme mort).
+    'sante' => [
+        'actif' => filter_var(env('ENVOI_SANTE_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
+        // Silence du serveur au-delà duquel : alerte critique + pause (homme mort, INF-025).
+        'silence_minutes' => 15,
+        // Seuils chiffrés. file/horloge : strictement au-delà ; disque/mémoire : strictement en deçà ; certificat : jours restants ≤.
+        'file_age_s' => ['attention' => 900, 'critique' => 3600],
+        'disque_libre_pct' => ['attention' => 20, 'critique' => 10],
+        'memoire_libre_pct' => ['attention' => 15, 'critique' => 7],
+        'certificat_jours' => ['attention' => 30, 'critique' => 7],
+        'horloge_ecart_s' => ['attention' => 60, 'critique' => 300],
+        // Dernier contrôle DNS (K12, quotidien) plus vieux que ceci : attention.
+        'dns_age_max_heures' => 36,
+    ],
 ];

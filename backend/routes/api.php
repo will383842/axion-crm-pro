@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
+use App\Http\Controllers\Api\EnvoiSanteController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\FederationsController;
@@ -122,6 +123,9 @@ Route::prefix('v1')->group(function () {
         // survecu a un audit de 46 agents -- parce que le mandat exigeait
         // d'ouvrir chaque ecran a la main et que la console ne tourne pas.
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+
+        // K15 : écran « Santé des envois » (lecture seule).
+        Route::get('/envoi/sante', [EnvoiSanteController::class, 'index']);
 
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe

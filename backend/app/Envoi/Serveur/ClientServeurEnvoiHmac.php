@@ -68,6 +68,16 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         return new LotSuivi($evenements, $suivant);
     }
 
+    /**
+     * Mesures de santé du serveur (K15) : GET signé, mêmes contrôles locaux que le tirage. Aucune écriture.
+     *
+     * @return array<string, mixed>
+     */
+    public function lireSante(string $workspaceId, string $source): array
+    {
+        return $this->appeler($this->preparer($workspaceId, $source), $workspaceId, 'GET', SignatureEnvoi::CHEMIN_SANTE, '', '');
+    }
+
     public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
     {
         // TOUS les contrôles locaux (interrupteurs, source active, adresse, garde d'hôte, TLS) AVANT toute trace :

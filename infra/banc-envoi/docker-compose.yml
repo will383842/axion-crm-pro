@@ -1,0 +1,51 @@
+# Banc d'envoi K10 — AUCUN envoi réel : réseau internal (pas de sortie Internet), aucun port publié.
+# Place réservée : service `simulateur` puis `kumomta` (lots suivants), sur le même réseau.
+name: banc-envoi
+x-banc: &banc
+  image: python:3.12-alpine@sha256:e064671ca452259bab50e8e2c7bd896e39e9a343bb06ca25234adf6fe18d0fc7
+  working_dir: /app
+  volumes: ["./services:/app:ro"]
+  user: "0"
+  read_only: true
+  cap_drop: [ALL]
+  cap_add: [NET_BIND_SERVICE]
+  networks: [banc]
+  restart: "no"
+services:
+  dns-banc:
+    <<: *banc
+    command: python dns_banc.py
+    environment: { IP_REPONSE: "10.99.0.10" }
+    networks: { banc: { ipv4_address: 10.99.0.2 } }
+  puits-accepte:
+    <<: *banc
+    command: python puits_smtp.py
+    environment: { MODE: accepte, COMPTEUR_URL: "http://compteur:8080" }
+    networks: { banc: { ipv4_address: 10.99.0.10 } }
+  puits-4xx:
+    <<: *banc
+    command: python puits_smtp.py
+    environment: { MODE: 4xx, COMPTEUR_URL: "http://compteur:8080" }
+  puits-5xx:
+    <<: *banc
+    command: python puits_smtp.py
+    environment: { MODE: 5xx, COMPTEUR_URL: "http://compteur:8080" }
+  puits-lent:
+    <<: *banc
+    command: python puits_smtp.py
+    environment: { MODE: lent, COMPTEUR_URL: "http://compteur:8080" }
+  imap-banc:
+    <<: *banc
+    command: python imap_banc.py
+  compteur:
+    <<: *banc
+    command: python compteur.py
+  sonde:
+    <<: *banc
+    command: python sonde.py
+    profiles: [sonde]
+    depends_on: [compteur]
+networks:
+  banc:
+    internal: true
+    ipam: { config: [{ subnet: 10.99.0.0/24 }] }

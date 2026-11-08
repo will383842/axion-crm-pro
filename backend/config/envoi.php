@@ -27,6 +27,11 @@ return [
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.
     'smtp_boucle_tests' => false,
     'smtp_tolere_transaction_englobante' => false,
+    // K12 — paramètres DNS par domaine d'envoi, posés dans l'environnement (jamais dans le dépôt) :
+    // JSON {"domaine": {"selecteur": "...", "helo": "...", "ip": "..."}}.
+    'dns' => [
+        'domaines' => (array) (json_decode((string) env('ENVOI_DNS_DOMAINES', '{}'), true) ?: []),
+    ],
     // K13 : surveillance des listes noires. Les serveurs de noms du SYSTÈME (resolv.conf) doivent
     // tous être locaux et non relayés (pas 127.0.0.11 de Docker) : Spamhaus refuse les résolveurs
     // publics, le contrôle est alors « non fiable ». Plus aucun réglage de résolveur ici : on ne

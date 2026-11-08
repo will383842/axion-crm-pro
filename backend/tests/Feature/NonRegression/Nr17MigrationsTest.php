@@ -41,6 +41,13 @@ const NR17_DERNIERE_ANCIENNE = '2026_11_01_999999';
 const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000011_envoi_journal_commandes.php',
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
+    // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
+    '2026_11_11_000110_envoi_controles_dns.php',
+    '2026_11_10_000060_envoi_evenements.php',
+    '2026_11_10_000061_envoi_curseurs_imap.php',
+    '2026_11_10_000062_envoi_rattachements.php',
+    '2026_11_10_000063_envoi_echecs_releve.php',
+    '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
     '2026_11_11_000120_envoi_controles_listes.php',
 ];

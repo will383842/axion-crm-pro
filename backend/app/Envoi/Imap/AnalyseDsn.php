@@ -5,6 +5,7 @@ namespace App\Envoi\Imap;
 /**
  * Lecture PURE (sans réseau) des en-têtes et d'un rapport de remise (DSN,
  * RFC 3464) à partir du texte brut d'un message. Testable sans serveur.
+ * Un échec PCRE lève `EchecAnalyse` (jamais « aucun rapport » en silence).
  */
 final class AnalyseDsn
 {
@@ -14,21 +15,21 @@ final class AnalyseDsn
     public static function depuisBrut(string $brut): array
     {
         $statut = null;
-        if (preg_match('/^Status:\s*([2-5]\.\d{1,3}\.\d{1,3})\b/mi', $brut, $m) === 1) {
-            $statut = $m[1];
+        if (($g = Pcre::groupes('/^Status:\s*([2-5]\.\d{1,3}\.\d{1,3})\b/mi', $brut)) !== null) {
+            $statut = $g[0];
         }
         $destinataire = null;
-        if (preg_match('/^Final-Recipient:\s*rfc822;\s*<?([^<>\s;]+@[^<>\s;]+)>?/mi', $brut, $m) === 1) {
-            $destinataire = $m[1];
+        if (($g = Pcre::groupes('/^Final-Recipient:\s*rfc822;\s*<?([^<>\s;]+@[^<>\s;]+)>?/mi', $brut)) !== null) {
+            $destinataire = $g[0];
         }
         // $brut est le CORPS du rapport : son premier Message-ID est celui du
         // message d'ORIGINE cité (les en-têtes du rapport lui-même n'y figurent pas).
         $messageId = null;
-        if (preg_match('/^Message-ID:\s*<?([^<>\s]+)>?/mi', $brut, $m) === 1) {
-            $messageId = $m[1];
+        if (($g = Pcre::groupes('/^Message-ID:\s*<?([^<>\s]+)>?/mi', $brut)) !== null) {
+            $messageId = $g[0];
         }
-        if (preg_match('/^X-Original-Message-ID:\s*<?([^<>\s]+)>?/mi', $brut, $m) === 1) {
-            $messageId = $m[1];
+        if (($g = Pcre::groupes('/^X-Original-Message-ID:\s*<?([^<>\s]+)>?/mi', $brut)) !== null) {
+            $messageId = $g[0];
         }
 
         return ['statut' => $statut, 'messageId' => $messageId, 'destinataire' => $destinataire];
@@ -37,7 +38,7 @@ final class AnalyseDsn
     /** Vrai rapport de remise : `report-type=delivery-status`, avec ou sans guillemets. */
     public static function estRapport(string $contentType): bool
     {
-        return preg_match('/report-type\s*=\s*"?\s*delivery-status\s*"?/i', $contentType) === 1;
+        return Pcre::correspond('/report-type\s*=\s*"?\s*delivery-status\s*"?/i', $contentType);
     }
 
     /**
@@ -60,12 +61,12 @@ final class AnalyseDsn
      */
     public static function enTetes(string $entete): array
     {
-        $entete = (string) preg_replace('/\r?\n[ \t]+/', ' ', $entete);
+        $entete = Pcre::remplacer('/\r?\n[ \t]+/', ' ', $entete);
         $utiles = ['auto-submitted', 'precedence', 'x-autoreply', 'x-autorespond', 'content-type'];
         $sortie = [];
-        foreach (preg_split('/\r?\n/', $entete) ?: [] as $ligne) {
-            if (preg_match('/^([A-Za-z0-9-]+):\s*(.*)$/', $ligne, $m) === 1 && in_array(strtolower($m[1]), $utiles, true)) {
-                $sortie[strtolower($m[1])] = trim($m[2]);
+        foreach (Pcre::decouper('/\r?\n/', $entete) as $ligne) {
+            if (($g = Pcre::groupes('/^([A-Za-z0-9-]+):\s*(.*)$/', $ligne)) !== null && in_array(strtolower($g[0]), $utiles, true)) {
+                $sortie[strtolower($g[0])] = trim($g[1]);
             }
         }
 

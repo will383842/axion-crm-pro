@@ -6,14 +6,15 @@ namespace App\Envoi\Imap;
  * Classe un message reçu. Fonction pure : aucune base, aucun réseau.
  *
  * Ordre (le premier qui s'applique gagne) :
- *  1. rapport de remise (DSN) : 5.x.x = rebond dur, 4.x.x = rebond mou ;
- *  2. auto-réponse déclarée par en-tête normalisé (RFC 3834 : Auto-Submitted…) ;
- *  3. hostile (plainte, menace, « spam »…) — traité comme une plainte ;
- *  4. STOP / désinscription (mots-clés fr/en, texte NON cité seulement) ;
- *  5. auto-réponse devinée à l'objet (« absent », « congé »…) : heuristique FAIBLE,
- *     donc après 3 et 4 — un objet « Gérez les congés de vos équipes » ne doit
- *     jamais masquer un STOP écrit par la personne ;
- *  6. sinon : réponse humaine.
+ *  1. rapport de remise (DSN) : 5.7.x = politique/réputation (PAS une adresse morte : aucun effet),
+ *     autres 5.x.x = rebond dur, 4.x.x = rebond mou ;
+ *  2. analyse échouée (UTF-8 invalide, limite PCRE) : STOP par prudence, jamais « réponse humaine » ;
+ *  3. auto-réponse déclarée par en-tête normalisé (RFC 3834 : Auto-Submitted, X-Autoreply, Precedence: auto_reply) ;
+ *  4. STOP / désinscription (mots-clés fr/en, texte NON cité seulement) : STOP PRIME ;
+ *  5. hostile (menace, avocat, « porter plainte »…) — traité comme une plainte ;
+ *  6. auto-réponse devinée (objet « absent », « congé » ; `Precedence: bulk/junk`) : heuristique FAIBLE,
+ *     donc après 4 et 5 — jamais avant la recherche d'un STOP ;
+ *  7. sinon : réponse humaine.
  *
  * Les erreurs vont toujours dans le sens PRUDENT : un faux « STOP » arrête un
  * envoi de trop, un vrai « STOP » manqué enverrait un message de trop.
@@ -21,9 +22,11 @@ namespace App\Envoi\Imap;
 final class Classificateur
 {
     private const MOTS_HOSTILES = [
-        'spam', 'pourriel', 'plainte', 'porter plainte', 'cnil', 'avocat', 'harcelement', 'harceler',
-        'poursuite', 'poursuivre', 'signaler', 'signalement', 'lawyer', 'harass', 'harassment',
-        'legal action', 'report you', 'reported you', 'sue you', 'illegal', 'illegal', 'scam', 'arnaque',
+        // Pas de « spam », « plainte », « signaler », « illegal » seuls : faux positifs (« aucune plainte »,
+        // « dans mes spams »). Seules les formules d'action ou de menace comptent ; un STOP prime de toute façon.
+        'porter plainte', 'deposer plainte', 'depose plainte', 'cnil', 'avocat', 'harcelement', 'harceler',
+        'poursuite', 'poursuivre', 'signalement', 'lawyer', 'harass', 'harassment',
+        'legal action', 'report you', 'reported you', 'sue you', 'scam', 'arnaque',
     ];
 
     private const MOTS_STOP = [
@@ -41,29 +44,49 @@ final class Classificateur
 
     public static function classer(MessageBrut $m): ClasseRetour
     {
+        try {
+            return self::classerOuEchouer($m);
+        } catch (EchecAnalyse) {
+            return ClasseRetour::Desinscription; // prudence : jamais « réponse humaine » sur un échec d'analyse
+        }
+    }
+
+    private static function classerOuEchouer(MessageBrut $m): ClasseRetour
+    {
         if ($m->statutDsn !== null) {
-            if (preg_match('/^5\.\d{1,3}\.\d{1,3}$/', $m->statutDsn) === 1) {
+            if (Pcre::correspond('/^5\.7\.\d{1,3}$/', $m->statutDsn)) {
+                return ClasseRetour::AutoReponse; // politique / réputation / « rejected as spam » : pas une adresse morte
+            }
+            if (Pcre::correspond('/^5\.\d{1,3}\.\d{1,3}$/', $m->statutDsn)) {
                 return ClasseRetour::RebondDur;
             }
-            if (preg_match('/^4\.\d{1,3}\.\d{1,3}$/', $m->statutDsn) === 1) {
+            if (Pcre::correspond('/^4\.\d{1,3}\.\d{1,3}$/', $m->statutDsn)) {
                 return ClasseRetour::RebondMou;
             }
 
             return ClasseRetour::AutoReponse; // 2.x.x : accusé de remise, aucun effet
         }
 
+        if ($m->analyseEchouee) {
+            return ClasseRetour::Desinscription;
+        }
+
         if (self::estAutoReponseDeclaree($m)) {
             return ClasseRetour::AutoReponse;
         }
 
-        $texte = self::normaliser(self::texteNonCite($m->corps) . ' ' . $m->sujet);
-        if (self::contient($texte, self::MOTS_HOSTILES)) {
-            return ClasseRetour::Hostile;
+        if (! mb_check_encoding($m->corps . $m->sujet, 'UTF-8')) {
+            throw new EchecAnalyse('Texte non UTF-8.');
         }
+        $texte = self::normaliser(self::texteNonCite($m->corps) . ' ' . $m->sujet);
         if (self::contient($texte, self::MOTS_STOP)) {
             return ClasseRetour::Desinscription;
         }
-        if (self::contient(self::normaliser($m->sujet), self::OBJETS_AUTO)) {
+        if (self::contient($texte, self::MOTS_HOSTILES)) {
+            return ClasseRetour::Hostile;
+        }
+        if (self::contient(self::normaliser($m->sujet), self::OBJETS_AUTO)
+            || in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['bulk', 'junk'], true)) {
             return ClasseRetour::AutoReponse;
         }
 
@@ -79,7 +102,7 @@ final class Classificateur
         if (isset($m->enTetes['x-autoreply']) || isset($m->enTetes['x-autorespond'])) {
             return true;
         }
-        if (in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['auto_reply', 'bulk', 'junk'], true)) {
+        if (in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['auto_reply'], true)) {
             return true;
         }
 
@@ -90,7 +113,7 @@ final class Classificateur
     private static function texteNonCite(string $corps): string
     {
         $gardees = [];
-        foreach (preg_split('/\R/u', mb_substr($corps, 0, 4000)) ?: [] as $ligne) {
+        foreach (Pcre::decouper('/\R/u', mb_substr($corps, 0, 4000)) as $ligne) {
             if (str_starts_with(ltrim($ligne), '>')) {
                 continue;
             }
@@ -109,7 +132,7 @@ final class Classificateur
             'ç' => 'c', '’' => ' ', "'" => ' ',
         ]);
 
-        return (string) preg_replace('/\s+/u', ' ', $t);
+        return Pcre::remplacer('/\s+/u', ' ', $t);
     }
 
     /** @param list<string> $mots */
@@ -117,7 +140,7 @@ final class Classificateur
     {
         foreach ($mots as $mot) {
             // Début de mot seulement : « stop » n'attrape ni « desktop » ni « laptop ».
-            if (preg_match('/(?<![a-z0-9])' . preg_quote($mot, '/') . '/u', $texte) === 1) {
+            if (Pcre::correspond('/(?<![a-z0-9])' . preg_quote($mot, '/') . '/u', $texte)) {
                 return true;
             }
         }

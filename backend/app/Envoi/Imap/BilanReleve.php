@@ -17,7 +17,10 @@ final class BilanReleve
     /** Messages écartés ou dont l'arrêt était inapplicable : « à rattacher », sans effet. */
     public int $enErreur = 0;
 
-    /** Le lot était plein : il reste peut-être des messages pour le passage suivant. */
+    /** Messages en échec pendant CE passage (relus au suivant, sauf mise à l'écart après N tentatives). */
+    public int $echecs = 0;
+
+    /** Il reste des UID bruts au-delà de ce lot (un lot filtré n'est pas la fin de la boîte). */
     public bool $lotPlein = false;
 
     public bool $uidValiditeChangee = false;

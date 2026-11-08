@@ -18,6 +18,8 @@ final class MessageBrut
      * @param  ?string  $statutDsn  « 5.1.1 », « 4.2.2 »… si c'est un rapport de remise
      * @param  ?string  $messageIdDsn  Message-ID du message d'origine cité par le rapport
      * @param  ?string  $destinataireDsn  Final-Recipient du rapport
+     * @param  ?string  $empreinteContenu  SHA-256 du message brut (stable : indépendant des UID) ; null si non lu
+     * @param  bool  $analyseEchouee  l'analyse du texte a échoué (UTF-8 invalide, limite PCRE) : traité en STOP par prudence
      * @param  ?string  $ecarte  « taille » ou « illisible » : message non lu, classé « à rattacher » sans effet
      */
     public function __construct(
@@ -34,5 +36,7 @@ final class MessageBrut
         public readonly ?string $messageIdDsn = null,
         public readonly ?string $destinataireDsn = null,
         public readonly ?string $ecarte = null,
+        public readonly ?string $empreinteContenu = null,
+        public readonly bool $analyseEchouee = false,
     ) {}
 }

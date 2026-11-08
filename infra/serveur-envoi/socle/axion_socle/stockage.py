@@ -115,8 +115,14 @@ class Stockage:
     def poser(self, c, cle, valeur):
         c.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (cle, str(valeur)))
 
-    def effacer(self, c, cle):
-        c.execute("DELETE FROM meta WHERE cle=?", (cle,))
+    def effacer(self, c, cle) -> int:
+        """Rend le nombre de lignes effacées (1 = la clé existait et CETTE transaction l'a consommée)."""
+        return c.execute("DELETE FROM meta WHERE cle=?", (cle,)).rowcount
+
+    def effacer_cles_des_jetons_purges(self, c, prefixe, seuil):
+        """Efface les clés `prefixe+id` des jetons confirmés que la purge va supprimer (seuil = durée)."""
+        c.execute("DELETE FROM meta WHERE cle IN (SELECT ? || id FROM jetons WHERE cree_duree<? AND etat<>'reserve')",
+                  (prefixe, seuil))
 
     def jeton(self, jeton_h):
         return self.c.execute("SELECT empreinte,id,etat,reserve_duree,espace,reacceptations FROM jetons WHERE jeton_h=?",

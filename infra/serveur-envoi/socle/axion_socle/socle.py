@@ -28,6 +28,7 @@ from .stockage import ErreurStockage, Stockage, assainir, cle_liste_temoins, cle
 SEPT_JOURS = 7 * 86400
 HOMME_MORT = 15 * 60
 DELAI_RESERVE = 120  # un jeton réservé depuis moins de 2 min : un dépôt est peut-être en cours
+PAS_HORLOGE_MAX = 300  # au-delà (en valeur absolue), la reprise ne recale pas l'horloge : 409 jusqu'à sa correction
 TOLERANCE_HORLOGE = 60  # écart toléré entre horloge murale et monotone avant de fermer
 JETON_MIN, JETON_MAX = 32, 128
 _JETON_RE = re.compile(r"[A-Za-z0-9_-]+")  # hex ou base64url
@@ -36,6 +37,10 @@ MAX_REACCEPTATIONS = 3  # un jeton « reserve » jamais confirmé n'est ré-acce
 COMMANDES = ("sante", "reprise", "temoins", "pause")
 PREFIXE_COMMANDES = "/v1/commandes/"
 CLE_REDEPOT = "redepot:"  # meta : redépôt autorisé pour cet identifiant de message (une seule fois)
+
+
+class _CourseRedepot(Exception):
+    """Interne : la transaction de redépôt a perdu une course (autorisation consommée, jeton confirmé...)."""
 
 
 def jeton_valide(jeton) -> bool:
@@ -191,8 +196,9 @@ class Socle:
         jh = hashlib.sha256(jeton.encode()).hexdigest()
         emp = hmac.new(self.p.secret, dest.encode() + b"\0" + contenu, hashlib.sha256).hexdigest()
         seuil = d - self.p.retention_jetons
-        if st.c.execute("SELECT 1 FROM jetons WHERE cree_duree<? LIMIT 1", (seuil,)).fetchone():
-            st.ecrire(lambda c: c.execute("DELETE FROM jetons WHERE cree_duree<?", (seuil,)))
+        # Purge : JAMAIS un jeton « reserve » (ambigu : il redeviendrait déposable seul => doublon silencieux).
+        if st.c.execute("SELECT 1 FROM jetons WHERE cree_duree<? AND etat<>'reserve' LIMIT 1", (seuil,)).fetchone():
+            st.ecrire(lambda c: self._purger(c, seuil))
         j = st.jeton(jh)
         if j:
             if j[4] != ws:  # un jeton appartient à SON espace
@@ -221,8 +227,13 @@ class Socle:
             if j[5] >= MAX_REACCEPTATIONS:
                 st.ecrire(lambda c: (self._journaliser(c, "jeton-reacceptations-max", jh[:8]),
                                      st.effacer(c, CLE_REDEPOT + j[1])))
-                return Reponse(451, "4.7.2 jeton reaccepte trop de fois sans confirmation, refus definitif")
-            motif = st.ecrire(lambda c: self._redeposer(c, jh, j[1], ws, mur, d))
+                return Reponse(451, "4.7.2 jeton reaccepte trop de fois sans confirmation, report maintenu, "
+                                    "intervention de l'operateur requise")
+            try:
+                motif = st.ecrire(lambda c: self._redeposer(c, jh, j[1], ws, mur, d))
+            except _CourseRedepot:  # un autre processus a agi entre la lecture et la transaction : rien n'est écrit
+                return Reponse(451, "4.3.3 rejeu ambigu : etat modifie entre-temps, a trancher", j[1], deposer=None,
+                               rejeu="reserve-ancien")
             if motif:
                 return Reponse(451, f"4.7.1 plafond {motif} journalier atteint, report")
             # Redépôt autorisé par `trancher(..., deja_depose=False)` : même id, une place sur le jour courant.
@@ -238,12 +249,23 @@ class Socle:
             self._apres_reserve()
         return Reponse(250, "2.0.0 ok", id_, deposer=True)
 
+    def _purger(self, c, seuil):
+        """Purge des jetons confirmés de plus de 7 jours (jamais les « reserve ») et de leur clé de redépôt."""
+        self.stockage.effacer_cles_des_jetons_purges(c, CLE_REDEPOT, seuil)
+        c.execute("DELETE FROM jetons WHERE cree_duree<? AND etat<>'reserve'", (seuil,))
+
     def _redeposer(self, c, jh, id_, ws, mur, d):
-        """Dans la transaction : consomme l'autorisation de redépôt. Si le jeton date d'un jour passé, la place est
-        reprise sur le jour COURANT (global et espace) : le plafond du lendemain ne peut pas être dépassé."""
+        """Dans la transaction (verrou d'écriture pris) : REVÉRIFIE tout ce qui a été lu hors transaction, puis consomme
+        l'autorisation de redépôt. Autorisation absente, jeton plus « reserve » ou borne atteinte => _CourseRedepot
+        (annulation complète, 451 ambigu). Si le jeton date d'un jour passé, la place est reprise sur le jour COURANT
+        (global et espace) : le plafond du lendemain ne peut pas être dépassé."""
         st = self.stockage
         jour = max(jour_paris(mur), st.meta("dernier_jour", ""))
-        ancien = c.execute("SELECT jour FROM jetons WHERE jeton_h=?", (jh,)).fetchone()[0]
+        ligne = c.execute("SELECT jour FROM jetons WHERE jeton_h=? AND id=? AND etat='reserve' AND reacceptations<?",
+                          (jh, id_, MAX_REACCEPTATIONS)).fetchone()
+        if ligne is None or st.meta(CLE_REDEPOT + id_) != "1":  # lu DANS la transaction (verrou d'écriture pris)
+            raise _CourseRedepot
+        ancien = ligne[0]
         if ancien != jour:
             if st.compteur(jour) >= self.p.plafond:
                 return "global"
@@ -254,8 +276,11 @@ class Socle:
                           (jour, espace))
             c.execute("UPDATE jetons SET jour=? WHERE jeton_h=?", (jour, jh))
             st.poser(c, "dernier_jour", jour)
-        c.execute("UPDATE jetons SET reserve_duree=?, reacceptations=reacceptations+1 WHERE jeton_h=?", (d, jh))
-        st.effacer(c, CLE_REDEPOT + id_)
+        if c.execute("UPDATE jetons SET reserve_duree=?, reacceptations=reacceptations+1 "
+                     "WHERE jeton_h=? AND etat='reserve' AND reacceptations<?", (d, jh, MAX_REACCEPTATIONS)).rowcount != 1:
+            raise _CourseRedepot
+        if st.effacer(c, CLE_REDEPOT + id_) != 1:
+            raise _CourseRedepot  # l'autorisation est à usage unique : une seule transaction la consomme
         self._poser_duree(c)
         return None
 
@@ -378,11 +403,14 @@ class Socle:
         if ls is not None and mur < float(ls) - TOLERANCE_HORLOGE:
             return 409  # murale antérieure à la dernière santé : horloge pas corrigée, on ne rouvre pas
         if self._ref and abs((mur - self._ref[0]) - (mono - self._ref[1])) > TOLERANCE_HORLOGE:
-            # Pas d'horloge (NTP) : la référence est périmée. On ne la recale QUE si le jour Paris n'a pas bougé par
-            # rapport au temps monotone attendu ET ne recule pas sous le dernier jour vu : un saut de jours reste refusé.
+            # Pas d'horloge (NTP) : la référence est périmée. On ne la recale QUE si |écart| < 5 min (un saut de
+            # plusieurs heures dans le même jour consommerait le plafond du lendemain : 409 jusqu'à correction de
+            # l'horloge), si le jour Paris n'a pas bougé par rapport au temps monotone attendu ET ne recule pas sous
+            # le dernier jour vu.
             attendu = self._ref[0] + (mono - self._ref[1])
             jour = jour_paris(mur)
-            if jour != jour_paris(attendu) or jour < st.meta("dernier_jour", ""):
+            ecart = (mur - self._ref[0]) - (mono - self._ref[1])
+            if abs(ecart) >= PAS_HORLOGE_MAX or jour != jour_paris(attendu) or jour < st.meta("dernier_jour", ""):
                 return 409
         self._duree()
         st.ecrire(lambda c: (st.poser(c, "pause_hm", 0), st.poser(c, "derniere_sante", mur), self._poser_duree(c),

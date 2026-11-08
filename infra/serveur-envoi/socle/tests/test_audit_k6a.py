@@ -82,7 +82,7 @@ class TestRejeuControle(Base):  # B1 : un rejeu n'est JAMAIS un passe-droit
         self.assertTrue(self.socle.trancher(r1.id, deja_depose=False))
         r = self.envoi(jt("a"))
         self.assertEqual(r.code, 451)
-        self.assertIn("definitif", r.texte)
+        self.assertIn("operateur", r.texte)  # M-4 : 451 ne dit plus « definitif »
         self.avance(121)
         self.assertEqual(self.sante(), 200)
         self.assertEqual(self.envoi(jt("a")).code, 451)  # reste refusé

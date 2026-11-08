@@ -59,37 +59,66 @@ final class GardeHoteServeur
 
     /**
      * Options Guzzle : adresse épinglée (CURLOPT_RESOLVE, SNI et vérification du certificat restent sur le nom),
-     * IPv4 forcée, AUCUNE redirection, vérification TLS toujours active, TLS mutuel et AC privée par chemins
-     * d'environnement. Chemins configurés mais absents = refus (jamais de repli sans vérification).
+     * IPv4 forcée, AUCUNE redirection, vérification TLS toujours active.
+     * ÉPINGLAGE STRICT : AUCUNE autorité publique du système n'est acceptée (CURLOPT_CAPATH = dossier vide ; l'AC
+     * privée est la seule dans « verify »). Si l'empreinte de clé publique est configurée, elle est imposée
+     * (CURLOPT_PINNEDPUBLICKEY). Dès que `reel_actif` est vrai, l'AC privée ET le TLS mutuel (certificat + clé
+     * client, existants et lisibles) sont OBLIGATOIRES : sinon REFUS, jamais de repli.
      *
      * @param  array{hote: string, port: int, ip: string}  $cible
      * @return array<string, mixed>
      */
     public static function optionsHttp(array $cible): array
     {
-        $options = [
-            'allow_redirects' => false,
-            'force_ip_resolve' => 'v4',
-            'verify' => true,
-            'curl' => [CURLOPT_RESOLVE => [$cible['hote'] . ':' . $cible['port'] . ':' . $cible['ip']]],
+        $curl = [
+            CURLOPT_RESOLVE => [$cible['hote'] . ':' . $cible['port'] . ':' . $cible['ip']],
+            CURLOPT_CAPATH => self::dossierAcVide(),
         ];
+        $options = ['allow_redirects' => false, 'force_ip_resolve' => 'v4', 'verify' => true];
+
+        $empreinte = trim((string) config('envoi.serveur.empreinte_cle', ''));
+        if ($empreinte !== '') {
+            if (preg_match('#^sha256//[A-Za-z0-9+/]{43}=(;sha256//[A-Za-z0-9+/]{43}=)*$#', $empreinte) !== 1) {
+                throw ServeurEnvoiRefuse::motif('empreinte de clé publique invalide.');
+            }
+            $curl[CURLOPT_PINNEDPUBLICKEY] = $empreinte;
+        }
+
         $ac = (string) config('envoi.serveur.ca_path', '');
+        $cert = (string) config('envoi.serveur.client_cert_path', '');
+        $cle = (string) config('envoi.serveur.client_key_path', '');
+        if (config('envoi.reel_actif') === true && ($ac === '' || $cert === '' || $cle === '')) {
+            throw ServeurEnvoiRefuse::motif('TLS mutuel et AC privée obligatoires (chemins non configurés).');
+        }
         if ($ac !== '') {
-            if (! is_file($ac)) {
+            if (! is_file($ac) || ! is_readable($ac)) {
                 throw ServeurEnvoiRefuse::motif('autorité de certification introuvable.');
             }
             $options['verify'] = $ac;
         }
-        $cert = (string) config('envoi.serveur.client_cert_path', '');
-        $cle = (string) config('envoi.serveur.client_key_path', '');
         if ($cert !== '' || $cle !== '') {
-            if (! is_file($cert) || ! is_file($cle)) {
+            if (! is_file($cert) || ! is_readable($cert) || ! is_file($cle) || ! is_readable($cle)) {
                 throw ServeurEnvoiRefuse::motif('certificat client incomplet ou introuvable.');
             }
             $options['cert'] = $cert;
             $options['ssl_key'] = $cle;
         }
+        $options['curl'] = $curl;
 
         return $options;
+    }
+
+    /** Dossier d'AC VIDE, propre à l'application (jamais le /tmp partagé) ; non vide = refus (anti-dépôt d'une AC). */
+    private static function dossierAcVide(): string
+    {
+        $dossier = storage_path('framework/envoi-ca-vide');
+        if (! is_dir($dossier) && ! @mkdir($dossier, 0700, true) && ! is_dir($dossier)) {
+            throw ServeurEnvoiRefuse::motif('dossier d’autorités vide impossible à créer.');
+        }
+        if (array_diff(scandir($dossier) ?: ['x'], ['.', '..']) !== []) {
+            throw ServeurEnvoiRefuse::motif('dossier d’autorités vide non vide.');
+        }
+
+        return $dossier;
     }
 }

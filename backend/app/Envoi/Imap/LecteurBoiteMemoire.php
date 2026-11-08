@@ -47,6 +47,9 @@ final class LecteurBoiteMemoire implements LecteurBoite
                 $m->ecarte,
                 $m->empreinteContenu,
                 $m->analyseEchouee,
+                $m->typeArf,
+                $m->destinataireArf,
+                $m->adressesLocales,
             );
         }
         $this->messages[$boite] = $refaits;

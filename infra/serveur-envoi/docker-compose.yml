@@ -22,6 +22,7 @@ services:
     volumes:
       - ./kumomta/init.lua:/opt/kumomta/etc/policy/init.lua:ro
       - ./kumomta/dkim.lua:/opt/kumomta/etc/policy/dkim.lua:ro
+      - ./kumomta/loghook.lua:/opt/kumomta/etc/policy/loghook.lua:ro
       - /etc/axion-envoi/dkim:/etc/axion-envoi/dkim:ro
       - kumo-spool:/var/spool/kumomta
       - kumo-log:/var/log/kumomta

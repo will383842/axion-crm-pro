@@ -3,10 +3,10 @@ name: Serveur envoi K7 log hook
 # Workflow DÉDIÉ, filtré par chemin. L'ingestion côté passerelle (PHP) est testée par passerelle-envoi.yml.
 on:
   pull_request:
-    paths: ['infra/serveur-envoi/loghook/**', 'infra/serveur-envoi/kumomta/**', '.github/workflows/serveur-envoi-loghook.yml']
+    paths: ['infra/serveur-envoi/docker-compose.yml', 'infra/serveur-envoi/installer.sh', 'infra/serveur-envoi/injection/axion_injection/file_kumo.py', 'infra/serveur-envoi/loghook/**', 'infra/serveur-envoi/kumomta/**', '.github/workflows/serveur-envoi-loghook.yml']
   push:
     branches: [main]
-    paths: ['infra/serveur-envoi/loghook/**', 'infra/serveur-envoi/kumomta/**', '.github/workflows/serveur-envoi-loghook.yml']
+    paths: ['infra/serveur-envoi/docker-compose.yml', 'infra/serveur-envoi/installer.sh', 'infra/serveur-envoi/injection/axion_injection/file_kumo.py', 'infra/serveur-envoi/loghook/**', 'infra/serveur-envoi/kumomta/**', '.github/workflows/serveur-envoi-loghook.yml']
 
 permissions:
   contents: read

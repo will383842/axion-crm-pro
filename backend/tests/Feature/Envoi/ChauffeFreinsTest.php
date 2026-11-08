@@ -1333,3 +1333,21 @@ test('D1b : envoi:temoin-indesirable SANS --auteur journalise « freins » (jama
     // faire rougir partout, d'où cette garde sur la source de la commande.
     expect(file_get_contents(app_path('Console/Commands/EnvoiTemoinIndesirable.php')))->not->toContain('get_current_user');
 });
+
+// ── K7 / I6 : les rebonds en observation ne comptent PAS dans les freins ─────
+
+test('K7 : un rebond dur en observation n’écrit aucun compteur ni ne freine ; hors observation il compte', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $c = new CompteurRetours(app(DepotChauffe::class), app(ResolveurFournisseur::class), fn () => $maintenant);
+    foreach (range(1, 3) as $i) {
+        $c->appliquer($ws, new EvenementEnvoi('obs-' . $i, 'rebond_dur', 'i' . $i, 'x' . $i . '@societe.fr', true));
+    }
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    expect($garde->evaluer($ws, $maintenant))->toBe([])
+        ->and(app(DepotChauffe::class)->totauxDuJour($ws, JourEnvoi_jour($maintenant), 'autre')['rebonds_durs'])->toBe(0);
+    foreach (range(4, 6) as $i) {
+        $c->appliquer($ws, new EvenementEnvoi('rb-' . $i, 'rebond_dur', 'i' . $i, 'x' . $i . '@societe.fr'));
+    }
+    expect(array_map(fn ($d) => $d->motif, $garde->evaluer($ws, $maintenant)))->toBe([DecisionFrein::REBONDS]);
+});

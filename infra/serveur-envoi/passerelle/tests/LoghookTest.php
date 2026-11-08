@@ -68,6 +68,32 @@ final class LoghookTest extends PasserelleTestCase
         }
         $this->assertSame([1, 2, 3], array_column($this->stockage->evenementsApres(self::WS_A, 0, 9), 'sequence'));
         $this->assertSame([], $this->stockage->trous(self::WS_A));
+        $this->maintenant += Ingestion::DELAI_TROU + 1;
+        $i->ingerer(self::WS_A, $this->ev(4));
+        $this->assertSame([], $this->alertes, 'I2 : un simple désordre ne lève AUCUNE alerte');
+    }
+
+    public function test_i2_rejeu_apres_200_perdu_avec_nouveau_numero_ne_lve_aucune_alerte(): void
+    {
+        $i = $this->ingestion();
+        $i->ingerer(self::WS_A, $this->ev(1, 'rebond_dur', 'k1'));
+        $this->assertSame('doublon', $i->ingerer(self::WS_A, $this->ev(2, 'rebond_dur', 'k1'))['statut']); // relais redémarré : nouveau numéro
+        $i->ingerer(self::WS_A, $this->ev(3));
+        $this->maintenant += Ingestion::DELAI_TROU + 1;
+        $i->ingerer(self::WS_A, $this->ev(4));
+        $this->assertSame([], $this->alertes, 'I2 : le numéro d\'un doublon est bien vu, pas un trou');
+    }
+
+    public function test_i2_trou_recent_pas_d_alerte_tant_que_le_delai_n_est_pas_ecoule(): void
+    {
+        $i = $this->ingestion();
+        $i->ingerer(self::WS_A, $this->ev(1));
+        $i->ingerer(self::WS_A, $this->ev(3));
+        $this->assertSame([], $this->alertes);
+        $i->ingerer(self::WS_A, $this->ev(2)); // le numéro manquant arrive : jamais d'alerte
+        $this->maintenant += Ingestion::DELAI_TROU + 1;
+        $i->ingerer(self::WS_A, $this->ev(4));
+        $this->assertSame([], $this->alertes);
     }
 
     public function test_s15_trou_dans_la_source_alerte_sans_casser_la_sequence(): void
@@ -75,9 +101,13 @@ final class LoghookTest extends PasserelleTestCase
         $i = $this->ingestion();
         $i->ingerer(self::WS_A, $this->ev(1));
         $i->ingerer(self::WS_A, $this->ev(4));
-        $this->assertContains('loghook_trou_source', $this->alertes);
+        $this->maintenant += Ingestion::DELAI_TROU + 1; // un vrai trou : le numéro 2-3 n'est jamais venu
+        $i->ingerer(self::WS_A, $this->ev(5));
+        $this->assertSame(['loghook_trou_source'], $this->alertes);
+        $i->ingerer(self::WS_A, $this->ev(6));
+        $this->assertSame(['loghook_trou_source'], $this->alertes, 'une seule alerte par trou');
         $this->assertSame([], $this->stockage->trous(self::WS_A));
-        $this->assertSame(2, $this->stockage->dernierSequence(self::WS_A));
+        $this->assertSame(4, $this->stockage->dernierSequence(self::WS_A));
     }
 
     public function test_sequence_sans_trou_ni_doublon_apres_redemarrage_et_epoque_dans_event_id(): void
@@ -206,11 +236,103 @@ final class LoghookTest extends PasserelleTestCase
         $this->assertFalse($this->stockage->evenementsApres(self::WS_A, 50, 9)[0]['donnees']['observation']);
     }
 
+    public function test_i7_types_inconnu_et_alerte_config_acceptes_et_alertes(): void
+    {
+        $i = $this->ingestion();
+        $i->ingerer(self::WS_A, $this->ev(1, 'inconnu'));
+        $i->ingerer(self::WS_A, $this->ev(2, 'alerte_config'));
+        $this->assertSame(['inconnu', 'alerte_config'], $this->types());
+        $this->assertSame(['loghook_alerte_config'], $this->alertes);
+        $this->assertSame(1, (int) $this->pdo()->query("SELECT COUNT(*) FROM loghook_journal WHERE genre='inconnu'")->fetchColumn());
+        $this->assertSame(0, (int) $this->pdo()->query('SELECT COALESCE(SUM(rebonds_durs),0) FROM loghook_compteurs')->fetchColumn(), 'un inconnu ne compte pas comme rebond dur');
+    }
+
+    public function test_jeton_mal_forme_alerte(): void
+    {
+        $this->ingestion()->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', 'trop court'));
+        $this->assertContains('loghook_jeton_malforme', $this->alertes);
+        $this->assertSame(['reception'], $this->types());
+    }
+
+    // --- I4 : jeton reconfirmable ---
+
+    private function jetonsBascule(bool &$panne): JetonsConfirmation
+    {
+        return new class($panne) implements JetonsConfirmation {
+            public int $appels = 0;
+            public function __construct(private bool &$panne) {}
+            public function confirmer(string $ws, string $jeton, string $idMessage): bool { $this->appels++; if ($this->panne) { throw new \RuntimeException('K6 indisponible'); } return true; }
+        };
+    }
+
+    public function test_i4_jeton_dont_la_confirmation_a_echoue_est_reconfirme_au_rejeu_du_doublon(): void
+    {
+        $panne = true;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('e', 32)));
+        $this->assertContains('loghook_jeton_echec', $this->alertes);
+        $panne = false;
+        $this->assertSame('doublon', $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('e', 32)))['statut']);
+        $this->assertSame(1, (int) $this->pdo()->query("SELECT COUNT(*) FROM loghook_journal WHERE genre='jeton_confirme'")->fetchColumn());
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('e', 32)));
+        $this->assertSame(2, $j->appels, 'confirmé : plus de nouvel appel');
+    }
+
+    public function test_i4_reconfirmer_rejoue_tant_que_non_confirme(): void
+    {
+        $panne = true;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('f', 32)));
+        $this->assertSame(0, $i->reconfirmer(self::WS_A)); // toujours en panne
+        $panne = false;
+        $this->assertSame(1, $i->reconfirmer(self::WS_A));
+        $this->assertSame(0, $i->reconfirmer(self::WS_A));
+    }
+
+    public function test_i4_k6a_absent_le_jeton_reste_rejouable(): void
+    {
+        $i = $this->ingestion();
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('c', 32)));
+        $this->assertSame(0, $i->reconfirmer(self::WS_A));
+        $this->assertSame(1, count($this->stockage->jetonsEnAttente(self::WS_A, 10)));
+    }
+
+    public function test_i4_pas_d_alerte_fausse_si_journaliser_echoue_apres_confirmation(): void
+    {
+        $this->pdo()->exec("CREATE TRIGGER t_refus_confirme BEFORE INSERT ON loghook_journal WHEN NEW.genre='jeton_confirme' BEGIN SELECT RAISE(ABORT,'journal indisponible'); END");
+        $panne = false;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('g', 32)));
+        $this->assertNotContains('loghook_jeton_echec', $this->alertes, 'K6 a bien confirmé : pas d\'alerte « échec de confirmation »');
+        $this->assertSame(['reception'], $this->types());
+    }
+
+    public function test_i6_la_reponse_pour_k1_porte_le_drapeau_observation_sans_adresse(): void
+    {
+        $i = $this->ingestion();
+        for ($n = 1; $n <= 51; $n++) {
+            $i->ingerer(self::WS_A, $this->ev($n));
+        }
+        $i->ingerer(self::WS_A, $this->ev(52, 'livre'));
+        $rep = $this->envoyer($this->signer('GET', '/v1/evenements?curseur=&limite=100', ''));
+        $ev = json_decode($rep->corps, true)['evenements'];
+        $this->assertTrue($ev[0]['observation']);
+        $this->assertTrue($ev[49]['observation']);
+        $this->assertArrayNotHasKey('observation', $ev[50]);
+        $this->assertArrayNotHasKey('observation', $ev[51], 'un livre n\'est jamais en observation');
+        $this->assertStringNotContainsString('@', $rep->corps);
+    }
+
     // --- point d'entrée local ---
 
-    private function entree(string $ip, string $corps): array
+    private const SECRET = 'secret-local-de-test-0123456789abcdef';
+
+    private function entree(string $ip, string $corps, string $secret = self::SECRET): array
     {
-        return (new \Passerelle\Evenements\PointEntree($this->ingestion()))->traiter($ip, $corps);
+        return (new \Passerelle\Evenements\PointEntree($this->ingestion(), self::SECRET, ['kumo-test']))->traiter($ip, $corps, $secret);
     }
 
     public function test_point_d_entree_refuse_toute_adresse_non_locale(): void
@@ -226,7 +348,36 @@ final class LoghookTest extends PasserelleTestCase
         $this->assertSame(200, $this->entree('127.0.0.1', $corps)[0]);
         $this->assertSame(400, $this->entree('127.0.0.1', '{pas du json')[0]);
         $this->assertSame(400, $this->entree('127.0.0.1', json_encode(['workspace_id' => 'x'] + $this->ev(2)))[0]);
-        $this->assertSame(400, $this->entree('127.0.0.1', json_encode(['workspace_id' => self::WS_A] + $this->ev(3, 'inconnu')))[0]);
+        $this->assertSame(400, $this->entree('127.0.0.1', json_encode(['workspace_id' => self::WS_A] + $this->ev(3, 'inconnu_type')))[0]);
         $this->assertSame(1, $this->stockage->dernierSequence(self::WS_A));
+    }
+
+    public function test_i5_127_0_0_1_sans_secret_ou_mauvais_secret_est_refuse(): void
+    {
+        $corps = json_encode(['workspace_id' => self::WS_A] + $this->ev(1));
+        $this->assertSame(403, $this->entree('127.0.0.1', $corps, '')[0]);
+        $this->assertSame(403, $this->entree('127.0.0.1', $corps, 'autre-secret-de-meme-longueur-0123456')[0]);
+        $this->assertSame(0, $this->stockage->dernierSequence(self::WS_A));
+    }
+
+    public function test_i5_secret_serveur_vide_refuse_tout(): void
+    {
+        $corps = json_encode(['workspace_id' => self::WS_A] + $this->ev(1));
+        $p = new \Passerelle\Evenements\PointEntree($this->ingestion(), '', ['kumo-test']);
+        $this->assertSame(403, $p->traiter('127.0.0.1', $corps, '')[0]);
+    }
+
+    public function test_i5_source_inconnue_refusee(): void
+    {
+        $e = ['workspace_id' => self::WS_A] + $this->ev(1);
+        $e['source'] = 'pirate';
+        $this->assertSame(403, $this->entree('127.0.0.1', json_encode($e))[0]);
+        $this->assertSame(0, $this->stockage->dernierSequence(self::WS_A));
+    }
+
+    public function test_i5_le_secret_n_est_pas_dans_le_depot(): void
+    {
+        $this->assertStringNotContainsString(self::SECRET, (string) file_get_contents(__DIR__.'/../src/Evenements/PointEntree.php'));
+        $this->assertStringContainsString('hash_equals', (string) file_get_contents(__DIR__.'/../src/Evenements/PointEntree.php'));
     }
 }

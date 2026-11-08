@@ -82,7 +82,7 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
                 || ! is_string($e['id_injection'] ?? null) || strlen($e['id_injection']) > 128) {
                 throw ServeurEnvoiRefuse::motif('réponse invalide (événement).');
             }
-            $evenements[] = new EvenementSuivi($e['event_id'], $e['seq'], $e['type'], $e['id_injection']);
+            $evenements[] = new EvenementSuivi($e['event_id'], $e['seq'], $e['type'], $e['id_injection'], ($e['observation'] ?? false) === true);
         }
         $suivant = $json['curseur_suivant'] ?? null;
         if ($suivant !== null && (! is_string($suivant) || strlen($suivant) > 128)) {

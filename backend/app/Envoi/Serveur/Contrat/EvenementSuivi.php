@@ -10,5 +10,7 @@ final class EvenementSuivi
         public readonly int $seq,
         public readonly string $type,
         public readonly string $idInjection,
+        /** K7 : un rebond dur en observation ne compte dans AUCUN frein (ajout seul, faux par défaut). */
+        public readonly bool $observation = false,
     ) {}
 }

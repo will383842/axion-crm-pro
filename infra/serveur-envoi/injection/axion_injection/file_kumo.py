@@ -2,6 +2,16 @@
 from abc import ABC, abstractmethod
 
 
+# K7 (ajout seul) : meta ecrite sur chaque message a l'injection, relue par le log hook (loghook.lua, `meta = {...}`).
+# `espace` = l'espace du COMPTE authentifie (jamais celui d'un en-tete du client) : le hook ne melange ainsi jamais deux espaces.
+META_LOGHOOK = ("id_injection", "espace")
+
+
+def meta_depot(espace: str, id_injection: str) -> dict:
+    """Meta a poser sur le message lors du depot dans KumoMTA (le jeton K6 s'y ajoute plus tard)."""
+    return {"espace": espace, "id_injection": id_injection}
+
+
 class ErreurFile(Exception):
     """La file est indisponible : l'écouteur répond 451 (jamais « accepté »)."""
 
@@ -30,4 +40,5 @@ class FausseFile(FileKumo):
         if self.panne:
             raise ErreurFile("file indisponible")
         self.depots.append({"espace": espace, "mail_from": mail_from,
-                            "rcpt": destinataire, "message": message})
+                            "rcpt": destinataire, "message": message,
+                            "meta": meta_depot(espace, "inj-%d" % (len(self.depots) + 1))})

@@ -3,7 +3,7 @@
 Chaîne : KumoMTA (`kumomta/loghook.lua`, 5 types d'enregistrement) -> écouteur local `127.0.0.1:2580` (`axion_loghook.serveur`) -> classifieur (règles TOML) -> `public/loghook.php` de la passerelle (127.0.0.1 seulement) -> `Evenements\Ingestion` -> `Stockage::ingererLoghook` (une transaction SQLite). K1 tire ensuite `GET /v1/evenements` : la passerelle ne pousse rien. **Aucun envoi réel, aucune action sur les adresses.**
 
 ## Règles de rebonds (`rebonds/*.toml`)
-Première règle qui correspond gagne ; `defaut_bounce` et `defaut_transitoire` obligatoires ; classes : `rebond_dur`, `rebond_mou`, `report`. Un `Expiration` n'est jamais dur. CI : `python3 -m axion_loghook.valider_toml rebonds` — TOML invalide, classe inconnue, défaut absent ou dossier sans `.toml` = CI rouge.
+Première règle qui correspond gagne ; `defaut_bounce` et `defaut_transitoire` obligatoires ; classes : `rebond_dur`, `rebond_mou`, `report`. Un `Expiration` n'est jamais dur (imposé par le validateur : `rebond_dur` exige `type="Bounce"` et un `statut_prefixe` en 5.1.x ; clés inconnues refusées). Un `Bounce` sans règle est **`inconnu`** (ni dur ni mou, journalisé) ; `5.7.26` (authentification SPF/DKIM/DMARC) est une **`alerte_config`** : la faute est chez nous, pas chez la personne. Format lu : `response.enhanced_code` (nom écrit par KumoMTA ; l'ancien nom reste toléré). CI : `python3 -m axion_loghook.valider_toml rebonds` — TOML invalide, classe inconnue, défaut absent ou dossier sans `.toml` = CI rouge.
 
 ## Garanties (tests)
 - Séquence sans trou ni doublon par espace, y compris après redémarrage ; l'époque est dans `event_id` (K2). Dédoublonnage par (espace, source, `id_kumo`, type). Un désordre garde tout ; un trou dans `src_seq` de la source lève l'alerte `loghook_trou_source`.
@@ -12,8 +12,20 @@ Première règle qui correspond gagne ; `defaut_bounce` et `defaut_transitoire` 
 - Aucune adresse en clair : seule l'empreinte SHA-256 du destinataire sort.
 - Jetons K6 : à la réception, l'interface `JetonsConfirmation::confirmer` fait passer `reserve -> confirme`. Un échec n'arrête jamais la séquence (alerte `loghook_jeton_echec`).
 
+- **Espaces** : le hook remonte la meta `espace` posée à l'injection (K4, `file_kumo.meta_depot`). Le relais numérote `src_seq` PAR espace, ne sert jamais un rebond de l'espace B à l'espace A, et écarte (compteur `sans_espace`) tout enregistrement sans espace valide.
+- **Trous** : un numéro source manquant n'alerte (`loghook_trou_source`) qu'après `DELAI_TROU` ; désordre, redémarrage du relais (envois en attente persistés) et rejeu après un 200 perdu (le numéro d'un doublon est noté) ne lèvent aucune alerte.
+- **Jetons** : `jeton_en_attente` est rejoué (`Ingestion::reconfirmer`, et au rejeu d'une réception) tant que `confirmer` n'a pas rendu vrai ; si le journal échoue après la confirmation, pas de fausse alerte.
+- **Entrée** : `127.0.0.1` ne suffit pas. Secret partagé local (en-tête `X-Axion-Loghook-Secret`, `hash_equals`, fichier hors dépôt `PASSERELLE_LOGHOOK_SECRET_FICHIER` côté passerelle, `lire_secret` côté relais) et liste fermée de `source` (`PASSERELLE_LOGHOOK_SOURCES`, défaut `kumo-envoi`).
+- **400** : un refus définitif de la passerelle (400) n'est jamais rejoué (le hook Lua ne lève pas 451 sur un 400).
+- **Observation côté CRM (K1)** : la passerelle ajoute `observation: true` aux 50 premiers rebonds durs ; K1 le garde (`EvenementSuivi`) et `CompteurRetours` n'en compte AUCUN dans les freins. Condition d'ouverture : la décision du responsable (K7-D3) ; tant qu'elle manque, ils ne freinent rien.
+- **Montage** : `loghook.lua` est monté (`docker-compose.yml`) et installé/comparé (`installer.sh`) comme `init.lua` et `dkim.lua` ; un test statique rougit si un `require` de `init.lua` n'est pas monté ET installé.
+
 ## Dettes nommées
 - **K7-D1** : K6a (`jetons.lua`) non fusionné -> seule l'interface existe, défaut `JetonsNonDisponibles` ; chaque jeton reste `jeton_en_attente` au journal, à rejouer quand K6a arrive.
-- **K7-D2** : `loghook.lua` écrit d'après l'API documentée de KumoMTA, non exécuté ici (pas de KumoMTA) : test statique seulement ; à passer au banc K10.
+- **K7-D2** : `loghook.lua` écrit d'après la documentation de référence de KumoMTA (`should_enqueue_log_record` booléen explicite + garde anti-boucle, `get_queue_config` → `custom_lua`), non exécuté ici : test statique seulement, **à prouver au banc K10** (coexistence avec d'autres `get_queue_config`, boucle, 451 = nouvel essai, meta `espace` reçue).
 - **K7-D3** : décision du responsable pour la sortie du mode observation (après 50 rebonds durs, quelle action K1 peut-elle appliquer ?). Seuil actuel : champ `observation` seulement.
 - **K7-D4** : nginx (K2-nginx) doit n'exposer `loghook.php` qu'en local ; le code refuse déjà toute autre adresse.
+- **K7-D5** : `serveur.py` n'a ni `main` ni unité systemd : le relais n'est pas lançable en service ; à faire avec le banc K10 (unité, utilisateur dédié, lecture du secret, `carte_espaces`).
+- **K7-D6** : `loghook_vus`, `loghook_src_vus` et le journal grossissent sans fin ; purge/archivage à définir (jamais de DROP/DELETE automatique ici, journal en ajout seul).
+- **K7-D7** : l'état est monotone — un `livre` reçu après un `rebond_dur` ne rétablit rien. Le rétablissement revient à K1 (`AppliquerRetour`) ; rien n'est fait côté log hook.
+- **K7-D8** : la meta `espace` de K4 est une étiquette de compte (ex. `ws1`), pas l'UUID de l'espace du CRM. **ESCALADE données** : fournir la correspondance étiquette → UUID (`carte_espaces` du relais) ou faire écrire l'UUID par K4 ; sans cela le relais écarte tout (`sans_espace`).

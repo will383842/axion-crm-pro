@@ -104,6 +104,12 @@ CREATE TABLE IF NOT EXISTS loghook_vus (
 CREATE TABLE IF NOT EXISTS loghook_sources (
   workspace_id TEXT NOT NULL, source TEXT NOT NULL, dernier_src_seq INTEGER NOT NULL,
   PRIMARY KEY (workspace_id, source)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS loghook_src_vus (
+  workspace_id TEXT NOT NULL, source TEXT NOT NULL, src_seq INTEGER NOT NULL, vu_le INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, source, src_seq)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS loghook_verifie (
+  workspace_id TEXT NOT NULL, source TEXT NOT NULL, jusqu INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, source)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS loghook_compteurs (
   workspace_id TEXT PRIMARY KEY, rebonds_durs INTEGER NOT NULL) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS loghook_journal (
@@ -274,28 +280,26 @@ SQL);
      * Les événements `rebond_dur` des $observationMax premiers (par espace) portent `observation=true`.
      * `action_auto` vaut toujours « aucune » : la passerelle n'agit jamais, K1 tire.
      *
+     * Le numéro source (src_seq) est noté même pour un doublon (relais redémarré : le rejeu a un nouveau numéro) ; les
+     * trous ne sont jugés qu'APRÈS un délai (voir trousSourceAnciens) : un désordre n'est jamais un trou.
+     *
      * @param array{source:string,src_seq:int,id_kumo:string,type:string,id_injection:string,destinataire_empreinte:string,jeton:?string} $e
-     * @return array{statut:'ingere'|'doublon',seq:?int,trou:bool}
+     * @return array{statut:'ingere'|'doublon',seq:?int}
      */
     public function ingererLoghook(string $ws, array $e, int $observationMax): array
     {
-        /** @var array{statut:'ingere'|'doublon',seq:?int,trou:bool} */
+        /** @var array{statut:'ingere'|'doublon',seq:?int} */
         return $this->transaction(function () use ($ws, $e, $observationMax): array {
             $j = fn (string $genre, string $detail) => $this->pdo->prepare('INSERT INTO loghook_journal (workspace_id, genre, id_kumo, detail, cree_le) VALUES (?,?,?,?,?)')
                 ->execute([$ws, $genre, $e['id_kumo'], $detail, $this->now()]);
             $vu = $this->pdo->prepare('INSERT OR IGNORE INTO loghook_vus (workspace_id, source, id_kumo, type) VALUES (?,?,?,?)');
             $vu->execute([$ws, $e['source'], $e['id_kumo'], $e['type']]);
+            $this->pdo->prepare('INSERT OR IGNORE INTO loghook_src_vus (workspace_id, source, src_seq, vu_le) VALUES (?,?,?,?)')
+                ->execute([$ws, $e['source'], $e['src_seq'], $this->now()]);
             if ($vu->rowCount() === 0) {
                 $j('doublon', $e['type']);
 
-                return ['statut' => 'doublon', 'seq' => null, 'trou' => false];
-            }
-            $st = $this->pdo->prepare('SELECT dernier_src_seq FROM loghook_sources WHERE workspace_id=? AND source=?');
-            $st->execute([$ws, $e['source']]);
-            $dernier = (int) ($st->fetchColumn() ?: 0);
-            $trou = $dernier > 0 && $e['src_seq'] > $dernier + 1;
-            if ($trou) {
-                $j('trou_source', ($dernier + 1).'-'.($e['src_seq'] - 1));
+                return ['statut' => 'doublon', 'seq' => null];
             }
             $this->pdo->prepare('INSERT INTO loghook_sources (workspace_id, source, dernier_src_seq) VALUES (?,?,?) ON CONFLICT (workspace_id, source) DO UPDATE SET dernier_src_seq = MAX(dernier_src_seq, excluded.dernier_src_seq)')
                 ->execute([$ws, $e['source'], $e['src_seq']]);
@@ -318,8 +322,77 @@ SQL);
             $seq = $this->insererEvenement($ws, $e['type'], $donnees);
             $j('ingere', $e['type'].' seq='.$seq);
 
-            return ['statut' => 'ingere', 'seq' => $seq, 'trou' => $trou];
+            return ['statut' => 'ingere', 'seq' => $seq];
         });
+    }
+
+    /**
+     * Trous RÉELS du numéro source : un numéro absent alors qu'un numéro plus grand est connu depuis au moins $delai
+     * secondes. Chaque trou n'est rendu (et journalisé) qu'une fois : la borne « vérifié jusqu'à » avance.
+     *
+     * @return list<array{0:int,1:int}>
+     */
+    public function trousSourceAnciens(string $ws, string $source, int $delai): array
+    {
+        /** @var list<array{0:int,1:int}> */
+        return $this->transaction(function () use ($ws, $source, $delai): array {
+            $b = $this->pdo->prepare('SELECT jusqu FROM loghook_verifie WHERE workspace_id=? AND source=?');
+            $b->execute([$ws, $source]);
+            $base = $b->fetchColumn();
+            $l = $this->pdo->prepare('SELECT src_seq, vu_le FROM loghook_src_vus WHERE workspace_id=? AND source=? AND src_seq > ? ORDER BY src_seq LIMIT 5000');
+            $l->execute([$ws, $source, $base === false ? 0 : (int) $base]);
+            $lignes = $l->fetchAll(PDO::FETCH_NUM);
+            if ($lignes === []) {
+                return [];
+            }
+            $attendu = $base === false ? (int) $lignes[0][0] : (int) $base + 1; // le tout premier numéro vu fixe le départ
+            $ok = $attendu - 1;
+            $trous = [];
+            foreach ($lignes as [$seq, $vuLe]) {
+                $seq = (int) $seq;
+                if ($seq > $attendu) {
+                    if ($this->now() - (int) $vuLe < $delai) {
+                        break;
+                    }
+                    $trous[] = [$attendu, $seq - 1];
+                    $this->pdo->prepare('INSERT INTO loghook_journal (workspace_id, genre, id_kumo, detail, cree_le) VALUES (?,?,?,?,?)')
+                        ->execute([$ws, 'trou_source', '-', $attendu.'-'.($seq - 1), $this->now()]);
+                }
+                $attendu = $seq + 1;
+                $ok = $seq;
+            }
+            if ($ok > ($base === false ? -1 : (int) $base)) {
+                $this->pdo->prepare('INSERT INTO loghook_verifie (workspace_id, source, jusqu) VALUES (?,?,?) ON CONFLICT (workspace_id, source) DO UPDATE SET jusqu = MAX(jusqu, excluded.jusqu)')
+                    ->execute([$ws, $source, $ok]);
+            }
+
+            return $trous;
+        });
+    }
+
+    /**
+     * Jetons reçus (jeton_en_attente) dont la confirmation n'est pas encore journalisée : à rejouer tant que non confirmés.
+     *
+     * @return list<array{id_kumo:string,jeton:string}>
+     */
+    public function jetonsEnAttente(string $ws, int $limite): array
+    {
+        $st = $this->pdo->prepare("SELECT a.id_kumo, a.detail FROM loghook_journal a WHERE a.workspace_id=? AND a.genre='jeton_en_attente'
+            AND NOT EXISTS (SELECT 1 FROM loghook_journal c WHERE c.workspace_id=a.workspace_id AND c.genre='jeton_confirme' AND c.id_kumo=a.id_kumo)
+            GROUP BY a.id_kumo ORDER BY MIN(a.id) LIMIT ?");
+        $st->bindValue(1, $ws);
+        $st->bindValue(2, max(1, $limite), PDO::PARAM_INT);
+        $st->execute();
+
+        return array_map(static fn (array $l): array => ['id_kumo' => (string) $l[0], 'jeton' => (string) $l[1]], $st->fetchAll(PDO::FETCH_NUM));
+    }
+
+    public function jetonDejaConfirme(string $ws, string $idKumo): bool
+    {
+        $st = $this->pdo->prepare("SELECT 1 FROM loghook_journal WHERE workspace_id=? AND genre='jeton_confirme' AND id_kumo=? LIMIT 1");
+        $st->execute([$ws, $idKumo]);
+
+        return $st->fetchColumn() !== false;
     }
 
     /** Ajoute une ligne au journal du log hook (ajout seul). */

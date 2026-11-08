@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\DB;
  * UPDATE, ni DELETE, ni TRUNCATE). Aucun corps de message, aucune adresse en
  * clair : empreintes SHA-256 seulement. Identifiant d'événement = (boîte,
  * UIDVALIDITY, UID) ; second garde-fou (boîte, empreinte du Message-ID) pour
- * qu'une renumérotation des UID ne crée aucun doublon. `down()` INERTE.
+ * qu'une renumérotation des UID ne crée aucun doublon. `id_injection` (UUID) est
+ * contrôlé à l'insertion comme une clé étrangère vers `envoi_injections_smtp` (même espace) par un
+ * déclencheur : une FK bloquerait le retour arrière de L4 (NR-17). `down()` INERTE.
  */
 return new class extends Migration
 {
@@ -25,7 +27,7 @@ return new class extends Migration
                 classe                TEXT        NOT NULL
                                       CHECK (classe IN ('reponse_humaine','auto_reponse','desinscription','hostile','rebond_dur','rebond_mou')),
                 statut                TEXT        NOT NULL CHECK (statut IN ('rattache','a_rattacher')),
-                id_injection          TEXT,
+                id_injection          UUID,
                 empreinte_expediteur  CHAR(64)    NOT NULL,
                 empreinte_destinataire CHAR(64),
                 code_dsn              TEXT,
@@ -53,6 +55,20 @@ return new class extends Migration
             CREATE TRIGGER envoi_evenements_pas_de_truncate
                 BEFORE TRUNCATE ON envoi_evenements
                 FOR EACH STATEMENT EXECUTE FUNCTION envoi_evenements_ajout_seul();
+            CREATE OR REPLACE FUNCTION envoi_verifie_id_injection() RETURNS trigger AS $f$
+            BEGIN
+                IF NEW.id_injection IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM envoi_injections_smtp i WHERE i.id_injection = NEW.id_injection AND i.workspace_id = NEW.workspace_id
+                ) THEN
+                    RAISE EXCEPTION 'id_injection inconnu pour cet espace (envoi_injections_smtp)' USING ERRCODE = '23503';
+                END IF;
+                RETURN NEW;
+            END;
+            $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            DROP TRIGGER IF EXISTS envoi_evenements_id_injection ON envoi_evenements;
+            CREATE TRIGGER envoi_evenements_id_injection
+                BEFORE INSERT ON envoi_evenements
+                FOR EACH ROW EXECUTE FUNCTION envoi_verifie_id_injection();
             ALTER TABLE envoi_evenements ENABLE ROW LEVEL SECURITY;
             ALTER TABLE envoi_evenements FORCE ROW LEVEL SECURITY;
             DROP POLICY IF EXISTS envoi_evenements_workspace_isolation ON envoi_evenements;

@@ -43,6 +43,9 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
+    '2026_11_10_000062_envoi_rattachements.php',
+    '2026_11_10_000063_envoi_echecs_releve.php',
+    '2026_11_10_000064_envoi_messages_envoyes.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

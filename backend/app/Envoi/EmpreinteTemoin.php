@@ -34,4 +34,20 @@ final class EmpreinteTemoin
 
         return hash_hmac('sha256', self::normaliser($adresse), $cle);
     }
+
+    /**
+     * Empreinte pour la DÉCISION « est-ce un témoin ? » : null (jamais témoin) pour toute adresse qui n'est pas
+     * entièrement ASCII (hors espaces), comme `empreinte_temoin` côté serveur d'envoi. Sans cela, le punycode
+     * transitoire ferait de a@faß.de le même témoin que a@fass.de. Le contrat partagé (`calculer`) est inchangé.
+     */
+    public static function pourDecision(string $adresse, ?string $cle = null): ?string
+    {
+        $sansEspaces = preg_replace('/\s+/u', '', $adresse);
+        // UTF-8 invalide (preg_replace = null) : non ASCII par prudence.
+        if ($sansEspaces === null || preg_match('/[^\x00-\x7F]/', $sansEspaces) === 1) {
+            return null;
+        }
+
+        return self::calculer($adresse, $cle);
+    }
 }

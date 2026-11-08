@@ -25,7 +25,10 @@ final class DepotSocleDb implements DepotSocle
 
     public function estTemoin(string $workspaceId, string $adresse): bool
     {
-        $empreinte = EmpreinteTemoin::calculer($adresse);
+        $empreinte = EmpreinteTemoin::pourDecision($adresse);
+        if ($empreinte === null) {
+            return false; // adresse non ASCII : jamais témoin (fermé)
+        }
 
         return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_temoins')
             ->where('workspace_id', $workspaceId)

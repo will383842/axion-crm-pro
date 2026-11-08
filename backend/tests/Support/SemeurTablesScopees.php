@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -127,6 +127,8 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
+        // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
+        'envoi_controles_listes',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -505,6 +507,13 @@ final class SemeurTablesScopees
         $inserer('envoi_domaines', [
             'nom' => 'zz-etancheite.example.invalid',
             'achete_le' => '2026-01-01',
+        ]);
+
+        $inserer('envoi_controles_listes', [
+            'type' => 'domaine',
+            'ressource' => 'zz-etancheite.example.invalid',
+            'statut' => 'non_liste',
+            'zone' => '*',
         ]);
 
         $inserer('listes_manuelles_membres', [

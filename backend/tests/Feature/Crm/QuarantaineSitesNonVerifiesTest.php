@@ -533,18 +533,17 @@ function qsEspaceRls(): array
         'information_tiers_version' => 'information-article-14/v3', 'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    // Statistiques du planificateur FIGÉES : sans cela, le plan dépend du moment
-    // où l'autovacuum a (ou non) analysé ces tables pendant la suite, et le test
-    // compare deux plans pris à des états de statistiques différents. On analyse
-    // une fois ici, et `qsGelerStatistiques` coupe l'autovacuum le temps du test.
-    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
-        $owner->statement('ANALYZE ' . $table);
-    }
-
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
 }
 
-/** Coupe (true) ou rétablit (false) l'autovacuum des tables dont le plan est mesuré. */
+/**
+ * Coupe (false) ou rétablit (true) l'autovacuum des tables dont le plan est
+ * mesuré. Sans cela, une analyse automatique peut tomber entre la mesure du plan
+ * « avec le critère » et celle du plan « sans le critère », qui sont alors pris à
+ * des statistiques différentes. On ne lance PAS d'`ANALYZE` ici : il laisserait
+ * des statistiques de 2 ou 3 lignes sur `companies` et changerait le plan lu par
+ * les tests suivants (`EntreprisesVerifierSitesTest`).
+ */
 function qsAutovacuum(bool $actif): void
 {
     foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
@@ -657,6 +656,13 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         qsNettoyer($a);
         qsNettoyer($b);
         qsAutovacuum(true);
+        // Les lignes semées sont supprimées, mais leurs pages restent : un VACUUM
+        // les rend au système. Sinon `companies` garde une taille que les tests
+        // suivants qui lisent un plan (`EntreprisesVerifierSitesTest`) subissent :
+        // le planificateur y choisit un tri au lieu de l'index partiel ordonné.
+        foreach (['contacts_provenances_tiers', 'contacts', 'companies'] as $table) {
+            qsProprio()->statement('VACUUM ' . $table);
+        }
         qsProprio()->disconnect();
     }
 });

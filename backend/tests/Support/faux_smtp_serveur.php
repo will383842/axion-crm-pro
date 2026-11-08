@@ -3,7 +3,7 @@
 /**
  * FAUX serveur SMTP local (socket PHP, 127.0.0.1 uniquement) pour les tests.
  * Usage : php faux_smtp_serveur.php <mode> <fichier_recu>
- * Modes : ok | coupure_apres_data | 451_apres_data | 550_apres_data
+ * Modes : ok | coupure_apres_data | 451_apres_data | 550_apres_data | banniere_554 | ehlo_554 | mail_550 | rcpt_550
  * Écrit le port sur la 1re ligne de stdout, enregistre le brut reçu (DATA) dans <fichier_recu>.
  * Enregistre aussi chaque commande reçue (hors DATA) dans <fichier_recu>.cmd, et ANNONCE
  * AUTH PLAIN LOGIN sans jamais proposer STARTTLS : sert à prouver qu'aucun identifiant
@@ -19,6 +19,11 @@ fflush(STDOUT);
 $c = @stream_socket_accept($srv, 20);
 if ($c === false) {
     exit(1);
+}
+if ($mode === 'banniere_554') {
+    fwrite($c, "554 5.7.1 IP non autorisee\r\n");
+    sleep(2);
+    exit(0);
 }
 fwrite($c, "220 faux ESMTP\r\n");
 $donnees = false;
@@ -50,7 +55,13 @@ while (($ligne = fgets($c)) !== false) {
     }
     file_put_contents($fichier . '.cmd', $ligne, FILE_APPEND);
     $cmd = strtoupper(substr($ligne, 0, 4));
-    if ($cmd === 'EHLO' || $cmd === 'HELO') {
+    if (($cmd === 'EHLO' || $cmd === 'HELO') && $mode === 'ehlo_554') {
+        fwrite($c, "554 5.7.1 refuse\r\n");
+    } elseif ($cmd === 'MAIL' && $mode === 'mail_550') {
+        fwrite($c, "550 5.7.1 expediteur refuse\r\n");
+    } elseif ($cmd === 'RCPT' && $mode === 'rcpt_550') {
+        fwrite($c, "550 5.1.1 destinataire inconnu\r\n");
+    } elseif ($cmd === 'EHLO' || $cmd === 'HELO') {
         fwrite($c, "250-faux\r\n250-AUTH PLAIN LOGIN\r\n250 8BITMIME\r\n");
     } elseif ($cmd === 'DATA') {
         fwrite($c, "354 go\r\n");

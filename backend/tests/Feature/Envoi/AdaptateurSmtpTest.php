@@ -16,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -431,6 +432,30 @@ test('réponse 5xx : échec définitif, jamais rejoué', function () {
         expect(fn () => $s->injecter(smtpMsg($ws)))->toThrow(RuntimeException::class);
     });
 });
+
+// L4-554 : un 5xx reçu AVANT MAIL FROM (bannière, EHLO) refuse la CONNEXION, pas le message.
+test('5xx de CONNEXION (bannière 554, EHLO 554) : message reporté (jamais echec), boîte en pause, alerte critique, aucun 5xx compté', function (string $mode) {
+    Event::fake([BoitePauseAutomatique::class]);
+    Log::spy();
+    smtpAvecFauxServeur($mode, function (int $port) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $r = smtpAdaptateur($ws, $boite)->injecter(smtpMsg($ws));
+        expect($r->accepte)->toBeFalse()->and($r->reporteAu)->not->toBeNull();
+        expect(smtpEtat($ws, 'k1'))->toBe('reporte');
+        expect(collect(smtpLignes($ws))->where('etat', 'echec')->count())->toBe(0);
+        expect(smtpEtatBoite($ws, $boite))->toBe('en_pause');
+        Event::assertNotDispatched(BoitePauseAutomatique::class); // aucun 5xx de message compté
+    });
+    Log::shouldHaveReceived('critical')->once();
+})->with(['banniere_554', 'ehlo_554']);
+
+test('5xx de MAIL FROM, RCPT TO ou DATA : échec définitif comme avant', function (string $mode) {
+    smtpAvecFauxServeur($mode, function (int $port) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        expect(fn () => smtpAdaptateur($ws, $boite)->injecter(smtpMsg($ws)))->toThrow(RuntimeException::class);
+        expect(smtpEtat($ws, 'k1'))->toBe('echec')->and(smtpEtatBoite($ws, $boite))->toBe('active');
+    });
+})->with(['mail_550', 'rcpt_550', '550_apres_data']);
 
 test('le code SMTP vient de UnexpectedResponseException::getCode(), pas du texte du message', function () {
     [$ws, $boite] = smtpBoite();

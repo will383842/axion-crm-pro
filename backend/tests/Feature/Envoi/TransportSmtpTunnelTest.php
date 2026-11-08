@@ -154,12 +154,12 @@ test('5xx NUMÉRIQUE avant DATA (RCPT ou MAIL FROM refusé) : le code est rendu,
 })->with(['rcpt_550', 'mail_550']);
 
 // B1 : un 5xx de CONNEXION (bannière, EHLO) n'est pas un refus du message : jamais rendu comme code d'échec définitif.
-test('5xx de CONNEXION (bannière 554, EHLO 554) : RefusConnexion (alerte et pause), jamais un code rendu', function (string $mode) {
+test('5xx de CONNEXION (bannière 554, EHLO 554, STARTTLS 554) : RefusConnexion (alerte et pause), jamais un code rendu', function (string $mode) {
     tunnelAvecFauxServeur($mode, function (int $port, string $fichier) {
         expect(fn () => tunnel($port)->envoyer(tunnelMsg(), str_repeat('a', 32)))->toThrow(RefusConnexion::class);
         expect(filesize($fichier))->toBe(0);
     });
-})->with(['banniere_554', 'ehlo_554']);
+})->with(['banniere_554', 'ehlo_554', 'starttls_554']);
 
 test('jeton de 33 à 64 caractères : refusé (le VERP exige 32), jamais envoyé sans VERP', function () {
     expect(fn () => tunnel(1)->envoyer(tunnelMsg(), str_repeat('a', 40)))->toThrow(ServeurEnvoiRefuse::class);

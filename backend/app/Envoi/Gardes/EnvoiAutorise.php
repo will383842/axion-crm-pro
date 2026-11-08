@@ -5,6 +5,7 @@ namespace App\Envoi\Gardes;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Personnes\NatureEmail;
+use App\Envoi\ListesNoires\GardeListes;
 use App\Socle\Espace\FonctionsEspace;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
@@ -67,6 +68,8 @@ final class EnvoiAutorise
     public const SEGMENT_SENSIBLE = 'segment_sensible_refuse';
 
     public const DOMAINE_LISTE_NOIRE = 'domaine_envoi_sur_liste_noire';
+
+    public const IP_LISTE_NOIRE = 'ip_envoi_sur_liste_noire';
 
     public const DATE_FUTURE = 'date_de_collecte_dans_le_futur';
 
@@ -161,6 +164,9 @@ final class EnvoiAutorise
         if (($m = self::garderDomaine($d, $maintenant)) !== null) {
             return new VerdictEnvoi($m);
         }
+        if (($m = self::garderListesNoires($d)) !== null) {
+            return new VerdictEnvoi($m);
+        }
         if (($m = self::garderArt14($d, $maintenant, $alertes)) !== null) {
             return new VerdictEnvoi($m, $alertes);
         }
@@ -245,6 +251,10 @@ final class EnvoiAutorise
         if (filter_var($dom->liste_noire ?? false, FILTER_VALIDATE_BOOLEAN)) {
             return self::DOMAINE_LISTE_NOIRE;
         }
+        // K13 : pause posée par la surveillance (listé, ou « non fiable » au-delà du délai).
+        if (app(GardeListes::class)->domaineEnPause($d->workspaceId, (string) $dom->nom)) {
+            return self::DOMAINE_LISTE_NOIRE;
+        }
 
         $age = self::joursCalendaires(new DateTimeImmutable((string) $dom->achete_le, new DateTimeZone(self::FUSEAU)), $maintenant);
         if ($age < self::DOMAINE_AGE_MIN_JOURS) {
@@ -261,6 +271,15 @@ final class EnvoiAutorise
         }
 
         return null;
+    }
+
+    /**
+     * K13 : une IP d'envoi déclarée de l'espace est en pause (listée, ou « non fiable » au-delà du
+     * délai). Voir `GardeListes` : le CRM ne connaît pas l'IP qui enverra, d'où la règle prudente.
+     */
+    private static function garderListesNoires(DemandeEnvoi $d): ?string
+    {
+        return app(GardeListes::class)->ipEnPause($d->workspaceId) ? self::IP_LISTE_NOIRE : null;
     }
 
     /** @param  list<string>  $alertes */

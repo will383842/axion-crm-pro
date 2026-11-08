@@ -43,6 +43,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
     // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
     '2026_11_11_000110_envoi_controles_dns.php',
+    // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
+    '2026_11_11_000120_envoi_controles_listes.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

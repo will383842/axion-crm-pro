@@ -191,7 +191,7 @@ test('C18-016/contournements — l inventaire des lectures directes est FIGE', f
     // Les trois premiers sont ceux qui comptent : ils décident du scraping, et
     // la production porte `MOCK_SCRAPERS=true`.
     $attendu = [
-        'Console/Commands/BlacklistsCheck.php' => 1,
+        // `BlacklistsCheck` ne lit plus `env('MOCK_MODE')` : remplacée par K13 (retirée de la liste, bonne nouvelle).
         'Console/Commands/ImportIgnAdminExpress.php' => 2,
         'Console/Commands/ImportNaf.php' => 1,
         'Console/Commands/ImportRpps.php' => 2,

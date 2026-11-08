@@ -9,6 +9,7 @@ use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\CrmUsinePousserAgregats;
+use App\Console\Commands\EnvoiListesNoiresControler;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
@@ -73,7 +74,7 @@ Artisan::command('inspire', function () {
 // la cible `prod`, donc sur CET entrypoint : un seul geste couvre les deux.
 //
 // CE QUI N'EST PAS FAIT. Les sept taches planifiees SANS `withoutOverlapping`
-// (`coverage:refresh-matrix`, `blacklists:check`, `audit:verify-chain`,
+// (`coverage:refresh-matrix`, `blacklists:check` [retirée depuis, remplacée par K13], `audit:verify-chain`,
 // `retention:purge`, `rgpd:anonymize-ips`, `anomaly:detect`,
 // `signals:nightly-scan`) ne sont pas concernees par ce constat : sans verrou,
 // il n'y a pas de verrou orphelin. Leur absence de verrou est un autre sujet.
@@ -102,7 +103,8 @@ Schedule::command('coverage:refresh-matrix')
             . 'precedentes du journal.',
         );
     });
-Schedule::command('blacklists:check')->hourly();
+// `blacklists:check` n'est plus planifiée : REMPLACÉE par `envoi:listes-noires:controler` (K13, plus bas).
+// L'ancienne commande ne faisait rien et affichait « all IPs assumed clean » : un faux vert.
 // 🔴 B16-006 / F39-006 / B17-003 (S1), mesure le 2026-08-20. Cette ligne etait
 // `Schedule::command('audit:verify-chain')->dailyAt('03:00');` — rien d'autre.
 // Le planificateur de Laravel N'INTERPRETE PAS le code de sortie d'une commande
@@ -538,3 +540,14 @@ Schedule::command(ControleDnsCommande::SIGNATURE_PLANIFIEE)
     ->dailyAt('05:45')
     ->withoutOverlapping(60)
     ->onOneServer();
+
+// Envoi K13 — surveillance des listes noires (IP/domaines d'envoi), résolveur DNS LOCAL.
+// Chaque minute : un « listé » met la ressource en pause au même passage (< 5 min) + alerte.
+Schedule::command(EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE)
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer()
+    // Code de sortie non nul (au moins un « non fiable ») : le planificateur ne le lit que par onFailure.
+    ->onFailure(function (): void {
+        Log::critical('[ENVOI] ' . EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE . ' : contrôle des listes noires non fiable ou incomplet.');
+    });

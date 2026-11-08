@@ -32,4 +32,16 @@ return [
     'dns' => [
         'domaines' => (array) (json_decode((string) env('ENVOI_DNS_DOMAINES', '{}'), true) ?: []),
     ],
+    // K13 : surveillance des listes noires. Les serveurs de noms du SYSTÈME (resolv.conf) doivent
+    // tous être locaux et non relayés (pas 127.0.0.11 de Docker) : Spamhaus refuse les résolveurs
+    // publics, le contrôle est alors « non fiable ». Plus aucun réglage de résolveur ici : on ne
+    // déclare pas ce que `dns_get_record()` n'utiliserait pas.
+    'listes_noires' => [
+        // « Non fiable » sans interruption au-delà de ce délai : domaine/IP traité comme en pause (fail-closed).
+        'non_fiable_bloque_apres_minutes' => (int) env('ENVOI_LISTES_NON_FIABLE_BLOQUE_APRES_MINUTES', 30),
+        'zones_ip' => ['zen.spamhaus.org'],
+        'zones_domaine' => ['dbl.spamhaus.org'],
+        // « ip@uuid-workspace », séparés par des virgules.
+        'ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('ENVOI_LISTES_IPS', ''))))),
+    ],
 ];

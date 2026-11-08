@@ -62,6 +62,7 @@ fichier ne la mentionne.
 
 ## Sécurité
 
+- **vendor des sessions cloud** (`.github/workflows/vendor-cloud.yml`, `infra/scripts/vendor-cloud.sh`) : risque accepté (décision du responsable). Le `.sha256` est dans la même pré-version mutable que l'archive : il prouve l'intégrité de transfert, pas l'authenticité ; surface équivalente à un accès en écriture au dépôt, sessions cloud seulement (la CI de test n'utilise jamais l'archive).
 - **AUCUN secret en clair dans le code ou git** — tout via `.env` (gitignored) ou Doppler
 - **AUCUN appel réseau réel** sans flag `MOCK_*=false` explicite
 - **SSRF guard** obligatoire (`SsrfGuard::ensure($url)`) avant tout fetch HTTP externe

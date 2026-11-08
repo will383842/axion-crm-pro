@@ -23,6 +23,9 @@ final class JetonDesinscription
 
     private const LONGUEUR_MAX = 300;
 
+    /** Longueur minimale de la clé, contrôlée à l'émission : une clé courte se devine. */
+    public const CLE_LONGUEUR_MIN = 32;
+
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
     public static function emettre(string $workspaceId, string $reference, ?DateTimeInterface $maintenant = null): string
@@ -30,6 +33,9 @@ final class JetonDesinscription
         $cle = self::cle();
         if ($cle === '') {
             throw new RuntimeException('Clé de désinscription absente (envoi.cle_desinscription) : jeton non émis.');
+        }
+        if (strlen($cle) < self::CLE_LONGUEUR_MIN) {
+            throw new RuntimeException('Clé de désinscription trop courte (' . self::CLE_LONGUEUR_MIN . ' caractères au moins) : jeton non émis.');
         }
         $depart = $maintenant ?? Carbon::now();
         $jours = max(1, (int) config('envoi.desinscription_validite_jours', 730));
@@ -40,7 +46,7 @@ final class JetonDesinscription
     }
 
     /**
-     * @param  bool  $accepterEchu  vrai pour l'opposition (POST) : l'échéance n'est alors pas contrôlée, la signature reste exigée
+     * @param  bool  $accepterEchu  vrai pour la page (GET) et l'opposition (POST) : l'échéance n'est alors pas contrôlée, la signature reste exigée
      * @return array{workspace_id: string, reference: string}|null null pour TOUTE
      *                                                             cause de refus (forme, signature, échéance) : l'appelant ne peut pas les distinguer.
      */
@@ -61,7 +67,7 @@ final class JetonDesinscription
         if (! HmacSignature::verify($cle, implode('.', [self::VERSION, $espace, $reference, $echeance]), $signature)) {
             return null;
         }
-        // Une opposition ne coûte rien : le POST accepte un jeton signé mais échu ($accepterEchu).
+        // Une opposition ne coûte rien : la page (GET, sans écriture) et le POST acceptent un jeton signé mais échu ($accepterEchu).
         if (! $accepterEchu && (int) $echeance < Carbon::now()->getTimestamp()) {
             return null;
         }

@@ -177,7 +177,7 @@ final class LecteurBoiteWebklex implements LecteurBoite
                         $contenuArf .= "\n" . mb_substr((string) $piece->getContent(), 0, ExtraitTexte::LIMITE * 4);
                     }
                     $arf = AnalyseArf::depuisBrut($contenuArf . "\n" . $message->getTextBody());
-                    $arf['type'] ??= 'other'; // rapport ARF sans type lisible : plainte par prudence
+                    $arf['type'] ??= 'illisible'; // rapport ARF sans type lisible : « à rattacher », jamais une plainte devinée
                 }
                 $corps = ExtraitTexte::choisir($message->getTextBody(), $message->getHTMLBody());
             } catch (EchecAnalyse) {

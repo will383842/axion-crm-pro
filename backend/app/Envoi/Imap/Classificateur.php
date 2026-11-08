@@ -44,16 +44,21 @@ final class Classificateur
         'auto-reply', 'reponse automatique', 'reponse automatique', 'conge', 'vacation',
     ];
 
-    public static function classer(MessageBrut $m): ClasseRetour
+    /**
+     * @param  list<string>  $nosDomaines  domaines d'envoi de l'espace : seuls leurs `abuse@` valent plainte
+     *                                     (liste vide = aucun `abuse@` reconnu : jamais de plainte devinée)
+     */
+    public static function classer(MessageBrut $m, array $nosDomaines = []): ClasseRetour
     {
         try {
-            return self::classerOuEchouer($m);
+            return self::classerOuEchouer($m, $nosDomaines);
         } catch (EchecAnalyse) {
             return ClasseRetour::Desinscription; // prudence : jamais « réponse humaine » sur un échec d'analyse
         }
     }
 
-    private static function classerOuEchouer(MessageBrut $m): ClasseRetour
+    /** @param list<string> $nosDomaines */
+    private static function classerOuEchouer(MessageBrut $m, array $nosDomaines): ClasseRetour
     {
         if ($m->statutDsn !== null) {
             if (Pcre::correspond('/^5\.7\.\d{1,3}$/', $m->statutDsn)) {
@@ -69,6 +74,10 @@ final class Classificateur
             return ClasseRetour::AutoReponse; // 2.x.x : accusé de remise, aucun effet
         }
 
+        if ($m->typeArf === 'illisible') {
+            return ClasseRetour::AutoReponse; // Feedback-Type illisible : ni plainte ni rattachement (revue humaine)
+        }
+
         if ($m->typeArf !== null) {
             // Rapport d'abus ARF (JMRP, Yahoo CFL) : un « Auto-Submitted » est ici normal, il ne l'écarte pas.
             return in_array($m->typeArf, ['not-spam', 'auth-failure'], true) ? ClasseRetour::AutoReponse : ClasseRetour::Hostile;
@@ -82,7 +91,7 @@ final class Classificateur
             return ClasseRetour::AutoReponse;
         }
 
-        if (self::recuSurAbuse($m)) {
+        if (self::recuSurAbuse($m, $nosDomaines)) {
             return ClasseRetour::Hostile; // écrit à abuse@ : plainte (une auto-réponse déclarée a été écartée plus haut)
         }
 
@@ -104,11 +113,20 @@ final class Classificateur
         return ClasseRetour::ReponseHumaine;
     }
 
-    private static function recuSurAbuse(MessageBrut $m): bool
+    /** @param list<string> $nosDomaines */
+    private static function recuSurAbuse(MessageBrut $m, array $nosDomaines): bool
     {
         foreach ($m->adressesLocales as $a) {
-            if (Pcre::correspond('/^abuse@/i', trim($a, ' <>'))) {
-                return true;
+            $g = Pcre::groupes('/^abuse@([a-z0-9.-]+)$/i', trim($a, ' <>'));
+            if ($g === null) {
+                continue;
+            }
+            $hote = strtolower($g[0]);
+            foreach ($nosDomaines as $d) {
+                $d = strtolower(trim($d));
+                if ($d !== '' && ($hote === $d || str_ends_with($hote, '.' . $d))) {
+                    return true; // notre domaine (ou un sous-domaine, ex. bounce.<domaine>)
+                }
             }
         }
 

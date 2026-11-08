@@ -2,10 +2,17 @@
 
 /**
  * Envoi K11 — rebonds et plaintes par la réception D2 (fourre-tout bounce.<domaine>, VERP rb-<jeton>, ARF).
- * Scénarios S09 à S13 du banc. AUCUN réseau, AUCUN envoi : lecteur et registre en mémoire.
+ * Scénarios S09 à S13 du banc (plan 26-SPEC-CONTRAT-ENVOI-ET-BANC, l.257-261) : S10 = ARF + hostile + abuse@ (3 plaintes, 48 h), S11 = réponse humaine, S12 = STOP, S13 = absence. AUCUN réseau, AUCUN envoi : lecteur et registre en mémoire.
  * Fixtures FICTIVES (dépôt public) : example.test uniquement.
  */
 
+use App\Envoi\Chauffe\CompteurRetours;
+use App\Envoi\Chauffe\DecisionFrein;
+use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Chauffe\ResolveurFournisseur;
+use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Imap\AnalyseArf;
 use App\Envoi\Imap\AnalyseDsn;
 use App\Envoi\Imap\ClasseRetour;
@@ -16,11 +23,14 @@ use App\Envoi\Imap\MessageBrut;
 use App\Envoi\Imap\MessageOrigine;
 use App\Envoi\Imap\RecepteurRetours;
 use App\Envoi\Imap\RecepteurRetoursCrm;
+use App\Envoi\Imap\RecepteurRetoursEnChaine;
+use App\Envoi\Imap\RecepteurRetoursFreins;
 use App\Envoi\Imap\RegistreMessagesEnvoyesDb;
 use App\Envoi\Imap\RegistreMessagesEnvoyesMemoire;
 use App\Envoi\Imap\ReleveImap;
 use App\Envoi\Imap\RetourDetecte;
 use App\Envoi\Imap\Verp;
+use App\Envoi\JourEnvoi;
 use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,21 +54,27 @@ function k11Falsifie(string $adresse): string
 
 beforeEach(function () {
     config(['envoi.cle_empreinte' => 'cle-de-test-k11']);
+    app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire); // jamais de DNS en test
     $this->ws = F::espace('zz-k11');
     config(['crm.ingest.business_workspace' => F::slug($this->ws)]);
     $this->lecteur = new LecteurBoiteMemoire;
     $this->registre = new RegistreMessagesEnvoyesMemoire;
     $this->inj = k11Injection($this->ws);
-    $this->registre->noter('envoi-k11@d.example.test', new MessageOrigine($this->inj, K11_ADRESSE));
+    $this->registre->noter('envoi-k11@d.example.test', new MessageOrigine($this->inj, K11_ADRESSE), $this->ws);
+    DB::table('envoi_domaines')->insert(['workspace_id' => $this->ws, 'nom' => 'd.example.test', 'achete_le' => '2026-01-01']);
     $this->recepteur = new class(new RecepteurRetoursCrm) implements RecepteurRetours
     {
         public int $appels = 0;
+
+        /** @var list<RetourDetecte> */
+        public array $vus = [];
 
         public function __construct(private readonly RecepteurRetours $reel) {}
 
         public function recevoir(string $workspaceId, RetourDetecte $retour): void
         {
             $this->appels++;
+            $this->vus[] = $retour;
             $this->reel->recevoir($workspaceId, $retour);
         }
     };
@@ -130,6 +146,8 @@ test('VERP : jeton signé, aller-retour, falsification et mauvais domaine refus�
         ->and(Verp::idInjectionDepuis(k11Falsifie($adresse)))->toBeNull()
         ->and(Verp::idInjectionDepuis(str_replace('@bounce.', '@', $adresse)))->toBeNull()
         ->and(Verp::idInjectionDepuis('rb-abc@bounce.d.example.test'))->toBeNull();
+    expect(fn () => Verp::adressePour('pas-un-uuid', 'd.example.test'))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => Verp::adressePour(str_repeat('a', 32), 'd.example.test'))->toThrow(InvalidArgumentException::class);
     config(['envoi.cle_empreinte' => 'autre-cle']);
     expect(Verp::idInjectionDepuis($adresse))->toBeNull();
     config(['envoi.cle_empreinte' => '']);
@@ -151,8 +169,11 @@ test('classification : ARF = plainte (même « Auto-Submitted »), not-spam sans
     expect(Classificateur::classer(k11Msg(1, ['arf' => 'abuse', 'h' => $auto])))->toBe(ClasseRetour::Hostile)
         ->and(Classificateur::classer(k11Msg(2, ['arf' => 'fraud'])))->toBe(ClasseRetour::Hostile)
         ->and(Classificateur::classer(k11Msg(3, ['arf' => 'not-spam'])))->toBe(ClasseRetour::AutoReponse)
-        ->and(Classificateur::classer(k11Msg(4, ['corps' => 'Merci de corriger', 'locales' => ['Abuse@d.example.test']])))->toBe(ClasseRetour::Hostile)
-        ->and(Classificateur::classer(k11Msg(5, ['h' => $auto, 'locales' => ['abuse@d.example.test']])))->toBe(ClasseRetour::AutoReponse)
+        ->and(Classificateur::classer(k11Msg(4, ['corps' => 'Merci de corriger', 'locales' => ['Abuse@d.example.test']]), ['d.example.test']))->toBe(ClasseRetour::Hostile)
+        ->and(Classificateur::classer(k11Msg(4, ['corps' => 'Merci', 'locales' => ['abuse@bounce.d.example.test']]), ['d.example.test']))->toBe(ClasseRetour::Hostile)
+        ->and(Classificateur::classer(k11Msg(7, ['corps' => 'Merci', 'locales' => ['abuse@autre.example.test']]), ['d.example.test']))->toBe(ClasseRetour::ReponseHumaine)
+        ->and(Classificateur::classer(k11Msg(8, ['corps' => 'Merci', 'locales' => ['abuse@d.example.test']])))->toBe(ClasseRetour::ReponseHumaine)
+        ->and(Classificateur::classer(k11Msg(5, ['h' => $auto, 'locales' => ['abuse@d.example.test']]), ['d.example.test']))->toBe(ClasseRetour::AutoReponse)
         ->and(Classificateur::classer(k11Msg(6, ['corps' => 'Merci', 'locales' => ['contact@d.example.test']])))->toBe(ClasseRetour::ReponseHumaine);
 });
 
@@ -168,28 +189,46 @@ test('S09 : rebond asynchrone reçu sur bounce.<domaine>, rattaché par le jeton
         ->and(DB::table('contacts')->count())->toBe($contact);
 });
 
-test('S10 : ARF JMRP rattaché par Original-Mail-From VERP => plainte, contact gardé', function () {
+test('ARF JMRP rattaché par Original-Mail-From VERP => plainte, contact gardé', function () {
     k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
 
     expect(DB::table('envoi_evenements')->where('classe', 'hostile')->where('statut', 'rattache')->count())->toBe(1)
         ->and(k11Plainte())->toBeTrue();
 });
 
-test('S11 : ARF Yahoo CFL rattaché par le Message-ID cité => plainte', function () {
+test('ARF Yahoo CFL avec SEUL le Message-ID cité (sans VERP signé) => « à rattacher », AUCUNE opposition', function () {
     k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'dsnMid' => 'envoi-k11@d.example.test']));
 
-    expect(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(1)
-        ->and(k11Plainte())->toBeTrue()
-        ->and(DB::table('opt_out')->count())->toBe(1); // l'expéditeur du rapport (fournisseur) n'est PAS opposé
+    expect(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(0)
+        ->and($this->recepteur->appels)->toBe(0)
+        ->and(DB::table('opt_out')->count())->toBe(0)
+        ->and(ListeSuppression::estSupprimee(K11_ADRESSE))->toBeFalse();
 });
 
-test('S12 : réponse hostile rattachée => plainte', function () {
+test('ARF : In-Reply-To / References pointant un message connu ne rattachent pas non plus (VERP signé seul)', function () {
+    k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'irt' => 'envoi-k11@d.example.test', 'arfDest' => K11_ADRESSE]));
+
+    expect(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+});
+
+test('ARF avec Feedback-Type illisible => « à rattacher », pas une plainte', function () {
+    k11Releve($this, k11Msg(1, ['arf' => 'illisible', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(Classificateur::classer(k11Msg(2, ['arf' => 'illisible'])))->not->toBe(ClasseRetour::Hostile)
+        ->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('classe', 'hostile')->count())->toBe(0)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+});
+
+test('réponse hostile rattachée par Message-ID => plainte', function () {
     k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Je vais porter plainte.']));
 
     expect(k11Plainte())->toBeTrue();
 });
 
-test('S13 : message reçu sur abuse@ rattaché => plainte', function () {
+test('message reçu sur abuse@ (notre domaine) rattaché => plainte', function () {
     k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Cessez ces envois svp.', 'locales' => ['abuse@d.example.test']]));
 
     expect(k11Plainte())->toBeTrue();
@@ -301,6 +340,113 @@ test('registre mémoire : le filtre par espace est respecté (comme la base)', f
     $r->noterInjection($inj, new MessageOrigine($inj, K11_ADRESSE), 'ws-a');
     expect($r->retrouverParInjection('ws-a', $inj))->not->toBeNull()
         ->and($r->retrouverParInjection('ws-b', $inj))->toBeNull();
+});
+
+test('rebond MOU 4.x.x rattaché par VERP : événement rattaché, AUCUNE opposition', function () {
+    k11Releve($this, k11Msg(1, ['dsn' => '4.2.2', 'dest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'rebond_mou')->where('statut', 'rattache')->where('id_injection', $this->inj)->count())->toBe(1)
+        ->and(DB::table('opt_out')->count())->toBe(0)
+        ->and(ListeSuppression::estSupprimee(K11_ADRESSE))->toBeFalse();
+});
+
+test('plainte d\'un AUTRE espace : le VERP de l\'espace A relevé dans l\'espace B => « à rattacher », aucune opposition', function () {
+    $autre = F::espace('zz-k11-b');
+    $this->registre->noterInjection($this->inj, new MessageOrigine($this->inj, K11_ADRESSE), $this->ws); // appartient à l'espace A
+    $this->releve->relever($autre, K11_BOITE); // curseur de l'espace B
+    $this->lecteur->deposer(K11_BOITE, k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+    $this->releve->relever($autre, K11_BOITE);
+
+    expect(DB::table('envoi_evenements')->where('workspace_id', $autre)->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(0)
+        ->and($this->recepteur->appels)->toBe(0)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+});
+
+/** Récepteur de bout en bout : opposition (CRM) PUIS compteurs des freins (L7). */
+function k11ChaineFreins(object $t): ReleveImap
+{
+    $chaine = new RecepteurRetoursEnChaine(
+        new RecepteurRetoursCrm,
+        new RecepteurRetoursFreins(new CompteurRetours(app(DepotChauffe::class), app(ResolveurFournisseur::class), fn () => new DateTimeImmutable('2026-12-02 11:00:00', new DateTimeZone('Europe/Paris')))),
+    );
+
+    return new ReleveImap($t->lecteur, $t->registre, $chaine);
+}
+
+test('S10 : ARF, puis réponse hostile, puis abuse@ => 3 plaintes comptées ; la 1re = palier tenu, la 2e en 7 jours = arrêt 48 h', function () {
+    $releve = k11ChaineFreins($this);
+    $maintenant = new DateTimeImmutable('2026-12-02 12:00:00', new DateTimeZone('Europe/Paris'));
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $evaluer = fn (): array => array_map(fn ($d) => $d->motif, $garde->evaluer($this->ws, $maintenant));
+    $depot = app(DepotChauffe::class);
+    $jour = JourEnvoi::de($maintenant);
+
+    // 1) ARF (VERP signé)
+    $this->lecteur->deposer(K11_BOITE, k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+    $releve->relever($this->ws, K11_BOITE);
+    expect($depot->plaintes7Jours($this->ws, $jour))->toBe(1)
+        ->and($evaluer())->toBe([]); // palier tenu : alerte de relecture, AUCUNE pause
+
+    // 2) réponse hostile
+    $this->lecteur->deposer(K11_BOITE, k11Msg(2, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Je vais porter plainte.']));
+    $releve->relever($this->ws, K11_BOITE);
+    expect($depot->plaintes7Jours($this->ws, $jour))->toBe(2)
+        ->and($evaluer())->toBe([DecisionFrein::PLAINTES_ARRET]); // la 2e en 7 jours : arrêt 48 h
+
+    // 3) message sur abuse@
+    $this->lecteur->deposer(K11_BOITE, k11Msg(3, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Cessez ces envois svp.', 'locales' => ['abuse@d.example.test']]));
+    $releve->relever($this->ws, K11_BOITE);
+    expect($depot->totaux7Jours($this->ws, $jour)['plaintes'])->toBe(3)
+        ->and(DB::table('envoi_evenements')->where('classe', 'hostile')->where('statut', 'rattache')->count())->toBe(3)
+        ->and(k11Plainte())->toBeTrue()
+        ->and(DB::table('envoi_pauses')->where('workspace_id', $this->ws)->count())->toBeGreaterThan(0);
+});
+
+test('S10 : plainte d\'un autre espace => compteurs de l\'espace concerné SEULEMENT (décision B5 en attente : défaut = limité à l\'espace)', function () {
+    $autre = F::espace('zz-k11-c');
+    $releve = k11ChaineFreins($this);
+    $this->lecteur->deposer(K11_BOITE, k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+    $this->lecteur->deposer(K11_BOITE, k11Msg(2, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Je vais porter plainte.']));
+    $releve->relever($this->ws, K11_BOITE);
+    $jour = JourEnvoi::de(new DateTimeImmutable('2026-12-02 12:00:00', new DateTimeZone('Europe/Paris')));
+
+    expect(app(DepotChauffe::class)->plaintes7Jours($this->ws, $jour))->toBe(2)
+        ->and(app(DepotChauffe::class)->plaintes7Jours($autre, $jour))->toBe(0);
+});
+
+test('S11 : réponse humaine => classée « Réponses », rattachée, transmise au séquenceur, aucune opposition', function () {
+    k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Bonjour, oui cela m\'intéresse, pouvez-vous me rappeler ?']));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'reponse_humaine')->where('statut', 'rattache')->count())->toBe(1)
+        ->and($this->recepteur->vus)->toHaveCount(1)
+        ->and($this->recepteur->vus[0]->classe)->toBe(ClasseRetour::ReponseHumaine)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+});
+
+test('S12 : STOP => opposition', function () {
+    k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'STOP']));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'desinscription')->where('statut', 'rattache')->count())->toBe(1)
+        ->and(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(K11_ADRESSE))->count())->toBe(1);
+});
+
+test('S13 : absence du bureau => auto-réponse (pause), AUCUNE opposition', function () {
+    k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'sujet' => 'Absence du bureau', 'corps' => 'Je suis absent jusqu\'au 15.', 'h' => ['auto-submitted' => 'auto-replied']]));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'auto_reponse')->where('statut', 'rattache')->count())->toBe(1)
+        ->and($this->recepteur->vus[0]->classe)->toBe(ClasseRetour::AutoReponse)
+        ->and(DB::table('opt_out')->count())->toBe(0)
+        ->and(ListeSuppression::estSupprimee(K11_ADRESSE))->toBeFalse();
+});
+
+test('ARF BRUT sans Feedback-Type lisible, lu par le lecteur réel => type « illisible », jamais « other »', function () {
+    Faux::reinitialiser();
+    Faux::deposer(1, str_replace('Feedback-Type: abuse', 'Feedback-Type: ???', k11ArfBrut($this->verp, 'envoi-k11@d.example.test')));
+    $lecteur = new LecteurBoiteWebklex(['host' => 'imap.k11.example.test', 'username' => 'u', 'password' => 'p'], K11_BOITE, 'INBOX', static fn () => new FauxProtocoleImap(Config::make(), true, 'ssl'));
+    expect($lecteur->lire(K11_BOITE, 0)->messages[0]->typeArf)->toBe('illisible');
+    (new ReleveImap($lecteur, $this->registre, $this->recepteur))->relever($this->ws, K11_BOITE);
+    expect(DB::table('opt_out')->count())->toBe(0)->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1);
 });
 
 test('index (workspace_id, id_injection) présent sur envoi_messages_envoyes', function () {

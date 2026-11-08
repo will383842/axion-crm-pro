@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -131,6 +131,8 @@ final class SemeurTablesScopees
         'envoi_sequences',
         'envoi_sequence_etapes',
         'envoi_inscriptions',
+        // Envoi P0 L1 : trace des événements d'inscription (ajout seul + FK composite vers `envoi_inscriptions`) : APPEND_SEUL_AVEC_FK.
+        'envoi_inscriptions_evenements',
         'envoi_messages',
         // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
         'envoi_controles_listes',
@@ -545,6 +547,10 @@ final class SemeurTablesScopees
             'id' => $inscription, 'sequence_id' => $sequence, 'contact_id' => $id['contacts'], 'entreprise_id' => $id['companies'],
             'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
             'prochaine_echeance' => now(), 'version_figee' => '{}',
+        ]);
+        $inserer('envoi_inscriptions_evenements', [
+            'inscription_id' => $inscription, 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'), 'evenement' => 'reponse',
         ]);
         $inserer('envoi_messages', [
             'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',

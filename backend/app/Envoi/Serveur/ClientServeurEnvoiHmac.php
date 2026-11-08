@@ -120,6 +120,22 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         throw ServeurEnvoiRefuse::motif('désynchronisation constatée : tirage arrêté pour ce serveur.');
     }
 
+    /**
+     * Mesures de santé du serveur (K15) : GET signé, mêmes contrôles locaux que le tirage. Aucune écriture.
+     *
+     * @return array<string, mixed>
+     */
+    public function lireSante(string $workspaceId, string $source): array
+    {
+        // 401 lu : la passerelle SIGNE son refus pour écart d'horloge (`horloge_hors_fenetre`), seulement après avoir vérifié la signature.
+        ['statut' => $statut, 'json' => $json] = $this->appeler($this->preparer($workspaceId, $source), $workspaceId, 'GET', SignatureEnvoi::CHEMIN_SANTE, '', '', [401]);
+        if ($statut === 401) {
+            throw ($json['erreur'] ?? null) === 'horloge_hors_fenetre' ? ServeurEnvoiRefuse::horloge() : ServeurEnvoiRefuse::motif('réponse en erreur (statut 401).');
+        }
+
+        return $json;
+    }
+
     public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
     {
         // TOUS les contrôles locaux (interrupteurs, source active, adresse, garde d'hôte, TLS) AVANT toute trace :
@@ -189,7 +205,7 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         $this->controlesGeneraux();
         $secret = $this->propre('secrets', $source);
         if ($secret === '') {
-            throw ServeurEnvoiRefuse::motif('secret HMAC propre à la source absent, appel refusé.');
+            throw ServeurEnvoiRefuse::configuration('secret HMAC propre à la source absent, appel refusé.');
         }
         $actif = WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')
             ->where('workspace_id', $workspaceId)->where('source', $source)->where('actif', true)->exists());
@@ -198,7 +214,7 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         }
         $url = $this->propre('urls', $source);
         if ($url === '') {
-            throw ServeurEnvoiRefuse::motif('adresse propre à la source absente de la configuration.');
+            throw ServeurEnvoiRefuse::configuration('adresse propre à la source absente de la configuration.');
         }
         $cible = GardeHoteServeur::controler($url, $this->resolveur);
         $max = self::MAX_CORPS_OCTETS;

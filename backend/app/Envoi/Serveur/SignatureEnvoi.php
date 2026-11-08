@@ -15,6 +15,8 @@ final class SignatureEnvoi
 {
     public const CHEMIN_EVENEMENTS = '/v1/evenements';
 
+    public const CHEMIN_SANTE = '/v1/sante';
+
     public const PREFIXE_COMMANDES = '/v1/commandes/';
 
     public static function chargeRequete(string $methode, string $chemin, string $horodatage, string $nonce, string $workspaceId, string $corps): string

@@ -34,6 +34,7 @@ use App\Envoi\JourEnvoi;
 use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\FauxProtocoleImap;
@@ -404,7 +405,7 @@ test('S10 : ARF, puis réponse hostile, puis abuse@ => 3 plaintes comptées ; la
     // 3) message sur abuse@
     $this->lecteur->deposer(K11_BOITE, k11Msg(3, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Cessez ces envois svp.', 'locales' => ['abuse@d.example.test']]));
     $releve->relever($this->ws, K11_BOITE);
-    expect($depot->totaux7Jours($this->ws, $jour)['plaintes'])->toBe(3)
+    expect($depot->totaux7Jours($this->ws, $jour, 'domaine')['plaintes'])->toBe(3)
         ->and(DB::table('envoi_evenements')->where('classe', 'hostile')->where('statut', 'rattache')->count())->toBe(3)
         ->and(k11Plainte())->toBeTrue()
         ->and(DB::table('envoi_pauses')->where('workspace_id', $this->ws)->count())->toBeGreaterThan(0);
@@ -520,6 +521,25 @@ test('ARF de type INCONNU (même avec un VERP signé) => « à rattacher », jam
         ->and($this->recepteur->appels)->toBe(0)
         ->and(DB::table('opt_out')->count())->toBe(0);
 })->with(['other', 'type-farfelu', 'opt-out']);
+
+test('ARF other/inconnu/illisible portant un VERP signé valide => ALERTE, jamais d\'opposition automatique', function (string $type) {
+    Log::spy();
+    k11Releve($this, k11Msg(1, ['arf' => $type, 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    Log::shouldHaveReceived('alert')->once()->withArgs(fn ($m, $ctx = []) => str_contains($m, 'envoi.arf_type_inconnu_verp_valide') && ($ctx['id_injection'] ?? null) === $this->inj && ! str_contains(json_encode($ctx), K11_ADRESSE));
+    expect($this->recepteur->appels)->toBe(0)
+        ->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+})->with(['other', 'type-farfelu', 'illisible']);
+
+test('ARF other SANS VERP signé (ou VERP falsifié) : pas d\'alerte, pas d\'opposition', function () {
+    Log::spy();
+    k11Releve($this, k11Msg(1, ['arf' => 'other', 'arfDest' => K11_ADRESSE, 'irt' => 'envoi-k11@d.example.test']));
+    k11Releve($this, k11Msg(2, ['arf' => 'other', 'arfDest' => K11_ADRESSE, 'locales' => [k11Falsifie($this->verp)]]));
+
+    Log::shouldNotHaveReceived('alert');
+    expect($this->recepteur->appels)->toBe(0)->and(DB::table('opt_out')->count())->toBe(0);
+});
 
 test('ARF de type connu : abuse, fraud, virus restent des plaintes rattachées', function (string $type) {
     k11Releve($this, k11Msg(1, ['arf' => $type, 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));

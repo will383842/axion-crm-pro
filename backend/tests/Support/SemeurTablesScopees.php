@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -127,8 +127,18 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
+        // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
+        'envoi_sequences',
+        'envoi_sequence_etapes',
+        'envoi_inscriptions',
+        // Envoi P0 L1 : trace des événements d'inscription (ajout seul + FK composite vers `envoi_inscriptions`) : APPEND_SEUL_AVEC_FK.
+        'envoi_inscriptions_evenements',
+        'envoi_messages',
         // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
         'envoi_controles_listes',
+        'envoi_config_versions',
+        'envoi_releves_sante',
+        'envoi_constats_sante',
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
@@ -530,11 +540,48 @@ final class SemeurTablesScopees
             'achete_le' => '2026-01-01',
         ]);
 
+        $sequence = (string) Str::uuid();
+        $inserer('envoi_sequences', ['id' => $sequence, 'nom' => 'ZZ Étanchéité']);
+        $inserer('envoi_sequence_etapes', [
+            'sequence_id' => $sequence, 'rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'ZZ sujet', 'corps' => 'ZZ corps',
+        ]);
+        $inscription = (string) Str::uuid();
+        $inserer('envoi_inscriptions', [
+            'id' => $inscription, 'sequence_id' => $sequence, 'contact_id' => $id['contacts'], 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'prochaine_echeance' => now(), 'version_figee' => '{}',
+        ]);
+        $inserer('envoi_inscriptions_evenements', [
+            'inscription_id' => $inscription, 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'), 'evenement' => 'reponse',
+        ]);
+        $inserer('envoi_messages', [
+            'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',
+        ]);
+
+        $inserer('envoi_config_versions', [
+            'empreinte' => hash('sha256', 'zz-etancheite'),
+            'statut' => 'invalide',
+        ]);
+
         $inserer('envoi_controles_listes', [
             'type' => 'domaine',
             'ressource' => 'zz-etancheite.example.invalid',
             'statut' => 'non_liste',
             'zone' => '*',
+        ]);
+
+        $inserer('envoi_releves_sante', [
+            'source' => 'zz-etancheite',
+            'mesure_le' => '2026-01-01 00:00:00+00',
+            'ok' => true,
+        ]);
+
+        $inserer('envoi_constats_sante', [
+            'source' => 'zz-etancheite',
+            'code' => 'disque',
+            'etat' => 'ouvert',
+            'gravite' => 'attention',
         ]);
 
         $inserer('listes_manuelles_membres', [

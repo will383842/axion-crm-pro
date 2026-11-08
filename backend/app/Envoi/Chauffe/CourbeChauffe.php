@@ -32,12 +32,15 @@ final class CourbeChauffe
     /**
      * Paliers : [dernier jour de chauffe couvert (null = sans fin), nom, quota/jour/boîte].
      *
-     * @var list<array{jusqua: ?int, palier: string, quota: int}>
+     * `quota` = par boîte ; `total` = budget TOTAL de la ressource (IP ou domaine) qui porte les boîtes
+     * (20 / 35 / 50 par jour : 26 § 4.2, deux boîtes), utilisé par la chauffe SÉPARÉE de l'IP (K8).
+     *
+     * @var list<array{jusqua: ?int, palier: string, quota: int, total: int}>
      */
     public const PALIERS = [
-        ['jusqua' => 5, 'palier' => 'P1', 'quota' => 10],
-        ['jusqua' => 10, 'palier' => 'P2', 'quota' => 18],
-        ['jusqua' => null, 'palier' => 'P3', 'quota' => 25],
+        ['jusqua' => 5, 'palier' => 'P1', 'quota' => 10, 'total' => 20],
+        ['jusqua' => 10, 'palier' => 'P2', 'quota' => 18, 'total' => 35],
+        ['jusqua' => null, 'palier' => 'P3', 'quota' => 25, 'total' => 50],
     ];
 
     /**
@@ -78,16 +81,20 @@ final class CourbeChauffe
      * Jours EFFECTIFS à partir des volumes réellement envoyés : un jour ne compte que si le volume atteint
      * `$part` × le quota du palier où la boîte se trouvait CE jour-là (arrondi au supérieur, au moins 1).
      *
+     * Avec `$parRessource`, le seuil se mesure sur le budget TOTAL de la ressource (IP : 10 en P1 = 50 % de 20),
+     * pas sur le quota d'une seule boîte.
+     *
      * @param  array<string, int>  $volumes  'Y-m-d' (Paris) => messages envoyés ce jour-là
      * @return list<DateTimeImmutable>
      */
-    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART): array
+    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART, bool $parRessource = false): array
     {
         ksort($volumes);
         $effectifs = [];
         foreach ($volumes as $j => $n) {
             $jour = new DateTimeImmutable($j, new \DateTimeZone(JourEnvoi::FUSEAU));
-            $minimum = max(1, (int) ceil(round($part * self::quotaBoite(self::jourDeChauffe($effectifs, $jour)), 9)));
+            $base = self::jourDeChauffe($effectifs, $jour);
+            $minimum = max(1, (int) ceil(round($part * ($parRessource ? self::quotaRessource($base) : self::quotaBoite($base)), 9)));
             if ($n >= $minimum) {
                 $effectifs[] = $jour;
             }
@@ -111,6 +118,12 @@ final class CourbeChauffe
     public static function quotaBoite(int $jourDeChauffe): int
     {
         return min(self::ligne(max(1, $jourDeChauffe))['quota'], PasserelleLocale::PLAFOND_MAX);
+    }
+
+    /** Budget TOTAL d'une ressource (IP ou domaine) pour ce jour de chauffe : 20 / 35 / 50, jamais au-delà du plafond dur. */
+    public static function quotaRessource(int $jourDeChauffe): int
+    {
+        return min(self::ligne(max(1, $jourDeChauffe))['total'], PasserelleLocale::PLAFOND_MAX);
     }
 
     /** Jours civils entre deux jours : 1 = jours consécutifs. */
@@ -140,7 +153,7 @@ final class CourbeChauffe
         return $effectifs;
     }
 
-    /** @return array{jusqua: ?int, palier: string, quota: int} */
+    /** @return array{jusqua: ?int, palier: string, quota: int, total: int} */
     private static function ligne(int $jourDeChauffe): array
     {
         foreach (self::PALIERS as $p) {

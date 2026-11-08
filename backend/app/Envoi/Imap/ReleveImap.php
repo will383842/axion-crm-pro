@@ -209,7 +209,14 @@ final class ReleveImap
         // Les autres retours : VERP d'abord (preuve la plus forte), puis le Message-ID cité ou répondu.
         $origine = $this->parVerp($workspaceId, $m);
         if ($m->typeArf !== null && ! AnalyseArf::typeConnu($m->typeArf)) {
-            $origine = null; // Feedback-Type illisible ou INCONNU : « à rattacher », jamais d'effet deviné
+            // Feedback-Type illisible ou INCONNU : « à rattacher », jamais d'effet deviné. Mais si un VERP SIGNÉ valide
+            // prouve que le rapport concerne bien un de nos envois, un humain doit le voir : ALERTE (sans adresse).
+            if ($origine !== null) {
+                Log::alert('envoi.arf_type_inconnu_verp_valide : plainte non classée portant un VERP signé, revue humaine requise (aucune opposition automatique).', [
+                    'workspace_id' => $workspaceId, 'id_injection' => $origine->idInjection, 'type' => substr($m->typeArf, 0, 40),
+                ]);
+            }
+            $origine = null;
         }
         if ($origine === null && $m->typeArf === null) {
             $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));

@@ -146,15 +146,15 @@ chk  "D7 documente (aucun tunnel vers la prod)" grep -q 'D7' "$D/RUNBOOK.md"
 # seules les adresses de DOCUMENTATION (RFC 5737 : 192.0.2/24, 198.51.100/24, 203.0.113/24 ;
 # RFC 3849 : 2001:db8::/32) en plus de 127.0.0.1 et ::1.
 litteraux() { # litteraux <dossier> [strict|doc] : une ligne par trouvaille
-  # Tiers exclus (K2) : vendor/ et composer.lock de la passerelle (URLs de paquets, versions).
-  local d="$1" mode="${2:-strict}" ex=(--exclude-dir=tests --exclude-dir=vendor --exclude=composer.lock)
-  [[ $mode == doc ]] && ex=(--exclude-dir=vendor --exclude=composer.lock)
+  local d="$1" mode="${2:-strict}" ex=(--exclude-dir=tests)
+  [[ $mode == doc ]] && ex=()
   { grep -rEno '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' "$d" "${ex[@]}" | grep -Ev ':127\.0\.0\.1$' \
       | { if [[ $mode == doc ]]; then grep -Ev ':(192\.0\.2|198\.51\.100|203\.0\.113)\.[0-9]{1,3}$'; else cat; fi; } || true
     grep -rPno '(?<![0-9A-Za-z:])[0-9A-Fa-f:]*:[0-9A-Fa-f]*:[0-9A-Fa-f:]*(?![0-9A-Za-z:])' "$d" "${ex[@]}" | grep -Ev ':::1$' \
       | { if [[ $mode == doc ]]; then grep -Eiv ':2001:db8(:[0-9a-f]*)*$'; else cat; fi; } || true
     grep -rPno '(?<![A-Za-z0-9_.@-])(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+(?:com|net|org|io|fr|eu|de|uk|us|info|biz|dev|app|cloud|xyz|ai|email|pro)(?![A-Za-z0-9-])' "$d" "${ex[@]}" | grep -Ev ':(ghcr|docker)\.io$' || true
-    grep -rEnio '(PrivateKey|PresharedKey) *= *[A-Za-z0-9+/]{43}=|BEGIN [A-Z ]*PRIVATE KEY|password *= *[^<[:space:]]' "$d" "${ex[@]}" || true; }
+    grep -rEnio '(PrivateKey|PresharedKey) *= *[A-Za-z0-9+/]{43}=|BEGIN [A-Z ]*PRIVATE KEY|password *= *[^<[:space:]]' "$d" "${ex[@]}" || true; } \
+    | grep -vF -- "$D/passerelle/composer.lock:" || true  # K2 : SEUL ce fichier (URL de paquets générées par Composer), rien d'autre
   return 0; }
 trouve="$(litteraux "$D")"
 [[ -z "$trouve" ]] && ok "aucune IP/IPv6/domaine/secret litteral" || bad "litteral: $trouve"

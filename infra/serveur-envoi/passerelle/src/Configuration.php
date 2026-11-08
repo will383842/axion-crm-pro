@@ -18,4 +18,15 @@ final class Configuration
 
         return array_filter($d, fn ($v, $k): bool => is_string($k) && is_string($v) && $v !== '', ARRAY_FILTER_USE_BOTH);
     }
+
+    /**
+     * Purge automatique des événements : INACTIVE par défaut. Les événements peuvent contenir des données de personnes ;
+     * la règle de rétention doit être validée par le responsable avant activation (PASSERELLE_PURGE_ACTIVE=true).
+     */
+    public static function purgeActive(?string $valeur = null): bool
+    {
+        $valeur ??= getenv('PASSERELLE_PURGE_ACTIVE') ?: '';
+
+        return $valeur === 'true';
+    }
 }

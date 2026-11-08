@@ -11,12 +11,19 @@ final class FauxKumo implements Kumo
 
     public bool $echec = false;
 
+    /** Crochet de test, appelé PENDANT l'appel (simule une requête concurrente ou une panne). */
+    public ?\Closure $pendant = null;
+
     public function executer(string $workspaceId, string $operation, array $params): array
     {
+        $this->appels[] = ['workspace_id' => $workspaceId, 'operation' => $operation, 'params' => $params];
+        if ($this->pendant !== null) {
+            ($this->pendant)();
+        }
         if ($this->echec) {
+            array_pop($this->appels);
             throw new \RuntimeException('faux_echec');
         }
-        $this->appels[] = ['workspace_id' => $workspaceId, 'operation' => $operation, 'params' => $params];
 
         return ['accepte' => true, 'appel' => count($this->appels)];
     }

@@ -1,0 +1,38 @@
+name: Passerelle envoi K2
+
+# Workflow DÉDIÉ, filtré par chemin : il ne tourne que si la passerelle (ou ce fichier, ou le contrat partagé) change.
+on:
+  pull_request:
+    paths:
+      - 'infra/serveur-envoi/passerelle/**'
+      - 'envoi-serveur/contrat/**'
+      - '.github/workflows/passerelle-envoi.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/serveur-envoi/passerelle/**'
+      - 'envoi-serveur/contrat/**'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Passerelle (PHPUnit, SQLite, faux KumoMTA)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10  # anti-gel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite
+          coverage: none
+          tools: composer:v2
+      - name: Dépendances (composer.lock figé)
+        working-directory: infra/serveur-envoi/passerelle
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Tests (aucun envoi réel : KumoMTA est simulé)
+        working-directory: infra/serveur-envoi/passerelle
+        run: vendor/bin/phpunit --no-progress

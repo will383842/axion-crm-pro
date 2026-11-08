@@ -584,12 +584,6 @@ jobs:
           git fetch --no-tags --prune --unshallow origin 2>/dev/null || true
           git fetch --no-tags origin main:refs/remotes/origin/main
           bash infra/serveur-envoi/tests/lancer-tests.sh
-      - name: Serveur d'envoi K2 — tests de la passerelle (PHPUnit, SQLite, faux KumoMTA)
-        working-directory: infra/serveur-envoi/passerelle
-        run: |
-          set -euo pipefail
-          composer install --no-interaction --no-progress --prefer-dist
-          vendor/bin/phpunit
 
   donnees-personnelles:
     name: Aucune donnée nominative dans ce dépôt public

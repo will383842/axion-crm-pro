@@ -69,7 +69,7 @@ final class RelanceEffetsOpposition
             })
             ->where('o.workspace_id', $workspaceId)->whereNull('o.effets_termines_le')
             ->where(fn ($q) => $q->whereNull('r.pas_avant')->orWhere('r.pas_avant', '<=', self::ts($maintenant)))
-            ->orderBy('o.id')->limit(self::LOT)->get(['o.id', 'r.essais']));
+            ->orderBy('o.id')->limit(self::LOT)->get(['o.id', 'r.essais', 'r.alerte_le']));
 
         $relancees = 0;
         foreach ($lignes as $ligne) {
@@ -82,7 +82,7 @@ final class RelanceEffetsOpposition
             $essais = (int) $ligne->essais + 1;
             $delai = min(2 ** $essais, self::DELAI_MAX_MIN);
             $this->noterEchec($workspaceId, $id, $essais, $maintenant->copy()->addMinutes($delai), $maintenant);
-            if ($essais === self::ALERTE_APRES) {
+            if ($essais >= self::ALERTE_APRES && $ligne->alerte_le === null) {
                 Log::critical("Opposition {$id} : effets toujours non terminés après {$essais} relances.", ['workspace_id' => $workspaceId]);
             }
         }
@@ -96,7 +96,7 @@ final class RelanceEffetsOpposition
             'INSERT INTO envoi_relances_effets (workspace_id, cle, essais, pas_avant, alerte_le, mis_a_jour_le) VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT (workspace_id, cle) DO UPDATE SET essais = EXCLUDED.essais, pas_avant = EXCLUDED.pas_avant,
                  alerte_le = COALESCE(envoi_relances_effets.alerte_le, EXCLUDED.alerte_le), mis_a_jour_le = EXCLUDED.mis_a_jour_le',
-            [$workspaceId, "opposition:{$id}", $essais, self::ts($pasAvant), $essais === self::ALERTE_APRES ? self::ts($maintenant) : null, self::ts($maintenant)],
+            [$workspaceId, "opposition:{$id}", $essais, self::ts($pasAvant), $essais >= self::ALERTE_APRES ? self::ts($maintenant) : null, self::ts($maintenant)],
         ));
     }
 

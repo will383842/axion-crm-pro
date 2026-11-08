@@ -10,7 +10,9 @@
 use App\Envoi\Desinscription\EnregistrerOpposition;
 use App\Envoi\Desinscription\InscriptionsEnvoi;
 use App\Envoi\Desinscription\JetonDesinscription;
+use App\Envoi\Desinscription\RelanceEffetsOpposition;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\TerminerEffetsOpposition;
 use App\Providers\EnvoiServiceProvider;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,17 +134,33 @@ test('(d) dejaEnregistree et executer ne voient jamais l’opposition d’un aut
     expect($opposition->executer($autre, $reference, EnregistrerOpposition::CANAL_PAGE))->toBeFalse();
 });
 
-test('(e) production : démarrage refusé si la clé de signature des liens fait moins de 32 caractères', function () {
-    config(['envoi.cle_desinscription' => str_repeat('k', 31)]);
+test('(e) production + envoi réel ouvert : démarrage refusé si la clé fait moins de 32 caractères', function () {
+    config(['envoi.reel_actif' => true, 'envoi.cle_desinscription' => str_repeat('k', 31)]);
     $this->app['env'] = 'production';
     expect(fn () => (new EnvoiServiceProvider($this->app))->boot())->toThrow(RuntimeException::class, '32');
 
     config(['envoi.cle_desinscription' => '']);
     expect(fn () => (new EnvoiServiceProvider($this->app))->boot())->toThrow(RuntimeException::class);
 
+    // 32 espaces : une fois « trim », la clé est vide => refus.
+    config(['envoi.cle_desinscription' => str_repeat(' ', 32)]);
+    expect(fn () => (new EnvoiServiceProvider($this->app))->boot())->toThrow(RuntimeException::class);
+
     config(['envoi.cle_desinscription' => str_repeat('k', 32)]);
     (new EnvoiServiceProvider($this->app))->boot();   // 32 caractères : accepté
     expect(true)->toBeTrue();
+});
+
+test('(e) production, envoi réel éteint, clé vide : le démarrage passe (jamais de coupure du CRM)', function () {
+    config(['envoi.reel_actif' => false]);
+    $this->app['env'] = 'production';
+    foreach (['', '   ', 'courte', str_repeat(' ', 32)] as $cle) {
+        config(['envoi.cle_desinscription' => $cle]);
+        (new EnvoiServiceProvider($this->app))->boot();
+    }
+    // L'émission d'un lien, elle, reste refusée sans clé valide.
+    config(['envoi.cle_desinscription' => '']);
+    expect(fn () => JetonDesinscription::emettre($this->ws, '00000000-0000-4000-8000-000000000000'))->toThrow(RuntimeException::class);
 });
 
 test('(e) la garde ne bloque jamais les tests : environnement testing exclu', function () {
@@ -174,4 +192,44 @@ test('(f) hôte non configuré ou invalide : aucun lien émis (jamais déduit de
 
     config(['envoi.desinscription_hote' => 'ailleurs', 'envoi.desinscription_hotes' => ['app' => 'https://app.zz-suivi.example.invalid']]);
     expect(fn () => JetonDesinscription::url($this->ws, $ref))->toThrow(RuntimeException::class);
+});
+
+test('(g) InscriptionsEnvoi::existe filtre par espace', function () {
+    $autre = F::espace('zz-suivi-existe');
+    $reference = InscriptionsEnvoi::creer($this->ws, 'g@zz-suivi.example.invalid');
+
+    expect(InscriptionsEnvoi::existe($this->ws, $reference))->toBeTrue();
+    expect(InscriptionsEnvoi::existe($autre, $reference))->toBeFalse();
+    // Sans le filtre d'espace applicatif, seule la RLS protège : on la contourne (hors contexte) pour prouver le filtre.
+    expect(DB::table('envoi_liens_desinscription')->where('workspace_id', $autre)->where('reference', $reference)->exists())->toBeFalse();
+});
+
+test('(h) TerminerEffetsOpposition ne termine jamais l’opposition d’un autre espace', function () {
+    $autre = F::espace('zz-suivi-terminer');
+    $id = suiviOpposition($this->ws, 'h@zz-suivi.example.invalid');
+    $effets = new TerminerEffetsOpposition(static function (): void {});
+
+    expect($effets->pour($autre, $id))->toBeFalse();
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('id', $id)->value('effets_termines_le')))->toBeNull();
+    expect($effets->pour($this->ws, $id))->toBeTrue();
+});
+
+test('(i) alerte critique après 10 échecs, une seule fois, même si le compteur dépasse 10', function () {
+    suiviRetraitEnPanne();
+    $id = suiviOpposition($this->ws, 'i@zz-suivi.example.invalid');
+    Log::spy();
+    $cle = "opposition:{$id}";
+    $relance = fn () => app(RelanceEffetsOpposition::class)->executer();
+    $etat = fn () => WorkspaceContext::run($this->ws, fn () => DB::table('envoi_relances_effets')->where('workspace_id', $this->ws)->where('cle', $cle)->first());
+
+    // Essai 10 « manqué » : l'état saute à 11 sans alerte (ex. ancienne ligne), alerte_le nul.
+    WorkspaceContext::run($this->ws, fn () => DB::table('envoi_relances_effets')->insert(['workspace_id' => $this->ws, 'cle' => $cle, 'essais' => 10, 'pas_avant' => null]));
+    $relance();
+    Log::shouldHaveReceived('critical')->once();
+    expect($etat()->essais)->toBe(11);
+    expect($etat()->alerte_le)->not->toBeNull();
+
+    WorkspaceContext::run($this->ws, fn () => DB::table('envoi_relances_effets')->where('cle', $cle)->update(['pas_avant' => null]));
+    $relance();
+    Log::shouldHaveReceived('critical')->once();   // pas de seconde alerte
 });

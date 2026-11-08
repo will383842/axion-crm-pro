@@ -27,7 +27,7 @@ return [
     'desinscription_validite_jours' => (int) env('ENVOI_DESINSCRIPTION_VALIDITE_JOURS', 730),
     // Hôte des liens de désinscription, FIXÉ ici et jamais déduit de la requête : `app` ou `api` (le Caddy route
     // /desinscription/* vers l'API sur les deux). Adresses sans chemin, en https (http toléré hors production).
-    'desinscription_hote' => (string) env('ENVOI_DESINSCRIPTION_HOTE', 'app'),
+    'desinscription_hote' => (string) (env('ENVOI_DESINSCRIPTION_HOTE') ?: 'app'),
     'desinscription_hotes' => [
         'app' => (string) env('ENVOI_DESINSCRIPTION_URL_APP', ''),
         'api' => (string) env('ENVOI_DESINSCRIPTION_URL_API', ''),

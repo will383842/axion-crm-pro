@@ -104,18 +104,20 @@ final class JetonDesinscription
     }
 
     /**
-     * Garde de démarrage : en production, une clé de signature de moins de 32 caractères (ou absente) interdit le
-     * démarrage. Jamais sous `testing` (ni en local) : les tests posent leurs propres clés.
+     * Garde de démarrage : en production ET seulement si l'envoi réel est ouvert (`envoi.reel_actif`), une clé de
+     * signature de moins de 32 caractères (espaces retirés) ou absente interdit le démarrage. Interrupteur éteint
+     * (défaut) : jamais d'échec du démarrage général (web, Horizon, scheduler, migrate) ; l'émission d'un lien reste
+     * refusée par `emettre()`. Jamais sous `testing` (ni en local) : les tests posent leurs propres clés.
      */
     public static function garderAuDemarrage(string $environnement): void
     {
-        if ($environnement === 'production' && strlen(self::cle()) < self::CLE_LONGUEUR_MIN) {
+        if ($environnement === 'production' && config('envoi.reel_actif') === true && strlen(self::cle()) < self::CLE_LONGUEUR_MIN) {
             throw new RuntimeException('ENVOI_CLE_DESINSCRIPTION absente ou trop courte (' . self::CLE_LONGUEUR_MIN . ' caractères au moins) : démarrage refusé en production.');
         }
     }
 
     private static function cle(): string
     {
-        return (string) config('envoi.cle_desinscription', '');
+        return trim((string) config('envoi.cle_desinscription', ''));
     }
 }

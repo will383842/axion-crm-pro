@@ -58,11 +58,7 @@ function Formulaire({ initiale }: { initiale: Identite }) {
       <Bloc titre="Bloc d’information (art. 14)" icone={<ShieldCheck className="h-5 w-5" />}>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Sous chaque message</p>
         <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{initiale.bloc_information}</p>
-        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Ajouté si la campagne mesure les ouvertures</p>
-        <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{initiale.bloc_information_ouvertures}</p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-          <li>La mesure des ouvertures est facultative : vous la choisissez campagne par campagne (décochée par défaut).</li>
-          <li>Elle n’est jamais appliquée à une personne qui s’est opposée.</li>
           <li>Aucun clic n’est suivi : les liens de vos messages ne sont pas modifiés.</li>
         </ul>
       </Bloc>

@@ -23,7 +23,8 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
     await page.getByRole('button', { name: 'Vérifier' }).click();
     const reponse = page.getByTestId('reponse-puis-je-ecrire');
     await expect(reponse).toContainText('Non');
-    await expect(reponse).toContainText(/aucune mesure des ouvertures/i);
+    await expect(reponse).toContainText(/aucun message ne part/i);
+    await expect(reponse).not.toContainText(/ouverture|pixel/i);
     await controleAxe(page);
   });
 
@@ -75,7 +76,7 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
 
     await page.goto(page.url().replace('/alertes', '/identite'));
     await expect(page.getByText(/SAS/).first()).toBeVisible();
-    await expect(page.getByText(/mesure des ouvertures/i).first()).toBeVisible();
+    await expect(page.getByText(/ouverture|pixel/i)).toHaveCount(0);
     await expect(page.getByText(/aucun clic/i).first()).toBeVisible();
     await controleAxe(page);
 

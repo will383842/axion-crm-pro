@@ -52,8 +52,9 @@ describe('Désinscriptions (DM2-CNF)', () => {
     const reponse = await screen.findByRole('status');
     expect(within(reponse).getByText('Non')).toBeVisible();
     expect(within(reponse).getByText(new RegExp(opposee.motif.replace(/[()«».]/g, '.'), 'i'))).toBeVisible();
-    // Jamais de mesure des ouvertures pour un contact opposé.
-    expect(within(reponse).getByText(/aucune mesure des ouvertures/i)).toBeVisible();
+    // Aucune mention d’ouverture ni de pixel, jamais.
+    expect(within(reponse).getByText(/aucun message ne part/i)).toBeVisible();
+    expect(within(reponse).queryByText(/ouverture|pixel/i)).toBeNull();
   });
 
   it('« Puis-je écrire à… ? » répond « Oui » pour une adresse inconnue du registre', async () => {

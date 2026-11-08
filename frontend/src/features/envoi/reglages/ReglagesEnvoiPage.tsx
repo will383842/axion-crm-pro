@@ -86,13 +86,6 @@ export function ReglagesEnvoiPage() {
               <Entree to="/envoi/reglages/connexion-crm" icone={<ClipboardList className="h-5 w-5" />} titre="Connexion au CRM" detail="Adaptateur, santé, ce qui passe" />
             </ul>
             <ModeAbsence absence={a.absence} />
-            <Bloc titre="Mesure des ouvertures" droite={<StatusPill tone="neutral">Éteinte par défaut</StatusPill>}>
-              <p className="text-sm text-slate-600">
-                Facultative, campagne par campagne : case « Suivre les ouvertures (estimation) », décochée par défaut. Le chiffre
-                reste une estimation : les ouvertures automatiques (Apple, relais d’images) sont exclues, et rien n’est mesuré pour
-                une personne qui s’est opposée. Les réponses restent l’indicateur principal. Aucun clic n’est mesuré.
-              </p>
-            </Bloc>
             <Bloc titre="Boucles de retour des messageries" droite={<StatusPill tone="warning">{a.boucles_de_retour.filter((b) => b.etat === 'a_faire').length} à faire</StatusPill>}>
               <ul className="divide-y divide-slate-100 text-sm">
                 {a.boucles_de_retour.map((b) => (

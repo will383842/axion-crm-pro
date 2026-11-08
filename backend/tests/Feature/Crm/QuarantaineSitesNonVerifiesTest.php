@@ -46,6 +46,7 @@ use Illuminate\Testing\TestResponse;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\ResolveurDnsSimule;
+use Tests\Support\StatistiquesPlanStables;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -536,44 +537,13 @@ function qsEspaceRls(): array
     // Statistiques du planificateur posées ICI, une fois : sans cela, le plan
     // dépend de ce que les tests précédents de la même part ont laissé sur ces
     // tables (taille, analyse faite ou non), et le test compare deux plans pris
-    // à un état que rien ne maîtrise. `qsNettoyer` rend les pages à la fin.
-    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
-        $owner->statement('ANALYZE ' . $table);
-    }
+    // à un état que rien ne maîtrise. `StatistiquesPlanStables::rendre` les retire à la fin.
+    StatistiquesPlanStables::analyser($owner, QS_TABLES_PLAN);
 
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
 }
 
-/**
- * Coupe (false) ou rétablit (true) l'autovacuum des tables dont le plan est
- * mesuré. Sans cela, une analyse automatique peut tomber entre la mesure du plan
- * « avec le critère » et celle du plan « sans le critère », qui sont alors pris à
- * des statistiques différentes. Les statistiques sont posées par `qsEspaceRls`.
- */
-function qsAutovacuum(bool $actif): void
-{
-    foreach (['companies', 'contacts', 'contacts_provenances_tiers'] as $table) {
-        qsProprio()->statement('ALTER TABLE ' . $table . ($actif ? ' RESET (autovacuum_enabled)' : ' SET (autovacuum_enabled = false)'));
-    }
-}
-
-/**
- * Rend les trois tables à l'état où les autres tests les attendent : vides,
- * sans page morte et SANS statistique. Les lignes semées sont supprimées, mais
- * leurs pages restent, et l'`ANALYZE` de `qsEspaceRls` laisse des statistiques
- * de 2 ou 3 lignes : `EntreprisesVerifierSitesTest`, qui lit un plan, y verrait
- * un tri au lieu de l'index partiel ordonné. Le rôle propriétaire est
- * SUPERUSER ; la base est celle des tests.
- */
-function qsRendreLesTables(): void
-{
-    $owner = qsProprio();
-    foreach (['contacts_provenances_tiers', 'contacts', 'companies'] as $table) {
-        $owner->statement('VACUUM ' . $table);
-        $owner->statement('DELETE FROM pg_statistic WHERE starelid = ?::regclass', [$table]);
-        $owner->statement('UPDATE pg_class SET reltuples = -1, relpages = 0 WHERE oid = ?::regclass', [$table]);
-    }
-}
+const QS_TABLES_PLAN = ['contacts_provenances_tiers', 'contacts', 'companies'];
 
 /** @param  array{id: string}  $e */
 function qsNettoyer(array $e): void
@@ -589,98 +559,97 @@ function qsNettoyer(array $e): void
 }
 
 test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
-    qsAutovacuum(false);
-    $a = qsEspaceRls();
-    $b = qsEspaceRls();
-    $precedente = DB::getDefaultConnection();
+    StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
+        $a = qsEspaceRls();
+        $b = qsEspaceRls();
+        $precedente = DB::getDefaultConnection();
 
-    try {
-        DB::setDefaultConnection('pgsql_app');
-        $role = DB::selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
-        expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
-        DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
+        try {
+            DB::setDefaultConnection('pgsql_app');
+            $role = DB::selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
+            expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
+            DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
 
-        $r = app(ResolveurDestinataires::class)->resoudre(
-            $a['id'],
-            ['all' => [['field' => 'country_code', 'op' => 'eq', 'value' => 'FR']]],
-            new ReglageDestinataires(ReglageDestinataires::GENERIQUE),
-            null,
-        );
-        expect(collect($r['lignes'])->pluck('email')->all())->toBe(['contact@zz-fiable-' . $a['marque'] . '.example.invalid'])
-            ->and($r['exclues'][EligibiliteAdresse::SITE_NON_VERIFIE])->toBe(1);
+            $r = app(ResolveurDestinataires::class)->resoudre(
+                $a['id'],
+                ['all' => [['field' => 'country_code', 'op' => 'eq', 'value' => 'FR']]],
+                new ReglageDestinataires(ReglageDestinataires::GENERIQUE),
+                null,
+            );
+            expect(collect($r['lignes'])->pluck('email')->all())->toBe(['contact@zz-fiable-' . $a['marque'] . '.example.invalid'])
+                ->and($r['exclues'][EligibiliteAdresse::SITE_NON_VERIFIE])->toBe(1);
 
-        $criteres = ['all' => [
-            ['field' => 'email_hors_quarantaine', 'op' => 'eq', 'value' => true],
-            ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
-        ]];
-        $builder = app(AudienceBuilderService::class);
-        $q = $builder->buildPublicQuery($a['id'], $criteres);
-        // `WorkspaceContext::run` (l'aperçu ci-dessus) repose le contexte à
-        // la sortie : on le rejoue comme le fait chaque chemin de production.
-        $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
-        expect($membres)->toBe([$a['fiable']]);
-        // Le motif tiers sous la RLS : la fiche dont la seule personne est
-        // apportée mal informée est bien VISIBLE (témoin sans le critère),
-        // mais elle n'est pas joignable.
-        $visibles = WorkspaceContext::run($a['id'], static fn (): array => $builder
-            ->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]])->pluck('id')->map(static fn ($v): int => (int) $v)->all());
-        expect($visibles)->toContain($a['tiers'])
-            ->and($membres)->not->toContain($a['tiers']);
+            $criteres = ['all' => [
+                ['field' => 'email_hors_quarantaine', 'op' => 'eq', 'value' => true],
+                ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
+            ]];
+            $builder = app(AudienceBuilderService::class);
+            $q = $builder->buildPublicQuery($a['id'], $criteres);
+            // `WorkspaceContext::run` (l'aperçu ci-dessus) repose le contexte à
+            // la sortie : on le rejoue comme le fait chaque chemin de production.
+            $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
+            expect($membres)->toBe([$a['fiable']]);
+            // Le motif tiers sous la RLS : la fiche dont la seule personne est
+            // apportée mal informée est bien VISIBLE (témoin sans le critère),
+            // mais elle n'est pas joignable.
+            $visibles = WorkspaceContext::run($a['id'], static fn (): array => $builder
+                ->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]])->pluck('id')->map(static fn ($v): int => (int) $v)->all());
+            expect($visibles)->toContain($a['tiers'])
+                ->and($membres)->not->toContain($a['tiers']);
 
-        // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
-        // n'ajoute AUCUN accès à `companies` et ne change pas son chemin
-        // d'accès — l'expression n'est qu'un filtre sur les fiches que les
-        // autres critères atteignent déjà (ici, le recalcul de 04:00, un
-        // traitement de fond ; l'aperçu web l'évalue sur les fiches retenues).
-        // Comparé avec et sans le critère, planificateur libre puis sans
-        // balayage séquentiel. Un `Seq Scan` imposé par le critère rougit.
-        $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
-        $acces = static function ($requete): array {
-            $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
-            $noeuds = [];
-            foreach ($lignes as $l) {
-                if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap|Bitmap Index) Scan)(?: using (\S+))? on companies\b/', $l, $m) === 1) {
-                    $noeuds[] = $m[1] . ' ' . ($m[2] ?? '');
+            // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
+            // n'ajoute AUCUN accès à `companies` et ne change pas son chemin
+            // d'accès — l'expression n'est qu'un filtre sur les fiches que les
+            // autres critères atteignent déjà (ici, le recalcul de 04:00, un
+            // traitement de fond ; l'aperçu web l'évalue sur les fiches retenues).
+            // Comparé avec et sans le critère, planificateur libre puis sans
+            // balayage séquentiel. Un `Seq Scan` imposé par le critère rougit.
+            $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
+            $acces = static function ($requete): array {
+                $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
+                $noeuds = [];
+                foreach ($lignes as $l) {
+                    if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap|Bitmap Index) Scan)(?: using (\S+))? on companies\b/', $l, $m) === 1) {
+                        $noeuds[] = $m[1] . ' ' . ($m[2] ?? '');
+                    }
+                }
+
+                return $noeuds;
+            };
+            //
+            // Planificateur libre, il peut PRÉFÉRER un index avec le critère :
+            // depuis le motif tiers (sous-requête indexée par personne), le filtre
+            // coûte plus cher, et sur cette table de quelques lignes il devient
+            // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
+            // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
+            // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
+            foreach (['on', 'off'] as $balayage) {
+                qsApp()->statement('SET enable_seqscan = ' . $balayage);
+                try {
+                    // Comparés en multiensembles : l'ordre des nœuds du plan
+                    // n'est pas une garantie (relecture de #317).
+                    $avec = $acces($q);
+                    $reference = $acces($sans);
+                    sort($avec);
+                    sort($reference);
+                    $seq = static fn (array $noeuds): int => count(array_filter($noeuds, static fn (string $n): bool => str_starts_with($n, 'Seq Scan')));
+                    if ($balayage === 'off') {
+                        expect($avec)->toBe($reference);
+                    } else {
+                        expect(count($avec))->toBe(count($reference))
+                            ->and($seq($avec))->toBeLessThanOrEqual($seq($reference));
+                    }
+                } finally {
+                    qsApp()->statement('RESET enable_seqscan');
                 }
             }
-
-            return $noeuds;
-        };
-        //
-        // Planificateur libre, il peut PRÉFÉRER un index avec le critère :
-        // depuis le motif tiers (sous-requête indexée par personne), le filtre
-        // coûte plus cher, et sur cette table de quelques lignes il devient
-        // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
-        // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
-        // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
-        foreach (['on', 'off'] as $balayage) {
-            qsApp()->statement('SET enable_seqscan = ' . $balayage);
-            try {
-                // Comparés en multiensembles : l'ordre des nœuds du plan
-                // n'est pas une garantie (relecture de #317).
-                $avec = $acces($q);
-                $reference = $acces($sans);
-                sort($avec);
-                sort($reference);
-                $seq = static fn (array $noeuds): int => count(array_filter($noeuds, static fn (string $n): bool => str_starts_with($n, 'Seq Scan')));
-                if ($balayage === 'off') {
-                    expect($avec)->toBe($reference);
-                } else {
-                    expect(count($avec))->toBe(count($reference))
-                        ->and($seq($avec))->toBeLessThanOrEqual($seq($reference));
-                }
-            } finally {
-                qsApp()->statement('RESET enable_seqscan');
-            }
+        } finally {
+            DB::setDefaultConnection($precedente);
+            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+            qsApp()->disconnect();
+            qsNettoyer($a);
+            qsNettoyer($b);
         }
-    } finally {
-        DB::setDefaultConnection($precedente);
-        qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-        qsApp()->disconnect();
-        qsNettoyer($a);
-        qsNettoyer($b);
-        qsAutovacuum(true);
-        qsRendreLesTables();
-        qsProprio()->disconnect();
-    }
+    }, qsProprio());
+    qsProprio()->disconnect();
 });

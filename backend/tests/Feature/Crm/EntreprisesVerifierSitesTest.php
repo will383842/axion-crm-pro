@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\StatistiquesPlanStables;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -660,10 +661,19 @@ test('sous axion_app : la sélection d un paquet passe par l index partiel ordon
     evsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $espace]);
     evsApp()->statement('SET enable_seqscan = off');
 
-    $plan = implode("\n", array_map(
-        static fn ($l): string => (string) array_values((array) $l)[0],
-        evsApp()->select('EXPLAIN ' . $sql, $liaisons),
-    ));
+    // Plan d'une table SANS donnée : il dépend des statistiques laissées par les
+    // tests précédents (un `ANALYZE` annulé garde `reltuples`) et d'une analyse
+    // automatique en cours de route. État normalisé, autovacuum coupé, puis rendu.
+    $proprietaire = DB::connection('pgsql_owner');
+    $plan = StatistiquesPlanStables::figer($proprietaire, ['companies'], static function () use ($proprietaire, $sql, $liaisons): string {
+        StatistiquesPlanStables::rendre($proprietaire, ['companies']);
+
+        return implode("\n", array_map(
+            static fn ($l): string => (string) array_values((array) $l)[0],
+            evsApp()->select('EXPLAIN ' . $sql, $liaisons),
+        ));
+    }, $proprietaire);
+    $proprietaire->disconnect();
 
     expect($plan)->toContain('idx_companies_site_non_verifie_id')
         ->and($plan)->not->toContain('Seq Scan on companies')

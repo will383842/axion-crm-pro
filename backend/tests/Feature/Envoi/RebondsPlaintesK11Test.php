@@ -510,3 +510,71 @@ test('index (workspace_id, id_injection) présent sur envoi_messages_envoyes', f
     $def = collect(DB::select("SELECT indexdef FROM pg_indexes WHERE tablename = 'envoi_messages_envoyes'"))->pluck('indexdef')->implode("\n");
     expect($def)->toContain('(workspace_id, id_injection)');
 });
+
+test('ARF de type INCONNU (même avec un VERP signé) => « à rattacher », jamais compté comme plainte', function (string $type) {
+    k11Releve($this, k11Msg(1, ['arf' => $type, 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(Classificateur::classer(k11Msg(2, ['arf' => $type])))->not->toBe(ClasseRetour::Hostile)
+        ->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('classe', 'hostile')->count())->toBe(0)
+        ->and($this->recepteur->appels)->toBe(0)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+})->with(['other', 'type-farfelu', 'opt-out']);
+
+test('ARF de type connu : abuse, fraud, virus restent des plaintes rattachées', function (string $type) {
+    k11Releve($this, k11Msg(1, ['arf' => $type, 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'hostile')->where('statut', 'rattache')->count())->toBe(1)
+        ->and(k11Plainte())->toBeTrue();
+})->with(['abuse', 'fraud', 'virus']);
+
+test('ARF not-spam / auth-failure : rattaché pour mémoire, mais NON transmis (ni plainte, ni auto-réponse)', function (string $type) {
+    k11Releve($this, k11Msg(1, ['arf' => $type, 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(1)
+        ->and($this->recepteur->appels)->toBe(0)
+        ->and(DB::table('opt_out')->count())->toBe(0);
+})->with(['not-spam', 'auth-failure']);
+
+test('registre base : un jeton VERP dont l\'injection a plusieurs destinataires différents => ambigu, null (à rattacher)', function () {
+    $autre = 'autre@client.example.test';
+    foreach ([K11_ADRESSE, $autre] as $i => $adresse) {
+        DB::table('envoi_messages_envoyes')->insert([
+            'workspace_id' => $this->ws, 'message_id_empreinte' => hash('sha256', "mid:amb-{$i}@d.example.test"),
+            'id_injection' => $this->inj, 'empreinte_destinataire' => ListeSuppression::empreinte($adresse),
+        ]);
+    }
+    $registre = new RegistreMessagesEnvoyesDb(fn (string $ws, string $e): ?string => $e === ListeSuppression::empreinte(K11_ADRESSE) ? K11_ADRESSE : $autre);
+
+    expect($registre->retrouverParInjection($this->ws, $this->inj))->toBeNull();
+});
+
+test('registre base : plusieurs lignes du MÊME destinataire pour l\'injection => pas d\'ambiguïté', function () {
+    foreach (['a', 'b'] as $i) {
+        DB::table('envoi_messages_envoyes')->insert([
+            'workspace_id' => $this->ws, 'message_id_empreinte' => hash('sha256', "mid:meme-{$i}@d.example.test"),
+            'id_injection' => $this->inj, 'empreinte_destinataire' => ListeSuppression::empreinte(K11_ADRESSE),
+        ]);
+    }
+    $registre = new RegistreMessagesEnvoyesDb(fn (): ?string => K11_ADRESSE);
+
+    expect($registre->retrouverParInjection($this->ws, $this->inj)?->adresse)->toBe(K11_ADRESSE);
+});
+
+test('registre mémoire : deux destinataires pour la même injection => ambigu, null', function () {
+    $r = new RegistreMessagesEnvoyesMemoire;
+    $inj = (string) Str::uuid();
+    $r->noter('m1@d.example.test', new MessageOrigine($inj, K11_ADRESSE), 'ws-a');
+    $r->noter('m2@d.example.test', new MessageOrigine($inj, 'autre@client.example.test'), 'ws-a');
+
+    expect($r->retrouverParInjection('ws-a', $inj))->toBeNull();
+});
+
+test('S09 ambigu : un VERP dont l\'injection a deux destinataires => « à rattacher », aucun arrêt', function () {
+    $this->registre->noter('envoi-k11-bis@d.example.test', new MessageOrigine($this->inj, 'autre@client.example.test'), $this->ws);
+    k11Releve($this, k11Msg(1, ['dsn' => '5.1.1', 'dest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and($this->recepteur->appels)->toBe(0)
+        ->and(ListeSuppression::estSupprimee(K11_ADRESSE))->toBeFalse();
+});

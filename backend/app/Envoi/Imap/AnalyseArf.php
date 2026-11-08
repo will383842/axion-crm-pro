@@ -8,6 +8,18 @@ namespace App\Envoi\Imap;
  */
 final class AnalyseArf
 {
+    /** Types ARF qui valent une plainte (RFC 5965). */
+    public const TYPES_PLAINTE = ['abuse', 'fraud', 'virus'];
+
+    /** Types connus SANS effet : ni plainte, ni transmission (ce n'est pas une auto-réponse non plus). */
+    public const TYPES_SANS_EFFET = ['not-spam', 'auth-failure'];
+
+    /** Tout autre type (« other », inconnu, « illisible ») : « à rattacher », revue humaine, jamais compté. */
+    public static function typeConnu(?string $type): bool
+    {
+        return in_array($type, [...self::TYPES_PLAINTE, ...self::TYPES_SANS_EFFET], true);
+    }
+
     public static function estRapport(string $contentType): bool
     {
         return Pcre::correspond('/report-type\s*=\s*"?\s*feedback-report\s*"?/i', $contentType);

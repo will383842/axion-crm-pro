@@ -6,7 +6,8 @@ namespace App\Envoi\Imap;
  * Classe un message reçu. Fonction pure : aucune base, aucun réseau.
  *
  * Ordre (le premier qui s'applique gagne) :
- *  0. rapport d'abus ARF (JMRP, Yahoo CFL) : plainte, sauf « not-spam » / « auth-failure » (sans effet) ;
+ *  0. rapport d'abus ARF (JMRP, Yahoo CFL) : plainte pour abuse / fraud / virus ; tout autre type (not-spam,
+ *     auth-failure, inconnu, illisible) : jamais une plainte (la relève ne transmet rien) ;
  *  1. rapport de remise (DSN) : 5.7.x = politique/réputation (PAS une adresse morte : aucun effet),
  *     autres 5.x.x = rebond dur, 4.x.x = rebond mou ;
  *  2. analyse échouée (UTF-8 invalide, limite PCRE) : STOP par prudence, jamais « réponse humaine » ;
@@ -74,13 +75,11 @@ final class Classificateur
             return ClasseRetour::AutoReponse; // 2.x.x : accusé de remise, aucun effet
         }
 
-        if ($m->typeArf === 'illisible') {
-            return ClasseRetour::AutoReponse; // Feedback-Type illisible : ni plainte ni rattachement (revue humaine)
-        }
-
         if ($m->typeArf !== null) {
             // Rapport d'abus ARF (JMRP, Yahoo CFL) : un « Auto-Submitted » est ici normal, il ne l'écarte pas.
-            return in_array($m->typeArf, ['not-spam', 'auth-failure'], true) ? ClasseRetour::AutoReponse : ClasseRetour::Hostile;
+            // Seuls abuse / fraud / virus sont des plaintes. Type illisible ou INCONNU (« other »…) : jamais une plainte
+            // devinée ; la relève le met en « à rattacher ». not-spam / auth-failure : sans effet.
+            return in_array($m->typeArf, AnalyseArf::TYPES_PLAINTE, true) ? ClasseRetour::Hostile : ClasseRetour::AutoReponse;
         }
 
         if ($m->analyseEchouee) {

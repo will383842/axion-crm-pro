@@ -5,9 +5,21 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # Filtre conservateur (workflow NON exige par la protection de main) :
+    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
+    # workflow changent. push main / schedule / dispatch restent sans filtre.
+    paths:
+      - 'frontend/**'
+      - 'backend/openapi/**'
+      - '.github/workflows/a11y.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: a11y-${{ github.event.pull_request.number || github.ref }}
+  # N'annule que les runs de PR ; jamais un run de push sur main.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la

@@ -15,3 +15,10 @@ Configuration : fichier JSON dont le chemin est dans `INJECTION_CONFIG` (champs 
 Tests : `cd infra/serveur-envoi/injection && python3 -m unittest discover -s tests -t .`
 
 Écart avec l'ADR K0 (§ 8) : l'ADR prévoit une politique Lua dans KumoMTA sur 127.0.0.1 ; ce lot suit la consigne (écouteur testable, IP du tunnel). Le branchement sur la vraie file reste à faire.
+
+## Durcissement (audit de sécurité)
+- STARTTLS : si des octets en clair sont déjà reçus derrière la commande (pipelining, type CVE-2024-34083), 503 puis coupure.
+- En-têtes From/Sender/Reply-To analysés avec `email.utils.getaddresses` (strict) après dépliage ; plusieurs From, domaine interdit dans l'un d'eux, ou domaine From hors registre de l'espace = 550. `Return-Path` du client retiré. Un message sans From reste accepté (Kumo fixe l'enveloppe).
+- Compte inconnu : empreinte de secours au même nombre d'itérations. PBKDF2 hors boucle asyncio.
+- Plafond de connexions (`max_connexions`), durée maximale de session (`duree_max_session`), échecs AUTH comptés par IP avec délai croissant puis blocage (`limiteur.py`).
+- Verbes SMTP en liste blanche ; réseau joker refusé dans `ips_autorisees` ; dot-unstuffing RFC 5321.

@@ -1,17 +1,19 @@
 """Machine à états SMTP pure (sans socket) : testable ligne à ligne."""
 import base64
 import re
+from email.utils import getaddresses
 
 from .config import Config, normaliser_domaine, verifier
 from .file_kumo import ErreurFile, FileKumo
 
-ENTETE_RETIRE = re.compile(rb"(?i)^x-tenant[ \t]*:")
+ENTETE_RETIRE = re.compile(rb"(?i)^(x-tenant|return-path)[ \t]*:")
+VERBES = frozenset({"EHLO", "HELO", "NOOP", "RSET", "QUIT", "STARTTLS", "AUTH", "MAIL", "RCPT", "DATA"})
 ADRESSE = re.compile(r"^<([^<>\s]+@[^<>\s@]+)>(\s.*)?$")
 AVANT_TLS = {"EHLO", "HELO", "NOOP", "QUIT", "STARTTLS", "RSET"}
 
 
 def retirer_x_tenant(message: bytes) -> bytes:
-    """Retire l'en-tête X-Tenant fourni par le client (lignes repliées comprises)."""
+    """Retire les en-têtes X-Tenant et Return-Path fournis par le client (lignes repliées comprises)."""
     tete, sep, corps = message.partition(b"\r\n\r\n")
     sortie, saute = [], False
     for l in tete.split(b"\r\n"):
@@ -25,15 +27,38 @@ def retirer_x_tenant(message: bytes) -> bytes:
     return b"\r\n".join(sortie) + sep + corps
 
 
-def domaine_from(message: bytes) -> str | None:
+def entetes(message: bytes) -> list[tuple[str, str]]:
+    """(nom en minuscules, valeur dépliée) de chaque en-tête, dans l'ordre."""
     tete = message.partition(b"\r\n\r\n")[0].decode("utf-8", "replace")
-    m = re.search(r"(?im)^from:.*?@([^>\s;,]+)", tete)
-    return m.group(1) if m else None
+    res: list[list[str]] = []
+    for l in tete.split("\r\n"):
+        if l[:1] in (" ", "\t") and res:
+            res[-1][1] += " " + l.strip()
+        elif ":" in l:
+            n, _, v = l.partition(":")
+            res.append([n.strip().lower(), v.strip()])
+    return [(n, v) for n, v in res]
+
+
+def adresses(valeur: str) -> list[str] | None:
+    """Domaines (normalisés) de toutes les adresses ; None si l'en-tête est inanalysable."""
+    try:
+        paires = getaddresses([valeur], strict=True)
+    except TypeError:                       # Python sans l'argument strict
+        paires = getaddresses([valeur])
+    doms = []
+    for _, adr in paires:
+        if adr.count("@") != 1 or not adr.rpartition("@")[2]:
+            return None
+        doms.append(normaliser_domaine(adr.rpartition("@")[2]))
+    return doms or None
 
 
 class Session:
-    def __init__(self, cfg: Config, file: FileKumo, ip_pair: str):
-        self.cfg, self.file, self.ip = cfg, file, ip_pair
+    def __init__(self, cfg: Config, file: FileKumo, ip_pair: str, limiteur=None):
+        self.cfg, self.file, self.ip, self.limiteur = cfg, file, ip_pair, limiteur
+        self.delai = 0.0          # délai à imposer avant la prochaine réponse (anti force brute)
+        self._attente = None      # AUTH en attente de vérification hors boucle
         self.tls = False
         self.authc = None
         self.echecs = 0
@@ -49,24 +74,26 @@ class Session:
     def accueil(self):
         if not self.cfg.ip_autorisee(self.ip):          # couche 1
             return ["554 5.7.1 IP non autorisee"], "close"
+        if self.limiteur and self.limiteur.bloque(self.ip):
+            return ["421 4.7.0 trop d'echecs depuis cette adresse"], "close"
         return ["220 injection ESMTP"], None
 
-    def ligne(self, brut: bytes):
+    def ligne(self, brut: bytes, differer_auth: bool = False):
         """Retourne (réponses, action) ; action ∈ {None, 'starttls', 'close'}."""
         if self.mode == "data":
             return self._lire_data(brut)
         if self.mode == "auth":
             self.mode = "cmd"
-            return self._auth_creds(brut.strip().decode("ascii", "replace"))
+            return self._auth_creds(brut.strip().decode("ascii", "replace"), differer_auth)
         txt = brut.rstrip(b"\r\n").decode("utf-8", "replace")
         verbe, _, arg = txt.partition(" ")
         verbe, arg = verbe.upper(), arg.strip()
         if not self.tls and verbe not in AVANT_TLS:
             return ["530 5.7.0 STARTTLS obligatoire"], None
-        m = getattr(self, "_" + verbe.lower(), None)
-        if m is None or not verbe.isalpha():
+        if verbe not in VERBES:                           # liste blanche explicite
             return ["502 5.5.2 commande inconnue"], None
-        return m(arg)
+        self._differer = differer_auth
+        return getattr(self, "_" + verbe.lower())(arg)
 
     # --- commandes ---
     def _ehlo(self, arg):
@@ -102,19 +129,31 @@ class Session:
         if not parts or parts[0].upper() != "PLAIN":
             return ["504 5.5.4 mecanisme non supporte"], None
         if len(parts) > 1:
-            return self._auth_creds(parts[1])
+            return self._auth_creds(parts[1], getattr(self, "_differer", False))
         self.mode = "auth"
         return ["334 "], None
 
-    def _auth_creds(self, b64):
+    def _auth_creds(self, b64, differer=False):
         try:
             authz, authc, mdp = base64.b64decode(b64, validate=True).decode().split("\0")
         except (ValueError, UnicodeError):
             return ["501 5.5.2 AUTH mal forme"], None
+        self._attente = (authz, authc, mdp)
+        if differer:                       # le serveur appelle verifier_auth() dans un executor
+            return [], "auth"
+        return self.verifier_auth()
+
+    def verifier_auth(self):
+        """PBKDF2 : coûteux, à exécuter hors de la boucle asyncio."""
+        authz, authc, mdp = self._attente
+        self._attente = None
         cpt = self.cfg.comptes.get(authc)
-        ok = verifier(mdp, cpt["hash"]) if cpt else verifier(mdp, "pbkdf2$1$AA==$AA==")
+        empreinte = cpt["hash"] if cpt else self.cfg.empreinte_secours   # même coût dans les deux cas
+        ok = verifier(mdp, empreinte)
         if not cpt or not ok or (authz and authz != authc):   # authz != authc : refus
             self.echecs += 1
+            if self.limiteur:
+                self.delai = self.limiteur.echec(self.ip)
             if self.echecs >= 3:
                 return ["421 4.7.0 trop d'echecs"], "close"
             return ["535 5.7.8 authentification refusee"], None
@@ -167,7 +206,7 @@ class Session:
             return ["550 5.6.0 fin de ligne invalide"], "close"
         self.taille += len(brut)
         if self.taille <= self.cfg.max_taille:
-            self.data.append(brut[1:] if brut.startswith(b"..") else brut)
+            self.data.append(brut[1:] if brut.startswith(b".") else brut)   # RFC 5321 §4.5.2
         return [], None
 
     def _fin(self):
@@ -176,12 +215,31 @@ class Session:
         self._raz()
         if trop:
             return ["552 5.3.4 message trop gros"], None
-        d = domaine_from(msg)
-        if d and self.cfg.domaine_interdit(d):
-            return ["550 5.7.1 domaine interdit dans From"], None
+        refus = self._controle_entetes(msg)
+        if refus:
+            return [refus], None
         msg = retirer_x_tenant(msg)
         try:
             self.file.deposer(self.cfg.comptes[self.authc]["espace"], mf, rcpt, msg)
         except ErreurFile:
             return ["451 4.3.0 file indisponible"], None
         return ["250 2.0.0 en file"], None
+
+    def _controle_entetes(self, msg: bytes) -> str | None:
+        """Analyse réelle des adresses de TOUS les From, Sender, Reply-To."""
+        ent = entetes(msg)
+        froms = [v for n, v in ent if n == "from"]
+        if len(froms) > 1:
+            return "550 5.7.1 plusieurs en-tetes From"
+        autorises = self.cfg.domaines_registre(self.cfg.comptes[self.authc]["espace"])
+        for n, v in ent:
+            if n not in ("from", "sender", "reply-to"):
+                continue
+            doms = adresses(v)
+            if doms is None:
+                return "550 5.7.1 en-tete %s inanalysable" % n
+            if any(self.cfg.domaine_interdit(d) for d in doms):
+                return "550 5.7.1 domaine interdit dans " + n
+            if n == "from" and not all(d in autorises and d in self.cfg.domaines_envoi for d in doms):
+                return "550 5.7.1 domaine From hors registre de l'espace"
+        return None

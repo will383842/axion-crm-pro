@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import os
 from dataclasses import dataclass, field
 
 
@@ -42,15 +43,25 @@ class Config:
     domaines_envoi: set = field(default_factory=set)     # couche 4
     domaines_interdits: set = field(default_factory=set)
     max_taille: int = 10_000_000
+    max_connexions: int = 100            # plafond de connexions simultanées
+    duree_max_session: float = 600.0     # durée totale maximale d'une session (s)
+    max_echecs_ip: int = 10              # échecs AUTH tolérés par IP source
+    fenetre_echecs: float = 900.0
 
     def __post_init__(self):
         ip = ipaddress.ip_address(self.ip_ecoute)
         if ip.is_unspecified:
             raise ValueError("ip_ecoute ne peut pas être une adresse joker")
         self.reseaux = [ipaddress.ip_network(n) for n in self.ips_autorisees]
+        if any(r.prefixlen == 0 for r in self.reseaux):
+            raise ValueError("ips_autorisees ne peut pas contenir un réseau joker")
         self.domaines_envoi = {normaliser_domaine(d) for d in self.domaines_envoi}
         self.domaines_interdits = {normaliser_domaine(d) for d in self.domaines_interdits}
         self.registre = {e: {a.strip().lower() for a in v} for e, v in self.registre.items()}
+        # Empreinte de secours (compte inconnu) : MÊME nombre d'itérations que les vrais comptes,
+        # pour que la durée ne révèle pas l'existence d'un compte.
+        its = [int(c["hash"].split("$")[1]) for c in self.comptes.values()]
+        self.empreinte_secours = hacher("secours", os.urandom(16), max(its) if its else 200_000)
 
     def ip_autorisee(self, ip: str) -> bool:
         try:
@@ -58,6 +69,9 @@ class Config:
         except ValueError:
             return False
         return any(a in r for r in self.reseaux)
+
+    def domaines_registre(self, espace: str) -> set:
+        return {normaliser_domaine(a.rpartition("@")[2]) for a in self.registre.get(espace, set())}
 
     def domaine_interdit(self, d: str) -> bool:
         d = normaliser_domaine(d)

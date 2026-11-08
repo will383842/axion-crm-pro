@@ -30,7 +30,7 @@ final class CommandeurEspion implements CommandeurServeur
     }
 }
 
-const SECRET_K9 = 'secret-de-test-0123456789abcdef';
+const SECRET_K9 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'; // valeur factice, entropie nulle (Gitleaks)
 
 /** @param ?Closure(): DateTimeImmutable $horloge */
 function kumoFabrique(?FauxTransportKumo $t = null, ?CommandeurServeur $c = null, ?Closure $horloge = null, ?RegistreInjections $registre = null): ServeurEnvoiKumo

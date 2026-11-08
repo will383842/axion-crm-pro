@@ -12,6 +12,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Serveur\Kumo\EsmtpSuiviData;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
@@ -84,13 +85,13 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $ip = GardeHoteSmtp::controlerBoite($boite->hote, $boite->port, $boite->chiffrement, $resolveur ?? new ResolveurDns);
 
         if ($boite->chiffrement === 'aucun') {
-            $t = new EsmtpTransport($ip, $boite->port, false);
+            $t = new EsmtpSuiviData($ip, $boite->port, false);
             $t->setAutoTls(false);
 
             return $t; // jamais d'identifiants sans TLS
         }
 
-        $t = new EsmtpTransport(str_contains($ip, ':') ? '[' . $ip . ']' : $ip, $boite->port, $boite->chiffrement === 'tls');
+        $t = new EsmtpSuiviData(str_contains($ip, ':') ? '[' . $ip . ']' : $ip, $boite->port, $boite->chiffrement === 'tls');
         if ($boite->chiffrement === 'starttls') {
             $t->setAutoTls(true);
             $t->setRequireTls(true);
@@ -247,7 +248,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         try {
             $transport->send(new RawMessage($brut), $enveloppe);
         } catch (TransportExceptionInterface $e) {
-            return $this->classer($message->cleIdempotence, $id, $e);
+            return $this->classer($message->cleIdempotence, $id, $e, $transport);
         } catch (\Throwable) {
             // Coupure, délai dépassé, réponse illisible : sort INCERTAIN.
             $this->maj($message->cleIdempotence, ['etat' => 'a_verifier'], ['injection_en_cours']);
@@ -267,7 +268,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         return ResultatInjection::accepte($id);
     }
 
-    private function classer(string $cle, string $id, TransportExceptionInterface $e): ResultatInjection
+    private function classer(string $cle, string $id, TransportExceptionInterface $e, TransportInterface $transport): ResultatInjection
     {
         // Le code SMTP est le code NUMÉRIQUE de la réponse du serveur, jamais celui lu dans un texte.
         $code = $e instanceof UnexpectedResponseException && $e->getCode() >= 100 && $e->getCode() < 600 ? (int) $e->getCode() : null;
@@ -277,6 +278,11 @@ final class AdaptateurSmtp implements ServeurEnvoi
             $this->maj($cle, ['etat' => 'reporte', 'code_smtp' => $code, 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
 
             return ResultatInjection::reporte($delai);
+        }
+        if ($code !== null && $code >= 500 && $transport instanceof EsmtpSuiviData && ! $transport->mailEmis && ! $transport->donneesEngagees) {
+            // 5xx AVANT MAIL FROM (bannière, EHLO, STARTTLS) : refus de la CONNEXION, pas du message. Rien n'a pu partir :
+            // report, alerte critique et pause ; jamais « echec », jamais compté dans les 5xx de messages.
+            return $this->refusConnexion($cle, $code);
         }
         if ($code !== null && $code >= 500) {
             $this->maj($cle, ['etat' => 'echec', 'code_smtp' => $code], ['injection_en_cours']);
@@ -294,6 +300,16 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $this->maj($cle, ['etat' => 'a_verifier', 'code_smtp' => $code], ['injection_en_cours']);
 
         return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+    }
+
+    private function refusConnexion(string $cle, int $code): ResultatInjection
+    {
+        $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
+        $this->maj($cle, ['etat' => 'reporte', 'code_smtp' => $code, 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
+        $this->boites->mettreEnPause($this->workspaceId, $this->boiteId, 'refus_connexion_5xx');
+        Log::critical('Envoi : connexion SMTP refusée (5xx avant MAIL FROM), boîte mise en pause, message reporté.', ['boite' => $this->boiteId, 'code' => $code]);
+
+        return ResultatInjection::reporte($delai);
     }
 
     private function pauseSiTrop5xx(): void

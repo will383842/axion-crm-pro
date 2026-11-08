@@ -57,7 +57,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_13_000145_envoi_chauffe_ressource_type.php',
     // Filet modifié : pourquoi — K8 durcissement : le garde fige aussi ressource_type + CHECK type/clé ; down() inerte (relâcher le garde réouvrirait la falsification).
     '2026_11_14_000150_envoi_chauffe_garde_ressource_type.php',
-
+    // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
+    '2026_11_30_000100_envoi_config_versions.php',
     // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
     // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_11_13_000140_envoi_serveurs_epoque.php',

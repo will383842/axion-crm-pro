@@ -48,7 +48,9 @@ class Base(unittest.TestCase):
         self.tls()
         self.assertTrue(self.cmd("AUTH PLAIN " + plain("", user))[0].startswith("235"))
 
-    def envoyer(self, mf="a@envoi.example.test", corps="Subject: x\r\n\r\nsalut\r\n"):
+    def envoyer(self, mf="a@envoi.example.test", corps=None):
+        if corps is None:     # From exigé (K4 suite 2) : l'en-tête suit l'enveloppe par défaut
+            corps = "From: %s\r\nSubject: x\r\n\r\nsalut\r\n" % mf
         r = [self.cmd(f"MAIL FROM:<{mf}>")[0]]
         if r[0].startswith("250"):
             r.append(self.cmd("RCPT TO:<d@dest.example.test>")[0])
@@ -143,6 +145,7 @@ class TestRefus(Base):
         s.ligne(("AUTH PLAIN " + plain("", "alice") + "\r\n").encode())
         for c in ("MAIL FROM:<a@envoi.example.test>", "RCPT TO:<d@dest.example.test>", "DATA"):
             s.ligne(c.encode() + b"\r\n")
+        s.ligne(b"From: a@envoi.example.test\r\n")
         self.assertTrue(s.ligne(b".\r\n")[0][0].startswith("451"))
 
     def test_joker_refuse_a_la_config(self):
@@ -153,7 +156,7 @@ class TestRefus(Base):
 class TestAcceptation(Base):
     def test_x_tenant_retire_et_espace_impose(self):
         self.auth("alice")
-        corps = "X-Tenant: ws2\r\n  suite\r\nx-tenant : ws2\r\nSubject: s\r\n\r\nX-Tenant: dans-le-corps\r\n"
+        corps = "From: a@envoi.example.test\r\nX-Tenant: ws2\r\n  suite\r\nx-tenant : ws2\r\nSubject: s\r\n\r\nX-Tenant: dans-le-corps\r\n"
         self.assertTrue(self.envoyer(corps=corps)[-1].startswith("250"))
         d = self.file.depots[0]
         self.assertEqual(d["espace"], "ws1")
@@ -281,10 +284,10 @@ class TestDurcissement(Base):
     def test_dot_unstuffing_toute_ligne_commencant_par_point(self):
         self.auth()
         self.cmd("MAIL FROM:<a@envoi.example.test>"); self.cmd("RCPT TO:<d@dest.example.test>"); self.cmd("DATA")
-        for l in (b"Subject: s\r\n", b"\r\n", b"..deux\r\n", b".un\r\n", b"normal\r\n"):
+        for l in (b"From: a@envoi.example.test\r\n", b"\r\n", b"..deux\r\n", b".un\r\n", b"normal\r\n"):
             self.s.ligne(l)
         self.assertTrue(self.s.ligne(b".\r\n")[0][0].startswith("250"))
-        self.assertEqual(self.file.depots[0]["message"], b"Subject: s\r\n\r\n.deux\r\nun\r\nnormal\r\n")
+        self.assertEqual(self.file.depots[0]["message"], b"From: a@envoi.example.test\r\n\r\n.deux\r\nun\r\nnormal\r\n")
 
     def test_empreinte_de_secours_meme_cout_que_les_vrais_comptes(self):
         c = cfg()
@@ -415,6 +418,7 @@ class TestSuiteK4(Base):
         s.ligne(("AUTH PLAIN " + plain("", "alice") + "\r\n").encode())
         for c in ("MAIL FROM:<a@envoi.example.test>", "RCPT TO:<d@dest.example.test>", "DATA"):
             s.ligne(c.encode() + b"\r\n")
+        s.ligne(b"From: a@envoi.example.test\r\n")
         self.assertTrue(s.ligne(b".\r\n")[0][0].startswith("451"))
 
     def test_principal_n_utilise_pas_la_fausse_file(self):
@@ -605,6 +609,108 @@ class TestSocketSuiteK4(unittest.TestCase):
                 await _client(cfg(), FausseFile(), None, L(), etat, type("R", (), {"_buffer": b""})(), W())
             return etat["n"]
         self.assertEqual(asyncio.run(run()), 0)
+
+
+class TestSuiteK4Bis(Base):
+    """K4 suite 2 : accusés de lecture, From exigé, IPv6 mappée, abort() sur refus."""
+
+    def deposer(self, tete):
+        self.auth()
+        return self.envoyer(corps=tete + "\r\n\r\nm\r\n")[-1]
+
+    def test_en_tetes_accuse_ou_retour_refuses_550(self):
+        for h in ("Disposition-Notification-To: x@dest.example.test", "return-receipt-to : x@dest.example.test",
+                  "ERRORS-TO: x@dest.example.test", "Errors-To:\r\n <x@dest.example.test>"):
+            self.setUp()
+            r = self.deposer("From: a@envoi.example.test\r\n" + h)
+            self.assertTrue(r.startswith("550"), h)
+            self.assertEqual(self.file.depots, [], h)
+
+    def test_en_tete_voisin_non_refuse(self):
+        r = self.deposer("From: a@envoi.example.test\r\nX-Errors-To-Note: ok")
+        self.assertTrue(r.startswith("250"), r)
+
+    def test_message_sans_from_refuse_550(self):
+        r = self.deposer("Subject: sans from")
+        self.assertTrue(r.startswith("550"), r)
+        self.assertEqual(self.file.depots, [])
+
+    def test_from_present_accepte(self):
+        self.assertTrue(self.deposer("From: a@envoi.example.test").startswith("250"))
+
+    def test_ipv6_mappee_traitee_comme_son_ipv4(self):
+        # ::ffff:0.0.0.0/96 == tout l'IPv4 : refusé comme 0.0.0.0/0
+        for reseau in ("::ffff:0.0.0.0/96", "::ffff:0:0/96"):
+            with self.assertRaises(ValueError, msg=reseau):
+                cfg(ips_autorisees=[reseau])
+        # deux moitiés IPv4 données sous forme mappée : recouvrement total
+        with self.assertRaises(ValueError):
+            cfg(ips_autorisees=["::ffff:0.0.0.0/97", "::ffff:128.0.0.0/97"])
+        with self.assertRaises(ValueError):
+            cfg(ip_ecoute="::ffff:0.0.0.0")
+
+    def test_ipv6_mappee_pair_et_reseau_equivalents_a_l_ipv4(self):
+        c = cfg()
+        self.assertTrue(c.ip_autorisee("::ffff:192.0.2.10"))
+        self.assertFalse(c.ip_autorisee("::ffff:203.0.113.9"))
+        c2 = cfg(ips_autorisees=["::ffff:192.0.2.0/120"])
+        self.assertTrue(c2.ip_autorisee("192.0.2.10"))
+        self.assertFalse(c2.ip_autorisee("203.0.113.9"))
+
+
+class TestAbortSurRefus(unittest.TestCase):
+    """Un refus coupe la connexion avec transport.abort() : rien ne reste ouvert."""
+
+    @staticmethod
+    def ecrivain(drain_bloque=False):
+        class T:
+            aborts = 0
+            def abort(self): T.aborts += 1
+        class W:
+            transport = T()
+            sortie = []
+            def write(self, b): W.sortie.append(b)
+            async def drain(self):
+                if drain_bloque: await asyncio.Event().wait()
+            def close(self): pass
+            def get_extra_info(self, k): return ("192.0.2.10", 1)
+        return W(), T
+
+    @staticmethod
+    def lecteur(lignes, tampon=b""):
+        class R:
+            _buffer = tampon
+            async def readuntil(self, sep):
+                if not lignes: raise asyncio.IncompleteReadError(b"", None)
+                return lignes.pop(0)
+        return R()
+
+    def lancer(self, c, w, r, etat=None):
+        from axion_injection.serveur import _client
+        etat = etat if etat is not None else {"n": 0}
+        asyncio.run(asyncio.wait_for(_client(c, FausseFile(), None, None, etat, r, w), 3))
+
+    def test_trop_de_connexions_abort(self):
+        w, T = self.ecrivain()
+        self.lancer(cfg(max_connexions=1), w, self.lecteur([]), {"n": 1})
+        self.assertEqual(T.aborts, 1)
+
+    def test_pipelining_starttls_abort(self):
+        w, T = self.ecrivain()
+        self.lancer(cfg(), w, self.lecteur([b"STARTTLS\r\n"], tampon=b"AUTH"))
+        self.assertTrue(any(b.startswith(b"503") for b in type(w).sortie))
+        self.assertEqual(T.aborts, 1)
+
+    def test_drain_bloque_abort(self):
+        w, T = self.ecrivain(drain_bloque=True)
+        self.lancer(cfg(delai_ecriture=0.2), w, self.lecteur([]))
+        self.assertEqual(T.aborts, 1)
+
+    def test_fin_de_ligne_invalide_abort(self):
+        w, T = self.ecrivain()
+        # session déjà en DATA impossible sans TLS : un verbe refusé n'est pas une coupure ; on teste le QUIT normal
+        self.lancer(cfg(), w, self.lecteur([b"QUIT\r\n"]))
+        self.assertEqual(T.aborts, 0)   # départ normal : fermeture propre, pas d'abort
 
 
 if __name__ == "__main__":

@@ -378,7 +378,13 @@ test('S10 : ARF, puis réponse hostile, puis abuse@ => 3 plaintes comptées ; la
     $releve = k11ChaineFreins($this);
     $maintenant = new DateTimeImmutable('2026-12-02 12:00:00', new DateTimeZone('Europe/Paris'));
     $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
-    $evaluer = fn (): array => array_map(fn ($d) => $d->motif, $garde->evaluer($this->ws, $maintenant));
+    $durees = [];
+    $evaluer = function () use ($garde, $maintenant, &$durees): array {
+        $decisions = $garde->evaluer($this->ws, $maintenant);
+        $durees = array_map(fn ($d) => $d->dureeHeures, $decisions);
+
+        return array_map(fn ($d) => $d->motif, $decisions);
+    };
     $depot = app(DepotChauffe::class);
     $jour = JourEnvoi::de($maintenant);
 
@@ -392,7 +398,8 @@ test('S10 : ARF, puis réponse hostile, puis abuse@ => 3 plaintes comptées ; la
     $this->lecteur->deposer(K11_BOITE, k11Msg(2, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Je vais porter plainte.']));
     $releve->relever($this->ws, K11_BOITE);
     expect($depot->plaintes7Jours($this->ws, $jour))->toBe(2)
-        ->and($evaluer())->toBe([DecisionFrein::PLAINTES_ARRET]); // la 2e en 7 jours : arrêt 48 h
+        ->and($evaluer())->toBe([DecisionFrein::PLAINTES_ARRET]) // la 2e en 7 jours : arrêt 48 h
+        ->and($durees)->toBe([48]); // durée de la pause L7 (tout l'espace)
 
     // 3) message sur abuse@
     $this->lecteur->deposer(K11_BOITE, k11Msg(3, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Cessez ces envois svp.', 'locales' => ['abuse@d.example.test']]));
@@ -447,6 +454,56 @@ test('ARF BRUT sans Feedback-Type lisible, lu par le lecteur réel => type « il
     expect($lecteur->lire(K11_BOITE, 0)->messages[0]->typeArf)->toBe('illisible');
     (new ReleveImap($lecteur, $this->registre, $this->recepteur))->relever($this->ws, K11_BOITE);
     expect(DB::table('opt_out')->count())->toBe(0)->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1);
+});
+
+function k11Lecteur(): LecteurBoiteWebklex
+{
+    return new LecteurBoiteWebklex(['host' => 'imap.k11.example.test', 'username' => 'u', 'password' => 'p'], K11_BOITE, 'INBOX', static fn () => new FauxProtocoleImap(Config::make(), true, 'ssl'));
+}
+
+test('RÈGLE DE FER : ARF dont l\'ANALYSE ÉCHOUE (UTF-8 invalide) + In-Reply-To connu => « à rattacher », opt_out = 0', function () {
+    Faux::reinitialiser();
+    $brut = str_replace(
+        ["Subject: Rapport abus\r\n", "Ceci est un rapport d'abus."],
+        ["Subject: Rapport abus\r\nIn-Reply-To: <envoi-k11@d.example.test>\r\nReferences: <envoi-k11@d.example.test>\r\n", "Rapport \xFF\xFE invalide"],
+        k11ArfBrut($this->verp, 'envoi-k11@d.example.test'),
+    );
+    $brut = str_replace("Content-Type: text/plain; charset=UTF-8\r\n\r\nRapport", "Content-Type: text/html; charset=UTF-8\r\n\r\n<p>Rapport", $brut);
+    Faux::deposer(1, $brut);
+    $lecteur = k11Lecteur();
+    $m = $lecteur->lire(K11_BOITE, 0)->messages[0];
+
+    expect($m->analyseEchouee)->toBeTrue()
+        ->and($m->typeArf)->toBe('illisible');
+
+    (new ReleveImap($lecteur, $this->registre, $this->recepteur))->relever($this->ws, K11_BOITE);
+    expect(DB::table('opt_out')->count())->toBe(0)
+        ->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(1)
+        ->and($this->recepteur->appels)->toBe(0);
+});
+
+test('ARF dont le VERP n\'est QUE dans Original-Mail-From (To / Delivered-To = fbl@) : rattaché', function () {
+    Faux::reinitialiser();
+    $brut = str_replace([": {$this->verp}\r\n"], [": fbl@d.example.test\r\n"], k11ArfBrut($this->verp, 'envoi-k11@d.example.test'));
+    expect($brut)->not->toContain("To: {$this->verp}")->and($brut)->toContain("Original-Mail-From: <{$this->verp}>");
+    Faux::deposer(1, $brut);
+    $lecteur = k11Lecteur();
+    $m = $lecteur->lire(K11_BOITE, 0)->messages[0];
+
+    expect($m->adressesLocales)->toContain($this->verp);
+
+    (new ReleveImap($lecteur, $this->registre, $this->recepteur))->relever($this->ws, K11_BOITE);
+    expect(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(1)->and(k11Plainte())->toBeTrue();
+});
+
+test('rebond / réponse (non-ARF) : le VERP l\'emporte sur le Message-ID cité d\'une AUTRE injection', function () {
+    $autre = k11Injection($this->ws);
+    $this->registre->noter('autre-envoi@d.example.test', new MessageOrigine($autre, 'autre@client.example.test'), $this->ws);
+    k11Releve($this, k11Msg(1, ['irt' => 'autre-envoi@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'STOP', 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('statut', 'rattache')->where('id_injection', $this->inj)->count())->toBe(1)
+        ->and(DB::table('envoi_evenements')->where('id_injection', $autre)->count())->toBe(0)
+        ->and(ListeSuppression::estSupprimee('autre@client.example.test'))->toBeFalse();
 });
 
 test('index (workspace_id, id_injection) présent sur envoi_messages_envoyes', function () {

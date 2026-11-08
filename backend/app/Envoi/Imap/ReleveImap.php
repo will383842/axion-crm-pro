@@ -66,6 +66,7 @@ final class ReleveImap
     public function relever(string $workspaceId, string $boite): BilanReleve
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite): BilanReleve {
+            $this->domainesEnCache = []; // un seul SELECT par relève et par espace
             $validite = $this->lecteur->uidValidity($boite);
             $curseur = DB::table('envoi_curseurs_imap')->where('workspace_id', $workspaceId)->where('boite', $boite)->first();
             $bilan = new BilanReleve;
@@ -247,10 +248,13 @@ final class ReleveImap
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => $origine !== null, 'enErreur' => false];
     }
 
+    /** @var array<string, list<string>> */
+    private array $domainesEnCache = [];
+
     /** @return list<string> */
     private function domainesDEnvoi(string $workspaceId): array
     {
-        return array_values(DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->pluck('nom')->map(fn ($n): string => (string) $n)->all());
+        return $this->domainesEnCache[$workspaceId] ??= array_values(DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->pluck('nom')->map(fn ($n): string => (string) $n)->all());
     }
 
     /**

@@ -33,6 +33,7 @@ final class GardeChauffe
         private readonly DepotSocle $socle,
         private readonly ResolveurFournisseur $resolveur,
         private readonly ?Alerte $alerte = null,
+        private readonly LecteurReports $reports = new AucunReportConnu,
     ) {}
 
     /** Adresse expéditeur normalisée (casse, espaces) pour la retrouver dans `envoi_boites`. */
@@ -132,9 +133,9 @@ final class GardeChauffe
     {
         $jour = JourEnvoi::de($maintenant);
         $s = $this->seuils($ws);
-        $sept = $this->depot->totaux7Jours($ws, $jour);
+        $sept = $this->depot->totaux7Jours($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE);
         $decisions = array_filter([
-            Freins::rebondsDurs($sept['envoyes'], $sept['rebonds_durs'], $this->depot->totauxDuJour($ws, $jour)['rebonds_durs'], $s['rebonds_durs_taux_max'], (int) $s['rebonds_durs_jour_max']),
+            Freins::rebondsDurs($sept['envoyes'], $sept['rebonds_durs'], $this->depot->totauxDuJour($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE)['rebonds_durs'], $s['rebonds_durs_taux_max'], (int) $s['rebonds_durs_jour_max']),
         ]);
 
         // Plaintes : on ne recompte pas celles qu'un arrêt de 48 h a déjà consommées.
@@ -162,6 +163,14 @@ final class GardeChauffe
                 $decisions[] = $d;
             }
         }
+        // Reports > 20 % sur 1 h : pause de CE fournisseur seulement (la source des reports est une dette, voir LecteurReports).
+        foreach (Fournisseur::TOUS as $f) {
+            $r = $this->reports->sur1Heure($ws, $f, $maintenant);
+            $d = Freins::reportsEnHausse($f, $r['envoyes'], $r['reports']);
+            if ($d !== null) {
+                $decisions[] = $d;
+            }
+        }
         // Tableau de bord non validé : ALERTE seulement (l'arrêt, lui, vient de l'homme mort INF-025).
         if (Freins::hommeMort($this->depot->derniereValidation($ws), $maintenant, (int) $s['homme_mort_jours']) !== null) {
             $this->alerterUneFoisParJour($ws, 'tableau_non_valide_alerte', $jour, 'Tableau de bord d’envoi non validé', 'Le tableau de bord n’a pas été validé depuis ' . (int) $s['homme_mort_jours'] . ' jours (ou jamais). L’envoi n’est pas arrêté : valider par envoi:valider-tableau.');
@@ -173,7 +182,7 @@ final class GardeChauffe
     /** Jour de chauffe EFFECTIF (volume réel minimal par jour), avec « palier tenu » tant qu'une plainte récente (7 jours) est dans la fenêtre. */
     private function jourDeChauffe(string $ws, string $boite, DateTimeImmutable $jour, float $part): int
     {
-        $jours = CourbeChauffe::joursEffectifs($this->depot->volumesParJour($ws, $boite, $jour), $part);
+        $jours = CourbeChauffe::joursEffectifs($this->depot->volumesParJour($ws, $boite, $jour, BudgetChauffe::RESSOURCE_DOMAINE), $part);
         $jc = CourbeChauffe::jourDeChauffe($jours, $jour);
         $plainte = $this->depot->dernierJourPlainte($ws, $jour);
         if ($plainte === null) {
@@ -193,7 +202,7 @@ final class GardeChauffe
         $details = ['motif' => $d->motif, 'fournisseur' => $d->fournisseur, 'duree_heures' => $d->dureeHeures];
         if ($d->motif === DecisionFrein::PLAINTES_ARRET) {
             // Plaintes du jour à l'instant de l'arrêt : celles d'après ne seront pas ignorées au recomptage.
-            $details['plaintes_jour'] = $this->depot->totauxDuJour($ws, JourEnvoi::de($maintenant))['plaintes'];
+            $details['plaintes_jour'] = $this->depot->totauxDuJour($ws, JourEnvoi::de($maintenant), BudgetChauffe::RESSOURCE_DOMAINE)['plaintes'];
         }
         if ($manuelle !== null) {
             $details['rouvert_apres_levee_par'] = $manuelle['par'];

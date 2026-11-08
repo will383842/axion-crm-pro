@@ -60,6 +60,12 @@ final class Seuils
      */
     public const JOUR_EFFECTIF_PART = 0.5;
 
+    /** Reports (4xx différés) : au-delà de 20 % des envois vers un fournisseur sur 1 h => pause de ce fournisseur (26 § 4.3). */
+    public const REPORTS_TAUX_MAX = 0.20;
+
+    /** Échantillon minimum sur l'heure (HYPOTHÈSE à confirmer en banc) : sous ce volume, un taux n'a pas de sens. */
+    public const REPORTS_ENVOIS_MIN = 10;
+
     /** Quota du DOMAINE d'envoi par jour = ce facteur × le quota d'une boîte (créer des boîtes ne contourne pas la montée). */
     public const DOMAINE_FACTEUR = 3;
 

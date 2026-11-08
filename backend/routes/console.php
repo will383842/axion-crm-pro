@@ -550,6 +550,14 @@ Schedule::command('envoi:sante')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// K15 — supervision des envois : sante() du serveur (file, disque, mémoire, certificats, tunnel, horloge) + derniers
+// contrôles K12/K13, alertes dédoublonnées, pause sur critique (jamais levée seule). Inerte tant que
+// ENVOI_REEL_ACTIF, ENVOI_K1_ACTIF et ENVOI_SANTE_ACTIF ne sont pas tous vrais ; n'envoie rien.
+Schedule::command('envoi:supervision-sante')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // K12 — contrôle DNS quotidien des domaines d'envoi (PTR/SPF/DKIM/DMARC). Lecture du DNS et
 // ajouts seulement ; n'envoie rien. Un domaine pas prêt n'est pas marqué vérifié ce jour.
 ConsoleApplication::starting(static function (ConsoleApplication $artisan): void {

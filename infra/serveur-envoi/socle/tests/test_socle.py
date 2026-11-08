@@ -407,7 +407,10 @@ class TestHorloge(Base):  # (B) un saut d'horloge ferme ; il n'efface rien et ne
         self.assertEqual(self.reprise(), 200)
         self.avance(130)
         self.assertEqual(self.sante(), 200)
-        r2 = self.envoi(jt("J"))  # réservé non confirmé depuis > 2 min : même place, même id
+        r2 = self.envoi(jt("J"))  # réservé non confirmé depuis > 2 min : ambigu, même id, même place
+        self.assertEqual((r2.code, r2.id, r2.deposer), (451, r1.id, None))
+        self.assertTrue(self.socle.trancher(r1.id, deja_depose=False))
+        r2 = self.envoi(jt("J"))
         self.assertEqual((r2.code, r2.id), (250, r1.id))
         self.assertEqual(self.socle.compteur_du_jour(), 1)
 
@@ -699,7 +702,10 @@ class TestJetons(Base):  # (A) le socle décide ; jeton à deux états
         self.avance(121)
         self.assertEqual(self.sante(), 200)
         r2 = self.envoi(jt("a"))
-        self.assertEqual((r2.code, r2.id, r2.rejoue), (250, r1.id, False))  # À déposer de nouveau (rien confirmé)
+        self.assertEqual((r2.code, r2.id, r2.deposer), (451, r1.id, None))  # AMBIGU : jamais un dépôt silencieux
+        self.assertTrue(self.socle.trancher(r1.id, deja_depose=False))  # l'appelant tranche : rien n'est déposé
+        r3 = self.envoi(jt("a"))
+        self.assertEqual((r3.code, r3.id, r3.rejoue, r3.deposer), (250, r1.id, False, True))
         self.assertEqual(self.socle.compteur_du_jour(), 1)  # pas une seconde place
         self.assertEqual(self.envoi(jt("a")).code, 451)  # la fenêtre de 2 min repart de zéro
 
@@ -722,7 +728,10 @@ class TestJetons(Base):  # (A) le socle décide ; jeton à deux états
         self.avance(125)
         self.assertEqual(self.sante(socle=s2), 200)
         r = self.envoi(jt("a"), socle=s2)
-        self.assertEqual(r.code, 250)
+        self.assertEqual((r.code, r.deposer), (451, None))  # ambigu : le dépôt a pu avoir lieu avant le kill -9
+        self.assertTrue(s2.trancher(self.ligne(jt("a"))[1], deja_depose=False))
+        r = self.envoi(jt("a"), socle=s2)
+        self.assertEqual((r.code, r.deposer), (250, True))
         self.assertEqual(s2.compteur_du_jour(), 1, "zéro doublon de plafond")
 
     def test_meme_jeton_autre_contenu_refuse_et_alerte(self):
@@ -778,7 +787,11 @@ class TestSocleSeulementDecide(Base):  # (A) KumoMTA dépose seul
 
     def test_aucun_contenu_ni_adresse_ni_jeton_en_clair_sur_disque(self):
         self.envoi(jt("a"), "personne.reelle@example.test", b"CORPS-SECRET-DU-MESSAGE")
-        colonnes = {r[1] for r in sqlite3.connect(self.chemin).execute("PRAGMA table_info(jetons)")}
+        c = sqlite3.connect(self.chemin)
+        try:
+            colonnes = {r[1] for r in c.execute("PRAGMA table_info(jetons)")}
+        finally:
+            c.close()  # WinError 32 : le fichier doit être fermé avant le nettoyage
         self.assertNotIn("contenu", colonnes)
         self.assertNotIn("destinataire", colonnes)
         self.assertNotIn("jeton", colonnes)

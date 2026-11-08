@@ -115,6 +115,9 @@ class Stockage:
     def poser(self, c, cle, valeur):
         c.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (cle, str(valeur)))
 
+    def effacer(self, c, cle):
+        c.execute("DELETE FROM meta WHERE cle=?", (cle,))
+
     def jeton(self, jeton_h):
         return self.c.execute("SELECT empreinte,id,etat,reserve_duree,espace,reacceptations FROM jetons WHERE jeton_h=?",
                               (jeton_h,)).fetchone()

@@ -35,6 +35,7 @@ MAX_REACCEPTATIONS = 3  # un jeton « reserve » jamais confirmé n'est ré-acce
 # « retrait » (CRM) relève de la passerelle K2 : le socle ne le traite pas (404, nonce consommé, aucun effet).
 COMMANDES = ("sante", "reprise", "temoins", "pause")
 PREFIXE_COMMANDES = "/v1/commandes/"
+CLE_REDEPOT = "redepot:"  # meta : redépôt autorisé pour cet identifiant de message (une seule fois)
 
 
 def jeton_valide(jeton) -> bool:
@@ -67,7 +68,9 @@ class Reponse:
     code: int
     texte: str
     id: str | None = None
-    rejoue: bool = False
+    rejoue: bool = False  # vrai SEULEMENT pour un rejeu confirmé (répondre 250 sans mettre en file)
+    deposer: bool | None = False  # True = déposer ; False = ne pas déposer ; None = AMBIGU, à trancher côté appelant
+    rejeu: str = ""  # "" (neuf ou redépôt autorisé), "confirme", "reserve-ancien" (ambigu)
 
 
 class Socle:
@@ -204,19 +207,26 @@ class Socle:
                 if refus:
                     return refus
                 # rejoue=True : répondre 250 au client SANS mettre en file (le message est jeté). Aucun dépôt.
-                return Reponse(250, "2.0.0 ok", j[1], rejoue=True)
+                return Reponse(250, "2.0.0 ok", j[1], rejoue=True, deposer=False, rejeu="confirme")
             if d - j[3] < self.p.delai_reserve:
                 return Reponse(451, "4.3.2 depot en cours, report")
             refus = self._refus(ws, dest, pause)  # pause, mode témoins et liste : à CHAQUE nouvelle acceptation
             if refus:
                 return refus
+            if st.meta(CLE_REDEPOT + j[1]) != "1":
+                # AMBIGU : réservé depuis plus de 2 min, dépôt non confirmé. Peut-être déposé, peut-être non. Jamais de
+                # dépôt silencieux : 451 + deposer=None. L'appelant tranche avec `trancher()` (K7 / console locale).
+                return Reponse(451, "4.3.3 rejeu ambigu : depot non confirme, a trancher", j[1], deposer=None,
+                               rejeu="reserve-ancien")
             if j[5] >= MAX_REACCEPTATIONS:
-                st.ecrire(lambda c: self._journaliser(c, "jeton-reacceptations-max", jh[:8]))
+                st.ecrire(lambda c: (self._journaliser(c, "jeton-reacceptations-max", jh[:8]),
+                                     st.effacer(c, CLE_REDEPOT + j[1])))
                 return Reponse(451, "4.7.2 jeton reaccepte trop de fois sans confirmation, refus definitif")
-            st.ecrire(lambda c: (c.execute("UPDATE jetons SET reserve_duree=?, reacceptations=reacceptations+1 "
-                                           "WHERE jeton_h=?", (d, jh)), self._poser_duree(c)))
-            # Même id, même place de plafond ; rien n'est confirmé : le message est à DÉPOSER (rejoue=False).
-            return Reponse(250, "2.0.0 ok", j[1])
+            motif = st.ecrire(lambda c: self._redeposer(c, jh, j[1], ws, mur, d))
+            if motif:
+                return Reponse(451, f"4.7.1 plafond {motif} journalier atteint, report")
+            # Redépôt autorisé par `trancher(..., deja_depose=False)` : même id, une place sur le jour courant.
+            return Reponse(250, "2.0.0 ok", j[1], deposer=True)
         refus = self._refus(ws, dest, pause)
         if refus:
             return refus
@@ -226,7 +236,28 @@ class Socle:
             return Reponse(451, f"4.7.1 plafond {motif} journalier atteint, report")
         if self._apres_reserve:
             self._apres_reserve()
-        return Reponse(250, "2.0.0 ok", id_)
+        return Reponse(250, "2.0.0 ok", id_, deposer=True)
+
+    def _redeposer(self, c, jh, id_, ws, mur, d):
+        """Dans la transaction : consomme l'autorisation de redépôt. Si le jeton date d'un jour passé, la place est
+        reprise sur le jour COURANT (global et espace) : le plafond du lendemain ne peut pas être dépassé."""
+        st = self.stockage
+        jour = max(jour_paris(mur), st.meta("dernier_jour", ""))
+        ancien = c.execute("SELECT jour FROM jetons WHERE jeton_h=?", (jh,)).fetchone()[0]
+        if ancien != jour:
+            if st.compteur(jour) >= self.p.plafond:
+                return "global"
+            if st.compteur(jour, ws) >= self.p.plafond_par_espace:
+                return "de l'espace"
+            for espace in ("*", ws):
+                c.execute("INSERT INTO compteur VALUES(?,?,1) ON CONFLICT(jour,espace) DO UPDATE SET n=n+1",
+                          (jour, espace))
+            c.execute("UPDATE jetons SET jour=? WHERE jeton_h=?", (jour, jh))
+            st.poser(c, "dernier_jour", jour)
+        c.execute("UPDATE jetons SET reserve_duree=?, reacceptations=reacceptations+1 WHERE jeton_h=?", (d, jh))
+        st.effacer(c, CLE_REDEPOT + id_)
+        self._poser_duree(c)
+        return None
 
     def _reserver(self, c, jh, emp, id_, ws, mur, d):
         """Dans la transaction : plafond global ET par espace, place, jeton réservé. None = réservé."""
@@ -254,6 +285,22 @@ class Socle:
                 # 451 (report) et non 550 : un message n'est JAMAIS perdu ; il repart quand l'espace sort du mode témoins.
                 return Reponse(451, "4.7.1 mode temoins : destinataire hors liste, report")
         return None
+
+    def trancher(self, id_message: str, deja_depose: bool) -> bool:
+        """Tranche un rejeu AMBIGU (local, hors réseau, non exposé par `traiter`). `deja_depose=True` : KumoMTA a le
+        message => confirmé (plus aucun dépôt). `False` : il ne l'a pas => UN redépôt est autorisé (borné à 3)."""
+        if self.ferme:
+            return False
+        if deja_depose:
+            return self.confirmer(id_message)
+        with self._verrou:
+            def f(c):
+                if not c.execute("SELECT 1 FROM jetons WHERE id=? AND etat='reserve'", (str(id_message),)).fetchone():
+                    return False
+                self.stockage.poser(c, CLE_REDEPOT + str(id_message), 1)
+                self._journaliser(c, "rejeu-tranche-redepot", assainir(id_message)[:8])
+                return True
+            return bool(self.stockage.ecrire(f))
 
     def confirmer(self, id_message: str) -> bool:
         """reserve -> confirme. Réservé au log hook K7 (local, hors réseau) ; non exposé par `traiter`."""
@@ -328,9 +375,15 @@ class Socle:
     def _reprise(self) -> int:
         st, mur, mono = self.stockage, self.horloge(), self.monotone()
         ls = st.meta("derniere_sante")
-        if (self._ref and abs((mur - self._ref[0]) - (mono - self._ref[1])) > TOLERANCE_HORLOGE) \
-                or (ls is not None and mur < float(ls) - TOLERANCE_HORLOGE):
-            return 409  # horloge murale pas corrigée : on ne rouvre pas
+        if ls is not None and mur < float(ls) - TOLERANCE_HORLOGE:
+            return 409  # murale antérieure à la dernière santé : horloge pas corrigée, on ne rouvre pas
+        if self._ref and abs((mur - self._ref[0]) - (mono - self._ref[1])) > TOLERANCE_HORLOGE:
+            # Pas d'horloge (NTP) : la référence est périmée. On ne la recale QUE si le jour Paris n'a pas bougé par
+            # rapport au temps monotone attendu ET ne recule pas sous le dernier jour vu : un saut de jours reste refusé.
+            attendu = self._ref[0] + (mono - self._ref[1])
+            jour = jour_paris(mur)
+            if jour != jour_paris(attendu) or jour < st.meta("dernier_jour", ""):
+                return 409
         self._duree()
         st.ecrire(lambda c: (st.poser(c, "pause_hm", 0), st.poser(c, "derniere_sante", mur), self._poser_duree(c),
                              self._journaliser(c, "reprise", "commande reprise")))

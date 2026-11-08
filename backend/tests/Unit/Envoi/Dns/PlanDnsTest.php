@@ -39,3 +39,29 @@ test('la configuration refuse un domaine ou un nom d hôte invalide', function (
     expect(fn () => new ConfigurationDomaine('pas un domaine', 's', 'h.example.test', '192.0.2.1'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => new ConfigurationDomaine('envoi.example.test', 's', 'h.example.test', 'pas-une-ip'))->toThrow(InvalidArgumentException::class);
 });
+
+test('une valeur TXT DKIM de 2048 bits est découpée en morceaux de 255 octets au plus', function () {
+    $valeur = 'v=DKIM1; k=rsa; p=' . base64_encode(str_repeat('x', 294)); // ~392 caractères
+    $morceaux = PlanDns::decouperTxt($valeur);
+    expect(strlen($valeur))->toBeGreaterThan(255)
+        ->and(count($morceaux))->toBeGreaterThan(1)
+        ->and(implode('', $morceaux))->toBe($valeur);
+    foreach ($morceaux as $m) {
+        expect(strlen($m))->toBeLessThanOrEqual(255)->and($m)->not->toBe('');
+    }
+});
+
+test('le plan sorti découpe le TXT DKIM une fois le jeton remplacé', function () {
+    $dkim = array_values(array_filter(PlanDns::enregistrements(configPlan()), fn ($e) => $e->role === 'DKIM'))[0];
+    $cle = base64_encode(str_repeat('y', 294));
+    $morceaux = PlanDns::chainesTxt($dkim, ['{CLE_PUBLIQUE_DKIM}' => $cle]);
+    expect(implode('', $morceaux))->toBe('v=DKIM1; k=rsa; p=' . $cle);
+    foreach ($morceaux as $m) {
+        expect(strlen($m))->toBeLessThanOrEqual(255);
+    }
+});
+
+test('une valeur courte ou vide reste en un seul morceau', function () {
+    expect(PlanDns::decouperTxt('v=spf1 -all'))->toBe(['v=spf1 -all'])
+        ->and(PlanDns::decouperTxt(''))->toBe(['']);
+});

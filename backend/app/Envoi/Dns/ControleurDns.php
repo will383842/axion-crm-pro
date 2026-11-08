@@ -30,14 +30,26 @@ final class ControleurDns
         $r['spf_autorise_ip'] = $ok($this->spfAutorise($mots, $c->ip));
 
         // DKIM
-        $dkim = $this->etiquettes($this->enregistrements($c->selecteur . '._domainkey.' . $c->domaine, 'v=DKIM1')[0] ?? '');
-        $cle = (string) base64_decode($dkim['p'] ?? '', true);
+        // v=DKIM1 est facultatif (RFC 6376) : on retient tout TXT qui porte une étiquette p=.
+        $dkim = [];
+        foreach ($this->dns->txt($c->selecteur . '._domainkey.' . $c->domaine) as $t) {
+            $e = $this->etiquettes($t);
+            if (isset($e['p']) || stripos(trim($t), 'v=DKIM1') === 0) {
+                $dkim = $e;
+                break;
+            }
+        }
+        $cle = (string) base64_decode((string) preg_replace('/\s+/', '', $dkim['p'] ?? ''), true);
         $r['dkim_present'] = $ok($dkim !== []);
         $r['dkim_cle_publique'] = $ok($cle !== '');
         $r['dkim_cle_2048'] = $ok(strlen($cle) >= 256, 'avert');
 
         // DMARC
         $dm = $this->enregistrements('_dmarc.' . $c->domaine, 'v=DMARC1');
+        if ($dm === [] && substr_count($c->domaine, '.') >= 2) {
+            // Repli RFC 7489 : sans enregistrement propre, la politique du domaine parent s'applique.
+            $dm = $this->enregistrements('_dmarc.' . substr($c->domaine, (int) strpos($c->domaine, '.') + 1), 'v=DMARC1');
+        }
         $e = $this->etiquettes($dm[0] ?? '');
         $r['dmarc_present'] = $ok($dm !== []);
         $r['dmarc_unique'] = $ok(count($dm) === 1);
@@ -71,7 +83,7 @@ final class ControleurDns
     {
         return array_values(array_filter(
             $this->dns->txt($nom),
-            static fn (string $t): bool => stripos(trim($t), $debut) === 0,
+            static fn (string $t): bool => stripos((string) preg_replace('/\s*=\s*/', '=', trim($t), 1), $debut) === 0,
         ));
     }
 

@@ -141,3 +141,27 @@ test('aucune requête hors DNS/MTA-STS : le contrôle ne fait que lire', functio
         expect($q)->toMatch('/^(TXT|A|PTR|STS) /');
     }
 });
+
+test('DMARC : repli sur le domaine parent quand le sous-domaine n en publie pas', function () {
+    $f = FauxResolveurDns::conforme('example.test', 'sel1', 'mx.envoi.example.test');
+    $f->txt['_dmarc.example.test'] = ['v=DMARC1; p=reject; rua=mailto:d@example.test'];
+    $f->txt['sel1._domainkey.envoi.example.test'] = $f->txt['sel1._domainkey.example.test'];
+    $f->txt['envoi.example.test'] = ['v=spf1 ip4:192.0.2.10 -all'];
+    $f->txt['_mta-sts.envoi.example.test'] = ['v=STSv1; id=1'];
+    $r = (new ControleurDns($f))->controler(new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10'));
+    expect(statut($r, 'dmarc_present'))->toBe('ok')->and(statut($r, 'dmarc_politique'))->toBe('ok');
+});
+
+test('DMARC : p = avec espaces toléré', function () {
+    $f = FauxResolveurDns::conforme();
+    $f->txt['_dmarc.envoi.example.test'] = ['v=DMARC1 ; p = quarantine ; rua = mailto:d@envoi.example.test'];
+    $r = (new ControleurDns($f))->controler(new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10'));
+    expect(statut($r, 'dmarc_politique'))->toBe('ok')->and(statut($r, 'dmarc_rua'))->toBe('ok');
+});
+
+test('DKIM : v=DKIM1 facultatif', function () {
+    $f = FauxResolveurDns::conforme();
+    $f->txt['sel1._domainkey.envoi.example.test'] = ['k=rsa; p=' . base64_encode(str_repeat('x', 294))];
+    $r = (new ControleurDns($f))->controler(new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '192.0.2.10'));
+    expect(statut($r, 'dkim_present'))->toBe('ok')->and(statut($r, 'dkim_cle_2048'))->toBe('ok');
+});

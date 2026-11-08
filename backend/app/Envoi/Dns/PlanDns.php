@@ -39,6 +39,32 @@ final class PlanDns
         ];
     }
 
+    /**
+     * Découpe une valeur TXT en chaînes de 255 octets au plus (limite d'une chaîne DNS) :
+     * indispensable pour une clé DKIM RSA 2048 (~392 caractères). La concaténation redonne la valeur.
+     *
+     * @return list<string>
+     */
+    public static function decouperTxt(string $valeur, int $max = 255): array
+    {
+        if ($valeur === '') {
+            return [''];
+        }
+
+        return str_split($valeur, max(1, min($max, 255)));
+    }
+
+    /**
+     * Chaînes TXT à publier pour une ligne du plan, jetons remplacés (ex. la vraie clé, fournie hors dépôt).
+     *
+     * @param  array<string, string>  $jetons
+     * @return list<string>
+     */
+    public static function chainesTxt(EnregistrementDns $e, array $jetons = []): array
+    {
+        return self::decouperTxt(strtr($e->valeurModele, $jetons));
+    }
+
     /** Fichier de politique MTA-STS : toujours en mode testing au départ. */
     public static function politiqueMtaSts(ConfigurationDomaine $c): string
     {

@@ -7,7 +7,6 @@ use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 /** Contrôle DNS quotidien de tous les domaines d'envoi. Lit le DNS, écrit des ajouts, n'envoie rien. */
 final class ControleDnsCommande extends Command
@@ -25,28 +24,15 @@ final class ControleDnsCommande extends Command
         /** @var array<string, array<string, string>> $config */
         $config = (array) config('envoi.dns.domaines', []);
 
-        foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $ws) {
-            $ws = (string) $ws;
-            $noms = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->pluck('nom')->all());
-            foreach ($noms as $nom) {
-                $p = $config[(string) $nom] ?? null;
-                if ($p === null) {
-                    $this->warn('domaine sans configuration DNS : ignoré');
+        $lot = new ControleDnsLot(
+            $controle,
+            $config,
+            fn () => DB::table('workspaces')->whereNull('deleted_at')->pluck('id'),
+            fn (string $ws) => WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->pluck('nom')->all()),
+            fn (string $m) => $this->warn($m),
+            fn (string $m) => $this->line($m),
+        );
 
-                    continue;
-                }
-                try {
-                    $c = new ConfigurationDomaine((string) $nom, (string) ($p['selecteur'] ?? ''), (string) ($p['helo'] ?? ''), (string) ($p['ip'] ?? ''));
-                } catch (InvalidArgumentException) {
-                    $this->warn('configuration DNS invalide : ignorée');
-
-                    continue;
-                }
-                $r = $controle->controler($ws, $c);
-                $this->line(sprintf('%s : %s%s', $c->domaine, $r->pret() ? 'prêt' : 'pas prêt', $r->pause() ? ' (pause)' : ''));
-            }
-        }
-
-        return self::SUCCESS;
+        return $lot->executer() > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

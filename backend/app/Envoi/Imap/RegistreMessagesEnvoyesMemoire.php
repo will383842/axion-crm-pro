@@ -52,13 +52,14 @@ final class RegistreMessagesEnvoyesMemoire implements RegistreMessagesEnvoyes
 
     private function parInjectionDepuisMessages(string $workspaceId, string $idInjection): ?MessageOrigine
     {
+        $trouvees = [];
         foreach ($this->parMessageId as $id => $origine) {
             if ($origine->idInjection === $idInjection && $this->visible('m:' . $id, $workspaceId)) {
-                return $origine;
+                $trouvees[mb_strtolower($origine->adresse)] = $origine;
             }
         }
 
-        return null;
+        return count($trouvees) === 1 ? array_values($trouvees)[0] : null; // plusieurs destinataires : ambigu
     }
 
     public function retrouver(string $workspaceId, array $messageIds): ?MessageOrigine

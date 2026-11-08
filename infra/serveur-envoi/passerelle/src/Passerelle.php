@@ -54,6 +54,10 @@ final class Passerelle
         ?\Closure $dormir = null,
         ?\Closure $alerte = null,
     ) {
+        if ($kumo->delaiMaximal() >= Stockage::DELAI_RESERVATION || $kumo->delaiMaximal() > Kumo::DELAI_MAX_SECONDES) {
+            // K4c : un client plus lent que la réservation ferait exécuter une commande deux fois.
+            throw new \InvalidArgumentException('délai du client KumoMTA trop long (< DELAI_RESERVATION exigé)');
+        }
         $this->cles = [];
         foreach ($cles as $ws => $v) {
             $v = is_string($v) ? ['1' => $v] : $v;

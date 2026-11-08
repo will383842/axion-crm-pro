@@ -37,7 +37,7 @@ final class TerminerEffetsOpposition
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $oppositionId): bool {
             try {
                 return DB::transaction(function () use ($workspaceId, $oppositionId): bool {
-                    $o = DB::table('envoi_oppositions')->where('id', $oppositionId)->lockForUpdate()->first();
+                    $o = DB::table('envoi_oppositions')->where('id', $oppositionId)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
                     if ($o === null || $o->effets_termines_le !== null) {
                         return false;
                     }

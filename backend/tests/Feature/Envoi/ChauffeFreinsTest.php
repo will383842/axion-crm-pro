@@ -1324,3 +1324,12 @@ test('RÉSERVE 4 : envoi:temoin-indesirable transmet --auteur au journal (plus �
     Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr', '--auteur' => 'marie']);
     expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->value('auteur'))->toBe('marie');
 });
+
+test('D1b : envoi:temoin-indesirable SANS --auteur journalise « freins » (jamais l\'utilisateur système)', function () {
+    $ws = espaceChauffe();
+    Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr']);
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->value('auteur'))->toBe('freins');
+    // get_current_user() dépend du propriétaire du script (vide dans certains conteneurs) : le test de valeur ne suffit pas à le
+    // faire rougir partout, d'où cette garde sur la source de la commande.
+    expect(file_get_contents(app_path('Console/Commands/EnvoiTemoinIndesirable.php')))->not->toContain('get_current_user');
+});

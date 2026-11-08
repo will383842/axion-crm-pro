@@ -28,6 +28,8 @@ final class RecepteurRetoursCrm implements RecepteurRetours
         'rebond_mou' => 'rebond_mou',
     ];
 
+    private const MINUTES_EN_COURS = 10;
+
     public function recevoir(string $workspaceId, RetourDetecte $retour): void
     {
         $type = self::TYPES[$retour->classe->value] ?? null;
@@ -56,15 +58,26 @@ final class RecepteurRetoursCrm implements RecepteurRetours
         }
 
         // Le compteur de rebonds mous du CRM vit en cache, hors transaction : si un récepteur suivant échoue, la
-        // relève relit le message ; sans cette marque (clé stable du message) le rebond serait recompté.
+        // relève relit le message ; sans marque (clé stable du message) le rebond serait recompté.
+        // Deux marques : « en cours » (10 min, posée AVANT le comptage, comme un verrou) et « appliqué » (30 jours, posée
+        // APRÈS le succès). Un processus tué entre les deux ne laisse que la marque courte : elle expire et le rebond
+        // est compté à la relève suivante (avant, la marque de 30 jours posée d'avance le faisait perdre pour de bon).
         $marque = $type === 'rebond_mou' ? 'envoi:rebond_mou_applique:' . $retour->cle : null;
-        if ($marque !== null && ! Cache::add($marque, 1, now()->addDays(30))) {
-            return;
+        $enCours = $marque . ':en_cours';
+        if ($marque !== null) {
+            if (Cache::has($marque)) {
+                return; // déjà compté
+            }
+            if (! Cache::add($enCours, 1, now()->addMinutes(self::MINUTES_EN_COURS))) {
+                // Traitement en cours (ou interrompu il y a moins de 10 min) : NE PAS rendre la main comme si c'était fait,
+                // la relève avancerait son curseur et le rebond serait perdu. Indisponibilité : la relève reprendra.
+                throw new RuntimeException('Rebond mou en cours de traitement ou interrompu récemment : à reprendre.');
+            }
         }
 
         $fichier = tempnam(sys_get_temp_dir(), 'imap-retour-');
         if ($fichier === false) {
-            $marque !== null && Cache::forget($marque);
+            $marque !== null && Cache::forget($enCours);
 
             throw new RuntimeException('Fichier temporaire impossible.');
         }
@@ -75,7 +88,7 @@ final class RecepteurRetoursCrm implements RecepteurRetours
             }
             $code = Artisan::call('crm:campagne:retours', ['file' => $fichier]);
         } catch (\Throwable $e) {
-            $marque !== null && Cache::forget($marque); // rien n'a été compté : le message pourra l'être
+            $marque !== null && Cache::forget($enCours); // rien n'a été compté : le message pourra l'être
 
             throw $e;
         } finally {
@@ -84,9 +97,13 @@ final class RecepteurRetoursCrm implements RecepteurRetours
             }
         }
         if ($code !== 0) {
-            $marque !== null && Cache::forget($marque);
+            $marque !== null && Cache::forget($enCours);
 
             throw new RuntimeException('Arrêt non appliqué : crm:campagne:retours a échoué.');
+        }
+        if ($marque !== null) {
+            Cache::put($marque, 1, now()->addDays(30));   // compté : la marque définitive remplace la marque courte
+            Cache::forget($enCours);
         }
     }
 }

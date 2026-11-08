@@ -43,7 +43,7 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
     '2026_11_11_000100_envoi_serveurs.php',
     '2026_11_11_000104_envoi_journal_commande_id.php',
-    // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (corps vide).
+    // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
     '2026_11_11_000110_envoi_controles_dns.php',
     // Envoi K15 : relevés de santé et constats, ajout seul (trigger), down() inerte.
     '2026_11_13_000150_envoi_sante.php',
@@ -58,12 +58,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     // des compteurs. Le down() de 000070 (table recréée à vide) rend en outre un retour réel non rejouable dans ce test.
     '2026_11_13_000145_envoi_chauffe_ressource_type.php',
     // Filet modifié : pourquoi — K8 durcissement : le garde fige aussi ressource_type + CHECK type/clé ; down() inerte (relâcher le garde réouvrirait la falsification).
-    '2026_11_14_000155_envoi_chauffe_garde_ressource_type.php',
+    '2026_11_14_000150_envoi_chauffe_garde_ressource_type.php',
     // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
     '2026_11_30_000100_envoi_config_versions.php',
     // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
     // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
-    '2026_11_13_000140_envoi_serveurs_epoque.php',
+    '2026_11_30_000310_envoi_serveurs_epoque.php',
     // Envoi P0 L5 (suivi) : état de relance des effets d'opposition, en base (ajout seul) ; down() inerte (corps vide).
     '2026_11_30_000200_envoi_relances_effets.php',
 ];

@@ -41,6 +41,11 @@ PROJET="${1:-axion-crm-pro}"
 # silencieusement « 80 et 443 autorisés ». Mesuré : la garde rougissait sur la
 # préproduction en annonçant « ports attendus absents : 80 443 ».
 AUTORISES="${2-80 443}"
+# Troisième argument, OPT-IN : « sans-publication » déclare qu'une pile qui ne publie
+# RIEN est le résultat attendu (banc d'envoi : réseau internal). Le témoin « des
+# conteneurs ont été vus » reste exigé ; seul l'échec « aucune publication » est levé.
+# Par défaut (production, préproduction) le comportement est inchangé.
+SANS_PUBLICATION="${3-}"
 
 if ! command -v docker > /dev/null 2>&1; then
   echo "ERREUR : docker introuvable — mesure impossible." >&2
@@ -108,7 +113,7 @@ fi
 # La première version exigeait au moins un port public et aurait donc rougi sur
 # une pile parfaitement conforme, en annonçant « la mesure est suspecte ».
 # Ce qu'il faut prouver, c'est qu'on a mesuré QUELQUE CHOSE.
-if [ -z "$PUBLIES" ] && [ -z "$LOOPBACK" ]; then
+if [ -z "$PUBLIES" ] && [ -z "$LOOPBACK" ] && [ "$SANS_PUBLICATION" != "sans-publication" ]; then
   echo "ERREUR : aucune publication d'aucune sorte — la mesure n'a rien vu." >&2
   echo "         Une pile qui ne publie RIEN ne sert personne : contrôle suspect." >&2
   exit 2

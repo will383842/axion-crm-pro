@@ -12,8 +12,15 @@ class FileKumo(ABC):
         """Dépose le message dans la file de l'espace. Lève ErreurFile si impossible."""
 
 
+class FileIndisponible(FileKumo):
+    """File de production tant que KumoMTA n'est pas branché : refuse toujours (451), ne garde rien."""
+
+    def deposer(self, espace, mail_from, destinataire, message):
+        raise ErreurFile("KumoMTA non branché")
+
+
 class FausseFile(FileKumo):
-    """Double de test : garde les dépôts en mémoire."""
+    """Double de test UNIQUEMENT (jamais en production) : garde les dépôts en mémoire."""
 
     def __init__(self, panne: bool = False):
         self.depots: list[dict] = []

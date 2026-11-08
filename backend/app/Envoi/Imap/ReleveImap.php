@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Imap;
 
+use App\Socle\Alertes\Alerte;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
@@ -58,6 +59,7 @@ final class ReleveImap
         private readonly LecteurBoite $lecteur,
         private readonly RegistreMessagesEnvoyes $registre,
         private readonly RecepteurRetours $recepteur,
+        private readonly ?Alerte $alerte = null,
     ) {}
 
     /** Relève courante : uniquement ce qui suit le curseur. */
@@ -153,6 +155,7 @@ final class ReleveImap
                 // Mis à l'écart : « à rattacher », SANS effet, pour revue humaine ; le curseur peut passer.
                 Log::error('Relève IMAP : message mis à l\'écart après échecs répétés', ['boite' => $boite, 'uid' => $m->uid, 'erreur' => $e::class]);
                 $r = DB::transaction(fn (): array => $this->noterSansEffet($workspaceId, $boite, $validite, $m));
+                $this->alerterSiOppositionPerdue($m, $boite);
             }
             if ($r['enErreur']) {
                 $bilan->enErreur++;
@@ -167,6 +170,29 @@ final class ReleveImap
         }
 
         return $premierEchec;
+    }
+
+    /**
+     * Un STOP / une plainte que le CRM n'a pas pu appliquer après MAX_TENTATIVES dort dans la file « à rattacher » :
+     * il faut qu'un humain le sache (jamais d'adresse ni de contenu dans l'alerte).
+     */
+    private function alerterSiOppositionPerdue(MessageBrut $m, string $boite): void
+    {
+        if (! in_array(Classificateur::classer($m), self::CLASSES_OPPOSITION, true)) {
+            return;
+        }
+        try {
+            ($this->alerte ?? app(Alerte::class))->envoyer(
+                'Relève IMAP : un STOP n\'a pas pu être appliqué',
+                'Une opposition (STOP ou plainte) a échoué ' . self::MAX_TENTATIVES . ' fois côté CRM : elle est dans la file « à rattacher », SANS effet. À traiter à la main avant tout nouvel envoi.',
+                'envoi',
+                'critique',
+                null,
+                ['boite' => $boite, 'uid' => $m->uid],
+            );
+        } catch (\Throwable) {
+            // une alerte ne casse jamais la relève
+        }
     }
 
     /** @return array{insere: bool, classe: string, rattache: bool, enErreur: bool} */

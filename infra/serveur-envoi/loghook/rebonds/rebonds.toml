@@ -1,0 +1,26 @@
+# Regles de classification des echecs (K7). Premiere regle qui correspond = gagnante.
+# Validees en CI : un TOML invalide, une classe inconnue ou un defaut absent = CI rouge.
+# Classes : rebond_dur (adresse perdue), rebond_mou (a reessayer plus tard, jamais d'opposition), report (4xx).
+defaut_bounce = "rebond_dur"
+defaut_transitoire = "report"
+
+[[regle]]
+nom = "boite-pleine"
+classe = "rebond_mou"
+statut_prefixe = "5.2.2"
+
+[[regle]]
+nom = "message-trop-gros"
+classe = "rebond_mou"
+statut_prefixe = "5.3.4"
+
+[[regle]]
+nom = "reputation-ou-blocage"
+classe = "rebond_mou"
+statut_prefixe = "5.7"
+contient = ["blocked", "spam", "reputation", "blacklist", "denied"]
+
+[[regle]]
+nom = "expiration-file"
+classe = "rebond_mou"
+type = "Expiration"

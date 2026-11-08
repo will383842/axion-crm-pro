@@ -96,6 +96,21 @@ CREATE TRIGGER IF NOT EXISTS purge_borne_no_delete BEFORE DELETE ON purge_borne
 CREATE TRIGGER IF NOT EXISTS purge_borne_no_recul BEFORE UPDATE ON purge_borne
   WHEN NEW.dernier_purge < OLD.dernier_purge
   BEGIN SELECT RAISE(ABORT, 'la borne de purge ne recule jamais'); END;
+CREATE TABLE IF NOT EXISTS loghook_vus (
+  workspace_id TEXT NOT NULL, source TEXT NOT NULL, id_kumo TEXT NOT NULL, type TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, source, id_kumo, type)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS loghook_sources (
+  workspace_id TEXT NOT NULL, source TEXT NOT NULL, dernier_src_seq INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, source)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS loghook_compteurs (
+  workspace_id TEXT PRIMARY KEY, rebonds_durs INTEGER NOT NULL) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS loghook_journal (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, genre TEXT NOT NULL,
+  id_kumo TEXT NOT NULL, detail TEXT NOT NULL, cree_le INTEGER NOT NULL);
+CREATE TRIGGER IF NOT EXISTS loghook_journal_no_update BEFORE UPDATE ON loghook_journal
+  BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
+CREATE TRIGGER IF NOT EXISTS loghook_journal_no_delete BEFORE DELETE ON loghook_journal
+  BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
 CREATE TABLE IF NOT EXISTS purge_etat (ouverte INTEGER NOT NULL);
 INSERT INTO purge_etat SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM purge_etat);
 CREATE TRIGGER IF NOT EXISTS evenements_no_update BEFORE UPDATE ON evenements
@@ -232,19 +247,84 @@ SQL);
             throw new \InvalidArgumentException('id_injection invalide');
         }
 
-        return (int) $this->transaction(function () use ($ws, $type, $donnees): int {
-            $this->pdo->prepare('INSERT OR IGNORE INTO sequences (workspace_id, dernier) VALUES (?,0)')->execute([$ws]);
-            $this->pdo->prepare('UPDATE sequences SET dernier = dernier + 1 WHERE workspace_id=?')->execute([$ws]);
-            $st = $this->pdo->prepare('SELECT dernier FROM sequences WHERE workspace_id=?');
-            $st->execute([$ws]);
-            $seq = (int) $st->fetchColumn();
-            // L'encodage JSON peut échouer APRÈS la réservation : la transaction annule alors tout.
-            $json = json_encode($donnees, JSON_THROW_ON_ERROR);
-            $this->pdo->prepare('INSERT INTO evenements (workspace_id, sequence, type, donnees, cree_le) VALUES (?,?,?,?,?)')
-                ->execute([$ws, $seq, $type, $json, $this->now()]);
+        return (int) $this->transaction(fn (): int => $this->insererEvenement($ws, $type, $donnees));
+    }
 
-            return $seq;
+    /** À appeler DANS une transaction : réserve le numéro suivant et écrit l'événement. */
+    private function insererEvenement(string $ws, string $type, array $donnees): int
+    {
+        $this->pdo->prepare('INSERT OR IGNORE INTO sequences (workspace_id, dernier) VALUES (?,0)')->execute([$ws]);
+        $this->pdo->prepare('UPDATE sequences SET dernier = dernier + 1 WHERE workspace_id=?')->execute([$ws]);
+        $st = $this->pdo->prepare('SELECT dernier FROM sequences WHERE workspace_id=?');
+        $st->execute([$ws]);
+        $seq = (int) $st->fetchColumn();
+        // L'encodage JSON peut échouer APRÈS la réservation : la transaction annule alors tout.
+        $json = json_encode($donnees, JSON_THROW_ON_ERROR);
+        $this->pdo->prepare('INSERT INTO evenements (workspace_id, sequence, type, donnees, cree_le) VALUES (?,?,?,?,?)')
+            ->execute([$ws, $seq, $type, $json, $this->now()]);
+
+        return $seq;
+    }
+
+    /**
+     * K7 : ingestion ATOMIQUE d'un enregistrement du log hook (dédoublonnage, trou de source, compteur d'observation,
+     * événement numéroté, journal) en UNE transaction : un arrêt brutal ne laisse ni doublon ni trou.
+     * Les événements `rebond_dur` des $observationMax premiers (par espace) portent `observation=true`.
+     * `action_auto` vaut toujours « aucune » : la passerelle n'agit jamais, K1 tire.
+     *
+     * @param array{source:string,src_seq:int,id_kumo:string,type:string,id_injection:string,destinataire_empreinte:string,jeton:?string} $e
+     * @return array{statut:'ingere'|'doublon',seq:?int,trou:bool}
+     */
+    public function ingererLoghook(string $ws, array $e, int $observationMax): array
+    {
+        /** @var array{statut:'ingere'|'doublon',seq:?int,trou:bool} */
+        return $this->transaction(function () use ($ws, $e, $observationMax): array {
+            $j = fn (string $genre, string $detail) => $this->pdo->prepare('INSERT INTO loghook_journal (workspace_id, genre, id_kumo, detail, cree_le) VALUES (?,?,?,?,?)')
+                ->execute([$ws, $genre, $e['id_kumo'], $detail, $this->now()]);
+            $vu = $this->pdo->prepare('INSERT OR IGNORE INTO loghook_vus (workspace_id, source, id_kumo, type) VALUES (?,?,?,?)');
+            $vu->execute([$ws, $e['source'], $e['id_kumo'], $e['type']]);
+            if ($vu->rowCount() === 0) {
+                $j('doublon', $e['type']);
+
+                return ['statut' => 'doublon', 'seq' => null, 'trou' => false];
+            }
+            $st = $this->pdo->prepare('SELECT dernier_src_seq FROM loghook_sources WHERE workspace_id=? AND source=?');
+            $st->execute([$ws, $e['source']]);
+            $dernier = (int) ($st->fetchColumn() ?: 0);
+            $trou = $dernier > 0 && $e['src_seq'] > $dernier + 1;
+            if ($trou) {
+                $j('trou_source', ($dernier + 1).'-'.($e['src_seq'] - 1));
+            }
+            $this->pdo->prepare('INSERT INTO loghook_sources (workspace_id, source, dernier_src_seq) VALUES (?,?,?) ON CONFLICT (workspace_id, source) DO UPDATE SET dernier_src_seq = MAX(dernier_src_seq, excluded.dernier_src_seq)')
+                ->execute([$ws, $e['source'], $e['src_seq']]);
+            $donnees = [
+                'id_injection' => $e['id_injection'], 'id_kumo' => $e['id_kumo'], 'source' => $e['source'], 'src_seq' => $e['src_seq'],
+                'destinataire_empreinte' => $e['destinataire_empreinte'], 'action_auto' => 'aucune',
+            ];
+            if ($e['type'] === 'rebond_dur') {
+                $this->pdo->prepare('INSERT OR IGNORE INTO loghook_compteurs (workspace_id, rebonds_durs) VALUES (?,0)')->execute([$ws]);
+                $this->pdo->prepare('UPDATE loghook_compteurs SET rebonds_durs = rebonds_durs + 1 WHERE workspace_id=?')->execute([$ws]);
+                $c = $this->pdo->prepare('SELECT rebonds_durs FROM loghook_compteurs WHERE workspace_id=?');
+                $c->execute([$ws]);
+                $n = (int) $c->fetchColumn();
+                $donnees['observation'] = $n <= $observationMax;
+                $j('rebond_dur', 'n='.$n.' observation='.($donnees['observation'] ? 'oui' : 'non'));
+            }
+            if ($e['type'] === 'reception' && $e['jeton'] !== null) {
+                $j('jeton_en_attente', $e['jeton']);
+            }
+            $seq = $this->insererEvenement($ws, $e['type'], $donnees);
+            $j('ingere', $e['type'].' seq='.$seq);
+
+            return ['statut' => 'ingere', 'seq' => $seq, 'trou' => $trou];
         });
+    }
+
+    /** Ajoute une ligne au journal du log hook (ajout seul). */
+    public function journaliserLoghook(string $ws, string $genre, string $idKumo, string $detail): void
+    {
+        $this->pdo->prepare('INSERT INTO loghook_journal (workspace_id, genre, id_kumo, detail, cree_le) VALUES (?,?,?,?,?)')
+            ->execute([$ws, $genre, $idKumo, $detail, $this->now()]);
     }
 
     public function dernierSequence(string $ws): int

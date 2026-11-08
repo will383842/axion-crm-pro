@@ -5,6 +5,8 @@ local kumo = require 'kumo'
 -- K5 : signature DKIM par le serveur (dkim.lua monte a cote de ce fichier).
 package.path = '/opt/kumomta/etc/policy/?.lua;' .. package.path
 require 'dkim'
+-- K7 : log hook vers le relais local (classification des rebonds).
+require 'loghook'
 
 kumo.on('init', function()
   kumo.define_spool {

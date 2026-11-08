@@ -11,7 +11,8 @@
 | Photos de référence (« instantanés ») | `instantanes/*.json` |
 | Liste figée | `LISTE.json`, vérifiée par `ListeFigeeTest.php` |
 | Gardes du frontend (routes, routeTree, menu) | `frontend/tests/non-regression/*.test.ts` |
-| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend` l'attend) |
+| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend-verdict` l'attend et échoue si le filet n'est pas vert — le contexte exigé par la protection de `main`) |
+| Verdict et artefacts | `backend-verdict` télécharge `pest-part-*` : il relit les artefacts de TOUTE la run (y compris d'une relance partielle), pas seulement ceux de la tentative en cours |
 
 ## Lancer le filet en local
 

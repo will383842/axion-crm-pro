@@ -607,6 +607,11 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
         // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
         // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
         // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
+        // Statistiques fixées AVANT la comparaison : le choix seq/index dépend de
+        // l'état d'`autovacuum` sur `companies`, donc de ce que les tests
+        // précédents de la part ont laissé (découpage CI par taille). Sans cela
+        // le même code passe ou rougit selon la position du fichier dans la part.
+        qsProprio()->statement('ANALYZE companies');
         foreach (['on', 'off'] as $balayage) {
             qsApp()->statement('SET enable_seqscan = ' . $balayage);
             try {

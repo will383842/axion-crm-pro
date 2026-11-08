@@ -25,8 +25,10 @@ final class EmetteurAlerteSocle implements EmetteurAlerteSante
             }
 
             return $this->alerte->envoyer(
-                'Santé des envois : ' . $constat->code . ' (' . $source . ', ' . $constat->gravite . ')',
-                $constat->detail . ($constat->gravite === Constat::CRITIQUE ? "\nLa ressource est mise en pause ; la levée est une décision humaine." : ''),
+                // L'ESPACE est dans le titre : le regroupement du Socle (titre + produit + gravité) ne doit pas
+                // absorber, dans sa fenêtre de 15 min, l'alerte d'un espace pour celle d'un autre.
+                'Santé des envois : ' . $constat->code . ' (espace ' . $workspaceId . ', ' . $source . ', ' . $constat->gravite . ($constat->palier === 2 ? ', palier 2' : '') . ')',
+                $constat->detail . ($constat->gravite === Constat::CRITIQUE ? "\nLa ressource est mise en pause ; la levée est une décision humaine (si la pause est levée alors que le défaut persiste, la supervision la repose)." : ''),
                 'envoi',
                 $constat->gravite,
                 '/envoi/sante',
@@ -49,8 +51,33 @@ final class EmetteurAlerteSocle implements EmetteurAlerteSante
 
         return WorkspaceContext::runWithoutScope(
             'alerte de santé : l’expéditeur de l’application ne doit être ni une boîte ni un domaine de prospection (tous espaces)',
-            fn (): bool => DB::table('envoi_boites')->whereRaw('lower(adresse) = ?', [$adresse])->exists()
-                || DB::table('envoi_domaines')->whereRaw('lower(nom) = ? OR ? LIKE \'%.\' || lower(nom)', [$domaine, $domaine])->exists(),
+            function () use ($adresse, $domaine): bool {
+                if (DB::table('envoi_boites')->whereRaw('lower(adresse) = ?', [$adresse])->exists()) {
+                    return true;
+                }
+                $organisation = self::domaineOrganisationnel($domaine);
+                foreach (DB::table('envoi_domaines')->pluck('nom') as $nom) {
+                    // Même domaine, sous-domaine, ou même domaine ORGANISATIONNEL (même politique DMARC, même réputation).
+                    if (self::domaineOrganisationnel(mb_strtolower((string) $nom)) === $organisation) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
         );
+    }
+
+    /** Domaine organisationnel approché : 2 derniers libellés, 3 si le second est un suffixe public courant (co.uk, com.fr…). */
+    public static function domaineOrganisationnel(string $domaine): string
+    {
+        $parties = array_values(array_filter(explode('.', trim(mb_strtolower($domaine), '.')), static fn (string $p): bool => $p !== ''));
+        $n = count($parties);
+        if ($n <= 2) {
+            return implode('.', $parties);
+        }
+        $garde = (strlen($parties[$n - 1]) === 2 && in_array($parties[$n - 2], ['co', 'com', 'org', 'net', 'gov', 'gouv', 'ac', 'asso', 'edu'], true)) ? 3 : 2;
+
+        return implode('.', array_slice($parties, -$garde));
     }
 }

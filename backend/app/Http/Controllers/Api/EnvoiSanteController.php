@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Sante\DepotSante;
+use App\Envoi\Sante\SuperviseurSante;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -24,11 +25,15 @@ class EnvoiSanteController extends ApiController
             }
             $serveurs[] = ['source' => $source, 'actif' => (bool) $s->actif, 'dernier_releve' => $depot->dernierReleve($ws, $source), 'constats' => $constats];
         }
+        $espace = [];
+        foreach ($depot->constatsOuverts($ws, SuperviseurSante::ESPACE) as $code => $c) {
+            $espace[] = ['code' => $code, 'gravite' => $c['gravite'], 'detail' => $c['detail'], 'depuis' => $c['depuis']];
+        }
         $pauses = array_map(
             static fn ($p): array => ['motif' => (string) $p->motif, 'portee' => (string) $p->portee, 'fournisseur' => $p->fournisseur],
             $chauffe->pausesActives($ws, now()->toDateTimeImmutable()),
         );
 
-        return response()->json(['serveurs' => $serveurs, 'pauses' => $pauses, 'seuils' => (array) config('envoi.sante')]);
+        return response()->json(['serveurs' => $serveurs, 'constats_espace' => $espace, 'pauses' => $pauses, 'seuils' => (array) config('envoi.sante')]);
     }
 }

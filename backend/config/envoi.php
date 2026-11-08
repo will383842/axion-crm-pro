@@ -78,11 +78,15 @@ return [
         'actif' => filter_var(env('ENVOI_SANTE_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
         // Silence du serveur au-delà duquel : alerte critique + pause (homme mort, INF-025).
         'silence_minutes' => 15,
+        // Silence au-delà duquel une alerte d'ATTENTION part déjà (tunnel coupé < 10 min, plan 33 K15) ; la pause reste à `silence_minutes`.
+        'silence_alerte_minutes' => 10,
+        // Canal des retours (rebonds, plaintes, réponses) sans aucun événement depuis N h alors que des envois ont eu lieu : critique + pause.
+        'retours_muets_heures' => 2,
         // Seuils chiffrés. file/horloge : strictement au-delà ; disque/mémoire : strictement en deçà ; certificat : jours restants ≤.
         'file_age_s' => ['attention' => 900, 'critique' => 3600],
         'disque_libre_pct' => ['attention' => 20, 'critique' => 10],
         'memoire_libre_pct' => ['attention' => 15, 'critique' => 7],
-        'certificat_jours' => ['attention' => 30, 'critique' => 7],
+        'certificat_jours' => ['attention' => 30, 'renforce' => 14, 'critique' => 7], // ADR K0 : 30, 14 et 7 jours
         'horloge_ecart_s' => ['attention' => 60, 'critique' => 300],
         // Dernier contrôle DNS (K12, quotidien) plus vieux que ceci : attention.
         'dns_age_max_heures' => 36,

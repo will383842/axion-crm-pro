@@ -50,3 +50,21 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
         ->and($s['constats'][0]['gravite'])->toBe('critique');
     expect(json_encode($json))->not->toContain('secret-autre-espace');
 });
+
+test('S1 : « Santé des envois » est refusée au viewer et à l’operator (403), accordée à l’admin (200) ; un viewer ne lit ni domaines ni listes noires ni pauses', function (string $role, int $statut) {
+    $ws = (string) Str::uuid();
+    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'k15s1-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    $user = User::create([
+        'id' => (string) Str::uuid(), 'email' => 'k15s1-' . Str::random(6) . '@example.test', 'name' => 'K15',
+        'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),
+        'current_workspace_id' => $ws, 'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($ws);
+    $user->assignRole($role);
+    (new DepotSanteDb)->ouvrir($ws, 'src', 'liste_noire:ip:203.0.113.9', 'critique', 'secret-liste-noire', new DateTimeImmutable('2026-11-13 10:00:00'));
+
+    $rep = $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertStatus($statut);
+    if ($statut === 403) {
+        expect($rep->getContent())->not->toContain('secret-liste-noire')->not->toContain('203.0.113.9');
+    }
+})->with([['viewer', 403], ['operator', 403], ['admin', 200]]);

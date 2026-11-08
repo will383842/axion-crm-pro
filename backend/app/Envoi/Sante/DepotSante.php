@@ -17,10 +17,13 @@ interface DepotSante
 
     public function premierReleve(string $ws, string $source): ?DateTimeImmutable;
 
-    /** @return array<string, array{gravite: string, detail: string, depuis: string}> constats ouverts, par code */
+    /** @return array<string, array{gravite: string, detail: string, depuis: string, palier: int, alerte_emise: bool}> constats ouverts, par code */
     public function constatsOuverts(string $ws, string $source): array;
 
-    public function ouvrir(string $ws, string $source, string $code, string $gravite, string $detail, DateTimeImmutable $quand): void;
+    public function ouvrir(string $ws, string $source, string $code, string $gravite, string $detail, DateTimeImmutable $quand, int $palier = 1): void;
+
+    /** Note (ajout) que l'alerte de l'ouverture courante de ce constat est partie. Tant qu'elle manque, la supervision la renvoie. */
+    public function marquerAlerteEmise(string $ws, string $source, string $code, string $gravite, DateTimeImmutable $quand): void;
 
     public function retablir(string $ws, string $source, string $code, DateTimeImmutable $quand): void;
 
@@ -34,9 +37,15 @@ interface DepotSante
     /**
      * Dernier statut de liste noire (K13) de chaque ressource.
      *
-     * @return list<array{type: string, ressource: string, statut: string}>
+     * @return list<array{type: string, ressource: string, statut: string, pause: bool}>
      */
     public function controlesListes(string $ws): array;
+
+    /** Dernier événement de retour (rebond, plainte, réponse…) enregistré pour cet espace, ou null. */
+    public function dernierRetourRecu(string $ws): ?DateTimeImmutable;
+
+    /** Messages envoyés dans $apres < cree_le <= $jusqua (bornes nulles = ouvertes) : la matière du « canal des retours muet ». */
+    public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua): int;
 
     /**
      * Serveurs d'envoi actifs (tous espaces) : [workspace_id, source].

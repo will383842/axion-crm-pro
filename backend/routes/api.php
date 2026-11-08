@@ -125,7 +125,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
         // K15 : écran « Santé des envois » (lecture seule).
-        Route::get('/envoi/sante', [EnvoiSanteController::class, 'index']);
+        // Elle rend domaines d'envoi, listes noires, pauses et état du serveur : réservée à `users.manage` (owner, admin ;
+        // `operator` et `viewer` : 403). `workspaces.manage` exclurait l'admin ; une permission dédiée exigerait une migration de rôles.
+        Route::get('/envoi/sante', [EnvoiSanteController::class, 'index'])
+            ->middleware('permission:users.manage');
 
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe

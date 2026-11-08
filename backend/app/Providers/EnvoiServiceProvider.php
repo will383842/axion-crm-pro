@@ -26,6 +26,7 @@ use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\SurveillanceListes;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
+use App\Envoi\Sante\CouplageSante;
 use App\Envoi\Sante\DepotSante;
 use App\Envoi\Sante\DepotSanteDb;
 use App\Envoi\Sante\EmetteurAlerteSante;
@@ -107,5 +108,7 @@ class EnvoiServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(OppositionEnregistree::class, EffetsOpposition::class);
+        // K15 / ADR K0 : envoi réel + K1 sans supervision = signalé au démarrage (journal critique), pas passé sous silence.
+        $this->app->booted(static fn () => CouplageSante::signaler());
     }
 }

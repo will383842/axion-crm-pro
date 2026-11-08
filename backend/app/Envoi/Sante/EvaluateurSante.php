@@ -7,7 +7,7 @@ use DateTimeImmutable;
 /**
  * Compare les mesures aux seuils chiffrés (`config('envoi.sante')`). Pure : aucun accès à la base ni au réseau.
  * Sens des seuils : file et horloge = STRICTEMENT au-delà ; disque et mémoire = STRICTEMENT en deçà ;
- * certificat = jours restants inférieurs ou égaux.
+ * certificat = jours restants inférieurs ou égaux (30 j attention, 14 j attention renforcée, 7 j critique).
  */
 final class EvaluateurSante
 {
@@ -18,9 +18,9 @@ final class EvaluateurSante
     public static function evaluer(MesuresSante $m, DateTimeImmutable $maintenant, array $seuils): array
     {
         $c = [];
-        $ajoute = static function (string $code, ?string $gravite, string $detail) use (&$c): void {
+        $ajoute = static function (string $code, ?string $gravite, string $detail, ?int $palier = null) use (&$c): void {
             if ($gravite !== null) {
-                $c[] = new Constat($code, $gravite, $detail);
+                $c[] = new Constat($code, $gravite, $detail, $palier);
             }
         };
         $absent = static function (string $code) use (&$c): void {
@@ -33,8 +33,16 @@ final class EvaluateurSante
             : $ajoute('disque', self::palier($m->disqueLibrePct, $seuils['disque_libre_pct'], fn ($v, $s) => $v < $s), 'disque libre : ' . $m->disqueLibrePct . ' %');
         $m->memoireLibrePct === null ? $absent('memoire')
             : $ajoute('memoire', self::palier($m->memoireLibrePct, $seuils['memoire_libre_pct'], fn ($v, $s) => $v < $s), 'mémoire libre : ' . $m->memoireLibrePct . ' %');
-        $m->certificatJours === null ? $absent('certificat')
-            : $ajoute('certificat', self::palier($m->certificatJours, $seuils['certificat_jours'], fn ($v, $s) => $v <= $s), 'certificat : ' . $m->certificatJours . ' jour(s) restant(s)');
+        if ($m->certificatJours === null) {
+            $absent('certificat');
+        } else {
+            // ADR K0 : échéances à 30, 14 et 7 jours. 14 jours = encore « attention », mais palier 2 : une nouvelle alerte repart.
+            $seuil = $seuils['certificat_jours'];
+            $jours = $m->certificatJours;
+            $gravite = self::palier($jours, $seuil, fn ($v, $s) => $v <= $s);
+            $palier = $gravite === Constat::CRITIQUE ? 3 : (isset($seuil['renforce']) && $jours <= $seuil['renforce'] ? 2 : 1);
+            $ajoute('certificat', $gravite, 'certificat : ' . $jours . ' jour(s) restant(s)', $palier);
+        }
         if ($m->tunnelOk === null) {
             $absent('tunnel');
         } elseif (! $m->tunnelOk) {

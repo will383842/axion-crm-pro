@@ -12,7 +12,7 @@ function seuilsSante(): array
         'file_age_s' => ['attention' => 900, 'critique' => 3600],
         'disque_libre_pct' => ['attention' => 20, 'critique' => 10],
         'memoire_libre_pct' => ['attention' => 15, 'critique' => 7],
-        'certificat_jours' => ['attention' => 30, 'critique' => 7],
+        'certificat_jours' => ['attention' => 30, 'renforce' => 14, 'critique' => 7],
         'horloge_ecart_s' => ['attention' => 60, 'critique' => 300],
     ];
 }
@@ -77,5 +77,22 @@ test('écart d’horloge > 5 min = critique ; 5 min pile = attention seulement',
 test('une mesure absente est signalée (jamais vert par défaut)', function () {
     $m = MesuresSante::depuis(['file_age_s' => 10]);
     $codes = array_keys(constatsDe($m));
-    expect($codes)->toContain('mesure_absente_disque', 'mesure_absente_memoire', 'mesure_absente_certificat', 'mesure_absente_horloge');
+    expect($codes)->toContain('mesure_absente_disque', 'mesure_absente_memoire', 'mesure_absente_certificat', 'mesure_absente_horloge', 'mesure_absente_tunnel', 'mesure_absente_ntp');
+    expect(array_keys(constatsDe(MesuresSante::depuis(['disque_libre_pct' => 60.0, 'memoire_libre_pct' => 50.0, 'certificat_jours' => 80, 'tunnel_ok' => true, 'ntp_synchro' => true, 'horloge_unix' => (new DateTimeImmutable(T_NOW, new DateTimeZone('UTC')))->getTimestamp()]))))->toBe(['mesure_absente_file_age']);
+    foreach (constatsDe($m) as $gravite) {
+        expect($gravite)->toBe(Constat::ATTENTION); // une mesure absente alerte, sans pause
+    }
 });
+
+test('certificat : paliers 30 j / 14 j / 7 j (palier 1, 2, 3) ; au-delà de 30 j rien', function (int $jours, ?string $gravite, ?int $palier) {
+    $c = EvaluateurSante::evaluer(mesuresSaines(['certificat_jours' => $jours]), new DateTimeImmutable(T_NOW, new DateTimeZone('UTC')), seuilsSante());
+    if ($gravite === null) {
+        expect($c)->toBe([]);
+
+        return;
+    }
+    expect($c)->toHaveCount(1)->and($c[0]->gravite)->toBe($gravite)->and($c[0]->palier)->toBe($palier);
+})->with([
+    [31, null, null], [30, Constat::ATTENTION, 1], [15, Constat::ATTENTION, 1], [14, Constat::ATTENTION, 2], [8, Constat::ATTENTION, 2],
+    [7, Constat::CRITIQUE, 3], [0, Constat::CRITIQUE, 3], [-2, Constat::CRITIQUE, 3],
+]);

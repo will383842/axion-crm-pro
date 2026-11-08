@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_sante_releves', 'envoi_sante_constats'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_releves_sante', 'envoi_constats_sante'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -129,8 +129,8 @@ final class SemeurTablesScopees
         'envoi_domaines',
         // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
         'envoi_controles_listes',
-        'envoi_sante_releves',
-        'envoi_sante_constats',
+        'envoi_releves_sante',
+        'envoi_constats_sante',
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
@@ -539,13 +539,13 @@ final class SemeurTablesScopees
             'zone' => '*',
         ]);
 
-        $inserer('envoi_sante_releves', [
+        $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',
             'mesure_le' => '2026-01-01 00:00:00+00',
             'ok' => true,
         ]);
 
-        $inserer('envoi_sante_constats', [
+        $inserer('envoi_constats_sante', [
             'source' => 'zz-etancheite',
             'code' => 'disque',
             'etat' => 'ouvert',

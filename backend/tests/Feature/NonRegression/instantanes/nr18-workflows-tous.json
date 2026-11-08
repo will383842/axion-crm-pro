@@ -14,6 +14,7 @@
     "diag-website-status.yml",
     "e2e.yml",
     "finess-sante-enrichir.yml",
+    "passerelle-envoi.yml",
     "pharmacies-contacts-osm.yml",
     "pharmacies-ecarter.yml",
     "pharmacies-enrichir.yml",

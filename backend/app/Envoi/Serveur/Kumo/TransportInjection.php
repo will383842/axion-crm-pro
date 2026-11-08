@@ -14,6 +14,7 @@ interface TransportInjection
      *
      * @throws CoupureTransport coupure ou délai de 30 s sans réponse
      * @throws EchecAuthentification AUTH ou certificat refusé
+     * @throws RefusConnexion 5xx de bannière, EHLO ou STARTTLS (avant MAIL FROM) : refus de la connexion
      * @throws ServeurEnvoiRefuse refus local (enveloppe, jeton, transaction)
      */
     public function envoyer(MessageAEnvoyer $message, string $jeton, string $source = ''): int;

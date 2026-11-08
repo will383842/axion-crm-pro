@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Alertes\AlerteTelegram;
+use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -143,9 +143,12 @@ class CrmSondeNonDiffusibles extends Command
         ]);
         $this->error($message);
 
-        app(AlerteTelegram::class)->envoyer(
-            '🔴 CRM — donnee personnelle qui ne devrait pas etre la',
+        app(Alerte::class)->envoyer(
+            'CRM — donnee personnelle qui ne devrait pas etre la',
             $message,
+            'crm',
+            'critique',
+            null,
             [
                 'constat' => 'C19-010',
                 'marquees_vivantes' => $marquees,

@@ -37,6 +37,24 @@ use Throwable;
 final class SemeurTablesScopees
 {
     /**
+     * Tables en ajout seul (trigger qui refuse DELETE) : `nettoyer()` les saute.
+     * Leurs lignes de test restent, sans clé étrangère vers `workspaces`.
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante'];
+
+    /**
+     * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
+     * de test bloqueraient la suppression du workspace. `nettoyer()` les vide en suspendant le
+     * trigger USER le temps d'une transaction (connexion propriétaire, tests seulement ; le
+     * trigger de production n'est pas touché).
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements'];
+
+    /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
      * celles dont ses clés étrangères dépendent. Le nettoyage parcourt cette
      * liste à l'envers.
@@ -106,6 +124,26 @@ final class SemeurTablesScopees
         // `propositions_champs`, ON DELETE RESTRICT) : APRÈS elle, pour que le nettoyage
         // (ordre inverse) la vide d'abord.
         'propositions_champs_ecartees',
+        // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
+        'envoi_verdicts_adresse',
+        'envoi_domaines',
+        // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
+        'envoi_sequences',
+        'envoi_sequence_etapes',
+        'envoi_inscriptions',
+        // Envoi P0 L1 : trace des événements d'inscription (ajout seul + FK composite vers `envoi_inscriptions`) : APPEND_SEUL_AVEC_FK.
+        'envoi_inscriptions_evenements',
+        'envoi_messages',
+        // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
+        'envoi_controles_listes',
+        'envoi_config_versions',
+        'envoi_releves_sante',
+        'envoi_constats_sante',
+        // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
+        'envoi_liens_desinscription',
+        'envoi_oppositions',
+        // Envoi P0 L5 (suivi) : état de la relance des effets d'opposition (sans clé étrangère vers l'opposition).
+        'envoi_relances_effets',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -145,6 +183,29 @@ final class SemeurTablesScopees
         'llm_usage',
         'llm_use_cases',
         'notifications',
+        // 2026-11-10 (envoi P0 L0) : socle local d'envoi. Le journal est en AJOUT SEUL
+        // (trigger) : le nettoyage ne peut pas le vider, voir APPEND_SEUL.
+        'envoi_drapeaux',
+        'envoi_journal_commandes',
+        'envoi_temoins',
+        // 2026-11-11 (envoi K1a) : serveurs d'envoi (le commande_id vit dans envoi_journal_commandes).
+        'envoi_serveurs',
+        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace. Chauffe et pauses :
+        // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
+        'envoi_chauffe_jours',
+        'envoi_pauses',
+        'envoi_seuils',
+        // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
+        // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
+        'envoi_boites',
+        'envoi_injections_smtp',
+        'envoi_controles_dns',
+        // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
+        'envoi_evenements',
+        'envoi_curseurs_imap',
+        'envoi_rattachements',
+        'envoi_echecs_releve',
+        'envoi_messages_envoyes',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -459,6 +520,78 @@ final class SemeurTablesScopees
             'motif' => 'demande_effacement',
         ]);
 
+        $inserer('envoi_verdicts_adresse', [
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'verdict' => 'valide',
+            'verifie_le' => now(),
+            'source' => 'zz-etancheite',
+        ]);
+
+        $id['envoi_liens_desinscription'] = $insererAvecId('envoi_liens_desinscription', [
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
+        ]);
+
+        $inserer('envoi_oppositions', [
+            'lien_id' => $id['envoi_liens_desinscription'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
+            'canal' => 'page',
+        ]);
+
+        $inserer('envoi_relances_effets', [
+            'cle' => 'opposition:1',
+            'essais' => 1,
+            'pas_avant' => now(),
+        ]);
+
+        $inserer('envoi_domaines', [
+            'nom' => 'zz-etancheite.example.invalid',
+            'achete_le' => '2026-01-01',
+        ]);
+
+        $sequence = (string) Str::uuid();
+        $inserer('envoi_sequences', ['id' => $sequence, 'nom' => 'ZZ Étanchéité']);
+        $inserer('envoi_sequence_etapes', [
+            'sequence_id' => $sequence, 'rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'ZZ sujet', 'corps' => 'ZZ corps',
+        ]);
+        $inscription = (string) Str::uuid();
+        $inserer('envoi_inscriptions', [
+            'id' => $inscription, 'sequence_id' => $sequence, 'contact_id' => $id['contacts'], 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'prochaine_echeance' => now(), 'version_figee' => '{}',
+        ]);
+        $inserer('envoi_inscriptions_evenements', [
+            'inscription_id' => $inscription, 'entreprise_id' => $id['companies'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'), 'evenement' => 'reponse',
+        ]);
+        $inserer('envoi_messages', [
+            'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',
+        ]);
+
+        $inserer('envoi_config_versions', [
+            'empreinte' => hash('sha256', 'zz-etancheite'),
+            'statut' => 'invalide',
+        ]);
+
+        $inserer('envoi_controles_listes', [
+            'type' => 'domaine',
+            'ressource' => 'zz-etancheite.example.invalid',
+            'statut' => 'non_liste',
+            'zone' => '*',
+        ]);
+
+        $inserer('envoi_releves_sante', [
+            'source' => 'zz-etancheite',
+            'mesure_le' => '2026-01-01 00:00:00+00',
+            'ok' => true,
+        ]);
+
+        $inserer('envoi_constats_sante', [
+            'source' => 'zz-etancheite',
+            'code' => 'disque',
+            'etat' => 'ouvert',
+            'gravite' => 'attention',
+        ]);
+
         $inserer('listes_manuelles_membres', [
             'liste_id' => $id['listes_manuelles'],
             'company_id' => $id['companies'],
@@ -624,6 +757,86 @@ final class SemeurTablesScopees
             'title' => 'ZZ',
         ]);
 
+        $inserer('envoi_drapeaux', []);
+        $inserer('envoi_journal_commandes', [
+            'commande' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_controles_dns', [
+            'domaine' => 'zz-' . $marque . '.example.test',
+            'controle_le' => '2026-11-11 06:00:00+00',
+            'pret' => false,
+        ]);
+        $inserer('envoi_temoins', [
+            'empreinte' => hash('sha256', 'zz-' . $marque),
+            'libelle' => 'zz',
+        ]);
+        $inserer('envoi_serveurs', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'url_base' => 'https://zz.test.invalid',
+        ]);
+
+        $inserer('envoi_chauffe_jours', [
+            'boite' => 'zz-etancheite@example.invalid',
+            'jour' => '2026-01-01',
+            'fournisseur' => 'autre',
+        ]);
+        $inserer('envoi_pauses', [
+            'portee' => 'global',
+            'motif' => 'zz',
+        ]);
+        $inserer('envoi_seuils', [
+            'nom' => 'zz',
+            'valeur' => 1,
+            'auteur' => 'zz',
+        ]);
+        $boiteId = (string) Str::uuid();
+        $inserer('envoi_boites', [
+            'id' => $boiteId,
+            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'hote' => 'smtp.exemple.test',
+            'port' => 587,
+            'chiffrement' => 'starttls',
+            'identifiants_chiffres' => 'zz-chiffre',
+        ]);
+        $idInjection = (string) Str::uuid();
+        $inserer('envoi_injections_smtp', [
+            'boite_id' => $boiteId,
+            'id_injection' => $idInjection,
+            'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
+        $id['envoi_evenements'] = $insererAvecId('envoi_evenements', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+            'uid' => 1,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'classe' => 'reponse_humaine',
+            'statut' => 'a_rattacher',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recu_le' => now()->toDateTimeString(),
+        ]);
+        $inserer('envoi_curseurs_imap', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+        ]);
+        $inserer('envoi_rattachements', [
+            'evenement_id' => $id['envoi_evenements'],
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+            'decide_par' => 'zz-revue',
+        ]);
+        $inserer('envoi_echecs_releve', [
+            'boite' => 'zz-' . $marque,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'motif' => 'RuntimeException',
+        ]);
+        $inserer('envoi_messages_envoyes', [
+            'message_id_empreinte' => hash('sha256', 'zz-mid-' . $marque),
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+        ]);
+
         $inserer('proxy_providers_config', [
             'slug' => 'zz-' . $marque,
             'type' => 'datacenter',
@@ -705,6 +918,18 @@ final class SemeurTablesScopees
         $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
 
         foreach (array_reverse(self::ORDRE) as $table) {
+            if (in_array($table, self::APPEND_SEUL, true)) {
+                continue;
+            }
+            if (in_array($table, self::APPEND_SEUL_AVEC_FK, true)) {
+                $owner->transaction(function () use ($owner, $table, $workspaceIds): void {
+                    $owner->statement("ALTER TABLE {$table} DISABLE TRIGGER USER");
+                    $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
+                    $owner->statement("ALTER TABLE {$table} ENABLE TRIGGER USER");
+                });
+
+                continue;
+            }
             $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
         }
 

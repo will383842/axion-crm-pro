@@ -1,0 +1,12 @@
+# Tunnel d'ADMINISTRATION (poste d'administration et serveur d'envoi). Decision D7 :
+# jamais de tunnel vers la prod. Modele : les marqueurs sont remplaces par
+# l'installateur ; la cle privee est generee SUR le serveur, jamais committee.
+[Interface]
+Address = <ip-tunnel>/32
+ListenPort = <port-wg>
+PrivateKey = <cle-privee-serveur>
+
+[Peer]
+# Le poste d'administration : seul pair autorise, seule IP de tunnel autorisee.
+PublicKey = <cle-publique-admin>
+AllowedIPs = <ip-tunnel-admin>/32

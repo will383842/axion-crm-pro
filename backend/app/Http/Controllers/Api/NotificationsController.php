@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Socle\Alertes\Alerte;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,8 +87,8 @@ class NotificationsController extends ApiController
             $lignes = $requete
                 ->orderByDesc('created_at')
                 ->limit(self::PLAFOND)
-                ->get(['id', 'type', 'title', 'body', 'action_url', 'read_at', 'created_at'])
-                ->map(fn (object $l) => (array) $l)
+                ->get(['id', 'type', 'title', 'body', 'action_url', 'read_at', 'created_at', 'produit', 'gravite'])
+                ->map(fn (object $l) => self::enrichir((array) $l))
                 ->all();
 
             // Le compteur est calcule en base, sur la meme condition que
@@ -194,6 +195,59 @@ class NotificationsController extends ApiController
             ->update(['read_at' => now()]);
 
         return $this->ok(['marked' => (int) $touchees]);
+    }
+
+    /**
+     * S9 : habille une ligne pour la cloche (contrat `Notification` d'Envoi) :
+     * `socle` s'affiche `commun`, la gravité devient un niveau, `lien` = `action_url`.
+     * Les anciennes lignes (avant S9) gardent leur forme : `produit` absent.
+     *
+     * @param  array<string, mixed>  $ligne
+     * @return array<string, mixed>
+     */
+    private static function enrichir(array $ligne): array
+    {
+        $produit = $ligne['produit'] ?? null;
+        $gravite = $ligne['gravite'] ?? null;
+        unset($ligne['produit'], $ligne['gravite']);
+
+        // Les lignes d'avant S9 n'ont pas été écrites par une alerte : rien à ajouter.
+        if (! is_string($produit) || ! str_starts_with((string) ($ligne['type'] ?? ''), 'alerte.')) {
+            return $ligne;
+        }
+
+        $ligne['produit'] = $produit === 'socle' ? 'commun' : $produit;
+        $ligne['lien'] = $ligne['action_url'] ?? null;
+        $ligne['niveau'] = match ($gravite) {
+            'critique' => 'a_faire',
+            'attention' => 'attention',
+            default => 'nouveau',
+        };
+
+        return $ligne;
+    }
+
+    /**
+     * Bouton « alerte de test » : une alerte par les DEUX canaux (cloche + e-mail),
+     * jamais absorbée par le regroupement, pour vérifier que la chaîne marche.
+     */
+    public function testerAlerte(Request $r): JsonResponse
+    {
+        if ($r->user() === null) {
+            abort(401);
+        }
+
+        $partie = app(Alerte::class)->envoyer(
+            'Alerte de test',
+            'Si vous lisez ceci dans la cloche et dans votre boîte de réception, les alertes fonctionnent.',
+            'socle',
+            'info',
+            null,
+            ['origine' => 'bouton-test'],
+            true,
+        );
+
+        return $this->ok(['sent' => $partie]);
     }
 
     /**

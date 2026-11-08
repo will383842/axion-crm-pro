@@ -42,6 +42,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\StatistiquesPlanStables;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -610,7 +611,15 @@ test('index : la passe prioritaire et la lecture par SIREN sont indexées sous a
     MiseAJourMensuelle::fichesPrioritaires($espace, '2026-07-06', 100);
     $requete = collect(DB::getQueryLog())->last();
     DB::disableQueryLog();
-    expect(mamPlan($espace, $requete['query'], $requete['bindings']))->toContain('idx_companies_insee_priorite');
+    // Table sans donnée : son plan dépend de ce que les tests précédents ont
+    // laissé (statistiques, pages mortes) et d'une analyse automatique en cours
+    // de route. État normalisé et autovacuum coupé le temps de la mesure.
+    $planPriorite = StatistiquesPlanStables::figer(mamProprio(), ['companies'], static function () use ($espace, $requete): string {
+        StatistiquesPlanStables::rendre(mamProprio(), ['companies']);
+
+        return mamPlan($espace, $requete['query'], $requete['bindings']);
+    }, mamProprio());
+    expect($planPriorite)->toContain('idx_companies_insee_priorite');
 
     // La lecture par SIREN : sur une table vide, le planificateur choisit au
     // hasard. On sème donc un volume (fictif) et des statistiques, et on lit
@@ -623,12 +632,23 @@ test('index : la passe prioritaire et la lecture par SIREN sont indexées sous a
             'discovery_source' => 'insee', 'created_at' => now(), 'updated_at' => now(),
         ], $paquet));
     }
-    DB::statement('ANALYZE companies');
-    DB::statement('SET LOCAL ROLE axion_app');
-    DB::select('SELECT set_config(?, ?, true)', ['app.current_workspace_id', $ws]);
-    $lignes = DB::select('EXPLAIN SELECT id FROM companies WHERE workspace_id = ? AND siren IN (?, ?)', [$ws, mamSirenNumero(500001), mamSirenNumero(500002)]);
-    DB::statement('RESET ROLE');
-    $parSiren = implode("\n", array_map(static fn ($l): string => (string) array_values((array) $l)[0], $lignes));
+    // Le plan dépend des statistiques : autovacuum coupé le temps de la mesure
+    // (rétabli quoi qu'il arrive), `ANALYZE` APRÈS le semis, et — l'`ANALYZE`
+    // laissant `reltuples`/`relpages` même après l'annulation de la transaction —
+    // les compteurs sont remis à zéro une fois celle-ci terminée.
+    $this->beforeApplicationDestroyed(static fn () => StatistiquesPlanStables::rendre(mamProprio(), ['companies']));
+    $parSiren = StatistiquesPlanStables::figer(DB::connection(), ['companies'], static function () use ($ws): string {
+        StatistiquesPlanStables::analyser(DB::connection(), ['companies']);
+        DB::statement('SET LOCAL ROLE axion_app');
+        try {
+            DB::select('SELECT set_config(?, ?, true)', ['app.current_workspace_id', $ws]);
+            $lignes = DB::select('EXPLAIN SELECT id FROM companies WHERE workspace_id = ? AND siren IN (?, ?)', [$ws, mamSirenNumero(500001), mamSirenNumero(500002)]);
+        } finally {
+            DB::statement('RESET ROLE');
+        }
+
+        return implode("\n", array_map(static fn ($l): string => (string) array_values((array) $l)[0], $lignes));
+    });
     expect($parSiren)->toContain('companies_workspace_id_siren_key')
         ->and($parSiren)->not->toContain('Seq Scan');
 });

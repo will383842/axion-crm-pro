@@ -12,6 +12,7 @@ import { demoDb } from '../../base';
 import { genererATraiter, LIBELLES_MOTIFS, type ArbitrageDemo, type FusionDemo, type PaireDemo, type PropositionDemo, type TacheDemo } from '../../donnees/crm/a-traiter';
 import { maintenant } from '../../horloge';
 import { api, delai, erreur, paginer, repondreEtatForce } from '../../outils';
+import { nombreEffacementsOuverts } from '../socle/ecrans-communs.handlers';
 
 const ZONE = 'a-traiter';
 const PREMIERE_FUSION = 214;
@@ -41,7 +42,7 @@ export function compteursATraiter() {
     a_rattacher: z.arbitrages.filtrer((a) => a.statut === 'en_attente').length,
     propositions: z.propositions.filtrer((p) => p.statut === 'en_attente').length,
     taches_en_retard: nombreTachesEnRetard(),
-    demandes_rgpd: 0,
+    demandes_rgpd: nombreEffacementsOuverts(),
   };
 }
 

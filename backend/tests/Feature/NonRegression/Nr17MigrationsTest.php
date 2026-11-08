@@ -27,6 +27,47 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const NR17_DERNIERE_ANCIENNE = '2026_11_01_999999';
 
+/**
+ * Filet modifié : pourquoi — envoi P0 L0 (PR #433).
+ * Migrations NOUVELLES dont le down() est INERTE PAR CONCEPTION : elles posent une
+ * protection « ajout seul » (triggers, REVOKE) sur le journal d’envoi et ne créent que
+ * des ajouts (colonne, index, table de compteur). Un vrai retour devrait retirer la
+ * protection ou effacer des lignes du journal, ce que REGLES-SOCLE S8 interdit.
+ * La liste est EXPLICITE et FERMÉE : toute autre migration nouvelle garde l’exigence
+ * d’un retour réel + aller-retour-aller. Pour ces fichiers on exige en plus que
+ * down() soit vraiment vide (aucun DROP/DELETE/TRUNCATE ne s’y glisse) et que up()
+ * soit rejouable deux fois (idempotent) à la place de l’aller-retour-aller.
+ */
+const NR17_RETOUR_INERTE_VOULU = [
+    '2026_11_10_000011_envoi_journal_commandes.php',
+    '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
+    '2026_11_11_000100_envoi_serveurs.php',
+    '2026_11_11_000104_envoi_journal_commande_id.php',
+    // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
+    '2026_11_11_000110_envoi_controles_dns.php',
+    // Envoi K15 : relevés de santé et constats, ajout seul (trigger), down() inerte.
+    '2026_11_13_000150_envoi_sante.php',
+    '2026_11_10_000060_envoi_evenements.php',
+    '2026_11_10_000061_envoi_curseurs_imap.php',
+    '2026_11_10_000062_envoi_rattachements.php',
+    '2026_11_10_000063_envoi_echecs_releve.php',
+    '2026_11_10_000064_envoi_messages_envoyes.php',
+    // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
+    '2026_11_11_000120_envoi_controles_listes.php',
+    // Filet modifié : pourquoi — K8 : colonne `ressource_type` ajoutée (ajout seul) ; la retirer effacerait la distinction ip/domaine
+    // des compteurs. Le down() de 000070 (table recréée à vide) rend en outre un retour réel non rejouable dans ce test.
+    '2026_11_13_000145_envoi_chauffe_ressource_type.php',
+    // Filet modifié : pourquoi — K8 durcissement : le garde fige aussi ressource_type + CHECK type/clé ; down() inerte (relâcher le garde réouvrirait la falsification).
+    '2026_11_14_000150_envoi_chauffe_garde_ressource_type.php',
+    // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
+    '2026_11_30_000100_envoi_config_versions.php',
+    // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
+    // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_11_30_000310_envoi_serveurs_epoque.php',
+    // Envoi P0 L5 (suivi) : état de relance des effets d'opposition, en base (ajout seul) ; down() inerte (corps vide).
+    '2026_11_30_000200_envoi_relances_effets.php',
+];
+
 /** @return list<string> noms de fichiers (sans dossier), triés */
 function nr17Migrations(): array
 {
@@ -92,7 +133,10 @@ function nr17ClasseRetour(string $fichier): string
 /** @return list<string> */
 function nr17SansRetour(): array
 {
-    return array_values(array_filter(nr17Migrations(), fn (string $f) => nr17ClasseRetour($f) !== 'reel'));
+    return array_values(array_filter(
+        nr17Migrations(),
+        fn (string $f) => nr17ClasseRetour($f) !== 'reel' && ! in_array($f, NR17_RETOUR_INERTE_VOULU, true),
+    ));
 }
 
 function nr17AllerRetourAller(string $fichier): void
@@ -114,6 +158,16 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
     $nouvelles = array_values(array_filter(nr17Migrations(), fn (string $f) => strcmp(substr($f, 0, 17), NR17_DERNIERE_ANCIENNE) > 0));
 
     foreach ($nouvelles as $fichier) {
+        if (in_array($fichier, NR17_RETOUR_INERTE_VOULU, true)) {
+            // Retour inerte voulu : down() vide (rien n’est retiré ni effacé), up() rejouable.
+            expect(nr17ClasseRetour($fichier))->toBe('vide');
+            $migration = require database_path('migrations/' . $fichier);
+            $migration->down();
+            $migration->up();
+            $migration->up();
+
+            continue;
+        }
         expect(nr17ClasseRetour($fichier))->toBe('reel');
         nr17AllerRetourAller($fichier);
     }
@@ -134,6 +188,14 @@ test('NR-17 témoin : l’instrument aller-retour-aller joue sur une migration a
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
     nr17AllerRetourAller($fichier);
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
+});
+
+test('NR-17 la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels', function () {
+    foreach (NR17_RETOUR_INERTE_VOULU as $fichier) {
+        expect(nr17Migrations())->toContain($fichier)
+            ->and(strcmp(substr($fichier, 0, 17), NR17_DERNIERE_ANCIENNE))->toBeGreaterThan(0)
+            ->and(nr17ClasseRetour($fichier))->toBe('vide');
+    }
 });
 
 test('NR-17 le classement voit bien des retours vides, refusés et réels (témoin de couverture)', function () {

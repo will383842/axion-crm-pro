@@ -1,0 +1,3 @@
+{
+    "envoi_inscriptions.version_figee": "hors-portee: version figée du gabarit de séquence de l'espace (sujets, corps avec variables, délais, fenêtre horaire), jamais une valeur de personne ; l'adresse n'est conservée qu'en empreinte SHA-256"
+}

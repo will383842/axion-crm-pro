@@ -1,5 +1,6 @@
 [
     "a11y.yml",
+    "banc-envoi.yml",
     "build-postgres-image.yml",
     "ci.yml",
     "crm-doublons.yml",
@@ -13,6 +14,7 @@
     "diag-website-status.yml",
     "e2e.yml",
     "finess-sante-enrichir.yml",
+    "passerelle-envoi.yml",
     "pharmacies-contacts-osm.yml",
     "pharmacies-ecarter.yml",
     "pharmacies-enrichir.yml",
@@ -29,6 +31,11 @@
     "prospection-stats.yml",
     "release-tracking.yml",
     "security.yml",
+    "serveur-envoi-injection.yml",
+    "serveur-envoi-loghook.yml",
+    "serveur-envoi-shaping.yml",
+    "serveur-envoi-socle.yml",
     "surveillance-canaux.yml",
-    "surveillance-sauvegarde.yml"
+    "surveillance-sauvegarde.yml",
+    "vendor-cloud.yml"
 ]

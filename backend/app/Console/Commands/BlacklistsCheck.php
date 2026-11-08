@@ -5,8 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 
 /**
- * Vérifie hourly que nos IPs sortantes ne sont pas blacklistées (Spamhaus, Barracuda, etc.).
- * En MOCK_MODE, retourne toujours OK.
+ * REMPLACÉE par K13 : `envoi:listes-noires:controler` (App\Envoi\ListesNoires). Plus planifiée.
+ * Conservée pour l'appel manuel ; elle ne contrôle rien et ne se dit plus « propre ».
  */
 class BlacklistsCheck extends Command
 {
@@ -16,14 +16,8 @@ class BlacklistsCheck extends Command
 
     public function handle(): int
     {
-        if (env('MOCK_MODE', true)) {
-            $this->info('MOCK_MODE — blacklists check skipped, all IPs assumed clean.');
+        $this->warn('blacklists:check est remplacée par envoi:listes-noires:controler (K13) : aucun contrôle effectué ici.');
 
-            return self::SUCCESS;
-        }
-
-        $this->warn('Implémentation réelle prévue Sprint 8 — DNSBL queries Spamhaus + Barracuda + SORBS.');
-
-        return self::SUCCESS;
+        return self::FAILURE;
     }
 }

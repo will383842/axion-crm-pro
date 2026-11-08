@@ -60,7 +60,7 @@ function ArbitrageContent() {
   const attach = useMutation({
     mutationFn: async (input: { activityId: number; companyId: number }) =>
       (
-        await api.post<{ contact_created: boolean }>(`/crm/arbitrage/${input.activityId}/attach`, {
+        await api.post<{ contact_created: boolean; contact_motif?: string | null }>(`/crm/arbitrage/${input.activityId}/attach`, {
           company_id: input.companyId,
         })
       ).data,
@@ -68,7 +68,9 @@ function ArbitrageContent() {
       toast.success(
         data.contact_created
           ? 'Rattaché — fiche personne créée ou retrouvée.'
-          : "Rattaché — aucun nom transmis, aucune fiche personne fabriquée.",
+          : data.contact_motif === 'adresse_personnelle'
+            ? 'Rattaché — adresse personnelle sans accord : aucune fiche personne créée.'
+            : "Rattaché — aucun nom transmis, aucune fiche personne fabriquée.",
       );
       invalidate();
     },

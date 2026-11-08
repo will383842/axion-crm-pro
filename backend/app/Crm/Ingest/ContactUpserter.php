@@ -203,7 +203,10 @@ final class ContactUpserter
      */
     private function rattacherPersonne(string $workspaceId, string $personKey, int $contactId, int $companyId): void
     {
-        if (! PersonnesIngestService::drapeauOuvert()) {
+        // Fiche demande : une personne née d'une demande sans SIREN doit se
+        // lier au contact quand la demande est rattachée, même si la lettre et
+        // le guide restent fermés.
+        if (! PersonnesIngestService::drapeauOuvert() && ! PersonnesIngestService::drapeauDemandesOuvert()) {
             return;
         }
 

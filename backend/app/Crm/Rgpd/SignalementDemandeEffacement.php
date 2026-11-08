@@ -4,6 +4,7 @@ namespace App\Crm\Rgpd;
 
 use App\Events\NotificationCreated;
 use App\Http\Controllers\Api\Crm\ATraiterController;
+use App\Socle\Alertes\Alerte;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\Log;
 final class SignalementDemandeEffacement
 {
     public const TYPE = 'rgpd.demande_effacement';
+
+    public const LIEN = '/rgpd/requests?statut=ouverte';
 
     public static function signaler(string $workspaceId, string $origine): void
     {
@@ -51,7 +54,7 @@ final class SignalementDemandeEffacement
                     'type' => self::TYPE,
                     'title' => $titre,
                     'body' => $corps,
-                    'action_url' => '/rgpd/requests',
+                    'action_url' => self::LIEN,
                     'created_at' => now(),
                 ]);
 
@@ -62,7 +65,7 @@ final class SignalementDemandeEffacement
                     $titre,
                     $corps,
                     'warning',
-                    '/rgpd/requests',
+                    self::LIEN,
                     (string) $userId,
                 ));
             }
@@ -72,12 +75,40 @@ final class SignalementDemandeEffacement
             }
 
             ATraiterController::oublier($workspaceId);
+
+            self::alerter($workspaceId, $origine);
         } catch (\Throwable $e) {
             Log::error('rgpd.demande_effacement: signalement en échec', [
                 'workspace_id' => $workspaceId,
                 'exception' => $e::class,
             ]);
             report($e);
+        }
+    }
+
+    /**
+     * Alerte #411 (cloche + e-mail, éteinte par défaut). Corps SANS donnée de
+     * personne : l'origine et le nombre de demandes ouvertes. Une panne ici ne
+     * remet jamais en cause la mise à l'écart ni le filet ci-dessus.
+     */
+    private static function alerter(string $workspaceId, string $origine): void
+    {
+        try {
+            $ouvertes = DB::table('rgpd_requests')
+                ->where('workspace_id', $workspaceId)->where('type', 'erasure')
+                ->whereIn('status', ['pending', 'processing'])->count();
+
+            app(Alerte::class)->envoyer(
+                'Demande d’effacement à traiter',
+                'Une demande d’effacement est arrivée (origine : ' . $origine . '). Demandes ouvertes : ' . $ouvertes
+                . '. La personne est mise à l’écart, rien n’est supprimé.',
+                'crm',
+                'attention',
+                self::LIEN,
+                ['workspace_id' => $workspaceId],
+            );
+        } catch (\Throwable $e) {
+            Log::error('rgpd.demande_effacement: alerte en échec', ['exception' => $e::class]);
         }
     }
 }

@@ -25,6 +25,15 @@ class RouteServiceProvider extends ServiceProvider
             );
         });
 
+        // Désinscription publique (RFC 8058) : JAMAIS de 429 pour un POST (une opposition ne doit
+        // pas être refusée, y compris depuis un NAT d'entreprise). Le GET est limité PAR JETON, pas par IP.
+        RateLimiter::for('desinscription', function (Request $r) {
+            if (! $r->isMethod('GET')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(120)->by('desinscription:' . hash('sha256', (string) $r->route('jeton')));
+        });
         RateLimiter::for('login', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
         RateLimiter::for('magic-link', fn (Request $r) => Limit::perMinute(3)->by($r->ip()));
         // Changement de mot de passe connecté : 5/min PAR COMPTE (l'ancien mot de
@@ -48,6 +57,14 @@ class RouteServiceProvider extends ServiceProvider
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LAUNCH_PER_MINUTE', 10))
                 ->by(optional($r->user())->id ?: $r->ip()),
         );
+        // origines-export / origines-historique : compteurs PROPRES (60/min/user chacun), pour qu'un
+        // changement de filtre ne fasse pas tomber les autres lectures en 429 en cascade.
+        foreach (['origines-export', 'origines-historique'] as $nom) {
+            RateLimiter::for(
+                $nom,
+                fn (Request $r) => Limit::perMinute(60)->by($nom . '|' . (optional($r->user())->id ?: $r->ip())),
+            );
+        }
         RateLimiter::for(
             'scraper-list',
             fn (Request $r) => Limit::perMinute((int) env('SCRAPER_LIST_PER_MINUTE', 60))

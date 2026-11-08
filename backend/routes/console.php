@@ -8,12 +8,17 @@ use App\Console\Commands\CrmPublicAnnuaireOfficiel;
 use App\Console\Commands\CrmSondeCleDePersonne;
 use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
+use App\Console\Commands\CrmUsinePousserAgregats;
+use App\Console\Commands\EnvoiListesNoiresControler;
+use App\Console\Commands\EnvoiRejouerCommandes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
 use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
+use App\Envoi\Dns\ControleDnsCommande;
 use App\Support\BattementPlanificateur;
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -70,7 +75,7 @@ Artisan::command('inspire', function () {
 // la cible `prod`, donc sur CET entrypoint : un seul geste couvre les deux.
 //
 // CE QUI N'EST PAS FAIT. Les sept taches planifiees SANS `withoutOverlapping`
-// (`coverage:refresh-matrix`, `blacklists:check`, `audit:verify-chain`,
+// (`coverage:refresh-matrix`, `blacklists:check` [retirée depuis, remplacée par K13], `audit:verify-chain`,
 // `retention:purge`, `rgpd:anonymize-ips`, `anomaly:detect`,
 // `signals:nightly-scan`) ne sont pas concernees par ce constat : sans verrou,
 // il n'y a pas de verrou orphelin. Leur absence de verrou est un autre sujet.
@@ -99,7 +104,8 @@ Schedule::command('coverage:refresh-matrix')
             . 'precedentes du journal.',
         );
     });
-Schedule::command('blacklists:check')->hourly();
+// `blacklists:check` n'est plus planifiée : REMPLACÉE par `envoi:listes-noires:controler` (K13, plus bas).
+// L'ancienne commande ne faisait rien et affichait « all IPs assumed clean » : un faux vert.
 // 🔴 B16-006 / F39-006 / B17-003 (S1), mesure le 2026-08-20. Cette ligne etait
 // `Schedule::command('audit:verify-chain')->dailyAt('03:00');` — rien d'autre.
 // Le planificateur de Laravel N'INTERPRETE PAS le code de sortie d'une commande
@@ -212,6 +218,10 @@ Schedule::command(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)
     });
 
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
+
+// Envoi K1 : rejeu des commandes non acquittées (idempotent par commande_id ; sans effet tant que
+// ENVOI_REEL_ACTIF et ENVOI_K1_ACTIF ne sont pas vrais).
+Schedule::command(EnvoiRejouerCommandes::SIGNATURE_PLANIFIEE)->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
 
 // Relecture R7 (PR #255) : un effacement dont la preuve différée n'a pas
 // conclu en 24 h est SIGNALÉ (journal `error`), pas seulement affiché.
@@ -517,4 +527,61 @@ Schedule::call(static fn () => BattementPlanificateur::battre())
 Schedule::command('origines:masquer-commentaire-ref')
     ->dailyAt('03:40')
     ->withoutOverlapping(60)
+    ->onOneServer();
+
+// L7 — push AGRÉGÉ CRM → Usine (comptages seulement, aucune donnée de personne). Sort
+// aussitôt tant que `USINE_AGREGATS_CRM_ENABLED` est éteint. Ne supprime RIEN.
+Schedule::command(CrmUsinePousserAgregats::SIGNATURE_PLANIFIEE)
+    ->dailyAt('05:30')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
+// Envoi P0 L7 — freins automatiques : évalue tous les espaces (rebonds, plaintes, réponses, humain)
+// et ouvre les pauses. Lecture de compteurs + écriture de pauses ; n'envoie rien, ne supprime rien.
+Schedule::command('envoi:evaluer-freins')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// Envoi P0 L7 — battement de l'homme mort (INF-025) : appelle sante() ; sans appel pendant 15 minutes
+// en fenêtre d'envoi, toutes les files passent en pause. Inerte tant que ENVOI_REEL_ACTIF est éteint.
+Schedule::command('envoi:sante')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// K15 — supervision des envois : sante() du serveur (file, disque, mémoire, certificats, tunnel, horloge) + derniers
+// contrôles K12/K13, alertes dédoublonnées, pause sur critique (jamais levée seule). Inerte tant que
+// ENVOI_REEL_ACTIF, ENVOI_K1_ACTIF et ENVOI_SANTE_ACTIF ne sont pas tous vrais ; n'envoie rien.
+Schedule::command('envoi:supervision-sante')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+// K12 — contrôle DNS quotidien des domaines d'envoi (PTR/SPF/DKIM/DMARC). Lecture du DNS et
+// ajouts seulement ; n'envoie rien. Un domaine pas prêt n'est pas marqué vérifié ce jour.
+ConsoleApplication::starting(static function (ConsoleApplication $artisan): void {
+    $artisan->resolve(ControleDnsCommande::class);
+});
+Schedule::command(ControleDnsCommande::SIGNATURE_PLANIFIEE)
+    ->dailyAt('05:45')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
+// Envoi K13 — surveillance des listes noires (IP/domaines d'envoi), résolveur DNS LOCAL.
+// Chaque minute : un « listé » met la ressource en pause au même passage (< 5 min) + alerte.
+Schedule::command(EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE)
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer()
+    // Code de sortie non nul (au moins un « non fiable ») : le planificateur ne le lit que par onFailure.
+    ->onFailure(function (): void {
+        Log::critical('[ENVOI] ' . EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE . ' : contrôle des listes noires non fiable ou incomplet.');
+    });
+
+// Envoi P0 L5 — relance, chaque minute et sans nouveau clic, les effets (retrait de la file,
+// arrêt par entreprise) des oppositions de désinscription restés inachevés. Idempotent ; ne supprime RIEN.
+Schedule::command('envoi:relancer-effets-opposition')
+    ->everyMinute()
+    ->withoutOverlapping(5)
     ->onOneServer();

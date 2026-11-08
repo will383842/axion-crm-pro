@@ -2,6 +2,7 @@
 
 namespace App\Crm\Ingest;
 
+use App\Crm\Guides\LienGuide;
 use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
@@ -204,16 +205,21 @@ final class ContenusAccords
      * `commentaire_ref` (empreinte) et `masque_le` ne sortent jamais ; une entrée
      * masquée est écartée AVANT (voir `estMasquee`), jamais présentée.
      *
+     * `lien_guide` : le lien public du guide, calculé par `LienGuide` depuis la
+     * table fermée (jamais depuis la donnée) ; `null` sans le droit, interrupteur
+     * éteint ou identifiant inconnu.
+     *
      * @param  array<mixed>  $o
-     * @return array<string, ?string>
+     * @return array<string, mixed>
      */
-    public static function presenterOrigine(array $o): array
+    public static function presenterOrigine(array $o, bool $droitLien = false): array
     {
         $sortie = [];
         foreach (['famille', 'detail', 'canal', 'reseau', 'compte', 'mot', 'guide', 'date', 'post_ref', 'post_url', 'version_texte', 'utm_campaign'] as $cle) {
             $v = $o[$cle] ?? null;
             $sortie[$cle] = is_string($v) ? mb_substr($v, 0, 300) : null;
         }
+        $sortie['lien_guide'] = $droitLien ? LienGuide::pour($sortie['guide']) : null;
 
         return $sortie;
     }
@@ -244,9 +250,14 @@ final class ContenusAccords
      * relue depuis la base. Même si une ligne ancienne portait autre chose, rien
      * d'autre ne sort (jamais de pseudo ni de texte de message).
      *
+     * Lien du guide : `nom` (nom connu de la table, sans adresse) et `lien`
+     * (`{url, libelle}` ou `null`) sont CALCULÉS par `LienGuide` depuis l'identifiant ;
+     * `lien_statut` dit pourquoi il manque (`eteint`, `refuse` sans droit, `disponible`).
+     * Sans le droit (`$droitLien` faux, par défaut) ou interrupteur éteint : aucune adresse.
+     *
      * @return array<string, mixed>
      */
-    public static function bloc(mixed $origine, mixed $guides, mixed $consentements, mixed $oppositionAt): array
+    public static function bloc(mixed $origine, mixed $guides, mixed $consentements, mixed $oppositionAt, bool $droitLien = false): array
     {
         $decode = static function (mixed $v): array {
             if (is_string($v)) {
@@ -275,11 +286,20 @@ final class ContenusAccords
             return $sortie;
         };
 
+        $avecLien = static function (array $ligne) use ($droitLien): array {
+            $guide = $ligne['guide'] ?? null;
+            $ligne['nom'] = LienGuide::nom($guide);
+            $ligne['lien'] = $droitLien ? LienGuide::pour($guide) : null;
+
+            return $ligne;
+        };
+
         $o = $decode($origine);
 
         return [
-            'origine' => $o === [] ? null : $garder($o, ['mot', 'reseau', 'guide', 'date']),
-            'guides' => $listes($decode($guides), ['guide', 'date']),
+            'lien_statut' => LienGuide::statut($droitLien),
+            'origine' => $o === [] ? null : $avecLien($garder($o, ['mot', 'reseau', 'guide', 'date'])),
+            'guides' => array_map($avecLien, $listes($decode($guides), ['guide', 'date'])),
             'consentements' => $listes($decode($consentements), ['nature', 'date', 'source', 'version']),
             'opposition' => [
                 'actif' => $oppositionAt !== null,

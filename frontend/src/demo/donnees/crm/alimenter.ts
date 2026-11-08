@@ -425,3 +425,40 @@ export function genererAlimenterDemo(alea: Alea): AlimenterGenere {
   const { personnes, taches } = genererPersonnes(alea);
   return { personnes, taches, candidats: genererCandidats(alea), collectes: genererCollectes(), couverture: genererCouverture(alea) };
 }
+
+// ── Origines des contacts (exemple) ───────────────────────────────────────
+// Quatorze personnes fictives « exemple », adresses en `exemple.invalid`. Mêmes repères que les
+// maquettes validées (Personne exemple 01…14). `post_ref` est un identifiant opaque inventé.
+
+export interface OrigineDemo {
+  famille: string | null; detail: string | null; canal: string | null; reseau: string | null; compte: string | null;
+  mot: string | null; guide: string | null; date: string; post_ref: string | null;
+}
+export interface PersonneOrigineDemo {
+  id: number; numero: string; opposee: boolean; origines: OrigineDemo[];
+}
+
+const o = (
+  famille: string | null, detail: string | null, canal: string | null, reseau: string | null, mot: string | null,
+  guide: string | null, jours: number, post_ref: string | null,
+): OrigineDemo => ({ famille, detail, canal, reseau, compte: reseau === null ? null : 'Page principale', mot, guide, date: ilYa(jours, 14, 7), post_ref });
+
+export function genererOriginesDemo(): PersonneOrigineDemo[] {
+  const p = (n: number, opposee: boolean, origines: OrigineDemo[]): PersonneOrigineDemo => ({ id: 900000 + n, numero: String(n).padStart(2, '0'), opposee, origines });
+  return [
+    p(1, true, [o('guide_reseau', 'guide_ia', 'commentaire', 'instagram', 'guide', 'Guide exemple A', 2, 'pr_Xk29aF7Qm1'), o('cas_concret', null, 'commentaire', 'facebook', 'cas', 'Cas exemple B', 14, 'pr_7TnQ0vLb4Zc'), o(null, null, null, null, null, null, 27, null)]),
+    p(2, false, [o('guide_reseau', 'guide_ia', 'message_prive', 'facebook', 'guide', 'Guide exemple A', 2, 'pr_Hd83LmQ2xW'), o('guide_reseau', 'guide_ia', 'commentaire', 'facebook', 'guide', 'Guide exemple A', 15, 'pr_Ab12Cd34Ef5')]),
+    p(3, false, [o('guide_reseau', 'guide_ia', 'commentaire', 'instagram', 'guide', null, 3, 'pr_Zt40BvN7cK')]),
+    p(4, true, [o('cas_concret', null, 'commentaire', 'linkedin', 'cas', 'Cas exemple C', 5, 'pr_Qw17PxR9eD')]),
+    p(5, false, [o('video', null, 'publication', 'tiktok', 'video', 'Vidéo exemple A', 6, 'pr_Vn52TgY8sA')]),
+    p(6, false, [o('autre', 'autre_non_classe', null, null, null, null, 8, null)]),
+    p(7, true, [o('cas_concret', null, null, null, null, 'Cas exemple A', 7, null)]),
+    p(8, true, [o('autre', 'autre_non_classe', null, null, null, null, 26, null)]),
+    p(9, true, [o('guide_reseau', 'guide_ia', 'message_prive', 'facebook', 'guide', 'Guide exemple A', 20, 'pr_Ke66DsF1zQ')]),
+    p(10, true, [o('carrousel', null, 'publication', 'instagram', 'modele', 'Carrousel exemple A', 30, 'pr_Lm90RtU2yB')]),
+    p(11, false, [o('guide_reseau', null, null, null, null, 'Guide exemple A', 4, null)]),
+    p(12, false, [o('carrousel', null, 'publication', 'linkedin', 'modele', null, 15, 'pr_Fg35HkP8nC')]),
+    p(13, true, [o('tour_france_ia', null, null, null, null, null, 68, null)]),
+    p(14, true, [o(null, null, null, null, null, null, 56, null)]),
+  ];
+}

@@ -22,9 +22,7 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // POST propositions/{id}/{action} : le dernier segment est choisi à l'exécution (accepter ou refuser) ;
 // le relevé statique ne peut pas le résoudre, ce n'est pas une route manquante.
 // Filet modifié : pourquoi. DM2-CNF : écrans de conformité et de réglages d'Envoi. Les appels `/envoi/…` ne partent
-// que si Envoi est actif (absent en production : routes gardées). Les deux appels `/public/desinscription/{p}` viennent
-// d'une page PUBLIQUE, joignable sans connexion : elle ne les lance que si `/config/features` annonce Envoi ; sinon
-// elle reste la page « en préparation » d'avant et n'appelle rien (test `DesinscriptionPubliquePage`). Tous sont
+// que si Envoi est actif (absent en production : routes gardées). Tous sont
 // servis par le faux serveur de la démo ; les routes serveur viendront au lot serveur d'Envoi, qui retirera ces lignes.
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
@@ -91,13 +89,11 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/reglages/connexion-crm',
   'GET /api/v1/envoi/reglages/identite',
   'GET /api/v1/envoi/reglages/regles',
-  'GET /api/v1/public/desinscription/{p}',
   'POST /api/v1/envoi/alertes/{p}/regler',
   'POST /api/v1/envoi/carnet',
   'POST /api/v1/envoi/opposition',
   'POST /api/v1/envoi/reglages/alertes/test',
   'POST /api/v1/envoi/reglages/connexion-crm/tester',
-  'POST /api/v1/public/desinscription/{p}',
   'PUT /api/v1/envoi/reglages/absence',
   'PUT /api/v1/envoi/reglages/alertes',
   'PUT /api/v1/envoi/reglages/identite',

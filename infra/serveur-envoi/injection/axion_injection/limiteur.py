@@ -23,3 +23,11 @@ class LimiteurEchecs:
 
     def bloque(self, ip: str) -> bool:
         return self._purger(ip) >= self.max
+
+    def pardon(self, ip: str) -> None:
+        """Retire le dernier échec réservé (l'authentification a finalement réussi)."""
+        v = self._echecs.get(ip)
+        if v:
+            v.pop()
+            if not v:
+                self._echecs.pop(ip, None)

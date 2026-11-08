@@ -9,6 +9,7 @@ from .file_kumo import ErreurFile, FileKumo
 ENTETE_RETIRE = re.compile(rb"(?i)^(x-tenant|return-path)[ \t]*:")
 VERBES = frozenset({"EHLO", "HELO", "NOOP", "RSET", "QUIT", "STARTTLS", "AUTH", "MAIL", "RCPT", "DATA"})
 ADRESSE = re.compile(r"^<([^<>\s]+@[^<>\s@]+)>(\s.*)?$")
+EN_TETES_ADRESSES = ("from", "sender", "reply-to", "resent-from", "resent-sender")
 AVANT_TLS = {"EHLO", "HELO", "NOOP", "QUIT", "STARTTLS", "RSET"}
 
 
@@ -40,12 +41,22 @@ def entetes(message: bytes) -> list[tuple[str, str]]:
     return [(n, v) for n, v in res]
 
 
+def verifier_python() -> None:
+    """Refuse de démarrer si getaddresses n'a pas le paramètre strict (Python >= 3.11.10 requis)."""
+    try:
+        getaddresses(["a@example.test"], strict=True)
+    except TypeError as e:
+        raise RuntimeError("Python trop ancien : email.utils.getaddresses sans strict (>= 3.11.10 requis)") from e
+
+
 def adresses(valeur: str) -> list[str] | None:
-    """Domaines (normalisés) de toutes les adresses ; None si l'en-tête est inanalysable."""
+    """Domaines (normalisés) de toutes les adresses ; None si l'en-tête est inanalysable.
+
+    Sans le paramètre strict, aucun repli sur l'analyseur permissif : None (le message est refusé)."""
     try:
         paires = getaddresses([valeur], strict=True)
-    except TypeError:                       # Python sans l'argument strict
-        paires = getaddresses([valeur])
+    except TypeError:
+        return None
     doms = []
     for _, adr in paires:
         if adr.count("@") != 1 or not adr.rpartition("@")[2]:
@@ -59,6 +70,7 @@ class Session:
         self.cfg, self.file, self.ip, self.limiteur = cfg, file, ip_pair, limiteur
         self.delai = 0.0          # délai à imposer avant la prochaine réponse (anti force brute)
         self._attente = None      # AUTH en attente de vérification hors boucle
+        self._reserve = None      # délai de l'échec réservé avant PBKDF2
         self.tls = False
         self.authc = None
         self.echecs = 0
@@ -139,30 +151,59 @@ class Session:
         except (ValueError, UnicodeError):
             return ["501 5.5.2 AUTH mal forme"], None
         self._attente = (authz, authc, mdp)
-        if differer:                       # le serveur appelle verifier_auth() dans un executor
+        if differer:                       # le serveur enchaîne preparer / executor / conclure
             return [], "auth"
         return self.verifier_auth()
 
-    def verifier_auth(self):
-        """PBKDF2 : coûteux, à exécuter hors de la boucle asyncio."""
+    def preparer_auth(self):
+        """Dans la boucle asyncio, AVANT PBKDF2 : blocage par IP puis réservation d'un échec.
+
+        L'échec est compté tout de suite (avant le calcul) : des sessions simultanées ne peuvent pas
+        lancer plus de `max_echecs_ip` vérifications. Retourne une réponse de refus, ou None."""
+        self._reserve = None
+        if self.limiteur:
+            if self.limiteur.bloque(self.ip):
+                return ["421 4.7.0 trop d'echecs depuis cette adresse"], "close"
+            self._reserve = self.limiteur.echec(self.ip)
+        return None
+
+    def calculer_auth(self) -> bool:
+        """PBKDF2 : coûteux, sans état partagé, exécutable dans un executor."""
         authz, authc, mdp = self._attente
-        self._attente = None
         cpt = self.cfg.comptes.get(authc)
         empreinte = cpt["hash"] if cpt else self.cfg.empreinte_secours   # même coût dans les deux cas
         ok = verifier(mdp, empreinte)
-        if not cpt or not ok or (authz and authz != authc):   # authz != authc : refus
+        return bool(cpt and ok and not (authz and authz != authc))       # authz != authc : refus
+
+    def conclure_auth(self, ok: bool):
+        """Dans la boucle asyncio, APRÈS PBKDF2."""
+        _, authc, _ = self._attente
+        self._attente = None
+        if not ok:
             self.echecs += 1
-            if self.limiteur:
-                self.delai = self.limiteur.echec(self.ip)
+            if self._reserve is not None:
+                self.delai = self._reserve
             if self.echecs >= 3:
                 return ["421 4.7.0 trop d'echecs"], "close"
             return ["535 5.7.8 authentification refusee"], None
+        if self.limiteur:
+            self.limiteur.pardon(self.ip)             # succès : l'essai réservé n'était pas un échec
         self.authc = authc
         return ["235 2.7.0 ok"], None
+
+    def verifier_auth(self):
+        """Version synchrone (tests, hors serveur) : préparer, calculer, conclure."""
+        refus = self.preparer_auth()
+        if refus:
+            self._attente = None
+            return refus
+        return self.conclure_auth(self.calculer_auth())
 
     def _mail(self, arg):
         if not self.authc:                                # couche 2
             return ["530 5.7.0 AUTH obligatoire"], None
+        if self.mail_from:
+            return ["503 5.5.1 MAIL deja donne (RSET d'abord)"], None
         m = re.match(r"(?i)^FROM:\s*(.*)$", arg)
         a = ADRESSE.match(m.group(1)) if m else None
         if not a:
@@ -226,7 +267,7 @@ class Session:
         return ["250 2.0.0 en file"], None
 
     def _controle_entetes(self, msg: bytes) -> str | None:
-        """Refus d'une DKIM-Signature déjà présente ; analyse réelle des adresses de TOUS les From, Sender, Reply-To."""
+        """Refus d'une DKIM-Signature déjà présente ; analyse réelle des adresses de TOUS les From, Sender, Reply-To, Resent-From, Resent-Sender."""
         ent = entetes(msg)
         if any(n == "dkim-signature" for n, _ in ent):    # ADR-K0 D3.3 : le serveur signe seul
             return "550 5.7.1 message deja signe DKIM : le serveur d'envoi signe, refuse"
@@ -235,13 +276,13 @@ class Session:
             return "550 5.7.1 plusieurs en-tetes From"
         autorises = self.cfg.domaines_registre(self.cfg.comptes[self.authc]["espace"])
         for n, v in ent:
-            if n not in ("from", "sender", "reply-to"):
+            if n not in EN_TETES_ADRESSES:
                 continue
             doms = adresses(v)
             if doms is None:
                 return "550 5.7.1 en-tete %s inanalysable" % n
             if any(self.cfg.domaine_interdit(d) for d in doms):
                 return "550 5.7.1 domaine interdit dans " + n
-            if n == "from" and not all(d in autorises and d in self.cfg.domaines_envoi for d in doms):
-                return "550 5.7.1 domaine From hors registre de l'espace"
+            if not all(d in autorises and d in self.cfg.domaines_envoi for d in doms):
+                return "550 5.7.1 domaine hors registre de l'espace dans " + n
         return None

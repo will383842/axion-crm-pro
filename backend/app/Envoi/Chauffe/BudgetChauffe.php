@@ -33,13 +33,25 @@ final class BudgetChauffe
     }
 
     /**
+     * Jours effectifs d'une RESSOURCE : un jour compte à partir de 50 % du budget de la ressource (10 pour l'IP en P1).
+     *
+     * @param  array<string, int>  $volumes  'Y-m-d' (Paris) => messages envoyés par la ressource ce jour-là
+     * @return list<DateTimeImmutable>
+     */
+    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART): array
+    {
+        return CourbeChauffe::joursEffectifs($volumes, $part, true);
+    }
+
+    /**
      * @param  list<DateTimeImmutable>  $joursEffectifsIp  jours effectifs de l'IP (vide = IP neuve)
      * @param  list<DateTimeImmutable>  $joursEffectifsDomaine  jours effectifs du domaine
      */
     public static function duJour(array $joursEffectifsIp, array $joursEffectifsDomaine, DateTimeImmutable $jour): self
     {
-        $ip = CourbeChauffe::quotaBoite(CourbeChauffe::jourDeChauffe($joursEffectifsIp, $jour));
-        $domaine = CourbeChauffe::quotaBoite(CourbeChauffe::jourDeChauffe($joursEffectifsDomaine, $jour));
+        // Budget de la RESSOURCE (total de l'IP / du domaine), pas le quota d'une boîte : P1 = 20 par jour (26 § 4.2).
+        $ip = CourbeChauffe::quotaRessource(CourbeChauffe::jourDeChauffe($joursEffectifsIp, $jour));
+        $domaine = CourbeChauffe::quotaRessource(CourbeChauffe::jourDeChauffe($joursEffectifsDomaine, $jour));
 
         return new self(min($ip, $domaine), $ip, $domaine, $ip <= $domaine ? self::RESSOURCE_IP : self::RESSOURCE_DOMAINE);
     }

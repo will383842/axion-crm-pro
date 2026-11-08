@@ -22,8 +22,10 @@ def valider(m):
     e = []
     if not isinstance(m, dict) or set(m) != {"modele", "fournisseur"}:
         return ["racine : attendu exactement [modele] et [fournisseur.*]"]
-    if m["modele"] != {"version": VERSION}:
-        e.append(f"modele.version : {VERSION} attendu")
+    mod = m["modele"]
+    # Entier STRICT : True == 1 et 1.0 == 1 en Python, mais ni un booléen ni un flottant ne sont une version.
+    if not isinstance(mod, dict) or set(mod) != {"version"} or not _entier(mod["version"], (VERSION, VERSION)):
+        e.append(f"modele.version : entier {VERSION} attendu")
     f = m["fournisseur"]
     if not isinstance(f, dict) or set(f) != set(FOURNISSEURS):
         return e + [f"fournisseur : exactement {', '.join(FOURNISSEURS)}"]

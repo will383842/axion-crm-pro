@@ -39,6 +39,20 @@ final class Freins
         return $plaintes7j >= Seuils::PLAINTES_RELECTURE ? new DecisionFrein(DecisionFrein::PLAINTE_RELECTURE) : null;
     }
 
+    /**
+     * Reports > 20 % sur 1 h vers un fournisseur : pause de CE fournisseur seulement (jamais les autres, jamais global).
+     * Échantillon minimum {@see Seuils::REPORTS_ENVOIS_MIN} envois sur l'heure ; 20 % pile ne déclenche pas.
+     */
+    public static function reportsEnHausse(string $fournisseur, int $envoyes1h, int $reports1h, float $tauxMax = Seuils::REPORTS_TAUX_MAX): ?DecisionFrein
+    {
+        if ($envoyes1h < Seuils::REPORTS_ENVOIS_MIN || $reports1h <= 0) {
+            return null;
+        }
+
+        return round($reports1h / $envoyes1h, 9) > round($tauxMax, 9)
+            ? new DecisionFrein(DecisionFrein::REPORTS_EN_HAUSSE, $fournisseur) : null;
+    }
+
     /** Frein de remplacement Gmail/Microsoft : un message en indésirables chez un témoin → ce fournisseur seulement. */
     public static function indesirableTemoin(string $fournisseur): DecisionFrein
     {

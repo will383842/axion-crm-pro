@@ -1,6 +1,7 @@
 """K8 : le modèle de shaping est validé ; un modèle invalide fait échouer la CI."""
 import copy
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,21 @@ sys.path.insert(0, str(RACINE))
 import valider_shaping as v  # noqa: E402
 
 MODELE = RACINE / "shaping.modele.toml"
+
+
+def sans_commentaire(texte):
+    return "\n".join(l.split("#", 1)[0] for l in texte.splitlines())
+
+
+def sans_entetes(texte):
+    """Retire les en-têtes de table TOML ([fournisseur.gmail.tsa] n'est pas un nom de domaine)."""
+    return "\n".join(l for l in sans_commentaire(texte).splitlines() if not l.lstrip().startswith("["))
+
+
+def noms_reels(texte):
+    """Noms de domaine hors .test / .example (RFC 2606) trouvés hors commentaires."""
+    trouves = re.findall(r"\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.([a-z][a-z0-9-]*)\b", sans_entetes(texte), flags=re.I)
+    return [t for t in trouves if t.lower() not in ("test", "example")]
 
 
 def charge():
@@ -29,10 +45,15 @@ class ModeleLivre(unittest.TestCase):
 
     def test_aucun_nom_de_domaine_ni_ip_litterale(self):
         texte = MODELE.read_text(encoding="utf-8")
-        import re
-        sans_commentaire = "\n".join(l.split("#", 1)[0] for l in texte.splitlines())
-        self.assertIsNone(re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", sans_commentaire))
-        self.assertIsNone(re.search(r"[a-z0-9-]+\.(com|net|org|fr|io)\b", sans_commentaire))
+        self.assertEqual(noms_reels(texte), [])
+        self.assertIsNone(re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", sans_commentaire(texte)))
+
+    def test_le_detecteur_de_domaines_reels_est_strict(self):
+        # Tout nom de domaine réel est refusé, quelle que soit l'extension ; seuls .test et .example passent (ADR l.253).
+        for reel in ("gmail.com", "mail.exemple.fr", "a.b.io", "x.dev", "foo.co.uk", 'h = "smtp.outlook.com"'):
+            self.assertNotEqual(noms_reels(reel), [], reel)
+        for ok in ("serveur.test", "mx.example", "valeur = 0.5", "version = 1"):
+            self.assertEqual(noms_reels(ok), [], ok)
 
 
 class ModelesInvalides(unittest.TestCase):
@@ -74,6 +95,11 @@ class ModelesInvalides(unittest.TestCase):
 
     def test_version_inconnue(self):
         self.assertTrue(self.erreurs(lambda m: m["modele"].update(version=99)))
+
+    def test_version_booleenne_ou_flottante_refusee(self):
+        # True == 1 et 1.0 == 1 en Python : sans contrôle de type, ces deux versions passeraient.
+        self.assertTrue(self.erreurs(lambda m: m["modele"].update(version=True)))
+        self.assertTrue(self.erreurs(lambda m: m["modele"].update(version=1.0)))
 
 
 class LigneDeCommande(unittest.TestCase):

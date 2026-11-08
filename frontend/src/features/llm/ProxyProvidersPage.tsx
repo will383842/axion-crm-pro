@@ -77,7 +77,7 @@ export function ProxyProvidersPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 984 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll template={GRID}>
+          <TableScroll tableau template={GRID}>
           <div
             role="row"
             className={cn(
@@ -86,15 +86,15 @@ export function ProxyProvidersPage() {
             )}
             style={{ gridTemplateColumns: GRID }}
           >
-            <div>Identifiant</div>
-            <div>Type</div>
-            <div>Zone</div>
-            <div className="text-right">Points de sortie</div>
-            <div>État de santé</div>
-            <div className="text-right">Poids</div>
-            <div className="text-right">Actions</div>
+            <div role="columnheader">Identifiant</div>
+            <div role="columnheader">Type</div>
+            <div role="columnheader">Zone</div>
+            <div role="columnheader" className="text-right">Points de sortie</div>
+            <div role="columnheader">État de santé</div>
+            <div role="columnheader" className="text-right">Poids</div>
+            <div role="columnheader" className="text-right">Actions</div>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div role="rowgroup" className="divide-y divide-slate-100 dark:divide-slate-800">
             {rows.map((p) => (
               <div
                 key={p.id}
@@ -102,13 +102,13 @@ export function ProxyProvidersPage() {
                 className="grid items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
                 style={{ gridTemplateColumns: GRID }}
               >
-                <div className="truncate font-medium text-slate-900 dark:text-white">{p.slug}</div>
-                <div>
+                <div role="cell" className="truncate font-medium text-slate-900 dark:text-white">{p.slug}</div>
+                <div role="cell">
                   <StatusPill tone={TYPE_TONE[p.type]}>{p.type}</StatusPill>
                 </div>
-                <div className="font-mono text-xs text-slate-500">{p.zone}</div>
-                <div className="text-right tabular-nums">{p.endpoints_count}</div>
-                <div className="text-xs text-slate-500">
+                <div role="cell" className="font-mono text-xs text-slate-500">{p.zone}</div>
+                <div role="cell" className="text-right tabular-nums">{p.endpoints_count}</div>
+                <div role="cell" className="text-xs text-slate-500">
                   {p.last_health_status ? (
                     <StatusPill tone={p.last_health_status === 'healthy' ? 'success' : 'danger'}>
                       {p.last_health_status}
@@ -122,8 +122,8 @@ export function ProxyProvidersPage() {
                     </span>
                   ) : null}
                 </div>
-                <div className="text-right tabular-nums">{p.weight}</div>
-                <div className="text-right">
+                <div role="cell" className="text-right tabular-nums">{p.weight}</div>
+                <div role="cell" className="text-right">
                   <Button
                     variant="secondary"
                     size="sm"

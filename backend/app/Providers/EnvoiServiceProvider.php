@@ -11,6 +11,13 @@ use App\Envoi\Chauffe\ToutArreter;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\ListesNoires\AlerteurJournal;
+use App\Envoi\ListesNoires\DepotControles;
+use App\Envoi\ListesNoires\DepotControlesDb;
+use App\Envoi\ListesNoires\ResolveurSysteme;
+use App\Envoi\ListesNoires\SourceRessources;
+use App\Envoi\ListesNoires\SourceRessourcesDb;
+use App\Envoi\ListesNoires\SurveillanceListes;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
@@ -30,6 +37,16 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(GardeChauffe::class, fn ($app) => new GardeChauffe($app->make(DepotChauffe::class), $app->make(DepotSocle::class), $app->make(ResolveurFournisseur::class), $app->make(Alerte::class)));
         $this->app->singleton(FauxServeurEnvoi::class);
         $this->app->singleton(ToutArreter::class, fn ($app) => new ToutArreter($app->make(DepotSocle::class), $app->make(ServeurEnvoi::class), $app->make(Alerte::class)));
+        $this->app->singleton(DepotControles::class, DepotControlesDb::class);
+        $this->app->singleton(SourceRessources::class, SourceRessourcesDb::class);
+        $this->app->singleton(SurveillanceListes::class, fn ($app) => new SurveillanceListes(
+            new ResolveurSysteme,
+            $app->make(DepotControles::class),
+            new AlerteurJournal($app->make(DepotSocle::class)),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_ip'))),
+            array_values(array_map('strval', (array) config('envoi.listes_noires.zones_domaine'))),
+            static fn (): \DateTimeImmutable => new \DateTimeImmutable,
+        ));
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
             $app->make(FauxServeurEnvoi::class),
             $app->make(DepotSocle::class),

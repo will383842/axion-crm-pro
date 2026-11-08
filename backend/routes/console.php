@@ -570,3 +570,10 @@ Schedule::command(EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE)
     ->onFailure(function (): void {
         Log::critical('[ENVOI] ' . EnvoiListesNoiresControler::SIGNATURE_PLANIFIEE . ' : contrôle des listes noires non fiable ou incomplet.');
     });
+
+// Envoi P0 L5 — relance, chaque minute et sans nouveau clic, les effets (retrait de la file,
+// arrêt par entreprise) des oppositions de désinscription restés inachevés. Idempotent ; ne supprime RIEN.
+Schedule::command('envoi:relancer-effets-opposition')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer();

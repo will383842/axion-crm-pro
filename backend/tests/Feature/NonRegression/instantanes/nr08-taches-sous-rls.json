@@ -20,6 +20,7 @@
     "envoi:evaluer-freins": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:listes-noires:controler": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:rejouer-commandes": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
+    "envoi:relancer-effets-opposition": "jouee",
     "envoi:sante": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "journalists:scrape-ours": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "media:backfill-periodicity": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

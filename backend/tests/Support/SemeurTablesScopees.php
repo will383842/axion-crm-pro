@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -129,6 +129,9 @@ final class SemeurTablesScopees
         'envoi_domaines',
         // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
         'envoi_controles_listes',
+        // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
+        'envoi_liens_desinscription',
+        'envoi_oppositions',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -510,6 +513,16 @@ final class SemeurTablesScopees
             'verdict' => 'valide',
             'verifie_le' => now(),
             'source' => 'zz-etancheite',
+        ]);
+
+        $id['envoi_liens_desinscription'] = $insererAvecId('envoi_liens_desinscription', [
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
+        ]);
+
+        $inserer('envoi_oppositions', [
+            'lien_id' => $id['envoi_liens_desinscription'],
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite-l5@example.invalid'),
+            'canal' => 'page',
         ]);
 
         $inserer('envoi_domaines', [

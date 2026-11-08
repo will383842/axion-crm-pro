@@ -189,3 +189,40 @@ test('K12 : nom PTR inversé IPv4 et IPv6 (nibbles)', function () {
         ->and(ResolveurDnsSysteme::nomInverse('2001:db8::1'))->toBe('1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa')
         ->and(ResolveurDnsSysteme::nomInverse('nimporte'))->toBeNull();
 });
+
+test('D1b : redirect= est IGNORÉ quand un « all » est déjà présent (RFC 7208 §6.1) : pas de résolution, pas de « +all » importé', function () {
+    $f = FauxResolveurDns::conforme();
+    $f->txt['envoi.example.test'] = ['v=spf1 ip4:192.0.2.10 redirect=_spf.example.test -all'];
+    $f->txt['_spf.example.test'] = ['v=spf1 +all'];   // si le redirect était suivi, le dernier mot deviendrait « +all »
+    $r = (new ControleurDns($f))->controler(cfg());
+    expect(statut($r, 'spf_se_termine_par_all'))->toBe('ok')
+        ->and(statut($r, 'spf_autorise_ip'))->toBe('ok')
+        ->and($f->requetes)->not->toContain('TXT _spf.example.test');
+
+    // Le « all » peut aussi venir APRÈS le modificateur, avec n'importe quel qualificatif.
+    $f2 = FauxResolveurDns::conforme();
+    $f2->txt['envoi.example.test'] = ['v=spf1 redirect=_spf.example.test ip4:192.0.2.10 ~all'];
+    $f2->txt['_spf.example.test'] = ['v=spf1 +all'];
+    expect(statut((new ControleurDns($f2))->controler(cfg()), 'spf_se_termine_par_all'))->toBe('ok')
+        ->and($f2->requetes)->not->toContain('TXT _spf.example.test');
+});
+
+test('D1b : redirect= ignoré ne compte pas dans la limite des 10 résolutions', function () {
+    $f = FauxResolveurDns::conforme();
+    $m = [];
+    for ($i = 0; $i < 10; $i++) {
+        $m[] = "a:h$i.example.test";   // 10 résolutions exactement
+    }
+    $f->txt['envoi.example.test'] = ['v=spf1 ip4:192.0.2.10 ' . implode(' ', $m) . ' redirect=_spf.example.test -all'];
+    expect(statut((new ControleurDns($f))->controler(cfg()), 'spf_10_resolutions_max'))->toBe('ok');
+});
+
+test('D1b : helo_a_vers_ip compare des adresses IPv6 NORMALISÉES (zéros, casse)', function () {
+    $c = new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '2001:0DB8:0000:0000:0000:0000:0000:0010');
+    $f = FauxResolveurDns::conforme();
+    $f->aaaa['mx.envoi.example.test'] = ['2001:db8::10'];
+    expect(statut((new ControleurDns($f))->controler($c), 'helo_a_vers_ip'))->toBe('ok');
+
+    $f->aaaa['mx.envoi.example.test'] = ['2001:db8::11'];
+    expect(statut((new ControleurDns($f))->controler($c), 'helo_a_vers_ip'))->toBe('ko');
+});

@@ -198,10 +198,45 @@ test('NR-08 CONSTAT : la sonde « non diffusibles » (06:20) est AVEUGLE sous le
     }
 });
 
+test('NR-08 sous le rôle de production, la relance des effets d’opposition termine ceux de CHAQUE espace, et seulement eux', function () {
+    $e = nr08Espaces();
+    $o = nr08Proprio();
+    $hashes = [];
+    try {
+        foreach (['a', 'b'] as $cle) {
+            $hashes[$cle] = hash('sha256', "nr08-{$cle}@exemple.invalid");
+            $lien = $o->table('envoi_liens_desinscription')->insertGetId([
+                'workspace_id' => $e[$cle], 'reference' => (string) Str::uuid(), 'empreinte_adresse' => $hashes[$cle], 'portee' => 'business',
+            ]);
+            $o->table('envoi_oppositions')->insert([
+                'workspace_id' => $e[$cle], 'lien_id' => $lien, 'empreinte_adresse' => $hashes[$cle], 'canal' => 'one_click',
+            ]);
+        }
+
+        $code = nr08SousRoleProduction(fn () => Artisan::call('envoi:relancer-effets-opposition'));
+
+        expect($code)->toBe(0);
+        foreach (['a', 'b'] as $cle) {
+            expect($o->table('envoi_oppositions')->where('workspace_id', $e[$cle])->whereNotNull('effets_termines_le')->count())->toBe(1);
+            // Un seul événement sortant, pour SON adresse (aucun mélange entre espaces).
+            expect($o->table('crm_outbound_events')->where('email_hash', $hashes[$cle])->count())->toBe(1);
+        }
+    } finally {
+        // Les triggers d'ajout seul sont suspendus le temps du nettoyage de CES lignes de test.
+        $o->statement("SET session_replication_role = 'replica'");
+        $o->table('crm_outbound_events')->whereIn('email_hash', array_values($hashes))->delete();
+        $o->table('envoi_oppositions')->whereIn('workspace_id', array_values($e))->delete();
+        $o->table('envoi_liens_desinscription')->whereIn('workspace_id', array_values($e))->delete();
+        $o->statement("SET session_replication_role = 'origin'");
+        nr08Nettoyer($e);
+    }
+});
+
 test('NR-08 l’inventaire des tâches planifiées sous RLS est celui de la photo de référence', function () {
     Artisan::call('list', ['--format' => 'txt']);
     $jouees = [
         'audiences:full-refresh' => 'jouee',
+        'envoi:relancer-effets-opposition' => 'jouee',
         'crm:sonde-non-diffusibles' => 'jouee : AVEUGLE sous RLS (code 0 malgre des fiches [ND]), a corriger par S7',
     ];
     $inventaire = [];

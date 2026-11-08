@@ -34,14 +34,14 @@ class EnvoiRelancerEffetsOpposition extends Command
     {
         $relancees = 0;
         foreach (DB::table('workspaces')->whereNotNull('deleted_at')->pluck('id') as $supprime) {
-            $n = WorkspaceContext::run((string) $supprime, fn () => DB::table('envoi_oppositions')->whereNull('effets_termines_le')->count());
+            $n = WorkspaceContext::run((string) $supprime, fn () => DB::table('envoi_oppositions')->where('workspace_id', $supprime)->whereNull('effets_termines_le')->count());
             if ($n > 0) {
                 Log::warning("Opposition(s) à terminer dans un espace supprimé : {$n}.", ['workspace_id' => (string) $supprime]);
             }
         }
         foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $workspaceId) {
             $ids = WorkspaceContext::run((string) $workspaceId, fn () => DB::table('envoi_oppositions')
-                ->whereNull('effets_termines_le')->orderBy('id')->limit(500)->pluck('id'));
+                ->where('workspace_id', $workspaceId)->whereNull('effets_termines_le')->orderBy('id')->limit(500)->pluck('id'));
             foreach ($ids as $id) {
                 $cle = "envoi:relance-opposition:{$workspaceId}:{$id}";
                 $etat = Cache::get($cle);

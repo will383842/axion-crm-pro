@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS loghook_compteurs (
 CREATE TABLE IF NOT EXISTS loghook_journal (
   id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, genre TEXT NOT NULL,
   id_kumo TEXT NOT NULL, detail TEXT NOT NULL, cree_le INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS loghook_journal_ws_genre ON loghook_journal (workspace_id, genre, id_kumo);
 CREATE TRIGGER IF NOT EXISTS loghook_journal_no_update BEFORE UPDATE ON loghook_journal
   BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
 CREATE TRIGGER IF NOT EXISTS loghook_journal_no_delete BEFORE DELETE ON loghook_journal
@@ -372,19 +373,60 @@ SQL);
 
     /**
      * Jetons reçus (jeton_en_attente) dont la confirmation n'est pas encore journalisée : à rejouer tant que non confirmés.
+     * Sont exclus : les jetons ABANDONNÉS (K6 les a refusés trop de fois : ils ne bloquent plus la tête de liste) et ceux
+     * essayés il y a moins de $delaiRejeu secondes (une tentative à la fois, espacée).
      *
      * @return list<array{id_kumo:string,jeton:string}>
      */
-    public function jetonsEnAttente(string $ws, int $limite): array
+    public function jetonsEnAttente(string $ws, int $limite, int $delaiRejeu = 0): array
     {
         $st = $this->pdo->prepare("SELECT a.id_kumo, a.detail FROM loghook_journal a WHERE a.workspace_id=? AND a.genre='jeton_en_attente'
             AND NOT EXISTS (SELECT 1 FROM loghook_journal c WHERE c.workspace_id=a.workspace_id AND c.genre='jeton_confirme' AND c.id_kumo=a.id_kumo)
+            AND NOT EXISTS (SELECT 1 FROM loghook_journal c WHERE c.workspace_id=a.workspace_id AND c.genre='jeton_abandonne' AND c.id_kumo=a.id_kumo)
+            AND NOT EXISTS (SELECT 1 FROM loghook_journal t WHERE t.workspace_id=a.workspace_id AND t.genre='jeton_tentative' AND t.id_kumo=a.id_kumo AND t.cree_le > ?)
             GROUP BY a.id_kumo ORDER BY MIN(a.id) LIMIT ?");
         $st->bindValue(1, $ws);
-        $st->bindValue(2, max(1, $limite), PDO::PARAM_INT);
+        $st->bindValue(2, $this->now() - $delaiRejeu, PDO::PARAM_INT);
+        $st->bindValue(3, max(1, $limite), PDO::PARAM_INT);
         $st->execute();
 
         return array_map(static fn (array $l): array => ['id_kumo' => (string) $l[0], 'jeton' => (string) $l[1]], $st->fetchAll(PDO::FETCH_NUM));
+    }
+
+    /**
+     * Espaces qui ont au moins un jeton à rejouer (même sans trafic), du plus ancien au plus récent.
+     *
+     * @return list<string>
+     */
+    public function espacesAvecJetonsEnAttente(int $limite): array
+    {
+        $st = $this->pdo->prepare("SELECT a.workspace_id FROM loghook_journal a WHERE a.genre='jeton_en_attente'
+            AND NOT EXISTS (SELECT 1 FROM loghook_journal c WHERE c.workspace_id=a.workspace_id AND c.genre IN ('jeton_confirme','jeton_abandonne') AND c.id_kumo=a.id_kumo)
+            GROUP BY a.workspace_id ORDER BY MIN(a.id) LIMIT ?");
+        $st->bindValue(1, max(1, $limite), PDO::PARAM_INT);
+        $st->execute();
+
+        return array_map('strval', $st->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /** Une réponse « non confirmé » de K6 pour ce jeton (ajout seul). Rend le nombre de tentatives, celle-ci comprise. */
+    public function noterTentativeJeton(string $ws, string $idKumo): int
+    {
+        $this->journaliserLoghook($ws, 'jeton_tentative', $idKumo, '-');
+        $st = $this->pdo->prepare("SELECT COUNT(*) FROM loghook_journal WHERE workspace_id=? AND genre='jeton_tentative' AND id_kumo=?");
+        $st->execute([$ws, $idKumo]);
+
+        return (int) $st->fetchColumn();
+    }
+
+    /** Vrai si une tentative date de moins de $delai secondes, ou si le jeton est déjà abandonné. */
+    public function jetonAEcarter(string $ws, string $idKumo, int $delai): bool
+    {
+        $st = $this->pdo->prepare("SELECT 1 FROM loghook_journal WHERE workspace_id=? AND id_kumo=?
+            AND (genre='jeton_abandonne' OR (genre='jeton_tentative' AND cree_le > ?)) LIMIT 1");
+        $st->execute([$ws, $idKumo, $this->now() - $delai]);
+
+        return $st->fetchColumn() !== false;
     }
 
     public function jetonDejaConfirme(string $ws, string $idKumo): bool

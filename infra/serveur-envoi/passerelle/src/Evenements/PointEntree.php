@@ -38,6 +38,7 @@ final class PointEntree
 
         try {
             $this->ingestion->reconfirmer($ws); // jetons encore « en attente » : rejoués à chaque passage
+            $this->ingestion->reconfirmerTous(); // ... y compris ceux des espaces sans trafic
         } catch (\Throwable) {
             // Sans effet sur l'ingestion déjà faite.
         }

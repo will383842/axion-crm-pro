@@ -380,4 +380,123 @@ final class LoghookTest extends PasserelleTestCase
         $this->assertStringNotContainsString(self::SECRET, (string) file_get_contents(__DIR__.'/../src/Evenements/PointEntree.php'));
         $this->assertStringContainsString('hash_equals', (string) file_get_contents(__DIR__.'/../src/Evenements/PointEntree.php'));
     }
+
+    // --- E5 : un jeton inconnu de K6 ne bloque pas la tête de liste ; E6 : index du journal ---
+
+    /** K6 qui répond FALSE (jeton inconnu) pour les jetons « inconnus », TRUE pour les autres. */
+    private function jetonsSelectif(array &$inconnus): JetonsConfirmation
+    {
+        return new class($inconnus) implements JetonsConfirmation {
+            public int $appels = 0;
+            public function __construct(private array &$inconnus) {}
+            public function confirmer(string $ws, string $jeton, string $idMessage): bool { $this->appels++; return ! in_array($jeton, $this->inconnus, true); }
+        };
+    }
+
+    public function test_e5_vingt_jetons_inconnus_ne_bloquent_pas_un_jeton_valide_arrive_apres(): void
+    {
+        $inconnus = [];
+        for ($n = 1; $n <= 25; $n++) {
+            $inconnus[] = str_pad((string) $n, 32, 'u');
+        }
+        $j = $this->jetonsSelectif($inconnus);
+        $i = $this->ingestion($j);
+        foreach ($inconnus as $n => $jeton) {
+            $i->ingerer(self::WS_A, $this->ev($n + 1, 'reception', 'u'.$n, $jeton));
+        }
+        $i->ingerer(self::WS_A, $this->ev(100, 'reception', 'valide', str_repeat('v', 32)));
+        for ($passage = 0; $passage < 40; $passage++) {
+            $this->maintenant += Ingestion::DELAI_REJEU_JETON + 1;
+            $i->reconfirmer(self::WS_A);
+        }
+        $this->assertTrue($this->stockage->jetonDejaConfirme(self::WS_A, 'valide'), 'le jeton valide doit finir par passer');
+        $this->assertSame([], $this->stockage->jetonsEnAttente(self::WS_A, 100), 'les jetons inconnus sortent de la liste');
+        $this->assertSame(25, (int) $this->pdo()->query("SELECT COUNT(DISTINCT id_kumo) FROM loghook_journal WHERE genre='jeton_abandonne'")->fetchColumn());
+        $this->assertContains('loghook_jeton_abandonne', $this->alertes);
+    }
+
+    public function test_e5_un_jeton_abandonne_n_est_plus_rejoue(): void
+    {
+        $inconnus = [str_repeat('x', 32)];
+        $j = $this->jetonsSelectif($inconnus);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('x', 32)));
+        for ($passage = 0; $passage < Ingestion::TENTATIVES_JETON_MAX + 3; $passage++) {
+            $this->maintenant += Ingestion::DELAI_REJEU_JETON + 1;
+            $i->reconfirmer(self::WS_A);
+        }
+        $appels = $j->appels;
+        $this->maintenant += 10 * Ingestion::DELAI_REJEU_JETON;
+        $i->reconfirmer(self::WS_A);
+        $this->assertSame($appels, $j->appels);
+        $this->assertSame(Ingestion::TENTATIVES_JETON_MAX, $appels, 'chaque réponse FALSE de K6 compte une tentative, puis le jeton est abandonné');
+    }
+
+    public function test_e5_les_tentatives_sont_espacees_dans_le_temps(): void
+    {
+        $inconnus = [str_repeat('y', 32)];
+        $j = $this->jetonsSelectif($inconnus);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('y', 32)));
+        $avant = $j->appels;
+        for ($passage = 0; $passage < 30; $passage++) { // 30 passages au même instant : une seule tentative compte
+            $i->reconfirmer(self::WS_A);
+        }
+        $this->assertSame($avant, $j->appels, 'au même instant : aucune nouvelle tentative');
+        $this->assertSame([], array_filter($this->alertes, fn ($a) => $a === 'loghook_jeton_abandonne'));
+    }
+
+    public function test_e5_k6a_absent_ne_consomme_aucune_tentative(): void
+    {
+        $i = $this->ingestion(); // JetonsNonDisponibles
+        $i->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('c', 32)));
+        for ($passage = 0; $passage < 40; $passage++) {
+            $this->maintenant += Ingestion::DELAI_REJEU_JETON + 1;
+            $i->reconfirmer(self::WS_A);
+        }
+        $this->assertCount(1, $this->stockage->jetonsEnAttente(self::WS_A, 10), 'K6a absent : le jeton reste rejouable, jamais abandonné');
+    }
+
+    public function test_e5_les_jetons_d_un_espace_sans_trafic_sont_aussi_rejoues(): void
+    {
+        $panne = true;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_B, $this->ev(1, 'reception', 'b1', str_repeat('b', 32)));
+        $panne = false;
+        // Trafic uniquement dans l'espace A : le jeton de B doit quand même être confirmé.
+        $this->assertSame(1, $i->reconfirmerTous());
+        $this->assertTrue($this->stockage->jetonDejaConfirme(self::WS_B, 'b1'));
+        $this->assertSame(0, $i->reconfirmerTous());
+    }
+
+    public function test_e5_le_point_d_entree_rejoue_les_autres_espaces(): void
+    {
+        $panne = true;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_B, $this->ev(1, 'reception', 'b1', str_repeat('b', 32)));
+        $panne = false;
+        $corps = json_encode(['workspace_id' => self::WS_A] + $this->ev(1, 'livre'));
+        $r = (new \Passerelle\Evenements\PointEntree($i, self::SECRET, ['kumo-test']))->traiter('127.0.0.1', $corps, self::SECRET);
+        $this->assertSame(200, $r[0]);
+        $this->assertTrue($this->stockage->jetonDejaConfirme(self::WS_B, 'b1'));
+    }
+
+    public function test_e6_le_journal_a_un_index_workspace_genre_id_kumo_utilise_par_les_requetes(): void
+    {
+        $plan = fn (string $sql): string => implode(' ', array_column($this->pdo()->query('EXPLAIN QUERY PLAN '.$sql)->fetchAll(PDO::FETCH_ASSOC), 'detail'));
+        $this->assertStringContainsString('loghook_journal_ws_genre', $plan("SELECT 1 FROM loghook_journal WHERE workspace_id='w' AND genre='jeton_confirme' AND id_kumo='k' LIMIT 1"));
+        $this->assertStringContainsString('loghook_journal_ws_genre', $plan("SELECT id_kumo FROM loghook_journal WHERE workspace_id='w' AND genre='jeton_en_attente'"));
+    }
+
+    public function test_e6_l_index_est_ajoute_a_une_base_existante_sans_toucher_aux_donnees(): void
+    {
+        $this->ingestion()->ingerer(self::WS_A, $this->ev(1, 'reception', 'm1', str_repeat('c', 32)));
+        $this->pdo()->exec('DROP INDEX loghook_journal_ws_genre'); // base d'avant la correction
+        $avant = (int) $this->pdo()->query('SELECT COUNT(*) FROM loghook_journal')->fetchColumn();
+        new \Passerelle\Stockage($this->fichier, fn (): int => $this->maintenant);
+        $this->assertSame(1, (int) $this->pdo()->query("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='loghook_journal_ws_genre'")->fetchColumn());
+        $this->assertSame($avant, (int) $this->pdo()->query('SELECT COUNT(*) FROM loghook_journal')->fetchColumn());
+    }
 }

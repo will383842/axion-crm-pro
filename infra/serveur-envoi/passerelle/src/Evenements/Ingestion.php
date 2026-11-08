@@ -17,6 +17,15 @@ final class Ingestion
     /** Les 50 premiers rebonds durs de chaque espace sont en observation (aucune action automatique). */
     public const OBSERVATION_MAX = 50;
 
+    /** Un jeton refusé par K6 est retenté au plus une fois par ce délai (secondes)... */
+    public const DELAI_REJEU_JETON = 60;
+
+    /** ... et abandonné (il sort de la liste de rejeu, alerte) après ce nombre de réponses « non confirmé » de K6. */
+    public const TENTATIVES_JETON_MAX = 10;
+
+    /** Espaces rejoués par passage (les plus anciens d'abord). */
+    private const ESPACES_PAR_PASSAGE = 20;
+
     /** @param \Closure(string,array<string,string>):mixed $alerte */
     public function __construct(
         private readonly Stockage $stockage,
@@ -70,8 +79,19 @@ final class Ingestion
     public function reconfirmer(string $ws, int $limite = 20): int
     {
         $n = 0;
-        foreach ($this->stockage->jetonsEnAttente($ws, $limite) as $j) {
+        foreach ($this->stockage->jetonsEnAttente($ws, $limite, self::DELAI_REJEU_JETON) as $j) {
             $n += $this->confirmerJeton($ws, $j['jeton'], $j['id_kumo'], '-') ? 1 : 0;
+        }
+
+        return $n;
+    }
+
+    /** Rejoue aussi les jetons des espaces SANS trafic : tout passage rejoue les espaces qui en ont en attente. */
+    public function reconfirmerTous(int $limite = 20): int
+    {
+        $n = 0;
+        foreach ($this->stockage->espacesAvecJetonsEnAttente(self::ESPACES_PAR_PASSAGE) as $ws) {
+            $n += $this->reconfirmer($ws, $limite);
         }
 
         return $n;
@@ -79,8 +99,8 @@ final class Ingestion
 
     private function confirmerJeton(string $ws, string $jeton, string $idMessage, string $src): bool
     {
-        if ($this->dejaConfirme($ws, $idMessage)) {
-            return false;
+        if ($this->dejaConfirme($ws, $idMessage) || $this->stockage->jetonAEcarter($ws, $idMessage, self::DELAI_REJEU_JETON)) {
+            return false; // déjà confirmé, abandonné, ou essayé à l'instant
         }
         try {
             $ok = $this->jetons->confirmer($ws, $jeton, $idMessage); // idempotent : true = confirmé (déjà ou à l'instant)
@@ -90,6 +110,11 @@ final class Ingestion
             return false;
         }
         if (! $ok) {
+            // K6a absent : rien n'est compté (le jeton reste rejouable). Sinon K6 a répondu « inconnu/refusé » : on compte.
+            if (! $this->jetons instanceof JetonsNonDisponibles) {
+                $this->compterRefus($ws, $idMessage, $src);
+            }
+
             return false;
         }
         try {
@@ -104,5 +129,17 @@ final class Ingestion
     private function dejaConfirme(string $ws, string $idMessage): bool
     {
         return $this->stockage->jetonDejaConfirme($ws, $idMessage);
+    }
+
+    private function compterRefus(string $ws, string $idMessage, string $src): void
+    {
+        try {
+            if ($this->stockage->noterTentativeJeton($ws, $idMessage) >= self::TENTATIVES_JETON_MAX) {
+                $this->stockage->journaliserLoghook($ws, 'jeton_abandonne', $idMessage, 'refusé par K6');
+                ($this->alerte)('loghook_jeton_abandonne', ['source' => $src]);
+            }
+        } catch (\Throwable) {
+            // Le compte est une aide : au pire le jeton sera retenté.
+        }
     }
 }

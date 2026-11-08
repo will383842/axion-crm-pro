@@ -1,6 +1,7 @@
 # En-tetes signes par le serveur d'envoi (h=). Meme ensemble et meme ordre que
 # App\Envoi\Message\DkimSigneur::ENTETES_SIGNES (test croise cote CRM). Un nom par ligne.
 From
+Reply-To
 To
 Subject
 Date

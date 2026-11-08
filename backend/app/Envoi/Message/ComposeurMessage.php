@@ -14,9 +14,9 @@ final class ComposeurMessage
 {
     public function __construct(
         private readonly string $domaineEnvoi,
-        private readonly ?DkimSigneur $dkim = null,
+        private readonly ?DkimSigneur $dkim,
+        private readonly SignatureDkim $signeDkim,   // aucune valeur par défaut (ADR-K0 D3.1)
         private readonly ControleurContenu $controleur = new ControleurContenu,
-        private readonly SignatureDkim $signeDkim = SignatureDkim::Crm,
     ) {
         if ($signeDkim === SignatureDkim::Serveur && $dkim !== null) {
             throw new InvalidArgumentException('Mode DKIM « serveur » : aucun signeur (ni clé privée) côté CRM.');

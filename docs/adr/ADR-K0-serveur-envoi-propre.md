@@ -74,7 +74,8 @@
    - Mode `serveur` : le composeur n'ajoute AUCUNE signature.
    - Mode `crm` : réservé au relais tiers temporaire (spec 26 § 7), avec un sélecteur distinct.
 2. **Test « aucune clé privée côté CRM ».** Le kit vérifie qu'aucune clé privée DKIM n'existe côté CRM pour un domaine rattaché à un serveur en mode `serveur` (variables d'environnement, base, disque de l'application).
-3. **Second verrou côté serveur.** Un message injecté qui contient déjà un en-tête `DKIM-Signature` pour le domaine d'envoi est refusé en 5xx. Un mauvais réglage se voit ainsi tout de suite au banc.
+3. **Second verrou côté serveur (livré en K5 dans l'écouteur d'injection, `infra/serveur-envoi/injection`).** Un message injecté qui contient déjà un en-tête `DKIM-Signature` pour le domaine d'envoi est refusé en 5xx. Un mauvais réglage se voit ainsi tout de suite au banc.
+   - **Dépendance K1** : la colonne `envoi_serveurs.signature_dkim` n'existe qu'avec la migration de K1. Tant que K1 n'est pas fusionné, le mode vient du constructeur de `ComposeurMessage` (`SignatureDkim $signeDkim`, sans valeur par défaut) et K5 ne lit aucune colonne.
 4. **Calendrier.** Ce mode doit entrer dans L2 (#434) avant sa fusion, ou dans un lot de 0,5 jour juste après. Sinon, L2 doit être reprise.
 
 **Raisons.** C'est le socle de la spec 26 (§ 1.8). Une clé qui ne quitte pas le serveur ne peut pas fuiter par le CRM ni par le dépôt public.
@@ -238,7 +239,7 @@ Les chemins sont proposés : chaque agent vérifie `origin/main` avant de créer
 | K4a | `envoi-serveur/kumo/policy/injection/{ecouteur,auth,espace,entetes}.lua`, `envoi-serveur/kumo/tests/injection/**` |
 | K4b | `envoi-serveur/kumo/policy/injection/{relais,registre,source,contenu}.lua`, `envoi-serveur/kumo/tests/registre/**` |
 | K4c | `envoi-serveur/passerelle/src/Injection/**`, `envoi-serveur/passerelle/tests/Injection/**`, `envoi-serveur/contrat/injection.schema.json` |
-| K5 | `envoi-serveur/kumo/policy/dkim.lua`, `envoi-serveur/systeme/scripts/generer-dkim.sh`, côté CRM le composeur L2 (mode `serveur`) + tests |
+| K5 | `infra/serveur-envoi/kumomta/dkim.lua` (+ chargement dans `init.lua`), `infra/serveur-envoi/dkim/{generer-dkim.sh,entetes-signes.txt,entetes-sursignes.txt,tests-dkim.sh}`, `infra/serveur-envoi/{docker-compose.yml,installer.sh,RUNBOOK.md,tests/lancer-tests.sh}`, `infra/serveur-envoi/injection/**` (refus d'un message déjà signé), côté CRM le composeur L2 (mode `serveur`) + tests |
 | K6 | `envoi-serveur/kumo/policy/socle/{plafond,homme_mort,temoins,jetons,stockage}.lua`, `envoi-serveur/outils/temoins-off`, `envoi-serveur/kumo/tests/socle/**` |
 | K7 | `envoi-serveur/kumo/policy/journal.lua`, `envoi-serveur/kumo/rebonds/*.toml`, `envoi-serveur/passerelle/src/Evenements/**` (ingestion du log hook) + tests, validateur TOML dans la CI |
 | K8 | `envoi-serveur/kumo/shaping/**`, `backend/app/Envoi/Chauffe/**` (IP séparée), migration `ressource_type` |

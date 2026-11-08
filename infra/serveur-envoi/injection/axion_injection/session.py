@@ -226,8 +226,10 @@ class Session:
         return ["250 2.0.0 en file"], None
 
     def _controle_entetes(self, msg: bytes) -> str | None:
-        """Analyse réelle des adresses de TOUS les From, Sender, Reply-To."""
+        """Refus d'une DKIM-Signature déjà présente ; analyse réelle des adresses de TOUS les From, Sender, Reply-To."""
         ent = entetes(msg)
+        if any(n == "dkim-signature" for n, _ in ent):    # ADR-K0 D3.3 : le serveur signe seul
+            return "550 5.7.1 message deja signe DKIM : le serveur d'envoi signe, refuse"
         froms = [v for n, v in ent if n == "from"]
         if len(froms) > 1:
             return "550 5.7.1 plusieurs en-tetes From"

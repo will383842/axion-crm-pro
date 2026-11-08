@@ -45,6 +45,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_11_000104_envoi_journal_commande_id.php',
     // K12 : table d'historique des contrôles DNS (ajout seul) ; down() inerte (simple commentaire).
     '2026_11_11_000110_envoi_controles_dns.php',
+    // Envoi K15 : relevés de santé et constats, ajout seul (trigger), down() inerte.
+    '2026_11_13_000150_envoi_sante.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',

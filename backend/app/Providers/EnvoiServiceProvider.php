@@ -26,6 +26,14 @@ use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\SurveillanceListes;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
+use App\Envoi\Sante\CouplageSante;
+use App\Envoi\Sante\DepotSante;
+use App\Envoi\Sante\DepotSanteDb;
+use App\Envoi\Sante\EmetteurAlerteSante;
+use App\Envoi\Sante\EmetteurAlerteSocle;
+use App\Envoi\Sante\SondeSante;
+use App\Envoi\Sante\SondeSanteK1;
+use App\Envoi\Sante\SuperviseurSante;
 use App\Envoi\Serveur\ClientServeurEnvoiHmac;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Contrat\TireurEvenements;
@@ -55,6 +63,18 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(GardeChauffe::class, fn ($app) => new GardeChauffe($app->make(DepotChauffe::class), $app->make(DepotSocle::class), $app->make(ResolveurFournisseur::class), $app->make(Alerte::class)));
         $this->app->singleton(FauxServeurEnvoi::class);
         $this->app->singleton(ToutArreter::class, fn ($app) => new ToutArreter($app->make(DepotSocle::class), $app->make(ServeurEnvoi::class), $app->make(Alerte::class)));
+        // K15 supervision : sonde K1, alerte par le Socle (jamais une boîte de prospection).
+        $this->app->bind(SondeSante::class, SondeSanteK1::class);
+        $this->app->bind(DepotSante::class, DepotSanteDb::class);
+        $this->app->bind(EmetteurAlerteSante::class, fn ($app) => new EmetteurAlerteSocle($app->make(Alerte::class)));
+        $this->app->bind(SuperviseurSante::class, fn ($app) => new SuperviseurSante(
+            $app->make(SondeSante::class),
+            $app->make(DepotSante::class),
+            $app->make(EmetteurAlerteSante::class),
+            $app->make(DepotChauffe::class),
+            $app->make(CommandeurServeur::class),
+            (array) config('envoi.sante'),
+        ));
         $this->app->singleton(DepotControles::class, DepotControlesDb::class);
         $this->app->singleton(SourceRessources::class, SourceRessourcesDb::class);
         $this->app->singleton(SurveillanceListes::class, fn ($app) => new SurveillanceListes(
@@ -88,5 +108,7 @@ class EnvoiServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(OppositionEnregistree::class, EffetsOpposition::class);
+        // K15 / ADR K0 : envoi réel + K1 sans supervision = signalé au démarrage (journal critique), pas passé sous silence.
+        $this->app->booted(static fn () => CouplageSante::signaler());
     }
 }

@@ -1,0 +1,7 @@
+{
+  "personnes.origine_contenu": "couverte",
+  "personnes.guides_recus": "couverte",
+  "personnes.consentements": "couverte",
+  "personnes.origines": "couverte",
+  "personne_origines_archive.origine": "hors-portee: clés fermées du dictionnaire, jetons et dates — jamais de pseudo, nom, texte ni adresse (ContenusAccords::origines)"
+}

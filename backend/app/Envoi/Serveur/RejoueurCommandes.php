@@ -34,7 +34,7 @@ final class RejoueurCommandes
                     }
                 } catch (Throwable $e) {
                     $bilan['echecs']++;
-                    Log::warning('envoi.rejeu_commande_echec', ['workspace_id' => (string) $espace, 'commande_id' => $i['commande_id'], 'motif' => $e->getMessage()]);
+                    Log::warning('envoi.rejeu_commande_echec', ['workspace_id' => (string) $espace, 'commande_id' => $i['commande_id'], 'motif' => $e::class]);
                 }
             }
         }

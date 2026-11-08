@@ -18,7 +18,7 @@ final class VerificateurHmacEnvoi
 {
     public const FENETRE_SECONDES = 300;
 
-    public function verifier(#[\SensitiveParameter] string $secret, string $source, ?string $horodatage, ?string $nonce, ?string $signature, string $corps, string $methode = 'POST', string $chemin = '', string $workspaceId = ''): int
+    public function verifier(#[\SensitiveParameter] string $secret, string $source, ?string $horodatage, ?string $nonce, ?string $signature, string $corps, string $methode, string $chemin, string $workspaceId = ''): int
     {
         if ($secret === '' || $nonce === null || ! SignatureEnvoi::estUuid($nonce) || ! SignatureEnvoi::estUuid($workspaceId)) {
             return 401;

@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -175,6 +175,11 @@ final class SemeurTablesScopees
         'envoi_temoins',
         // 2026-11-11 (envoi K1a) : serveurs d'envoi (le commande_id vit dans envoi_journal_commandes).
         'envoi_serveurs',
+        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace. Chauffe et pauses :
+        // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
+        'envoi_chauffe_jours',
+        'envoi_pauses',
+        'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
         'envoi_boites',
@@ -703,6 +708,20 @@ final class SemeurTablesScopees
             'url_base' => 'https://zz.test.invalid',
         ]);
 
+        $inserer('envoi_chauffe_jours', [
+            'boite' => 'zz-etancheite@example.invalid',
+            'jour' => '2026-01-01',
+            'fournisseur' => 'autre',
+        ]);
+        $inserer('envoi_pauses', [
+            'portee' => 'global',
+            'motif' => 'zz',
+        ]);
+        $inserer('envoi_seuils', [
+            'nom' => 'zz',
+            'valeur' => 1,
+            'auteur' => 'zz',
+        ]);
         $boiteId = (string) Str::uuid();
         $inserer('envoi_boites', [
             'id' => $boiteId,

@@ -68,7 +68,7 @@ test('secret vide : refus, même avec la signature « calculée » avec un secre
 });
 
 test('en-têtes absents : 401', function () {
-    expect((new VerificateurHmacEnvoi)->verifier('s', 'srv', null, null, null, 'x'))->toBe(401);
+    expect((new VerificateurHmacEnvoi)->verifier('s', 'srv', null, null, null, 'x', 'POST', '/v1/commandes/pause'))->toBe(401);
 });
 
 test('vecteurs HMAC communs (envoi-serveur/contrat/vecteurs-hmac.json)', function () {

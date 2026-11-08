@@ -101,3 +101,7 @@ temp/
 # Surcharge du BANC de verification uniquement — porte des secrets de test,
 # ne doit JAMAIS etre versionnee (le depot est public).
 docker-compose.verif.banc.yml
+
+# Bytecode Python
+__pycache__/
+*.pyc

@@ -2,6 +2,7 @@
 
 namespace App\Envoi;
 
+use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
@@ -22,6 +23,8 @@ use DateTimeImmutable;
  *   3. Tout arrêter             => exception ;
  *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
  *   5. rejeu idempotent (même clé) => passe sans recompter ;
+ *   5b. (L7) hors fenêtre d'envoi 8 h-19 h, homme mort (silence de sante()), pauses, freins, expéditeur inconnu,
+ *       quota de chauffe de la boîte et du domaine => report au lendemain ;
  *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
  *   7. seulement alors, le serveur est appelé, et l'injection acceptée est notée
  *      dans la même transaction : deux workers ne peuvent pas dépasser le plafond.
@@ -42,6 +45,7 @@ final class PasserelleLocale implements ServeurEnvoi
         private readonly string $espaceDefaut = '',
         private readonly int|\Closure|null $plafondGlobal = null,
         private readonly ?\Closure $contexteCourant = null,
+        private readonly ?GardeChauffe $chauffe = null,
     ) {}
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
@@ -55,11 +59,13 @@ final class PasserelleLocale implements ServeurEnvoi
             throw EnvoiRefuse::autreEspace();
         }
         $jour = $this->jour();
+        // Fournisseur résolu UNE fois, AVANT le verrou (jamais de DNS sous verrou), puis réutilisé par refus() et noter().
+        $fournisseur = $this->chauffe?->preparer($message);
         $plafond = $this->plafond($this->plafondJour);
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
         // Les autres portes, le comptage, l'appel et la note sont sous UN verrou.
-        return $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global): ResultatInjection {
+        return $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur): ResultatInjection {
             if ($this->depot->toutArreter($ws)) {
                 throw EnvoiRefuse::toutArreter();
             }
@@ -74,9 +80,15 @@ final class PasserelleLocale implements ServeurEnvoi
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
 
+            // Chauffe et freins (lot L7) : pause ou quota => report, aucune connexion.
+            if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur) !== null) {
+                return ResultatInjection::reporte($jour->modify('+1 day'));
+            }
+
             $resultat = $this->serveur->injecter($message);
             if ($resultat->accepte) {
                 $this->depot->noterInjection($ws, $jour, $message->cleIdempotence);
+                $this->chauffe?->noter($message, $jour, $fournisseur);
             }
 
             return $resultat;
@@ -114,7 +126,17 @@ final class PasserelleLocale implements ServeurEnvoi
 
     public function sante(): SanteServeur
     {
-        return $this->reel() ? $this->serveur->sante() : new SanteServeur(false, 'envoi réel inactif');
+        if (! $this->reel()) {
+            return new SanteServeur(false, 'envoi réel inactif');
+        }
+        // Homme mort (INF-025, plan 26) : le battement n'est noté que si le serveur répond OK ;
+        // 15 minutes sans battement OK = pause de toutes les files (dans la fenêtre d'envoi, la seule où l'on envoie).
+        $sante = $this->serveur->sante();
+        if ($sante->ok) {
+            $this->chauffe?->battre($this->instant());
+        }
+
+        return $sante;
     }
 
     public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements
@@ -135,6 +157,11 @@ final class PasserelleLocale implements ServeurEnvoi
         }
 
         return $n;
+    }
+
+    private function instant(): DateTimeImmutable
+    {
+        return $this->maintenant === null ? now()->toDateTimeImmutable() : DateTimeImmutable::createFromInterface(($this->maintenant)());
     }
 
     private function jour(): DateTimeImmutable

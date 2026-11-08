@@ -315,5 +315,7 @@ out="$(perim main hors.txt)"; rc=$?
 nochk "M-N1 lancer-tests.sh n'a plus de garde de perimetre inline" grep -q 'git -C "\$D" diff --name-only' "$T/lancer-tests.sh"
 # K5 : DKIM cote serveur (cle generee dans un dossier temporaire).
 chk "K5: tests DKIM serveur" bash "$D/dkim/tests-dkim.sh"
+# K16 : reconstruction du serveur (refus sans marqueurs remplaces, a blanc, idempotence, shellcheck).
+chk "K16: tests de la reconstruction" bash "$D/reconstruction/tests-reconstruction.sh"
 echo "--- $n verifications, $([[ $ko = 0 ]] && echo VERT || echo ROUGE)"
 exit "$ko"

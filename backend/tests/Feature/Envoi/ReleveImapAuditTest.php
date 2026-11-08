@@ -6,6 +6,7 @@
  * Horloge figée, UTC.
  */
 
+use App\Console\Commands\CrmCampagneRetours;
 use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\Classificateur;
@@ -27,9 +28,12 @@ use App\Envoi\Imap\ReleveIncomplete;
 use App\Envoi\Imap\RetourDetecte;
 use App\Envoi\Retours\AppliquerRetour;
 use App\Support\ListeSuppression;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -493,5 +497,55 @@ test('RÉSERVE L6 : un rebond mou déjà appliqué par le CRM n\'est pas recompt
     $crm->recevoir($this->ws, $retour);
     $crm->recevoir($this->ws, $retour);   // relecture après échec des freins : même clé
     $cle = 'soft_bounce:business:' . ListeSuppression::empreinte('mou@zz-client.example.invalid');
+    expect((int) cache()->get($cle))->toBe(1);
+});
+
+/** Cache dont `forget` ne fait RIEN : un processus tué ne nettoie pas ses marques. */
+function auditCacheSansNettoyage(): object
+{
+    return new class(Cache::getFacadeRoot())
+    {
+        public function __construct(private readonly object $reel) {}
+
+        public function forget(string $cle): bool
+        {
+            return true;
+        }
+
+        /** @param array<int, mixed> $args */
+        public function __call(string $m, array $args): mixed
+        {
+            return $this->reel->{$m}(...$args);
+        }
+    };
+}
+
+test('RÉSERVE D1b : tué entre la marque et le comptage, le rebond mou reste RÉCUPÉRABLE (marque courte), puis il est compté une seule fois', function () {
+    $retour = new RetourDetecte(ClasseRetour::RebondMou, (string) Str::uuid(), 'tue@zz-client.example.invalid', null, hash('sha256', 'mid:tue-1'));
+    $cle = 'soft_bounce:business:' . ListeSuppression::empreinte('tue@zz-client.example.invalid');
+
+    // Le processus meurt PENDANT crm:campagne:retours (rien n'a été compté) et n'exécute aucun nettoyage.
+    Artisan::command('crm:campagne:retours {file}', function () {
+        throw new Error('processus tué (simulation)');
+    });
+    $reel = Cache::getFacadeRoot();
+    Cache::swap(auditCacheSansNettoyage());
+    try {
+        (new RecepteurRetoursCrm)->recevoir($this->ws, $retour);
+    } catch (Throwable) {
+    }
+    Cache::swap($reel);
+    expect((int) cache()->get($cle))->toBe(0);
+    // Tout de suite après : le traitement « en cours » n'est PAS rendu pour fait (la relève réessaie, elle ne perd pas le rebond).
+    expect(fn () => (new RecepteurRetoursCrm)->recevoir($this->ws, $retour))->toThrow(RuntimeException::class);
+
+    // Redémarrage 30 minutes plus tard : la relève relit le message ; la vraie commande doit pouvoir le compter.
+    $plus = new DateTimeImmutable('2026-12-06 10:30:00', new DateTimeZone('UTC'));
+    CarbonImmutable::setTestNow($plus);
+    Carbon::setTestNow($plus);
+    app('Illuminate\Contracts\Console\Kernel')->registerCommand(app(CrmCampagneRetours::class));
+    $crm = new RecepteurRetoursCrm;
+    $crm->recevoir($this->ws, $retour);
+    $crm->recevoir($this->ws, $retour);   // relecture suivante : déjà compté, marque définitive
     expect((int) cache()->get($cle))->toBe(1);
 });

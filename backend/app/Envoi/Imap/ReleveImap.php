@@ -221,17 +221,17 @@ final class ReleveImap
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => $origine !== null, 'enErreur' => false];
     }
 
+    /** @return list<string> */
+    private function domainesDEnvoi(string $workspaceId): array
+    {
+        return array_values(DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->pluck('nom')->map(fn ($n): string => (string) $n)->all());
+    }
+
     /**
      * Événement « à rattacher » SANS aucun effet (message écarté, illisible ou arrêt inapplicable).
      *
      * @return array{insere: bool, classe: string, rattache: bool, enErreur: bool}
      */
-    /** @return list<string> */
-    private function domainesDEnvoi(string $workspaceId): array
-    {
-        return DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->pluck('nom')->map(fn ($n): string => (string) $n)->all();
-    }
-
     private function noterSansEffet(string $workspaceId, string $boite, int $validite, MessageBrut $m): array
     {
         $classe = $m->ecarte !== null ? ClasseRetour::ReponseHumaine : Classificateur::classer($m, $this->domainesDEnvoi($workspaceId));

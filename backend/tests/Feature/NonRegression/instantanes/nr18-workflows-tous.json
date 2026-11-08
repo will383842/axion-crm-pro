@@ -34,6 +34,7 @@
     "serveur-envoi-injection.yml",
     "serveur-envoi-loghook.yml",
     "serveur-envoi-shaping.yml",
+    "serveur-envoi-socle.yml",
     "surveillance-canaux.yml",
     "surveillance-sauvegarde.yml",
     "vendor-cloud.yml"

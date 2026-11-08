@@ -1,0 +1,30 @@
+-- ESQUISSE POUR K6b. MODELE, sans valeur reelle, NON EXECUTE, non testee.
+-- Relais appele depuis le gestionnaire smtp_server_message_received de K4a : il ne porte aucune logique.
+-- Le socle (service Python local) DECIDE seulement (250 / 451 / 550) ; KumoMTA depose SEUL.
+-- Transport : socket Unix 0660 (jamais un port reseau). Socle injoignable ou reponse illisible => 451 (ferme).
+local kumo = require 'kumo'
+local SOCLE_SOCKET = '/run/axion-socle/socle.sock' -- a renseigner a l'installation (K6b)
+
+kumo.on('smtp_server_message_received', function(msg)
+  local ok, reponse = pcall(function()
+    -- appeler_socle (K6b) : envoie workspace_id, jeton, destinataire ET contenu (msg:get_data()) au socle LOCAL.
+    -- Le socle en calcule une empreinte HMAC (meme jeton, autre contenu => 550) et ne le stocke JAMAIS.
+    return appeler_socle(SOCLE_SOCKET, msg:get_meta('workspace_id'), msg:get_meta('jeton'), msg:recipient(),
+      msg:get_data())
+  end)
+  if not ok or reponse == nil then
+    kumo.reject(451, '4.3.0 socle indisponible, report') -- ferme par defaut
+  end
+  if reponse.code ~= 250 then
+    -- inclut le rejeu AMBIGU (code 451, reponse.rejeu == 'reserve-ancien', reponse.deposer == nil) : RIEN n'est depose.
+    -- K7 tranche (Socle.trancher) ; le client rejoue ensuite le meme jeton.
+    kumo.reject(reponse.code, reponse.texte)
+  end
+  -- CONTRAT : reponse.deposer == false (ou reponse.rejoue == true) => repondre 250 au client SANS mettre en file. Le message
+  -- est jete (file nulle), rien n'est depose, aucune place de plafond. Seul reponse.deposer == true depose normalement.
+  if reponse.rejoue or reponse.deposer ~= true then
+    msg:set_meta('queue', 'null')
+    return
+  end
+  msg:set_meta('id_message_socle', reponse.id) -- le log hook K7 confirmera ce jeton a la RECEPTION par KumoMTA
+end)

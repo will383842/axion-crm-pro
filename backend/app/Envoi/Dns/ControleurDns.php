@@ -61,7 +61,8 @@ final class ControleurDns
         $r['helo_est_un_nom'] = $ok(true); // garanti par ConfigurationDomaine
         $r['ptr_existe'] = $ok($ptr !== []);
         $r['ptr_egal_helo'] = $ok(in_array($c->helo, $ptr, true));
-        $r['helo_a_vers_ip'] = $ok(in_array($c->ip, $this->dns->a($c->helo), true));
+        $v6 = filter_var($c->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        $r['helo_a_vers_ip'] = $ok(in_array($c->ip, $v6 ? $this->dns->aaaa($c->helo) : $this->dns->a($c->helo), true));
 
         // MTA-STS (testing) et TLS-RPT : recommandés, non bloquants
         $r['mta_sts_enregistrement'] = $ok($this->enregistrements('_mta-sts.' . $c->domaine, 'v=STSv1') !== [], 'avert');
@@ -118,6 +119,20 @@ final class ControleurDns
             if (preg_match('/^(include:|a$|a:|a\/|mx$|mx:|mx\/|ptr|exists:|redirect=)/', ltrim($m, '+-~?')) === 1) {
                 $lookups++;
             }
+            if (str_starts_with($m, 'redirect=') && $profondeur < self::LIMITE_SPF) {
+                // redirect= REMPLACE la politique (RFC 7208 §6.1) : ses mécanismes, y compris son « all », sont repris.
+                $cible = substr($m, 9);
+                if (! isset($vus[$cible]) && $lookups <= self::LIMITE_SPF + 1) {
+                    $vus[$cible] = true;
+                    foreach ($this->enregistrements($cible, 'v=spf1') as $sous) {
+                        foreach ($this->mecanismesSpf($sous, $lookups, $profondeur + 1, $vus) as $x) {
+                            $sortie[] = $x;
+                        }
+                    }
+                }
+
+                continue;
+            }
             if (str_starts_with($m, 'include:') && $profondeur < self::LIMITE_SPF) {
                 $cible = substr($m, 8);
                 if (! isset($vus[$cible]) && $lookups <= self::LIMITE_SPF + 1) {
@@ -142,18 +157,27 @@ final class ControleurDns
     /** @param list<string> $mots */
     private function spfAutorise(array $mots, string $ip): bool
     {
-        $adresse = ip2long($ip);
+        $adresse = inet_pton($ip);
+        if ($adresse === false) {
+            return false;
+        }
+        $v6 = strlen($adresse) === 16;
         foreach ($mots as $m) {
-            if (preg_match('#^\+?ip4:([0-9.]+)(?:/(\d{1,2}))?$#', $m, $x) !== 1) {
+            if (preg_match($v6 ? '#^\+?ip6:([0-9a-f:.]+)(?:/(\d{1,3}))?$#' : '#^\+?ip4:([0-9.]+)(?:/(\d{1,2}))?$#', $m, $x) !== 1) {
                 continue;
             }
-            $reseau = ip2long($x[1]);
-            $bits = isset($x[2]) ? (int) $x[2] : 32;
-            if ($reseau === false || $adresse === false || $bits > 32) {
+            $reseau = inet_pton($x[1]);
+            $max = $v6 ? 128 : 32;
+            $bits = isset($x[2]) ? (int) $x[2] : $max;
+            if ($reseau === false || strlen($reseau) !== strlen($adresse) || $bits > $max) {
                 continue;
             }
-            $masque = $bits === 0 ? 0 : (-1 << (32 - $bits)) & 0xFFFFFFFF;
-            if ((($adresse & $masque) === ($reseau & $masque))) {
+            $complet = intdiv($bits, 8);
+            $reste = $bits % 8;
+            if (substr($adresse, 0, $complet) !== substr($reseau, 0, $complet)) {
+                continue;
+            }
+            if ($reste === 0 || ((ord($adresse[$complet]) ^ ord($reseau[$complet])) & (0xFF << (8 - $reste) & 0xFF)) === 0) {
                 return true;
             }
         }

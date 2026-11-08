@@ -26,7 +26,12 @@ use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\SurveillanceListes;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
+use App\Envoi\Serveur\ClientServeurEnvoiHmac;
+use App\Envoi\Serveur\Contrat\CommandeurServeur;
+use App\Envoi\Serveur\Contrat\TireurEvenements;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Envoi\Smtp\ResolveurDns;
+use App\Envoi\Smtp\ResolveurHote;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Event;
@@ -38,6 +43,12 @@ class EnvoiServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(DepotSocle::class, DepotSocleDb::class);
+        // K1 — client signé HMAC : tirage par curseur et commandes (interfaces NOUVELLES ;
+        // `ServeurEnvoi` n'a reçu aucune méthode).
+        $this->app->bind(ResolveurHote::class, ResolveurDns::class);
+        $this->app->bind(ClientServeurEnvoiHmac::class);
+        $this->app->bind(TireurEvenements::class, ClientServeurEnvoiHmac::class);
+        $this->app->bind(CommandeurServeur::class, ClientServeurEnvoiHmac::class);
         $this->app->singleton(DepotChauffe::class);
         $this->app->singleton(ResolveurFournisseur::class, ResolveurMx::class);
         $this->app->singleton(AppliquerRetour::class, fn ($app) => new CompteurRetours($app->make(DepotChauffe::class), $app->make(ResolveurFournisseur::class)));

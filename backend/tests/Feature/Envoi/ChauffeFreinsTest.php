@@ -314,8 +314,8 @@ test('résolveur MX : lecture MX → famille, cache en table (un seul appel DNS)
         ->and($r->fournisseurDe('a@panne.fr'))->toBe(Fournisseur::INCONNU)
         ->and($r->fournisseurDe('a@panne.fr'))->toBe(Fournisseur::INCONNU)
         ->and($appels)->toBe(5)                                       // l'échec n'est PAS mis en cache
-        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'google-hote.fr')->value('fournisseur'))->toBe('gmail')
-        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'panne.fr')->exists())->toBeFalse();
+        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'sans-espace|google-hote.fr')->value('fournisseur'))->toBe('gmail')
+        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'sans-espace|panne.fr')->exists())->toBeFalse();
     // un nouveau résolveur relit la table, sans DNS
     $appels = 0;
     expect((new ResolveurMx(function () use (&$appels): array {
@@ -898,7 +898,7 @@ test('MAJEUR 2 : un fournisseur INCONNU (échec DNS) est bloqué par toute pause
     expect($p->injecter(messageChauffe($ws, 'x@panne.fr'))->accepte)->toBeFalse()          // inconnu : peut être gmail => bloqué
         ->and($p->injecter(messageChauffe($ws, 'x@outlook.com'))->accepte)->toBeTrue()    // microsoft connu : non visé par la pause gmail
         ->and($faux->appels)->toBe(2)
-        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'panne.fr')->exists())->toBeFalse();
+        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'sans-espace|panne.fr')->exists())->toBeFalse();
     expect(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('fournisseur')->unique()->sort()->values()->all())->toBe(['autre', 'microsoft']);   // jamais « inconnu » en base
 });
 
@@ -909,7 +909,7 @@ test('MAJEUR 2 : le fournisseur est résolu UNE fois par injection (avant le ver
     {
         public function __construct(private int &$appels) {}
 
-        public function fournisseurDe(string $adresse): string
+        public function fournisseurDe(string $adresse, ?string $workspaceId = null): string
         {
             $this->appels++;
 
@@ -1273,4 +1273,54 @@ test('fenêtre d’envoi : l’horloge de l’appli figée HORS fenêtre (Paris)
     Carbon::setTestNow(Carbon::parse('2026-11-10 11:00:00', 'UTC'));
     $serveur->sante();
     expect($serveur->injecter(messageChauffe($ws, 'x@societe.fr'))->accepte)->toBeTrue()->and($faux->appels)->toBe(1);
+});
+
+// ── Réserves « mineurs » (durcissement) ──────────────────────────────────────
+
+test('RÉSERVE 1 : un seuil NaN (ou infini) est refusé par l’appli ET par la base ; resserre() l’ignore', function () {
+    $ws = espaceChauffe();
+    expect(fn () => app(DepotChauffe::class)->fixerSeuil($ws, 'rebonds_durs_taux_max', NAN, 'test'))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => app(DepotChauffe::class)->fixerSeuil($ws, 'rebonds_durs_taux_max', INF, 'test'))->toThrow(InvalidArgumentException::class)
+        ->and(Seuils::resserre('rebonds_durs_taux_max', 0.02, NAN))->toBe(0.02);
+    DB::statement("SELECT set_config('app.current_workspace_id', ?, true)", [$ws]);
+    foreach (['NaN', 'Infinity', '-Infinity'] as $v) {
+        expect(sqlRefuse("INSERT INTO envoi_seuils (workspace_id, nom, valeur, auteur) VALUES ('$ws', 'rebonds_durs_taux_max', '$v', 'x')"))->toContain('envoi_seuils');
+    }
+});
+
+test('RÉSERVE 2 : le cache MX est cloisonné par espace (un espace ne lit pas le fournisseur résolu par un autre)', function () {
+    $a = espaceChauffe();
+    $b = espaceChauffe();
+    $appels = 0;
+    $r = new ResolveurMx(function () use (&$appels): array {
+        $appels++;
+
+        return ['mx.cloison.example.test'];
+    });
+    expect($r->fournisseurDe('x@cloison.example.test', $a))->toBe('autre')
+        ->and($r->fournisseurDe('y@cloison.example.test', $a))->toBe('autre')
+        ->and($appels)->toBe(1)
+        ->and($r->fournisseurDe('z@cloison.example.test', $b))->toBe('autre')
+        ->and($appels)->toBe(2);   // l'espace B ne réutilise pas la ligne de A
+});
+
+test('RÉSERVE 3 : app.maintenant n’est posé que par l’environnement de test (hors test : horloge de la base)', function () {
+    $depot = app(DepotChauffe::class);
+    $ws = espaceChauffe();
+    $env = app()['env'];
+    try {
+        app()['env'] = 'production';
+        DB::select("SELECT set_config('app.maintenant', '2000-01-01 00:00:00+00', true)");   // posé « à la main » par une session
+        $depot->ouvrirPause($ws, DecisionFrein::INDESIRABLE_TEMOIN, null, paris('2026-11-10 10:00:00'));
+        $depot->noterBattement(paris('2026-11-10 10:00:00'));
+        expect(DB::scalar("SELECT current_setting('app.maintenant', true)"))->toBe('');
+    } finally {
+        app()['env'] = $env;
+    }
+});
+
+test('RÉSERVE 4 : envoi:temoin-indesirable transmet --auteur au journal (plus « freins » par défaut)', function () {
+    $ws = espaceChauffe();
+    Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr', '--auteur' => 'marie']);
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->value('auteur'))->toBe('marie');
 });

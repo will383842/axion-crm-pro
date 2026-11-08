@@ -3,6 +3,7 @@
 namespace App\Envoi\Imap;
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -54,8 +55,17 @@ final class RecepteurRetoursCrm implements RecepteurRetours
             ], JSON_THROW_ON_ERROR) . "\n";
         }
 
+        // Le compteur de rebonds mous du CRM vit en cache, hors transaction : si un récepteur suivant échoue, la
+        // relève relit le message ; sans cette marque (clé stable du message) le rebond serait recompté.
+        $marque = $type === 'rebond_mou' ? 'envoi:rebond_mou_applique:' . $retour->cle : null;
+        if ($marque !== null && ! Cache::add($marque, 1, now()->addDays(30))) {
+            return;
+        }
+
         $fichier = tempnam(sys_get_temp_dir(), 'imap-retour-');
         if ($fichier === false) {
+            $marque !== null && Cache::forget($marque);
+
             throw new RuntimeException('Fichier temporaire impossible.');
         }
         try {
@@ -64,12 +74,18 @@ final class RecepteurRetoursCrm implements RecepteurRetours
                 throw new RuntimeException('Écriture du fichier temporaire impossible.');
             }
             $code = Artisan::call('crm:campagne:retours', ['file' => $fichier]);
+        } catch (\Throwable $e) {
+            $marque !== null && Cache::forget($marque); // rien n'a été compté : le message pourra l'être
+
+            throw $e;
         } finally {
             if (is_file($fichier)) {
                 unlink($fichier);
             }
         }
         if ($code !== 0) {
+            $marque !== null && Cache::forget($marque);
+
             throw new RuntimeException('Arrêt non appliqué : crm:campagne:retours a échoué.');
         }
     }

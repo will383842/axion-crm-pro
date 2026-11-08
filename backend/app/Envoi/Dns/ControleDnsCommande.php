@@ -7,6 +7,7 @@ use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /** Contrôle DNS quotidien de tous les domaines d'envoi. Lit le DNS, écrit des ajouts, n'envoie rien. */
 final class ControleDnsCommande extends Command
@@ -29,7 +30,12 @@ final class ControleDnsCommande extends Command
             $config,
             fn () => DB::table('workspaces')->whereNull('deleted_at')->pluck('id'),
             fn (string $ws) => WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->pluck('nom')->all()),
-            fn (string $m) => $this->warn($m),
+            function (string $m): void {
+                $this->warn($m);
+                if (str_starts_with($m, 'ALERTE')) {
+                    Log::alert('envoi:controle-dns : ' . $m);
+                }
+            },
             fn (string $m) => $this->line($m),
         );
 

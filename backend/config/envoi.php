@@ -27,6 +27,27 @@ return [
     'desinscription_validite_jours' => (int) env('ENVOI_DESINSCRIPTION_VALIDITE_JOURS', 730),
     // Adresse de contact générique affichée sur la page de refus d'un lien expiré (facultative).
     'contact_desinscription' => (string) env('ENVOI_CONTACT_DESINSCRIPTION', ''),
+    // K1 — serveur d'envoi (ADR K0 D3/D7). TOUT vient de l'environnement ; jamais de fichier ni de secret dans le
+    // dépôt. L'adresse n'est PAS lue en base. Appels réels bloqués tant que `reel_actif` est faux.
+    // Interrupteur PROPRE à K1 (faux par défaut), en plus de `reel_actif` : les deux doivent être vrais.
+    'k1_actif' => filter_var(env('ENVOI_K1_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
+    'serveur' => [
+        // Une source n'a AUCUN repli global : URL et secret PROPRES à chaque source, sinon refus.
+        'urls' => (array) json_decode((string) env('ENVOI_SERVEUR_URLS', '{}'), true),      // {"source":"https://…"}
+        'secrets' => (array) json_decode((string) env('ENVOI_SERVEUR_SECRETS', '{}'), true), // {"source":"secret"}
+        'cle_id' => (string) env('ENVOI_SERVEUR_CLE_ID', '1'),              // identifiant « k= » par défaut (pas un secret)
+        'cles' => (array) json_decode((string) env('ENVOI_SERVEUR_CLE_IDS', '{}'), true),
+        // TLS mutuel + AC privée : OBLIGATOIRES dès que `reel_actif` est vrai (refus sinon, aucun repli public).
+        'ca_path' => (string) env('ENVOI_SERVEUR_CA_PATH', ''),             // AC privée épinglée (chemin)
+        'client_cert_path' => (string) env('ENVOI_SERVEUR_CLIENT_CERT_PATH', ''),
+        'client_key_path' => (string) env('ENVOI_SERVEUR_CLIENT_KEY_PATH', ''),
+        'empreinte_cle' => (string) env('ENVOI_SERVEUR_EMPREINTE_CLE', ''),  // optionnel : « sha256//base64= » (épinglage)
+        // Délais bornés à [1, 30] s par le client (jamais 0 = infini).
+        'connect_timeout' => (int) env('ENVOI_SERVEUR_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('ENVOI_SERVEUR_TIMEOUT', 10),
+        // Dérogation de TEST (valeur littérale, honorée SEULEMENT sous APP_ENV=testing).
+        'tolere_transaction_englobante' => false,
+    ],
     // Délai (minutes) avant nouvelle tentative après une réponse SMTP 4xx.
     'smtp_delai_4xx_minutes' => (int) env('ENVOI_SMTP_DELAI_4XX_MINUTES', 15),
     // Dérogations de TEST uniquement. Valeurs littérales (jamais lues dans l'environnement) et, de

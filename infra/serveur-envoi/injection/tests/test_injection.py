@@ -206,6 +206,22 @@ class TestEntetesFrom(Base):
         r = self.deposer("From: a@envoi.example.test\r\nFrom: x@principal.example.test")
         self.assertTrue(r.startswith("550")); self.assertEqual(self.file.depots, [])
 
+    def test_message_deja_signe_dkim_refuse(self):
+        # ADR-K0 D3.3 : second verrou, le serveur signe seul ; un message portant deja une
+        # DKIM-Signature (mauvais reglage du CRM) est refuse en 5xx, rien n'est mis en file.
+        for ent in ("DKIM-Signature: v=1; a=rsa-sha256; d=envoi.example.test; s=x; b=AAAA",
+                    "dkim-signature : v=1; d=autre.example.test; b=AAAA",
+                    "DKIM-SIGNATURE:\r\n v=1; d=envoi.example.test; b=AAAA"):
+            self.file.depots.clear()
+            r = self.deposer("From: a@envoi.example.test\r\n" + ent)
+            self.assertTrue(r.startswith("550"), ent)
+            self.assertIn("DKIM", r)
+            self.assertEqual(self.file.depots, [], ent)
+
+    def test_message_non_signe_accepte(self):
+        r = self.deposer("From: a@envoi.example.test\r\nX-Dkim-Signature-Note: ok")
+        self.assertTrue(r.startswith("250"), r)
+
     def test_from_replie_refuse(self):
         r = self.deposer('From: "Nom"\r\n <x@principal.example.test>')
         self.assertTrue(r.startswith("550")); self.assertEqual(self.file.depots, [])
@@ -379,6 +395,216 @@ class TestSocketDurci(unittest.TestCase):
             self.assertLess(maxi, 0.15, "boucle asyncio bloquée par PBKDF2")
             w.close(); srv.close()
         asyncio.run(run())
+
+
+class TestSuiteK4(Base):
+    """Lot K4 suite : correctifs de l'audit (tests écrits avant les correctifs)."""
+
+    def deposer(self, tete):
+        self.auth()
+        return self.envoyer(corps=tete + "\r\n\r\nm\r\n")[-1]
+
+    def test_file_de_production_refuse_toujours_en_451(self):
+        from axion_injection import serveur
+        from axion_injection.file_kumo import ErreurFile
+        f = serveur.file_production()
+        self.assertNotIsInstance(f, FausseFile)
+        with self.assertRaises(ErreurFile):
+            f.deposer("ws1", "a@envoi.example.test", "d@dest.example.test", b"x")
+        s = Session(cfg(), f, IP_OK); s.accueil(); s.tls_etabli()
+        s.ligne(("AUTH PLAIN " + plain("", "alice") + "\r\n").encode())
+        for c in ("MAIL FROM:<a@envoi.example.test>", "RCPT TO:<d@dest.example.test>", "DATA"):
+            s.ligne(c.encode() + b"\r\n")
+        self.assertTrue(s.ligne(b".\r\n")[0][0].startswith("451"))
+
+    def test_principal_n_utilise_pas_la_fausse_file(self):
+        import inspect
+        from axion_injection import serveur
+        self.assertNotIn("FausseFile", inspect.getsource(serveur))
+
+    def test_getaddresses_sans_strict_message_refuse(self):
+        import axion_injection.session as sess
+        orig = sess.getaddresses
+        sess.getaddresses = lambda valeurs: [("", "a@envoi.example.test")]   # ancien Python : pas de strict
+        try:
+            self.assertIsNone(sess.adresses("a@envoi.example.test"))
+            r = self.deposer("From: a@envoi.example.test")
+            with self.assertRaises(RuntimeError):
+                sess.verifier_python()
+        finally:
+            sess.getaddresses = orig
+        self.assertTrue(r.startswith("550"))
+        self.assertEqual(self.file.depots, [])
+
+    def test_demarrage_refuse_sans_strict(self):
+        import axion_injection.session as sess
+        orig = sess.getaddresses
+        sess.getaddresses = lambda valeurs: []
+        try:
+            with self.assertRaises(RuntimeError):
+                asyncio.run(demarrer(cfg(ip_ecoute="127.0.0.1", port=0), self.file))
+        finally:
+            sess.getaddresses = orig
+
+    def test_deuxieme_mail_from_refuse_503(self):
+        self.auth()
+        self.assertTrue(self.cmd("MAIL FROM:<a@envoi.example.test>")[0].startswith("250"))
+        self.cmd("RCPT TO:<d@dest.example.test>")
+        self.assertTrue(self.cmd("MAIL FROM:<a@envoi.example.test>")[0].startswith("503"))
+        self.cmd("RSET")
+        self.assertTrue(self.cmd("MAIL FROM:<a@envoi.example.test>")[0].startswith("250"))
+
+    def test_resent_sender_reply_to_hors_registre_refuses(self):
+        for h in ("Resent-From: b@autre.example.test", "Resent-Sender: b@autre.example.test",
+                  "Sender: b@autre.example.test", "Reply-To: b@autre.example.test",
+                  "Reply-To: x@dest.example.test", "Resent-From: x@principal.example.test"):
+            self.setUp()
+            r = self.deposer("From: a@envoi.example.test\r\n" + h)
+            self.assertTrue(r.startswith("550"), h)
+            self.assertEqual(self.file.depots, [], h)
+
+    def test_resent_sender_reply_to_du_registre_acceptes(self):
+        r = self.deposer("From: a@envoi.example.test\r\nSender: a@envoi.example.test\r\n"
+                         "Reply-To: a@envoi.example.test\r\nResent-From: a@envoi.example.test")
+        self.assertTrue(r.startswith("250"))
+
+    def test_reseaux_couvrant_tout_refuses(self):
+        for lst in (["0.0.0.0/1", "128.0.0.0/1"], ["::/1", "8000::/1"],
+                    ["0.0.0.0/2", "64.0.0.0/2", "128.0.0.0/1"]):
+            with self.assertRaises(ValueError, msg=str(lst)):
+                cfg(ips_autorisees=lst)
+        cfg(ips_autorisees=["0.0.0.0/1"])      # une moitie seule reste permise
+
+    def test_auth_en_deux_temps(self):
+        self.tls()
+        self.assertEqual(self.cmd("AUTH PLAIN"), ["334 "])
+        self.assertTrue(self.s.ligne((plain("", "alice") + "\r\n").encode())[0][0].startswith("235"))
+        self.assertEqual(self.s.authc, "alice")
+
+    def test_auth_en_deux_temps_mauvais_mdp(self):
+        self.tls()
+        self.cmd("AUTH PLAIN")
+        self.assertTrue(self.s.ligne((plain("", "alice", "faux") + "\r\n").encode())[0][0].startswith("535"))
+        self.assertIsNone(self.s.authc)
+
+
+@unittest.skipUnless(shutil.which("openssl"), "openssl absent")
+class TestSocketSuiteK4(unittest.TestCase):
+    serveur = TestSocketDurci.serveur
+
+    async def ouvrir(self, port, tls=True):
+        r, w = await asyncio.open_connection("127.0.0.1", port)
+        await r.readline()
+        if tls:
+            w.write(b"STARTTLS\r\n"); await w.drain(); await r.readline()
+            ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+            await w.start_tls(ctx)
+        return r, w
+
+    def test_auth_en_deux_temps_sur_vraie_connexion(self):
+        async def run():
+            srv, port = await self.serveur()
+            r, w = await self.ouvrir(port)
+            w.write(b"AUTH PLAIN\r\n"); await w.drain()
+            self.assertEqual(await asyncio.wait_for(r.readline(), 5), b"334 \r\n")
+            w.write(plain("", "alice").encode() + b"\r\n"); await w.drain()
+            self.assertTrue((await asyncio.wait_for(r.readline(), 5)).startswith(b"235"))
+            w.close(); srv.close()
+        asyncio.run(run())
+
+    def test_delai_du_limiteur_sur_vraie_connexion(self):
+        async def run():
+            srv, port = await self.serveur()
+            r, w = await self.ouvrir(port)
+            loop = asyncio.get_running_loop()
+            t0 = loop.time()
+            durees = []
+            for _ in range(2):
+                t = loop.time()
+                w.write(b"AUTH PLAIN " + plain("", "alice", "faux").encode() + b"\r\n"); await w.drain()
+                self.assertTrue((await asyncio.wait_for(r.readline(), 5)).startswith(b"535"))
+                durees.append(loop.time() - t)
+            self.assertGreaterEqual(durees[0], 0.045)       # 0,05 s au 1er echec
+            self.assertGreaterEqual(durees[1], 0.095)       # 0,1 s au 2e echec
+            w.close(); srv.close()
+        asyncio.run(run())
+
+    def test_100_connexions_3_essais_bloquees_avant_10_verifications(self):
+        import axion_injection.session as sess
+        appels = []
+        orig = sess.verifier
+        sess.verifier = lambda m, e: (appels.append(1), orig(m, e))[1]
+        self.addCleanup(setattr, sess, "verifier", orig)
+
+        async def client(port, refus):
+            try:
+                r, w = await self.ouvrir(port)
+                for _ in range(3):
+                    w.write(b"AUTH PLAIN " + plain("", "alice", "faux").encode() + b"\r\n"); await w.drain()
+                    ligne = await asyncio.wait_for(r.readline(), 60)
+                    if ligne.startswith(b"535"):
+                        refus.append(1)
+                    if not ligne or ligne.startswith(b"421"):
+                        break
+                w.close()
+            except (ConnectionError, ssl.SSLError):
+                pass
+
+        async def run():
+            srv, port = await self.serveur(max_connexions=200)
+            refus = []
+            await asyncio.gather(*[client(port, refus) for _ in range(100)])
+            srv.close()
+            return refus
+        refus = asyncio.run(run())
+        self.assertLessEqual(len(appels), 10, "PBKDF2 execute %d fois" % len(appels))
+        self.assertLessEqual(len(refus), 10)
+        self.assertGreaterEqual(len(appels), 1)
+
+    def test_place_liberee_apres_fermeture(self):
+        async def run():
+            srv, port = await self.serveur(max_connexions=1)
+            r1, w1 = await asyncio.open_connection("127.0.0.1", port); await r1.readline()
+            r2, w2 = await asyncio.open_connection("127.0.0.1", port)
+            self.assertTrue((await asyncio.wait_for(r2.readline(), 5)).startswith(b"421"))
+            w1.close()
+            for _ in range(50):
+                r3, w3 = await asyncio.open_connection("127.0.0.1", port)
+                if (await asyncio.wait_for(r3.readline(), 5)).startswith(b"220"):
+                    w3.close(); srv.close(); return
+                w3.close(); await asyncio.sleep(0.1)
+            self.fail("place non liberee")
+        asyncio.run(run())
+
+    def test_drain_bloque_ne_retient_pas_la_connexion(self):
+        from axion_injection.serveur import _client
+        class W:
+            def write(self, b): pass
+            async def drain(self): await asyncio.Event().wait()
+            def close(self): self.ferme = True
+            def get_extra_info(self, k): return ("192.0.2.10", 1)
+        async def run():
+            etat = {"n": 0}
+            c = cfg(delai_ecriture=0.2)
+            await asyncio.wait_for(_client(c, FausseFile(), None, None, etat, type("R", (), {"_buffer": b""})(), W()), 3)
+            return etat["n"]
+        self.assertEqual(asyncio.run(run()), 0)
+
+    def test_compteur_decremente_si_accueil_leve(self):
+        from axion_injection.serveur import _client
+        class W:
+            def write(self, b): pass
+            async def drain(self): pass
+            def close(self): pass
+            def get_extra_info(self, k): return ("192.0.2.10", 1)
+        class L:
+            def bloque(self, ip): raise RuntimeError("panne")
+        async def run():
+            etat = {"n": 0}
+            with self.assertRaises(RuntimeError):
+                await _client(cfg(), FausseFile(), None, L(), etat, type("R", (), {"_buffer": b""})(), W())
+            return etat["n"]
+        self.assertEqual(asyncio.run(run()), 0)
 
 
 if __name__ == "__main__":

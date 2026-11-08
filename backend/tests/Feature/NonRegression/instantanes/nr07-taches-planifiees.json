@@ -220,6 +220,16 @@
         "sauts": 1
     },
     {
+        "tache": "envoi:rejouer-commandes",
+        "horaire": "*/5 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 10,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 1
+    },
+    {
         "tache": "envoi:relancer-effets-opposition",
         "horaire": "* * * * *",
         "fuseau": "Europe/Paris",

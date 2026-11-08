@@ -58,5 +58,19 @@ Au premier démarrage : `docker inspect --format '{{.HostConfig.CapDrop}}' <cont
 ## Changer l'image
 Relever la nouvelle empreinte `sha256:`, la remplacer dans `docker-compose.yml`, relancer `tests/lancer-tests.sh`, PR, puis `installer.sh --oui`.
 
+## DKIM (K5) : clés, groupe, rotation
+
+Le serveur signe seul (`kumomta/dkim.lua`, chargé par `init.lua`) ; le CRM ne détient aucune clé privée. Sans clé lisible, le message est refusé en 451 (jamais envoyé non signé). Un message injecté qui porte déjà une `DKIM-Signature` est refusé en 550 par l'écouteur d'injection.
+
+- **Préparer** : `install -d -m 0755 /etc/axion-envoi` (l'installeur le fait). Créer un groupe dédié de GID `10025` (le même que `group_add` dans `docker-compose.yml`) : `groupadd -g 10025 axion-dkim`.
+- **Créer** : `dkim/generer-dkim.sh --domaine D --selecteur S --secours S2 --groupe axion-dkim`. Clés `0640 root:axion-dkim`, dossiers `0750` ; sans `--groupe` : `0600` / `0700`. Les TXT publics (noms absolus, point final) sont affichés ; publier les DEUX avant d'envoyer.
+- **Dossier** : le script ne change les droits QUE de ce qu'il crée. Un `--repertoire` existant doit être vide ou déjà géré par le script (marqueur `.axion-dkim`), sinon refus. Un nom de dossier commençant par « - » s'écrit `./-nom`.
+- **Rotation** : `dkim/generer-dkim.sh --rotation --domaine D --secours NOUVEAU [--groupe axion-dkim]`. En rotation, le mode et le groupe sont repris du dossier existant (jamais `0600 root` par défaut) ; un `--groupe` incohérent avec le dossier est refusé. Le secours déjà publié devient principal, UN nouveau secours est généré (publier son TXT), le principal actuel n'est pas régénéré. L'ancienne clé principale reste sur disque : la supprimer à la main après expiration du TTL DNS.
+- **Concurrence / panne** : création de dossier atomique (un seul lancement gagne), écriture sans écrasement (`noclobber`), en cas d'échec tout ce que le lancement a créé est retiré (aucune clé ni fichier temporaire, y compris `.principal.nouveau` / `.secours.nouveau`).
+- **Banc** : l'accepteur de la liste `h=` répétée (sur-signature de From, Subject, List-Unsubscribe) dépend de la version de KumoMTA : à vérifier au banc avec un vérificateur DKIM indépendant avant tout envoi.
+- **I1 (banc)** : vérifier au banc que `kumod` lit bien une clé depuis le conteneur (`docker compose exec kumod head -c1 /etc/axion-envoi/dkim/D/S.pem`). `group_add` peut être perdu si l'image change d'utilisateur ou de GID.
+- **I3 (banc)** : la sur-signature KumoMTA (liste `h=` répétée) est à valider au banc avec un vérificateur DKIM indépendant, version de KumoMTA figée.
+- **M3 (lots K4)** : tout lot K4 qui touche `smtp_server_message_received` / `http_message_generated` doit se greffer sur `kumomta/dkim.lua` (pas de second handler concurrent qui court-circuiterait la signature).
+
 ## Hors périmètre K3 (restant)
 Passerelle HTTPS HMAC elle-même (écoute 443) et son **AC privée** (autorité de certification interne qui signe le certificat de la passerelle et que le CRM épingle : non livrée ici), injection CRM→KumoMTA, DKIM/SPF/DMARC, réputation et chauffe de l'IP, supervision.

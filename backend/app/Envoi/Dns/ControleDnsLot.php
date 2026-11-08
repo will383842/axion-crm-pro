@@ -33,7 +33,14 @@ final class ControleDnsLot
     public function executer(): int
     {
         $echecs = 0;
-        foreach (($this->espaces)() as $ws) {
+        try {
+            $espaces = [...($this->espaces)()];
+        } catch (Throwable) {
+            ($this->avertir)('ALERTE : lecture de la liste des espaces impossible : aucun domaine contrôlé');
+
+            return 1;
+        }
+        foreach ($espaces as $ws) {
             $ws = (string) $ws;
             try {
                 $noms = [...($this->domainesDe)($ws)];
@@ -46,14 +53,16 @@ final class ControleDnsLot
             foreach ($noms as $nom) {
                 $p = $this->config[(string) $nom] ?? null;
                 if ($p === null) {
-                    ($this->avertir)('domaine sans configuration DNS : ignoré');
+                    $echecs++; // un domaine d'envoi non contrôlé n'est pas « tout va bien »
+                    ($this->avertir)('domaine sans configuration DNS : non contrôlé');
 
                     continue;
                 }
                 try {
                     $c = new ConfigurationDomaine((string) $nom, (string) ($p['selecteur'] ?? ''), (string) ($p['helo'] ?? ''), (string) ($p['ip'] ?? ''));
                 } catch (InvalidArgumentException) {
-                    ($this->avertir)('configuration DNS invalide : ignorée');
+                    $echecs++;
+                    ($this->avertir)('configuration DNS invalide : non contrôlé');
 
                     continue;
                 }

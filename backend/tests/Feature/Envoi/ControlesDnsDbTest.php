@@ -98,11 +98,12 @@ test('la commande : DMARC absent => pause journalisée', function () {
     expect($n)->toBe(1);
 });
 
-test('la commande ignore un domaine sans configuration DNS et ne plante pas', function () {
+test('la commande ne plante pas sur un domaine sans configuration DNS, le compte en échec (code 1) et ne contrôle rien', function () {
     $ws = espaceDns();
     domaineDns($ws, 'inconnu.example.test');
     config(['envoi.dns.domaines' => []]);
     $this->app->instance(ResolveurDns::class, new FauxResolveurDns);
 
-    expect(Artisan::call('envoi:controle-dns'))->toBe(0);
+    expect(Artisan::call('envoi:controle-dns'))->toBe(1)
+        ->and(DB::table('envoi_controles_dns')->count())->toBe(0);
 });

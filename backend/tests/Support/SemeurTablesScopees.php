@@ -176,6 +176,8 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
+        // 2026-11-11 (envoi K1a) : serveurs d'envoi (le commande_id vit dans envoi_journal_commandes).
+        'envoi_serveurs',
         // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace. Chauffe et pauses :
         // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
         'envoi_chauffe_jours',
@@ -713,6 +715,10 @@ final class SemeurTablesScopees
         $inserer('envoi_temoins', [
             'empreinte' => hash('sha256', 'zz-' . $marque),
             'libelle' => 'zz',
+        ]);
+        $inserer('envoi_serveurs', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'url_base' => 'https://zz.test.invalid',
         ]);
 
         $inserer('envoi_chauffe_jours', [

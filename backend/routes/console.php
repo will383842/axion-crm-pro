@@ -10,6 +10,7 @@ use App\Console\Commands\CrmSondeNonDiffusibles;
 use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\CrmUsinePousserAgregats;
 use App\Console\Commands\EnvoiListesNoiresControler;
+use App\Console\Commands\EnvoiRejouerCommandes;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
@@ -217,6 +218,10 @@ Schedule::command(CrmSondeNonDiffusibles::SIGNATURE_PLANIFIEE)
     });
 
 Schedule::command('rgpd:anonymize-ips')->dailyAt('04:30');
+
+// Envoi K1 : rejeu des commandes non acquittées (idempotent par commande_id ; sans effet tant que
+// ENVOI_REEL_ACTIF et ENVOI_K1_ACTIF ne sont pas vrais).
+Schedule::command(EnvoiRejouerCommandes::SIGNATURE_PLANIFIEE)->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
 
 // Relecture R7 (PR #255) : un effacement dont la preuve différée n'a pas
 // conclu en 24 h est SIGNALÉ (journal `error`), pas seulement affiché.

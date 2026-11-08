@@ -10,6 +10,7 @@ use App\Envoi\Message\ControleurContenu;
 use App\Envoi\Message\DemandeMessage;
 use App\Envoi\Message\DkimSigneur;
 use App\Envoi\Message\MessageRefuse;
+use App\Envoi\Message\SignatureDkim;
 
 function l2Demande(array $o = []): DemandeMessage
 {
@@ -57,7 +58,7 @@ function l2Analyse(string $msg): array
 
 function l2Composeur(?DkimSigneur $d = null): ComposeurMessage
 {
-    return new ComposeurMessage('exemple-envoi.test', $d);
+    return new ComposeurMessage('exemple-envoi.test', $d, signeDkim: $d === null ? SignatureDkim::Serveur : SignatureDkim::Crm);
 }
 
 it('pose Message-ID unique sous le domaine d\'envoi', function () {
@@ -309,7 +310,7 @@ it('le contrôleur refuse une pièce jointe vue dans le MIME brut', function () 
 // ---- DKIM ---------------------------------------------------------------------------
 
 it('la liste des en-têtes signés DKIM est exactement la liste exigée', function () {
-    expect(DkimSigneur::ENTETES_SIGNES)->toBe(['From', 'To', 'Subject', 'Date', 'Message-ID', 'MIME-Version',
+    expect(DkimSigneur::ENTETES_SIGNES)->toBe(['From', 'Reply-To', 'To', 'Subject', 'Date', 'Message-ID', 'MIME-Version',
         'Content-Type', 'List-Unsubscribe', 'List-Unsubscribe-Post']);
 });
 
@@ -326,7 +327,7 @@ it('signe en DKIM avec le sélecteur dédié et la signature se vérifie', funct
 
     expect($tags['d'])->toBe('exemple-envoi.test')->and($tags['s'])->toBe('crm1')
         ->and($tags['a'])->toBe('rsa-sha256')->and($tags['c'])->toBe('relaxed/relaxed')
-        ->and(explode(':', $tags['h']))->toBe(array_map('strtolower', DkimSigneur::ENTETES_SIGNES));
+        ->and(explode(':', $tags['h']))->toBe(array_map('strtolower', [...DkimSigneur::ENTETES_SIGNES, ...DkimSigneur::ENTETES_SURSIGNES]));
 
     // body hash
     $bodyHash = base64_encode(hash('sha256', DkimSigneur::canonCorps($corps), true));
@@ -339,7 +340,12 @@ it('signe en DKIM avec le sélecteur dédié et la signature se vérifie', funct
         $lignes[strtolower($n)] = DkimSigneur::canonEntete($n, $v);
     }
     $aVerifier = '';
+    $vus = [];
     foreach ($tags['h'] ? explode(':', $tags['h']) : [] as $n) {
+        if (isset($vus[$n])) {
+            continue;   // sur-signature (RFC 6376 § 5.4.2) : 2e occurrence absente du message = vide
+        }
+        $vus[$n] = true;
         $aVerifier .= $lignes[$n] . "\r\n";
     }
     $sansB = preg_replace('/\bb=[^;]*$/', 'b=', preg_replace('/\s+/', ' ', 'DKIM-Signature: ' . $dkim));
@@ -357,7 +363,7 @@ it('DKIM : vérification indépendante sur message figé (canonisation écrite �
     $pem = l2CleTest();
     $pub = openssl_pkey_get_details(openssl_pkey_get_private($pem))['key'];
     $entetes = [
-        'From' => 'A <contact@exemple-envoi.test>', 'To' => 'cible@exemple.test', 'Subject' => 'Sujet  de   test',
+        'From' => 'A <contact@exemple-envoi.test>', 'Reply-To' => 'r@exemple-envoi.test', 'To' => 'cible@exemple.test', 'Subject' => 'Sujet  de   test',
         'Date' => 'Mon, 02 Nov 2026 10:00:00 +0000', 'Message-ID' => '<fixe@exemple-envoi.test>', 'MIME-Version' => '1.0',
         'Content-Type' => 'text/plain; charset=UTF-8', 'List-Unsubscribe' => '<https://exemple-envoi.test/u>',
         'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
@@ -373,7 +379,7 @@ it('DKIM : vérification indépendante sur message figé (canonisation écrite �
     expect($bh[1])->toBe('igz4sVfZ9caY86e4xaF+p7WfJZNye3GseYFQ/wC1vaU=');
     preg_match('/ b=(.*)$/', $unfold, $b);
     $sansB = substr($unfold, strlen('DKIM-Signature: '), -strlen($b[1]));
-    $attendu = "from:A <contact@exemple-envoi.test>\r\nto:cible@exemple.test\r\nsubject:Sujet de test\r\n"
+    $attendu = "from:A <contact@exemple-envoi.test>\r\nreply-to:r@exemple-envoi.test\r\nto:cible@exemple.test\r\nsubject:Sujet de test\r\n"
         . "date:Mon, 02 Nov 2026 10:00:00 +0000\r\nmessage-id:<fixe@exemple-envoi.test>\r\nmime-version:1.0\r\n"
         . "content-type:text/plain; charset=UTF-8\r\nlist-unsubscribe:<https://exemple-envoi.test/u>\r\n"
         . "list-unsubscribe-post:List-Unsubscribe=One-Click\r\ndkim-signature:" . preg_replace('/\s+/', ' ', trim($sansB));
@@ -386,7 +392,7 @@ it('DKIM : refuse un d= différent du domaine d\'envoi du message', function () 
 })->throws(InvalidArgumentException::class);
 
 it('DKIM : le signeur refuse un From d\'un autre domaine', function () {
-    $e = ['From' => 'A <x@autre.test>', 'To' => 'a@b.test', 'Subject' => 's', 'Date' => 'd', 'Message-ID' => '<m@exemple-envoi.test>',
+    $e = ['From' => 'A <x@autre.test>', 'Reply-To' => 'r@b.test', 'To' => 'a@b.test', 'Subject' => 's', 'Date' => 'd', 'Message-ID' => '<m@exemple-envoi.test>',
         'MIME-Version' => '1.0', 'Content-Type' => 'text/plain', 'List-Unsubscribe' => '<https://x.test>', 'List-Unsubscribe-Post' => 'x'];
     (new DkimSigneur('exemple-envoi.test', 'crm1', l2CleTest()))->signer($e, "a\r\n");
 })->throws(InvalidArgumentException::class);

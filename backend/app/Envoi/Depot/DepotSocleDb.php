@@ -75,11 +75,8 @@ final class DepotSocleDb implements DepotSocle
             [$workspaceId, $jour->format('Y-m-d'), $cleIdempotence],
         ));
         if ($insere > 0) {
-            DB::statement(
-                'INSERT INTO envoi_compteur_global (jour, n) VALUES (?, 1)
-                 ON CONFLICT (jour) DO UPDATE SET n = envoi_compteur_global.n + 1',
-                [$jour->format('Y-m-d')],
-            );
+            // Seule voie d'écriture du compteur : le rôle applicatif n'a ni INSERT ni UPDATE direct.
+            DB::select('SELECT envoi_compteur_global_incrementer(?::date)', [$jour->format('Y-m-d')]);
         }
     }
 
@@ -88,18 +85,11 @@ final class DepotSocleDb implements DepotSocle
         // UNE transaction, journal d'abord : si le journal échoue, le mode reste allumé.
         DB::transaction(function () use ($workspaceId, $auteur): void {
             $this->journaliser($workspaceId, 'temoins_off', $auteur);
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId): void {
-                // Autorisation locale à la transaction, lue par le trigger envoi_drapeaux_garde.
-                DB::select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
-                DB::statement(
-                    'INSERT INTO envoi_drapeaux (workspace_id, mode_temoins) VALUES (?, false)
-                     ON CONFLICT (workspace_id) DO UPDATE SET mode_temoins = false, mis_a_jour_le = now()',
-                    [$workspaceId],
-                );
-                // Autorisation retirée dès l'écriture faite : si cette transaction est elle-même
-                // imbriquée (SAVEPOINT, tests), le réglage local survivrait sinon au « commit ».
-                DB::select("SELECT set_config('app.envoi_ecriture_gardee', '', true)");
-            });
+            $this->ecrireDrapeaux($workspaceId, true, fn () => DB::statement(
+                'INSERT INTO envoi_drapeaux (workspace_id, mode_temoins) VALUES (?, false)
+                 ON CONFLICT (workspace_id) DO UPDATE SET mode_temoins = false, mis_a_jour_le = now()',
+                [$workspaceId],
+            ));
         });
     }
 
@@ -107,13 +97,11 @@ final class DepotSocleDb implements DepotSocle
     {
         DB::transaction(function () use ($workspaceId, $auteur): void {
             $this->journaliser($workspaceId, 'tout_arreter', $auteur);
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId): void {
-                DB::statement(
-                    'INSERT INTO envoi_drapeaux (workspace_id, tout_arreter) VALUES (?, true)
-                     ON CONFLICT (workspace_id) DO UPDATE SET tout_arreter = true, mis_a_jour_le = now()',
-                    [$workspaceId],
-                );
-            });
+            $this->ecrireDrapeaux($workspaceId, false, fn () => DB::statement(
+                'INSERT INTO envoi_drapeaux (workspace_id, tout_arreter) VALUES (?, true)
+                 ON CONFLICT (workspace_id) DO UPDATE SET tout_arreter = true, mis_a_jour_le = now()',
+                [$workspaceId],
+            ));
         });
     }
 
@@ -124,12 +112,30 @@ final class DepotSocleDb implements DepotSocle
                 return false;
             }
             $this->journaliser($workspaceId, 'reprise', $auteur);
-            WorkspaceContext::run($workspaceId, function () use ($workspaceId): void {
-                DB::table('envoi_drapeaux')->where('workspace_id', $workspaceId)->update(['tout_arreter' => false, 'mis_a_jour_le' => now()]);
-            });
+            $this->ecrireDrapeaux($workspaceId, true, fn () => DB::table('envoi_drapeaux')->where('workspace_id', $workspaceId)->update(['tout_arreter' => false, 'mis_a_jour_le' => now()]));
 
             return true;
         });
+    }
+
+    /**
+     * Écrit `envoi_drapeaux` dans un SAVEPOINT. Si l'écriture échoue, le retour au savepoint garde la
+     * transaction saine : sans lui, le nettoyage du contexte lèverait 25P02 et masquerait l'erreur
+     * réelle. L'autorisation locale (lue par le trigger, qui exige en plus la ligne de journal) est
+     * posée dans le savepoint et retirée dès l'écriture faite ; en cas d'échec le retour au savepoint
+     * la retire aussi (pas de try/finally : sur transaction avortée, il lèverait 25P02).
+     */
+    private function ecrireDrapeaux(string $workspaceId, bool $gardee, Closure $ecriture): void
+    {
+        WorkspaceContext::run($workspaceId, fn () => DB::transaction(function () use ($gardee, $ecriture): void {
+            if ($gardee) {
+                DB::select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
+            }
+            $ecriture();
+            if ($gardee) {
+                DB::select("SELECT set_config('app.envoi_ecriture_gardee', '', true)");
+            }
+        }));
     }
 
     public function journaliser(string $workspaceId, string $commande, string $auteur, array $details = [], ?DateTimeImmutable $jour = null): void

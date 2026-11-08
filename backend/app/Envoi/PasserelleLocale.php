@@ -161,7 +161,7 @@ final class PasserelleLocale implements ServeurEnvoi
 
     private function instant(): DateTimeImmutable
     {
-        return $this->maintenant === null ? new DateTimeImmutable : DateTimeImmutable::createFromInterface(($this->maintenant)());
+        return $this->maintenant === null ? now()->toDateTimeImmutable() : DateTimeImmutable::createFromInterface(($this->maintenant)());
     }
 
     private function jour(): DateTimeImmutable

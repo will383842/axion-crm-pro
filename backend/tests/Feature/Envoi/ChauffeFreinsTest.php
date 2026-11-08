@@ -11,8 +11,13 @@ use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Chauffe\ResolveurMx;
 use App\Envoi\Chauffe\Seuils;
+use App\Envoi\Contrat\EtatMessage;
+use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\EvenementEnvoi;
+use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\ResultatInjection;
+use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
@@ -22,9 +27,9 @@ use App\Envoi\Retours\AppliquerRetour;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,11 +39,17 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // Horloge de l'appli figée en UTC DANS la fenêtre d'envoi (12:00 Paris) : les tests ne dépendent jamais de l'heure réelle.
+    Carbon::setTestNow(Carbon::parse('2026-11-10 11:00:00', 'UTC'));
     config(['envoi.cle_empreinte' => 'cle-de-test-seulement']);
     // AUCUN réseau en test : le résolveur de fournisseur est un faux en mémoire.
     app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire([
         'gmail.com' => 'gmail', 'outlook.com' => 'microsoft', 'outlook.fr' => 'microsoft', 'pro-google.fr' => 'gmail',
     ]));
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 function paris(string $quand): DateTimeImmutable
@@ -381,6 +392,7 @@ test('chauffe en base : l’adresse expéditeur est normalisée (casse, espaces)
         ->and(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('boite')->unique()->values()->all())->toBe([boiteChauffe($ws, 'boite1@example.test')]);
 });
 
+// Un domaine d'envoi distinct par étape (quota du domaine = commun à toutes ses boîtes) : on mesure ici le frein humain seul.
 test('frein humain en base : 10 réponses = normal, 14 = quota réduit de moitié, 15 = pause', function () {
     $ws = espaceChauffe();
     $depot = app(DepotSocle::class);
@@ -398,16 +410,16 @@ test('frein humain en base : 10 réponses = normal, 14 = quota réduit de moiti�
     foreach (range(1, 10) as $_) {
         $depot->journaliser($ws, 'reponse_recue', 'test');
     }
-    expect($envoyer('b-10@example.test'))->toBe(10);       // 10 : plein quota (10)
+    expect($envoyer('b@etape-10.example.test'))->toBe(10);       // 10 : plein quota (10)
     foreach (range(1, 4) as $_) {
         $depot->journaliser($ws, 'reponse_recue', 'test');
     }
     expect(app(DepotChauffe::class)->reponsesEnAttente($ws))->toBe(14)
-        ->and($envoyer('b-14@example.test'))->toBe(5);     // 14 : floor(10 × 0,5)
+        ->and($envoyer('b@etape-14.example.test'))->toBe(5);     // 14 : floor(10 × 0,5)
     $depot->journaliser($ws, 'reponse_recue', 'test');
-    expect($envoyer('b-15@example.test'))->toBe(0);        // 15 : pause
+    expect($envoyer('b@etape-15.example.test'))->toBe(0);        // 15 : pause
     $depot->journaliser($ws, 'reponse_traitee', 'test');
-    expect($envoyer('b-1415@example.test'))->toBe(5);      // retombé à 14 : ralenti, plus en pause
+    expect($envoyer('b@etape-1415.example.test'))->toBe(5);      // retombé à 14 : ralenti, plus en pause
 });
 
 // ── B6 : homme mort (INF-025) ────────────────────────────────────────────────
@@ -722,7 +734,7 @@ test('envoi:reprendre n’est exposé par AUCUNE route (commande locale seulemen
 test('envoi:lever-pause : la levée et son journal sont dans UNE transaction (journal en échec = pause toujours active)', function () {
     $ws = espaceChauffe();
     app(GardeChauffe::class)->indesirableChezTemoin($ws, 'temoin@gmail.com');
-    $maintenant = new DateTimeImmutable('now');
+    $maintenant = now()->toDateTimeImmutable();
     $pause = app(DepotChauffe::class)->pausesActives($ws, $maintenant)[0];
     // Le journal refuse désormais d'écrire « pause_levee » (trigger posé dans la transaction du test).
     DB::unprepared("CREATE OR REPLACE FUNCTION test_refuse_levee() RETURNS trigger AS \$f\$ BEGIN
@@ -740,7 +752,7 @@ test('envoi:lever-pause : la levée et son journal sont dans UNE transaction (jo
 test('index unique partiel : une seule pause active par (espace, motif, fournisseur) ; levée, on peut rouvrir', function () {
     $ws = espaceChauffe();
     $ligne = ['workspace_id' => $ws, 'portee' => 'global', 'fournisseur' => null, 'motif' => 'm'];
-    WorkspaceContext::run($ws, function () use ($ligne) {
+    WorkspaceContext::run($ws, function () use ($ws, $ligne) {
         DB::table('envoi_pauses')->insert($ligne);
         expect(fn () => DB::transaction(fn () => DB::table('envoi_pauses')->insert($ligne)))->toThrow(QueryException::class);
         $autre = ['portee' => 'fournisseur', 'fournisseur' => 'gmail'] + $ligne;
@@ -936,7 +948,7 @@ test('MAJEUR 3 : un seul message par jour ne fait pas avancer un jour effectif (
     $v1 = array_fill_keys(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'], 1);
     $v5 = array_fill_keys(array_keys($v1), 5);
     expect(CourbeChauffe::joursEffectifs($v1))->toBe([])
-        ->and(count(CourbeChauffe::joursEffectifs($v5)))->toBe(8)
+        ->and(count(CourbeChauffe::joursEffectifs($v5)))->toBe(5)   // jours 1-5 (P1, minimum 5) ; dès le 6e jour (P2, quota 18) le minimum est 9
         ->and(count(CourbeChauffe::joursEffectifs(['2026-11-01' => 4, '2026-11-02' => 5])))->toBe(1)
         // au palier P2 (quota 18), le minimum monte à 9 : 8 ne suffit plus
         ->and(count(CourbeChauffe::joursEffectifs(array_fill_keys(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'], 5) + ['2026-11-06' => 8, '2026-11-07' => 9])))->toBe(6);
@@ -1026,7 +1038,7 @@ test('MAJEUR 5 : une pause ne se lève QUE par le chemin journalisé ou par expi
     // 4. le chemin journalisé passe ; la levée datée est ensuite définitive
     leverPauseJournalisee($ws, $id, 'will');
     expect(DB::table('envoi_pauses')->where('id', $id)->value('levee_par'))->toBe('will');
-    WorkspaceContext::run($ws, fn () => expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = NULL, levee_par = NULL WHERE id = ?", [$id]))->toContain('définitive'));
+    WorkspaceContext::run($ws, fn () => expect(sqlRefuse('UPDATE envoi_pauses SET levee_le = NULL, levee_par = NULL WHERE id = ?', [$id]))->toContain('définitive'));
     // 5. l'expiration réelle est tracée dans le journal
     $depot->ouvrirPause($ws, 'longue', null, $t0->modify('+49 hours'), 48);
     expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_expiree')->count())->toBe(1);
@@ -1058,6 +1070,7 @@ test('MAJEUR 5 : le battement est borné à l’horloge (jamais dans le futur) e
     $depot->noterBattement(paris('2026-11-10 10:05:00'));
     expect($depot->dernierBattement()?->getTimestamp())->toBe(paris('2026-11-10 10:05:00')->getTimestamp());
     // à la main (sans horloge d'appli) : 2099 est ramené à l'horloge de la base, donc l'homme mort reste armé
+    DB::select("SELECT set_config('app.maintenant', '', true)");   // pas d'horloge d'appli (la transaction du test englobe les précédentes)
     DB::statement("UPDATE envoi_sante_battement SET dernier_le = '2099-01-01 00:00:00+00' WHERE id = 1");
     expect($depot->dernierBattement()->getTimestamp())->toBeLessThanOrEqual(time() + 2)
         ->and(Freins::santeSilencieuse($depot->dernierBattement(), new DateTimeImmutable('2030-01-01')))->toBeTrue();
@@ -1066,8 +1079,9 @@ test('MAJEUR 5 : le battement est borné à l’horloge (jamais dans le futur) e
 test('MAJEUR 5 : le fournisseur résolu d’un domaine ne se « force » pas à autre avant l’expiration du cache', function () {
     DB::statement("INSERT INTO envoi_fournisseur_domaines (domaine, fournisseur, resolu_le) VALUES ('societe-g.fr', 'gmail', now())");
     expect(sqlRefuse("UPDATE envoi_fournisseur_domaines SET fournisseur = 'autre' WHERE domaine = 'societe-g.fr'"))->toContain('expiration du cache');
-    DB::statement("UPDATE envoi_fournisseur_domaines SET resolu_le = now() - interval '8 days' WHERE domaine = 'societe-g.fr'");
-    expect(sqlRefuse("UPDATE envoi_fournisseur_domaines SET fournisseur = 'autre' WHERE domaine = 'societe-g.fr'"))->toBe('');   // cache expiré : re-résolution légitime
+    // cache expiré : le recul de `resolu_le` est interdit par le trigger, on insère donc un domaine déjà ancien
+    DB::statement("INSERT INTO envoi_fournisseur_domaines (domaine, fournisseur, resolu_le) VALUES ('societe-h.fr', 'gmail', now() - interval '8 days')");
+    expect(sqlRefuse("UPDATE envoi_fournisseur_domaines SET fournisseur = 'autre' WHERE domaine = 'societe-h.fr'"))->toBe('');   // cache expiré : re-résolution légitime
 });
 
 test('MAJEUR 5 : aucun DELETE ni TRUNCATE sur les tables d’état de L7, même pour un superutilisateur (triggers)', function () {
@@ -1173,14 +1187,14 @@ test('m6 : le battement n’est noté que si sante() du serveur répond OK', fun
     {
         public bool $ok = false;
 
-        public function injecter(MessageAEnvoyer $message): App\Envoi\Contrat\ResultatInjection
+        public function injecter(MessageAEnvoyer $message): ResultatInjection
         {
-            return App\Envoi\Contrat\ResultatInjection::accepte('id');
+            return ResultatInjection::accepte('id');
         }
 
-        public function etatEnvoi(string $idInjection): App\Envoi\Contrat\EtatMessage
+        public function etatEnvoi(string $idInjection): EtatMessage
         {
-            return App\Envoi\Contrat\EtatMessage::Inconnu;
+            return EtatMessage::Inconnu;
         }
 
         public function pause(): void {}
@@ -1192,19 +1206,19 @@ test('m6 : le battement n’est noté que si sante() du serveur répond OK', fun
             return false;
         }
 
-        public function etat(): App\Envoi\Contrat\EtatServeur
+        public function etat(): EtatServeur
         {
-            return new App\Envoi\Contrat\EtatServeur(false, 0);
+            return new EtatServeur(false, 0);
         }
 
-        public function sante(): App\Envoi\Contrat\SanteServeur
+        public function sante(): SanteServeur
         {
-            return new App\Envoi\Contrat\SanteServeur($this->ok, 'test');
+            return new SanteServeur($this->ok, 'test');
         }
 
-        public function lireEvenements(?string $curseur, int $limite = 100): App\Envoi\Contrat\LotEvenements
+        public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements
         {
-            return new App\Envoi\Contrat\LotEvenements([], $curseur);
+            return new LotEvenements([], $curseur);
         }
     };
     $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
@@ -1216,4 +1230,25 @@ test('m6 : le battement n’est noté que si sante() du serveur répond OK', fun
     $p->sante();
     expect(app(DepotChauffe::class)->dernierBattement()?->getTimestamp())->toBe($maintenant->getTimestamp())
         ->and($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+});
+
+test('fenêtre d’envoi : l’horloge de l’appli figée HORS fenêtre (Paris) reporte l’envoi, figée DEDANS elle l’accepte', function () {
+    config(['envoi.reel_actif' => true, 'envoi.plafond_jour' => 300, 'envoi.plafond_global_jour' => 300]);
+    $ws = espaceChauffe();
+    WorkspaceContext::set($ws);
+    $faux = new FauxServeurEnvoi;
+    app()->instance(FauxServeurEnvoi::class, $faux);
+    $serveur = app(ServeurEnvoi::class);
+
+    // 01:30 UTC = 02:30 Paris, et 18:30 UTC = 19:30 Paris : hors fenêtre [08:00, 19:00[ → report, aucune connexion
+    foreach (['2026-11-10 01:30:00', '2026-11-10 18:30:00'] as $horsFenetre) {
+        Carbon::setTestNow(Carbon::parse($horsFenetre, 'UTC'));
+        $serveur->sante();
+        $r = $serveur->injecter(messageChauffe($ws, 'x@societe.fr'));
+        expect($r->accepte)->toBeFalse()->and($faux->appels)->toBe(0);
+    }
+    // 11:00 UTC = 12:00 Paris : dans la fenêtre → accepté
+    Carbon::setTestNow(Carbon::parse('2026-11-10 11:00:00', 'UTC'));
+    $serveur->sante();
+    expect($serveur->injecter(messageChauffe($ws, 'x@societe.fr'))->accepte)->toBeTrue()->and($faux->appels)->toBe(1);
 });

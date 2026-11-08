@@ -99,8 +99,14 @@ return new class extends Migration
                 ref timestamptz := envoi_l7_horloge();
             BEGIN
                 -- Borné à l'horloge (jamais dans le futur) et monotone ; un ancien battement déjà dans le futur est ramené à l'horloge.
+                -- Monotone : l'ancien battement n'est ramené à l'horloge QUE sans horloge d'appli (UPDATE à la main) ;
+                -- avec l'horloge de l'appli, un instant plus ancien que l'actuel est ignoré (jamais de recul).
                 IF TG_OP = 'UPDATE' THEN
-                    NEW.dernier_le := GREATEST(LEAST(NEW.dernier_le, ref), LEAST(OLD.dernier_le, ref));
+                    IF COALESCE(current_setting('app.maintenant', true), '') = '' THEN
+                        NEW.dernier_le := GREATEST(LEAST(NEW.dernier_le, ref), LEAST(OLD.dernier_le, ref));
+                    ELSE
+                        NEW.dernier_le := GREATEST(LEAST(NEW.dernier_le, ref), OLD.dernier_le);
+                    END IF;
                 ELSE
                     NEW.dernier_le := LEAST(NEW.dernier_le, ref);
                 END IF;

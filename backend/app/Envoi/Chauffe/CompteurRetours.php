@@ -32,7 +32,7 @@ final class CompteurRetours implements AppliquerRetour
         if ($colonne === null) {
             return;
         }
-        $instant = $this->maintenant === null ? new DateTimeImmutable : DateTimeImmutable::createFromInterface(($this->maintenant)());
+        $instant = $this->maintenant === null ? now()->toDateTimeImmutable() : DateTimeImmutable::createFromInterface(($this->maintenant)());
         $this->depot->compterRetour($workspaceId, $evenement->id, $colonne, JourEnvoi::de($instant), $this->resolveur->fournisseurDe($evenement->adresse));
     }
 }

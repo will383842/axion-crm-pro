@@ -120,7 +120,7 @@ final class GardeChauffe
         // Témoin dont le fournisseur est introuvable : on ne peut pas cibler, donc pause GLOBALE (la plus stricte).
         $d = $f === Fournisseur::INCONNU ? new DecisionFrein(DecisionFrein::INDESIRABLE_TEMOIN) : Freins::indesirableTemoin($f);
 
-        return $this->declarer($ws, $d, $maintenant ?? new DateTimeImmutable);
+        return $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable());
     }
 
     /**
@@ -198,7 +198,7 @@ final class GardeChauffe
         if ($manuelle !== null) {
             $details['rouvert_apres_levee_par'] = $manuelle['par'];
         }
-        $this->socle->journaliser($ws, 'pause_auto', 'freins', $details);
+        $this->socle->journaliser($ws, 'pause_auto', 'freins', $details, JourEnvoi::de($maintenant));
         $corps = $d->dureeHeures !== null
             ? "Un frein automatique a mis l’envoi en pause pour {$d->dureeHeures} h (elle expire d’elle-même). Vérifier le tableau de bord."
             : 'Un frein automatique a mis l’envoi en pause. Vérifier le tableau de bord, puis lever la pause par envoi:lever-pause.';

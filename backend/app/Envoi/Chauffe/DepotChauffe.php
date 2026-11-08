@@ -261,9 +261,15 @@ final class DepotChauffe
     /** Lever = dater la levée (la ligne reste). Réservé à la commande humaine, qui l'enveloppe avec son journal. */
     public function leverPause(string $ws, int $id, string $par): bool
     {
-        return WorkspaceContext::run($ws, fn (): bool => DB::table('envoi_pauses')
-            ->where('workspace_id', $ws)->where('id', $id)->whereNull('levee_le')
-            ->update(['levee_le' => now(), 'levee_par' => $par]) > 0);
+        $instant = now();
+
+        return WorkspaceContext::run($ws, fn (): bool => DB::transaction(function () use ($ws, $id, $par, $instant): bool {
+            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant->format('Y-m-d H:i:sP')]); // même horloge que la levée datée
+
+            return DB::table('envoi_pauses')
+                ->where('workspace_id', $ws)->where('id', $id)->whereNull('levee_le')
+                ->update(['levee_le' => $instant, 'levee_par' => $par]) > 0;
+        }));
     }
 
     /** Cette commande a-t-elle déjà été journalisée ce jour-là (dédoublonnage des alertes) ? */

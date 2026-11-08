@@ -496,11 +496,33 @@ function qsApp(): Connection
     return DB::connection('pgsql_app');
 }
 
+/**
+ * Crée un espace de test (commité, hors transaction du test). Si la création lève à mi-chemin, l'espace PARTIEL est
+ * nettoyé avant de relancer l'erreur d'origine (un échec du nettoyage ne la masque pas).
+ *
+ * @param  (Closure(string): void)|null  $apresPremiereFiche  point d'injection de panne (test de la garde de nettoyage)
+ * @return array{id: string, marque: string, devinee: int, fiable: int, tiers: int}
+ */
+function qsEspaceRls(?Closure $apresPremiereFiche = null): array
+{
+    $id = (string) Str::uuid();
+    try {
+        return qsCreerEspaceRls($id, $apresPremiereFiche);
+    } catch (Throwable $e) {
+        try {
+            qsNettoyer(['id' => $id]);
+        } catch (Throwable) {
+            // le nettoyage a échoué à son tour : l'erreur d'origine prime
+        }
+
+        throw $e;
+    }
+}
+
 /** @return array{id: string, marque: string, devinee: int, fiable: int, tiers: int} */
-function qsEspaceRls(): array
+function qsCreerEspaceRls(string $id, ?Closure $apresPremiereFiche): array
 {
     $owner = qsProprio();
-    $id = (string) Str::uuid();
     $marque = substr(str_replace('-', '', $id), 0, 8);
     $owner->table('workspaces')->insert([
         'id' => $id, 'slug' => 'zz-qs-rls-' . $marque, 'name' => 'ZZ QS RLS', 'settings' => '{}',
@@ -515,6 +537,9 @@ function qsEspaceRls(): array
             'email_generic' => $email, 'metadata' => '{}', 'quality_score' => 0, 'prospection_status' => 'ready_for_outreach',
             'signals' => qsSignals($email), 'created_at' => now(), 'updated_at' => now(),
         ]);
+        if ($apresPremiereFiche !== null) {
+            $apresPremiereFiche($id);
+        }
     }
 
     // Une fiche au site fiable, SANS générique, dont la seule personne est
@@ -569,6 +594,33 @@ function qsNettoyerTous(array $espaces): void
     }
 }
 
+/**
+ * Sortie d'un test à espaces commités : exécute CHAQUE étape (même si la précédente lève), puis nettoie TOUJOURS les
+ * espaces. Une panne de sortie n'est relancée (la première) que s'il n'y a pas d'erreur d'origine en vol : elle ne la masque pas.
+ *
+ * @param  list<Closure>  $etapes
+ * @param  list<array{id: string}|null>  $espaces
+ */
+function qsSortie(array $etapes, array $espaces, ?Throwable $origine): void
+{
+    $erreur = null;
+    foreach ($etapes as $etape) {
+        try {
+            $etape();
+        } catch (Throwable $t) {
+            $erreur ??= $t;
+        }
+    }
+    try {
+        qsNettoyerTous($espaces);
+    } catch (Throwable $t) {
+        $erreur ??= $t;
+    }
+    if ($erreur !== null && $origine === null) {
+        throw $erreur;
+    }
+}
+
 const QS_TABLES_PLAN = ['contacts_provenances_tiers', 'contacts', 'companies'];
 
 /** @param  array{id: string}  $e */
@@ -586,7 +638,7 @@ function qsNettoyer(array $e): void
 
 test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
     StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
-        $a = $b = null;
+        $a = $b = $origine = null;
         $precedente = DB::getDefaultConnection();
 
         try {
@@ -633,12 +685,17 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
             // tests précédents d'une même part Pest) : deux coûts presque à égalité
             // basculent d'un run à l'autre. Ils ne sont donc plus comparés.
             $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
-            qsGardePlan($q, $sans);
+            qsGardePlan($q, $sans, false, $a['id']);
+        } catch (Throwable $e) {
+            $origine = $e;
+
+            throw $e;
         } finally {
-            DB::setDefaultConnection($precedente);
-            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-            qsApp()->disconnect();
-            qsNettoyerTous([$a, $b]);
+            qsSortie([
+                static fn () => DB::setDefaultConnection($precedente),
+                static fn () => qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']),
+                static fn () => qsApp()->disconnect(),
+            ], [$a, $b], $origine);
         }
     }, qsProprio());
     qsProprio()->disconnect();
@@ -659,7 +716,7 @@ function qsAccesCompanies(array $lignes): array
 {
     $res = [];
     foreach ($lignes as $i => $l) {
-        if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap) Scan)(?: using (\S+))? on companies\b/', $l, $m) !== 1) {
+        if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap) Scan(?: Backward)?)(?: using (\S+))? on companies\b/', $l, $m) !== 1) {
             continue;
         }
         $col = strpos($l, '->');
@@ -686,12 +743,16 @@ function qsAccesCompanies(array $lignes): array
 
 /**
  * Vrai si une ligne `Index Cond` / `Recheck Cond` du bloc cadre l'accès par
- * `workspace_id`. Une condition contenant `OR`, ou un BitmapOr, ne cadre PAS
- * (une branche peut échapper au cadrage).
+ * `workspace_id` DE LA SESSION. Une condition contenant `OR`, ou un BitmapOr, ne
+ * cadre PAS (une branche peut échapper au cadrage). Le `workspace_id` de l'accès
+ * doit valoir : un paramètre (`$n`), un InitPlan, le réglage de session
+ * (`current_setting`) ou un littéral uuid — ce dernier égal à `$session` s'il est
+ * donné. Une valeur prise dans une autre table ou un alias (`c2.workspace_id`),
+ * ou dans la ligne elle-même, ne cadre rien.
  *
  * @param  array{noeud: string, bloc: list<string>}  $a
  */
-function qsAccesCadre(array $a): bool
+function qsAccesCadre(array $a, ?string $session = null): bool
 {
     $cadre = false;
     foreach ($a['bloc'] as $l) {
@@ -704,7 +765,16 @@ function qsAccesCadre(array $a): bool
         if (preg_match('/\bOR\b/i', $m[1]) === 1) {
             return false;
         }
-        $cadre = $cadre || preg_match('/\bworkspace_id\b/', $m[1]) === 1;
+        // `workspace_id` nu (non qualifié) à gauche d'un « = » ; à droite : la valeur de la session.
+        if (preg_match_all('/(?<![\w.])workspace_id\s*=\s*(\$\d+|\(InitPlan\s+\d+\)\.\w+|\(?current_setting\(|\'([0-9a-fA-F-]{36})\'::uuid)/', $m[1], $c, PREG_SET_ORDER) < 1) {
+            continue;
+        }
+        foreach ($c as $x) {
+            if (isset($x[2]) && $x[2] !== '' && $session !== null && strtolower($x[2]) !== strtolower($session)) {
+                return false;   // un autre espace que celui de la session
+            }
+            $cadre = true;
+        }
     }
 
     return $cadre;
@@ -722,7 +792,7 @@ function qsAccesCadre(array $a): bool
  *    accès par un index sans `workspace_id`, ou un Seq Scan, rougit.
  * Le type de nœud et l'index choisis ne sont PAS comparés (instables, voir plus haut).
  */
-function qsGardePlan($avecCritere, $reference, bool $sansIndex = false): void
+function qsGardePlan($avecCritere, $reference, bool $sansIndex = false, ?string $session = null): void
 {
     $acces = static function ($requete): array {
         $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
@@ -730,7 +800,7 @@ function qsGardePlan($avecCritere, $reference, bool $sansIndex = false): void
         return qsAccesCompanies($lignes);
     };
     $seq = static fn (array $n): int => count(array_filter($n, static fn (array $x): bool => str_starts_with($x['noeud'], 'Seq Scan')));
-    $cadre = 'qsAccesCadre';
+    $cadre = static fn (array $a): bool => qsAccesCadre($a, $session);
 
     // 1. Planificateur libre.
     $avec = $acces($avecCritere);
@@ -765,7 +835,7 @@ function qsGardePlan($avecCritere, $reference, bool $sansIndex = false): void
 
 test('garde négative du plan : un critère factice qui ajoute un accès à companies fait rougir la comparaison', function () {
     StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
-        $a = $b = null;
+        $a = $b = $origine = null;
         $precedente = DB::getDefaultConnection();
 
         try {
@@ -790,14 +860,19 @@ test('garde négative du plan : un critère factice qui ajoute un accès à comp
                 ->whereRaw('EXISTS (SELECT 1 FROM companies AS c2 WHERE c2.id = companies.id)');
 
             // Témoin : la garde accepte la requête identique à elle-même…
-            qsGardePlan($builder->buildPublicQuery($a['id'], $crit), $reference);
+            qsGardePlan($builder->buildPublicQuery($a['id'], $crit), $reference, false, $a['id']);
             // … et rougit dès que le critère ajoute un accès.
-            expect(fn () => qsGardePlan($factice, $reference))->toThrow(ExpectationFailedException::class);
+            expect(fn () => qsGardePlan($factice, $reference, false, $a['id']))->toThrow(ExpectationFailedException::class);
+        } catch (Throwable $e) {
+            $origine = $e;
+
+            throw $e;
         } finally {
-            DB::setDefaultConnection($precedente);
-            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-            qsApp()->disconnect();
-            qsNettoyerTous([$a, $b]);
+            qsSortie([
+                static fn () => DB::setDefaultConnection($precedente),
+                static fn () => qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']),
+                static fn () => qsApp()->disconnect(),
+            ], [$a, $b], $origine);
         }
     }, qsProprio());
     qsProprio()->disconnect();
@@ -805,7 +880,7 @@ test('garde négative du plan : un critère factice qui ajoute un accès à comp
 
 test('garde négative du plan : sans index utilisable, le Seq Scan sans Index Cond sur workspace_id fait rougir la garde', function () {
     StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
-        $a = $b = null;
+        $a = $b = $origine = null;
         $precedente = DB::getDefaultConnection();
 
         try {
@@ -828,14 +903,19 @@ test('garde négative du plan : sans index utilisable, le Seq Scan sans Index Co
             // que le Seq Scan, que seule la branche workspace_id peut refuser.
             $q = $builder->buildPublicQuery($a['id'], $crit);
             $meme = $builder->buildPublicQuery($a['id'], $crit);
-            expect(fn () => qsGardePlan($q, $meme, true))->toThrow(ExpectationFailedException::class, 'sans Index Cond/Recheck Cond sur workspace_id');
+            expect(fn () => qsGardePlan($q, $meme, true, $a['id']))->toThrow(ExpectationFailedException::class, 'sans Index Cond/Recheck Cond sur workspace_id');
             // Témoin : la garde normale accepte ces mêmes requêtes.
-            qsGardePlan($q, $meme);
+            qsGardePlan($q, $meme, false, $a['id']);
+        } catch (Throwable $e) {
+            $origine = $e;
+
+            throw $e;
         } finally {
-            DB::setDefaultConnection($precedente);
-            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-            qsApp()->disconnect();
-            qsNettoyerTous([$a, $b]);
+            qsSortie([
+                static fn () => DB::setDefaultConnection($precedente),
+                static fn () => qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']),
+                static fn () => qsApp()->disconnect(),
+            ], [$a, $b], $origine);
         }
     }, qsProprio());
     qsProprio()->disconnect();
@@ -903,4 +983,95 @@ test('garde du plan (texte) : une sous-requête SubPlan/InitPlan ou une conditio
         '              Index Cond: (workspace_id = $1)',
     ];
     expect(qsAccesCadre(qsAccesCompanies($bitmapAnd)[0]))->toBeTrue();
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// D1b (#468) — durcissement de la garde de plan et du nettoyage
+// ─────────────────────────────────────────────────────────────────────────
+
+test('garde du plan (texte) D1b : « Index Scan Backward using … on companies » est un accès, et il doit être cadré', function () {
+    $sansCadre = [
+        'Index Scan Backward using idx_companies_created_at on companies  (cost=0.14..8.16 rows=1 width=8)',
+        "  Filter: (prospection_status = 'ready_for_outreach'::text)",
+    ];
+    $acces = qsAccesCompanies($sansCadre);
+    expect($acces)->toHaveCount(1)
+        ->and($acces[0]['noeud'])->toStartWith('Index Scan Backward')
+        ->and(qsAccesCadre($acces[0]))->toBeFalse();
+
+    $seulementOrdre = [
+        'Index Only Scan Backward using idx_companies_ws_counts on companies  (cost=0.14..8.16 rows=1 width=8)',
+        '  Index Cond: (workspace_id = $1)',
+    ];
+    $acces = qsAccesCompanies($seulementOrdre);
+    expect($acces)->toHaveCount(1)->and(qsAccesCadre($acces[0]))->toBeTrue();
+});
+
+test('garde du plan (texte) D1b : le workspace_id du cadrage doit être celui de la SESSION, pas une valeur venue d une autre table', function () {
+    $session = '11111111-1111-4111-8111-111111111111';
+    $autre = '22222222-2222-4222-8222-222222222222';
+    $acces = static fn (string $cond): array => qsAccesCompanies([
+        'Index Scan using idx_companies_ws on companies c1  (cost=0.14..8.16 rows=1 width=8)',
+        '  Index Cond: ' . $cond,
+    ])[0];
+
+    // Valeur prise dans une AUTRE table (alias c2) ou dans la ligne elle-même : ce n'est pas le cadrage de la session.
+    expect(qsAccesCadre($acces('(workspace_id = c2.workspace_id)'), $session))->toBeFalse()
+        ->and(qsAccesCadre($acces('(workspace_id = companies.workspace_id)'), $session))->toBeFalse()
+        ->and(qsAccesCadre($acces('(c2.workspace_id = c1.workspace_id)'), $session))->toBeFalse()
+        ->and(qsAccesCadre($acces("(workspace_id = '{$autre}'::uuid)"), $session))->toBeFalse();
+
+    // Témoins : la session (littéral identique, paramètre, réglage de session, InitPlan).
+    expect(qsAccesCadre($acces("(workspace_id = '{$session}'::uuid)"), $session))->toBeTrue()
+        ->and(qsAccesCadre($acces('(workspace_id = $1)'), $session))->toBeTrue()
+        ->and(qsAccesCadre($acces("(workspace_id = (current_setting('app.current_workspace_id'::text, true))::uuid)"), $session))->toBeTrue()
+        ->and(qsAccesCadre($acces('(workspace_id = (InitPlan 1).col1)'), $session))->toBeTrue()
+        ->and(qsAccesCadre($acces('(workspace_id = $0)'), $session))->toBeTrue();
+});
+
+test('nettoyage D1b : si qsEspaceRls lève à mi-création, l espace PARTIEL est nettoyé', function () {
+    $id = null;
+    try {
+        qsEspaceRls(function (string $espace) use (&$id): void {
+            $id = $espace;
+            throw new RuntimeException('panne simulée à mi-création');
+        });
+        $leve = false;
+    } catch (RuntimeException $e) {
+        $leve = $e->getMessage() === 'panne simulée à mi-création';
+    }
+    try {
+        expect($leve)->toBeTrue()
+            ->and($id)->not->toBeNull()
+            ->and(qsProprio()->table('workspaces')->where('id', $id)->count())->toBe(0)
+            ->and(qsProprio()->table('companies')->where('workspace_id', $id)->count())->toBe(0);
+    } finally {
+        $id !== null && qsNettoyer(['id' => $id]);   // jamais de reste dans la base, même si l'attendu échoue
+        qsProprio()->disconnect();
+    }
+});
+
+test('nettoyage D1b : qsSortie nettoie TOUJOURS les espaces, même si une étape lève, sans masquer l erreur d origine', function () {
+    $a = qsEspaceRls();
+    $vivant = static fn (array $e): int => qsProprio()->table('workspaces')->where('id', $e['id'])->count();
+    try {
+        // Sans erreur d'origine : la première panne de sortie est relancée, APRÈS le nettoyage.
+        expect(fn () => qsSortie([static function (): void {
+            throw new RuntimeException('select en panne');
+        }, static function (): void {
+            throw new RuntimeException('disconnect en panne');
+        }], [$a], null))->toThrow(RuntimeException::class, 'select en panne');
+        expect($vivant($a))->toBe(0);
+
+        // Avec une erreur d'origine : la sortie ne la remplace pas (elle ne lève rien).
+        $b = qsEspaceRls();
+        $origine = new LogicException('assertion rouge du test');
+        qsSortie([static function (): void {
+            throw new RuntimeException('select en panne');
+        }], [$b], $origine);
+        expect($vivant($b))->toBe(0);
+    } finally {
+        qsNettoyerTous([$a, $b ?? null]);
+        qsProprio()->disconnect();
+    }
 });

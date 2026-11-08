@@ -94,3 +94,16 @@ test('K12 : la lecture de la liste des espaces est protégée (échec compté + 
 
     expect($lot->executer())->toBe(1)->and($avert)->not->toBeEmpty();
 });
+
+test('D1b : un domaine SANS configuration émet une ALERTE (la commande la passe en Log::alert), sans citer le domaine', function () {
+    $controle = new ControleQuotidien(new FauxResolveurDns, new DepotQuiCasseSurLePremier, new DepotMemoire, fn () => new DateTimeImmutable('2026-11-11 06:00:00'));
+    $avert = [];
+    $lot = new ControleDnsLot($controle, [], fn () => ['ws1'], fn () => ['secret-inconnu.example.test'], function (string $m) use (&$avert) {
+        $avert[] = $m;
+    }, fn () => null);
+
+    expect($lot->executer())->toBe(1)
+        ->and($avert)->toHaveCount(1)
+        ->and($avert[0])->toStartWith('ALERTE')
+        ->and($avert[0])->not->toContain('secret-inconnu');
+});

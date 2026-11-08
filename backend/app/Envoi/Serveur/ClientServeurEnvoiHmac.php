@@ -14,6 +14,7 @@ use DateTimeZone;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -35,13 +36,39 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
 
     private const TYPE_AUTORISE = '/^[a-z][a-z0-9_]{0,63}$/';
 
+    private const EPOQUE = '/^[0-9a-f]{16}$/';
+
     public function __construct(private readonly JournalCommandes $journal, private readonly ResolveurHote $resolveur) {}
 
     public function tirer(string $workspaceId, string $source, ?string $curseur, int $limite, DateTimeImmutable $depuis): LotSuivi
     {
         $limite = max(1, min($limite, self::MAX_EVENEMENTS));
-        $requete = http_build_query(['curseur' => $curseur ?? '', 'depuis' => DateTimeImmutable::createFromInterface($depuis)->setTimezone(new DateTimeZone('UTC'))->format('c'), 'limite' => $limite]);
-        $json = $this->appeler($this->preparer($workspaceId, $source), $workspaceId, 'GET', SignatureEnvoi::CHEMIN_EVENEMENTS, $requete, '');
+        $prep = $this->preparer($workspaceId, $source);
+        // Désynchronisation déjà constatée : AUCUN appel tant qu'un humain n'a pas vérifié (jamais d'oubli silencieux).
+        $etat = $this->etatTirage($workspaceId, $source);
+        if ($etat['bloque']) {
+            throw ServeurEnvoiRefuse::motif('tirage arrêté pour ce serveur (désynchronisation constatée) : intervention humaine requise.');
+        }
+        $parametres = ['curseur' => $curseur ?? '', 'depuis' => DateTimeImmutable::createFromInterface($depuis)->setTimezone(new DateTimeZone('UTC'))->format('c'), 'limite' => $limite];
+        if ($etat['epoque'] !== null) {
+            $parametres['epoque'] = $etat['epoque']; // la passerelle répond 409 si sa base n'est plus la même
+        }
+        $requete = http_build_query($parametres);
+        ['statut' => $statut, 'json' => $json] = $this->appeler($prep, $workspaceId, 'GET', SignatureEnvoi::CHEMIN_EVENEMENTS, $requete, '', [409]);
+        if ($statut === 409) {
+            if (($json['erreur'] ?? null) !== 'curseur_desynchronise') {
+                throw ServeurEnvoiRefuse::motif('réponse en erreur (statut 409).'); // ex. nonce rejoué : pas une dérive de curseur
+            }
+            $this->bloquerTirage($workspaceId, $source, 'la passerelle signale un curseur ou une époque désynchronisé (409)');
+        }
+        $epoque = $json['epoque'] ?? null;
+        if (! is_string($epoque) || preg_match(self::EPOQUE, $epoque) !== 1) {
+            throw ServeurEnvoiRefuse::motif('réponse invalide (époque).');
+        }
+        if ($etat['epoque'] !== null && ! hash_equals($etat['epoque'], $epoque)) {
+            // Base recréée : même si le compteur a rattrapé l'ancien curseur, rien n'est cru ni écrasé en silence.
+            $this->bloquerTirage($workspaceId, $source, 'époque de la passerelle changée (base recréée ?)');
+        }
 
         $brut = $json['evenements'] ?? null;
         if (! is_array($brut) || ! array_is_list($brut) || count($brut) > self::MAX_EVENEMENTS || count($brut) > $limite) {
@@ -65,7 +92,32 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
             throw ServeurEnvoiRefuse::motif('le curseur ne peut pas reculer.');
         }
 
-        return new LotSuivi($evenements, $suivant);
+        if ($etat['epoque'] === null) {
+            WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')->where('workspace_id', $workspaceId)->where('source', $source)
+                ->whereNull('epoque_passerelle')->update(['epoque_passerelle' => $epoque]));
+        }
+
+        return new LotSuivi($evenements, $suivant, $epoque);
+    }
+
+    /** @return array{epoque: ?string, bloque: bool} */
+    private function etatTirage(string $workspaceId, string $source): array
+    {
+        $ligne = WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')->where('workspace_id', $workspaceId)->where('source', $source)->first(['epoque_passerelle', 'tirage_bloque_le']));
+
+        $epoque = $ligne?->epoque_passerelle;
+
+        return ['epoque' => is_string($epoque) ? $epoque : null, 'bloque' => $ligne?->tirage_bloque_le !== null];
+    }
+
+    /** Alerte critique, arrêt du tirage de CE serveur (persistant), puis exception : le lot n'est jamais utilisé. */
+    private function bloquerTirage(string $workspaceId, string $source, string $motif): never
+    {
+        Log::critical('envoi.serveur_desynchronise : tirage arrêté, intervention humaine requise.', ['workspace_id' => $workspaceId, 'source' => $source, 'motif' => $motif]);
+        WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_serveurs')->where('workspace_id', $workspaceId)->where('source', $source)
+            ->update(['tirage_bloque_le' => now(), 'tirage_bloque_motif' => $motif]));
+
+        throw ServeurEnvoiRefuse::motif('désynchronisation constatée : tirage arrêté pour ce serveur.');
     }
 
     public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
@@ -165,9 +217,10 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
 
     /**
      * @param  array{secret: string, cle: string, cible: array{base: string, hote: string, port: int, ip: string}, options: array<string, mixed>}  $prep
-     * @return array<string, mixed>
+     * @param  list<int>  $statutsLus  statuts non 2xx dont le corps SIGNÉ est lu (au lieu d'un refus)
+     * @return array{statut: int, json: array<string, mixed>}
      */
-    private function appeler(array $prep, string $workspaceId, string $methode, string $chemin, string $signe, string $corps): array
+    private function appeler(array $prep, string $workspaceId, string $methode, string $chemin, string $signe, string $corps, array $statutsLus = []): array
     {
         $secret = $prep['secret'];
         $ts = (string) Carbon::now('UTC')->getTimestamp();
@@ -189,13 +242,16 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
             throw ServeurEnvoiRefuse::motif('injoignable ou en échec réseau.');
         }
 
-        return $this->lireReponse($reponse, $secret, $nonce, $workspaceId);
+        return ['statut' => $reponse->status(), 'json' => $this->lireReponse($reponse, $secret, $nonce, $workspaceId, $statutsLus)];
     }
 
-    /** @return array<string, mixed> */
-    private function lireReponse(Response $reponse, #[\SensitiveParameter] string $secret, string $nonce, string $workspaceId): array
+    /**
+     * @param  list<int>  $statutsLus
+     * @return array<string, mixed>
+     */
+    private function lireReponse(Response $reponse, #[\SensitiveParameter] string $secret, string $nonce, string $workspaceId, array $statutsLus = []): array
     {
-        if (! $reponse->successful()) {
+        if (! $reponse->successful() && ! in_array($reponse->status(), $statutsLus, true)) {
             throw ServeurEnvoiRefuse::motif('réponse en erreur (statut ' . $reponse->status() . ').');
         }
         $corps = $reponse->body();

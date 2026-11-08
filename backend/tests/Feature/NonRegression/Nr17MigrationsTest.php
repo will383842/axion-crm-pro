@@ -54,6 +54,9 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_11_000120_envoi_controles_listes.php',
     // Envoi K18 : versions de configuration (empreinte + statut), ajout seul (trigger), down() inerte.
     '2026_11_13_000140_envoi_config_versions.php',
+    // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
+    // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_11_13_000140_envoi_serveurs_epoque.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -104,3 +104,8 @@ c12bf3d32504a8127b359da9e3a4f6e6454160f4:_AUDIT/2026-08-18_AUDIT-360/04_PREUVES/
 # ─────────────────────────────────────────────────────────────────────────────
 e898999a17cfd512aeb81fffc5257856b771087f:backend/tests/Feature/Usine/SignatureAgregatsTest.php:generic-api-key:14
 e898999a17cfd512aeb81fffc5257856b771087f:backend/tests/Feature/Usine/PushAgregatsTest.php:generic-api-key:20
+
+# ─── K9 : constante de test `SECRET_K9` (PR #469) ─────────────────────────────
+# Chaîne factice « secret-de-test-… » (rien de réel). Les commits suivants n'ont plus de littéral à entropie ;
+# seul le commit 1d1c327 de l'historique de la branche le garde.
+1d1c3276ec18914f7af666be173dc861961009ae:backend/tests/Unit/Envoi/Kumo/ServeurEnvoiKumoTest.php:generic-api-key:33

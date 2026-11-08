@@ -545,6 +545,30 @@ function qsEspaceRls(): array
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
 }
 
+/**
+ * Nettoie chaque espace, même si le nettoyage du précédent lève ; la première
+ * erreur est relancée à la fin.
+ *
+ * @param  list<array{id: string}|null>  $espaces
+ */
+function qsNettoyerTous(array $espaces): void
+{
+    $erreur = null;
+    foreach ($espaces as $e) {
+        if ($e === null) {
+            continue;
+        }
+        try {
+            qsNettoyer($e);
+        } catch (Throwable $t) {
+            $erreur ??= $t;
+        }
+    }
+    if ($erreur !== null) {
+        throw $erreur;
+    }
+}
+
 const QS_TABLES_PLAN = ['contacts_provenances_tiers', 'contacts', 'companies'];
 
 /** @param  array{id: string}  $e */
@@ -614,15 +638,77 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
             DB::setDefaultConnection($precedente);
             qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
             qsApp()->disconnect();
-            foreach ([$a, $b] as $e) {
-                if ($e !== null) {
-                    qsNettoyer($e);
-                }
-            }
+            qsNettoyerTous([$a, $b]);
         }
     }, qsProprio());
     qsProprio()->disconnect();
 });
+
+/**
+ * Les accès à `companies` d'un plan EXPLAIN (texte, une ligne par élément).
+ * Chaque accès = [nœud, bloc]. Le bloc ne contient que les conditions du nœud
+ * et de ses enfants d'index bitmap (Bitmap Index Scan, BitmapAnd, BitmapOr). Il
+ * s'arrête à la première ligne `SubPlan` / `InitPlan` (les sous-requêtes
+ * corrélées, ex. sur `contacts`, n'ont pas de flèche mais ne sont pas des
+ * conditions de l'accès) et à toute flèche d'un autre type de nœud.
+ *
+ * @param  list<string>  $lignes
+ * @return list<array{noeud: string, bloc: list<string>}>
+ */
+function qsAccesCompanies(array $lignes): array
+{
+    $res = [];
+    foreach ($lignes as $i => $l) {
+        if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap) Scan)(?: using (\S+))? on companies\b/', $l, $m) !== 1) {
+            continue;
+        }
+        $col = strpos($l, '->');
+        $col = $col === false ? -1 : $col;
+        $bloc = [];
+        for ($j = $i + 1; $j < count($lignes); $j++) {
+            $suivante = $lignes[$j];
+            if (preg_match('/^\s*(?:SubPlan|InitPlan)\b/', $suivante) === 1) {
+                break;
+            }
+            $fleche = strpos($suivante, '->');
+            if ($fleche !== false) {
+                if ($fleche <= $col || preg_match('/->\s+(?:Bitmap Index Scan|BitmapAnd|BitmapOr)\b/', $suivante) !== 1) {
+                    break;
+                }
+            }
+            $bloc[] = $suivante;
+        }
+        $res[] = ['noeud' => $m[1] . ' ' . ($m[2] ?? ''), 'bloc' => $bloc];
+    }
+
+    return $res;
+}
+
+/**
+ * Vrai si une ligne `Index Cond` / `Recheck Cond` du bloc cadre l'accès par
+ * `workspace_id`. Une condition contenant `OR`, ou un BitmapOr, ne cadre PAS
+ * (une branche peut échapper au cadrage).
+ *
+ * @param  array{noeud: string, bloc: list<string>}  $a
+ */
+function qsAccesCadre(array $a): bool
+{
+    $cadre = false;
+    foreach ($a['bloc'] as $l) {
+        if (preg_match('/->\s+BitmapOr\b/', $l) === 1) {
+            return false;
+        }
+        if (preg_match('/(?:Index|Recheck) Cond:(.*)$/', $l, $m) !== 1) {
+            continue;
+        }
+        if (preg_match('/\bOR\b/i', $m[1]) === 1) {
+            return false;
+        }
+        $cadre = $cadre || preg_match('/\bworkspace_id\b/', $m[1]) === 1;
+    }
+
+    return $cadre;
+}
 
 /**
  * Garde du plan : le critère testé n'ajoute aucun accès à `companies`, et
@@ -638,41 +724,13 @@ test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse e
  */
 function qsGardePlan($avecCritere, $reference, bool $sansIndex = false): void
 {
-    // Un accès = [nœud, texte de son sous-plan]. Le sous-plan court jusqu'au
-    // prochain `->` de colonne inférieure ou égale (les conditions d'un nœud et
-    // celles de ses enfants, ex. Bitmap Index Scan sous Bitmap Heap Scan).
     $acces = static function ($requete): array {
         $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
-        $res = [];
-        foreach ($lignes as $i => $l) {
-            if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap) Scan)(?: using (\S+))? on companies\b/', $l, $m) !== 1) {
-                continue;
-            }
-            $col = strpos($l, '->');
-            $col = $col === false ? -1 : $col;
-            $bloc = [];
-            for ($j = $i + 1; $j < count($lignes); $j++) {
-                $fleche = strpos($lignes[$j], '->');
-                if ($fleche !== false && $fleche <= $col) {
-                    break;
-                }
-                $bloc[] = $lignes[$j];
-            }
-            $res[] = ['noeud' => $m[1] . ' ' . ($m[2] ?? ''), 'bloc' => $bloc];
-        }
 
-        return $res;
+        return qsAccesCompanies($lignes);
     };
     $seq = static fn (array $n): int => count(array_filter($n, static fn (array $x): bool => str_starts_with($x['noeud'], 'Seq Scan')));
-    $cadre = static function (array $a): bool {
-        foreach ($a['bloc'] as $l) {
-            if (preg_match('/(?:Index|Recheck) Cond:.*\bworkspace_id\b/', $l) === 1) {
-                return true;
-            }
-        }
-
-        return false;
-    };
+    $cadre = 'qsAccesCadre';
 
     // 1. Planificateur libre.
     $avec = $acces($avecCritere);
@@ -689,6 +747,10 @@ function qsGardePlan($avecCritere, $reference, bool $sansIndex = false): void
         $avec = $acces($avecCritere);
         $ref = $acces($reference);
         expect(count($avec))->toBe(count($ref));
+        if (! $sansIndex) {
+            // `enable_seqscan = off` : aucun Seq Scan ne doit subsister.
+            expect($seq($avec))->toBe(0)->and($seq($ref))->toBe(0);
+        }
         foreach (['avec' => $avec, 'ref' => $ref] as $nom => $liste) {
             foreach ($liste as $a) {
                 Assert::assertTrue($cadre($a), 'accès à companies (' . $nom . ') sans Index Cond/Recheck Cond sur workspace_id : ' . $a['noeud']);
@@ -735,11 +797,7 @@ test('garde négative du plan : un critère factice qui ajoute un accès à comp
             DB::setDefaultConnection($precedente);
             qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
             qsApp()->disconnect();
-            foreach ([$a, $b] as $e) {
-                if ($e !== null) {
-                    qsNettoyer($e);
-                }
-            }
+            qsNettoyerTous([$a, $b]);
         }
     }, qsProprio());
     qsProprio()->disconnect();
@@ -777,12 +835,72 @@ test('garde négative du plan : sans index utilisable, le Seq Scan sans Index Co
             DB::setDefaultConnection($precedente);
             qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
             qsApp()->disconnect();
-            foreach ([$a, $b] as $e) {
-                if ($e !== null) {
-                    qsNettoyer($e);
-                }
-            }
+            qsNettoyerTous([$a, $b]);
         }
     }, qsProprio());
     qsProprio()->disconnect();
+});
+
+test('garde du plan (texte) : une sous-requête SubPlan/InitPlan ou une condition en OR ne cadre pas l accès à companies', function () {
+    // Sous-requête corrélée sur contacts avec Index Cond sur workspace_id,
+    // alors que l'accès à companies (Seq Scan) n'est pas cadré : doit rougir.
+    $sousRequete = [
+        'Seq Scan on companies  (cost=0.00..99.00 rows=1 width=8)',
+        "  Filter: ((prospection_status = 'ready_for_outreach'::text) AND (SubPlan 1))",
+        '  SubPlan 1',
+        '    ->  Index Scan using idx_contacts_ws on contacts  (cost=0.14..8.16 rows=1 width=0)',
+        '          Index Cond: (workspace_id = companies.workspace_id)',
+    ];
+    $acces = qsAccesCompanies($sousRequete);
+    expect($acces)->toHaveCount(1)->and(qsAccesCadre($acces[0]))->toBeFalse();
+
+    // Même chose avec un InitPlan et un Bitmap Heap Scan sur contacts.
+    $initPlan = [
+        'Index Scan using companies_pkey on companies  (cost=0.14..8.16 rows=1 width=8)',
+        '  InitPlan 1 (returns $0)',
+        '    ->  Bitmap Heap Scan on contacts  (cost=4.2..9.0 rows=1 width=0)',
+        '          Recheck Cond: (workspace_id = $1)',
+        '          ->  Bitmap Index Scan on idx_contacts_ws  (cost=0.00..4.2 rows=1 width=0)',
+        '                Index Cond: (workspace_id = $1)',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($initPlan)[0]))->toBeFalse();
+
+    // Condition en OU : une branche échappe à workspace_id.
+    $ou = [
+        'Bitmap Heap Scan on companies  (cost=8.0..12.0 rows=2 width=8)',
+        '  Recheck Cond: ((workspace_id = $1) OR (id = $2))',
+        '  ->  BitmapOr  (cost=8.0..8.0 rows=2 width=0)',
+        '        ->  Bitmap Index Scan on idx_companies_ws  (cost=0.00..4.0 rows=1 width=0)',
+        '              Index Cond: (workspace_id = $1)',
+        '        ->  Bitmap Index Scan on companies_pkey  (cost=0.00..4.0 rows=1 width=0)',
+        '              Index Cond: (id = $2)',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($ou)[0]))->toBeFalse();
+    $ouSeul = [
+        'Index Scan using idx_companies_ws on companies  (cost=0.14..8.16 rows=1 width=8)',
+        '  Index Cond: ((workspace_id = $1) OR (id = $2))',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($ouSeul)[0]))->toBeFalse();
+    $ouRecheck = [
+        'Bitmap Heap Scan on companies  (cost=8.0..12.0 rows=2 width=8)',
+        '  Recheck Cond: ((workspace_id = $1) OR (id = $2))',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($ouRecheck)[0]))->toBeFalse();
+
+    // Témoins : accès réellement cadrés.
+    $cadre = [
+        'Index Scan using idx_companies_ws on companies  (cost=0.14..8.16 rows=1 width=8)',
+        '  Index Cond: (workspace_id = $1)',
+        '  SubPlan 1',
+        '    ->  Seq Scan on contacts',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($cadre)[0]))->toBeTrue();
+    $bitmapAnd = [
+        'Bitmap Heap Scan on companies  (cost=8.0..12.0 rows=2 width=8)',
+        '  Recheck Cond: ((workspace_id = $1) AND (id = $2))',
+        '  ->  BitmapAnd',
+        '        ->  Bitmap Index Scan on idx_companies_ws',
+        '              Index Cond: (workspace_id = $1)',
+    ];
+    expect(qsAccesCadre(qsAccesCompanies($bitmapAnd)[0]))->toBeTrue();
 });

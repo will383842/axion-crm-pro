@@ -8,4 +8,6 @@ enum StatutVersion: string
     case Invalide = 'invalide';
     case RetourArriere = 'retour_arriere';
     case DeriveRefusee = 'derive_refusee';
+    /** Réponse du serveur inconnue (transport, délai) : l'état du serveur est à vérifier à la main. */
+    case Incertaine = 'incertaine';
 }

@@ -16,7 +16,7 @@ return new class extends Migration
                 id           BIGSERIAL   PRIMARY KEY,
                 workspace_id UUID        NOT NULL, -- pas de clé étrangère : l'historique survit à tout
                 empreinte    TEXT        NOT NULL CHECK (empreinte ~ '^[0-9a-f]{64}$'),
-                statut       TEXT        NOT NULL CHECK (statut IN ('appliquee', 'invalide', 'retour_arriere', 'derive_refusee')),
+                statut       TEXT        NOT NULL CHECK (statut IN ('appliquee', 'invalide', 'retour_arriere', 'derive_refusee', 'incertaine')),
                 motif        TEXT        NULL,
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now()
             )

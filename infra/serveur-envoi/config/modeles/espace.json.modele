@@ -1,10 +1,9 @@
 {
   "version": 1,
+  "espace": "<uuid-espace>",
   "domaines": [
     {
       "domaine": "<domaine-1>",
-      "selecteur": "<selecteur-principal>",
-      "cle_publique": "<cle-publique-dkim-base64>",
       "debit_heure": "<debit-par-heure>",
       "plafond_jour": "<plafond-souhaite-par-jour>"
     }

@@ -4,8 +4,8 @@ namespace App\Envoi\Configuration;
 
 final class GenerateurConfiguration
 {
-    public function generer(SourceConfiguration $source): Paquet
+    public function generer(string $workspaceId, SourceConfiguration $source): Paquet
     {
-        return Paquet::depuis($source);
+        return Paquet::pourEspace($workspaceId, $source);
     }
 }

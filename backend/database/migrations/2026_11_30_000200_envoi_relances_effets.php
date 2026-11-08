@@ -53,6 +53,6 @@ return new class extends Migration
     /** Retour arrière INERTE : l'état de relance est conservé. */
     public function down(): void
     {
-        DB::statement("COMMENT ON TABLE envoi_relances_effets IS 'Envoi P0 L5 : table conservee au retour arriere.'");
+        // Volontairement vide.
     }
 };

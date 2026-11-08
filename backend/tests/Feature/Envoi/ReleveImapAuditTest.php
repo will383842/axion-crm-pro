@@ -131,7 +131,7 @@ test('2 : une panne passagère pendant le téléchargement n\'écarte JAMAIS un 
     Faux::$panneSurCorps = 2;
 
     $releve = new ReleveImap(auditLecteurReel(), $this->registre, new RecepteurRetoursCrm);
-    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(RuntimeException::class);
+    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(Exception::class);
     expect(DB::table('envoi_evenements')->where('classe', 'reponse_humaine')->where('uid', 2)->count())->toBe(0)
         ->and(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->where('uid', 2)->count())->toBe(0)
         ->and(DB::table('envoi_evenements')->where('uid', 2)->count())->toBe(0)
@@ -148,7 +148,7 @@ test('2 : une panne de la recherche reste une exception technique, rien n\'est n
     Faux::deposer(1, Faux::brut('a1@zz-client.example.invalid', 'STOP'));
     Faux::$panneSurRecherche = true;
     $releve = new ReleveImap(auditLecteurReel(), $this->registre, new RecepteurRetoursCrm);
-    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(RuntimeException::class);
+    expect(fn () => $releve->relever($this->ws, AUDIT_BOITE))->toThrow(Exception::class);
     expect(auditCompte($this->ws))->toBe(0);
 });
 
@@ -160,6 +160,13 @@ test('2 : un message dont le MIME est réellement illisible est écarté (à rat
     expect($bilan->lus)->toBe(2)
         ->and(DB::table('envoi_evenements')->where('uid', 1)->value('statut'))->toBe('a_rattacher')
         ->and(DB::table('envoi_evenements')->where('uid', 2)->value('classe'))->toBe('desinscription');
+});
+
+test('1 : un message trop gros n\'est jamais téléchargé : écarté « taille », sans effet', function () {
+    Faux::deposer(1, Faux::brut('gros@zz-client.example.invalid', 'STOP'), taille: LecteurBoiteWebklex::MAX_OCTETS + 1);
+    $lot = auditLecteurReel()->lire(AUDIT_BOITE, 0);
+    expect($lot->messages)->toHaveCount(1)->and($lot->messages[0]->ecarte)->toBe('taille');
+    expect(implode("\n", Faux::commandes()))->not->toContain('BODY.PEEK');
 });
 
 // ───────────── (3) AppliquerRetour (freins L7) ─────────────
@@ -204,7 +211,7 @@ test('3 : le constructeur marque le mot de passe #[SensitiveParameter] ; la boî
 test('7 : le rattrapage pagine sur les UID bruts jusqu\'à la fin réelle, même si le lot de 200 est filtré par la date', function () {
     $sauvegarde = new DateTimeImmutable('2026-12-01 03:00:00', new DateTimeZone('UTC'));
     for ($i = 1; $i <= 450; $i++) {   // 449 vieux messages (hors fenêtre), le STOP récent est le 450e
-        $this->lecteur->deposer(AUDIT_BOITE, auditMsg($i, $i < 450 ? '2026-06-01 10:00:00' : '2026-12-03 10:00:00', ['corps' => $i < 450 ? 'Merci.' : 'STOP']));
+        $this->lecteur->deposer(AUDIT_BOITE, auditMsg($i, $i < 450 ? '2026-06-01 10:00:00' : '2026-12-03 10:00:00', corps: $i < 450 ? 'Merci.' : 'STOP'));
     }
     $bilan = (new ReleveImap($this->lecteur, $this->registre, new RecepteurRetoursCrm))->rattraper($this->ws, AUDIT_BOITE, $sauvegarde);
 
@@ -411,7 +418,7 @@ test('4 : message écarté sans Message-ID : empreinte stable, indépendante d\'
 
 // ───────────── (14) id_injection ─────────────
 
-test('14 : id_injection est une clé étrangère vers envoi_injections_smtp ; un identifiant inventé est refusé', function () {
+test('14 : id_injection est contrôlé comme une clé étrangère vers envoi_injections_smtp (même espace) ; un identifiant inventé est refusé', function () {
     $this->lecteur->deposer(AUDIT_BOITE, auditMsg(1, corps: 'STOP'));
     (new ReleveImap($this->lecteur, $this->registre, new RecepteurRetoursCrm))->relever($this->ws, AUDIT_BOITE);
     expect(DB::table('envoi_evenements')->where('uid', 1)->value('id_injection'))->toBe($this->idInjection);

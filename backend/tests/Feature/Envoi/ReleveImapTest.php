@@ -25,6 +25,7 @@ use App\Support\ListeSuppression;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
 
@@ -39,9 +40,28 @@ beforeEach(function () {
     config(['crm.ingest.business_workspace' => F::slug($this->ws)]);
     $this->lecteur = new LecteurBoiteMemoire;
     $this->registre = new RegistreMessagesEnvoyesMemoire;
-    $this->registre->noter('envoi-1@zz.example.invalid', new MessageOrigine('inj-1', RELEVE_ADRESSE));
+    $this->registre->noter('envoi-1@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-1'), RELEVE_ADRESSE));
     $this->releve = new ReleveImap($this->lecteur, $this->registre, new RecepteurRetoursCrm);
 });
+
+/** Injection réelle (clé étrangère) : un identifiant par (espace, nom), créé à la demande. */
+function releveInj(string $ws, string $nom): string
+{
+    static $faites = [];
+    $cle = $ws . '|' . $nom;
+    if (isset($faites[$cle]) && DB::table('envoi_injections_smtp')->where('id_injection', $faites[$cle])->exists()) {
+        return $faites[$cle];
+    }
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert([
+        'id' => $boite, 'workspace_id' => $ws, 'adresse' => 'zz-' . substr($boite, 0, 8) . '@test.invalid',
+        'hote' => 'smtp.exemple.test', 'port' => 587, 'chiffrement' => 'starttls', 'identifiants_chiffres' => 'zz-chiffre',
+    ]);
+    $id = (string) Str::uuid();
+    DB::table('envoi_injections_smtp')->insert(['workspace_id' => $ws, 'boite_id' => $boite, 'id_injection' => $id, 'cle_idempotence' => 'zz-' . $id]);
+
+    return $faites[$cle] = $id;
+}
 
 /** @param array<string, mixed> $s */
 function releveMsg(int $uid, array $s = []): MessageBrut
@@ -49,7 +69,7 @@ function releveMsg(int $uid, array $s = []): MessageBrut
     $a = array_merge([
         'mid' => "r{$uid}@zz-client.example.invalid", 'irt' => 'envoi-1@zz.example.invalid', 'refs' => [],
         'de' => RELEVE_ADRESSE, 'le' => '2026-12-02 10:00:00', 'sujet' => 'Re: bonjour', 'corps' => 'Merci, je regarde ça.',
-        'h' => [], 'dsn' => null, 'dsnMid' => null,
+        'h' => [], 'dsn' => null, 'dsnMid' => null, 'dest' => null,
     ], $s);
 
     return new MessageBrut(
@@ -64,6 +84,7 @@ function releveMsg(int $uid, array $s = []): MessageBrut
         $a['h'],
         $a['dsn'],
         $a['dsnMid'],
+        $a['dest'],
     );
 }
 
@@ -93,7 +114,8 @@ test('classification : les six classes, fr et en', function () {
         [['corps' => 'Ceci est du spam, je vais porter plainte.'], ClasseRetour::Hostile],
         [['corps' => 'I will contact my lawyer'], ClasseRetour::Hostile],
         [['dsn' => '5.1.1'], ClasseRetour::RebondDur],
-        [['dsn' => '5.7.1'], ClasseRetour::RebondDur],
+        [['dsn' => '5.1.1', 'dest' => RELEVE_ADRESSE], ClasseRetour::RebondDur],
+        [['dsn' => '5.7.1'], ClasseRetour::AutoReponse], // politique / réputation : PAS une adresse morte (point 6 de l'audit)
         [['dsn' => '4.2.2'], ClasseRetour::RebondMou],
     ];
     foreach ($cas as [$s, $attendu]) {
@@ -138,17 +160,17 @@ test('UIDVALIDITY : un changement resynchronise sans doublon ni perte', function
 });
 
 test('rattachement : In-Reply-To, References et Message-ID cité par le DSN', function () {
-    $this->registre->noter('envoi-2@zz.example.invalid', new MessageOrigine('inj-2', 'autre@zz-client.example.invalid'));
-    $this->registre->noter('envoi-3@zz.example.invalid', new MessageOrigine('inj-3', 'tiers@zz-client.example.invalid'));
+    $this->registre->noter('envoi-2@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-2'), 'autre@zz-client.example.invalid'));
+    $this->registre->noter('envoi-3@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-3'), 'tiers@zz-client.example.invalid'));
     releveDeposer(
         $this,
         releveMsg(1),
         releveMsg(2, ['irt' => null, 'refs' => ['x@y', 'envoi-2@zz.example.invalid']]),
-        releveMsg(3, ['irt' => null, 'de' => 'MAILER-DAEMON@zz.example.invalid', 'dsn' => '5.1.1', 'dsnMid' => '<envoi-3@zz.example.invalid>']),
+        releveMsg(3, ['irt' => null, 'de' => 'MAILER-DAEMON@zz.example.invalid', 'dsn' => '5.1.1', 'dsnMid' => '<envoi-3@zz.example.invalid>', 'dest' => 'tiers@zz-client.example.invalid']),
     );
     $this->releve->relever($this->ws, RELEVE_BOITE);
 
-    expect(DB::table('envoi_evenements')->orderBy('uid')->pluck('id_injection')->all())->toBe(['inj-1', 'inj-2', 'inj-3']);
+    expect(DB::table('envoi_evenements')->orderBy('uid')->pluck('id_injection')->all())->toBe([releveInj($this->ws, 'inj-1'), releveInj($this->ws, 'inj-2'), releveInj($this->ws, 'inj-3')]);
 });
 
 test('non rattaché : file « à rattacher », JAMAIS d\'opposition ni de suppression automatique', function () {
@@ -170,8 +192,8 @@ test('effets rattachés : STOP, hostile et rebond dur retirent l\'adresse', func
     $this->releve->relever($this->ws, RELEVE_BOITE);
     expect(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(RELEVE_ADRESSE))->count())->toBeGreaterThan(0);
 
-    $this->registre->noter('envoi-9@zz.example.invalid', new MessageOrigine('inj-9', 'mort@zz-client.example.invalid'));
-    releveDeposer($this, releveMsg(2, ['irt' => null, 'dsn' => '5.1.1', 'dsnMid' => 'envoi-9@zz.example.invalid', 'de' => 'MAILER-DAEMON@zz.example.invalid']));
+    $this->registre->noter('envoi-9@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-9'), 'mort@zz-client.example.invalid'));
+    releveDeposer($this, releveMsg(2, ['irt' => null, 'dsn' => '5.1.1', 'dsnMid' => 'envoi-9@zz.example.invalid', 'dest' => 'mort@zz-client.example.invalid', 'de' => 'MAILER-DAEMON@zz.example.invalid']));
     $this->releve->relever($this->ws, RELEVE_BOITE);
     expect(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte('mort@zz-client.example.invalid'))->count())->toBeGreaterThan(0);
 });
@@ -287,12 +309,13 @@ test('rattrapage : la fenêtre est de 30 jours avant la sauvegarde, pas plus', f
     expect($bilan->lus)->toBe(1)->and(ReleveImap::FENETRE_RATTRAPAGE_JOURS)->toBe(30);
 });
 
-test('aucun réseau, aucune mesure d\'ouverture : le code n\'en contient pas', function () {
-    foreach (glob(app_path('Envoi/Imap/*.php')) as $f) {
+test('aucune mesure d\'ouverture : le code n\'en contient pas', function () {
+    $fichiers = glob(app_path('Envoi/Imap/*.php'));
+    expect(count($fichiers))->toBeGreaterThan(10);
+    foreach ($fichiers as $f) {
         $code = strtolower((string) file_get_contents($f));
         expect($code)->not->toContain('tracking pixel')->not->toContain('read_receipt')->not->toContain('disposition-notification');
     }
-    expect(true)->toBeTrue();
 });
 
 test('analyse DSN : statut, destinataire et Message-ID d\'origine, sans réseau', function () {
@@ -308,7 +331,7 @@ test('analyse DSN : statut, destinataire et Message-ID d\'origine, sans réseau'
 // ───────────────────────── Corrections de l'audit (B1 à B5) ─────────────────────────
 
 test('B1 : un message piégé (From multiple, accentué, mal formé) ne bloque pas la boîte : le STOP suivant est appliqué', function () {
-    $this->registre->noter('envoi-7@zz.example.invalid', new MessageOrigine('inj-7', 'suivant@zz-client.example.invalid'));
+    $this->registre->noter('envoi-7@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-7'), 'suivant@zz-client.example.invalid'));
     releveDeposer(
         $this,
         releveMsg(1, ['de' => 'A <a@zz-client.example.invalid>, B <b@zz-client.example.invalid>', 'corps' => 'STOP']),
@@ -324,7 +347,7 @@ test('B1 : un message piégé (From multiple, accentué, mal formé) ne bloque p
 });
 
 test('B1 : un arrêt impossible à appliquer pour UN message (adresse d\'origine invalide) le met « à rattacher » sans effet, la boîte continue', function () {
-    $this->registre->noter('envoi-8@zz.example.invalid', new MessageOrigine('inj-8', 'adresse invalide'));
+    $this->registre->noter('envoi-8@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-8'), 'adresse invalide'));
     releveDeposer(
         $this,
         releveMsg(1, ['irt' => 'envoi-8@zz.example.invalid', 'corps' => 'STOP']),
@@ -383,7 +406,7 @@ test('B4/B5 : le lecteur réel ne lit jamais le message entier, n\'enregistre ri
     expect($code)->toContain('MAX_OCTETS');
     $compo = json_decode((string) file_get_contents(base_path('composer.json')), true);
     expect($compo['require']['webklex/php-imap'])->toBe('6.2.0');
-    expect(fn () => new LecteurBoiteWebklex(['host' => 'x.example.invalid', 'encryption' => 'tcp', 'username' => 'u', 'password' => 'p']))->toThrow(InvalidArgumentException::class);
+    expect(fn () => new LecteurBoiteWebklex(['host' => 'x.example.invalid', 'encryption' => 'tcp', 'username' => 'u', 'password' => 'p'], RELEVE_BOITE))->toThrow(InvalidArgumentException::class);
 });
 
 test('DSN : report-type entre guillemets accepté ; Message-ID lu seulement dans un vrai rapport', function () {
@@ -397,7 +420,7 @@ test('DSN : report-type entre guillemets accepté ; Message-ID lu seulement dans
 });
 
 test('DSN : Final-Recipient différent de l\'adresse d\'origine = « à rattacher », sans effet ; identique = rebond appliqué', function () {
-    $this->registre->noter('envoi-4@zz.example.invalid', new MessageOrigine('inj-4', 'cible@zz-client.example.invalid'));
+    $this->registre->noter('envoi-4@zz.example.invalid', new MessageOrigine(releveInj($this->ws, 'inj-4'), 'cible@zz-client.example.invalid'));
     $dsn = fn (int $uid, string $dest) => new MessageBrut($uid, "d{$uid}@zz.example.invalid", null, [], 'MAILER-DAEMON@zz.example.invalid', new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('Europe/Paris')), 'Undelivered', '', [], '5.1.1', 'envoi-4@zz.example.invalid', $dest);
     releveDeposer($this, $dsn(1, 'autre-personne@zz-client.example.invalid'));
     $this->releve->relever($this->ws, RELEVE_BOITE);

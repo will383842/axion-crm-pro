@@ -55,6 +55,7 @@
       },
       "existants": [
         "Crm/CampagnesB2bTest.php",
+        "Envoi/ReleveImapAuditTest.php",
         "Envoi/ReleveImapTest.php"
       ],
       "frontend": []

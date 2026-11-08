@@ -619,7 +619,7 @@ test('la commande COMPTE les échecs : un serveur dont le passage échoue => cod
     $this->app->instance(EmetteurAlerteSante::class, $em = new EmetteurEnregistreur);
     $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 1.0, 'horloge_unix' => now()->getTimestamp()]), saines('10:00:00', ['memoire_libre_pct' => 1.0, 'horloge_unix' => now()->getTimestamp()])];
     config(['envoi.reel_actif' => true, 'envoi.k1_actif' => true, 'envoi.sante.actif' => true]);
-    casserPause('sante:disque:src');
+    casserPause('sante:disque:a');
     $this->artisan('envoi:supervision-sante')->assertFailed();
     casserPause(null);
     expect(array_column($em->envoyees, 0))->toContain('disque', 'memoire');

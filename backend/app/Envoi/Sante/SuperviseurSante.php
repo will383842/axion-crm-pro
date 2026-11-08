@@ -238,7 +238,11 @@ final class SuperviseurSante
         return array_map(static fn ($p): string => (string) $p->motif, $this->chauffe->pausesActives($ws, $maintenant));
     }
 
-    /** @param ?list<string> $pauses */
+    /**
+     * @param  ?list<string>  $pauses
+     *
+     * @param-out list<string>  $pauses
+     */
     private function pauseActive(string $ws, string $source, string $code, DateTimeImmutable $maintenant, ?array &$pauses): bool
     {
         $pauses ??= $this->motifsActifs($ws, $maintenant);

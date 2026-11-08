@@ -1,0 +1,25 @@
+name: Serveur envoi K4 injection
+
+on:
+  pull_request:
+    paths: ['infra/serveur-envoi/injection/**', '.github/workflows/serveur-envoi-injection.yml']
+  push:
+    branches: [main]
+    paths: ['infra/serveur-envoi/injection/**']
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests de l'écouteur d'injection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Tests
+        working-directory: infra/serveur-envoi/injection
+        run: python3 -m unittest discover -s tests -t . -v

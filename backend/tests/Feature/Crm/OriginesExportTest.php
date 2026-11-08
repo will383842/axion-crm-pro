@@ -84,10 +84,17 @@ test('OE 3 ter — flux interrompu par une exception : la ligne d’audit existe
         }
     });
 
+    $niveauTampons = ob_get_level();
     try {
         $this->get('/api/v1/crm/origines/export?reseau=instagram')->streamedContent();
     } catch (Throwable) {
         // l'interruption est voulue
+    } finally {
+        // Le flux interrompu laisse son tampon de sortie ouvert : on le ferme,
+        // sinon Pest marque le test « risky » (failOnRisky) selon la part jouee.
+        while (ob_get_level() > $niveauTampons) {
+            ob_end_clean();
+        }
     }
 
     $lignes = DB::table('audit_logs')->where('path', 'like', '%origines/export%')->get();

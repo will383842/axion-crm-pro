@@ -55,6 +55,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     // Filet modifié : pourquoi — K8 : colonne `ressource_type` ajoutée (ajout seul) ; la retirer effacerait la distinction ip/domaine
     // des compteurs. Le down() de 000070 (table recréée à vide) rend en outre un retour réel non rejouable dans ce test.
     '2026_11_13_000140_envoi_chauffe_ressource_type.php',
+
+    // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
+    // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_11_13_000140_envoi_serveurs_epoque.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

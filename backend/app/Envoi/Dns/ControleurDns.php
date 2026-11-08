@@ -62,7 +62,10 @@ final class ControleurDns
         $r['ptr_existe'] = $ok($ptr !== []);
         $r['ptr_egal_helo'] = $ok(in_array($c->helo, $ptr, true));
         $v6 = filter_var($c->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
-        $r['helo_a_vers_ip'] = $ok(in_array($c->ip, $v6 ? $this->dns->aaaa($c->helo) : $this->dns->a($c->helo), true));
+        // IPv6 : « 2001:0DB8::0010 » et « 2001:db8::10 » sont la même adresse : comparer les formes normalisées.
+        $cible = self::normaliserIp($c->ip);
+        $resolues = array_map(self::normaliserIp(...), $v6 ? $this->dns->aaaa($c->helo) : $this->dns->a($c->helo));
+        $r['helo_a_vers_ip'] = $ok(in_array($cible, $resolues, true));
 
         // MTA-STS (testing) et TLS-RPT : recommandés, non bloquants
         $r['mta_sts_enregistrement'] = $ok($this->enregistrements('_mta-sts.' . $c->domaine, 'v=STSv1') !== [], 'avert');
@@ -112,9 +115,20 @@ final class ControleurDns
     private function mecanismesSpf(string $spf, int &$lookups, int $profondeur, array $vus): array
     {
         $sortie = [];
-        foreach (preg_split('/\s+/', strtolower(trim($spf))) ?: [] as $m) {
+        $mots = preg_split('/\s+/', strtolower(trim($spf))) ?: [];
+        // RFC 7208 §6.1 : redirect= n'est considéré que si AUCUN « all » n'est présent (quel que soit l'ordre ou le qualificatif).
+        $aUnAll = false;
+        foreach ($mots as $m) {
+            if (ltrim($m, '+-~?') === 'all') {
+                $aUnAll = true;
+            }
+        }
+        foreach ($mots as $m) {
             if ($m === '' || $m === 'v=spf1') {
                 continue;
+            }
+            if ($aUnAll && str_starts_with($m, 'redirect=')) {
+                continue; // ignoré : ni résolu, ni compté
             }
             if (preg_match('/^(include:|a$|a:|a\/|mx$|mx:|mx\/|ptr|exists:|redirect=)/', ltrim($m, '+-~?')) === 1) {
                 $lookups++;
@@ -152,6 +166,14 @@ final class ControleurDns
         }
 
         return $sortie;
+    }
+
+    /** Forme canonique d'une adresse IP (zéros, casse) ; une valeur qui n'est pas une IP reste telle quelle. */
+    private static function normaliserIp(string $ip): string
+    {
+        $bin = @inet_pton(trim($ip));
+
+        return $bin === false ? $ip : (string) inet_ntop($bin);
     }
 
     /** @param list<string> $mots */

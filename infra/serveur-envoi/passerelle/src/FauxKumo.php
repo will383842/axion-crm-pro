@@ -14,6 +14,11 @@ final class FauxKumo implements Kumo
     /** Crochet de test, appelé PENDANT l'appel (simule une requête concurrente ou une panne). */
     public ?\Closure $pendant = null;
 
+    public function delaiMaximal(): int
+    {
+        return self::DELAI_MAX_SECONDES;
+    }
+
     public function executer(string $workspaceId, string $operation, array $params): array
     {
         $this->appels[] = ['workspace_id' => $workspaceId, 'operation' => $operation, 'params' => $params];

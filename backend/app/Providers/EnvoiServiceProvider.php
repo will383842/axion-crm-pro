@@ -26,7 +26,7 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(DepotControles::class, DepotControlesDb::class);
         $this->app->singleton(SourceRessources::class, SourceRessourcesDb::class);
         $this->app->singleton(SurveillanceListes::class, fn ($app) => new SurveillanceListes(
-            new ResolveurSysteme((string) config('envoi.listes_noires.resolveur')),
+            new ResolveurSysteme,
             $app->make(DepotControles::class),
             new AlerteurJournal($app->make(DepotSocle::class)),
             array_values(array_map('strval', (array) config('envoi.listes_noires.zones_ip'))),

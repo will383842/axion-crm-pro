@@ -39,3 +39,25 @@ test('pause enregistrée, reportée, isolée par espace, ajout seul', function (
         expect(fn () => DB::transaction(fn () => DB::table('envoi_controles_listes')->delete()))->toThrow(QueryException::class);
     });
 });
+
+test('m2 : IP et UUID validés au chargement — UUID invalide rejeté (et signalé), IP invalide gardée pour être marquée non fiable', function () {
+    $ws = espaceListes();
+    config(['envoi.listes_noires.ips' => ['203.0.113.7@' . $ws, '203.0.113.8@pas-un-uuid', '999.1.1.1@' . $ws]]);
+    $source = new App\Envoi\ListesNoires\SourceRessourcesDb;
+
+    $ips = array_values(array_filter($source->toutes(), fn (Ressource $r): bool => $r->type === Ressource::IP));
+
+    expect(array_map(fn (Ressource $r): string => $r->valeur, $ips))->toBe(['203.0.113.7', '999.1.1.1'])
+        ->and($source->rejets())->toHaveCount(1);
+});
+
+test('« listé » déjà en pause : pas réécrit à chaque passage ; première ligne seule', function () {
+    $ws = espaceListes();
+    $depot = new DepotControlesDb;
+    $r = new Ressource($ws, Ressource::IP, '203.0.113.9');
+    $t = new DateTimeImmutable('2026-11-11 10:00:00');
+
+    expect($depot->enregistrer($r, StatutListe::Liste, 'zen.spamhaus.org', '127.0.0.2', true, $t, $t))->toBeTrue()
+        ->and($depot->enregistrer($r, StatutListe::Liste, 'zen.spamhaus.org', '127.0.0.2', true, $t->modify('+1 minute'), $t->modify('+1 minute')))->toBeFalse()
+        ->and($depot->dernierStatut($r))->toBe(StatutListe::Liste);
+});

@@ -2,7 +2,6 @@
     "anomaly:detect": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "audiences:full-refresh": "jouee",
     "audit:verify-chain": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
-    "blacklists:check": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "campaigns:start-scheduled": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "companies:rescrape-archives": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "companies:retry-google-places": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

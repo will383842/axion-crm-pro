@@ -27,10 +27,13 @@ return [
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.
     'smtp_boucle_tests' => false,
     'smtp_tolere_transaction_englobante' => false,
-    // K13 : surveillance des listes noires. Le résolveur DOIT être local (non public) :
-    // Spamhaus refuse les résolveurs publics, le contrôle est alors « non fiable ».
+    // K13 : surveillance des listes noires. Les serveurs de noms du SYSTÈME (resolv.conf) doivent
+    // tous être locaux et non relayés (pas 127.0.0.11 de Docker) : Spamhaus refuse les résolveurs
+    // publics, le contrôle est alors « non fiable ». Plus aucun réglage de résolveur ici : on ne
+    // déclare pas ce que `dns_get_record()` n'utiliserait pas.
     'listes_noires' => [
-        'resolveur' => (string) env('ENVOI_LISTES_RESOLVEUR', '127.0.0.1'),
+        // « Non fiable » sans interruption au-delà de ce délai : domaine/IP traité comme en pause (fail-closed).
+        'non_fiable_bloque_apres_minutes' => (int) env('ENVOI_LISTES_NON_FIABLE_BLOQUE_APRES_MINUTES', 30),
         'zones_ip' => ['zen.spamhaus.org'],
         'zones_domaine' => ['dbl.spamhaus.org'],
         // « ip@uuid-workspace », séparés par des virgules.

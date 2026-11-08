@@ -30,16 +30,6 @@
         "sauts": 0
     },
     {
-        "tache": "blacklists:check",
-        "horaire": "0 * * * *",
-        "fuseau": "Europe/Paris",
-        "verrou_minutes": null,
-        "en_arriere_plan": false,
-        "un_seul_serveur": false,
-        "conditions": 0,
-        "sauts": 0
-    },
-    {
         "tache": "campaigns:start-scheduled",
         "horaire": "* * * * *",
         "fuseau": "Europe/Paris",

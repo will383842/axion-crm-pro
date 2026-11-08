@@ -152,7 +152,7 @@ function concLignes(string $ws, string $ins): array
     return $lignes;
 }
 
-test('200 exécutions concurrentes sur la même inscription : zéro doublon (verrou de ligne)', function () {
+test('200 exécutions concurrentes sur la même inscription : zéro doublon (verrou de ligne ET unicité réunis ; le verrou seul est prouvé par SequenceurTest « verrou de ligne RÉELLEMENT demandé »)', function () {
     [$ws, $ins, $jour] = concPreparer(3);
     try {
         $sorties = concLancer('traiter', $ws, $ins);

@@ -5,15 +5,28 @@
  * Transport : FauxServeurEnvoi seulement, derrière la PasserelleLocale. Aucun réseau.
  */
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\FichesProtegees;
+use App\Envoi\Chauffe\DecisionFrein;
+use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\Gardes\EnvoiAutorise;
+use App\Envoi\ListesNoires\DepotControlesDb;
+use App\Envoi\ListesNoires\Ressource;
+use App\Envoi\ListesNoires\StatutListe;
+use App\Envoi\Message\MessageRefuse;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Sequence\ComposeurSequence;
 use App\Envoi\Sequence\DemandeComposition;
 use App\Envoi\Sequence\Evenement;
+use App\Envoi\Sequence\FenetreHoraire;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
 use App\Envoi\Sequence\ParametresExpedition;
+use App\Envoi\Sequence\RefusSequenceur;
 use App\Envoi\Sequence\Sequenceur;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Socle\Espace\FonctionsEspace;
@@ -22,6 +35,7 @@ use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
@@ -259,7 +273,7 @@ test('l\'opposition arrête aussi l\'entreprise ; un STOP ou un rebond dur ne to
     expect(DB::table('envoi_inscriptions')->whereIn('id', [$i1, $i2, $i3])->pluck('statut')->unique()->all())->toBe(['arretee']);
 });
 
-test('la porte EnvoiAutorise s\'applique : adresse sans verdict, segment fermé, domaine inconnu => refus et arrêt, rien envoyé', function () {
+test('la porte EnvoiAutorise s\'applique : verdict d\'adresse INVALIDE => refus et arrêt, rien envoyé', function () {
     $sid = seqSequence($this, 1);
     [, $contact] = seqFiche($this, 'g@zz-client.example.invalid');
     DB::table('envoi_verdicts_adresse')->where('workspace_id', $this->ws)->update(['verdict' => 'invalide']);
@@ -326,7 +340,7 @@ test('aucune adresse en clair dans les tables du séquenceur, aucune mesure d\'o
 
 /* ───────── Audit 07/11 : la fiche transmise à la porte est COMPLÈTE ───────── */
 
-test('fiche complète : non diffusible, fermée, entrepreneur individuel, OSM, personnelle, tiers insuffisant => refus avec le bon motif', function (array $entreprise, array $contact, string $motif) {
+test('fiche complète : non diffusible, fermée, entrepreneur individuel, OSM, personnelle => refus avec le bon motif', function (array $entreprise, array $contact, string $motif) {
     $sid = seqSequence($this, 1);
     [, $c] = seqFicheAvec($this, 'k-' . $motif . '@zz-client.example.invalid', $entreprise, $contact);
     $ins = seqInscrire($this, $sid, $c);
@@ -515,4 +529,284 @@ test('clé étrangère composite (workspace_id, inscription_id) : un message ne 
     expect(fn () => DB::table('envoi_messages')->insert([
         'workspace_id' => $autre, 'inscription_id' => $ins, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<fk@x>',
     ]))->toThrow(QueryException::class);
+});
+
+/* ───────── Relecture d'exactitude (B1, B2, I2–I5) ───────── */
+
+/** Un séquenceur sur mesure : composeur, entité expéditrice et chauffe au choix (DNS daté de « maintenant »). */
+function seqSurMesure(object $t, ?ComposeurSequence $composeur = null, string $entite = 'ZZ Expediteur SAS', ?GardeChauffe $chauffe = null): Sequenceur
+{
+    DB::table('envoi_domaines')->where('workspace_id', $t->ws)->update([
+        'dmarc_verifie_le' => $t->maintenant->format('c'), 'spf_verifie_le' => $t->maintenant->format('c'), 'dkim_verifie_le' => $t->maintenant->format('c'),
+    ]);
+
+    return new Sequenceur(
+        new PasserelleLocale($t->faux, new DepotSocleDb, true, 300, fn () => $t->maintenant, $t->ws, 300, fn () => WorkspaceContext::current(), $chauffe),
+        new LecteurFicheDb,
+        $composeur ?? $t->composeur,
+        new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, $entite),
+    );
+}
+
+function seqEtat(string $ins): object
+{
+    return DB::table('envoi_inscriptions')->where('id', $ins)->first();
+}
+
+test('B1 : CHAQUE code de refus de la porte est classé « reporter » ou « arrêter » (un code ajouté sans classement fait échouer ce test)', function () {
+    $codes = [];
+    foreach ([EnvoiAutorise::class, EligibiliteAdresse::class] as $classe) {
+        foreach ((new ReflectionClass($classe))->getConstants() as $nom => $valeur) {
+            if (is_string($valeur) && ! in_array($nom, ['FUSEAU'], true) && ! str_starts_with($nom, 'AGE_') && ! str_starts_with($nom, 'ART14_ALERTE') && ! str_ends_with($nom, '_JOURS')) {
+                $codes[$nom] = $valeur;
+            }
+        }
+    }
+    expect($codes)->not->toBeEmpty();
+    $classes = array_merge(RefusSequenceur::TEMPORAIRES, RefusSequenceur::DEFINITIFS);
+    foreach ($codes as $nom => $valeur) {
+        expect(in_array($valeur, $classes, true))->toBeTrue("Le refus {$nom} ({$valeur}) n'est classé ni temporaire ni définitif.");
+    }
+    expect(array_intersect(RefusSequenceur::TEMPORAIRES, RefusSequenceur::DEFINITIFS))->toBe([]);
+});
+
+test('B1 : refus TEMPORAIRE ou réglage d\'espace => REPORTÉ (inscription active, échéance repoussée, journalisé), repris dès que la cause disparaît', function (string $code) {
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, "tmp-{$code}@zz-client.example.invalid");
+    $ins = seqInscrire($this, $sid, $c);
+    $entite = 'ZZ Expediteur SAS';
+    $leve = function () {};
+    switch ($code) {
+        case 'domaine_envoi_sur_liste_noire':
+            DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => true]);
+            $leve = fn () => DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => false]);
+            break;
+        case 'ip_envoi_sur_liste_noire':
+            config(['envoi.listes_noires.ips' => ['203.0.113.5@' . $this->ws]]);
+            $r = new Ressource($this->ws, Ressource::IP, '203.0.113.5');
+            (new DepotControlesDb)->enregistrer($r, StatutListe::Liste, 'zen.spamhaus.org', '127.0.0.4', true, new DateTimeImmutable);
+            $leve = fn () => config(['envoi.listes_noires.ips' => []]);
+            break;
+        case 'domaine_envoi_trop_jeune':
+            DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['achete_le' => $this->lundi->modify('-5 days')->format('Y-m-d')]);
+            $leve = fn () => DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['achete_le' => '2026-01-01']);
+            break;
+        case 'domaine_envoi_inconnu':
+            DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['nom' => 'zz-autre.example.invalid']);
+            $leve = fn () => DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['nom' => SEQ_DOMAINE]);
+            break;
+        case 'entite_legale_expeditrice_absente':
+            $entite = '';
+            break;
+        case 'segment_ferme':
+            FonctionsEspace::regler($this->ws, 'federations', false);
+            $leve = fn () => FonctionsEspace::regler($this->ws, 'federations', true);
+            break;
+    }
+
+    expect(seqSurMesure($this, null, $entite)->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REPORTE)
+        ->and(seqEtat($ins)->statut)->toBe('active')
+        ->and(seqEtat($ins)->motif_arret)->toBeNull()
+        ->and((new DateTimeImmutable(seqEtat($ins)->prochaine_echeance))->getTimestamp())->toBeGreaterThan($this->maintenant->getTimestamp())
+        ->and(seqMessages($ins)[0]->statut)->toBe('reporte')
+        ->and(seqMessages($ins)[0]->refus)->toBe($code)
+        ->and($this->faux->appels)->toBe(0);
+
+    $leve();
+    $this->maintenant = $this->lundi->modify('+1 day');
+    expect(seqSurMesure($this)->executer($this->ws, $this->maintenant))->toBe([Sequenceur::ENVOYE => 1])
+        ->and(count(seqMessages($ins)))->toBe(1);
+})->with([
+    'domaine sur liste noire' => 'domaine_envoi_sur_liste_noire',
+    'IP sur liste noire (K13)' => 'ip_envoi_sur_liste_noire',
+    'domaine trop jeune' => 'domaine_envoi_trop_jeune',
+    'domaine inconnu' => 'domaine_envoi_inconnu',
+    'entité expéditrice absente' => 'entite_legale_expeditrice_absente',
+    'segment fermé' => 'segment_ferme',
+]);
+
+test('B1 : refus DÉFINITIF lié à la personne (opposition / liste de suppression) => inscription ARRÊTÉE pour de bon', function () {
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'def@zz-client.example.invalid');
+    ListeSuppression::inscrire('def@zz-client.example.invalid', 'complaint', 'zz-test');
+    $ins = seqInscrire($this, $sid, $c);
+
+    expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REFUSE)
+        ->and(seqEtat($ins)->statut)->toBe('arretee')
+        ->and(seqEtat($ins)->motif_arret)->toBe('garde:opposition')
+        ->and($this->faux->appels)->toBe(0);
+});
+
+test('B2 : une réponse reçue APRÈS la dernière étape (inscription « terminée ») arrête quand même le collègue inscrit à une autre séquence', function () {
+    $a = seqSequence($this, 1);
+    $b = seqSequence($this, 1);
+    [$ent, $c1] = seqFiche($this, 'fin1@zz-client.example.invalid');
+    [, $c2] = seqFiche($this, 'fin2@zz-client.example.invalid', $ent);
+    $insA = seqInscrire($this, $a, $c1);
+    expect(($this->seq)()->executer($this->ws, $this->maintenant))->toBe([Sequenceur::ENVOYE => 1])
+        ->and(seqEtat($insA)->statut)->toBe('terminee');
+
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, Evenement::REPONSE, $this->maintenant);
+    expect(seqEtat($insA)->statut)->toBe('terminee'); // le statut ne change pas : la trace est ailleurs
+
+    $insB = seqInscrire($this, $b, $c2);
+    expect(($this->seq)()->traiter($this->ws, $insB, $this->maintenant))->toBe(Sequenceur::ARRETEE)
+        ->and(seqMessages($insB))->toBe([])
+        ->and($this->faux->appels)->toBe(1); // seul le premier message est parti
+});
+
+test('B2 : un STOP reçu après la dernière étape vaut pour l\'adresse : une autre séquence de la même personne ne part pas', function () {
+    $a = seqSequence($this, 1);
+    $b = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'stopfin@zz-client.example.invalid');
+    $insA = seqInscrire($this, $a, $c);
+    ($this->seq)()->executer($this->ws, $this->maintenant);
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, Evenement::STOP, $this->maintenant);
+
+    $insB = seqInscrire($this, $b, $c);
+    expect(($this->seq)()->traiter($this->ws, $insB, $this->maintenant))->toBe(Sequenceur::ARRETEE)
+        ->and($this->faux->appels)->toBe(1);
+});
+
+test('B2 : la trace d\'un événement est en AJOUT SEUL (aucune modification, aucun effacement)', function () {
+    $a = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'trace@zz-client.example.invalid');
+    $insA = seqInscrire($this, $a, $c);
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, Evenement::REPONSE, $this->maintenant);
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, Evenement::REPONSE, $this->maintenant); // rejeu : pas de doublon
+
+    expect(DB::table('envoi_inscriptions_evenements')->where('inscription_id', $insA)->count())->toBe(1);
+    expect(fn () => DB::table('envoi_inscriptions_evenements')->where('inscription_id', $insA)->update(['evenement' => 'stop']))->toThrow(QueryException::class);
+});
+
+test('I2 : opposition par le canal RÉEL (liste de suppression) => le collègue de la même entreprise est ARRÊTÉ, rien ne part', function () {
+    $sid = seqSequence($this, 1);
+    [$ent, $c1] = seqFiche($this, 'opp1@zz-client.example.invalid');
+    [, $c2] = seqFiche($this, 'opp2@zz-client.example.invalid', $ent);
+    ListeSuppression::inscrire('opp1@zz-client.example.invalid', 'complaint', 'zz-test');
+    $i1 = seqInscrire($this, $sid, $c1);
+    $i2 = seqInscrire($this, $sid, $c2);
+    $seq = ($this->seq)();
+
+    expect($seq->traiter($this->ws, $i1, $this->maintenant))->toBe(Sequenceur::REFUSE)
+        ->and($seq->traiter($this->ws, $i2, $this->maintenant))->toBe(Sequenceur::ARRETEE)
+        ->and(seqEtat($i2)->motif_arret)->toBe(Evenement::MOTIF_ENTREPRISE)
+        ->and($this->faux->appels)->toBe(0);
+});
+
+test('I3 : une fenêtre qui commence avant 8 h (7 h–17 h) est rognée à 8 h–19 h : à 7 h 30 rien ne part, l\'échéance est 8 h, et ça part à 8 h', function () {
+    $sid = seqSequence($this, 1, 7, 17);
+    [, $c] = seqFiche($this, 'tot@zz-client.example.invalid');
+    $this->maintenant = new DateTimeImmutable('2026-11-16 07:30:00', new DateTimeZone('Europe/Paris'));
+    $ins = seqInscrire($this, $sid, $c);
+    DB::table('envoi_inscriptions')->where('id', $ins)->update(['prochaine_echeance' => '2026-11-16 07:00:00+01']);
+
+    expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::HORS_FENETRE)
+        ->and((new DateTimeImmutable(seqEtat($ins)->prochaine_echeance))->setTimezone(new DateTimeZone('Europe/Paris'))->format('Y-m-d H:i'))->toBe('2026-11-16 08:00');
+
+    $this->maintenant = new DateTimeImmutable('2026-11-16 08:00:00', new DateTimeZone('Europe/Paris'));
+    expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ENVOYE);
+});
+
+test('I3 : une fenêtre qui finit après 19 h est rognée à 19 h ; une fenêtre entièrement hors 8–19 h est refusée', function () {
+    $f = new FenetreHoraire(7, 22);
+    expect($f->debut)->toBe(8)->and($f->fin)->toBe(19);
+    expect(fn () => new FenetreHoraire(20, 23))->toThrow(InvalidArgumentException::class);
+    expect(fn () => new FenetreHoraire(0, 7))->toThrow(InvalidArgumentException::class);
+});
+
+test('I4 : une inscription qui lève une exception (composeur refusé, SQL en échec) n\'interrompt pas les autres, est marquée en erreur avec compteur, puis alerte après 5 échecs', function (Closure $panne) {
+    Log::spy();
+    $sid = seqSequence($this, 1);
+    [, $cMauvais] = seqFiche($this, 'mauvais@zz-client.example.invalid');
+    [, $cBon] = seqFiche($this, 'bon@zz-client.example.invalid');
+    $mauvais = seqInscrire($this, $sid, $cMauvais);
+    $bon = seqInscrire($this, $sid, $cBon);
+    DB::table('envoi_inscriptions')->where('id', $mauvais)->update(['prochaine_echeance' => $this->lundi->modify('-1 hour')->format('c')]); // première de file
+    $composeur = new class($panne) implements ComposeurSequence
+    {
+        public function __construct(private Closure $panne) {}
+
+        public function composer(DemandeComposition $d): string
+        {
+            if (str_starts_with($d->destinataire, 'mauvais@')) {
+                ($this->panne)();
+            }
+
+            return "Message-ID: {$d->messageId}\r\n\r\n{$d->corps}";
+        }
+    };
+
+    $bilan = seqSurMesure($this, $composeur)->executer($this->ws, $this->maintenant);
+    expect($bilan)->toBe([Sequenceur::ERREUR => 1, Sequenceur::ENVOYE => 1])
+        ->and(seqEtat($bon)->statut)->toBe('terminee')
+        ->and(seqEtat($mauvais)->statut)->toBe('active')
+        ->and((int) seqEtat($mauvais)->echecs)->toBe(1)
+        ->and(seqEtat($mauvais)->derniere_erreur)->not->toBeNull()
+        ->and((new DateTimeImmutable(seqEtat($mauvais)->prochaine_echeance))->getTimestamp())->toBeGreaterThan($this->maintenant->getTimestamp())
+        ->and(seqMessages($mauvais))->toBe([]); // la réservation a été défaite avec la transaction : l'étape reste reprenable
+    Log::shouldNotHaveReceived('critical');
+
+    for ($i = 2; $i <= 5; $i++) {
+        $this->maintenant = $this->maintenant->modify('+1 hour'); // reste dans la fenêtre du lundi
+        DB::table('envoi_inscriptions')->where('id', $mauvais)->update(['prochaine_echeance' => $this->maintenant->modify('-1 hour')->format('c')]);
+        seqSurMesure($this, $composeur)->executer($this->ws, $this->maintenant);
+    }
+    expect((int) seqEtat($mauvais)->echecs)->toBe(5);
+    Log::shouldHaveReceived('critical')->once();
+})->with([
+    'message refusé (L2)' => [fn () => throw new MessageRefuse(['Adresse postale absente'])],
+    'erreur SQL (transaction avortée)' => [fn () => DB::select('SELECT * FROM table_qui_nexiste_pas_zz')],
+]);
+
+test('I5 : boîte en pause ou quota de chauffe atteint (GardeChauffe réelle branchée) => inscription active et reportée, rien d\'envoyé', function (string $cas) {
+    config(['envoi.cle_empreinte' => 'cle-de-test-seulement']);
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), new ResolveurEnMemoire, null);
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert([
+        'id' => $boite, 'workspace_id' => $this->ws, 'adresse' => 'from@' . SEQ_DOMAINE, 'hote' => 'smtp.example.test', 'port' => 587,
+        'identifiants_chiffres' => 'chiffre-de-test',
+    ]);
+    if ($cas === 'pause') {
+        app(DepotChauffe::class)->ouvrirPause($this->ws, DecisionFrein::REBONDS, null, $this->maintenant);
+    } else {
+        app(DepotChauffe::class)->incrementer($this->ws, $boite, $this->maintenant, 'autre', 'envoyes', 1000);
+    }
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, "chauffe-{$cas}@zz-client.example.invalid");
+    $ins = seqInscrire($this, $sid, $c);
+    $passerelle = new PasserelleLocale($this->faux, new DepotSocleDb, true, 300, fn () => $this->maintenant, $this->ws, 300, fn () => WorkspaceContext::current(), $garde);
+    $passerelle->sante(); // homme mort : un battement à l'heure courante
+    $seq = seqSurMesure($this, null, 'ZZ Expediteur SAS', $garde);
+
+    expect($seq->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REPORTE)
+        ->and(seqEtat($ins)->statut)->toBe('active')
+        ->and(seqMessages($ins)[0]->statut)->toBe('reporte')
+        ->and($this->faux->appels)->toBe(0);
+})->with(['pause', 'quota']);
+
+test('mineur : le verrou de ligne est RÉELLEMENT demandé (SELECT … FOR UPDATE sur envoi_inscriptions) à chaque traitement', function () {
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'verrou@zz-client.example.invalid');
+    $ins = seqInscrire($this, $sid, $c);
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes) {
+        $requetes[] = strtolower($q->sql);
+    });
+    ($this->seq)()->traiter($this->ws, $ins, $this->maintenant);
+
+    $verrous = array_filter($requetes, fn (string $sql): bool => str_contains($sql, 'from "envoi_inscriptions"') && str_contains($sql, 'for update'));
+    expect($verrous)->not->toBeEmpty();
+});
+
+test('mineur : un délai de 0 jour ouvré n\'est autorisé qu\'à l\'étape 1 ; les relances (étapes 2 et 3) attendent au moins 1 jour ouvré', function () {
+    $sid = seqSequence($this, 2);
+    expect(fn () => DB::transaction(fn () => DB::table('envoi_sequence_etapes')->where('sequence_id', $sid)->where('rang', 2)->update(['delai_jours_ouvres' => 0])))->toThrow(QueryException::class);
+    DB::table('envoi_sequence_etapes')->where('sequence_id', $sid)->where('rang', 1)->update(['delai_jours_ouvres' => 0]); // l'étape 1 : tout de suite
+    expect(DB::table('envoi_sequence_etapes')->where('sequence_id', $sid)->where('rang', 1)->value('delai_jours_ouvres'))->toBe(0);
+});
+
+test('mineur : l\'échéance d\'une relance utilise l\'instant passé en paramètre, pas l\'horloge de la machine', function () {
+    $source = file_get_contents(base_path('app/Envoi/Sequence/Sequenceur.php'));
+    expect($source)->not->toContain('now()');
 });

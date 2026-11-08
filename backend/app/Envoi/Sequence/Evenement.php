@@ -24,6 +24,9 @@ final class Evenement
      */
     public const VALENT_POUR_L_ADRESSE = [self::STOP, self::OPPOSITION, self::REBOND_DUR];
 
+    /** Motif posé par le séquenceur quand la porte refuse pour opposition (liste de suppression). */
+    public const MOTIF_GARDE_OPPOSITION = 'garde:opposition';
+
     public const MOTIF_ENTREPRISE = 'entreprise_arretee';
 
     /** Motif posé sur les AUTRES inscriptions de la même adresse. */

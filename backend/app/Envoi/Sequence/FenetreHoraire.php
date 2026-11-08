@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Sequence;
 
+use App\Envoi\Chauffe\Seuils;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -14,10 +15,23 @@ use InvalidArgumentException;
  */
 final class FenetreHoraire
 {
-    public function __construct(public readonly int $debut = 9, public readonly int $fin = 17)
+    public readonly int $debut;
+
+    public readonly int $fin;
+
+    /**
+     * La fenêtre est ROGNÉE à [8 h, 19 h[ : la passerelle (L7, `GardeChauffe::refus`) n'injecte jamais en dehors.
+     * Sans cela, une fenêtre 7 h–17 h reporterait à la même heure, chaque jour, pour toujours.
+     */
+    public function __construct(int $debut = 9, int $fin = 17)
     {
         if ($debut < 0 || $fin > 24 || $debut >= $fin) {
             throw new InvalidArgumentException("Fenêtre horaire invalide : {$debut}h–{$fin}h.");
+        }
+        $this->debut = max($debut, Seuils::FENETRE_ENVOI_DEBUT);
+        $this->fin = min($fin, Seuils::FENETRE_ENVOI_FIN);
+        if ($this->debut >= $this->fin) {
+            throw new InvalidArgumentException("Fenêtre horaire hors des heures d'envoi ({$debut}h–{$fin}h) : l'envoi n'a lieu qu'entre " . Seuils::FENETRE_ENVOI_DEBUT . 'h et ' . Seuils::FENETRE_ENVOI_FIN . 'h.');
         }
     }
 

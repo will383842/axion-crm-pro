@@ -61,6 +61,8 @@ final class Inscriptions
             if ($ins === null) {
                 return 0;
             }
+            // La trace d'abord : elle subsiste même si l'inscription est déjà « terminee » (statut inchangé).
+            self::tracer($ws, $ins, $evenement, $maintenant);
             $n = $this->arreter($ws, [$inscriptionId], $evenement, $maintenant);
             if (in_array($evenement, Evenement::VALENT_POUR_L_ADRESSE, true)) {
                 // Ajout seulement : les autres inscriptions de la MÊME adresse passent « arretee » (rien n'est effacé).
@@ -78,6 +80,15 @@ final class Inscriptions
 
             return $n;
         });
+    }
+
+    /** Ajout seul, idempotent (une ligne par inscription et par événement). */
+    public static function tracer(string $ws, \stdClass $ins, string $evenement, DateTimeImmutable $maintenant): void
+    {
+        DB::table('envoi_inscriptions_evenements')->insertOrIgnore([
+            'workspace_id' => $ws, 'inscription_id' => $ins->id, 'entreprise_id' => $ins->entreprise_id,
+            'empreinte_adresse' => $ins->empreinte_adresse, 'evenement' => $evenement, 'recu_le' => $maintenant->format('c'),
+        ]);
     }
 
     /** @param  list<string>  $ids */

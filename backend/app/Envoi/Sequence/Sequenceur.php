@@ -2,15 +2,19 @@
 
 namespace App\Envoi\Sequence;
 
+use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise;
+use App\Envoi\Message\MessageRefuse;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Séquenceur (envoi P0, lot L1). Pour une inscription échue :
@@ -22,6 +26,10 @@ use Illuminate\Support\Str;
  *   5. fiche relue EN BASE, puis `EnvoiAutorise::verifier` ;
  *   6. composition (relance dans le MÊME fil : In-Reply-To / References) ;
  *   7. `$serveur` (la PasserelleLocale) : jamais d'appel réseau d'ici.
+ * DETTE NOMMÉE (lot suivant L1↔L2↔L6) : l'injection (et donc l'appel SMTP de la passerelle) a lieu DANS la
+ * transaction ouverte par `traiter` (verrou de ligne tenu pendant l'appel réseau). Le verrou garantit « un seul
+ * envoi par inscription » ; il faudra le découper (réserver → commit → envoyer → noter) avec reprise des
+ * réservations restées « reserve ».
  * La version du message est celle FIGÉE à l'inscription. Aucune mesure d'ouverture.
  * Aucun effacement : un message refusé ou reporté reste en base avec son motif.
  */
@@ -40,6 +48,12 @@ final class Sequenceur
     public const REPORTE = 'reporte';
 
     public const IGNORE = 'ignore';
+
+    /** Exception technique rattrapée pour UNE inscription (voir `echec()`) : les autres continuent. */
+    public const ERREUR = 'erreur';
+
+    /** Nombre d'échecs techniques d'une même inscription avant l'alerte (puis tous les N échecs). */
+    public const ECHECS_AVANT_ALERTE = 5;
 
     public function __construct(
         private readonly ServeurEnvoi $serveur,
@@ -60,7 +74,13 @@ final class Sequenceur
             ->orderBy('prochaine_echeance')->limit($limite)->pluck('id')->all();
         $bilan = [];
         foreach ($ids as $id) {
-            $r = $this->traiter($ws, (string) $id, $maintenant);
+            try {
+                $r = $this->traiter($ws, (string) $id, $maintenant);
+            } catch (Throwable $e) {
+                // La transaction de `traiter` (un savepoint si on est déjà dans une transaction) est défaite :
+                // la réservation aussi, l'étape reste reprenable. On note l'échec HORS de cette transaction.
+                $r = $this->echec($ws, (string) $id, $e, $maintenant);
+            }
             $bilan[$r] = ($bilan[$r] ?? 0) + 1;
         }
 
@@ -101,7 +121,7 @@ final class Sequenceur
             $references = $ins->fil_references === null || trim((string) $ins->fil_references) === '' ? [] : explode(' ', trim((string) $ins->fil_references));
             $inReplyTo = $references === [] ? null : $references[array_key_last($references)];
 
-            $messageId = $this->reserver($ins, $rang, $inReplyTo);
+            $messageId = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
             if ($messageId === null) {
                 return self::DEJA;
             }
@@ -160,28 +180,64 @@ final class Sequenceur
         });
     }
 
+    /**
+     * Une AUTRE personne de l'entreprise a répondu ou s'est opposée : soit son inscription est arrêtée pour ce motif
+     * (y compris l'opposition constatée par la porte : `garde:opposition`), soit la TRACE de l'événement existe
+     * (même si son inscription est « terminee » : le statut ne dit plus rien).
+     */
     private function entrepriseArretee(string $ws, int $entrepriseId, string $inscriptionId): bool
     {
-        return DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('entreprise_id', $entrepriseId)
+        $arretee = DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('entreprise_id', $entrepriseId)
             ->where('id', '<>', $inscriptionId)->where('statut', 'arretee')
-            ->whereIn('motif_arret', [Evenement::REPONSE, Evenement::OPPOSITION, Evenement::MOTIF_ENTREPRISE])->exists();
+            ->whereIn('motif_arret', [Evenement::REPONSE, Evenement::OPPOSITION, Evenement::MOTIF_GARDE_OPPOSITION, Evenement::MOTIF_ENTREPRISE])->exists();
+
+        return $arretee || DB::table('envoi_inscriptions_evenements')->where('workspace_id', $ws)->where('entreprise_id', $entrepriseId)
+            ->where('inscription_id', '<>', $inscriptionId)->whereIn('evenement', Evenement::PROPAGENT_A_L_ENTREPRISE)->exists();
     }
 
     private function adresseArretee(string $ws, string $empreinte, string $inscriptionId): bool
     {
-        return DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('empreinte_adresse', $empreinte)
+        $arretee = DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('empreinte_adresse', $empreinte)
             ->where('id', '<>', $inscriptionId)->where('statut', 'arretee')
-            ->whereIn('motif_arret', [...Evenement::VALENT_POUR_L_ADRESSE, Evenement::MOTIF_ADRESSE])->exists();
+            ->whereIn('motif_arret', [...Evenement::VALENT_POUR_L_ADRESSE, Evenement::MOTIF_GARDE_OPPOSITION, Evenement::MOTIF_ADRESSE])->exists();
+
+        return $arretee || DB::table('envoi_inscriptions_evenements')->where('workspace_id', $ws)->where('empreinte_adresse', $empreinte)
+            ->where('inscription_id', '<>', $inscriptionId)->whereIn('evenement', Evenement::VALENT_POUR_L_ADRESSE)->exists();
     }
 
     /**
-     * Un refus qui peut se lever sans qu'une personne ait rien décidé : le contrôle DNS du jour n'est pas
-     * fait, ou le verdict d'adresse (« valide ») est périmé/daté du futur. Un verdict « invalide », une
-     * adresse jamais vérifiée, un refus de garde (RGPD, pays, segment…) sont DÉFINITIFS.
+     * Exception technique sur UNE inscription : compteur, dernière erreur (classe et motifs, jamais d'adresse), échéance
+     * repoussée (1 h par échec, 24 h au plus) ; alerte au 5ᵉ échec puis tous les 5. L'inscription reste active.
+     */
+    private function echec(string $ws, string $inscriptionId, Throwable $e, DateTimeImmutable $maintenant): string
+    {
+        try {
+            $detail = $e::class . ($e instanceof MessageRefuse ? ' : ' . implode(' ; ', $e->motifs) : '');
+            $echecs = (int) DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('id', $inscriptionId)->where('statut', 'active')->value('echecs') + 1;
+            DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('id', $inscriptionId)->where('statut', 'active')->update([
+                'echecs' => $echecs,
+                'derniere_erreur' => mb_substr($detail, 0, 500),
+                'derniere_erreur_le' => $maintenant->format('c'),
+                'prochaine_echeance' => $maintenant->modify('+' . min(24, $echecs) . ' hours')->format('c'),
+            ]);
+            if ($echecs % self::ECHECS_AVANT_ALERTE === 0) {
+                Log::critical('envoi.sequenceur_inscription_en_erreur : intervention requise.', ['workspace_id' => $ws, 'inscription_id' => $inscriptionId, 'echecs' => $echecs, 'erreur' => $e::class]);
+            }
+        } catch (Throwable $autre) {
+            Log::error('envoi.sequenceur_echec_non_note', ['workspace_id' => $ws, 'inscription_id' => $inscriptionId, 'erreur' => $autre::class]);
+        }
+
+        return self::ERREUR;
+    }
+
+    /**
+     * Refus qui se lève sans qu'une personne ait rien décidé, ou réglage d'espace : voir `RefusSequenceur` (table
+     * explicite). Cas particulier : `VERDICT_ABSENT` n'est reporté que si le DERNIER verdict de l'adresse est
+     * « valide » (donc périmé ou daté du futur) ; un verdict « invalide » ou jamais posé est DÉFINITIF.
      */
     private function passager(string $ws, string $motif, string $email): bool
     {
-        if ($motif === EnvoiAutorise::DOMAINE_DNS_NON_VERIFIE) {
+        if (RefusSequenceur::temporaire($motif)) {
             return true;
         }
         if ($motif !== EnvoiAutorise::VERDICT_ABSENT) {
@@ -195,7 +251,7 @@ final class Sequenceur
     }
 
     /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
-    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo): ?string
+    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, ?DateTimeImmutable $maintenant = null): ?string
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
@@ -211,7 +267,7 @@ final class Sequenceur
         }
         // Une ligne « reporte » (passerelle pleine) peut être reprise ; toute autre est définitive.
         $repris = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reporte')
-            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => now()]);
+            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => ($maintenant ?? new DateTimeImmutable)->format('c')]);
 
         return $repris === 1 ? $messageId : null;
     }
@@ -241,6 +297,11 @@ final class Sequenceur
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
             ->update(['statut' => 'refuse', 'refus' => $motif, 'maj_le' => $maintenant->format('c')]);
         $this->arreter($ins, 'garde:' . $motif, $maintenant);
+        if ($motif === EligibiliteAdresse::OPPOSITION) {
+            // Opposition constatée par la porte (liste de suppression) : elle vaut comme l'événement « opposition »
+            // (adresse ET entreprise), et sa trace ne dépend pas du statut de l'inscription.
+            Inscriptions::tracer((string) $ins->workspace_id, $ins, Evenement::OPPOSITION, $maintenant);
+        }
 
         return self::REFUSE;
     }

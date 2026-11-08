@@ -179,6 +179,7 @@ final class SemeurTablesScopees
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
         'envoi_boites',
         'envoi_injections_smtp',
+        'envoi_controles_dns',
         // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
         'envoi_evenements',
         'envoi_curseurs_imap',
@@ -687,6 +688,11 @@ final class SemeurTablesScopees
         $inserer('envoi_journal_commandes', [
             'commande' => 'zz',
             'auteur' => 'zz',
+        ]);
+        $inserer('envoi_controles_dns', [
+            'domaine' => 'zz-' . $marque . '.example.test',
+            'controle_le' => '2026-11-11 06:00:00+00',
+            'pret' => false,
         ]);
         $inserer('envoi_temoins', [
             'empreinte' => hash('sha256', 'zz-' . $marque),

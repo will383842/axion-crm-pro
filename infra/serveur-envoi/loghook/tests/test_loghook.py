@@ -656,6 +656,129 @@ class EtatEmpreinteBornes(unittest.TestCase):
         self.assertEqual(len(x.alertes), Relais.MEMOIRE_MAX)
 
 
+class RejeuEtEtatDurcis(unittest.TestCase):
+    """Revue PR #472 : rejeu sans perte, etat en 0600 sans adresse en clair, cle hexadecimale, secret sans blanc de tete."""
+
+    def _orphelin(self, carte, **kw):
+        p = PuitsMemoire()
+        x = Relais(charger(REGLES), p, source="kumo-test", carte_espaces=carte, **kw)
+        x.traiter(rec("Bounce", 550, "5.1.1", rid="dur1", espace="ws1"))
+        carte["ws1"] = WS_A
+        return x, p
+
+    def test_bloquant_panne_pendant_le_rejeu_ne_perd_pas_le_rebond_dur(self):
+        with tempfile.TemporaryDirectory() as d:
+            etat = pathlib.Path(d) / "etat.json"
+            x, p = self._orphelin({}, fichier_etat=etat)
+            p.panne = True
+            self.assertEqual(x.rejouer_ecartes(), 0)  # passerelle en panne : rien n'est rejoue...
+            self.assertEqual([e["id"] for e in x.ecartes], ["dur1"])  # ...et rien n'est perdu
+            y = Relais(charger(REGLES), p, source="kumo-test", fichier_etat=etat, carte_espaces={"ws1": WS_A})
+            self.assertEqual([e["id"] for e in y.ecartes], ["dur1"])  # meme apres redemarrage
+            p.panne = False
+            self.assertEqual(y.rejouer_ecartes(), 1)
+            self.assertEqual([(e["id_kumo"], e["type"], e["workspace_id"]) for e in p.evenements], [("dur1", "rebond_dur", WS_A)])
+            self.assertEqual(y.ecartes, [])
+            self.assertEqual(json.loads(etat.read_text())["ecartes"], [])
+
+    def test_bloquant_refus_definitif_pendant_le_rejeu_retire_l_enregistrement(self):
+        class Refuse:
+            def envoyer(self, ev):
+                raise EvenementRefuse("400")
+        from axion_loghook.relais import EvenementRefuse  # noqa: F811
+        carte = {}
+        x = Relais(charger(REGLES), Refuse(), source="kumo-test", carte_espaces=carte)
+        x.traiter(rec("Bounce", 550, "5.1.1", rid="dur1", espace="ws1"))
+        carte["ws1"] = WS_A
+        x.rejouer_ecartes()
+        self.assertEqual(x.ecartes, [])  # refus definitif : pas de rejeu infini
+
+    def test_important_fichier_d_etat_en_0600_meme_sous_umask_large(self):
+        import os
+        ancien = os.umask(0o000)
+        self.addCleanup(os.umask, ancien)
+        with tempfile.TemporaryDirectory() as d:
+            etat = pathlib.Path(d) / "etat.json"
+            x = Relais(charger(REGLES), PuitsMemoire(), source="kumo-test", fichier_etat=etat)
+            x.traiter(rec("Bounce", 550, "5.1.1", rid="a"))
+            self.assertEqual(etat.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(pathlib.Path(str(etat) + ".tmp").exists())
+            etat.chmod(0o644)  # etat herite d'une ancienne version : resserre au demarrage
+            Relais(charger(REGLES), PuitsMemoire(), source="kumo-test", fichier_etat=etat)
+            self.assertEqual(etat.stat().st_mode & 0o777, 0o600)
+
+    def test_important_ecartes_sans_adresse_ni_texte_de_reponse(self):
+        with tempfile.TemporaryDirectory() as d:
+            etat = pathlib.Path(d) / "etat.json"
+            x = Relais(charger(REGLES), PuitsMemoire(), source="kumo-test", fichier_etat=etat)
+            x.traiter(rec("Bounce", 550, "5.1.1", rid="o", texte="user unknown secret-texte", espace="ws1"))
+            brut = etat.read_text()
+            for interdit in ("x@dest.example.test", "dest.example.test", "secret-texte", "recipient", "sender"):
+                self.assertNotIn(interdit, brut)
+
+    def test_important_ancien_etat_avec_adresse_en_clair_est_reduit_au_demarrage(self):
+        with tempfile.TemporaryDirectory() as d:
+            etat = pathlib.Path(d) / "etat.json"
+            cle = "ab" * 32
+            etat.write_text(json.dumps({"seq": {}, "attente": {}, "cle": cle,
+                                        "ecartes": [rec("Bounce", 550, "5.1.1", rid="vieux", espace="ws1")]}))
+            x = Relais(charger(REGLES), PuitsMemoire(), source="kumo-test", fichier_etat=etat)
+            self.assertNotIn("x@dest.example.test", etat.read_text())
+            self.assertEqual([e["id"] for e in x.ecartes], ["vieux"])
+            x.carte["ws1"] = WS_A
+            self.assertEqual(x.rejouer_ecartes(), 1)
+
+    def test_mineur_cle_d_etat_non_hexadecimale_refusee(self):
+        from axion_loghook.relais import EtatCorrompu
+        with tempfile.TemporaryDirectory() as d:
+            etat = pathlib.Path(d) / "etat.json"
+            etat.write_text(json.dumps({"seq": {}, "attente": {}, "ecartes": [], "cle": "z" * 64}))
+            with self.assertRaises(EtatCorrompu):
+                Relais(charger(REGLES), PuitsMemoire(), source="kumo-test", fichier_etat=etat)
+
+    def test_mineur_secret_commencant_par_un_blanc_refuse_cote_python(self):
+        import os
+        from axion_loghook.serveur import lire_secret
+        with tempfile.TemporaryDirectory() as d:
+            f = pathlib.Path(d) / "s"
+            f.write_text(" " + "s" * 40)
+            os.chmod(f, 0o600)
+            with self.assertRaises(ValueError):
+                lire_secret(f)
+            f.write_text("s" * 40 + "\n")  # blancs de fin : toleres des deux cotes
+            self.assertEqual(lire_secret(f), "s" * 40)
+        with self.assertRaises(ValueError):
+            creer(relais()[0], " " + "s" * 40)
+
+    def test_mineur_secret_commencant_par_un_blanc_refuse_cote_lua(self):
+        lua = (RACINE.parent / "kumomta" / "loghook.lua").read_text()
+        self.assertRegex(lua, r"match\('\^%s'\)")
+
+    def test_mineur_serveur_multifil_et_connexions_bornees(self):
+        import socket
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        x, _ = relais()
+        srv = creer(x, SECRET_RELAIS, max_connexions=2)
+        self.assertIsInstance(srv, ThreadingHTTPServer)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(lambda: (srv.shutdown(), srv.server_close()))
+        muets = [socket.create_connection(("127.0.0.1", srv.server_port)) for _ in range(2)]
+        self.addCleanup(lambda: [m.close() for m in muets])
+        import time
+        time.sleep(0.3)
+        trop = socket.create_connection(("127.0.0.1", srv.server_port))
+        self.addCleanup(trop.close)
+        trop.settimeout(3)
+        self.assertTrue(trop.recv(64).startswith(b"HTTP/1.1 503"))  # au-dela de la borne : 503, Kumo reessaie
+        muets.pop().close()
+        time.sleep(0.3)
+        corps = json.dumps(rec("Bounce", 550, "5.1.1")).encode()
+        r = urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:%d/" % srv.server_port, corps, {ENTETE_RELAIS: SECRET_RELAIS}), timeout=5)
+        self.assertEqual(r.status, 200)  # un client muet ne bloque pas les autres
+
+
 class HookLuaDurci(unittest.TestCase):
     LUA = (RACINE.parent / "kumomta" / "loghook.lua").read_text()
     INSTALLER = (RACINE.parent / "installer.sh").read_text()
@@ -701,6 +824,34 @@ class HookLuaDurci(unittest.TestCase):
             r = subprocess.run(["bash", "-c", "set -u; %s\nfor a in \"$@\"; do :; done; echo $LOGHOOK" % ligne[0]],
                                capture_output=True, text=True, env={**os.environ})
             self.assertEqual(r.stdout.strip(), "0")
+
+    def _drapeaux(self, *args):
+        """Execute VRAIMENT les deux lignes de l'installateur qui lisent les drapeaux ; rend « REEL LOGHOOK »."""
+        import subprocess
+        lignes = [l.split("#")[0] for l in self.INSTALLER.splitlines() if l.startswith(("REEL=0", "LOGHOOK=0"))]
+        self.assertEqual(len(lignes), 2)
+        r = subprocess.run(["bash", "-c", "set -u\n%s\necho $REEL $LOGHOOK" % "\n".join(lignes), "x", *args], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.strip()
+
+    def test_i2_fort_avec_loghook_donne_1_et_oui_seul_donne_0(self):
+        self.assertEqual(self._drapeaux(), "0 0")
+        self.assertEqual(self._drapeaux("--avec-loghook"), "0 1")  # a blanc, hook demande
+        self.assertEqual(self._drapeaux("--oui"), "1 0")  # reel SANS --avec-loghook : hook inactif
+
+    def test_mineur_oui_est_reconnu_dans_les_deux_ordres(self):
+        self.assertEqual(self._drapeaux("--avec-loghook", "--oui"), "1 1")
+        self.assertEqual(self._drapeaux("--oui", "--avec-loghook"), "1 1")
+
+    def test_important_dossier_du_secret_lisible_par_kumo_groupe_10025(self):
+        import re
+        self.assertRegex(self.INSTALLER, r"install -d -m 0750 -o root -g 10025 /etc/axion-envoi/loghook")
+        self.assertNotRegex(self.INSTALLER, r"install -d -m 0750 /etc/axion-envoi/loghook")
+        self.assertIn("group_add: [\"10025\"]", self.COMPOSE)  # le conteneur Kumo porte bien ce groupe
+
+    def test_important_expiration_de_la_file_documentee_comme_perte(self):
+        self.assertIn("K7-D11", self.LUA)
+        self.assertIn("scheduled_count", self.LUA)
 
 
 class RelaisDansLaDoc(unittest.TestCase):

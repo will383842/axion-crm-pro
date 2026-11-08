@@ -27,8 +27,8 @@ local function lire_secret()
   end
   local secret = (f:read '*a' or ''):gsub('%s+$', '')
   f:close()
-  if #secret < 32 then
-    return nil
+  if #secret < 32 or secret:match('^%s') then
+    return nil -- trop court, ou blanc de TETE : meme regle que le relais (serveur.py lire_secret), jamais de secret « rogne »
   end
   return secret
 end
@@ -73,6 +73,9 @@ if ACTIF then
       return kumo.make_queue_config {
         protocol = { custom_lua = { constructor = 'make.axion_loghook' } },
         -- Expiration : un enregistrement que le relais n'accepte jamais ne reste pas en file indefiniment.
+        -- PERTE ASSUMEE (K7-D11) : passe 2 jours, un enregistrement non livre au relais EXPIRE sans alerte cote hook (la file
+        -- du hook n'est pas journalisee : garde anti-boucle). Surveiller la profondeur de la file `axion_loghook` (metrique
+        -- KumoMTA scheduled_count{queue="axion_loghook"}) au banc K10 ; voir README.
         max_age = '2 days',
         max_retry_interval = '10 minutes',
       }

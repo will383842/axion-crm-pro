@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS loghook_journal (
   id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, genre TEXT NOT NULL,
   id_kumo TEXT NOT NULL, detail TEXT NOT NULL, cree_le INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS loghook_journal_ws_genre ON loghook_journal (workspace_id, genre, id_kumo);
+CREATE INDEX IF NOT EXISTS loghook_journal_genre_date ON loghook_journal (genre, cree_le);
+CREATE TABLE IF NOT EXISTS loghook_passages (nom TEXT PRIMARY KEY, dernier INTEGER NOT NULL) WITHOUT ROWID;
 CREATE TRIGGER IF NOT EXISTS loghook_journal_no_update BEFORE UPDATE ON loghook_journal
   BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
 CREATE TRIGGER IF NOT EXISTS loghook_journal_no_delete BEFORE DELETE ON loghook_journal
@@ -398,15 +400,34 @@ SQL);
      *
      * @return list<string>
      */
-    public function espacesAvecJetonsEnAttente(int $limite): array
-    {
-        $st = $this->pdo->prepare("SELECT a.workspace_id FROM loghook_journal a WHERE a.genre='jeton_en_attente'
+    public const SQL_ESPACES_JETONS = "SELECT a.workspace_id FROM loghook_journal a INDEXED BY loghook_journal_genre_date
+            WHERE a.genre='jeton_en_attente' AND a.cree_le > ?
             AND NOT EXISTS (SELECT 1 FROM loghook_journal c WHERE c.workspace_id=a.workspace_id AND c.genre IN ('jeton_confirme','jeton_abandonne') AND c.id_kumo=a.id_kumo)
-            GROUP BY a.workspace_id ORDER BY MIN(a.id) LIMIT ?");
-        $st->bindValue(1, max(1, $limite), PDO::PARAM_INT);
+            GROUP BY a.workspace_id ORDER BY MIN(a.id) LIMIT ?";
+
+    /** Borné : seules les lignes des $fenetre dernières secondes sont lues (index genre+date), jamais tout le journal. */
+    public function espacesAvecJetonsEnAttente(int $limite, int $fenetre = 2_592_000): array
+    {
+        $st = $this->pdo->prepare(self::SQL_ESPACES_JETONS);
+        $st->bindValue(1, $this->now() - $fenetre, PDO::PARAM_INT);
+        $st->bindValue(2, max(1, $limite), PDO::PARAM_INT);
         $st->execute();
 
         return array_map('strval', $st->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Réserve le passage global (« lot ») : vrai pour UN seul appelant par intervalle, même avec des requêtes concurrentes
+     * (UPDATE conditionnel atomique). Table en ajout seul (`CREATE TABLE IF NOT EXISTS`), aucune donnée touchée.
+     */
+    public function reserverPassageGlobal(string $nom, int $intervalle): bool
+    {
+        $maintenant = $this->now();
+        $this->pdo->prepare('INSERT OR IGNORE INTO loghook_passages (nom, dernier) VALUES (?, 0)')->execute([$nom]);
+        $st = $this->pdo->prepare('UPDATE loghook_passages SET dernier=? WHERE nom=? AND dernier <= ?');
+        $st->execute([$maintenant, $nom, $maintenant - $intervalle]);
+
+        return $st->rowCount() === 1;
     }
 
     /** Une réponse « non confirmé » de K6 pour ce jeton (ajout seul). Rend le nombre de tentatives, celle-ci comprise. */

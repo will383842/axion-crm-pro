@@ -13,7 +13,7 @@ set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CIBLE=/opt/axion-envoi
 VALEURS="${AXION_VALEURS:-/etc/axion-envoi/valeurs.env}"
-REEL=0; [[ "${1:-}" == "--oui" ]] && REEL=1
+REEL=0; for a in "$@"; do [[ "$a" == "--oui" ]] && REEL=1; done   # n'importe quel ordre des drapeaux
 # Log hook K7 : DESACTIVE par defaut (aucun relais en service, K7-D5). Jamais active sans ce drapeau explicite.
 LOGHOOK=0; for a in "$@"; do [[ "$a" == "--avec-loghook" ]] && LOGHOOK=1; done
 agir() { echo "+ $*"; if [[ $REEL == 1 ]]; then "$@"; fi; }
@@ -92,7 +92,7 @@ if [[ $REEL == 1 ]]; then
   echo "AXION_LOGHOOK_ACTIF=$LOGHOOK" >"$tmpd/compose.env"
   cmp -s "$tmpd/compose.env" "$CIBLE/.env" 2>/dev/null || changement_kumo=1
   install -m 0644 "$tmpd/compose.env" "$CIBLE/.env"
-  install -d -m 0750 /etc/axion-envoi/loghook   # dossier du secret Lua -> relais (le secret lui-meme est pose a la main, jamais ici)
+  install -d -m 0750 -o root -g 10025 /etc/axion-envoi/loghook   # dossier du secret Lua -> relais ; groupe 10025 = Kumo (sinon illisible) ; le secret lui-meme est pose a la main, jamais ici
   install -m 0644 "$SRC/kumomta/loghook.lua" "$CIBLE/kumomta/loghook.lua"   # K7 : log hook (require par init.lua)
   # Dossier des cles DKIM (genere par dkim/generer-dkim.sh) : cree vide s'il manque, jamais touche s'il existe.
   install -d -m 0755 /etc/axion-envoi

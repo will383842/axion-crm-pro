@@ -399,12 +399,25 @@ final class LoghookTest extends PasserelleTestCase
         for ($n = 1; $n <= 25; $n++) {
             $inconnus[] = str_pad((string) $n, 32, 'u');
         }
-        $j = $this->jetonsSelectif($inconnus);
+        $panne = true; // K6 en panne à l'arrivée : les 26 jetons restent « en attente » (sinon le valide serait confirmé tout de suite)
+        $j = new class($inconnus, $panne) implements JetonsConfirmation {
+            public function __construct(private array $inconnus, private bool &$panne) {}
+            public function confirmer(string $ws, string $jeton, string $idMessage): bool { if ($this->panne) { throw new \RuntimeException('K6 indisponible'); } return ! in_array($jeton, $this->inconnus, true); }
+        };
         $i = $this->ingestion($j);
         foreach ($inconnus as $n => $jeton) {
             $i->ingerer(self::WS_A, $this->ev($n + 1, 'reception', 'u'.$n, $jeton));
         }
         $i->ingerer(self::WS_A, $this->ev(100, 'reception', 'valide', str_repeat('v', 32)));
+        $panne = false;
+        // Preuve que le scénario est réel : le jeton valide est BIEN derrière 20 jetons inconnus qui occupent la tête de liste.
+        $tete = array_column($this->stockage->jetonsEnAttente(self::WS_A, 20, Ingestion::DELAI_REJEU_JETON), 'id_kumo');
+        $this->assertCount(20, $tete);
+        $this->assertNotContains('valide', $tete, 'le jeton valide est hors de la tête (limite 20)');
+        $this->assertFalse($this->stockage->jetonDejaConfirme(self::WS_A, 'valide'));
+        $this->maintenant += Ingestion::DELAI_REJEU_JETON + 1;
+        $i->reconfirmer(self::WS_A);
+        $this->assertFalse($this->stockage->jetonDejaConfirme(self::WS_A, 'valide'), 'au premier passage les inconnus bloquent encore la tête');
         for ($passage = 0; $passage < 40; $passage++) {
             $this->maintenant += Ingestion::DELAI_REJEU_JETON + 1;
             $i->reconfirmer(self::WS_A);
@@ -480,6 +493,46 @@ final class LoghookTest extends PasserelleTestCase
         $corps = json_encode(['workspace_id' => self::WS_A] + $this->ev(1, 'livre'));
         $r = (new \Passerelle\Evenements\PointEntree($i, self::SECRET, ['kumo-test']))->traiter('127.0.0.1', $corps, self::SECRET);
         $this->assertSame(200, $r[0]);
+        $this->assertTrue($this->stockage->jetonDejaConfirme(self::WS_B, 'b1'));
+    }
+
+    // --- Revue PR #472 : la requête globale ne parcourt plus tout le journal à chaque requête du hook ---
+
+    public function test_important_requete_globale_bornee_par_age_et_index(): void
+    {
+        $plan = implode(' ', array_column($this->pdo()->query('EXPLAIN QUERY PLAN '.str_replace('?', '0', \Passerelle\Stockage::SQL_ESPACES_JETONS))->fetchAll(PDO::FETCH_ASSOC), 'detail'));
+        $this->assertStringContainsString('loghook_journal_genre_date', $plan, $plan);
+        $this->assertDoesNotMatchRegularExpression('/SCAN (a|loghook_journal)\b(?! USING)/', $plan, 'aucun balayage complet du journal');
+    }
+
+    public function test_important_jetons_plus_vieux_que_la_fenetre_ne_sont_plus_parcourus(): void
+    {
+        $i = $this->ingestion();
+        $i->ingerer(self::WS_B, $this->ev(1, 'reception', 'vieux', str_repeat('o', 32)));
+        $this->assertSame([self::WS_B], $this->stockage->espacesAvecJetonsEnAttente(20, Ingestion::FENETRE_JETONS));
+        $this->maintenant += Ingestion::FENETRE_JETONS + 10;
+        $this->assertSame([], $this->stockage->espacesAvecJetonsEnAttente(20, Ingestion::FENETRE_JETONS));
+        // Rien n'est supprimé : le jeton reste au journal et reste rejouable pour son espace.
+        $this->assertCount(1, $this->stockage->jetonsEnAttente(self::WS_B, 10, 0));
+    }
+
+    public function test_important_reconfirmer_tous_passe_une_fois_par_minute_pas_a_chaque_requete(): void
+    {
+        $panne = true;
+        $j = $this->jetonsBascule($panne);
+        $i = $this->ingestion($j);
+        $i->ingerer(self::WS_B, $this->ev(1, 'reception', 'b1', str_repeat('b', 32)));
+        $this->assertSame(0, $i->reconfirmerTous()); // 1er passage du lot : K6 encore en panne
+        $panne = false;
+        $this->maintenant += Ingestion::DELAI_REJEU_JETON - 5;
+        $appels = $j->appels;
+        for ($requete = 0; $requete < 50; $requete++) { // 50 requêtes du hook dans la même minute
+            $i->reconfirmerTous();
+        }
+        $this->assertSame($appels, $j->appels, 'aucun parcours global avant la fin de la minute');
+        $this->assertFalse($this->stockage->jetonDejaConfirme(self::WS_B, 'b1'));
+        $this->maintenant += 10;
+        $this->assertSame(1, $i->reconfirmerTous(), 'minute écoulée : le lot repasse');
         $this->assertTrue($this->stockage->jetonDejaConfirme(self::WS_B, 'b1'));
     }
 

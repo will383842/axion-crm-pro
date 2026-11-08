@@ -3,19 +3,21 @@ import hmac
 import json
 import os
 import pathlib
+import threading
 import urllib.error
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .relais import EvenementRefuse
 
 TAILLE_MAX = 1 << 20
 ENTETE_SECRET = "X-Axion-Relais-Secret"  # secret Lua -> relais (distinct du secret relais -> passerelle)
+CONNEXIONS_MAX = 32  # connexions simultanees : au-dela, 503 immediat (Kumo reessaie)
 DELAI_MAX = 10  # secondes : un client lent ou muet ne bloque jamais le relais
 
 
 def _secret_valide(secret):
-    return isinstance(secret, str) and len(secret) >= 32
+    return isinstance(secret, str) and len(secret) >= 32 and not secret[0].isspace()
 
 
 def lire_secret(chemin):
@@ -27,11 +29,13 @@ def lire_secret(chemin):
             raise ValueError("secret du log hook lisible par d'autres que son proprietaire (chmod 0600)")
         if hasattr(os, "geteuid") and st.st_uid != os.geteuid():
             raise ValueError("secret du log hook : proprietaire inattendu")
-        secret = pathlib.Path(chemin).read_text().strip()
+        secret = pathlib.Path(chemin).read_text().rstrip()  # blancs de FIN seulement (comme le hook Lua) ; un blanc de tete est refuse plus bas
     except OSError as e:
         raise ValueError("secret du log hook illisible") from e
     if len(secret) < 32:
         raise ValueError("secret du log hook trop court (32 caracteres minimum)")
+    if secret[0].isspace():
+        raise ValueError("secret du log hook commence par un blanc (refuse, comme cote Lua)")
     return secret
 
 
@@ -61,7 +65,32 @@ class PuitsHttp:
             raise IOError("passerelle indisponible") from e
 
 
-def creer(relais, secret, port=0):
+class _Serveur(ThreadingHTTPServer):
+    """Un fil par connexion (un client lent ne bloque pas les autres), au plus `max_connexions` a la fois."""
+    daemon_threads = True
+
+    def __init__(self, adresse, gestionnaire, max_connexions):
+        self._places = threading.BoundedSemaphore(max_connexions)
+        super().__init__(adresse, gestionnaire)
+
+    def process_request(self, request, client_address):
+        if not self._places.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._places.release()
+
+
+def creer(relais, secret, port=0, max_connexions=CONNEXIONS_MAX):
     """Ecouteur local. `secret` obligatoire (>= 32 caracteres) : sans lui, le relais ne demarre pas."""
     if not _secret_valide(secret):
         raise ValueError("secret Lua -> relais absent ou trop court (32 caracteres minimum)")
@@ -94,4 +123,4 @@ def creer(relais, secret, port=0):
         def log_message(self, *a):
             pass
 
-    return HTTPServer(("127.0.0.1", port), H)
+    return _Serveur(("127.0.0.1", port), H, max_connexions)

@@ -25,6 +25,10 @@ final class Ingestion
 
     /** Espaces rejoués par passage (les plus anciens d'abord). */
     private const ESPACES_PAR_PASSAGE = 20;
+    /** Le passage global (tous espaces) a lieu au plus une fois par minute, pas à chaque requête du hook. */
+    public const INTERVALLE_PASSAGE_GLOBAL = 60;
+    /** Fenêtre du parcours global : 30 jours. Au-delà, un jeton reste au journal et rejouable pour son espace (K7-D12). */
+    public const FENETRE_JETONS = 2_592_000;
 
     /** @param \Closure(string,array<string,string>):mixed $alerte */
     public function __construct(
@@ -89,8 +93,11 @@ final class Ingestion
     /** Rejoue aussi les jetons des espaces SANS trafic : tout passage rejoue les espaces qui en ont en attente. */
     public function reconfirmerTous(int $limite = 20): int
     {
+        if (! $this->stockage->reserverPassageGlobal('reconfirmer_tous', self::INTERVALLE_PASSAGE_GLOBAL)) {
+            return 0; // un lot est déjà passé dans la dernière minute
+        }
         $n = 0;
-        foreach ($this->stockage->espacesAvecJetonsEnAttente(self::ESPACES_PAR_PASSAGE) as $ws) {
+        foreach ($this->stockage->espacesAvecJetonsEnAttente(self::ESPACES_PAR_PASSAGE, self::FENETRE_JETONS) as $ws) {
             $n += $this->reconfirmer($ws, $limite);
         }
 

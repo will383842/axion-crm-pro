@@ -118,6 +118,13 @@ bash "$G" --domaine "$DOM" --selecteur k5a --secours k5b --repertoire "$tmpd/grp
 [[ "$(stat -c %a "$tmpd/grp/$DOM/k5a.pem")" == 640 && "$(stat -c %a "$tmpd/grp/$DOM")" == 750 && "$(stat -c %G "$tmpd/grp/$DOM/k5a.pem")" == "$grp" ]] && ok "groupe: cle 0640, dossier 0750, groupe applique" || bad "groupe: permissions"
 bash "$G" --domaine "$DOM" --selecteur k5a --secours k5b --repertoire "$tmpd/grp2" --groupe 'inexistant-zz9' >/dev/null 2>&1 && bad "groupe inexistant accepte" || ok "groupe inexistant refuse"
 
+# ---- I2 : rotation sans --groupe sur un domaine cree avec --groupe => memes mode et groupe
+bash "$G" --rotation --domaine "$DOM" --secours k5c --repertoire "$tmpd/grp" >/dev/null 2>&1 && ok "rotation sans --groupe sur domaine a groupe" || bad "rotation sans --groupe sur domaine a groupe"
+[[ "$(stat -c %a "$tmpd/grp/$DOM/k5c.pem")" == 640 && "$(stat -c %G "$tmpd/grp/$DOM/k5c.pem")" == "$grp" && "$(stat -c %a "$tmpd/grp/$DOM")" == 750 ]] && ok "rotation: nouvelle cle reprend 0640 et le groupe du dossier" || bad "rotation: mode/groupe non repris (I2)"
+# incoherence : --groupe sur un domaine cree SANS groupe (0700) => refus, aucun fichier temporaire residuel
+bash "$G" --rotation --domaine "$DOM" --secours k5d --repertoire "$tmpd/cles" --groupe "$grp" >/dev/null 2>&1 && bad "rotation: --groupe sur domaine 0700 accepte" || ok "rotation: --groupe sur domaine 0700 refuse"
+[[ ! -e "$tmpd/cles/$DOM/k5d.pem" && -z "$(find "$tmpd/cles/$DOM" -name '*.nouveau' -o -name '.verrou')" ]] && ok "rotation refusee: rien de residuel" || bad "rotation refusee: residus"
+
 # ---- cote serveur KumoMTA : dkim.lua charge par init.lua, memes en-tetes, compose
 K="$D/../kumomta"; DC="$D/../docker-compose.yml"
 grep -qE "require[ (]*['\"]dkim['\"]" "$K/init.lua" && ok "init.lua charge dkim.lua" || bad "init.lua ne charge pas dkim.lua"

@@ -65,9 +65,8 @@ nettoyer() {
   if [[ $rc != 0 ]]; then
     for ((i=${#CREES[@]}-1; i>=0; i--)); do f="${CREES[$i]}"; [[ -z "$f" ]] || rm -f -- "$f"; done
     for ((i=${#DOSSIERS_CREES[@]}-1; i>=0; i--)); do rmdir -- "${DOSSIERS_CREES[$i]}" 2>/dev/null || true; done
-  else
-    for f in "${TEMP_OK[@]:-}"; do [[ -z "$f" ]] || rm -f -- "$f"; done
   fi
+  for f in "${TEMP_OK[@]:-}"; do [[ -z "$f" ]] || rm -f -- "$f"; done   # M1 : succes OU echec
   [[ -z "${VERROU:-}" ]] || rmdir -- "$VERROU" 2>/dev/null || true
   exit "$rc"
 }
@@ -106,6 +105,19 @@ else
   [[ -d "$DOSSIER" && -f "$DOSSIER/principal" && -f "$DOSSIER/secours" ]] || { echo "domaine non initialise : rien a faire tourner" >&2; exit 1; }
   VERROU="$DOSSIER/.verrou"
   mkdir -- "$VERROU" 2>/dev/null || { echo "rotation deja en cours" >&2; unset VERROU; exit 1; }
+  # I2 : en rotation, mode et groupe sont repris du dossier existant (jamais 0600 root par defaut).
+  MODE_EXIST="$(stat -c %a -- "$DOSSIER")"; GRP_EXIST="$(stat -c %G -- "$DOSSIER")"
+  if [[ "$MODE_EXIST" == 750 ]]; then
+    if [[ -n "$GRP" && "$GRP" != "$GRP_EXIST" ]]; then
+      echo "incoherence : --groupe $GRP different du groupe du dossier ($GRP_EXIST)" >&2; exit 1
+    fi
+    GRP="$GRP_EXIST"; M_CLE=0640; M_DOS=0750
+  elif [[ "$MODE_EXIST" == 700 ]]; then
+    [[ -z "$GRP" ]] || { echo "incoherence : le domaine existe sans groupe (0700), --groupe refuse" >&2; exit 1; }
+    M_CLE=0600; M_DOS=0700
+  else
+    echo "mode du dossier inattendu ($MODE_EXIST) : refus" >&2; exit 1
+  fi
   ANC_PRINC="$(<"$DOSSIER/principal")"; ANC_SEC="$(<"$DOSSIER/secours")"
   [[ "$SEC" != "$ANC_PRINC" && "$SEC" != "$ANC_SEC" ]] || { echo "ce selecteur est deja utilise" >&2; exit 1; }
   SEL="$ANC_SEC"

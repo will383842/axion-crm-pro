@@ -28,12 +28,13 @@ test('versions : ajout seul, isolées par espace', function () {
     $depot->noter($ws, str_repeat('a', 64), StatutVersion::Appliquee);
     $depot->noter($ws, str_repeat('b', 64), StatutVersion::DeriveRefusee, 'plafond_dur');
 
-    WorkspaceContext::run($ws, function () {
-        expect(DB::table('envoi_config_versions')->count())->toBe(2);
+    WorkspaceContext::run($ws, function () use ($ws) {
+        expect(DB::table('envoi_config_versions')->where('workspace_id', $ws)->count())->toBe(2);
         expect(fn () => DB::transaction(fn () => DB::table('envoi_config_versions')->update(['motif' => 'x'])))->toThrow(QueryException::class);
         expect(fn () => DB::transaction(fn () => DB::table('envoi_config_versions')->delete()))->toThrow(QueryException::class);
     });
-    WorkspaceContext::run($autre, fn () => expect(DB::table('envoi_config_versions')->count())->toBe(0));
+    // La connexion propriétaire est SUPERUSER (RLS ignorée) : on filtre par espace, comme ControlesDnsDbTest.
+    WorkspaceContext::run($autre, fn () => expect(DB::table('envoi_config_versions')->where('workspace_id', $autre)->count())->toBe(0));
 });
 
 test('la source lit les domaines de la base et produit une empreinte stable', function () {

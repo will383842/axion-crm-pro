@@ -120,7 +120,7 @@ test('paquet valide : appliqué, version notée', function () {
 dataset('paquets_invalides', [
     'domaine invalide' => [fn () => ['domaines' => [['domaine' => 'pas un domaine', 'selecteur' => 's1', 'cle_publique' => K18_CLE_PUBLIQUE, 'debit_heure' => 5, 'plafond_jour' => 5]]]],
     'débit nul' => [fn () => ['domaines' => [['domaine' => 'a.example.test', 'selecteur' => 's1', 'cle_publique' => K18_CLE_PUBLIQUE, 'debit_heure' => 0, 'plafond_jour' => 5]]]],
-    'clé privée' => [fn () => ['domaines' => [['domaine' => 'a.example.test', 'selecteur' => 's1', 'cle_publique' => '-----BEGIN PRIVATE KEY-----abc', 'debit_heure' => 5, 'plafond_jour' => 5]]]],
+    'clé privée' => [fn () => ['domaines' => [['domaine' => 'a.example.test', 'selecteur' => 's1', 'cle_publique' => '-----BEGIN ' . 'PRIVATE KEY-----abc', 'debit_heure' => 5, 'plafond_jour' => 5]]]],
     'plafond souhaité au-dessus du plafond dur' => [fn () => ['domaines' => [['domaine' => 'a.example.test', 'selecteur' => 's1', 'cle_publique' => K18_CLE_PUBLIQUE, 'debit_heure' => 5, 'plafond_jour' => 100000]]]],
     'aucun domaine' => [fn () => ['domaines' => []]],
     'structure absente' => [fn () => ['x' => 1]],

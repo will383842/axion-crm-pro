@@ -24,12 +24,24 @@ interface DepotSante
 
     public function retablir(string $ws, string $source, string $code, DateTimeImmutable $quand): void;
 
-    /** Dernier contrôle DNS (K12) de chaque domaine. @return list<array{domaine: string, pret: bool, pause: bool, controle_le: string}> */
+    /**
+     * Dernier contrôle DNS (K12) de chaque domaine.
+     *
+     * @return list<array{domaine: string, pret: bool, pause: bool, controle_le: string}>
+     */
     public function controlesDns(string $ws): array;
 
-    /** Dernier statut de liste noire (K13) de chaque ressource. @return list<array{type: string, ressource: string, statut: string}> */
+    /**
+     * Dernier statut de liste noire (K13) de chaque ressource.
+     *
+     * @return list<array{type: string, ressource: string, statut: string}>
+     */
     public function controlesListes(string $ws): array;
 
-    /** Serveurs d'envoi actifs (tous espaces) : [workspace_id, source]. @return list<array{0: string, 1: string}> */
+    /**
+     * Serveurs d'envoi actifs (tous espaces) : [workspace_id, source].
+     *
+     * @return list<array{0: string, 1: string}>
+     */
     public function serveursActifs(): array;
 }

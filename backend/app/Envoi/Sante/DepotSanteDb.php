@@ -65,6 +65,7 @@ final class DepotSanteDb implements DepotSante
         $this->constat($ws, $source, $code, 'retabli', 'attention', '', $quand);
     }
 
+    /** @return list<array{domaine: string, pret: bool, pause: bool, controle_le: string}> */
     public function controlesDns(string $ws): array
     {
         $l = WorkspaceContext::run($ws, fn () => DB::select(
@@ -72,9 +73,10 @@ final class DepotSanteDb implements DepotSante
             [$ws],
         ));
 
-        return array_map(static fn ($r): array => ['domaine' => (string) $r->domaine, 'pret' => (bool) $r->pret, 'pause' => (bool) $r->pause, 'controle_le' => (string) $r->controle_le], $l);
+        return array_values(array_map(static fn ($r): array => ['domaine' => (string) $r->domaine, 'pret' => (bool) $r->pret, 'pause' => (bool) $r->pause, 'controle_le' => (string) $r->controle_le], $l));
     }
 
+    /** @return list<array{type: string, ressource: string, statut: string}> */
     public function controlesListes(string $ws): array
     {
         $l = WorkspaceContext::run($ws, fn () => DB::select(
@@ -82,9 +84,10 @@ final class DepotSanteDb implements DepotSante
             [$ws],
         ));
 
-        return array_map(static fn ($r): array => ['type' => (string) $r->type, 'ressource' => (string) $r->ressource, 'statut' => (string) $r->statut], $l);
+        return array_values(array_map(static fn ($r): array => ['type' => (string) $r->type, 'ressource' => (string) $r->ressource, 'statut' => (string) $r->statut], $l));
     }
 
+    /** @return list<array{0: string, 1: string}> */
     public function serveursActifs(): array
     {
         $l = WorkspaceContext::runWithoutScope('supervision de santé : parcourt les serveurs d’envoi de tous les espaces', fn () => DB::table('envoi_serveurs')->where('actif', true)->orderBy('workspace_id')->orderBy('source')->get(['workspace_id', 'source']));

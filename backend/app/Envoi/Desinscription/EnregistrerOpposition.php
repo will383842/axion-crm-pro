@@ -2,7 +2,7 @@
 
 namespace App\Envoi\Desinscription;
 
-use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +14,15 @@ use Illuminate\Support\Facades\DB;
  *
  * L'opposition MET À L'ÉCART, elle n'efface rien (règle S8). Elle est acquise
  * dès que la transaction est validée ; les effets aval (file, arrêt par
- * entreprise) sont rejoués par un rejeu du jeton tant qu'ils ne sont pas
+ * entreprise, événement sortant) sont rejoués par un rejeu du jeton tant qu'ils ne sont pas
  * terminés.
  */
 final class EnregistrerOpposition
 {
-    public function __construct(private readonly TerminerEffetsOpposition $effets) {}
+    public function __construct(
+        private readonly TerminerEffetsOpposition $effets,
+        private readonly DeduplicationService $dedup,
+    ) {}
 
     public const CANAL_PAGE = 'page';
 
@@ -45,14 +48,9 @@ final class EnregistrerOpposition
                 }
                 // Jamais l'adresse en clair : l'empreinte seule (décision du 2026-08-18).
                 $empreinte = (string) $inscription->empreinte_adresse;
+                // Liste de suppression (blocage des envois) ET opt_out (même geste que CrmCampagneRetours : raison `unsubscribe`).
                 ListeSuppression::inscrireEmpreinte($empreinte, ListeSuppression::MANUEL, 'desinscription_lien', (string) $inscription->portee, ['canal' => $canal]);
-                (new ConsentOutboundRecorder)->record(
-                    'consent_optout',
-                    $empreinte,
-                    (string) $inscription->portee,
-                    null,
-                    ['motif' => 'desinscription_lien', 'canal' => $canal],
-                );
+                $this->dedup->addOptOutParEmpreinte($empreinte, null, 'desinscription_lien', 'unsubscribe', [(string) $inscription->portee]);
             });
 
             $opposition = DB::table('envoi_oppositions')->where('lien_id', $inscription->id)->first();

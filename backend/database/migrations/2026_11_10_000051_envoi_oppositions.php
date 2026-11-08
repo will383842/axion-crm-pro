@@ -20,11 +20,14 @@ return new class extends Migration
             CREATE TABLE IF NOT EXISTS envoi_oppositions (
                 id                 BIGSERIAL   PRIMARY KEY,
                 workspace_id       UUID        NOT NULL REFERENCES workspaces(id),
-                lien_id     BIGINT      NOT NULL REFERENCES envoi_liens_desinscription(id),
+                lien_id            BIGINT      NOT NULL,
                 empreinte_adresse  CHAR(64)    NOT NULL,
                 canal              TEXT        NOT NULL CHECK (canal IN ('page', 'one_click')),
                 enregistree_le     TIMESTAMPTZ NOT NULL DEFAULT now(),
-                effets_termines_le TIMESTAMPTZ
+                effets_termines_le TIMESTAMPTZ,
+                -- Composite : une opposition ne peut pointer que sur un lien DE SON espace.
+                CONSTRAINT fk_envoi_oppositions_lien FOREIGN KEY (workspace_id, lien_id)
+                    REFERENCES envoi_liens_desinscription (workspace_id, id)
             )
             SQL,
         );

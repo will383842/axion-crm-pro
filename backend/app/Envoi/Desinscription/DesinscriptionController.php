@@ -12,7 +12,8 @@ use Illuminate\Http\Response;
  *           lien ne crée aucune opposition).
  *  - POST : l'opposition (bouton), ou « one-click » RFC 8058 (corps
  *           `List-Unsubscribe=One-Click`, réponse vide).
- *  - Tout jeton refusé (forme, signature, échéance, inconnu) reçoit LA MÊME
+ *  - Le POST accepte un jeton signé mais échu ; le GET (page) le refuse.
+ *  - Tout jeton refusé (forme, signature, échéance pour le GET, inconnu) reçoit LA MÊME
  *    réponse 404 : rien ne permet de distinguer les causes.
  *
  * Page sans suivi : pas de cookie, pas de script, pas d'image, pas de
@@ -38,7 +39,9 @@ final class DesinscriptionController
 
     public function confirmer(Request $request, string $jeton, EnregistrerOpposition $opposition): Response
     {
-        $verifie = JetonDesinscription::verifier($jeton);
+        // Jeton signé mais échu : accepté. Se désinscrire ne coûte rien, et refuser un
+        // lien ancien (message vieux de deux ans) serait un manquement au droit d'opposition.
+        $verifie = JetonDesinscription::verifier($jeton, accepterEchu: true);
         if ($verifie === null) {
             return $this->refus();
         }
@@ -71,12 +74,20 @@ final class DesinscriptionController
         ));
     }
 
-    /** Moyen de contact générique (adresse de l'exploitant), sans donnée de personne. */
+    /**
+     * Moyen de contact, JAMAIS vide : réglage dédié, sinon adresse d'expédition,
+     * sinon la consigne de répondre au message. Aucune donnée de personne.
+     */
     private function contact(): string
     {
-        $c = trim((string) config('envoi.contact_desinscription', ''));
+        foreach ([config('envoi.contact_desinscription'), config('mail.from.address')] as $c) {
+            $c = trim((string) $c);
+            if ($c !== '') {
+                return ' ou écrivez à ' . e($c);
+            }
+        }
 
-        return $c === '' ? '' : ' ou écrivez à ' . e($c);
+        return ' (écrivez-nous à l’adresse qui figure dans le message que vous avez reçu)';
     }
 
     private function gabarit(string $titre, string $corps): string

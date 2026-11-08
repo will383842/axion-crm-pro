@@ -138,6 +138,7 @@
         "Nr23Nr08AudiencesEtRlsTest.php": [
           "NR-08 sous le rôle de production, le rafraîchissement des audiences voit les fiches de CHAQUE espace, et seulement les siennes",
           "NR-08 témoin : le rôle de production ne contourne PAS la RLS (sans contexte d’espace, zéro ligne)",
+          "NR-08 sous le rôle de production, la relance des effets d’opposition termine ceux de CHAQUE espace, et seulement eux",
           "NR-08 CONSTAT : la sonde « non diffusibles » (06:20) est AVEUGLE sous le rôle de production (à corriger par S7)",
           "NR-08 l’inventaire des tâches planifiées sous RLS est celui de la photo de référence"
         ]

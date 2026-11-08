@@ -3,8 +3,8 @@
 namespace App\Envoi\Desinscription;
 
 use App\Support\HmacSignature;
-use DateTimeImmutable;
 use DateTimeInterface;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 
 /**
@@ -31,7 +31,7 @@ final class JetonDesinscription
         if ($cle === '') {
             throw new RuntimeException('Clé de désinscription absente (envoi.cle_desinscription) : jeton non émis.');
         }
-        $depart = $maintenant ?? new DateTimeImmutable;
+        $depart = $maintenant ?? Carbon::now();
         $jours = max(1, (int) config('envoi.desinscription_validite_jours', 730));
         $echeance = $depart->getTimestamp() + $jours * 86400;
         $charge = implode('.', [self::VERSION, $workspaceId, $reference, (string) $echeance]);
@@ -40,10 +40,11 @@ final class JetonDesinscription
     }
 
     /**
+     * @param  bool  $accepterEchu  vrai pour l'opposition (POST) : l'échéance n'est alors pas contrôlée, la signature reste exigée
      * @return array{workspace_id: string, reference: string}|null null pour TOUTE
      *                                                             cause de refus (forme, signature, échéance) : l'appelant ne peut pas les distinguer.
      */
-    public static function verifier(string $jeton): ?array
+    public static function verifier(string $jeton, bool $accepterEchu = false): ?array
     {
         $cle = self::cle();
         if ($cle === '' || strlen($jeton) > self::LONGUEUR_MAX) {
@@ -60,7 +61,8 @@ final class JetonDesinscription
         if (! HmacSignature::verify($cle, implode('.', [self::VERSION, $espace, $reference, $echeance]), $signature)) {
             return null;
         }
-        if ((int) $echeance < time()) {
+        // Une opposition ne coûte rien : le POST accepte un jeton signé mais échu ($accepterEchu).
+        if (! $accepterEchu && (int) $echeance < Carbon::now()->getTimestamp()) {
             return null;
         }
 

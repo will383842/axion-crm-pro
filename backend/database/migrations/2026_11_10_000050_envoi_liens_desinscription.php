@@ -6,9 +6,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Envoi P0 L5 — liens de désinscription : ce à quoi un lien de désinscription est lié.
  * ADDITIF SEULEMENT. La `reference` (UUID aléatoire) est la seule chose qui
- * voyage dans le jeton : aucune donnée de personne dans l'URL. L'adresse reste
- * en base (RLS FORCE), car la liste de suppression existante se tient par
- * adresse. `down()` inerte : rien ne s'efface (règle S8).
+ * voyage dans le jeton : aucune donnée de personne dans l'URL. L'adresse en clair
+ * n'existe PAS (décision du 2026-08-18) : l'empreinte seule porte l'identité. `down()` inerte : rien ne s'efface (règle S8).
  */
 return new class extends Migration
 {
@@ -20,7 +19,6 @@ return new class extends Migration
                 id                BIGSERIAL   PRIMARY KEY,
                 workspace_id      UUID        NOT NULL REFERENCES workspaces(id),
                 reference         UUID        NOT NULL DEFAULT gen_random_uuid(),
-                adresse           CITEXT      NOT NULL,
                 empreinte_adresse CHAR(64)    NOT NULL,
                 portee            TEXT        NOT NULL DEFAULT 'business'
                                   CHECK (portee IN ('business', 'vivier')),
@@ -41,6 +39,8 @@ return new class extends Migration
             END
             $$
             SQL);
+        // (workspace_id, id) unique : cible de la clé étrangère composite de envoi_oppositions.
+        DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS uq_envoi_liens_desinscription_ws_id ON envoi_liens_desinscription (workspace_id, id)');
         DB::statement('CREATE UNIQUE INDEX IF NOT EXISTS uq_envoi_liens_desinscription_reference ON envoi_liens_desinscription (reference)');
         DB::statement('CREATE INDEX IF NOT EXISTS idx_envoi_liens_desinscription_empreinte ON envoi_liens_desinscription (workspace_id, empreinte_adresse)');
         DB::statement('ALTER TABLE envoi_liens_desinscription ENABLE ROW LEVEL SECURITY');

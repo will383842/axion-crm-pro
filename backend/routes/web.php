@@ -23,8 +23,8 @@ Route::middleware([])->withoutMiddleware([
     ShareErrorsFromSession::class,
     ValidateCsrfToken::class,
 ])->group(function () {
-    // Limitation de débit par IP : 30 requêtes par minute.
-    Route::middleware('throttle:30,1')->group(function () {
+    // Limitation PAR JETON pour le GET, aucune pour le POST (RFC 8058) : voir RouteServiceProvider.
+    Route::middleware('throttle:desinscription')->group(function () {
         Route::get('/desinscription/{jeton}', [DesinscriptionController::class, 'page'])
             ->name('envoi.desinscription.page');
         Route::post('/desinscription/{jeton}', [DesinscriptionController::class, 'confirmer'])

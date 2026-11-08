@@ -19,7 +19,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE envoi_liens_desinscription ALTER COLUMN adresse DROP NOT NULL');
+        // Tolérance d'un environnement où la table a été créée AVANT ce correctif (avec `adresse`) : la colonne devient facultative.
+        DB::unprepared("DO \$\$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'envoi_liens_desinscription' AND column_name = 'adresse') THEN ALTER TABLE envoi_liens_desinscription ALTER COLUMN adresse DROP NOT NULL; END IF; END \$\$");
         DB::statement('ALTER TABLE envoi_liens_desinscription ADD COLUMN IF NOT EXISTS contact_id BIGINT');
         DB::statement('CREATE INDEX IF NOT EXISTS idx_envoi_liens_desinscription_contact ON envoi_liens_desinscription (workspace_id, contact_id) WHERE contact_id IS NOT NULL');
     }

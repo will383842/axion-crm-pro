@@ -2,7 +2,9 @@
 
 namespace App\Envoi\Desinscription;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Support\WorkspaceContext;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -14,6 +16,21 @@ use Throwable;
  */
 final class TerminerEffetsOpposition
 {
+    /** @var Closure(string, string, string, string): void émet l'événement sortant « consent_optout » */
+    private readonly Closure $emettreEvenementSortant;
+
+    /**
+     * @param  Closure|null  $emettreEvenementSortant  (espace, empreinte, portée, canal) ; par défaut l'enregistreur CRM.
+     *                                                 L'événement sortant est émis ICI (rejouable), pas dans la transaction d'opposition :
+     *                                                 sa panne ne peut donc jamais annuler l'opposition.
+     */
+    public function __construct(?Closure $emettreEvenementSortant = null)
+    {
+        $this->emettreEvenementSortant = $emettreEvenementSortant ?? static function (string $espace, string $empreinte, string $portee, string $canal): void {
+            (new ConsentOutboundRecorder)->record('consent_optout', $empreinte, $portee, null, ['motif' => 'desinscription_lien', 'canal' => $canal]);
+        };
+    }
+
     /** @return bool true si cet appel a terminé les effets */
     public function pour(string $workspaceId, int $oppositionId): bool
     {
@@ -25,6 +42,7 @@ final class TerminerEffetsOpposition
                         return false;
                     }
                     $portee = (string) DB::table('envoi_liens_desinscription')->where('id', $o->lien_id)->value('portee');
+                    ($this->emettreEvenementSortant)($workspaceId, (string) $o->empreinte_adresse, $portee, (string) $o->canal);
                     event(new OppositionEnregistree($workspaceId, (string) $o->empreinte_adresse, $portee, (string) $o->canal));
                     DB::table('envoi_oppositions')->where('id', $o->id)->update(['effets_termines_le' => now()]);
 

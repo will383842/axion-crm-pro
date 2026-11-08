@@ -122,7 +122,9 @@ final class ListeSuppression
         array $metadata = [],
     ): void {
         if (preg_match('/^[0-9a-f]{64}$/', $empreinte) !== 1) {
-            return;
+            // Une empreinte mal formée ne heurterait JAMAIS personne : l'ignorer en silence
+            // laisserait croire qu'une opposition est tenue alors que rien n'est écrit.
+            throw new \InvalidArgumentException('Empreinte invalide : 64 caractères hexadécimaux minuscules attendus.');
         }
         $maintenant = now();
 
@@ -132,7 +134,9 @@ final class ListeSuppression
             ->first();
 
         if ($existante === null) {
-            DB::table('email_suppressions')->insert([
+            // ON CONFLICT DO NOTHING : si un appel simultané a inséré entre la lecture et l'écriture,
+            // on retombe sur la mise à jour (incrément) au lieu d'une erreur d'unicité.
+            $inseree = DB::table('email_suppressions')->insertOrIgnore([
                 'scope' => $scope,
                 // 🔴 JAMAIS l'adresse en clair (décision du 2026-08-18, temps 1).
                 // Une liste de suppression recense des adresses auxquelles on
@@ -148,14 +152,20 @@ final class ListeSuppression
                 'last_seen_at' => $maintenant,
                 'metadata' => $metadata === [] ? null : json_encode($metadata, JSON_THROW_ON_ERROR),
             ]);
-
-            return;
+            if ($inseree === 1) {
+                return;
+            }
+            $existante = DB::table('email_suppressions')->where('scope', $scope)->where('email_hash', $empreinte)->first();
+            if ($existante === null) {
+                return; // ligne retirée entre-temps : rien à compléter
+            }
         }
 
+        // Incrément ATOMIQUE (pas de « lu + 1 ») : deux appels simultanés comptent deux fois.
         DB::table('email_suppressions')
             ->where('id', $existante->id)
             ->update([
-                'occurrences' => $existante->occurrences + 1,
+                'occurrences' => DB::raw('occurrences + 1'),
                 'last_seen_at' => $maintenant,
                 'reason' => self::raisonLaPlusGrave((string) $existante->reason, $raison),
                 // ⚠️ L'adresse en clair d'une ligne ANCIENNE n'est ni écrasée

@@ -5,19 +5,26 @@
  */
 
 use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\EffetsOpposition;
 use App\Envoi\Desinscription\InscriptionsEnvoi;
 use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\Desinscription\TerminerEffetsOpposition;
+use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;
 
@@ -26,12 +33,16 @@ uses(TestCase::class, RefreshDatabase::class);
 const DESINSCR_ADRESSE = 'personne@zz-desinscription.example.invalid';
 
 beforeEach(function () {
+    // Horloge figée en UTC : ni l'heure de lancement ni le fuseau de l'application ne comptent.
+    Carbon::setTestNow(Carbon::parse('2026-11-10 12:00:00', 'UTC'));
     config(['envoi.cle_desinscription' => 'cle-de-test-seulement', 'envoi.desinscription_validite_jours' => 30]);
     $this->ws = F::espace('zz-desinscr');
     $this->ref = InscriptionsEnvoi::creer($this->ws, DESINSCR_ADRESSE);
     $this->jeton = JetonDesinscription::emettre($this->ws, $this->ref);
     $this->chemin = '/desinscription/' . $this->jeton;
 });
+
+afterEach(fn () => Carbon::setTestNow());
 
 function desinscrOppositions(string $ws): int
 {
@@ -89,7 +100,7 @@ test('S22 rejeu du même jeton : une seule opposition, un seul comptage, un seul
 
 test('jetons invalides, falsifiés ou expirés : même refus, sans fuite, sans écriture', function () {
     $autre = F::espace('zz-desinscr-b');
-    $expire = JetonDesinscription::emettre($this->ws, $this->ref, new DateTimeImmutable('-2 years'));
+    $expire = JetonDesinscription::emettre($this->ws, $this->ref, Carbon::now()->subYears(2));
     $inconnu = JetonDesinscription::emettre($this->ws, '00000000-0000-4000-8000-000000000000');
     // Même signature, autre espace : la signature couvre l'espace.
     $croise = str_replace($this->ws, $autre, $this->jeton);
@@ -102,7 +113,7 @@ test('jetons invalides, falsifiés ou expirés : même refus, sans fuite, sans �
     })();
 
     $corps = [];
-    foreach (['n-importe-quoi', substr($this->jeton, 0, -3), $expire, $inconnu, $croise, $mauvaiseCle, str_repeat('a', 5000)] as $j) {
+    foreach (['n-importe-quoi', substr($this->jeton, 0, -3), $inconnu, $croise, $mauvaiseCle, str_repeat('a', 5000)] as $j) {
         foreach (['get', 'post'] as $m) {
             $r = $this->{$m}('/desinscription/' . $j);
             $r->assertNotFound();
@@ -222,7 +233,7 @@ test('RLS FORCE sur les deux tables', function () {
 
 test('B2 l’adresse en clair n’est écrite nulle part : empreinte seule, liste de suppression sans adresse', function () {
     $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->where('reference', $this->ref)->first());
-    expect($ligne->adresse)->toBeNull();
+    expect(property_exists($ligne, 'adresse'))->toBeFalse(); // la colonne n'existe plus
     expect($ligne->empreinte_adresse)->toBe(ListeSuppression::empreinte(DESINSCR_ADRESSE));
 
     $this->post($this->chemin)->assertOk();
@@ -238,7 +249,7 @@ test('B2 la référence au contact est conservée à la place de l’adresse', f
     $ref = InscriptionsEnvoi::creer($this->ws, 'autre@zz-desinscription.example.invalid', 'business', 4242);
     $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->where('reference', $ref)->first());
     expect((int) $ligne->contact_id)->toBe(4242);
-    expect($ligne->adresse)->toBeNull();
+    expect(property_exists($ligne, 'adresse'))->toBeFalse();
 });
 
 test('B1 EffetsOpposition tente les DEUX effets même si le premier lève une erreur', function () {
@@ -303,10 +314,14 @@ test('B1 la relance est planifiée chaque minute', function () {
 });
 
 test('deux terminaisons simultanées des effets : un seul événement', function () {
-    Event::fake([OppositionEnregistree::class]);
-    $this->post($this->chemin)->assertOk(); // l'écouteur est simulé : l'événement part, effets marqués terminés
-    $id = (int) WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->value('id'));
-    WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('id', $id)->update(['effets_termines_le' => null]));
+    // Opposition acquise, effets non terminés (sans UPDATE : le trigger d'ajout seul l'interdit désormais).
+    $id = WorkspaceContext::run($this->ws, function () {
+        $lien = DB::table('envoi_liens_desinscription')->where('reference', $this->ref)->first();
+
+        return (int) DB::table('envoi_oppositions')->insertGetId([
+            'workspace_id' => $this->ws, 'lien_id' => $lien->id, 'empreinte_adresse' => $lien->empreinte_adresse, 'canal' => 'page',
+        ]);
+    });
     Event::fake([OppositionEnregistree::class]);
 
     $t = app(TerminerEffetsOpposition::class);
@@ -325,16 +340,206 @@ test('one-click RFC 8058 envoyé en multipart/form-data', function () {
     expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->value('canal')))->toBe('one_click');
 });
 
-test('limitation de débit : 30 requêtes par minute et par IP, la 31e reçoit 429', function () {
-    for ($i = 0; $i < 30; $i++) {
-        $this->get($this->chemin)->assertOk();
-    }
-    $this->get($this->chemin)->assertStatus(429);
-});
-
 test('lien expiré : page de refus avec un moyen de contact générique, sans distinguer la cause', function () {
     config(['envoi.contact_desinscription' => 'desinscription@exemple.invalid']);
     $r = $this->get('/desinscription/v1.invalide');
     $r->assertNotFound();
     expect($r->getContent())->toContain('desinscription@exemple.invalid')->toContain('expiré');
+});
+
+// ── Correctifs des audits Opus (sécurité + données) ─────────────────────────────────────────
+
+test('RFC 8058 : une désinscription en un clic ne reçoit JAMAIS 429, même en rafale depuis une même IP', function () {
+    for ($i = 0; $i < 150; $i++) {
+        $this->post($this->chemin, ['List-Unsubscribe' => 'One-Click'])->assertOk();
+    }
+    // Des jetons DIFFÉRENTS depuis la même IP (messagerie d'entreprise derrière un seul NAT) : jamais limités entre eux.
+    for ($i = 0; $i < 60; $i++) {
+        $ref = InscriptionsEnvoi::creer($this->ws, "p{$i}@zz-desinscription.example.invalid");
+        $this->get('/desinscription/' . JetonDesinscription::emettre($this->ws, $ref))->assertOk();
+    }
+});
+
+test('jeton signé mais EXPIRÉ : le POST est accepté (une opposition ne coûte rien), le GET reste refusé', function () {
+    $expire = JetonDesinscription::emettre($this->ws, $this->ref, Carbon::now()->subYears(2));
+    $this->get('/desinscription/' . $expire)->assertNotFound();
+    expect(desinscrOppositions($this->ws))->toBe(0);
+
+    $this->post('/desinscription/' . $expire, ['List-Unsubscribe' => 'One-Click'])->assertOk();
+    expect(desinscrOppositions($this->ws))->toBe(1);
+    expect(ListeSuppression::estSupprimee(DESINSCR_ADRESSE))->toBeTrue();
+
+    // Signature falsifiée : toujours refusée, expirée ou non.
+    $this->post('/desinscription/' . substr($expire, 0, -2) . 'zz')->assertNotFound();
+});
+
+test('page de refus : le moyen de contact n’est jamais vide, même sans réglage dédié', function () {
+    config(['envoi.contact_desinscription' => '', 'mail.from.address' => 'expediteur@exemple.invalid']);
+    $r = $this->get('/desinscription/v1.invalide');
+    $r->assertNotFound();
+    expect($r->getContent())->toContain('expediteur@exemple.invalid');
+
+    config(['mail.from.address' => '']);
+    $sans = $this->get('/desinscription/v1.invalide')->getContent();
+    expect($sans)->toContain('répondez')->not->toContain('ou écrivez à  ')->not->toMatch('/désinscription\s*\./u');
+});
+
+test('triggers d’ajout seul : envoi_oppositions n’autorise que NULL -> valeur sur effets_termines_le', function () {
+    $this->post($this->chemin)->assertOk();
+    $refus = fn (string $sql) => expect(fn () => DB::transaction(fn () => WorkspaceContext::run($this->ws, fn () => DB::statement($sql))))->toThrow(QueryException::class);
+
+    $refus('UPDATE envoi_oppositions SET effets_termines_le = NULL');           // valeur -> NULL
+    $refus("UPDATE envoi_oppositions SET effets_termines_le = now() + interval '1 day'"); // valeur -> autre valeur
+    $refus("UPDATE envoi_oppositions SET canal = 'page'");
+    $refus("UPDATE envoi_oppositions SET empreinte_adresse = repeat('b', 64)");
+    $refus('DELETE FROM envoi_oppositions');
+    $refus('TRUNCATE envoi_oppositions');
+    $refus('DELETE FROM envoi_liens_desinscription');
+    $refus('TRUNCATE envoi_liens_desinscription CASCADE');
+    expect(desinscrOppositions($this->ws))->toBe(1);
+});
+
+test('trigger : le passage NULL -> valeur reste permis (c’est le seul)', function () {
+    Event::fake([OppositionEnregistree::class]);
+    $this->post($this->chemin)->assertOk();
+    $id = (int) WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->value('id'));
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_oppositions')->where('id', $id)->whereNotNull('effets_termines_le')->count()))->toBe(1);
+    // Les fonctions de trigger fixent leur search_path (convention de 000011).
+    $n = DB::selectOne("SELECT count(*) AS n FROM pg_proc WHERE proname LIKE 'envoi_%ajout_seul%' AND (proconfig IS NULL OR NOT proconfig::text LIKE '%search_path%')");
+    expect((int) $n->n)->toBe(0);
+});
+
+test('table des liens sans colonne adresse ; clé étrangère composite (espace, lien)', function () {
+    $cols = DB::table('information_schema.columns')->where('table_name', 'envoi_liens_desinscription')->pluck('column_name')->all();
+    expect($cols)->not->toContain('adresse')->toContain('empreinte_adresse');
+
+    $fk = DB::selectOne("SELECT pg_get_constraintdef(oid) AS d FROM pg_constraint WHERE conrelid = 'envoi_oppositions'::regclass AND contype = 'f' AND confrelid = 'envoi_liens_desinscription'::regclass");
+    expect($fk->d)->toContain('(workspace_id, lien_id)')->toContain('(workspace_id, id)');
+
+    // Une opposition d'un AUTRE espace ne peut pas pointer sur ce lien.
+    $autre = F::espace('zz-desinscr-fk');
+    $lien = (int) WorkspaceContext::run($this->ws, fn () => DB::table('envoi_liens_desinscription')->value('id'));
+    expect(fn () => DB::transaction(fn () => WorkspaceContext::run($autre, fn () => DB::table('envoi_oppositions')->insert([
+        'workspace_id' => $autre, 'lien_id' => $lien, 'empreinte_adresse' => str_repeat('a', 64), 'canal' => 'page',
+    ]))))->toThrow(QueryException::class);
+});
+
+test('M1 l’opposition est écrite via addOptOut (raison unsubscribe) ET dans la liste de suppression', function () {
+    $this->post($this->chemin)->assertOk();
+    $h = ListeSuppression::empreinte(DESINSCR_ADRESSE);
+    $lignes = DB::table('opt_out')->where('email_hash', $h)->get();
+    expect($lignes)->not->toBeEmpty();
+    expect($lignes->pluck('reason')->unique()->all())->toBe(['unsubscribe']);
+    expect($lignes->pluck('email')->filter()->all())->toBe([]); // jamais l'adresse en clair
+    // Le blocage par email_suppressions n'est pas cassé.
+    expect(ListeSuppression::estSupprimee(DESINSCR_ADRESSE))->toBeTrue();
+    expect(DB::table('email_suppressions')->where('email_hash', $h)->value('reason'))->toBe(ListeSuppression::MANUEL); // vocabulaire fermé de cette table
+    // Rejeu : pas de doublon.
+    $n = $lignes->count();
+    $this->post($this->chemin)->assertOk();
+    expect(DB::table('opt_out')->where('email_hash', $h)->count())->toBe($n);
+});
+
+test('inscrireEmpreinte : exception si l’empreinte est mal formée, rien n’est écrit', function () {
+    foreach (['', 'abc', str_repeat('Z', 64), str_repeat('a', 63), str_repeat('a', 65)] as $mauvaise) {
+        expect(fn () => ListeSuppression::inscrireEmpreinte($mauvaise, ListeSuppression::MANUEL, 'test'))->toThrow(InvalidArgumentException::class);
+    }
+    expect(DB::table('email_suppressions')->count())->toBe(0);
+});
+
+test('inscrireEmpreinte : deux appels = une seule ligne (ON CONFLICT), occurrences cumulées', function () {
+    $h = ListeSuppression::empreinte('x@zz-desinscription.example.invalid');
+    ListeSuppression::inscrireEmpreinte($h, ListeSuppression::MANUEL, 'test');
+    ListeSuppression::inscrireEmpreinte($h, ListeSuppression::MANUEL, 'test');
+    expect(DB::table('email_suppressions')->where('email_hash', $h)->count())->toBe(1);
+    expect((int) DB::table('email_suppressions')->where('email_hash', $h)->value('occurrences'))->toBe(2);
+});
+
+test('l’événement sortant en panne n’annule PAS l’opposition ; la relance le reprend une seule fois', function () {
+    $panne = true;
+    $essais = 0;
+    app()->instance(TerminerEffetsOpposition::class, new TerminerEffetsOpposition(function () use (&$panne, &$essais) {
+        $essais++;
+        if ($panne) {
+            throw new RuntimeException('panne de l’événement sortant');
+        }
+        (new ConsentOutboundRecorder)->record('consent_optout', ListeSuppression::empreinte(DESINSCR_ADRESSE), 'business', null, []);
+    }));
+
+    $this->post($this->chemin)->assertOk(); // la réponse ne dépend pas de la panne
+    expect(desinscrOppositions($this->ws))->toBe(1);
+    expect(ListeSuppression::estSupprimee(DESINSCR_ADRESSE))->toBeTrue();
+    expect(DB::table('crm_outbound_events')->count())->toBe(0);
+
+    $panne = false;
+    $this->artisan('envoi:relancer-effets-opposition')->assertSuccessful();
+    $this->artisan('envoi:relancer-effets-opposition')->assertSuccessful();
+    expect(DB::table('crm_outbound_events')->count())->toBe(1);
+    expect($essais)->toBe(2);
+});
+
+test('M2 opposition -> envoi réel : refusé tant que le retrait des envois en file est celui par défaut', function () {
+    $ws = $this->ws;
+    $m = new MessageAEnvoyer($ws, 'a@example.test', 'f@example.test', 'S', 'C', 'k');
+    $this->post($this->chemin)->assertOk();
+    config(['envoi.reel_actif' => true]);
+
+    // Retrait « absent » branché : l'envoi réel est tenu pour inactif, rien ne part.
+    expect(app(RetraitEnvoisEnFile::class))->toBeInstanceOf(RetraitEnvoisEnFileAbsent::class);
+    expect(fn () => WorkspaceContext::run($ws, fn () => app(ServeurEnvoi::class)->injecter($m)))->toThrow(EnvoiRefuse::class, 'Envoi réel inactif');
+});
+
+test('M2 la garde s’efface quand un vrai retrait est branché (l’envoi reste soumis aux autres portes)', function () {
+    app()->instance(RetraitEnvoisEnFile::class, new class implements RetraitEnvoisEnFile
+    {
+        public function retirerPour(string $workspaceId, string $empreinteAdresse): int
+        {
+            return 0;
+        }
+    });
+    config(['envoi.reel_actif' => true]);
+    $m = new MessageAEnvoyer($this->ws, 'a@example.test', 'f@example.test', 'S', 'C', 'k');
+    try {
+        WorkspaceContext::run($this->ws, fn () => app(ServeurEnvoi::class)->injecter($m));
+    } catch (EnvoiRefuse $e) {
+        expect($e->getMessage())->not->toContain('Envoi réel inactif'); // refusé pour une autre raison (témoins), pas par cette garde
+    }
+});
+
+test('concurrence RÉELLE : deux processus simultanés sur le même lien = une opposition, un comptage, un événement', function () {
+    $proprio = DB::connection('pgsql_owner');
+    $ws = (string) Str::uuid();
+    $ref = (string) Str::uuid();
+    $h = ListeSuppression::empreinte('conc@zz-desinscription.example.invalid');
+    $proprio->table('workspaces')->insert(['id' => $ws, 'slug' => 'zz-conc-' . substr($ws, 0, 6), 'name' => 'Concurrence', 'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+    $proprio->table('envoi_liens_desinscription')->insert(['workspace_id' => $ws, 'reference' => $ref, 'empreinte_adresse' => $h, 'portee' => 'business']);
+    try {
+        $depart = microtime(true) + 4;
+        $procs = [];
+        foreach ([1, 2, 3] as $i) {
+            $procs[$i] = proc_open([PHP_BINARY, base_path('tests/Support/opposition-concurrente.php'), $ws, $ref, sprintf('%.4F', $depart)], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes[$i]);
+        }
+        $codes = [];
+        foreach ($procs as $i => $p) {
+            $sortie = stream_get_contents($tubes[$i][1]) . stream_get_contents($tubes[$i][2]);
+            $codes[$i] = proc_close($p);
+            expect($codes[$i])->toBe(0, $sortie);
+        }
+        expect($proprio->table('envoi_oppositions')->where('workspace_id', $ws)->count())->toBe(1);
+        expect((int) $proprio->table('email_suppressions')->where('email_hash', $h)->sum('occurrences'))->toBe(1);
+        expect($proprio->table('email_suppressions')->where('email_hash', $h)->count())->toBe(1);
+        expect($proprio->table('crm_outbound_events')->where('email_hash', $h)->count())->toBe(1);
+        expect($proprio->table('opt_out')->where('email_hash', $h)->count())->toBe(1); // portée « business »
+    } finally {
+        // Nettoyage par le propriétaire : les triggers d'ajout seul sont suspendus le temps du nettoyage de CES lignes.
+        $proprio->statement("SET session_replication_role = 'replica'");
+        $proprio->table('crm_outbound_events')->where('email_hash', $h)->delete();
+        $proprio->table('opt_out')->where('email_hash', $h)->delete();
+        $proprio->table('email_suppressions')->where('email_hash', $h)->delete();
+        $proprio->table('envoi_oppositions')->where('workspace_id', $ws)->delete();
+        $proprio->table('envoi_liens_desinscription')->where('workspace_id', $ws)->delete();
+        $proprio->table('workspaces')->where('id', $ws)->delete();
+        $proprio->statement("SET session_replication_role = 'origin'");
+        $proprio->disconnect();
+    }
 });

@@ -26,7 +26,10 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
             new FauxServeurEnvoi,
             $app->make(DepotSocle::class),
-            fn (): bool => (bool) config('envoi.reel_actif'),
+            // Garde M2 : tant que le retrait des envois en file est la liaison « absente », une opposition
+            // ne retirerait RIEN de la file (étape suivante d'une séquence) : l'envoi réel est tenu pour inactif.
+            fn (): bool => (bool) config('envoi.reel_actif')
+                && ! ($app->make(RetraitEnvoisEnFile::class) instanceof RetraitEnvoisEnFileAbsent),
             fn (): int => (int) config('envoi.plafond_jour'),
             null,
             '',

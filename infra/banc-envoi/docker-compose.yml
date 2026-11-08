@@ -48,4 +48,4 @@ services:
 networks:
   banc:
     internal: true
-    ipam: { config: [{ subnet: 10.99.0.0/24 }] }
+    ipam: { config: [{ subnet: 10.99.0.0/24, ip_range: 10.99.0.128/25 }] }  # auto-attribution hors des IP fixes (.2, .10)

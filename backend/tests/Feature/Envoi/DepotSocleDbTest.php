@@ -160,3 +160,15 @@ test('commande envoi:tout-arreter : arme le drapeau en base et journalise', func
     $n = WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->where('commande', 'tout_arreter')->where('auteur', 'will')->count());
     expect($n)->toBe(1);
 });
+
+test('I-3 : une adresse non ASCII n\'est jamais témoin (a@faß.de ≠ a@fass.de), comme empreinte_temoin côté serveur', function () {
+    $ws = espaceEnvoi();
+    $depot = app(DepotSocle::class);
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->insert([
+        'workspace_id' => $ws, 'empreinte' => EmpreinteTemoin::calculer('a@fass.de'), 'libelle' => 'témoin ASCII',
+    ]));
+    expect($depot->estTemoin($ws, 'a@fass.de'))->toBeTrue();
+    expect($depot->estTemoin($ws, 'a@faß.de'))->toBeFalse();            // punycode transitoire : même empreinte, pas témoin
+    expect($depot->estTemoin($ws, 'a@fass.de' . ' '))->toBeTrue();         // les espaces restent ignorés
+    expect($depot->estTemoin($ws, "a@fass.d\u{212A}"))->toBeFalse();     // signe KELVIN
+});

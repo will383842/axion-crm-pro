@@ -78,6 +78,10 @@ class Reponse:
     rejeu: str = ""  # "" (neuf ou redépôt autorisé), "confirme", "reserve-ancien" (ambigu)
 
 
+class ErreurSocleFerme(RuntimeError):
+    """Le socle est fermé (stockage absent ou illisible) : l'appelant doit réessayer plus tard, pas conclure « inconnu »."""
+
+
 class Socle:
     _apres_reserve = None  # crochet de test : simule un kill -9 entre la réservation et le 250
 
@@ -311,29 +315,35 @@ class Socle:
                 return Reponse(451, "4.7.1 mode temoins : destinataire hors liste, report")
         return None
 
-    def trancher(self, id_message: str, deja_depose: bool) -> bool:
+    def trancher(self, id_message: str, deja_depose: bool, espace: str | None = None) -> bool:
         """Tranche un rejeu AMBIGU (local, hors réseau, non exposé par `traiter`). `deja_depose=True` : KumoMTA a le
-        message => confirmé (plus aucun dépôt). `False` : il ne l'a pas => UN redépôt est autorisé (borné à 3)."""
+        message => confirmé (plus aucun dépôt). `False` : il ne l'a pas => UN redépôt est autorisé (borné à 3).
+        `espace` (facultatif) : si fourni, seul un jeton de CET espace est tranché. Socle fermé : `ErreurSocleFerme`
+        (jamais un `False`, qui se confondrait avec « jeton inconnu »)."""
         if self.ferme:
-            return False
+            raise ErreurSocleFerme("socle ferme : decision impossible")
         if deja_depose:
-            return self.confirmer(id_message)
+            return self.confirmer(id_message, espace)
         with self._verrou:
             def f(c):
-                if not c.execute("SELECT 1 FROM jetons WHERE id=? AND etat='reserve'", (str(id_message),)).fetchone():
+                if not c.execute("SELECT 1 FROM jetons WHERE id=? AND etat='reserve'" + ("" if espace is None else " AND espace=?"),
+                                 (str(id_message),) + (() if espace is None else (str(espace),))).fetchone():
                     return False
                 self.stockage.poser(c, CLE_REDEPOT + str(id_message), 1)
                 self._journaliser(c, "rejeu-tranche-redepot", assainir(id_message)[:8])
                 return True
             return bool(self.stockage.ecrire(f))
 
-    def confirmer(self, id_message: str) -> bool:
-        """reserve -> confirme. Réservé au log hook K7 (local, hors réseau) ; non exposé par `traiter`."""
+    def confirmer(self, id_message: str, espace: str | None = None) -> bool:
+        """reserve -> confirme. Réservé au log hook K7 (local, hors réseau) ; non exposé par `traiter`.
+        `espace` (facultatif, à fournir dès que l'appelant le connaît) : filtre `AND espace=?`, un identifiant d'un autre
+        espace n'est pas confirmé. Socle fermé : `ErreurSocleFerme` (jamais un `False`, ambigu avec « inconnu »)."""
         if self.ferme:
-            return False
+            raise ErreurSocleFerme("socle ferme : confirmation impossible")
         with self._verrou:
             def f(c):
-                return c.execute("UPDATE jetons SET etat='confirme' WHERE id=?", (str(id_message),)).rowcount == 1
+                filtre, arg = ("", ()) if espace is None else (" AND espace=?", (str(espace),))
+                return c.execute("UPDATE jetons SET etat='confirme' WHERE id=?" + filtre, (str(id_message),) + arg).rowcount == 1
             return bool(self.stockage.ecrire(f))
 
     # --- homme mort ------------------------------------------------------------------------------

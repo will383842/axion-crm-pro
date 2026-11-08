@@ -1,0 +1,168 @@
+{
+  "description": "Vecteurs d'empreintes de témoins communs CRM (PHP, App\\Envoi\\EmpreinteTemoin) / serveur d'envoi (Python). Normalisation : minuscules, espaces retirés, domaine (après le dernier @) sans point final et en punycode (IDNA/UTS46). Empreinte = HMAC-SHA256(adresse normalisée, clé) en hexadécimal. Clé de vecteur : publiable, sans valeur. Calculé indépendamment en Python (hmac+hashlib). Cas IDN : Python (IDNA2003) et PHP (UTS46 transitoire) concordent ; un cas qui diverge doit rougir des deux côtés.",
+  "cle": "cle-empreinte-de-vecteur-NON-SECRETE",
+  "cas": [
+    {
+      "libelle": "minuscules",
+      "adresse": "Temoin@Example.TEST",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "espaces_retires",
+      "adresse": "  temoin @ example.test ",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "tabulation_saut_de_ligne",
+      "adresse": "a\tb@example.test\n",
+      "normalisee": "ab@example.test",
+      "empreinte": "9657aa02ac737bd4a1dfc5eb54fc54f9c1d209dd2108e1082e80fec4d8ad2b09"
+    },
+    {
+      "libelle": "point_final_du_domaine",
+      "adresse": "temoin@example.test.",
+      "normalisee": "temoin@example.test",
+      "empreinte": "d5057e5d5e157907bb50de82d5fb6e15489721478f561c7236970b1102684586"
+    },
+    {
+      "libelle": "punycode",
+      "adresse": "Temoin@BÜCHER.example",
+      "normalisee": "temoin@xn--bcher-kva.example",
+      "empreinte": "e81fd60c0501e16ba01b2b569f9a330c5f36e1dc144f42d91adb4af3cc3ebfe3"
+    },
+    {
+      "libelle": "punycode_deja_ascii_et_point_final",
+      "adresse": "temoin@xn--bcher-kva.example.",
+      "normalisee": "temoin@xn--bcher-kva.example",
+      "empreinte": "e81fd60c0501e16ba01b2b569f9a330c5f36e1dc144f42d91adb4af3cc3ebfe3"
+    },
+    {
+      "libelle": "partie_locale_accentuee_en_minuscules",
+      "adresse": "ÉLODIE@Example.test",
+      "normalisee": "élodie@example.test",
+      "empreinte": "2f49189f85ba07e8c9c28ab011f3f00ad286eec2c2b32ddeafaa41b984a2c688"
+    },
+    {
+      "libelle": "idn_eszett_transitoire",
+      "adresse": "a@faß.de",
+      "normalisee": "a@fass.de",
+      "empreinte": "50170e4f781d0ff71e178ac9a2e5f3e5afb58eef8daaa71d44c6ca7b355f3461"
+    },
+    {
+      "libelle": "idn_sigma_final_majuscules",
+      "adresse": "a@ΣΑΣ.gr",
+      "normalisee": "a@xn--mxa9ab.gr",
+      "empreinte": "1ca8dea8374a89be052f007be07ec89278479ed21202db6e0f6ec9fdb18e3970"
+    },
+    {
+      "libelle": "idn_zwj_retire",
+      "adresse": "a@e‍x.de",
+      "normalisee": "a@ex.de",
+      "empreinte": "2db9b8a52103f5b202df9e60c6bbd1f124be5264d9d54e7a18b3549834b37cad"
+    },
+    {
+      "libelle": "idn_zwnj_retire",
+      "adresse": "a@e‌x.de",
+      "normalisee": "a@ex.de",
+      "empreinte": "2db9b8a52103f5b202df9e60c6bbd1f124be5264d9d54e7a18b3549834b37cad"
+    },
+    {
+      "libelle": "local_k_ascii",
+      "adresse": "K@Example.test",
+      "normalisee": "k@example.test",
+      "empreinte": "e602b49916d69d1dff96cb47d49c4c2776d42404a9abf3d2d36d8f2537a6e390"
+    },
+    {
+      "libelle": "local_signe_kelvin_replie_en_k",
+      "adresse": "K@Example.test",
+      "normalisee": "k@example.test",
+      "empreinte": "e602b49916d69d1dff96cb47d49c4c2776d42404a9abf3d2d36d8f2537a6e390"
+    },
+    {
+      "libelle": "idn_pleine_chasse",
+      "adresse": "a@ＥＸＡＭＰＬＥ.test",
+      "normalisee": "a@example.test",
+      "empreinte": "a4ef0ad423020d4878a212ee941442d26e257ca71ed1af95b8c73c033090ba16"
+    },
+    {
+      "libelle": "idn_point_ideographique",
+      "adresse": "a@日本語。jp",
+      "normalisee": "a@xn--wgv71a119e.jp",
+      "empreinte": "6461502450d2104cea038d25e8357af93ad5d34febb01a4fb1a1c22adebff83e"
+    },
+    {
+      "libelle": "idn_trait_union_conditionnel",
+      "adresse": "a@ab­c.test",
+      "normalisee": "a@abc.test",
+      "empreinte": "a7043a2aa69547b053b010cf4c1f56667392bf9f3e0f03f6093e3e70e1eac59f"
+    },
+    {
+      "libelle": "idn_chiffre_romain",
+      "adresse": "a@ⅷ.test",
+      "normalisee": "a@viii.test",
+      "empreinte": "efb0f489e3280c193aab00bd8ae8db967d478340d5ff21b058ea90e82b5bd747"
+    },
+    {
+      "libelle": "idn_point_ideographique_separateur",
+      "adresse": "a@a。b",
+      "normalisee": "a@a.b",
+      "empreinte": "1a581812dff56790ac24c8732a60088f476d99544c0182952ac6d6cd9b463894"
+    },
+    {
+      "libelle": "idn_combinant",
+      "adresse": "a@x̸.test",
+      "normalisee": "a@xn--x-2eb.test",
+      "empreinte": "fee3be7ec2e81c4659ac656df1185771863d762b56aab92992141c8ed58fe5a2"
+    },
+    {
+      "libelle": "idn_digraphe",
+      "adresse": "a@ǆ.test",
+      "normalisee": "a@xn--d-toa.test",
+      "empreinte": "d35d9f7178e51d462ebea91175e44228bb949a19e9c6a327d81ba90269b5fd90"
+    },
+    {
+      "libelle": "idn_iota_souscrit",
+      "adresse": "a@ᾳ.gr",
+      "normalisee": "a@xn--mxaq.gr",
+      "empreinte": "263f9df7954646a77a22eecfcee618da4dc81e29090ceba40d311b741ba013f0"
+    },
+    {
+      "libelle": "tiret_bas_inchange",
+      "adresse": "a@exa_mple.test",
+      "normalisee": "a@exa_mple.test",
+      "empreinte": "01bce1608db89372f733859f3de31ec22cf9d26e15873887667fd68ef5aa3844"
+    },
+    {
+      "libelle": "punycode_vide_inchange",
+      "adresse": "a@xn--.test",
+      "normalisee": "a@xn--.test",
+      "empreinte": "a2830b2ffac2740d8ac3bd09d1d12ffdcba6a23d23b6e186e7a041669df7b6c4"
+    },
+    {
+      "libelle": "points_doubles_inchanges",
+      "adresse": "a@ex..test",
+      "normalisee": "a@ex..test",
+      "empreinte": "dce947c2ab328a9df19c3915653186799f0f537d5cbd5857662ee6ef8b9a8614"
+    },
+    {
+      "libelle": "idn_allemand",
+      "adresse": "a@münchen.de",
+      "normalisee": "a@xn--mnchen-3ya.de",
+      "empreinte": "02a9e479cf78b9ed2432f1a23ec7921088b37e0b5d29c457eb45d44984f97901"
+    },
+    {
+      "libelle": "idn_majuscules_accentuees",
+      "adresse": "a@ÀÉ.fr",
+      "normalisee": "a@xn--0cas.fr",
+      "empreinte": "510e40e38670ec1e8e3336a9b580175f2d5f8c3efa750b1fdf39a60df066efa8"
+    },
+    {
+      "libelle": "idn_sigma_final_minuscule",
+      "adresse": "a@ας.gr",
+      "normalisee": "a@xn--mxa0b.gr",
+      "empreinte": "336462301cbb9d3bc293659fb4d05bb5ffae9e5aa42786d8ba444fdf9b7661dc"
+    }
+  ]
+}

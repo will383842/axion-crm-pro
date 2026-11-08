@@ -175,7 +175,7 @@ test('une demande d\'effacement de la CONSOLE prévient le owner (NotificationCr
     $notification = DB::table('notifications')->where('user_id', $proprietaire->id)->first();
     expect($notification)->not->toBeNull()
         ->and($notification->type)->toBe('rgpd.demande_effacement')
-        ->and($notification->action_url)->toBe('/rgpd/requests')
+        ->and($notification->action_url)->toBe('/rgpd/requests?statut=ouverte')
         ->and(mb_strtolower((string) $notification->body))->not->toContain('efface@asdr.test');
     Event::assertDispatched(NotificationCreated::class, fn (NotificationCreated $e): bool => $e->userId === (string) $proprietaire->id);
 

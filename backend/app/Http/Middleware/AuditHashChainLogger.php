@@ -59,6 +59,13 @@ class AuditHashChainLogger
      */
     private const MOTIF_PARAMETRE_SECRET = '#token|jeton|secret|signature#i';
 
+    /**
+     * Posé par un contrôleur qui écrit LUI-MÊME sa ligne d'audit (avec des
+     * informations que le middleware ne connaît pas, comme le compte de lignes
+     * d'un export) : le journal générique n'en écrit pas une deuxième.
+     */
+    public const ATTRIBUT_JOURNAL_PROPRE = 'audit.journal_propre';
+
     public function __construct(private readonly AuditHashChain $chain) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -125,6 +132,10 @@ class AuditHashChainLogger
      */
     private static function doitJournaliser(Request $request): bool
     {
+        if ($request->attributes->get(self::ATTRIBUT_JOURNAL_PROPRE) === true) {
+            return false;
+        }
+
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return true;
         }

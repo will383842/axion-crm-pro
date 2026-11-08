@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Crm\Ingest\PersonnesIngestService;
-use App\Services\Alertes\AlerteTelegram;
+use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -101,9 +101,12 @@ class CrmSondePersonnes extends Command
         Log::critical($message, ['recus' => $recus, 'rattaches' => $rattaches, 'creees' => $creees]);
         $this->error($message);
 
-        app(AlerteTelegram::class)->envoyer(
-            '🔴 CRM — flux lettre et guide muet',
+        app(Alerte::class)->envoyer(
+            'CRM — flux lettre et guide muet',
             $message,
+            'crm',
+            'critique',
+            null,
             ['constat' => 'L4-C', 'recus' => $recus, 'rattaches' => $rattaches, 'creees' => $creees],
         );
 

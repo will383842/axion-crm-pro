@@ -20,12 +20,14 @@ use App\Http\Controllers\Api\Crm\BulkController;
 use App\Http\Controllers\Api\Crm\CandidatesController;
 use App\Http\Controllers\Api\Crm\ChoixEntrepriseController;
 use App\Http\Controllers\Api\Crm\ContactsHubController;
+use App\Http\Controllers\Api\Crm\OriginesController;
 use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
+use App\Http\Controllers\Api\EnvoiSanteController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\FederationsController;
@@ -121,6 +123,12 @@ Route::prefix('v1')->group(function () {
         // survecu a un audit de 46 agents -- parce que le mandat exigeait
         // d'ouvrir chaque ecran a la main et que la console ne tourne pas.
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+
+        // K15 : écran « Santé des envois » (lecture seule).
+        // Elle rend domaines d'envoi, listes noires, pauses et état du serveur : réservée à `users.manage` (owner, admin ;
+        // `operator` et `viewer` : 403). `workspaces.manage` exclurait l'admin ; une permission dédiée exigerait une migration de rôles.
+        Route::get('/envoi/sante', [EnvoiSanteController::class, 'index'])
+            ->middleware('permission:users.manage');
 
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe
@@ -432,6 +440,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/notifications', [NotificationsController::class, 'index']);
         Route::post('/notifications/{n}/read', [NotificationsController::class, 'markRead']);
         Route::post('/notifications/read-all', [NotificationsController::class, 'markAllRead']);
+        Route::post('/notifications/test-alerte', [NotificationsController::class, 'testerAlerte'])->middleware(['permission:users.manage', 'throttle:6,1']);
 
         // RGPD + AI Act + audit
         //
@@ -577,6 +586,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/personnes/counts', [PersonnesController::class, 'counts'])->middleware('delai-sql:120');
             Route::get('/personnes/export', [PersonnesController::class, 'export'])
                 ->middleware(['throttle:scraper-list', 'permission:data.export', 'delai-sql:300']);
+            // PR-A (L2-back) — API de LECTURE des origines. Derrière l'interrupteur
+            // `origines.lecture_enabled` (éteint → 404) ET la fonction d'espace
+            // `origines.lecture` (L6). Segments fixes AVANT `{personneId}`.
+            Route::get('/origines/apercu', [OriginesController::class, 'apercu'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-reseau', [OriginesController::class, 'parReseau'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-mot', [OriginesController::class, 'parMot'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/export', [OriginesController::class, 'export'])
+                ->middleware(['throttle:origines-export', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
+            Route::get('/personnes/{personneId}/origines', [OriginesController::class, 'historique'])
+                ->whereNumber('personneId')->middleware(['throttle:origines-historique', 'delai-sql:120']);
             Route::get('/personnes/{personneId}', [PersonnesController::class, 'show'])->whereNumber('personneId');
             Route::post('/personnes/{personneId}/taches', [PersonnesController::class, 'storeTache'])
                 ->whereNumber('personneId')

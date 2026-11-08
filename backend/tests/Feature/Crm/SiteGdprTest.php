@@ -64,12 +64,22 @@ function gdprVivierWorkspaceId(): string
 function gdprPost(array $payload): TestResponse
 {
     $body = json_encode($payload, JSON_THROW_ON_ERROR);
-    // Chaque appel est signé avec un horodatage DISTINCT (dans la fenêtre),
-    // comme le fait l'émetteur du site à chaque tentative : le CRM refuse une
-    // copie exacte d'une requête déjà reçue, et plusieurs appels d'un même test
-    // tombent souvent dans la même seconde.
-    static $decalage = 0;
-    $timestamp = (string) (time() - ($decalage++ % 200));
+    // Chaque appel est signé avec un horodatage DISTINCT POUR CE CORPS (dans la
+    // fenêtre), comme le fait l'émetteur du site à chaque tentative : le CRM
+    // refuse une copie exacte d'une requête déjà reçue. L'ancien calcul
+    // `time() - (n++ % 200)` n'était distinct que si l'horloge ne bougeait pas :
+    // dès que le 2e appel franchissait une seconde, `T - k` retombait sur
+    // l'horodatage du 1er (même corps, même signature) → 401 « déjà reçue »,
+    // au hasard selon la seconde. On garde donc, par corps, les horodatages déjà
+    // employés et on prend le plus récent encore libre.
+    static $employes = [];
+    $cle = hash('sha256', $body);
+    $timestamp = time();
+    while (isset($employes[$cle][$timestamp])) {
+        $timestamp--;
+    }
+    $employes[$cle][$timestamp] = true;
+    $timestamp = (string) $timestamp;
     $signature = hash_hmac('sha256', $timestamp . '.' . $body, GDPR_TEST_SECRET);
 
     return test()->call('POST', '/api/internal/site-sync/gdpr', [], [], [], [
@@ -334,6 +344,15 @@ test('L3c-0 : un REJEU de la demande ne crée pas de seconde ligne pending, ne r
         ->and($rejeu->json())->not->toHaveKey('demandes');
 });
 
+test('L3c-0 : deux demandes identiques de part et d\'autre d\'un changement de seconde ne se heurtent pas au garde anti-rejeu', function () {
+    gdprSeedPerson();
+
+    $premiere = gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL]);
+    $premiere->assertOk();
+    sleep(1);
+    gdprPost(['action' => 'erase', 'person_key' => gdprPersonKey(), 'email' => GDPR_EMAIL])->assertOk();
+});
+
 test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille Demandes RGPD)', function () {
     gdprSeedPerson();
     $this->seed(PermissionsAndRolesSeeder::class);
@@ -346,7 +365,7 @@ test('L3c-0 : la demande du site est SIGNALEE à Will (notification + pastille D
     $notification = DB::table('notifications')->where('user_id', $proprietaire)->first();
     expect($notification)->not->toBeNull()
         ->and($notification->type)->toBe('rgpd.demande_effacement')
-        ->and($notification->action_url)->toBe('/rgpd/requests')
+        ->and($notification->action_url)->toBe('/rgpd/requests?statut=ouverte')
         // Jamais l'adresse de la personne dans le texte.
         ->and(mb_strtolower((string) $notification->title . ' ' . (string) $notification->body))->not->toContain(GDPR_EMAIL);
     Event::assertDispatched(NotificationCreated::class, fn (NotificationCreated $e): bool => $e->userId === $proprietaire && $e->workspaceId === $espace);

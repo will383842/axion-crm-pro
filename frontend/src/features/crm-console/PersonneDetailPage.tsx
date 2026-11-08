@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
 import { api, messageApiLisible } from '@/lib/api';
 import { ContenusAccordsCard } from './ContenusAccordsCard';
+import { HistoriqueOrigines } from '@/features/origines/HistoriqueOrigines';
 import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
@@ -276,6 +277,8 @@ function PersonneDetailContent() {
               </ul>
             )}
           </Card>
+
+          <HistoriqueOrigines personneId={personneId} bloc={contenus_accords} integre />
 
           <Card>
             <CardTitle>Historique</CardTitle>

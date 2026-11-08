@@ -52,7 +52,7 @@ const MOTIF_IPV6 = /\b([0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b/gi;
 
 export function adresseFactice(adresse: string): boolean {
   const domaine = adresse.split('@')[1] ?? '';
-  return domaine === 'example.test' || domaine.endsWith('.example');
+  return domaine === 'example.test' || domaine.endsWith('.example') || domaine === 'exemple.invalid';
 }
 
 export function ipDeDocumentation(ip: string): boolean {

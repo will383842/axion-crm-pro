@@ -1,0 +1,37 @@
+name: Banc envoi K10
+
+on:
+  pull_request:
+    paths: ['infra/banc-envoi/**', '.github/workflows/banc-envoi.yml']
+  push:
+    branches: [main]
+    paths: ['infra/banc-envoi/**']
+
+permissions:
+  contents: read
+
+jobs:
+  banc:
+    name: Banc d'envoi (isolation + sonde)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15  # anti-gel (F38-008) : démarrage de 7 conteneurs légers
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests statiques (réseau internal, digests, sonde, puits)
+        run: |
+          pip install pyyaml==6.0.2
+          python3 -m unittest discover -s infra/banc-envoi/tests -v
+      - name: Démarrer le banc
+        run: bash infra/banc-envoi/demarrer-banc.sh
+        # pas de healthcheck : --wait attend l'état running
+      - name: Garde des ports publiés (F38-003, contournée par demarrer-banc.sh)
+        run: bash infra/scripts/verifier-ports-publies.sh banc-envoi "" sans-publication
+      - name: Sonde — zéro connexion sortante
+        working-directory: infra/banc-envoi
+        run: |
+          docker compose run --rm sonde-temoin   # témoin positif : joignable depuis hors-banc
+          docker compose run --rm sonde          # depuis le banc : zéro connexion, témoin inclus
+      - name: Nettoyer
+        if: always()
+        working-directory: infra/banc-envoi
+        run: docker compose down -v

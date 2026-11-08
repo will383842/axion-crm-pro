@@ -88,16 +88,6 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
     await controleAxe(page);
   });
 
-  test('page publique : un clic, sans connexion, ni lien vers le site de l’éditeur', async ({ page }) => {
-    await ouvrirDemo(page, '/desinscription/demo-tilleuls', { offre: 'les-deux', connecte: false });
-    await expect(page.getByRole('heading', { level: 1, name: 'Se désinscrire' })).toBeVisible();
-    await expect(page.getByRole('main').getByRole('link')).toHaveCount(0);
-    await controleAxe(page);
-    await passage360(page);
-    await page.getByRole('button', { name: 'Confirmer la désinscription' }).click();
-    await expect(page.getByText(/ne recevra plus rien de notre part/i)).toBeVisible();
-  });
-
   test('360 px : les pages du lot ne défilent pas à l’horizontale', async ({ page }) => {
     for (const chemin of [
       '/envoi/desinscriptions',
@@ -125,7 +115,6 @@ test.describe('DM2-CNF : conformité et réglages d’envoi', () => {
       ['reglages-alertes', '/envoi/reglages/alertes', true],
       ['regles', '/envoi/reglages/regles', true],
       ['connexion-crm', '/envoi/reglages/connexion-crm', true],
-      ['desinscription-publique', '/desinscription/demo-tilleuls', false],
     ];
     for (const [largeur, hauteur] of [[1440, 900], [360, 780]] as const) {
       await page.setViewportSize({ width: largeur, height: hauteur });

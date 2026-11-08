@@ -106,6 +106,8 @@ export interface TableScrollProps extends HTMLAttributes<HTMLDivElement> {
   gouttiere?: number;
   /** `px-*` des lignes, en px pour UN côté. Défaut 16 (`px-4`). */
   rembourrageX?: number;
+  /** Pose la sémantique ARIA `table` sur la grille (lignes `row`, cellules `cell`). */
+  tableau?: boolean;
   children: ReactNode;
 }
 
@@ -113,6 +115,7 @@ export function TableScroll({
   template,
   gouttiere,
   rembourrageX,
+  tableau = false,
   className,
   children,
   ...reste
@@ -124,7 +127,9 @@ export function TableScroll({
     // la classe est là. La garde a besoin d'un marqueur qu'elle puisse croire,
     // ET elle vérifie en plus la présence littérale de `overflow-x-auto`.
     <div data-tableau-defilable="true" className={cn('overflow-x-auto', className)} {...reste}>
-      <div style={{ minWidth: `${largeurMin}px` }}>{children}</div>
+      <div role={tableau ? 'table' : undefined} style={{ minWidth: `${largeurMin}px` }}>
+        {children}
+      </div>
     </div>
   );
 }

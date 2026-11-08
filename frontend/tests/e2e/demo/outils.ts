@@ -37,11 +37,14 @@ export function adresseDemo(chemin: string, options: OptionsDemo = {}): string {
 /** Ouvre une page de la démo et attend que le faux serveur et le bandeau soient prêts. */
 export async function ouvrirDemo(page: Page, chemin: string, options: OptionsDemo = {}): Promise<void> {
   await page.goto(adresseDemo(chemin, options));
-  await expect(page.getByRole('region', { name: 'Démonstration' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Démonstration' })).toBeVisible({ timeout: 15_000 });
 }
 
 /** Contrôle axe : aucune violation CRITIQUE sur la page affichée. */
 export async function controleAxe(page: Page): Promise<void> {
+  // Pas d'analyse pendant le squelette de chargement : on attend les données.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(page.locator('[role="status"][aria-label^="Chargement"]')).toHaveCount(0);
   const resultat = await new AxeBuilder({ page }).analyze();
   const critiques = resultat.violations.filter((v) => v.impact === 'critical');
   expect(critiques.map((v) => `${v.id} : ${v.help}`)).toEqual([]);

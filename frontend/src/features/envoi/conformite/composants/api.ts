@@ -21,7 +21,6 @@ export type ApercuReglages = S['ApercuReglages'];
 export type ModeAbsence = S['ModeAbsence'];
 export type EntreeCarnet = S['EntreeCarnet'];
 export type PuisJeEcrire = operations['puisJeEcrire']['responses'][200]['content']['application/json'];
-export type PageDesinscription = operations['lirePageDesinscription']['responses'][200]['content']['application/json'];
 export type RegistreOpposition = operations['listerOpposition']['responses'][200]['content']['application/json'];
 
 export const CLES = {
@@ -33,7 +32,6 @@ export const CLES = {
   identite: ['envoi', 'reglages', 'identite'] as const,
   connexionCrm: ['envoi', 'reglages', 'connexion-crm'] as const,
   carnet: (q: string) => ['envoi', 'carnet', q] as const,
-  publique: (jeton: string) => ['envoi', 'public', 'desinscription', jeton] as const,
 };
 
 export function useRegistre(q: string) {
@@ -163,22 +161,5 @@ export function useAjouterAuCarnet() {
     mutationFn: async (corps: { adresse: string; prenom?: string; nom?: string; organisation?: string }) =>
       (await api.post<EntreeCarnet>('/envoi/carnet', corps)).data,
     onSuccess: () => client.invalidateQueries({ queryKey: ['envoi', 'carnet'] }),
-  });
-}
-
-export function usePageDesinscription(jeton: string) {
-  return useQuery({
-    queryKey: CLES.publique(jeton),
-    retry: false,
-    queryFn: async () => (await api.get<PageDesinscription>(`/public/desinscription/${encodeURIComponent(jeton)}`)).data,
-  });
-}
-
-export function useConfirmerDesinscription(jeton: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (toute_l_organisation: boolean) =>
-      (await api.post<unknown>(`/public/desinscription/${encodeURIComponent(jeton)}`, { toute_l_organisation })).data,
-    onSuccess: () => client.invalidateQueries({ queryKey: CLES.publique(jeton) }),
   });
 }

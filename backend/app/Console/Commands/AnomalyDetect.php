@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\Alertes\AlerteTelegram;
+use App\Socle\Alertes\Alerte;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -12,18 +12,18 @@ use Illuminate\Support\Facades\DB;
  * - latence p95 LLM > 5s
  * - coût LLM/h > kill-switch workspace
  * - taux email invalid > 30 %
- * Si anomalie détectée → notification Telegram + journal d'application.
+ * Si anomalie détectée → alerte (cloche + e-mail) + journal d'application.
  *
  * 🔴 PENDANT DES MOIS, CETTE COMMANDE N'A ALERTE PERSONNE (audit 360, 21/08).
  *
  * Elle détectait, puis écrivait :
  *
  *     $this->warn(json_encode($a));
- *     // Sprint 11 : send TelegramAlert::dispatch($anomalies);
+ *     // Sprint 11 : envoi de l'alerte($anomalies);
  *
  * Deux défauts, et ce sont exactement ceux relevés sur `AuditVerifyChain` :
  *
- * 1. LE COMMENTAIRE TENAIT LIEU DE CODE. `TelegramAlert` n'existait nulle part.
+ * 1. LE COMMENTAIRE TENAIT LIEU DE CODE. L'alerte n'existait nulle part.
  * 2. `$this->warn()` ÉCRIT SUR UN FLUX QUE PERSONNE NE LIT. Lancée toutes les
  *    15 minutes par le planificateur, cette commande n'a pas de terminal : sa
  *    sortie part dans le vide.
@@ -32,8 +32,8 @@ use Illuminate\Support\Facades\DB;
  * quatre fois par heure en ne prévenant personne. *Un détecteur qui n'alerte
  * pas ne se distingue pas d'un détecteur éteint.*
  *
- * Désormais : journal d'application (canal fiable) ET Telegram (canal lu), par
- * `AlerteTelegram`, qui DIT quand il n'est pas configuré au lieu de se taire.
+ * Désormais : journal d'application (canal fiable) ET cloche + e-mail (canal lu), par
+ * `Alerte`, qui DIT quand elle est éteinte au lieu de se taire.
  */
 class AnomalyDetect extends Command
 {
@@ -108,8 +108,8 @@ class AnomalyDetect extends Command
             $anomalies,
         );
 
-        app(AlerteTelegram::class)->envoyer(
-            '🔴 CRM — ' . count($anomalies) . ' anomalie(s) detectee(s)',
+        app(Alerte::class)->envoyer(
+            'CRM — ' . count($anomalies) . ' anomalie(s) detectee(s)',
             implode('
 ', $lignes)
             . '
@@ -117,6 +117,9 @@ class AnomalyDetect extends Command
 Detecteur : `anomaly:detect`, toutes les 15 min.'
             . '
 Les valeurs sont comparees a la moyenne mobile 7 jours.',
+            'crm',
+            'critique',
+            null,
             ['anomalies' => $anomalies],
         );
 

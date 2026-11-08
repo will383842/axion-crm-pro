@@ -67,6 +67,8 @@ const LABELS: Record<string, string> = {
   '/users': 'Utilisateurs',
   '/tags': 'Étiquettes',
   '/rgpd/requests': 'Demandes RGPD',
+  '/rgpd/effacements': 'Effacements demandés',
+  '/origines': 'Origines des contacts',
   // Technique
   '/scraper-runs': 'Historique des collectes',
   '/admin/observability': 'Santé du système',

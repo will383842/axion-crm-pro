@@ -34,6 +34,8 @@ import { LlmRouterPage } from '@/features/llm/LlmRouterPage';
 import { ProxyProvidersPage } from '@/features/llm/ProxyProvidersPage';
 import { RotationsPage } from '@/features/llm/RotationsPage';
 import { RgpdRequestsPage } from '@/features/rgpd/RgpdRequestsPage';
+import { EffacementsDemandesPage } from '@/features/rgpd/EffacementsDemandesPage';
+import { OriginesPage } from '@/features/origines/OriginesPage';
 import { AiActRegisterPage } from '@/features/rgpd/AiActRegisterPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 import { UsersPage } from '@/features/users/UsersPage';
@@ -100,7 +102,6 @@ import { IdentitePage } from '@/features/envoi/reglages/IdentitePage';
 import { ReglagesAlertesPage } from '@/features/envoi/reglages/ReglagesAlertesPage';
 import { ReglesPrudencePage } from '@/features/envoi/reglages/ReglesPrudencePage';
 import { ConnexionCrmPage } from '@/features/envoi/reglages/ConnexionCrmPage';
-import { DesinscriptionPubliquePage } from '@/features/envoi/public/DesinscriptionPubliquePage';
 // Phase 2 scaffold stubs
 
 // P6-UI-005 — SITE DE MONTAGE 1/3 de la frontiere d'erreur (cf.
@@ -191,6 +192,8 @@ const llmRouterRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/
 const proxyProvidersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/proxy-providers', component: ProxyProvidersPage });
 const rotationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/rotations', component: RotationsPage });
 const rgpdRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/requests', component: RgpdRequestsPage });
+const effacementsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/effacements', component: EffacementsDemandesPage });
+const originesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/origines', component: OriginesPage });
 const aiActRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/ai-act', component: AiActRegisterPage });
 const auditRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audit-logs', component: AuditLogsPage });
 const usersRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/users', component: UsersPage });
@@ -432,9 +435,8 @@ const envoiReglagesAlertesRoute = createRoute({ getParentRoute: () => layoutRout
 const envoiReglesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/regles', beforeLoad: gardeEnvoi, component: ReglesPrudencePage });
 const envoiConnexionCrmRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages/connexion-crm', beforeLoad: gardeEnvoi, component: ConnexionCrmPage });
 
-// Page PUBLIQUE de désinscription (lien d'un e-mail) : HORS coquille, sans
-// garde de produit — un destinataire n'est pas un utilisateur de l'espace.
-const desinscriptionPubliqueRoute = createRoute({ getParentRoute: () => rootRoute, path: '/desinscription/$jeton', component: DesinscriptionPubliquePage });
+// La page PUBLIQUE de désinscription (lien d'un e-mail) est servie par le BACKEND
+// (`/desinscription/*` routé par le Caddyfile) : aucune route SPA ne doit la masquer.
 
 export const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -442,7 +444,6 @@ export const routeTree = rootRoute.addChildren([
   magicLinkRoute,
   magicLinkVerifyRoute,
   passwordResetRoute,
-  desinscriptionPubliqueRoute,
   layoutRoute.addChildren([
     dashboardRoute,
     companiesRoute,
@@ -467,6 +468,8 @@ export const routeTree = rootRoute.addChildren([
     proxyProvidersRoute,
     rotationsRoute,
     rgpdRoute,
+    effacementsRoute,
+    originesRoute,
     aiActRoute,
     auditRoute,
     usersRoute,

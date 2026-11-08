@@ -54,7 +54,9 @@
         ]
       },
       "existants": [
-        "Crm/CampagnesB2bTest.php"
+        "Crm/CampagnesB2bTest.php",
+        "Envoi/ReleveImapAuditTest.php",
+        "Envoi/ReleveImapTest.php"
       ],
       "frontend": []
     },
@@ -138,6 +140,7 @@
         "Nr23Nr08AudiencesEtRlsTest.php": [
           "NR-08 sous le rôle de production, le rafraîchissement des audiences voit les fiches de CHAQUE espace, et seulement les siennes",
           "NR-08 témoin : le rôle de production ne contourne PAS la RLS (sans contexte d’espace, zéro ligne)",
+          "NR-08 sous le rôle de production, la relance des effets d’opposition termine ceux de CHAQUE espace, et seulement eux",
           "NR-08 CONSTAT : la sonde « non diffusibles » (06:20) est AVEUGLE sous le rôle de production (à corriger par S7)",
           "NR-08 l’inventaire des tâches planifiées sous RLS est celui de la photo de référence"
         ]
@@ -269,6 +272,7 @@
           "NR-17 les migrations anciennes sans retour réel sont celles de la photo (la liste ne peut que baisser)",
           "NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, aller sans erreur",
           "NR-17 témoin : l’instrument aller-retour-aller joue sur une migration ancienne réversible",
+          "NR-17 la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels",
           "NR-17 le classement voit bien des retours vides, refusés et réels (témoin de couverture)"
         ]
       },
@@ -386,6 +390,47 @@
       },
       "existants": [
         "HorodatagesFuseauTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-L1",
+      "risque": "envoi P0 L1 sequenceur : garde-fous figes",
+      "nouveaux": {
+        "EnvoiSequenceurFigeTest.php": [
+          "ENVOI-L1 les migrations du séquenceur ont des préfixes uniques 000030 à 000039 et n'effacent aucune donnée",
+          "ENVOI-L1 le séquenceur n'ouvre aucune connexion réseau et ne mesure aucune ouverture",
+          "ENVOI-L1 le séquenceur passe par la porte EnvoiAutorise et par la PasserelleLocale (ServeurEnvoi)",
+          "ENVOI-L1 le séquenceur n'appelle pas l'extension PHP calendar (absente de l'image)"
+        ]
+      },
+      "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-L7",
+      "risque": "envoi P0 L7 : chauffe, freins, Tout arreter",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/ChauffeFreinsTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-P0-L4",
+      "risque": "adaptateur SMTP de la boite : aucun doublon, aucune perte, identifiants chiffres",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/AdaptateurSmtpTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-L5-DESINSCRIPTION",
+      "risque": "envoi P0 L5, desinscription (S22) : aucune ecriture au GET, une seule opposition, jetons refuses sans fuite",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/DesinscriptionTest.php"
       ],
       "frontend": []
     },

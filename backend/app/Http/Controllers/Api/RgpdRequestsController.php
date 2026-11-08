@@ -9,6 +9,7 @@ use App\Models\RgpdRequest;
 use App\Services\Dedup\DeduplicationService;
 use App\Services\Rgpd\GdprErasureService;
 use App\Services\Rgpd\GdprPortabilityService;
+use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,15 @@ class RgpdRequestsController extends ApiController
      * fera rougir la garde au lieu de tomber dans un `default` muet.
      */
     public const TYPES = ['access', 'portability', 'erasure', 'rectification', 'opposition'];
+
+    /** Filtre `statut` de la liste (L5) : calculé, jamais stocké. */
+    public const STATUTS_FILTRE_VERS_BASE = [
+        'ouverte' => ['pending', 'processing'],
+        'traitee' => ['done', 'rejected', 'expired'],
+        'toutes' => null,
+    ];
+
+    private const STATUTS_FILTRE = ['ouverte', 'traitee', 'toutes'];
 
     public function __construct(
         private readonly GdprErasureService $erasure,
@@ -62,6 +72,21 @@ class RgpdRequestsController extends ApiController
         // demande de deviner un identifiant, la liste les donne tous.
         $espaceCourant = $this->espaceCourantOuNull();
 
+        // L5 : filtre CALCULÉ (aucune valeur stockée `ouverte`) — `ouverte` = en
+        // attente de la décision de Will (pending + processing).
+        $statut = $r->query('statut');
+        if ($statut !== null && ! in_array($statut, self::STATUTS_FILTRE, true)) {
+            return response()->json(['error' => 'statut_invalide', 'valeurs' => array_keys(self::STATUTS_FILTRE_VERS_BASE)], 422);
+        }
+        $type = $r->query('type');
+        if ($type !== null && ! in_array($type, self::TYPES, true)) {
+            return response()->json(['error' => 'type_invalide'], 422);
+        }
+        $statutsBase = self::STATUTS_FILTRE_VERS_BASE[$statut] ?? null;
+        // Ligne RGPD d'effacement : masquée pour TOUT rôle sauf owner/admin (`rgpd.view_pii`).
+        // `contacts.view_pii` ne convient pas : operator le possède et verrait adresse, note et jeton.
+        $masquer = ! (auth()->user()?->can('rgpd.view_pii') ?? false);
+
         try {
             $rows = RgpdRequest::query()
                 ->when(
@@ -72,13 +97,29 @@ class RgpdRequestsController extends ApiController
                     fn ($q) => $q->whereRaw('1 = 0'),
                 )
                 ->when($r->query('status'), fn ($q, $s) => $q->where('status', $s))
-                ->orderByDesc('requested_at')
+                ->when($statutsBase !== null, fn ($q) => $q->whereIn('status', $statutsBase))
+                ->when($type !== null, fn ($q) => $q->where('type', $type))
+                // Les demandes ouvertes : la plus ancienne d'abord (elle attend depuis le plus longtemps).
+                ->when($statut === 'ouverte', fn ($q) => $q->orderBy('requested_at'), fn ($q) => $q->orderByDesc('requested_at'))
                 ->paginate(25);
+
+            if ($masquer) {
+                $rows->getCollection()->transform(function ($ligne) {
+                    $ligne->setAttribute('subject_email', MasquageCoordonnees::email($ligne->subject_email));
+                    // Toute la ligne : `metadata` porte la note libre de l'opérateur et le bilan du
+                    // traitement (texte libre, parfois nominatif). On n'en laisse que deux drapeaux sans PII.
+                    $ligne->setAttribute('metadata', array_intersect_key((array) $ligne->metadata, ['mise_a_l_ecart' => 1, 'verification' => 1]));
+                    $ligne->setAttribute('export_token', null);
+
+                    return $ligne;
+                });
+            }
 
             return $this->ok($rows);
         } catch (\Throwable $e) {
-            Log::error('rgpd.requests.index failed', ['exception' => $e->getMessage()]);
-            report($e);
+            // Jamais `getMessage()` : un message SQL peut citer `subject_email` (PII dans les journaux).
+            // Pas de `report($e)` non plus : il journalise le message complet. Seule la classe sort.
+            Log::error('rgpd.requests.index failed', ['exception' => $e::class]);
 
             return $this->ok(['data' => [], 'meta' => ['total' => 0], 'degraded' => true]);
         }
@@ -272,7 +313,17 @@ class RgpdRequestsController extends ApiController
             ATraiterController::oublier((string) $req->workspace_id); // la pastille suit
         }
 
-        return $this->ok(['request' => $req->fresh(), 'result' => $result]);
+        $reponse = ['request' => $req->fresh(), 'result' => $result];
+        if ($req->type === 'erasure') {
+            // L5 : dit noir sur blanc que rien n'est supprimé.
+            $reponse['mise_a_l_ecart'] = [
+                'personnes' => (int) ($result['deleted']['personnes'] ?? 0),
+                'abonnements' => (int) ($result['deleted']['abonnements'] ?? 0),
+            ];
+            $reponse['supprime'] = 0;
+        }
+
+        return $this->ok($reponse);
     }
 
     /**

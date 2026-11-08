@@ -159,18 +159,38 @@ fi
 
 # --- 7. Envoi + contrôle SHA-1 / taille ---
 SHA1="$(sha1sum "$ARCHIVE" | cut -d' ' -f1)"
-b2_post b2_get_upload_url "$(jq -nc --arg b "$BUCKET_ID" '{bucketId:$b}')" > "$TMP/upload.json"
-UPLOAD_URL="$(jq -r '.uploadUrl' "$TMP/upload.json")"
-printf 'header = "Authorization: %s"\n' "$(jq -r '.authorizationToken' "$TMP/upload.json")" > "$TMP/upload.cfg"
-
-log "Envoi vers le bucket B2…"
-# B2 attend un POST pour l envoi : -T seul enverrait un PUT (405).
-if ! b2_curl -K "$TMP/upload.cfg" \
-        -H "X-Bz-File-Name: $B2_PREFIX$NOM" \
-        -H 'Content-Type: b2/x-auto' \
-        -H "X-Bz-Content-Sha1: $SHA1" \
-        -X POST -T "$ARCHIVE" "$UPLOAD_URL" > "$TMP/resultat.json"; then
-    log "❌ Envoi B2 en échec."
+# Envoi avec reprises : B2 répond parfois 503 (« occupé ») ou coupe la connexion ;
+# la consigne de Backblaze est de redemander une NOUVELLE URL d'envoi et de recommencer.
+# 5 essais au plus, attente croissante (20 s, 40 s, 60 s, 80 s). Le plafond de 9 Go et
+# le contrôle SHA-1 plus bas restent inchangés ; B2 ne valide un fichier qu'une fois
+# complet et conforme au SHA-1 annoncé, donc un essai coupé ne laisse rien de partiel.
+ESSAIS_MAX=5
+ESSAI=1
+ENVOYE=0
+while [ "$ESSAI" -le "$ESSAIS_MAX" ]; do
+    if b2_post b2_get_upload_url "$(jq -nc --arg b "$BUCKET_ID" '{bucketId:$b}')" > "$TMP/upload.json" 2>/dev/null \
+        && [ -n "$(jq -r '.uploadUrl // empty' "$TMP/upload.json")" ]; then
+        UPLOAD_URL="$(jq -r '.uploadUrl' "$TMP/upload.json")"
+        printf 'header = "Authorization: %s"\n' "$(jq -r '.authorizationToken' "$TMP/upload.json")" > "$TMP/upload.cfg"
+        log "Envoi vers le bucket B2 (essai $ESSAI/$ESSAIS_MAX)…"
+        # B2 attend un POST pour l envoi : -T seul enverrait un PUT (405).
+        if b2_curl -K "$TMP/upload.cfg" \
+                -H "X-Bz-File-Name: $B2_PREFIX$NOM" \
+                -H 'Content-Type: b2/x-auto' \
+                -H "X-Bz-Content-Sha1: $SHA1" \
+                -X POST -T "$ARCHIVE" "$UPLOAD_URL" > "$TMP/resultat.json"; then
+            ENVOYE=1
+            break
+        fi
+        log "⚠️ Essai $ESSAI en échec (réponse B2 ou connexion coupée)."
+    else
+        log "⚠️ Essai $ESSAI : impossible d'obtenir une URL d'envoi B2."
+    fi
+    ESSAI=$((ESSAI + 1))
+    if [ "$ESSAI" -le "$ESSAIS_MAX" ]; then sleep $(( (ESSAI - 1) * 20 )); fi
+done
+if [ "$ENVOYE" != "1" ]; then
+    log "❌ Envoi B2 en échec après $ESSAIS_MAX essais."
     exit 1
 fi
 if [ "$(jq -r '.contentSha1' "$TMP/resultat.json")" != "$SHA1" ] \

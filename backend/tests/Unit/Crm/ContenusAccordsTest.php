@@ -72,3 +72,54 @@ test('le bloc de lecture ne laisse sortir que les clés prévues, échappables',
         ->and($bloc['opposition']['actif'])->toBeFalse();
     expect(ContenusAccords::bloc(null, null, null, '2026-11-02 10:00:00')['opposition']['actif'])->toBeTrue();
 });
+
+test('lien du guide : toutes les clés actuelles restent, `lien` et `lien_statut` s’ajoutent', function () {
+    config([
+        'guides.lien_enabled' => true,
+        'guides.publics' => ['guide-ia' => ['nom' => 'Guide exemple A', 'url' => 'https://exemple.invalid/guides/guide-ia.pdf', 'libelle' => 'Guide exemple A (PDF)']],
+    ]);
+    $lien = ['url' => 'https://exemple.invalid/guides/guide-ia.pdf', 'libelle' => 'Guide exemple A (PDF)'];
+    $args = [
+        json_encode(['mot' => 'm', 'reseau' => 'r', 'guide' => 'guide-ia', 'date' => 'd']),
+        json_encode([['guide' => 'guide-ia', 'date' => 'd'], ['guide' => 'guide-ancien-exemple', 'date' => 'd2']]),
+        null,
+        null,
+    ];
+
+    $b = ContenusAccords::bloc(...$args, droitLien: true);
+    expect($b['lien_statut'])->toBe('disponible')
+        ->and($b['origine'])->toMatchArray(['mot' => 'm', 'reseau' => 'r', 'guide' => 'guide-ia', 'date' => 'd', 'lien' => $lien])
+        ->and($b['guides'][0])->toMatchArray(['guide' => 'guide-ia', 'date' => 'd', 'lien' => $lien])
+        ->and($b['guides'][1])->toMatchArray(['guide' => 'guide-ancien-exemple', 'lien' => null]);
+
+    // Sans droit (viewer) : jamais d'URL dans la réponse, statut dédié.
+    $v = ContenusAccords::bloc(...$args, droitLien: false);
+    expect($v['lien_statut'])->toBe('refuse')->and($v['origine']['lien'])->toBeNull()->and(json_encode($v))->not->toContain('exemple.invalid');
+
+    // Par défaut le droit est fermé.
+    expect(ContenusAccords::bloc(...$args)['lien_statut'])->toBe('refuse');
+
+    // Interrupteur éteint : pas de lien, même avec le droit.
+    config(['guides.lien_enabled' => false]);
+    $e = ContenusAccords::bloc(...$args, droitLien: true);
+    expect($e['lien_statut'])->toBe('eteint')->and($e['origine']['lien'])->toBeNull()->and(json_encode($e))->not->toContain('exemple.invalid');
+});
+
+test('lien du guide : une ligne ancienne sans guide donne `lien: null`', function () {
+    config(['guides.lien_enabled' => true]);
+    $b = ContenusAccords::bloc(json_encode(['mot' => 'm']), json_encode([['date' => 'd']]), null, null, droitLien: true);
+    expect($b['origine']['lien'])->toBeNull()->and($b['guides'][0]['lien'])->toBeNull();
+});
+
+test('l’historique v3 : `lien_guide` seulement avec le droit, commentaire_ref et masque_le ne sortent jamais', function () {
+    config([
+        'guides.lien_enabled' => true,
+        'guides.publics' => ['guide-ia' => ['nom' => 'Guide exemple A', 'url' => 'https://exemple.invalid/guides/guide-ia.pdf', 'libelle' => 'Guide exemple A (PDF)']],
+    ]);
+    $o = ['mot' => 'm', 'guide' => 'guide-ia', 'date' => 'd', 'commentaire_ref' => 'EMPREINTE', 'masque_le' => 'x', 'pseudo' => 'non'];
+    $avec = ContenusAccords::presenterOrigine($o, true);
+    expect($avec['lien_guide'])->toBe(['url' => 'https://exemple.invalid/guides/guide-ia.pdf', 'libelle' => 'Guide exemple A (PDF)'])
+        ->and(json_encode($avec))->not->toContain('EMPREINTE')->not->toContain('masque_le')->not->toContain('pseudo');
+    expect(ContenusAccords::presenterOrigine($o)['lien_guide'])->toBeNull()
+        ->and(ContenusAccords::presenterOrigine(['guide' => 'inconnu'], true)['lien_guide'])->toBeNull();
+});

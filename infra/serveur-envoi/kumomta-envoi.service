@@ -1,0 +1,18 @@
+[Unit]
+Description=KumoMTA (serveur d'envoi propre)
+Requires=docker.service nftables.service
+After=docker.service wg-quick@wg0.service nftables.service
+
+[Service]
+# Type=simple : `compose up` reste au premier plan ; si le conteneur sort,
+# compose sort, systemd le voit et Restart=on-failure s'applique reellement.
+Type=simple
+WorkingDirectory=/opt/axion-envoi
+ExecStart=/usr/bin/docker compose up --remove-orphans
+ExecStop=/usr/bin/docker compose down --timeout 60
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

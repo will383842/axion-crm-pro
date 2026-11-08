@@ -31,6 +31,8 @@ interface AuditLog {
   user_agent?: string | null;
   created_at: string;
   current_hash: string;
+  /** Produit concerné par l'action (DM1-COM). */
+  produit?: 'crm' | 'envoi' | 'commun' | null;
   actor?: string | null;
   target?: string | null;
   severity?: Severity | null;
@@ -46,6 +48,10 @@ const SEVERITY_TONE: Record<Severity, StatusTone> = {
 };
 
 const GRID = '160px 180px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+/** Avec la colonne « Produit » : seulement quand le serveur envoie le champ `produit`. */
+const GRID_PRODUIT = '160px 180px 100px minmax(160px,1.2fr) minmax(160px,1fr) 100px 130px 110px';
+
+const NOM_PRODUIT = { crm: 'CRM Pro', envoi: 'Envoi', commun: 'Commun' } as const;
 
 function severityFromStatus(l: AuditLog): Severity {
   if (l.severity) return l.severity;
@@ -78,6 +84,12 @@ export function AuditLogsPage() {
     onError: () => toast.error('La vérification n’a pas pu aboutir. Réessayez dans un instant.'),
   });
 
+  // DM1-COM : la colonne « Produit » n'apparaît que si le serveur envoie `produit`
+  // sur au moins une ligne (la démo le fait, le vrai serveur pas encore) : en
+  // production, le tableau reste celui d'avant.
+  const avecProduit = (list.data?.data ?? []).some((l) => l.produit != null);
+  const grille = avecProduit ? GRID_PRODUIT : GRID;
+
   const rows = useMemo(() => {
     const all = list.data?.data ?? [];
     return all.filter((l) => {
@@ -93,6 +105,7 @@ export function AuditLogsPage() {
   return (
     <div>
       <PageHeader
+        surTitre="Commun"
         title="Journal des actions"
         subtitle="Qui a fait quoi, et quand. Rien ne peut y être effacé."
         actions={
@@ -168,17 +181,18 @@ export function AuditLogsPage() {
           {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 1104 px
               de largeur minimale de ce tableau etaient coupes net par le
               `overflow-hidden` de la Card, sans aucun moyen de les atteindre. */}
-          <TableScroll tableau template={GRID}>
+          <TableScroll tableau template={grille}>
           <div
             role="row"
             className={cn(
               'sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-600 backdrop-blur',
               'dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400',
             )}
-            style={{ gridTemplateColumns: GRID }}
+            style={{ gridTemplateColumns: grille }}
           >
             <div role="columnheader">Quand</div>
             <div role="columnheader">Événement</div>
+            {avecProduit ? <div role="columnheader">Produit</div> : null}
             <div role="columnheader">Écran ou action</div>
             <div role="columnheader">Acteur</div>
             <div role="columnheader">Gravité</div>
@@ -194,7 +208,7 @@ export function AuditLogsPage() {
                   role="row"
                   onClick={() => setSelected(l)}
                   className="grid w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
-                  style={{ gridTemplateColumns: GRID }}
+                  style={{ gridTemplateColumns: grille }}
                 >
                   <div role="cell" className="text-xs text-slate-500">
                     {new Date(l.created_at).toLocaleString('fr-FR')}
@@ -202,6 +216,11 @@ export function AuditLogsPage() {
                   <div role="cell" className="truncate font-medium text-slate-900 dark:text-white">
                     {l.event_type}
                   </div>
+                  {avecProduit ? (
+                    <div role="cell" className="truncate text-xs text-slate-600">
+                      {l.produit ? NOM_PRODUIT[l.produit] : '—'}
+                    </div>
+                  ) : null}
                   <div role="cell" className="truncate font-mono text-xs text-slate-500">
                     {l.path ?? '—'}
                   </div>

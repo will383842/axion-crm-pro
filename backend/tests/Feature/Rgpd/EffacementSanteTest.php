@@ -53,7 +53,7 @@ function praticienDeSante(string $email, ?string $phone = null): int
     ]);
 }
 
-test('l’effacement console SUPPRIME le praticien de santé, il ne l’anonymise pas', function () {
+test('L3c-0 : l’effacement console MASQUE le praticien de santé, il ne le supprime pas', function () {
     $email = 'dr.durand@example.com';
     praticienDeSante($email);
 
@@ -62,17 +62,18 @@ test('l’effacement console SUPPRIME le praticien de santé, il ne l’anonymis
     $resultat = app(GdprErasureService::class)->erase($email);
 
     expect($resultat['deleted']['health_practitioners'])->toBe(1)
-        // Suppression FERME : plus aucune ligne, pas même en soft-delete.
-        ->and(DB::table('health_practitioners')->count())->toBe(0);
+        // La ligne est GARDÉE ; elle est à la corbeille douce.
+        ->and(DB::table('health_practitioners')->count())->toBe(1)
+        ->and(DB::table('health_practitioners')->whereNull('deleted_at')->count())->toBe(0);
 });
 
-test('l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE', function () {
+test('L3c-0 : l’effacement atteint aussi le praticien retrouvé par son TÉLÉPHONE (masqué)', function () {
     $telephone = '+33612345678';
     praticienDeSante('autre-adresse@example.com', $telephone);
 
     app(GdprErasureService::class)->erase('sujet@example.com', $telephone);
 
-    expect(DB::table('health_practitioners')->count())->toBe(0);
+    expect(DB::table('health_practitioners')->whereNull('deleted_at')->count())->toBe(0);
 });
 
 test('un praticien SANS rapport avec le sujet n’est jamais touché', function () {
@@ -80,21 +81,5 @@ test('un praticien SANS rapport avec le sujet n’est jamais touché', function 
 
     app(GdprErasureService::class)->erase('quelquun-dautre@example.com');
 
-    expect(DB::table('health_practitioners')->count())->toBe(1);
-});
-
-test('aucune trace identifiante ne subsiste après effacement', function () {
-    $email = 'dr.effacee@example.com';
-    praticienDeSante($email);
-
-    app(GdprErasureService::class)->erase($email);
-
-    // On cherche ce qui rendrait la personne identifiable même sans son email.
-    $restes = DB::table('health_practitioners')
-        ->where('nom', 'Durand')
-        ->orWhere('rpps', '10001234567')
-        ->orWhere('specialite', 'Cardiologie')
-        ->count();
-
-    expect($restes)->toBe(0);
+    expect(DB::table('health_practitioners')->whereNull('deleted_at')->count())->toBe(1);
 });

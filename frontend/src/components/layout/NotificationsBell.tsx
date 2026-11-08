@@ -51,7 +51,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { IconButton, QueryErrorState, StatusPill, type StatusTone } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -159,6 +159,14 @@ export function NotificationsBell() {
       document.removeEventListener('keydown', auClavier);
     };
   }, [ouvert]);
+
+  const queryClient = useQueryClient();
+  const toutLire = useMutation({
+    mutationFn: async () => {
+      await api.post('/notifications/read-all');
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLE_NOTIFICATIONS }),
+  });
 
   const nonLues = requete.data?.unread_count ?? 0;
 
@@ -313,14 +321,23 @@ export function NotificationsBell() {
             )}
           </div>
 
-          {/*
-            La seule chose que ce panneau AVOUE. `markRead` / `markAllRead`
-            rendent 501 : plutôt qu'un bouton qui échoue en silence, on écrit
-            que le geste n'existe pas encore. Voir l'en-tête de fichier.
-          */}
-          <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500 dark:border-slate-800">
-            Marquer une notification comme lue n’est pas encore disponible sur ce serveur.
-          </p>
+          {nonLues > 0 ? (
+            <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => toutLire.mutate()}
+                disabled={toutLire.isPending}
+                className="rounded-md px-2 py-1 text-xs font-medium text-brand-700 hover:bg-slate-100 disabled:opacity-50 dark:text-brand-300 dark:hover:bg-slate-800"
+              >
+                Tout marquer comme lu
+              </button>
+              {toutLire.isError ? (
+                <p role="alert" className="mt-1 text-xs text-rose-700">
+                  Le marquage a échoué. Veuillez réessayer.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

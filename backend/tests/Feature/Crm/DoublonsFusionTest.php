@@ -287,13 +287,13 @@ test('les purges écartent les fiches absorbée ET gardée au lieu d échouer', 
     DB::table('company_tag')->where('company_id', $this->absorbee)->delete();
     dfFusionner($this->ws, $this->garde, $this->absorbee);
     expect(FichesProtegees::estProtegee($this->garde))->toBeFalse();
-    // Une fiche ordinaire sans forme juridique : la purge la supprime (témoin).
+    // L3c-0 : la purge est neutralisée, même la fiche ordinaire reste (témoin).
     $temoin = F::fiche($this->ws, 'ZZ Temoin purge');
 
     $code = Artisan::call('prospection:purge-non-commercial', ['--force' => true]);
 
-    expect($code)->toBe(0)
-        ->and(DB::table('companies')->where('id', $temoin)->exists())->toBeFalse()
+    expect($code)->toBe(1)
+        ->and(DB::table('companies')->where('id', $temoin)->exists())->toBeTrue()
         ->and(DB::table('companies')->where('id', $this->absorbee)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $this->jumelleAbsorbee)->exists())->toBeTrue()
         // S4 — la fiche gardée (sans forme juridique ici) et les personnes
@@ -308,13 +308,13 @@ test('S4 — la purge de rétention RGPD épargne les personnes d une fiche gard
     DB::table('company_tag')->where('company_id', $this->absorbee)->delete();
     dfFusionner($this->ws, $this->garde, $this->absorbee);
     DB::table('contacts')->where('workspace_id', $this->ws)->update(['created_at' => now()->subYears(4), 'legal_basis' => 'legitimate_interest_b2b']);
-    // TÉMOIN : une personne d'une fiche ordinaire, aussi ancienne, est purgée.
+    // L3c-0 : la purge est neutralisée, la personne ordinaire reste aussi.
     $ordinaire = F::fiche($this->ws, 'ZZ Ordinaire purge');
     $temoin = F::contact($this->ws, $ordinaire, 'Zut', 'ZZTEMOINPURGE', ['created_at' => now()->subYears(4), 'legal_basis' => 'legitimate_interest_b2b']);
 
     Artisan::call('rgpd:purge-business-prospects');
 
-    expect(DB::table('contacts')->where('id', $temoin)->exists())->toBeFalse()
+    expect(DB::table('contacts')->where('id', $temoin)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $this->seule)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $this->jumelleGarde)->exists())->toBeTrue()
         ->and(DB::table('contacts')->where('id', $this->jumelleAbsorbee)->exists())->toBeTrue();

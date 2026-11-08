@@ -72,13 +72,14 @@ jobs:
   # `backend/tests/Feature/NonRegression/`) plus les 3 gardes Vitest du dossier
   # `frontend/tests/non-regression/`. Rouge ici = rien ne part en production
   # (`deploy-direct-ssh.yml` et `deploy-staging.yml` appellent ce workflow et
-  # ont `needs: [ci]`). Le job `backend` l'attend (`needs`), pour échouer VITE.
+  # ont `needs: [ci]`). Le job `backend-verdict` l'attend (`needs`) et REFUSE de passer
+  # au vert si le filet n'est pas `success` (un job sauté compterait comme réussi).
   #
   # Règles : jamais `continue-on-error`, jamais de test sauté ni mis en
   # quarantaine ; machine standard gratuite (dépôt public) ; aucun secret (les
   # valeurs ci-dessous sont des valeurs de test factices, comme dans `backend`).
-  # Retour arrière : retirer ce job ET la ligne `needs: [filet-non-regression]`
-  # du job `backend`. Règles détaillées : backend/tests/Feature/NonRegression/LISEZ-MOI.md
+  # Retour arrière : retirer ce job ET `filet-non-regression` du `needs` (et du
+  # contrôle) du job `backend-verdict`. Règles détaillées : backend/tests/Feature/NonRegression/LISEZ-MOI.md
   # ═══════════════════════════════════════════════════════════════════════════
   filet-non-regression:
     name: Filet de non-régression (24 gardes, instantanés)
@@ -99,7 +100,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: backend/vendor
-          key: composer-${{ hashFiles('backend/composer.json') }}
+          key: composer-${{ hashFiles('backend/composer.lock') }}
 
       - name: Préparer l'arborescence Laravel inscriptible
         run: |
@@ -574,6 +575,15 @@ jobs:
             exit 1
           fi
           echo "Tous les scripts d'infra sont en 100755."
+      - name: Serveur d'envoi K3 — tests statiques (pare-feu, WireGuard d'admin, installateur)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nftables
+          # Le garde de périmètre compare à origin/main : on s'assure qu'elle existe.
+          git fetch --no-tags --prune --unshallow origin 2>/dev/null || true
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          bash infra/serveur-envoi/tests/lancer-tests.sh
 
   donnees-personnelles:
     name: Aucune donnée nominative dans ce dépôt public
@@ -605,11 +615,29 @@ jobs:
           fi
           exit "$code"
 
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BACKEND EN 4 PARTS + VERDICT.
+  #
+  # `backend` est une MATRICE de 4 parts (la suite Pest durait ~9 min en un seul
+  # processus). Il n'a volontairement AUCUN `needs` : un job dont le `needs` est
+  # rouge est « skipped », et un job sauté compte comme RÉUSSI pour un check
+  # exigé par la protection de branche — une PR au filet rouge était fusionnable.
+  # Le contexte exigé « Backend Laravel (install + PHPStan + Pint + Pest) » est
+  # désormais le `name:` du job `backend-verdict` (en fin de ce bloc), qui tourne
+  # TOUJOURS (`if: always()`) et ne passe au vert que si le filet ET les 4 parts
+  # sont verts et que tous les tests ont bien été joués. La protection de branche
+  # ne change pas. Les parts se nomment « Pest part N » : jamais le nom du verdict.
+  # ═══════════════════════════════════════════════════════════════════════════
   backend:
-    name: Backend Laravel (install + PHPStan + Pint + Pest)
-    needs: [filet-non-regression]  # R0 — le filet passe d'abord (retour arrière : retirer cette ligne)
+    name: Pest part ${{ matrix.part }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60  # F38-008 — le job le plus long de la chaîne (Postgres + suite Pest entière)
+    # F38-008 — plafond anti-gel. Durée mesurée ≈ 3-4 min par part (Postgres + 1/4 de la
+    # suite Pest) : 20 min = plus de 5× la durée utile, sans laisser un gel durer 1 h.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -628,7 +656,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: backend/vendor
-          key: composer-${{ hashFiles('backend/composer.json') }}
+          key: composer-${{ hashFiles('backend/composer.lock') }}
 
       - name: Préparer l'arborescence Laravel inscriptible
         # Ni `bootstrap/cache` ni `storage/**` ne sont versionnés : sans eux,
@@ -655,10 +683,12 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: PHPStan niveau 8 (BLOQUANT — baseline figée)
+        if: matrix.part == 1
         working-directory: backend
         run: composer analyse
 
       - name: Pint — format des fichiers PHP modifiés (BLOQUANT)
+        if: matrix.part == 1
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
@@ -666,7 +696,12 @@ jobs:
           base="${BASE_SHA:-}"
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+            base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+            # merge-base == HEAD (workflow_dispatch sur main) : la différence serait
+            # vide et Pint ne contrôlerait plus rien → on se replie sur HEAD^.
+            if [ -n "$base" ] && [ "$base" = "$(git rev-parse HEAD)" ]; then
+              base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+            fi
           fi
           if [ -z "$base" ]; then
             echo "Aucune base de comparaison disponible — rien à contrôler."
@@ -779,7 +814,7 @@ jobs:
           docker logs axion-ci-postgres | tail -50
           exit 1
 
-      - name: Pest (BLOQUANT)
+      - name: Pest part ${{ matrix.part }}/4 (BLOQUANT)
         working-directory: backend
         env:
           APP_ENV: testing
@@ -813,7 +848,23 @@ jobs:
         # qu'une différence avec `phpunit.xml` : `executionOrder="default"`,
         # pour qu'un gate ne change pas d'avis à code constant. L'ordre
         # aléatoire reste actif en local pour débusquer le couplage.
-        run: php vendor/bin/pest --colors --configuration phpunit-ci.xml
+        #
+        # LA PART : `tests/ci/decouper-suite.php` répartit les *Test.php par taille,
+        # VÉRIFIE lui-même que les 4 parts couvrent tout sans recouvrement (sinon
+        # il échoue) et écrit `phpunit-part.xml` = `phpunit-ci.xml` dont seul le
+        # bloc <testsuites> change (le bloc <php> reste identique).
+        # La part 1 écrit aussi le nombre TOTAL de tests de la suite entière
+        # (`parts/total.txt`) : `backend-verdict` le compare à la somme jouée.
+        run: |
+          set -euo pipefail
+          php tests/ci/decouper-suite.php "${{ matrix.part }}" 4
+          if [ "${{ matrix.part }}" = "1" ]; then
+            mkdir -p parts
+            php vendor/bin/pest --list-tests --configuration phpunit-ci.xml > parts/liste.txt
+            grep -c '^ - ' parts/liste.txt > parts/total.txt || true
+            echo "Total de tests de la suite entière : $(cat parts/total.txt)"
+          fi
+          php vendor/bin/pest --colors --configuration phpunit-part.xml --log-junit "junit-${{ matrix.part }}.xml"
 
       # 🔴 A06-005 — LE GESTE, PAS SEULEMENT LA CAUSE.
       #
@@ -882,6 +933,77 @@ jobs:
           docker logs axion-ci-postgres 2>&1 | grep -iE "PANIC|was terminated by signal|terminating any other active|startup process|recovery|out of memory" || echo "(aucune)"
           echo "--- fin du journal ---"
           docker logs axion-ci-postgres 2>&1 | tail -40
+
+      # Le junit de CETTE part (et, pour la part 1, le total de la suite) part en
+      # artefact : `backend-verdict` les relit pour contrôler que tout a été joué.
+      - name: Artefact pest-part-${{ matrix.part }} (junit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pest-part-${{ matrix.part }}
+          path: |
+            backend/junit-${{ matrix.part }}.xml
+            backend/parts/total.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+  # LE VERDICT — c'est ce job que la protection de `main` exige (son `name:` est
+  # le contexte requis, inchangé). `if: always()` : il tourne même si le filet ou
+  # une part est rouge, et il ÉCHOUE alors — jamais « skipped ».
+  backend-verdict:
+    name: Backend Laravel (install + PHPStan + Pint + Pest)
+    needs: [filet-non-regression, backend]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Télécharger les artefacts pest-part-*
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pest-part-*
+          path: artefacts
+
+      - name: Verdict (filet vert + 4 parts vertes + tous les tests joués)
+        if: always()
+        env:
+          RESULTAT_FILET: ${{ needs.filet-non-regression.result }}
+          RESULTAT_BACKEND: ${{ needs.backend.result }}
+        run: |
+          set -uo pipefail
+          echo "filet-non-regression : ${RESULTAT_FILET}"
+          echo "backend (4 parts)    : ${RESULTAT_BACKEND}"
+          ko=0
+          if [ "${RESULTAT_FILET}" != "success" ]; then
+            echo "::error::Le filet de non-régression n'est pas « success » (${RESULTAT_FILET})."; ko=1
+          fi
+          if [ "${RESULTAT_BACKEND}" != "success" ]; then
+            echo "::error::Le job backend (4 parts) n'est pas « success » (${RESULTAT_BACKEND})."; ko=1
+          fi
+          # Les parts : exactement 4 junit, au moins un test chacun.
+          mapfile -t junits < <(find artefacts -name 'junit-*.xml' | sort)
+          if [ "${#junits[@]}" -ne 4 ]; then
+            echo "::error::${#junits[@]} fichier(s) junit trouvé(s), exactement 4 attendus."; ko=1
+          fi
+          # Chaque part doit avoir joué au moins un test, et l'égalité « somme jouée =
+          # total listé » est BLOQUANTE (étalonnée sur un vrai run : 4544 = 4544).
+          somme=0
+          for j in "${junits[@]}"; do
+            n=$(grep -o '<testcase ' "$j" | wc -l)
+            echo "  $j : $n tests"
+            if [ "$n" -lt 1 ]; then echo "::error::$j ne contient aucun test."; ko=1; fi
+            somme=$((somme + n))
+          done
+          total_fichier=$(find artefacts -name total.txt | head -n 1)
+          if [ -n "$total_fichier" ] && grep -qE '^[0-9]+$' "$total_fichier"; then
+            total=$(cat "$total_fichier")
+            echo "Somme jouée : ${somme} — total listé : ${total}"
+            if [ "$somme" -ne "$total" ]; then
+              echo "::error::Somme jouée (${somme}) ≠ total listé (${total}) : des tests n'ont pas été joués."; ko=1
+            fi
+          else
+            echo "::error::parts/total.txt introuvable ou non numérique (part 1) : total non vérifiable."; ko=1
+          fi
+          exit "$ko"
 
   frontend:
     name: Frontend React/Vite

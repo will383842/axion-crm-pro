@@ -23,3 +23,6 @@ yarn-error.log
 /.vscode
 *.swp
 *.swo
+/phpunit-part.xml
+/junit-*.xml
+/parts/

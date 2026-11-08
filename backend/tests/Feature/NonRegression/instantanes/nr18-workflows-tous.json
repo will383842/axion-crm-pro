@@ -30,5 +30,6 @@
     "release-tracking.yml",
     "security.yml",
     "surveillance-canaux.yml",
-    "surveillance-sauvegarde.yml"
+    "surveillance-sauvegarde.yml",
+    "vendor-cloud.yml"
 ]

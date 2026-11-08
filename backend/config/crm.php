@@ -145,6 +145,12 @@ return [
         // Rollback = remettre à false, par un DÉPLOIEMENT (un `restart` ne
         // relit pas l'environnement).
         'personnes_enabled' => env('CRM_INGEST_PERSONNES_ENABLED', false),
+        // Fiche demande (04/11/2026, lot C1) : toute demande du site
+        // (formulaire, rendez-vous) sans SIREN devient une PERSONNE du CRM, en
+        // plus de rester dans la file d'arbitrage. Fermé (défaut) : aucune
+        // lecture ni écriture de `personnes` par ce chemin. À ouvrir APRÈS
+        // `migrate` (colonnes `phone` et `entreprise_declaree`).
+        'demandes_personne_enabled' => env('CRM_INGEST_DEMANDES_PERSONNE_ENABLED', false),
         // Synchro AUTOMATIQUE du dossier client de la console du site
         // (25/10/2026, `DossierClientIngest`). Fermé (défaut) : les messages
         // `dossier_client_synchro` sont refusés en 503 et restent en attente
@@ -505,6 +511,17 @@ return [
     | `GardePresse`), ouverte ou non.
     */
     'segments_ouverts' => env('CRM_SEGMENTS_OUVERTS', ''),
+
+    /*
+    | Segments réglés PAR ESPACE (lot S6) — ÉTEINT par défaut.
+    |
+    | Éteint : `segments_ouverts` ci-dessus fait foi, pour tous les espaces
+    | (comportement d'avant S6). Allumé : l'ouverture se lit dans la table
+    | `fonctions_espace` ; un espace sans réglage a TOUT FERMÉ, l'espace d'Axion
+    | garde l'état d'aujourd'hui (posé par la migration de données).
+    | Retour arrière : CRM_SEGMENTS_PAR_ESPACE=false (puis `config:clear`).
+    */
+    'segments_par_espace' => (bool) env('CRM_SEGMENTS_PAR_ESPACE', false),
 
     /*
     | Vérification des e-mails — `crm:emails:verifier` (2026-09-29).

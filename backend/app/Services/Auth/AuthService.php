@@ -63,6 +63,35 @@ class AuthService
         return self::$hachagesFactices[$cout] ??= Hash::make('aucun-compte-ne-porte-ce-mot-de-passe');
     }
 
+    /** Fenêtre du limiteur par compte, en secondes (15 min). */
+    public const FENETRE_LIMITEUR_COMPTE = 900;
+
+    /**
+     * Le limiteur PAR COMPTE (lot S1) est-il actif ? Éteint par défaut : le plafond
+     * par adresse suffit tant qu'on n'a pas décidé de l'allumer en production.
+     * Retour arrière : `crm.auth_limiteur_compte` = false.
+     */
+    public static function limiteurCompteActif(): bool
+    {
+        return (bool) config('crm.auth_limiteur_compte', false);
+    }
+
+    /** Nombre d'essais tolérés par compte et par fenêtre, toutes adresses confondues. */
+    public static function essaisMaxParCompte(): int
+    {
+        return max(1, (int) config('crm.auth_limite_compte_essais', 8));
+    }
+
+    /**
+     * Clé de limiteur d'un compte. L'adresse est normalisée puis hachée : elle ne
+     * s'écrit jamais en clair dans le cache, et la clé existe que le compte existe ou non
+     * (sans quoi le limiteur révélerait l'existence du compte).
+     */
+    public static function cleCompte(string $portee, string $email): string
+    {
+        return $portee . ':compte:' . sha1(strtolower(trim($email)));
+    }
+
     /**
      * @return array{user: User, requires_2fa: bool}
      */
@@ -76,6 +105,17 @@ class AuthService
             ]);
         }
 
+        // Limiteur PAR COMPTE : plusieurs adresses qui visent le même compte.
+        // Même message pour un compte inconnu (la clé ne dépend pas de l'existence).
+        $cleCompte = self::cleCompte('login', $email);
+        $limiteCompte = self::limiteurCompteActif();
+        if ($limiteCompte && RateLimiter::tooManyAttempts($cleCompte, self::essaisMaxParCompte())) {
+            self::journaliserEchec('limite_essais_compte', $request);
+            throw ValidationException::withMessages([
+                'email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($cleCompte)]),
+            ]);
+        }
+
         /** @var User|null $user */
         $user = User::query()->where('email', $email)->whereNull('deleted_at')->first();
 
@@ -85,6 +125,9 @@ class AuthService
         // compteur d'échecs continuait de monter. Le verrou doit couper avant.
         if ($user && $user->locked_until && $user->locked_until->isFuture()) {
             RateLimiter::hit($throttleKey, 60);
+            if ($limiteCompte) {
+                RateLimiter::hit($cleCompte, self::FENETRE_LIMITEUR_COMPTE);
+            }
             $verrou = ValidationException::withMessages([
                 'email' => __('auth.locked', ['until' => $user->locked_until->toIso8601String()]),
             ]);
@@ -104,6 +147,9 @@ class AuthService
 
         if (! $user || ! $user->password_hash || ! $motDePasseValide) {
             RateLimiter::hit($throttleKey, 60);
+            if ($limiteCompte) {
+                RateLimiter::hit($cleCompte, self::FENETRE_LIMITEUR_COMPTE);
+            }
             if ($user) {
                 $this->enregistrerEchec($user);
             }

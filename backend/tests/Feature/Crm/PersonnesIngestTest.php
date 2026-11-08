@@ -364,7 +364,7 @@ test('L4-C 8 bis — ordre inverse : la personne qui arrive APRÈS sa fiche cont
 // 9. Effacement RGPD
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('L4-C 9 — l’effacement RGPD vide personnes, abonnements et activities, et garde l’empreinte en opposition', function () {
+test('L4-C 9 / L3c-0 — la demande d’effacement met la personne à l’écart (rien n’est supprimé) et garde l’empreinte en opposition', function () {
     l4cPost(l4cOptinActuel(['occurred_at' => '2026-09-01T10:00:00Z']))->assertOk();
     l4cPost(l4cEvent('newsletter_optout', '2026-09-02T12:00:00Z'))->assertOk();
 
@@ -374,10 +374,11 @@ test('L4-C 9 — l’effacement RGPD vide personnes, abonnements et activities, 
 
     $result = app(SiteGdprService::class)->erase(l4cKey(), L4C_EMAIL);
 
-    expect($result['deleted']['business']['personnes'])->toBe(1)
-        ->and(DB::table('personnes')->count())->toBe(0)
-        ->and(DB::table('abonnements')->count())->toBe(0)
-        ->and(DB::table('activities')->where('person_key', l4cKey())->count())->toBe(0);
+    expect($result['mis_a_l_ecart']['business']['personnes'])->toBe(1)
+        ->and(DB::table('personnes')->count())->toBe(1)
+        ->and(DB::table('personnes')->whereNotNull('opposition_at')->count())->toBe(1)
+        ->and(DB::table('abonnements')->where('statut', 'desabonne')->count())->toBe(1)
+        ->and(DB::table('activities')->where('person_key', l4cKey())->count())->toBeGreaterThan(0);
 
     $portees = DB::table('opt_out')->where('email_hash', hash('sha256', L4C_EMAIL))->pluck('scope')->sort()->values()->all();
     expect($portees)->toContain('business')->toContain('lettre');
@@ -614,7 +615,8 @@ test('L4-C relecture — un désabonnement reçu en premier crée la personne SA
     // L'effacement la retrouve quand même, par l'empreinte.
     $bilan = app(GdprErasureService::class)->erase(L4C_EMAIL);
     expect($bilan['deleted']['personnes'])->toBe(1)
-        ->and(DB::table('personnes')->count())->toBe(0);
+        ->and(DB::table('personnes')->count())->toBe(1)
+        ->and(DB::table('personnes')->whereNotNull('opposition_at')->count())->toBe(1);
 });
 
 test('L4-C relecture — la timeline ne recopie que les clés FERMÉES de payload', function () {

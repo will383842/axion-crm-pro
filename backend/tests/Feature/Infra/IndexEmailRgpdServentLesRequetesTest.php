@@ -461,10 +461,12 @@ test('C21-001 — les chemins RGPD (art. 15 et art. 17) EMPLOIENT tous un index'
         app(SiteGdprService::class)->erase(cleSujet(), adresseCible(), 'both');
     });
 
+    // L3c-0 : l'effacement ne supprime plus ; il RELEVE les lignes (select) puis les
+    // masque (update). Les verbes `delete` d'avant sont devenus `select` / `update`.
     // `health_practitioners` -- ARTICLE 9, categorie particuliere. Cette table
     // n'avait AUCUN index sur `email` avant la migration
     // `2026_08_20_150000_index_email_praticiens_sante.php`.
-    $planSante = planDe(requeteEmail($emisErase, 'health_practitioners', verbe: 'delete'));
+    $planSante = planDe(requeteEmail($emisErase, 'health_practitioners', verbe: 'update'));
     $this->assertStringContainsString(
         'idx_health_practitioners_email',
         $planSante,
@@ -480,7 +482,7 @@ Si l'index n'apparait pas, verifier que la migration "
         . 'idempotence (cf. G41-003).',
     );
 
-    $planEffacementVivier = planDe(requeteEmail($emisErase, 'candidates', verbe: 'delete'));
+    $planEffacementVivier = planDe(requeteEmail($emisErase, 'candidates', verbe: 'select'));
     $this->assertStringContainsString(
         'idx_candidates_email',
         $planEffacementVivier,
@@ -489,14 +491,21 @@ Si l'index n'apparait pas, verifier que la migration "
 {$planEffacementVivier}",
     );
 
-    $planEffacementContacts = planDe(requeteEmail($emisErase, 'contacts', verbe: 'delete'));
-    $this->assertStringContainsString(
-        'idx_contacts_email',
-        $planEffacementContacts,
-        "Une demande d'effacement ne doit pas balayer la base de contacts. Plan obtenu :
-
-"
-        . $planEffacementContacts,
+    // L3c-0 : le relevé des contacts à masquer porte EXACTEMENT le même prédicat que
+    // l'export (dont le plan emploie `idx_contacts_email`, vérifié plus haut). On
+    // compare les prédicats plutôt qu'un plan : sur un petit banc, un `select id`
+    // peut être servi par n'importe quel index, ce qui ne dit rien de l'adresse.
+    $predicat = static fn (string $sql): string => strtolower(substr($sql, (int) strpos(strtolower($sql), ' where ')));
+    $releveContacts = requeteEmail($emisErase, 'contacts', verbe: 'select');
+    $memePredicatQueLExport = array_filter(
+        $emisExport,
+        static fn (array $r): bool => str_starts_with(ltrim(strtolower($r['sql'])), 'select')
+            && str_contains(strtolower($r['sql']), '"contacts"')
+            && $predicat($r['sql']) === $predicat($releveContacts['sql']),
+    );
+    $this->assertNotEmpty(
+        $memePredicatQueLExport,
+        "Le relevé des contacts à masquer doit interroger par le même prédicat que l'export (adresse OU clé de personne), servi par son index.",
     );
 });
 

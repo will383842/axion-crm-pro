@@ -19,7 +19,7 @@ beforeEach(function () {
     ]);
 });
 
-test('erasure deletes contacts matching email', function () {
+test('L3c-0 : erasure MASQUE les contacts de l\'adresse, sans les supprimer', function () {
     $companyId = DB::table('companies')->insertGetId([
         'workspace_id' => $this->workspaceId, 'siren' => '123456789',
         'denomination' => 'Acme', 'signals' => '{}', 'metadata' => '{}',
@@ -37,7 +37,10 @@ test('erasure deletes contacts matching email', function () {
     $result = $service->erase('marie.dupont@example.com');
 
     expect($result['deleted']['contacts'])->toBe(1);
-    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->count())->toBe(0);
+    // La ligne est GARDÉE ; elle est seulement à la corbeille douce, avec sa trace.
+    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->count())->toBe(1);
+    expect(DB::table('contacts')->where('email', 'marie.dupont@example.com')->whereNull('deleted_at')->count())->toBe(0);
+    expect((string) DB::table('contacts')->where('email', 'marie.dupont@example.com')->value('metadata'))->toContain('mis_a_l_ecart_le');
 });
 
 test('erasure adds opt_out entry', function () {
@@ -56,12 +59,14 @@ test('erasure runs in atomic transaction (rollback on failure)', function () {
     expect(fn () => $service->erase(''))->not->toThrow(Throwable::class);
 });
 
-test('erasure deletes email_validations entry', function () {
+test('L3c-0 : le traitement d\'une demande NE SUPPRIME PAS le cache email_validations', function () {
     DB::table('email_validations')->insert([
         'email' => 'cached@example.com', 'status' => 'valid', 'score' => 90,
         'expires_at' => now()->addDays(30),
     ]);
     $service = new GdprErasureService(new AuditHashChain, new DeduplicationService);
     $result = $service->erase('cached@example.com');
-    expect($result['deleted']['email_validations'])->toBe(1);
+
+    expect(DB::table('email_validations')->where('email', 'cached@example.com')->count())->toBe(1)
+        ->and($result['deleted'])->not->toHaveKey('email_validations');
 });

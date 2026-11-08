@@ -1,0 +1,35 @@
+{
+  "schema_version": 3,
+  "event_id": "9647335f-3698-593e-89bb-cef0e9870a0e",
+  "event_type": "lead_magnet_requested",
+  "occurred_at": "2026-11-01T10:00:00.000Z",
+  "subject_ref": "site:guide-reseau:run_zernio_0001",
+  "person": {
+    "person_key": "h:personne@exemple.test",
+    "email": "personne@exemple.test"
+  },
+  "payload": {
+    "schema_version": 3,
+    "origine_contenu": {
+      "mot": "GUIDE",
+      "reseau": "instagram",
+      "guide": "guide-ia",
+      "date": "2026-11-01T10:00:00.000Z"
+    },
+    "origines": [
+      {
+        "mot": "GUIDE",
+        "reseau": "instagram",
+        "guide": "guide-ia",
+        "date": "2026-11-01T10:00:00.000Z",
+        "post_ref": "post_ref_test_01",
+        "canal": "commentaire",
+        "famille": "guide_reseau",
+        "detail": "autre_non_classe",
+        "compte": "page_principale",
+        "version_texte": "m1-v1",
+        "utm_campaign": "guide_reseau"
+      }
+    ]
+  }
+}

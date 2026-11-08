@@ -37,6 +37,24 @@ use Throwable;
 final class SemeurTablesScopees
 {
     /**
+     * Tables en ajout seul (trigger qui refuse DELETE) : `nettoyer()` les saute.
+     * Leurs lignes de test restent, sans clé étrangère vers `workspaces`.
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL = ['envoi_journal_commandes'];
+
+    /**
+     * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
+     * de test bloqueraient la suppression du workspace. `nettoyer()` les vide en suspendant le
+     * trigger USER le temps d'une transaction (connexion propriétaire, tests seulement ; le
+     * trigger de production n'est pas touché).
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites'];
+
+    /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
      * celles dont ses clés étrangères dépendent. Le nettoyage parcourt cette
      * liste à l'envers.
@@ -76,6 +94,9 @@ final class SemeurTablesScopees
         'events',
         // ── Feuilles ─────────────────────────────────────────────────────────
         'abonnements',
+        // 2026-11-03 (contrat v3 de l'origine) : origines archivées d'une personne —
+        // feuille de `personnes` (ajout seul pour le rôle applicatif).
+        'personne_origines_archive',
         'activities',
         // 2026-09-30 (chantier 5) : adresses generiques partagees (empreintes).
         'adresses_partagees',
@@ -99,6 +120,13 @@ final class SemeurTablesScopees
         // 2026-10-03 (N13) : propositions venues d'un tiers — feuille de
         // `companies` (pas de clé étrangère : un déclencheur vérifie l'espace).
         'propositions_champs',
+        // L3c-0 : marque de mise à l'écart d'une proposition (clé étrangère vers
+        // `propositions_champs`, ON DELETE RESTRICT) : APRÈS elle, pour que le nettoyage
+        // (ordre inverse) la vide d'abord.
+        'propositions_champs_ecartees',
+        // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
+        'envoi_verdicts_adresse',
+        'envoi_domaines',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -138,6 +166,15 @@ final class SemeurTablesScopees
         'llm_usage',
         'llm_use_cases',
         'notifications',
+        // 2026-11-10 (envoi P0 L0) : socle local d'envoi. Le journal est en AJOUT SEUL
+        // (trigger) : le nettoyage ne peut pas le vider, voir APPEND_SEUL.
+        'envoi_drapeaux',
+        'envoi_journal_commandes',
+        'envoi_temoins',
+        // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
+        // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
+        'envoi_boites',
+        'envoi_injections_smtp',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -290,6 +327,12 @@ final class SemeurTablesScopees
             'dernier_evenement_at' => now(),
         ]);
 
+        $inserer('personne_origines_archive', [
+            'personne_id' => $id['personnes'],
+            'cle' => 'zz-origine-' . $marque,
+            'origine' => json_encode(['mot' => 'guide', 'date' => '2026-11-01T10:00:00Z']),
+        ]);
+
         $id['events'] = $insererAvecId('events', [
             'external_ref' => 'zz-evenement-' . $marque,
             'nom' => 'ZZ Événement ' . $marque,
@@ -433,12 +476,29 @@ final class SemeurTablesScopees
             'information_tiers_version' => 'information-article-14/v5',
         ]);
 
-        $inserer('propositions_champs', [
+        $id['propositions_champs'] = $insererAvecId('propositions_champs', [
             'entite' => 'entreprise',
             'entite_id' => $id['companies'],
             'champ' => 'city',
             'valeur_proposee' => 'ZZ Etancheite',
             'origine' => 'apporteur',
+        ]);
+
+        $inserer('propositions_champs_ecartees', [
+            'proposition_id' => $id['propositions_champs'],
+            'motif' => 'demande_effacement',
+        ]);
+
+        $inserer('envoi_verdicts_adresse', [
+            'empreinte_adresse' => hash('sha256', 'zz-etancheite@example.invalid'),
+            'verdict' => 'valide',
+            'verifie_le' => now(),
+            'source' => 'zz-etancheite',
+        ]);
+
+        $inserer('envoi_domaines', [
+            'nom' => 'zz-etancheite.example.invalid',
+            'achete_le' => '2026-01-01',
         ]);
 
         $inserer('listes_manuelles_membres', [
@@ -606,6 +666,30 @@ final class SemeurTablesScopees
             'title' => 'ZZ',
         ]);
 
+        $inserer('envoi_drapeaux', []);
+        $inserer('envoi_journal_commandes', [
+            'commande' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_temoins', [
+            'empreinte' => hash('sha256', 'zz-' . $marque),
+            'libelle' => 'zz',
+        ]);
+
+        $boiteId = (string) Str::uuid();
+        $inserer('envoi_boites', [
+            'id' => $boiteId,
+            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'hote' => 'smtp.exemple.test',
+            'port' => 587,
+            'chiffrement' => 'starttls',
+            'identifiants_chiffres' => 'zz-chiffre',
+        ]);
+        $inserer('envoi_injections_smtp', [
+            'boite_id' => $boiteId,
+            'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
         $inserer('proxy_providers_config', [
             'slug' => 'zz-' . $marque,
             'type' => 'datacenter',
@@ -687,6 +771,18 @@ final class SemeurTablesScopees
         $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
 
         foreach (array_reverse(self::ORDRE) as $table) {
+            if (in_array($table, self::APPEND_SEUL, true)) {
+                continue;
+            }
+            if (in_array($table, self::APPEND_SEUL_AVEC_FK, true)) {
+                $owner->transaction(function () use ($owner, $table, $workspaceIds): void {
+                    $owner->statement("ALTER TABLE {$table} DISABLE TRIGGER USER");
+                    $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
+                    $owner->statement("ALTER TABLE {$table} ENABLE TRIGGER USER");
+                });
+
+                continue;
+            }
             $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
         }
 

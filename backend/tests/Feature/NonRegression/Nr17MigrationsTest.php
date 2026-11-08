@@ -27,6 +27,22 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const NR17_DERNIERE_ANCIENNE = '2026_11_01_999999';
 
+/**
+ * Filet modifié : pourquoi — envoi P0 L0 (PR #433).
+ * Migrations NOUVELLES dont le down() est INERTE PAR CONCEPTION : elles posent une
+ * protection « ajout seul » (triggers, REVOKE) sur le journal d’envoi et ne créent que
+ * des ajouts (colonne, index, table de compteur). Un vrai retour devrait retirer la
+ * protection ou effacer des lignes du journal, ce que REGLES-SOCLE S8 interdit.
+ * La liste est EXPLICITE et FERMÉE : toute autre migration nouvelle garde l’exigence
+ * d’un retour réel + aller-retour-aller. Pour ces fichiers on exige en plus que
+ * down() soit vraiment vide (aucun DROP/DELETE/TRUNCATE ne s’y glisse) et que up()
+ * soit rejouable deux fois (idempotent) à la place de l’aller-retour-aller.
+ */
+const NR17_RETOUR_INERTE_VOULU = [
+    '2026_11_10_000011_envoi_journal_commandes.php',
+    '2026_11_10_000013_envoi_garde_drapeaux_compteurs.php',
+];
+
 /** @return list<string> noms de fichiers (sans dossier), triés */
 function nr17Migrations(): array
 {
@@ -92,7 +108,10 @@ function nr17ClasseRetour(string $fichier): string
 /** @return list<string> */
 function nr17SansRetour(): array
 {
-    return array_values(array_filter(nr17Migrations(), fn (string $f) => nr17ClasseRetour($f) !== 'reel'));
+    return array_values(array_filter(
+        nr17Migrations(),
+        fn (string $f) => nr17ClasseRetour($f) !== 'reel' && ! in_array($f, NR17_RETOUR_INERTE_VOULU, true),
+    ));
 }
 
 function nr17AllerRetourAller(string $fichier): void
@@ -114,6 +133,16 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
     $nouvelles = array_values(array_filter(nr17Migrations(), fn (string $f) => strcmp(substr($f, 0, 17), NR17_DERNIERE_ANCIENNE) > 0));
 
     foreach ($nouvelles as $fichier) {
+        if (in_array($fichier, NR17_RETOUR_INERTE_VOULU, true)) {
+            // Retour inerte voulu : down() vide (rien n’est retiré ni effacé), up() rejouable.
+            expect(nr17ClasseRetour($fichier))->toBe('vide');
+            $migration = require database_path('migrations/' . $fichier);
+            $migration->down();
+            $migration->up();
+            $migration->up();
+
+            continue;
+        }
         expect(nr17ClasseRetour($fichier))->toBe('reel');
         nr17AllerRetourAller($fichier);
     }
@@ -134,6 +163,14 @@ test('NR-17 témoin : l’instrument aller-retour-aller joue sur une migration a
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
     nr17AllerRetourAller($fichier);
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
+});
+
+test('NR-17 la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels', function () {
+    foreach (NR17_RETOUR_INERTE_VOULU as $fichier) {
+        expect(nr17Migrations())->toContain($fichier)
+            ->and(strcmp(substr($fichier, 0, 17), NR17_DERNIERE_ANCIENNE))->toBeGreaterThan(0)
+            ->and(nr17ClasseRetour($fichier))->toBe('vide');
+    }
 });
 
 test('NR-17 le classement voit bien des retours vides, refusés et réels (témoin de couverture)', function () {

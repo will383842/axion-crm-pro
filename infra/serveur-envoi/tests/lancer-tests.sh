@@ -316,6 +316,6 @@ nochk "M-N1 lancer-tests.sh n'a plus de garde de perimetre inline" grep -q 'git 
 # K5 : DKIM cote serveur (cle generee dans un dossier temporaire).
 chk "K5: tests DKIM serveur" bash "$D/dkim/tests-dkim.sh"
 # K16 : reconstruction du serveur (refus sans marqueurs remplaces, a blanc, idempotence, shellcheck).
-chk "K16: tests de la reconstruction" bash "$D/reconstruction/tests-reconstruction.sh"
+if sortie_k16="$(bash "$D/reconstruction/tests-reconstruction.sh" 2>&1)"; then ok "K16: tests de la reconstruction"; else bad "K16: tests de la reconstruction"; grep -v "^ok" <<<"$sortie_k16"; fi
 echo "--- $n verifications, $([[ $ko = 0 ]] && echo VERT || echo ROUGE)"
 exit "$ko"

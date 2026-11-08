@@ -44,3 +44,12 @@ def verifier(secret: bytes, methode, chemin, horodatage, nonce, workspace_id, co
     attendu = hmac.new(secret, charge_requete(methode, chemin, horodatage, nonce, workspace_id, corps),
                        hashlib.sha256).hexdigest()
     return hmac.compare_digest(attendu, recu)
+
+
+def signer_reponse(secret: bytes, nonce: str, workspace_id: str, statut: int, corps: str) -> str:
+    """Signature de RÉPONSE du contrat v2 : HMAC-SHA256 hex de « REPONSE\\nnonce\\nworkspace_id\\nstatut\\ncorps »
+    (le nonce est celui de la requête). Secret vide => chaîne vide (rien n'est signé). Vecteurs : `reponses`."""
+    if not secret:
+        return ""
+    charge = "\n".join(["REPONSE", nonce, workspace_id, str(int(statut)), corps]).encode()
+    return hmac.new(secret, charge, hashlib.sha256).hexdigest()

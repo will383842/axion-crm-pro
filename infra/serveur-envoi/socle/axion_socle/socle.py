@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from . import signature
 from .empreinte import empreinte_temoin, liste_valide
 from .horloge import jour_paris
-from .stockage import ErreurStockage, Stockage, assainir
+from .stockage import ErreurStockage, Stockage, assainir, cle_liste_temoins, cle_temoins
 
 SEPT_JOURS = 7 * 86400
 HOMME_MORT = 15 * 60
@@ -31,7 +31,9 @@ DELAI_RESERVE = 120  # un jeton réservé depuis moins de 2 min : un dépôt est
 TOLERANCE_HORLOGE = 60  # écart toléré entre horloge murale et monotone avant de fermer
 JETON_MIN, JETON_MAX = 32, 128
 _JETON_RE = re.compile(r"[A-Za-z0-9_-]+")  # hex ou base64url
-COMMANDES = ("sante", "reprise", "temoins")
+MAX_REACCEPTATIONS = 3  # un jeton « reserve » jamais confirmé n'est ré-accepté que 3 fois, puis 451 définitif
+# « retrait » (CRM) relève de la passerelle K2 : le socle ne le traite pas (404, nonce consommé, aucun effet).
+COMMANDES = ("sante", "reprise", "temoins", "pause")
 PREFIXE_COMMANDES = "/v1/commandes/"
 
 
@@ -142,7 +144,8 @@ class Socle:
             return 503
 
     def traiter(self, methode, chemin, horodatage, nonce, workspace_id, corps, entete) -> int:
-        """Commande signée du CRM : /v1/commandes/{sante,reprise,temoins}. Rend un statut HTTP."""
+        """Commande signée du CRM : /v1/commandes/{sante,reprise,temoins,pause}. Rend un statut HTTP (200 401 403 404 405 409
+        422 500 503 ; 500 = exception interne, fermé)."""
         statut = self.verifier_requete(methode, chemin, horodatage, nonce, workspace_id, corps, entete)
         if statut != 200:
             return statut
@@ -154,7 +157,8 @@ class Socle:
         try:
             with self._verrou:
                 return {"sante": self._sante, "reprise": self._reprise,
-                        "temoins": lambda: self._temoins(corps)}[nom]()
+                        "temoins": lambda: self._temoins(workspace_id, corps),
+                        "pause": lambda: self._pause(corps)}[nom]()
         except ErreurStockage:
             return 503
         except Exception:  # fermé par défaut
@@ -188,20 +192,32 @@ class Socle:
             st.ecrire(lambda c: c.execute("DELETE FROM jetons WHERE cree_duree<?", (seuil,)))
         j = st.jeton(jh)
         if j:
+            if j[4] != ws:  # un jeton appartient à SON espace
+                st.ecrire(lambda c: self._journaliser(c, "alerte-jeton-espace", jh[:8]))
+                return Reponse(550, "5.5.4 jeton deja utilise dans un autre espace")
             if j[0] != emp:
                 st.ecrire(lambda c: self._journaliser(c, "alerte-jeton-contenu", jh[:8]))
                 return Reponse(550, "5.5.4 jeton deja utilise avec un autre contenu")
             if j[2] == "confirme":
+                # Rejeu d'un message déjà reçu par KumoMTA : jamais un passe-droit. Pause, témoins et liste valent AUSSI ici.
+                refus = self._refus(ws, dest, pause)
+                if refus:
+                    return refus
+                # rejoue=True : répondre 250 au client SANS mettre en file (le message est jeté). Aucun dépôt.
                 return Reponse(250, "2.0.0 ok", j[1], rejoue=True)
             if d - j[3] < self.p.delai_reserve:
                 return Reponse(451, "4.3.2 depot en cours, report")
-            refus = self._refus(dest, pause)  # pause, mode témoins et liste : à CHAQUE nouvelle acceptation
+            refus = self._refus(ws, dest, pause)  # pause, mode témoins et liste : à CHAQUE nouvelle acceptation
             if refus:
                 return refus
-            st.ecrire(lambda c: (c.execute("UPDATE jetons SET reserve_duree=? WHERE jeton_h=?", (d, jh)),
-                                 self._poser_duree(c)))
-            return Reponse(250, "2.0.0 ok", j[1], rejoue=True)  # même id, même place de plafond
-        refus = self._refus(dest, pause)
+            if j[5] >= MAX_REACCEPTATIONS:
+                st.ecrire(lambda c: self._journaliser(c, "jeton-reacceptations-max", jh[:8]))
+                return Reponse(451, "4.7.2 jeton reaccepte trop de fois sans confirmation, refus definitif")
+            st.ecrire(lambda c: (c.execute("UPDATE jetons SET reserve_duree=?, reacceptations=reacceptations+1 "
+                                           "WHERE jeton_h=?", (d, jh)), self._poser_duree(c)))
+            # Même id, même place de plafond ; rien n'est confirmé : le message est à DÉPOSER (rejoue=False).
+            return Reponse(250, "2.0.0 ok", j[1])
+        refus = self._refus(ws, dest, pause)
         if refus:
             return refus
         id_ = secrets.token_hex(12)
@@ -223,18 +239,20 @@ class Socle:
         for espace in ("*", ws):
             c.execute("INSERT INTO compteur VALUES(?,?,1) ON CONFLICT(jour,espace) DO UPDATE SET n=n+1",
                       (jour, espace))
-        c.execute("INSERT INTO jetons VALUES(?,?,?,?,?,'reserve',?,?)", (jh, emp, id_, ws, jour, d, d))
+        c.execute("INSERT INTO jetons(jeton_h,empreinte,id,espace,jour,etat,cree_duree,reserve_duree) "
+                  "VALUES(?,?,?,?,?,'reserve',?,?)", (jh, emp, id_, ws, jour, d, d))
         st.poser(c, "dernier_jour", jour)
         self._poser_duree(c)
         return None
 
-    def _refus(self, dest, pause) -> Reponse | None:
+    def _refus(self, ws, dest, pause) -> Reponse | None:
         if pause:
             return Reponse(451, "4.7.0 pause totale (homme mort), report")
-        if self.temoins_actifs():
+        if self.temoins_actifs(ws):
             emp = empreinte_temoin(dest, self.p.cle_empreinte)
-            if emp is None or emp not in self.liste_temoins():
-                return Reponse(550, "5.7.1 mode temoins : destinataire hors liste")
+            if emp is None or emp not in self.liste_temoins(ws):
+                # 451 (report) et non 550 : un message n'est JAMAIS perdu ; il repart quand l'espace sort du mode témoins.
+                return Reponse(451, "4.7.1 mode temoins : destinataire hors liste, report")
         return None
 
     def confirmer(self, id_message: str) -> bool:
@@ -250,7 +268,7 @@ class Socle:
     def _verifier_homme_mort(self, mur) -> bool:
         """True = pause. Durées monotones ; tout saut de l'horloge murale (avant OU arrière) FERME, jamais n'ouvre."""
         st = self.stockage
-        if st.meta("pause_hm") == "1":
+        if st.meta("pause_hm") != "0":  # absente ou illisible => FERMÉ ; seule la valeur « 0 » ouvre
             return True
         mono = self.monotone()
         ls = st.meta("derniere_sante")
@@ -319,22 +337,39 @@ class Socle:
         self._mono_sante, self._ref = mono, (mur, mono)
         return 200
 
-    # --- mode témoins ----------------------------------------------------------------------------
-    def temoins_actifs(self) -> bool:
-        return self.ferme or self.stockage.meta("temoins") == "1"
+    # --- mode témoins (PAR ESPACE, comme dans le CRM) ----------------------------------------------
+    def temoins_actifs(self, ws) -> bool:
+        """Fermé par défaut : seule la valeur « 0 » enregistrée pour CET espace éteint le mode."""
+        return self.ferme or self.stockage.meta(cle_temoins(ws)) != "0"
 
-    def liste_temoins(self) -> frozenset:
+    def liste_temoins(self, ws) -> frozenset:
         if self.ferme:
             return frozenset()
         try:
-            liste = json.loads(self.stockage.meta("liste_temoins", "[]"))
+            liste = json.loads(self.stockage.meta(cle_liste_temoins(ws), "[]"))
         except ValueError:
             return frozenset()
         return frozenset(liste) if liste_valide(liste) else frozenset()
 
-    def _temoins(self, corps) -> int:
-        """modeTemoins(actif, liste d'EMPREINTES). Éteint : le CRM peut allumer. Déjà actif : il ne peut que RÉDUIRE
-        (intersection) ; agrandir ou éteindre passe par la console locale."""
+    def _pause(self, corps) -> int:
+        """Commande `pause` du CRM : {commande_id, commande:"pause"}. Arrêt LOCAL écrit sur disque. Restrictif donc
+        toujours permis (idempotent) ; seule la commande signée `reprise` rouvre."""
+        try:
+            data = json.loads(corps)
+        except ValueError:
+            return 422
+        if not isinstance(data, dict) or set(data) != {"commande_id", "commande"} or data["commande"] != "pause" \
+                or not signature.est_uuid(data["commande_id"]):
+            return 422
+        st = self.stockage
+        self._duree()
+        st.ecrire(lambda c: (st.poser(c, "pause_hm", 1), self._poser_duree(c),
+                             self._journaliser(c, "pause-crm", data["commande_id"][:8])))
+        return 200
+
+    def _temoins(self, ws, corps) -> int:
+        """modeTemoins(actif, liste d'EMPREINTES) pour l'espace `ws` (signé). Éteint : le CRM peut allumer. Déjà actif :
+        il ne peut que RÉDUIRE (intersection) ; agrandir ou éteindre passe par la console locale."""
         try:
             data = json.loads(corps)
         except ValueError:
@@ -342,18 +377,18 @@ class Socle:
         if not isinstance(data, dict) or not isinstance(data.get("actif"), bool) or not liste_valide(data.get("liste")):
             return 422
         st = self.stockage
-        if not self.temoins_actifs():
+        if not self.temoins_actifs(ws):
             if not data["actif"]:
                 return 200
             liste = sorted(set(data["liste"]))
-            st.ecrire(lambda c: (st.poser(c, "temoins", 1), st.poser(c, "liste_temoins", json.dumps(liste)),
+            st.ecrire(lambda c: (st.poser(c, cle_temoins(ws), 1), st.poser(c, cle_liste_temoins(ws), json.dumps(liste)),
                                  self._journaliser(c, "temoins-on", f"{len(liste)} empreintes")))
             return 200
         if not data["actif"]:
             st.ecrire(lambda c: self._journaliser(c, "alerte-temoins-crm-refuse", "extinction demandee par le CRM"))
             return 403
-        liste = sorted(self.liste_temoins() & set(data["liste"]))
-        st.ecrire(lambda c: (st.poser(c, "liste_temoins", json.dumps(liste)),
+        liste = sorted(self.liste_temoins(ws) & set(data["liste"]))
+        st.ecrire(lambda c: (st.poser(c, cle_liste_temoins(ws), json.dumps(liste)),
                              self._journaliser(c, "temoins-reduit", f"{len(liste)} empreintes")))
         return 200
 

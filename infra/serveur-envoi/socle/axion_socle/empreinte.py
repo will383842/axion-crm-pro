@@ -26,11 +26,21 @@ def normaliser(adresse: str) -> str:
     return adresse[:i + 1] + domaine
 
 
-def empreinte_temoin(adresse: str, cle: bytes) -> str | None:
-    """None si la clé est vide : aucune empreinte, donc aucune adresse ne peut figurer sur la liste (fermé)."""
+def empreinte_contrat(adresse: str, cle: bytes) -> str | None:
+    """Empreinte du CONTRAT partagé avec le CRM (vecteurs communs). None si la clé est vide (fermé)."""
     if not cle:
         return None
     return hmac.new(cle, normaliser(adresse).encode(), hashlib.sha256).hexdigest()
+
+
+def empreinte_temoin(adresse: str, cle: bytes) -> str | None:
+    """Empreinte pour la DÉCISION : comparaison après normalisation ASCII STRICTE. Une adresse qui n'est pas
+    entièrement ASCII (hors espaces) n'a pas d'empreinte, donc n'est jamais « sur la liste » : la minuscule
+    Unicode replierait le signe KELVIN (U+212A) sur « k » et ferait passer une autre boîte pour un témoin.
+    Un témoin IDN se compare en punycode (ASCII). Le contrat partagé et les empreintes déjà stockées sont inchangés."""
+    if not re.sub(r"\s+", "", str(adresse)).isascii():
+        return None
+    return empreinte_contrat(adresse, cle)
 
 
 def liste_valide(liste) -> bool:

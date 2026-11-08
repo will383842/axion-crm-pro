@@ -1,8 +1,9 @@
 name: Serveur envoi K6 socle
 
 on:
+  # PAS de filtre « paths » sur pull_request : « Tests du socle d'envoi » est un contrôle exigé, un filtre le laisserait
+  # « en attente » sur toute PR qui ne touche pas ces dossiers. Les tests durent quelques secondes.
   pull_request:
-    paths: ['infra/serveur-envoi/socle/**', 'envoi-serveur/contrat/**', '.github/workflows/serveur-envoi-socle.yml']
   push:
     branches: [main]
     paths: ['infra/serveur-envoi/socle/**', 'envoi-serveur/contrat/**', '.github/workflows/serveur-envoi-socle.yml']

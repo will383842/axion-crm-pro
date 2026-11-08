@@ -16,5 +16,11 @@ kumo.on('smtp_server_message_received', function(msg)
   if reponse.code ~= 250 then
     kumo.reject(reponse.code, reponse.texte)
   end
-  msg:set_meta('id_message_socle', reponse.id) -- le log hook K7 confirmera ce jeton
+  -- CONTRAT : reponse.rejoue == true => repondre 250 au client SANS mettre en file. Le message est jete
+  -- (file nulle), rien n'est depose, aucune place de plafond. Sinon (rejoue faux) le message est depose normalement.
+  if reponse.rejoue then
+    msg:set_meta('queue', 'null')
+    return
+  end
+  msg:set_meta('id_message_socle', reponse.id) -- le log hook K7 confirmera ce jeton a la RECEPTION par KumoMTA
 end)

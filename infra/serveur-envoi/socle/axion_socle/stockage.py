@@ -2,6 +2,7 @@
 import os
 import re
 import sqlite3
+import stat
 
 PRAGMAS_AUTORISES = frozenset({"synchronous", "journal_mode", "foreign_keys", "user_version"})
 
@@ -9,6 +10,14 @@ PRAGMAS_AUTORISES = frozenset({"synchronous", "journal_mode", "foreign_keys", "u
 def assainir(texte, borne: int = 64) -> str:
     """Texte à journaliser : borné, sans retour ligne ni caractère de contrôle ou exotique."""
     return re.sub(r"[^A-Za-z0-9._@-]", "_", str(texte))[:borne]
+
+
+def cle_temoins(espace: str) -> str:
+    return f"temoins:{espace}"
+
+
+def cle_liste_temoins(espace: str) -> str:
+    return f"liste_temoins:{espace}"
 
 
 class ErreurStockage(Exception):
@@ -20,7 +29,7 @@ CREATE TABLE meta(cle TEXT PRIMARY KEY, valeur TEXT);
 CREATE TABLE compteur(jour TEXT NOT NULL, espace TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY(jour, espace));
 CREATE TABLE jetons(jeton_h TEXT PRIMARY KEY, empreinte TEXT NOT NULL, id TEXT NOT NULL UNIQUE, espace TEXT NOT NULL,
   jour TEXT NOT NULL, etat TEXT NOT NULL CHECK(etat IN ('reserve','confirme')),
-  cree_duree REAL NOT NULL, reserve_duree REAL NOT NULL);
+  cree_duree REAL NOT NULL, reserve_duree REAL NOT NULL, reacceptations INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE nonces(h TEXT PRIMARY KEY, expire_duree REAL NOT NULL);
 CREATE TABLE journal(n INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, type TEXT, detail TEXT);
 """
@@ -32,6 +41,8 @@ class Stockage:
     def __init__(self, chemin: str):
         if not os.path.isfile(chemin):
             raise ErreurStockage("fichier d'état absent")
+        if os.name != "nt" and stat.S_IMODE(os.stat(chemin).st_mode) & 0o077:
+            raise ErreurStockage("droits du fichier d'état trop larges (0600 exigé)")
         try:
             self.c = sqlite3.connect(f"file:{chemin}?mode=rw", uri=True, isolation_level=None,
                                      check_same_thread=False)
@@ -39,6 +50,8 @@ class Stockage:
             if self.c.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ErreurStockage("fichier d'état corrompu")
             self.c.execute("SELECT 1 FROM meta LIMIT 1").fetchall()
+            if "reacceptations" not in [r[1] for r in self.c.execute("PRAGMA table_info(jetons)")]:
+                self.c.execute("ALTER TABLE jetons ADD COLUMN reacceptations INTEGER NOT NULL DEFAULT 0")  # ajout seul
         except (sqlite3.Error, ErreurStockage) as e:
             self.close()
             if isinstance(e, ErreurStockage):
@@ -47,7 +60,7 @@ class Stockage:
 
     @classmethod
     def creer(cls, chemin: str) -> None:
-        """Installation uniquement. Départ FERMÉ : pause (seule la commande reprise ouvre), témoins allumés, liste vide."""
+        """Installation uniquement. Départ FERMÉ : pause (seule la commande reprise ouvre), aucun espace n'est configuré (donc tous en mode témoins, liste vide : l'absence ferme)."""
         if os.path.lexists(chemin):
             raise ErreurStockage("existe déjà")
         dossier = os.path.dirname(os.path.abspath(chemin))
@@ -64,7 +77,7 @@ class Stockage:
         try:
             c.execute("PRAGMA synchronous=FULL")
             c.executescript(SCHEMA)
-            c.execute("INSERT INTO meta VALUES('temoins','1'),('liste_temoins','[]'),('pause_hm','1'),('duree','0')")
+            c.execute("INSERT INTO meta VALUES('pause_hm','1'),('duree','0')")
         finally:
             c.close()
 
@@ -103,7 +116,7 @@ class Stockage:
         c.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (cle, str(valeur)))
 
     def jeton(self, jeton_h):
-        return self.c.execute("SELECT empreinte,id,etat,reserve_duree FROM jetons WHERE jeton_h=?",
+        return self.c.execute("SELECT empreinte,id,etat,reserve_duree,espace,reacceptations FROM jetons WHERE jeton_h=?",
                               (jeton_h,)).fetchone()
 
     def compteur(self, jour, espace="*") -> int:

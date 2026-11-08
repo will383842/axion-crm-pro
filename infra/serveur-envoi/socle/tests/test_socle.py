@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from unittest import mock
 
 from axion_socle import local
-from axion_socle.empreinte import empreinte_temoin, normaliser
+from axion_socle.empreinte import empreinte_contrat, empreinte_temoin, normaliser
 from axion_socle.socle import Parametres, Socle
 from axion_socle.stockage import Stockage
 
@@ -25,6 +25,7 @@ SECRET = b"cle-de-test-sans-valeur"
 CLE_EMP = b"cle-empreinte-de-test"
 WS = "11111111-1111-4111-8111-111111111111"
 WS2 = "22222222-2222-4222-8222-222222222222"
+WS3 = "33333333-3333-4333-8333-333333333333"
 OK = "temoin@example.test"
 RACINE = os.path.abspath(os.path.join(os.path.dirname(__file__), *[os.pardir] * 4))
 CONTRAT = os.path.join(RACINE, "envoi-serveur", "contrat")
@@ -93,8 +94,10 @@ class Base(unittest.TestCase):
         for o in self._ouverts:
             o.close()
 
-    def eteindre(self, chemin=None, operateur="op"):
-        return local.eteindre_temoins_local(chemin or self.chemin, operateur)
+    def eteindre(self, chemin=None, operateur="op", ws=None):
+        """Éteint le mode témoins d'UN espace (ws) ou, par défaut, des trois espaces de test (il est PAR ESPACE)."""
+        espaces = (ws,) if ws else (WS, WS2, WS3)
+        return all(local.eteindre_temoins_local(chemin or self.chemin, operateur, w) for w in espaces)
 
     def stockage_ouvert(self, chemin=None):
         st = Stockage(chemin or self.chemin)
@@ -138,8 +141,8 @@ class Base(unittest.TestCase):
     def reprise(self, socle=None):
         return self.req("/v1/commandes/reprise", socle=socle)
 
-    def temoins(self, actif, liste, socle=None):
-        return self.req("/v1/commandes/temoins", json.dumps({"actif": actif, "liste": liste}), socle=socle)
+    def temoins(self, actif, liste, socle=None, ws=WS):
+        return self.req("/v1/commandes/temoins", json.dumps({"actif": actif, "liste": liste}), socle=socle, ws=ws)
 
     def envoi(self, jeton=None, dest=OK, contenu=b"msg", ws=WS, socle=None):
         return (socle or self.socle).decider(ws, jt("j") if jeton is None else jeton, dest, contenu)
@@ -174,7 +177,7 @@ class TestPlafond(Base):  # S19
         self.assertEqual([self.envoi(jt(i), ws=WS, socle=s).code for i in range(3)], [250, 250, 451])
         self.assertEqual([self.envoi(jt(10 + i), ws=WS2, socle=s).code for i in range(3)], [250, 250, 451])
         # global atteint (4) : un troisième espace est refusé alors que son propre plafond est libre
-        ws3 = "33333333-3333-4333-8333-333333333333"
+        ws3 = WS3
         r = self.envoi(jt("20"), ws=ws3, socle=s)
         self.assertEqual((r.code, "global" in r.texte), (451, True))
         self.assertEqual(s.compteur_du_jour(), 4)
@@ -544,19 +547,19 @@ class TestTemoins(Base):  # S18 (E) liste blanche d'EMPREINTES, jamais d'adresse
         self.assertEqual(self.envoi(jt("a"), "autre@example.test").code, 250)
         self.actifs(OK)
         r = self.envoi(jt("b"), "autre@example.test")
-        self.assertEqual(r.code, 550)
+        self.assertEqual(r.code, 451)
         self.assertEqual(self.envoi(jt("c"), OK).code, 250)
 
     def test_normalisation_remplace_la_comparaison_a_l_identique(self):
         self.actifs(OK)
         self.assertEqual(self.envoi(jt("a"), OK.upper()).code, 250)  # la casse est normalisée
         self.assertEqual(self.envoi(jt("b"), " Temoin @ Example.TEST. ").code, 250)
-        self.assertEqual(self.envoi(jt("c"), "autre@example.test").code, 550)
+        self.assertEqual(self.envoi(jt("c"), "autre@example.test").code, 451)
 
     def test_adresses_en_clair_refusees(self):
         for liste in ([OK], ["abc"], [E(OK)[:63]], [E(OK).upper()], [E(OK), 7]):
             self.assertEqual(self.temoins(True, liste), 422, repr(liste))
-        self.assertTrue(self.socle.temoins_actifs() is False)
+        self.assertTrue(self.socle.temoins_actifs(WS) is False)
 
     def test_taille_max_10(self):
         self.assertEqual(self.temoins(True, [E(f"t{i}@example.test") for i in range(11)]), 422)
@@ -571,27 +574,27 @@ class TestTemoins(Base):  # S18 (E) liste blanche d'EMPREINTES, jamais d'adresse
         a, b, c = "a@example.test", "b@example.test", "c@example.test"
         self.assertEqual(self.temoins(True, [E(a), E(b)]), 200)
         self.assertEqual(self.temoins(True, [E(b), E(c)]), 200)  # intersection : seul b reste
-        self.assertEqual(self.socle.liste_temoins(), frozenset([E(b)]))
-        self.assertEqual(self.envoi(jt("1"), c).code, 550)
-        self.assertEqual(self.envoi(jt("2"), a).code, 550)
+        self.assertEqual(self.socle.liste_temoins(WS), frozenset([E(b)]))
+        self.assertEqual(self.envoi(jt("1"), c).code, 451)
+        self.assertEqual(self.envoi(jt("2"), a).code, 451)
         self.assertEqual(self.envoi(jt("3"), b).code, 250)
         self.assertEqual(self.temoins(True, []), 200)  # vider est une réduction
-        self.assertEqual(self.envoi(jt("4"), b).code, 550)
+        self.assertEqual(self.envoi(jt("4"), b).code, 451)
 
     def test_deja_actif_extinction_par_le_crm_refusee_et_journalisee(self):
         self.actifs(OK)
         self.assertEqual(self.temoins(False, []), 403)
         self.assertEqual(self.temoins(False, [E(OK)]), 403)
-        self.assertTrue(self.socle.temoins_actifs())
+        self.assertTrue(self.socle.temoins_actifs(WS))
         self.assertTrue(any(e[0] == "alerte-temoins-crm-refuse" for e in self.socle.journal()))
 
     def test_extinction_distante_refusee_locale_journalisee(self):
         self.actifs(OK)
         self.assertFalse(self.socle.eteindre_temoins("crm", "x"))
         self.assertFalse(self.socle.eteindre_temoins("local", "x"))
-        self.assertTrue(self.socle.temoins_actifs())
+        self.assertTrue(self.socle.temoins_actifs(WS))
         self.assertTrue(self.eteindre(operateur="alice"))
-        self.assertFalse(self.socle.temoins_actifs())
+        self.assertFalse(self.socle.temoins_actifs(WS))
         j = self.socle.journal()
         self.assertTrue(any(e[0] == "temoins-off" and "alice" in e[1] for e in j))
         self.assertTrue(any(e[0] == "alerte-temoins-off-refuse" for e in j))
@@ -599,41 +602,41 @@ class TestTemoins(Base):  # S18 (E) liste blanche d'EMPREINTES, jamais d'adresse
     def test_agrandir_passe_par_la_console_locale_et_se_journalise(self):
         self.actifs(OK)
         nouvelle = [E(OK), E("autre@example.test")]
-        self.assertTrue(local.definir_temoins_local(self.chemin, "bob", True, nouvelle))
-        self.assertEqual(self.socle.liste_temoins(), frozenset(nouvelle))
+        self.assertTrue(local.definir_temoins_local(self.chemin, "bob", WS, True, nouvelle))
+        self.assertEqual(self.socle.liste_temoins(WS), frozenset(nouvelle))
         self.assertEqual(self.envoi(jt("a"), "autre@example.test").code, 250)
         self.assertTrue(any(e[0] == "temoins-liste-locale" and "bob" in e[1] for e in self.socle.journal()))
-        self.assertFalse(local.definir_temoins_local(self.chemin, "", True, nouvelle))
-        self.assertFalse(local.definir_temoins_local(self.chemin, "bob", True, ["en@clair.test"]))
-        self.assertFalse(local.definir_temoins_local(self.chemin, "bob", True, [E(f"{i}@x.test") for i in range(11)]))
+        self.assertFalse(local.definir_temoins_local(self.chemin, "", WS, True, nouvelle))
+        self.assertFalse(local.definir_temoins_local(self.chemin, "bob", WS, True, ["en@clair.test"]))
+        self.assertFalse(local.definir_temoins_local(self.chemin, "bob", WS, True, [E(f"{i}@x.test") for i in range(11)]))
 
     def test_inactif_le_crm_peut_allumer_avec_une_liste(self):
-        self.assertFalse(self.socle.temoins_actifs())
+        self.assertFalse(self.socle.temoins_actifs(WS))
         self.actifs(OK, "autre@example.test")
-        self.assertEqual(len(self.socle.liste_temoins()), 2)
+        self.assertEqual(len(self.socle.liste_temoins(WS)), 2)
 
     def test_actif_survit_au_redemarrage(self):
         self.actifs(OK)
         s2 = self.ouvrir()
-        self.assertTrue(s2.temoins_actifs())
-        self.assertEqual(s2.liste_temoins(), frozenset([E(OK)]))
+        self.assertTrue(s2.temoins_actifs(WS))
+        self.assertEqual(s2.liste_temoins(WS), frozenset([E(OK)]))
 
     def test_allumage_non_signe_refuse(self):
         self.assertEqual(self.req("/v1/commandes/temoins", json.dumps({"actif": True, "liste": []}), secret=b"x"), 401)
-        self.assertFalse(self.socle.temoins_actifs())
+        self.assertFalse(self.socle.temoins_actifs(WS))
 
     def test_cle_d_empreinte_vide_refuse_tout_en_mode_temoins(self):
         s = self.ouvrir()
         s.p = Parametres(plafond=3, plafond_espace=3, secret=SECRET, cle_empreinte=b"")
         self.actifs(OK)
-        self.assertEqual(self.envoi(jt("a"), OK, socle=s).code, 550)
+        self.assertEqual(self.envoi(jt("a"), OK, socle=s).code, 451)
 
     def test_rejeu_reserve_respecte_les_temoins(self):
         r = self.envoi(jt("x"), "reserve@example.test")
         self.assertEqual(r.code, 250)
         self.actifs(OK)
         self.vivre(130)
-        self.assertEqual(self.envoi(jt("x"), "reserve@example.test").code, 550)
+        self.assertEqual(self.envoi(jt("x"), "reserve@example.test").code, 451)
 
     def test_vecteurs_d_empreintes_communs_crm_serveur(self):
         with open(os.path.join(CONTRAT, "vecteurs-empreintes-temoins.json"), encoding="utf-8") as f:
@@ -641,7 +644,7 @@ class TestTemoins(Base):  # S18 (E) liste blanche d'EMPREINTES, jamais d'adresse
         self.assertTrue(v["cas"])
         for c in v["cas"]:
             self.assertEqual(normaliser(c["adresse"]), c["normalisee"], c["libelle"])
-            self.assertEqual(empreinte_temoin(c["adresse"], v["cle"].encode()), c["empreinte"], c["libelle"])
+            self.assertEqual(empreinte_contrat(c["adresse"], v["cle"].encode()), c["empreinte"], c["libelle"])
 
     def test_normalisation_cas_limites(self):
         self.assertEqual(normaliser("sans-arobase"), "sans-arobase")
@@ -696,7 +699,7 @@ class TestJetons(Base):  # (A) le socle décide ; jeton à deux états
         self.avance(121)
         self.assertEqual(self.sante(), 200)
         r2 = self.envoi(jt("a"))
-        self.assertEqual((r2.code, r2.id, r2.rejoue), (250, r1.id, True))
+        self.assertEqual((r2.code, r2.id, r2.rejoue), (250, r1.id, False))  # À déposer de nouveau (rien confirmé)
         self.assertEqual(self.socle.compteur_du_jour(), 1)  # pas une seconde place
         self.assertEqual(self.envoi(jt("a")).code, 451)  # la fenêtre de 2 min repart de zéro
 
@@ -747,7 +750,7 @@ class TestJetons(Base):  # (A) le socle décide ; jeton à deux états
         os.remove(self.chemin)
         s = self.ouvrir()
         self.assertEqual(self.envoi(jt("a"), socle=s).code, 451)
-        self.assertTrue(s.temoins_actifs())
+        self.assertTrue(s.temoins_actifs(WS))
 
     def test_fichier_illisible_ferme(self):
         with open(self.chemin, "wb") as f:
@@ -893,8 +896,8 @@ class TestDurcissements(Base):
     def test_extinction_locale_hors_du_socle(self):
         self.assertFalse(hasattr(Socle, "eteindre_temoins_local"))
         self.assertFalse(self.socle.eteindre_temoins("local", "op"))
-        self.assertFalse(local.eteindre_temoins_local(os.path.join(self.rep.name, "absent.sqlite"), "op"))
-        self.assertFalse(local.eteindre_temoins_local(self.chemin, ""))
+        self.assertFalse(local.eteindre_temoins_local(os.path.join(self.rep.name, "absent.sqlite"), "op", WS))
+        self.assertFalse(local.eteindre_temoins_local(self.chemin, "", WS))
 
 
 if __name__ == "__main__":

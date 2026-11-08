@@ -30,16 +30,13 @@ interface Parametres {
   crm: S['ConnexionCrm'];
 }
 
-/** Phrase ajoutée au bloc d'information seulement si la campagne mesure les ouvertures. */
-const BLOC_OUVERTURES =
-  'Si l’expéditeur a choisi de mesurer les ouvertures pour cette campagne, une image invisible permet d’estimer si ce message a été ouvert (simple estimation, ouvertures automatiques exclues) ; aucun clic n’est suivi, et cette mesure n’est jamais appliquée à une personne qui s’est opposée.';
 const BLOC_ART_14 =
   'Vous recevez ce message car votre adresse professionnelle est publique. Données : nom, adresse, entreprise. Source : annuaires publics. Se désinscrire en un clic.';
 
 function zone() {
   return demoDb.etendre('conformite', () => ({
     alertes: [
-      { id: 'al-1', titre: 'Boîte « will@ » ralentie', detail: 'Refus temporaires à 3 % depuis 09:30.', ce_qui_se_passe: 'Refus temporaires à 3 % depuis 09:30.', ce_que_le_systeme_a_fait: 'Volume divisé par 2.', que_faire: 'Rien si ça baisse ; sinon ouvrir la boîte.', niveau: 'attention', survenue_le: ilYa(0, 9, 30), lien: '/envoi/boites', close: false },
+      { id: 'al-1', titre: 'Boîte « prospection-a@ » ralentie', detail: 'Refus temporaires à 3 % depuis 09:30.', ce_qui_se_passe: 'Refus temporaires à 3 % depuis 09:30.', ce_que_le_systeme_a_fait: 'Volume divisé par 2.', que_faire: 'Rien si ça baisse ; sinon ouvrir la boîte.', niveau: 'attention', survenue_le: ilYa(0, 9, 30), lien: '/envoi/boites', close: false },
       { id: 'al-2', titre: 'DMARC : passer à « quarantaine »', detail: 'prospection-b.example est prêt.', ce_qui_se_passe: 'prospection-b.example est prêt pour la politique « quarantaine ».', ce_que_le_systeme_a_fait: 'Rappel posé au 15 janvier.', que_faire: 'Ouvrir le domaine.', niveau: 'nouveau', survenue_le: ilYa(1, 16, 10), lien: '/envoi/domaines', close: false },
       { id: 'al-3', titre: 'Test du matin réussi', detail: '4 témoins sur 4 à 07:05.', ce_qui_se_passe: '4 témoins sur 4 à 07:05.', ce_que_le_systeme_a_fait: 'Rien.', que_faire: 'Rien.', niveau: 'fait', survenue_le: ilYa(0, 7, 5), lien: null, close: true },
       { id: 'al-4', titre: 'Réponse intéressée reçue', detail: 'Paul Morin a répondu.', ce_qui_se_passe: 'Paul Morin (Boulangerie des Tilleuls) a répondu avec intérêt.', ce_que_le_systeme_a_fait: 'Relances annulées pour cette personne.', que_faire: 'Lui répondre.', niveau: 'fait', survenue_le: ilYa(2, 11, 40), lien: '/envoi/reponses', close: true },
@@ -47,7 +44,7 @@ function zone() {
     ] satisfies S['AlerteEnvoi'][],
     carnet: [
       { id: 'car-1', adresse: 'accueil@salon-vienne.example', prenom: null, nom: null, organisation: 'Salon des artisans de Vienne', etiquettes: ['salon-artisans-2026'], ajoute_le: ilYa(20, 10, 0) },
-      { id: 'car-2', adresse: 'lea.fournier@federation-btp.example', prenom: 'Léa', nom: 'Fournier', organisation: 'Fédération BTP Rhône', etiquettes: ['fédérations'], ajoute_le: ilYa(14, 14, 30) },
+      { id: 'car-2', adresse: 'lea.fournier@federation-btp.example', prenom: 'Léa', nom: 'Fournier', organisation: 'Association du bâtiment d’exemple', etiquettes: ['fédérations'], ajoute_le: ilYa(14, 14, 30) },
       { id: 'car-3', adresse: 'redaction@courrier-rhone.example', prenom: null, nom: null, organisation: 'Le Courrier du Rhône', etiquettes: ['presse'], ajoute_le: ilYa(9, 9, 15) },
     ] satisfies S['EntreeCarnet'][],
     parametres: [
@@ -59,9 +56,9 @@ function zone() {
           adresse_postale: '1 rue de l’Exemple, 69000 Lyon',
           signature: 'L’équipe Rhône Prospection',
           lien_desinscription: true,
-          lien_rendez_vous: 'https://rdv.example/will',
+          lien_rendez_vous: 'https://rdv.example/prospection-a',
           bloc_information: BLOC_ART_14,
-          bloc_information_ouvertures: BLOC_OUVERTURES,
+          bloc_information_ouvertures: '',
         },
         alertes: { seconde_adresse: null, regroupement_minutes: 15 },
         regles: {
@@ -151,7 +148,7 @@ function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non'
   if (sequences > 0 && etat.reponse !== 'non') prudence('Déjà dans une campagne en cours : attendez la fin de la séquence.');
 
   if (etat.reponse === 'oui') raisons.push('Aucune opposition connue pour cette adresse.');
-  if (etat.reponse === 'non') raisons.push('Aucune mesure des ouvertures ne s’applique : aucun message ne part vers cette adresse.');
+  if (etat.reponse === 'non') raisons.push('Aucun message ne part vers cette adresse.');
   return { adresse: saisie.trim(), reponse: etat.reponse, raisons, mesure_ouvertures_permise: etat.reponse !== 'non' };
 }
 
@@ -419,7 +416,7 @@ export const handlers: HttpHandler[] = [
       expediteur: 'Rhône Prospection',
       deja_desinscrit: deja,
       organisation: dest.organisation,
-      pourquoi_ce_message: `${BLOC_ART_14} ${BLOC_OUVERTURES}`,
+      pourquoi_ce_message: BLOC_ART_14,
     });
   }),
 

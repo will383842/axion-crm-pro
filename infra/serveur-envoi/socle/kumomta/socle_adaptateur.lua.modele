@@ -1,0 +1,15 @@
+-- MODELE, sans valeur reelle, non execute. Le socle (Python) decide ; ce fichier ne fait que relayer.
+local kumo = require 'kumo'
+local SOCLE_URL = 'http://127.0.0.1:PORT_SOCLE/recevoir' -- a renseigner a l'installation
+
+kumo.on('smtp_server_message_received', function(msg)
+  local ok, reponse = pcall(function()
+    return appeler_socle(SOCLE_URL, msg:get_meta('jeton'), msg:recipient(), msg:get_data())
+  end)
+  if not ok or reponse == nil then
+    kumo.reject(451, '4.3.0 socle indisponible, report') -- ferme par defaut
+  end
+  if reponse.code ~= 250 then
+    kumo.reject(reponse.code, reponse.texte)
+  end
+end)

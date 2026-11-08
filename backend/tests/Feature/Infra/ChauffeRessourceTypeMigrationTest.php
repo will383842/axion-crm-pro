@@ -16,11 +16,15 @@ function migrationK8(): string
     return $f[0];
 }
 
-test('K8 la migration ressource_type est la plus récente et ajoute la colonne sans rien supprimer', function () {
+test('K8 la migration ressource_type est postérieure aux existantes et ajoute la colonne sans rien supprimer', function () {
     $f = migrationK8();
-    $toutes = array_map('basename', glob(database_path('migrations/*.php')) ?: []);
-    sort($toutes);
-    expect(basename($f))->toBe(end($toutes));
+    // Postérieure à toutes les migrations qui existaient quand K8 est née (d'autres lots ont pu s'ajouter depuis : pas « la dernière »).
+    foreach (glob(database_path('migrations/*.php')) ?: [] as $autre) {
+        if (str_starts_with(basename($autre), '2026_11_12_') || basename($autre) < '2026_11_12_') {
+            expect(basename($autre) < basename($f))->toBeTrue();
+        }
+    }
+    expect(basename($f))->toBeGreaterThan('2026_11_12_000130_envoi_seuils_valeur_finie.php');
 
     $sql = explode('function down()', (string) file_get_contents($f))[0]; // up() seulement : down() est gardé par un refus si des lignes ip existent
     $code = implode("\n", array_filter(explode("\n", $sql), fn ($l) => ! preg_match('~^\s*(//|\*|/\*)~', $l)));

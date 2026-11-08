@@ -218,8 +218,9 @@ final class DurcissementTest extends PasserelleTestCase
         $this->assertFalse(GardeTls::autorise([], 'valeur-bizarre'), 'doute = envoi réel supposé actif');
         $this->assertTrue(GardeTls::autorise(['SSL_CLIENT_VERIFY' => 'SUCCESS'], 'true'));
         $this->assertTrue(GardeTls::autorise([], 'false'));
-        $this->assertTrue(GardeTls::autorise([], null));
-        $this->assertTrue(GardeTls::autorise([], ''));
+        // Audit #461 (3) : variable absente ou vide = envoi supposé ACTIF (php-fpm vide l'environnement) ; test durci, pas affaibli.
+        $this->assertFalse(GardeTls::autorise([], null));
+        $this->assertFalse(GardeTls::autorise([], ''));
     }
 
     public function test_index_php_refuse_401_sans_certificat_client(): void

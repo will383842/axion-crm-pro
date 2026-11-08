@@ -31,7 +31,7 @@ class EnvoiConfigAppliquer extends Command
     {
         $ws = (string) $this->argument('workspace');
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $ws) !== 1
-            || ! DB::table('workspaces')->where('id', $ws)->exists()) {
+            || ! DB::table('workspaces')->where('id', $ws)->whereNull('deleted_at')->exists()) {
             $this->error('Espace inconnu : un UUID présent dans workspaces est attendu.');
 
             return self::FAILURE;

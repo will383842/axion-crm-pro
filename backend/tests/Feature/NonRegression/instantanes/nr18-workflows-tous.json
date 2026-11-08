@@ -1,5 +1,6 @@
 [
     "a11y.yml",
+    "banc-envoi.yml",
     "build-postgres-image.yml",
     "ci.yml",
     "crm-doublons.yml",

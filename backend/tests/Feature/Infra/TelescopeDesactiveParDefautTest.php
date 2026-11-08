@@ -187,6 +187,8 @@ function sondeTelescope(array $environnement): array
         // Coupe le bruit du refus de simulacre (C18-016) en environnement de
         // production, qui n'a rien a voir avec ce qu'on mesure ici.
         'MOCK_MODE' => 'false',
+        // Clé de signature des liens de désinscription (factice, 32 caractères) : en production le démarrage la réclame.
+        'ENVOI_CLE_DESINSCRIPTION' => 'cle-factice-sonde-0123456789abcdef',
 
         // ⚠️ MESURE PAYEE, ET ELLE NE VENAIT PAS DU DEPOT MAIS DU BANC.
         //
@@ -388,6 +390,8 @@ function sondeTelescopeSousConfigCache(array $environnementDuCache, array $envir
     $base = [
         'APP_KEY' => 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         'MOCK_MODE' => 'false',
+        // Clé de signature des liens de désinscription (factice, 32 caractères) : en production le démarrage la réclame.
+        'ENVOI_CLE_DESINSCRIPTION' => 'cle-factice-sonde-0123456789abcdef',
         'APP_CONFIG_CACHE' => $cache,
     ];
 

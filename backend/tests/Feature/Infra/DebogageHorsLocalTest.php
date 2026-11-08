@@ -121,6 +121,8 @@ function cheminSondeDebogage(): string
 function sondeDebogage(array $environnement): array
 {
     $commande = 'env -u APP_ENV -u APP_DEBUG';
+    // Clé de signature des liens de désinscription (factice, 32 caractères) : en production le démarrage la réclame.
+    $environnement += ['ENVOI_CLE_DESINSCRIPTION' => 'cle-factice-sonde-0123456789abcdef'];
     foreach ($environnement as $cle => $valeur) {
         $commande .= ' ' . escapeshellarg($cle . '=' . $valeur);
     }

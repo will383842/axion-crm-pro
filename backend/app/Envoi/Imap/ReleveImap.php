@@ -176,7 +176,9 @@ final class ReleveImap
         }
 
         $classe = Classificateur::classer($m);
-        $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
+        // Un jeton VERP signé est la preuve la plus forte ; à défaut, le Message-ID cité ou répondu.
+        $origine = $this->parVerp($workspaceId, $m)
+            ?? $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
         $expediteur = self::adresseDe($m->expediteur); // null si multiple, accentuée ou mal formée
 
         if ($origine !== null && in_array($classe, self::CLASSES_REBOND, true)) {
@@ -186,6 +188,11 @@ final class ReleveImap
             if ($destinataire === null ? $classe === ClasseRetour::RebondDur : $destinataire !== mb_strtolower(trim($origine->adresse))) {
                 $origine = null;
             }
+        }
+
+        if ($origine !== null && $m->typeArf !== null && $m->destinataireArf !== null
+            && mb_strtolower(trim($m->destinataireArf)) !== mb_strtolower(trim($origine->adresse))) {
+            $origine = null; // rapport d'abus sur une autre adresse que celle écrite : revue humaine
         }
 
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, $origine, $expediteur ?? $m->expediteur);
@@ -198,7 +205,7 @@ final class ReleveImap
                 $classe,
                 $origine->idInjection,
                 $origine->adresse,
-                $opposition && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
+                $opposition && $m->typeArf === null && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
                 self::empreinteMessage($m), // clé STABLE (ni UID, ni UIDVALIDITY) : un retour n'est compté qu'une fois
             ));
         }
@@ -254,6 +261,20 @@ final class ReleveImap
         DB::table('envoi_curseurs_imap')->where('id', $existant->id)->update([
             'uid_validity' => $validite, 'dernier_uid' => $nouveau, 'maj_le' => now(),
         ]);
+    }
+
+    /** Origine d'après un VERP `rb-<jeton>@bounce.<domaine>` signé, parmi les adresses du message. */
+    private function parVerp(string $workspaceId, MessageBrut $m): ?MessageOrigine
+    {
+        foreach ($m->adressesLocales as $adresse) {
+            $id = Verp::idInjectionDepuis($adresse);
+            $origine = $id === null ? null : $this->registre->retrouverParInjection($workspaceId, $id);
+            if ($origine !== null) {
+                return $origine;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<string> */

@@ -62,7 +62,7 @@ final class AnalyseDsn
     public static function enTetes(string $entete): array
     {
         $entete = Pcre::remplacer('/\r?\n[ \t]+/', ' ', $entete);
-        $utiles = ['auto-submitted', 'precedence', 'x-autoreply', 'x-autorespond', 'content-type'];
+        $utiles = ['auto-submitted', 'precedence', 'x-autoreply', 'x-autorespond', 'content-type', 'delivered-to', 'x-original-to', 'envelope-to', 'to'];
         $sortie = [];
         foreach (Pcre::decouper('/\r?\n/', $entete) as $ligne) {
             if (($g = Pcre::groupes('/^([A-Za-z0-9-]+):\s*(.*)$/', $ligne)) !== null && in_array(strtolower($g[0]), $utiles, true)) {

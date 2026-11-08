@@ -1,0 +1,195 @@
+<?php
+
+/**
+ * Envoi K11 — rebonds et plaintes par la réception D2 (fourre-tout bounce.<domaine>, VERP rb-<jeton>, ARF).
+ * Scénarios S09 à S13 du banc. AUCUN réseau, AUCUN envoi : lecteur et registre en mémoire.
+ * Fixtures FICTIVES (dépôt public) : example.test uniquement.
+ */
+
+use App\Envoi\Imap\AnalyseArf;
+use App\Envoi\Imap\ClasseRetour;
+use App\Envoi\Imap\Classificateur;
+use App\Envoi\Imap\LecteurBoiteMemoire;
+use App\Envoi\Imap\MessageBrut;
+use App\Envoi\Imap\MessageOrigine;
+use App\Envoi\Imap\RecepteurRetoursCrm;
+use App\Envoi\Imap\RegistreMessagesEnvoyesMemoire;
+use App\Envoi\Imap\ReleveImap;
+use App\Envoi\Imap\Verp;
+use App\Support\ListeSuppression;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Tests\Support\DoublonsFixtures as F;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
+
+const K11_BOITE = 'boite-k11';
+const K11_ADRESSE = 'contact@client.example.test';
+
+beforeEach(function () {
+    config(['envoi.cle_empreinte' => 'cle-de-test-k11']);
+    $this->ws = F::espace('zz-k11');
+    config(['crm.ingest.business_workspace' => F::slug($this->ws)]);
+    $this->lecteur = new LecteurBoiteMemoire;
+    $this->registre = new RegistreMessagesEnvoyesMemoire;
+    $this->inj = k11Injection($this->ws);
+    $this->registre->noter('envoi-k11@d.example.test', new MessageOrigine($this->inj, K11_ADRESSE));
+    $this->releve = new ReleveImap($this->lecteur, $this->registre, new RecepteurRetoursCrm);
+    $this->verp = Verp::adressePour($this->inj, 'd.example.test');
+});
+
+function k11Injection(string $ws): string
+{
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert([
+        'id' => $boite, 'workspace_id' => $ws, 'adresse' => 'k11-' . substr($boite, 0, 8) . '@test.invalid',
+        'hote' => 'smtp.exemple.test', 'port' => 587, 'chiffrement' => 'starttls', 'identifiants_chiffres' => 'zz-chiffre',
+    ]);
+    $id = (string) Str::uuid();
+    DB::table('envoi_injections_smtp')->insert(['workspace_id' => $ws, 'boite_id' => $boite, 'id_injection' => $id, 'cle_idempotence' => 'k11-' . $id]);
+
+    return $id;
+}
+
+/** @param array<string, mixed> $s */
+function k11Msg(int $uid, array $s = []): MessageBrut
+{
+    $a = array_merge([
+        'mid' => "k{$uid}@retour.example.test", 'irt' => null, 'de' => 'MAILER-DAEMON@retour.example.test',
+        'sujet' => 'Rapport', 'corps' => '', 'h' => [], 'dsn' => null, 'dsnMid' => null, 'dest' => null,
+        'arf' => null, 'arfDest' => null, 'locales' => [],
+    ], $s);
+
+    return new MessageBrut(
+        $uid,
+        $a['mid'],
+        $a['irt'],
+        [],
+        $a['de'],
+        new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('UTC')),
+        $a['sujet'],
+        $a['corps'],
+        $a['h'],
+        $a['dsn'],
+        $a['dsnMid'],
+        $a['dest'],
+        typeArf: $a['arf'],
+        destinataireArf: $a['arfDest'],
+        adressesLocales: $a['locales'],
+    );
+}
+
+function k11Releve(object $t, MessageBrut ...$ms): void
+{
+    foreach ($ms as $m) {
+        $t->lecteur->deposer(K11_BOITE, $m);
+    }
+    $t->releve->relever($t->ws, K11_BOITE);
+}
+
+function k11Plainte(): bool
+{
+    return DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte(K11_ADRESSE))->count() > 0
+        && ListeSuppression::estSupprimee(K11_ADRESSE);
+}
+
+test('VERP : jeton signé, aller-retour, falsification et mauvais domaine refusés', function () {
+    $inj = (string) Str::uuid();
+    $adresse = Verp::adressePour($inj, 'd.example.test');
+    expect($adresse)->toStartWith('rb-')->toEndWith('@bounce.d.example.test')
+        ->and(Verp::idInjectionDepuis($adresse))->toBe($inj)
+        ->and(Verp::idInjectionDepuis(strtoupper($adresse)))->toBe($inj)
+        ->and(Verp::idInjectionDepuis(substr_replace($adresse, '0', 5, 1)))->toBeNull()
+        ->and(Verp::idInjectionDepuis(str_replace('@bounce.', '@', $adresse)))->toBeNull()
+        ->and(Verp::idInjectionDepuis('rb-abc@bounce.d.example.test'))->toBeNull();
+    config(['envoi.cle_empreinte' => 'autre-cle']);
+    expect(Verp::idInjectionDepuis($adresse))->toBeNull();
+    config(['envoi.cle_empreinte' => '']);
+    expect(Verp::idInjectionDepuis($adresse))->toBeNull(); // sans clé : jamais de rattachement
+});
+
+test('ARF : lecture du rapport (JMRP et Yahoo CFL)', function () {
+    $jmrp = "Feedback-Type: abuse\nUser-Agent: JMRP/1.0\nOriginal-Mail-From: <rb-abc@bounce.d.example.test>\nOriginal-Rcpt-To: <contact@client.example.test>\n\nMessage-ID: <envoi-k11@d.example.test>\n";
+    expect(AnalyseArf::depuisBrut($jmrp))->toBe([
+        'type' => 'abuse', 'destinataire' => 'contact@client.example.test',
+        'messageId' => 'envoi-k11@d.example.test', 'adresses' => ['rb-abc@bounce.d.example.test'],
+    ]);
+    expect(AnalyseArf::estRapport('multipart/report; report-type=feedback-report; boundary=x'))->toBeTrue()
+        ->and(AnalyseArf::estRapport('multipart/report; report-type=delivery-status'))->toBeFalse();
+});
+
+test('classification : ARF = plainte (même « Auto-Submitted »), not-spam sans effet, abuse@ = plainte', function () {
+    $auto = ['auto-submitted' => 'auto-generated'];
+    expect(Classificateur::classer(k11Msg(1, ['arf' => 'abuse', 'h' => $auto])))->toBe(ClasseRetour::Hostile)
+        ->and(Classificateur::classer(k11Msg(2, ['arf' => 'fraud'])))->toBe(ClasseRetour::Hostile)
+        ->and(Classificateur::classer(k11Msg(3, ['arf' => 'not-spam'])))->toBe(ClasseRetour::AutoReponse)
+        ->and(Classificateur::classer(k11Msg(4, ['corps' => 'Merci de corriger', 'locales' => ['Abuse@d.example.test']])))->toBe(ClasseRetour::Hostile)
+        ->and(Classificateur::classer(k11Msg(5, ['h' => $auto, 'locales' => ['abuse@d.example.test']])))->toBe(ClasseRetour::AutoReponse)
+        ->and(Classificateur::classer(k11Msg(6, ['corps' => 'Merci', 'locales' => ['contact@d.example.test']])))->toBe(ClasseRetour::ReponseHumaine);
+});
+
+test('S09 : rebond asynchrone reçu sur bounce.<domaine>, rattaché par le jeton VERP seul', function () {
+    $mort = 'mort@client.example.test';
+    $inj = k11Injection($this->ws);
+    $this->registre->noterInjection($inj, new MessageOrigine($inj, $mort));
+    $contact = DB::table('contacts')->count();
+    k11Releve($this, k11Msg(1, ['dsn' => '5.1.1', 'dest' => $mort, 'locales' => [Verp::adressePour($inj, 'd.example.test')]]));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'rebond_dur')->where('statut', 'rattache')->where('id_injection', $inj)->count())->toBe(1)
+        ->and(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte($mort))->count())->toBeGreaterThan(0)
+        ->and(DB::table('contacts')->count())->toBe($contact);
+});
+
+test('S10 : ARF JMRP rattaché par Original-Mail-From VERP => plainte, contact gardé', function () {
+    k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE, 'locales' => [$this->verp]]));
+
+    expect(DB::table('envoi_evenements')->where('classe', 'hostile')->where('statut', 'rattache')->count())->toBe(1)
+        ->and(k11Plainte())->toBeTrue();
+});
+
+test('S11 : ARF Yahoo CFL rattaché par le Message-ID cité => plainte', function () {
+    k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'dsnMid' => 'envoi-k11@d.example.test']));
+
+    expect(DB::table('envoi_evenements')->where('statut', 'rattache')->count())->toBe(1)
+        ->and(k11Plainte())->toBeTrue()
+        ->and(DB::table('opt_out')->count())->toBe(1); // l'expéditeur du rapport (fournisseur) n'est PAS opposé
+});
+
+test('S12 : réponse hostile rattachée => plainte', function () {
+    k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Je vais porter plainte.']));
+
+    expect(k11Plainte())->toBeTrue();
+});
+
+test('S13 : message reçu sur abuse@ rattaché => plainte', function () {
+    k11Releve($this, k11Msg(1, ['irt' => 'envoi-k11@d.example.test', 'de' => K11_ADRESSE, 'corps' => 'Cessez ces envois svp.', 'locales' => ['abuse@d.example.test']]));
+
+    expect(k11Plainte())->toBeTrue();
+});
+
+test('ARF sans jeton ni Message-ID connu, jeton falsifié ou destinataire différent => « à rattacher », AUCUNE opposition', function () {
+    $faux = substr_replace($this->verp, '0', 5, 1);
+    k11Releve(
+        $this,
+        k11Msg(1, ['arf' => 'abuse', 'arfDest' => K11_ADRESSE]),
+        k11Msg(2, ['arf' => 'abuse', 'locales' => [$faux]]),
+        k11Msg(3, ['arf' => 'abuse', 'arfDest' => 'autre@client.example.test', 'locales' => [$this->verp]]),
+    );
+
+    expect(DB::table('envoi_evenements')->where('statut', 'a_rattacher')->count())->toBe(3)
+        ->and(DB::table('opt_out')->count())->toBe(0)
+        ->and(ListeSuppression::estSupprimee(K11_ADRESSE))->toBeFalse();
+});
+
+test('rejeu et renumérotation UIDVALIDITY : ni doublon d\'événement, ni second effet', function () {
+    $this->lecteur->definirUidValidity(K11_BOITE, 5);
+    k11Releve($this, k11Msg(1, ['arf' => 'abuse', 'locales' => [$this->verp]]));
+    $this->lecteur->renumeroter(K11_BOITE, 6);
+    $bilan = $this->releve->relever($this->ws, K11_BOITE);
+
+    expect($bilan->doublons)->toBe(1)->and($bilan->nouveaux)->toBe(0)
+        ->and(DB::table('envoi_evenements')->count())->toBe(1)
+        ->and(DB::table('opt_out')->count())->toBe(1);
+});

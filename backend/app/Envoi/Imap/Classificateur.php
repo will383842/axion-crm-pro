@@ -6,10 +6,12 @@ namespace App\Envoi\Imap;
  * Classe un message reçu. Fonction pure : aucune base, aucun réseau.
  *
  * Ordre (le premier qui s'applique gagne) :
+ *  0. rapport d'abus ARF (JMRP, Yahoo CFL) : plainte, sauf « not-spam » / « auth-failure » (sans effet) ;
  *  1. rapport de remise (DSN) : 5.7.x = politique/réputation (PAS une adresse morte : aucun effet),
  *     autres 5.x.x = rebond dur, 4.x.x = rebond mou ;
  *  2. analyse échouée (UTF-8 invalide, limite PCRE) : STOP par prudence, jamais « réponse humaine » ;
  *  3. auto-réponse déclarée par en-tête normalisé (RFC 3834 : Auto-Submitted, X-Autoreply, Precedence: auto_reply) ;
+ *  3b. message reçu sur abuse@ : plainte ;
  *  4. STOP / désinscription (mots-clés fr/en, texte NON cité seulement) : STOP PRIME ;
  *  5. hostile (menace, avocat, « porter plainte »…) — traité comme une plainte ;
  *  6. auto-réponse devinée (objet « absent », « congé » ; `Precedence: bulk/junk`) : heuristique FAIBLE,
@@ -67,12 +69,21 @@ final class Classificateur
             return ClasseRetour::AutoReponse; // 2.x.x : accusé de remise, aucun effet
         }
 
+        if ($m->typeArf !== null) {
+            // Rapport d'abus ARF (JMRP, Yahoo CFL) : un « Auto-Submitted » est ici normal, il ne l'écarte pas.
+            return in_array($m->typeArf, ['not-spam', 'auth-failure'], true) ? ClasseRetour::AutoReponse : ClasseRetour::Hostile;
+        }
+
         if ($m->analyseEchouee) {
             return ClasseRetour::Desinscription;
         }
 
         if (self::estAutoReponseDeclaree($m)) {
             return ClasseRetour::AutoReponse;
+        }
+
+        if (self::recuSurAbuse($m)) {
+            return ClasseRetour::Hostile; // écrit à abuse@ : plainte (une auto-réponse déclarée a été écartée plus haut)
         }
 
         if (! mb_check_encoding($m->corps . $m->sujet, 'UTF-8')) {
@@ -91,6 +102,17 @@ final class Classificateur
         }
 
         return ClasseRetour::ReponseHumaine;
+    }
+
+    private static function recuSurAbuse(MessageBrut $m): bool
+    {
+        foreach ($m->adressesLocales as $a) {
+            if (Pcre::correspond('/^abuse@/i', trim($a, ' <>'))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function estAutoReponseDeclaree(MessageBrut $m): bool

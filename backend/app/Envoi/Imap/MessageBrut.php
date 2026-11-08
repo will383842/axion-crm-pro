@@ -20,6 +20,9 @@ final class MessageBrut
      * @param  ?string  $destinataireDsn  Final-Recipient du rapport
      * @param  ?string  $empreinteContenu  SHA-256 du message brut (stable : indépendant des UID) ; null si non lu
      * @param  bool  $analyseEchouee  l'analyse du texte a échoué (UTF-8 invalide, limite PCRE) : traité en STOP par prudence
+     * @param  ?string  $typeArf  Feedback-Type d'un rapport ARF (« abuse », « fraud », « not-spam »…) ; son Message-ID cité est dans `messageIdDsn`
+     * @param  ?string  $destinataireArf  Original-Rcpt-To du rapport ARF
+     * @param  list<string>  $adressesLocales  adresses du message reçu et Original-Mail-From : VERP, abuse@
      * @param  ?string  $ecarte  « taille » ou « illisible » : message non lu, classé « à rattacher » sans effet
      */
     public function __construct(
@@ -38,5 +41,8 @@ final class MessageBrut
         public readonly ?string $ecarte = null,
         public readonly ?string $empreinteContenu = null,
         public readonly bool $analyseEchouee = false,
+        public readonly ?string $typeArf = null,
+        public readonly ?string $destinataireArf = null,
+        public readonly array $adressesLocales = [],
     ) {}
 }

@@ -170,6 +170,15 @@ final class LecteurBoiteWebklex implements LecteurBoite
                     }
                     $dsn = AnalyseDsn::pourContenu($enTetes['content-type'], $contenu . "\n" . $message->getTextBody());
                 }
+                $arf = ['type' => null, 'destinataire' => null, 'messageId' => null, 'adresses' => []];
+                if (AnalyseArf::estRapport($enTetes['content-type'] ?? '')) {
+                    $contenuArf = '';
+                    foreach ($message->getAttachments() as $piece) {
+                        $contenuArf .= "\n" . mb_substr((string) $piece->getContent(), 0, ExtraitTexte::LIMITE * 4);
+                    }
+                    $arf = AnalyseArf::depuisBrut($contenuArf . "\n" . $message->getTextBody());
+                    $arf['type'] ??= 'other'; // rapport ARF sans type lisible : plainte par prudence
+                }
                 $corps = ExtraitTexte::choisir($message->getTextBody(), $message->getHTMLBody());
             } catch (EchecAnalyse) {
                 return new MessageBrut($uid, $messageId, self::texte($message->getInReplyTo()), $references, $expediteur ?? '', $recuLe, $sujet, '', [], null, null, null, null, $empreinte, true);
@@ -186,10 +195,14 @@ final class LecteurBoiteWebklex implements LecteurBoite
                 $corps,
                 $enTetes,
                 $dsn['statut'],
-                $dsn['messageId'],
+                $dsn['messageId'] ?? $arf['messageId'],
                 $dsn['destinataire'],
                 null,
                 $empreinte,
+                false,
+                $arf['type'],
+                $arf['destinataire'],
+                [...AnalyseArf::adressesDesEnTetes($enTetes), ...$arf['adresses']],
             );
         } catch (EchecAnalyse) {
             return new MessageBrut($uid, null, null, [], '', $recuLe, '', '', [], null, null, null, null, $empreinte, true);

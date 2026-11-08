@@ -21,6 +21,9 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 /** Appels sans route dans la photo à la date du filet (R0). À ne faire que BAISSER. */
 // POST propositions/{id}/{action} : le dernier segment est choisi à l'exécution (accepter ou refuser) ;
 // le relevé statique ne peut pas le résoudre, ce n'est pas une route manquante.
+// Filet modifié : pourquoi. DM2-CNF : écrans de conformité et de réglages d'Envoi. Les appels `/envoi/…` ne partent
+// que si Envoi est actif (absent en production : routes gardées). Tous sont
+// servis par le faux serveur de la démo ; les routes serveur viendront au lot serveur d'Envoi, qui retirera ces lignes.
 // Filet modifié : pourquoi. DM0-COQ (#392) : feu et compteurs de l'espace Envoi. Ces appels ne partent que si
 // Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; la route serveur est
 // prévue au lot S/Envoi, qui retirera ces deux lignes.
@@ -67,6 +70,26 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/crm/contacts/{p}/retirer',
   'POST /api/v1/crm/persons/{p}/appels',
   'POST /api/v1/crm/persons/{p}/rappel',
+  // DM2-CNF — conformité, réglages, page publique de désinscription.
+  'GET /api/v1/envoi/alertes',
+  'GET /api/v1/envoi/carnet',
+  'GET /api/v1/envoi/opposition',
+  'GET /api/v1/envoi/opposition/export',
+  'GET /api/v1/envoi/puis-je-ecrire',
+  'GET /api/v1/envoi/reglages/alertes',
+  'GET /api/v1/envoi/reglages/apercu',
+  'GET /api/v1/envoi/reglages/connexion-crm',
+  'GET /api/v1/envoi/reglages/identite',
+  'GET /api/v1/envoi/reglages/regles',
+  'POST /api/v1/envoi/alertes/{p}/regler',
+  'POST /api/v1/envoi/carnet',
+  'POST /api/v1/envoi/opposition',
+  'POST /api/v1/envoi/reglages/alertes/test',
+  'POST /api/v1/envoi/reglages/connexion-crm/tester',
+  'PUT /api/v1/envoi/reglages/absence',
+  'PUT /api/v1/envoi/reglages/alertes',
+  'PUT /api/v1/envoi/reglages/identite',
+  'PUT /api/v1/envoi/reglages/regles',
   'GET /api/v1/crm/affaires',
   'GET /api/v1/crm/taches',
   'PATCH /api/v1/crm/affaires/{p}',

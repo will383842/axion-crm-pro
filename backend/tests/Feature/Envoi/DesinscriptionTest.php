@@ -34,10 +34,13 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const DESINSCR_ADRESSE = 'personne@zz-desinscription.example.invalid';
 
+// Clé de TEST (32 caractères au moins, longueur minimale contrôlée à l'émission) : fictive.
+const DESINSCR_CLE = 'cle-de-test-seulement-0123456789';
+
 beforeEach(function () {
     // Horloge figée en UTC : ni l'heure de lancement ni le fuseau de l'application ne comptent.
     Carbon::setTestNow(Carbon::parse('2026-11-10 12:00:00', 'UTC'));
-    config(['envoi.cle_desinscription' => 'cle-de-test-seulement', 'envoi.desinscription_validite_jours' => 30]);
+    config(['envoi.cle_desinscription' => DESINSCR_CLE, 'envoi.desinscription_validite_jours' => 30]);
     $this->ws = F::espace('zz-desinscr');
     $this->ref = InscriptionsEnvoi::creer($this->ws, DESINSCR_ADRESSE);
     $this->jeton = JetonDesinscription::emettre($this->ws, $this->ref);
@@ -102,14 +105,13 @@ test('S22 rejeu du même jeton : une seule opposition, un seul comptage, un seul
 
 test('jetons invalides, falsifiés ou expirés : même refus, sans fuite, sans écriture', function () {
     $autre = F::espace('zz-desinscr-b');
-    $expire = JetonDesinscription::emettre($this->ws, $this->ref, Carbon::now()->subYears(2));
     $inconnu = JetonDesinscription::emettre($this->ws, '00000000-0000-4000-8000-000000000000');
     // Même signature, autre espace : la signature couvre l'espace.
     $croise = str_replace($this->ws, $autre, $this->jeton);
     $mauvaiseCle = (function () {
-        config(['envoi.cle_desinscription' => 'une-autre-cle']);
+        config(['envoi.cle_desinscription' => 'une-autre-cle-de-test-0123456789ab']);
         $j = JetonDesinscription::emettre($this->ws, $this->ref);
-        config(['envoi.cle_desinscription' => 'cle-de-test-seulement']);
+        config(['envoi.cle_desinscription' => DESINSCR_CLE]);
 
         return $j;
     })();
@@ -344,7 +346,9 @@ test('one-click RFC 8058 envoyé en multipart/form-data', function () {
 
 test('lien expiré : page de refus avec un moyen de contact générique, sans distinguer la cause', function () {
     config(['envoi.contact_desinscription' => 'desinscription@exemple.invalid']);
-    $r = $this->get('/desinscription/v1.invalide');
+    // Un jeton RÉELLEMENT échu mais d'une référence inconnue : refusé (même page), sans fuite de la cause.
+    $echuInconnu = JetonDesinscription::emettre($this->ws, '00000000-0000-4000-8000-000000000000', Carbon::now()->subYears(2));
+    $r = $this->get('/desinscription/' . $echuInconnu);
     $r->assertNotFound();
     expect($r->getContent())->toContain('desinscription@exemple.invalid')->toContain('expiré');
 });
@@ -362,9 +366,9 @@ test('RFC 8058 : une désinscription en un clic ne reçoit JAMAIS 429, même en 
     }
 });
 
-test('jeton signé mais EXPIRÉ : le POST est accepté (une opposition ne coûte rien), le GET reste refusé', function () {
+test('jeton signé mais EXPIRÉ : le GET (page, aucune écriture) et le POST sont tous deux acceptés', function () {
     $expire = JetonDesinscription::emettre($this->ws, $this->ref, Carbon::now()->subYears(2));
-    $this->get('/desinscription/' . $expire)->assertNotFound();
+    $this->get('/desinscription/' . $expire)->assertOk()->assertSee('Confirmer la désinscription', false);
     expect(desinscrOppositions($this->ws))->toBe(0);
 
     $this->post('/desinscription/' . $expire, ['List-Unsubscribe' => 'One-Click'])->assertOk();
@@ -516,11 +520,12 @@ test('concurrence RÉELLE : deux processus simultanés sur le même lien = une o
     $h = ListeSuppression::empreinte('conc@zz-desinscription.example.invalid');
     $proprio->table('workspaces')->insert(['id' => $ws, 'slug' => 'zz-conc-' . substr($ws, 0, 6), 'name' => 'Concurrence', 'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
     $proprio->table('envoi_liens_desinscription')->insert(['workspace_id' => $ws, 'reference' => $ref, 'empreinte_adresse' => $h, 'portee' => 'business']);
+    $fichierEffets = tempnam(sys_get_temp_dir(), 'effets-opposition-');
     try {
         $depart = microtime(true) + 4;
         $procs = [];
         foreach ([1, 2, 3] as $i) {
-            $procs[$i] = proc_open([PHP_BINARY, base_path('tests/Support/opposition-concurrente.php'), $ws, $ref, sprintf('%.4F', $depart)], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes[$i]);
+            $procs[$i] = proc_open([PHP_BINARY, base_path('tests/Support/opposition-concurrente.php'), $ws, $ref, sprintf('%.4F', $depart), $fichierEffets], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes[$i]);
         }
         $codes = [];
         foreach ($procs as $i => $p) {
@@ -533,7 +538,10 @@ test('concurrence RÉELLE : deux processus simultanés sur le même lien = une o
         expect($proprio->table('email_suppressions')->where('email_hash', $h)->count())->toBe(1);
         expect($proprio->table('crm_outbound_events')->where('email_hash', $h)->count())->toBe(1);
         expect($proprio->table('opt_out')->where('email_hash', $h)->count())->toBe(1); // portée « business »
+        // Les EFFETS déclenchés (pas seulement les lignes en base) : sans lockForUpdate, deux processus les déclencheraient chacun.
+        expect(substr_count((string) file_get_contents($fichierEffets), "effet\n"))->toBe(1);
     } finally {
+        @unlink($fichierEffets);
         // Nettoyage par le propriétaire : les triggers d'ajout seul sont suspendus le temps du nettoyage de CES lignes.
         $proprio->statement("SET session_replication_role = 'replica'");
         $proprio->table('crm_outbound_events')->where('email_hash', $h)->delete();

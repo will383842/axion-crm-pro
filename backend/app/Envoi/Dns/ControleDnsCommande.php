@@ -25,7 +25,7 @@ final class ControleDnsCommande extends Command
         /** @var array<string, array<string, string>> $config */
         $config = (array) config('envoi.dns.domaines', []);
 
-        foreach (DB::table('workspaces')->pluck('id') as $ws) {
+        foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $ws) {
             $ws = (string) $ws;
             $noms = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->pluck('nom')->all());
             foreach ($noms as $nom) {

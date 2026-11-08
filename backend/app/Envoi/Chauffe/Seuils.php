@@ -54,9 +54,18 @@ final class Seuils
     /** Tableau de bord non validé depuis N jours civils (Paris) : ALERTE seulement (plus une pause). */
     public const HOMME_MORT_JOURS = 7;
 
+    /**
+     * Un « jour effectif » de chauffe n'est compté que si la boîte a RÉELLEMENT envoyé au moins cette part du quota
+     * de son palier ce jour-là (un seul message par jour ne fait plus avancer la montée de chauffe).
+     */
+    public const JOUR_EFFECTIF_PART = 0.5;
+
+    /** Quota du DOMAINE d'envoi par jour = ce facteur × le quota d'une boîte (créer des boîtes ne contourne pas la montée). */
+    public const DOMAINE_FACTEUR = 3;
+
     public const NOMS = [
         'rebonds_durs_taux_max', 'rebonds_durs_jour_max', 'homme_mort_jours',
-        'humain_pause_a', 'reponse_ratio_min',
+        'humain_pause_a', 'reponse_ratio_min', 'jour_effectif_part',
     ];
 
     /** Valeur effective : celle de l'espace si elle est PLUS STRICTE, sinon la constante. */
@@ -66,7 +75,7 @@ final class Seuils
             return $constante;
         }
 
-        // « plus petit = plus strict » sauf le ratio de réponse minimal (plus grand = plus strict).
-        return $nom === 'reponse_ratio_min' ? max($constante, $reglage) : min($constante, $reglage);
+        // « plus petit = plus strict » sauf le ratio de réponse minimal et la part de jour effectif (plus grand = plus strict).
+        return in_array($nom, ['reponse_ratio_min', 'jour_effectif_part'], true) ? max($constante, $reglage) : min($constante, $reglage);
     }
 }

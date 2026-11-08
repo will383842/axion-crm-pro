@@ -20,14 +20,22 @@ class EnvoiLeverPause extends Command
         $auteur = (string) ($this->option('auteur') ?: get_current_user());
         $pause = (int) $this->argument('pause');
         // La levée et son journal sont UNE seule transaction : pas de pause levée sans trace.
-        $levee = DB::transaction(function () use ($depot, $socle, $ws, $pause, $auteur): bool {
-            if (! $depot->leverPause($ws, $pause, $auteur)) {
-                return false;
-            }
-            $socle->journaliser($ws, 'pause_levee', $auteur, ['pause' => $pause]);
+        try {
+            $levee = DB::transaction(function () use ($depot, $socle, $ws, $pause, $auteur): bool {
+                // Le journal d'abord : le trigger de `envoi_pauses` refuse toute levée sans cette trace (même transaction).
+                $socle->journaliser($ws, 'pause_levee', $auteur, ['pause' => $pause]);
+                if (! $depot->leverPause($ws, $pause, $auteur)) {
+                    throw new \RuntimeException('aucune pause active'); // annule aussi la trace d'une levée qui n'a pas eu lieu
+                }
 
-            return true;
-        });
+                return true;
+            });
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() !== 'aucune pause active') {
+                throw $e;
+            }
+            $levee = false;
+        }
         if (! $levee) {
             $this->error('Aucune pause active avec cet identifiant.');
 

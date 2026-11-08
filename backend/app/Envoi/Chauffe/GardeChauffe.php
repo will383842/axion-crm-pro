@@ -22,6 +22,12 @@ final class GardeChauffe
 {
     public const QUOTA_ATTEINT = 'quota_de_chauffe_atteint';
 
+    public const QUOTA_DOMAINE_ATTEINT = 'quota_du_domaine_atteint';
+
+    public const EXPEDITEUR_INCONNU = 'expediteur_inconnu';
+
+    public const HORS_FENETRE = 'hors_fenetre_envoi';
+
     public function __construct(
         private readonly DepotChauffe $depot,
         private readonly DepotSocle $socle,
@@ -29,36 +35,49 @@ final class GardeChauffe
         private readonly ?Alerte $alerte = null,
     ) {}
 
-    /** Adresse expéditeur normalisée : une boîte = une adresse, quelle que soit la casse saisie. */
+    /** Adresse expéditeur normalisée (casse, espaces) pour la retrouver dans `envoi_boites`. */
     public static function boite(string $expediteur): string
     {
         return mb_strtolower(trim($expediteur));
     }
 
-    /** Résout (et met en cache) le fournisseur AVANT le verrou de la passerelle : pas de DNS sous verrou. */
-    public function preparer(MessageAEnvoyer $m): void
+    /**
+     * Résout le fournisseur du destinataire UNE SEULE FOIS, AVANT le verrou de la passerelle (le DNS ne tourne
+     * jamais sous verrou) ; la valeur est ensuite réutilisée par `refus()` et `noter()`.
+     * Échec DNS = {@see Fournisseur::INCONNU} : bloqué par toute pause de fournisseur (fail-closed).
+     */
+    public function preparer(MessageAEnvoyer $m): string
     {
-        $this->resolveur->fournisseurDe($m->destinataire);
+        return $this->resolveur->fournisseurDe($m->destinataire);
     }
 
-    /** Homme mort INF-025 : la passerelle note chaque appel à sante(). */
+    /** Homme mort INF-025 : la passerelle note chaque appel à sante() qui répond OK. */
     public function battre(DateTimeImmutable $maintenant): void
     {
         $this->depot->noterBattement($maintenant);
     }
 
-    /** Motif de report, ou null si l'envoi peut partir. */
-    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant): ?string
+    /**
+     * Motif de report, ou null si l'envoi peut partir. Ordre : fenêtre d'envoi, homme mort (toujours, dans la
+     * fenêtre), pauses, frein humain, expéditeur connu, quota de la boîte, quota du domaine.
+     *
+     * @param  ?string  $fournisseur  valeur déjà résolue par `preparer()` ; null = résolu ici (hors passerelle)
+     */
+    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null): ?string
     {
-        // INF-025 : sans appel à sante() depuis 15 minutes en fenêtre d'envoi, TOUTES les files sont en pause.
-        if (Freins::dansFenetreEnvoi($maintenant) && Freins::santeSilencieuse($this->depot->dernierBattement(), $maintenant)) {
+        // Jamais d'envoi hors de la fenêtre [08:00, 19:00[ (Paris) : sans cela, l'homme mort ne jouerait pas.
+        if (! Freins::dansFenetreEnvoi($maintenant)) {
+            return self::HORS_FENETRE;
+        }
+        // INF-025 : sans appel à sante() OK depuis 15 minutes, TOUTES les files sont en pause (en permanence, dans la fenêtre).
+        if (Freins::santeSilencieuse($this->depot->dernierBattement(), $maintenant)) {
             return 'pause:' . DecisionFrein::SANTE_SILENCIEUSE;
         }
         $ws = $m->workspaceId;
-        $boite = self::boite($m->expediteur);
-        $fournisseur = $this->resolveur->fournisseurDe($m->destinataire);
+        $fournisseur ??= $this->resolveur->fournisseurDe($m->destinataire);
         foreach ($this->depot->pausesActives($ws, $maintenant) as $p) {
-            if ($p->portee === 'global' || $p->fournisseur === $fournisseur) {
+            // Fournisseur INCONNU (DNS en échec) : toute pause de fournisseur le bloque (fail-closed).
+            if ($p->portee === 'global' || $fournisseur === Fournisseur::INCONNU || $p->fournisseur === $fournisseur) {
                 return 'pause:' . $p->motif;
             }
         }
@@ -67,23 +86,39 @@ final class GardeChauffe
         if ($humain === Freins::PAUSE) {
             return 'pause:' . DecisionFrein::REPONSES_NON_TRAITEES;
         }
-        $quota = CourbeChauffe::quotaBoite($this->jourDeChauffe($ws, $boite, $jour));
+        // Le quota se compte par boîte RÉELLE (`envoi_boites`), jamais par une chaîne libre : expéditeur inconnu = refus.
+        $boite = $this->depot->boiteId($ws, $m->expediteur);
+        if ($boite === null) {
+            return self::EXPEDITEUR_INCONNU;
+        }
+        $quota = CourbeChauffe::quotaBoite($this->jourDeChauffe($ws, $boite, $jour, $s['jour_effectif_part']));
         if ($humain === Freins::RALENTI) {
             $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
         }
+        if ($this->depot->envoyesBoite($ws, $boite, $jour) >= $quota) {
+            return self::QUOTA_ATTEINT;
+        }
+        // Quota du DOMAINE d'envoi : créer des boîtes sur le même domaine ne multiplie pas la montée de chauffe.
+        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) >= Seuils::DOMAINE_FACTEUR * $quota) {
+            return self::QUOTA_DOMAINE_ATTEINT;
+        }
 
-        return $this->depot->envoyesBoite($ws, $boite, $jour) >= $quota ? self::QUOTA_ATTEINT : null;
+        return null;
     }
 
-    public function noter(MessageAEnvoyer $m, DateTimeImmutable $jour): void
+    public function noter(MessageAEnvoyer $m, DateTimeImmutable $jour, ?string $fournisseur = null): void
     {
-        $this->depot->incrementer($m->workspaceId, self::boite($m->expediteur), $jour, $this->resolveur->fournisseurDe($m->destinataire), 'envoyes');
+        $boite = $this->depot->boiteId($m->workspaceId, $m->expediteur)
+            ?? throw new \LogicException('envoi accepté pour un expéditeur qui n\'est pas une boîte d\'envoi');
+        $this->depot->incrementer($m->workspaceId, $boite, $jour, $fournisseur ?? $this->resolveur->fournisseurDe($m->destinataire), 'envoyes');
     }
 
     /** Un message est arrivé en indésirables chez un témoin : pause vers CE fournisseur seulement. */
     public function indesirableChezTemoin(string $ws, string $adresseTemoin, ?DateTimeImmutable $maintenant = null): bool
     {
-        $d = Freins::indesirableTemoin($this->resolveur->fournisseurDe($adresseTemoin));
+        $f = $this->resolveur->fournisseurDe($adresseTemoin);
+        // Témoin dont le fournisseur est introuvable : on ne peut pas cibler, donc pause GLOBALE (la plus stricte).
+        $d = $f === Fournisseur::INCONNU ? new DecisionFrein(DecisionFrein::INDESIRABLE_TEMOIN) : Freins::indesirableTemoin($f);
 
         return $this->declarer($ws, $d, $maintenant ?? new DateTimeImmutable);
     }
@@ -113,10 +148,14 @@ final class GardeChauffe
             $decisions[] = new DecisionFrein(DecisionFrein::REPONSES_NON_TRAITEES);
         }
         foreach (Fournisseur::TOUS as $f) {
+            // Fenêtres COMPLÈTES seulement (jours révolus) : la dernière fournée complète contre les 3 d'avant.
+            // Limite documentée : un événement de retour ne porte pas la date d'envoi du message d'origine, donc
+            // une réponse est comptée le jour où elle est traitée (pas sur la fournée qui l'a provoquée).
+            $fournees = $this->depot->fourneesPrecedentes($ws, $f, $jour, Seuils::REPONSE_FOURNEES_COMPAREES + 1);
             $d = Freins::reponsesEnBaisse(
                 $f,
-                $this->depot->totauxDuJour($ws, $jour, $f),
-                $this->depot->fourneesPrecedentes($ws, $f, $jour, Seuils::REPONSE_FOURNEES_COMPAREES),
+                $fournees[0] ?? ['envoyes' => 0, 'reponses' => 0],
+                array_slice($fournees, 1),
                 $s['reponse_ratio_min'],
             );
             if ($d !== null) {
@@ -131,10 +170,10 @@ final class GardeChauffe
         return array_values(array_filter($decisions, fn (DecisionFrein $d): bool => $this->declarer($ws, $d, $maintenant)));
     }
 
-    /** Jour de chauffe EFFECTIF, avec « palier tenu » tant qu'une plainte récente (7 jours) est dans la fenêtre. */
-    private function jourDeChauffe(string $ws, string $boite, DateTimeImmutable $jour): int
+    /** Jour de chauffe EFFECTIF (volume réel minimal par jour), avec « palier tenu » tant qu'une plainte récente (7 jours) est dans la fenêtre. */
+    private function jourDeChauffe(string $ws, string $boite, DateTimeImmutable $jour, float $part): int
     {
-        $jours = $this->depot->joursAvecEnvoi($ws, $boite, $jour);
+        $jours = CourbeChauffe::joursEffectifs($this->depot->volumesParJour($ws, $boite, $jour), $part);
         $jc = CourbeChauffe::jourDeChauffe($jours, $jour);
         $plainte = $this->depot->dernierJourPlainte($ws, $jour);
         if ($plainte === null) {
@@ -147,15 +186,28 @@ final class GardeChauffe
 
     private function declarer(string $ws, DecisionFrein $d, DateTimeImmutable $maintenant): bool
     {
+        $manuelle = $this->depot->derniereLeveeManuelle($ws, $d->motif, $d->fournisseur);
         if (! $this->depot->ouvrirPause($ws, $d->motif, $d->fournisseur, $maintenant, $d->dureeHeures)) {
             return false;
         }
-        $this->socle->journaliser($ws, 'pause_auto', 'freins', ['motif' => $d->motif, 'fournisseur' => $d->fournisseur, 'duree_heures' => $d->dureeHeures]);
+        $details = ['motif' => $d->motif, 'fournisseur' => $d->fournisseur, 'duree_heures' => $d->dureeHeures];
+        if ($d->motif === DecisionFrein::PLAINTES_ARRET) {
+            // Plaintes du jour à l'instant de l'arrêt : celles d'après ne seront pas ignorées au recomptage.
+            $details['plaintes_jour'] = $this->depot->totauxDuJour($ws, JourEnvoi::de($maintenant))['plaintes'];
+        }
+        if ($manuelle !== null) {
+            $details['rouvert_apres_levee_par'] = $manuelle['par'];
+        }
+        $this->socle->journaliser($ws, 'pause_auto', 'freins', $details);
+        $corps = $d->dureeHeures !== null
+            ? "Un frein automatique a mis l’envoi en pause pour {$d->dureeHeures} h (elle expire d’elle-même). Vérifier le tableau de bord."
+            : 'Un frein automatique a mis l’envoi en pause. Vérifier le tableau de bord, puis lever la pause par envoi:lever-pause.';
+        if ($manuelle !== null) {
+            $corps .= " Ce frein avait été levé à la main (par {$manuelle['par']}, le {$manuelle['le']}) et se rouvre : la cause n’a pas disparu. Ne pas relever la pause sans l’avoir traitée.";
+        }
         $this->alerte?->envoyer(
-            'Envoi en pause' . ($d->fournisseur !== null ? ' vers ' . $d->fournisseur : '') . ' : ' . $d->motif,
-            $d->dureeHeures !== null
-                ? "Un frein automatique a mis l’envoi en pause pour {$d->dureeHeures} h (elle expire d’elle-même). Vérifier le tableau de bord."
-                : 'Un frein automatique a mis l’envoi en pause. Vérifier le tableau de bord, puis lever la pause par envoi:lever-pause.',
+            'Envoi en pause' . ($d->fournisseur !== null ? ' vers ' . $d->fournisseur : '') . ' : ' . $d->motif . ($manuelle !== null ? ' (frein levé à la main, rouvert)' : ''),
+            $corps,
             'envoi',
             'critique',
         );
@@ -172,7 +224,7 @@ final class GardeChauffe
         $this->alerte?->envoyer($titre, $corps, 'envoi', 'critique');
     }
 
-    /** @return array{rebonds_durs_taux_max: float, rebonds_durs_jour_max: float, homme_mort_jours: float, humain_pause_a: float, reponse_ratio_min: float} */
+    /** @return array{rebonds_durs_taux_max: float, rebonds_durs_jour_max: float, homme_mort_jours: float, humain_pause_a: float, reponse_ratio_min: float, jour_effectif_part: float} */
     private function seuils(string $ws): array
     {
         return [
@@ -181,6 +233,7 @@ final class GardeChauffe
             'homme_mort_jours' => Seuils::resserre('homme_mort_jours', Seuils::HOMME_MORT_JOURS, $this->depot->seuil($ws, 'homme_mort_jours')),
             'humain_pause_a' => Seuils::resserre('humain_pause_a', Seuils::HUMAIN_PAUSE_A, $this->depot->seuil($ws, 'humain_pause_a')),
             'reponse_ratio_min' => Seuils::resserre('reponse_ratio_min', Seuils::REPONSE_RATIO_MIN, $this->depot->seuil($ws, 'reponse_ratio_min')),
+            'jour_effectif_part' => Seuils::resserre('jour_effectif_part', Seuils::JOUR_EFFECTIF_PART, $this->depot->seuil($ws, 'jour_effectif_part')),
         ];
     }
 }

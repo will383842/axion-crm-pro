@@ -15,6 +15,12 @@ final class Fournisseur
 
     public const AUTRE = 'autre';
 
+    /**
+     * Résolution IMPOSSIBLE (échec DNS) : jamais stocké ni compté (hors de TOUS) ; traité comme « peut-être
+     * n'importe lequel » — toute pause de fournisseur le bloque (fail-closed).
+     */
+    public const INCONNU = 'inconnu';
+
     public const TOUS = [self::GMAIL, self::MICROSOFT, self::AUTRE];
 
     /** Domaine d'une adresse, en minuscules, sans espaces. */

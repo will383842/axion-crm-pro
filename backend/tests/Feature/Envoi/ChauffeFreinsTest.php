@@ -24,6 +24,7 @@ use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -82,9 +83,36 @@ function passerelleChauffe(FauxServeurEnvoi $faux, DateTimeImmutable &$maintenan
 /** Jours d'envoi passés d'une boîte (compteurs), pour fabriquer des « jours effectifs ». */
 function envoisPasses(string $ws, string $boite, array $jours, int $n = 10, string $fournisseur = 'autre'): void
 {
+    $id = boiteChauffe($ws, $boite);
     foreach ($jours as $j) {
-        app(DepotChauffe::class)->incrementer($ws, $boite, new DateTimeImmutable($j), $fournisseur, 'envoyes', $n);
+        app(DepotChauffe::class)->incrementer($ws, $id, new DateTimeImmutable($j), $fournisseur, 'envoyes', $n);
     }
+}
+
+/** La boîte d'envoi (`envoi_boites`) de cette adresse : la crée si besoin ; renvoie son identifiant (la clé des compteurs). */
+function boiteChauffe(string $ws, string $adresse): string
+{
+    $adresse = mb_strtolower(trim($adresse));
+    $existante = app(DepotChauffe::class)->boiteId($ws, $adresse);
+    if ($existante !== null) {
+        return $existante;
+    }
+    $id = (string) Str::uuid();
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->insert([
+        'id' => $id, 'workspace_id' => $ws, 'adresse' => $adresse, 'hote' => 'smtp.example.test', 'port' => 587,
+        'identifiants_chiffres' => 'chiffre-de-test',
+    ]));
+
+    return $id;
+}
+
+/** Lève une pause par le chemin JOURNALISÉ (ligne `pause_levee` puis levée, une seule transaction), comme envoi:lever-pause. */
+function leverPauseJournalisee(string $ws, int $pause, string $par = 'test'): void
+{
+    DB::transaction(function () use ($ws, $pause, $par) {
+        app(DepotSocle::class)->journaliser($ws, 'pause_levee', $par, ['pause' => $pause]);
+        app(DepotChauffe::class)->leverPause($ws, $pause, $par);
+    });
 }
 
 function jourP(string $j): DateTimeImmutable
@@ -94,6 +122,8 @@ function jourP(string $j): DateTimeImmutable
 
 function messageChauffe(string $ws, string $dest = 'x@gmail.com', string $boite = 'boite1@example.test'): MessageAEnvoyer
 {
+    boiteChauffe($ws, $boite); // l'expéditeur est une boîte réelle (un expéditeur inconnu est refusé)
+
     return new MessageAEnvoyer($ws, $dest, $boite, 'S', 'C', (string) Str::uuid());
 }
 
@@ -235,7 +265,7 @@ test('résolveur en mémoire : domaine d’entreprise hébergé chez Google = gm
         ->and($r->fournisseurDe('a@societe.fr'))->toBe('autre');
 });
 
-test('résolveur MX : lecture MX → famille, cache en table (un seul appel DNS), échec DNS = autre sans mise en cache', function () {
+test('résolveur MX : lecture MX → famille, cache en table (un seul appel DNS), échec DNS = INCONNU (fail-closed) sans mise en cache', function () {
     $appels = 0;
     $mx = ['google-hote.fr' => ['aspmx.l.google.com', 'alt1.aspmx.l.google.com'], 'ms-hote.fr' => ['x-fr.mail.protection.outlook.com'], 'ovh-hote.fr' => ['mx1.mail.ovh.net']];
     $r = new ResolveurMx(function (string $domaine) use (&$appels, $mx): array {
@@ -253,8 +283,8 @@ test('résolveur MX : lecture MX → famille, cache en table (un seul appel DNS)
         ->and($r->fournisseurDe('a@ovh-hote.fr'))->toBe('autre')
         ->and($r->fournisseurDe('a@gmail.com'))->toBe('gmail')        // domaines publics : zéro DNS
         ->and($appels)->toBe(3)
-        ->and($r->fournisseurDe('a@panne.fr'))->toBe('autre')
-        ->and($r->fournisseurDe('a@panne.fr'))->toBe('autre')
+        ->and($r->fournisseurDe('a@panne.fr'))->toBe(Fournisseur::INCONNU)
+        ->and($r->fournisseurDe('a@panne.fr'))->toBe(Fournisseur::INCONNU)
         ->and($appels)->toBe(5)                                       // l'échec n'est PAS mis en cache
         ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'google-hote.fr')->value('fournisseur'))->toBe('gmail')
         ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'panne.fr')->exists())->toBeFalse();
@@ -311,14 +341,15 @@ test('la pause d’un espace n’est pas vue par un autre espace (RLS)', functio
 test('quota de chauffe : la boîte jour 1 envoie 10 messages, le 11e est reporté ; à minuit Paris elle repart (jour effectif 2)', function () {
     $ws = espaceChauffe();
     $faux = new FauxServeurEnvoi;
-    $maintenant = paris('2026-11-10 23:59:50');
+    $maintenant = paris('2026-11-10 18:59:50');
     $p = passerelleChauffe($faux, $maintenant);
     foreach (range(1, 10) as $i) {
         expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
     }
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(10);
 
-    $maintenant = paris('2026-11-11 00:00:00'); // minuit Paris : nouveau jour, jour de chauffe 2
+    $maintenant = paris('2026-11-11 08:00:00'); // nouveau jour (Paris), ouverture de la fenêtre : jour de chauffe 2
+    $p->sante();
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
 });
 
@@ -336,7 +367,7 @@ test('chauffe en base : jours effectifs, passage P1 → P2 au 6e jour d’envoi 
     expect($acceptes)->toBe(18);
 });
 
-test('chauffe en base : l’adresse expéditeur est normalisée en minuscules pour les quotas', function () {
+test('chauffe en base : l’adresse expéditeur est normalisée (casse, espaces) et retrouvée dans envoi_boites : le quota se compte par IDENTIFIANT de boîte', function () {
     $ws = espaceChauffe();
     $faux = new FauxServeurEnvoi;
     $maintenant = paris('2026-11-10 10:00:00');
@@ -347,7 +378,7 @@ test('chauffe en base : l’adresse expéditeur est normalisée en minuscules po
         $acceptes += $p->injecter(messageChauffe($ws, 'x@societe.fr', $boite))->accepte ? 1 : 0;
     }
     expect($acceptes)->toBe(10)
-        ->and(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('boite')->unique()->values()->all())->toBe(['boite1@example.test']);
+        ->and(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('boite')->unique()->values()->all())->toBe([boiteChauffe($ws, 'boite1@example.test')]);
 });
 
 test('frein humain en base : 10 réponses = normal, 14 = quota réduit de moitié, 15 = pause', function () {
@@ -397,7 +428,7 @@ test('homme mort : sans appel à sante() depuis 15 min en fenêtre d’envoi, to
     expect($p->injecter(messageChauffe($b))->accepte)->toBeTrue();
 });
 
-test('homme mort : jamais de battement = pause en fenêtre d’envoi, mais pas hors fenêtre', function () {
+test('homme mort : jamais de battement = pause en fenêtre d’envoi ; et plus AUCUN envoi hors fenêtre (motif explicite)', function () {
     $ws = espaceChauffe();
     $faux = new FauxServeurEnvoi;
     $maintenant = paris('2026-11-10 10:00:00');
@@ -407,7 +438,7 @@ test('homme mort : jamais de battement = pause en fenêtre d’envoi, mais pas h
     }, '', 300, null, $garde);   // aucun sante()
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(0);
     $maintenant = paris('2026-11-10 22:00:00');
-    expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(0);   // hors fenêtre : refusé, battement ou non
 });
 
 test('envoi:sante appelle sante() (battement du planificateur) et envoi:evaluer-freins / envoi:sante sont planifiés', function () {
@@ -533,12 +564,13 @@ test('évaluation : le taux de réponse en baisse met en pause le fournisseur co
         $ws = espaceChauffe();
         $depot = app(DepotChauffe::class);
         $maintenant = paris('2026-11-10 10:00:00');
-        foreach (['2026-11-07', '2026-11-08', '2026-11-09'] as $j) {
+        foreach (['2026-11-06', '2026-11-07', '2026-11-08'] as $j) {
             $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable($j), $f, 'envoyes', 100);
             $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable($j), $f, 'reponses', 10);
         }
-        $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), $f, 'envoyes', 100);
-        $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), $f, 'reponses', 2);
+        // la dernière fournée COMPLÈTE (hier) : 2 % contre 10 % ; la journée en cours (partielle) n'entre pas dans la comparaison
+        $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-09'), $f, 'envoyes', 100);
+        $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-09'), $f, 'reponses', 2);
         $garde = new GardeChauffe($depot, app(DepotSocle::class), app(ResolveurFournisseur::class), null);
         $ouvertes = $garde->evaluer($ws, $maintenant);
         expect(array_map(fn ($d) => [$d->motif, $d->fournisseur], $ouvertes))->toBe([[DecisionFrein::REPONSES_EN_BAISSE, $f]]);
@@ -592,16 +624,22 @@ test('retours → freins : trois rebonds durs reçus dans la journée suffisent 
     expect(array_map(fn ($d) => $d->motif, $garde->evaluer($ws, $maintenant)))->toBe([DecisionFrein::REBONDS]);
 });
 
-test('envoi:evaluer-freins sans argument évalue tous les espaces', function () {
-    $a = espaceChauffe();
-    $b = espaceChauffe();
-    $depot = app(DepotChauffe::class);
-    foreach ([$a, $b] as $ws) {
-        $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour(new DateTimeImmutable('now')), 'autre', 'rebonds_durs', 3);
-    }
-    expect(Artisan::call('envoi:evaluer-freins'))->toBe(0);
-    foreach ([$a, $b] as $ws) {
-        expect($depot->pausesActives($ws, new DateTimeImmutable('now')))->toHaveCount(1);
+test('envoi:evaluer-freins sans argument évalue tous les espaces (horloge de l’appli figée en UTC)', function () {
+    Carbon::setTestNow(Carbon::parse('2026-11-10 09:00:00', 'UTC'));
+    try {
+        $a = espaceChauffe();
+        $b = espaceChauffe();
+        $depot = app(DepotChauffe::class);
+        $maintenant = now()->toDateTimeImmutable();
+        foreach ([$a, $b] as $ws) {
+            $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), 'autre', 'rebonds_durs', 3);
+        }
+        expect(Artisan::call('envoi:evaluer-freins'))->toBe(0);
+        foreach ([$a, $b] as $ws) {
+            expect($depot->pausesActives($ws, $maintenant))->toHaveCount(1);
+        }
+    } finally {
+        Carbon::setTestNow();
     }
 });
 
@@ -707,7 +745,7 @@ test('index unique partiel : une seule pause active par (espace, motif, fourniss
         expect(fn () => DB::transaction(fn () => DB::table('envoi_pauses')->insert($ligne)))->toThrow(QueryException::class);
         $autre = ['portee' => 'fournisseur', 'fournisseur' => 'gmail'] + $ligne;
         DB::table('envoi_pauses')->insert($autre);                       // autre portée : permis
-        DB::table('envoi_pauses')->where('motif', 'm')->whereNull('fournisseur')->update(['levee_le' => now()]);
+        leverPauseJournalisee($ws, (int) DB::table('envoi_pauses')->where('motif', 'm')->whereNull('fournisseur')->value('id'));
         DB::table('envoi_pauses')->insert($ligne);                       // la précédente est levée : permis
     });
     expect(DB::table('envoi_pauses')->where('workspace_id', $ws)->count())->toBe(3);
@@ -772,4 +810,410 @@ test('les tables L7 sont isolées par espace (RLS forcée) ; le rôle applicatif
         DB::unprepared('RESET ROLE');
         expect($refuse)->toBeTrue();
     }
+});
+
+// ══ Corrections de l'audit sécurité (L7) ═════════════════════════════════════
+
+/** @return array<int, string> motifs d'un refus de la garde pour ce message à cet instant */
+function refusGarde(string $ws, MessageAEnvoyer $m, DateTimeImmutable $quand, ?ResolveurFournisseur $r = null): ?string
+{
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), $r ?? app(ResolveurFournisseur::class), null);
+
+    return $garde->refus($m, JourEnvoi::de($quand), $quand);
+}
+
+// ── MAJEUR 1 : fenêtre d'envoi + homme mort permanent ───────────────────────
+
+test('MAJEUR 1 : aucun envoi hors de la fenêtre 8 h-19 h (Paris), motif explicite, aucune connexion au serveur', function () {
+    $ws = espaceChauffe();
+    foreach (['2026-11-10 00:00:00', '2026-11-10 03:00:00', '2026-11-10 07:59:59', '2026-11-10 19:00:00', '2026-11-10 22:00:00', '2026-11-10 23:59:59'] as $h) {
+        $faux = new FauxServeurEnvoi;
+        $maintenant = paris($h);
+        $p = passerelleChauffe($faux, $maintenant);   // battement frais à la même heure : seul l'horaire peut refuser
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse($h)->and($faux->appels)->toBe(0)
+            ->and(refusGarde($ws, messageChauffe($ws), $maintenant))->toBe(GardeChauffe::HORS_FENETRE);
+    }
+    foreach (['2026-11-10 08:00:00', '2026-11-10 18:59:59'] as $h) {
+        $maintenant = paris($h);
+        $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue($h);
+    }
+});
+
+test('MAJEUR 1 : l’homme mort joue EN PERMANENCE dans la fenêtre (une nuit de silence ne l’excuse pas)', function () {
+    $ws = espaceChauffe();
+    $faux = new FauxServeurEnvoi;
+    $maintenant = paris('2026-11-10 18:30:00');
+    $p = passerelleChauffe($faux, $maintenant);                 // dernier battement : 18:30
+    $maintenant = paris('2026-11-11 08:00:00');                 // ouverture de la fenêtre, 13 h 30 plus tard, sans battement
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(0)
+        ->and(refusGarde($ws, messageChauffe($ws), $maintenant))->toBe('pause:' . DecisionFrein::SANTE_SILENCIEUSE);
+    $p->sante();
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    $maintenant = paris('2026-11-11 08:15:00');                 // 15 min pile sans battement : mort
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse();
+});
+
+// ── MAJEUR 2 : DNS en échec = fail-closed, résolu une seule fois ────────────
+
+test('MAJEUR 2 : un fournisseur INCONNU (échec DNS) est bloqué par toute pause de fournisseur active ; sans pause il passe', function () {
+    $ws = espaceChauffe();
+    $mx = new ResolveurMx(fn (string $d): array => throw new RuntimeException('dns indisponible'));
+    app()->instance(ResolveurFournisseur::class, $mx);
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    expect($p->injecter(messageChauffe($ws, 'x@panne.fr'))->accepte)->toBeTrue();        // aucune pause : on n'arrête pas tout pour une panne DNS
+    expect(app(GardeChauffe::class)->indesirableChezTemoin($ws, 'temoin@gmail.com'))->toBeTrue();   // pause vers gmail
+    expect($p->injecter(messageChauffe($ws, 'x@panne.fr'))->accepte)->toBeFalse()          // inconnu : peut être gmail => bloqué
+        ->and($p->injecter(messageChauffe($ws, 'x@outlook.com'))->accepte)->toBeTrue()    // microsoft connu : non visé par la pause gmail
+        ->and($faux->appels)->toBe(2)
+        ->and(DB::table('envoi_fournisseur_domaines')->where('domaine', 'panne.fr')->exists())->toBeFalse();
+    expect(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('fournisseur')->unique()->sort()->values()->all())->toBe(['autre', 'microsoft']);   // jamais « inconnu » en base
+});
+
+test('MAJEUR 2 : le fournisseur est résolu UNE fois par injection (avant le verrou), réutilisé par refus() et noter()', function () {
+    $ws = espaceChauffe();
+    $appels = 0;
+    app()->instance(ResolveurFournisseur::class, new class($appels) implements ResolveurFournisseur
+    {
+        public function __construct(private int &$appels) {}
+
+        public function fournisseurDe(string $adresse): string
+        {
+            $this->appels++;
+
+            return 'autre';
+        }
+    });
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    expect($p->injecter(messageChauffe($ws, 'x@societe.fr'))->accepte)->toBeTrue()->and($appels)->toBe(1);
+});
+
+test('MAJEUR 2 : une pause ouverte sur un témoin dont le fournisseur est introuvable devient GLOBALE (la plus stricte)', function () {
+    $ws = espaceChauffe();
+    app()->instance(ResolveurFournisseur::class, new ResolveurMx(fn (string $d): array => throw new RuntimeException('dns indisponible')));
+    expect(app(GardeChauffe::class)->indesirableChezTemoin($ws, 'temoin@panne.fr'))->toBeTrue()
+        ->and(app(DepotChauffe::class)->pausesActives($ws, paris('2026-11-10 10:00:00'))[0]->portee)->toBe('global');
+});
+
+// ── MAJEUR 3 : quota par boîte RÉELLE, par domaine, jours effectifs à volume minimal ───
+
+test('MAJEUR 3 : un expéditeur qui n’est pas une boîte d’envoi est refusé (a+1@dom, « Nom <a@dom> », autre espace…)', function () {
+    $a = espaceChauffe();
+    $b = espaceChauffe();
+    boiteChauffe($a, 'boite1@example.test');
+    boiteChauffe($b, 'boite-de-b@example.test');
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    foreach (['boite1+1@example.test', 'Boîte <boite1@example.test>', 'boite2@example.test', 'boite-de-b@example.test', ''] as $exp) {
+        $m = new MessageAEnvoyer($a, 'x@societe.fr', $exp, 'S', 'C', (string) Str::uuid());
+        expect($p->injecter($m)->accepte)->toBeFalse($exp)
+            ->and(refusGarde($a, $m, $maintenant))->toBe(GardeChauffe::EXPEDITEUR_INCONNU);
+    }
+    expect($faux->appels)->toBe(0)
+        ->and($p->injecter(new MessageAEnvoyer($a, 'x@societe.fr', ' BOITE1@Example.Test ', 'S', 'C', (string) Str::uuid()))->accepte)->toBeTrue();
+});
+
+test('MAJEUR 3 : le quota est compté par identifiant de boîte, et PAR DOMAINE d’envoi (créer des boîtes ne contourne pas la montée)', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    $acceptes = 0;
+    foreach (range(1, 6) as $i) {                              // 6 boîtes du MÊME domaine, quota de 10 chacune : 60 possibles sans garde
+        foreach (range(1, 10) as $_) {
+            $acceptes += $p->injecter(messageChauffe($ws, 'x@societe.fr', "b{$i}@meme-domaine.test"))->accepte ? 1 : 0;
+        }
+    }
+    expect($acceptes)->toBe(Seuils::DOMAINE_FACTEUR * 10)       // 30 : le plafond du domaine
+        ->and(DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)->pluck('boite')->unique()->every(fn ($b) => Str::isUuid($b)))->toBeTrue();
+    // un autre domaine garde son propre quota
+    expect($p->injecter(messageChauffe($ws, 'x@societe.fr', 'b1@autre-domaine.test'))->accepte)->toBeTrue();
+});
+
+test('MAJEUR 3 : un seul message par jour ne fait pas avancer un jour effectif (volume minimal = 50 % du quota du palier)', function () {
+    // pur : 1 message/jour pendant 8 jours = aucun jour effectif ; 5 messages (50 % de 10) = jour effectif
+    $v1 = array_fill_keys(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'], 1);
+    $v5 = array_fill_keys(array_keys($v1), 5);
+    expect(CourbeChauffe::joursEffectifs($v1))->toBe([])
+        ->and(count(CourbeChauffe::joursEffectifs($v5)))->toBe(8)
+        ->and(count(CourbeChauffe::joursEffectifs(['2026-11-01' => 4, '2026-11-02' => 5])))->toBe(1)
+        // au palier P2 (quota 18), le minimum monte à 9 : 8 ne suffit plus
+        ->and(count(CourbeChauffe::joursEffectifs(array_fill_keys(['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05'], 5) + ['2026-11-06' => 8, '2026-11-07' => 9])))->toBe(6);
+    // en base : 6 jours à 1 message restent en P1 (quota 10) ; à 5 messages, le 6e jour passe en P2 (18)
+    $ws = espaceChauffe();
+    envoisPasses($ws, 'boite1@example.test', ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07'], 1);
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    $acceptes = 0;
+    foreach (range(1, 20) as $_) {
+        $acceptes += $p->injecter(messageChauffe($ws, 'x@societe.fr'))->accepte ? 1 : 0;
+    }
+    expect($acceptes)->toBe(10);
+});
+
+test('MAJEUR 3 : le réglage de la part de jour effectif ne peut que RESSERRER', function () {
+    expect(Seuils::resserre('jour_effectif_part', 0.5, 0.2))->toBe(0.5)
+        ->and(Seuils::resserre('jour_effectif_part', 0.5, 0.8))->toBe(0.8)
+        ->and(in_array('jour_effectif_part', Seuils::NOMS, true))->toBeTrue();
+    $ws = espaceChauffe();
+    app(DepotChauffe::class)->fixerSeuil($ws, 'jour_effectif_part', 1.0, 'test');   // il faut un quota plein pour compter un jour
+    envoisPasses($ws, 'boite1@example.test', ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07'], 9);
+    $maintenant = paris('2026-11-10 10:00:00');
+    $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
+    $acceptes = 0;
+    foreach (range(1, 20) as $_) {
+        $acceptes += $p->injecter(messageChauffe($ws, 'x@societe.fr'))->accepte ? 1 : 0;
+    }
+    expect($acceptes)->toBe(10);                                // 9 < 10 : aucun jour effectif, toujours P1
+});
+
+// ── MAJEUR 4 : taux de réponse sur des fenêtres COMPLÈTES ───────────────────
+
+test('MAJEUR 4 : la journée en cours (partielle) n’est JAMAIS comparée aux fournées complètes', function () {
+    $ws = espaceChauffe();
+    $depot = app(DepotChauffe::class);
+    foreach (['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09'] as $j) {       // 4 jours révolus à 10 %
+        $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable($j), 'gmail', 'envoyes', 100);
+        $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable($j), 'gmail', 'reponses', 10);
+    }
+    // aujourd'hui : 100 envois et 0 réponse AU MILIEU de la journée (les réponses n'ont pas eu le temps d'arriver)
+    $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-10'), 'gmail', 'envoyes', 100);
+    $garde = new GardeChauffe($depot, app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    expect($garde->evaluer($ws, paris('2026-11-10 10:00:00')))->toBe([]);
+    // le lendemain, la journée est révolue avec ses (vraies) réponses : 1 % contre 10 % => pause
+    $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-10'), 'gmail', 'reponses', 1);
+    expect(array_map(fn ($d) => [$d->motif, $d->fournisseur], $garde->evaluer($ws, paris('2026-11-11 10:00:00'))))->toBe([[DecisionFrein::REPONSES_EN_BAISSE, 'gmail']]);
+});
+
+// ── MAJEUR 5 : l'état de frein ne se modifie plus sans trace ────────────────
+
+/** Exécute un SQL attendu REFUSÉ (savepoint : la transaction du test reste saine) et renvoie le message. */
+function sqlRefuse(string $sql, array $liens = []): string
+{
+    DB::unprepared('SAVEPOINT avant_refus');
+    try {
+        DB::statement($sql, $liens);
+    } catch (Throwable $e) {
+        DB::unprepared('ROLLBACK TO SAVEPOINT avant_refus');
+
+        return $e->getMessage();
+    }
+    DB::unprepared('ROLLBACK TO SAVEPOINT avant_refus');
+
+    return '';
+}
+
+test('MAJEUR 5 : une pause ne se lève QUE par le chemin journalisé ou par expiration réelle ; sinon refus de la base', function () {
+    $ws = espaceChauffe();
+    $depot = app(DepotChauffe::class);
+    app(GardeChauffe::class)->indesirableChezTemoin($ws, 'temoin@gmail.com');                        // pause sans durée
+    $t0 = paris('2026-11-10 10:00:00');
+    $depot->ouvrirPause($ws, 'longue', null, $t0, 48);
+    $id = (int) DB::table('envoi_pauses')->where('workspace_id', $ws)->where('motif', DecisionFrein::INDESIRABLE_TEMOIN)->value('id');
+    $idLongue = (int) DB::table('envoi_pauses')->where('workspace_id', $ws)->where('motif', 'longue')->value('id');
+    WorkspaceContext::run($ws, function () use ($id, $idLongue, $ws) {
+        // 1. levée « silencieuse » (UPDATE direct) : refusée
+        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = now(), levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
+        // 2. expire_le ramenée dans le passé, ou levee_le datée dans le futur : refusées
+        expect(sqlRefuse("UPDATE envoi_pauses SET expire_le = now() - interval '1 day' WHERE id = ?", [$idLongue]))->toContain('figés')
+            ->and(sqlRefuse("UPDATE envoi_pauses SET levee_le = now() - interval '1 day', levee_par = 'expiration' WHERE id = ?", [$idLongue]))->toContain('expiration refusée')
+            ->and(sqlRefuse("UPDATE envoi_pauses SET motif = 'autre' WHERE id = ?", [$id]))->toContain('figés');
+        // 3. journal d'un AUTRE identifiant : ne couvre pas cette levée
+        app(DepotSocle::class)->journaliser($ws, 'pause_levee', 'x', ['pause' => $id + 1000]);
+        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = now(), levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
+    });
+    // 4. le chemin journalisé passe ; la levée datée est ensuite définitive
+    leverPauseJournalisee($ws, $id, 'will');
+    expect(DB::table('envoi_pauses')->where('id', $id)->value('levee_par'))->toBe('will');
+    WorkspaceContext::run($ws, fn () => expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = NULL, levee_par = NULL WHERE id = ?", [$id]))->toContain('définitive'));
+    // 5. l'expiration réelle est tracée dans le journal
+    $depot->ouvrirPause($ws, 'longue', null, $t0->modify('+49 hours'), 48);
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_expiree')->count())->toBe(1);
+});
+
+test('MAJEUR 5 : les compteurs de chauffe sont en CROISSANCE SEULE', function () {
+    $ws = espaceChauffe();
+    $depot = app(DepotChauffe::class);
+    $depot->incrementer($ws, 'b', new DateTimeImmutable('2026-11-10'), 'autre', 'envoyes', 5);
+    $depot->incrementer($ws, 'b', new DateTimeImmutable('2026-11-10'), 'autre', 'plaintes', 2);
+    WorkspaceContext::run($ws, function () {
+        foreach (['envoyes', 'plaintes', 'rebonds_durs', 'reponses'] as $c) {
+            $r = sqlRefuse("UPDATE envoi_chauffe_jours SET {$c} = {$c} - 1 WHERE {$c} > 0");
+            if ($c === 'envoyes' || $c === 'plaintes') {
+                expect($r)->toContain('croissance seule');
+            }
+        }
+        expect(sqlRefuse("UPDATE envoi_chauffe_jours SET jour = '2026-01-01'"))->toContain('identité figée')
+            ->and(sqlRefuse("UPDATE envoi_chauffe_jours SET boite = 'autre'"))->toContain('identité figée')
+            ->and(sqlRefuse('UPDATE envoi_chauffe_jours SET envoyes = envoyes + 1'))->toBe('');   // croître reste permis
+    });
+});
+
+test('MAJEUR 5 : le battement est borné à l’horloge (jamais dans le futur) et monotone', function () {
+    $depot = app(DepotChauffe::class);
+    $depot->noterBattement(paris('2026-11-10 10:00:00'));
+    $depot->noterBattement(paris('2026-11-10 09:00:00'));                                       // en arrière : ignoré
+    expect($depot->dernierBattement()?->getTimestamp())->toBe(paris('2026-11-10 10:00:00')->getTimestamp());
+    $depot->noterBattement(paris('2026-11-10 10:05:00'));
+    expect($depot->dernierBattement()?->getTimestamp())->toBe(paris('2026-11-10 10:05:00')->getTimestamp());
+    // à la main (sans horloge d'appli) : 2099 est ramené à l'horloge de la base, donc l'homme mort reste armé
+    DB::statement("UPDATE envoi_sante_battement SET dernier_le = '2099-01-01 00:00:00+00' WHERE id = 1");
+    expect($depot->dernierBattement()->getTimestamp())->toBeLessThanOrEqual(time() + 2)
+        ->and(Freins::santeSilencieuse($depot->dernierBattement(), new DateTimeImmutable('2030-01-01')))->toBeTrue();
+});
+
+test('MAJEUR 5 : le fournisseur résolu d’un domaine ne se « force » pas à autre avant l’expiration du cache', function () {
+    DB::statement("INSERT INTO envoi_fournisseur_domaines (domaine, fournisseur, resolu_le) VALUES ('societe-g.fr', 'gmail', now())");
+    expect(sqlRefuse("UPDATE envoi_fournisseur_domaines SET fournisseur = 'autre' WHERE domaine = 'societe-g.fr'"))->toContain('expiration du cache');
+    DB::statement("UPDATE envoi_fournisseur_domaines SET resolu_le = now() - interval '8 days' WHERE domaine = 'societe-g.fr'");
+    expect(sqlRefuse("UPDATE envoi_fournisseur_domaines SET fournisseur = 'autre' WHERE domaine = 'societe-g.fr'"))->toBe('');   // cache expiré : re-résolution légitime
+});
+
+test('MAJEUR 5 : aucun DELETE ni TRUNCATE sur les tables d’état de L7, même pour un superutilisateur (triggers)', function () {
+    $ws = espaceChauffe();
+    app(GardeChauffe::class)->indesirableChezTemoin($ws, 'temoin@gmail.com');
+    app(DepotChauffe::class)->incrementer($ws, 'b', new DateTimeImmutable('2026-11-10'), 'autre', 'envoyes', 1);
+    app(DepotChauffe::class)->noterBattement(paris('2026-11-10 10:00:00'));
+    DB::statement("INSERT INTO envoi_fournisseur_domaines (domaine, fournisseur) VALUES ('z.fr', 'autre')");
+    WorkspaceContext::run($ws, function () {
+        foreach (['envoi_pauses', 'envoi_chauffe_jours', 'envoi_sante_battement', 'envoi_fournisseur_domaines'] as $t) {
+            expect(sqlRefuse("DELETE FROM {$t}"))->toContain('ajout seulement')
+                ->and(sqlRefuse("TRUNCATE {$t}"))->toContain('ajout seulement');
+        }
+    });
+});
+
+test('MAJEUR 5 : les fonctions de L7 fixent leur search_path', function () {
+    $f = DB::select("SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND proname IN ('envoi_pauses_garde','envoi_chauffe_jours_garde','envoi_sante_battement_garde','envoi_fournisseur_domaines_garde','envoi_l7_horloge','envoi_l7_aucun_effacement')
+          AND (proconfig IS NULL OR NOT EXISTS (SELECT 1 FROM unnest(proconfig) c WHERE c LIKE 'search_path=%'))");
+    expect($f)->toBe([]);
+    expect(DB::selectOne("SELECT count(*) AS n FROM pg_proc WHERE proname LIKE 'envoi_%garde' OR proname LIKE 'envoi_l7_%'")->n)->toBeGreaterThanOrEqual(6);
+});
+
+// ── MINEURS ──────────────────────────────────────────────────────────────────
+
+test('m1 : envoi:evaluer-freins : un espace en erreur n’empêche pas d’évaluer les suivants (code retour en échec)', function () {
+    $espaces = [espaceChauffe(), espaceChauffe(), espaceChauffe()];
+    sort($espaces);
+    $depot = app(DepotChauffe::class);
+    $maintenant = now()->toDateTimeImmutable();
+    foreach ($espaces as $ws) {
+        $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), 'autre', 'rebonds_durs', 3);
+    }
+    // l'espace du MILIEU lève une exception à l'ouverture de sa pause
+    DB::unprepared("CREATE OR REPLACE FUNCTION test_pause_en_panne() RETURNS trigger AS \$f\$ BEGIN
+            IF NEW.workspace_id = '{$espaces[0]}'::uuid THEN RAISE EXCEPTION 'panne simulée'; END IF; RETURN NEW; END; \$f\$ LANGUAGE plpgsql");
+    DB::unprepared('CREATE TRIGGER test_pause_en_panne BEFORE INSERT ON envoi_pauses FOR EACH ROW EXECUTE FUNCTION test_pause_en_panne()');
+    expect(Artisan::call('envoi:evaluer-freins'))->toBe(1);
+    expect($depot->pausesActives($espaces[0], $maintenant))->toHaveCount(0)
+        ->and($depot->pausesActives($espaces[1], $maintenant))->toHaveCount(1)
+        ->and($depot->pausesActives($espaces[2], $maintenant))->toHaveCount(1);
+});
+
+test('m2 : après un arrêt pour plaintes, celles arrivées LE MÊME JOUR, après l’ouverture, sont recomptées', function () {
+    $ws = espaceChauffe();
+    $depot = app(DepotChauffe::class);
+    $garde = new GardeChauffe($depot, app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $maintenant = paris('2026-11-10 10:00:00');
+    $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-10'), 'autre', 'plaintes', 2);
+    expect(array_map(fn ($d) => $d->motif, $garde->evaluer($ws, $maintenant)))->toBe([DecisionFrein::PLAINTES_ARRET]);
+    expect($depot->plaintes7Jours($ws, JourEnvoi::de($maintenant), $depot->derniereOuverture($ws, DecisionFrein::PLAINTES_ARRET)))->toBe(0);   // consommées
+    $depot->incrementer($ws, 'b@example.test', new DateTimeImmutable('2026-11-10'), 'autre', 'plaintes', 2);                                 // 2 de plus, même jour
+    expect($depot->plaintes7Jours($ws, JourEnvoi::de($maintenant), $depot->derniereOuverture($ws, DecisionFrein::PLAINTES_ARRET)))->toBe(2);
+});
+
+test('m3 : un frein levé à la main qui se rouvre le dit à l’opérateur', function () {
+    Log::spy();
+    $ws = espaceChauffe();
+    $depot = app(DepotChauffe::class);
+    $maintenant = paris('2026-11-10 10:00:00');
+    $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), 'autre', 'rebonds_durs', 3);
+    $garde = new GardeChauffe($depot, app(DepotSocle::class), app(ResolveurFournisseur::class), app(Alerte::class));
+    $garde->evaluer($ws, $maintenant);
+    leverPauseJournalisee($ws, (int) $depot->pausesActives($ws, $maintenant)[0]->id, 'will');
+    $garde->evaluer($ws, $maintenant);                                                           // la cause est toujours là : il se rouvre
+    Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'levé à la main') || str_contains($m, 'levé à la main, rouvert'))->atLeast()->once();
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->orderByDesc('id')->value('details'))->toContain('will');
+});
+
+test('m5 : changements d’heure Europe/Paris (29/03 et 25/10/2026) : fenêtre d’envoi et jour d’envoi', function () {
+    $utc = fn (string $q) => new DateTimeImmutable($q, new DateTimeZone('UTC'));
+    // 29 mars 2026 : 02:00 → 03:00 (CET → CEST). 06:59 UTC = 08:59 Paris, mais 05:59 UTC = 07:59 Paris (hors fenêtre).
+    expect(Freins::dansFenetreEnvoi($utc('2026-03-29 05:59:59')))->toBeFalse()
+        ->and(Freins::dansFenetreEnvoi($utc('2026-03-29 06:00:00')))->toBeTrue()          // 08:00 CEST
+        ->and(Freins::dansFenetreEnvoi($utc('2026-03-29 16:59:59')))->toBeTrue()          // 18:59:59 CEST
+        ->and(Freins::dansFenetreEnvoi($utc('2026-03-29 17:00:00')))->toBeFalse()         // 19:00 CEST
+        ->and(Freins::dansFenetreEnvoi($utc('2026-03-28 17:59:59')))->toBeTrue()          // veille : 18:59:59 CET
+        ->and(Freins::dansFenetreEnvoi($utc('2026-03-28 18:00:00')))->toBeFalse();        // 19:00 CET
+    // 25 octobre 2026 : 03:00 → 02:00 (CEST → CET). 24 h + 1 h.
+    expect(Freins::dansFenetreEnvoi($utc('2026-10-25 05:59:59')))->toBeFalse()            // 06:59:59 CET
+        ->and(Freins::dansFenetreEnvoi($utc('2026-10-25 07:00:00')))->toBeTrue()          // 08:00 CET
+        ->and(Freins::dansFenetreEnvoi($utc('2026-10-25 17:59:59')))->toBeTrue()          // 18:59:59 CET
+        ->and(Freins::dansFenetreEnvoi($utc('2026-10-25 18:00:00')))->toBeFalse()         // 19:00 CET
+        ->and(Freins::dansFenetreEnvoi($utc('2026-10-24 16:59:59')))->toBeTrue()          // 18:59:59 CEST la veille
+        ->and(Freins::dansFenetreEnvoi($utc('2026-10-24 17:00:00')))->toBeFalse();        // 19:00 CEST
+    // jour d'envoi : minuit Paris, pas minuit UTC, de part et d'autre du changement d'heure
+    $jour = fn (string $q) => JourEnvoi::de($utc($q))->format('Y-m-d');
+    expect($jour('2026-03-28 22:59:59'))->toBe('2026-03-28')->and($jour('2026-03-28 23:00:00'))->toBe('2026-03-29')   // 00:00 CET
+        ->and($jour('2026-03-29 21:59:59'))->toBe('2026-03-29')->and($jour('2026-03-29 22:00:00'))->toBe('2026-03-30')   // 00:00 CEST
+        ->and($jour('2026-10-24 21:59:59'))->toBe('2026-10-24')->and($jour('2026-10-24 22:00:00'))->toBe('2026-10-25')   // 00:00 CEST
+        ->and($jour('2026-10-25 22:59:59'))->toBe('2026-10-25')->and($jour('2026-10-25 23:00:00'))->toBe('2026-10-26');  // 00:00 CET
+    // jours effectifs : un envoi la veille et le lendemain du changement d'heure = deux jours consécutifs (pas de trou de 25 h)
+    expect(CourbeChauffe::jourDeChauffe([jourP('2026-03-28'), jourP('2026-03-29')], jourP('2026-03-30')))->toBe(3)
+        ->and(CourbeChauffe::jourDeChauffe([jourP('2026-10-24'), jourP('2026-10-25')], jourP('2026-10-26')))->toBe(3);
+});
+
+test('m6 : le battement n’est noté que si sante() du serveur répond OK', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    // un serveur dont la santé est KO au début
+    $faux = new class implements ServeurEnvoi
+    {
+        public bool $ok = false;
+
+        public function injecter(MessageAEnvoyer $message): App\Envoi\Contrat\ResultatInjection
+        {
+            return App\Envoi\Contrat\ResultatInjection::accepte('id');
+        }
+
+        public function etatEnvoi(string $idInjection): App\Envoi\Contrat\EtatMessage
+        {
+            return App\Envoi\Contrat\EtatMessage::Inconnu;
+        }
+
+        public function pause(): void {}
+
+        public function reprise(): void {}
+
+        public function modeTemoins(): bool
+        {
+            return false;
+        }
+
+        public function etat(): App\Envoi\Contrat\EtatServeur
+        {
+            return new App\Envoi\Contrat\EtatServeur(false, 0);
+        }
+
+        public function sante(): App\Envoi\Contrat\SanteServeur
+        {
+            return new App\Envoi\Contrat\SanteServeur($this->ok, 'test');
+        }
+
+        public function lireEvenements(?string $curseur, int $limite = 100): App\Envoi\Contrat\LotEvenements
+        {
+            return new App\Envoi\Contrat\LotEvenements([], $curseur);
+        }
+    };
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $p = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $p->sante();
+    expect(app(DepotChauffe::class)->dernierBattement())->toBeNull()                          // santé KO : pas de battement
+        ->and($p->injecter(messageChauffe($ws))->accepte)->toBeFalse();                        // donc l'homme mort ferme les files
+    $faux->ok = true;
+    $p->sante();
+    expect(app(DepotChauffe::class)->dernierBattement()?->getTimestamp())->toBe($maintenant->getTimestamp())
+        ->and($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
 });

@@ -23,7 +23,8 @@ use DateTimeImmutable;
  *   3. Tout arrêter             => exception ;
  *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
  *   5. rejeu idempotent (même clé) => passe sans recompter ;
- *   5b. (L7) homme mort (silence de sante()), pauses, freins, quota de chauffe de la boîte => report au lendemain ;
+ *   5b. (L7) hors fenêtre d'envoi 8 h-19 h, homme mort (silence de sante()), pauses, freins, expéditeur inconnu,
+ *       quota de chauffe de la boîte et du domaine => report au lendemain ;
  *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
  *   7. seulement alors, le serveur est appelé, et l'injection acceptée est notée
  *      dans la même transaction : deux workers ne peuvent pas dépasser le plafond.
@@ -58,12 +59,13 @@ final class PasserelleLocale implements ServeurEnvoi
             throw EnvoiRefuse::autreEspace();
         }
         $jour = $this->jour();
-        $this->chauffe?->preparer($message); // résolution MX (cache) AVANT le verrou : jamais de DNS sous verrou
+        // Fournisseur résolu UNE fois, AVANT le verrou (jamais de DNS sous verrou), puis réutilisé par refus() et noter().
+        $fournisseur = $this->chauffe?->preparer($message);
         $plafond = $this->plafond($this->plafondJour);
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
         // Les autres portes, le comptage, l'appel et la note sont sous UN verrou.
-        return $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global): ResultatInjection {
+        return $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur): ResultatInjection {
             if ($this->depot->toutArreter($ws)) {
                 throw EnvoiRefuse::toutArreter();
             }
@@ -79,14 +81,14 @@ final class PasserelleLocale implements ServeurEnvoi
             }
 
             // Chauffe et freins (lot L7) : pause ou quota => report, aucune connexion.
-            if ($this->chauffe?->refus($message, $jour, $this->instant()) !== null) {
+            if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur) !== null) {
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
 
             $resultat = $this->serveur->injecter($message);
             if ($resultat->accepte) {
                 $this->depot->noterInjection($ws, $jour, $message->cleIdempotence);
-                $this->chauffe?->noter($message, $jour);
+                $this->chauffe?->noter($message, $jour, $fournisseur);
             }
 
             return $resultat;
@@ -127,10 +129,14 @@ final class PasserelleLocale implements ServeurEnvoi
         if (! $this->reel()) {
             return new SanteServeur(false, 'envoi réel inactif');
         }
-        // Homme mort (INF-025, plan 26) : chaque appel est noté ; 15 minutes de silence en fenêtre d'envoi = pause.
-        $this->chauffe?->battre($this->instant());
+        // Homme mort (INF-025, plan 26) : le battement n'est noté que si le serveur répond OK ;
+        // 15 minutes sans battement OK = pause de toutes les files (dans la fenêtre d'envoi, la seule où l'on envoie).
+        $sante = $this->serveur->sante();
+        if ($sante->ok) {
+            $this->chauffe?->battre($this->instant());
+        }
 
-        return $this->serveur->sante();
+        return $sante;
     }
 
     public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements

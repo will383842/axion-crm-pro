@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\DB;
  * ajout/mise à jour seulement, aucune donnée de personne : un domaine et sa famille).
  *  - MX en `*.google.com` / `*.googlemail.com`         => gmail
  *  - MX en `*.outlook.com` / `*.protection.outlook.com` / `*.hotmail.com` => microsoft
- *  - tout le reste, et tout ÉCHEC DNS                    => autre (l'échec n'est PAS mis en cache).
+ *  - tout le reste                                      => autre ;
+ *  - tout ÉCHEC DNS                                     => INCONNU (jamais mis en cache) : la garde le bloque
+ *    dès qu'une pause de fournisseur est active (fail-closed), au lieu de le laisser passer comme « autre ».
  * Les domaines publics connus (gmail.com, outlook.com…) ne coûtent aucun appel DNS.
  * La requête DNS est injectable (`$dns`) ; la valeur par défaut REFUSE de sortir en test.
  */
@@ -45,7 +47,7 @@ final class ResolveurMx implements ResolveurFournisseur
         } catch (\LogicException $e) {
             throw $e; // « pas de réseau en test » : jamais avalé
         } catch (\Throwable) {
-            return Fournisseur::AUTRE; // échec DNS : prudent, et surtout pas mis en cache
+            return Fournisseur::INCONNU; // échec DNS : fail-closed côté garde, et surtout pas mis en cache
         }
         $f = self::famille($hotes);
         DB::statement(

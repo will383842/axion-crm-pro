@@ -74,6 +74,28 @@ final class CourbeChauffe
         return $effectifs + 1;
     }
 
+    /**
+     * Jours EFFECTIFS à partir des volumes réellement envoyés : un jour ne compte que si le volume atteint
+     * `$part` × le quota du palier où la boîte se trouvait CE jour-là (arrondi au supérieur, au moins 1).
+     *
+     * @param  array<string, int>  $volumes  'Y-m-d' (Paris) => messages envoyés ce jour-là
+     * @return list<DateTimeImmutable>
+     */
+    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART): array
+    {
+        ksort($volumes);
+        $effectifs = [];
+        foreach ($volumes as $j => $n) {
+            $jour = new DateTimeImmutable($j, new \DateTimeZone(JourEnvoi::FUSEAU));
+            $minimum = max(1, (int) ceil(round($part * self::quotaBoite(self::jourDeChauffe($effectifs, $jour)), 9)));
+            if ($n >= $minimum) {
+                $effectifs[] = $jour;
+            }
+        }
+
+        return $effectifs;
+    }
+
     public static function palier(int $jourDeChauffe): string
     {
         return self::ligne($jourDeChauffe)['palier'];

@@ -19,15 +19,24 @@ class EnvoiEvaluerFreins extends Command
         $ws = $this->argument('workspace');
         $espaces = $ws !== null ? [(string) $ws] : $this->tousLesEspaces();
         $total = 0;
+        $echecs = 0;
+        $maintenant = now()->toDateTimeImmutable(); // horloge de l'appli (figeable en test), pas new DateTimeImmutable
         foreach ($espaces as $espace) {
-            foreach ($garde->evaluer($espace, new \DateTimeImmutable) as $d) {
-                $total++;
-                $this->warn($espace . ' — pause ouverte : ' . $d->motif . ($d->fournisseur !== null ? ' (' . $d->fournisseur . ')' : ''));
+            // Un espace en erreur ne doit pas empêcher d'évaluer les suivants (leurs freins comptent autant).
+            try {
+                foreach ($garde->evaluer($espace, $maintenant) as $d) {
+                    $total++;
+                    $this->warn($espace . ' — pause ouverte : ' . $d->motif . ($d->fournisseur !== null ? ' (' . $d->fournisseur . ')' : ''));
+                }
+            } catch (\Throwable $e) {
+                $echecs++;
+                report($e);
+                $this->error($espace . ' — évaluation impossible : ' . $e->getMessage());
             }
         }
         $this->info($total . ' pause(s) ouverte(s).');
 
-        return self::SUCCESS;
+        return $echecs > 0 ? self::FAILURE : self::SUCCESS;
     }
 
     /** @return list<string> */

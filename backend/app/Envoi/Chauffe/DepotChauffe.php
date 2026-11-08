@@ -29,6 +29,48 @@ final class DepotChauffe
         return array_values($jours->map(fn ($j): DateTimeImmutable => new DateTimeImmutable((string) $j, new \DateTimeZone(JourEnvoi::FUSEAU)))->all());
     }
 
+    /**
+     * Messages envoyés par jour (Paris), STRICTEMENT avant $jour, avec au moins un envoi : la matière de
+     * {@see CourbeChauffe::joursEffectifs()}.
+     *
+     * @return array<string, int>
+     */
+    public function volumesParJour(string $ws, string $boite, DateTimeImmutable $jour): array
+    {
+        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+            ->where('workspace_id', $ws)->where('boite', $boite)->where('jour', '<', $jour->format('Y-m-d'))
+            ->groupBy('jour')->havingRaw('SUM(envoyes) > 0')->orderBy('jour')
+            ->selectRaw('jour, SUM(envoyes) AS n')->get());
+        $v = [];
+        foreach ($l as $r) {
+            $v[(string) $r->jour] = (int) $r->n;
+        }
+
+        return $v;
+    }
+
+    /**
+     * Identifiant de la boîte d'envoi (`envoi_boites`) de cette adresse expéditeur dans cet espace, ou null
+     * (expéditeur inconnu : `a+1@dom`, « Nom <a@dom> »… ne sont PAS des boîtes). Comparaison exacte, casse ignorée.
+     */
+    public function boiteId(string $ws, string $expediteur): ?string
+    {
+        $id = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')
+            ->where('workspace_id', $ws)->whereRaw('lower(adresse) = ?', [GardeChauffe::boite($expediteur)])
+            ->orderBy('cree_le')->orderBy('id')->value('id'));
+
+        return is_string($id) ? $id : null;
+    }
+
+    /** Messages envoyés ce jour-là par TOUTES les boîtes de l'espace qui partagent ce domaine d'envoi. */
+    public function envoyesDomaine(string $ws, string $domaine, DateTimeImmutable $jour): int
+    {
+        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
+            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
+            ->where('c.workspace_id', $ws)->where('c.jour', $jour->format('Y-m-d'))
+            ->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [$domaine])->sum('c.envoyes'));
+    }
+
     public function envoyesBoite(string $ws, string $boite, DateTimeImmutable $jour): int
     {
         return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
@@ -38,6 +80,9 @@ final class DepotChauffe
 
     public function incrementer(string $ws, string $boite, DateTimeImmutable $jour, string $fournisseur, string $colonne, int $n = 1): void
     {
+        if ($fournisseur === Fournisseur::INCONNU) {
+            $fournisseur = Fournisseur::AUTRE; // résolution impossible : compté sous « autre » (le blocage, lui, est fait par la garde)
+        }
         if (! in_array($colonne, self::COLONNES, true) || ! in_array($fournisseur, Fournisseur::TOUS, true)) {
             throw new \InvalidArgumentException('colonne ou fournisseur inconnu');
         }
@@ -78,15 +123,61 @@ final class DepotChauffe
         return self::totauxDe($l);
     }
 
-    /** Plaintes des 7 jours glissants, en ne comptant que les jours APRÈS $apres (plaintes déjà « consommées » par un arrêt). */
+    /**
+     * Plaintes des 7 jours glissants, sans celles qu'un arrêt de 48 h a déjà « consommées » : les jours APRÈS
+     * $apres, plus les plaintes arrivées le jour même de l'arrêt APRÈS son ouverture (le journal de l'arrêt
+     * garde le nombre de plaintes du jour à l'instant de l'ouverture ; sans cette trace, tout le jour est consommé).
+     */
     public function plaintes7Jours(string $ws, DateTimeImmutable $jour, ?DateTimeImmutable $apres = null): int
     {
-        $apresJour = $apres?->format('Y-m-d');
-
-        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)
-            ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])
+        $debut = $this->debutFenetre($jour)->format('Y-m-d');
+        $fin = $jour->format('Y-m-d');
+        $somme = fn (?string $apresJour, ?string $egal = null): int => (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')
+            ->where('workspace_id', $ws)->whereBetween('jour', [$debut, $fin])
             ->when($apresJour !== null, fn ($q) => $q->where('jour', '>', $apresJour))
+            ->when($egal !== null, fn ($q) => $q->where('jour', $egal))
             ->sum('plaintes'));
+        if ($apres === null) {
+            return $somme(null);
+        }
+        $jourArret = $apres->format('Y-m-d');
+        $consommees = $this->plaintesDuJourALOuvertureDeLArret($ws, $jourArret);
+        $memeJour = $consommees === null ? 0 : max(0, $somme(null, $jourArret) - $consommees);
+
+        return $somme($jourArret) + $memeJour;
+    }
+
+    /** Plaintes du jour de l'arrêt, telles qu'elles étaient à son ouverture (trace du journal), ou null si inconnu. */
+    private function plaintesDuJourALOuvertureDeLArret(string $ws, string $jourArret): ?int
+    {
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')
+            ->where('workspace_id', $ws)->where('commande', 'pause_auto')->where('jour', $jourArret)
+            ->whereRaw("details::jsonb->>'motif' = ?", [DecisionFrein::PLAINTES_ARRET])
+            ->whereRaw("jsonb_exists(details::jsonb, 'plaintes_jour')")
+            ->orderByDesc('id')->value('details'));
+        if (! is_string($d)) {
+            return null;
+        }
+        $n = json_decode($d, true)['plaintes_jour'] ?? null;
+
+        return is_int($n) ? $n : null;
+    }
+
+    /**
+     * Dernière pause de ce frein LEVÉE À LA MAIN (hors expiration) : {par, le}, ou null. Sert au message
+     * « ce frein se rouvre alors qu'il a été levé à la main ».
+     *
+     * @return array{par: string, le: string}|null
+     */
+    public function derniereLeveeManuelle(string $ws, string $motif, ?string $fournisseur): ?array
+    {
+        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_pauses')
+            ->where('workspace_id', $ws)->where('motif', $motif)->whereNotNull('levee_le')
+            ->where(fn ($q) => $q->whereNull('levee_par')->orWhere('levee_par', '<>', 'expiration'))
+            ->when($fournisseur === null, fn ($q) => $q->whereNull('fournisseur'), fn ($q) => $q->where('fournisseur', $fournisseur))
+            ->orderByDesc('levee_le')->first(['levee_par', 'levee_le']));
+
+        return $l === null ? null : ['par' => (string) ($l->levee_par ?? 'inconnu'), 'le' => (string) $l->levee_le];
     }
 
     /** Dernier jour (7 jours glissants) où une plainte est arrivée, ou null. */
@@ -139,11 +230,12 @@ final class DepotChauffe
     {
         return WorkspaceContext::run($ws, fn (): bool => DB::transaction(function () use ($ws, $motif, $fournisseur, $maintenant, $dureeHeures): bool {
             $instant = $maintenant->format('Y-m-d H:i:sP');
+            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant]); // horloge de référence des triggers de L7
             // Une pause expirée du même motif occupe encore l'index unique : on la date « levée » (la ligne reste).
             DB::table('envoi_pauses')->where('workspace_id', $ws)->whereNull('levee_le')
                 ->where('motif', $motif)->whereNotNull('expire_le')->where('expire_le', '<=', $instant)
                 ->when($fournisseur === null, fn ($q) => $q->whereNull('fournisseur'), fn ($q) => $q->where('fournisseur', $fournisseur))
-                ->update(['levee_le' => $instant, 'levee_par' => 'expiration']);
+                ->update(['levee_le' => DB::raw('expire_le'), 'levee_par' => 'expiration']); // levée = l'instant exact d'expiration
             $insere = DB::affectingStatement(
                 "INSERT INTO envoi_pauses (workspace_id, portee, fournisseur, motif, declenchee_le, expire_le)
                  VALUES (?, ?, ?, ?, ?, ?)
@@ -184,11 +276,16 @@ final class DepotChauffe
     /** Homme mort INF-025 : dernier appel à sante() (global, sans donnée de personne). */
     public function noterBattement(DateTimeImmutable $maintenant): void
     {
-        DB::statement(
-            'INSERT INTO envoi_sante_battement (id, dernier_le) VALUES (1, ?)
-             ON CONFLICT (id) DO UPDATE SET dernier_le = EXCLUDED.dernier_le',
-            [$maintenant->format('Y-m-d H:i:sP')],
-        );
+        $instant = $maintenant->format('Y-m-d H:i:sP');
+        // Le trigger borne le battement à l'horloge de référence (jamais dans le futur) et le rend monotone.
+        DB::transaction(function () use ($instant): void {
+            DB::select("SELECT set_config('app.maintenant', ?, true)", [$instant]);
+            DB::statement(
+                'INSERT INTO envoi_sante_battement (id, dernier_le) VALUES (1, ?)
+                 ON CONFLICT (id) DO UPDATE SET dernier_le = EXCLUDED.dernier_le',
+                [$instant],
+            );
+        });
     }
 
     public function dernierBattement(): ?DateTimeImmutable

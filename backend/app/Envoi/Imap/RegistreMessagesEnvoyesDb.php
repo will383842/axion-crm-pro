@@ -17,9 +17,12 @@ final class RegistreMessagesEnvoyesDb implements RegistreMessagesEnvoyes
 
     public function retrouverParInjection(string $workspaceId, string $idInjection): ?MessageOrigine
     {
-        $ligne = DB::table('envoi_messages_envoyes')
-            ->where('workspace_id', $workspaceId)->where('id_injection', $idInjection)->orderBy('id')->first();
-        $adresse = $ligne === null ? null : ($this->adresseDe)($workspaceId, (string) $ligne->empreinte_destinataire);
+        // Jamais « la première ligne » : si l'injection a plusieurs destinataires différents, c'est ambigu => null
+        // (le retour reste « à rattacher »). Plusieurs lignes du MÊME destinataire ne sont pas une ambiguïté.
+        $empreintes = DB::table('envoi_messages_envoyes')
+            ->where('workspace_id', $workspaceId)->where('id_injection', $idInjection)
+            ->distinct()->limit(2)->pluck('empreinte_destinataire');
+        $adresse = $empreintes->count() === 1 ? ($this->adresseDe)($workspaceId, (string) $empreintes->first()) : null;
 
         return $adresse === null || $adresse === '' ? null : new MessageOrigine($idInjection, $adresse);
     }

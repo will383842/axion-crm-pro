@@ -363,9 +363,12 @@ final class DepotChauffe
     }
 
     /**
-     * Horloge de référence des triggers (`app.maintenant`, locale à la transaction). Posable UNIQUEMENT en
-     * environnement de test (horloge figée) : ailleurs, le réglage est vidé et les triggers retombent sur
-     * l'horloge de la base, qu'une session ne peut pas reculer.
+     * Horloge de référence des triggers (`app.maintenant`, locale à la transaction), posée depuis l'horloge injectable
+     * de l'appli. Ce n'est PAS une protection : n'importe quelle session SQL peut poser ce réglage elle-même. La
+     * protection est dans la base (migration 2026_11_13_000140) : `envoi_l7_horloge()` n'obéit à `app.maintenant`
+     * que sur une base portant le paramètre `axion.test_horloge = on` (ALTER DATABASE, posé seulement sur les bases de
+     * test) ; ailleurs elle ignore ce réglage et retombe sur l'horloge de la base, qu'une session ne peut pas avancer.
+     * Ici, hors environnement de test, on vide le réglage par hygiène (jamais d'horloge d'appli résiduelle).
      */
     private static function poserHorloge(string $instant): void
     {

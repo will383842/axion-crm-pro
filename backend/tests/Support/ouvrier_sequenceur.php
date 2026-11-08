@@ -57,7 +57,7 @@ if ($mode === 'reserver') {
     for ($i = 0; $i < (int) $repetitions; $i++) {
         $ins = WorkspaceContext::run($ws, fn () => DB::table('envoi_inscriptions')->where('id', $inscription)->first());
         foreach ([1, 2, 3] as $rang) {
-            $id = WorkspaceContext::run($ws, fn () => $reserver->invoke($seq, $ins, $rang, null));
+            $id = WorkspaceContext::run($ws, fn () => $reserver->invoke($seq, $ins, $rang, null, new DateTimeImmutable($maintenant)));
             $reservees += $id === null ? 0 : 1;
         }
     }

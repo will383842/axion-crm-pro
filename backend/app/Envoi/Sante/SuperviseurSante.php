@@ -72,8 +72,12 @@ final class SuperviseurSante
         }
         $espace = [...$this->constatsDns($ws, $maintenant), ...$this->constatsListes($ws), ...$this->constatsRetours($ws, $maintenant)];
 
-        $echecs = $this->appliquer($ws, $source, $serveur, $mesures !== null, $maintenant)
-            + $this->appliquer($ws, self::ESPACE, $espace, true, $maintenant);
+        // Constats du serveur rétablissables : tous si la sonde a mesuré ; si la passerelle a répondu en refusant l'horloge (réponse
+        // signée = elle est vivante et notre secret est bon), seulement « muet » et « configuration » ; sinon (muet, configuration
+        // absente) aucun : on ignore l'état réel.
+        $retablissables = $mesures !== null ? null : ($refusHorloge ? ['serveur_muet', 'configuration_serveur'] : []);
+        $echecs = $this->appliquer($ws, $source, $serveur, $retablissables, $maintenant)
+            + $this->appliquer($ws, self::ESPACE, $espace, null, $maintenant);
         if ($echecs > 0) {
             throw new RuntimeException('supervision : ' . $echecs . ' constat(s) non traité(s) (les autres l’ont été).');
         }
@@ -88,13 +92,21 @@ final class SuperviseurSante
         if ($ref === null) {
             return [];
         }
+        // M1 : après un arrêt de la supervision (ou un rallumage), le silence ne se compte que depuis la REPRISE, pas depuis un vieux
+        // battement : un seul échec au premier passage ne déclenche rien.
+        $debut = $this->depot->debutSerieReleves($ws, $source, $maintenant, (int) ($this->seuils['supervision_trou_s'] ?? 900));
+        if ($debut !== null && $debut > $ref) {
+            $ref = $debut;
+        }
         $ecoule = $maintenant->getTimestamp() - $ref->getTimestamp();
         $silence = (int) ($this->seuils['silence_minutes'] ?? 15);
         $alerte = min($silence, (int) ($this->seuils['silence_alerte_minutes'] ?? 10));
-        if ($ecoule >= $silence * 60) {
+        // Marge : le passage tombe à 5 min ± quelques secondes ; sans elle, 9 min 59 s d'écoulé reportent l'alerte au passage suivant (+5 min).
+        $marge = max(0, (int) ($this->seuils['silence_marge_s'] ?? 60));
+        if ($ecoule >= $silence * 60 - $marge) {
             return [new Constat('serveur_muet', Constat::CRITIQUE, 'aucune réponse du serveur depuis ' . $silence . ' min ou plus (homme mort)')];
         }
-        if ($ecoule >= $alerte * 60) {
+        if ($ecoule >= $alerte * 60 - $marge) {
             return [new Constat('serveur_muet', Constat::ATTENTION, 'aucune réponse du serveur depuis ' . $alerte . ' min ou plus (tunnel coupé ?) ; pause à ' . $silence . ' min')];
         }
 
@@ -103,9 +115,10 @@ final class SuperviseurSante
 
     /**
      * @param  list<Constat>  $constats
+     * @param  ?list<string>  $retablissables  codes que l'on peut rétablir s'ils ne sont plus constatés ; null = tous (état connu)
      * @return int nombre de constats dont le traitement a échoué
      */
-    private function appliquer(string $ws, string $source, array $constats, bool $etatConnu, DateTimeImmutable $maintenant): int
+    private function appliquer(string $ws, string $source, array $constats, ?array $retablissables, DateTimeImmutable $maintenant): int
     {
         $ouverts = $this->depot->constatsOuverts($ws, $source);
         $pauses = null; // motifs de pause actifs, lus une fois si besoin
@@ -122,7 +135,7 @@ final class SuperviseurSante
         }
         foreach (array_keys($ouverts) as $code) {
             // Serveur injoignable : on ne sait pas si ses constats sont réglés, on les laisse ouverts (ceux de l'espace viennent de la base).
-            if (! isset($presents[$code]) && $etatConnu) {
+            if (! isset($presents[$code]) && ($retablissables === null || in_array($code, $retablissables, true))) {
                 try {
                     $this->depot->retablir($ws, $source, $code, $maintenant);
                 } catch (Throwable $e) {
@@ -158,12 +171,20 @@ final class SuperviseurSante
             $alerteDue = true;
         } elseif ($c->palier < $avant['palier']) {
             $this->depot->ouvrir($ws, $source, $c->code, $c->gravite, $c->detail, $maintenant, $c->palier);
-            $this->depot->marquerAlerteEmise($ws, $source, $c->code, $c->gravite, $maintenant); // redescente : pas de nouvelle alerte, mais le prochain franchissement en aura une
+            if ($avant['alerte_emise']) {
+                $this->depot->marquerAlerteEmise($ws, $source, $c->code, $c->gravite, $maintenant); // redescente : pas de nouvelle alerte, mais le prochain franchissement en aura une
+            } else {
+                $alerteDue = true; // I2 : l'alerte du palier plus haut n'est JAMAIS partie : on n'acquitte rien sans envoi, l'alerte du palier actuel part
+            }
         } elseif (! $avant['alerte_emise']) {
             $alerteDue = true; // alerte perdue lors d'un passage précédent : renvoyée
         }
         // 3. L'alerte : tant qu'elle n'est pas partie, le constat reste « alerte non émise » et elle est renvoyée à chaque passage.
         if ($alerteDue) {
+            // I2 : un constat qui n'est plus critique mais dont la pause dure encore (jamais levée seule) doit le dire.
+            if ($c->gravite !== Constat::CRITIQUE && $this->pauseActive($ws, $source, $c->code, $maintenant, $pauses)) {
+                $c = new Constat($c->code, $c->gravite, $c->detail . ' — la pause posée lors du défaut critique reste ACTIVE (levée humaine).', $c->palier);
+            }
             if ($this->emetteur->alerter($ws, $source, $c)) {
                 $this->depot->marquerAlerteEmise($ws, $source, $c->code, $c->gravite, $maintenant);
             } else {
@@ -182,8 +203,8 @@ final class SuperviseurSante
      */
     private function assurerPause(string $ws, string $source, Constat $c, bool $dejaOuvert, DateTimeImmutable $maintenant, ?array &$pauses): void
     {
-        $motif = 'sante:' . $c->code;
-        $pauses ??= array_map(static fn ($p): string => (string) $p->motif, $this->chauffe->pausesActives($ws, $maintenant));
+        $motif = self::motif($source, $c->code);
+        $pauses ??= $this->motifsActifs($ws, $maintenant);
         if (in_array($motif, $pauses, true)) {
             return;
         }
@@ -200,6 +221,29 @@ final class SuperviseurSante
                 Log::error('[ENVOI] supervision : commande de pause au serveur impossible (la pause locale est posée).', ['exception' => $e::class, 'code' => $c->code]);
             }
         }
+    }
+
+    /**
+     * Motif de pause : la SOURCE y figure pour un défaut de serveur (la pause vaut pour tout l'espace, mais le 2ᵉ serveur en défaut
+     * sur le même code doit recevoir SA commande de pause et sa propre trace) ; un défaut d'espace n'a pas de source.
+     */
+    private static function motif(string $source, string $code): string
+    {
+        return $source === self::ESPACE ? 'sante:' . $code : 'sante:' . $code . ':' . $source;
+    }
+
+    /** @return list<string> */
+    private function motifsActifs(string $ws, DateTimeImmutable $maintenant): array
+    {
+        return array_map(static fn ($p): string => (string) $p->motif, $this->chauffe->pausesActives($ws, $maintenant));
+    }
+
+    /** @param ?list<string> $pauses */
+    private function pauseActive(string $ws, string $source, string $code, DateTimeImmutable $maintenant, ?array &$pauses): bool
+    {
+        $pauses ??= $this->motifsActifs($ws, $maintenant);
+
+        return in_array(self::motif($source, $code), $pauses, true);
     }
 
     /** @return list<string> */
@@ -259,8 +303,10 @@ final class SuperviseurSante
     }
 
     /**
-     * Canal des retours muet (ADR K0 / plan 33 K15) : des messages sont partis il y a plus de N h, d'autres partent
-     * encore, et aucun retour (rebond, plainte, réponse) n'est arrivé depuis N h. Sans retours, rebonds et plaintes sont invisibles.
+     * Canal des retours muet (ADR K0 / plan 33 K15), mesuré par la VIE DE LA RELÈVE IMAP et non par l'arrivée de retours : une petite
+     * campagne saine n'a parfois aucun rebond ni aucune plainte, et ne doit ni alerter ni se bloquer. Constat si des messages partent
+     * encore (« en campagne ») et qu'un message vieux de N h ou plus est parti APRÈS la dernière relève (jamais relevée = depuis toujours) :
+     * la relève est à l'arrêt, rebonds et plaintes sont invisibles. Une campagne qui démarre ce matin ne déclenche rien.
      *
      * @return list<Constat>
      */
@@ -268,13 +314,11 @@ final class SuperviseurSante
     {
         $heures = max(1, (int) ($this->seuils['retours_muets_heures'] ?? 2));
         $limite = $maintenant->modify('-' . $heures . ' hours');
-        $dernier = $this->depot->dernierRetourRecu($ws);
-        // « En campagne » : des messages partent encore. « Sans retour » : au moins un message vieux de N h ou plus est parti APRÈS le dernier
-        // retour (un retour récent rend l'intervalle vide). Une campagne qui démarre ce matin ne déclenche donc rien.
+        $derniereReleve = $this->depot->dernierReleveImap($ws);
         $enCampagne = $this->depot->envoisEntre($ws, $limite, null) > 0;
-        $sansRetourDepuisN = $this->depot->envoisEntre($ws, $dernier, $limite) > 0;
-        if ($enCampagne && $sansRetourDepuisN) {
-            return [new Constat('retours_muets', Constat::CRITIQUE, 'aucun retour (rebond, plainte, réponse) reçu depuis ' . $heures . ' h alors que des envois ont eu lieu : relève IMAP en panne ?')];
+        $sansReleveDepuisN = $this->depot->envoisEntre($ws, $derniereReleve, $limite) > 0;
+        if ($enCampagne && $sansReleveDepuisN) {
+            return [new Constat('retours_muets', Constat::CRITIQUE, 'aucune relève IMAP réussie depuis ' . $heures . ' h alors que des envois ont eu lieu : rebonds, plaintes et réponses ne sont plus lus')];
         }
 
         return [];

@@ -48,11 +48,11 @@ afterEach(function () {
     }
 });
 
-function reponseSanteSignee(array $donnees, int $statut = 200): Closure
+function reponseSanteSignee(array $donnees, int $statut = 200, bool $avecEspace = true): Closure
 {
-    return function (Request $r) use ($donnees, $statut) {
+    return function (Request $r) use ($donnees, $statut, $avecEspace) {
         $ws = $r->header('X-Envoi-Workspace')[0];
-        $corps = json_encode($donnees + ['workspace_id' => $ws], JSON_THROW_ON_ERROR);
+        $corps = json_encode($avecEspace ? $donnees + ['workspace_id' => $ws] : $donnees, JSON_THROW_ON_ERROR);
         $sig = SignatureEnvoi::signer('secret-de-test', SignatureEnvoi::chargeReponse($r->header('X-Envoi-Nonce')[0], $ws, $statut, $corps));
 
         return Http::response($corps, $statut, ['X-Envoi-Signature' => SignatureEnvoi::entete('1', $sig)]);
@@ -87,6 +87,16 @@ test('E4 : un 401 SIGNÉ « horloge_hors_fenetre » donne un refus de cause horl
         expect($e->estHorloge())->toBe($horloge)->and($e->estConfiguration())->toBeFalse();
     }
 })->with([['horloge_hors_fenetre', true], ['non_autorise', false]]);
+
+test('I1 : le 401 signé « horloge_hors_fenetre » DOIT porter workspace_id (contrat) ; sans lui, refus ordinaire, jamais « horloge »', function () {
+    Http::fake(['*' => reponseSanteSignee(['erreur' => 'horloge_hors_fenetre'], 401, false)]); // le helper n'ajoute PAS workspace_id
+    try {
+        app(SondeSanteK1::class)->mesurer($this->ws, 'srv1');
+        $this->fail('refus attendu');
+    } catch (ServeurEnvoiRefuse $e) {
+        expect($e->estHorloge())->toBeFalse();
+    }
+});
 
 test('E4 : un 401 NON signé (passerelle actuelle) reste un refus ordinaire, jamais pris pour l’horloge', function () {
     Http::fake(['*' => Http::response('{"erreur":"horloge_hors_fenetre"}', 401)]);

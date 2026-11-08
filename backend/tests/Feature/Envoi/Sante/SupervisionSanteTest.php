@@ -134,11 +134,11 @@ test('alerte critique => pause de la ressource ; la pause n’est JAMAIS levée 
     [$sup, $sonde, $em, $cmd] = monter();
     $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0]), saines('10:05:00'), saines('10:10:00')];
     $sup->superviser($ws, 'src', t('10:00:00'));
-    expect(pausesDe($ws))->toBe(['sante:disque'])->and($cmd->commandes)->toBe(['pause']);
+    expect(pausesDe($ws))->toBe(['sante:disque:src'])->and($cmd->commandes)->toBe(['pause']);
 
     $sup->superviser($ws, 'src', t('10:05:00')); // tout est redevenu sain
     $sup->superviser($ws, 'src', t('10:10:00'));
-    expect(pausesDe($ws))->toBe(['sante:disque'])->and($cmd->commandes)->toBe(['pause']); // ni levée, ni 2e commande
+    expect(pausesDe($ws))->toBe(['sante:disque:src'])->and($cmd->commandes)->toBe(['pause']); // ni levée, ni 2e commande
     $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_pauses')->where('workspace_id', $ws)->first());
     expect($ligne->levee_le)->toBeNull();
 });
@@ -156,28 +156,27 @@ test('écart d’horloge > 5 min => alerte critique et pause', function () {
     [$sup, $sonde, $em] = monter();
     $sonde->file = [saines('10:00:00', ['horloge_unix' => t('10:00:00')->getTimestamp() + 301])];
     $sup->superviser($ws, 'src', t('10:00:00'));
-    expect($em->envoyees)->toBe([['horloge', 'critique']])->and(pausesDe($ws))->toBe(['sante:horloge']);
+    expect($em->envoyees)->toBe([['horloge', 'critique']])->and(pausesDe($ws))->toBe(['sante:horloge:src']);
 });
 
-test('tunnel coupé : alerte d’ATTENTION dès 10 min de silence (9 min 59 : rien) ; pause et critique à 15 min seulement', function () {
+test('tunnel coupé : alerte d’ATTENTION avant 10 min, critique et pause avant 15 min, MÊME avec le décalage de quelques secondes du planificateur', function () {
     $ws = espaceSante();
     [$sup, $sonde, $em, $cmd] = monter();
-    $sonde->file = [saines('10:00:00')]; // dernier battement bon à 10:00 ; ensuite la file est vide = muet
-    foreach (['10:00:00', '10:05:00', '10:09:59'] as $h) {
+    $sonde->file = [saines('10:00:03')]; // dernier battement bon à 10:00:03 ; ensuite la file est vide = muet
+    $sup->superviser($ws, 'src', t('10:00:03'));
+    foreach (['10:05:01', '10:08:59'] as $h) { // 298 s et 536 s : rien
         $sup->superviser($ws, 'src', t($h));
     }
     expect($em->envoyees)->toBe([])->and(pausesDe($ws))->toBe([]);
 
-    $sup->superviser($ws, 'src', t('10:10:00'));
+    $sup->superviser($ws, 'src', t('10:10:00')); // 597 s (et non 600) : le passage qui tombe 3 s « trop tôt » alerte quand même
     expect($em->envoyees)->toBe([['serveur_muet', 'attention']])->and(pausesDe($ws))->toBe([])->and($cmd->commandes)->toBe([]);
-    $sup->superviser($ws, 'src', t('10:14:59'));
+    $sup->superviser($ws, 'src', t('10:13:59')); // 836 s : pas encore critique
     expect($em->envoyees)->toHaveCount(1)->and(pausesDe($ws))->toBe([]);
 
-    foreach (['10:15:00', '10:20:00', '10:25:00'] as $h) {
-        $sup->superviser($ws, 'src', t($h));
-    }
+    $sup->superviser($ws, 'src', t('10:15:00')); // 897 s (et non 900) : critique + pause, pas à 10:20
     expect($em->envoyees)->toBe([['serveur_muet', 'attention'], ['serveur_muet', 'critique']])
-        ->and(pausesDe($ws))->toBe(['sante:serveur_muet'])
+        ->and(pausesDe($ws))->toBe(['sante:serveur_muet:src'])
         ->and($cmd->commandes)->toBe(['pause']);
 });
 
@@ -185,12 +184,27 @@ test('homme mort : un serveur jamais joint compte le silence depuis le premier r
     $ws = espaceSante();
     [$sup, , $em] = monter();
     $sup->superviser($ws, 'src', t('10:00:00'));
-    $sup->superviser($ws, 'src', t('10:09:59'));
+    $sup->superviser($ws, 'src', t('10:08:59'));
     expect($em->envoyees)->toBe([]);
-    $sup->superviser($ws, 'src', t('10:14:00'));
+    $sup->superviser($ws, 'src', t('10:09:00'));
     expect($em->envoyees)->toBe([['serveur_muet', 'attention']]);
-    $sup->superviser($ws, 'src', t('10:15:00'));
+    $sup->superviser($ws, 'src', t('10:13:59'));
+    expect($em->envoyees)->toHaveCount(1);
+    $sup->superviser($ws, 'src', t('10:14:00'));
     expect($em->envoyees)->toBe([['serveur_muet', 'attention'], ['serveur_muet', 'critique']]);
+});
+
+test('M1 : premier passage après un arrêt de la supervision = un seul échec ne déclenche PAS « serveur muet » ; le silence compte depuis la reprise', function () {
+    $ws = espaceSante();
+    [$sup, $sonde, $em] = monter();
+    $sonde->file = [saines('10:00:00')];
+    $sup->superviser($ws, 'src', t('10:00:00')); // dernier bon battement, puis la supervision s'arrête 2 jours
+    $reprise = fn (string $min) => t('10:00:00')->modify('+2 days ' . $min);
+    $sup->superviser($ws, 'src', $reprise('+0 minutes'));
+    $sup->superviser($ws, 'src', $reprise('+5 minutes'));
+    expect($em->envoyees)->toBe([])->and(constatsEn($ws))->toBe([]);
+    $sup->superviser($ws, 'src', $reprise('+10 minutes')); // 10 min de silence APRÈS la reprise : attention
+    expect($em->envoyees)->toBe([['serveur_muet', 'attention']]);
 });
 
 test('la commande de pause en échec n’empêche ni la pause locale ni l’alerte', function () {
@@ -205,7 +219,7 @@ test('la commande de pause en échec n’empêche ni la pause locale ni l’aler
     [$sup, $sonde, $em] = monter(null, $cmd);
     $sonde->file = [saines('10:00:00', ['memoire_libre_pct' => 2.0])];
     $sup->superviser($ws, 'src', t('10:00:00'));
-    expect(pausesDe($ws))->toBe(['sante:memoire'])->and($em->envoyees)->toBe([['memoire', 'critique']]);
+    expect(pausesDe($ws))->toBe(['sante:memoire:src'])->and($em->envoyees)->toBe([['memoire', 'critique']]);
 });
 
 test('K12 et K13 : DNS pas prêt = attention, DNS en pause = critique, domaine listé = critique', function () {
@@ -261,7 +275,7 @@ test('la supervision est tenue par espace : l’état d’un espace ne masque pa
         $sup->superviser($ws, 'src', t('10:00:00'));
     }
     expect($em->envoyees)->toBe([['file_age', 'critique'], ['file_age', 'critique']]);
-    expect(pausesDe($a))->toBe(['sante:file_age'])->and(pausesDe($b))->toBe(['sante:file_age']);
+    expect(pausesDe($a))->toBe(['sante:file_age:src'])->and(pausesDe($b))->toBe(['sante:file_age:src']);
 });
 
 test('la commande est INERTE tant que l’envoi réel ou K1 est éteint, REFUSE si seule la supervision est éteinte, et supervise chaque serveur actif sinon', function () {
@@ -325,24 +339,24 @@ function constatsEn(string $ws, string $source = 'src'): array
 test('E1 : pause en échec => constat ouvert + alerte partie, puis la pause est RETENTÉE au passage suivant (sans 2e alerte)', function () {
     $ws = espaceSante();
     [$sup, $sonde, $em, $cmd] = monter();
-    casserPause('sante:disque');
+    casserPause('sante:disque:src');
     $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0]), saines('10:05:00', ['disque_libre_pct' => 5.0])];
     expect(fn () => $sup->superviser($ws, 'src', t('10:00:00')))->toThrow(RuntimeException::class);
     expect($em->envoyees)->toBe([['disque', 'critique']])->and(pausesDe($ws))->toBe([])->and(constatsEn($ws))->toBe(['disque' => 'critique/3/emise']);
 
     casserPause(null);
     $sup->superviser($ws, 'src', t('10:05:00'));
-    expect(pausesDe($ws))->toBe(['sante:disque'])->and($cmd->commandes)->toBe(['pause'])->and($em->envoyees)->toHaveCount(1);
+    expect(pausesDe($ws))->toBe(['sante:disque:src'])->and($cmd->commandes)->toBe(['pause'])->and($em->envoyees)->toHaveCount(1);
 });
 
 test('E1 : une exception sur un constat ne saute pas les autres (alerte et pause des suivants posées), puis le passage échoue', function () {
     $ws = espaceSante();
     [$sup, $sonde, $em] = monter();
-    casserPause('sante:disque');
+    casserPause('sante:disque:src');
     $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0, 'memoire_libre_pct' => 2.0, 'file_age_s' => 1000])];
     expect(fn () => $sup->superviser($ws, 'src', t('10:00:00')))->toThrow(RuntimeException::class, '1 constat');
     $codes = array_column($em->envoyees, 0);
-    expect($codes)->toContain('disque', 'memoire', 'file_age')->and(pausesDe($ws))->toBe(['sante:memoire']);
+    expect($codes)->toContain('disque', 'memoire', 'file_age')->and(pausesDe($ws))->toBe(['sante:memoire:src']);
     casserPause(null);
 });
 
@@ -355,7 +369,7 @@ test('E1 : un humain lève la pause alors que le défaut critique persiste => la
     expect(pausesDe($ws))->toBe([]);
 
     $sup->superviser($ws, 'src', t('10:05:00'));
-    expect(pausesDe($ws))->toBe(['sante:disque'])->and($cmd->commandes)->toBe(['pause', 'pause'])->and($em->envoyees)->toHaveCount(1);
+    expect(pausesDe($ws))->toBe(['sante:disque:src'])->and($cmd->commandes)->toBe(['pause', 'pause'])->and($em->envoyees)->toHaveCount(1);
 });
 
 test('E1 : défaut critique GUÉRI puis pause levée par un humain => la supervision ne la repose pas', function () {
@@ -381,6 +395,7 @@ function semerEnvoi(string $ws, DateTimeImmutable $quand): void
     });
 }
 
+/** Un retour (événement) daté. */
 function semerRetour(string $ws, DateTimeImmutable $quand): void
 {
     $u = (string) Str::uuid();
@@ -390,14 +405,20 @@ function semerRetour(string $ws, DateTimeImmutable $quand): void
     ]));
 }
 
-test('E2 : canal des retours muet 2 h en campagne => critique + pause ; bornes et cas sans campagne', function (array $envois, ?string $retour, bool $muet) {
+/** Une relève IMAP menée à son terme (curseur mis à jour) à cet instant. */
+function semerReleve(string $ws, DateTimeImmutable $quand, string $boite = 'boite-1'): void
+{
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_curseurs_imap')->insert(['workspace_id' => $ws, 'boite' => $boite, 'uid_validity' => 1, 'dernier_uid' => 1, 'maj_le' => $quand->format('c')]));
+}
+
+test('B1 : relève IMAP à l’arrêt en campagne => critique + pause ; une campagne saine SANS AUCUN retour mais relève vivante ne déclenche rien', function (array $envois, ?string $releve, bool $muet) {
     $ws = espaceSante();
     DB::table('envoi_serveurs')->insert(['workspace_id' => $ws, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
     foreach ($envois as $min) {
         semerEnvoi($ws, t('12:00:00')->modify("-{$min} minutes"));
     }
-    if ($retour !== null) {
-        semerRetour($ws, t('12:00:00')->modify($retour));
+    if ($releve !== null) {
+        semerReleve($ws, t('12:00:00')->modify($releve));
     }
     [$sup, $sonde, $em, $cmd] = monter();
     $sonde->file = [saines('12:00:00')];
@@ -407,26 +428,39 @@ test('E2 : canal des retours muet 2 h en campagne => critique + pause ; bornes e
         ->and($cmd->commandes)->toBe($muet ? ['pause'] : []);
     expect(array_keys((new DepotSanteDb)->constatsOuverts($ws, SuperviseurSante::ESPACE)))->toBe($muet ? ['retours_muets'] : []);
 })->with([
-    'envois il y a 3 h et 30 min, aucun retour' => [[180, 30], null, true],
-    'retour il y a 1 h 59 : le canal vit' => [[180, 30], '-119 minutes', false],
-    'message resté 2 h pile sans retour : muet' => [[120, 30], null, true],
-    'message resté 1 h 59 sans retour : pas encore' => [[119, 30], null, false],
-    'retour il y a 2 h pile, message parti ensuite et vieux de 2 h : impossible, le retour le précède' => [[180, 100], '-120 minutes', false],
-    'retour il y a 5 h, envois depuis' => [[180, 30], '-300 minutes', true],
+    'envois depuis 3 h, aucun retour, relève vivante (il y a 5 min) : campagne saine' => [[180, 30], '-5 minutes', false],
+    'relève vivante il y a 1 h 59' => [[180, 30], '-119 minutes', false],
+    'relève jamais tournée, envois depuis 3 h' => [[180, 30], null, true],
+    'relève arrêtée depuis 5 h' => [[180, 30], '-300 minutes', true],
+    'relève arrêtée depuis 3 h, un envoi vieux de 2 h 30 est parti après' => [[150, 30], '-180 minutes', true],
+    'message resté 2 h pile après la dernière relève' => [[120, 30], null, true],
+    'message resté 1 h 59 sans relève : pas encore' => [[119, 30], null, false],
+    'dernière relève il y a 2 h pile, message parti ensuite et vieux de moins de 2 h' => [[180, 100], '-120 minutes', false],
+    'relève il y a 2 h 30, envois avant elle et récent' => [[180, 30], '-150 minutes', false],
     'campagne qui démarre (envois < 2 h)' => [[90, 30], null, false],
     'campagne finie (envois > 2 h seulement)' => [[300, 200], null, false],
     'aucun envoi' => [[], null, false],
-    'retour avant tous les envois anciens (aucun envoi sans retour depuis 2 h)' => [[180, 30], '-150 minutes', false],
 ]);
 
-test('E2 : le constat « retours muets » se rétablit dès qu’un retour arrive, la pause reste', function () {
+test('B1 : un retour (rebond…) n’est PAS une preuve de vie de la relève : retour récent mais relève arrêtée => constat', function () {
+    $ws = espaceSante();
+    semerEnvoi($ws, t('12:00:00')->modify('-180 minutes'));
+    semerEnvoi($ws, t('12:00:00')->modify('-30 minutes'));
+    semerRetour($ws, t('12:00:00')->modify('-10 minutes'));
+    [$sup, $sonde, $em] = monter();
+    $sonde->file = [saines('12:00:00')];
+    $sup->superviser($ws, 'src', t('12:00:00'));
+    expect($em->envoyees)->toBe([['retours_muets', 'critique']]);
+});
+
+test('B1 : le constat « retours muets » se rétablit dès que la relève repasse, la pause reste ; plus de pose à l’envoi suivant', function () {
     $ws = espaceSante();
     semerEnvoi($ws, t('12:00:00')->modify('-180 minutes'));
     semerEnvoi($ws, t('12:00:00')->modify('-30 minutes'));
     [$sup, $sonde] = monter();
     $sonde->file = [saines('12:00:00'), saines('12:05:00')];
     $sup->superviser($ws, 'src', t('12:00:00'));
-    semerRetour($ws, t('12:04:00'));
+    semerReleve($ws, t('12:04:00'));
     $sup->superviser($ws, 'src', t('12:05:00'));
     expect((new DepotSanteDb)->constatsOuverts($ws, SuperviseurSante::ESPACE))->toBe([])->and(pausesDe($ws))->toBe(['sante:retours_muets']);
 });
@@ -437,7 +471,7 @@ test('E4 : refus de la passerelle pour horloge => constat « horloge » CRITIQUE
     $sonde->file = [ServeurEnvoiRefuse::horloge(), ServeurEnvoiRefuse::horloge()];
     $sup->superviser($ws, 'src', t('10:00:00'));
     $sup->superviser($ws, 'src', t('10:20:00'));
-    expect($em->envoyees)->toBe([['horloge', 'critique']])->and(pausesDe($ws))->toBe(['sante:horloge']);
+    expect($em->envoyees)->toBe([['horloge', 'critique']])->and(pausesDe($ws))->toBe(['sante:horloge:src']);
 });
 
 test('E4 : source active sans secret ni adresse => motif de CONFIGURATION (attention), jamais « serveur_muet »', function () {
@@ -522,7 +556,7 @@ test('E10 : certificat à 30, 14 puis 7 jours => trois alertes (palier ou gravit
     }
     expect($em->envoyees)->toBe([['certificat', 'attention'], ['certificat', 'attention'], ['certificat', 'critique']])
         ->and(constatsEn($ws))->toBe(['certificat' => 'attention/2/emise']); // redescendu sans nouvelle alerte
-    expect(pausesDe($ws))->toBe(['sante:certificat']);
+    expect(pausesDe($ws))->toBe(['sante:certificat:src']);
 });
 
 test('critique -> attention sans retour au vert : pas de nouvelle alerte, mais le franchissement suivant du critique ré-alerte', function () {
@@ -585,7 +619,7 @@ test('la commande COMPTE les échecs : un serveur dont le passage échoue => cod
     $this->app->instance(EmetteurAlerteSante::class, $em = new EmetteurEnregistreur);
     $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 1.0, 'horloge_unix' => now()->getTimestamp()]), saines('10:00:00', ['memoire_libre_pct' => 1.0, 'horloge_unix' => now()->getTimestamp()])];
     config(['envoi.reel_actif' => true, 'envoi.k1_actif' => true, 'envoi.sante.actif' => true]);
-    casserPause('sante:disque');
+    casserPause('sante:disque:src');
     $this->artisan('envoi:supervision-sante')->assertFailed();
     casserPause(null);
     expect(array_column($em->envoyees, 0))->toContain('disque', 'memoire');
@@ -641,4 +675,86 @@ test('E7 : l’état « alerte émise » est celui de l’OUVERTURE COURANTE : u
     $essais = $em->essais;
     $passe('10:25:00', ['file_age_s' => 1000]);
     expect($em->essais)->toBe($essais + 1);
+});
+
+final class EmetteurScripte implements EmetteurAlerteSante
+{
+    /** @var list<bool> */
+    public array $reponses = [];
+
+    /** @var list<Constat> */
+    public array $recus = [];
+
+    public function alerter(string $workspaceId, string $source, Constat $c): bool
+    {
+        $this->recus[] = $c;
+
+        return array_shift($this->reponses) ?? true;
+    }
+}
+
+test('I2 : alerte critique perdue puis constat redescendu en « attention » => RIEN n’est acquitté sans envoi : l’alerte part, et dit que la pause reste', function () {
+    $ws = espaceSante();
+    $em = new EmetteurScripte;
+    $em->reponses = [false, true];
+    [$sup, $sonde] = monter($em);
+    $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0]), saines('10:05:00', ['disque_libre_pct' => 15.0]), saines('10:10:00', ['disque_libre_pct' => 15.0])];
+    $sup->superviser($ws, 'src', t('10:00:00'));
+    expect(constatsEn($ws))->toBe(['disque' => 'critique/3/a_emettre']);
+    $sup->superviser($ws, 'src', t('10:05:00'));
+    expect($em->recus)->toHaveCount(2)->and($em->recus[1]->gravite)->toBe('attention')
+        ->and($em->recus[1]->detail)->toContain('pause')->toContain('ACTIVE')
+        ->and(constatsEn($ws))->toBe(['disque' => 'attention/1/emise'])->and(pausesDe($ws))->toBe(['sante:disque:src']);
+    $sup->superviser($ws, 'src', t('10:10:00'));
+    expect($em->recus)->toHaveCount(2); // acquittée pour de bon : pas de rafale
+});
+
+test('I2 : alerte critique PARTIE puis redescente => toujours pas de nouvelle alerte', function () {
+    $ws = espaceSante();
+    $em = new EmetteurScripte;
+    [$sup, $sonde] = monter($em);
+    $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0]), saines('10:05:00', ['disque_libre_pct' => 15.0])];
+    $sup->superviser($ws, 'src', t('10:00:00'));
+    $sup->superviser($ws, 'src', t('10:05:00'));
+    expect($em->recus)->toHaveCount(1);
+});
+
+test('I2 bis : deux serveurs d’un même espace en défaut critique sur le même code => CHACUN reçoit sa commande de pause et sa propre pause (motif avec la source)', function () {
+    $ws = espaceSante();
+    [$sup, $sonde, $em, $cmd] = monter();
+    $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 5.0]), saines('10:00:00', ['disque_libre_pct' => 5.0])];
+    $sup->superviser($ws, 'srv-a', t('10:00:00'));
+    $sup->superviser($ws, 'srv-b', t('10:00:00'));
+    expect($cmd->commandes)->toBe(['pause', 'pause'])
+        ->and(pausesDe($ws))->toEqualCanonicalizing(['sante:disque:srv-a', 'sante:disque:srv-b'])
+        ->and($em->envoyees)->toBe([['disque', 'critique'], ['disque', 'critique']]);
+});
+
+test('M3 : un refus d’horloge (réponse signée = la passerelle vit) rétablit « serveur muet » ; les autres constats serveur restent ouverts', function () {
+    $ws = espaceSante();
+    [$sup, $sonde] = monter();
+    $sonde->file = [saines('10:00:00', ['disque_libre_pct' => 15.0])];
+    $sup->superviser($ws, 'src', t('10:00:00'));
+    $sup->superviser($ws, 'src', t('10:09:00')); // muet, attention
+    expect(array_keys(constatsEn($ws)))->toBe(['disque', 'serveur_muet']);
+    $sonde->file = [ServeurEnvoiRefuse::horloge()];
+    $sup->superviser($ws, 'src', t('10:10:00'));
+    expect(array_keys(constatsEn($ws)))->toBe(['disque', 'horloge']);
+});
+
+test('M2 : l’alerte « supervision éteinte alors que l’envoi réel est allumé » part au plus UNE fois par jour, pas toutes les 5 min', function () {
+    Mail::fake();
+    config(['alertes.actif' => true, 'alertes.email.destinataire' => 'resp@example.test', 'mail.from.address' => 'alertes@app.example.test', 'envoi.reel_actif' => true, 'envoi.k1_actif' => true, 'envoi.sante.actif' => false]);
+    Carbon\Carbon::setTestNow(Carbon\Carbon::parse('2026-11-13 10:00:00'));
+    CouplageSante::oublier();
+    foreach (['10:00:00', '10:20:00', '11:00:00', '20:00:00'] as $h) { // hors de la fenêtre de regroupement du Socle (15 min)
+        Carbon\Carbon::setTestNow(Carbon\Carbon::parse('2026-11-13 ' . $h));
+        $this->artisan('envoi:supervision-sante')->assertFailed(); // l'échec de la commande, lui, reste à chaque passage
+    }
+    Mail::assertSent(AlerteMail::class, 1);
+    Carbon\Carbon::setTestNow(Carbon\Carbon::parse('2026-11-14 10:30:00'));
+    $this->artisan('envoi:supervision-sante')->assertFailed();
+    Mail::assertSent(AlerteMail::class, 2);
+    Carbon\Carbon::setTestNow();
+    CouplageSante::oublier();
 });

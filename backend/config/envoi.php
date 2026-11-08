@@ -80,7 +80,12 @@ return [
         'silence_minutes' => 15,
         // Silence au-delà duquel une alerte d'ATTENTION part déjà (tunnel coupé < 10 min, plan 33 K15) ; la pause reste à `silence_minutes`.
         'silence_alerte_minutes' => 10,
-        // Canal des retours (rebonds, plaintes, réponses) sans aucun événement depuis N h alors que des envois ont eu lieu : critique + pause.
+        // Marge (s) retranchée aux deux seuils de silence : le planificateur passe toutes les 5 min, au plus juste ±quelques secondes.
+        // Sans marge, un passage à 9 min 59 s ferait attendre le suivant (+5 min) : alerte à 15 min au lieu de < 10 (ADR K0), pause à 20 min.
+        'silence_marge_s' => 60,
+        // Trou (s) entre deux relevés au-delà duquel la supervision a été interrompue (arrêt, interrupteur éteint) : le silence est recompté depuis la reprise.
+        'supervision_trou_s' => 900,
+        // Relève IMAP (vie du canal des retours) sans passage réussi depuis N h alors que des envois vieux de N h ont eu lieu : critique + pause.
         'retours_muets_heures' => 2,
         // Seuils chiffrés. file/horloge : strictement au-delà ; disque/mémoire : strictement en deçà ; certificat : jours restants ≤.
         'file_age_s' => ['attention' => 900, 'critique' => 3600],

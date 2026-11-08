@@ -31,9 +31,11 @@ critique au démarrage (`CouplageSante`), alerte du Socle, et la commande planif
   **Si un humain lève la pause alors que le défaut critique persiste, la supervision la repose** (décision). Défaut guéri puis pause levée :
   elle n'est pas reposée. La supervision ne lève jamais une pause. Les critiques DNS et listes noires ne sont pas re-pausés (K12/K13 le font).
 - **Un constat qui échoue ne saute pas les autres** ; le passage lève ensuite une exception, la commande compte l'échec et sort en erreur.
-- **Silence** : attention dès 10 min sans réponse (tunnel coupé), critique + pause à 15 min (homme mort). Un refus de la passerelle pour
+- **Silence** : attention dès 10 min sans réponse (tunnel coupé), critique + pause à 15 min (homme mort), avec une **marge de 60 s** (`silence_marge_s`) : le planificateur passe toutes les 5 min à quelques secondes près, sans marge l'alerte serait retardée de 5 min. Après un arrêt de la supervision (trou de plus de 15 min entre deux relevés), le silence se compte depuis la reprise : un seul échec ne déclenche rien. Un refus d'horloge (réponse signée) rétablit « serveur_muet ». Un refus de la passerelle pour
   horloge est « horloge » critique ; un secret ou une adresse absents de la configuration est « configuration_serveur » (attention), jamais « serveur_muet ».
-- **Retours muets** : critique + pause si un message parti il y a 2 h ou plus n'a vu aucun retour depuis, et que des messages partent encore.
+- **Retours muets** : mesure la **vie de la relève IMAP** (`envoi_curseurs_imap.maj_le`), pas l'arrivée de retours : critique + pause si un message parti il y a 2 h ou plus l'a été après la dernière relève et que des messages partent encore. Une petite campagne saine sans aucun rebond ne déclenche rien. Dette : par boîte.
+- **Pauses** : motif `sante:<code>:<source>` pour un défaut de serveur (chaque serveur reçoit sa commande de pause), `sante:<code>` pour un défaut d'espace. Un constat redescendu en « attention » dont la pause dure encore le dit dans son alerte ; une alerte non partie n'est jamais acquittée.
+- **Couplage** : l'alerte « supervision éteinte alors que l'envoi réel est allumé » part au plus une fois par jour (la commande, elle, échoue à chaque passage).
 - **Certificats** : alertes à 30 j (attention), 14 j (attention renforcée, nouvelle alerte) et 7 j (critique, pause).
 - **Liste noire** : le constat reste ouvert tant que la pause K13 dure, même si la ressource n'est plus listée.
 - **Accès** : `GET /api/v1/envoi/sante` exige `users.manage` (owner, admin) ; `operator` et `viewer` reçoivent 403.
@@ -48,5 +50,6 @@ Index couvrants sur `(workspace_id, source, mesure_le)` pour `max`/`min(mesure_l
 ## Dettes nommées
 - **K2-suite** : route `GET /v1/sante` côté passerelle (calcul de `file_age_s`, pourcentage mémoire sans division par zéro) et `401` signé `horloge_hors_fenetre`.
 - **K15-D1** : *(livré dans cette PR : canal des retours muet 2 h en campagne, constat `retours_muets`.)*
+- **K15-D4** (M4) : un espace sans serveur actif n'a ni constat DNS ni constat de listes noires (la supervision est tenue par serveur).
 - **K15-D2** (lot L8) : l'écran « Santé du serveur » du plan 33 n'est pas livré ; seul le point d'API `GET /api/v1/envoi/sante` existe.
 - **K15-D3** : aucune purge des relevés (≈ 288 par jour et par serveur, ajout seul : le trigger refuse tout DELETE). Prévoir partitionnement ou archivage.

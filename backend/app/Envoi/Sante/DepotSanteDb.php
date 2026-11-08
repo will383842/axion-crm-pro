@@ -104,11 +104,24 @@ final class DepotSanteDb implements DepotSante
         return array_values(array_map(static fn ($r): array => [(string) $r->workspace_id, (string) $r->source], $l->all()));
     }
 
-    public function dernierRetourRecu(string $ws): ?DateTimeImmutable
+    public function dernierReleveImap(string $ws): ?DateTimeImmutable
     {
-        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_evenements')->where('workspace_id', $ws)->max('cree_le'));
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_curseurs_imap')->where('workspace_id', $ws)->max('maj_le'));
 
         return $d === null ? null : new DateTimeImmutable((string) $d);
+    }
+
+    public function debutSerieReleves(string $ws, string $source, DateTimeImmutable $jusqua, int $trouSecondes): ?DateTimeImmutable
+    {
+        $l = WorkspaceContext::run($ws, fn () => DB::selectOne(
+            'SELECT max(mesure_le) AS debut FROM (
+                SELECT mesure_le, mesure_le - lag(mesure_le) OVER (ORDER BY mesure_le) AS ecart FROM envoi_releves_sante
+                WHERE workspace_id = ? AND source = ? AND mesure_le > ?::timestamptz - interval \'3 days\' AND mesure_le <= ?::timestamptz
+             ) x WHERE ecart IS NULL OR ecart > make_interval(secs => ?)',
+            [$ws, $source, $jusqua->format('c'), $jusqua->format('c'), $trouSecondes],
+        ));
+
+        return $l?->debut === null ? null : new DateTimeImmutable((string) $l->debut);
     }
 
     public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua): int

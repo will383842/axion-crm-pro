@@ -59,7 +59,8 @@ Règles de lecture côté CRM :
 - Écart d'horloge : le CRM compare `horloge_unix` à sa propre heure prise juste avant la sonde ; > 60 s attention, > 300 s critique.
   Or la passerelle refuse déjà toute requête dont l'horodatage s'écarte de plus de 300 s : au-delà, la sonde n'obtient pas de mesure.
   La passerelle DOIT alors répondre `401` **signé** (la signature est vérifiée avant le contrôle d'horloge) avec le corps
-  `{"erreur":"horloge_hors_fenetre"}` ; le CRM classe ce refus « horloge » critique (pas « serveur muet »). Un `401` non signé reste un refus ordinaire.
+  `{"erreur":"horloge_hors_fenetre","workspace_id":"<uuid de l'en-tête>"}` (comme toute réponse signée, `workspace_id` est EXIGÉ : le CRM refuse une réponse
+  sans lui, ce 401 compris, et la traite alors comme un refus ordinaire) ; le CRM classe ce refus « horloge » critique (pas « serveur muet »). Un `401` non signé reste un refus ordinaire.
 
 **Dette K2-suite (nommée) : la route `/v1/sante` n'existe pas encore côté passerelle**, pas plus que le `401` signé `horloge_hors_fenetre`
 (`infra/serveur-envoi/passerelle/src/Passerelle.php`, `FENETRE_HORODATAGE`). Tant qu'elle manque, `ENVOI_SANTE_ACTIF` doit rester faux

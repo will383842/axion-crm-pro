@@ -41,8 +41,18 @@ interface DepotSante
      */
     public function controlesListes(string $ws): array;
 
-    /** Dernier événement de retour (rebond, plainte, réponse…) enregistré pour cet espace, ou null. */
-    public function dernierRetourRecu(string $ws): ?DateTimeImmutable;
+    /**
+     * Dernière relève IMAP de l'espace (curseur `envoi_curseurs_imap.maj_le`, posé à chaque relève menée à son terme ; le plus récent
+     * de ses boîtes), ou null si elle n'a jamais tourné. Mesure la VIE de la relève, pas l'arrivée de retours : une petite campagne saine
+     * peut n'avoir aucun rebond. Dette : par boîte (une boîte morte derrière une boîte vivante passe inaperçue ici).
+     */
+    public function dernierReleveImap(string $ws): ?DateTimeImmutable;
+
+    /**
+     * Début de la série ININTERROMPUE de relevés de ce serveur : le dernier relevé précédé d'un trou de plus de $trouSecondes
+     * (ou le premier). Fenêtre de 3 jours avant $jusqua. Sert à ne pas compter comme silence une période où la supervision était arrêtée.
+     */
+    public function debutSerieReleves(string $ws, string $source, DateTimeImmutable $jusqua, int $trouSecondes): ?DateTimeImmutable;
 
     /** Messages envoyés dans $apres < cree_le <= $jusqua (bornes nulles = ouvertes) : la matière du « canal des retours muet ». */
     public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua): int;

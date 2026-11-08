@@ -3,6 +3,7 @@
 namespace App\Envoi\Sante;
 
 use App\Socle\Alertes\Alerte;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -32,10 +33,12 @@ final class CouplageSante
             self::$journalise = true;
             Log::critical('[ENVOI] ' . self::MESSAGE);
         }
-        if ($alerter) {
+        // M2 : la commande tourne toutes les 5 min ; l'alerte du Socle (cloche + e-mail) part au plus UNE fois par jour (le journal et l'échec de la commande, eux, restent à chaque passage).
+        if ($alerter && Cache::add('envoi:sante:couplage-alerte', true, now()->addDay())) {
             try {
                 app(Alerte::class)->envoyer('Santé des envois : supervision éteinte alors que l’envoi réel est allumé', self::MESSAGE, 'envoi', 'critique', '/envoi/sante');
             } catch (\Throwable $e) {
+                Cache::forget('envoi:sante:couplage-alerte'); // non partie : retentée au passage suivant
                 Log::error('[ENVOI] alerte de couplage en échec.', ['exception' => $e::class]);
             }
         }

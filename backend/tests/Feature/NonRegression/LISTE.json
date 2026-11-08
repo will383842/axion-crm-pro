@@ -54,7 +54,9 @@
         ]
       },
       "existants": [
-        "Crm/CampagnesB2bTest.php"
+        "Crm/CampagnesB2bTest.php",
+        "Envoi/ReleveImapAuditTest.php",
+        "Envoi/ReleveImapTest.php"
       ],
       "frontend": []
     },
@@ -402,6 +404,24 @@
         ]
       },
       "existants": [],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-L7",
+      "risque": "envoi P0 L7 : chauffe, freins, Tout arreter",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/ChauffeFreinsTest.php"
+      ],
+      "frontend": []
+    },
+    {
+      "id": "ENVOI-P0-L4",
+      "risque": "adaptateur SMTP de la boite : aucun doublon, aucune perte, identifiants chiffres",
+      "nouveaux": {},
+      "existants": [
+        "Envoi/AdaptateurSmtpTest.php"
+      ],
       "frontend": []
     },
     {

@@ -43,9 +43,11 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\ExpectationFailedException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\ResolveurDnsSimule;
+use Tests\Support\StatistiquesPlanStables;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -165,7 +167,13 @@ test('le SQL et le miroir PHP disent la même chose, sans rien réécrire', func
     }
     $generiques = DB::table('companies')->where('workspace_id', $ws)
         ->selectRaw('id, ' . QuarantaineSite::generiqueSql('companies') . ' AS q')->pluck('q', 'id')->all();
-    expect($generiques)->toBe([$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false]);
+    // `toBe` compare aussi l'ORDRE des clés, et un SELECT sans ORDER BY ne
+    // garantit aucun ordre (il suit la place physique des lignes) : on compare
+    // donc des tableaux triés par identifiant, le contenu reste strictement égal.
+    ksort($generiques);
+    $attendu = [$j['devinee'] => true, $j['verifiee'] => false, $j['fiable'] => false];
+    ksort($attendu);
+    expect($generiques)->toBe($attendu);
 
     $apres = DB::table('contacts')->where('workspace_id', $ws)->orderBy('id')->get()->toJson()
         . DB::table('companies')->where('workspace_id', $ws)->orderBy('id')->get()->toJson();
@@ -527,8 +535,16 @@ function qsEspaceRls(): array
         'information_tiers_version' => 'information-article-14/v3', 'recu_le' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    // Statistiques du planificateur posées ICI, une fois : sans cela, le plan
+    // dépend de ce que les tests précédents de la même part ont laissé sur ces
+    // tables (taille, analyse faite ou non), et le test compare deux plans pris
+    // à un état que rien ne maîtrise. `StatistiquesPlanStables::rendre` les retire à la fin.
+    StatistiquesPlanStables::analyser($owner, QS_TABLES_PLAN);
+
     return ['id' => $id, 'marque' => $marque, 'devinee' => $ids['devinee'], 'fiable' => $ids['fiable'], 'tiers' => $ids['tiers']];
 }
+
+const QS_TABLES_PLAN = ['contacts_provenances_tiers', 'contacts', 'companies'];
 
 /** @param  array{id: string}  $e */
 function qsNettoyer(array $e): void
@@ -544,95 +560,129 @@ function qsNettoyer(array $e): void
 }
 
 test('sous axion_app (RLS) : aperçu et audience « joignables » sans adresse en quarantaine, le critère ne change pas l accès à companies', function () {
-    $a = qsEspaceRls();
-    $b = qsEspaceRls();
-    $precedente = DB::getDefaultConnection();
+    StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
+        $a = qsEspaceRls();
+        $b = qsEspaceRls();
+        $precedente = DB::getDefaultConnection();
 
-    try {
-        DB::setDefaultConnection('pgsql_app');
-        $role = DB::selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
-        expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
-        DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
+        try {
+            DB::setDefaultConnection('pgsql_app');
+            $role = DB::selectOne('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
+            expect($role->rolsuper)->toBeFalse()->and($role->rolbypassrls)->toBeFalse();
+            DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
 
-        $r = app(ResolveurDestinataires::class)->resoudre(
-            $a['id'],
-            ['all' => [['field' => 'country_code', 'op' => 'eq', 'value' => 'FR']]],
-            new ReglageDestinataires(ReglageDestinataires::GENERIQUE),
-            null,
-        );
-        expect(collect($r['lignes'])->pluck('email')->all())->toBe(['contact@zz-fiable-' . $a['marque'] . '.example.invalid'])
-            ->and($r['exclues'][EligibiliteAdresse::SITE_NON_VERIFIE])->toBe(1);
+            $r = app(ResolveurDestinataires::class)->resoudre(
+                $a['id'],
+                ['all' => [['field' => 'country_code', 'op' => 'eq', 'value' => 'FR']]],
+                new ReglageDestinataires(ReglageDestinataires::GENERIQUE),
+                null,
+            );
+            expect(collect($r['lignes'])->pluck('email')->all())->toBe(['contact@zz-fiable-' . $a['marque'] . '.example.invalid'])
+                ->and($r['exclues'][EligibiliteAdresse::SITE_NON_VERIFIE])->toBe(1);
 
-        $criteres = ['all' => [
-            ['field' => 'email_hors_quarantaine', 'op' => 'eq', 'value' => true],
-            ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
-        ]];
-        $builder = app(AudienceBuilderService::class);
-        $q = $builder->buildPublicQuery($a['id'], $criteres);
-        // `WorkspaceContext::run` (l'aperçu ci-dessus) repose le contexte à
-        // la sortie : on le rejoue comme le fait chaque chemin de production.
-        $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
-        expect($membres)->toBe([$a['fiable']]);
-        // Le motif tiers sous la RLS : la fiche dont la seule personne est
-        // apportée mal informée est bien VISIBLE (témoin sans le critère),
-        // mais elle n'est pas joignable.
-        $visibles = WorkspaceContext::run($a['id'], static fn (): array => $builder
-            ->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]])->pluck('id')->map(static fn ($v): int => (int) $v)->all());
-        expect($visibles)->toContain($a['tiers'])
-            ->and($membres)->not->toContain($a['tiers']);
+            $criteres = ['all' => [
+                ['field' => 'email_hors_quarantaine', 'op' => 'eq', 'value' => true],
+                ['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach'],
+            ]];
+            $builder = app(AudienceBuilderService::class);
+            $q = $builder->buildPublicQuery($a['id'], $criteres);
+            // `WorkspaceContext::run` (l'aperçu ci-dessus) repose le contexte à
+            // la sortie : on le rejoue comme le fait chaque chemin de production.
+            $membres = WorkspaceContext::run($a['id'], static fn (): array => (clone $q)->pluck('id')->map(static fn ($v): int => (int) $v)->all());
+            expect($membres)->toBe([$a['fiable']]);
+            // Le motif tiers sous la RLS : la fiche dont la seule personne est
+            // apportée mal informée est bien VISIBLE (témoin sans le critère),
+            // mais elle n'est pas joignable.
+            $visibles = WorkspaceContext::run($a['id'], static fn (): array => $builder
+                ->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]])->pluck('id')->map(static fn ($v): int => (int) $v)->all());
+            expect($visibles)->toContain($a['tiers'])
+                ->and($membres)->not->toContain($a['tiers']);
 
-        // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
-        // n'ajoute AUCUN accès à `companies` et ne change pas son chemin
-        // d'accès — l'expression n'est qu'un filtre sur les fiches que les
-        // autres critères atteignent déjà (ici, le recalcul de 04:00, un
-        // traitement de fond ; l'aperçu web l'évalue sur les fiches retenues).
-        // Comparé avec et sans le critère, planificateur libre puis sans
-        // balayage séquentiel. Un `Seq Scan` imposé par le critère rougit.
-        $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
-        $acces = static function ($requete): array {
-            $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
-            $noeuds = [];
-            foreach ($lignes as $l) {
-                if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap|Bitmap Index) Scan)(?: using (\S+))? on companies\b/', $l, $m) === 1) {
-                    $noeuds[] = $m[1] . ' ' . ($m[2] ?? '');
-                }
-            }
+            // Le PLAN (relecture #311) : ce que l'on prouve, c'est que le critère
+            // n'ajoute AUCUN accès à `companies` et aucun `Seq Scan` — pas que le
+            // planificateur choisisse le même nœud. Le TYPE de nœud (Bitmap Heap
+            // Scan ou Index Scan) et l'index retenu (idx_companies_ws_counts ou
+            // idx_companies_workspace_lifecycle_stage) dépendent de la taille
+            // physique de la table et des index (pages mortes laissées par les
+            // tests précédents d'une même part Pest) : deux coûts presque à égalité
+            // basculent d'un run à l'autre. Ils ne sont donc plus comparés.
+            $sans = $builder->buildPublicQuery($a['id'], ['all' => [$criteres['all'][1]]]);
+            qsGardePlan($q, $sans);
+        } finally {
+            DB::setDefaultConnection($precedente);
+            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+            qsApp()->disconnect();
+            qsNettoyer($a);
+            qsNettoyer($b);
+        }
+    }, qsProprio());
+    qsProprio()->disconnect();
+});
 
-            return $noeuds;
-        };
-        //
-        // Planificateur libre, il peut PRÉFÉRER un index avec le critère :
-        // depuis le motif tiers (sous-requête indexée par personne), le filtre
-        // coûte plus cher, et sur cette table de quelques lignes il devient
-        // rentable de restreindre d'abord par `workspace_id`. Ce n'est pas un
-        // balayage imposé : seul un `Seq Scan` absent sans le critère rougit,
-        // ou un accès de plus. Sans balayage séquentiel, le chemin est le même.
-        foreach (['on', 'off'] as $balayage) {
-            qsApp()->statement('SET enable_seqscan = ' . $balayage);
-            try {
-                // Comparés en multiensembles : l'ordre des nœuds du plan
-                // n'est pas une garantie (relecture de #317).
-                $avec = $acces($q);
-                $reference = $acces($sans);
-                sort($avec);
-                sort($reference);
-                $seq = static fn (array $noeuds): int => count(array_filter($noeuds, static fn (string $n): bool => str_starts_with($n, 'Seq Scan')));
-                if ($balayage === 'off') {
-                    expect($avec)->toBe($reference);
-                } else {
-                    expect(count($avec))->toBe(count($reference))
-                        ->and($seq($avec))->toBeLessThanOrEqual($seq($reference));
-                }
-            } finally {
-                qsApp()->statement('RESET enable_seqscan');
+/**
+ * Garde du plan : le critère testé n'ajoute aucun accès à `companies`.
+ *  - nombre d'accès identique, planificateur libre ou non ;
+ *  - sans balayage séquentiel (`enable_seqscan = off`), aucun `Seq Scan` ni avec
+ *    ni sans le critère : un Seq Scan n'y apparaît que si le critère rend
+ *    l'index inutilisable. Planificateur libre, les Seq Scan ne sont pas comparés.
+ * Le type de nœud et l'index choisis ne sont PAS comparés (instables, voir plus haut).
+ */
+function qsGardePlan($avecCritere, $reference): void
+{
+    $noeuds = static function ($requete): array {
+        $lignes = array_map(static fn ($l): string => (string) $l->{'QUERY PLAN'}, qsApp()->select('EXPLAIN ' . $requete->toSql(), $requete->getBindings()));
+        $res = [];
+        foreach ($lignes as $l) {
+            if (preg_match('/((?:Seq|Index|Index Only|Bitmap Heap|Bitmap Index) Scan)(?: using (\S+))? on companies\b/', $l, $m) === 1) {
+                $res[] = $m[1] . ' ' . ($m[2] ?? '');
             }
         }
-    } finally {
-        DB::setDefaultConnection($precedente);
-        qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-        qsApp()->disconnect();
-        qsNettoyer($a);
-        qsNettoyer($b);
-        qsProprio()->disconnect();
+
+        return $res;
+    };
+    $seq = static fn (array $n): int => count(array_filter($n, static fn (string $x): bool => str_starts_with($x, 'Seq Scan')));
+
+    foreach (['on', 'off'] as $balayage) {
+        qsApp()->statement('SET enable_seqscan = ' . $balayage);
+        try {
+            $avec = $noeuds($avecCritere);
+            $ref = $noeuds($reference);
+            expect(count($avec))->toBe(count($ref));
+            if ($balayage === 'off') {
+                expect($seq($avec))->toBe(0)->and($seq($ref))->toBe(0);
+            }
+        } finally {
+            qsApp()->statement('RESET enable_seqscan');
+        }
     }
+}
+
+test('garde négative du plan : un critère factice qui accède à companies SANS filtre workspace_id fait rougir la comparaison', function () {
+    StatistiquesPlanStables::figer(qsProprio(), QS_TABLES_PLAN, function () {
+        $a = qsEspaceRls();
+        $precedente = DB::getDefaultConnection();
+
+        try {
+            DB::setDefaultConnection('pgsql_app');
+            DB::select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $a['id']]);
+            $builder = app(AudienceBuilderService::class);
+            $crit = ['all' => [['field' => 'prospection_status', 'op' => 'eq', 'value' => 'ready_for_outreach']]];
+            $reference = $builder->buildPublicQuery($a['id'], $crit);
+            // Critère factice : un second accès à `companies`, joint sur la seule
+            // clé primaire, sans aucun filtre `workspace_id`.
+            $factice = $builder->buildPublicQuery($a['id'], $crit)
+                ->whereRaw('EXISTS (SELECT 1 FROM companies AS c2 WHERE c2.id = companies.id)');
+
+            // Témoin : la garde accepte la requête identique à elle-même…
+            qsGardePlan($builder->buildPublicQuery($a['id'], $crit), $reference);
+            // … et rougit dès que le critère ajoute un accès.
+            expect(fn () => qsGardePlan($factice, $reference))->toThrow(ExpectationFailedException::class);
+        } finally {
+            DB::setDefaultConnection($precedente);
+            qsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+            qsApp()->disconnect();
+            qsNettoyer($a);
+        }
+    }, qsProprio());
+    qsProprio()->disconnect();
 });

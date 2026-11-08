@@ -42,7 +42,17 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes'];
+
+    /**
+     * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
+     * de test bloqueraient la suppression du workspace. `nettoyer()` les vide en suspendant le
+     * trigger USER le temps d'une transaction (connexion propriétaire, tests seulement ; le
+     * trigger de production n'est pas touché).
+     *
+     * @var list<string>
+     */
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -122,6 +132,8 @@ final class SemeurTablesScopees
         'envoi_sequence_etapes',
         'envoi_inscriptions',
         'envoi_messages',
+        // Envoi K13 : contrôles de listes noires, ajout seul (trigger) : voir APPEND_SEUL.
+        'envoi_controles_listes',
         'coverage_zones',
         'crm_notes',
         'crm_tasks',
@@ -166,6 +178,24 @@ final class SemeurTablesScopees
         'envoi_drapeaux',
         'envoi_journal_commandes',
         'envoi_temoins',
+        // 2026-11-11 (envoi K1a) : serveurs d'envoi (le commande_id vit dans envoi_journal_commandes).
+        'envoi_serveurs',
+        // Envoi P0 L7 : compteurs de chauffe, pauses et seuils d'un espace. Chauffe et pauses :
+        // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
+        'envoi_chauffe_jours',
+        'envoi_pauses',
+        'envoi_seuils',
+        // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
+        // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
+        'envoi_boites',
+        'envoi_injections_smtp',
+        'envoi_controles_dns',
+        // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
+        'envoi_evenements',
+        'envoi_curseurs_imap',
+        'envoi_rattachements',
+        'envoi_echecs_releve',
+        'envoi_messages_envoyes',
         'proxy_providers_config',
         'proxy_usage_log',
         'rgpd_requests',
@@ -507,6 +537,13 @@ final class SemeurTablesScopees
             'inscription_id' => $inscription, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<zz-etancheite@example.invalid>',
         ]);
 
+        $inserer('envoi_controles_listes', [
+            'type' => 'domaine',
+            'ressource' => 'zz-etancheite.example.invalid',
+            'statut' => 'non_liste',
+            'zone' => '*',
+        ]);
+
         $inserer('listes_manuelles_membres', [
             'liste_id' => $id['listes_manuelles'],
             'company_id' => $id['companies'],
@@ -677,9 +714,79 @@ final class SemeurTablesScopees
             'commande' => 'zz',
             'auteur' => 'zz',
         ]);
+        $inserer('envoi_controles_dns', [
+            'domaine' => 'zz-' . $marque . '.example.test',
+            'controle_le' => '2026-11-11 06:00:00+00',
+            'pret' => false,
+        ]);
         $inserer('envoi_temoins', [
             'empreinte' => hash('sha256', 'zz-' . $marque),
             'libelle' => 'zz',
+        ]);
+        $inserer('envoi_serveurs', [
+            'source' => 'zz-' . substr($marque, 0, 8),
+            'url_base' => 'https://zz.test.invalid',
+        ]);
+
+        $inserer('envoi_chauffe_jours', [
+            'boite' => 'zz-etancheite@example.invalid',
+            'jour' => '2026-01-01',
+            'fournisseur' => 'autre',
+        ]);
+        $inserer('envoi_pauses', [
+            'portee' => 'global',
+            'motif' => 'zz',
+        ]);
+        $inserer('envoi_seuils', [
+            'nom' => 'zz',
+            'valeur' => 1,
+            'auteur' => 'zz',
+        ]);
+        $boiteId = (string) Str::uuid();
+        $inserer('envoi_boites', [
+            'id' => $boiteId,
+            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'hote' => 'smtp.exemple.test',
+            'port' => 587,
+            'chiffrement' => 'starttls',
+            'identifiants_chiffres' => 'zz-chiffre',
+        ]);
+        $idInjection = (string) Str::uuid();
+        $inserer('envoi_injections_smtp', [
+            'boite_id' => $boiteId,
+            'id_injection' => $idInjection,
+            'cle_idempotence' => 'zz-' . $marque,
+        ]);
+
+        $id['envoi_evenements'] = $insererAvecId('envoi_evenements', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+            'uid' => 1,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'classe' => 'reponse_humaine',
+            'statut' => 'a_rattacher',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recu_le' => now()->toDateTimeString(),
+        ]);
+        $inserer('envoi_curseurs_imap', [
+            'boite' => 'zz-' . $marque,
+            'uid_validity' => 1,
+        ]);
+        $inserer('envoi_rattachements', [
+            'evenement_id' => $id['envoi_evenements'],
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+            'decide_par' => 'zz-revue',
+        ]);
+        $inserer('envoi_echecs_releve', [
+            'boite' => 'zz-' . $marque,
+            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'motif' => 'RuntimeException',
+        ]);
+        $inserer('envoi_messages_envoyes', [
+            'message_id_empreinte' => hash('sha256', 'zz-mid-' . $marque),
+            'id_injection' => $idInjection,
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
         ]);
 
         $inserer('proxy_providers_config', [
@@ -764,6 +871,15 @@ final class SemeurTablesScopees
 
         foreach (array_reverse(self::ORDRE) as $table) {
             if (in_array($table, self::APPEND_SEUL, true)) {
+                continue;
+            }
+            if (in_array($table, self::APPEND_SEUL_AVEC_FK, true)) {
+                $owner->transaction(function () use ($owner, $table, $workspaceIds): void {
+                    $owner->statement("ALTER TABLE {$table} DISABLE TRIGGER USER");
+                    $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();
+                    $owner->statement("ALTER TABLE {$table} ENABLE TRIGGER USER");
+                });
+
                 continue;
             }
             $owner->table($table)->whereIn('workspace_id', $workspaceIds)->delete();

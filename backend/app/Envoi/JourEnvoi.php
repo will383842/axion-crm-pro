@@ -12,7 +12,7 @@ final class JourEnvoi
 
     public static function de(?DateTimeImmutable $instant = null): DateTimeImmutable
     {
-        return ($instant ?? new DateTimeImmutable('now'))
+        return ($instant ?? now()->toDateTimeImmutable())
             ->setTimezone(new DateTimeZone(self::FUSEAU))
             ->setTime(0, 0);
     }

@@ -1,0 +1,5 @@
+# En-tetes SUR-SIGNES (nom repete en fin de h=). Meme liste, meme ordre que
+# App\Envoi\Message\DkimSigneur::ENTETES_SURSIGNES (test croise cote CRM). Un nom par ligne.
+From
+Subject
+List-Unsubscribe

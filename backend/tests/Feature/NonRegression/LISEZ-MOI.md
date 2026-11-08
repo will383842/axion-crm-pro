@@ -9,9 +9,11 @@
 | Gardes neuves (24 risques NR-01 à NR-24 + horodatages de Paris) | ce dossier, groupe Pest `non-regression` |
 | Gardes existantes « citées et verrouillées » | rattachées au groupe dans `backend/tests/Pest.php` (leur fichier n'est pas touché) |
 | Photos de référence (« instantanés ») | `instantanes/*.json` |
-| Liste figée | `LISTE.json`, vérifiée par `ListeFigeeTest.php` |
+| Liste figée | `LISTE.json` (base figée) + `LISTE.d/<date>-<lot>.json` (un fragment par lot), union vérifiée par `ListeFigeeTest.php` |
+| Colonnes JSON/JSONB (RGPD) | `../Rgpd/colonnes-json/<date>-<lot>.json` (un fragment par lot), union vérifiée par `PortabiliteCompleteTest.php` (B10-004) |
 | Gardes du frontend (routes, routeTree, menu) | `frontend/tests/non-regression/*.test.ts` |
-| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend` l'attend) |
+| Job de CI | `.github/workflows/ci.yml`, job `filet-non-regression` (premier ; le job `backend-verdict` l'attend et échoue si le filet n'est pas vert — le contexte exigé par la protection de `main`) |
+| Verdict et artefacts | `backend-verdict` télécharge `pest-part-*` : il relit les artefacts de TOUTE la run (y compris d'une relance partielle), pas seulement ceux de la tentative en cours |
 
 ## Lancer le filet en local
 
@@ -51,7 +53,7 @@ git diff backend/tests/Feature/NonRegression/instantanes/   # le changement appa
 ## Ajouter un test au filet
 
 1. Écrire le test dans ce dossier (il reçoit le groupe automatiquement), avec un titre qui commence par `NR-xx`.
-2. Le déclarer dans `LISTE.json` (`ListeFigeeTest` rougit sinon).
+2. Le déclarer dans un NOUVEAU fragment `LISTE.d/<date>-<lot>.json` (objet dont la SEULE clé est `gardes`, une liste ; chaque garde porte un `id` non vide et uniquement les clés `id`, `nouveaux`, `existants`, `frontend` — les trois dernières peuvent être omises ; toute autre clé, un JSON illisible ou un `id` vide fait échouer le chargement) — ne pas toucher `LISTE.json` ni le fragment d'un autre lot ; `ListeFigeeTest` rougit sinon, et refuse un même identifiant de garde ou un même `fichier::titre` présent deux fois.
 3. Un test qui constate doit avoir son **témoin** : la preuve que l'instrument sait voir (une garde qui ne trouve rien passerait pour verte).
 
 ## Nouvel appel vers une nouvelle route (NR-20)
@@ -76,6 +78,10 @@ Ils sont aussi écrits en tête des fichiers concernés.
 | La sonde « non diffusibles » est aveugle sous le rôle de production (RLS) | `Nr23Nr08AudiencesEtRlsTest.php` | S7 |
 | Seules 2 tâches planifiées sont rejouées sous le rôle de production ; les autres sont listées « non jouée » | `instantanes/nr08-taches-sous-rls.json` | S7 |
 | NR-22 (connexion de bout en bout) : seules les gardes Pest sont rattachées ; l'e2e `auth` est hors du périmètre fermé de ce lot | `LISTE.json` | lot e2e |
+
+## Ajouter une colonne JSON/JSONB (B10-004)
+
+Une migration qui ajoute une colonne `json`/`jsonb` n'édite plus de nombre en dur : elle ajoute un NOUVEAU fragment `backend/tests/Feature/Rgpd/colonnes-json/<date>-<lot>.json`, au format `{"table.colonne": "couverte" | "hors-portee: motif"}`. Le test exige l'**égalité stricte** entre l'union des fragments et les colonnes réellement présentes en base (dans les deux sens), et entre les « hors-portee » déclarées et celles que le test calcule. Un même nom dans deux fragments est refusé. Deux lots n'écrivent donc plus jamais dans le même fichier.
 
 ## Journal de la liste figée (ajouts seulement)
 

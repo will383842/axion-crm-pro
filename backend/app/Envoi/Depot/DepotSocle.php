@@ -43,6 +43,9 @@ interface DepotSocle
     /** Commande locale : arme « Tout arrêter » (journalisé). */
     public function armerToutArreter(string $workspaceId, string $auteur): void;
 
+    /** Commande locale : désarme « Tout arrêter » (journalisé, dans la même transaction). Faux si rien n'était armé. */
+    public function leverToutArreter(string $workspaceId, string $auteur): bool;
+
     /** @param array<string, mixed> $details */
     public function journaliser(string $workspaceId, string $commande, string $auteur, array $details = [], ?DateTimeImmutable $jour = null): void;
 }

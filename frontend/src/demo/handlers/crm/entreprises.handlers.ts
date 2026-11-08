@@ -9,6 +9,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { demoDb } from '../../base';
 import { zoneEntreprises, type FicheEntreprise } from '../../donnees/crm/entreprises';
+import type { LigneRoumanie } from '../../donnees/crm/technique';
 import type { Entreprise } from '../../donnees/types';
 import { maintenant } from '../../horloge';
 import { api, delai, erreur, filtrerTexte, paginer, repondreEtatForce } from '../../outils';
@@ -112,6 +113,9 @@ export const handlers: HttpHandler[] = [
       liste = demoDb.entreprises.filtrer((e) => ids.includes(String(e.id)));
     } else {
       liste = filtrer(request);
+      // Export d'une étiquette (gestion des étiquettes) : paramètre `tag` de la route réelle.
+      const tag = lire(request, 'tag');
+      if (tag !== '') liste = liste.filter((e) => e.etiquettes.includes(tag));
     }
     return new HttpResponse(csv(liste), { headers: { 'Content-Type': 'text/csv; charset=UTF-8' } });
   }),
@@ -146,6 +150,17 @@ export const handlers: HttpHandler[] = [
     await delai();
     const force = await repondreEtatForce(request, PAGE_VIDE);
     if (force) return force;
+    const url = new URL(request.url);
+    // Le vivier Roumanie (section Technique) passe par la même route : sa zone est tenue par technique.handlers.ts.
+    if (url.searchParams.get('filter[country_code]') === 'RO') {
+      const nature = url.searchParams.get('filter[entity_nature]');
+      const statut = url.searchParams.get('filter[prospection_status]');
+      const vivier = demoDb.zone<LigneRoumanie>('technique', 'roumanie').filtrer(
+        (l) => (nature === null || nature === '' || l.entity_nature === nature) && (statut === null || statut === '' || l.prospection_status === statut),
+      );
+      const pageRo = paginer(vivier, request, 50);
+      return HttpResponse.json({ data: pageRo.data, meta: { total: vivier.length, current_page: pageRo.meta.current_page, last_page: pageRo.meta.last_page } });
+    }
     const page = paginer(filtrer(request).map(ligne), request, 100);
     // `export_selection` : la démo annonce l'export d'une sélection ; le vrai serveur pas encore.
     return HttpResponse.json({ data: page.data, meta: { total: page.meta.total, last_page: page.meta.last_page, current_page: page.meta.current_page, per_page: page.meta.per_page, export_selection: true } });

@@ -603,17 +603,6 @@ const handlersEtiquettes: HttpHandler[] = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // L'export des entreprises (route réelle), filtré par étiquette : CSV.
-  http.get(api('/companies/export'), async ({ request }) => {
-    await delai();
-    const slug = new URL(request.url).searchParams.get('tag') ?? '';
-    const cellule = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const lignes = demoDb.entreprises
-      .filtrer((e) => slug === '' || e.etiquettes.includes(slug))
-      .map((e) => [e.denomination, e.siren, e.city, e.email_generic, estJoignable(e) ? 'oui' : 'non'].map(cellule).join(';'));
-    const corps = ['Dénomination;SIREN;Ville;E-mail;Joignable', ...lignes].join('\r\n');
-    return new HttpResponse(`\uFEFF${corps}`, { headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
-  }),
 ];
 
 export const handlers: HttpHandler[] = [...handlersAudiences, ...handlersListes, ...handlersEtiquettes];

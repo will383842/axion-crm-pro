@@ -10,8 +10,6 @@ ko=0; n=0
 ok()  { n=$((n+1)); echo "ok   $*"; }
 bad() { n=$((n+1)); ko=1; echo "ROUGE $*"; }
 verifie() { local nom="$1"; shift; if "$@"; then ok "$nom"; else bad "$nom"; fi; }   # verifie <nom> <commande vraie>
-# shellcheck disable=SC2329  # appelee indirectement par verifie
-contient() { [[ "$1" == *"$2"* ]]; }
 tmpd="$(mktemp -d)"; trap 'rm -rf "${tmpd:?}"' EXIT
 
 cle_pub="$(printf 'B%.0s' {1..43})="
@@ -49,21 +47,21 @@ refuse "valeurs.env non conforme" "valeurs non conformes" "${BON[@]}"
 cp "$tmpd/valeurs.bon" "$tmpd/valeurs.env"
 out="$(env -i PATH="$PATH" AXION_VALEURS="$tmpd/absent.env" "${BON[@]}" bash "$R" 2>&1)"; rc=$?
 verifie "refus: fichier de valeurs absent (code 1)" test "$rc" = 1
-verifie "refus: fichier de valeurs absent (motif)" contient "$out" "fichier de valeurs absent"
+verifie "refus: fichier de valeurs absent (motif)" test "${out#*'fichier de valeurs absent'}" != "$out"
 out="$(env -i PATH="$PATH" AXION_VALEURS="$tmpd/valeurs.env" REP_DKIM="$tmpd/dkim" "${BON[@]}" bash "$R" --bizarre 2>&1)"; rc=$?
 verifie "refus: option inconnue (code 2)" test "$rc" = 2
 # 4. A blanc sur valeurs de documentation : passe, ne cree rien, ne lance rien.
 out="$(lancer "${BON[@]}" 2>&1)"; rc=$?
 verifie "a blanc: vert sur valeurs de documentation" test "$rc" = 0
-verifie "a blanc: controles annonces" contient "$out" "controles passes (a blanc)"
+verifie "a blanc: controles annonces" test "${out#*'controles passes (a blanc)'}" != "$out"
 verifie "a blanc: aucune cle creee" test ! -e "$tmpd/dkim"
-verifie "a blanc: l'envoi n'est jamais repris" contient "$out" "ENVOI N'EST PAS REPRIS"
+verifie "a blanc: l'envoi n'est jamais repris" test "${out#*'PAS REPRIS'}" != "$out"
 out2="$(lancer "${BON[@]}" 2>&1)"
 verifie "idempotence: deux passages a blanc identiques" test "$out" = "$out2"
 # 5. Idempotence DKIM : domaine deja initialise -> saute.
 mkdir -p "$tmpd/dkim/domaine-1.test"; : >"$tmpd/dkim/domaine-1.test/principal"
 out="$(lancer "${BON[@]}" 2>&1)"
-verifie "idempotence: cles DKIM existantes sautees" contient "$out" "deja presentes"
+verifie "idempotence: cles DKIM existantes sautees" test "${out#*'deja presentes'}" != "$out"
 # 6. Statique : jamais de trace de commande, aucun envoi reel active, script executable.
 verifie "statique: ni set -x ni ENVOI_REEL_ACTIF=true" bash -c "! grep -Eq 'set -x|ENVOI_REEL_ACTIF *= *true' '$R'"
 verifie "statique: script executable" test -x "$R"

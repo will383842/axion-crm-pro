@@ -3,7 +3,7 @@
     "charge": "v1\\nworkspace_id\\ntimestamp\\nnonce\\nMETHODE\\nchemin?requete\\nsha256(corps)",
     "vecteurs": [
         {
-            "nom": "get-evenements",
+            "libelle": "get-evenements",
             "cle": "cle-vecteur-1",
             "workspace_id": "espace-a",
             "timestamp": "1800000000",
@@ -14,7 +14,7 @@
             "signature": "aacfd225e27bb78775191dc448a4eb87aa6e1038e7c8debe74d52187272affac"
         },
         {
-            "nom": "post-pause",
+            "libelle": "post-pause",
             "cle": "cle-vecteur-1",
             "workspace_id": "espace-a",
             "timestamp": "1800000000",
@@ -25,7 +25,7 @@
             "signature": "d92a61a26270c364a5a8a668879c64fa3b1a7f373c2ea7bc0b1c511136db19e4"
         },
         {
-            "nom": "autre-espace",
+            "libelle": "autre-espace",
             "cle": "cle-vecteur-2",
             "workspace_id": "espace-b",
             "timestamp": "1800000100",

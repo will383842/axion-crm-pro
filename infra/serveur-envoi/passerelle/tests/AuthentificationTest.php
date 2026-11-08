@@ -129,7 +129,7 @@ final class AuthentificationTest extends PasserelleTestCase
         $v = json_decode((string) file_get_contents(__DIR__.'/vecteurs-hmac.json'), true, 8, JSON_THROW_ON_ERROR);
         $this->assertNotEmpty($v['vecteurs']);
         foreach ($v['vecteurs'] as $x) {
-            $this->assertSame($x['signature'], \Passerelle\Signature::signer($x['cle'], $x['workspace_id'], $x['timestamp'], $x['nonce'], $x['methode'], $x['chemin'], $x['corps']), $x['nom']);
+            $this->assertSame($x['signature'], \Passerelle\Signature::signer($x['cle'], $x['workspace_id'], $x['timestamp'], $x['nonce'], $x['methode'], $x['chemin'], $x['corps']), $x['libelle']);
         }
     }
 }

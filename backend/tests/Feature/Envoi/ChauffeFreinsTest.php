@@ -1072,7 +1072,9 @@ test('MAJEUR 5 : le battement est borné à l’horloge (jamais dans le futur) e
     // à la main (sans horloge d'appli) : 2099 est ramené à l'horloge de la base, donc l'homme mort reste armé
     DB::select("SELECT set_config('app.maintenant', '', true)");   // pas d'horloge d'appli (la transaction du test englobe les précédentes)
     DB::statement("UPDATE envoi_sante_battement SET dernier_le = '2099-01-01 00:00:00+00' WHERE id = 1");
-    expect($depot->dernierBattement()->getTimestamp())->toBeLessThanOrEqual(time() + 2)
+    // borne = horloge de la BASE (celle qui ramène 2099), pas time() : indépendant de l'heure réelle du processus PHP
+    $horlogeBase = (int) DB::scalar('SELECT floor(extract(epoch FROM clock_timestamp()))');
+    expect($depot->dernierBattement()->getTimestamp())->toBeLessThanOrEqual($horlogeBase + 2)
         ->and(Freins::santeSilencieuse($depot->dernierBattement(), new DateTimeImmutable('2030-01-01')))->toBeTrue();
 });
 

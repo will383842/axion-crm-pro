@@ -9,7 +9,9 @@ use DateTimeImmutable;
  * aucun marquage « lu » dans la boîte : la relève ne modifie jamais la source.
  *
  * Implémentations : `LecteurBoiteMemoire` (tests, aucun réseau) et
- * `LecteurBoiteWebklex` (réelle).
+ * `LecteurBoiteWebklex` (réelle : EXAMINE + BODY.PEEK[] seulement).
+ *
+ * Toute panne technique (réseau, protocole) est une EXCEPTION : elle n'écarte jamais un message.
  */
 interface LecteurBoite
 {
@@ -17,11 +19,9 @@ interface LecteurBoite
     public function uidValidity(string $boite): int;
 
     /**
-     * Messages dont l'UID est strictement supérieur à $uidApres et, si $depuis
-     * est donné, reçus (INTERNALDATE) à cette date ou après. Triés par UID
-     * croissant, au plus $limite messages (le reste vient au passage suivant).
-     *
-     * @return list<MessageBrut>
+     * Au plus $limite UID BRUTS strictement supérieurs à $uidApres (triés), puis — seulement ensuite —
+     * filtrés : si $depuis est donné, on ne garde que les messages reçus (INTERNALDATE) à cette date ou après.
+     * `LotBoite::dernierUid` / `suite` portent sur les UID bruts, pas sur les messages gardés.
      */
-    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): array;
+    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): LotBoite;
 }

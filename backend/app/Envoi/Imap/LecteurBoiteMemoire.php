@@ -45,6 +45,8 @@ final class LecteurBoiteMemoire implements LecteurBoite
                 $m->messageIdDsn,
                 $m->destinataireDsn,
                 $m->ecarte,
+                $m->empreinteContenu,
+                $m->analyseEchouee,
             );
         }
         $this->messages[$boite] = $refaits;
@@ -55,14 +57,20 @@ final class LecteurBoiteMemoire implements LecteurBoite
         return $this->validites[$boite] ?? 1;
     }
 
-    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): array
+    public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): LotBoite
     {
-        $sortie = array_values(array_filter(
+        // Comme le lecteur réel : on pagine d'abord sur les UID BRUTS, on filtre par la date ENSUITE.
+        $bruts = array_values(array_filter(
             $this->messages[$boite] ?? [],
-            static fn (MessageBrut $m): bool => $m->uid > $uidApres && ($depuis === null || $m->recuLe >= $depuis),
+            static fn (MessageBrut $m): bool => $m->uid > $uidApres,
         ));
-        usort($sortie, static fn (MessageBrut $a, MessageBrut $b): int => $a->uid <=> $b->uid);
+        usort($bruts, static fn (MessageBrut $a, MessageBrut $b): int => $a->uid <=> $b->uid);
+        $page = array_slice($bruts, 0, $limite);
+        $gardes = array_values(array_filter(
+            $page,
+            static fn (MessageBrut $m): bool => $depuis === null || $m->recuLe >= $depuis,
+        ));
 
-        return array_slice($sortie, 0, $limite);
+        return new LotBoite($gardes, $page === [] ? $uidApres : $page[count($page) - 1]->uid, count($bruts) > $limite);
     }
 }

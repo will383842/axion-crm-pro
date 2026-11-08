@@ -5,7 +5,9 @@ namespace App\Envoi\Imap;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
+use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Relève des réponses et rebonds d'une boîte d'envoi.
@@ -25,9 +27,15 @@ use Illuminate\Support\Facades\DB;
  *  - ISOLEMENT PAR MESSAGE : un message piégé (From multiple, accentué, mal
  *    formé, trop gros, illisible) ou dont l'arrêt est inapplicable
  *    (`RetourInapplicable`) devient « à rattacher » SANS effet ; la boîte
- *    continue et le curseur avance. Seule une vraie indisponibilité (toute
- *    autre exception : CRM, base) interrompt la relève, sans noter l'événement.
- *  - Par passage : au plus LIMITE_LOT messages (le reste au passage suivant).
+ *    continue et le curseur avance.
+ *  - ERREUR PROPRE À UN MESSAGE (code non nul de `crm:campagne:retours`, exception base…) : elle ne bloque
+ *    PAS la boîte. Elle est journalisée (classe technique seulement) et comptée dans `envoi_echecs_releve` ;
+ *    les messages suivants sont traités ; le curseur reste AVANT le premier échec (relu au passage suivant) ;
+ *    `ReleveIncomplete` est levée en fin de passage. Après MAX_TENTATIVES échecs, le message est mis à
+ *    l'écart : « à rattacher » SANS effet (revue humaine) et le curseur peut passer.
+ *  - Une PANNE du lecteur (réseau, IMAP) est une exception technique : rien n'est noté, le curseur n'avance pas.
+ *  - Par passage : au plus LIMITE_LOT UID bruts (le reste au passage suivant ; `lotPlein` suit les UID bruts).
+ *  - `RetourDetecte::cle` = empreinte du message (stable) : les freins de L7 comptent une seule fois.
  *  - La file « à rattacher » exige un circuit de REVUE HUMAINE avant mise en
  *    service (lot L8) : une opposition qui y dort n'est PAS appliquée.
  *  - La relève ne modifie jamais la boîte et n'efface rien.
@@ -37,6 +45,9 @@ final class ReleveImap
     public const FENETRE_RATTRAPAGE_JOURS = 30;
 
     public const LIMITE_LOT = 200;
+
+    /** Échecs propres à un même message avant sa mise à l'écart (revue humaine). */
+    public const MAX_TENTATIVES = 3;
 
     private const CLASSES_OPPOSITION = [ClasseRetour::Desinscription, ClasseRetour::Hostile];
 
@@ -63,9 +74,13 @@ final class ReleveImap
             }
 
             $lot = $this->lecteur->lire($boite, $uidApres, null, self::LIMITE_LOT);
-            $bilan->lotPlein = count($lot) >= self::LIMITE_LOT;
-            $this->traiter($workspaceId, $boite, $validite, $lot, $bilan, false);
-            $this->poserCurseur($workspaceId, $boite, $validite, 0);
+            $bilan->lotPlein = $lot->suite;
+            $premierEchec = $this->traiter($workspaceId, $boite, $validite, $lot->messages, $bilan, false);
+            // Le curseur ne dépasse jamais le premier message en échec : il sera relu.
+            $this->poserCurseur($workspaceId, $boite, $validite, $premierEchec !== null ? max($uidApres, $premierEchec - 1) : $lot->dernierUid);
+            if ($premierEchec !== null) {
+                throw new ReleveIncomplete($bilan);
+            }
 
             return $bilan;
         });
@@ -76,7 +91,9 @@ final class ReleveImap
      * la base restaurée) et on rejoue la fenêtre de 30 jours qui précède
      * l'heure de la sauvegarde restaurée, jusqu'à maintenant. Les oppositions
      * déjà rattachées sont ré-appliquées (idempotent) même si l'événement
-     * existe : un arrêt ne doit jamais manquer.
+     * existe : un arrêt ne doit jamais manquer. On PAGINE SUR LES UID BRUTS
+     * jusqu'à la fin réelle de la boîte : un lot entièrement filtré par la date
+     * n'arrête pas la boucle.
      */
     public function rattraper(string $workspaceId, string $boite, DateTimeImmutable $sauvegardeLe): BilanReleve
     {
@@ -85,28 +102,55 @@ final class ReleveImap
             $depuis = $sauvegardeLe->modify('-' . self::FENETRE_RATTRAPAGE_JOURS . ' days');
             $bilan = new BilanReleve;
             $apres = 0;
+            $echec = false;
             do {
                 $lot = $this->lecteur->lire($boite, $apres, $depuis, self::LIMITE_LOT);
-                $this->traiter($workspaceId, $boite, $validite, $lot, $bilan, true);
-                foreach ($lot as $m) {
-                    $apres = max($apres, $m->uid);
-                }
-            } while (count($lot) >= self::LIMITE_LOT);
+                $echec = $this->traiter($workspaceId, $boite, $validite, $lot->messages, $bilan, true) !== null || $echec;
+                $suite = $lot->suite && $lot->dernierUid > $apres; // garde-fou : la boucle avance toujours
+                $apres = max($apres, $lot->dernierUid);
+            } while ($suite);
             $this->poserCurseur($workspaceId, $boite, $validite, 0);
+            if ($echec) {
+                throw new ReleveIncomplete($bilan);
+            }
 
             return $bilan;
         });
     }
 
-    /** @param list<MessageBrut> $messages */
-    private function traiter(string $workspaceId, string $boite, int $validite, array $messages, BilanReleve $bilan, bool $rattrapage): void
+    /**
+     * @param  list<MessageBrut>  $messages
+     * @return ?int UID du premier message en échec de ce lot (null si aucun)
+     */
+    private function traiter(string $workspaceId, string $boite, int $validite, array $messages, BilanReleve $bilan, bool $rattrapage): ?int
     {
+        $premierEchec = null;
         foreach ($messages as $m) {
             $bilan->lus++;
             try {
-                $r = DB::transaction(fn (): array => $this->appliquer($workspaceId, $boite, $validite, $m, $rattrapage));
-            } catch (RetourInapplicable) {
-                // Isolé PAR MESSAGE : sans effet, à rattacher (revue humaine), la boîte continue.
+                try {
+                    $r = DB::transaction(fn (): array => $this->appliquer($workspaceId, $boite, $validite, $m, $rattrapage));
+                } catch (RetourInapplicable) {
+                    // Isolé PAR MESSAGE : sans effet, à rattacher (revue humaine), la boîte continue.
+                    $r = DB::transaction(fn (): array => $this->noterSansEffet($workspaceId, $boite, $validite, $m));
+                }
+            } catch (Exception $e) {
+                // Erreur PROPRE à ce message (le lecteur, lui, a déjà tout livré) : isoler, compter, passer au suivant.
+                $empreinte = self::empreinteMessage($m);
+                DB::table('envoi_echecs_releve')->insert([
+                    'workspace_id' => $workspaceId, 'boite' => $boite, 'empreinte_message' => $empreinte,
+                    'motif' => $e::class, 'cree_le' => now(),
+                ]);
+                $tentatives = DB::table('envoi_echecs_releve')->where('workspace_id', $workspaceId)->where('boite', $boite)->where('empreinte_message', $empreinte)->count();
+                Log::warning('Relève IMAP : message en échec', ['boite' => $boite, 'uid' => $m->uid, 'tentative' => $tentatives, 'erreur' => $e::class]);
+                if ($tentatives < self::MAX_TENTATIVES) {
+                    $bilan->echecs++;
+                    $premierEchec ??= $m->uid;
+
+                    continue;
+                }
+                // Mis à l'écart : « à rattacher », SANS effet, pour revue humaine ; le curseur peut passer.
+                Log::error('Relève IMAP : message mis à l\'écart après échecs répétés', ['boite' => $boite, 'uid' => $m->uid, 'erreur' => $e::class]);
                 $r = DB::transaction(fn (): array => $this->noterSansEffet($workspaceId, $boite, $validite, $m));
             }
             if ($r['enErreur']) {
@@ -120,6 +164,8 @@ final class ReleveImap
                 $bilan->doublons++;
             }
         }
+
+        return $premierEchec;
     }
 
     /** @return array{insere: bool, classe: string, rattache: bool, enErreur: bool} */
@@ -133,11 +179,13 @@ final class ReleveImap
         $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
         $expediteur = self::adresseDe($m->expediteur); // null si multiple, accentuée ou mal formée
 
-        // Un rebond dont le Final-Recipient n'est pas l'adresse à laquelle on a écrit
-        // (alias, redirection) ne prouve rien sur cette adresse : revue humaine.
-        if ($origine !== null && $m->destinataireDsn !== null && in_array($classe, self::CLASSES_REBOND, true)
-            && mb_strtolower(trim($m->destinataireDsn)) !== mb_strtolower(trim($origine->adresse))) {
-            $origine = null;
+        if ($origine !== null && in_array($classe, self::CLASSES_REBOND, true)) {
+            // Un rebond dont le Final-Recipient n'est pas l'adresse à laquelle on a écrit (alias, redirection),
+            // ou SANS Final-Recipient (un rebond dur ne prouve alors rien sur cette adresse), est douteux : revue humaine.
+            $destinataire = $m->destinataireDsn === null ? null : mb_strtolower(trim($m->destinataireDsn));
+            if ($destinataire === null ? $classe === ClasseRetour::RebondDur : $destinataire !== mb_strtolower(trim($origine->adresse))) {
+                $origine = null;
+            }
         }
 
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, $origine, $expediteur ?? $m->expediteur);
@@ -151,11 +199,9 @@ final class ReleveImap
                 $origine->idInjection,
                 $origine->adresse,
                 $opposition && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
-                $boite . ':' . $validite . ':' . $m->uid,
+                self::empreinteMessage($m), // clé STABLE (ni UID, ni UIDVALIDITY) : un retour n'est compté qu'une fois
             ));
         }
-
-        $this->poserCurseur($workspaceId, $boite, $validite, $m->uid);
 
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => $origine !== null, 'enErreur' => false];
     }
@@ -169,7 +215,6 @@ final class ReleveImap
     {
         $classe = $m->ecarte !== null ? ClasseRetour::ReponseHumaine : Classificateur::classer($m);
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, null, self::adresseDe($m->expediteur) ?? $m->expediteur);
-        $this->poserCurseur($workspaceId, $boite, $validite, $m->uid);
 
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => false, 'enErreur' => true];
     }
@@ -181,7 +226,7 @@ final class ReleveImap
             'boite' => $boite,
             'uid_validity' => $validite,
             'uid' => $m->uid,
-            'empreinte_message' => self::empreinteMessage($m, $validite),
+            'empreinte_message' => self::empreinteMessage($m),
             'classe' => $classe->value,
             'statut' => $origine !== null ? 'rattache' : 'a_rattacher',
             'id_injection' => $origine?->idInjection,
@@ -226,20 +271,21 @@ final class ReleveImap
         return array_map('strval', array_keys($propres));
     }
 
-    private static function empreinteMessage(MessageBrut $m, int $validite): string
+    /**
+     * Empreinte STABLE d'un message, indépendante des UID et d'UIDVALIDITY :
+     *  1. son Message-ID ; 2. à défaut, le HASH DE SON CONTENU (message lu ou écarté) ;
+     *  3. à défaut (lecteur sans contenu), expéditeur + INTERNALDATE + objet.
+     */
+    private static function empreinteMessage(MessageBrut $m): string
     {
         $id = trim((string) $m->messageId, " \t\r\n<>");
         if ($id !== '') {
             return hash('sha256', 'mid:' . $id);
         }
-        // Message écarté sans Message-ID : pas d'autre repère que sa position.
-        if ($m->ecarte !== null) {
-            return hash('sha256', 'ecarte:' . $validite . ':' . $m->uid);
+        if ($m->empreinteContenu !== null) {
+            return hash('sha256', 'contenu:' . $m->empreinteContenu);
         }
 
-        // Sans Message-ID : empreinte synthétique STABLE (jamais le corps), fondée sur
-        // l'expéditeur, la date INTERNALDATE (fixée par le serveur, pas l'en-tête Date
-        // que l'expéditeur choisit) et l'objet : elle survit à une renumérotation.
         return hash('sha256', 'syn:' . mb_strtolower(trim($m->expediteur)) . '|' . $m->recuLe->format('c') . '|' . trim($m->sujet));
     }
 
@@ -250,16 +296,20 @@ final class ReleveImap
     private static function adresseDe(string $expediteur): ?string
     {
         $expediteur = trim($expediteur);
-        $n = preg_match_all('/<([^<>]*)>/', $expediteur, $r);
-        if ($n > 1) {
-            return null;
-        }
-        if ($n === 1) {
-            $candidate = trim($r[1][0]);
-        } elseif (preg_match('/[\s,;]/', $expediteur) === 1) {
-            return null;
-        } else {
-            $candidate = $expediteur;
+        try {
+            $chevrons = Pcre::tousLesGroupes1('/<([^<>]*)>/', $expediteur);
+            if (count($chevrons) > 1) {
+                return null;
+            }
+            if (count($chevrons) === 1) {
+                $candidate = trim($chevrons[0]);
+            } elseif (Pcre::correspond('/[\s,;]/', $expediteur)) {
+                return null;
+            } else {
+                $candidate = $expediteur;
+            }
+        } catch (EchecAnalyse) {
+            return null; // non traitable sans risque : jamais d'effet deviné
         }
 
         return filter_var($candidate, FILTER_VALIDATE_EMAIL) !== false ? $candidate : null;

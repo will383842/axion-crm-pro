@@ -79,6 +79,17 @@ final class DepotMemoire implements DepotSocle
         $this->journaliser($workspaceId, 'tout_arreter', $auteur);
     }
 
+    public function leverToutArreter(string $workspaceId, string $auteur): bool
+    {
+        if (! $this->arret) {
+            return false;
+        }
+        $this->arret = false;
+        $this->journaliser($workspaceId, 'reprise', $auteur);
+
+        return true;
+    }
+
     public function eteindreTemoins(string $workspaceId, string $auteur): void
     {
         $this->temoinsAllumes = false;

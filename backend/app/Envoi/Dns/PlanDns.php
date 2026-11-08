@@ -28,10 +28,13 @@ final class PlanDns
     /** @return list<EnregistrementDns> */
     public static function enregistrements(ConfigurationDomaine $c): array
     {
+        // IPv6 configurée : AAAA et ip6: (un A / ip4: avec une adresse IPv6 serait faux).
+        $v6 = filter_var($c->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+
         return [
-            new EnregistrementDns('A', $c->helo, '{IP_ENVOI}', 'nom du HELO'),
+            new EnregistrementDns($v6 ? 'AAAA' : 'A', $c->helo, '{IP_ENVOI}', 'nom du HELO'),
             new EnregistrementDns('PTR', '{IP_ENVOI}', $c->helo . '.', 'PTR = HELO = A'),
-            new EnregistrementDns('TXT', $c->domaine, 'v=spf1 ip4:{IP_ENVOI} -all', 'SPF'),
+            new EnregistrementDns('TXT', $c->domaine, 'v=spf1 ' . ($v6 ? 'ip6' : 'ip4') . ':{IP_ENVOI} -all', 'SPF'),
             new EnregistrementDns('TXT', $c->selecteur . '._domainkey.' . $c->domaine, 'v=DKIM1; k=rsa; p={CLE_PUBLIQUE_DKIM}', 'DKIM'),
             new EnregistrementDns('TXT', '_dmarc.' . $c->domaine, 'v=DMARC1; p=none; rua=mailto:{BOITE_RAPPORTS_DMARC}', 'DMARC'),
             new EnregistrementDns('TXT', '_mta-sts.' . $c->domaine, 'v=STSv1; id={IDENTIFIANT_POLITIQUE}', 'MTA-STS'),

@@ -11,6 +11,12 @@ use App\Envoi\Chauffe\ToutArreter;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\Desinscription\ArretParEntreprise;
+use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
+use App\Envoi\Desinscription\EffetsOpposition;
+use App\Envoi\Desinscription\OppositionEnregistree;
+use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\ListesNoires\AlerteurJournal;
 use App\Envoi\ListesNoires\DepotControles;
 use App\Envoi\ListesNoires\DepotControlesDb;
@@ -28,6 +34,7 @@ use App\Envoi\Smtp\ResolveurDns;
 use App\Envoi\Smtp\ResolveurHote;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 /** Palier 0 : le seul transport branché est le simulateur. */
@@ -61,7 +68,10 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
             $app->make(FauxServeurEnvoi::class),
             $app->make(DepotSocle::class),
-            fn (): bool => (bool) config('envoi.reel_actif'),
+            // Garde M2 : tant que le retrait des envois en file est la liaison « absente », une opposition
+            // ne retirerait RIEN de la file (étape suivante d'une séquence) : l'envoi réel est tenu pour inactif.
+            fn (): bool => (bool) config('envoi.reel_actif')
+                && ! ($app->make(RetraitEnvoisEnFile::class) instanceof RetraitEnvoisEnFileAbsent),
             fn (): int => (int) config('envoi.plafond_jour'),
             null,
             '',
@@ -69,5 +79,14 @@ class EnvoiServiceProvider extends ServiceProvider
             fn (): ?string => WorkspaceContext::current(),
             $app->make(GardeChauffe::class),
         ));
+
+        // L5 désinscription : liaisons par défaut, remplacées par la file (retrait) et par L1 (arrêt par entreprise).
+        $this->app->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
+        $this->app->bind(ArretParEntreprise::class, ArretParEntrepriseAbsent::class);
+    }
+
+    public function boot(): void
+    {
+        Event::listen(OppositionEnregistree::class, EffetsOpposition::class);
     }
 }

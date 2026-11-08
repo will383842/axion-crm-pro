@@ -65,3 +65,17 @@ test('une valeur courte ou vide reste en un seul morceau', function () {
     expect(PlanDns::decouperTxt('v=spf1 -all'))->toBe(['v=spf1 -all'])
         ->and(PlanDns::decouperTxt(''))->toBe(['']);
 });
+
+test('D1b : IPv6 configurée → AAAA et ip6: (jamais A / ip4:) ; IPv4 → A et ip4: comme avant', function () {
+    $v6 = new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '2001:db8::10');
+    $lignes = array_map(fn ($e) => $e->type . ' ' . $e->nom . ' ' . $e->valeurModele, PlanDns::enregistrements($v6));
+    expect($lignes)->toContain('AAAA mx.envoi.example.test {IP_ENVOI}')
+        ->toContain('TXT envoi.example.test v=spf1 ip6:{IP_ENVOI} -all')
+        ->not->toContain('A mx.envoi.example.test {IP_ENVOI}');
+    expect(json_encode(PlanDns::enregistrements($v6), JSON_THROW_ON_ERROR))->not->toContain('2001:db8');   // modèles seulement
+
+    $v4 = array_map(fn ($e) => $e->type . ' ' . $e->nom . ' ' . $e->valeurModele, PlanDns::enregistrements(configPlan()));
+    expect($v4)->toContain('A mx.envoi.example.test {IP_ENVOI}')
+        ->toContain('TXT envoi.example.test v=spf1 ip4:{IP_ENVOI} -all')
+        ->not->toContain('AAAA mx.envoi.example.test {IP_ENVOI}');
+});

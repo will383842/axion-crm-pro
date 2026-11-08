@@ -29,8 +29,9 @@ final class Stockage
      * @param \Closure():int $horloge
      * @param bool|null      $purgeActive null = lu de PASSERELLE_PURGE_ACTIVE (faux par défaut : la purge ne fait rien)
      */
-    public function __construct(string $fichier, private readonly \Closure $horloge, ?bool $purgeActive = null)
+    public function __construct(string $fichier, private readonly \Closure $horloge, ?bool $purgeActive = null, int $busyTimeoutMs = 5000)
     {
+        $busyTimeoutMs = max(0, min(60_000, $busyTimeoutMs));
         $this->purgeActive = $purgeActive ?? Configuration::purgeActive();
         // Droits 0600 posés par le code (fichier, -wal et -shm héritent du mode du fichier) : umask restrictif à la création.
         $ancienUmask = umask(0077);
@@ -38,7 +39,7 @@ final class Stockage
             $this->pdo = new PDO('sqlite:'.$fichier);
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-            $this->pdo->exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;');
+            $this->pdo->exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout='.$busyTimeoutMs.';');
             $this->migrer();
         } finally {
             umask($ancienUmask);
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS evenements (
   workspace_id TEXT NOT NULL, sequence INTEGER NOT NULL, type TEXT NOT NULL,
   donnees TEXT NOT NULL, cree_le INTEGER NOT NULL,
   PRIMARY KEY (workspace_id, sequence)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS evenements_cree_le ON evenements (workspace_id, cree_le, sequence);
 CREATE TABLE IF NOT EXISTS purge_borne (workspace_id TEXT PRIMARY KEY, dernier_purge INTEGER NOT NULL) WITHOUT ROWID;
 CREATE TRIGGER IF NOT EXISTS purge_borne_no_delete BEFORE DELETE ON purge_borne
   BEGIN SELECT RAISE(ABORT, 'borne de purge definitive'); END;
@@ -386,19 +388,24 @@ SQL);
      */
     public function trous(string $ws): array
     {
-        $st = $this->pdo->prepare('SELECT sequence FROM evenements WHERE workspace_id=? ORDER BY sequence');
+        $purge = $this->dernierPurge($ws);
+        $dernier = $this->dernierSequence($ws);
+        // Voie rapide, 100 % SQL (aucun numéro rapatrié en PHP) : (purge, dernier] est contigu si et seulement si
+        // le nombre de lignes vaut dernier - purge, avec les bons extrêmes.
+        $st = $this->pdo->prepare('SELECT COUNT(*), MIN(sequence), MAX(sequence) FROM evenements WHERE workspace_id=?');
         $st->execute([$ws]);
-        $trous = [];
-        $prec = $this->dernierPurge($ws);
-        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $s) {
-            $s = (int) $s;
-            if ($s !== $prec + 1) {
-                $trous[] = [$prec + 1, $s - 1];
-            }
-            $prec = $s;
+        [$n, $min, $max] = array_values($st->fetch(PDO::FETCH_NUM));
+        if ((int) $n === $dernier - $purge && ($n === 0 || ((int) $min === $purge + 1 && (int) $max === $dernier))) {
+            return [];
         }
-        if ($prec !== $this->dernierSequence($ws)) {
-            $trous[] = [$prec + 1, $this->dernierSequence($ws)];
+        // Voie lente (anomalie seulement) : plages exactes calculées en SQL, puis queue.
+        $st = $this->pdo->prepare('SELECT prec + 1, sequence - 1 FROM (SELECT sequence, LAG(sequence, 1, ?) OVER (ORDER BY sequence) AS prec FROM evenements WHERE workspace_id=?) WHERE sequence <> prec + 1');
+        $st->execute([$purge, $ws]);
+        $trous = array_map(static fn (array $l): array => [(int) $l[0], (int) $l[1]], $st->fetchAll(PDO::FETCH_NUM));
+        if ($max !== null && (int) $max < $dernier) {
+            $trous[] = [(int) $max + 1, $dernier];
+        } elseif ($max === null && $dernier > $purge) {
+            $trous[] = [$purge + 1, $dernier];
         }
 
         return $trous;

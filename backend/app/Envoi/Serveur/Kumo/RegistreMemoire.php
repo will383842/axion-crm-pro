@@ -2,59 +2,107 @@
 
 namespace App\Envoi\Serveur\Kumo;
 
-/** Registre en mémoire : banc et tests. Ne survit pas au processus (voir la dette K9-registre-durable). */
+use RuntimeException;
+
+/**
+ * Registre en mémoire : banc et tests UNIQUEMENT. Ne survit pas au processus (voir la dette K9-registre-durable) :
+ * en production, un `a_verifier` perdu ferait RENVOYER un message déjà parti. Il refuse donc de se construire (et de
+ * servir) hors environnement `testing`, que le verrou d'envoi soit ouvert ou non.
+ */
 final class RegistreMemoire implements RegistreInjections
 {
-    /** @var array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string}> */
+    /** @var array<string, array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}>> */
     private array $lignes = [];
 
-    private bool $pause = false;
+    /** @var array<string, bool> */
+    private array $pause = [];
 
-    /** @var list<int> */
+    /** @var array<string, list<int>> */
     private array $cinqCents = [];
 
-    public function lire(string $cle): ?array
+    /** @var array<string, int> */
+    private array $sequence = [];
+
+    public function __construct()
     {
-        return $this->lignes[$cle] ?? null;
+        self::garde();
     }
 
-    public function ecrire(string $cle, array $ligne): void
+    private static function garde(): void
     {
-        $this->lignes[$cle] = $ligne;
+        if (! app()->environment('testing')) {
+            throw new RuntimeException('RegistreMemoire : réservé à l’environnement de test (registre durable requis ailleurs).');
+        }
     }
 
-    public function ecrireSi(string $cle, ?string $etatAttendu, array $ligne): bool
+    public function lire(string $workspaceId, string $cle): ?array
     {
-        if (($this->lignes[$cle]['etat'] ?? null) !== $etatAttendu) {
+        self::garde();
+
+        return $this->lignes[$workspaceId][$cle] ?? null;
+    }
+
+    public function ecrire(string $workspaceId, string $cle, array $ligne): void
+    {
+        self::garde();
+        $this->lignes[$workspaceId][$cle] = $ligne;
+    }
+
+    public function ecrireSi(string $workspaceId, string $cle, ?string $etatAttendu, ?int $instantAttendu, array $ligne): bool
+    {
+        self::garde();
+        $courante = $this->lignes[$workspaceId][$cle] ?? null;
+        if (($courante['etat'] ?? null) !== $etatAttendu || ($courante['instant'] ?? null) !== $instantAttendu) {
             return false;
         }
-        $this->lignes[$cle] = $ligne;
+        $this->lignes[$workspaceId][$cle] = $ligne;
 
         return true;
     }
 
-    public function tout(): array
+    public function tout(string $workspaceId): array
     {
-        return $this->lignes;
+        self::garde();
+
+        return $this->lignes[$workspaceId] ?? [];
     }
 
-    public function enPause(): bool
+    public function enPause(string $workspaceId): bool
     {
-        return $this->pause;
+        self::garde();
+
+        return $this->pause[$workspaceId] ?? false;
     }
 
-    public function fixerPause(bool $pause): void
+    public function fixerPause(string $workspaceId, bool $pause): void
     {
-        $this->pause = $pause;
+        self::garde();
+        $this->pause[$workspaceId] = $pause;
     }
 
-    public function noter5xx(int $instant): void
+    public function noter5xx(string $workspaceId, int $instant): void
     {
-        $this->cinqCents[] = $instant;
+        self::garde();
+        $this->cinqCents[$workspaceId][] = $instant;
     }
 
-    public function compter5xx(int $depuis): int
+    public function compter5xx(string $workspaceId, int $depuis): int
     {
-        return count(array_filter($this->cinqCents, fn (int $i): bool => $i >= $depuis));
+        self::garde();
+
+        return count(array_filter($this->cinqCents[$workspaceId] ?? [], fn (int $i): bool => $i >= $depuis));
+    }
+
+    public function reinitialiser5xx(string $workspaceId): void
+    {
+        self::garde();
+        $this->cinqCents[$workspaceId] = [];
+    }
+
+    public function prochaineSequence(string $workspaceId): int
+    {
+        self::garde();
+
+        return $this->sequence[$workspaceId] = ($this->sequence[$workspaceId] ?? 0) + 1;
     }
 }

@@ -14,9 +14,11 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
+use App\Envoi\Serveur\Kumo\EchecAuthentification;
 use App\Envoi\Serveur\Kumo\InterrogeurEtat;
 use App\Envoi\Serveur\Kumo\RegistreInjections;
 use App\Envoi\Serveur\Kumo\TransportInjection;
+use App\Envoi\Serveur\Kumo\TransportSmtpTunnel;
 use Closure;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +43,10 @@ use Throwable;
  *  - JETON X-Envoi-Jeton PAR message (128 bits, HMAC de la clé d'idempotence) ; écriture conditionnelle (CAS) du
  *    registre avant d'envoyer : deux workers sur la même clé => un seul envoi.
  *  - pause / reprise / retrait : commandes signées (contrat v2) via ClientServeurEnvoiHmac.
- *  - liste blanche des témoins vérifiée AVANT tout état et toute connexion.
+ *  - liste blanche des témoins ET validité de l'enveloppe vérifiées AVANT tout état et toute connexion.
+ *  - 5xx numérique (même avant DATA) = echec + compté ; AUTH/certificat refusé = alerte critique + pause, JAMAIS de
+ *    réessai périodique (aurait l'air d'un forçage d'identifiants).
+ *  - Tout est cloisonné par espace (registre : clés, pause, compteur de 5xx, séquence des événements).
  * L'état d'injection est écrit AVANT le réseau. Aucun suivi d'ouverture.
  */
 final class ServeurEnvoiKumo implements ServeurEnvoi
@@ -78,6 +83,7 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
             throw EnvoiRefuse::autreEspace();
         }
         self::refuserTransactionEnglobante();
+        $this->verifierEnveloppe($message); // avant le moindre état d'injection (comme L4)
         if ($this->verrouFerme()) {
             return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
         }
@@ -89,14 +95,14 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         }
 
         $cle = $message->cleIdempotence;
-        $ligne = $this->registre->lire($cle);
+        $ligne = $this->registre->lire($this->workspaceId, $cle);
         if ($ligne !== null) {
             $decision = $this->decisionSurExistant($cle, $ligne);
             if ($decision !== null) {
                 return $decision;
             }
         }
-        if ($this->registre->enPause()) {
+        if ($this->registre->enPause($this->workspaceId)) {
             return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
         }
 
@@ -107,19 +113,29 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         // L'état est écrit AVANT le réseau, et de façon CONDITIONNELLE : si un autre worker a déjà pris la clé
         // (état différent de celui que nous avons lu), nous n'envoyons rien.
         $nouvelle = ['id' => $id, 'etat' => 'injection_en_cours', 'reporte_au' => null, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton];
-        if (! $this->registre->ecrireSi($cle, $ligne['etat'] ?? null, $nouvelle)) {
+        if (! $this->registre->ecrireSi($this->workspaceId, $cle, $ligne['etat'] ?? null, $ligne['instant'] ?? null, $nouvelle)) {
             return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
         }
 
         try {
-            $code = $this->transport->envoyer($message, $jeton);
+            $code = $this->transport->envoyer($message, $jeton, $this->source);
         } catch (CoupureTransport $c) {
             if (! $c->apresData) {
                 return $this->reporter($cle, $id, $jeton); // rien n'a pu partir
             }
 
             return $this->incertain($cle, $id, $jeton);
-        } catch (Throwable) {
+        } catch (EchecAuthentification) {
+            return $this->authEchouee($cle, $id, $jeton);
+        } catch (ServeurEnvoiRefuse $e) {
+            // Refus LOCAL du transport (jeton, transaction, enveloppe) : rien n'est parti, rien ne se réessaiera seul.
+            $this->noter($cle, $id, 'echec', $jeton);
+            Log::warning('envoi.kumo_refus_local', ['workspace_id' => $this->workspaceId, 'classe' => $e::class]);
+            throw $e;
+        } catch (Throwable $e) {
+            // Classe seulement : le message d'une exception réseau peut contenir des identifiants.
+            Log::error('envoi.kumo_injection_incertaine', ['workspace_id' => $this->workspaceId, 'classe' => $e::class]);
+
             return $this->incertain($cle, $id, $jeton);
         }
 
@@ -133,7 +149,7 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         }
         if ($code >= 500 && $code < 600) {
             $this->noter($cle, $id, 'echec', $jeton);
-            $this->registre->noter5xx(($this->horloge)()->getTimestamp());
+            $this->registre->noter5xx($this->workspaceId, ($this->horloge)()->getTimestamp());
             $this->pauseSiTrop5xx();
             throw new RuntimeException('Refus définitif du serveur d’envoi (' . $code . ').');
         }
@@ -144,7 +160,9 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
     /**
      * Jeton interne X-Envoi-Jeton : 128 bits (32 hex), HMAC de l'espace et de la clé d'idempotence. Un jeton par
      * message ; le même pour un renvoi de la même clé. Il sert au dédoublonnage et, mis en forme d'UUID, d'identifiant
-     * d'injection : l'adresse de rebond `rb-<jeton>` (Verp) se rattache donc à l'injection.
+     * d'injection : l'adresse de rebond `rb-<jeton>` (Verp) se rattache donc à l'injection. Le transport SMTP pose ce VERP
+     * en chemin de retour et X-Envoi-Source (testé : TransportSmtpTunnelTest). Le ComposeurMessage (List-Unsubscribe,
+     * pied art. 14) n'est PAS utilisé : dette nommée dans docs/envoi/K9-adaptateur-kumo.md.
      */
     private function jetonPour(MessageAEnvoyer $message): string
     {
@@ -170,14 +188,25 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         }
     }
 
+    /** Enveloppe valide (adresses RFC, partie locale ASCII) : refus AVANT tout état, sans adresse dans le journal. */
+    private function verifierEnveloppe(MessageAEnvoyer $message): void
+    {
+        try {
+            TransportSmtpTunnel::adressesValides($message->expediteur, $message->destinataire);
+        } catch (Throwable) {
+            Log::warning('envoi.kumo_enveloppe_invalide', ['workspace_id' => $this->workspaceId]);
+            throw ServeurEnvoiRefuse::motif('enveloppe invalide (adresse expéditeur ou destinataire).');
+        }
+    }
+
     /** Filet : une injection restée « en cours » (processus tué) devient « à vérifier ». Jamais renvoyée. */
     public function reconcilierOrphelines(int $minutes = 5): int
     {
         $limite = ($this->horloge)()->getTimestamp() - max(1, $minutes) * 60;
         $n = 0;
-        foreach ($this->registre->tout() as $cle => $l) {
+        foreach ($this->registre->tout($this->workspaceId) as $cle => $l) {
             if ($l['etat'] === 'injection_en_cours' && $l['instant'] < $limite
-                && $this->registre->ecrireSi($cle, 'injection_en_cours', ['etat' => 'a_verifier', 'instant' => ($this->horloge)()->getTimestamp()] + $l)) {
+                && $this->registre->ecrireSi($this->workspaceId, $cle, 'injection_en_cours', $l['instant'], ['etat' => 'a_verifier', 'instant' => ($this->horloge)()->getTimestamp()] + $l)) {
                 $n++;
             }
         }
@@ -205,7 +234,7 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
                 };
             case 'reporte':
                 if ($ligne['reporte_au'] !== null && $ligne['reporte_au'] > ($this->horloge)()->getTimestamp()) {
-                    return ResultatInjection::reporte((new DateTimeImmutable)->setTimestamp($ligne['reporte_au']));
+                    return ResultatInjection::reporte(($this->horloge)()->setTimestamp($ligne['reporte_au']));
                 }
         }
 
@@ -243,18 +272,34 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
         return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
     }
 
+    /** AUTH ou certificat refusé : alerte critique SANS secret ni trace, puis PAUSE ; au plus tôt demain, jamais +15 min. */
+    private function authEchouee(string $cle, string $id, string $jeton): ResultatInjection
+    {
+        Log::critical('Envoi : authentification ou certificat du serveur d’envoi refusé, pause posée.', ['workspace_id' => $this->workspaceId]);
+        $this->registre->fixerPause($this->workspaceId, true);
+        $demain = ($this->horloge)()->modify('tomorrow');
+        $this->noter($cle, $id, 'reporte', $jeton, $demain->getTimestamp());
+
+        return ResultatInjection::reporte($demain);
+    }
+
     private function noter(string $cle, string $id, string $etat, string $jeton, ?int $reporteAu = null): void
     {
-        $this->registre->ecrire($cle, ['id' => $id, 'etat' => $etat, 'reporte_au' => $reporteAu, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton]);
+        $ligne = ['id' => $id, 'etat' => $etat, 'reporte_au' => $reporteAu, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton];
+        if ($etat === 'accepte') {
+            // Séquence STABLE assignée une fois, à l'acceptation : un événement ne se déplace jamais.
+            $ligne['seq'] = $this->registre->lire($this->workspaceId, $cle)['seq'] ?? $this->registre->prochaineSequence($this->workspaceId);
+        }
+        $this->registre->ecrire($this->workspaceId, $cle, $ligne);
     }
 
     private function pauseSiTrop5xx(): void
     {
         $depuis = ($this->horloge)()->getTimestamp() - self::FENETRE_5XX_SECONDES;
-        $n = $this->registre->compter5xx($depuis);
+        $n = $this->registre->compter5xx($this->workspaceId, $depuis);
         if ($n >= self::SEUIL_5XX) {
             Log::critical('Envoi : pause automatique du serveur (5xx répétés).', ['nombre_5xx' => $n]);
-            $this->registre->fixerPause(true); // fail-safe : posée AVANT la commande, même si elle échoue
+            $this->registre->fixerPause($this->workspaceId, true); // fail-safe : posée AVANT la commande, même si elle échoue
             $this->commander('pause');
         }
     }
@@ -288,7 +333,7 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
 
     public function etatEnvoi(string $idInjection): EtatMessage
     {
-        foreach ($this->registre->tout() as $cle => $l) {
+        foreach ($this->registre->tout($this->workspaceId) as $cle => $l) {
             if ($l['id'] !== $idInjection) {
                 continue;
             }
@@ -306,10 +351,14 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
 
     private function etatDistant(string $cle, string $id, string $jeton): EtatMessage
     {
+        // Même lecture que decisionSurExistant : Envoye/EnFile/Rebond = pris en charge, Refuse = échec définitif
+        // (lu par interrogation : ne compte pas pour la pause), Inconnu = reste a_verifier.
         $etat = $this->interroger($id);
-        if ($etat === EtatMessage::Envoye) {
-            $this->noter($cle, $id, 'accepte', $jeton);
-        }
+        match ($etat) {
+            EtatMessage::Envoye, EtatMessage::EnFile, EtatMessage::Rebond => $this->noter($cle, $id, 'accepte', $jeton),
+            EtatMessage::Refuse => $this->noter($cle, $id, 'echec', $jeton),
+            EtatMessage::Inconnu => null,
+        };
 
         return $etat;
     }
@@ -317,14 +366,15 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
     public function pause(): void
     {
         // Pause posée AVANT la commande : passerelle injoignable => plus aucune injection (sûr par défaut).
-        $this->registre->fixerPause(true);
+        $this->registre->fixerPause($this->workspaceId, true);
         $this->commander('pause');
     }
 
     public function reprise(): void
     {
         $this->commander('reprise'); // si elle échoue, la pause reste posée
-        $this->registre->fixerPause(false);
+        $this->registre->fixerPause($this->workspaceId, false);
+        $this->registre->reinitialiser5xx($this->workspaceId); // on ne repart pas avec les 5xx qui ont causé la pause
     }
 
     /** Retrait urgent (opposition) : file du serveur. Hors `ServeurEnvoi` (D4) : l'appelant teste `instanceof`. */
@@ -340,27 +390,32 @@ final class ServeurEnvoiKumo implements ServeurEnvoi
 
     public function etat(): EtatServeur
     {
-        $n = count(array_filter($this->registre->tout(), fn (array $l): bool => $l['etat'] === 'accepte'));
+        $n = count(array_filter($this->registre->tout($this->workspaceId), fn (array $l): bool => $l['etat'] === 'accepte'));
 
-        return new EtatServeur($this->registre->enPause(), $n);
+        return new EtatServeur($this->registre->enPause($this->workspaceId), $n);
     }
 
     /** Aucun ping réseau. */
     public function sante(): SanteServeur
     {
-        return new SanteServeur(true, $this->registre->enPause() ? 'kumo en pause' : 'kumo pret');
+        return new SanteServeur(true, $this->registre->enPause($this->workspaceId) ? 'kumo en pause' : 'kumo pret');
     }
 
+    /** Curseur = dernier numéro de séquence rendu (stable, assigné à l'acceptation) ; illisible ou négatif => 0. */
     public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements
     {
-        $debut = $curseur === null ? 0 : (int) $curseur;
-        $acceptes = array_values(array_filter($this->registre->tout(), fn (array $l): bool => $l['etat'] === 'accepte'));
-        $tranche = array_slice($acceptes, $debut, max(1, $limite));
+        $apres = $curseur === null ? 0 : max(0, (int) $curseur);
+        $acceptes = array_filter(
+            $this->registre->tout($this->workspaceId),
+            fn (array $l): bool => $l['etat'] === 'accepte' && ($l['seq'] ?? 0) > $apres,
+        );
+        usort($acceptes, fn (array $a, array $b): int => $a['seq'] <=> $b['seq']);
+        $tranche = array_slice($acceptes, 0, max(1, $limite));
         $evenements = [];
-        foreach ($tranche as $i => $l) {
-            $evenements[] = new EvenementEnvoi('ev-' . ($debut + $i), 'accepte_smtp', $l['id'], '');
+        foreach ($tranche as $l) {
+            $evenements[] = new EvenementEnvoi('ev-' . $l['seq'], 'accepte_smtp', $l['id'], '');
         }
 
-        return new LotEvenements($evenements, $tranche === [] ? $curseur : (string) ($debut + count($tranche)));
+        return new LotEvenements($evenements, $tranche === [] ? $curseur : (string) end($tranche)['seq']);
     }
 }

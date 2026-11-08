@@ -35,5 +35,5 @@ test('injecter() est refusé dans une transaction ouverte : zéro connexion, rie
     } finally {
         DB::rollBack();
     }
-    expect($t->connexions)->toBe(0)->and($reg->tout())->toBe([]);
+    expect($t->connexions)->toBe(0)->and($reg->tout(WS_K9))->toBe([]);
 });

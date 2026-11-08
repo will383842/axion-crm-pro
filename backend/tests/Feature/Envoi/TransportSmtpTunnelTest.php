@@ -2,7 +2,10 @@
 
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
+use App\Envoi\Serveur\Kumo\EchecAuthentification;
+use App\Envoi\Serveur\Kumo\EsmtpSuiviData;
 use App\Envoi\Serveur\Kumo\TransportSmtpTunnel;
+use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -111,10 +114,19 @@ test('STARTTLS absent : classé AVANT DATA, et aucun identifiant n’est envoyé
     });
 });
 
-test('AUTH refusé (535) : classé AVANT DATA', function () {
+// Corrigé (audit K9) : l'ancien test classait l'AUTH 535 en simple coupure avant DATA, donc en report toutes les
+// 15 minutes (apparence de forçage d'identifiants). Un échec AUTH est désormais une exception À PART.
+test('AUTH refusé (535) : EchecAuthentification (à part), sans secret ni cause chaînée, DATA jamais atteint', function () {
     tunnelAvecFauxServeur('auth_535', function (int $port, string $fichier) {
-        expect(tunnelCoupure(tunnel($port))[0])->toBeFalse();
-        expect(filesize($fichier))->toBe(0); // DATA jamais atteint
+        try {
+            tunnel($port)->envoyer(tunnelMsg(), str_repeat('a', 32));
+        } catch (EchecAuthentification $e) {
+            expect($e->getMessage())->not->toContain('secret-de-test-tunnel')->and($e->getPrevious())->toBeNull();
+            expect(filesize($fichier))->toBe(0);
+
+            return;
+        }
+        throw new RuntimeException('EchecAuthentification attendu.');
     });
 });
 
@@ -125,10 +137,35 @@ test('délai sur la bannière : classé AVANT DATA', function () {
     });
 });
 
-test('certificat qui ne correspond pas au nom attendu : refus AVANT DATA', function () {
+test('certificat qui ne correspond pas au nom attendu : EchecAuthentification (à part), avant DATA', function () {
     tunnelAvecFauxServeur('ok', function (int $port, string $fichier) {
-        expect(tunnelCoupure(tunnel($port, 30, 'autre.exemple.test'))[0])->toBeFalse();
+        expect(fn () => tunnel($port, 30, 'autre.exemple.test')->envoyer(tunnelMsg(), str_repeat('a', 32)))
+            ->toThrow(EchecAuthentification::class);
         expect(filesize($fichier))->toBe(0);
+    });
+});
+
+test('5xx NUMÉRIQUE avant DATA (RCPT ou MAIL FROM refusé) : le code est rendu, jamais une coupure à reporter', function (string $mode) {
+    tunnelAvecFauxServeur($mode, function (int $port, string $fichier) {
+        expect(tunnel($port)->envoyer(tunnelMsg(), str_repeat('a', 32)))->toBe(550);
+        expect(filesize($fichier))->toBe(0);
+    });
+})->with(['rcpt_550', 'mail_550']);
+
+test('enveloppe invalide (adresse non RFC ou partie locale non ASCII) : refus local, aucune connexion', function (string $dest) {
+    $m = new MessageAEnvoyer('00000000-0000-4000-8000-000000000001', $dest, 'from@example.test', 'S', 'C', 'cle-tunnel');
+    // port 1 : une connexion échouerait ; le refus doit venir AVANT.
+    expect(fn () => tunnel(1)->envoyer($m, str_repeat('a', 32)))->toThrow(ServeurEnvoiRefuse::class);
+})->with(['a b@example.test', 'é@example.test', 'a@@x']);
+
+test('X-Envoi-Source est transmis et le chemin de retour est le VERP rb-<jeton>@bounce.<domaine>', function () {
+    config(['envoi.cle_empreinte' => 'cle-empreinte-de-test-0123456789']);
+    tunnelAvecFauxServeur('ok', function (int $port, string $fichier) {
+        $jeton = str_repeat('ab', 16);
+        expect(tunnel($port)->envoyer(tunnelMsg(), $jeton, 'src-test'))->toBe(250);
+        expect(file_get_contents($fichier))->toContain('X-Envoi-Source: src-test');
+        $cmd = (string) file_get_contents($fichier . '.cmd');
+        expect($cmd)->toMatch('/MAIL FROM:<rb-' . $jeton . '[0-9a-f]{10}@bounce\.example\.test>/i');
     });
 });
 
@@ -138,13 +175,21 @@ test('4xx et 5xx après DATA : le code SMTP est rendu tel quel', function (strin
     });
 })->with([['451_apres_data', 451], ['550_apres_data', 550]]);
 
-test('le secret n’apparaît pas dans la trace d’une construction refusée', function () {
+// Corrigé (audit K9) : l'ancien test lisait getTraceAsString(), qui coupe les arguments à 15 caractères : il passait
+// même avec un secret exposé. On vérifie l'exception rendue : ni le secret, ni cause chaînée, et le secret est
+// marqué #[\SensitiveParameter] (le constructeur ET executeCommand, qui reçoit « AUTH ... » avec identifiants).
+test('construction refusée : ni le secret ni une cause chaînée dans l’exception rendue', function () {
     try {
         new TransportSmtpTunnel('', 587, 'u', 'secret-visible-xyz');
     } catch (Throwable $e) {
-        expect($e->getTraceAsString())->not->toContain('secret-visible-xyz');
+        expect($e->getMessage())->not->toContain('secret-visible-xyz')->and($e->getPrevious())->toBeNull();
 
         return;
     }
     throw new RuntimeException('Un refus était attendu.');
+});
+
+test('executeCommand porte #[SensitiveParameter] (la commande AUTH contient les identifiants)', function () {
+    $p = (new ReflectionMethod(EsmtpSuiviData::class, 'executeCommand'))->getParameters()[0];
+    expect($p->getAttributes(SensitiveParameter::class))->toHaveCount(1);
 });

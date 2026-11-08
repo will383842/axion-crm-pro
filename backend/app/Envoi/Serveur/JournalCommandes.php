@@ -54,6 +54,9 @@ final class JournalCommandes
 
     /**
      * Intentions SANS acquittement de l'espace (les plus anciennes d'abord), à rejouer avec le même commande_id.
+     * Exception : une `pause` (ou `reprise`) non acquittée est OBSOLÈTE, donc jamais rejouée, si une commande
+     * contraire (`reprise` / `pause`) POSTÉRIEURE a été acquittée : sinon le rejeu remettrait le serveur dans un état
+     * que l'opérateur a déjà défait. Le journal reste en ajout seul (rien n'est modifié).
      *
      * @return list<array{commande_id: string, commande: string, source: string}>
      */
@@ -65,8 +68,12 @@ final class JournalCommandes
                 'SELECT i.commande_id, i.commande, i.source FROM envoi_journal_commandes i
                  WHERE i.workspace_id = ? AND i.commande_id IS NOT NULL AND i.source IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM envoi_journal_commandes a WHERE a.workspace_id = i.workspace_id AND a.commande = ? AND a.cle_idempotence = i.commande_id)
+                   AND NOT (i.commande IN (\'pause\', \'reprise\') AND EXISTS (
+                       SELECT 1 FROM envoi_journal_commandes j
+                       JOIN envoi_journal_commandes a2 ON a2.workspace_id = j.workspace_id AND a2.commande = ? AND a2.cle_idempotence = j.commande_id
+                       WHERE j.workspace_id = i.workspace_id AND j.commande IN (\'pause\', \'reprise\') AND j.commande <> i.commande AND j.id > i.id))
                  ORDER BY i.id LIMIT ?',
-                [$workspaceId, self::ACQUITTEMENT, $limite],
+                [$workspaceId, self::ACQUITTEMENT, self::ACQUITTEMENT, $limite],
             ),
         )));
     }

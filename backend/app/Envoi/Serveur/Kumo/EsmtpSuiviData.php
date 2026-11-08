@@ -9,7 +9,7 @@ final class EsmtpSuiviData extends EsmtpTransport
 {
     public bool $donneesEngagees = false;
 
-    public function executeCommand(string $command, array $codes): string
+    public function executeCommand(#[\SensitiveParameter] string $command, array $codes): string
     {
         $reponse = parent::executeCommand($command, $codes);
         if (trim($command) === 'DATA') {

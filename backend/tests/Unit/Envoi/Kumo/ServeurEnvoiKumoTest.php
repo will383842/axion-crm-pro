@@ -62,10 +62,10 @@ test('verrou fermé : zéro connexion, rien enregistré', function () {
     $reg = new RegistreMemoire;
     $r = kumoFabrique($t, null, null, $reg)->injecter(msgK9());
     expect($r->accepte)->toBeFalse()->and($t->connexions)->toBe(0)->and($t->interrogations)->toBe(0);
-    expect($reg->tout())->toBe([]); // rien enregistré : ni ligne, ni compteur, ni pause
+    expect($reg->tout(WS_K9))->toBe([]); // rien enregistré : ni ligne, ni compteur, ni pause
     config(['envoi.reel_actif' => true, 'envoi.k1_actif' => false]);
     kumoFabrique($t, null, null, $reg)->injecter(msgK9());
-    expect($t->connexions)->toBe(0)->and($reg->tout())->toBe([]);
+    expect($t->connexions)->toBe(0)->and($reg->tout(WS_K9))->toBe([]);
 });
 
 test('hors liste blanche des témoins : refus, zéro connexion', function () {
@@ -95,7 +95,7 @@ test('jeton : un renvoi de la même clé garde le même jeton (et le jeton est s
     }, $reg);
     $s->injecter(msgK9('m1'));
     $premier = $t->dernierJeton;
-    expect($reg->lire('m1')['jeton'])->toBe($premier);
+    expect($reg->lire(WS_K9, 'm1')['jeton'])->toBe($premier);
     $maintenant = $maintenant->modify('+2 hours');
     expect($s->injecter(msgK9('m1'))->accepte)->toBeTrue();
     expect($t->dernierJeton)->toBe($premier)->and($t->connexions)->toBe(2);
@@ -121,7 +121,7 @@ test('4xx : report de tranche, une seule tentative, jamais de boucle', function 
     }, $reg);
     $r = $s->injecter(msgK9());
     expect($r->accepte)->toBeFalse()->and($r->reporteAu)->not->toBeNull()->and($t->connexions)->toBe(1);
-    expect($reg->lire('k1')['etat'])->toBe('reporte');
+    expect($reg->lire(WS_K9, 'k1')['etat'])->toBe('reporte');
     // Rappel avant l'échéance : aucune nouvelle connexion.
     $maintenant = $maintenant->modify('+5 minutes');
     $s->injecter(msgK9());
@@ -129,7 +129,7 @@ test('4xx : report de tranche, une seule tentative, jamais de boucle', function 
     // Après l'échéance : retour à l'envoi, une seule tentative de plus.
     $maintenant = $maintenant->modify('+20 minutes');
     expect($s->injecter(msgK9())->accepte)->toBeTrue();
-    expect($t->connexions)->toBe(2)->and($reg->lire('k1')['etat'])->toBe('accepte');
+    expect($t->connexions)->toBe(2)->and($reg->lire(WS_K9, 'k1')['etat'])->toBe('accepte');
 });
 
 test('coupure après DATA : a_verifier, jamais renvoyé, état consulté avant toute réinjection', function () {
@@ -138,7 +138,7 @@ test('coupure après DATA : a_verifier, jamais renvoyé, état consulté avant t
     $reg = new RegistreMemoire;
     $s = kumoFabrique($t, null, null, $reg);
     $r = $s->injecter(msgK9());
-    expect($r->accepte)->toBeFalse()->and($t->connexions)->toBe(1)->and($reg->lire('k1')['etat'])->toBe('a_verifier');
+    expect($r->accepte)->toBeFalse()->and($t->connexions)->toBe(1)->and($reg->lire(WS_K9, 'k1')['etat'])->toBe('a_verifier');
     // Rappel : etatEnvoi est interrogé, et le sort reste inconnu => toujours aucun renvoi.
     $r2 = $s->injecter(msgK9());
     expect($r2->accepte)->toBeFalse()->and($t->interrogations)->toBeGreaterThan(0)->and($t->connexions)->toBe(1);
@@ -163,7 +163,7 @@ test('coupure avant DATA : report simple, rien n’est parti', function () {
         return $maintenant;
     }, $reg);
     expect($s->injecter(msgK9())->accepte)->toBeFalse();
-    expect($reg->lire('k1')['etat'])->toBe('reporte')->and($t->interrogations)->toBe(0); // PAS a_verifier
+    expect($reg->lire(WS_K9, 'k1')['etat'])->toBe('reporte')->and($t->interrogations)->toBe(0); // PAS a_verifier
     $maintenant = $maintenant->modify('+1 hour');
     expect($s->injecter(msgK9())->accepte)->toBeTrue()->and($t->connexions)->toBe(2);
 });
@@ -241,7 +241,7 @@ test('reprise : si la commande échoue, la pause reste posée (sûr par défaut)
         }
     };
     expect(fn () => kumoFabrique(null, $ko, null, $reg)->reprise())->toThrow(ServeurEnvoiRefuse::class);
-    expect($reg->enPause())->toBeTrue();
+    expect($reg->enPause(WS_K9))->toBeTrue();
 });
 
 test('5xx : la fenêtre de 10 minutes compte avec une horloge avancée', function () {
@@ -273,7 +273,7 @@ test('5xx : 3 en 10 minutes sont comptés dans le registre partagé (compteur pe
         } catch (RuntimeException) {
         }
     }
-    expect($c->commandes)->toBe(['pause'])->and($reg->enPause())->toBeTrue();
+    expect($c->commandes)->toBe(['pause'])->and($reg->enPause(WS_K9))->toBeTrue();
 });
 
 test('un échec lu par interrogation (sort Refuse) ne compte PAS comme un 5xx', function () {
@@ -297,9 +297,9 @@ test('un échec lu par interrogation (sort Refuse) ne compte PAS comme un 5xx', 
 test('registre : écriture conditionnelle (compare-and-set)', function () {
     $r = new RegistreMemoire;
     $l = ['id' => 'i', 'etat' => 'injection_en_cours', 'reporte_au' => null, 'instant' => 1, 'jeton' => str_repeat('a', 32)];
-    expect($r->ecrireSi('k', null, $l))->toBeTrue()->and($r->ecrireSi('k', null, $l))->toBeFalse();
-    expect($r->ecrireSi('k', 'reporte', ['etat' => 'accepte'] + $l))->toBeFalse()->and($r->lire('k')['etat'])->toBe('injection_en_cours');
-    expect($r->ecrireSi('k', 'injection_en_cours', ['etat' => 'accepte'] + $l))->toBeTrue()->and($r->lire('k')['etat'])->toBe('accepte');
+    expect($r->ecrireSi(WS_K9, 'k', null, null, $l))->toBeTrue()->and($r->ecrireSi(WS_K9, 'k', null, null, $l))->toBeFalse();
+    expect($r->ecrireSi(WS_K9, 'k', 'reporte', 1, ['etat' => 'accepte'] + $l))->toBeFalse()->and($r->lire(WS_K9, 'k')['etat'])->toBe('injection_en_cours');
+    expect($r->ecrireSi(WS_K9, 'k', 'injection_en_cours', 1, ['etat' => 'accepte'] + $l))->toBeTrue()->and($r->lire(WS_K9, 'k')['etat'])->toBe('accepte');
 });
 
 test('deux workers, même clé, lecture périmée : un seul envoi', function () {
@@ -309,44 +309,54 @@ test('deux workers, même clé, lecture périmée : un seul envoi', function () 
     {
         public function __construct(private readonly RegistreMemoire $r) {}
 
-        public function lire(string $cle): ?array
+        public function lire(string $workspaceId, string $cle): ?array
         {
             return null;
         }
 
-        public function ecrire(string $cle, array $ligne): void
+        public function ecrire(string $workspaceId, string $cle, array $ligne): void
         {
-            $this->r->ecrire($cle, $ligne);
+            $this->r->ecrire($workspaceId, $cle, $ligne);
         }
 
-        public function ecrireSi(string $cle, ?string $etatAttendu, array $ligne): bool
+        public function ecrireSi(string $workspaceId, string $cle, ?string $etatAttendu, ?int $instantAttendu, array $ligne): bool
         {
-            return $this->r->ecrireSi($cle, $etatAttendu, $ligne);
+            return $this->r->ecrireSi($workspaceId, $cle, $etatAttendu, $instantAttendu, $ligne);
         }
 
-        public function tout(): array
+        public function tout(string $workspaceId): array
         {
-            return $this->r->tout();
+            return $this->r->tout($workspaceId);
         }
 
-        public function enPause(): bool
+        public function enPause(string $workspaceId): bool
         {
-            return $this->r->enPause();
+            return $this->r->enPause($workspaceId);
         }
 
-        public function fixerPause(bool $pause): void
+        public function fixerPause(string $workspaceId, bool $pause): void
         {
-            $this->r->fixerPause($pause);
+            $this->r->fixerPause($workspaceId, $pause);
         }
 
-        public function noter5xx(int $instant): void
+        public function noter5xx(string $workspaceId, int $instant): void
         {
-            $this->r->noter5xx($instant);
+            $this->r->noter5xx($workspaceId, $instant);
         }
 
-        public function compter5xx(int $depuis): int
+        public function compter5xx(string $workspaceId, int $depuis): int
         {
-            return $this->r->compter5xx($depuis);
+            return $this->r->compter5xx($workspaceId, $depuis);
+        }
+
+        public function reinitialiser5xx(string $workspaceId): void
+        {
+            $this->r->reinitialiser5xx($workspaceId);
+        }
+
+        public function prochaineSequence(string $workspaceId): int
+        {
+            return $this->r->prochaineSequence($workspaceId);
         }
     };
     $t = new FauxTransportKumo;
@@ -364,10 +374,10 @@ test('orphelines : une injection_en_cours ancienne devient a_verifier (jamais re
         return $maintenant;
     }, $reg);
     $vieille = ['id' => 'v', 'etat' => 'injection_en_cours', 'reporte_au' => null, 'instant' => $maintenant->getTimestamp() - 3600, 'jeton' => str_repeat('b', 32)];
-    $reg->ecrire('vieille', $vieille);
-    $reg->ecrire('recente', ['id' => 'r', 'instant' => $maintenant->getTimestamp() - 30] + $vieille);
+    $reg->ecrire(WS_K9, 'vieille', $vieille);
+    $reg->ecrire(WS_K9, 'recente', ['id' => 'r', 'instant' => $maintenant->getTimestamp() - 30] + $vieille);
     expect($s->reconcilierOrphelines(5))->toBe(1);
-    expect($reg->lire('vieille')['etat'])->toBe('a_verifier')->and($reg->lire('recente')['etat'])->toBe('injection_en_cours');
+    expect($reg->lire(WS_K9, 'vieille')['etat'])->toBe('a_verifier')->and($reg->lire(WS_K9, 'recente')['etat'])->toBe('injection_en_cours');
     expect($s->injecter(msgK9('vieille'))->accepte)->toBeFalse()->and($t->connexions)->toBe(0);
 });
 
@@ -388,4 +398,185 @@ test('l’identifiant d’injection est le jeton mis en forme d’UUID : le VERP
     expect(str_replace('-', '', $r->idInjection))->toBe($t->dernierJeton);
     $adresse = Verp::adressePour($r->idInjection, 'exemple.test');
     expect($adresse)->toStartWith('rb-' . $t->dernierJeton)->and(Verp::idInjectionDepuis($adresse))->toBe($r->idInjection);
+});
+
+// ───────── Audit d'exactitude K9 : tests écrits ROUGES d'abord ─────────
+
+const WS_K9_B = '00000000-0000-4000-8000-000000000002';
+
+/** @param array<string, mixed> $c */
+function kumoEspace(string $ws, FauxTransportKumo $t, RegistreInjections $reg, ?CommandeurServeur $c = null, ?Closure $horloge = null): ServeurEnvoiKumo
+{
+    $fixe = new DateTimeImmutable('2026-11-08 10:00:00');
+
+    return new ServeurEnvoiKumo($ws, 'src1', $t, $t, $reg, $c ?? new CommandeurEspion, new DepotMemoire, SECRET_K9, $horloge ?? fn () => $fixe);
+}
+
+function msgEspace(string $ws, string $cle): MessageAEnvoyer
+{
+    return new MessageAEnvoyer($ws, 'temoin@example.test', 'from@example.test', 'S', 'C', $cle);
+}
+
+test('(1) échec AUTH/certificat : Log::critical sans secret, pause, aucun réessai (zéro connexion ensuite)', function () {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $t->scenario = ['echec_auth', 250];
+    $reg = new RegistreMemoire;
+    $c = new CommandeurEspion;
+    $s = kumoFabrique($t, $c, null, $reg);
+    $r = $s->injecter(msgK9('a1'));
+    expect($r->accepte)->toBeFalse()->and($s->etat()->enPause)->toBeTrue();
+    Log::shouldHaveReceived('critical')->once()->withArgs(fn (string $m, array $ctx = []) => ! str_contains($m . json_encode($ctx), 'secret') && ! isset($ctx['exception']) && ! isset($ctx['trace']));
+    // Pas de réessai de 15 minutes : l'autre message ne se connecte PAS.
+    $s->injecter(msgK9('a2'));
+    expect($t->connexions)->toBe(1);
+    // Le message en échec d'AUTH n'est pas reporté à +15 minutes : au plus tôt demain.
+    expect($r->reporteAu->getTimestamp())->toBeGreaterThan((new DateTimeImmutable('2026-11-08 10:00:00'))->modify('+1 hour')->getTimestamp());
+});
+
+test('(2) enveloppe invalide : refusée AVANT tout état, zéro connexion, refus journalisé', function (string $dest) {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $reg = new RegistreMemoire;
+    $m = new MessageAEnvoyer(WS_K9, $dest, 'from@example.test', 'S', 'C', 'bad');
+    expect(fn () => kumoFabrique($t, null, null, $reg)->injecter($m))->toThrow(ServeurEnvoiRefuse::class);
+    expect($t->connexions)->toBe(0)->and($reg->tout(WS_K9))->toBe([]);
+    Log::shouldHaveReceived('warning')->once();
+})->with(['a b@example.test', 'é@example.test', 'a@@x']);
+
+test('(2) refus local du transport (jeton/transaction) : echec journalisé, jamais a_verifier ni 5xx compté', function () {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $t->scenario = ['envoi_refuse_local'];
+    $reg = new RegistreMemoire;
+    expect(fn () => kumoFabrique($t, null, null, $reg)->injecter(msgK9('r1')))->toThrow(ServeurEnvoiRefuse::class);
+    expect($reg->lire(WS_K9, 'r1')['etat'])->toBe('echec')->and($reg->compter5xx(WS_K9, 0))->toBe(0);
+    Log::shouldHaveReceived('warning')->once();
+});
+
+test('(3) X-Envoi-Source : la source de l’adaptateur est transmise au transport', function () {
+    $t = new FauxTransportKumo;
+    kumoFabrique($t)->injecter(msgK9('s1'));
+    expect($t->derniereSource)->toBe('src1');
+});
+
+test('(4) événements : curseur = numéro de séquence stable (k1 a_verifier, k2 accepté, puis k1 confirmé)', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_apres_data', 250];
+    $s = kumoFabrique($t);
+    $s->injecter(msgK9('k1'));                       // k1 : a_verifier
+    $id2 = $s->injecter(msgK9('k2'))->idInjection;   // k2 : accepté (séquence 1)
+    $lot1 = $s->lireEvenements(null, 1);
+    expect($lot1->evenements)->toHaveCount(1)->and($lot1->evenements[0]->idInjection)->toBe($id2);
+    $t->etatDistant = EtatMessage::Envoye;
+    $id1 = $s->injecter(msgK9('k1'))->idInjection;   // k1 confirmé (séquence 2)
+    $lot2 = $s->lireEvenements($lot1->curseurSuivant, 10);
+    expect(array_map(fn ($e) => $e->idInjection, $lot2->evenements))->toBe([$id1]);   // ni perdu ni dupliqué
+    $lot3 = $s->lireEvenements($lot2->curseurSuivant, 10);
+    expect($lot3->evenements)->toBe([]);
+    $tous = array_map(fn ($e) => $e->idInjection, $s->lireEvenements(null, 10)->evenements);
+    expect($tous)->toBe([$id2, $id1]);
+});
+
+test('curseur négatif ou illisible => 0', function (string $curseur) {
+    $s = kumoFabrique();
+    $s->injecter(msgK9('c1'));
+    expect($s->lireEvenements($curseur, 10)->evenements)->toHaveCount(1);
+})->with(['-5', 'abc']);
+
+test('(6) RegistreMemoire refusé hors environnement testing', function () {
+    $ancien = app()->environment();
+    app()->detectEnvironment(fn () => 'production');
+    try {
+        expect(fn () => new RegistreMemoire)->toThrow(RuntimeException::class);
+    } finally {
+        app()->detectEnvironment(fn () => $ancien);
+    }
+});
+
+test('(7) registre par espace : pause et compteur de 5xx isolés, mêmes clés sans collision', function () {
+    $reg = new RegistreMemoire;
+    $tA = new FauxTransportKumo;
+    $tB = new FauxTransportKumo;
+    $tA->scenario = [550, 550, 550];
+    $a = kumoEspace(WS_K9, $tA, $reg);
+    $b = kumoEspace(WS_K9_B, $tB, $reg);
+    foreach (['x', 'y', 'z'] as $k) {
+        try {
+            $a->injecter(msgEspace(WS_K9, $k));
+        } catch (RuntimeException) {
+        }
+    }
+    expect($a->etat()->enPause)->toBeTrue()->and($b->etat()->enPause)->toBeFalse();
+    expect($reg->compter5xx(WS_K9_B, 0))->toBe(0);
+    // Même clé d'idempotence dans l'autre espace : pas de collision, envoi normal.
+    expect($b->injecter(msgEspace(WS_K9_B, 'x'))->accepte)->toBeTrue()->and($tB->connexions)->toBe(1);
+    expect(array_keys($reg->tout(WS_K9_B)))->toBe(['x'])->and(array_keys($reg->tout(WS_K9)))->toBe(['x', 'y', 'z']);
+});
+
+test('(8) exception inattendue : journalisée SANS message (donc sans secret) avant a_verifier', function () {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $t->scenario = ['panne_secret'];
+    $reg = new RegistreMemoire;
+    kumoFabrique($t, null, null, $reg)->injecter(msgK9('p1'));
+    expect($reg->lire(WS_K9, 'p1')['etat'])->toBe('a_verifier');
+    Log::shouldHaveReceived('error')->once()->withArgs(fn (string $m, array $ctx = []) => ! str_contains($m . json_encode($ctx), 'secret-visible-xyz') && ($ctx['classe'] ?? null) === RuntimeException::class);
+});
+
+test('mineur : la reprise remet le compteur de 5xx à zéro', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = [550, 550, 550, 550];
+    $c = new CommandeurEspion;
+    $s = kumoFabrique($t, $c);
+    foreach (['a', 'b'] as $k) {
+        try {
+            $s->injecter(msgK9($k));
+        } catch (RuntimeException) {
+        }
+    }
+    $s->reprise();
+    foreach (['c', 'd'] as $k) {
+        try {
+            $s->injecter(msgK9($k));
+        } catch (RuntimeException) {
+        }
+    }
+    expect($c->commandes)->toBe(['reprise'])->and($s->etat()->enPause)->toBeFalse(); // 2 + 2 : jamais 3 d'affilée après la reprise
+});
+
+test('mineur : le CAS compare aussi l’instant (ABA sur reporte)', function () {
+    $r = new RegistreMemoire;
+    $l = ['id' => 'i', 'etat' => 'reporte', 'reporte_au' => 5, 'instant' => 100, 'jeton' => str_repeat('a', 32)];
+    $r->ecrire(WS_K9, 'k', $l);
+    $r->ecrire(WS_K9, 'k', ['instant' => 200] + $l); // un autre worker est passé par injection_en_cours et revenu à reporte
+    expect($r->ecrireSi(WS_K9, 'k', 'reporte', 100, ['etat' => 'injection_en_cours'] + $l))->toBeFalse();
+    expect($r->ecrireSi(WS_K9, 'k', 'reporte', 200, ['etat' => 'injection_en_cours'] + $l))->toBeTrue();
+});
+
+test('mineur : étatDistant et la décision sur existant interprètent pareil EnFile/Rebond/Refuse', function (EtatMessage $distant, string $attendu) {
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_apres_data'];
+    $reg = new RegistreMemoire;
+    $s = kumoFabrique($t, null, null, $reg);
+    $s->injecter(msgK9('e1'));
+    $id = $reg->lire(WS_K9, 'e1')['id'];
+    $t->etatDistant = $distant;
+    expect($s->etatEnvoi($id))->toBe($distant)->and($reg->lire(WS_K9, 'e1')['etat'])->toBe($attendu);
+})->with([
+    'enfile' => [EtatMessage::EnFile, 'accepte'],
+    'rebond' => [EtatMessage::Rebond, 'accepte'],
+    'envoye' => [EtatMessage::Envoye, 'accepte'],
+    'refuse' => [EtatMessage::Refuse, 'echec'],
+    'inconnu' => [EtatMessage::Inconnu, 'a_verifier'],
+]);
+
+test('mineur : le report d’une clé déjà reportée utilise l’horloge injectée (fuseau compris)', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = [451];
+    $h = new DateTimeImmutable('2026-11-08 10:00:00', new DateTimeZone('Asia/Tokyo'));
+    $s = kumoFabrique($t, null, fn () => $h);
+    $s->injecter(msgK9('h1'));
+    $r = $s->injecter(msgK9('h1'));
+    expect($r->reporteAu->getTimezone()->getName())->toBe('Asia/Tokyo');
 });

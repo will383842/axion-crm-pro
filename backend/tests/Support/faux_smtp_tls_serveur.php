@@ -3,7 +3,7 @@
 /**
  * FAUX serveur SMTP local AVEC STARTTLS (127.0.0.1 uniquement), dérivé de faux_smtp_serveur.php (L4), pour prouver
  * le transport du tunnel K9. Usage : php faux_smtp_tls_serveur.php <mode> <fichier_recu> <pem_cert_et_cle>
- * Modes : ok | coupure_apres_data | muet_apres_data | 451_apres_data | 550_apres_data | auth_535 | sans_starttls | banniere_muette
+ * Modes : ok | coupure_apres_data | muet_apres_data | 451_apres_data | 550_apres_data | rcpt_550 | mail_550 | auth_535 | sans_starttls | banniere_muette
  * Port sur la 1re ligne de stdout, brut reçu (DATA) dans <fichier_recu>, commandes dans <fichier_recu>.cmd.
  * Une seule connexion. Aucun accès réseau externe.
  */
@@ -73,6 +73,10 @@ while (($ligne = fgets($c)) !== false) {
         $tls = true;
     } elseif ($cmd === 'AUTH') {
         fwrite($c, $mode === 'auth_535' ? "535 5.7.8 identifiants refuses\r\n" : "235 ok\r\n");
+    } elseif ($cmd === 'RCPT' && $mode === 'rcpt_550') {
+        fwrite($c, "550 5.1.1 destinataire inconnu\r\n");
+    } elseif ($cmd === 'MAIL' && $mode === 'mail_550') {
+        fwrite($c, "550 5.7.1 expediteur hors registre\r\n");
     } elseif ($cmd === 'DATA') {
         fwrite($c, "354 go\r\n");
         $donnees = true;

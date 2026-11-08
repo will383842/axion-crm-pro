@@ -32,6 +32,6 @@ final class InscriptionsEnvoi
     /** Lecture seule : cette référence existe-t-elle dans cet espace ? */
     public static function existe(string $workspaceId, string $reference): bool
     {
-        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_liens_desinscription')->where('reference', $reference)->exists());
+        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_liens_desinscription')->where('workspace_id', $workspaceId)->where('reference', $reference)->exists());
     }
 }

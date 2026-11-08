@@ -33,6 +33,7 @@ final class EnregistrerOpposition
     {
         return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_oppositions as o')
             ->join('envoi_liens_desinscription as l', 'l.id', '=', 'o.lien_id')
+            ->where('o.workspace_id', $workspaceId)->where('l.workspace_id', $workspaceId)
             ->where('l.reference', $reference)->exists());
     }
 
@@ -40,7 +41,7 @@ final class EnregistrerOpposition
     public function executer(string $workspaceId, string $reference, string $canal): bool
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $reference, $canal): bool {
-            $inscription = DB::table('envoi_liens_desinscription')->where('reference', $reference)->first();
+            $inscription = DB::table('envoi_liens_desinscription')->where('workspace_id', $workspaceId)->where('reference', $reference)->first();
             if ($inscription === null) {
                 return false;
             }
@@ -61,7 +62,7 @@ final class EnregistrerOpposition
                 $this->dedup->addOptOutParEmpreinte($empreinte, null, 'desinscription_lien', 'unsubscribe', [(string) $inscription->portee]);
             });
 
-            $opposition = DB::table('envoi_oppositions')->where('lien_id', $inscription->id)->first();
+            $opposition = DB::table('envoi_oppositions')->where('workspace_id', $workspaceId)->where('lien_id', $inscription->id)->first();
             if ($opposition !== null) {
                 $this->effets->pour($workspaceId, (int) $opposition->id);
             }

@@ -14,6 +14,7 @@ use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\EffetsOpposition;
+use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
@@ -88,5 +89,6 @@ class EnvoiServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(OppositionEnregistree::class, EffetsOpposition::class);
+        JetonDesinscription::garderAuDemarrage($this->app->environment());
     }
 }

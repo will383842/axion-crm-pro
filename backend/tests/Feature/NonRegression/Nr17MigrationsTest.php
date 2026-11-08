@@ -55,6 +55,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     // Envoi K1 (suite K2) : trois colonnes NULLABLES ajoutées à envoi_serveurs (époque de la passerelle, blocage du tirage) ;
     // les retirer effacerait la mémoire de désynchronisation : down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_11_13_000140_envoi_serveurs_epoque.php',
+    // Envoi P0 L5 (suivi) : état de relance des effets d'opposition, en base (ajout seul) ; down() inerte (simple commentaire).
+    '2026_11_30_000200_envoi_relances_effets.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -141,6 +141,7 @@ test('aucune donnée de personne dans le lien', function () {
     expect($this->jeton)->not->toContain('zz-desinscription')->not->toContain('@')
         ->not->toContain(ListeSuppression::empreinte(DESINSCR_ADRESSE))
         ->not->toContain(base64_encode(DESINSCR_ADRESSE));
+    config(['envoi.desinscription_hote' => 'app', 'envoi.desinscription_hotes' => ['app' => 'https://app.zz-desinscription.example.invalid']]);
     expect(JetonDesinscription::url($this->ws, $this->ref))->toContain('/desinscription/');
 });
 

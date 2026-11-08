@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
  *    relire deux fois ne crée rien. Si UIDVALIDITY change, on relit TOUTE la
  *    boîte depuis l'UID 0 ; l'empreinte du Message-ID (unique par boîte)
  *    écarte ce qui était déjà enregistré : ni doublon, ni perte.
+ *  - RATTACHEMENT d'un rapport d'abus ARF : jeton VERP signé SEUL (jamais le Message-ID cité).
  *  - RATTACHEMENT par In-Reply-To / References / Message-ID cité par le DSN,
  *    via le registre des messages envoyés. Non rattaché = « à rattacher »
  *    (revue humaine) : AUCUN effet, jamais d'opposition automatique.
@@ -65,6 +66,7 @@ final class ReleveImap
     public function relever(string $workspaceId, string $boite): BilanReleve
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite): BilanReleve {
+            $this->domainesEnCache = []; // un seul SELECT par relève et par espace
             $validite = $this->lecteur->uidValidity($boite);
             $curseur = DB::table('envoi_curseurs_imap')->where('workspace_id', $workspaceId)->where('boite', $boite)->first();
             $bilan = new BilanReleve;
@@ -201,8 +203,17 @@ final class ReleveImap
             return $this->noterSansEffet($workspaceId, $boite, $validite, $m);
         }
 
-        $classe = Classificateur::classer($m);
-        $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
+        $classe = Classificateur::classer($m, $this->domainesDEnvoi($workspaceId));
+        // RÈGLE DE FER : un rapport d'abus ARF ne se rattache QUE par un jeton VERP signé. Le Message-ID qu'il cite
+        // peut être forgé ou recopié : sans VERP signé, « à rattacher », JAMAIS d'opposition automatique.
+        // Les autres retours : VERP d'abord (preuve la plus forte), puis le Message-ID cité ou répondu.
+        $origine = $this->parVerp($workspaceId, $m);
+        if ($m->typeArf === 'illisible') {
+            $origine = null; // Feedback-Type illisible : jamais d'effet deviné
+        }
+        if ($origine === null && $m->typeArf === null) {
+            $origine = $this->registre->retrouver($workspaceId, self::identifiantsCandidats($m));
+        }
         $expediteur = self::adresseDe($m->expediteur); // null si multiple, accentuée ou mal formée
 
         if ($origine !== null && in_array($classe, self::CLASSES_REBOND, true)) {
@@ -212,6 +223,11 @@ final class ReleveImap
             if ($destinataire === null ? $classe === ClasseRetour::RebondDur : $destinataire !== mb_strtolower(trim($origine->adresse))) {
                 $origine = null;
             }
+        }
+
+        if ($origine !== null && $m->typeArf !== null && $m->destinataireArf !== null
+            && mb_strtolower(trim($m->destinataireArf)) !== mb_strtolower(trim($origine->adresse))) {
+            $origine = null; // rapport d'abus sur une autre adresse que celle écrite : revue humaine
         }
 
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, $origine, $expediteur ?? $m->expediteur);
@@ -224,12 +240,21 @@ final class ReleveImap
                 $classe,
                 $origine->idInjection,
                 $origine->adresse,
-                $opposition && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
+                $opposition && $m->typeArf === null && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
                 self::empreinteMessage($m), // clé STABLE (ni UID, ni UIDVALIDITY) : un retour n'est compté qu'une fois
             ));
         }
 
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => $origine !== null, 'enErreur' => false];
+    }
+
+    /** @var array<string, list<string>> */
+    private array $domainesEnCache = [];
+
+    /** @return list<string> */
+    private function domainesDEnvoi(string $workspaceId): array
+    {
+        return $this->domainesEnCache[$workspaceId] ??= array_values(DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->pluck('nom')->map(fn ($n): string => (string) $n)->all());
     }
 
     /**
@@ -239,7 +264,7 @@ final class ReleveImap
      */
     private function noterSansEffet(string $workspaceId, string $boite, int $validite, MessageBrut $m): array
     {
-        $classe = $m->ecarte !== null ? ClasseRetour::ReponseHumaine : Classificateur::classer($m);
+        $classe = $m->ecarte !== null ? ClasseRetour::ReponseHumaine : Classificateur::classer($m, $this->domainesDEnvoi($workspaceId));
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, null, self::adresseDe($m->expediteur) ?? $m->expediteur);
 
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => false, 'enErreur' => true];
@@ -280,6 +305,20 @@ final class ReleveImap
         DB::table('envoi_curseurs_imap')->where('id', $existant->id)->update([
             'uid_validity' => $validite, 'dernier_uid' => $nouveau, 'maj_le' => now(),
         ]);
+    }
+
+    /** Origine d'après un VERP `rb-<jeton>@bounce.<domaine>` signé, parmi les adresses du message. */
+    private function parVerp(string $workspaceId, MessageBrut $m): ?MessageOrigine
+    {
+        foreach ($m->adressesLocales as $adresse) {
+            $id = Verp::idInjectionDepuis($adresse);
+            $origine = $id === null ? null : $this->registre->retrouverParInjection($workspaceId, $id);
+            if ($origine !== null) {
+                return $origine;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<string> */

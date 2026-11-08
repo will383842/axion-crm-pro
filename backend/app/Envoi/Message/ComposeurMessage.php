@@ -16,7 +16,14 @@ final class ComposeurMessage
         private readonly string $domaineEnvoi,
         private readonly ?DkimSigneur $dkim = null,
         private readonly ControleurContenu $controleur = new ControleurContenu,
+        private readonly SignatureDkim $signeDkim = SignatureDkim::Crm,
     ) {
+        if ($signeDkim === SignatureDkim::Serveur && $dkim !== null) {
+            throw new InvalidArgumentException('Mode DKIM « serveur » : aucun signeur (ni clé privée) côté CRM.');
+        }
+        if ($signeDkim === SignatureDkim::Crm && $dkim === null) {
+            throw new InvalidArgumentException('Mode DKIM « crm » : un signeur est obligatoire.');
+        }
         if (preg_match('/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i', $domaineEnvoi) !== 1) {
             throw new InvalidArgumentException('Domaine d\'envoi invalide.');
         }

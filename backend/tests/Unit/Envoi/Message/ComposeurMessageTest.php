@@ -10,6 +10,7 @@ use App\Envoi\Message\ControleurContenu;
 use App\Envoi\Message\DemandeMessage;
 use App\Envoi\Message\DkimSigneur;
 use App\Envoi\Message\MessageRefuse;
+use App\Envoi\Message\SignatureDkim;
 
 function l2Demande(array $o = []): DemandeMessage
 {
@@ -57,7 +58,7 @@ function l2Analyse(string $msg): array
 
 function l2Composeur(?DkimSigneur $d = null): ComposeurMessage
 {
-    return new ComposeurMessage('exemple-envoi.test', $d);
+    return new ComposeurMessage('exemple-envoi.test', $d, signeDkim: $d === null ? SignatureDkim::Serveur : SignatureDkim::Crm);
 }
 
 it('pose Message-ID unique sous le domaine d\'envoi', function () {

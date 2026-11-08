@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit colors="false" failOnWarning="true" failOnRisky="true" cacheDirectory=".phpunit.cache">
+  <testsuites><testsuite name="conformite-passerelle"><file>ConformiteTest.php</file></testsuite></testsuites>
+</phpunit>

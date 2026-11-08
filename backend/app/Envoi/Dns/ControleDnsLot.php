@@ -54,7 +54,7 @@ final class ControleDnsLot
                 $p = $this->config[(string) $nom] ?? null;
                 if ($p === null) {
                     $echecs++; // un domaine d'envoi non contrôlé n'est pas « tout va bien »
-                    ($this->avertir)('domaine sans configuration DNS : non contrôlé');
+                    ($this->avertir)('ALERTE : domaine sans configuration DNS : non contrôlé');
 
                     continue;
                 }

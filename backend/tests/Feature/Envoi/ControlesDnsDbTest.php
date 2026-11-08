@@ -8,6 +8,7 @@ use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 use Tests\Unit\Envoi\Dns\FauxResolveurDns;
@@ -106,4 +107,14 @@ test('la commande ne plante pas sur un domaine sans configuration DNS, le compte
 
     expect(Artisan::call('envoi:controle-dns'))->toBe(1)
         ->and(DB::table('envoi_controles_dns')->count())->toBe(0);
+});
+
+test('D1b : envoi:controle-dns journalise en Log::alert un domaine d\'envoi SANS configuration DNS (échec, pas un « tout va bien »)', function () {
+    $ws = espaceDns();
+    domaineDns($ws, 'sans-config.example.test');
+    config(['envoi.dns.domaines' => []]);
+    $journal = Log::spy();
+
+    expect(Artisan::call('envoi:controle-dns'))->toBe(1);
+    $journal->shouldHaveReceived('alert')->once();
 });

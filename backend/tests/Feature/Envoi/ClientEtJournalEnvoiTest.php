@@ -17,10 +17,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
+
+const ENVOI_EPOQUE_A = '0123456789abcdef';
+const ENVOI_EPOQUE_B = 'fedcba9876543210';
 
 beforeEach(function () {
     // m7 : horloge figée, en UTC (jamais de dépendance à l'heure de la machine ni à son fuseau).
@@ -67,6 +71,8 @@ function envoiReponseSignee(array $donnees, ?string $ws = null, string $secret =
 {
     return function (Request $r) use ($donnees, $ws, $secret, $statut) {
         $espace = $ws ?? $r->header('X-Envoi-Workspace')[0];
+        // Audit #461 : la passerelle répond TOUJOURS avec son époque ; `'epoque' => null` explicite la retire.
+        $donnees = array_key_exists('evenements', $donnees) ? $donnees + ['epoque' => ENVOI_EPOQUE_A] : $donnees;
         $corps = json_encode($donnees + ['workspace_id' => $espace], JSON_THROW_ON_ERROR);
         $sig = SignatureEnvoi::signer($secret, SignatureEnvoi::chargeReponse($r->header('X-Envoi-Nonce')[0], $espace, $statut, $corps));
 
@@ -449,4 +455,100 @@ test('m9 : commande_id doit être un UUID (CHECK en base) ; plus d’index globa
     expect($index)->toContain('envoi_journal_commandes_ws_commande_id_uniq')
         ->and($index)->not->toContain('envoi_journal_commandes_commande_id_uniq')
         ->and(glob(database_path('migrations/*envoi_k1_unicite_par_espace_et_https*')))->toBe([]);
+});
+
+// --- Audit #461 (1) : K1 mémorise l'époque de la passerelle et la renvoie à chaque tirage ---
+
+function envoiEtatTirage(string $ws): object
+{
+    return WorkspaceContext::run($ws, fn () => DB::table('envoi_serveurs')->where('workspace_id', $ws)->where('source', 'srv1')->first());
+}
+
+function envoiParametresEnvoyes(): array
+{
+    $dernier = Http::recorded()->last()[0];
+    parse_str((string) parse_url($dernier->url(), PHP_URL_QUERY), $q);
+
+    return $q;
+}
+
+/** Réponse 409 de la passerelle, signée comme elle le fait. */
+function envoiReponse409(array $corps = ['erreur' => 'curseur_desynchronise', 'epoque' => ENVOI_EPOQUE_B, 'dernier' => 3]): Closure
+{
+    return envoiReponseSignee($corps, null, 'secret-de-test', 409);
+}
+
+test('époque : le premier tirage ne l’envoie pas, la mémorise, puis la renvoie à chaque tirage', function () {
+    Http::fake(['*' => envoiReponseSignee(['evenements' => [], 'curseur_suivant' => '0'])]);
+    app(TireurEvenements::class)->tirer($this->ws, 'srv1', null, 10, new DateTimeImmutable);
+    expect(envoiParametresEnvoyes())->not->toHaveKey('epoque')
+        ->and(envoiEtatTirage($this->ws)->epoque_passerelle)->toBe(ENVOI_EPOQUE_A);
+    $lot = app(TireurEvenements::class)->tirer($this->ws, 'srv1', '0', 10, new DateTimeImmutable);
+    expect(envoiParametresEnvoyes()['epoque'])->toBe(ENVOI_EPOQUE_A)
+        ->and($lot->epoque)->toBe(ENVOI_EPOQUE_A);
+    app(TireurEvenements::class)->tirer($this->ws, 'srv1', '0', 10, new DateTimeImmutable);
+    expect(envoiParametresEnvoyes()['epoque'])->toBe(ENVOI_EPOQUE_A);
+});
+
+test('époque : 409 curseur_desynchronise = alerte critique + arrêt du tirage de ce serveur, sans aucun appel ensuite', function () {
+    Log::spy();
+    $courante = envoiReponseSignee(['evenements' => []]);
+    Http::fake(['*' => function (Request $r) use (&$courante) {
+        return $courante($r);
+    }]);
+    app(TireurEvenements::class)->tirer($this->ws, 'srv1', null, 10, new DateTimeImmutable); // époque mémorisée
+    $courante = envoiReponse409();
+    expect(fn () => app(TireurEvenements::class)->tirer($this->ws, 'srv1', '2', 10, new DateTimeImmutable))->toThrow(ServeurEnvoiRefuse::class);
+    Log::shouldHaveReceived('critical')->once();
+    expect(envoiEtatTirage($this->ws)->tirage_bloque_le)->not->toBeNull()
+        ->and(envoiEtatTirage($this->ws)->epoque_passerelle)->toBe(ENVOI_EPOQUE_A, 'l’ancienne époque n’est JAMAIS écrasée en silence');
+    $avant = Http::recorded()->count();
+    expect(fn () => app(TireurEvenements::class)->tirer($this->ws, 'srv1', '2', 10, new DateTimeImmutable))->toThrow(ServeurEnvoiRefuse::class)
+        ->and(Http::recorded()->count())->toBe($avant, 'aucun appel réseau une fois le tirage arrêté');
+});
+
+test('époque : base recréée dont le compteur a rattrapé le curseur (200 mais autre époque) = alerte, pas de saut silencieux', function () {
+    Log::spy();
+    $courante = envoiReponseSignee(['evenements' => []]);
+    Http::fake(['*' => function (Request $r) use (&$courante) {
+        return $courante($r);
+    }]);
+    app(TireurEvenements::class)->tirer($this->ws, 'srv1', null, 10, new DateTimeImmutable);
+    // Une passerelle qui ignorerait `epoque` et répondrait 200 avec des événements d'une AUTRE base :
+    $courante = (envoiReponseSignee(['evenements' => [['event_id' => 'x:' . ENVOI_EPOQUE_B . ':3', 'seq' => 3, 'type' => 'bounce', 'id_injection' => 'm']], 'curseur_suivant' => '3', 'epoque' => ENVOI_EPOQUE_B]));
+    expect(fn () => app(TireurEvenements::class)->tirer($this->ws, 'srv1', '2', 10, new DateTimeImmutable))->toThrow(ServeurEnvoiRefuse::class);
+    Log::shouldHaveReceived('critical')->once();
+    expect(envoiEtatTirage($this->ws)->tirage_bloque_le)->not->toBeNull()
+        ->and(envoiEtatTirage($this->ws)->epoque_passerelle)->toBe(ENVOI_EPOQUE_A);
+});
+
+test('époque : 409 non signé ou autre 409 (nonce rejoué) ne bloque pas le tirage', function (Closure $reponse) {
+    Log::spy();
+    Http::fake(['*' => $reponse]);
+    expect(fn () => app(TireurEvenements::class)->tirer($this->ws, 'srv1', '2', 10, new DateTimeImmutable))->toThrow(ServeurEnvoiRefuse::class);
+    expect(envoiEtatTirage($this->ws)->tirage_bloque_le)->toBeNull();
+    Log::shouldNotHaveReceived('critical');
+})->with([
+    '409 non signé' => [fn () => Http::response(['erreur' => 'curseur_desynchronise', 'workspace_id' => 'x'], 409)],
+    '409 signé avec un autre secret' => [fn () => envoiReponseSignee(['erreur' => 'curseur_desynchronise'], null, 'autre-secret', 409)],
+    '409 nonce_rejoue' => [fn () => envoiReponse409(['erreur' => 'nonce_rejoue'])],
+]);
+
+test('époque : réponse sans époque valide = refus (pas de tirage sans époque)', function (mixed $epoque) {
+    Http::fake(['*' => envoiReponseSignee(['evenements' => [], 'epoque' => $epoque])]);
+    expect(fn () => app(TireurEvenements::class)->tirer($this->ws, 'srv1', null, 10, new DateTimeImmutable))->toThrow(ServeurEnvoiRefuse::class);
+    expect(envoiEtatTirage($this->ws)->epoque_passerelle)->toBeNull();
+})->with(['absente' => [null], 'courte' => ['abc'], 'majuscules' => ['0123456789ABCDEF'], 'nombre' => [123]]);
+
+test('époque : le blocage du tirage ne bloque pas les commandes (pause/retrait restent possibles)', function () {
+    WorkspaceContext::run($this->ws, fn () => DB::table('envoi_serveurs')->where('source', 'srv1')->update(['tirage_bloque_le' => now(), 'epoque_passerelle' => ENVOI_EPOQUE_A]));
+    Http::fake(['*' => envoiReponseSignee(['commande_id' => 'x', 'statut' => 'ok'])]);
+    expect(app(CommandeurServeur::class)->commander($this->ws, 'srv1', envoiCmd(), 'pause'))->toBeTrue();
+    Http::assertSentCount(1);
+});
+
+test('époque : la migration ne fait qu’ajouter (aucun DROP/DELETE)', function () {
+    $f = glob(database_path('migrations/*envoi_serveurs_epoque*.php'));
+    expect($f)->toHaveCount(1);
+    expect((string) file_get_contents($f[0]))->not->toMatch('/\b(DROP|DELETE|TRUNCATE)\s/i');
 });

@@ -53,7 +53,7 @@ git diff backend/tests/Feature/NonRegression/instantanes/   # le changement appa
 ## Ajouter un test au filet
 
 1. Écrire le test dans ce dossier (il reçoit le groupe automatiquement), avec un titre qui commence par `NR-xx`.
-2. Le déclarer dans un NOUVEAU fragment `LISTE.d/<date>-<lot>.json` (`{"gardes": [{id, nouveaux, existants, frontend}]}`) — ne pas toucher `LISTE.json` ni le fragment d'un autre lot ; `ListeFigeeTest` rougit sinon, et refuse un même identifiant de garde ou un même `fichier::titre` présent deux fois.
+2. Le déclarer dans un NOUVEAU fragment `LISTE.d/<date>-<lot>.json` (objet dont la SEULE clé est `gardes`, une liste ; chaque garde porte un `id` non vide et uniquement les clés `id`, `nouveaux`, `existants`, `frontend` — les trois dernières peuvent être omises ; toute autre clé, un JSON illisible ou un `id` vide fait échouer le chargement) — ne pas toucher `LISTE.json` ni le fragment d'un autre lot ; `ListeFigeeTest` rougit sinon, et refuse un même identifiant de garde ou un même `fichier::titre` présent deux fois.
 3. Un test qui constate doit avoir son **témoin** : la preuve que l'instrument sait voir (une garde qui ne trouve rien passerait pour verte).
 
 ## Nouvel appel vers une nouvelle route (NR-20)

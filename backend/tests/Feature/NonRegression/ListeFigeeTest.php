@@ -21,7 +21,8 @@ uses(TestCase::class);
 
 /**
  * Base figée `LISTE.json` + UNION des fragments `LISTE.d/*.json` (un par lot,
- * `{"gardes": [...]}`). Deux lots n'écrivent plus jamais dans le même fichier.
+ * `{"gardes": [...]}`, SEULE clé admise ; chaque garde : `id` non vide, clés admises
+ * `id`, `nouveaux`, `existants`, `frontend`). Toute autre structure lève. Deux lots n'écrivent plus jamais dans le même fichier.
  * Refuse un même identifiant de garde, ou un même `fichier::titre`, présent deux
  * fois (base comprise) : l'égalité stricte de la liste ne s'affaiblit pas.
  *
@@ -60,7 +61,21 @@ function nrListe(?string $base = null, ?string $dossier = null): array
     }
     foreach ($fragments as $fragment) {
         $contenu = json_decode((string) file_get_contents($fragment), true, 512, JSON_THROW_ON_ERROR);
-        foreach ($contenu['gardes'] ?? [] as $garde) {
+        $nom = basename($fragment);
+        if (! is_array($contenu) || array_keys($contenu) !== ['gardes'] || ! is_array($contenu['gardes']) || ! array_is_list($contenu['gardes'])) {
+            throw new RuntimeException("fragment {$nom} : doit être un objet dont la seule clé est « gardes » (une liste)");
+        }
+        foreach ($contenu['gardes'] as $garde) {
+            if (! is_array($garde) || ($garde !== [] && array_is_list($garde))) {
+                throw new RuntimeException("fragment {$nom} : une garde doit être un objet");
+            }
+            $inconnues = array_diff(array_keys($garde), ['id', 'nouveaux', 'existants', 'frontend']);
+            if ($inconnues !== []) {
+                throw new RuntimeException("fragment {$nom} : clé(s) inconnue(s) « " . implode(', ', $inconnues) . ' » (admis : id, nouveaux, existants, frontend)');
+            }
+            if (! isset($garde['id']) || ! is_string($garde['id']) || trim($garde['id']) === '') {
+                throw new RuntimeException("fragment {$nom} : « id » obligatoire (chaîne non vide)");
+            }
             $garde += ['nouveaux' => [], 'existants' => [], 'frontend' => []];
             $enregistrer($garde, basename($fragment));
             $liste['gardes'][] = $garde;
@@ -218,4 +233,36 @@ test('LISTE TEMOIN fragments : l’union passe, un doublon de titre ou de garde 
     // même titre qu'une garde de la base
     $frag2('2026-01-lot-e', [['id' => 'X-5', 'nouveaux' => ['A.php' => ['t1']]]]);
     expect(fn () => nrListe($base, "{$dossier}/d"))->toThrow(RuntimeException::class, 'présent deux fois');
+    unlink("{$dossier}/d/2026-01-lot-e.json");
+
+    // structure mal formée : chacun doit faire ÉCHOUER le chargement (jamais un faux vert)
+    $brut = fn (string $contenu) => file_put_contents("{$dossier}/d/2026-01-lot-m.json", $contenu);
+    $mal = [
+        'clé « garde » au lieu de « gardes »' => json_encode(['garde' => [['id' => 'M-1']]]),
+        'clé « gardes » en plus d’une clé inconnue' => json_encode(['gardes' => [['id' => 'M-1']], 'autre' => 1]),
+        'fragment qui n’est pas un objet' => json_encode([['id' => 'M-1']]),
+        '« gardes » qui n’est pas une liste' => json_encode(['gardes' => ['id' => 'M-1']]),
+        'clé « existant » au lieu de « existants »' => json_encode(['gardes' => [['id' => 'M-1', 'existant' => ['x.php']]]]),
+        'clé « nouveau » au lieu de « nouveaux »' => json_encode(['gardes' => [['id' => 'M-1', 'nouveau' => ['x.php' => ['t']]]]]),
+        'id vide' => json_encode(['gardes' => [['id' => '', 'nouveaux' => []]]]),
+        'id absent' => json_encode(['gardes' => [['nouveaux' => []]]]),
+        'id qui n’est pas une chaîne' => json_encode(['gardes' => [['id' => 5]]]),
+        'garde qui n’est pas un objet' => json_encode(['gardes' => ['M-1']]),
+        'JSON illisible' => '{"gardes": [',
+    ];
+    foreach ($mal as $cas => $contenu) {
+        $brut($contenu);
+        $leve = false;
+        try {
+            nrListe($base, "{$dossier}/d");
+        } catch (Throwable) {
+            $leve = true;
+        }
+        expect($leve)->toBeTrue("fragment mal formé accepté : {$cas}");
+    }
+    unlink("{$dossier}/d/2026-01-lot-m.json");
+
+    // clés absentes complétées par défaut : accepté
+    $brut(json_encode(['gardes' => [['id' => 'M-OK']]]));
+    expect(array_column(nrListe($base, "{$dossier}/d")['gardes'], 'id'))->toBe(['B-1', 'X-1', 'X-2', 'M-OK']);
 });

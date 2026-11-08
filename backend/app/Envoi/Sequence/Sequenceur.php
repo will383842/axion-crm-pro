@@ -30,6 +30,13 @@ use Throwable;
  * transaction ouverte par `traiter` (verrou de ligne tenu pendant l'appel réseau). Le verrou garantit « un seul
  * envoi par inscription » ; il faudra le découper (réserver → commit → envoyer → noter) avec reprise des
  * réservations restées « reserve ».
+ * DETTES NOMMÉES (relecture, à traiter AVEC ce découpage) :
+ *   - I2 : si le serveur accepte le message puis que le COMMIT de `traiter` échoue (SMTP direct), la réservation est
+ *     défaite alors que le message est parti : un rejeu renverrait. Remède = réservation validée dans sa propre
+ *     transaction AVANT l'injection (repli : la clé d'idempotence `seq-<inscription>-<rang>` de la passerelle).
+ *   - I3 : le verrou `pg_advisory_xact_lock` (un par jour, pris par la passerelle) est tenu jusqu'au COMMIT de
+ *     `traiter`, donc pendant les écritures qui suivent l'injection. Un verrou de transaction ne se relâche pas
+ *     avant le COMMIT ; il faut le même découpage (injection + note dans leur propre transaction courte).
  * La version du message est celle FIGÉE à l'inscription. Aucune mesure d'ouverture.
  * Aucun effacement : un message refusé ou reporté reste en base avec son motif.
  */
@@ -51,6 +58,11 @@ final class Sequenceur
 
     /** Exception technique rattrapée pour UNE inscription (voir `echec()`) : les autres continuent. */
     public const ERREUR = 'erreur';
+
+    /** Reports consécutifs (refus PASSAGERS de la porte) au-delà desquels l'inscription est arrêtée avec alerte. */
+    public const REPORTS_MAX = 10;
+
+    public const MOTIF_REPORTS_EPUISES = 'reports_epuises';
 
     /** Nombre d'échecs techniques d'une même inscription avant l'alerte (puis tous les N échecs). */
     public const ECHECS_AVANT_ALERTE = 5;
@@ -138,7 +150,7 @@ final class Sequenceur
                 $motif = (string) $verdict->refus;
                 // Refus PASSAGER (DNS du jour non vérifié, verdict d'adresse périmé) : on reporte, on n'arrête pas.
                 if ($this->passager($ws, $motif, $fiche->email)) {
-                    return $this->reporter($ins, $rang, $motif, $fenetre, $maintenant);
+                    return $this->reporterAvecPlafond($ins, $rang, $motif, $fenetre, $maintenant);
                 }
 
                 return $this->refuser($ins, $rang, $motif, $maintenant);
@@ -251,7 +263,7 @@ final class Sequenceur
     }
 
     /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
-    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, ?DateTimeImmutable $maintenant = null): ?string
+    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, DateTimeImmutable $maintenant): ?string
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
@@ -261,13 +273,16 @@ final class Sequenceur
             'statut' => 'reserve',
             'message_id' => $messageId,
             'in_reply_to' => $inReplyTo,
+            // L'instant du traitement, jamais l'horloge de la base (M3).
+            'cree_le' => $maintenant->format('c'),
+            'maj_le' => $maintenant->format('c'),
         ]);
         if ($lignes === 1) {
             return $messageId;
         }
         // Une ligne « reporte » (passerelle pleine) peut être reprise ; toute autre est définitive.
         $repris = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reporte')
-            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => ($maintenant ?? new DateTimeImmutable)->format('c')]);
+            ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => $maintenant->format('c')]);
 
         return $repris === 1 ? $messageId : null;
     }
@@ -306,6 +321,25 @@ final class Sequenceur
         return self::REFUSE;
     }
 
+    /** Report d'un refus PASSAGER, plafonné : au plafond, refus définitif + arrêt + alerte (une cause « passagère » qui dure demande un humain). */
+    private function reporterAvecPlafond(\stdClass $ins, int $rang, string $motif, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string
+    {
+        $reports = (int) $ins->reports + 1; // la ligne est verrouillée par `traiter` : pas de course
+        if ($reports >= self::REPORTS_MAX) {
+            DB::table('envoi_inscriptions')->where('id', $ins->id)->update(['reports' => $reports]);
+            Log::critical('envoi.sequenceur_reports_epuises : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'reports' => $reports, 'dernier_motif' => $motif]);
+            DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
+                ->update(['statut' => 'refuse', 'refus' => $motif, 'maj_le' => $maintenant->format('c')]);
+
+            $this->arreter($ins, self::MOTIF_REPORTS_EPUISES, $maintenant);
+
+            return self::REFUSE;
+        }
+        DB::table('envoi_inscriptions')->where('id', $ins->id)->update(['reports' => $reports]);
+
+        return $this->reporter($ins, $rang, $motif, $fenetre, $maintenant);
+    }
+
     private function reporter(\stdClass $ins, int $rang, string $motif, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string
     {
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
@@ -337,7 +371,7 @@ final class Sequenceur
     {
         $fil = $ins->fil_message_id ?? $messageId;
         $refs = trim(implode(' ', [...$references, $messageId]));
-        $maj = ['fil_message_id' => $fil, 'fil_references' => $refs];
+        $maj = ['fil_message_id' => $fil, 'fil_references' => $refs, 'reports' => 0];
         if ($rang >= count($version['etapes'])) {
             $maj += ['statut' => 'terminee'];
         } else {

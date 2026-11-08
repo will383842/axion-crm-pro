@@ -68,13 +68,13 @@ final class Inscriptions
                 // Ajout seulement : les autres inscriptions de la MÊME adresse passent « arretee » (rien n'est effacé).
                 $memeAdresse = array_values(DB::table('envoi_inscriptions')->where('workspace_id', $ws)
                     ->where('empreinte_adresse', $ins->empreinte_adresse)->where('statut', 'active')
-                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
+                    ->where('id', '<>', $inscriptionId)->orderBy('id')->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
                 $n += $this->arreter($ws, $memeAdresse, Evenement::MOTIF_ADRESSE, $maintenant);
             }
             if (in_array($evenement, Evenement::PROPAGENT_A_L_ENTREPRISE, true)) {
                 $autres = array_values(DB::table('envoi_inscriptions')->where('workspace_id', $ws)
                     ->where('entreprise_id', $ins->entreprise_id)->where('statut', 'active')
-                    ->where('id', '<>', $inscriptionId)->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
+                    ->where('id', '<>', $inscriptionId)->orderBy('id')->lockForUpdate()->pluck('id')->map(fn ($v): string => (string) $v)->all());
                 $n += $this->arreter($ws, $autres, Evenement::MOTIF_ENTREPRISE, $maintenant);
             }
 

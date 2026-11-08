@@ -810,3 +810,74 @@ test('mineur : l\'échéance d\'une relance utilise l\'instant passé en paramè
     $source = file_get_contents(base_path('app/Envoi/Sequence/Sequenceur.php'));
     expect($source)->not->toContain('now()');
 });
+
+test('M2 : les reports pour refus PASSAGER ont un plafond ; au plafond l\'inscription est arrêtée, le message refusé, et une alerte critique est émise', function () {
+    Log::spy();
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'plafond@zz-client.example.invalid');
+    $ins = seqInscrire($this, $sid, $c);
+    DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => true]); // refus passager permanent
+
+    $plafond = Sequenceur::REPORTS_MAX;
+    for ($i = 1; $i < $plafond; $i++) {
+        $this->maintenant = $this->lundi->modify('+' . (7 * ($i - 1)) . ' days'); // un lundi à chaque tour
+        expect(seqSurMesure($this)->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REPORTE);
+        expect(seqEtat($ins)->statut)->toBe('active');
+    }
+    Log::shouldNotHaveReceived('critical');
+
+    $this->maintenant = $this->lundi->modify('+' . (7 * ($plafond - 1)) . ' days');
+    expect(seqSurMesure($this)->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REFUSE)
+        ->and(seqEtat($ins)->statut)->toBe('arretee')
+        ->and(seqEtat($ins)->motif_arret)->toBe(Sequenceur::MOTIF_REPORTS_EPUISES)
+        ->and(seqMessages($ins)[0]->statut)->toBe('refuse')
+        ->and($this->faux->appels)->toBe(0);
+    Log::shouldHaveReceived('critical')->once();
+});
+
+test('M2 : un envoi réussi remet le compteur de reports à zéro', function () {
+    $sid = seqSequence($this, 2);
+    [, $c] = seqFiche($this, 'raz@zz-client.example.invalid');
+    $ins = seqInscrire($this, $sid, $c);
+    DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => true]);
+    expect(seqSurMesure($this)->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REPORTE);
+    expect((int) seqEtat($ins)->reports)->toBe(1);
+
+    DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => false]);
+    $this->maintenant = $this->lundi->modify('+1 day');
+    expect(seqSurMesure($this)->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ENVOYE);
+    expect((int) seqEtat($ins)->reports)->toBe(0);
+});
+
+test('M3 : la réservation d\'un message porte l\'instant PASSÉ en paramètre, pas le now() de la base', function () {
+    $sid = seqSequence($this, 1);
+    [, $c] = seqFiche($this, 'horloge@zz-client.example.invalid');
+    $ins = seqInscrire($this, $sid, $c);
+    DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['liste_noire' => true]); // le message reste « reporte », cree_le intact
+
+    seqSurMesure($this)->traiter($this->ws, $ins, $this->maintenant);
+
+    $m = seqMessages($ins)[0];
+    expect((new DateTimeImmutable($m->cree_le))->getTimestamp())->toBe($this->maintenant->getTimestamp());
+    expect((new DateTimeImmutable($m->maj_le))->getTimestamp())->toBe($this->maintenant->getTimestamp());
+});
+
+test('M1 : evenement() verrouille les inscriptions de l\'adresse puis de l\'entreprise dans l\'ordre des identifiants (ORDER BY id)', function () {
+    $sid = seqSequence($this, 1);
+    [$e, $c1] = seqFiche($this, 'ordre1@zz-client.example.invalid');
+    [, $c2] = seqFiche($this, 'ordre2@zz-client.example.invalid', $e);
+    $i1 = seqInscrire($this, $sid, $c1);
+    seqInscrire($this, $sid, $c2);
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes) {
+        $requetes[] = strtolower($q->sql);
+    });
+
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $i1, Evenement::OPPOSITION, $this->maintenant);
+
+    $verrous = array_values(array_filter($requetes, fn (string $sql): bool => str_contains($sql, 'from "envoi_inscriptions"') && str_contains($sql, 'for update') && str_contains($sql, '"id" <>')));
+    expect(count($verrous))->toBe(2);
+    foreach ($verrous as $sql) {
+        expect($sql)->toContain('order by "id"');
+    }
+});

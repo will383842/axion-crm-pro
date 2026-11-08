@@ -13,6 +13,7 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
+use App\Envoi\Desinscription\ArretParEntrepriseL1;
 use App\Envoi\Desinscription\EffetsOpposition;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
@@ -88,10 +89,11 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
             $app->make(FauxServeurEnvoi::class),
             $app->make(DepotSocle::class),
-            // Garde M2 : tant que le retrait des envois en file est la liaison « absente », une opposition
-            // ne retirerait RIEN de la file (étape suivante d'une séquence) : l'envoi réel est tenu pour inactif.
+            // Garde M2 : tant que le retrait des envois en file OU l'arrêt par entreprise est la liaison « absente », une
+            // opposition ne retirerait RIEN (file, collègues de l'entreprise) : l'envoi réel est tenu pour inactif.
             fn (): bool => (bool) config('envoi.reel_actif')
-                && ! ($app->make(RetraitEnvoisEnFile::class) instanceof RetraitEnvoisEnFileAbsent),
+                && ! ($app->make(RetraitEnvoisEnFile::class) instanceof RetraitEnvoisEnFileAbsent)
+                && ! ($app->make(ArretParEntreprise::class) instanceof ArretParEntrepriseAbsent),
             fn (): int => (int) config('envoi.plafond_jour'),
             null,
             '',
@@ -102,7 +104,7 @@ class EnvoiServiceProvider extends ServiceProvider
 
         // L5 désinscription : liaisons par défaut, remplacées par la file (retrait) et par L1 (arrêt par entreprise).
         $this->app->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
-        $this->app->bind(ArretParEntreprise::class, ArretParEntrepriseAbsent::class);
+        $this->app->bind(ArretParEntreprise::class, ArretParEntrepriseL1::class);
     }
 
     public function boot(): void

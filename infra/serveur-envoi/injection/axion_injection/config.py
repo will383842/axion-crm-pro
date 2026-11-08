@@ -47,14 +47,17 @@ class Config:
     duree_max_session: float = 600.0     # durée totale maximale d'une session (s)
     max_echecs_ip: int = 10              # échecs AUTH tolérés par IP source
     fenetre_echecs: float = 900.0
+    delai_ecriture: float = 30.0         # délai max d'un drain() : un client qui ne lit pas est coupé
 
     def __post_init__(self):
         ip = ipaddress.ip_address(self.ip_ecoute)
         if ip.is_unspecified:
             raise ValueError("ip_ecoute ne peut pas être une adresse joker")
         self.reseaux = [ipaddress.ip_network(n) for n in self.ips_autorisees]
-        if any(r.prefixlen == 0 for r in self.reseaux):
-            raise ValueError("ips_autorisees ne peut pas contenir un réseau joker")
+        for version in (4, 6):                # réseau joker, seul ou par recouvrement (0/1 + 128/1)
+            groupe = [r for r in self.reseaux if r.version == version]
+            if any(r.prefixlen == 0 for r in ipaddress.collapse_addresses(groupe)):
+                raise ValueError("ips_autorisees ne peut pas couvrir tout l'espace d'adresses")
         self.domaines_envoi = {normaliser_domaine(d) for d in self.domaines_envoi}
         self.domaines_interdits = {normaliser_domaine(d) for d in self.domaines_interdits}
         self.registre = {e: {a.strip().lower() for a in v} for e, v in self.registre.items()}

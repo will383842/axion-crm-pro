@@ -6,12 +6,14 @@ use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Envoi\Smtp\EnvoiSmtpRefuse;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\ServeurEspion;
+use Tests\Support\ServeurEspionDedoublonneur;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -76,6 +78,8 @@ test('deux injections « concurrentes » ne dépassent jamais le plafond : la se
     expect($p->injecter(($this->msg)('k1'))->accepte)->toBeTrue();
     expect($second->accepte)->toBeFalse()
         ->and($serveur->appels)->toBe(1)
+        ->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee') // état final de k1 : conclue, pas restée réservée
+        ->and($this->depot->etatInjection($this->ws, 'k2'))->toBeNull()
         ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(1);
 });
 
@@ -148,11 +152,11 @@ test('avec un serveur qui dédoublonne par clé (simulateur), le renvoi de la m�
 test('isolement entre espaces : la même clé dans un autre espace ne voit ni réservation, ni libération', function () {
     $autre = F::espace('zz-ric-b');
     $depot = $this->depot;
-    $depot->reserverInjection($this->ws, $this->jour, 'k1');
+    $depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
     WorkspaceContext::set($autre);
     expect($depot->etatInjection($autre, 'k1'))->toBeNull()
         ->and($depot->injectesLe($autre, $this->jour))->toBe(0);
-    expect($depot->reserverInjection($autre, $this->jour, 'k1'))->toBeTrue();
+    expect($depot->reserverInjection($autre, $this->jour, 'k1', $this->jour))->toBeTrue();
     expect($depot->concluireInjection($autre, $this->jour, 'k1', 'liberee'))->toBeTrue();
     WorkspaceContext::set($this->ws);
     expect($depot->etatInjection($this->ws, 'k1'))->toBe('reservee')
@@ -161,8 +165,40 @@ test('isolement entre espaces : la même clé dans un autre espace ne voit ni r�
 
 test('une réservation ne se conclut qu\'une fois ; sans réservation, aucune conclusion n\'est posée', function () {
     expect($this->depot->concluireInjection($this->ws, $this->jour, 'jamais', 'acceptee'))->toBeFalse();
-    $this->depot->reserverInjection($this->ws, $this->jour, 'k1');
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
     expect($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'acceptee'))->toBeTrue()
         ->and($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'liberee'))->toBeFalse()
         ->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee');
+});
+
+test('B3 : un refus fait AVANT tout envoi (EnvoiSmtpRefuse) est un refus CERTAIN : liberee, aucune alerte « issue incertaine »', function () {
+    Log::spy();
+    $serveur = new ServeurEspion(fn () => throw EnvoiSmtpRefuse::motif('enveloppe invalide'));
+    $p = ($this->passerelle)($serveur, plafond: 1);
+    expect(fn () => $p->injecter(($this->msg)()))->toThrow(EnvoiSmtpRefuse::class);
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBeNull()
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(0);
+    Log::shouldNotHaveReceived('critical');
+});
+
+test('B2 : un renvoi CONFIRMÉ (serveur dédoublonnant) après a_verifier conclut en acceptee, une seule fois', function () {
+    $panne = true;
+    $serveur = new ServeurEspionDedoublonneur(function () use (&$panne) {
+        if ($panne) {
+            throw new RuntimeException('coupure après envoi possible');
+        }
+
+        return ResultatInjection::accepte('id-1');
+    });
+    $p = ($this->passerelle)($serveur);
+    expect(fn () => $p->injecter(($this->msg)()))->toThrow(RuntimeException::class);
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
+
+    $panne = false;
+    expect($p->injecter(($this->msg)())->accepte)->toBeTrue();
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee')
+        ->and($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'acceptee'))->toBeFalse() // déjà confirmée : idempotent
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(1);
+    $p->injecter(($this->msg)()); // un second renvoi ne repose aucune confirmation
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('commande', 'injection_confirmee')->count())->toBe(1);
 });

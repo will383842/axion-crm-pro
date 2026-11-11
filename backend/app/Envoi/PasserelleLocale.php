@@ -13,7 +13,10 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Serveur\ServeurEnvoiRefuse;
+use App\Envoi\Smtp\EnvoiSmtpRefuse;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -77,9 +80,10 @@ final class PasserelleLocale implements ServeurEnvoi
 
         // (A) Transaction COURTE sous le verrou du jour : portes, chauffe, plafonds, puis RÉSERVATION (elle compte). COMMIT.
         $decision = $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur): ResultatInjection|string {
-            // (D) Réservation restée `reservee` trop longtemps : issue inconnue => `a_verifier` (compte toujours), alerte.
+            // (D) Réservation restée `reservee` trop longtemps (même horloge que la réservation) : issue inconnue => `a_verifier`
+            // (compte toujours). L'alerte ne part qu'APRÈS le COMMIT de cette conclusion.
             foreach ($this->depot->perimerReservations($ws, $this->instant()->modify('-' . self::DELAI_RESERVATION_MINUTES . ' minutes')) as $cle) {
-                Log::critical('envoi.injection_a_verifier : réservation restée sans issue, intervention requise.', ['workspace_id' => $ws, 'cle' => $cle]);
+                DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : réservation restée sans issue, intervention requise.', ['workspace_id' => $ws, 'cle' => $cle]));
             }
             if ($this->depot->toutArreter($ws)) {
                 throw EnvoiRefuse::toutArreter();
@@ -99,7 +103,7 @@ final class PasserelleLocale implements ServeurEnvoi
             if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur) !== null) {
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
-            $this->depot->reserverInjection($ws, $jour, $message->cleIdempotence);
+            $this->depot->reserverInjection($ws, $jour, $message->cleIdempotence, $this->instant());
 
             return self::RESERVEE;
         });
@@ -107,7 +111,7 @@ final class PasserelleLocale implements ServeurEnvoi
             return $decision;
         }
         if ($decision !== self::RESERVEE) {
-            return $this->rejouer($message, $decision);
+            return $this->rejouer($message, $decision, $ws, $jour, $fournisseur);
         }
 
         // (B) HORS de toute transaction : le seul endroit où le serveur est appelé.
@@ -116,10 +120,16 @@ final class PasserelleLocale implements ServeurEnvoi
         } catch (EnvoiRefuse $e) {
             $this->conclure($ws, $jour, $message, 'liberee'); // refus net : rien n'est parti, la place est rendue
             throw $e;
+        } catch (EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
+            // Refus local fait AVANT toute transmission (enveloppe, expéditeur, message vide, transaction englobante, boîte
+            // introuvable, garde de Kumo) : refus CERTAIN, la place est rendue, aucune alerte.
+            $this->conclure($ws, $jour, $message, 'liberee');
+            throw $e;
         } catch (Throwable $e) {
-            // Issue incertaine (coupure après envoi possible) : la place reste prise, une alerte part.
+            // Échec APRÈS le début de transmission (coupure, réponse inconnue) : issue incertaine, la place reste prise.
+            // L'alerte ne part qu'après le COMMIT de `a_verifier`.
             $this->conclure($ws, $jour, $message, 'a_verifier');
-            Log::critical('envoi.injection_a_verifier : issue incertaine, intervention requise.', ['workspace_id' => $ws, 'erreur' => $e::class]);
+            DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine, intervention requise.', ['workspace_id' => $ws, 'erreur' => $e::class]));
             throw $e;
         }
 
@@ -129,13 +139,21 @@ final class PasserelleLocale implements ServeurEnvoi
         return $resultat;
     }
 
-    /** Renvoi d'une clé déjà réservée : seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS. */
-    private function rejouer(MessageAEnvoyer $message, string $etat): ResultatInjection
+    /**
+     * Renvoi d'une clé déjà réservée : seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS.
+     * Un renvoi CONFIRMÉ (`accepte`) d'une issue incertaine conclut la ligne en `acceptee` (une seule fois) et note la chauffe.
+     */
+    private function rejouer(MessageAEnvoyer $message, string $etat, string $ws, DateTimeImmutable $jour, ?string $fournisseur): ResultatInjection
     {
-        if ($this->serveur instanceof RenvoiParMemeCle || $etat === 'acceptee') {
-            return $this->serveur->injecter($message);
+        if (! ($this->serveur instanceof RenvoiParMemeCle) && $etat !== 'acceptee') {
+            throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
-        throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
+        $resultat = $this->serveur->injecter($message);
+        if ($etat === 'a_verifier' && $resultat->accepte) {
+            $this->conclure($ws, $jour, $message, 'acceptee', $fournisseur);
+        }
+
+        return $resultat;
     }
 
     private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null): void

@@ -41,11 +41,12 @@ interface DepotSocle
     public function etatInjection(string $workspaceId, string $cleIdempotence): ?string;
 
     /** À appeler SOUS le verrou : réserve la place (statut `reservee`, compte dans les plafonds). Vrai si la réservation est nouvelle. */
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool;
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool;
 
     /**
      * Conclut la réservation en cours : `acceptee` | `liberee` (la place est rendue) | `a_verifier` (elle compte toujours).
      * Une seule conclusion par réservation : vrai la première fois, faux ensuite (rien ne change).
+     * Seule transition permise ensuite : `a_verifier` -> `acceptee` (renvoi confirmé), une seule fois.
      */
     public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool;
 

@@ -89,7 +89,7 @@ final class DepotMemoire implements DepotSocle
         return $this->dejaInjecte($workspaceId, $cleIdempotence) ? ($this->statuts[$cleIdempotence] ?? 'acceptee') : null;
     }
 
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool
     {
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
             return false;
@@ -103,6 +103,11 @@ final class DepotMemoire implements DepotSocle
 
     public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool
     {
+        if (($this->statuts[$cleIdempotence] ?? null) === 'a_verifier' && $statut === 'acceptee') {
+            $this->statuts[$cleIdempotence] = 'acceptee'; // renvoi confirmé : une seule fois (le statut n'est plus a_verifier ensuite)
+
+            return true;
+        }
         if (($this->statuts[$cleIdempotence] ?? null) !== 'reservee') {
             return false;
         }
@@ -110,7 +115,7 @@ final class DepotMemoire implements DepotSocle
             $this->cles = array_values(array_diff($this->cles, [$cleIdempotence]));
             unset($this->statuts[$cleIdempotence]);
             $n = $this->injectesLe($workspaceId, $jour) - 1;
-            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = [];
+            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = array_diff_key($this->compteurs, [$jour->format('Y-m-d') => 1]);
 
             return true;
         }

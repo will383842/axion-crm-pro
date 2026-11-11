@@ -27,7 +27,7 @@ final class DepotCampagnes
     ];
 
     /** Statuts qui exigent une séquence (CHECK en base). */
-    public const EXIGENT_SEQUENCE = ['en_cours', 'arretee'];
+    public const EXIGENT_SEQUENCE = ['en_cours', 'en_pause', 'terminee', 'arretee'];
 
     public const SAISIE_MAX_OCTETS = 65536;
 

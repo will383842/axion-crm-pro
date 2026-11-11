@@ -3,6 +3,7 @@
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -169,4 +170,46 @@ test('CRM-G2 8 — opposition reçue d’abord, puis inscription à la lettre et
     expect(DB::table('abonnements')->where('statut', '!=', 'desabonne')->count())->toBe(0)
         ->and(DB::table('personnes')->count())->toBe(0)
         ->and(DB::table('opt_out')->where('scope', 'business')->where('email_hash', $empreinte)->count())->toBe(1);
+});
+
+test('CRM-G2 9 — guide reçu APRÈS une opposition : rien n’est écrit, les données déjà là sont gardées, événement ignoré journalisé', function () {
+    g2Poster(g2Evenement())->assertOk();
+    $opposition = g2Evenement(['schema_version' => 2, 'opposition' => ['actif' => true, 'date' => '2026-11-01T11:00:00Z']], '2026-11-02T10:00:00Z');
+    unset($opposition['origines']);
+    g2Poster($opposition)->assertOk();
+    $avant = g2Personne();
+    Log::spy();
+
+    // Guide tardif : autre date, donc une autre clé d'origine — l'ancien code l'ajoutait à la fiche opposée.
+    g2Poster(g2Evenement(['payload' => ['newsletter_optin' => true]], '2026-11-04T10:00:00Z'))->assertOk();
+
+    $apres = g2Personne();
+    expect(json_decode((string) $apres->origines, true))->toHaveCount(1)
+        ->and($apres->origines)->toBe($avant->origines)
+        ->and($apres->accords_at)->toBe($avant->accords_at)
+        ->and($apres->opposition_at)->toBe($avant->opposition_at)
+        ->and(DB::table('personnes')->count())->toBe(1)
+        ->and(DB::table('abonnements')->count())->toBe(0);
+    Log::shouldHaveReceived('info')->withArgs(fn ($message) => $message === 'Événement ignoré : personne opposée')->once();
+});
+
+test('CRM-G2 10 — adresse sur la liste d’opposition (fiche gardée) : un guide tardif n’ajoute rien', function () {
+    g2Poster(g2Evenement())->assertOk();
+    DB::table('opt_out')->insert([
+        'email' => null,
+        'email_hash' => hash('sha256', G2_EMAIL),
+        'scope' => 'business',
+        'source' => 'test',
+        'reason' => 'effacement',
+        'created_at' => now(),
+    ]);
+    $avant = g2Personne();
+
+    g2Poster(g2Evenement([], '2026-11-04T10:00:00Z'))->assertOk();
+
+    $apres = g2Personne();
+    expect($apres)->not->toBeNull()
+        ->and(json_decode((string) $apres->origines, true))->toHaveCount(1)
+        ->and($apres->origines)->toBe($avant->origines)
+        ->and(DB::table('personnes')->count())->toBe(1);
 });

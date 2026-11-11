@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -390,6 +391,17 @@ final class PersonnesIngestService
             : $this->trouver($workspaceId, $event);
 
         if ($personne === null) {
+            return;
+        }
+
+        // Personne opposée (fiche posée en opposition, ou empreinte sur la liste
+        // d'opposition `business`, donc fiche effacée) : un événement qui ne porte
+        // pas lui-même l'opposition n'écrit RIEN (ni origine, ni guide, ni accord).
+        // Les données déjà là sont GARDÉES, rien n'est supprimé. Un seul journal par
+        // événement (l'ingestion est idempotente : un rejeu n'arrive pas jusqu'ici).
+        if (! $accords->oppose() && $this->personneOpposee($event, $personne)) {
+            Log::info('Événement ignoré : personne opposée', ['event_id' => $event->eventId, 'personne_id' => (int) $personne->id]);
+
             return;
         }
 
@@ -1038,6 +1050,17 @@ final class PersonnesIngestService
             ->where('scope', $scope)
             ->where('email_hash', $emailHash)
             ->exists();
+    }
+
+    private function personneOpposee(SiteSyncEvent $event, \stdClass $personne): bool
+    {
+        if (($personne->opposition_at ?? null) !== null) {
+            return true;
+        }
+
+        $hash = $event->emailHash();
+
+        return $hash !== null && $this->opposee($hash, 'business');
     }
 
     private function opposeeAuCanalDepuis(string $emailHash, DateTimeImmutable $consentAt): bool

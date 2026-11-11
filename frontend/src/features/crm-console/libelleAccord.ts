@@ -35,6 +35,10 @@ export function libelleAccord(consentements: Consentement[], opposition: Contenu
 
   if (opposition.actif) {
     if (donne !== null) {
+      const retrait = plusRecent(choix.filter((c) => c.nature === 'retrait' && (c.date ?? '') >= (donne.date ?? '')));
+      if (retrait !== null) {
+        return { texte: `accord donné le ${jour(donne.date)}, retiré le ${jour(retrait.date)}, opposition le ${jour(opposition.date)}`, retenu: retrait };
+      }
       return { texte: `accord donné le ${jour(donne.date)}, retiré par opposition le ${jour(opposition.date)}`, retenu: donne };
     }
     return { texte: `aucun accord donné · opposition reçue le ${jour(opposition.date)}`, retenu: dernier };

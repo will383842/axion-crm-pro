@@ -61,4 +61,12 @@ describe('CRM-OPP — libellé de l’accord', () => {
     }
     expect(libelleAccord([], { actif: false, date: null })).toBeNull();
   });
+
+  it('accord, retrait, puis opposition : le retrait est dit, pas seulement l’opposition', () => {
+    const retrait = { nature: 'retrait', date: '2026-11-05T12:00:00Z', source: 'confirmation', version: 'M2' };
+    const t = texteAccord({ ...base, consentements: [ACCORD, retrait], opposition: { actif: true, date: '2026-11-10T12:00:00Z' } });
+    expect(t).toContain('accord donné le 03/11/2026');
+    expect(t).toContain('retiré le 05/11/2026');
+    expect(t).toContain('opposition le 10/11/2026');
+  });
 });

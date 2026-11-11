@@ -150,3 +150,19 @@ test('CRM-G2 7 — une personne opposée reste opposée après l’événement',
         ->and(DB::table('abonnements')->count())->toBe(0)
         ->and(DB::table('personnes')->count())->toBe(1);
 });
+
+test('CRM-G2 8 — opposition reçue d’abord, puis événement guide avec accord : l’opposition l’emporte quel que soit l’ordre', function () {
+    $opposee = g2Evenement(['schema_version' => 2, 'opposition' => ['actif' => true, 'date' => '2026-11-01T11:00:00Z']], '2026-11-02T10:00:00Z');
+    unset($opposee['origines']);
+    g2Poster($opposee)->assertOk();
+    $opposition = g2Personne()->opposition_at;
+    expect($opposition)->not->toBeNull();
+
+    g2Poster(g2Evenement(['payload' => ['newsletter_optin' => true]], '2026-11-03T10:00:00Z'))->assertOk();
+    g2Poster(g2Evenement([], '2026-11-04T10:00:00Z'))->assertOk();
+
+    $p = g2Personne();
+    expect($p->opposition_at)->toBe($opposition)
+        ->and(DB::table('abonnements')->count())->toBe(0)
+        ->and(DB::table('personnes')->count())->toBe(1);
+});

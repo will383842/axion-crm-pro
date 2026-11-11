@@ -44,7 +44,7 @@ describe('BoitePage', () => {
   it('enregistre la signature et le mode absence', async () => {
     const u = userEvent.setup();
     await monter('boi-claire', 'claire@prospection-a.example');
-    const signature = await screen.findByLabelText('Signature');
+    const signature = await screen.findByLabelText('Pied de message');
     await u.clear(signature);
     await u.type(signature, 'Claire, équipe démo');
     await u.click(screen.getByRole('checkbox', { name: 'Mode absence' }));

@@ -1,9 +1,11 @@
-/** DM2-INF — fiche d’une boîte : envois sur 30 jours, refus en clair, réponses, chauffe, réglages. */
+/** L8-F10 — fiche d’une boîte : envois sur 30 jours, refus en clair, réponses, chauffe du domaine, réglages, suspendre / réactiver. */
 import { useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link, useParams } from '@tanstack/react-router';
 import { Button, KpiCard } from '@/components/ui';
 import {
   useBoite,
+  useDomaine,
   useEnregistrerReglages,
   useReactiverBoite,
   useSuspendreBoite,
@@ -11,6 +13,7 @@ import {
   type ReglagesBoite,
 } from './composants/api';
 import { Entete } from './composants/Entete';
+import { PERMISSION_REACTIVER, PERMISSION_SUSPENDRE, useDroitsBoites } from './composants/permissions';
 import { Etats } from './composants/Etats';
 import { BOUTON_TACTILE, CLASSE_CHAMP, MessageErreur, MessageSucces } from './composants/Formulaire';
 import { dateHeure, LIBELLE_STATUT, messageErreur, nombre, pourcent } from './composants/format';
@@ -45,10 +48,10 @@ function FormulaireReglages({ id, depart }: { id: string; depart: ReglagesBoite 
 
   return (
     <section aria-labelledby="reglages-titre" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-      <h2 id="reglages-titre" className="text-lg font-bold text-slate-900">Signature et absence</h2>
+      <h2 id="reglages-titre" className="text-lg font-bold text-slate-900">Pied de message et absence</h2>
       <div className="mt-3 space-y-3">
         <div className="flex flex-col gap-1">
-          <label htmlFor="boite-signature" className="text-xs font-medium text-slate-700">Signature</label>
+          <label htmlFor="boite-signature" className="text-xs font-medium text-slate-700">Pied de message</label>
           <textarea id="boite-signature" rows={3} className={`${CLASSE_CHAMP} h-auto py-2 md:h-auto`} value={signature} onChange={(e) => setSignature(e.target.value)} />
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-800 md:min-h-0">
@@ -71,6 +74,20 @@ function FormulaireReglages({ id, depart }: { id: string; depart: ReglagesBoite 
         {retour ? (retour.ok ? <MessageSucces>{retour.texte}</MessageSucces> : <MessageErreur>{retour.texte}</MessageErreur>) : null}
       </div>
     </section>
+  );
+}
+
+function ChauffeDomaine({ domaineId }: { domaineId: string }) {
+  const domaine = useDomaine(domaineId).data?.domaine;
+  const chauffe = domaine?.chauffe ?? null;
+  if (!domaine) return null;
+  return chauffe ? (
+    <p className="mt-3 text-sm text-slate-700">
+      Chauffe du domaine : palier <strong>{chauffe.palier}</strong>, <strong>{chauffe.jours_effectifs} jours</strong> effectifs sur {chauffe.total_palier}
+      {chauffe.tenu_jusqu_au ? <>, palier tenu jusqu’au {dateHeure(chauffe.tenu_jusqu_au)}</> : null}.
+    </p>
+  ) : (
+    <p className="mt-3 text-sm text-slate-700">Le domaine n’est plus en chauffe.</p>
   );
 }
 
@@ -97,6 +114,7 @@ function Contenu({ fiche }: { fiche: FicheBoite }) {
         <section aria-label="Chauffe" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
           <h2 className="text-lg font-bold text-slate-900">Plafond du jour</h2>
           <p className="mt-3 text-sm text-slate-700"><strong>{boite.envoyes_aujourdhui}</strong> envoyés aujourd’hui sur <strong>{boite.quota_jour}</strong> permis. La montée en douceur se lit par domaine, dans la page Chauffe.</p>
+          <ChauffeDomaine domaineId={boite.domaine_id} />
         </section>
       </div>
       <section aria-label="Derniers refus (raison en clair)" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
@@ -146,7 +164,13 @@ export function BoitePage() {
   const requete = useBoite(boiteId);
   const suspendre = useSuspendreBoite();
   const reactiver = useReactiverBoite();
+  const droits = useDroitsBoites();
   const boite = requete.data?.boite;
+  const suspendue = boite?.statut === 'suspendue';
+  const refus = reactiver.isError && isAxiosError(reactiver.error) && reactiver.error.response?.status === 409;
+  const erreurGeste = suspendre.isError ? messageErreur(suspendre.error) : reactiver.isError ? (refus ? 'Réactivation impossible pour l’instant : la boîte est sous pause de frein ou pause automatique.' : messageErreur(reactiver.error)) : null;
+  const permis = suspendue ? droits.reactiver : droits.suspendre;
+  const raison = suspendue ? `Il vous manque la permission ${PERMISSION_REACTIVER}.` : `Il vous manque la permission ${PERMISSION_SUSPENDRE}.`;
   return (
     <div>
       <Entete
@@ -155,16 +179,18 @@ export function BoitePage() {
         actions={
           boite ? (
             <>
-              {boite.statut === 'suspendue' ? (
-                <Button variant="secondary" className={BOUTON_TACTILE} loading={reactiver.isPending} onClick={() => reactiver.mutate(boite.id)}>Réactiver</Button>
+              {suspendue ? (
+                <Button variant="secondary" className={BOUTON_TACTILE} disabled={!permis} loading={reactiver.isPending} onClick={() => { suspendre.reset(); reactiver.mutate(boite.id); }}>Réactiver</Button>
               ) : (
-                <Button variant="secondary" className={BOUTON_TACTILE} loading={suspendre.isPending} onClick={() => suspendre.mutate(boite.id)}>Mettre en pause</Button>
+                <Button variant="secondary" className={BOUTON_TACTILE} disabled={!permis} loading={suspendre.isPending} onClick={() => { reactiver.reset(); suspendre.mutate(boite.id); }}>Suspendre</Button>
               )}
               <Link to="/envoi/campagnes" className="inline-flex h-9 items-center rounded-lg bg-white px-4 text-sm font-medium text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 max-md:h-11">Voir les campagnes</Link>
             </>
           ) : undefined
         }
       />
+      {boite && droits.charges && !permis ? <p className="mb-3 text-xs text-slate-600">{raison}</p> : null}
+      {erreurGeste ? <div className="mb-3"><MessageErreur>{erreurGeste}</MessageErreur></div> : null}
       <Etats requete={requete} contexte="cette boîte d’envoi">{(fiche) => <Contenu fiche={fiche} />}</Etats>
     </div>
   );

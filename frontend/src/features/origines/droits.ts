@@ -6,7 +6,8 @@
  * Si le serveur envoie `permissions` (liste de noms), on la lit telle quelle ;
  * sinon on déduit de `roles` la carte du semeur (`PermissionsAndRolesSeeder`) :
  *  - `contacts.view_pii` et `data.export` : owner, admin, operator ;
- *  - `rgpd.handle` : owner SEUL (L3c-0).
+ *  - `rgpd.handle` : owner SEUL (L3c-0) ;
+ *  - `users.manage` : owner, admin ; `workspaces.manage` : owner (boîtes d'envoi).
  */
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -21,10 +22,14 @@ export const PERMISSION_EXPORT = 'data.export';
 export const PERMISSION_TRAITER = 'rgpd.handle';
 /** Voir adresse, note et jeton des demandes RGPD : owner et admin seulement. */
 export const PERMISSION_RGPD_PII = 'rgpd.view_pii';
+/** Suspendre une boîte d'envoi : owner et admin (semeur : `users.manage`). */
+export const PERMISSION_GERER_UTILISATEURS = 'users.manage';
+/** Réactiver une boîte d'envoi : owner seul (semeur : `workspaces.manage`). */
+export const PERMISSION_GERER_ESPACE = 'workspaces.manage';
 
 const PAR_ROLE: Record<string, string[]> = {
-  owner: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_TRAITER, PERMISSION_RGPD_PII],
-  admin: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_RGPD_PII],
+  owner: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_TRAITER, PERMISSION_RGPD_PII, PERMISSION_GERER_UTILISATEURS, PERMISSION_GERER_ESPACE],
+  admin: [PERMISSION_PII, PERMISSION_EXPORT, PERMISSION_RGPD_PII, PERMISSION_GERER_UTILISATEURS],
   operator: [PERMISSION_PII, PERMISSION_EXPORT],
   viewer: [],
 };

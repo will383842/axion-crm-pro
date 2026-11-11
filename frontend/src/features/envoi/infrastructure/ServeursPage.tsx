@@ -13,7 +13,7 @@ import { Jauge, PastilleFeu } from './composants/Pastilles';
 import { OngletsServeurs } from './OngletsServeurs';
 
 const FLUX = { prospection: 'Prospection', lettre: 'Lettre d’information' } as const;
-const STATUT = { prete: 'Prête', ralentie: 'Ralentie', en_chauffe: 'En chauffe', suspendue: 'Suspendue' } as const;
+const STATUT = { prete: 'Prête', ralentie: 'Ralentie', en_chauffe: 'En chauffe', suspendue: 'Suspendue', inconnu: 'État inconnu' } as const;
 
 function BlocServeur({ serveur }: { serveur: Serveur }) {
   const sante = useSanteServeur(serveur.id);
@@ -25,7 +25,7 @@ function BlocServeur({ serveur }: { serveur: Serveur }) {
     <section aria-labelledby={`srv-${serveur.id}`} className="space-y-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={`srv-${serveur.id}`} className="text-lg font-bold text-slate-900">{serveur.nom}</h2>
-        <div className="flex items-center gap-2"><PastilleFeu etat={serveur.etat} /><span className="text-xs text-slate-600">configuration version {serveur.version_configuration}</span></div>
+        <div className="flex items-center gap-2"><PastilleFeu etat={serveur.etat} /><span className="text-xs text-slate-600">{serveur.version_configuration === null ? 'configuration inconnue' : `configuration version ${serveur.version_configuration}`}</span></div>
       </div>
       {s ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

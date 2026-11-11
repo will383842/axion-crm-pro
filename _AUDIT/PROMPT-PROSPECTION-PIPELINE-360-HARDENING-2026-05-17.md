@@ -25,11 +25,11 @@ Le sprint initial pipeline 360° livre un MVP fonctionnel **mais 6 risques le re
 
 ## Contexte projet (à connaître impérativement)
 
-- **Repo** : `C:\Users\willi\Documents\Projets\Axion-CRM-Pro` (branche `main`, public `will383842/axion-crm-pro`)
+- **Repo** : `<dossier du projet>` (branche `main`, public `will383842/axion-crm-pro`)
 - **Stack** : Laravel 12 + PHP 8.3 + Postgres 16 + Redis + Horizon + React 19 + Vite 6 + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Williams Jullin (`williamsjullin@gmail.com`, workspace UUID `1db106f5-c8a4-47b0-bf86-930f1ccc9f4a`)
+- **Owner** : Jean Exemple (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 - **Sentry DSN** : déjà configuré côté backend (`SENTRY_LARAVEL_DSN` dans `.env`) + frontend (`VITE_SENTRY_DSN`)
 
 ## Prérequis (vérifier avant de lancer)
@@ -774,7 +774,7 @@ docker compose exec -T api php artisan horizon:status
 docker compose exec -T api php artisan horizon:list
 
 # Smoke test commande rescrape
-docker compose exec -T api php artisan companies:rescrape-archives --limit=10 --workspace=1db106f5-c8a4-47b0-bf86-930f1ccc9f4a
+docker compose exec -T api php artisan companies:rescrape-archives --limit=10 --workspace=00000000-0000-0000-0000-000000000000
 
 # Smoke test Hunter (1 vérif réelle, attention quota)
 docker compose exec -T api php artisan tinker --execute='

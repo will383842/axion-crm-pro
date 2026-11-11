@@ -127,7 +127,7 @@ Chaque appel LLM = transfert PII potentiel (extrait HTML de site corporate peut 
    - Toutes les mesures techniques + organisationnelles de la § 7-8
    - Procédure exercice droits art. 15-22 : cf. § 2
 5. Consultation
-   - DPO Axion-IA (Williams Jullin) — consultation interne
+   - DPO Axion-IA (Jean Exemple) — consultation interne
    - Pas de consultation CNIL préalable nécessaire (pas de high-risk caractérisé après mesures)
 
 **Statut :** DPIA à produire avant **S12 promotion prod**. Bloquant.

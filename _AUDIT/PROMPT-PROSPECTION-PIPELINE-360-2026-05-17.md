@@ -71,11 +71,11 @@ Tu es Claude, mode autopilot total. Tu vas transformer Axion CRM Pro en platefor
 
 ## Contexte projet (à connaître impérativement)
 
-- **Repo** : `C:\Users\willi\Documents\Projets\Axion-CRM-Pro` (branche `main`, public `will383842/axion-crm-pro`)
+- **Repo** : `<dossier du projet>` (branche `main`, public `will383842/axion-crm-pro`)
 - **Stack** : Laravel 12 + PHP 8.3 + Postgres 16 + Redis + Horizon + React 19 + Vite 6 + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`, Docker Compose (api, horizon, app, postgres, redis)
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Williams Jullin (`williamsjullin@gmail.com`, workspace UUID `1db106f5-c8a4-47b0-bf86-930f1ccc9f4a`)
+- **Owner** : Jean Exemple (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 
 ## État actuel (session précédente 2026-05-17 — 10 bugs résolus)
 
@@ -578,7 +578,7 @@ docker compose exec -T api php artisan schedule:list | grep -E "audiences|compan
 # SMOKE TEST FINAL : créer campagne multi-source INSEE + France Travail dept 75
 docker compose exec -T api php artisan tinker --execute='
 $campaign = \App\Models\ScrapingCampaign::create([
-    "workspace_id" => "1db106f5-c8a4-47b0-bf86-930f1ccc9f4a",
+    "workspace_id" => "00000000-0000-0000-0000-000000000000",
     "created_by"   => "4c77fc58-0fa5-4b64-8d11-1ffbff557f13",
     "name"         => "SMOKE Paris multi-source",
     "status"       => "running",
@@ -599,8 +599,8 @@ docker compose exec -T postgres psql -U axion -d axion_crm -c "
 SELECT id, name, status, runs_total, runs_completed, companies_created FROM scraping_campaigns ORDER BY id DESC LIMIT 1;
 SELECT source, status, COUNT(*) FROM scraper_runs WHERE campaign_id = (SELECT MAX(id) FROM scraping_campaigns) GROUP BY source, status;
 SELECT prospection_status, COUNT(*) FROM companies GROUP BY prospection_status;
-SELECT category, COUNT(*) FROM tags WHERE workspace_id='1db106f5-c8a4-47b0-bf86-930f1ccc9f4a' GROUP BY category;
-SELECT id, name, member_count FROM email_audiences WHERE workspace_id='1db106f5-c8a4-47b0-bf86-930f1ccc9f4a';
+SELECT category, COUNT(*) FROM tags WHERE workspace_id='00000000-0000-0000-0000-000000000000' GROUP BY category;
+SELECT id, name, member_count FROM email_audiences WHERE workspace_id='00000000-0000-0000-0000-000000000000';
 "
 ```
 

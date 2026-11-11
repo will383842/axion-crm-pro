@@ -44,7 +44,8 @@
 #   Compte visé : premier argument, par défaut le propriétaire.
 set -euo pipefail
 
-COMPTE="${1:-williamsjullin@gmail.com}"
+COMPTE="${1:-${COMPTE_PROPRIETAIRE:-}}"
+if [ -z "$COMPTE" ]; then echo "ERREUR : donner le compte en argument ou dans COMPTE_PROPRIETAIRE." >&2; exit 2; fi
 CONTENEUR="${CONTENEUR_API:-axion-crm-api}"
 
 if [ "$(id -u)" -ne 0 ]; then

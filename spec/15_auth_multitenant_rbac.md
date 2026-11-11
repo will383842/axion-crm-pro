@@ -591,7 +591,7 @@ class OwnerUserSeeder extends Seeder
 # 1. Stockage dans Doppler (jamais Git)
 doppler secrets set OWNER_INITIAL_EMAIL=proprietaire@exemple.test
 doppler secrets set OWNER_INITIAL_PASSWORD='<random 32 chars, généré par gestionnaire pwd>'
-doppler secrets set OWNER_INITIAL_NAME='Jean Exemple'
+doppler secrets set OWNER_INITIAL_NAME='Williams'
 
 # 2. Run seeder une seule fois en S1, via Doppler injecteur
 doppler run -- php artisan db:seed --class=OwnerUserSeeder

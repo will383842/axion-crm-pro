@@ -75,7 +75,7 @@ Tu es Claude, mode autopilot total. Tu vas transformer Axion CRM Pro en platefor
 - **Stack** : Laravel 12 + PHP 8.3 + Postgres 16 + Redis + Horizon + React 19 + Vite 6 + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`, Docker Compose (api, horizon, app, postgres, redis)
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Jean Exemple (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
+- **Owner** : Williams (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 
 ## État actuel (session précédente 2026-05-17 — 10 bugs résolus)
 

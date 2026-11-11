@@ -29,7 +29,7 @@ Le sprint initial pipeline 360° livre un MVP fonctionnel **mais 6 risques le re
 - **Stack** : Laravel 12 + PHP 8.3 + Postgres 16 + Redis + Horizon + React 19 + Vite 6 + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Jean Exemple (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
+- **Owner** : Williams (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 - **Sentry DSN** : déjà configuré côté backend (`SENTRY_LARAVEL_DSN` dans `.env`) + frontend (`VITE_SENTRY_DSN`)
 
 ## Prérequis (vérifier avant de lancer)

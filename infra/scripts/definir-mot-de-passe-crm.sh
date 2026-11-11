@@ -36,12 +36,13 @@
 # silence : l'opérateur croyait la protection acquise.
 #
 #   Usage, en root sur le serveur :
-#     printf '%s' 'le-mot-de-passe' | bash definir-mot-de-passe-crm.sh
+#     printf '%s' 'le-mot-de-passe' | bash definir-mot-de-passe-crm.sh COMPTE@EXEMPLE
 #
 #   Ou en le tapant soi-même, sans qu'il s'affiche :
-#     read -rsp 'Mot de passe : ' P; echo; printf '%s' "$P" | bash definir-mot-de-passe-crm.sh; unset P
+#     read -rsp 'Mot de passe : ' P; echo; printf '%s' "$P" | bash definir-mot-de-passe-crm.sh COMPTE@EXEMPLE; unset P
 #
-#   Compte visé : premier argument, par défaut le propriétaire.
+#   Compte visé : premier argument OBLIGATOIRE (e-mail du compte), ou à défaut la
+#   variable COMPTE_PROPRIETAIRE. Aucune valeur par défaut (dépôt public).
 set -euo pipefail
 
 COMPTE="${1:-${COMPTE_PROPRIETAIRE:-}}"

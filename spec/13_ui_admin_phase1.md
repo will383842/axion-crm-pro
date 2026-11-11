@@ -168,7 +168,7 @@ Pour distinguer dirigeants légaux des C-level Direction Finder.
 ├──────────────────────────────────────────────────────────────────────┤
 │ Contacts (4)                                              + Ajouter  │
 │   ┌──────────────────────────────────────────────────────────────┐   │
-│   │ ★ Jean Exemple        Président          ⓜ ☎ 🔗 — 🟢      │   │
+│   │ ★ Williams        Président          ⓜ ☎ 🔗 — 🟢      │   │
 │   │   Trouvé via : Dirigeant légal (annuaire-entreprises)        │   │
 │   │   responsable@exemple.test   score 88   tel +33...            │   │
 │   │ ─────────────────────────────────────────────────────────── │   │
@@ -379,7 +379,7 @@ Cf. `17_rgpd_aiact_owasp.md` pour le SQL transactional multi-tables.
 │  • Axion-IA  (owner: will@) · 1 user · €245.30 spent this month     │
 │                                                                      │
 │ Users (1 workspace courant)            + Inviter                     │
-│  • Jean Exemple · will@... · Owner · 2FA ✅ · Last login il y a 2h│
+│  • Williams · will@... · Owner · 2FA ✅ · Last login il y a 2h│
 │  ➕ Invite pending: julie@... (Operator) · expire J+5                │
 └──────────────────────────────────────────────────────────────────────┘
 ```

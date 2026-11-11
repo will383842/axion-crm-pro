@@ -23,6 +23,8 @@ final class JetonDesinscription
 
     private const LONGUEUR_MAX = 300;
 
+    private const HOTES = ['app', 'api'];
+
     /** Longueur minimale de la clé, contrôlée à l'émission : une clé courte se devine. */
     public const CLE_LONGUEUR_MIN = 32;
 
@@ -34,7 +36,7 @@ final class JetonDesinscription
         if ($cle === '') {
             throw new RuntimeException('Clé de désinscription absente (envoi.cle_desinscription) : jeton non émis.');
         }
-        if (strlen($cle) < self::CLE_LONGUEUR_MIN) {
+        if (! self::cleAssezLongue($cle)) {
             throw new RuntimeException('Clé de désinscription trop courte (' . self::CLE_LONGUEUR_MIN . ' caractères au moins) : jeton non émis.');
         }
         $depart = $maintenant ?? Carbon::now();
@@ -90,17 +92,58 @@ final class JetonDesinscription
     private static function baseHote(): string
     {
         $hote = (string) config('envoi.desinscription_hote', 'app');
-        if (! in_array($hote, ['app', 'api'], true)) {
+        if (! in_array($hote, self::HOTES, true)) {
             throw new RuntimeException('Hôte des liens de désinscription inconnu (envoi.desinscription_hote : app ou api).');
         }
-        $base = rtrim(trim((string) (((array) config('envoi.desinscription_hotes', []))[$hote] ?? '')), '/');
-        $p = parse_url($base);
-        $schemaOk = is_array($p) && in_array($p['scheme'] ?? '', app()->environment('production') ? ['https'] : ['https', 'http'], true);
-        if ($base === '' || ! $schemaOk || ($p['host'] ?? '') === '' || isset($p['path']) || isset($p['query']) || isset($p['fragment']) || isset($p['user'])) {
+        $base = self::adresseValide($hote);
+        if ($base === null) {
             throw new RuntimeException("Adresse de l'hôte « {$hote} » des liens de désinscription absente ou invalide (envoi.desinscription_hotes) : lien non émis.");
         }
 
         return $base;
+    }
+
+    /**
+     * Adresse de l'hôte $hote (app|api) si elle est valide, sinon null : sans blancs de bord, https (http hors production),
+     * avec un host, sans chemin, requête, fragment ni identifiant. Règle UNIQUE, partagée par `baseHote()` et le feu vert.
+     */
+    private static function adresseValide(string $hote): ?string
+    {
+        $base = rtrim(trim((string) (((array) config('envoi.desinscription_hotes', []))[$hote] ?? '')), '/');
+        $p = parse_url($base);
+        $schemaOk = is_array($p) && in_array($p['scheme'] ?? '', app()->environment('production') ? ['https'] : ['https', 'http'], true);
+        if ($base === '' || ! $schemaOk || ($p['host'] ?? '') === '' || isset($p['path']) || isset($p['query']) || isset($p['fragment']) || isset($p['user'])) {
+            return null;
+        }
+
+        return $base;
+    }
+
+    /** Vrai si l'hôte choisi vaut app|api ET si les DEUX adresses sont valides (lecture seule : aucun lien n'est émis). */
+    public static function hotesConfiguresValides(): bool
+    {
+        if (! in_array((string) config('envoi.desinscription_hote', 'app'), self::HOTES, true)) {
+            return false;
+        }
+        foreach (self::HOTES as $hote) {
+            if (self::adresseValide($hote) === null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Règle de longueur de la clé (après retrait des blancs de bord). Source UNIQUE : émission, garde de démarrage, feu vert. */
+    public static function cleAssezLongue(string $cle): bool
+    {
+        return strlen(trim($cle)) >= self::CLE_LONGUEUR_MIN;
+    }
+
+    /** La clé configurée respecte la règle (lecture seule, la valeur n'est jamais exposée). */
+    public static function cleConfigureeValide(): bool
+    {
+        return self::cleAssezLongue(self::cle());
     }
 
     /**
@@ -111,7 +154,7 @@ final class JetonDesinscription
      */
     public static function garderAuDemarrage(string $environnement): void
     {
-        if ($environnement === 'production' && config('envoi.reel_actif') === true && strlen(self::cle()) < self::CLE_LONGUEUR_MIN) {
+        if ($environnement === 'production' && config('envoi.reel_actif') === true && ! self::cleConfigureeValide()) {
             throw new RuntimeException('ENVOI_CLE_DESINSCRIPTION absente ou trop courte (' . self::CLE_LONGUEUR_MIN . ' caractères au moins) : démarrage refusé en production.');
         }
     }

@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Envoi\FeuVert;
+
+use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\Desinscription\ArretParEntreprise;
+use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
+use App\Envoi\Desinscription\JetonDesinscription;
+use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
+use App\Envoi\Sante\DepotSante;
+use App\Support\WorkspaceContext;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Feu vert : liste CALCULÉE (L8-F04). Lecture seule : elle ne signe jamais, n'écrit jamais `envoi_drapeaux`,
+ * ne change aucun réglage. Points automatiques = lus dans le système ; points manuels = jamais automatiques,
+ * « fait » seulement si une preuve a été déposée (et, par défaut, « vérifiable seulement avec le vrai serveur »).
+ *
+ * Catalogue versionné unique CatalogueManuels : `auto.*` (calculés) et `manuel.*` (spécification 26 § 8, 18 points).
+ */
+class ListeFeuVert
+{
+    public const PREMIER = CatalogueManuels::PREMIER;
+
+    public function __construct(private readonly DepotPreuves $preuves, private readonly DepotSante $sante) {}
+
+    /** @return list<PointFeuVert> */
+    public function points(string $ws): array
+    {
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first());
+        $auto = static fn (string $code, bool $fait, string $ok, string $ko): PointFeuVert => self::pointAuto($code, $fait, $fait ? $ok : $ko);
+
+        $dns = $this->sante->controlesDns($ws);
+        $listes = $this->sante->controlesListes($ws);
+        $dnsOk = $dns !== [] && array_filter($dns, static fn (array $c): bool => ! $c['pret'] || $c['pause']) === [];
+        $listesOk = $listes !== [] && array_filter($listes, static fn (array $c): bool => $c['statut'] !== 'non_liste' || $c['pause']) === [];
+
+        $points = [
+            $auto('auto.reel_actif_faux', config('envoi.reel_actif') === false, 'ENVOI_REEL_ACTIF est faux.', 'L’envoi réel est actif.'),
+            $auto('auto.mode_temoins_vrai', $d !== null && (bool) $d->mode_temoins, 'Le mode témoins est actif.', 'Mode témoins inactif ou drapeaux absents.'),
+            $auto('auto.signature_absente', $d !== null && $d->feu_vert_signature === null, 'Aucune signature posée.', $d === null ? 'Drapeaux absents.' : 'Une signature existe déjà.'),
+            $this->temoins($ws),
+            $auto('auto.arret_entreprise', ! self::estAbsent(app(ArretParEntreprise::class), ArretParEntrepriseAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
+            $auto('auto.retrait_file', ! self::estAbsent(app(RetraitEnvoisEnFile::class), RetraitEnvoisEnFileAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
+            // Mêmes règles que la vraie garde (JetonDesinscription) : jamais une copie.
+            $auto('auto.cle_desinscription', JetonDesinscription::cleConfigureeValide(), 'Clé posée, longueur suffisante.', 'Clé absente ou trop courte.'),
+            $auto('auto.hotes_desinscription', JetonDesinscription::hotesConfiguresValides(), 'Hôte (app ou api) et deux adresses valides posés.', 'Hôte inconnu, ou adresse app/api absente ou invalide.'),
+            $auto('auto.releve_imap', config('envoi.releve_actif', false) === true, 'Interrupteur de relève actif.', 'Interrupteur de relève éteint ou absent (fiche F12).'),
+            $auto('auto.domaines_prets', $dnsOk, 'Tous les domaines contrôlés sont prêts.', 'Aucun contrôle, ou un domaine pas prêt / en pause.'),
+            $auto('auto.listes_noires', $listesOk, 'Aucune ressource listée.', 'Aucun contrôle, ou une ressource listée / non fiable / en pause.'),
+            $auto('auto.supervision_k15', config('envoi.sante.actif') === true, 'Supervision active.', 'Supervision éteinte.'),
+        ];
+
+        $preuves = $this->preuves->dernieres($ws);
+        foreach (CatalogueManuels::codesManuels() as $code) {
+            $p = $preuves[$code] ?? null;
+            $fait = $p !== null && $p['fait'];
+            $c = CatalogueManuels::POINTS[$code];
+            // Aucun signal « K17 fait » n'existe encore dans le code : par prudence, un point qui exige le vrai serveur attend toujours.
+            $attend = $c['serveur_reel'];
+            $points[] = new PointFeuVert(
+                $code,
+                $c['libelle'],
+                false,
+                $fait,
+                $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.',
+                $c['source'],
+                $c['groupe'],
+                $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE),
+                $fait ? $p['preuve'] : null,
+            );
+        }
+
+        return $points;
+    }
+
+    private static function pointAuto(string $code, bool $fait, string $detail): PointFeuVert
+    {
+        $c = CatalogueManuels::POINTS[$code];
+
+        return new PointFeuVert($code, $c['libelle'], true, $fait, $detail, $c['source'], $c['groupe'], $fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
+    }
+
+    /** @param class-string $absent */
+    private static function estAbsent(object $liaison, string $absent): bool
+    {
+        return is_a($liaison, $absent);
+    }
+
+    private function temoins(string $ws): PointFeuVert
+    {
+        $code = 'auto.temoins_fournisseurs';
+        if (! Schema::hasColumn('envoi_temoins', 'fournisseur')) {
+            return self::pointAuto($code, false, 'Colonne fournisseur absente (fiche F03 pas encore posée).');
+        }
+        $presents = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->where('workspace_id', $ws)->distinct()->pluck('fournisseur')->all());
+        $manquants = array_values(array_diff(DepotSocleDb::FOURNISSEURS_TEMOINS, array_map('strval', $presents)));
+
+        return self::pointAuto($code, $manquants === [], $manquants === [] ? 'Tous les fournisseurs témoins sont couverts.' : count($manquants) . ' fournisseur(s) sans témoin : ' . implode(', ', $manquants) . '.');
+    }
+}

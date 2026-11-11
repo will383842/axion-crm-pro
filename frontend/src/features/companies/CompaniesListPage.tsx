@@ -49,6 +49,9 @@ import {
 import { Pagination } from "./components/Pagination";
 import { FERMEES_INCLURE, FERMEES_SEULES } from "./fermees";
 import { AjouterAUneListe } from "@/features/listes/AjouterAUneListe";
+import { ExporterLaSelection } from "./export/ExporterLaSelection";
+import { exportSelectionAnnonce } from "./export/exporterSelection";
+import { VuesSauvegardees } from "./vues/VuesSauvegardees";
 
 type Company = CompanyRowData & {
   discovery_source?: string | null;
@@ -63,6 +66,8 @@ interface CompaniesResponse {
     last_page: number;
     current_page?: number;
     per_page?: number;
+    /** DM1-ENT — le serveur sait exporter une sélection (`filter[ids]`). */
+    export_selection?: boolean;
   };
 }
 
@@ -427,6 +432,13 @@ export function CompaniesListPage() {
         />
       </div>
 
+      {/* Résultat de l'action de masse : hors de la barre, qui disparaît avec la sélection. */}
+      {messageMasse !== null && (
+        <p role="status" className="mb-3 text-sm text-slate-700">
+          {messageMasse}
+        </p>
+      )}
+
       {/* Prospection status tabs */}
       <div className="mb-3 flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800">
         {PROSPECTION_TABS.map((tab) => {
@@ -551,6 +563,15 @@ export function CompaniesListPage() {
                 </Button>
               </>
             ) : null}
+            {/* DM1-ENT — vues sauvegardées (SavedViewsController). */}
+            <VuesSauvegardees
+              filtre={filter}
+              onAppliquer={(f) => {
+                setFilter(f);
+                setFiltreImpose(f);
+                setPage(1);
+              }}
+            />
           </div>
         </div>
 
@@ -741,26 +762,26 @@ export function CompaniesListPage() {
               </Button>
               {/* 2026-09-30 — les fiches cochées vont dans une liste manuelle. */}
               <AjouterAUneListe companyIds={[...selection]} onAjoute={() => setSelection(new Set())} />
+              {/* DM1-ENT — un CSV des seules fiches cochées, seulement si le
+                  serveur annonce `filter[ids]` : sinon l'export rendrait toute la liste. */}
+              {exportSelectionAnnonce(data?.meta) ? <ExporterLaSelection ids={[...selection]} /> : null}
               <Button size="sm" variant="ghost" onClick={() => setSelection(new Set())}>
                 Annuler la sélection
               </Button>
-              {messageMasse !== null && (
-                <span role="status" className="text-xs text-slate-600 dark:text-slate-300">
-                  {messageMasse}
-                </span>
-              )}
             </div>
           )}
-          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 746 px de
-              largeur minimale de ce tableau (32+110+90+110+140+100+36 de colonnes
-              fixes, 8 gouttieres de 12, 2x16 de rembourrage) etaient coupes net par
+          {/* D30-002 — conteneur a defilement horizontal. Sans lui, les 874 px de
+              largeur minimale de ce tableau (DM1-ENT : 32+160+100+110+140+80+100+36
+              de colonnes, minima des `minmax` compris, 7 gouttieres de 12, 2x16 de
+              rembourrage ; calcul de `largeurMinimaleGrille`) seraient coupes net par
               le `overflow-hidden` de la Card. L en-tete ET le corps virtualise sont
               dedans : sinon ils defileraient separement et ne seraient plus alignes. */}
-          <TableScroll template={GRID}>
+          <TableScroll template={GRID} role="table" aria-label="Entreprises" aria-rowcount={rows.length + 1}>
 
           {/* Sticky header — must share GRID with CompanyRow */}
           <div
             role="row"
+            aria-rowindex={1}
             className={cn(
               "sticky top-0 z-10 grid items-center gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-xs font-semibold tracking-wider text-slate-600 uppercase backdrop-blur",
               "dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400",
@@ -770,7 +791,7 @@ export function CompaniesListPage() {
             {/* Tout cocher ne porte que sur la PAGE affichée : « toutes les
                 fiches du filtre » se compterait en millions et ne pourrait pas
                 être annulé à la main. */}
-            <div className="flex items-center justify-center">
+            <div role="columnheader" className="flex items-center justify-center">
               <input
                 type="checkbox"
                 checked={rows.length > 0 && rows.every((r) => selection.has(r.id))}
@@ -781,13 +802,13 @@ export function CompaniesListPage() {
                 className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600"
               />
             </div>
-            <div>Entreprise</div>
-            <div>Activité</div>
-            <div>Taille</div>
-            <div>Qualité</div>
-            <div>Ville</div>
-            <div>Enrichi</div>
-            <div className="sr-only">Actions</div>
+            <div role="columnheader">Entreprise</div>
+            <div role="columnheader">Activité</div>
+            <div role="columnheader">Taille</div>
+            <div role="columnheader">Qualité</div>
+            <div role="columnheader">Ville</div>
+            <div role="columnheader">Enrichi</div>
+            <div role="columnheader" className="sr-only">Actions</div>
           </div>
 
           {/* Virtualised body — DO NOT remove the absolute positioning trick,
@@ -796,7 +817,6 @@ export function CompaniesListPage() {
             ref={parentRef}
             className="h-[600px] overflow-auto"
             role="rowgroup"
-            aria-rowcount={rows.length}
           >
             <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
               {rowVirtualizer.getVirtualItems().map((vrow) => {
@@ -805,7 +825,7 @@ export function CompaniesListPage() {
                 return (
                   <div
                     key={c.id}
-                    aria-rowindex={vrow.index + 1}
+                    role="presentation"
                     style={{
                       position: "absolute",
                       top: 0,
@@ -819,6 +839,7 @@ export function CompaniesListPage() {
                       company={c}
                       selectionnee={selection.has(c.id)}
                       onBasculerSelection={basculerSelection}
+                      rangAria={vrow.index + 2}
                     />
                   </div>
                 );

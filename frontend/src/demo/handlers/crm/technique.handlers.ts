@@ -16,7 +16,6 @@ import {
   type CasUsageIa,
   type EntreeRegistreIa,
   type FournisseurRelais,
-  type LigneRoumanie,
   type PassageCollecte,
   type RotationAcces,
   type ReperesSante,
@@ -30,7 +29,6 @@ function zone(): void {
 }
 zone();
 
-const roumanie = () => demoDb.zone<LigneRoumanie>('technique', 'roumanie');
 const passages = () => demoDb.zone<PassageCollecte>('technique', 'passages');
 const casUsage = () => demoDb.zone<CasUsageIa>('technique', 'casUsage');
 const relais = () => demoDb.zone<FournisseurRelais>('technique', 'relais');
@@ -41,23 +39,7 @@ const sante = () => demoDb.zone<ReperesSante & { id: number }>('technique', 'san
 const SANS_ARCHIVAGE: ReperesSante['archivages'] = {};
 
 export const handlers: HttpHandler[] = [
-  // ── Roumanie : le vivier, filtré par nature et par statut ───────────────
-  http.get(api('/companies'), async ({ request }) => {
-    const url = new URL(request.url);
-    // Cette zone ne sert que le vivier Roumanie ; les autres listes ne sont pas les siennes.
-    if (url.searchParams.get('filter[country_code]') !== 'RO') return undefined;
-    await delai();
-    const force = await repondreEtatForce(request, { data: [], meta: { total: 0 } });
-    if (force) return force;
-    const nature = url.searchParams.get('filter[entity_nature]');
-    const statut = url.searchParams.get('filter[prospection_status]');
-    const liste = roumanie().filtrer(
-      (l) => (nature === null || nature === '' || l.entity_nature === nature) && (statut === null || statut === '' || l.prospection_status === statut),
-    );
-    const page = paginer(liste, request, 50);
-    return HttpResponse.json({ data: page.data, meta: { total: liste.length, current_page: page.meta.current_page, last_page: page.meta.last_page } });
-  }),
-
+  // ── Roumanie : le vivier (`GET /companies?filter[country_code]=RO`) est servi par entreprises.handlers.ts ──
   // ── Historique des collectes ────────────────────────────────────────────
   http.get(api('/scraper-runs'), async ({ request }) => {
     await delai();

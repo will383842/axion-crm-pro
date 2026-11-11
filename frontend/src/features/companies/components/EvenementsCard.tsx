@@ -1,6 +1,6 @@
 /**
  * Bloc « Événements et démarche » de la fiche entreprise : les événements
- * qu'organise cette fiche et l'état de la démarche de Will sur chacun.
+ * qu'organise cette fiche et l'état de la démarche du responsable sur chacun.
  * Invisible pour une fiche qui n'organise rien — la quasi-totalité.
  */
 import { useQuery } from "@tanstack/react-query";

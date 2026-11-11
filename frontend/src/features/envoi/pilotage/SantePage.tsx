@@ -88,7 +88,7 @@ export function SantePage() {
                     <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                       <Feu etat={d.etat} />
                       <span>{d.boites} boîte{d.boites > 1 ? 's' : ''}</span>
-                      {d.chauffe ? <span>jour {d.chauffe.jour} sur {d.chauffe.sur}</span> : null}
+                      {d.chauffe ? <span>palier {d.chauffe.palier}, jour {d.chauffe.jours_effectifs}</span> : null}
                     </span>
                     <span className="mt-2 block text-xs text-slate-600">DMARC : {d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}{d.listes_noires > 0 ? ` · ${d.listes_noires} liste${d.listes_noires > 1 ? 's' : ''} noire${d.listes_noires > 1 ? 's' : ''}` : ''}</span>
                   </Link>

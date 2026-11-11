@@ -51,19 +51,19 @@ export const CODES_SERVEUR: ReadonlyArray<{ code: string; libelle: string; dur: 
 export const DOMAINES_DEMO: Domaine[] = [
   { id: 'dom-a', nom: 'prospection-a.example', etat: 'vert', boites: 3, dmarc: 'quarantine', dmarc_prochaine_etape: { politique: 'reject', le: '2027-02-15T08:00:00.000Z' }, listes_noires: 0, ajoute_le: ilYa(40, 10, 0), chauffe: null },
   { id: 'dom-b', nom: 'prospection-b.example', etat: 'ambre', boites: 2, dmarc: 'none', dmarc_prochaine_etape: { politique: 'quarantine', le: '2027-01-26T08:00:00.000Z' }, listes_noires: 1, ajoute_le: ilYa(40, 10, 30), chauffe: null },
-  { id: 'dom-c', nom: 'prospection-c.example', etat: 'bleu', boites: 2, dmarc: 'none', dmarc_prochaine_etape: { politique: 'quarantine', le: '2027-01-15T08:00:00.000Z' }, listes_noires: 0, ajoute_le: ilYa(6, 9, 0), chauffe: { jour: 6, sur: 30, plafond_aujourdhui: 10 } },
+  { id: 'dom-c', nom: 'prospection-c.example', etat: 'bleu', boites: 2, dmarc: 'none', dmarc_prochaine_etape: { politique: 'quarantine', le: '2027-01-15T08:00:00.000Z' }, listes_noires: 0, ajoute_le: ilYa(6, 9, 0), chauffe: { palier: 'P2', jours_effectifs: 6, total_palier: 20, tenu_jusqu_au: null } },
   { id: 'dom-d', nom: 'prospection-d.example', etat: 'gris', boites: 1, dmarc: 'none', dmarc_prochaine_etape: null, listes_noires: 0, ajoute_le: ilYa(1, 16, 0), chauffe: null },
 ];
 
 export const BOITES_DEMO: Boite[] = [
-  { id: 'boi-claire', adresse: 'claire@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Claire · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 32, taux_refus: 0.6, reponses_7j: 4, chauffe: null },
-  { id: 'boi-sophie', adresse: 'sophie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Sophie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 28, taux_refus: 0.4, reponses_7j: 2, chauffe: null },
-  { id: 'boi-lucie', adresse: 'lucie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Lucie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 21, taux_refus: 0.8, reponses_7j: 3, chauffe: null },
-  { id: 'boi-camille', adresse: 'camille@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Camille · Axion (démo)', etat: 'ambre', statut: 'ralentie', quota_jour: 20, envoyes_aujourdhui: 12, taux_refus: 3, reponses_7j: 1, chauffe: null },
-  { id: 'boi-nina', adresse: 'nina@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Nina · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 30, envoyes_aujourdhui: 9, taux_refus: 1.1, reponses_7j: 1, chauffe: null },
-  { id: 'boi-paul', adresse: 'paul@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Paul · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 8, taux_refus: 0, reponses_7j: 0, chauffe: { jour: 6, sur: 30, plafond_aujourdhui: 10 } },
-  { id: 'boi-hugo', adresse: 'hugo@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Hugo · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 6, taux_refus: 0, reponses_7j: 0, chauffe: { jour: 6, sur: 30, plafond_aujourdhui: 10 } },
-  { id: 'boi-marc', adresse: 'marc@prospection-d.example', domaine_id: 'dom-d', nom_affiche: 'Marc · Axion (démo)', etat: 'gris', statut: 'suspendue', quota_jour: 0, envoyes_aujourdhui: 0, taux_refus: 0, reponses_7j: 0, chauffe: null },
+  { id: 'boi-claire', adresse: 'claire@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Claire · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 32, taux_refus: 0.6, reponses_7j: 4 },
+  { id: 'boi-sophie', adresse: 'sophie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Sophie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 28, taux_refus: 0.4, reponses_7j: 2 },
+  { id: 'boi-lucie', adresse: 'lucie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Lucie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 21, taux_refus: 0.8, reponses_7j: 3 },
+  { id: 'boi-camille', adresse: 'camille@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Camille · Axion (démo)', etat: 'ambre', statut: 'ralentie', quota_jour: 20, envoyes_aujourdhui: 12, taux_refus: 3, reponses_7j: 1 },
+  { id: 'boi-nina', adresse: 'nina@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Nina · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 30, envoyes_aujourdhui: 9, taux_refus: 1.1, reponses_7j: 1 },
+  { id: 'boi-paul', adresse: 'paul@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Paul · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 8, taux_refus: 0, reponses_7j: 0 },
+  { id: 'boi-hugo', adresse: 'hugo@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Hugo · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 6, taux_refus: 0, reponses_7j: 0 },
+  { id: 'boi-marc', adresse: 'marc@prospection-d.example', domaine_id: 'dom-d', nom_affiche: 'Marc · Axion (démo)', etat: 'gris', statut: 'suspendue', quota_jour: 0, envoyes_aujourdhui: 0, taux_refus: 0, reponses_7j: 0 },
 ];
 
 export const SERVEURS_DEMO: Serveur[] = [

@@ -1,4 +1,4 @@
-/** Feu vert (DM2-PIL) — les 15 critères avant le premier envoi réel, avec leur état. */
+/** Feu vert (DM2-PIL) — les critères avant le premier envoi réel, avec leur état. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Check, Circle } from 'lucide-react';
@@ -7,14 +7,14 @@ import { api } from '@/lib/api';
 import { OngletsSante } from './OngletsSante';
 import { Chargement, Panne, Vide } from './composants/Etats';
 
-interface Point { code: string; libelle: string; fait: boolean; detail: string | null }
+interface Point { code: string; libelle: string; nature: 'auto' | 'manuel'; fait: boolean; detail: string | null }
 interface FeuVert { points: Point[]; faits: number; total: number }
 
 export function FeuVertPage() {
   const qc = useQueryClient();
   const requete = useQuery({ queryKey: ['envoi', 'feu-vert'], queryFn: async () => (await api.get<FeuVert>('/envoi/feu-vert')).data });
   const marquer = useMutation({
-    mutationFn: async (code: string) => (await api.post<Point>(`/envoi/feu-vert/${code}/fait`)).data,
+    mutationFn: async (code: string) => (await api.post<Point>(`/envoi/feu-vert/${code}/fait`, { preuve: 'Fait, constaté depuis l’écran.' })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['envoi', 'feu-vert'] }),
   });
   const f = requete.data;
@@ -37,7 +37,7 @@ export function FeuVertPage() {
                       {p.libelle}
                       <span className="block text-xs text-slate-600">{p.fait ? 'Fait' : 'À faire'}{p.detail ? ` · ${p.detail}` : ''}</span>
                     </span>
-                    {!p.fait && p.detail ? (
+                    {!p.fait && p.nature === 'manuel' ? (
                       <Button variant="secondary" size="sm" className="min-h-11 md:min-h-8" aria-label={`Marquer fait : ${p.libelle}`} loading={marquer.isPending && marquer.variables === p.code} onClick={() => marquer.mutate(p.code)}>Marquer fait</Button>
                     ) : null}
                   </li>

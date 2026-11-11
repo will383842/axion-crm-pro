@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
+use App\Http\Controllers\Api\EnvoiFeuVertController;
 use App\Http\Controllers\Api\EnvoiSanteController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
@@ -129,6 +130,11 @@ Route::prefix('v1')->group(function () {
         // `operator` et `viewer` : 403). `workspaces.manage` exclurait l'admin ; une permission dédiée exigerait une migration de rôles.
         Route::get('/envoi/sante', [EnvoiSanteController::class, 'index'])
             ->middleware('permission:users.manage');
+
+        // L8-F05 : feu vert (contrat pilotage.yaml). Lecture ; la preuve d'un point manuel exige `workspaces.manage`.
+        Route::get('/envoi/feu-vert', [EnvoiFeuVertController::class, 'index']);
+        Route::post('/envoi/feu-vert/{code}/fait', [EnvoiFeuVertController::class, 'fait'])
+            ->middleware('permission:workspaces.manage');
 
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe

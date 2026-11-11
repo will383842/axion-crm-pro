@@ -65,15 +65,50 @@ class ListeFeuVert
                 $c['libelle'],
                 false,
                 $fait,
-                $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.',
+                self::detailManuel($attend, $fait),
                 $c['source'],
                 $c['groupe'],
                 $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE),
                 $fait ? $p['preuve'] : null,
+                $fait ? $p['par'] : null,
+                $fait ? $p['le'] : null,
             );
         }
 
         return $points;
+    }
+
+    /** « Vrai serveur » seulement si le point attend le serveur réel (dépend de `$attend`). */
+    private static function detailManuel(bool $attend, bool $fait): string
+    {
+        if ($attend) {
+            return $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.';
+        }
+
+        return $fait ? 'Preuve déposée.' : 'Preuve humaine à déposer.';
+    }
+
+    /**
+     * Verrous en LECTURE SEULE (contrat VerrousFeuVert) : aucune écriture, aucune valeur secrète.
+     *
+     * @return array{envoi_reel_actif: bool, mode_temoins: bool, signature_presente: bool, signature_date: ?string, fournisseurs_temoins_couverts: int, fournisseurs_temoins_requis: int}
+     */
+    public function verrous(string $ws): array
+    {
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first());
+        $requis = DepotSocleDb::FOURNISSEURS_TEMOINS;
+        $presents = Schema::hasColumn('envoi_temoins', 'fournisseur')
+            ? WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->where('workspace_id', $ws)->distinct()->pluck('fournisseur')->all())
+            : [];
+
+        return [
+            'envoi_reel_actif' => config('envoi.reel_actif') !== false,
+            'mode_temoins' => $d !== null && (bool) $d->mode_temoins,
+            'signature_presente' => $d !== null && $d->feu_vert_signature !== null,
+            'signature_date' => $d !== null && $d->feu_vert_date !== null ? substr((string) $d->feu_vert_date, 0, 10) : null,
+            'fournisseurs_temoins_couverts' => count(array_intersect($requis, array_map('strval', $presents))),
+            'fournisseurs_temoins_requis' => count($requis),
+        ];
     }
 
     private static function pointAuto(string $code, bool $fait, string $detail): PointFeuVert

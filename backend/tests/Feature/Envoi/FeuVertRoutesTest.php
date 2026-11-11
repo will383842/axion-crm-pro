@@ -1,0 +1,196 @@
+<?php
+
+use App\Envoi\FeuVert\CatalogueManuels;
+use App\Envoi\FeuVert\DepotPreuves;
+use App\Models\User;
+use App\Models\Workspace;
+use Database\Seeders\PermissionsAndRolesSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+use Tests\Support\ContratOpenApiEnvoi;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class)->group('envoi');
+
+beforeEach(function () {
+    $this->seed(PermissionsAndRolesSeeder::class);
+});
+
+/** Compte fictif (exemple.test) d'un rôle donné, dans un espace neuf ou celui passé. */
+function fvCompte(string $role, ?string $espace = null, string $nom = 'Williams'): User
+{
+    $espace ??= Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'fvr-' . Str::random(8), 'name' => 'Espace feu vert'])->id;
+    $user = User::create([
+        'id' => (string) Str::uuid(),
+        'email' => $role . '-' . Str::random(6) . '@exemple.test',
+        'name' => $nom,
+        'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),
+        'current_workspace_id' => $espace,
+        'first_login_completed_at' => now(),
+    ]);
+    setPermissionsTeamId($espace);
+    $user->assignRole($role);
+
+    return $user;
+}
+
+const FV_PREUVE = 'Courriel de l’hébergeur du 10 novembre, port 25 ouvert (réf. exemple-0042).';
+
+test('GET /envoi/feu-vert : 401 sans session', function () {
+    $this->getJson('/api/v1/envoi/feu-vert')->assertUnauthorized();
+});
+
+test('POST /envoi/feu-vert/{code}/fait : 401 sans session', function () {
+    $this->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertUnauthorized();
+});
+
+test('GET : la réponse suit le contrat pilotage.yaml (30 points, verrous en lecture seule)', function () {
+    $u = fvCompte('viewer');
+    $r = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $r->json('points.0')))->toBe([]);
+    foreach ($r->json('points') as $p) {
+        expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $p))->toBe([], $p['code']);
+    }
+    expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'VerrousFeuVert', $r->json('verrous')))->toBe([]);
+    expect($r->json('points'))->toHaveCount(30)->and($r->json('total'))->toBe(30)
+        ->and($r->json('bloquants_restants'))->toBe(count(array_filter($r->json('points'), fn ($p) => ! $p['fait'])))
+        ->and($r->json('faits'))->toBe(30 - $r->json('bloquants_restants'))
+        ->and($r->json('verrous.envoi_reel_actif'))->toBeFalse()
+        ->and($r->json('verrous.fournisseurs_temoins_requis'))->toBe(6);
+    // Un point `fait` l'est exactement quand son état vaut `fait`.
+    foreach ($r->json('points') as $p) {
+        expect($p['fait'])->toBe($p['etat'] === 'fait');
+    }
+});
+
+test('POST : un propriétaire dépose une preuve ; la réponse suit le contrat et `par` est un nom affiché', function () {
+    $u = fvCompte('owner');
+    $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
+    expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $r->json()))->toBe([]);
+    expect($r->json('code'))->toBe('manuel.port25')
+        ->and($r->json('fait'))->toBeTrue()
+        ->and($r->json('preuve.texte'))->toBe(FV_PREUVE)
+        ->and($r->json('preuve.par'))->toBe('Williams')
+        ->and($r->json('preuve.par'))->not->toContain('@');
+    $liste = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect(collect($liste->json('points'))->firstWhere('code', 'manuel.port25')['preuve']['texte'])->toBe(FV_PREUVE);
+});
+
+test('POST : `par` ne vaut jamais une adresse e-mail (nom absent ou égal à l’e-mail → « responsable »)', function (string $nom) {
+    $u = fvCompte('owner', null, $nom);
+    $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
+    expect($r->json('preuve.par'))->toBe('responsable');
+    expect(DB::table('envoi_feu_vert_preuves')->where('auteur', 'like', '%@%')->count())->toBe(0);
+})->with(['nom = e-mail' => ['jean@exemple.test'], 'nom vide' => ['   '], 'nom avec arobase pleine chasse' => ["jean\u{FF20}exemple.test"], 'nom avec caractère de format' => ["Will\u{200B}iams"]]);
+
+test('POST : `fait` à false défait le point, `fait` absent vaut true', function () {
+    $u = fvCompte('owner');
+    $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.capacite_reponses/fait', ['preuve' => FV_PREUVE])->assertOk()->assertJsonPath('fait', true);
+    $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.capacite_reponses/fait', ['preuve' => 'Preuve périmée, à refaire.', 'fait' => false])->assertOk();
+    expect($r->json('fait'))->toBeFalse()->and($r->json('preuve'))->toBeNull();
+    expect(DB::table('envoi_feu_vert_preuves')->where('code', 'manuel.capacite_reponses')->count())->toBe(2);
+});
+
+test('POST : défaire un point jamais fait → 422', function () {
+    $this->actingAs(fvCompte('owner'))->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'Rien à défaire ici.', 'fait' => false])->assertStatus(422);
+});
+
+test('POST : 403 hors permission workspaces.manage, et rien n’est écrit', function (string $role) {
+    $u = fvCompte($role);
+    $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertForbidden();
+    expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
+})->with(['viewer', 'operator', 'admin']);
+
+test('POST : 404 pour un code inconnu (même en auto.* inexistant ou manuel.* inexistant)', function (string $code) {
+    $this->actingAs(fvCompte('owner'))->postJson('/api/v1/envoi/feu-vert/' . $code . '/fait', ['preuve' => FV_PREUVE])->assertNotFound();
+})->with(['code_inconnu', 'manuel.n_existe_pas', 'auto.n_existe_pas']);
+
+test('POST : 422 pour tout code auto.* du catalogue, sans écriture', function () {
+    $u = fvCompte('owner');
+    foreach (CatalogueManuels::codes() as $code) {
+        if (str_starts_with($code, 'auto.')) {
+            $this->actingAs($u)->postJson("/api/v1/envoi/feu-vert/{$code}/fait", ['preuve' => FV_PREUVE])->assertStatus(422);
+        }
+    }
+    expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
+});
+
+test('POST : 422 pour une preuve absente, vide, courte, générique, trop longue, avec e-mail ou caractère de format', function (mixed $corps) {
+    $u = fvCompte('owner');
+    $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', $corps)->assertStatus(422);
+    expect($r->json('message'))->toBeString()->not->toBe('');
+    expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
+})->with([
+    'absente' => [[]],
+    'vide' => [['preuve' => '']],
+    'blancs' => [['preuve' => '          ']],
+    'courte (9)' => [['preuve' => 'abcdefghi']],
+    'phrase fixe de l’écran' => [['preuve' => 'Fait, constaté depuis l\'écran.']],
+    'phrase fixe, apostrophe typographique' => [['preuve' => 'Fait, constaté depuis l’écran.']],
+    'trop longue' => [['preuve' => str_repeat('a', 501)]],
+    'non texte' => [['preuve' => ['x']]],
+    'e-mail' => [['preuve' => 'Voir jean.dupont@exemple.test pour la preuve']],
+    'e-mail, espaces autour de @' => [['preuve' => 'Voir jean.dupont @ exemple.test pour la preuve']],
+    'arobase pleine chasse' => [['preuve' => "Voir jean.dupont\u{FF20}exemple.test pour la preuve"]],
+    'chez' => [['preuve' => 'Voir jean.dupont chez exemple.test pour la preuve']],
+    'arobase en toutes lettres' => [['preuve' => 'Voir jean.dupont arobase exemple point test pour la preuve']],
+    'espace de largeur nulle' => [['preuve' => "Courrier de l’hébergeur\u{200B} reçu hier"]],
+    'inversion de sens' => [['preuve' => "Courrier de l’hébergeur\u{202E} reçu hier"]],
+    'fait non booléen' => [['preuve' => FV_PREUVE, 'fait' => 'peut-être']],
+]);
+
+test('POST : un UTF-8 invalide est refusé en 422 (jamais 500)', function () {
+    $u = fvCompte('owner');
+    $this->actingAs($u)->call('POST', '/api/v1/envoi/feu-vert/manuel.port25/fait', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], "{\"preuve\":\"Courrier \xC3\x28 de l'hébergeur\"}")
+        ->assertStatus(422);
+    expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
+});
+
+test('isolement : un espace ne voit ni ne coche les preuves d’un autre', function () {
+    $a = fvCompte('owner');
+    $b = fvCompte('owner');
+    $this->actingAs($a)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
+
+    $vueB = $this->actingAs($b)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    $pB = collect($vueB->json('points'))->firstWhere('code', 'manuel.port25');
+    expect($pB['fait'])->toBeFalse()->and($pB['preuve'])->toBeNull();
+
+    // B défait « son » point : refusé (jamais fait chez lui) et la preuve de A reste intacte.
+    $this->actingAs($b)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'Tentative de défaire chez A.', 'fait' => false])->assertStatus(422);
+    $vueA = $this->actingAs($a)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect(collect($vueA->json('points'))->firstWhere('code', 'manuel.port25')['fait'])->toBeTrue();
+    expect(app(DepotPreuves::class)->dernieres($b->current_workspace_id))->toBe([]);
+});
+
+test('aucune route n’ouvre un verrou, ne signe, ni n’écrit envoi_drapeaux ; l’envoi réel reste éteint', function () {
+    $u = fvCompte('owner');
+    DB::table('envoi_drapeaux')->updateOrInsert(['workspace_id' => $u->current_workspace_id], ['mode_temoins' => true, 'feu_vert_signature' => null]);
+    $avant = DB::table('envoi_drapeaux')->where('workspace_id', $u->current_workspace_id)->first();
+    $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
+    $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect(DB::table('envoi_drapeaux')->where('workspace_id', $u->current_workspace_id)->first())->toEqual($avant);
+    expect(config('envoi.reel_actif'))->toBeFalse();
+
+    $routes = [];
+    foreach (Route::getRoutes() as $route) {
+        if (str_contains($route->uri(), 'feu-vert')) {
+            $routes[] = implode('|', array_diff($route->methods(), ['HEAD'])) . ' ' . $route->uri();
+        }
+    }
+    sort($routes);
+    expect($routes)->toBe(['GET api/v1/envoi/feu-vert', 'POST api/v1/envoi/feu-vert/{code}/fait']);
+    foreach (Route::getRoutes() as $route) {
+        $t = strtolower($route->uri() . ' ' . $route->getActionName());
+        if (str_contains($t, 'feu-vert') || str_contains($t, 'feuvert')) {
+            expect($t)->not->toContain('verrou')->not->toContain('signature')->not->toContain('drapeaux')->not->toContain('temoin')->not->toContain('tout-arreter');
+        }
+    }
+});
+
+test('l’écriture exige la permission workspaces.manage (middleware présent sur la route)', function () {
+    $route = Route::getRoutes()->match(Request::create('/api/v1/envoi/feu-vert/manuel.port25/fait', 'POST'));
+    expect(implode(' ', $route->gatherMiddleware()))->toContain('permission:workspaces.manage');
+});

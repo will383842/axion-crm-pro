@@ -136,7 +136,7 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
     expect(count($codes) - 18)->toBe(12);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
-            expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'preuve', 'auteur'))->toThrow(InvalidArgumentException::class);
+            expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
         }
     }
 });
@@ -144,8 +144,8 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
 test('chaque point expose groupe, nature, état et source ; un manuel qui exige le vrai serveur attend K17', function () {
     $ws = espaceFeuVert();
     toutVert($ws);
-    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'ok', 'auteur');
-    app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'ok', 'auteur');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve de test, réf. exemple-01', 'auteur');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'Preuve de test, réf. exemple-01', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
     expect($liste)->toHaveCount(30);
     foreach ($liste as $p) {
@@ -177,8 +177,8 @@ test('par défaut (réglages non posés), l’envoi réel est éteint et le poin
 
 test('un point automatique n’accepte jamais de preuve', function () {
     $ws = espaceFeuVert();
-    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'auto.reel_actif_faux', 'preuve', 'auteur'))->toThrow(InvalidArgumentException::class);
-    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'code_inconnu', 'preuve', 'auteur'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'auto.reel_actif_faux', 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'code_inconnu', 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
 });
 
 test('preuve manuelle : acceptée, rend le point fait, reste manuel', function () {
@@ -196,12 +196,12 @@ test('preuve refusée : vide, > 500 caractères, adresse e-mail', function (stri
 
 test('auteur refusé : adresse e-mail, espace insécable seule, trop long', function (string $auteur) {
     $ws = espaceFeuVert();
-    expect(fn () => app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'ok', $auteur))->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'Preuve de test, réf. exemple-01', $auteur))->toThrow(InvalidArgumentException::class);
 })->with(['e-mail' => ['jean@exemple.test'], 'arobase pleine largeur' => ["jean\u{FF20}exemple.test"], 'contrôle au milieu' => ["jean\0dupont"], 'insécable' => ["\u{00A0}"], 'trop long' => [str_repeat('a', 101)]]);
 
 test('auteur de 100 caractères accepté', function () {
     $ws = espaceFeuVert();
-    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'ok', str_repeat('a', 100));
+    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'Preuve de test, réf. exemple-01', str_repeat('a', 100));
     expect(point($ws, ListeFeuVert::PREMIER)->fait)->toBeTrue();
 });
 
@@ -209,25 +209,25 @@ test('cycle fait / défait / refait : la dernière ligne par code fait foi, rien
     $ws = espaceFeuVert();
     $code = ListeFeuVert::PREMIER;
     $d = app(DepotPreuves::class);
-    $d->ajouter($ws, $code, 'preuve 1', 'responsable');
+    $d->ajouter($ws, $code, 'Première preuve de test', 'responsable');
     expect(point($ws, $code)->fait)->toBeTrue();
     expect(point($ws, $code)->detail)->toContain('revalider avec le vrai serveur');
-    $d->defaire($ws, $code, 'preuve périmée', 'responsable');
+    $d->defaire($ws, $code, 'Première preuve périmée', 'responsable');
     $p = point($ws, $code);
     expect($p->fait)->toBeFalse()->and($p->bloquant)->toBeTrue()->and($p->preuve)->toBeNull();
-    $d->ajouter($ws, $code, 'preuve 2', 'responsable');
-    expect(point($ws, $code)->fait)->toBeTrue()->and(point($ws, $code)->preuve)->toBe('preuve 2');
+    $d->ajouter($ws, $code, 'Seconde preuve de test', 'responsable');
+    expect(point($ws, $code)->fait)->toBeTrue()->and(point($ws, $code)->preuve)->toBe('Seconde preuve de test');
     expect(DB::table('envoi_feu_vert_preuves')->where('workspace_id', $ws)->where('code', $code)->count())->toBe(3);
 });
 
 test('défaire un point automatique ou inconnu est refusé', function () {
     $ws = espaceFeuVert();
-    expect(fn () => app(DepotPreuves::class)->defaire($ws, 'auto.reel_actif_faux', 'x', 'auteur'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(DepotPreuves::class)->defaire($ws, 'auto.reel_actif_faux', 'Motif de test suffisant', 'auteur'))->toThrow(InvalidArgumentException::class);
 });
 
 test('défaire un point qui n’a jamais été fait est refusé', function () {
     $ws = espaceFeuVert();
-    expect(fn () => app(DepotPreuves::class)->defaire($ws, ListeFeuVert::PREMIER, 'motif', 'auteur'))->toThrow(InvalidArgumentException::class);
+    expect(fn () => app(DepotPreuves::class)->defaire($ws, ListeFeuVert::PREMIER, 'Motif de test suffisant', 'auteur'))->toThrow(InvalidArgumentException::class);
     expect(DB::table('envoi_feu_vert_preuves')->where('workspace_id', $ws)->count())->toBe(0);
 });
 
@@ -240,7 +240,7 @@ test('envoi_drapeaux absent : les points qui en dépendent restent non faits', f
 
 test('table de preuves : UPDATE, DELETE et TRUNCATE refusés par le déclencheur', function () {
     $ws = espaceFeuVert();
-    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'ok', 'auteur');
+    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'Preuve de test, réf. exemple-01', 'auteur');
     WorkspaceContext::run($ws, function () {
         expect(fn () => DB::transaction(fn () => DB::table('envoi_feu_vert_preuves')->update(['auteur' => 'z'])))->toThrow(QueryException::class);
         expect(fn () => DB::transaction(fn () => DB::table('envoi_feu_vert_preuves')->delete()))->toThrow(QueryException::class);
@@ -252,7 +252,7 @@ test('isolement entre espaces', function () {
     $a = espaceFeuVert();
     $b = espaceFeuVert();
     $code = ListeFeuVert::PREMIER;
-    app(DepotPreuves::class)->ajouter($a, $code, 'preuve de A', 'auteur');
+    app(DepotPreuves::class)->ajouter($a, $code, 'Preuve du premier espace', 'auteur');
     expect(point($a, $code)->fait)->toBeTrue()->and(point($b, $code)->fait)->toBeFalse();
     expect(app(DepotPreuves::class)->dernieres($b))->toBe([])->and(app(DepotPreuves::class)->dernieres($a))->toHaveCount(1);
 });
@@ -262,7 +262,7 @@ test('la liste ne signe jamais et n’écrit jamais envoi_drapeaux', function ()
     toutVert($ws);
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     app(ListeFeuVert::class)->points($ws);
-    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'ok', 'auteur');
+    app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'Preuve de test, réf. exemple-01', 'auteur');
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
     expect(config('envoi.reel_actif'))->toBeFalse();
 });

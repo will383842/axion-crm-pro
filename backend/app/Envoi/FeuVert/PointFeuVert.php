@@ -33,6 +33,8 @@ final readonly class PointFeuVert
         public string $groupe,
         public string $etat,
         public ?string $preuve = null,
+        public ?string $preuvePar = null,
+        public ?string $preuveLe = null,
     ) {
         $this->manuel = ! $automatique;
         $this->bloquant = ! $fait;

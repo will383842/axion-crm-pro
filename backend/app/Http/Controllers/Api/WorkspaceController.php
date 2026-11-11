@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class WorkspaceController extends ApiController
 {
@@ -106,6 +107,13 @@ class WorkspaceController extends ApiController
             'cost_cap_eur' => ['sometimes', 'numeric', 'min:0', 'max:99999999.99'],
         ]);
 
+        // R00 : `settings.produits` (droits par produit, lus par la garde `produit-envoi`) est RÉSERVÉ à l'exploitation.
+        // Un propriétaire ne doit pas pouvoir s'activer un produit : 422 explicite, quelle que soit la valeur.
+        // (Pas de règle `settings.produits` ci-dessus : une règle imbriquée restreindrait `validated()` à ses sous-clés.)
+        if (is_array($valide['settings'] ?? null) && array_key_exists('produits', $valide['settings'])) {
+            throw ValidationException::withMessages(['settings.produits' => 'Cette clé est réservée à l’exploitation et ne se modifie pas ici.']);
+        }
+
         $champs = [];
         if (array_key_exists('name', $valide)) {
             $champs['name'] = $valide['name'];
@@ -114,7 +122,14 @@ class WorkspaceController extends ApiController
             // Remplacement, pas fusion — et c'est delibere. Une fusion rendrait
             // impossible le retrait d'un reglage : il n'y aurait aucun moyen
             // d'exprimer « enleve cette cle ». Un PUT remplace.
-            $champs['settings'] = json_encode($valide['settings'], JSON_UNESCAPED_UNICODE);
+            $reglages = $valide['settings'];
+            // R00 : la clé réservée `produits` n'est jamais écrite par cette route, et CONSERVÉE telle qu'en base
+            // quand les autres réglages sont remplacés (sinon un simple enregistrement retirerait le produit).
+            $actuels = is_array($courant->settings) ? $courant->settings : [];
+            if (array_key_exists('produits', $actuels)) {
+                $reglages['produits'] = $actuels['produits'];
+            }
+            $champs['settings'] = json_encode($reglages, JSON_UNESCAPED_UNICODE);
         }
         if (array_key_exists('cost_cap_eur', $valide)) {
             $champs['cost_cap_eur'] = $valide['cost_cap_eur'];

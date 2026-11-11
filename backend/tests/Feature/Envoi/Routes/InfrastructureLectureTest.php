@@ -76,6 +76,8 @@ test('GET /envoi/domaines suit le contrat, sans secret, et ne montre que son esp
         ->and($j['data'][0]['dmarc_prochaine_etape'])->toBeNull()->and($j['data'][0]['chauffe'])->toBeNull()
         ->and($j['garde_dispersion']['limite'])->toBeGreaterThanOrEqual(1);
     sansEcart(ContratOpenApiEnvoi::ecarts('commun.yaml', 'DomaineResume', $j['data'][0]));
+    // Toute l'enveloppe (data, garde_dispersion, expirations), pas seulement une ligne.
+    sansEcart(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/domaines', 'get', '200', $j));
     expect($j['expirations'])->toBe([]);
     sansSecret($r->getContent());
     expect($r->getContent())->not->toContain('envoi-b');
@@ -192,4 +194,39 @@ test('ces routes ne font qu’une lecture : aucune écriture, aucun ServeurEnvoi
         $this->actingAs($u)->postJson("/api/v1/envoi/$uri", [])->assertStatus(405);
     }
     expect(DB::table('envoi_drapeaux')->count())->toBe($avant)->and($this->resolutions)->toBe(0);
+});
+
+test('version_configuration (/serveurs) = numero de la version courante (/configuration) : une seule définition', function () {
+    $s = semerInfra($this);
+    // Historique : 1 appliquée, 2 invalide, 3 appliquée => 2 appliquées mais la courante porte le numéro 3.
+    WorkspaceContext::run($s['espace']->id, fn () => DB::table('envoi_config_versions')->insert([
+        'workspace_id' => $s['espace']->id, 'empreinte' => str_repeat('c', 64), 'statut' => 'appliquee', 'cree_le' => '2026-11-10 11:00:00+00',
+    ]));
+    $u = $this->compte($s['espace'], 'admin');
+    $courante = $this->actingAs($u)->getJson('/api/v1/envoi/configuration')->assertOk()->json('courante.numero');
+    $serveurs = $this->actingAs($u)->getJson('/api/v1/envoi/serveurs')->assertOk()->json('data');
+    expect($courante)->toBe(3)->and($serveurs[0]['version_configuration'])->toBe($courante);
+});
+
+test('GET /envoi/domaines : nombre de requêtes constant, quel que soit le nombre de domaines (pas de N+1)', function () {
+    $s = semerInfra($this);
+    $u = $this->compte($s['espace'], 'admin');
+    $compter = function () use ($u): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->actingAs($u)->getJson('/api/v1/envoi/domaines')->assertOk();
+        $n = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $n;
+    };
+    $compter(); // échauffe les caches d'authentification
+    $avant = $compter();
+    WorkspaceContext::run($s['espace']->id, function () use ($s) {
+        foreach (['c', 'd', 'e', 'f'] as $x) {
+            DB::table('envoi_domaines')->insert(['workspace_id' => $s['espace']->id, 'nom' => "envoi-$x.exemple.test", 'achete_le' => '2026-10-01']);
+        }
+    });
+    expect($this->actingAs($u)->getJson('/api/v1/envoi/domaines')->json('data'))->toHaveCount(5);
+    expect($compter())->toBe($avant);
 });

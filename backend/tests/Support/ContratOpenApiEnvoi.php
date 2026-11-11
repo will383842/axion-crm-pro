@@ -26,6 +26,23 @@ final class ContratOpenApiEnvoi
         return $e;
     }
 
+    /**
+     * Valide TOUTE l'enveloppe d'une réponse décrite sous `paths` (et non un seul schéma nommé).
+     *
+     * @return list<string> écarts
+     */
+    public static function ecartsReponse(string $fichier, string $chemin, string $methode, string $statut, mixed $valeur): array
+    {
+        $schema = self::charger($fichier)['paths'][$chemin][$methode]['responses'][$statut]['content']['application/json']['schema'] ?? null;
+        if ($schema === null) {
+            return ["$methode $chemin $statut : aucun schéma de réponse dans le contrat"];
+        }
+        $e = [];
+        self::verifier($fichier, $schema, $valeur, "$methode $chemin", $e);
+
+        return $e;
+    }
+
     /** Règle croisée du feu vert : `fait` = (`etat` == « fait »), et un point non fait est bloquant. @return list<string> */
     private static function croiserPoint(array $p): array
     {

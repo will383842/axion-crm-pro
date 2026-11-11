@@ -41,14 +41,10 @@ export interface components {
             etapes: number;
             id: components["schemas"]["Identifiant"];
             nom: string;
-            /** @description Présent seulement si la campagne suit les ouvertures. */
-            ouvertures: components["schemas"]["ResumeOuvertures"] | null;
             prochain_envoi_le: components["schemas"]["Horodatage"] | null;
             reponses: number;
             reponses_interessees: number;
             statut: components["schemas"]["StatutCampagne"];
-            /** @description Case « Suivre les ouvertures » de la campagne (pixel optionnel, désactivé par défaut). */
-            suivre_ouvertures: boolean;
             total: number;
         };
         /**
@@ -105,8 +101,6 @@ export interface components {
             motif: string | null;
             nom: string | null;
             organisation: string | null;
-            /** @description Nul si la campagne ne suit pas les ouvertures ou si rien n'a été vu. */
-            ouverture: components["schemas"]["Ouverture"] | null;
             prenom: string | null;
         };
         DomaineResume: {
@@ -156,8 +150,6 @@ export interface components {
         EvenementEnvoi: {
             /** Format: email */
             adresse: string;
-            /** @description Pour une ouverture seulement ; nul pour les autres types. */
-            automatique_probable: boolean | null;
             boite_id: components["schemas"]["Identifiant"];
             campagne_id: components["schemas"]["Identifiant"];
             code_serveur: string | null;
@@ -224,18 +216,6 @@ export interface components {
             source: components["schemas"]["SourceDesinscription"];
             valeur: string;
         };
-        /**
-         * @description Ouverture estimée d'un message (pixel). `automatique_probable` vaut vrai
-         *     quand l'ouverture vient probablement d'un relais (protection de la vie
-         *     privée d'Apple, relais d'images, antivirus) et non d'une personne.
-         */
-        Ouverture: {
-            automatique_probable: boolean;
-            derniere_le: components["schemas"]["Horodatage"];
-            nombre: number;
-            premiere_le: components["schemas"]["Horodatage"];
-            raison_automatique: ("protection_apple" | "relais_images" | "antivirus" | "ouverture_immediate") | null;
-        };
         Pagination: {
             page: number;
             pages: number;
@@ -275,18 +255,6 @@ export interface components {
             };
             traitee: boolean;
         };
-        /**
-         * @description Ouvertures d'une campagne qui les suit. Toujours affichées comme une
-         *     « estimation » ; `automatiques_probables` est déjà retiré de `estimees`.
-         */
-        ResumeOuvertures: {
-            automatiques_probables: number;
-            estimees: number;
-            /** @constant */
-            mention: "estimation";
-            /** @description Pourcentage des messages remis, ouvertures automatiques retirées. */
-            taux_estime: number;
-        };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
             etat: components["schemas"]["EtatFeu"];
@@ -308,7 +276,7 @@ export interface components {
         /** @enum {string} */
         TypeCible: "liste" | "audience" | "etiquette" | "carnet";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         VersionMessage: {
             corps: string;
             modifie_le: components["schemas"]["Horodatage"];

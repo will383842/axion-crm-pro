@@ -3,8 +3,8 @@
 Banc minimal pour tester l'envoi de prospection **sans aucun envoi réel**.
 
 - Réseau Docker `internal: true` : aucune sortie Internet, aucun port publié.
-- `dns-banc` (répond à tout nom vers `puits-accepte`), puits SMTP programmables
-  (`puits-accepte`, `puits-4xx`, `puits-5xx`, `puits-lent`), `imap-banc`,
+- `dns-banc` (répond à tout nom vers `imap-banc`, IP fixe 10.99.0.11, qui porte le Banc partagé), puits SMTP programmables
+  (`puits-accepte`, `puits-4xx`, `puits-5xx`, `puits-lent`), `imap-banc` (IMAP + puits SMTP « accepte » dans un même processus, Banc partagé),
   `compteur` (HTTP `/inc`, `/metrics`), `sonde` (prouve zéro connexion sortante).
 - Images figées par empreinte (`@sha256:`) ; scripts Python stdlib montés en lecture seule.
 - Place réservée : `simulateur` puis `kumomta` (lots suivants), sur le même réseau.
@@ -16,4 +16,22 @@ docker compose run --rm sonde      # code 0 = zéro connexion sortante
 python3 -m unittest discover -s tests
 ```
 
+Les 6 témoins (`temoin@<fournisseur>.test`) : tout `RCPT` hors de ces 6 adresses est refusé en 550 par
+tous les puits. Sur `imap-banc` (SMTP 25 / IMAP 143), un message livré est déposé dans la boîte selon
+`BANC_TEMOIN_<FOURNISSEUR>=inbox|junk|absent` (GMAIL, GOOGLE_WORKSPACE, OUTLOOK_COM, MICROSOFT_365, YAHOO,
+ORANGE) puis relu par IMAP. Mots de passe IMAP dérivés de `BANC_SECRET` (généré par `demarrer-banc.sh` puis relu dans `infra/banc-envoi/.env.banc`,
+fichier local en droits 600, ignoré par git, jamais dans le dépôt : un relancement garde les mêmes mots de passe ;
+pour un `docker compose up` manuel : `set -a; . ./.env.banc; set +a`) : `temoins.mot_de_passe(secret, adresse)`. Sans `BANC_SECRET`, aucun LOGIN n'est possible.
+Les boîtes vivent en mémoire (read_only inchangé) : un redémarrage les vide.
+
 Scénario S01 : `backend/tests/Unit/Envoi/ScenarioS01BancTest.php` (contre `FauxServeurEnvoi`).
+
+Chemin normal : un client du banc résout `temoin@gmail.test` via `dns-banc` → `imap-banc` (SMTP 25) → Banc partagé →
+lecture IMAP (143). IMAP : dossiers `INBOX` et `Junk` ; tout autre dossier répond `NO` ; `FETCH` renvoie le message
+complet (`BODY[]`). Le SMTP d'`imap-banc` est en mode `accepte` fixe et alimente le compteur (`accepte.recu`).
+Les autres puits (`puits-accepte`, `4xx`, `5xx`, `lent`) restent joignables par leur nom de service (DNS Docker) ;
+`puits-accepte` ne dépose rien (pas de Banc).
+
+Testé en processus (sans Docker) : refus 550, dépôt SMTP→IMAP, FETCH, dossier inconnu, cohérence compose
+(IP_REPONSE → service qui porte le Banc). **Non testé** : démarrage Docker réel, résolution DNS réelle entre conteneurs
+(vérifiée seulement par le workflow CI : démarrage + sonde).

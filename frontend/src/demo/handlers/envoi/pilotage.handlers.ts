@@ -3,7 +3,7 @@
  * Contrat : `backend/openapi/envoi/pilotage.yaml`. Tout est calculé depuis `demoDb`
  * (événements d'envoi, réponses, boîtes) : aucun chiffre écrit en dur, sauf la liste
  * des 15 critères du feu vert. Aucun suivi des clics ; aucune ouverture n'est
- * donnée (ni mesurée ni estimée) : `ouvertures` et `ouvertures_estimees` valent null.
+ * donnée (ni mesurée ni estimée) : le contrat ne porte aucun champ d'ouverture.
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { components } from '@/features/envoi/api/pilotage';
@@ -47,7 +47,7 @@ function zone() {
 const lignePoint = (p: PointFeuVert) => ({ code: p.code, libelle: p.libelle, fait: p.fait, detail: p.detail });
 
 function vide(cle: string, libelle: string, version?: number): Ligne {
-  return { cle, libelle, ...(version === undefined ? {} : { version }), envoyes: 0, remis: 0, rebonds_durs: 0, rebonds_mous: 0, plaintes: 0, desinscriptions: 0, reponses: 0, reponses_interessees: 0, ouvertures: null };
+  return { cle, libelle, ...(version === undefined ? {} : { version }), envoyes: 0, remis: 0, rebonds_durs: 0, rebonds_mous: 0, plaintes: 0, desinscriptions: 0, reponses: 0, reponses_interessees: 0 };
 }
 
 /** Clé et libellé du groupe d'un événement. */
@@ -134,7 +134,7 @@ export const handlers: HttpHandler[] = [
       if (!c) continue;
       if (e.type === 'remis') c.remis += 1; else if (e.type === 'rebond_dur' || e.type === 'rebond_mou') c.rebonds += 1; else if (e.type === 'reponse') c.reponses += 1;
     }
-    return HttpResponse.json({ data: jours.map((jour) => ({ jour, ...compte.get(jour)!, ouvertures_estimees: null })) });
+    return HttpResponse.json({ data: jours.map((jour) => ({ jour, ...compte.get(jour)! })) });
   }),
 
   http.get(api('/envoi/sante'), async ({ request }) => {

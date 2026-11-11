@@ -5,10 +5,7 @@ info:
   description: |
     Résultats par campagne, boîte, domaine, liste et message ; santé ; chercher
     un envoi ; feu vert. Indicateur principal : les réponses.
-    Aucun suivi des clics. Les
-    ouvertures ne sont données que pour les campagnes qui les suivent, toujours
-    comme une estimation, ouvertures automatiques probables retirées et
-    comptées à part. Lot : DM2-PIL.
+    Aucun suivi des clics ni d'ouverture. Lot : DM2-PIL.
 servers:
   - url: /api/v1
 paths:
@@ -79,15 +76,12 @@ paths:
                     type: array
                     items:
                       type: object
-                      required: [jour, remis, rebonds, reponses, ouvertures_estimees]
+                      required: [jour, remis, rebonds, reponses]
                       properties:
                         jour: { type: string, format: date }
                         remis: { type: integer, minimum: 0 }
                         rebonds: { type: integer, minimum: 0 }
                         reponses: { type: integer, minimum: 0 }
-                        ouvertures_estimees:
-                          description: Nul si aucune campagne de la période ne suit les ouvertures.
-                          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
   /envoi/sante:
     get:
       operationId: lireSante
@@ -247,7 +241,7 @@ components:
   schemas:
     LigneResultat:
       type: object
-      required: [cle, libelle, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, desinscriptions, reponses, reponses_interessees, ouvertures]
+      required: [cle, libelle, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, desinscriptions, reponses, reponses_interessees]
       properties:
         cle: { type: string }
         libelle: { type: string }
@@ -260,8 +254,3 @@ components:
         desinscriptions: { type: integer, minimum: 0 }
         reponses: { type: integer, minimum: 0 }
         reponses_interessees: { type: integer, minimum: 0 }
-        ouvertures:
-          description: Estimation ; nul si le groupe ne contient aucune campagne qui suit les ouvertures.
-          oneOf:
-            - $ref: './commun.yaml#/components/schemas/ResumeOuvertures'
-            - type: 'null'

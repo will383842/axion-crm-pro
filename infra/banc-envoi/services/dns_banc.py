@@ -1,7 +1,7 @@
-"""DNS minimal : répond A (IP du puits-accepte, fournie en env) et MX à tout nom ; rien ne sort du réseau."""
+"""DNS minimal : répond A (IP fournie en env (IP_REPONSE = imap-banc, qui porte le Banc partagé)) et MX à tout nom ; rien ne sort du réseau."""
 import os, socket, struct
 
-REP = socket.inet_aton(os.environ.get("IP_REPONSE", "10.99.0.10"))
+REP = socket.inet_aton(os.environ.get("IP_REPONSE", "10.99.0.11"))
 
 
 def repondre(req):

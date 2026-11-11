@@ -75,7 +75,7 @@ export function contenuEtape(etape: number, s: Saisie): ContenuEtape {
     return { nom: s.nom, ...(cible ? { cible } : {}) };
   }
   if (etape === 2) {
-    return { sequence: sequenceDeContrat(s), repli: s.repli, suivre_ouvertures: s.suivreOuvertures };
+    return { sequence: sequenceDeContrat(s), repli: s.repli };
   }
   if (etape === 3) {
     const fenetre = FENETRES.find((f) => f.id === s.fenetre) ?? FENETRES[0];
@@ -108,7 +108,6 @@ export function saisieDepuis(b: Brouillon): Saisie {
     s.objetB = typeof b2 === 'string' ? b2 : '';
   }
   s.repli = c.repli ?? {};
-  s.suivreOuvertures = c.suivre_ouvertures === true;
   if (c.depart_immediat === true) s.depart = 'immediat';
   if (c.debut_le) {
     const d = new Date(c.debut_le);

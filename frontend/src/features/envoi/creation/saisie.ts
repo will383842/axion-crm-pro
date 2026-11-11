@@ -21,7 +21,6 @@ export interface Saisie {
   ab: boolean;
   objetB: string;
   repli: Record<string, string>;
-  suivreOuvertures: boolean;
   depart: 'immediat' | 'programme';
   jour: string;
   heure: string;
@@ -42,8 +41,6 @@ export const SAISIE_INITIALE: Saisie = {
   ab: false,
   objetB: '',
   repli: {},
-  // Décision de Will : la mesure des ouvertures est désactivée par défaut.
-  suivreOuvertures: false,
   depart: 'programme',
   jour: '',
   heure: '09:00',

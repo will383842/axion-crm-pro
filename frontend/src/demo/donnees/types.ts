@@ -147,30 +147,12 @@ export interface Etiquette {
 
 // ── Envoi (types du contrat) ──────────────────────────────────────────────
 
-// TEMPORAIRE (fiche L8-F02) : champs d'ouverture RETIRÉS du contrat, encore lus par
-// le jeu factice et ses tests. F02 supprime ces types et le code qui les remplit.
-export interface OuvertureHeritee {
-  premiere_le: string;
-  derniere_le: string;
-  nombre: number;
-  automatique_probable: boolean;
-  raison_automatique: string | null;
-}
-export interface ResumeOuverturesHerite {
-  estimees: number;
-  automatiques_probables: number;
-  taux_estime: number;
-  mention: string;
-}
-export type Campagne = S['CampagneResume'] & { suivre_ouvertures?: boolean; ouvertures?: ResumeOuverturesHerite | null };
+export type Campagne = S['CampagneResume'];
 export type Domaine = S['DomaineResume'];
 export type Boite = S['BoiteResume'];
 export type Serveur = S['ServeurResume'];
-export type Destinataire = S['Destinataire'] & { ouverture?: OuvertureHeritee | null };
-export type EvenementEnvoi = Omit<S['EvenementEnvoi'], 'type'> & {
-  type: S['EvenementEnvoi']['type'] | 'ouverture';
-  automatique_probable?: boolean | null;
-};
+export type Destinataire = S['Destinataire'];
+export type EvenementEnvoi = S['EvenementEnvoi'];
 export type Reponse = S['ReponseResume'];
 export type MessageType = S['MessageType'];
 export type RegleAlerte = S['RegleAlerte'];

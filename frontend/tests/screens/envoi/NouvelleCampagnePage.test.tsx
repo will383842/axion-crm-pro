@@ -124,13 +124,18 @@ describe('NouvelleCampagnePage', () => {
     expect(demoDb.campagnes.trouver(campagneId)?.statut).toBe('brouillon');
   });
 
-  it('la case « Suivre les ouvertures » est décochée par défaut, avec une phrase d’information claire', async () => {
-    const { user } = await ouvrir();
+  it('ni case de suivi, ni texte d’ouverture, ni pixel : à l’étape message comme au récapitulatif', async () => {
+    const { user, container } = await ouvrir();
     await continuer(user, /Continuer : message/);
-    const interrupteur = await screen.findByRole('switch', { name: /Suivre les ouvertures/ });
-    expect(interrupteur).not.toBeChecked();
-    expect(screen.getByText(/estimation/i)).toBeVisible();
-    expect(screen.getByText(/jamais suivis/i)).toBeVisible();
+    await screen.findByLabelText('Message 1');
+    expect(screen.queryByRole('switch', { name: /ouverture/i })).not.toBeInTheDocument();
+    expect(container.textContent ?? '').not.toMatch(/ouverture|pixel|estimation/i);
+    await continuer(user, /Continuer : quand/);
+    await user.click(await screen.findByRole('button', { name: 'Demain 9:00' }));
+    await continuer(user, /Continuer : vérification/);
+    await continuer(user, /Continuer : lancement/);
+    await screen.findByRole('button', { name: 'Valider et programmer' });
+    expect(container.textContent ?? '').not.toMatch(/ouverture|pixel/i);
   });
 
   it('sans cible dans l’espace : état vide', async () => {

@@ -180,7 +180,7 @@ export const handlers: HttpHandler[] = [
     const contact = demoDb.contacts.tous().find((c) => adresseSansAccent(c.email) === q)
       ?? demoDb.contacts.tous().find((c) => adresseSansAccent(c.email).includes(q) || adresseSansAccent(`${c.first_name} ${c.last_name}`).includes(q));
     const adresse = contact?.email ?? q;
-    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse) && e.type !== 'ouverture')
+    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse))
       .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le));
     const rebond = evenements.find((e) => e.type === 'rebond_dur');
     const opposition = demoDb.opposition.filtrer((o) => adresseSansAccent(o.valeur) === adresseSansAccent(adresse))[0];

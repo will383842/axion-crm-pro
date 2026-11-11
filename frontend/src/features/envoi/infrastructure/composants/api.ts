@@ -31,7 +31,7 @@ export type FicheDomaine = Json<'lireDomaine'>;
 export type Chauffe = Json<'lireChauffe'>;
 export type ResultatTest = Json<'testerConnexionBoite'>;
 
-/** Plafond d'envois par boîte et par jour en V0 (décision de Will). */
+/** Plafond d'envois par boîte et par jour en V0 (décision du responsable du projet). */
 export const PLAFOND_PAR_BOITE = 150;
 
 export const CLES = {

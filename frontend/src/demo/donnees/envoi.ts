@@ -4,13 +4,8 @@
  * par destinataire, 30 jours d'événements d'envoi, 60 réponses, messages
  * types versionnés, règles d'alerte, désinscriptions, registre d'opposition.
  *
- * Décision du propriétaire (01/11/2026) : les OUVERTURES sont mesurées quand la
- * campagne coche « Suivre les ouvertures ». Chaque ouverture est datée, par
- * destinataire, et marquée `automatique_probable` quand elle vient
- * vraisemblablement d'un relais (protection d'Apple, relais d'images,
- * antivirus, ouverture dans la seconde). Les campagnes qui ne cochent pas la
- * case n'ont aucune ouverture. Aucun clic n'est suivi : l'indicateur
- * principal reste les réponses.
+ * Aucune mesure de lecture : ni ouverture, ni clic. L'indicateur principal
+ * reste les réponses.
  */
 import { graine, type Alea } from '../graine';
 import { ilYa, MAINTENANT_ISO } from '../horloge';
@@ -30,7 +25,6 @@ import type {
   Reponse,
   Serveur,
 } from './types';
-import { arrondi1 } from './outils-donnees';
 
 const MINUTE = 60_000;
 const MAINTENANT_MS = Date.parse(MAINTENANT_ISO);
@@ -98,7 +92,6 @@ interface DefCampagne {
   envoyes: number;
   etapes: number;
   ab: boolean;
-  suivre: boolean;
   prochain: string | null;
   /** Jours écoulés depuis le premier envoi (0 si rien n'est parti). */
   depuis: number;
@@ -110,18 +103,18 @@ interface DefCampagne {
 }
 
 const CAMPAGNES: ReadonlyArray<DefCampagne> = [
-  { nom: 'Organisateurs Rhône-Alpes', statut: 'en_cours', cible: { type: 'audience', reference: '2', libelle: 'Audience · Organisateurs Rhône-Alpes', total: 290 }, envoyes: 168, etapes: 3, ab: true, suivre: true, prochain: ilYa(0, 14, 0), depuis: 9, duree: 9, boites: ['boi-claire', 'boi-camille', 'boi-paul'], reponses: 9, interessees: 3 },
-  { nom: 'Fédérations — début d’année', statut: 'programmee', cible: { type: 'etiquette', reference: 'salon-artisans-2026', libelle: 'Étiquette · salon-artisans-2026', total: 388 }, envoyes: 0, etapes: 2, ab: false, suivre: false, prochain: '2027-01-13T08:00:00.000Z', depuis: 0, duree: 0, boites: ['boi-claire', 'boi-sophie', 'boi-lucie'], reponses: 0, interessees: 0 },
-  { nom: 'Presse régionale AURA', statut: 'a_valider', cible: { type: 'audience', reference: '3', libelle: 'Audience · Audience presse AURA', total: 186 }, envoyes: 0, etapes: 1, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: ['boi-sophie'], reponses: 0, interessees: 0 },
-  { nom: 'Commerces de Vienne', statut: 'en_pause', cible: { type: 'liste', reference: '1', libelle: 'Liste · Invités salon', total: 127 }, envoyes: 64, etapes: 2, ab: false, suivre: true, prochain: null, depuis: 12, duree: 6, boites: ['boi-lucie'], reponses: 4, interessees: 1 },
-  { nom: 'Clubs d’entreprises Savoie', statut: 'terminee', cible: { type: 'audience', reference: '4', libelle: 'Audience · Clubs d’entreprises Savoie', total: 212 }, envoyes: 212, etapes: 3, ab: false, suivre: true, prochain: null, depuis: 28, duree: 16, boites: ['boi-claire', 'boi-sophie'], reponses: 17, interessees: 6 },
-  { nom: 'Relance printemps', statut: 'brouillon', cible: { type: 'etiquette', reference: 'relance-printemps', libelle: 'Étiquette · relance-printemps', total: 96 }, envoyes: 0, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },
-  { nom: 'Artisans du Pilat', statut: 'terminee', cible: { type: 'audience', reference: '5', libelle: 'Audience · Artisans du Pilat', total: 140 }, envoyes: 140, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 26, duree: 10, boites: ['boi-nina'], reponses: 8, interessees: 2 },
-  { nom: 'Salon des artisans de Vienne — exposants', statut: 'en_cours', cible: { type: 'audience', reference: '6', libelle: 'Audience · Exposants potentiels du salon', total: 180 }, envoyes: 75, etapes: 3, ab: true, suivre: false, prochain: ilYa(0, 10, 30), depuis: 5, duree: 5, boites: ['boi-sophie', 'boi-hugo'], reponses: 5, interessees: 2 },
-  { nom: 'Traiteurs et événements', statut: 'arretee', cible: { type: 'audience', reference: '7', libelle: 'Audience · Traiteurs et événements', total: 120 }, envoyes: 40, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 15, duree: 3, boites: ['boi-camille'], reponses: 1, interessees: 0 },
-  { nom: 'Partenaires 2026 — vœux', statut: 'terminee', cible: { type: 'liste', reference: '3', libelle: 'Liste · Partenaires 2026', total: 96 }, envoyes: 96, etapes: 1, ab: false, suivre: true, prochain: null, depuis: 8, duree: 2, boites: ['boi-claire'], reponses: 11, interessees: 3 },
-  { nom: 'Presse spécialisée artisanat', statut: 'programmee', cible: { type: 'liste', reference: '5', libelle: 'Liste · Presse spécialisée artisanat', total: 64 }, envoyes: 0, etapes: 1, ab: false, suivre: true, prochain: '2027-01-19T08:30:00.000Z', depuis: 0, duree: 0, boites: ['boi-nina'], reponses: 0, interessees: 0 },
-  { nom: 'Nouveaux commerces de Lyon', statut: 'brouillon', cible: { type: 'audience', reference: '8', libelle: 'Audience · Nouveaux commerces de Lyon', total: 150 }, envoyes: 0, etapes: 1, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },
+  { nom: 'Organisateurs Rhône-Alpes', statut: 'en_cours', cible: { type: 'audience', reference: '2', libelle: 'Audience · Organisateurs Rhône-Alpes', total: 290 }, envoyes: 168, etapes: 3, ab: true, prochain: ilYa(0, 14, 0), depuis: 9, duree: 9, boites: ['boi-claire', 'boi-camille', 'boi-paul'], reponses: 9, interessees: 3 },
+  { nom: 'Fédérations — début d’année', statut: 'programmee', cible: { type: 'etiquette', reference: 'salon-artisans-2026', libelle: 'Étiquette · salon-artisans-2026', total: 388 }, envoyes: 0, etapes: 2, ab: false, prochain: '2027-01-13T08:00:00.000Z', depuis: 0, duree: 0, boites: ['boi-claire', 'boi-sophie', 'boi-lucie'], reponses: 0, interessees: 0 },
+  { nom: 'Presse régionale AURA', statut: 'a_valider', cible: { type: 'audience', reference: '3', libelle: 'Audience · Audience presse AURA', total: 186 }, envoyes: 0, etapes: 1, ab: false, prochain: null, depuis: 0, duree: 0, boites: ['boi-sophie'], reponses: 0, interessees: 0 },
+  { nom: 'Commerces de Vienne', statut: 'en_pause', cible: { type: 'liste', reference: '1', libelle: 'Liste · Invités salon', total: 127 }, envoyes: 64, etapes: 2, ab: false, prochain: null, depuis: 12, duree: 6, boites: ['boi-lucie'], reponses: 4, interessees: 1 },
+  { nom: 'Clubs d’entreprises Savoie', statut: 'terminee', cible: { type: 'audience', reference: '4', libelle: 'Audience · Clubs d’entreprises Savoie', total: 212 }, envoyes: 212, etapes: 3, ab: false, prochain: null, depuis: 28, duree: 16, boites: ['boi-claire', 'boi-sophie'], reponses: 17, interessees: 6 },
+  { nom: 'Relance printemps', statut: 'brouillon', cible: { type: 'etiquette', reference: 'relance-printemps', libelle: 'Étiquette · relance-printemps', total: 96 }, envoyes: 0, etapes: 2, ab: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },
+  { nom: 'Artisans du Pilat', statut: 'terminee', cible: { type: 'audience', reference: '5', libelle: 'Audience · Artisans du Pilat', total: 140 }, envoyes: 140, etapes: 2, ab: false, prochain: null, depuis: 26, duree: 10, boites: ['boi-nina'], reponses: 8, interessees: 2 },
+  { nom: 'Salon des artisans de Vienne — exposants', statut: 'en_cours', cible: { type: 'audience', reference: '6', libelle: 'Audience · Exposants potentiels du salon', total: 180 }, envoyes: 75, etapes: 3, ab: true, prochain: ilYa(0, 10, 30), depuis: 5, duree: 5, boites: ['boi-sophie', 'boi-hugo'], reponses: 5, interessees: 2 },
+  { nom: 'Traiteurs et événements', statut: 'arretee', cible: { type: 'audience', reference: '7', libelle: 'Audience · Traiteurs et événements', total: 120 }, envoyes: 40, etapes: 2, ab: false, prochain: null, depuis: 15, duree: 3, boites: ['boi-camille'], reponses: 1, interessees: 0 },
+  { nom: 'Partenaires 2026 — vœux', statut: 'terminee', cible: { type: 'liste', reference: '3', libelle: 'Liste · Partenaires 2026', total: 96 }, envoyes: 96, etapes: 1, ab: false, prochain: null, depuis: 8, duree: 2, boites: ['boi-claire'], reponses: 11, interessees: 3 },
+  { nom: 'Presse spécialisée artisanat', statut: 'programmee', cible: { type: 'liste', reference: '5', libelle: 'Liste · Presse spécialisée artisanat', total: 64 }, envoyes: 0, etapes: 1, ab: false, prochain: '2027-01-19T08:30:00.000Z', depuis: 0, duree: 0, boites: ['boi-nina'], reponses: 0, interessees: 0 },
+  { nom: 'Nouveaux commerces de Lyon', statut: 'brouillon', cible: { type: 'audience', reference: '8', libelle: 'Audience · Nouveaux commerces de Lyon', total: 150 }, envoyes: 0, etapes: 1, ab: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },
 ];
 
 const idCampagne = (i: number) => `cmp-${String(i + 1).padStart(2, '0')}`;
@@ -223,7 +216,6 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
         dernier_evenement_le: null,
         code_serveur: null,
         motif: null,
-        ouverture: null,
       };
       if (rang >= def.envoyes) {
         destinataires.push(base);
@@ -247,33 +239,17 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
       if (estYves || tirage < 0.015) {
         const code = estYves ? CODES_SERVEUR[0]! : choisirCode(alea, true);
         Object.assign(d, { etat: 'rebond_dur', etape: 1, code_serveur: code.code, motif: code.libelle });
-        evt({ survenu_le: instant(envoiMs + MINUTE), type: 'rebond_dur', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: code.code, libelle: code.libelle, automatique_probable: null });
+        evt({ survenu_le: instant(envoiMs + MINUTE), type: 'rebond_dur', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: code.code, libelle: code.libelle });
         destinataires.push(d);
         return;
       }
       for (let e = 1; e <= etape; e += 1) {
-        evt({ survenu_le: instant(envoiMs + (e - 1) * 4 * 86_400_000), type: 'remis', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: '250 2.0.0', libelle: 'Remis', automatique_probable: null });
+        evt({ survenu_le: instant(envoiMs + (e - 1) * 4 * 86_400_000), type: 'remis', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: '250 2.0.0', libelle: 'Remis' });
       }
       if (tirage < 0.04) {
         const code = choisirCode(alea, false);
         Object.assign(d, { etat: 'rebond_mou', code_serveur: code.code, motif: code.libelle });
-        evt({ survenu_le: instant(envoiMs + 2 * MINUTE), type: 'rebond_mou', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: code.code, libelle: code.libelle, automatique_probable: null });
-      }
-
-      // Ouvertures (seulement si la campagne les suit).
-      if (def.suivre && d.etat !== 'rebond_mou' && (repond || alea.booleen(0.42))) {
-        const automatique = !repond && alea.booleen(0.18);
-        const delai = automatique ? alea.entier(0, 1) * MINUTE + 20_000 : alea.entier(12, 60 * 30) * MINUTE;
-        const premiere = envoiMs + delai;
-        const nombre = automatique ? 1 : alea.entier(1, 4);
-        d.ouverture = {
-          premiere_le: instant(premiere),
-          derniere_le: instant(premiere + (nombre - 1) * alea.entier(30, 600) * MINUTE),
-          nombre,
-          automatique_probable: automatique,
-          raison_automatique: automatique ? alea.choisir(['protection_apple', 'protection_apple', 'relais_images', 'antivirus', 'ouverture_immediate'] as const) : null,
-        };
-        evt({ survenu_le: d.ouverture.premiere_le, type: 'ouverture', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: automatique ? 'Ouverture automatique probable' : 'Ouverture estimée', automatique_probable: automatique });
+        evt({ survenu_le: instant(envoiMs + 2 * MINUTE), type: 'rebond_mou', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: code.code, libelle: code.libelle });
       }
 
       // Réponses.
@@ -300,18 +276,18 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
           traitee: !(estPaul || recente),
         });
         d.etat = classement === 'stop' ? 'desinscrit' : 'a_repondu';
-        evt({ survenu_le: instant(recueMs), type: 'reponse', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Réponse reçue', automatique_probable: null });
+        evt({ survenu_le: instant(recueMs), type: 'reponse', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Réponse reçue' });
         if (classement === 'stop') {
           desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, survenue_le: instant(recueMs), source: 'reponse_stop', campagne_id: campagneId });
           opposition.push({ id: `opp-${String(opposition.length + 1).padStart(2, '0')}`, portee: 'adresse', valeur: d.adresse, motif: 'Réponse « stop »', inscrite_le: instant(recueMs), source: 'reponse_stop' });
-          evt({ survenu_le: instant(recueMs + MINUTE), type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Inscrit au registre d’opposition', automatique_probable: null });
+          evt({ survenu_le: instant(recueMs + MINUTE), type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Inscrit au registre d’opposition' });
         }
       } else if (d.etat === 'remis' && alea.booleen(0.006)) {
         const le = instant(envoiMs + alea.entier(60, 60 * 24) * MINUTE);
         d.etat = 'desinscrit';
         desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, survenue_le: le, source: 'lien', campagne_id: campagneId });
         opposition.push({ id: `opp-${String(opposition.length + 1).padStart(2, '0')}`, portee: 'adresse', valeur: d.adresse, motif: 'Lien de désinscription', inscrite_le: le, source: 'lien' });
-        evt({ survenu_le: le, type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Désinscrit par le lien', automatique_probable: null });
+        evt({ survenu_le: le, type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Désinscrit par le lien' });
       }
       destinataires.push(d);
     });
@@ -322,15 +298,12 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
       if (cible) {
         cible.etat = 'plainte';
         const le = instant(Date.parse(cible.dernier_evenement_le ?? MAINTENANT_ISO) + 3 * 60 * MINUTE);
-        evt({ survenu_le: le, type: 'plainte', campagne_id: campagneId, boite_id: 'boi-sophie', destinataire_id: cible.id, adresse: cible.adresse, code_serveur: null, libelle: 'Signalé comme indésirable', automatique_probable: null });
+        evt({ survenu_le: le, type: 'plainte', campagne_id: campagneId, boite_id: 'boi-sophie', destinataire_id: cible.id, adresse: cible.adresse, code_serveur: null, libelle: 'Signalé comme indésirable' });
         opposition.push({ id: `opp-${String(opposition.length + 1).padStart(2, '0')}`, portee: 'adresse', valeur: cible.adresse, motif: 'Plainte (signalé comme indésirable)', inscrite_le: le, source: 'plainte' });
       }
     }
 
     const siens = destinataires.filter((x) => x.campagne_id === campagneId);
-    const remis = siens.filter((x) => x.etape > 0 && x.etat !== 'rebond_dur').length;
-    const estimees = siens.filter((x) => x.ouverture && !x.ouverture.automatique_probable).length;
-    const automatiques = siens.filter((x) => x.ouverture?.automatique_probable === true).length;
     const siennes = reponses.filter((r) => r.campagne_id === campagneId);
     campagnes.push({
       id: campagneId,
@@ -341,10 +314,6 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
       total: def.cible.total,
       reponses: siennes.length,
       reponses_interessees: siennes.filter((r) => r.classement === 'interesse').length,
-      suivre_ouvertures: def.suivre,
-      ouvertures: def.suivre && def.envoyes > 0
-        ? { estimees, automatiques_probables: automatiques, taux_estime: remis === 0 ? 0 : arrondi1((estimees * 100) / remis), mention: 'estimation' }
-        : null,
       ab_objet: def.ab,
       prochain_envoi_le: def.prochain,
       cree_le: ilYa(Math.min(40, def.depuis + 3 + ic), 10, 15),

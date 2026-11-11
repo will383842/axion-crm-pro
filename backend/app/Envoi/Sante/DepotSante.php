@@ -46,7 +46,7 @@ interface DepotSante
      * de ses boîtes), ou null si elle n'a jamais tourné. Mesure la VIE de la relève, pas l'arrivée de retours : une petite campagne saine
      * peut n'avoir aucun rebond. Dette : par boîte (une boîte morte derrière une boîte vivante passe inaperçue ici).
      */
-    public function dernierReleveImap(string $ws): ?DateTimeImmutable;
+    public function dernierReleveImap(string $ws, ?string $boite = null): ?DateTimeImmutable;
 
     /**
      * Début de la série ININTERROMPUE de relevés de ce serveur : le dernier relevé précédé d'un trou de plus de $trouSecondes
@@ -55,7 +55,14 @@ interface DepotSante
     public function debutSerieReleves(string $ws, string $source, DateTimeImmutable $jusqua, int $trouSecondes): ?DateTimeImmutable;
 
     /** Messages envoyés dans $apres < cree_le <= $jusqua (bornes nulles = ouvertes) : la matière du « canal des retours muet ». */
-    public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua): int;
+    public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua, ?string $boite = null): int;
+
+    /**
+     * Boîtes (identifiants) d'où un message est parti après $apres : la matière du « canal des retours muet », compté PAR BOÎTE.
+     *
+     * @return list<string>
+     */
+    public function boitesAvecEnvoisDepuis(string $ws, DateTimeImmutable $apres): array;
 
     /**
      * Serveurs d'envoi actifs (tous espaces) : [workspace_id, source].

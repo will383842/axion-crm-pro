@@ -307,7 +307,7 @@ final class SuperviseurSante
     }
 
     /**
-     * Canal des retours muet (ADR K0 / plan 33 K15), mesuré par la VIE DE LA RELÈVE IMAP et non par l'arrivée de retours : une petite
+     * Canal des retours muet (ADR K0 / plan 33 K15), mesuré PAR BOÎTE par la VIE DE LA RELÈVE IMAP et non par l'arrivée de retours : une petite
      * campagne saine n'a parfois aucun rebond ni aucune plainte, et ne doit ni alerter ni se bloquer. Constat si des messages partent
      * encore (« en campagne ») et qu'un message vieux de N h ou plus est parti APRÈS la dernière relève (jamais relevée = depuis toujours) :
      * la relève est à l'arrêt, rebonds et plaintes sont invisibles. Une campagne qui démarre ce matin ne déclenche rien.
@@ -318,11 +318,16 @@ final class SuperviseurSante
     {
         $heures = max(1, (int) ($this->seuils['retours_muets_heures'] ?? 2));
         $limite = $maintenant->modify('-' . $heures . ' hours');
-        $derniereReleve = $this->depot->dernierReleveImap($ws);
-        $enCampagne = $this->depot->envoisEntre($ws, $limite, null) > 0;
-        $sansReleveDepuisN = $this->depot->envoisEntre($ws, $derniereReleve, $limite) > 0;
-        if ($enCampagne && $sansReleveDepuisN) {
-            return [new Constat('retours_muets', Constat::CRITIQUE, 'aucune relève IMAP réussie depuis ' . $heures . ' h alors que des envois ont eu lieu : rebonds, plaintes et réponses ne sont plus lus')];
+        // PAR BOÎTE : la relève vivante d'une boîte ne doit pas cacher celle d'une autre à l'arrêt.
+        $muettes = 0;
+        foreach ($this->depot->boitesAvecEnvoisDepuis($ws, $limite) as $boite) {
+            $derniereReleve = $this->depot->dernierReleveImap($ws, $boite);
+            if ($this->depot->envoisEntre($ws, $derniereReleve, $limite, $boite) > 0) {
+                $muettes++;
+            }
+        }
+        if ($muettes > 0) {
+            return [new Constat('retours_muets', Constat::CRITIQUE, 'aucune relève IMAP réussie depuis ' . $heures . ' h pour ' . $muettes . ' boîte(s) alors que des envois ont eu lieu : rebonds, plaintes et réponses ne sont plus lus')];
         }
 
         return [];

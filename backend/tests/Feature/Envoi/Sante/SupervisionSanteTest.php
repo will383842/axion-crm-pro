@@ -383,15 +383,28 @@ test('E1 : défaut critique GUÉRI puis pause levée par un humain => la supervi
     expect(pausesDe($ws))->toBe([]);
 });
 
-/** Un envoi (boîte, injection, message) daté, et un retour daté, dans de VRAIES tables. */
-function semerEnvoi(string $ws, DateTimeImmutable $quand): void
+/**
+ * Un envoi (injection, message) daté, dans de VRAIES tables. Boîte : `$boite` si fournie ; sinon la boîte UNIQUE de l'espace
+ * (créée au premier envoi) ; `$neuve` force une nouvelle boîte. Retourne l'identifiant de la boîte.
+ */
+function semerEnvoi(string $ws, DateTimeImmutable $quand, bool $neuve = false, ?string $boite = null): string
 {
-    WorkspaceContext::run($ws, function () use ($ws, $quand) {
-        $boite = (string) Str::uuid();
+    static $uniques = [];
+
+    return WorkspaceContext::run($ws, function () use ($ws, $quand, $neuve, $boite, &$uniques): string {
+        $boite ??= $neuve ? null : ($uniques[$ws] ?? null);
+        if ($boite === null) {
+            $boite = (string) Str::uuid();
+            DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $ws, 'adresse' => 'b-' . substr($boite, 0, 8) . '@boite.test', 'hote' => 'smtp.exemple.test', 'port' => 587, 'chiffrement' => 'starttls', 'identifiants_chiffres' => 'x']);
+            if (! $neuve) {
+                $uniques[$ws] = $boite;
+            }
+        }
         $inj = (string) Str::uuid();
-        DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $ws, 'adresse' => 'b-' . substr($boite, 0, 8) . '@boite.test', 'hote' => 'smtp.exemple.test', 'port' => 587, 'chiffrement' => 'starttls', 'identifiants_chiffres' => 'x']);
         DB::table('envoi_injections_smtp')->insert(['workspace_id' => $ws, 'boite_id' => $boite, 'id_injection' => $inj, 'cle_idempotence' => 'k-' . $inj]);
         DB::table('envoi_messages_envoyes')->insert(['workspace_id' => $ws, 'message_id_empreinte' => hash('sha256', $inj), 'id_injection' => $inj, 'empreinte_destinataire' => hash('sha256', 'd' . $inj), 'cree_le' => $quand->format('c')]);
+
+        return $boite;
     });
 }
 
@@ -406,8 +419,9 @@ function semerRetour(string $ws, DateTimeImmutable $quand): void
 }
 
 /** Une relève IMAP menée à son terme (curseur mis à jour) à cet instant. */
-function semerReleve(string $ws, DateTimeImmutable $quand, string $boite = 'boite-1'): void
+function semerReleve(string $ws, DateTimeImmutable $quand, ?string $boite = null): void
 {
+    $boite ??= (string) (DB::table('envoi_boites')->where('workspace_id', $ws)->orderBy('id')->value('id') ?: 'boite-1');
     WorkspaceContext::run($ws, fn () => DB::table('envoi_curseurs_imap')->insert(['workspace_id' => $ws, 'boite' => $boite, 'uid_validity' => 1, 'dernier_uid' => 1, 'maj_le' => $quand->format('c')]));
 }
 
@@ -758,3 +772,23 @@ test('M2 : l’alerte « supervision éteinte alors que l’envoi réel est allu
     Carbon\Carbon::setTestNow();
     CouplageSante::oublier();
 });
+
+test('M1 : « retours muets » est compté PAR BOÎTE : une boîte dont la relève vit ne cache pas celle qui est à l’arrêt', function (bool $secondeVivante, bool $muet) {
+    $ws = espaceSante();
+    DB::table('envoi_serveurs')->insert(['workspace_id' => $ws, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
+    $a = semerEnvoi($ws, t('12:00:00')->modify('-180 minutes'), true);
+    $b = semerEnvoi($ws, t('12:00:00')->modify('-180 minutes'), true);
+    semerEnvoi($ws, t('12:00:00')->modify('-30 minutes'), false, $a);
+    semerEnvoi($ws, t('12:00:00')->modify('-30 minutes'), false, $b);
+    semerReleve($ws, t('12:00:00')->modify('-5 minutes'), $a);
+    if ($secondeVivante) {
+        semerReleve($ws, t('12:00:00')->modify('-5 minutes'), $b);
+    }
+    [$sup, $sonde, $em] = monter();
+    $sonde->file = [saines('12:00:00')];
+    $sup->superviser($ws, 'src', t('12:00:00'));
+    expect($em->envoyees)->toBe($muet ? [['retours_muets', 'critique']] : []);
+})->with([
+    'les deux relèves vivent' => [true, false],
+    'la boîte B n’a jamais été relevée alors que A vit' => [false, true],
+]);

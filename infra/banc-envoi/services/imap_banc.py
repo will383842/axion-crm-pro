@@ -3,7 +3,8 @@
 Un seul processus (conteneur imap-banc) héberge DEUX serveurs sur le MÊME objet Banc :
 - le puits SMTP (port 25, mode accepte) qui refuse en 550 tout RCPT hors des 6 témoins et
   dépose les messages acceptés selon le comportement de chaque boîte (inbox | junk | absent) ;
-- ce serveur IMAP (port 143) qui les relit : LOGIN authentifié, SELECT INBOX|Junk (EXISTS réel), SEARCH.
+- ce serveur IMAP (port 143) qui les relit : LOGIN authentifié, SELECT INBOX|Junk (EXISTS réel ; autre dossier = NO), SEARCH, FETCH (message complet, BODY[]).
+Compteur : COMPTEUR_URL (optionnel) ; le MODE du SMTP d'imap-banc est fixe : accepte.
 Réglage par variables d'environnement : BANC_SECRET (mots de passe dérivés, voir temoins.mot_de_passe)
 et BANC_TEMOIN_<FOURNISSEUR>=inbox|junk|absent. Rien n'est écrit sur disque (read_only conservé)."""
 import asyncio
@@ -13,6 +14,21 @@ from temoins import Banc
 from puits_smtp import faire_client
 
 BANC = Banc()  # les 6 boîtes témoins (A10), partagé avec le puits SMTP du même processus
+
+
+def numeros(seq, total):
+    """Ensemble de séquence IMAP ('1', '1:2', '2:*', '*', '1,3') -> numéros valides, triés."""
+    out = set()
+    for part in seq.split(","):
+        a, _, b = part.partition(":")
+        try:
+            lo = total if a == "*" else int(a)
+            hi = lo if not b else (total if b == "*" else int(b))
+        except ValueError:
+            continue
+        lo, hi = min(lo, hi), max(lo, hi)
+        out.update(range(max(lo, 1), min(hi, total) + 1))
+    return sorted(out)
 
 
 def faire_client_imap(banc):
@@ -33,16 +49,27 @@ def faire_client_imap(banc):
                 if not b or b.mot_de_passe != arg[2]:
                     w.write(t + b" NO refuse\r\n"); await w.drain(); continue
                 boite = b
-            elif c in ("SELECT", "EXAMINE", "LIST", "SEARCH") and not boite:
+            elif c in ("SELECT", "EXAMINE", "LIST", "SEARCH", "FETCH") and not boite:
                 w.write(t + b" NO non authentifie\r\n"); await w.drain(); continue
             elif c in ("SELECT", "EXAMINE"):
-                d = "junk" if len(arg) > 1 and arg[1].lower() == "junk" else "inbox"
+                nom = arg[1].lower() if len(arg) > 1 else ""
+                d = {"inbox": "inbox", "junk": "junk"}.get(nom)
+                if d is None:  # dossier inconnu (ex. Spam) : NO, on ne retombe pas sur INBOX
+                    boite_ouverte = None
+                    w.write(t + b" NO dossier inconnu\r\n"); await w.drain(); continue
                 boite_ouverte = d
                 w.write(f"* {len(boite[d])} EXISTS\r\n* 0 RECENT\r\n".encode())
             elif c == "LIST": w.write(b'* LIST () "/" INBOX\r\n* LIST () "/" Junk\r\n')
             elif c == "SEARCH":
                 ids = " ".join(str(i + 1) for i in range(len(boite[boite_ouverte]))) if boite_ouverte else ""
                 w.write(f"* SEARCH {ids}\r\n".encode())
+            elif c == "FETCH":
+                if not boite_ouverte:
+                    w.write(t + b" NO aucun dossier selectionne\r\n"); await w.drain(); continue
+                msgs = boite[boite_ouverte]
+                for n in numeros(arg[1] if len(arg) > 1 else "", len(msgs)):
+                    corps = msgs[n - 1].replace("\r\n", "\n").replace("\n", "\r\n").encode()
+                    w.write(f"* {n} FETCH (BODY[] {{{len(corps)}}}\r\n".encode() + corps + b")\r\n")
             if c == "LOGOUT":
                 w.write(b"* BYE\r\n" + t + b" OK fin\r\n"); break
             w.write(t + b" OK " + c.encode() + b" fait\r\n")

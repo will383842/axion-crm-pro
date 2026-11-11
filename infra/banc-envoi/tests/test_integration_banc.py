@@ -76,6 +76,44 @@ class TestS18A6(unittest.IsolatedAsyncioTestCase):
         self.assertIn(" NO ", login)
         self.assertIsNone(exist)
 
+    async def imap_brut(self, adresse, lignes):
+        r, w = await asyncio.open_connection("127.0.0.1", self.pi)
+        await r.readline()
+        tout = []
+        async def cmd(c):
+            w.write((c + "\r\n").encode()); await w.drain()
+            out = b""
+            while True:
+                l = await r.readline(); out += l
+                if l.startswith(b"a "): return out.decode()
+        await cmd(f'a LOGIN "{adresse}" "{temoins.mot_de_passe(SECRET, adresse)}"')
+        for c in lignes:
+            tout.append(await cmd(c))
+        w.close()
+        return tout
+
+    async def test_dossier_inconnu_repond_no(self):
+        await self.envoyer(GMAIL)
+        rep = (await self.imap_brut(GMAIL, ["a SELECT Spam", "a SELECT INBOX"]))
+        self.assertIn("a NO", rep[0]); self.assertNotIn("EXISTS", rep[0])
+        self.assertIn("* 1 EXISTS", rep[1])
+
+    async def test_fetch_renvoie_les_donnees_reelles(self):
+        await self.envoyer(GMAIL)
+        rep = await self.imap_brut(GMAIL, ["a SELECT INBOX", "a FETCH 1 (BODY[])", "a FETCH 2 (BODY[])"])
+        self.assertIn("Subject: s18", rep[1]); self.assertIn("corps", rep[1])
+        self.assertIn("* 1 FETCH (BODY[]", rep[1]); self.assertIn("a OK", rep[1])
+        self.assertNotIn("* 2 FETCH", rep[2])
+
+    async def test_fetch_sans_dossier_ou_sans_login_refuse(self):
+        rep = await self.imap_brut(GMAIL, ["a FETCH 1 (BODY[])"])
+        self.assertIn("a NO", rep[0])
+
+    async def test_chemin_normal_smtp_vers_imap_meme_banc(self):
+        """Ce que fait un client qui résout temoin@gmail.test vers imap-banc : dépôt SMTP puis SELECT INBOX = 1."""
+        await self.envoyer(GMAIL)
+        self.assertEqual((await imap(self.pi, GMAIL, temoins.mot_de_passe(SECRET, GMAIL), "INBOX"))[1], "* 1 EXISTS")
+
     def test_comportement_inconnu_refuse(self):
         with self.assertRaises(ValueError):
             temoins.Banc({"BANC_TEMOIN_GMAIL": "n_importe_quoi"})

@@ -20,6 +20,11 @@ const INTERDITS: ReadonlyArray<[string, RegExp]> = [
   ['taux_ouverture', /taux_ouverture/i],
   ['pixel', /pixel/i],
   ['clé ouverture', /^\s*ouverture\s*:/im],
+  ['automatique_probable', /automatique_probable/i],
+  // valeur « ouverture » dans une énumération en ligne : enum: [remis, ouverture, reponse]
+  ['valeur ouverture (enum en ligne)', /\[[^\]]*['"]?\bouverture\b['"]?[^\]]*\]/i],
+  // valeur « ouverture » dans une liste YAML multi-lignes : - ouverture
+  ['valeur ouverture (liste YAML)', /^\s*-\s*['"]?ouverture['"]?\s*(#.*)?$/im],
 ];
 
 const fichiers = readdirSync(SOURCES).filter((f) => f.endsWith('.yaml'));

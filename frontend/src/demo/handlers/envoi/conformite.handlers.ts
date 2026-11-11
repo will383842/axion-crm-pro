@@ -110,7 +110,7 @@ function motif(o: Opposition): string {
 }
 
 /** « Puis-je écrire à… ? » : la réponse et TOUTES ses raisons. */
-function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non' | 'prudence'; raisons: string[]; mesure_ouvertures_permise: boolean } {
+function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non' | 'prudence'; raisons: string[] } {
   const adresse = saisie.trim().toLowerCase();
   const domaine = domaineDe(adresse);
   const raisons: string[] = [];
@@ -148,7 +148,7 @@ function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non'
 
   if (etat.reponse === 'oui') raisons.push('Aucune opposition connue pour cette adresse.');
   if (etat.reponse === 'non') raisons.push('Aucun message ne part vers cette adresse.');
-  return { adresse: saisie.trim(), reponse: etat.reponse, raisons, mesure_ouvertures_permise: etat.reponse !== 'non' };
+  return { adresse: saisie.trim(), reponse: etat.reponse, raisons };
 }
 
 function resumeRegistre() {

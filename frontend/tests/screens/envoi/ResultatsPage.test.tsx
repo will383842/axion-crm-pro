@@ -57,13 +57,13 @@ describe('ResultatsPage — Résultats', () => {
     expect(container.textContent ?? '').not.toMatch(/ouvertures|automatiques à part/i);
   });
 
-  it('le faux serveur ne calcule ni ne renvoie aucune ouverture estimée', async () => {
+  it('le faux serveur ne calcule ni ne renvoie aucune ouverture estimée (le champ est absent)', async () => {
     server.use(...handlers);
     for (const par of ['boite', 'domaine', 'liste', 'message']) {
       const reponse = await fetch(`https://api.localhost/api/v1/envoi/resultats?par=${par}`);
-      const corps = (await reponse.json()) as { data: Array<{ ouvertures: unknown }> };
+      const corps = (await reponse.json()) as { data: Array<Record<string, unknown>> };
       expect(corps.data.length).toBeGreaterThan(0);
-      expect(corps.data.every((l) => l.ouvertures === null)).toBe(true);
+      expect(corps.data.every((l) => !('ouvertures' in l))).toBe(true);
     }
   });
 

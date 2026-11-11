@@ -32,6 +32,7 @@ function ModeAbsence({ absence }: { absence: ApercuReglages['absence'] }) {
   const [au, setAu] = useState(absence.au ?? '');
   const [message, setMessage] = useState<{ texte: string; ton: 'ok' | 'erreur' } | null>(null);
   const enregistrer = useModeAbsence();
+  const [cible, setCible] = useState<boolean | null>(null);
   useEffect(() => {
     setDu(absence.du ?? '');
     setAu(absence.au ?? '');
@@ -39,11 +40,14 @@ function ModeAbsence({ absence }: { absence: ApercuReglages['absence'] }) {
 
   async function appliquer(actif: boolean) {
     setMessage(null);
+    setCible(actif);
     try {
       await enregistrer.mutateAsync({ actif, du: actif ? du || null : null, au: actif ? au || null : null });
       setMessage({ texte: actif ? 'Mode absence activé : les campagnes se mettent en pause, les réponses attendent.' : 'Mode absence désactivé.', ton: 'ok' });
     } catch (e) {
       setMessage({ texte: messageDErreur(e, 'Le mode absence n’a pas pu être enregistré.'), ton: 'erreur' });
+    } finally {
+      setCible(null);
     }
   }
 
@@ -55,11 +59,11 @@ function ModeAbsence({ absence }: { absence: ApercuReglages['absence'] }) {
         <div><Etiquette htmlFor={`${id}-au`}>Au</Etiquette><input id={`${id}-au`} type="date" value={au} onChange={(e) => setAu(e.target.value)} className={CLASSE_CHAMP} /></div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="secondary" loading={enregistrer.isPending} className={CLASSE_BOUTON_MOBILE} onClick={() => void appliquer(true)}>
+        <Button variant="secondary" loading={enregistrer.isPending && cible === true} disabled={enregistrer.isPending} className={CLASSE_BOUTON_MOBILE} onClick={() => void appliquer(true)}>
           Activer le mode absence
         </Button>
         {absence.actif ? (
-          <Button variant="ghost" className={CLASSE_BOUTON_MOBILE} onClick={() => void appliquer(false)}>
+          <Button variant="ghost" loading={enregistrer.isPending && cible === false} disabled={enregistrer.isPending} className={CLASSE_BOUTON_MOBILE} onClick={() => void appliquer(false)}>
             Désactiver
           </Button>
         ) : null}
@@ -79,9 +83,9 @@ export function ReglagesEnvoiPage() {
         {(a) => (
           <div className="space-y-4">
             <ul className="grid gap-3 sm:grid-cols-2">
-              <Entree to="/envoi/reglages/regles" icone={<Gauge className="h-5 w-5" />} titre="Règles de prudence et horaires" detail={`${a.regles_actives} règle(s) d’alerte active(s) ; seuils, fenêtre d’envoi`} />
+              <Entree to="/envoi/reglages/regles" icone={<Gauge className="h-5 w-5" />} titre="Règles de prudence et horaires" detail="Seuils, fenêtre d’envoi, jours ouvrés" />
               <Entree to="/envoi/reglages/identite" icone={<FileSignature className="h-5 w-5" />} titre="Identité de l’expéditeur" detail="Bloc d’information art. 14" />
-              <Entree to="/envoi/reglages/alertes" icone={<Bell className="h-5 w-5" />} titre="Alertes et avis" detail="Console et e-mail" />
+              <Entree to="/envoi/reglages/alertes" icone={<Bell className="h-5 w-5" />} titre="Alertes et avis" detail={`${a.regles_actives} règle(s) d’alerte active(s) ; console et e-mail`} />
               <Entree to="/envoi/desinscriptions" icone={<UserX className="h-5 w-5" />} titre="Désinscriptions" detail={`Registre et preuve : ${a.oppositions} oppositions`} />
               <Entree to="/envoi/reglages/connexion-crm" icone={<ClipboardList className="h-5 w-5" />} titre="Connexion au CRM" detail="Adaptateur, santé, ce qui passe" />
             </ul>

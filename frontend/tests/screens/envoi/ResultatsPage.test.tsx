@@ -5,6 +5,7 @@ import { ResultatsPage } from '@/features/envoi/pilotage/ResultatsPage';
 import { handlers } from '@/demo/handlers/envoi/pilotage.handlers';
 import { demoDb } from '@/demo/base';
 import { renderScreen } from '../../helpers/renderScreen';
+import { server } from '../../msw/server';
 
 async function monter() {
   return renderScreen(<ResultatsPage />, { path: '/envoi/campagnes/resultats', handlers });
@@ -47,13 +48,23 @@ describe('ResultatsPage — Résultats', () => {
     expect(container.textContent ?? '').not.toMatch(/aucun pixel/i);
   });
 
-  it('montre la colonne « Ouvertures (estimation) » quand une campagne a activé le pixel', async () => {
-    await monter();
+  it('ne montre aucune ouverture estimée, même quand une campagne a activé le pixel', async () => {
+    expect(demoDb.campagnes.tous().some((c) => c.suivre_ouvertures)).toBe(true);
+    const { container } = await monter();
     const tableau = await screen.findByRole('table', { name: 'Par boîte' });
     const entetes = within(tableau).getAllByRole('columnheader').map((c) => c.textContent ?? '');
-    expect(entetes).toContain('Ouvertures (estimation)');
-    // Jamais un chiffre d'ouverture sans le mot « estimation » dans son en-tête.
-    expect(entetes.filter((t) => /ouvert/i.test(t)).every((t) => /estimation/i.test(t))).toBe(true);
+    expect(entetes.filter((t) => /ouvert/i.test(t))).toEqual([]);
+    expect(container.textContent ?? '').not.toMatch(/ouvertures|automatiques à part/i);
+  });
+
+  it('le faux serveur ne calcule ni ne renvoie aucune ouverture estimée', async () => {
+    server.use(...handlers);
+    for (const par of ['boite', 'domaine', 'liste', 'message']) {
+      const reponse = await fetch(`https://api.localhost/api/v1/envoi/resultats?par=${par}`);
+      const corps = (await reponse.json()) as { data: Array<{ ouvertures: unknown }> };
+      expect(corps.data.length).toBeGreaterThan(0);
+      expect(corps.data.every((l) => l.ouvertures === null)).toBe(true);
+    }
   });
 
   it('n’affiche aucune ouverture quand aucune campagne n’a activé le pixel', async () => {

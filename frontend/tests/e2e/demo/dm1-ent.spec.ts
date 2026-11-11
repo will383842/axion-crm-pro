@@ -56,7 +56,7 @@ test.describe('entreprises en démo', () => {
     await expect(page.getByRole('link', { name: 'Ajouter à une campagne' })).toHaveCount(0);
   });
 
-  test('les 4 états de la liste', async ({ page }) => {
+  test('états de la liste : vide et erreur (chargement et plein couverts par les autres tests)', async ({ page }) => {
     await ouvrirDemo(page, '/companies', { etat: 'vide' });
     await expect(page.getByRole('heading', { name: 'Aucune entreprise' })).toBeVisible();
     await ouvrirDemo(page, '/companies', { etat: 'erreur' });

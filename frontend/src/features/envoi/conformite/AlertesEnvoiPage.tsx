@@ -70,7 +70,7 @@ export function AlertesEnvoiPage() {
       />
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard label="En cours" value={ouvertes ?? '—'} tone="amber" />
-        <KpiCard label="Réglées (7 j)" value={reglees ?? '—'} tone="emerald" />
+        <KpiCard label="Réglées" value={reglees ?? '—'} tone="emerald" />
         <KpiCard label="Canaux" value="2" sublabel="console + e-mail" tone="slate" />
       </div>
       <Etat requete={requete} contexte="les alertes d’envoi" vide={(d) => d.length === 0}>

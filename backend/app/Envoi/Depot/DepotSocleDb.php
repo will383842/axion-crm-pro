@@ -3,6 +3,7 @@
 namespace App\Envoi\Depot;
 
 use App\Envoi\EmpreinteTemoin;
+use App\Envoi\Exceptions\TemoinRefuse;
 use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use Closure;
@@ -109,6 +110,20 @@ final class DepotSocleDb implements DepotSocle
 
         // UNE transaction : le témoin et sa trace dans le journal vont ensemble ou pas du tout.
         return DB::transaction(function () use ($workspaceId, $empreinte, $fournisseur, $libelle, $auteur): bool {
+            // Verrou par workspace : deux ajouts simultanés ne dépassent ni le plafond ni « un par fournisseur ».
+            DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['envoi_temoins:' . $workspaceId]);
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $empreinte, $fournisseur): void {
+                $existe = DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->where('empreinte', $empreinte)->exists();
+                if ($existe) {
+                    return; // doublon : idempotent, jamais refusé
+                }
+                if (DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->count() >= TemoinRefuse::PLAFOND) {
+                    throw TemoinRefuse::plafondAtteint();
+                }
+                if (DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->where('fournisseur', $fournisseur)->exists()) {
+                    throw TemoinRefuse::fournisseurDejaCouvert($fournisseur);
+                }
+            });
             $nouveau = WorkspaceContext::run($workspaceId, fn (): bool => DB::affectingStatement(
                 'INSERT INTO envoi_temoins (workspace_id, empreinte, libelle, fournisseur) VALUES (?, ?, ?, ?)
                  ON CONFLICT (workspace_id, empreinte) DO NOTHING',
@@ -126,7 +141,7 @@ final class DepotSocleDb implements DepotSocle
 
     public function listerTemoins(string $workspaceId): array
     {
-        return WorkspaceContext::run($workspaceId, fn (): array => DB::table('envoi_temoins')
+        return array_values(WorkspaceContext::run($workspaceId, fn (): array => DB::table('envoi_temoins')
             ->where('workspace_id', $workspaceId)
             ->orderBy('id')
             ->get(['empreinte', 'libelle', 'fournisseur', 'cree_le'])
@@ -135,7 +150,7 @@ final class DepotSocleDb implements DepotSocle
                 'libelle' => (string) $l->libelle,
                 'fournisseur' => $l->fournisseur === null ? null : (string) $l->fournisseur,
                 'cree_le' => (string) $l->cree_le,
-            ])->all());
+            ])->all()));
     }
 
     public function armerToutArreter(string $workspaceId, string $auteur): void

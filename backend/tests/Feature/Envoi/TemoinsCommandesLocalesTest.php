@@ -1,7 +1,9 @@
 <?php
 
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\EmpreinteTemoin;
+use App\Envoi\Exceptions\TemoinRefuse;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,6 +11,9 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Sentry\Breadcrumb;
+use Symfony\Component\Console\Exception\InvalidArgumentException;
+use Symfony\Component\Console\Exception\InvalidOptionException;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -25,7 +30,7 @@ function espaceTemoin(): string
 
 function ajouterTemoin(string $ws, string $adresse, string $fournisseur = 'gmail', string $libelle = 'Gmail de test'): int
 {
-    return Artisan::call('envoi:temoin-ajouter', ['workspace' => $ws, 'adresse' => $adresse, 'fournisseur' => $fournisseur, '--libelle' => $libelle, '--auteur' => 'testeur']);
+    return appelerSansAdresseEnArgument('envoi:temoin-ajouter', ['workspace' => $ws, 'fournisseur' => $fournisseur, '--libelle' => $libelle, '--auteur' => 'testeur'], $adresse);
 }
 
 function journalTemoin(string $ws, string $commande): array
@@ -140,4 +145,122 @@ test('dette D0 : temoins-off est journalisé DANS la même transaction que l’e
     expect(app(DepotSocle::class)->modeTemoins($ws))->toBeTrue();
     Artisan::call('envoi:temoins-off', ['workspace' => $ws, '--auteur' => 'testeur']);
     expect(app(DepotSocle::class)->modeTemoins($ws))->toBeFalse()->and(journalTemoin($ws, 'temoins_off'))->toHaveCount(1);
+});
+
+test('dette D0 (sens inverse) : si l’écriture de envoi_drapeaux échoue APRÈS le journal, aucune ligne temoins_off ne reste', function () {
+    $ws = espaceTemoin();
+    DB::unprepared('CREATE OR REPLACE FUNCTION zz_refus_drapeaux() RETURNS trigger AS $f$ BEGIN RAISE EXCEPTION \'refus drapeaux test\'; END; $f$ LANGUAGE plpgsql');
+    DB::unprepared('CREATE TRIGGER zz_refus_drapeaux BEFORE INSERT OR UPDATE ON envoi_drapeaux FOR EACH ROW EXECUTE FUNCTION zz_refus_drapeaux()');
+    try {
+        expect(fn () => app(DepotSocle::class)->eteindreTemoins($ws, 'testeur'))->toThrow(QueryException::class);
+    } finally {
+        DB::unprepared('DROP TRIGGER zz_refus_drapeaux ON envoi_drapeaux');
+    }
+    // Sans transaction commune, la ligne de journal écrite avant l'échec resterait.
+    expect(journalTemoin($ws, 'temoins_off'))->toHaveCount(0);
+    expect(app(DepotSocle::class)->modeTemoins($ws))->toBeTrue();
+});
+
+// ── B1 : l'adresse ne passe JAMAIS par la ligne de commande ──────────────────
+
+test('B1 : aucun argument ni option « adresse » dans la signature des commandes témoin', function () {
+    foreach (['envoi:temoin-ajouter', 'envoi:temoin-indesirable'] as $nom) {
+        $def = Artisan::all()[$nom]->getDefinition();
+        expect($def->getArguments())->not->toHaveKey('adresse')->and($def->getOptions())->not->toHaveKey('adresse');
+        foreach (array_merge(array_keys($def->getArguments()), array_keys($def->getOptions())) as $n) {
+            expect($n)->not->toMatch('/adresse|email|mail|address/i');
+        }
+        // Passer l'adresse en argument ou option doit être refusé par artisan lui-même.
+        expect(fn () => Artisan::call($nom, ['workspace' => (string) Str::uuid(), 'adresse' => 'x@exemple.test']))->toThrow(InvalidArgumentException::class);
+        expect(fn () => Artisan::call($nom, ['workspace' => (string) Str::uuid(), '--adresse' => 'x@exemple.test']))->toThrow(InvalidOptionException::class);
+    }
+});
+
+test('B1 : adresse absente (STDIN vide) = échec propre, message sans adresse, rien d’écrit', function () {
+    $ws = espaceTemoin();
+    foreach ([['envoi:temoin-ajouter', ['workspace' => $ws, 'fournisseur' => 'gmail']], ['envoi:temoin-indesirable', ['workspace' => $ws]]] as [$cmd, $params]) {
+        expect(appelerSansAdresseEnArgument($cmd, $params, null))->toBe(1);
+        expect(Artisan::output())->toContain('Adresse absente');
+    }
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(0);
+});
+
+test('B1 : quand la commande échoue (workspace invalide, clé absente), ni sortie, ni log, ni exception ne contiennent l’adresse', function () {
+    $adresse = 'fuite.secrete@exemple.test';
+    Log::spy();
+    $ws = espaceTemoin();
+
+    // Workspace invalide.
+    foreach (['envoi:temoin-ajouter' => ['workspace' => 'pas-un-uuid', 'fournisseur' => 'gmail'], 'envoi:temoin-indesirable' => ['workspace' => 'pas-un-uuid']] as $cmd => $params) {
+        expect(appelerSansAdresseEnArgument($cmd, $params, $adresse))->toBe(1);
+        expect(Artisan::output())->not->toContain('fuite')->and(Artisan::output())->not->toContain('exemple.test');
+    }
+    // Clé d'empreinte absente.
+    config(['envoi.cle_empreinte' => '']);
+    foreach (['envoi:temoin-ajouter' => ['workspace' => $ws, 'fournisseur' => 'gmail'], 'envoi:temoin-indesirable' => ['workspace' => $ws]] as $cmd => $params) {
+        try {
+            $code = appelerSansAdresseEnArgument($cmd, $params, $adresse);
+            $sortie = Artisan::output();
+        } catch (Throwable $e) {
+            $code = 1;
+            $sortie = $e->getMessage() . $e->getTraceAsString();
+        }
+        expect($code)->toBe(1);
+        expect($sortie)->not->toContain('fuite')->and($sortie)->not->toContain('exemple.test');
+    }
+    Log::shouldNotHaveReceived('error');
+    Log::shouldNotHaveReceived('warning');
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(0);
+    expect(json_encode(DB::table('envoi_journal_commandes')->get()))->not->toContain('fuite');
+});
+
+test('B1 : sentry ne garde pas la trace des commandes envoi:temoin-* (liste d’exclusion)', function () {
+    $filtre = config('sentry.before_breadcrumb');
+    expect($filtre)->toBeArray();
+    $cmd = new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_DEFAULT, 'artisan.command', 'Starting Artisan command: envoi:temoin-ajouter', ['input' => 'x']);
+    $autre = new Breadcrumb(Breadcrumb::LEVEL_INFO, Breadcrumb::TYPE_DEFAULT, 'artisan.command', 'Starting Artisan command: migrate', []);
+    expect(call_user_func($filtre, $cmd))->toBeNull()->and(call_user_func($filtre, $autre))->toBe($autre);
+});
+
+// ── M2 : libellé ──────────────────────────────────────────────────────────────
+
+test('M2 : un libellé en adresse reformulée ou trop long est refusé', function () {
+    $ws = espaceTemoin();
+    foreach (['moi at exemple.test', 'moi arobase exemple', 'moi[at]exemple', 'moi(at)exemple', 'moi {at} exemple', 'MOI AT exemple', str_repeat('x', 61)] as $l) {
+        expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail', $l))->toBe(1, $l);
+    }
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(0);
+    expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail', 'Gmail de test'))->toBe(0);
+});
+
+// ── M3 : plafond et un seul témoin par fournisseur ───────────────────────────
+
+test('M3 : un 2e témoin pour un fournisseur déjà couvert est refusé avec un message clair', function () {
+    $ws = espaceTemoin();
+    expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail'))->toBe(0);
+    expect(ajouterTemoin($ws, 'b@exemple.test', 'gmail'))->toBe(1);
+    expect(Artisan::output())->toContain('déjà un témoin')->and(Artisan::output())->not->toContain('exemple.test');
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(1);
+    // Le doublon exact reste idempotent.
+    expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail'))->toBe(0);
+});
+
+test('M3 : jamais plus de 6 témoins par workspace (un par fournisseur), et l’autre espace n’est pas touché', function () {
+    $ws = espaceTemoin();
+    $autre = espaceTemoin();
+    foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $i => $f) {
+        expect(ajouterTemoin($ws, "t{$i}@exemple.test", $f))->toBe(0);
+    }
+    expect(ajouterTemoin($ws, 'de-trop@exemple.test', 'gmail'))->toBe(1);
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(6);
+    expect(ajouterTemoin($autre, 'a@exemple.test', 'gmail'))->toBe(0);
+});
+
+test('M3 : le plafond lève TemoinRefuse::plafondAtteint côté dépôt quand la table est pleine', function () {
+    $ws = espaceTemoin();
+    foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $i => $f) {
+        app(DepotSocle::class)->ajouterTemoin($ws, "t{$i}@exemple.test", $f, '', 'testeur');
+    }
+    // Fournisseur déjà couvert ET plafond atteint : le plafond est vérifié en premier.
+    expect(fn () => app(DepotSocle::class)->ajouterTemoin($ws, 'x@exemple.test', 'yahoo', '', 'testeur'))->toThrow(TemoinRefuse::class, '6 témoins');
 });

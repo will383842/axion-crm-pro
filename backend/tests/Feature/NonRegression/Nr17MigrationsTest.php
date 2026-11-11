@@ -74,6 +74,9 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_01_000030_envoi_temoins_journees.php',
     // Envoi L8-F07a : table des reculs de chauffe, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait l'historique des reculs ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_01_000040_envoi_chauffe_reculs.php',
+    // Filet modifié : pourquoi — Envoi L8-F14a : colonne `statut` (défaut `acceptee`, sans UPDATE), index unique des conclusions et fonction
+    // de libération (ajouts seuls) ; les retirer effacerait l'état des réservations d'injection ; down() inerte, up() rejouable.
+    '2026_12_01_000050_envoi_injection_reservation_statut.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -12,14 +12,15 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\Kumo\EsmtpSuiviData;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -121,7 +122,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         }
         self::refuserTransactionEnglobante();
         $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
-            ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
+            ?? throw EnvoiSmtpRefuse::motif('Boîte d\'envoi introuvable.'); // refus CERTAIN, avant tout envoi
 
         // Tout ce qui peut être refusé l'est ICI, avant le moindre état d'injection.
         $enveloppe = self::enveloppe($message, $boite);
@@ -191,13 +192,13 @@ final class AdaptateurSmtp implements ServeurEnvoi
             case 'accepte':
                 return ResultatInjection::accepte((string) $existant->id_injection);
             case 'echec':
-                throw new RuntimeException('Refus définitif (5xx) déjà enregistré pour cette clé.');
+                throw new RefusDefinitifServeur('Refus définitif (5xx) déjà enregistré pour cette clé.');
             case 'injection_en_cours':
             case 'a_verifier':
-                return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+                return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
             case 'reporte':
                 if ($existant->reporte_au !== null && new DateTimeImmutable((string) $existant->reporte_au) > new DateTimeImmutable) {
-                    return ResultatInjection::reporte(new DateTimeImmutable((string) $existant->reporte_au));
+                    return ResultatInjection::reporteEchec(new DateTimeImmutable((string) $existant->reporte_au));
                 }
                 break;
         }
@@ -213,7 +214,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             return $deja;
         }
         $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
-            ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
+            ?? throw EnvoiSmtpRefuse::motif('Boîte d\'envoi introuvable.'); // rien n'est parti : refus CERTAIN
         if ($boite->enPause || $this->limiteAtteinte()) {
             return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
         }
@@ -226,9 +227,16 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $bloquante = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('boite_id', $this->boiteId)->whereIn('etat', ['injection_en_cours', 'a_verifier'])
             ->where('cle_idempotence', '<>', $message->cleIdempotence)->exists());
+        $cleAlerte = 'envoi:boite_bloquee_a_verifier:' . $this->boiteId;
         if ($bloquante) {
-            return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
+            // Report d'ATTENTE, ESPACÉ (jamais chaque minute) et UNE seule alerte par boîte tant que le blocage dure.
+            if (Cache::add($cleAlerte, 1, now()->addDays(30))) {
+                Log::critical('Envoi : boîte bloquée par une injection à vérifier (a_verifier), vérification humaine requise.', ['workspace_id' => $this->workspaceId, 'boite' => $this->boiteId]);
+            }
+
+            return ResultatInjection::reporte(new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_boite_bloquee_minutes', 60)) . ' minutes'));
         }
+        Cache::forget($cleAlerte); // blocage levé : une nouvelle alerte sera de nouveau émise s'il revient
 
         // Transport (résolution + contrôle de l'adresse, épinglée) AVANT l'état : un refus d'hôte ne laisse aucune trace.
         $transport = ($this->fabriqueTransport)($boite);
@@ -241,7 +249,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         // Hors transaction : chaque instruction est commitée IMMÉDIATEMENT, donc AVANT le réseau.
         $pris = $this->maj($message->cleIdempotence, ['etat' => 'injection_en_cours'], ['a_injecter', 'reporte']);
         if (! $pris) {
-            return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
+            return ResultatInjection::incertain(new DateTimeImmutable('+1 minute'));
         }
         $id = (string) $this->ligne($message->cleIdempotence)?->id_injection;
 
@@ -253,7 +261,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             // Coupure, délai dépassé, réponse illisible : sort INCERTAIN.
             $this->maj($message->cleIdempotence, ['etat' => 'a_verifier'], ['injection_en_cours']);
 
-            return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+            return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
         } finally {
             try {
                 if ($transport instanceof EsmtpTransport) {
@@ -277,7 +285,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
             $this->maj($cle, ['etat' => 'reporte', 'code_smtp' => $code, 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
 
-            return ResultatInjection::reporte($delai);
+            return ResultatInjection::reporteEchec($delai);
         }
         if ($code !== null && $code >= 500 && $transport instanceof EsmtpSuiviData && ! $transport->mailEmis && ! $transport->donneesEngagees) {
             // 5xx AVANT MAIL FROM (bannière, EHLO, STARTTLS) : refus de la CONNEXION, pas du message. Rien n'a pu partir :
@@ -287,19 +295,19 @@ final class AdaptateurSmtp implements ServeurEnvoi
         if ($code !== null && $code >= 500) {
             $this->maj($cle, ['etat' => 'echec', 'code_smtp' => $code], ['injection_en_cours']);
             $this->pauseSiTrop5xx();
-            throw new RuntimeException('Refus définitif du serveur SMTP (' . $code . ').');
+            throw new RefusDefinitifServeur('Refus définitif du serveur SMTP (' . $code . ').');
         }
         if (str_contains($e->getMessage(), 'Connection could not be established')) {
             // Aucune connexion : rien n'a pu être transmis, report simple.
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
             $this->maj($cle, ['etat' => 'reporte', 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
 
-            return ResultatInjection::reporte($delai);
+            return ResultatInjection::reporteEchec($delai);
         }
         // Coupure / réponse inconnue : a_verifier, aucun renvoi automatique.
         $this->maj($cle, ['etat' => 'a_verifier', 'code_smtp' => $code], ['injection_en_cours']);
 
-        return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+        return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
     }
 
     private function refusConnexion(string $cle, int $code): ResultatInjection
@@ -309,7 +317,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $this->boites->mettreEnPause($this->workspaceId, $this->boiteId, 'refus_connexion_5xx');
         Log::critical('Envoi : connexion SMTP refusée (5xx avant MAIL FROM), boîte mise en pause, message reporté.', ['boite' => $this->boiteId, 'code' => $code]);
 
-        return ResultatInjection::reporte($delai);
+        return ResultatInjection::reporteEchec($delai);
     }
 
     private function pauseSiTrop5xx(): void

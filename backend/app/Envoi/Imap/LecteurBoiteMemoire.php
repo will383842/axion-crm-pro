@@ -3,6 +3,7 @@
 namespace App\Envoi\Imap;
 
 use DateTimeImmutable;
+use RuntimeException;
 
 /** Lecteur de test : aucune connexion réseau. */
 final class LecteurBoiteMemoire implements LecteurBoite
@@ -12,6 +13,27 @@ final class LecteurBoiteMemoire implements LecteurBoite
 
     /** @var array<string, list<MessageBrut>> */
     private array $messages = [];
+
+    /** @var array<string, true> */
+    private array $enPanne = [];
+
+    /** Simule une panne de connexion de cette boîte (exception technique, comme le lecteur réel). */
+    public function mettreEnPanne(string $boite): void
+    {
+        $this->enPanne[$boite] = true;
+    }
+
+    public function retablir(string $boite): void
+    {
+        unset($this->enPanne[$boite]);
+    }
+
+    private function verifierConnexion(string $boite): void
+    {
+        if (isset($this->enPanne[$boite])) {
+            throw new RuntimeException('Connexion impossible à imap.exemple.invalid.');
+        }
+    }
 
     public function definirUidValidity(string $boite, int $valeur): void
     {
@@ -57,11 +79,14 @@ final class LecteurBoiteMemoire implements LecteurBoite
 
     public function uidValidity(string $boite): int
     {
+        $this->verifierConnexion($boite);
+
         return $this->validites[$boite] ?? 1;
     }
 
     public function lire(string $boite, int $uidApres, ?DateTimeImmutable $depuis = null, int $limite = ReleveImap::LIMITE_LOT): LotBoite
     {
+        $this->verifierConnexion($boite);
         // Comme le lecteur réel : on pagine d'abord sur les UID BRUTS, on filtre par la date ENSUITE.
         $bruts = array_values(array_filter(
             $this->messages[$boite] ?? [],

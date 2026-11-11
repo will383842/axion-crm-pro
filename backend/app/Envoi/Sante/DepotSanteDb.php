@@ -104,9 +104,10 @@ final class DepotSanteDb implements DepotSante
         return array_values(array_map(static fn ($r): array => [(string) $r->workspace_id, (string) $r->source], $l->all()));
     }
 
-    public function dernierReleveImap(string $ws): ?DateTimeImmutable
+    public function dernierReleveImap(string $ws, ?string $boite = null): ?DateTimeImmutable
     {
-        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_curseurs_imap')->where('workspace_id', $ws)->max('maj_le'));
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_curseurs_imap')->where('workspace_id', $ws)
+            ->when($boite !== null, fn ($q) => $q->where('boite', $boite))->max('maj_le'));
 
         return $d === null ? null : new DateTimeImmutable((string) $d);
     }
@@ -124,12 +125,24 @@ final class DepotSanteDb implements DepotSante
         return $l?->debut === null ? null : new DateTimeImmutable((string) $l->debut);
     }
 
-    public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua): int
+    public function envoisEntre(string $ws, ?DateTimeImmutable $apres, ?DateTimeImmutable $jusqua, ?string $boite = null): int
     {
-        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_messages_envoyes')->where('workspace_id', $ws)
-            ->when($apres !== null, fn ($q) => $q->where('cree_le', '>', $apres?->format('c')))
-            ->when($jusqua !== null, fn ($q) => $q->where('cree_le', '<=', $jusqua?->format('c')))
+        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_messages_envoyes as m')->where('m.workspace_id', $ws)
+            ->when($boite !== null, fn ($q) => $q->join('envoi_injections_smtp as i', 'i.id_injection', '=', 'm.id_injection')
+                ->where('i.workspace_id', $ws)->where('i.boite_id', $boite))
+            ->when($apres !== null, fn ($q) => $q->where('m.cree_le', '>', $apres?->format('c')))
+            ->when($jusqua !== null, fn ($q) => $q->where('m.cree_le', '<=', $jusqua?->format('c')))
             ->count());
+    }
+
+    public function boitesAvecEnvoisDepuis(string $ws, DateTimeImmutable $apres): array
+    {
+        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_messages_envoyes as m')
+            ->join('envoi_injections_smtp as i', 'i.id_injection', '=', 'm.id_injection')
+            ->where('m.workspace_id', $ws)->where('i.workspace_id', $ws)->where('m.cree_le', '>', $apres->format('c'))
+            ->distinct()->orderBy('i.boite_id')->pluck('i.boite_id'));
+
+        return array_values(array_map('strval', $l->all()));
     }
 
     private function constat(string $ws, string $source, string $code, string $etat, string $gravite, string $detail, DateTimeImmutable $quand, int $palier = 1): void

@@ -33,7 +33,7 @@ critique au démarrage (`CouplageSante`), alerte du Socle, et la commande planif
 - **Un constat qui échoue ne saute pas les autres** ; le passage lève ensuite une exception, la commande compte l'échec et sort en erreur.
 - **Silence** : attention dès 10 min sans réponse (tunnel coupé), critique + pause à 15 min (homme mort), avec une **marge de 60 s** (`silence_marge_s`) : le planificateur passe toutes les 5 min à quelques secondes près, sans marge l'alerte serait retardée de 5 min. Après un arrêt de la supervision (trou de plus de 15 min entre deux relevés), le silence se compte depuis la reprise : un seul échec ne déclenche rien. Un refus d'horloge (réponse signée) rétablit « serveur_muet ». Un refus de la passerelle pour
   horloge est « horloge » critique ; un secret ou une adresse absents de la configuration est « configuration_serveur » (attention), jamais « serveur_muet ».
-- **Retours muets** : mesure la **vie de la relève IMAP** (`envoi_curseurs_imap.maj_le`), pas l'arrivée de retours : critique + pause si un message parti il y a 2 h ou plus l'a été après la dernière relève et que des messages partent encore. Une petite campagne saine sans aucun rebond ne déclenche rien. Dette : par boîte.
+- **Retours muets** : mesure la **vie de la relève IMAP** (`envoi_curseurs_imap.maj_le`), pas l'arrivée de retours : critique + pause si un message parti il y a 2 h ou plus l'a été après la dernière relève et que des messages partent encore. Une petite campagne saine sans aucun rebond ne déclenche rien. Le constat est compté **par boîte** : la relève vivante d'une boîte ne cache pas celle d'une autre boîte restée à l'arrêt (curseur `envoi_curseurs_imap` de chaque boîte, envois rattachés à cette boîte par leur injection).
 - **Pauses** : motif `sante:<code>:<source>` pour un défaut de serveur (chaque serveur reçoit sa commande de pause), `sante:<code>` pour un défaut d'espace. Un constat redescendu en « attention » dont la pause dure encore le dit dans son alerte ; une alerte non partie n'est jamais acquittée.
 - **Couplage** : l'alerte « supervision éteinte alors que l'envoi réel est allumé » part au plus une fois par jour (la commande, elle, échoue à chaque passage).
 - **Certificats** : alertes à 30 j (attention), 14 j (attention renforcée, nouvelle alerte) et 7 j (critique, pause).
@@ -47,7 +47,9 @@ Le constat `retours_muets` lit `envoi_curseurs_imap.maj_le` : sans relève qui t
 envoi réel. La relève est donc planifiée : `envoi:releve-imap`, **chaque minute**, `withoutOverlapping` et `onOneServer` (`routes/console.php`).
 Elle est inerte tant que **`ENVOI_RELEVE_ACTIF`** (faux par défaut) **et** `ENVOI_REEL_ACTIF` ne sont pas vrais : aucun lecteur n'est alors instancié,
 aucune connexion IMAP. **À poser avant le premier envoi réel** : `ENVOI_RELEVE_ACTIF=true`, et le lecteur IMAP réel dans le conteneur
-(`ReleveImap` / `LecteurBoite`, paramètres tirés du gestionnaire de secrets) — non livré ici : sans lui, la commande échoue (visible), jamais en silence.
+— **un lecteur par boîte** : la relève demande à la fabrique `FabriqueLecteurs::fabrique($boite)` un `LecteurBoite` pour chaque boîte (un `LecteurBoiteWebklex` ne sert qu'une boîte ;
+paramètres tirés du gestionnaire de secrets) — non livré ici : sans fabrique liée au conteneur, la commande échoue (visible), jamais en silence.
+Une boîte en panne n'arrête pas les autres ; sa panne est journalisée **une fois** par changement d'état (au plus une fois par heure tant qu'elle dure), avec la classe de l'exception seulement.
 
 ## Tables (ajout seul)
 `envoi_releves_sante` (relevés) et `envoi_constats_sante` (ouvert / rétabli / alerte_emise). Ces noms (préfixe `envoi_`, puis le sujet) ont été

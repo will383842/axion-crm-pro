@@ -6,6 +6,8 @@ use App\Envoi\Temoins\HotesTemoins;
 use App\Envoi\Temoins\ReleveTemoins;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * R16 : relève automatique des dossiers d'indésirables des témoins. Inerte (code 0) tant que `ENVOI_REEL_ACTIF` ET
@@ -31,7 +33,16 @@ class EnvoiTemoinsReleve extends Command
         $pannes = 0;
         $limites = [];
         foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $ws) {
-            $bilan = $releve->relever((string) $ws, now()->toDateTimeImmutable());
+            try {
+                $bilan = $releve->relever((string) $ws, now()->toDateTimeImmutable());
+            } catch (Throwable $e) {
+                // Filet : une erreur d'un espace ne doit jamais arrêter la relève des suivants (classe d'exception seulement).
+                $pannes++;
+                Log::error('[ENVOI] relève des témoins : espace en erreur.', ['exception' => $e::class]);
+                $this->error('Un espace n\'a pas pu être relevé : panne signalée, relève des autres espaces poursuivie.');
+
+                continue;
+            }
             $pannes += $bilan['pannes'];
             $this->info(sprintf('Témoins lus : %d ; messages en indésirables reconnus : %d ; pannes : %d.', $bilan['temoins'], $bilan['indesirables'], $bilan['pannes']));
             foreach ($bilan['fournisseurs'] as $f) {

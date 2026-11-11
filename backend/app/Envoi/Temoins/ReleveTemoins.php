@@ -9,6 +9,7 @@ use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -36,9 +37,48 @@ final class ReleveTemoins
     public function relever(string $ws, DateTimeImmutable $maintenant): array
     {
         $bilan = ['temoins' => 0, 'indesirables' => 0, 'pannes' => 0, 'fournisseurs' => []];
+        // Verrou consultatif de l'espace (le même que les autres gestes sur les témoins) : deux relèves ou une relève et
+        // un geste manuel ne se croisent pas. Pris ? On ne lit rien et on le SIGNALE (panne) : le prochain passage réessaie.
+        $verrou = 'envoi_temoins:' . $ws;
+        try {
+            $pris = (bool) DB::selectOne('SELECT pg_try_advisory_lock(hashtext(?)) AS ok', [$verrou])->ok;
+        } catch (Throwable $e) {
+            Log::error('[ENVOI] relève des témoins : verrou de l\'espace impossible.', ['exception' => $e::class]);
+            $bilan['pannes']++;
+
+            return $bilan;
+        }
+        if (! $pris) {
+            Log::error('[ENVOI] relève des témoins : espace déjà occupé, relève ignorée.');
+            $bilan['pannes']++;
+
+            return $bilan;
+        }
+        try {
+            $this->releverEspace($ws, $maintenant, $bilan);
+        } catch (Throwable $e) {
+            // Une erreur de l'espace (lecture des accès, base) est UNE panne de CET espace, jamais celle des suivants.
+            $bilan['pannes']++;
+            Log::error('[ENVOI] relève des témoins impossible pour un espace.', ['exception' => $e::class]);
+        } finally {
+            try {
+                DB::select('SELECT pg_advisory_unlock(hashtext(?))', [$verrou]);
+            } catch (Throwable) {
+                // la session se ferme avec le processus : le verrou tombe avec elle
+            }
+        }
+
+        return $bilan;
+    }
+
+    /** @param array{temoins: int, indesirables: int, pannes: int, fournisseurs: list<string>} $bilan */
+    private function releverEspace(string $ws, DateTimeImmutable $maintenant, array &$bilan): void
+    {
         $depuis = $maintenant->modify(self::FENETRE);
         $jour = JourEnvoi::de($maintenant)->format('Y-m-d');
-        foreach ($this->acces->lister($ws) as $acces) {
+        $liste = $this->acces->listerAvecPannes($ws);
+        $bilan['pannes'] += $liste['illisibles']; // une ligne illisible = une panne, les autres lignes continuent
+        foreach ($liste['acces'] as $acces) {
             $bilan['temoins']++;
             try {
                 $ids = $this->lecteur->messageIdsEnIndesirables($acces, $depuis);
@@ -48,16 +88,7 @@ final class ReleveTemoins
                 }
                 // La pause d'abord (idempotente) : si elle échoue, aucune journée n'est écrite et le prochain passage réessaie.
                 $this->garde->indesirableChezTemoin($ws, $acces->adresse, $maintenant, self::AUTEUR);
-                WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_journees')->insertOrIgnore([
-                    'workspace_id' => $ws,
-                    'jour' => $jour,
-                    'fournisseur' => $acces->fournisseur,
-                    'reception' => 'indesirables',
-                    'auth_alignee' => false,
-                    'bouton_vu' => false,
-                    'post_effectif' => false,
-                    'auteur' => self::AUTEUR,
-                ]));
+                $this->ecrireJournee($ws, $jour, $acces->fournisseur);
                 $bilan['indesirables']++;
                 $bilan['fournisseurs'][] = $acces->fournisseur;
             } catch (Throwable $e) {
@@ -65,8 +96,32 @@ final class ReleveTemoins
                 Log::error('[ENVOI] relève des témoins impossible pour un témoin.', ['exception' => $e::class, 'fournisseur' => $acces->fournisseur]);
             }
         }
+    }
 
-        return $bilan;
+    /**
+     * Écrit la journée rouge (rejeu sans effet grâce à l'index unique). Si l'insertion est ignorée parce qu'une AUTRE ligne
+     * `releve_auto` occupe déjà la place (ligne non rouge posée à la main en base), le constat ne doit pas disparaître en
+     * silence : on le signale (panne) ; la pause, elle, est déjà ouverte et le feu vert ignore de toute façon les lignes `releve_auto` vertes.
+     */
+    private function ecrireJournee(string $ws, string $jour, string $fournisseur): void
+    {
+        WorkspaceContext::run($ws, function () use ($ws, $jour, $fournisseur): void {
+            DB::table('envoi_temoins_journees')->insertOrIgnore([
+                'workspace_id' => $ws,
+                'jour' => $jour,
+                'fournisseur' => $fournisseur,
+                'reception' => 'indesirables',
+                'auth_alignee' => false,
+                'bouton_vu' => false,
+                'post_effectif' => false,
+                'auteur' => self::AUTEUR,
+            ]);
+            $rouge = DB::table('envoi_temoins_journees')->where('workspace_id', $ws)->where('jour', $jour)
+                ->where('fournisseur', $fournisseur)->where('auteur', self::AUTEUR)->where('reception', 'indesirables')->exists();
+            if (! $rouge) {
+                throw new RuntimeException('Journée rouge non écrite : une autre ligne de la relève occupe la place.');
+            }
+        });
     }
 
     /** @param list<string> $ids */

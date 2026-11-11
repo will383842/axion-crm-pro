@@ -16,7 +16,11 @@ use Throwable;
  */
 final class LecteurIndesirablesWebklex implements LecteurIndesirables
 {
+    /** Taille d'une page d'UID bruts. */
     private const LIMITE = 200;
+
+    /** Pages au plus par dossier (10 000 messages) : au-delà, la fenêtre n'est pas couverte, donc PANNE (jamais un faux vert). */
+    private const PAGES_MAX = 50;
 
     /** @param ?Closure(AccesTemoin, string): LecteurBoite $fabrique tests : lecteur de dossier sans réseau */
     public function __construct(private readonly ?Closure $fabrique = null) {}
@@ -38,10 +42,21 @@ final class LecteurIndesirablesWebklex implements LecteurIndesirables
                 continue; // dossier inexistant chez ce fournisseur (nom différent) : on essaie le suivant
             }
             $lu = true;
-            foreach ($lot->messages as $m) {
-                if ($m->messageId !== null && $m->ecarte === null) {
-                    $ids[] = trim($m->messageId, " \t\r\n<>");
+            // Les UID sont lus par ordre croissant et la page est coupée AVANT le filtre de date : on pagine tant que
+            // `suite` est vrai, pour atteindre les messages récents. Une panne en cours de route remonte (hors du try).
+            for ($page = 1; ; $page++) {
+                foreach ($lot->messages as $m) {
+                    if ($m->messageId !== null && $m->ecarte === null) {
+                        $ids[] = trim($m->messageId, " \t\r\n<>");
+                    }
                 }
+                if (! $lot->suite) {
+                    break;
+                }
+                if ($page >= self::PAGES_MAX) {
+                    throw new RuntimeException('Fenêtre de lecture non couverte : dossier trop volumineux.');
+                }
+                $lot = $lecteur->lire('temoin', $lot->dernierUid, $depuis, self::LIMITE);
             }
         }
         if (! $lu) {

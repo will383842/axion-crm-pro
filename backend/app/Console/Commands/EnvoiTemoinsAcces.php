@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Envoi\Temoins\DepotAccesTemoins;
 use App\Envoi\Temoins\HotesTemoins;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -38,6 +39,11 @@ class EnvoiTemoinsAcces extends Command
             $depot->poser($workspace, $fournisseur, $adresse, $motDePasse);
         } catch (InvalidArgumentException) {
             $this->error('Accès refusé : adresse ou mot de passe absent ou invalide.');
+
+            return self::FAILURE;
+        } catch (QueryException) {
+            // Espace inexistant (clé étrangère) ou refus de la base : message fixe, ni requête ni valeur (adresse, mot de passe).
+            $this->error('Accès refusé : espace inexistant ou écriture impossible.');
 
             return self::FAILURE;
         }

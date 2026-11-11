@@ -257,3 +257,13 @@ test('m4 : espace inexistant pour envoi:temoins-acces : erreur claire, aucune ex
     $code = Artisan::call('envoi:temoins-acces', ['workspace' => (string) Str::uuid(), 'fournisseur' => 'gmail', '--no-interaction' => true]);
     expect($code)->toBe(1)->and(Artisan::output())->not->toContain('mdp-de-test')->and(Artisan::output())->not->toContain('temoin@example.test');
 });
+
+// ---------- M1 (suite) : une ligne verte déjà posée sous releve_auto ne doit pas faire taire le constat ----------
+
+test('M1 : ligne verte releve_auto déjà présente (index unique) : le constat n’est pas perdu en silence, panne signalée, pause ouverte', function () {
+    $ws = espaceAuditR16();
+    temoinAuditR16($ws, 'temoin@example.test', 'nous@envoi.example.invalid');
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => '2026-12-03', 'fournisseur' => 'gmail', 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'releve_auto']));
+    $bilan = releveAvecDossierR16($ws, dossierSimuleR16(0, '<nous@envoi.example.invalid>'));
+    expect(pausesAuditR16($ws))->toHaveCount(1)->and($bilan['pannes'])->toBe(1);
+});

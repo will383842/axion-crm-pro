@@ -22,7 +22,7 @@ uses(TestCase::class, RefreshDatabase::class);
 beforeEach(function () {
     Carbon::setTestNow(Carbon::parse('2026-12-03 10:00:00', 'UTC'));
     config(['envoi.cle_empreinte' => 'cle-de-test-seulement', 'envoi.reel_actif' => true, 'envoi.temoins_releve_actif' => true]);
-    app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire(['gmail.com' => 'gmail', 'yahoo.fr' => 'autre']));
+    app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire(['example.test' => 'gmail', 'yahoo.example.test' => 'autre']));
     app()->forgetInstance(GardeChauffe::class);
 });
 
@@ -83,7 +83,7 @@ function pausesDeR16(string $ws): array
 
 test('interrupteurs éteints : aucune connexion, aucun lecteur résolu', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'm1@envoi.example.invalid');
     $lecteur = new LecteurIndesirablesMemoire(['gmail' => ['m1@envoi.example.invalid']]);
     foreach ([[false, false], [true, false], [false, true]] as [$reel, $releve]) {
         config(['envoi.reel_actif' => $reel, 'envoi.temoins_releve_actif' => $releve]);
@@ -94,19 +94,19 @@ test('interrupteurs éteints : aucune connexion, aucun lecteur résolu', functio
 
 test('notre message en indésirables : pause vers CE fournisseur et journée releve_auto', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'm1@envoi.example.invalid');
     expect(releverAvecR16(new LecteurIndesirablesMemoire(['gmail' => ['<m1@envoi.example.invalid>']])))->toBe(0);
     $pauses = pausesDeR16($ws);
     expect($pauses)->toHaveCount(1)->and($pauses[0]->fournisseur)->toBe('gmail');
     $j = journeesAutoR16($ws);
     expect($j)->toHaveCount(1)->and($j[0]->reception)->toBe('indesirables')->and($j[0]->fournisseur)->toBe('gmail')
         ->and($j[0]->jour)->toBe('2026-12-03')->and($j[0]->auth_alignee)->toBeFalse();
-    expect(Artisan::output())->not->toContain('temoin@gmail.com')->and(Artisan::output())->not->toContain('mdp-de-test');
+    expect(Artisan::output())->not->toContain('temoin@example.test')->and(Artisan::output())->not->toContain('mdp-de-test');
 });
 
 test('deux relèves le même jour : une seule ligne (rejeu sans effet)', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'm1@envoi.example.invalid');
     $lecteur = new LecteurIndesirablesMemoire(['gmail' => ['m1@envoi.example.invalid']]);
     releverAvecR16($lecteur);
     releverAvecR16($lecteur);
@@ -115,28 +115,28 @@ test('deux relèves le même jour : une seule ligne (rejeu sans effet)', functio
 
 test('un message d’un tiers dans les indésirables n’est jamais compté', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'nous@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'nous@envoi.example.invalid');
     expect(releverAvecR16(new LecteurIndesirablesMemoire(['gmail' => ['pourriel@tiers.example.invalid']])))->toBe(0);
     expect(journeesAutoR16($ws))->toBeEmpty()->and(pausesDeR16($ws))->toBeEmpty();
 });
 
 test('notre message destiné à quelqu’un d’autre n’est pas compté pour ce témoin', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'autre@envoi.example.invalid', 'prospect@societe.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'autre@envoi.example.invalid', 'prospect@societe.example.invalid');
     releverAvecR16(new LecteurIndesirablesMemoire(['gmail' => ['autre@envoi.example.invalid']]));
     expect(journeesAutoR16($ws))->toBeEmpty()->and(pausesDeR16($ws))->toBeEmpty();
 });
 
 test('un constat peut freiner, jamais libérer : rien d’écrit quand les indésirables sont vides', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'm1@envoi.example.invalid');
     releverAvecR16(new LecteurIndesirablesMemoire);
     expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_journees')->count()))->toBe(0);
 });
 
 test('Yahoo : pause « autre », et la limite est écrite dans le rapport', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'yahoo', 'temoin@yahoo.fr', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'yahoo', 'temoin@yahoo.example.test', 'm1@envoi.example.invalid');
     releverAvecR16(new LecteurIndesirablesMemoire(['yahoo' => ['m1@envoi.example.invalid']]));
     $pauses = pausesDeR16($ws);
     expect($pauses)->toHaveCount(1)->and($pauses[0]->fournisseur)->toBe('autre');
@@ -145,13 +145,13 @@ test('Yahoo : pause « autre », et la limite est écrite dans le rapport', func
 
 test('une panne de lecture est signalée (échec), sans mot de passe ni adresse dans les journaux', function () {
     $ws = espaceReleveR16();
-    temoinAvecMessageR16($ws, 'gmail', 'temoin@gmail.com', 'm1@envoi.example.invalid');
+    temoinAvecMessageR16($ws, 'gmail', 'temoin@example.test', 'm1@envoi.example.invalid');
     Log::spy();
     $lecteur = new LecteurIndesirablesMemoire;
     $lecteur->mettreEnPanne('gmail');
     expect(releverAvecR16($lecteur))->toBe(1);
-    expect(Artisan::output())->not->toContain('mdp-de-test')->and(Artisan::output())->not->toContain('temoin@gmail.com');
-    Log::shouldHaveReceived('error')->withArgs(fn ($m, $ctx = []) => ! str_contains(json_encode([$m, $ctx]), 'mdp-de-test') && ! str_contains(json_encode([$m, $ctx]), 'temoin@gmail.com'));
+    expect(Artisan::output())->not->toContain('mdp-de-test')->and(Artisan::output())->not->toContain('temoin@example.test');
+    Log::shouldHaveReceived('error')->withArgs(fn ($m, $ctx = []) => ! str_contains(json_encode([$m, $ctx]), 'mdp-de-test') && ! str_contains(json_encode([$m, $ctx]), 'temoin@example.test'));
     expect(journeesAutoR16($ws))->toBeEmpty();
 });
 

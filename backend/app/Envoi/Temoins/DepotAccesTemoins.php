@@ -6,8 +6,11 @@ use App\Envoi\EmpreinteTemoin;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use RuntimeException;
 use SensitiveParameter;
+use Throwable;
 
 /**
  * Accès IMAP des témoins (`envoi_temoins_acces`, ajout seul). L'identifiant (adresse + mot de passe) est CHIFFRÉ
@@ -33,22 +36,44 @@ final class DepotAccesTemoins
         ]));
     }
 
-    /** @return list<AccesTemoin> un par témoin (dernière ligne) */
+    /** @return list<AccesTemoin> un par témoin (dernière ligne) ; une ligne illisible fait échouer toute la liste */
     public function lister(string $ws): array
+    {
+        $r = $this->listerAvecPannes($ws);
+        if ($r['illisibles'] > 0) {
+            throw new RuntimeException('Accès de témoin illisible.');
+        }
+
+        return $r['acces'];
+    }
+
+    /**
+     * Comme {@see lister}, mais UN essai par ligne : une ligne qu'on ne peut pas déchiffrer (clé changée, base altérée) est
+     * comptée, journalisée sans aucun secret (classe d'exception et fournisseur seulement) et n'arrête pas les autres.
+     *
+     * @return array{acces: list<AccesTemoin>, illisibles: int}
+     */
+    public function listerAvecPannes(string $ws): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_acces')
             ->where('workspace_id', $ws)->orderByDesc('id')->get());
         $vus = [];
         $sortie = [];
+        $illisibles = 0;
         foreach ($lignes as $l) {
             if (isset($vus[$l->empreinte_temoin]) || ! HotesTemoins::hoteAutorise((string) $l->hote)) {
                 continue; // plus récent déjà pris ; hôte hors liste (base altérée) : ignoré, jamais joint
             }
             $vus[$l->empreinte_temoin] = true;
-            $d = json_decode(Crypt::decryptString((string) $l->identifiant_chiffre), true, 4, JSON_THROW_ON_ERROR);
-            $sortie[] = new AccesTemoin($ws, (string) $l->fournisseur, (string) $l->hote, (string) $d['adresse'], (string) $d['mot_de_passe'], (string) $l->empreinte_temoin);
+            try {
+                $d = json_decode(Crypt::decryptString((string) $l->identifiant_chiffre), true, 4, JSON_THROW_ON_ERROR);
+                $sortie[] = new AccesTemoin($ws, (string) $l->fournisseur, (string) $l->hote, (string) $d['adresse'], (string) $d['mot_de_passe'], (string) $l->empreinte_temoin);
+            } catch (Throwable $e) {
+                $illisibles++;
+                Log::error('[ENVOI] accès de témoin illisible.', ['exception' => $e::class, 'fournisseur' => (string) $l->fournisseur]);
+            }
         }
 
-        return array_reverse($sortie);
+        return ['acces' => array_reverse($sortie), 'illisibles' => $illisibles];
     }
 }

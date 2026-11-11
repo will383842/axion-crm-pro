@@ -30,7 +30,6 @@ export type FicheBoite = Json<'lireBoite'>;
 export type FicheDomaine = Json<'lireDomaine'>;
 export type Chauffe = Json<'lireChauffe'>;
 export type RessourceChauffe = Chauffe['ressources'][number];
-export type ResultatTest = Json<'testerConnexionBoite'>;
 
 /** Plafond d'envois par boîte et par jour en V0 (décision du responsable du projet). */
 export const PLAFOND_PAR_BOITE = 150;
@@ -69,9 +68,6 @@ function useGeste<Entree, Sortie>(appel: (entree: Entree) => Promise<Sortie>) {
 const mettre = async <T,>(chemin: string, corps: unknown): Promise<T> => (await api.put<T>(chemin, corps)).data;
 const poster = async <T,>(chemin: string, corps?: unknown): Promise<T> => (await api.post<T>(chemin, corps)).data;
 
-export const useAjouterBoite = () =>
-  useGeste((c: { adresse: string; domaine_id: string; nom_affiche: string; signature?: string; mode_absence?: ReglagesBoite['mode_absence'] }) => poster<Boite>('/envoi/boites', c));
-export const useTesterConnexion = () => useMutation({ mutationFn: (c: { adresse: string; domaine_id: string }) => poster<ResultatTest>('/envoi/boites/test-connexion', c) });
 export const useSuspendreBoite = () => useGeste((id: string) => poster<Boite>(`/envoi/boites/${id}/suspendre`));
 export const useReactiverBoite = () => useGeste((id: string) => poster<Boite>(`/envoi/boites/${id}/reactiver`));
 export const useEnregistrerReglages = (id: string) =>

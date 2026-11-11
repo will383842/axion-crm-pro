@@ -3,6 +3,7 @@
 namespace Tests\Feature\Envoi\Routes;
 
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ContratOpenApiEnvoi;
 
@@ -21,7 +22,7 @@ abstract class BaseMessagesTypes extends BaseRoutesEnvoi
 
     public function utilisateur(string $espaceId, string $role): User
     {
-        return $this->compte(\App\Models\Workspace::findOrFail($espaceId), $role);
+        return $this->compte(Workspace::findOrFail($espaceId), $role);
     }
 
     public function autreOwner(): User
@@ -171,4 +172,12 @@ test('contexte et champs de fusion', function () {
     foreach ($r['champs'] as $ch) {
         expect(ContratOpenApiEnvoi::ecarts('creation.yaml', 'ChampUtilise', $ch))->toBe([]);
     }
+});
+
+test('écriture : bloc d’information retiré ou objet B demandé = 422 (non pris en charge), corps trop long = 422', function () {
+    [$owner] = $this->jeu();
+    $this->actingAs($owner)->postJson(MSG, msgSaisie(['bloc_information' => false]))->assertStatus(422)->assertJsonPath('error', 'validation');
+    $this->actingAs($owner)->postJson(MSG, msgSaisie(['objet_b' => 'Autre objet']))->assertStatus(422);
+    $this->actingAs($owner)->postJson(MSG, msgSaisie(['corps' => str_repeat('a', 20001)]))->assertStatus(422);
+    expect(DB::table('envoi_modeles')->count())->toBe(1);
 });

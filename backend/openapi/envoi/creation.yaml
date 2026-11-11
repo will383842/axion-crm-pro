@@ -238,6 +238,7 @@ paths:
             schema: { $ref: '#/components/schemas/SaisieMessage' }
       responses:
         '201': { $ref: '#/components/responses/MessageType' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/messages/{id}:
     get:
       operationId: lireMessageType
@@ -259,6 +260,9 @@ paths:
             schema: { $ref: '#/components/schemas/SaisieMessage' }
       responses:
         '200': { $ref: '#/components/responses/MessageType' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/messages/{id}/versions/{numero}/restaurer:
     post:
       operationId: restaurerVersion
@@ -455,6 +459,13 @@ paths:
                 properties:
                   ok: { type: boolean, const: true }
                   adresses: { type: integer, minimum: 0 }
+        '409':
+          description: >-
+            Palier 0 : l'envoi de test est fermé, sans aucun effet. Code `envoi_ferme_palier_0`. Aucune route de ce
+            domaine ne fait partir un message.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/messages/suggestion:
     post:
       operationId: suggererSequence
@@ -488,6 +499,13 @@ paths:
                         delai_jours: { type: integer, minimum: 0 }
                         objet: { type: string }
                         corps: { type: string }
+        '501':
+          description: >-
+            Palier 0 : la suggestion par IA n'est pas ouverte (coût, données confiées à un tiers : décision du
+            propriétaire). Code `non_disponible`.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/messages/{id}/versions/{numero}/valider:
     post:
       operationId: validerVersion

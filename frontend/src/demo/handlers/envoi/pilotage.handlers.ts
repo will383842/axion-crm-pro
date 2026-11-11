@@ -230,13 +230,15 @@ export const handlers: HttpHandler[] = [
   http.post(api('/envoi/feu-vert/:code/fait'), async ({ request, params }) => {
     await delai();
     const code = String(params['code']);
+    // Même ordre que le backend : 422 pour tout code `auto.` (même inconnu), puis 404, puis la preuve.
+    if (code.startsWith('auto.')) return erreur(422, 'point_automatique', 'Ce point se calcule tout seul : il ne s’écrit pas à la main.');
     const p = demoDb.zone<PointFeuVert>('pilotage', 'points').trouver(code);
     if (!p) return erreur(404, 'non_trouve', 'Ce point n’existe pas.');
-    if (code.startsWith('auto.')) return erreur(422, 'point_automatique', 'Ce point se calcule tout seul : il ne s’écrit pas à la main.');
     const corps = (await request.json().catch(() => ({}))) as { preuve?: unknown; fait?: unknown };
     const preuve = typeof corps.preuve === 'string' ? corps.preuve.trim() : '';
-    if (preuve.length < 1 || preuve.length > 500) return erreur(422, 'validation', 'La preuve doit faire entre 1 et 500 caractères.');
-    if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(preuve)) return erreur(422, 'validation', 'La preuve ne doit pas contenir d’adresse e-mail.');
+    if (preuve.length < 10 || preuve.length > 500) return erreur(422, 'validation', 'La preuve doit faire entre 10 et 500 caractères.');
+    // Adresse e-mail : « @ » (ou sa forme pleine chasse) collé ou séparé par des espaces.
+    if (/\S\s*@\s*\S/.test(preuve.normalize('NFKC'))) return erreur(422, 'validation', 'La preuve ne doit pas contenir d’adresse e-mail.');
     const fait = corps.fait !== false;
     const maj = demoDb.zone<PointFeuVert>('pilotage', 'points').modifier(p.id, {
       fait,

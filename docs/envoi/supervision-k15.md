@@ -42,6 +42,13 @@ critique au démarrage (`CouplageSante`), alerte du Socle, et la commande planif
 - **Alerte** : jamais par une boîte ni un domaine de prospection. Refusée si l'expéditeur de l'application est une boîte, un domaine d'envoi, un
   sous-domaine d'un domaine d'envoi, ou partage son **domaine organisationnel** (même politique DMARC) avec un domaine d'envoi.
 
+## Prérequis : la relève IMAP doit être planifiée (L8-F12)
+Le constat `retours_muets` lit `envoi_curseurs_imap.maj_le` : sans relève qui tourne, il passe en critique et met tout en pause 2 h après le premier
+envoi réel. La relève est donc planifiée : `envoi:releve-imap`, **chaque minute**, `withoutOverlapping` et `onOneServer` (`routes/console.php`).
+Elle est inerte tant que **`ENVOI_RELEVE_ACTIF`** (faux par défaut) **et** `ENVOI_REEL_ACTIF` ne sont pas vrais : aucun lecteur n'est alors instancié,
+aucune connexion IMAP. **À poser avant le premier envoi réel** : `ENVOI_RELEVE_ACTIF=true`, et le lecteur IMAP réel dans le conteneur
+(`ReleveImap` / `LecteurBoite`, paramètres tirés du gestionnaire de secrets) — non livré ici : sans lui, la commande échoue (visible), jamais en silence.
+
 ## Tables (ajout seul)
 `envoi_releves_sante` (relevés) et `envoi_constats_sante` (ouvert / rétabli / alerte_emise). Ces noms (préfixe `envoi_`, puis le sujet) ont été
 posés dans la migration `2026_11_13_000150_envoi_sante.php` avant sa première exécution en production : pas de RENAME, rien perdu.

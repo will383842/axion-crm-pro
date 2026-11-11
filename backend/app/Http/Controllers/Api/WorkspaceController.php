@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class WorkspaceController extends ApiController
 {
@@ -98,38 +99,43 @@ class WorkspaceController extends ApiController
         // SILENCE : la seconde ecrase la premiere sans que personne l'apprenne.
         $this->refuserSiVersionPerimee($r, $courant);
 
-        // 🔒 Clés réservées à la console (`ProduitsEspace::CLES_RESERVEES`) : fournies par un client, c'est un 422 explicite.
-        $regles = [
+        $valide = $r->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'settings' => ['sometimes', 'array'],
             // Le plafond est un `NUMERIC(10,2)` : au-dela de 99 999 999,99 la
             // base leve « numeric field overflow », donc un 500 sur une saisie.
             // On borne ici pour que la reponse soit un 422 qui nomme le champ.
             'cost_cap_eur' => ['sometimes', 'numeric', 'min:0', 'max:99999999.99'],
-        ];
-        $messages = [];
+        ]);
+
+        // R00 : `settings.produits` (droits par produit, lus par la garde `produit-envoi`) est RÉSERVÉ à l'exploitation.
+        // Un propriétaire ne doit pas pouvoir s'activer un produit : 422 explicite, quelle que soit la valeur.
+        // (Pas de règle `settings.produits` ci-dessus : une règle imbriquée restreindrait `validated()` à ses sous-clés.)
+        // Les clés réservées sont listées dans UNE constante : `ProduitsEspace::CLES_RESERVEES`.
         foreach (ProduitsEspace::CLES_RESERVEES as $cle) {
-            $regles['settings.' . $cle] = ['prohibited'];
-            $messages['settings.' . $cle . '.prohibited'] = 'Le réglage « ' . $cle . ' » est réservé à la console d\'administration : il ne peut pas être modifié ici.';
+            if (is_array($valide['settings'] ?? null) && array_key_exists($cle, $valide['settings'])) {
+                throw ValidationException::withMessages(['settings.' . $cle => 'Cette clé est réservée à l’exploitation et ne se modifie pas ici.']);
+            }
         }
-        $valide = $r->validate($regles, $messages);
 
         $champs = [];
         if (array_key_exists('name', $valide)) {
             $champs['name'] = $valide['name'];
         }
-        if ($r->has('settings')) {
-            // `$valide['settings']` est réduit aux seules sous-clés ayant une règle : on relit l'entrée (déjà validée `array`).
+        if (array_key_exists('settings', $valide)) {
             // Remplacement, pas fusion — et c'est delibere. Une fusion rendrait
             // impossible le retrait d'un reglage : il n'y aurait aucun moyen
             // d'exprimer « enleve cette cle ». Un PUT remplace.
-            //
-            // 🔒 Seules les clés réservées à la console échappent au remplacement : elles sont reprises
-            // telles qu'en base (activation des produits posée par `produits:activer`).
-            $enBase = DB::table('workspaces')->where('id', $espace)->whereNull('deleted_at')->value('settings');
-            $enBase = is_string($enBase) ? json_decode($enBase, true) : $enBase;
-            $reserves = array_intersect_key(is_array($enBase) ? $enBase : [], array_flip(ProduitsEspace::CLES_RESERVEES));
-            $champs['settings'] = json_encode($r->input('settings') + $reserves, JSON_UNESCAPED_UNICODE);
+            $reglages = $valide['settings'];
+            // R00 : la clé réservée `produits` n'est jamais écrite par cette route, et CONSERVÉE telle qu'en base
+            // quand les autres réglages sont remplacés (sinon un simple enregistrement retirerait le produit).
+            $actuels = $courant->settings;
+            foreach (ProduitsEspace::CLES_RESERVEES as $cle) {
+                if (array_key_exists($cle, $actuels)) {
+                    $reglages[$cle] = $actuels[$cle];
+                }
+            }
+            $champs['settings'] = json_encode($reglages, JSON_UNESCAPED_UNICODE);
         }
         if (array_key_exists('cost_cap_eur', $valide)) {
             $champs['cost_cap_eur'] = $valide['cost_cap_eur'];

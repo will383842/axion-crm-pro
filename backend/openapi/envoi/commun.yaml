@@ -30,11 +30,10 @@ components:
     EtatProduit:
       type: string
       description: >-
-        Droit d'accès d'un espace à un produit. Le serveur est FERMÉ par défaut : seul `actif` ouvre Envoi ;
-        `suspendu`, `resilie`, `absent` ou toute autre valeur donnent 404 sur chaque route `/envoi/*`.
-        Le frontend peut afficher un état différent (par exemple l'entrée Envoi pour un espace `suspendu`),
-        mais l'ouverture réelle est décidée par le serveur seul. Posé uniquement par la console
-        (`php artisan produits:activer`) ; `PUT /workspace` refuse la clé `settings.produits`.
+        Droit d'accès d'un espace à un produit. Côté serveur, la garde `produit-envoi` n'ouvre `/envoi/*`
+        (404 sinon) que pour `actif` : `suspendu`, `resilie` et `absent` sont fermés (choix prudent, plus
+        strict que l'affichage du frontend). Source : `workspaces.settings` → `produits.<produit>`, clé
+        réservée à l'exploitation (`PUT /workspace` la refuse et la conserve).
       enum: [actif, suspendu, resilie, absent]
     EtatFeu:
       type: string

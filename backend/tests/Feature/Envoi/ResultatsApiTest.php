@@ -43,18 +43,20 @@ test('regroupement par boîte : remis = envoyés − rebonds durs − rebonds mo
     ligne($id, 'b1', '2026-10-20', 50, 0, 0, 2);   // dans les 30 jours (du 2026-10-13 au 2026-11-11)
     ligne($id, 'b1', '2026-10-05', 40, 2, 0, 1);   // période précédente (du 2026-09-13 au 2026-10-12)
     ligne($id, 'b1', '2026-08-01', 999);            // hors des deux périodes
-    ligne($id, '(retours)', '2026-11-10', 5000);    // pseudo-boîte des retours : jamais comptée
+    ligne($id, '(retours)', '2026-11-10', 0, 1, 0, 3); // retours : groupe à part, sans envoi
 
     $r = $this->actingAs($this->admin)->getJson('/api/v1/envoi/resultats?par=boite');
     $r->assertOk();
     expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'Resultats', $r->json()))->toBe([]);
     expect($r->json('periode'))->toBe(['du' => '2026-10-13', 'au' => '2026-11-11']);
-    $l = $r->json('data.0');
-    expect($r->json('data'))->toHaveCount(1)
+    $l = $r->json('data.0'); // « (retours) » trie avant « b1 »
+    expect($l['cle'])->toBe('(retours)');
+    $l = $r->json('data.1');
+    expect($r->json('data'))->toHaveCount(2)
         ->and($l)->toMatchArray(['cle' => 'b1', 'envoyes' => 150, 'rebonds_durs' => 4, 'rebonds_mous' => 0, 'remis' => 146, 'plaintes' => 1, 'reponses' => 8])
-        ->and($r->json('totaux.envoyes'))->toBe(150)
+        ->and($r->json('totaux'))->toMatchArray(['envoyes' => 150, 'rebonds_durs' => 5, 'remis' => 145, 'reponses' => 11])
         ->and($r->json('precedent'))->toMatchArray(['envoyes' => 40, 'remis' => 38, 'rebonds_durs' => 2])
-        ->and($r->json('entonnoir'))->toBe(['envoyes' => 150, 'reponses' => 8, 'rendez_vous' => null, 'gagnes' => null]);
+        ->and($r->json('entonnoir'))->toBe(['envoyes' => 150, 'reponses' => 11, 'rendez_vous' => null, 'gagnes' => null]);
 });
 
 test('jours : 7, 30 ou 90 seulement ; par obligatoire et connu', function () {
@@ -77,7 +79,7 @@ test('par domaine : regroupe sur la partie après @ ; par campagne, liste, messa
 });
 
 test('bornes de jour en Europe/Paris autour du changement d’heure', function () {
-    Carbon::setTestNow('2026-10-25 23:30:00'); // UTC : déjà le 26 à Paris
+    Carbon::setTestNow(Carbon::parse('2026-10-25 23:30:00', 'UTC')); // : déjà le 26 à Paris
     $id = $this->ws->id;
     ligne($id, 'b1', '2026-10-26', 10);
     ligne($id, 'b1', '2026-10-20', 20);

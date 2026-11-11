@@ -47,27 +47,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CourbeResultats'
-  /envoi/envois/chercher:
-    get:
-      operationId: chercherEnvoi
-      summary: Chercher les retours reçus pour une adresse
-      description: |
-        Recherche par empreinte de l'adresse saisie (aucune adresse n'est stockée ni journalisée).
-        10 recherches par minute et par compte ; chaque recherche est journalisée (qui, quand, empreinte).
-        Une adresse inconnue et une adresse d'un autre espace donnent la même réponse vide (aucun oracle).
-      parameters:
-        - name: adresse
-          in: query
-          required: true
-          schema: { type: string, maxLength: 254 }
-      responses:
-        '200':
-          description: Retours reçus pour cette adresse (au plus 50, du plus récent au plus ancien).
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RechercheEnvoi' }
-        '422': { description: Adresse absente ou invalide. }
-        '429': { description: Plus de 10 recherches dans la minute. }
   /envoi/sante:
     get:
       operationId: lireSante
@@ -145,37 +124,25 @@ paths:
   /envoi/envois/chercher:
     get:
       operationId: chercherEnvoi
-      summary: Chercher un envoi par adresse (tous les événements)
+      summary: Chercher les retours reçus pour une adresse
+      description: |
+        Recherche par empreinte de l'adresse saisie (aucune adresse n'est stockée ni journalisée).
+        10 recherches par minute et par compte ; chaque recherche est journalisée (qui, quand, empreinte).
+        Une adresse inconnue et une adresse d'un autre espace donnent la même réponse vide (aucun oracle) :
+        la réponse ne dit ni « personne connue » ni « peut-on lui écrire ».
       parameters:
         - name: adresse
           in: query
           required: true
-          schema: { type: string }
+          schema: { type: string, maxLength: 254 }
       responses:
         '200':
-          description: Événements de cette adresse, et peut-on encore lui écrire.
+          description: Retours reçus pour cette adresse (au plus 50, du plus récent au plus ancien).
           content:
             application/json:
-              schema:
-                type: object
-                required: [adresse, personne, evenements, peut_ecrire, raison]
-                properties:
-                  adresse: { type: string }
-                  personne:
-                    description: Fiche du CRM quand l'adresse y est connue ; nul sinon.
-                    oneOf:
-                      - type: object
-                        required: [contact_id, nom, organisation]
-                        properties:
-                          contact_id: { type: integer }
-                          nom: { type: string }
-                          organisation: { oneOf: [{ type: string }, { type: 'null' }] }
-                      - type: 'null'
-                  evenements:
-                    type: array
-                    items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
-                  peut_ecrire: { type: boolean }
-                  raison: { oneOf: [{ type: string }, { type: 'null' }] }
+              schema: { $ref: '#/components/schemas/RechercheEnvoi' }
+        '422': { description: Adresse absente ou invalide. }
+        '429': { description: Plus de 10 recherches dans la minute. }
   /envoi/feu-vert:
     get:
       operationId: lireFeuVert

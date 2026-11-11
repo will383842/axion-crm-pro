@@ -34,6 +34,8 @@ class RouteServiceProvider extends ServiceProvider
 
             return Limit::perMinute(120)->by('desinscription:' . hash('sha256', (string) $r->route('jeton')));
         });
+        // R04 : recherche d'un envoi par adresse, 10 par minute et par compte.
+        RateLimiter::for('envoi-chercher', fn (Request $r) => Limit::perMinute(10)->by('envoi-chercher:' . (optional($r->user())->id ?: $r->ip())));
         RateLimiter::for('login', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
         RateLimiter::for('magic-link', fn (Request $r) => Limit::perMinute(3)->by($r->ip()));
         // Changement de mot de passe connecté : 5/min PAR COMPTE (l'ancien mot de

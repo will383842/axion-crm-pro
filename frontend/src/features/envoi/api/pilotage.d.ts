@@ -11,7 +11,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chercher un envoi par adresse (tous les événements) */
+        /**
+         * Chercher les retours reçus pour une adresse
+         * @description Recherche par empreinte de l'adresse saisie (aucune adresse n'est stockée ni journalisée).
+         *     10 recherches par minute et par compte ; chaque recherche est journalisée (qui, quand, empreinte).
+         *     Une adresse inconnue et une adresse d'un autre espace donnent la même réponse vide (aucun oracle) :
+         *     la réponse ne dit ni « personne connue » ni « peut-on lui écrire ».
+         */
         get: operations["chercherEnvoi"];
         put?: never;
         post?: never;
@@ -174,6 +180,15 @@ export interface components {
             tenu_jusqu_au: string | null;
             total_palier: number;
         };
+        CourbeResultats: {
+            data: {
+                /** Format: date */
+                jour: string;
+                rebonds: number;
+                remis: number;
+                reponses: number;
+            }[];
+        };
         DomaineResume: {
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
@@ -203,19 +218,6 @@ export interface components {
          * @enum {string}
          */
         EtatFeu: "vert" | "ambre" | "rouge" | "bleu" | "gris";
-        EvenementEnvoi: {
-            /** Format: email */
-            adresse: string;
-            boite_id: components["schemas"]["Identifiant"];
-            campagne_id: components["schemas"]["Identifiant"];
-            code_serveur: string | null;
-            destinataire_id: components["schemas"]["Identifiant"] | null;
-            id: components["schemas"]["Identifiant"];
-            /** @description Explication en français (code serveur traduit). */
-            libelle: string | null;
-            survenu_le: components["schemas"]["Horodatage"];
-            type: components["schemas"]["TypeEvenementEnvoi"];
-        };
         /** @enum {string} */
         FluxEnvoi: "prospection" | "lettre";
         /**
@@ -228,6 +230,10 @@ export interface components {
          * @example cmp-01
          */
         Identifiant: string;
+        /**
+         * @description Définition unique, la même que celle des freins : `remis` = `envoyes` moins `rebonds_durs` moins `rebonds_mous`
+         *     (jamais négatif) ; le taux de réponse se calcule sur les envoyés.
+         */
         LigneResultat: {
             cle: string;
             desinscriptions: number;
@@ -272,6 +278,37 @@ export interface components {
         };
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
+        RechercheEnvoi: {
+            data: {
+                boite: string;
+                /** @enum {string} */
+                classe: "reponse_humaine" | "auto_reponse" | "desinscription" | "hostile" | "rebond_dur" | "rebond_mou";
+                recu_le: components["schemas"]["Horodatage"];
+            }[];
+        };
+        Resultats: {
+            data: components["schemas"]["LigneResultat"][];
+            /**
+             * @description `rendez_vous` et `gagnes` valent null tant que le lien avec le CRM n'est pas défini
+             *     (on ne les invente pas).
+             */
+            entonnoir: {
+                envoyes: number;
+                gagnes: number | null;
+                rendez_vous: number | null;
+                reponses: number;
+            };
+            /** @description Jours civils d'Europe/Paris, bornes comprises. */
+            periode: {
+                /** Format: date */
+                au: string;
+                /** Format: date */
+                du: string;
+            };
+            /** @description Totaux de la période d'avant, de même durée (pour la comparaison). */
+            precedent: components["schemas"]["LigneResultat"];
+            totaux: components["schemas"]["LigneResultat"];
+        };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
             etat: components["schemas"]["EtatFeu"];
@@ -281,8 +318,6 @@ export interface components {
         };
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
-        /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         /** @description État des verrous d'envoi, en lecture seule. */
         VerrousFeuVert: {
             envoi_reel_actif: boolean;
@@ -323,25 +358,28 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Événements de cette adresse, et peut-on encore lui écrire. */
+            /** @description Retours reçus pour cette adresse (au plus 50, du plus récent au plus ancien). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        adresse: string;
-                        evenements: components["schemas"]["EvenementEnvoi"][];
-                        /** @description Fiche du CRM quand l'adresse y est connue ; nul sinon. */
-                        personne: {
-                            contact_id: number;
-                            nom: string;
-                            organisation: string | null;
-                        } | null;
-                        peut_ecrire: boolean;
-                        raison: string | null;
-                    };
+                    "application/json": components["schemas"]["RechercheEnvoi"];
                 };
+            };
+            /** @description Adresse absente ou invalide. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Plus de 10 recherches dans la minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -423,24 +461,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        data: components["schemas"]["LigneResultat"][];
-                        entonnoir: {
-                            envoyes: number;
-                            gagnes: number;
-                            rendez_vous: number;
-                            reponses: number;
-                        };
-                        periode: {
-                            /** Format: date */
-                            au: string;
-                            /** Format: date */
-                            du: string;
-                        };
-                        /** @description Totaux de la période d'avant, de même durée (pour la comparaison). */
-                        precedent: components["schemas"]["LigneResultat"];
-                        totaux: components["schemas"]["LigneResultat"];
-                    };
+                    "application/json": components["schemas"]["Resultats"];
                 };
             };
         };
@@ -462,15 +483,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        data: {
-                            /** Format: date */
-                            jour: string;
-                            rebonds: number;
-                            remis: number;
-                            reponses: number;
-                        }[];
-                    };
+                    "application/json": components["schemas"]["CourbeResultats"];
                 };
             };
         };

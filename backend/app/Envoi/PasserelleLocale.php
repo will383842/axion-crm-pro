@@ -174,7 +174,10 @@ final class PasserelleLocale implements ServeurEnvoi
             if ($id !== null) {
                 return ResultatInjection::accepte($id);
             }
-            // Ligne ancienne sans identifiant conservé : repli sur le serveur (il dédoublonne par clé).
+            if (! ($this->serveur instanceof RenvoiParMemeCle)) {
+                return ResultatInjection::accepte('inconnu'); // parti, identifiant perdu : jamais d'appel en SMTP direct
+            }
+            // Ligne ancienne sans identifiant conservé, serveur dédoublonnant : repli sur le serveur.
         } elseif (! ($this->serveur instanceof RenvoiParMemeCle)) {
             throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }

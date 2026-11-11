@@ -4,7 +4,10 @@ namespace App\Envoi\Sequence;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\ServeurEnvoi;
+use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
@@ -82,9 +85,10 @@ final class Sequenceur
         private readonly LecteurFiche $fiches,
         private readonly ComposeurSequence $composeur,
         private readonly ParametresExpedition $expedition,
+        private readonly ?DepotSocle $depot = null,
     ) {}
 
-    /** @var list<array{0: string, 1: array<string, mixed>}> alertes critiques en attente du COMMIT de la transaction en cours */
+    /** @var list<array{0: string, 1: array<string, mixed>, 2: string}> alertes critiques en attente du COMMIT de la transaction en cours */
     private array $alertes = [];
 
     /**
@@ -138,7 +142,7 @@ final class Sequenceur
         }
 
         try {
-            $res = $this->serveur->injecter($plan['message']);
+            $res = $plan['message'] === null ? ResultatInjection::accepte($plan['accepteId'] ?? 'inconnu') : $this->serveur->injecter($plan['message']);
         } catch (EnvoiRefuse $e) {
             if ($e->getCode() === EnvoiRefuse::ISSUE_INCERTAINE) {
                 // Issue d'une injection précédente incertaine : JAMAIS de report (il reboucherait chaque jour). Inscription arrêtée
@@ -146,13 +150,14 @@ final class Sequenceur
                 return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
             }
 
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
+            // Report d'ATTENTE (envoi réel éteint, hors témoins, arrêt général…) : sans incrément, sans alerte, sans limite.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
         } catch (RefusDefinitifServeur) {
             // Refus définitif (5xx) : refus et arrêt, pas de report quotidien.
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->refuser($ins, $plan['rang'], 'refus_definitif_du_serveur', $maintenant), $maintenant);
         } catch (EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
             // Refus CERTAIN fait avant toute transmission (déjà libéré par la passerelle) : ni alerte « incertaine », ni arrêt ;
-            // report soumis au plafond.
+            // report d'ÉCHEC, compté et soumis au plafond.
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'refus_avant_envoi', $plan['fenetre'], $maintenant), $maintenant);
         } catch (InjectionIncertaine $e) {
             // La passerelle a gardé la place (`a_verifier`) : le message ne repart JAMAIS, l'inscription attend une vérification humaine.
@@ -165,7 +170,8 @@ final class Sequenceur
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
         }
         if (! $res->accepte) {
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
+            // Report d'ATTENTE (plafond du jour, quota de chauffe, pause, frein) : sans incrément, sans alerte, sans limite.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
         }
 
         return $this->conclure($plan, function (\stdClass $ins) use ($plan, $res, $maintenant): string {
@@ -187,7 +193,7 @@ final class Sequenceur
     /**
      * Temps C : transaction courte, ligne d'inscription relue sous verrou, alertes émises après le COMMIT.
      *
-     * @param  array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer}  $plan
+     * @param  array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: ?MessageAEnvoyer, accepteId: ?string}  $plan
      */
     private function conclure(array $plan, \Closure $f, DateTimeImmutable $maintenant): string
     {
@@ -210,15 +216,15 @@ final class Sequenceur
     {
         $alertes = $this->alertes;
         $this->alertes = [];
-        foreach ($alertes as [$message, $contexte]) {
-            Log::critical($message, $contexte);
+        foreach ($alertes as [$message, $contexte, $niveau]) {
+            Log::{$niveau}($message, $contexte);
         }
     }
 
     /**
      * Temps A (dans la transaction ouverte par `traiter`).
      *
-     * @return string|array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer}
+     * @return string|array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: ?MessageAEnvoyer, accepteId: ?string}
      */
     private function reserverEtPreparer(string $ws, string $inscriptionId, DateTimeImmutable $maintenant): string|array
     {
@@ -253,10 +259,31 @@ final class Sequenceur
         $references = $ins->fil_references === null || trim((string) $ins->fil_references) === '' ? [] : explode(' ', trim((string) $ins->fil_references));
         $inReplyTo = $references === [] ? null : $references[array_key_last($references)];
 
+        $repris = false;
         $messageId = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
         if ($messageId === null) {
-            // Ligne « reserve » récente : une autre exécution est en cours (les lignes anciennes sont reprises par `reserver`).
+            $messageId = $this->reprendre($ins, $rang, $maintenant);
+            $repris = $messageId !== null;
+        }
+        if ($messageId === null) {
+            // Ligne « reserve » récente : une autre exécution est en cours. On repousse l'échéance à l'heure de reprise
+            // pour ne pas occuper une des places de `executer` à chaque passage.
+            $maj = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')->value('maj_le');
+            if ($maj !== null) {
+                $this->echeance($ins, (new DateTimeImmutable((string) $maj))->modify('+' . self::RESERVATION_REPRISE_HEURES . ' hours'));
+            }
+
             return self::DEJA;
+        }
+        if ($repris) {
+            // Reprise : si la passerelle avait DÉJÀ accepté le message, il est parti. On conclut « envoyé » sans renvoyer et sans
+            // repasser les gardes (un refus tardif ne doit pas écraser un envoi réel) ; la garde de l'étape suivante jouera ensuite.
+            $cle = 'seq-' . $ins->id . '-' . $rang;
+            $depot = $this->depot ?? new DepotSocleDb;
+            if ($depot->etatInjection($ws, $cle) === 'acceptee') {
+                return ['ins' => $ins, 'rang' => $rang, 'version' => $version, 'messageId' => $messageId, 'references' => $references, 'fenetre' => $fenetre,
+                    'message' => null, 'accepteId' => $depot->idInjection($ws, $cle) ?? 'inconnu'];
+            }
         }
 
         $fiche = $this->fiches->lire($ws, (int) $ins->contact_id);
@@ -291,6 +318,7 @@ final class Sequenceur
 
         return [
             'ins' => $ins, 'rang' => $rang, 'version' => $version, 'messageId' => $messageId, 'references' => $references, 'fenetre' => $fenetre,
+            'accepteId' => null,
             'message' => new MessageAEnvoyer($ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, 'seq-' . $ins->id . '-' . $rang),
         ];
     }
@@ -366,6 +394,7 @@ final class Sequenceur
     }
 
     /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
+    /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
     private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, DateTimeImmutable $maintenant): ?string
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
@@ -390,7 +419,16 @@ final class Sequenceur
         if ($repris === 1) {
             return $messageId;
         }
-        // Ligne « reserve » ancienne : reprise (on réclame la ligne en avançant `maj_le`, une seule exécution gagne) avec le MÊME Message-ID.
+
+        return null;
+    }
+
+    /**
+     * Reprise d'une ligne « reserve » ANCIENNE (plantage entre la réservation et l'appel, ou entre l'appel et la conclusion) :
+     * on réclame la ligne en avançant `maj_le` (une seule exécution gagne) et on garde le MÊME Message-ID. null = pas de reprise.
+     */
+    private function reprendre(\stdClass $ins, int $rang, DateTimeImmutable $maintenant): ?string
+    {
         $reprise = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
             ->where('maj_le', '<', $maintenant->modify('-' . self::RESERVATION_REPRISE_HEURES . ' hours')->format('c'))
             ->update(['maj_le' => $maintenant->format('c')]);
@@ -443,7 +481,7 @@ final class Sequenceur
         $reports = (int) $ins->reports + 1; // la ligne est verrouillée par `traiter` : pas de course
         if ($reports >= self::REPORTS_MAX) {
             DB::table('envoi_inscriptions')->where('id', $ins->id)->update(['reports' => $reports]);
-            $this->alertes[] = ['envoi.sequenceur_reports_epuises : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'reports' => $reports, 'dernier_motif' => $motif]];
+            $this->alertes[] = ['envoi.sequenceur_reports_epuises : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'reports' => $reports, 'dernier_motif' => $motif], 'critical'];
             DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)
                 ->update(['statut' => 'refuse', 'refus' => $motif, 'maj_le' => $maintenant->format('c')]);
 
@@ -459,7 +497,8 @@ final class Sequenceur
     /** Issue incertaine : inscription arrêtée (jamais reportée) et UNE alerte critique. */
     private function arreterIssueIncertaine(\stdClass $ins, ?string $erreur, DateTimeImmutable $maintenant): string
     {
-        $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $erreur]];
+        // L'alerte CRITIQUE de l'incident est celle de la passerelle (une seule) : ici, simple trace d'avertissement.
+        $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée en attente de vérification.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $erreur], 'warning'];
 
         return $this->arreter($ins, self::MOTIF_ISSUE_INCERTAINE, $maintenant);
     }

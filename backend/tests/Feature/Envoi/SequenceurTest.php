@@ -947,7 +947,7 @@ test('B1 : refus net, report ou issue incertaine du serveur => l\'étape n\'avan
     [, $c2] = seqFiche($this, 'b1b@zz-client.example.invalid');
     $i2 = seqInscrire($this, $sid, $c2);
     $inc = seqAvecServeur($this, new ServeurEspion(fn () => ResultatInjection::incertain(new DateTimeImmutable('2026-11-17'))));
-    Log::shouldReceive('critical')->twice()->andReturnUsing(function () use (&$niveauAlerte) {
+    Log::shouldReceive('warning')->twice()->andReturnUsing(function () use (&$niveauAlerte) {
         $niveauAlerte = DB::transactionLevel();
     });
     expect($inc->traiter($this->ws, $i2, $this->maintenant))->toBe(Sequenceur::ARRETEE);
@@ -1037,7 +1037,7 @@ test('issue incertaine en SMTP direct : inscription ARRÊTÉE d\'emblée (aucun 
         ->and($espion->appels)->toBe(1)
         ->and((int) seqEtat($i)->reports)->toBe(0)
         ->and(seqMessages($i)[0]->statut)->not->toBe('reporte');
-    Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'sequenceur_issue_incertaine'))->once();
+    Log::shouldHaveReceived('warning')->withArgs(fn ($m) => str_contains($m, 'sequenceur_issue_incertaine'))->once();
 });
 
 test('coupure après la réservation de la passerelle (SMTP direct) : InjectionIncertaine => arrêt + alerte ; une AUTRE exception (avant réservation) n\'arrête rien', function () {
@@ -1069,16 +1069,45 @@ test('refus CERTAIN avant tout envoi (EnvoiSmtpRefuse) : ni arrêt, ni alerte «
     Log::shouldNotHaveReceived('critical');
 });
 
-test('tout report issu de l\'injection passe par le plafond : au plafond, refus + arrêt + alerte', function () {
+test('report d\'ÉCHEC (refus temporaire avant envoi) : compté et plafonné => au plafond, refus + arrêt + alerte', function () {
     Log::spy();
     $sid = seqSequence($this);
     [, $c] = seqFiche($this, 'plaf@zz-client.example.invalid');
     $i = seqInscrire($this, $sid, $c);
     DB::table('envoi_inscriptions')->where('id', $i)->update(['reports' => Sequenceur::REPORTS_MAX - 1]);
-    $seq = seqViaPasserelle($this, new ServeurEspion(fn () => ResultatInjection::reporte(new DateTimeImmutable('tomorrow'))));
+    $seq = seqViaPasserelle($this, new ServeurEspion(fn () => throw EnvoiSmtpRefuse::motif('hôte injoignable')));
     expect($seq->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::REFUSE)
         ->and(seqEtat($i)->motif_arret)->toBe(Sequenceur::MOTIF_REPORTS_EPUISES);
     Log::shouldHaveReceived('critical')->once();
+});
+
+/** Rejoue `traiter` sur 15 jours ouvrés : chaque passage est un report d'ATTENTE. */
+function seqQuinzeJoursDAttente(object $t, string $i, Closure $serveur): void
+{
+    for ($jour = 0; $jour < 15; $jour++) {
+        $t->maintenant = new DateTimeImmutable((string) DB::table('envoi_inscriptions')->where('id', $i)->value('prochaine_echeance'));
+        expect(seqViaPasserelle($t, $serveur())->traiter($t->ws, $i, $t->maintenant))->toBe(Sequenceur::REPORTE);
+    }
+}
+
+test('15 jours de quota plein (plafond du jour atteint) : l\'inscription reste ACTIVE, aucun échec compté, aucune alerte', function () {
+    Log::spy();
+    $sid = seqSequence($this);
+    [, $c] = seqFiche($this, 'att1@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $c);
+    seqQuinzeJoursDAttente($this, $i, fn () => new ServeurEspion(fn () => ResultatInjection::reporte(new DateTimeImmutable('tomorrow'))));
+    expect(seqEtat($i)->statut)->toBe('active')->and((int) seqEtat($i)->reports)->toBe(0)->and((int) seqEtat($i)->echecs)->toBe(0);
+    Log::shouldNotHaveReceived('critical');
+});
+
+test('15 jours de mode témoins / envoi réel éteint / arrêt général (EnvoiRefuse) : inscription ACTIVE, compteurs à zéro, aucune alerte', function () {
+    Log::spy();
+    $sid = seqSequence($this);
+    [, $c] = seqFiche($this, 'att2@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $c);
+    seqQuinzeJoursDAttente($this, $i, fn () => new ServeurEspion(fn () => throw EnvoiRefuse::horsTemoins()));
+    expect(seqEtat($i)->statut)->toBe('active')->and((int) seqEtat($i)->reports)->toBe(0)->and((int) seqEtat($i)->echecs)->toBe(0);
+    Log::shouldNotHaveReceived('critical');
 });
 
 test('ligne « reserve » ancienne reprise par le rejeu : message ACCEPTÉ mais conclusion perdue => conclue SANS renvoyer, étape avancée', function () {
@@ -1108,8 +1137,35 @@ test('ligne « reserve » ancienne SANS réservation côté passerelle (plantage
     expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::DEJA) // récente : en cours ailleurs
         ->and($espion->appels)->toBe(0);
 
+    // Le temps passe : la ligne a maintenant plus d'une heure et l'échéance (repoussée à l'heure de reprise) est échue.
     DB::table('envoi_messages')->where('inscription_id', $i)->update(['maj_le' => $vieux]);
+    DB::table('envoi_inscriptions')->where('id', $i)->update(['prochaine_echeance' => $this->maintenant->format('c')]);
     expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ENVOYE)
         ->and($espion->appels)->toBe(1)
         ->and(seqMessages($i)[0]->message_id)->toBe('<m1@' . SEQ_DOMAINE . '>'); // MÊME Message-ID
+});
+
+test('reprise : message DÉJÀ accepté par la passerelle, mais la garde refuse maintenant (opposition tardive) => conclu « envoyé », jamais « refuse », pas de renvoi', function () {
+    $sid = seqSequence($this);
+    [, $c] = seqFiche($this, 'tard@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $c);
+    $espion = new ServeurEspion(fn () => ResultatInjection::accepte('id-tard'));
+    expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ENVOYE);
+    DB::table('envoi_messages')->where('inscription_id', $i)->update(['statut' => 'reserve', 'id_injection' => null, 'maj_le' => $this->maintenant->modify('-3 hours')->format('c')]);
+    DB::table('envoi_inscriptions')->where('id', $i)->update(['statut' => 'active', 'etape_courante' => 1, 'prochaine_echeance' => $this->maintenant->format('c')]);
+    ListeSuppression::inscrire('tard@zz-client.example.invalid', 'complaint', 'zz-test'); // la garde refuserait désormais
+
+    expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ENVOYE)
+        ->and(seqMessages($i)[0]->statut)->toBe('envoye')->and(seqMessages($i)[0]->id_injection)->toBe('id-tard')
+        ->and($espion->appels)->toBe(1);
+});
+
+test('ligne « reserve » récente : DEJA, et l\'échéance est repoussée à l\'heure de reprise (elle n\'occupe plus une place de executer)', function () {
+    $sid = seqSequence($this);
+    [, $c] = seqFiche($this, 'rec@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $c);
+    $recent = $this->maintenant->modify('-5 minutes');
+    DB::table('envoi_messages')->insert(['workspace_id' => $this->ws, 'inscription_id' => $i, 'etape' => 1, 'statut' => 'reserve', 'message_id' => '<r@' . SEQ_DOMAINE . '>', 'cree_le' => $recent->format('c'), 'maj_le' => $recent->format('c')]);
+    expect(seqAvecServeur($this, new ServeurEspion(fn () => ResultatInjection::accepte('x')))->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::DEJA);
+    expect(new DateTimeImmutable((string) seqEtat($i)->prochaine_echeance))->toEqual($recent->modify('+' . Sequenceur::RESERVATION_REPRISE_HEURES . ' hours'));
 });

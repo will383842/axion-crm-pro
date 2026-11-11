@@ -39,11 +39,17 @@ return new class extends Migration
                 WHERE commande = 'injection_confirmee' AND cle_idempotence IS NOT NULL;
             -- Libération : conclusion `liberee` ET décrément du compteur global dans UN seul acte, une fois par réservation
             -- (l'index unique des conclusions fait foi) ; jamais de décrément sans réservation ni sans conclusion posée.
+            -- Ancienne version de travail (jamais déployée) : retirée, la nouvelle fonction la remplace.
+            DROP FUNCTION IF EXISTS envoi_compteur_global_liberer(DATE);
             CREATE OR REPLACE FUNCTION envoi_injection_liberer(p_ws UUID, p_cle TEXT) RETURNS boolean AS $f$
             DECLARE
                 v_jour DATE;
                 v_n INTEGER;
             BEGIN
+                -- L'espace de la clé doit être l'espace courant (RLS) : jamais de libération pour un autre espace.
+                IF p_ws::TEXT IS DISTINCT FROM NULLIF(current_setting('app.current_workspace_id', true), '') THEN
+                    RETURN false;
+                END IF;
                 SELECT jour INTO v_jour FROM public.envoi_journal_commandes
                     WHERE workspace_id = p_ws AND commande = 'injection' AND cle_idempotence = p_cle;
                 IF v_jour IS NULL THEN

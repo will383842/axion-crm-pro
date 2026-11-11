@@ -371,3 +371,21 @@ test('rejeu depuis « a_verifier » : un refus définitif ne libère PAS la plac
     expect(fn () => ($this->passerelle)($serveur)->injecter(($this->msg)()))->toThrow(RefusDefinitifServeur::class);
     expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
 });
+
+test('la libération refuse une clé d\'un AUTRE espace que le contexte courant', function () {
+    $autre = F::espace('zz-ric-c');
+    $this->depot->reserverInjection($autre, $this->jour, 'k9', $this->jour);
+    // Le contexte courant est $this->ws : la fonction (SECURITY DEFINER) ne doit rien libérer pour $autre.
+    expect((bool) DB::selectOne('SELECT envoi_injection_liberer(?::uuid, ?) AS ok', [$autre, 'k9'])->ok)->toBeFalse();
+    expect($this->depot->etatInjection($autre, 'k9'))->toBe('reservee');
+});
+
+test('ligne « acceptee » sans identifiant en SMTP direct : le serveur n\'est JAMAIS rappelé', function () {
+    DB::table('envoi_journal_commandes')->insert([
+        'workspace_id' => $this->ws, 'commande' => 'injection', 'auteur' => 'passerelle', 'jour' => '2026-11-17',
+        'cle_idempotence' => 'k1', 'statut' => 'acceptee', 'cree_le' => $this->jour->format('c'),
+    ]);
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('autre'));
+    expect(($this->passerelle)($serveur)->injecter(($this->msg)())->accepte)->toBeTrue()
+        ->and($serveur->appels)->toBe(0);
+});

@@ -13,10 +13,13 @@ namespace App\Envoi\Imap;
  *  2. analyse échouée (UTF-8 invalide, limite PCRE) : STOP par prudence, jamais « réponse humaine » ;
  *  3. auto-réponse déclarée par en-tête normalisé (RFC 3834 : Auto-Submitted, X-Autoreply, Precedence: auto_reply) ;
  *  3b. message reçu sur abuse@ : plainte ;
+ *  3c. auto-réponse devinée (objet « absent », « congé », « accusé de réception » ; `Precedence: bulk/junk`) dont le
+ *     texte est LONG (plus de 40 caractères) : classée en absence AVANT la recherche d'un STOP, car un message
+ *     d'absence ou un accusé cite souvent « se désinscrire » dans son pied de page, et un faux STOP arrêterait toute
+ *     l'entreprise (D1). Un texte COURT (« STOP ») sous un objet d'absence reste un STOP : prudence ;
  *  4. STOP / désinscription (mots-clés fr/en, texte NON cité seulement) : STOP PRIME ;
  *  5. hostile (menace, avocat, « porter plainte »…) — traité comme une plainte ;
- *  6. auto-réponse devinée (objet « absent », « congé » ; `Precedence: bulk/junk`) : heuristique FAIBLE,
- *     donc après 4 et 5 — jamais avant la recherche d'un STOP ;
+ *  6. auto-réponse devinée (mêmes indices, texte court) : heuristique FAIBLE, donc après 4 et 5 ;
  *  7. sinon : réponse humaine.
  *
  * Les erreurs vont toujours dans le sens PRUDENT : un faux « STOP » arrête un
@@ -43,7 +46,11 @@ final class Classificateur
     private const OBJETS_AUTO = [
         'absence', 'absent', 'out of office', 'automatic reply', 'auto reply', 'autoreply',
         'auto-reply', 'reponse automatique', 'reponse automatique', 'conge', 'vacation',
+        'accuse de reception', 'accuse reception', 'delivery receipt', 'read receipt',
     ];
+
+    /** Au-delà, un message à objet d'absence est une vraie réponse automatique (D1) ; en dessous, c'est peut-être un STOP. */
+    private const TEXTE_COURT_MAX = 40;
 
     /**
      * @param  list<string>  $nosDomaines  domaines d'envoi de l'espace : seuls leurs `abuse@` valent plainte
@@ -98,14 +105,16 @@ final class Classificateur
             throw new EchecAnalyse('Texte non UTF-8.');
         }
         $texte = self::normaliser(self::texteNonCite($m->corps) . ' ' . $m->sujet);
+        if (self::estAutoReponseDevinee($m) && mb_strlen(trim(self::normaliser(self::texteNonCite($m->corps)))) > self::TEXTE_COURT_MAX) {
+            return ClasseRetour::AutoReponse; // absence / accusé : jamais un STOP ni une plainte (D1)
+        }
         if (self::contient($texte, self::MOTS_STOP)) {
             return ClasseRetour::Desinscription;
         }
         if (self::contient($texte, self::MOTS_HOSTILES)) {
             return ClasseRetour::Hostile;
         }
-        if (self::contient(self::normaliser($m->sujet), self::OBJETS_AUTO)
-            || in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['bulk', 'junk'], true)) {
+        if (self::estAutoReponseDevinee($m)) {
             return ClasseRetour::AutoReponse;
         }
 
@@ -130,6 +139,12 @@ final class Classificateur
         }
 
         return false;
+    }
+
+    private static function estAutoReponseDevinee(MessageBrut $m): bool
+    {
+        return self::contient(self::normaliser($m->sujet), self::OBJETS_AUTO)
+            || in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['bulk', 'junk'], true);
     }
 
     private static function estAutoReponseDeclaree(MessageBrut $m): bool

@@ -28,7 +28,6 @@ use App\Envoi\Imap\ReleveImap;
 use App\Envoi\Imap\Verp;
 use App\Support\ListeSuppression;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
@@ -39,8 +38,18 @@ uses(TestCase::class, RefreshDatabase::class);
 function d1Msg(int $uid, string $sujet, string $corps, array $entetes = [], ?string $dsn = null, ?string $dest = null, array $locales = []): MessageBrut
 {
     return new MessageBrut(
-        $uid, "d1-{$uid}@retour.exemple.test", 'envoi-d1@d.exemple.test', [], 'contact@client.exemple.test',
-        new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('UTC')), $sujet, $corps, $entetes, $dsn, null, $dest,
+        $uid,
+        "d1-{$uid}@retour.exemple.test",
+        'envoi-d1@d.exemple.test',
+        [],
+        'contact@client.exemple.test',
+        new DateTimeImmutable('2026-12-02 10:00:00', new DateTimeZone('UTC')),
+        $sujet,
+        $corps,
+        $entetes,
+        $dsn,
+        null,
+        $dest,
         adressesLocales: $locales,
     );
 }
@@ -98,7 +107,7 @@ test('absence : une réponse automatique qui contient des mots de désinscriptio
     expect(Classificateur::classer(d1Msg(1, $sujet, $corps)))->toBe(ClasseRetour::AutoReponse);
 })->with([
     'absence + unsubscribe en pied' => ['Absence du bureau', "Je suis absent jusqu'au 15 décembre.\nTo unsubscribe from this list, click here."],
-    'out of office + stop' => ['Out of office: Re: votre offre', "I am away until Monday. For urgent matters, do not wait: call the front desk. Please stop by next week."],
+    'out of office + stop' => ['Out of office: Re: votre offre', 'I am away until Monday. For urgent matters, do not wait: call the front desk. Please stop by next week.'],
     'congé + ne plus recevoir (pied de page)' => ['Réponse automatique : congé', "Je suis en congé jusqu'au 3 janvier, je vous répondrai à mon retour. Vous pouvez demander à ne plus recevoir nos lettres d'information via le lien du pied de page."],
     'accusé de réception' => ['Accusé de réception automatique', 'Votre message a bien été reçu. Pour vous désinscrire de nos notifications, cliquez ici.'],
 ]);
@@ -129,16 +138,24 @@ test('absence : de bout en bout, aucune opposition ni arrêt de l\'entreprise', 
 
 // ── 3. L'injection n'a pas de doublon ────────────────────────────────────────────────────────────────────
 
-test('injection : un même destinataire ne peut pas être enregistré deux fois pour une même injection', function () {
+test('injection : plusieurs lignes du MÊME destinataire pour une injection = une seule origine, sans doublon d\'effet', function () {
+    config(['envoi.cle_empreinte' => 'cle-de-test-d1']);
     $inj = d1Injection($this->ws);
-    $ligne = fn (string $mid) => [
-        'workspace_id' => $this->ws, 'message_id_empreinte' => hash('sha256', 'mid:' . $mid),
-        'id_injection' => $inj, 'empreinte_destinataire' => ListeSuppression::empreinte('contact@client.exemple.test'),
-    ];
-    DB::table('envoi_messages_envoyes')->insert($ligne('a@d.exemple.test'));
+    foreach (['a', 'b'] as $mid) {
+        DB::table('envoi_messages_envoyes')->insert([
+            'workspace_id' => $this->ws, 'message_id_empreinte' => hash('sha256', "mid:{$mid}@d.exemple.test"),
+            'id_injection' => $inj, 'empreinte_destinataire' => ListeSuppression::empreinte('contact@client.exemple.test'),
+        ]);
+    }
+    $registre = new RegistreMessagesEnvoyesDb(fn () => 'contact@client.exemple.test');
+    $lecteur = new LecteurBoiteMemoire;
+    $lecteur->deposer('boite-d1', d1Msg(1, 'Re: offre', 'Bonjour, oui, rappelez-moi s\'il vous plaît.'));
+    $releve = new ReleveImap($lecteur, $registre, new RecepteurRetoursEnChaine);
+    $releve->relever($this->ws, 'boite-d1');
+    $releve->relever($this->ws, 'boite-d1'); // rejeu de la relève
 
-    expect(fn () => DB::table('envoi_messages_envoyes')->insert($ligne('b@d.exemple.test')))->toThrow(QueryException::class);
-    expect(DB::table('envoi_messages_envoyes')->where('id_injection', $inj)->count())->toBe(1);
+    expect($registre->retrouverParInjection($this->ws, $inj)?->adresse)->toBe('contact@client.exemple.test')
+        ->and(DB::table('envoi_evenements')->where('classe', 'reponse_humaine')->count())->toBe(1);
 });
 
 test('injection : plusieurs destinataires DIFFÉRENTS restent ambigus (retour « à rattacher »)', function () {

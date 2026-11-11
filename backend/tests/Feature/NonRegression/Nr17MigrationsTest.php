@@ -74,6 +74,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_01_000030_envoi_temoins_journees.php',
     // Envoi L8-F07a : table des reculs de chauffe, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait l'historique des reculs ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_01_000040_envoi_chauffe_reculs.php',
+    // Filet modifié : pourquoi — envoi D1 : fonction IMMUTABLE + index d'expression sur l'empreinte des contacts (ajout seul, IF NOT EXISTS) ; down() inerte (retirer l'index ne se fait pas dans ce plan), up() rejouable.
+    '2026_12_02_000200_contacts_index_empreinte_email.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

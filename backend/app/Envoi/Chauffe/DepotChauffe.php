@@ -441,7 +441,7 @@ final class DepotChauffe
                 return false;
             }
         }
-        $effectifs = BudgetChauffe::joursEffectifs($this->volumesParJour($ws, $ressource, $civil, $ressourceType));
+        $effectifs = BudgetChauffe::joursEffectifs($this->volumesParJour($ws, $ressource, $civil, $ressourceType), Seuils::JOUR_EFFECTIF_PART, $reculs);
         if (CourbeChauffe::palierEtendu(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $civil)) === 'P1') {
             throw ReculRefuse::dejaAuPlusBas($ressourceType, $ressource);
         }

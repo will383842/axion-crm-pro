@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\EnvoiConformiteController;
 use App\Http\Controllers\Api\EnvoiOppositionExportController;
+use App\Http\Controllers\Api\EnvoiOppositionManuelleController;
 use App\Http\Controllers\Api\EnvoiPuisJeEcrireController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,3 +19,7 @@ Route::get('/envoi/opposition/export', EnvoiOppositionExportController::class)
     ->middleware(['permission:workspaces.manage', 'permission:data.export', 'throttle:envoi-opposition-export']);
 Route::post('/envoi/puis-je-ecrire', EnvoiPuisJeEcrireController::class)
     ->middleware(['permission:users.manage', 'throttle:envoi-puis-je-ecrire']);
+
+// R13 : inscription MANUELLE au registre d'opposition (adresse, organisation, domaine). Propriétaire seul ; n'envoie rien.
+Route::post('/envoi/opposition', EnvoiOppositionManuelleController::class)
+    ->middleware('permission:workspaces.manage');

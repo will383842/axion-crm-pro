@@ -40,7 +40,7 @@ function r13Nominal(object $t, string $ws, string $adresse): DemandeEnvoi
         'achete_le' => $now->modify('-30 days')->format('Y-m-d'), 'dmarc_verifie_le' => $d, 'spf_verifie_le' => $d, 'dkim_verifie_le' => $d,
     ]);
 
-    return new DemandeEnvoi($ws, $adresse, [['verification' => 'valide']], 'FR', '552081317', 'zz-envoi.example.invalid',
+    return new DemandeEnvoi($ws, $adresse, [['verification' => 'valide']], 'FR', '123456782', 'zz-envoi.example.invalid',
         'ZZ Expediteur SAS', $now->modify('-5 days'), null, 'federations', true);
 }
 
@@ -71,7 +71,7 @@ test('entrées refusées en 422 : portée inconnue, motif vide/trop long/avec ad
     'domaine mal formé' => [['portee' => 'domaine', 'valeur' => 'pas un domaine', 'motif' => 'x']],
     'domaine sans point' => [['portee' => 'domaine', 'valeur' => 'localhost', 'motif' => 'x']],
     'organisation pas un SIREN' => [['portee' => 'organisation', 'valeur' => 'ABC', 'motif' => 'x']],
-    'organisation SIREN à clé fausse' => [['portee' => 'organisation', 'valeur' => '552081318', 'motif' => 'x']],
+    'organisation SIREN à clé fausse' => [['portee' => 'organisation', 'valeur' => '123456783', 'motif' => 'x']],
 ]);
 
 test('domaine de messagerie grand public refusé en portée domaine (422 expliqué), sous-domaines compris', function (string $domaine) {
@@ -95,7 +95,7 @@ test('domaine inscrit : EnvoiAutorise refuse toute adresse du domaine et de ses 
 });
 
 test('organisation inscrite (SIREN) : EnvoiAutorise refuse toute adresse de cette organisation', function () {
-    $this->actingAs($this->proprio)->postJson(R13_URI, ['portee' => 'organisation', 'valeur' => '552 081 317', 'motif' => 'Demande de la direction'])->assertCreated();
+    $this->actingAs($this->proprio)->postJson(R13_URI, ['portee' => 'organisation', 'valeur' => '123 456 782', 'motif' => 'Demande de la direction'])->assertCreated();
     $d = r13Nominal($this, $this->espace->id, 'x@zz-client.example.invalid');
     expect(EnvoiAutorise::verifier($d, r13Maintenant())->refus)->toBe(EnvoiAutorise::OPPOSITION_REGISTRE);
 });

@@ -208,3 +208,13 @@ test('boîtes : domaine rouge => boîte non verte ; pause d’une seule messager
     $b = lireSanteContrat($this, $user2)['boites'][0];
     expect($b)->toMatchArray(['etat' => 'gris', 'statut' => 'inconnu', 'domaine_id' => null]);
 });
+
+test('arrêt général armé : boîtes suspendues et volume possible du jour à 0 (rien ne peut partir)', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    DB::table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'tout_arreter' => true]);
+    $j = lireSanteContrat($this, $user);
+
+    expect($j['boites'][0])->toMatchArray(['etat' => 'rouge', 'statut' => 'suspendue'])
+        ->and($j['volume_jour']['possibles'])->toBe(0);
+});

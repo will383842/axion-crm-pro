@@ -40,7 +40,7 @@ final class VueSante
         $constatsEspace = $this->sante->constatsOuverts($ws, SuperviseurSante::ESPACE);
         $santeConnue = array_filter($serveurs, static fn (array $s): bool => $s['etat'] !== self::GRIS) !== [];
         $domaines = $this->domaines($ws, $toutEstFreine);
-        $boites = $this->boites($ws, $jour, $domaines, $toutEstFreine, $santeConnue);
+        $boites = $this->boites($ws, $jour, $domaines, $toutEstFreine, $santeConnue, $arret);
         $test = $this->testDuMatin($ws, $jour);
 
         // Le pire feu l'emporte : rouge > ambre > gris (inconnu) > vert. Aucun serveur déclaré = on ne sait pas (gris), sans masquer un rouge.
@@ -106,7 +106,7 @@ final class VueSante
      * @param  list<array<string, mixed>>  $domaines
      * @return list<array<string, mixed>>
      */
-    private function boites(string $ws, DateTimeImmutable $jour, array $domaines, bool $toutEstFreine, bool $santeConnue): array
+    private function boites(string $ws, DateTimeImmutable $jour, array $domaines, bool $toutEstFreine, bool $santeConnue, bool $arretGeneral = false): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->orderBy('adresse')->get(['id', 'adresse', 'etat', 'limite_jour']));
         $c = $this->chauffe->chiffresParBoite($ws, $jour);
@@ -119,7 +119,7 @@ final class VueSante
             $feuDomaine = $domaine['etat'] ?? self::GRIS; // domaine non enregistré dans l'espace : inconnu
             // Une pause visant une seule messagerie ne change pas l'état de la boîte : elle se lit dans le rythme par messagerie.
             [$etat, $statut] = match (true) {
-                (string) $b->etat === 'en_pause' => ['rouge', 'suspendue'],
+                $arretGeneral || (string) $b->etat === 'en_pause' => ['rouge', 'suspendue'], // arrêt général : rien ne peut partir
                 $toutEstFreine || $feuDomaine === 'rouge' => ['rouge', 'ralentie'],
                 $feuDomaine === 'ambre' => ['ambre', 'ralentie'],
                 ! $santeConnue || $feuDomaine === self::GRIS => [self::GRIS, 'inconnu'], // on ne sait pas : jamais « prête »

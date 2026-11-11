@@ -17,7 +17,7 @@ function moi() {
     user: { id: u.id, name: u.name, email: u.email, current_workspace_id: espace.id, totp_enabled_at: u.totp_enabled_at, role: u.role },
     workspace: { id: espace.id, name: espace.name },
     // Démo : le compte montré est celui du propriétaire (droits d'export et de traitement RGPD).
-    permissions: ['rgpd.view', 'rgpd.handle', 'data.export', 'contacts.view_pii', 'rgpd.view_pii'],
+    permissions: ['rgpd.view', 'rgpd.handle', 'users.manage', 'workspaces.manage', 'data.export', 'contacts.view_pii', 'rgpd.view_pii'],
   };
 }
 

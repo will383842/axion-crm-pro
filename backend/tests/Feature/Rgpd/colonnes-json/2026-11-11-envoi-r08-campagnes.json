@@ -1,0 +1,4 @@
+{
+    "envoi_campagnes.cible": "hors-portee: référence de la cible de l'espace (type, identifiant de liste/audience/étiquette/carnet, libellé) ; aucune adresse e-mail (CHECK sans « @ »), jamais une valeur de personne",
+    "envoi_campagnes.saisie": "hors-portee: brouillon de configuration de la campagne saisi par l'espace (objet JSON borné à 64 Ko, jamais une liste de destinataires) ; l'espace ne saisit aucune donnée de personne dedans, les destinataires viennent de la cible"
+}

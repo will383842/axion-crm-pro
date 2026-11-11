@@ -141,7 +141,7 @@ describe('jeu factice — la garde a bien quelque chose sous les yeux', () => {
       'salon-artisans-2026',
       'Organisateurs Rhône-Alpes',
       'prospection-a.example',
-      'will@prospection-b.example',
+      'camille@prospection-b.example',
     ]) {
       const [prenom, ...reste] = repere.split(' ');
       // Les personnes sont rangées en prénom / nom séparés : on cherche les deux.

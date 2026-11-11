@@ -4,7 +4,7 @@
  * par destinataire, 30 jours d'événements d'envoi, 60 réponses, messages
  * types versionnés, règles d'alerte, désinscriptions, registre d'opposition.
  *
- * Décision de Will (01/11/2026) : les OUVERTURES sont mesurées quand la
+ * Décision du propriétaire (01/11/2026) : les OUVERTURES sont mesurées quand la
  * campagne coche « Suivre les ouvertures ». Chaque ouverture est datée, par
  * destinataire, et marquée `automatique_probable` quand elle vient
  * vraisemblablement d'un relais (protection d'Apple, relais d'images,
@@ -59,7 +59,7 @@ export const BOITES_DEMO: Boite[] = [
   { id: 'boi-claire', adresse: 'claire@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Claire · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 32, taux_refus: 0.6, reponses_7j: 4, chauffe: null },
   { id: 'boi-sophie', adresse: 'sophie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Sophie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 28, taux_refus: 0.4, reponses_7j: 2, chauffe: null },
   { id: 'boi-lucie', adresse: 'lucie@prospection-a.example', domaine_id: 'dom-a', nom_affiche: 'Lucie · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 40, envoyes_aujourdhui: 21, taux_refus: 0.8, reponses_7j: 3, chauffe: null },
-  { id: 'boi-will', adresse: 'will@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Will · Axion (démo)', etat: 'ambre', statut: 'ralentie', quota_jour: 20, envoyes_aujourdhui: 12, taux_refus: 3, reponses_7j: 1, chauffe: null },
+  { id: 'boi-camille', adresse: 'camille@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Camille · Axion (démo)', etat: 'ambre', statut: 'ralentie', quota_jour: 20, envoyes_aujourdhui: 12, taux_refus: 3, reponses_7j: 1, chauffe: null },
   { id: 'boi-nina', adresse: 'nina@prospection-b.example', domaine_id: 'dom-b', nom_affiche: 'Nina · Axion (démo)', etat: 'vert', statut: 'prete', quota_jour: 30, envoyes_aujourdhui: 9, taux_refus: 1.1, reponses_7j: 1, chauffe: null },
   { id: 'boi-paul', adresse: 'paul@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Paul · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 8, taux_refus: 0, reponses_7j: 0, chauffe: { jour: 6, sur: 30, plafond_aujourdhui: 10 } },
   { id: 'boi-hugo', adresse: 'hugo@prospection-c.example', domaine_id: 'dom-c', nom_affiche: 'Hugo · Axion (démo)', etat: 'bleu', statut: 'en_chauffe', quota_jour: 10, envoyes_aujourdhui: 6, taux_refus: 0, reponses_7j: 0, chauffe: { jour: 6, sur: 30, plafond_aujourdhui: 10 } },
@@ -110,7 +110,7 @@ interface DefCampagne {
 }
 
 const CAMPAGNES: ReadonlyArray<DefCampagne> = [
-  { nom: 'Organisateurs Rhône-Alpes', statut: 'en_cours', cible: { type: 'audience', reference: '2', libelle: 'Audience · Organisateurs Rhône-Alpes', total: 290 }, envoyes: 168, etapes: 3, ab: true, suivre: true, prochain: ilYa(0, 14, 0), depuis: 9, duree: 9, boites: ['boi-claire', 'boi-will', 'boi-paul'], reponses: 9, interessees: 3 },
+  { nom: 'Organisateurs Rhône-Alpes', statut: 'en_cours', cible: { type: 'audience', reference: '2', libelle: 'Audience · Organisateurs Rhône-Alpes', total: 290 }, envoyes: 168, etapes: 3, ab: true, suivre: true, prochain: ilYa(0, 14, 0), depuis: 9, duree: 9, boites: ['boi-claire', 'boi-camille', 'boi-paul'], reponses: 9, interessees: 3 },
   { nom: 'Fédérations — début d’année', statut: 'programmee', cible: { type: 'etiquette', reference: 'salon-artisans-2026', libelle: 'Étiquette · salon-artisans-2026', total: 388 }, envoyes: 0, etapes: 2, ab: false, suivre: false, prochain: '2027-01-13T08:00:00.000Z', depuis: 0, duree: 0, boites: ['boi-claire', 'boi-sophie', 'boi-lucie'], reponses: 0, interessees: 0 },
   { nom: 'Presse régionale AURA', statut: 'a_valider', cible: { type: 'audience', reference: '3', libelle: 'Audience · Audience presse AURA', total: 186 }, envoyes: 0, etapes: 1, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: ['boi-sophie'], reponses: 0, interessees: 0 },
   { nom: 'Commerces de Vienne', statut: 'en_pause', cible: { type: 'liste', reference: '1', libelle: 'Liste · Invités salon', total: 127 }, envoyes: 64, etapes: 2, ab: false, suivre: true, prochain: null, depuis: 12, duree: 6, boites: ['boi-lucie'], reponses: 4, interessees: 1 },
@@ -118,7 +118,7 @@ const CAMPAGNES: ReadonlyArray<DefCampagne> = [
   { nom: 'Relance printemps', statut: 'brouillon', cible: { type: 'etiquette', reference: 'relance-printemps', libelle: 'Étiquette · relance-printemps', total: 96 }, envoyes: 0, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },
   { nom: 'Artisans du Pilat', statut: 'terminee', cible: { type: 'audience', reference: '5', libelle: 'Audience · Artisans du Pilat', total: 140 }, envoyes: 140, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 26, duree: 10, boites: ['boi-nina'], reponses: 8, interessees: 2 },
   { nom: 'Salon des artisans de Vienne — exposants', statut: 'en_cours', cible: { type: 'audience', reference: '6', libelle: 'Audience · Exposants potentiels du salon', total: 180 }, envoyes: 75, etapes: 3, ab: true, suivre: false, prochain: ilYa(0, 10, 30), depuis: 5, duree: 5, boites: ['boi-sophie', 'boi-hugo'], reponses: 5, interessees: 2 },
-  { nom: 'Traiteurs et événements', statut: 'arretee', cible: { type: 'audience', reference: '7', libelle: 'Audience · Traiteurs et événements', total: 120 }, envoyes: 40, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 15, duree: 3, boites: ['boi-will'], reponses: 1, interessees: 0 },
+  { nom: 'Traiteurs et événements', statut: 'arretee', cible: { type: 'audience', reference: '7', libelle: 'Audience · Traiteurs et événements', total: 120 }, envoyes: 40, etapes: 2, ab: false, suivre: false, prochain: null, depuis: 15, duree: 3, boites: ['boi-camille'], reponses: 1, interessees: 0 },
   { nom: 'Partenaires 2026 — vœux', statut: 'terminee', cible: { type: 'liste', reference: '3', libelle: 'Liste · Partenaires 2026', total: 96 }, envoyes: 96, etapes: 1, ab: false, suivre: true, prochain: null, depuis: 8, duree: 2, boites: ['boi-claire'], reponses: 11, interessees: 3 },
   { nom: 'Presse spécialisée artisanat', statut: 'programmee', cible: { type: 'liste', reference: '5', libelle: 'Liste · Presse spécialisée artisanat', total: 64 }, envoyes: 0, etapes: 1, ab: false, suivre: true, prochain: '2027-01-19T08:30:00.000Z', depuis: 0, duree: 0, boites: ['boi-nina'], reponses: 0, interessees: 0 },
   { nom: 'Nouveaux commerces de Lyon', statut: 'brouillon', cible: { type: 'audience', reference: '8', libelle: 'Audience · Nouveaux commerces de Lyon', total: 150 }, envoyes: 0, etapes: 1, ab: false, suivre: false, prochain: null, depuis: 0, duree: 0, boites: [], reponses: 0, interessees: 0 },

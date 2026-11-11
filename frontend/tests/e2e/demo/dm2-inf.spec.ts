@@ -17,7 +17,7 @@ import { controleAxe, ouvrirDemo, passage360 } from './outils';
 
 const PAGES: ReadonlyArray<[string, string]> = [
   ['/envoi/boites', 'Boîtes d’envoi'],
-  ['/envoi/boites/boi-will', 'will@prospection-b.example'],
+  ['/envoi/boites/boi-camille', 'camille@prospection-b.example'],
   ['/envoi/domaines', 'Domaines'],
   ['/envoi/domaines/dom-b', 'prospection-b.example'],
   ['/envoi/serveurs', 'Serveurs et adresses IP'],

@@ -36,7 +36,7 @@ const notif = (
 /** Les 6 alertes de la cloche des maquettes (`ALERTES_CLOCHE`), datées sur l'horloge de démo. */
 export function notificationsDemo(): Notification[] {
   return [
-    notif('ntf-1', 'envoi', 'attention', 'Boîte « will@ » ralentie', 'Refus temporaires : 3 %. Plafond divisé par deux.', '/envoi/boites/boi-will', decalage({ minutes: -12 })),
+    notif('ntf-1', 'envoi', 'attention', 'Boîte « camille@ » ralentie', 'Refus temporaires : 3 %. Plafond divisé par deux.', '/envoi/boites/boi-camille', decalage({ minutes: -12 })),
     notif('ntf-2', 'envoi', 'a_faire', '2 réponses intéressées', 'Organisateurs Rhône-Alpes.', '/envoi/reponses', decalage({ minutes: -25 })),
     notif('ntf-3', 'crm', 'a_faire', '12 doublons à vérifier', 'Collecte « Rhône » terminée.', '/doublons', ilYa(0, 7, 40)),
     notif('ntf-4', 'crm', 'attention', 'Demande RGPD : 5 jours restants', 'Droit d’accès. Reçue le 8 janvier.', '/rgpd', ilYa(4, 14, 10)),

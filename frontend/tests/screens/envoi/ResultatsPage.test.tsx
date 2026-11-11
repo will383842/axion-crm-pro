@@ -25,7 +25,7 @@ describe('ResultatsPage — Résultats', () => {
     const user = userEvent.setup();
     await monter();
     const tableau = await screen.findByRole('table', { name: 'Par boîte' });
-    expect(within(tableau).getByText('will@prospection-b.example')).toBeVisible();
+    expect(within(tableau).getByText('camille@prospection-b.example')).toBeVisible();
     await user.click(screen.getByRole('tab', { name: 'Par domaine' }));
     const domaines = await screen.findByRole('table', { name: 'Par domaine' });
     expect(within(domaines).getByText('prospection-a.example')).toBeVisible();

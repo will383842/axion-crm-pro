@@ -7,7 +7,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '@/lib/api';
 import type { components, operations } from '@/features/envoi/api/campagnes';
 
-export type Campagne = components['schemas']['CampagneResume'];
+export type Campagne = components['schemas']['CampagneSuivi'];
 export type Destinataire = components['schemas']['Destinataire'];
 export type EtatDestinataire = components['schemas']['EtatDestinataire'];
 export type StatutCampagne = components['schemas']['StatutCampagne'];

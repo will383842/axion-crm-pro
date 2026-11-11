@@ -302,7 +302,7 @@ components:
       required: false
       description: |
         Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
-        clé (double clic) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+        clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
         Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
       schema: { type: string, minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9._-]+$' }
   schemas:

@@ -41,8 +41,9 @@ final class BudgetChauffe
     /**
      * Jours effectifs d'une RESSOURCE : un jour compte à partir de 50 % du budget de la ressource (10 pour l'IP en P1).
      *
+     * `$reculs` : voir {@see CourbeChauffe::joursEffectifs()} (null = ancienne règle ; liste = rejeu P1-P8 avec reculs).
+     *
      * @param  array<string, int>  $volumes  'Y-m-d' (Paris) => messages envoyés par la ressource ce jour-là
-     *                                       `$reculs` : voir {@see CourbeChauffe::joursEffectifs()} (null = ancienne règle ; liste = rejeu P1-P8 avec reculs).
      * @param  list<DateTimeImmutable>|null  $reculs
      * @return list<DateTimeImmutable>
      */

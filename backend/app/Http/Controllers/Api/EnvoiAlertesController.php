@@ -20,7 +20,7 @@ class EnvoiAlertesController extends ApiController
 
     public function regler(Request $r, string $id, DepotAlertes $depot): JsonResponse
     {
-        $alerte = $depot->regler($this->ws(), (string) $r->user()?->getKey(), $id, (string) ($r->user()?->name ?? 'inconnu'));
+        $alerte = $depot->regler($this->ws(), (string) $r->user()?->getKey(), $id, (string) $r->user()?->name);
 
         return $alerte === null
             ? response()->json(['error' => 'non_trouve', 'message' => 'Cette alerte n’existe pas.'], 404)
@@ -54,7 +54,7 @@ class EnvoiAlertesController extends ApiController
             }
             $regles[] = ['condition' => $l['condition'], 'nom' => trim($l['nom']), 'seuil' => isset($l['seuil']) ? (float) $l['seuil'] : null, 'canaux' => array_values(array_unique($canaux)), 'actif' => $l['actif']];
         }
-        $depot->enregistrer($this->ws(), $regles, (string) ($r->user()?->name ?? 'inconnu'));
+        $depot->enregistrer($this->ws(), $regles, (string) $r->user()?->name);
 
         return response()->json($this->reponse($depot));
     }

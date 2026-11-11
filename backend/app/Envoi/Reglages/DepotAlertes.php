@@ -94,7 +94,7 @@ final class DepotAlertes
     }
 
     /** @return array<string, mixed> */
-    private static function depuisNotification(object $n, bool $reglee): array
+    private static function depuisNotification(\stdClass $n, bool $reglee): array
     {
         $niveau = $reglee ? 'fait' : match ($n->gravite) {
             'critique' => 'a_faire', 'attention' => 'attention', default => 'nouveau',
@@ -110,7 +110,7 @@ final class DepotAlertes
     }
 
     /** @return array<string, mixed> */
-    private static function depuisPause(object $p, bool $reglee): array
+    private static function depuisPause(\stdClass $p, bool $reglee): array
     {
         $ouverte = $p->levee_le === null;
         $portee = $p->portee === 'global' ? 'tous les envois' : 'les envois vers ' . $p->fournisseur;

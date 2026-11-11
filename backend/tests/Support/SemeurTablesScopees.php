@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_regles_alerte', 'envoi_alertes_reglees'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -203,6 +203,9 @@ final class SemeurTablesScopees
         // Envoi R14 : règles d'alerte et alertes réglées, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_regles_alerte',
         'envoi_alertes_reglees',
+        // Envoi R14 : identité versionnée (ajout seul + FK : APPEND_SEUL_AVEC_FK) et réglages clé/valeur (pas de DELETE : nettoyer() les gère comme envoi_seuils).
+        'envoi_identite_versions',
+        'envoi_reglages',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -825,6 +828,19 @@ final class SemeurTablesScopees
         ]);
         $inserer('envoi_alertes_reglees', [
             'alerte_id' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_identite_versions', [
+            'raison_sociale' => 'zz',
+            'forme' => 'zz',
+            'adresse_postale' => 'zz',
+            'signature' => 'zz',
+            'bloc_information' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_reglages', [
+            'cle' => 'zz',
+            'valeur' => 'zz',
             'auteur' => 'zz',
         ]);
         $inserer('envoi_seuils', [

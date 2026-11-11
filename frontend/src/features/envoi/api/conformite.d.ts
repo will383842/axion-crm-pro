@@ -337,8 +337,11 @@ export interface components {
          */
         CanalAlerte: "console" | "email";
         ConnexionCrm: {
-            /** @enum {string} */
-            adaptateur: "crm_pro" | "generique" | "aucun";
+            /**
+             * @description interne = CRM de la même application (palier 0).
+             * @enum {string}
+             */
+            adaptateur: "interne" | "crm_pro" | "generique" | "aucun";
             /** @description Ce qui ne quitte jamais Envoi ou le CRM. */
             ce_qui_ne_passe_pas: string[];
             /** @description Ce que l'adaptateur échange avec le CRM (phrases courtes). */

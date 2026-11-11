@@ -77,6 +77,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     // Envoi R14 : règles d'alerte et alertes réglées, AJOUT SEUL (déclencheur, droits SELECT+INSERT) ; les retirer effacerait l'historique ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000140_envoi_regles_alerte.php',
     '2026_12_02_000141_envoi_alertes_reglees.php',
+    '2026_12_02_000142_envoi_identite_versions.php',
+    '2026_12_02_000143_envoi_reglages.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

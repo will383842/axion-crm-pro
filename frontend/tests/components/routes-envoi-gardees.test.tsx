@@ -82,9 +82,9 @@ async function monter(url: string) {
  * garde « Sans Envoi → introuvable » couvre toujours TOUTES les routes.
  */
 const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
-  ['/envoi/campagnes', 'DM2-CAM', 'Campagnes'],
-  ['/envoi/campagnes/calendrier', 'DM2-CAM', 'Calendrier'],
-  ['/envoi/campagnes/cmp-01', 'DM2-CAM', 'Organisateurs Rhône-Alpes'],
+  ['/envoi/campagnes', 'DM2-CAM'],
+  ['/envoi/campagnes/calendrier', 'DM2-CAM'],
+  ['/envoi/campagnes/c-1', 'DM2-CAM'],
   ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
   ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],

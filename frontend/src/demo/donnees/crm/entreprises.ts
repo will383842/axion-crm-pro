@@ -75,7 +75,7 @@ export interface ZoneEntreprises {
   vues: VueSauvegardee[];
 }
 
-const RESPONSABLES = ['Will', 'Camille Roux', 'Nadia Perrin'] as const;
+const RESPONSABLES = ['Alix Marchand', 'Camille Roux', 'Nadia Perrin'] as const;
 const ETAPES: readonly EtapeCommerciale[] = ['nouveau', 'nouveau', 'qualifie', 'qualifie', 'opportunite', 'client', 'dormant', 'perdu'];
 const FORMES = ['5499', '5710', '5498', '9220'] as const;
 
@@ -90,14 +90,15 @@ function fabriquer(alea: Alea): ZoneEntreprises {
       const autre = entreprises[(i + 7) % entreprises.length]!;
       liens.push({ company_id: autre.id, denomination: autre.denomination, lien: alea.choisir(['Société mère', 'Filiale', 'Même groupe'] as const) });
     }
-    if (repere) liens.push({ company_id: 0, denomination: 'Groupe Tilleuls Holding', lien: 'Société mère' });
+    // Le lien pointe vers une vraie fiche de la démo (id valide) : le nom affiché est celui de la holding fictive.
+    if (repere && entreprises[1]) liens.push({ company_id: entreprises[1].id, denomination: 'Groupe Tilleuls Holding', lien: 'Société mère' });
     return {
       id: e.id,
       relation_type: repere ? 'prospect' : alea.choisir(['prospect', 'prospect', 'prospect', 'client', 'partenaire'] as const),
       lifecycle_stage: etape,
       relation_saisie_manuelle_at: repere || alea.booleen(0.1) ? ilYa(alea.entier(3, 20), 10, 15) : null,
       joignabilite: e.quality_score >= 70 ? 'email_verifie' : e.quality_score >= 50 ? 'telephone_seul' : 'aucune',
-      responsable: repere ? 'Will' : alea.choisir(RESPONSABLES),
+      responsable: repere ? 'Alix Marchand' : alea.choisir(RESPONSABLES),
       affaire: repere || etape === 'opportunite' || etape === 'client'
         ? { titre: repere ? 'Devis site vitrine' : `Offre ${e.denomination}`, montant: repere ? '1 800 €' : `${alea.entier(6, 40) * 100} €`, etape: repere ? 'Devis envoyé' : 'En discussion' }
         : null,

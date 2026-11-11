@@ -43,9 +43,6 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // démo (`src/demo/handlers/envoi/reponses.handlers.ts`, contrat `backend/openapi/envoi/reponses.yaml`) ; la route
 // serveur est prévue au lot S/Envoi, qui retirera ces sept lignes. La liste reste FERMÉE : tout autre appel
 // sans route fait toujours rougir.
-// Filet modifié : pourquoi. DM2-CAM (#401) : liste, calendrier et suivi des campagnes d'Envoi. Ces appels ne
-// partent que si Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; le lot
-// serveur d'Envoi retirera ces quatre lignes. La liste reste figée et exacte.
 // Filet modifié : pourquoi. DM1-ACC (#399) : Mes tâches et Affaires. Ces appels ne partent qu'en démo
 // (`VITE_DEMO`, figé au build) : hors démo, donc en production, /taches et /affaires gardent leur page
 // « en attente » et le tableau de bord n'a pas d'onglets. La démo les sert ; le lot serveur du CRM reprendra
@@ -73,11 +70,6 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/crm/contacts/{p}/retirer',
   'POST /api/v1/crm/persons/{p}/appels',
   'POST /api/v1/crm/persons/{p}/rappel',
-  // DM2-CAM — liste, calendrier et suivi des campagnes.
-  'GET /api/v1/envoi/campagnes',
-  'GET /api/v1/envoi/campagnes/calendrier',
-  'GET /api/v1/envoi/campagnes/{p}',
-  'GET /api/v1/envoi/campagnes/{p}/destinataires',
   // DM2-CNF — conformité, réglages, page publique de désinscription.
   'GET /api/v1/envoi/alertes',
   'GET /api/v1/envoi/carnet',

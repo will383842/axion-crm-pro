@@ -1044,15 +1044,17 @@ test('MAJEUR 5 : une pause ne se lève QUE par le chemin journalisé ou par expi
     $id = (int) DB::table('envoi_pauses')->where('workspace_id', $ws)->where('motif', DecisionFrein::INDESIRABLE_TEMOIN)->value('id');
     $idLongue = (int) DB::table('envoi_pauses')->where('workspace_id', $ws)->where('motif', 'longue')->value('id');
     WorkspaceContext::run($ws, function () use ($id, $idLongue, $ws) {
-        // 1. levée « silencieuse » (UPDATE direct) : refusée
-        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = now(), levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
+        // 1. levée « silencieuse » (UPDATE direct) : refusée. La levée est datée de l'horloge d'APPLI figée (app.maintenant,
+        //    posée par ouvrirPause) et non de now() : le trigger refuse une levée postérieure à son horloge de référence + 1 min,
+        //    donc now() (heure réelle) ferait échouer ce test sur le mauvais motif dès que le jour réel dépasse la date figée.
+        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = current_setting('app.maintenant')::timestamptz, levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
         // 2. expire_le ramenée dans le passé, ou levee_le datée dans le futur : refusées
         expect(sqlRefuse("UPDATE envoi_pauses SET expire_le = now() - interval '1 day' WHERE id = ?", [$idLongue]))->toContain('figés')
             ->and(sqlRefuse("UPDATE envoi_pauses SET levee_le = now() - interval '1 day', levee_par = 'expiration' WHERE id = ?", [$idLongue]))->toContain('expiration refusée')
             ->and(sqlRefuse("UPDATE envoi_pauses SET motif = 'autre' WHERE id = ?", [$id]))->toContain('figés');
         // 3. journal d'un AUTRE identifiant : ne couvre pas cette levée
         app(DepotSocle::class)->journaliser($ws, 'pause_levee', 'x', ['pause' => $id + 1000]);
-        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = now(), levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
+        expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = current_setting('app.maintenant')::timestamptz, levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
     });
     // 4. le chemin journalisé passe ; la levée datée est ensuite définitive
     leverPauseJournalisee($ws, $id, 'will');

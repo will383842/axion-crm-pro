@@ -64,7 +64,11 @@ function fiche(id: string): FicheEntreprise | undefined {
 }
 
 function csv(liste: readonly Entreprise[]): string {
-  const echapper = (v: string) => (/[",\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
+  // Neutralise l'injection de formule : une cellule commençant par = + - @ (ou tabulation/retour) est préfixée d'une apostrophe.
+  const echapper = (brut: string) => {
+    const v = /^[=+\-@\t\r]/.test(brut) ? `'${brut}` : brut;
+    return /[",\n\r]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v;
+  };
   const entete = ['SIREN', 'Dénomination', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web'];
   const lignes = liste.map((e) =>
     [e.siren, e.denomination, e.naf, e.size_category, e.department_code, e.city, e.email_generic, e.phone, e.website].map(echapper).join(','),

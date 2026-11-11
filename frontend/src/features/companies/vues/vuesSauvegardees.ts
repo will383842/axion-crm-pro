@@ -37,5 +37,11 @@ export async function enregistrerVue(nom: string, filtre: Filter): Promise<VueSa
 
 /** Le filtre complet d'une vue : les champs absents repartent de zéro. */
 export function filtreDeLaVue(vue: VueSauvegardee): Filter {
-  return { ...EMPTY_FILTER, ...vue.filters };
+  // Seules les clés connues du filtre, avec des valeurs texte, sont reprises : le reste est ignoré.
+  const retenu: Partial<Filter> = {};
+  for (const cle of Object.keys(EMPTY_FILTER) as Array<keyof Filter>) {
+    const valeur: unknown = (vue.filters as Record<string, unknown> | null | undefined)?.[cle];
+    if (typeof valeur === 'string') (retenu as Record<string, string>)[cle] = valeur;
+  }
+  return { ...EMPTY_FILTER, ...retenu };
 }

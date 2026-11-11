@@ -1,6 +1,6 @@
 /**
  * DM1-ENT — Entreprises et fiche entreprise en démo.
- * Tâche T1 du test de Will : « Boulangerie des Tilleuls », poser l'étiquette
+ * Tâche T1 : « Boulangerie des Tilleuls », poser l'étiquette
  * `salon-artisans-2026`, exporter la sélection, en moins de 3 minutes.
  */
 import { test, expect } from '@playwright/test';

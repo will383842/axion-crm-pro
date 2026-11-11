@@ -5,124 +5,176 @@ namespace Tests\Support;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Validateur minimal d'un contrat OpenAPI 3.1 d'Envoi (`backend/openapi/envoi/*.yaml`) : vérifie une RÉPONSE réelle
- * contre le schéma déclaré. Lecture seule. Couvre ce que le contrat emploie : $ref (fichiers relatifs compris), type
- * (dont 'null'), required, properties, items, enum, oneOf, minimum, maxLength, pattern, format date / date-time / email.
- * Les propriétés non déclarées sont tolérées (le contrat n'écrit pas additionalProperties: false).
+ * Valide une réponse JSON contre un schéma de backend/openapi/envoi/*.yaml (sous-ensemble utilisé par ces contrats :
+ * $ref locaux ou vers un autre fichier du dossier, type, required, properties, enum, const, pattern, minimum/maximum,
+ * minLength/maxLength, items, oneOf, format date et date-time). Renvoie la liste des écarts (vide = conforme).
  */
 final class ContratOpenApiEnvoi
 {
     /** @var array<string, array<string, mixed>> */
-    private array $documents = [];
+    private static array $fichiers = [];
 
-    public function __construct(private readonly string $dossier = __DIR__ . '/../../openapi/envoi') {}
-
-    /** @return list<string> erreurs ; vide = conforme */
-    public function erreursReponse(string $zone, string $chemin, string $methode, int $statut, mixed $corps): array
+    /** @return list<string> écarts */
+    public static function ecarts(string $fichier, string $schema, mixed $valeur): array
     {
-        $doc = $this->charger($zone . '.yaml');
-        $schema = $doc['paths'][$chemin][strtolower($methode)]['responses'][(string) $statut]['content']['application/json']['schema'] ?? null;
-        if (! is_array($schema)) {
-            return ["aucun schéma pour {$methode} {$chemin} {$statut}"];
+        $e = [];
+        self::verifier($fichier, ['$ref' => '#/components/schemas/' . $schema], $valeur, $schema, $e);
+        if ($schema === 'PointFeuVert' && is_array($valeur)) {
+            array_push($e, ...self::croiserPoint($valeur));
         }
 
-        return $this->valider($schema, $corps, '$', $zone . '.yaml');
+        return $e;
+    }
+
+    /**
+     * Réponse réelle d'une route : valide le corps contre le schéma de réponse déclaré pour ce chemin, cette méthode et ce statut.
+     *
+     * @return list<string> écarts
+     */
+    public static function ecartsReponse(string $fichier, string $chemin, string $methode, int $statut, mixed $valeur): array
+    {
+        $schema = self::charger($fichier)['paths'][$chemin][strtolower($methode)]['responses'][(string) $statut]['content']['application/json']['schema'] ?? null;
+        if (! is_array($schema)) {
+            return ["aucun schéma de réponse pour $methode $chemin $statut dans $fichier"];
+        }
+        $e = [];
+        self::verifier($fichier, $schema, $valeur, '$', $e);
+
+        return $e;
+    }
+
+    /** Règle croisée du feu vert : `fait` = (`etat` == « fait »), et un point non fait est bloquant. @return list<string> */
+    private static function croiserPoint(array $p): array
+    {
+        $e = [];
+        if (($p['fait'] ?? null) !== (($p['etat'] ?? null) === 'fait')) {
+            $e[] = ($p['code'] ?? '?') . ' : `fait` doit valoir (etat == fait)';
+        }
+        if (($p['bloquant'] ?? null) !== (($p['fait'] ?? null) === false)) {
+            $e[] = ($p['code'] ?? '?') . ' : `bloquant` doit valoir !fait';
+        }
+
+        return $e;
+    }
+
+    /** Règle croisée de la liste : `faits` et `bloquants_restants` se calculent sur `fait`. @return list<string> */
+    public static function croiserListe(array $liste): array
+    {
+        $faits = count(array_filter($liste['points'], static fn (array $p): bool => $p['fait'] === true));
+        $e = [];
+        if ($liste['faits'] !== $faits || $liste['total'] !== count($liste['points']) || $liste['bloquants_restants'] !== count($liste['points']) - $faits) {
+            $e[] = 'faits / total / bloquants_restants incohérents avec les points';
+        }
+
+        return $e;
+    }
+
+    /**
+     * Réponse de GET /envoi/feu-vert : chaque point suit le contrat (règles croisées comprises, voir `ecarts`), la liste
+     * suit `croiserListe`, et un point qui attend le vrai serveur est non fait et bloquant, preuve déposée ou non.
+     *
+     * @param  array<string, mixed>  $liste
+     * @return list<string> écarts
+     */
+    public static function ecartsListeFeuVert(array $liste): array
+    {
+        $e = [];
+        foreach ($liste['points'] ?? [] as $p) {
+            array_push($e, ...self::ecarts('pilotage.yaml', 'PointFeuVert', $p));
+            if (($p['etat'] ?? null) === 'attend_serveur_reel' && (($p['fait'] ?? true) !== false || ($p['bloquant'] ?? false) !== true)) {
+                $e[] = ($p['code'] ?? '?') . ' : un point qui attend le vrai serveur est non fait et bloquant';
+            }
+        }
+        array_push($e, ...self::croiserListe($liste));
+
+        return $e;
     }
 
     /** @return array<string, mixed> */
-    private function charger(string $fichier): array
+    private static function charger(string $fichier): array
     {
-        return $this->documents[$fichier] ??= (array) Yaml::parseFile($this->dossier . '/' . $fichier);
+        return self::$fichiers[$fichier] ??= Yaml::parseFile(base_path('openapi/envoi/' . $fichier));
     }
 
-    /** @return array{0: array<string, mixed>, 1: string} */
-    private function resoudre(string $ref, string $fichier): array
+    /** @param list<string> $e */
+    private static function verifier(string $fichier, array $s, mixed $v, string $chemin, array &$e): void
     {
-        [$f, $pointeur] = str_contains($ref, '#') ? explode('#', $ref, 2) : [$ref, ''];
-        $cible = $f === '' ? $fichier : basename($f);
-        $noeud = $this->charger($cible);
-        foreach (array_filter(explode('/', $pointeur), 'strlen') as $cle) {
-            $noeud = $noeud[$cle] ?? throw new \RuntimeException("référence introuvable : {$ref}");
-        }
-
-        return [$noeud, $cible];
-    }
-
-    /** @return list<string> */
-    private function valider(array $schema, mixed $v, string $chemin, string $fichier): array
-    {
-        if (isset($schema['$ref'])) {
-            [$s, $f] = $this->resoudre((string) $schema['$ref'], $fichier);
-
-            return $this->valider($s, $v, $chemin, $f);
-        }
-        if (isset($schema['oneOf'])) {
-            $ok = 0;
-            $dernieres = [];
-            foreach ($schema['oneOf'] as $alt) {
-                $e = $this->valider($alt, $v, $chemin, $fichier);
-                $e === [] ? $ok++ : $dernieres = $e;
+        if (isset($s['$ref'])) {
+            [$autre, $pointeur] = explode('#', (string) $s['$ref'], 2) + [1 => ''];
+            $cible = $autre === '' ? $fichier : basename($autre);
+            $n = self::charger($cible);
+            foreach (array_filter(explode('/', $pointeur)) as $cle) {
+                $n = $n[$cle];
             }
+            self::verifier($cible, $n, $v, $chemin, $e);
 
-            return $ok === 1 ? [] : ["{$chemin} : {$ok} alternatives valides sur " . count($schema['oneOf']) . ($dernieres ? ' (' . $dernieres[0] . ')' : '')];
+            return;
         }
-        $erreurs = [];
-        if (isset($schema['type']) && ! $this->typeOk((string) $schema['type'], $v)) {
-            return ["{$chemin} : type attendu {$schema['type']}, reçu " . get_debug_type($v)];
-        }
-        if (isset($schema['enum']) && ! in_array($v, $schema['enum'], true)) {
-            $erreurs[] = "{$chemin} : valeur hors énumération";
-        }
-        if (isset($schema['minimum']) && is_numeric($v) && $v < $schema['minimum']) {
-            $erreurs[] = "{$chemin} : inférieur au minimum";
-        }
-        if (($schema['format'] ?? null) === 'date' && is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) !== 1) {
-            $erreurs[] = "{$chemin} : date invalide";
-        }
-        if (($schema['format'] ?? null) === 'date-time' && is_string($v) && (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/', $v) !== 1 || strtotime($v) === false)) {
-            $erreurs[] = "{$chemin} : date-heure invalide";
-        }
-        if (($schema['format'] ?? null) === 'email' && is_string($v) && filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
-            $erreurs[] = "{$chemin} : adresse e-mail invalide";
-        }
-        if (isset($schema['maxLength']) && is_string($v) && mb_strlen($v) > $schema['maxLength']) {
-            $erreurs[] = "{$chemin} : trop long";
-        }
-        if (isset($schema['pattern']) && is_string($v) && preg_match('~' . str_replace('~', '\\~', (string) $schema['pattern']) . '~u', $v) !== 1) {
-            $erreurs[] = "{$chemin} : ne respecte pas le motif";
-        }
-        if (is_array($v) && ($schema['type'] ?? null) === 'object') {
-            foreach ($schema['required'] ?? [] as $cle) {
-                if (! array_key_exists($cle, $v)) {
-                    $erreurs[] = "{$chemin}.{$cle} : champ requis absent";
+        if (isset($s['oneOf'])) {
+            foreach ($s['oneOf'] as $option) {
+                $essai = [];
+                self::verifier($fichier, $option, $v, $chemin, $essai);
+                if ($essai === []) {
+                    return;
                 }
             }
-            foreach ($schema['properties'] ?? [] as $cle => $sous) {
-                if (array_key_exists($cle, $v)) {
-                    array_push($erreurs, ...$this->valider($sous, $v[$cle], "{$chemin}.{$cle}", $fichier));
-                }
-            }
-        }
-        if (is_array($v) && ($schema['type'] ?? null) === 'array' && isset($schema['items'])) {
-            foreach ($v as $i => $element) {
-                array_push($erreurs, ...$this->valider($schema['items'], $element, "{$chemin}[{$i}]", $fichier));
-            }
-        }
+            $e[] = "$chemin : aucune alternative oneOf ne convient";
 
-        return $erreurs;
-    }
-
-    private function typeOk(string $type, mixed $v): bool
-    {
-        return match ($type) {
-            'null' => $v === null,
-            'string' => is_string($v),
-            'integer' => is_int($v),
-            'number' => is_int($v) || is_float($v),
-            'boolean' => is_bool($v),
-            'array' => is_array($v) && array_is_list($v),
-            'object' => is_array($v) && ($v === [] || ! array_is_list($v)),
+            return;
+        }
+        if (array_key_exists('const', $s) && $v !== $s['const']) {
+            $e[] = "$chemin : valeur constante attendue";
+        }
+        if (isset($s['enum']) && ! in_array($v, $s['enum'], true)) {
+            $e[] = "$chemin : hors énumération";
+        }
+        $type = $s['type'] ?? null;
+        $ok = match ($type) {
+            'string' => is_string($v), 'integer' => is_int($v), 'number' => is_int($v) || is_float($v), 'boolean' => is_bool($v), 'null' => $v === null,
+            'array' => is_array($v) && array_is_list($v), 'object' => is_array($v) && ! ($v !== [] && array_is_list($v)),
             default => true,
         };
+        if (! $ok) {
+            $e[] = "$chemin : type $type attendu";
+
+            return;
+        }
+        if (is_string($v)) {
+            if (isset($s['pattern']) && preg_match('/' . str_replace('/', '\/', $s['pattern']) . '/u', $v) !== 1) {
+                $e[] = "$chemin : motif non respecté";
+            }
+            if ((isset($s['minLength']) && mb_strlen($v) < $s['minLength']) || (isset($s['maxLength']) && mb_strlen($v) > $s['maxLength'])) {
+                $e[] = "$chemin : longueur hors bornes";
+            }
+            if (($s['format'] ?? '') === 'email' && filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
+                $e[] = "$chemin : adresse e-mail attendue";
+            }
+            if (($s['format'] ?? '') === 'date' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) !== 1) {
+                $e[] = "$chemin : date attendue";
+            }
+            if (($s['format'] ?? '') === 'date-time' && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/', $v) !== 1) {
+                $e[] = "$chemin : date-heure ISO 8601 attendue";
+            }
+        }
+        if ((is_int($v) || is_float($v)) && ((isset($s['minimum']) && $v < $s['minimum']) || (isset($s['maximum']) && $v > $s['maximum']))) {
+            $e[] = "$chemin : entier hors bornes";
+        }
+        if ($type === 'array') {
+            foreach ($v as $i => $item) {
+                self::verifier($fichier, $s['items'] ?? [], $item, "{$chemin}[$i]", $e);
+            }
+        }
+        if ($type === 'object') {
+            foreach ($s['required'] ?? [] as $cle) {
+                if (! array_key_exists($cle, $v)) {
+                    $e[] = "$chemin : clé « $cle » manquante";
+                }
+            }
+            foreach ($s['properties'] ?? [] as $cle => $sous) {
+                if (array_key_exists($cle, $v)) {
+                    self::verifier($fichier, $sous, $v[$cle], "$chemin.$cle", $e);
+                }
+            }
+        }
     }
 }

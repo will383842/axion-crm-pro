@@ -53,9 +53,12 @@ export interface paths {
         put?: never;
         /**
          * Poser ou retirer la preuve d'un point manuel du feu vert
-         * @description Permission requise, `workspaces.manage` (403 sinon). 404 si le code est
-         *     inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit) ou si
-         *     la preuve contient une adresse e-mail.
+         * @description Permission requise, `workspaces.manage` (403 sinon, au format `Erreur`). 404 si le
+         *     code est inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit ;
+         *     même réponse que le code existe ou non), si la preuve (ou le motif de retrait)
+         *     fait moins de 10 caractères ou contient une adresse e-mail. La preuve est lue
+         *     dans le corps JSON seulement. Un point qui attend le vrai serveur reste non fait
+         *     (`fait` false, `bloquant` true) : sa preuve est affichée mais ne le valide pas.
          */
         post: operations["marquerPointFeuVert"];
         delete?: never;
@@ -247,13 +250,14 @@ export interface components {
          */
         PalierChauffe: "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8";
         PointFeuVert: {
+            /** @description Vrai exactement quand `fait` est faux. */
             bloquant: boolean;
             /** @description Préfixé `auto.` (calculé) ou `manuel.` (preuve humaine). */
             code: string;
             detail: string | null;
             /** @enum {string} */
             etat: "fait" | "a_faire" | "attend_serveur_reel";
-            /** @description Vrai exactement quand `etat` vaut `fait`. */
+            /** @description Vrai exactement quand `etat` vaut `fait` (jamais pour `attend_serveur_reel`, preuve ou non). */
             fait: boolean;
             /** @enum {string} */
             groupe: "verrous" | "banc" | "dns" | "serveur" | "temoins" | "conformite" | "exploitation";
@@ -387,6 +391,7 @@ export interface operations {
                 "application/json": {
                     /** @default true */
                     fait?: boolean;
+                    /** @description Preuve humaine, ou motif quand `fait` vaut false : 10 à 500 caractères après nettoyage, ni phrase générique ni adresse e-mail. */
                     preuve: string;
                 };
             };

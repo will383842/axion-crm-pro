@@ -21,7 +21,7 @@ final readonly class PointFeuVert
     public string $nature;
 
     /**
-     * @param  string  $etat  fait | a_faire | attend_serveur_reel (point manuel qui a besoin du vrai serveur tant que K17 n'est pas fait, preuve déposée ou non ; `fait` reste calculé)
+     * @param  string  $etat  fait | a_faire | attend_serveur_reel (point manuel qui a besoin du vrai serveur tant que K17 n'est pas fait, preuve déposée ou non ; alors `fait` vaut false et `bloquant` true). Règle : `fait` === (`etat` === « fait »)
      */
     public function __construct(
         public string $code,
@@ -33,6 +33,8 @@ final readonly class PointFeuVert
         public string $groupe,
         public string $etat,
         public ?string $preuve = null,
+        public ?string $preuvePar = null,
+        public ?string $preuveLe = null,
     ) {
         $this->manuel = ! $automatique;
         $this->bloquant = ! $fait;

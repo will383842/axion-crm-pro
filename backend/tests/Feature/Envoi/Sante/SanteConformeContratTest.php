@@ -59,7 +59,7 @@ function espaceSainContrat(string $ws, array $temoins = DepotSocleDb::FOURNISSEU
 function lireSanteContrat($test, User $user): array
 {
     $json = $test->actingAs($user)->getJson('/api/v1/envoi/sante')->assertOk()->json();
-    $erreurs = (new ContratOpenApiEnvoi)->erreursReponse('pilotage', '/envoi/sante', 'get', 200, $json);
+    $erreurs = ContratOpenApiEnvoi::ecartsReponse('pilotage.yaml', '/envoi/sante', 'get', 200, $json);
     expect($erreurs)->toBe([], implode("\n", $erreurs));
 
     return $json;
@@ -67,7 +67,7 @@ function lireSanteContrat($test, User $user): array
 
 test('le validateur refuse l’ancienne forme {serveurs, constats_espace, pauses, seuils}', function () {
     $ancienne = ['serveurs' => [], 'constats_espace' => [], 'pauses' => [], 'seuils' => []];
-    expect((new ContratOpenApiEnvoi)->erreursReponse('pilotage', '/envoi/sante', 'get', 200, $ancienne))->not->toBe([]);
+    expect(ContratOpenApiEnvoi::ecartsReponse('pilotage.yaml', '/envoi/sante', 'get', 200, $ancienne))->not->toBe([]);
 });
 
 test('espace vide : réponse conforme au contrat, feu inconnu (gris), test du matin jamais fait, aucune pause', function () {

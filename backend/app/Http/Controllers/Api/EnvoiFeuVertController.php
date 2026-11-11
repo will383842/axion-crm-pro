@@ -21,6 +21,9 @@ class EnvoiFeuVertController extends ApiController
     public function index(ListeFeuVert $liste): JsonResponse
     {
         $ws = (string) WorkspaceContext::current();
+        if ($ws === '') {
+            return $this->sansEspace();
+        }
         $points = $liste->points($ws);
         $faits = count(array_filter($points, static fn (PointFeuVert $p): bool => $p->fait));
 
@@ -35,18 +38,27 @@ class EnvoiFeuVertController extends ApiController
 
     public function fait(Request $request, string $code, ListeFeuVert $liste, DepotPreuves $depot): JsonResponse
     {
+        // 422 pour TOUT code `auto.*`, AVANT la recherche au catalogue : la réponse ne dit pas si le point automatique existe.
+        if (str_starts_with($code, 'auto.')) {
+            return $this->erreur('validation', 'Ce point est calculé par le système : il ne reçoit jamais de preuve.', 422);
+        }
         if (! in_array($code, CatalogueManuels::codes(), true)) {
             return $this->erreur('non_trouve', 'Ce point du feu vert n’existe pas.', 404);
         }
         if (! CatalogueManuels::estManuel($code)) {
             return $this->erreur('validation', 'Ce point est calculé par le système : il ne reçoit jamais de preuve.', 422);
         }
-        $preuve = $request->input('preuve');
-        $fait = $request->input('fait', true);
+        // Le corps JSON seulement : jamais la query string ni un formulaire.
+        $corps = $request->json()->all();
+        $preuve = $corps['preuve'] ?? null;
+        $fait = $corps['fait'] ?? true;
         if (! is_string($preuve) || ! is_bool($fait)) {
             return $this->erreur('validation', 'La preuve (texte) est obligatoire ; « fait » doit être vrai ou faux.', 422);
         }
         $ws = (string) WorkspaceContext::current();
+        if ($ws === '') {
+            return $this->sansEspace();
+        }
         $par = DepotPreuves::auteurAffichable($request->user()?->name);
         try {
             $fait ? $depot->ajouter($ws, $code, $preuve, $par) : $depot->defaire($ws, $code, $preuve, $par);
@@ -60,6 +72,11 @@ class EnvoiFeuVertController extends ApiController
         }
 
         return $this->erreur('non_trouve', 'Ce point du feu vert n’existe pas.', 404);
+    }
+
+    private function sansEspace(): JsonResponse
+    {
+        return $this->erreur('interdit', 'Aucun espace de travail n’est sélectionné pour votre compte.', 403);
     }
 
     private function erreur(string $code, string $message, int $statut): JsonResponse

@@ -23,6 +23,50 @@ final class ContratOpenApiEnvoi
         return $e;
     }
 
+    /**
+     * Réponse de GET /envoi/feu-vert : chaque point suit le contrat ET les règles croisées (décision d'architecte) :
+     * `fait` === (`etat` === « fait »), `bloquant` === ! `fait`, et les compteurs se calculent sur ces seuls champs.
+     * Un point qui attend le vrai serveur n'est jamais fait, même avec une preuve déposée.
+     *
+     * @param  array<string, mixed>  $liste
+     * @return list<string> écarts
+     */
+    public static function ecartsListeFeuVert(array $liste): array
+    {
+        $e = [];
+        $points = $liste['points'] ?? [];
+        $faits = 0;
+        $bloquants = 0;
+        foreach ($points as $p) {
+            $code = (string) ($p['code'] ?? '?');
+            foreach (self::ecarts('pilotage.yaml', 'PointFeuVert', $p) as $ecart) {
+                $e[] = $ecart;
+            }
+            if (($p['fait'] ?? null) !== (($p['etat'] ?? null) === 'fait')) {
+                $e[] = "$code : fait doit valoir (etat === fait)";
+            }
+            if (($p['bloquant'] ?? null) !== ! ($p['fait'] ?? false)) {
+                $e[] = "$code : bloquant doit valoir ! fait";
+            }
+            if (($p['etat'] ?? null) === 'attend_serveur_reel' && (($p['fait'] ?? true) !== false || ($p['bloquant'] ?? false) !== true)) {
+                $e[] = "$code : un point qui attend le serveur réel est non fait et bloquant";
+            }
+            $faits += ($p['fait'] ?? false) ? 1 : 0;
+            $bloquants += ($p['bloquant'] ?? false) ? 1 : 0;
+        }
+        if (($liste['total'] ?? null) !== count($points)) {
+            $e[] = 'total : doit valoir le nombre de points';
+        }
+        if (($liste['faits'] ?? null) !== $faits) {
+            $e[] = 'faits : doit compter les points dont fait est vrai';
+        }
+        if (($liste['bloquants_restants'] ?? null) !== $bloquants) {
+            $e[] = 'bloquants_restants : doit compter les points bloquants';
+        }
+
+        return $e;
+    }
+
     /** @return array<string, mixed> */
     private static function charger(string $fichier): array
     {

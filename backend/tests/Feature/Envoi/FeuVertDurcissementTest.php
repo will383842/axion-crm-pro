@@ -44,17 +44,26 @@ test('durcissement 3 : détection stricte d’adresse e-mail, dans la preuve et 
     'espace après @' => ['jean@ exemple.test'],
     'arobase pleine chasse' => ["jean\u{FF20}exemple.test"],
     'petite arobase' => ["jean\u{FE6B}exemple.test"],
-    'chez' => ['jean chez exemple.test'],
+    'chez, point en lettres (minuscules)' => ['jean chez exemple point test'],
     'chez, point en lettres' => ['jean CHEZ exemple point test'],
     'arobase en lettres' => ['jean arobase exemple.test'],
     'arobase en lettres, majuscules' => ['jean AROBASE exemple point test'],
 ]);
 
-test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', function () {
+test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', function (string $phrase) {
     $ws = espaceFeuVertDur();
-    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Constaté chez l’hébergeur le 10 novembre', 'responsable');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', $phrase, 'responsable');
     expect(app(DepotPreuves::class)->dernieres($ws)['manuel.port25']['fait'])->toBeTrue();
-});
+})->with([
+    'hébergeur' => ['Constaté chez l’hébergeur le 10 novembre'],
+    'ticket chez un nom de domaine' => ['Ticket ouvert chez ovh.com'],
+    'port 25 chez un hébergeur' => ['Port 25 ouvert chez Scaleway'],
+]);
+
+test('durcissement 3 : le refus « chez » ne vise que les formes épelées (point / dot en lettres)', function (string $texte) {
+    $ws = espaceFeuVertDur();
+    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve valable : ' . $texte, 'responsable'))->toThrow(InvalidArgumentException::class);
+})->with(['jean chez exemple point test', 'jean CHEZ exemple dot test', 'jean chez exemple . test']);
 
 test('durcissement 3 : une chaîne UTF-8 invalide est refusée (preuve et auteur)', function () {
     $ws = espaceFeuVertDur();
@@ -69,7 +78,7 @@ test('durcissement 4 : les caractères de format \p{Cf} sont refusés (preuve et
             'avant' => $c . 'Courrier de l’hébergeur reçu', 'milieu' => 'Courrier de' . $c . ' l’hébergeur reçu', 'fin' => 'Courrier de l’hébergeur reçu' . $c,
         };
         expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', $t, 'responsable'))->toThrow(InvalidArgumentException::class);
-        expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve valable de dix signes', 'Will' . $c . 'iams'))->toThrow(InvalidArgumentException::class);
+        expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve valable de dix signes', 'Respon' . $c . 'sable'))->toThrow(InvalidArgumentException::class);
     }
     expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
 })->with(['U+200B' => ["\u{200B}"], 'U+202E' => ["\u{202E}"], 'U+FEFF' => ["\u{FEFF}"]]);
@@ -106,20 +115,57 @@ test('durcissement 7 : clé de désinscription vide ou absente → auto.cle_desi
     config(['envoi.cle_desinscription' => $valeur]);
     $p = collect(app(ListeFeuVert::class)->points($ws))->firstWhere('code', 'auto.cle_desinscription');
     expect($p->fait)->toBeFalse()->and($p->bloquant)->toBeTrue()->and($p->detail)->not->toBe('');
-})->with(['chaîne vide' => [''], 'null' => [null], 'blancs seuls' => ['                                '], 'absente' => [null]]);
+})->with(['chaîne vide' => [''], 'null' => [null], 'blancs seuls' => ['                                ']]);
+
+test('durcissement 7 bis : clé de désinscription VRAIMENT absente de la config (clé non définie) → non fait', function () {
+    $ws = espaceFeuVertDur();
+    $envoi = config('envoi');
+    unset($envoi['cle_desinscription']);
+    config(['envoi' => $envoi]);
+    expect(array_key_exists('cle_desinscription', config('envoi')))->toBeFalse();
+    $p = collect(app(ListeFeuVert::class)->points($ws))->firstWhere('code', 'auto.cle_desinscription');
+    expect($p->fait)->toBeFalse()->and($p->bloquant)->toBeTrue()->and($p->detail)->not->toBe('');
+});
+
+test('durcissement 8 : un motif de défaire de moins de 10 caractères est refusé, 10 est accepté', function () {
+    $ws = espaceFeuVertDur();
+    $d = app(DepotPreuves::class);
+    $d->ajouter($ws, 'manuel.port25', 'Première preuve déposée ici', 'responsable');
+    expect(fn () => $d->defaire($ws, 'manuel.port25', 'abcdefghi', 'responsable'))->toThrow(InvalidArgumentException::class);
+    $d->defaire($ws, 'manuel.port25', 'abcdefghij', 'responsable');
+    expect(DB::table('envoi_feu_vert_preuves')->where('workspace_id', $ws)->count())->toBe(2);
+});
+
+test('durcissement 9 : ajouter et défaire s’exécutent dans une transaction avec un verrou par espace et par point', function () {
+    $ws = espaceFeuVertDur();
+    $d = app(DepotPreuves::class);
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes) {
+        $requetes[] = ['sql' => $q->sql, 'niveau' => DB::transactionLevel()];
+    });
+    $d->ajouter($ws, 'manuel.port25', 'Première preuve déposée ici', 'responsable');
+    $d->defaire($ws, 'manuel.port25', 'Première preuve périmée', 'responsable');
+    $verrous = array_keys(array_filter($requetes, fn ($r) => str_contains($r['sql'], 'pg_advisory_xact_lock')));
+    $ecritures = array_keys(array_filter($requetes, fn ($r) => str_contains($r['sql'], 'insert into "envoi_feu_vert_preuves"')));
+    expect($verrous)->toHaveCount(2)->and($ecritures)->toHaveCount(2);
+    // Le verrou précède l'écriture, et la lecture « dernière ligne » du défaire est faite APRÈS le verrou.
+    expect($verrous[0])->toBeLessThan($ecritures[0])->and($verrous[1])->toBeLessThan($ecritures[1]);
+    $lectureDefaire = array_keys(array_filter($requetes, fn ($r) => str_contains($r['sql'], 'DISTINCT ON (code)')));
+    expect(max($lectureDefaire))->toBeGreaterThan($verrous[1])->and(min(array_filter($lectureDefaire, fn ($i) => $i > $verrous[1])))->toBeLessThan($ecritures[1]);
+});
 
 test('preuve : `par` et `le` sont lus avec la dernière ligne', function () {
     $ws = espaceFeuVertDur();
-    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Courrier du 10/11, réf. exemple-0042', 'Williams');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Courrier du 10/11, réf. exemple-0042', 'Responsable Test');
     $p = collect(app(ListeFeuVert::class)->points($ws))->firstWhere('code', 'manuel.port25');
-    expect($p->preuve)->toBe('Courrier du 10/11, réf. exemple-0042')->and($p->preuvePar)->toBe('Williams')
+    expect($p->preuve)->toBe('Courrier du 10/11, réf. exemple-0042')->and($p->preuvePar)->toBe('Responsable Test')
         ->and($p->preuveLe)->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/');
 });
 
 test('auteur affichable : nom propre gardé, e-mail ou invalide → « responsable »', function (?string $nom, string $attendu) {
     expect(DepotPreuves::auteurAffichable($nom))->toBe($attendu);
 })->with([
-    'nom' => ['Williams', 'Williams'], 'nom avec blancs' => ['  Williams  ', 'Williams'], 'e-mail' => ['jean@exemple.test', 'responsable'],
+    'nom' => ['Responsable Test', 'Responsable Test'], 'nom avec blancs' => ['  Responsable Test  ', 'Responsable Test'], 'e-mail' => ['jean@exemple.test', 'responsable'],
     'null' => [null, 'responsable'], 'vide' => ['', 'responsable'], 'trop long' => [str_repeat('a', 101), 'responsable'],
-    'format' => ["Will\u{200B}iams", 'responsable'], 'chez' => ['jean chez exemple.test', 'responsable'],
+    'format' => ["Respon\u{200B}sable", 'responsable'], 'chez' => ['jean chez exemple point test', 'responsable'],
 ]);

@@ -65,13 +65,18 @@ class DepotPreuves
         if ($auteur === '' || mb_strlen($auteur) > 100 || self::ressembleAUneAdresse($auteur)) {
             throw new InvalidArgumentException('Auteur invalide (1 à 100 caractères, sans adresse e-mail).');
         }
-        // Défaire : la DERNIÈRE ligne du point doit être « fait » (pas seulement qu'une ligne fait ait existé un jour).
-        if (! $fait && ! (self::derniere($workspaceId, $code)['fait'] ?? false)) {
-            throw new InvalidArgumentException('Ce point n’est pas fait actuellement : rien à défaire.');
-        }
-        WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_feu_vert_preuves')->insert([
-            'workspace_id' => $workspaceId, 'code' => $code, 'preuve' => $texte, 'auteur' => $auteur, 'fait' => $fait,
-        ]));
+        // Transaction + verrou consultatif par (espace, point) : le contrôle « dernière ligne = fait » et l'écriture
+        // ne peuvent pas être doublés par une requête concurrente (deux « défaire » simultanés n'en passent qu'un).
+        WorkspaceContext::run($workspaceId, fn () => DB::transaction(function () use ($workspaceId, $code, $texte, $auteur, $fait): void {
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_feu_vert_preuves|' . $workspaceId . '|' . $code]);
+            // Défaire : la DERNIÈRE ligne du point doit être « fait » (pas seulement qu'une ligne fait ait existé un jour).
+            if (! $fait && ! (self::derniere($workspaceId, $code)['fait'] ?? false)) {
+                throw new InvalidArgumentException('Ce point n’est pas fait actuellement : rien à défaire.');
+            }
+            DB::table('envoi_feu_vert_preuves')->insert([
+                'workspace_id' => $workspaceId, 'code' => $code, 'preuve' => $texte, 'auteur' => $auteur, 'fait' => $fait,
+            ]);
+        }));
     }
 
     /** Nom affiché d'un utilisateur : son nom s'il est présentable, sinon un libellé neutre. Jamais une adresse e-mail. */
@@ -100,7 +105,7 @@ class DepotPreuves
 
     /**
      * Adresse e-mail, même déguisée : arobase ASCII, pleine chasse (U+FF20) ou petite (U+FE6B) quel que soit
-     * l'espacement, « arobase » en lettres, ou « <nom> chez <domaine>(.|point)<fin> ».
+     * l'espacement, « arobase » en lettres, ou « <nom> chez <domaine> point|dot <fin> » (formes ÉPELÉES seulement ; « Ticket ouvert chez ovh.com » reste accepté).
      */
     private static function ressembleAUneAdresse(string $s): bool
     {
@@ -111,7 +116,7 @@ class DepotPreuves
 
         return preg_match('/[@\x{FF20}\x{FE6B}]/u', $s) === 1
             || preg_match('/arobase/iu', $s) === 1
-            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s*(\.|point|dot)\s*\p{L}{2,}/iu', $s) === 1;
+            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s+(point|dot|\.)\s+\p{L}{2,}/iu', $s) === 1;
     }
 
     /** Retire les blancs de bord, y compris Unicode (espace insécable, séparateurs, caractères de contrôle). */

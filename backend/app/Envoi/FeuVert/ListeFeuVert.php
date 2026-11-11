@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Feu vert : liste CALCULÉE (L8-F04). Lecture seule : elle ne signe jamais, n'écrit jamais `envoi_drapeaux`,
  * ne change aucun réglage. Points automatiques = lus dans le système ; points manuels = jamais automatiques,
- * « fait » seulement si une preuve a été déposée (et, par défaut, « vérifiable seulement avec le vrai serveur »).
+ * « fait » seulement si une preuve a été déposée ET que le point n'attend pas le vrai serveur
+ * (un point qui l'attend reste non fait et bloquant, sa preuve restant affichée).
  *
  * Catalogue versionné unique CatalogueManuels : `auto.*` (calculés) et `manuel.*` (spécification 26 § 8, 18 points).
  */
@@ -58,22 +59,25 @@ class ListeFeuVert
         $preuves = $this->preuves->dernieres($ws);
         foreach (CatalogueManuels::codesManuels() as $code) {
             $p = $preuves[$code] ?? null;
-            $fait = $p !== null && $p['fait'];
+            $prouve = $p !== null && $p['fait'];
             $c = CatalogueManuels::POINTS[$code];
             // Aucun signal « K17 fait » n'existe encore dans le code : par prudence, un point qui exige le vrai serveur attend toujours.
             $attend = $c['serveur_reel'];
+            $etat = $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($prouve ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
+            // Règle d'architecte : `fait` === (`etat` === « fait »). Un point qui attend le vrai serveur n'est jamais fait,
+            // même avec une preuve déposée (la preuve reste affichée).
             $points[] = new PointFeuVert(
                 $code,
                 $c['libelle'],
                 false,
-                $fait,
-                self::detailManuel($attend, $fait),
+                $etat === PointFeuVert::ETAT_FAIT,
+                self::detailManuel($attend, $prouve),
                 $c['source'],
                 $c['groupe'],
-                $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE),
-                $fait ? $p['preuve'] : null,
-                $fait ? $p['par'] : null,
-                $fait ? $p['le'] : null,
+                $etat,
+                $prouve ? $p['preuve'] : null,
+                $prouve ? $p['par'] : null,
+                $prouve ? $p['le'] : null,
             );
         }
 

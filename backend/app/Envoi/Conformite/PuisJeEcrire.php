@@ -5,6 +5,7 @@ namespace App\Envoi\Conformite;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise;
 use App\Envoi\Sequence\LecteurFicheDb;
+use App\Models\Workspace;
 use App\Support\ListeSuppression;
 use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ final class PuisJeEcrire
             ->where('m.workspace_id', $workspaceId)->where('i.empreinte_adresse', ListeSuppression::empreinte($adresse))->where('m.statut', 'envoye')->exists();
         // Domaine et entité expéditrice de l'espace : le premier domaine d'envoi connu et le nom de l'espace (aucun n'est envoyé).
         $domaine = (string) DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->orderBy('nom')->value('nom');
-        $entite = (string) DB::table('workspaces')->where('id', $workspaceId)->value('name');
+        $entite = (string) Workspace::query()->whereKey($workspaceId)->value('name');
 
         $verdict = EnvoiAutorise::verifier(new DemandeEnvoi(
             $workspaceId,

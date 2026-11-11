@@ -107,7 +107,7 @@ class DepotPreuves
      * Adresse e-mail, même déguisée : arobase ASCII, pleine chasse (U+FF20) ou petite (U+FE6B) quel que soit
      * l'espacement, « arobase » en lettres, ou la forme ÉPELÉE « <nom> chez <domaine> point <fin> » (« ouvert chez ovh.com » reste accepté).
      */
-    private static function ressembleAUneAdresse(string $s): bool
+    public static function ressembleAUneAdresse(string $s): bool
     {
         if (! mb_check_encoding($s, 'UTF-8')) {
             return true;
@@ -120,7 +120,7 @@ class DepotPreuves
     }
 
     /** Retire les blancs de bord, y compris Unicode (espace insécable, séparateurs, caractères de contrôle). */
-    private static function nettoyer(string $s): string
+    public static function nettoyer(string $s): string
     {
         $r = preg_replace('/^[\s\p{Z}\p{C}]+|[\s\p{Z}\p{C}]+$/u', '', $s);
         if ($r === null) {

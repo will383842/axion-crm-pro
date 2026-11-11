@@ -51,7 +51,7 @@ paths:
             schema: { $ref: '#/components/schemas/SaisieConstatReputation' }
       responses:
         '200':
-          description: Rejeu reconnu : le constat déjà enregistré, aucun nouvel effet.
+          description: 'Rejeu reconnu, le constat déjà enregistré (aucun nouvel effet).'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConstatReputation' }

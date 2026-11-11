@@ -20,12 +20,23 @@ test('espace SANS produit envoi : le 404 passe avant le contrôle de permission 
     $this->actingAs($user)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'x'])->assertNotFound();
 });
 
-test('produit « suspendu » ou « résilié » ou valeur inconnue : fermé (404)', function (mixed $etat) {
+test('produit absent ou valeur inconnue : fermé (404)', function (mixed $etat) {
     $espace = $this->espace(false);
     $espace->update(['settings' => ['produits' => ['envoi' => $etat]]]);
     $user = $this->compte($espace, 'owner');
     $this->actingAs($user)->getJson('/api/v1/envoi/feu-vert')->assertNotFound();
-})->with([['suspendu'], ['resilie'], ['absent'], ['ACTIF '], [true], [1], [['actif']], ['']]);
+})->with([['absent'], ['ACTIF '], [true], [1], [['actif']], ['']]);
+
+// D3 : suspendu et résilié sont des états CONNUS du contrat : fermés aussi, mais avec un 403 qui explique (français).
+test('produit « suspendu » ou « résilié » : 403 clair, code stable, aucun effet', function (string $etat, string $code, string $mot) {
+    $espace = $this->espace(false);
+    $espace->update(['settings' => ['produits' => ['envoi' => $etat]]]);
+    $user = $this->compte($espace, 'viewer');
+    $reponse = $this->actingAs($user)->getJson('/api/v1/envoi/feu-vert')->assertForbidden()->assertJsonPath('code', $code);
+    expect($reponse->json('message'))->toContain($mot);
+    $this->actingAs($user)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'x'])->assertForbidden()->assertJsonPath('code', $code);
+    expect($this->resolutions)->toBe(0);
+})->with([['suspendu', 'produit_suspendu', 'suspendu'], ['resilie', 'produit_resilie', 'résilié']]);
 
 test('espace AVEC produit envoi : comportement inchangé (200 / 403 selon la permission)', function () {
     $espace = $this->espace(true);

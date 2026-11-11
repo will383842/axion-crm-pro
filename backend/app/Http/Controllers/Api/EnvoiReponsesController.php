@@ -27,8 +27,14 @@ class EnvoiReponsesController extends ApiController
         $parPage = min(100, max(1, (int) $request->query('par_page', 25)));
         $q = $request->query('q');
 
-        return response()->json($this->service->lister($this->espace(), $file, $classement === null ? null : (string) $classement,
-            is_string($q) ? $q : null, max(1, (int) $request->query('page', 1)), $parPage));
+        return response()->json($this->service->lister(
+            $this->espace(),
+            $file,
+            $classement === null ? null : (string) $classement,
+            is_string($q) ? $q : null,
+            max(1, (int) $request->query('page', 1)),
+            $parPage,
+        ));
     }
 
     public function show(string $id): JsonResponse
@@ -44,7 +50,7 @@ class EnvoiReponsesController extends ApiController
         if (! is_string($classement) || ! in_array($classement, ServiceReponses::CLASSEMENTS, true)) {
             return $this->erreur('validation', 'Ce classement n’existe pas.', 422);
         }
-        $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()->id, (int) $id, $classement) : null;
+        $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $classement) : null;
 
         return $r === null ? $this->introuvable() : response()->json($r);
     }
@@ -59,7 +65,7 @@ class EnvoiReponsesController extends ApiController
         if (! ctype_digit($id)) {
             return $this->introuvable();
         }
-        [$etat, $res] = $this->service->rattacher($this->espace(), (string) $request->user()->id, (int) $id, $reference);
+        [$etat, $res] = $this->service->rattacher($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $reference);
 
         return match ($etat) {
             'ok' => response()->json($res),
@@ -96,6 +102,7 @@ class EnvoiReponsesController extends ApiController
         if (! ctype_digit($id) || $this->service->resumeDe($this->espace(), (int) $id) === null) {
             return $this->introuvable();
         }
+
         return $this->erreur('envoi_ferme_palier_0', 'L’envoi est fermé pour le moment : votre réponse n’est pas partie.', 409);
     }
 

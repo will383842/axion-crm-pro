@@ -50,6 +50,9 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',
+    // Filet modifié : pourquoi — envoi R12 : texte chiffré des réponses et classements, ajout seul (trigger, REVOKE), down() inerte par conception (S8).
+    '2026_12_02_000120_envoi_reponses.php',
+    '2026_12_02_000121_envoi_reponses_classements.php',
     '2026_11_10_000063_envoi_echecs_releve.php',
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.

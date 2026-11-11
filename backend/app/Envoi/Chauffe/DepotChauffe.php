@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Chauffe;
 
+use App\Envoi\Exceptions\ReculRefuse;
 use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
@@ -407,5 +408,48 @@ final class DepotChauffe
             'plaintes' => (int) ($l->p ?? 0),
             'reponses' => (int) ($l->a ?? 0),
         ];
+    }
+
+    /**
+     * Dates des reculs d'UNE ressource nommée, jusqu'à $jour inclus (matière de {@see CourbeChauffe::jourDeChauffeAvecReculs()}).
+     *
+     * @return list<DateTimeImmutable>
+     */
+    public function reculsDe(string $ws, string $ressourceType, string $ressource, DateTimeImmutable $jour): array
+    {
+        $dates = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_reculs')
+            ->where('workspace_id', $ws)->where('ressource_type', $ressourceType)->where('ressource', $ressource)
+            ->where('date_recul', '<=', JourEnvoi::de($jour)->format('Y-m-d'))->orderBy('date_recul')->pluck('date_recul'));
+
+        return array_values($dates->map(fn ($d): DateTimeImmutable => new DateTimeImmutable((string) $d, new \DateTimeZone(JourEnvoi::FUSEAU)))->all());
+    }
+
+    /**
+     * Recule UNE ressource nommée (IP ou domaine) d'UN palier, ce jour-là. Retourne false si un recul existe déjà
+     * ce jour-là pour cette ressource (idempotent : jamais deux reculs le même jour) ; lève {@see ReculRefuse}
+     * (409) si elle est déjà en P1. Aucune autre ressource n'est touchée ; il n'existe aucune opération « avancer ».
+     */
+    public function reculer(string $ws, string $ressourceType, string $ressource, string $motif, string $auteur, DateTimeImmutable $jour): bool
+    {
+        if (! BudgetChauffe::typeValide($ressourceType)) {
+            throw new \InvalidArgumentException('type de ressource inconnu');
+        }
+        $civil = JourEnvoi::de($jour);
+        $reculs = $this->reculsDe($ws, $ressourceType, $ressource, $civil);
+        foreach ($reculs as $r) {
+            if ($r->format('Y-m-d') === $civil->format('Y-m-d')) {
+                return false;
+            }
+        }
+        $effectifs = BudgetChauffe::joursEffectifs($this->volumesParJour($ws, $ressource, $civil, $ressourceType));
+        if (CourbeChauffe::palierEtendu(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $civil)) === 'P1') {
+            throw ReculRefuse::dejaAuPlusBas($ressourceType, $ressource);
+        }
+
+        return WorkspaceContext::run($ws, fn (): bool => DB::affectingStatement(
+            'INSERT INTO envoi_chauffe_reculs (workspace_id, ressource_type, ressource, motif, auteur, date_recul) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT (workspace_id, ressource_type, ressource, date_recul) DO NOTHING',
+            [$ws, $ressourceType, $ressource, $motif, $auteur, $civil->format('Y-m-d')],
+        ) === 1);
     }
 }

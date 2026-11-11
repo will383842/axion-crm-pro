@@ -43,6 +43,66 @@ final class CourbeChauffe
         ['jusqua' => null, 'palier' => 'P3', 'quota' => 25, 'total' => 50],
     ];
 
+    /** Plafond par boîte et par jour (ADR E2) : atteint au dernier palier, P8. */
+    public const PLAFOND_BOITE_JOUR = 150;
+
+    /** Jours effectifs « verts » à passer, après un recul, avant que la montée reprenne. */
+    public const JOURS_VERTS_APRES_RECUL = 3;
+
+    /**
+     * Table COMPLÈTE P1 à P8 (L8-F07a). La spécification 26 § 4.1 n'est pas dans le dépôt : P1-P3 reprennent
+     * EXACTEMENT {@see self::PALIERS} ; P4-P8 sont une progression LINÉAIRE documentée, sans autre valeur inventée :
+     * le budget de la ressource gagne 50 par palier à partir de P3 (50), pour finir sur le plafond du serveur,
+     * 300 en P8 : P4 = 100, P5 = 150, P6 = 200, P7 = 250, P8 = 300. Le quota d'une boîte est la moitié (deux boîtes
+     * par ressource, comme P1-P3 : 10/18/25), arrondie au supérieur : 50 / 75 / 100 / 125 / 150, soit
+     * {@see self::PLAFOND_BOITE_JOUR} en P8. Chaque palier P4-P7 dure 5 jours effectifs, comme P1-P3.
+     * HYPOTHÈSES à confirmer en banc. La table vivante PALIERS (P1-P3, P3 sans fin) n'est PAS modifiée : le
+     * branchement de la table étendue sur l'envoi est la fiche F07b.
+     *
+     * @var list<array{jusqua: ?int, palier: string, quota: int, total: int}>
+     */
+    public const PALIERS_ETENDUS = [
+        ['jusqua' => 5, 'palier' => 'P1', 'quota' => 10, 'total' => 20],
+        ['jusqua' => 10, 'palier' => 'P2', 'quota' => 18, 'total' => 35],
+        ['jusqua' => 15, 'palier' => 'P3', 'quota' => 25, 'total' => 50],
+        ['jusqua' => 20, 'palier' => 'P4', 'quota' => 50, 'total' => 100],
+        ['jusqua' => 25, 'palier' => 'P5', 'quota' => 75, 'total' => 150],
+        ['jusqua' => 30, 'palier' => 'P6', 'quota' => 100, 'total' => 200],
+        ['jusqua' => 35, 'palier' => 'P7', 'quota' => 125, 'total' => 250],
+        ['jusqua' => null, 'palier' => 'P8', 'quota' => 150, 'total' => 300],
+    ];
+
+    /**
+     * Jour de chauffe de $jour avec les RECULS (table P1-P8) : un recul ramène d'UN palier vers le bas (au premier
+     * jour du palier précédent ; en P1, il est sans effet), puis les {@see self::JOURS_VERTS_APRES_RECUL} jours
+     * effectifs suivants ne font pas avancer le compteur. Un recul daté de $jour s'applique ce jour-là, avant
+     * l'éventuel envoi du jour ; un recul postérieur est ignoré. Aucune opération « avancer » : seuls les jours
+     * effectifs font monter. Même rejeu que {@see self::jourDeChauffe()} pour l'inactivité (7 jours).
+     *
+     * @param  list<DateTimeImmutable>  $joursEffectifs
+     * @param  list<DateTimeImmutable>  $reculs  dates des reculs de CETTE ressource uniquement
+     */
+    public static function jourDeChauffeAvecReculs(array $joursEffectifs, array $reculs, DateTimeImmutable $jour): int
+    {
+        return self::rejouer(self::PALIERS_ETENDUS, $joursEffectifs, $reculs, $jour);
+    }
+
+    public static function palierEtendu(int $jourDeChauffe): string
+    {
+        return self::ligne(max(1, $jourDeChauffe), self::PALIERS_ETENDUS)['palier'];
+    }
+
+    /** Budget TOTAL d'une ressource (table P1-P8), jamais au-delà du plafond serveur. */
+    public static function quotaRessourceEtendu(int $jourDeChauffe): int
+    {
+        return min(self::ligne(max(1, $jourDeChauffe), self::PALIERS_ETENDUS)['total'], PasserelleLocale::PLAFOND_MAX);
+    }
+
+    public static function quotaBoiteEtendu(int $jourDeChauffe): int
+    {
+        return min(self::ligne(max(1, $jourDeChauffe), self::PALIERS_ETENDUS)['quota'], self::PLAFOND_BOITE_JOUR);
+    }
+
     /**
      * Jour de chauffe EFFECTIF de $jour, d'après les jours où la boîte a réellement envoyé.
      * Seuls comptent les jours STRICTEMENT avant $jour (l'envoi du jour même n'avance pas
@@ -52,29 +112,7 @@ final class CourbeChauffe
      */
     public static function jourDeChauffe(array $joursAvecEnvoi, DateTimeImmutable $jour): int
     {
-        $jour = JourEnvoi::de($jour);
-        $civils = [];
-        foreach ($joursAvecEnvoi as $j) {
-            $civil = JourEnvoi::de($j);
-            if ($civil < $jour) {
-                $civils[$civil->format('Y-m-d')] = $civil;
-            }
-        }
-        ksort($civils);
-        $effectifs = 0;
-        $precedent = null;
-        foreach ($civils as $civil) {
-            if ($precedent !== null) {
-                $effectifs = self::reculSiInactif($effectifs, self::ecart($precedent, $civil));
-            }
-            $effectifs++;
-            $precedent = $civil;
-        }
-        if ($precedent !== null) {
-            $effectifs = self::reculSiInactif($effectifs, self::ecart($precedent, $jour));
-        }
-
-        return $effectifs + 1;
+        return self::rejouer(self::PALIERS, $joursAvecEnvoi, [], $jour);
     }
 
     /**
@@ -126,6 +164,59 @@ final class CourbeChauffe
         return min(self::ligne(max(1, $jourDeChauffe))['total'], PasserelleLocale::PLAFOND_MAX);
     }
 
+    /**
+     * Rejeu chronologique : jours d'envoi et reculs (à date égale, le recul passe d'abord).
+     *
+     * @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table
+     * @param  list<DateTimeImmutable>  $joursAvecEnvoi
+     * @param  list<DateTimeImmutable>  $reculs
+     */
+    private static function rejouer(array $table, array $joursAvecEnvoi, array $reculs, DateTimeImmutable $jour): int
+    {
+        $jour = JourEnvoi::de($jour);
+        $evenements = [];
+        foreach ($joursAvecEnvoi as $j) {
+            $civil = JourEnvoi::de($j);
+            if ($civil < $jour) {
+                $evenements[$civil->format('Y-m-d') . '#1'] = $civil;
+            }
+        }
+        foreach ($reculs as $r) {
+            $civil = JourEnvoi::de($r);
+            if ($civil <= $jour) {
+                $evenements[$civil->format('Y-m-d') . '#0'] = $civil;
+            }
+        }
+        ksort($evenements);
+        $effectifs = 0;
+        $verts = 0;
+        $precedent = null;
+        foreach ($evenements as $cle => $civil) {
+            if (str_ends_with($cle, '#0')) {
+                if ($effectifs !== ($recule = self::reculerUnPalier($table, $effectifs))) {
+                    $effectifs = $recule;
+                    $verts = self::JOURS_VERTS_APRES_RECUL;
+                }
+
+                continue;
+            }
+            if ($precedent !== null) {
+                $effectifs = self::reculSiInactif($table, $effectifs, self::ecart($precedent, $civil));
+            }
+            if ($verts > 0) {
+                $verts--;
+            } else {
+                $effectifs++;
+            }
+            $precedent = $civil;
+        }
+        if ($precedent !== null) {
+            $effectifs = self::reculSiInactif($table, $effectifs, self::ecart($precedent, $jour));
+        }
+
+        return $effectifs + 1;
+    }
+
     /** Jours civils entre deux jours : 1 = jours consécutifs. */
     private static function ecart(DateTimeImmutable $de, DateTimeImmutable $a): int
     {
@@ -133,16 +224,23 @@ final class CourbeChauffe
     }
 
     /** Écart de $ecart jours civils depuis le dernier envoi : à 7 ou plus, on recule d'un palier. */
-    private static function reculSiInactif(int $effectifs, int $ecart): int
+    /** @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table */
+    private static function reculSiInactif(array $table, int $effectifs, int $ecart): int
     {
-        if ($ecart < self::INACTIVITE_JOURS) {
-            return $effectifs;
-        }
-        // Prochain jour = $effectifs + 1 ; on le ramène au premier jour du palier d'avant (P1 : inchangé).
+        return $ecart < self::INACTIVITE_JOURS ? $effectifs : self::reculerUnPalier($table, $effectifs);
+    }
+
+    /**
+     * Ramène le prochain jour au premier jour du palier d'avant (P1 : inchangé).
+     *
+     * @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table
+     */
+    private static function reculerUnPalier(array $table, int $effectifs): int
+    {
         $prochain = $effectifs + 1;
         $debutPrecedent = null;
         $debut = 1;
-        foreach (self::PALIERS as $p) {
+        foreach ($table as $p) {
             if ($p['jusqua'] === null || $prochain <= $p['jusqua']) {
                 return $debutPrecedent === null ? $effectifs : $debutPrecedent - 1;
             }
@@ -153,15 +251,20 @@ final class CourbeChauffe
         return $effectifs;
     }
 
-    /** @return array{jusqua: ?int, palier: string, quota: int, total: int} */
-    private static function ligne(int $jourDeChauffe): array
+    /**
+     * @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table
+     * @return array{jusqua: ?int, palier: string, quota: int, total: int}
+     */
+    private static function ligne(int $jourDeChauffe, array $table = self::PALIERS): array
     {
-        foreach (self::PALIERS as $p) {
+        $derniere = $table[0];
+        foreach ($table as $p) {
             if ($p['jusqua'] === null || $jourDeChauffe <= $p['jusqua']) {
                 return $p;
             }
+            $derniere = $p;
         }
 
-        return self::PALIERS[array_key_last(self::PALIERS)];
+        return $derniere;
     }
 }

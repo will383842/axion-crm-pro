@@ -51,11 +51,47 @@ describe('démo — feu vert', () => {
   });
 
   it('404 code inconnu, 422 code auto.* ou preuve avec une adresse e-mail ou hors longueur', async () => {
-    expect((await appeler('POST', '/envoi/feu-vert/manuel.inconnu/fait', { preuve: 'x' })).statut).toBe(404);
-    expect((await appeler('POST', '/envoi/feu-vert/auto.dns_au_vert/fait', { preuve: 'x' })).statut).toBe(422);
+    expect((await appeler('POST', '/envoi/feu-vert/manuel.inconnu/fait', { preuve: 'x'.repeat(12) })).statut).toBe(404);
+    expect((await appeler('POST', '/envoi/feu-vert/auto.dns_au_vert/fait', { preuve: 'x'.repeat(12) })).statut).toBe(422);
     expect((await appeler('POST', '/envoi/feu-vert/manuel.boucles_retour/fait', { preuve: 'écrit à jean@exemple.test' })).statut).toBe(422);
     expect((await appeler('POST', '/envoi/feu-vert/manuel.boucles_retour/fait', { preuve: '' })).statut).toBe(422);
     expect((await appeler('POST', '/envoi/feu-vert/manuel.boucles_retour/fait', { preuve: 'a'.repeat(501) })).statut).toBe(422);
+  });
+});
+
+describe('démo — feu vert : règles de la preuve', () => {
+  const poser = (code: string, preuve: unknown) => appeler('POST', `/envoi/feu-vert/${code}/fait`, { preuve });
+  it('refuse en 422 une preuve de moins de 10 caractères', async () => {
+    expect((await poser('manuel.boucles_retour', 'court')).statut).toBe(422);
+    expect((await poser('manuel.boucles_retour', '   123456789   ')).statut).toBe(422);
+    expect((await poser('manuel.boucles_retour', '1234567890')).statut).toBe(200);
+  });
+  it('422 pour tout code auto. même inconnu, AVANT le 404', async () => {
+    expect((await poser('auto.nexiste_pas', 'x'.repeat(12))).statut).toBe(422);
+    expect((await poser('manuel.nexiste_pas', 'x'.repeat(12))).statut).toBe(404);
+  });
+  it('détecte une adresse avec espaces autour du @ ou un @ pleine chasse', async () => {
+    expect((await poser('manuel.boucles_retour', 'écrit à jean @ exemple.test ok')).statut).toBe(422);
+    expect((await poser('manuel.boucles_retour', 'écrit à jean＠exemple.test ok')).statut).toBe(422);
+    expect((await poser('manuel.boucles_retour', 'Inscription faite ce jour.')).statut).toBe(200);
+  });
+  it('refuse tout @ : en début, en fin, pleine chasse (U+FF20) et petite forme (U+FE6B)', async () => {
+    for (const t of ['@jean puis un texte long', 'un texte assez long fini par @', 'texte long \uFF20 exemple', 'texte long \uFE6B exemple', 'texte long \uFF20', '\uFE6Btexte long ici']) {
+      expect((await poser('manuel.boucles_retour', t)).statut, t).toBe(422);
+    }
+  });
+  it('refuse un motif de défaire de moins de 10 caractères, accepte 10', async () => {
+    await poser('manuel.boucles_retour', 'Inscription faite ce jour.');
+    const defaire = (motif: string) => appeler('POST', '/envoi/feu-vert/manuel.boucles_retour/fait', { preuve: motif, fait: false });
+    expect((await defaire('court')).statut).toBe(422);
+    expect((await defaire('motif @ mail ici')).statut).toBe(422);
+    expect((await defaire('1234567890')).json).toMatchObject({ etat: 'a_faire', preuve: null });
+  });
+  it('contient un point manuel avec preuve qui attend le serveur réel (pas fait)', async () => {
+    const { json } = await appeler('GET', '/envoi/feu-vert');
+    const p = json!['points'].find((x: any) => x.code === 'manuel.essai_serveur_reel');
+    expect(p).toMatchObject({ nature: 'manuel', etat: 'attend_serveur_reel', fait: false });
+    expect(p.preuve).not.toBeNull();
   });
 });
 
@@ -88,6 +124,34 @@ describe('démo — chauffe', () => {
   it('reculer depuis P1 donne 409', async () => {
     demoDb.domaines.modifier('dom-c', { chauffe: { palier: 'P1', jours_effectifs: 1, total_palier: 10, tenu_jusqu_au: null } });
     expect((await appeler('POST', '/envoi/chauffe/domaine:dom-c/reculer')).statut).toBe(409);
+  });
+});
+
+describe('démo — chauffe : l’IP et le domaine de même nom sont indépendants', () => {
+  const chauffeDe = async (id: string) => (await appeler('GET', '/envoi/chauffe')).json!['ressources'].find((r: any) => r.id === id);
+
+  it('reculer l’IP ne touche pas le domaine, et inversement', async () => {
+    const domaineAvant = await chauffeDe('domaine:dom-c');
+    const ipAvant = await chauffeDe('ip:192.0.2.11');
+    expect(domaineAvant.palier).toBe(ipAvant.palier);
+    expect((await appeler('POST', '/envoi/chauffe/ip:192.0.2.11/reculer')).json).toMatchObject({ palier: 'P1' });
+    expect(await chauffeDe('domaine:dom-c')).toEqual(domaineAvant);
+    const ipApres = await chauffeDe('ip:192.0.2.11');
+    expect((await appeler('POST', '/envoi/chauffe/domaine:dom-c/reculer')).json).toMatchObject({ palier: 'P1' });
+    expect(await chauffeDe('ip:192.0.2.11')).toEqual(ipApres);
+  });
+
+  it('le verrou « un recul par jour » est par ressource (type et identifiant)', async () => {
+    demoDb.domaines.modifier('dom-c', { chauffe: { palier: 'P4', jours_effectifs: 12, total_palier: 60, tenu_jusqu_au: null } });
+    await appeler('POST', '/envoi/chauffe/domaine:dom-c/reculer');
+    const ip = await chauffeDe('ip:192.0.2.11');
+    expect(ip.peut_reculer).toBe(true);
+    expect((await chauffeDe('domaine:dom-c')).peut_reculer).toBe(false);
+  });
+
+  it('l’IP reculée ne change pas la chauffe enregistrée du domaine', async () => {
+    await appeler('POST', '/envoi/chauffe/ip:192.0.2.11/reculer');
+    expect(demoDb.domaines.trouver('dom-c')?.chauffe?.palier).toBe('P2');
   });
 });
 

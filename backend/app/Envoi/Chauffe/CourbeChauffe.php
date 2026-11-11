@@ -21,6 +21,10 @@ use DateTimeImmutable;
  * recule d'UN palier (elle repart du premier jour du palier précédent ; en P1, elle reste en P1).
  * Les valeurs sont des HYPOTHÈSES à confirmer en banc ; les changer = changer CE tableau.
  *
+ * Table étendue P1-P8 : le saut P3 → P4 (50 → 100 par ressource, +100 %) est une HYPOTHÈSE à confirmer en banc
+ * (aucune source). « Vert » (jours de probation après un recul) signifie « jour EFFECTIF » (volume au moins égal
+ * au seuil), PAS « sans incident » : un jour vert peut avoir eu des retours.
+ *
  * Quota par BOÎTE. Le plafond dur de 300 par jour et par espace n'est PAS dans la courbe :
  * `PasserelleLocale` l'applique avant tout (porte 6), et la courbe ne peut pas le dépasser.
  */
@@ -122,17 +126,30 @@ final class CourbeChauffe
      * Avec `$parRessource`, le seuil se mesure sur le budget TOTAL de la ressource (IP : 10 en P1 = 50 % de 20),
      * pas sur le quota d'une seule boîte.
      *
+     * `$reculs` (L8-F07a2) : `null` = ancienne règle (table PALIERS P1-P3, sans recul : chemin en service, inchangé).
+     * Une liste (même vide) REJOUE, jour par jour, les envois et les reculs de la ressource avec la table étendue
+     * P1-P8, comme {@see self::jourDeChauffeAvecReculs()} (recul avant l'envoi du même jour) : le seuil d'un jour
+     * suit donc le palier réel (P4 : 50 % de 100 = 50 ; après deux reculs jusqu'en P1 : 50 % de 20 = 10), au lieu
+     * d'un seuil figé par l'ancienne table plafonnée à 50.
+     *
      * @param  array<string, int>  $volumes  'Y-m-d' (Paris) => messages envoyés ce jour-là
+     * @param  list<DateTimeImmutable>|null  $reculs  dates des reculs de CETTE ressource
      * @return list<DateTimeImmutable>
      */
-    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART, bool $parRessource = false): array
+    public static function joursEffectifs(array $volumes, float $part = Seuils::JOUR_EFFECTIF_PART, bool $parRessource = false, ?array $reculs = null): array
     {
         ksort($volumes);
         $effectifs = [];
         foreach ($volumes as $j => $n) {
             $jour = new DateTimeImmutable($j, new \DateTimeZone(JourEnvoi::FUSEAU));
-            $base = self::jourDeChauffe($effectifs, $jour);
-            $minimum = max(1, (int) ceil(round($part * ($parRessource ? self::quotaRessource($base) : self::quotaBoite($base)), 9)));
+            if ($reculs === null) {
+                $base = self::jourDeChauffe($effectifs, $jour);
+                $quota = $parRessource ? self::quotaRessource($base) : self::quotaBoite($base);
+            } else {
+                $base = self::jourDeChauffeAvecReculs($effectifs, $reculs, $jour);
+                $quota = $parRessource ? self::quotaRessourceEtendu($base) : self::quotaBoiteEtendu($base);
+            }
+            $minimum = max(1, (int) ceil(round($part * $quota, 9)));
             if ($n >= $minimum) {
                 $effectifs[] = $jour;
             }
@@ -201,7 +218,7 @@ final class CourbeChauffe
                 continue;
             }
             if ($precedent !== null) {
-                $effectifs = self::reculSiInactif($table, $effectifs, self::ecart($precedent, $civil));
+                [$effectifs, $verts] = self::apresInactivite($table, $effectifs, $verts, self::ecart($precedent, $civil));
             }
             if ($verts > 0) {
                 $verts--;
@@ -211,23 +228,34 @@ final class CourbeChauffe
             $precedent = $civil;
         }
         if ($precedent !== null) {
-            $effectifs = self::reculSiInactif($table, $effectifs, self::ecart($precedent, $jour));
+            [$effectifs] = self::apresInactivite($table, $effectifs, $verts, self::ecart($precedent, $jour));
         }
 
         return $effectifs + 1;
+    }
+
+    /**
+     * Inactivité (7 jours civils sans envoi) : recul d'un palier (règle inchangée). CAS NON SPÉCIFIÉ — l'inactivité
+     * PENDANT la période d'essai de {@see self::JOURS_VERTS_APRES_RECUL} jours après un recul : option la plus
+     * PRUDENTE, la période d'essai REPART à 3 (même si le recul d'inactivité est sans effet en P1). Hors période
+     * d'essai, l'inactivité n'en ouvre pas (comportement en service inchangé). À confirmer en banc.
+     *
+     * @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table
+     * @return array{0: int, 1: int} [jours effectifs, jours d'essai restants]
+     */
+    private static function apresInactivite(array $table, int $effectifs, int $verts, int $ecart): array
+    {
+        if ($ecart < self::INACTIVITE_JOURS) {
+            return [$effectifs, $verts];
+        }
+
+        return [self::reculerUnPalier($table, $effectifs), $verts > 0 ? self::JOURS_VERTS_APRES_RECUL : 0];
     }
 
     /** Jours civils entre deux jours : 1 = jours consécutifs. */
     private static function ecart(DateTimeImmutable $de, DateTimeImmutable $a): int
     {
         return (int) $de->diff($a)->format('%r%a');
-    }
-
-    /** Écart de $ecart jours civils depuis le dernier envoi : à 7 ou plus, on recule d'un palier. */
-    /** @param  list<array{jusqua: ?int, palier: string, quota: int, total: int}>  $table */
-    private static function reculSiInactif(array $table, int $effectifs, int $ecart): int
-    {
-        return $ecart < self::INACTIVITE_JOURS ? $effectifs : self::reculerUnPalier($table, $effectifs);
     }
 
     /**

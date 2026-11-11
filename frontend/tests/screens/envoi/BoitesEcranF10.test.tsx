@@ -16,6 +16,8 @@ import { apiUrl } from '../../msw/handlers';
 
 const moi = (permissions: string[]) => http.get(apiUrl('/auth/me'), () => HttpResponse.json({ permissions }));
 const TOUT = ['users.manage', 'workspaces.manage'];
+/** Le vrai /auth/me ne renvoie que `roles` (jamais `permissions`). */
+const moiRoles = (roles: string[]) => http.get(apiUrl('/auth/me'), () => HttpResponse.json({ roles }));
 
 async function monterListe(permissions: string[] = TOUT) {
   const vue = await renderScreen(<BoitesPage />, { path: '/envoi/boites', handlers: [moi(permissions), ...handlers] });
@@ -135,8 +137,57 @@ describe('L8-F10 — suspendre et réactiver', () => {
     await waitFor(() => expect(bouton).toBeEnabled());
     await u.click(bouton);
     const alerte = await screen.findByRole('alert');
-    expect(alerte).toHaveTextContent('impossible tant que le frein est actif');
+    expect(alerte).toHaveTextContent('pause de frein ou pause automatique');
+    expect(alerte).not.toHaveTextContent('tant que le frein est actif');
     expect(demoDb.boites.trouver('boi-marc')?.statut).toBe('suspendue');
+  });
+});
+
+describe('L8-F10 — droits déduits des rôles (vrai /auth/me sans permissions)', () => {
+  beforeEach(() => demoDb.reinitialiser());
+
+  async function fiche(id: string, adresse: string, roles: string[]) {
+    await renderScreen(<BoitePage />, { path: '/envoi/boites/$boiteId', url: `/envoi/boites/${id}`, handlers: [moiRoles(roles), ...handlers] });
+    await screen.findByRole('heading', { level: 1, name: adresse });
+  }
+
+  it.each(['owner', 'admin'])('%s : « Suspendre » actif', async (role) => {
+    await fiche('boi-claire', 'claire@prospection-a.example', [role]);
+    const bouton = await screen.findByRole('button', { name: 'Suspendre' });
+    await waitFor(() => expect(bouton).toBeEnabled());
+  });
+
+  it('owner : « Réactiver » actif', async () => {
+    await fiche('boi-marc', 'marc@prospection-d.example', ['owner']);
+    const bouton = await screen.findByRole('button', { name: 'Réactiver' });
+    await waitFor(() => expect(bouton).toBeEnabled());
+  });
+
+  it('admin : « Réactiver » grisé avec sa raison', async () => {
+    await fiche('boi-marc', 'marc@prospection-d.example', ['admin']);
+    const bouton = await screen.findByRole('button', { name: 'Réactiver' });
+    expect(await screen.findByText(/workspaces\.manage/)).toBeInTheDocument();
+    expect(bouton).toBeDisabled();
+  });
+
+  it('viewer : « Suspendre » grisé avec sa raison', async () => {
+    await fiche('boi-claire', 'claire@prospection-a.example', ['viewer']);
+    const bouton = await screen.findByRole('button', { name: 'Suspendre' });
+    expect(await screen.findByText(/users\.manage/)).toBeInTheDocument();
+    expect(bouton).toBeDisabled();
+  });
+
+  it('n’affiche pas « permission manquante » tant que /auth/me charge', async () => {
+    let liberer: () => void = () => {};
+    const attente = new Promise<void>((r) => { liberer = r; });
+    const lent = http.get(apiUrl('/auth/me'), async () => { await attente; return HttpResponse.json({ roles: ['owner'] }); });
+    await renderScreen(<BoitePage />, { path: '/envoi/boites/$boiteId', url: '/envoi/boites/boi-claire', handlers: [lent, ...handlers] });
+    await screen.findByRole('heading', { level: 1, name: 'claire@prospection-a.example' });
+    expect(screen.queryByText(/Il vous manque la permission/)).toBeNull();
+    liberer();
+    const bouton = await screen.findByRole('button', { name: 'Suspendre' });
+    await waitFor(() => expect(bouton).toBeEnabled());
+    expect(screen.queryByText(/Il vous manque la permission/)).toBeNull();
   });
 });
 

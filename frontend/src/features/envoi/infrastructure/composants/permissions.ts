@@ -11,13 +11,13 @@ export const PERMISSION_SUSPENDRE = 'users.manage';
 /** Réactiver une boîte suspendue. */
 export const PERMISSION_REACTIVER = 'workspaces.manage';
 
-export function useDroitsBoites(): { suspendre: boolean; reactiver: boolean } {
-  const { data } = useQuery({
+export function useDroitsBoites(): { charges: boolean; suspendre: boolean; reactiver: boolean } {
+  const { data, isPending } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: async () => (await api.get<{ roles?: string[]; permissions?: string[] }>('/auth/me')).data,
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
   const p = permissionsDe(data);
-  return { suspendre: p.has(PERMISSION_SUSPENDRE), reactiver: p.has(PERMISSION_REACTIVER) };
+  return { charges: !isPending, suspendre: p.has(PERMISSION_SUSPENDRE), reactiver: p.has(PERMISSION_REACTIVER) };
 }

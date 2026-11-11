@@ -168,7 +168,7 @@ export function BoitePage() {
   const boite = requete.data?.boite;
   const suspendue = boite?.statut === 'suspendue';
   const refus = reactiver.isError && isAxiosError(reactiver.error) && reactiver.error.response?.status === 409;
-  const erreurGeste = suspendre.isError ? messageErreur(suspendre.error) : reactiver.isError ? (refus ? 'Réactivation impossible tant que le frein est actif.' : messageErreur(reactiver.error)) : null;
+  const erreurGeste = suspendre.isError ? messageErreur(suspendre.error) : reactiver.isError ? (refus ? 'Réactivation impossible pour l’instant : la boîte est sous pause de frein ou pause automatique.' : messageErreur(reactiver.error)) : null;
   const permis = suspendue ? droits.reactiver : droits.suspendre;
   const raison = suspendue ? `Il vous manque la permission ${PERMISSION_REACTIVER}.` : `Il vous manque la permission ${PERMISSION_SUSPENDRE}.`;
   return (
@@ -189,7 +189,7 @@ export function BoitePage() {
           ) : undefined
         }
       />
-      {boite && !permis ? <p className="mb-3 text-xs text-slate-600">{raison}</p> : null}
+      {boite && droits.charges && !permis ? <p className="mb-3 text-xs text-slate-600">{raison}</p> : null}
       {erreurGeste ? <div className="mb-3"><MessageErreur>{erreurGeste}</MessageErreur></div> : null}
       <Etats requete={requete} contexte="cette boîte d’envoi">{(fiche) => <Contenu fiche={fiche} />}</Etats>
     </div>

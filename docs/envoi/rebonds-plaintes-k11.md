@@ -12,7 +12,7 @@ Extension de la relève IMAP (L6, `docs/envoi/releve-imap.md`). Aucun envoi. Une
 
 Scénarios du banc (plan 26-SPEC-CONTRAT-ENVOI-ET-BANC l.257-261, `tests/Feature/Envoi/RebondsPlaintesK11Test.php`) : S09 rebond asynchrone par VERP · S10 ARF + réponse hostile + `abuse@` (3 plaintes comptées, 1re = palier tenu, 2e en 7 jours = arrêt 48 h) · S11 réponse humaine (« Réponses ») · S12 STOP (opposition) · S13 absence du bureau (auto-réponse, aucune opposition).
 
-Limite : l'arrêt/la pause de la **séquence** (S11, S13) relève du séquenceur (L1) : K11 classe, rattache et TRANSMET le retour au récepteur (testé) ; il n'arrête aucune séquence lui-même. Voir la dette nommée « Lot L1-RETOURS-SEQ » ci-dessous.
+Limite : K11 classe, rattache et TRANSMET le retour à la chaîne de récepteurs ; S11 (arrêt de séquence) est branché depuis M3, S13 (pause) ne l'est pas. Voir la dette nommée « Lot L1-RETOURS-SEQ » ci-dessous.
 
 ## Décision en attente (plan 30, B5)
 
@@ -31,9 +31,27 @@ K11 touche `Envoi/Imap/**` : c'est une extension de L6 (relève IMAP).
 
 ## Dette connue
 
-- **Lot L1-RETOURS-SEQ (S11 réponse humaine, S13 absence du bureau)** : « une séquence arrêtée ou en pause ne reçoit plus de relance ». NON fait ici : le séquenceur n'est pas sur `main` (L1, PR #442 en cours de correction, fichiers interdits à ce lot). À faire APRÈS la fusion de #442 : un récepteur de séquence (dans `RecepteurRetoursEnChaine`) qui, sur `ReponseHumaine` rattachée, ARRÊTE la séquence du contact, sur `AutoReponse` rattachée la met EN PAUSE (reprise à la date de retour si connue), et surtout un contrôle côté tirage des relances qui refuse toute étape d'une séquence arrêtée/en pause (test rouge : relance échue sur séquence arrêtée => non tirée). Sans ce lot, S11/S13 ne sont couverts que par la classification.
+- **Lot L1-RETOURS-SEQ (S11 réponse humaine, S13 absence du bureau)** — état après M3 :
+  - **S11 réponse humaine : FAIT.** `RecepteurRetoursSequence` (3e maillon de la chaîne) arrête l'inscription du destinataire (motif `reponse`, via `Inscriptions::evenement`, donc aussi les autres inscriptions de la même entreprise, comme le séquenceur le prévoit). Rattachement exact : injection du retour → `envoi_messages.id_injection` → inscription. Une inscription arrêtée n'est plus tirée par le séquenceur (il ne traite que `statut = 'active'`). Idempotent, ajout seul, aucun envoi.
+  - **S13 absence du bureau : PAS de pause, NON fait.** L'état « en pause » n'existe pas : la contrainte de `envoi_inscriptions.statut` n'admet que `active`, `terminee`, `arretee`. L'ajouter demande une migration (élargir la contrainte) et un contrôle côté tirage ; ce n'est pas inventé ici. Une auto-réponse est donc classée, rattachée et journalisée, sans aucun effet sur la séquence (ni arrêt, ni relance retardée). Reste à faire : lot dédié (état `en_pause` + reprise à la date de retour + test « relance échue sur séquence en pause => non tirée »). Décision à prendre par le responsable du projet : une absence retarde-t-elle la relance, ou la laisse-t-on partir ?
+  - Le séquenceur lui-même n'est pas branché au planificateur ici (hors périmètre M3).
 
 - **Rotation de `envoi.cle_empreinte`** : elle invalide tous les VERP déjà émis (leurs retours tombent en « à rattacher »). Garder l'ancienne clé quelques jours, ou accepter la revue humaine.
 - `Verp::adressePour` exige désormais un UUID (`InvalidArgumentException` sinon).
 - **`Verp::adressePour` n'est appelé nulle part en production** : seul le décodage (`idInjectionDepuis`) est branché. Le lot qui posera le `Return-Path` VERP (`rb-<jeton>@bounce.<domaine>`) à l'injection devra l'appeler. Aucun envoi réel n'est codé ici (`ENVOI_REEL_ACTIF=false`) ; tant que ce lot n'existe pas, aucun message sortant ne porte de VERP et le rattachement se fait par Message-ID.
 - Plusieurs `Delivered-To` : `AnalyseDsn::enTetes` les joint par « , » et chaque adresse est testée pour le jeton `rb-`.
+
+## Branchement de la relève (M3)
+
+Avant M3, `ReleveImap`, le registre des messages envoyés, la fabrique de lecteurs et la chaîne de récepteurs n'étaient liés **que dans les tests** : une fois `ENVOI_RELEVE_ACTIF` allumé, la commande `envoi:releve-imap` aurait échoué à la résolution de dépendance. Désormais `EnvoiServiceProvider` lie :
+
+- `RecepteurRetours` → `RecepteurRetoursEnChaine`, dans cet ordre (le même que celui des tests de bout en bout `RebondsPlaintesK11Test` / `ReleveImapAuditTest` pour les deux premiers, inchangé) : **1. CRM** (`RecepteurRetoursCrm` : arrêts permanents via `crm:campagne:retours`) → **2. freins L7** (`RecepteurRetoursFreins`) → **3. état des séquences** (`RecepteurRetoursSequence`). Le **journal** (`envoi_evenements`) est écrit par `ReleveImap` lui-même, dans la même transaction : une exception d'un maillon l'annule et le message est relu. La première exception interrompt la chaîne.
+- `RegistreMessagesEnvoyes` → `RegistreMessagesEnvoyesDb`, l'adresse étant retrouvée dans les contacts de l'espace à partir de son empreinte (`AdresseParEmpreinteCrm`, lecture seule ; introuvable => « à rattacher »).
+- `FabriqueLecteurs` → `FabriqueLecteursNonFournie` : la fabrique **réelle** (boîtes, secrets) n'est pas livrée. Tant qu'elle n'est pas posée, la commande échoue (code 1) avec le message « aucune fabrique de lecteurs IMAP… » : aucune connexion réseau, aucun identifiant lu.
+- `ReleveImap` → construit à partir des liaisons ci-dessus.
+
+Garde-fous inchangés : `ENVOI_RELEVE_ACTIF=false` et `ENVOI_REEL_ACTIF=false` par défaut, la commande reste inerte avant toute résolution ; aucune route, aucune planification nouvelle ; aucune écriture dans `envoi_drapeaux`.
+
+### Rebond mou : seuil de répétition (constat)
+
+Il **existe** : `crm:campagne:retours` appelle `ListeSuppression::rebondTemporaire`, qui compte les rebonds mous par adresse (fenêtre glissante de 30 jours) et ne supprime qu'à partir de `SEUIL_REBONDS_TEMPORAIRES` = 3. `RecepteurRetoursCrm` n'a pas de seuil propre : il transmet chaque rebond mou une seule fois (marque d'idempotence par message) et le seuil s'applique côté CRM. Rien n'a donc été inventé. Limite connue : ce compteur vit **en cache** (hors transaction, perdu si le cache est vidé) ; les freins L7 comptent de leur côté les rebonds mous dans leurs propres seuils.

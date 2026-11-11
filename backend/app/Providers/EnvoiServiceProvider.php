@@ -19,6 +19,17 @@ use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
+use App\Envoi\Imap\AdresseParEmpreinteCrm;
+use App\Envoi\Imap\FabriqueLecteurs;
+use App\Envoi\Imap\FabriqueLecteursNonFournie;
+use App\Envoi\Imap\RecepteurRetours;
+use App\Envoi\Imap\RecepteurRetoursCrm;
+use App\Envoi\Imap\RecepteurRetoursEnChaine;
+use App\Envoi\Imap\RecepteurRetoursFreins;
+use App\Envoi\Imap\RecepteurRetoursSequence;
+use App\Envoi\Imap\RegistreMessagesEnvoyes;
+use App\Envoi\Imap\RegistreMessagesEnvoyesDb;
+use App\Envoi\Imap\ReleveImap;
 use App\Envoi\ListesNoires\AlerteurJournal;
 use App\Envoi\ListesNoires\DepotControles;
 use App\Envoi\ListesNoires\DepotControlesDb;
@@ -101,6 +112,27 @@ class EnvoiServiceProvider extends ServiceProvider
             fn (): int => (int) config('envoi.plafond_global_jour'),
             fn (): ?string => WorkspaceContext::current(),
             $app->make(GardeChauffe::class),
+        ));
+
+        // M3 — relève IMAP branchée. Ordre de la chaîne (docs/envoi/rebonds-plaintes-k11.md) : 1. CRM (arrêts permanents,
+        // `crm:campagne:retours`), 2. freins L7, 3. état des séquences (réponse humaine => arrêt). Le journal
+        // (`envoi_evenements`) est écrit par `ReleveImap` lui-même, dans la même transaction que les trois récepteurs.
+        // Aucune écriture dans `envoi_drapeaux`. Tout reste derrière ENVOI_RELEVE_ACTIF (faux) et ENVOI_REEL_ACTIF (faux).
+        $this->app->bind(RecepteurRetours::class, fn ($app) => new RecepteurRetoursEnChaine(
+            new RecepteurRetoursCrm,
+            new RecepteurRetoursFreins($app->make(AppliquerRetour::class)),
+            RecepteurRetoursSequence::parDefaut(),
+        ));
+        $this->app->bind(RegistreMessagesEnvoyes::class, fn () => new RegistreMessagesEnvoyesDb(
+            static fn (string $espace, string $empreinte): ?string => AdresseParEmpreinteCrm::trouver($espace, $empreinte),
+        ));
+        // La fabrique RÉELLE de lecteurs (boîtes, secrets) n'est pas livrée : par défaut, échec visible et propre, sans réseau.
+        $this->app->bind(FabriqueLecteurs::class, FabriqueLecteursNonFournie::class);
+        $this->app->bind(ReleveImap::class, fn ($app) => new ReleveImap(
+            $app->make(FabriqueLecteurs::class),
+            $app->make(RegistreMessagesEnvoyes::class),
+            $app->make(RecepteurRetours::class),
+            $app->make(Alerte::class),
         ));
 
         // L5 désinscription : liaisons par défaut, remplacées par la file (retrait) et par L1 (arrêt par entreprise).

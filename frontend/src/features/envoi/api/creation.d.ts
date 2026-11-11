@@ -1077,6 +1077,7 @@ export interface operations {
         };
         responses: {
             201: components["responses"]["MessageType"];
+            422: components["responses"]["Erreur"];
         };
     };
     lireMessageType: {
@@ -1110,6 +1111,9 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["MessageType"];
+            404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
         };
     };
     archiverMessageType: {
@@ -1255,6 +1259,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Palier 0 : la suggestion par IA n'est pas ouverte (coût, données confiées à un tiers : décision du propriétaire). Code `non_disponible`. */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
         };
     };
     envoyerTestMessage: {
@@ -1289,6 +1302,15 @@ export interface operations {
                         /** @constant */
                         ok: true;
                     };
+                };
+            };
+            /** @description Palier 0 : l'envoi de test est fermé, sans aucun effet. Code `envoi_ferme_palier_0`. Aucune route de ce domaine ne fait partir un message. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
                 };
             };
         };

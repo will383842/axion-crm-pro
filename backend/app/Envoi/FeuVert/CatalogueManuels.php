@@ -7,11 +7,11 @@ namespace App\Envoi\FeuVert;
  *  - `auto.<code>`   : point CALCULÉ (lu dans le système, jamais écrit, jamais prouvé à la main) ;
  *  - `manuel.<code>` : preuve humaine (spécification 26 § 8, 18 points), déposée via DepotPreuves.
  * Les codes sont stables et permanents : on n'en renomme ni n'en supprime jamais ; un ajout incrémente VERSION
- * (F15 y ajoutera `auto.temoins_3_jours`). `serveur_reel` = le point n'est vérifiable qu'avec le vrai serveur (K17).
+ * (v2 : F15 ajoute `auto.temoins_3_jours`). `serveur_reel` = le point n'est vérifiable qu'avec le vrai serveur (K17).
  */
 final class CatalogueManuels
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public const PREFIXE_AUTO = 'auto.';
 
@@ -27,6 +27,7 @@ final class CatalogueManuels
         'auto.mode_temoins_vrai' => ['libelle' => 'Mode témoins actif', 'groupe' => 'verrous', 'source' => 'table envoi_drapeaux.mode_temoins', 'serveur_reel' => false],
         'auto.signature_absente' => ['libelle' => 'Aucune signature de feu vert', 'groupe' => 'verrous', 'source' => 'table envoi_drapeaux.feu_vert_signature', 'serveur_reel' => false],
         'auto.temoins_fournisseurs' => ['libelle' => 'Tous les fournisseurs témoins sont couverts', 'groupe' => 'temoins', 'source' => 'table envoi_temoins.fournisseur (fiche F03)', 'serveur_reel' => false],
+        'auto.temoins_3_jours' => ['libelle' => 'Les 6 témoins sont verts 3 jours de suite (réception, authentification, bouton, POST)', 'groupe' => 'temoins', 'source' => 'F15 : table envoi_temoins_journees', 'serveur_reel' => false],
         'auto.arret_entreprise' => ['libelle' => 'Arrêt par entreprise branché', 'groupe' => 'verrous', 'source' => 'conteneur ArretParEntreprise', 'serveur_reel' => false],
         'auto.retrait_file' => ['libelle' => 'Retrait des envois en file branché', 'groupe' => 'verrous', 'source' => 'conteneur RetraitEnvoisEnFile', 'serveur_reel' => false],
         'auto.cle_desinscription' => ['libelle' => 'Clé de désinscription posée (32 caractères au moins)', 'groupe' => 'verrous', 'source' => 'config envoi.cle_desinscription (valeur jamais lue ici)', 'serveur_reel' => false],

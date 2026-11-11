@@ -20,8 +20,17 @@ return new class extends Migration
     {
         DB::unprepared(<<<'SQL'
             ALTER TABLE envoi_journal_commandes
-                ADD COLUMN IF NOT EXISTS statut TEXT NOT NULL DEFAULT 'acceptee'
-                    CHECK (statut IN ('reservee', 'acceptee', 'liberee', 'a_verifier'));
+                ADD COLUMN IF NOT EXISTS statut TEXT NOT NULL DEFAULT 'acceptee';
+            -- CHECK posé NOT VALID puis validé : la validation ne bloque pas les écritures (pas de verrou exclusif long).
+            DO $c$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'envoi_journal_commandes_statut_check' AND conrelid = 'public.envoi_journal_commandes'::regclass) THEN
+                    ALTER TABLE envoi_journal_commandes ADD CONSTRAINT envoi_journal_commandes_statut_check
+                        CHECK (statut IN ('reservee', 'acceptee', 'liberee', 'a_verifier')) NOT VALID;
+                END IF;
+            END
+            $c$;
+            ALTER TABLE envoi_journal_commandes VALIDATE CONSTRAINT envoi_journal_commandes_statut_check;
             CREATE UNIQUE INDEX IF NOT EXISTS envoi_journal_commandes_injection_issue_uniq
                 ON envoi_journal_commandes (workspace_id, cle_idempotence)
                 WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL;

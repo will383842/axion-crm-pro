@@ -6,6 +6,7 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise;
@@ -63,10 +64,12 @@ final class Sequenceur
 
     public const MOTIF_REPORTS_EPUISES = 'reports_epuises';
 
-    public const MOTIF_RESERVATION_ORPHELINE = 'reservation_orpheline';
-
-    /** Une étape « reserve » sans issue depuis ce délai est tenue pour orpheline (plantage entre la réservation et l'appel). */
-    public const RESERVATION_ORPHELINE_HEURES = 1;
+    /**
+     * Une ligne « reserve » sans issue depuis ce délai (horloge injectée) est REPRISE par le chemin de rejeu (même clé,
+     * même Message-ID) : plantage entre la réservation et l'appel, ou entre l'appel et la conclusion. La passerelle dit
+     * ce qui s'est passé : acceptée => conclure sans renvoyer ; jamais réservée => injecter ; incertaine => arrêt + alerte.
+     */
+    public const RESERVATION_REPRISE_HEURES = 1;
 
     /** Exception du serveur d'envoi après réservation : le message est peut-être parti, il ne repart jamais. */
     public const MOTIF_ISSUE_INCERTAINE = 'issue_incertaine';
@@ -99,8 +102,9 @@ final class Sequenceur
             try {
                 $r = $this->traiter($ws, (string) $id, $maintenant);
             } catch (Throwable $e) {
-                // Exception hors temps B (avant la réservation d'étape ou pendant la conclusion) : la transaction
-                // concernée est défaite et l'étape reste reprenable. On note l'échec HORS de toute transaction.
+                // Exception technique de `traiter` (temps A ou C défait, passerelle en échec AVANT sa réservation, refus
+                // définitif repris ailleurs) : aucune issue incertaine ici (celle-ci arrête l'inscription sans exception).
+                // La ligne « reserve » éventuelle est reprise plus tard par le rejeu. On note l'échec HORS de toute transaction.
                 $r = $this->echec($ws, (string) $id, $e, $maintenant);
             }
             $bilan[$r] = ($bilan[$r] ?? 0) + 1;
@@ -115,9 +119,10 @@ final class Sequenceur
      *   B. l'appel à la passerelle, HORS de toute transaction (aucun verrou de ligne ni de jour tenu pendant le réseau) ;
      *   C. transaction courte : conclusion, idempotente (le message passe de « reserve » à « envoye » UNE fois, et l'étape
      *      n'avance que si cette bascule a eu lieu).
-     * Issue de B : refus net ou report => `reporte` (reprenable) ; refus définitif du serveur => `reporte` et l'exception
-     * remonte (compteur d'échecs) ; toute autre exception = issue INCERTAINE : le message reste « reserve » (il ne repart
-     * jamais) et l'inscription est arrêtée avec alerte. Option la plus prudente : perdre un message plutôt que l'envoyer deux fois.
+     * Issue de B : refus net ou report => `reporte` (plafonné) ; refus définitif (5xx) => refus et arrêt ; issue INCERTAINE
+     * (`InjectionIncertaine`, ou résultat `incertain`) => inscription arrêtée sans report, une alerte, le message ne repart
+     * JAMAIS ; toute autre exception n'a rien envoyé et remonte à `executer`. Une ligne « reserve » restée sans issue est
+     * reprise par le rejeu après `RESERVATION_REPRISE_HEURES`. Option la plus prudente : perdre plutôt que doubler.
      */
     public function traiter(string $ws, string $inscriptionId, DateTimeImmutable $maintenant): string
     {
@@ -149,13 +154,18 @@ final class Sequenceur
             // Refus CERTAIN fait avant toute transmission (déjà libéré par la passerelle) : ni alerte « incertaine », ni arrêt ;
             // report soumis au plafond.
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'refus_avant_envoi', $plan['fenetre'], $maintenant), $maintenant);
-        } catch (Throwable $e) {
-            $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, $e::class, $maintenant), $maintenant);
-
-            return self::ARRETEE;
+        } catch (InjectionIncertaine $e) {
+            // La passerelle a gardé la place (`a_verifier`) : le message ne repart JAMAIS, l'inscription attend une vérification humaine.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, $e->getPrevious() === null ? null : $e->getPrevious()::class, $maintenant), $maintenant);
+        }
+        // Toute autre exception (avant la réservation de la passerelle, erreur SQL passagère) n'a rien envoyé : elle remonte
+        // à `executer` (compteur d'échecs, échéance repoussée) ; la ligne « reserve » est reprise plus tard par le rejeu.
+        if ($res->incertain) {
+            // Issue incertaine rapportée : JAMAIS de report, arrêt en attente de vérification humaine, une alerte.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
         }
         if (! $res->accepte) {
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $res->incertain ? 'issue_incertaine_reportee' : 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
         }
 
         return $this->conclure($plan, function (\stdClass $ins) use ($plan, $res, $maintenant): string {
@@ -245,16 +255,7 @@ final class Sequenceur
 
         $messageId = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
         if ($messageId === null) {
-            // Ligne « reserve » restée sans issue (plantage entre A et B) : le message n'est jamais renvoyé, mais l'étape ne doit pas
-            // rester bloquée en silence : inscription arrêtée et UNE alerte.
-            $orpheline = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
-                ->where('maj_le', '<', $maintenant->modify('-' . self::RESERVATION_ORPHELINE_HEURES . ' hours')->format('c'))->exists();
-            if ($orpheline) {
-                $this->alertes[] = ['envoi.sequenceur_reservation_orpheline : étape réservée sans issue, inscription arrêtée, intervention requise.', ['workspace_id' => $ws, 'inscription_id' => $ins->id, 'etape' => $rang]];
-
-                return $this->arreter($ins, self::MOTIF_RESERVATION_ORPHELINE, $maintenant);
-            }
-
+            // Ligne « reserve » récente : une autre exécution est en cours (les lignes anciennes sont reprises par `reserver`).
             return self::DEJA;
         }
 
@@ -386,7 +387,20 @@ final class Sequenceur
         $repris = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reporte')
             ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => $maintenant->format('c')]);
 
-        return $repris === 1 ? $messageId : null;
+        if ($repris === 1) {
+            return $messageId;
+        }
+        // Ligne « reserve » ancienne : reprise (on réclame la ligne en avançant `maj_le`, une seule exécution gagne) avec le MÊME Message-ID.
+        $reprise = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
+            ->where('maj_le', '<', $maintenant->modify('-' . self::RESERVATION_REPRISE_HEURES . ' hours')->format('c'))
+            ->update(['maj_le' => $maintenant->format('c')]);
+        if ($reprise === 1) {
+            Log::warning('envoi.sequenceur_reprise_reservation : étape « reserve » reprise par le chemin de rejeu.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang]);
+
+            return (string) DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('message_id');
+        }
+
+        return null;
     }
 
     private function demande(string $ws, Fiche $f, int $rang, string $empreinte): DemandeEnvoi

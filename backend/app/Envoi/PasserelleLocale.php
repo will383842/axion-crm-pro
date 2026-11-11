@@ -13,6 +13,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use App\Envoi\Smtp\EnvoiSmtpRefuse;
@@ -138,7 +139,7 @@ final class PasserelleLocale implements ServeurEnvoi
             // L'alerte ne part qu'après le COMMIT de `a_verifier`.
             $this->conclure($ws, $jour, $message, 'a_verifier');
             DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine, intervention requise.', ['workspace_id' => $ws, 'erreur' => $e::class]));
-            throw $e;
+            throw new InjectionIncertaine($e);
         }
 
         // (C) Transaction COURTE : la conclusion (et, si acceptée, la chauffe) se notent une seule fois.
@@ -177,7 +178,14 @@ final class PasserelleLocale implements ServeurEnvoi
         } elseif (! ($this->serveur instanceof RenvoiParMemeCle)) {
             throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
-        $resultat = $this->serveur->injecter($message);
+        try {
+            $resultat = $this->serveur->injecter($message);
+        } catch (EnvoiRefuse|RefusDefinitifServeur|EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
+            if ($etat === 'reservee') {
+                $this->conclure($ws, $jour, $message, 'liberee'); // refus certain d'un rejeu depuis `reservee` : la place est rendue
+            }
+            throw $e;
+        }
         if ($etat !== 'acceptee' && $resultat->accepte) {
             $this->conclure($ws, $jour, $message, 'acceptee', $fournisseur, $resultat->idInjection);
         }

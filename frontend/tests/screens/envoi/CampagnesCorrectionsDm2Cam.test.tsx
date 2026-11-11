@@ -35,17 +35,18 @@ describe('Démo des campagnes — aucune ouverture exposée', () => {
       await lire(`/envoi/campagnes/${ids[0]}/dupliquer`, { method: 'POST', body: '{}' }),
     ];
     for (const texte of reponses) {
-      expect(texte).not.toMatch(/ouverture/i);
+      expect(texte).not.toMatch(/ouverture|automatique_probable|raison_automatique/i);
       expect(texte).not.toContain('suivre_ouvertures');
     }
   });
 
-  it('« Ce qui se passe » garde ses 8 derniers événements utiles (les ouvertures sont écartées avant la découpe)', async () => {
+  it('« Ce qui se passe » garde ses 8 derniers événements utiles (hors « remis »)', async () => {
     server.use(...handlers);
     for (const c of demoDb.campagnes.tous()) {
       const fiche = JSON.parse(await lire(`/envoi/campagnes/${c.id}`)) as { derniers_evenements: Array<{ type: string }> };
-      expect(fiche.derniers_evenements.every((e) => e.type !== 'ouverture' && e.type !== 'remis')).toBe(true);
-      const utiles = demoDb.evenementsEnvoi.filtrer((e) => e.campagne_id === String(c.id) && e.type !== 'ouverture' && e.type !== 'remis').length;
+      expect(fiche.derniers_evenements.every((e) => e.type !== 'remis')).toBe(true);
+      expect(JSON.stringify(fiche.derniers_evenements)).not.toContain('automatique_probable');
+      const utiles = demoDb.evenementsEnvoi.filtrer((e) => e.campagne_id === String(c.id) && e.type !== 'remis').length;
       expect(fiche.derniers_evenements).toHaveLength(Math.min(8, utiles));
     }
   });

@@ -163,13 +163,6 @@ export function EtapeMessage({
             </div>
           </div>
         ) : null}
-        <Interrupteur
-          id="suivre-ouvertures"
-          libelle="Suivre les ouvertures (facultatif)"
-          aide="Un pixel invisible est ajouté à vos messages pour compter les ouvertures. Ce chiffre reste une estimation : les protections de messagerie ouvrent parfois les messages à la place du destinataire. Les clics ne sont jamais suivis."
-          coche={saisie.suivreOuvertures}
-          onChange={(c) => { modifier({ suivreOuvertures: c }); }}
-        />
       </div>
 
       {champs.data && champs.data.champs.length > 0 ? (

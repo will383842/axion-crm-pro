@@ -1,10 +1,11 @@
-/** DM2-INF — « Boîtes d’envoi » : tuiles, plafond de 150 par jour, ajout avec test de connexion. */
-import { useState } from 'react';
+/**
+ * L8-F10 — « Boîtes d’envoi » : tuiles et plafond de 150 par jour. L'ajout d'une boîte
+ * se fait par commande locale au palier 0 (501 au contrat) : bouton désactivé, aucun
+ * champ d'identifiant, d'hôte ni de port à l'écran.
+ */
 import { Link } from '@tanstack/react-router';
 import { Button, EmptyState, KpiCard } from '@/components/ui';
 import { PLAFOND_PAR_BOITE, useBoites, type Boite } from './composants/api';
-import { useActionDemandee } from './composants/actionDemandee';
-import { DialogueAjouterBoite } from './composants/DialogueAjouterBoite';
 import { Entete } from './composants/Entete';
 import { Etats } from './composants/Etats';
 import { BOUTON_TACTILE } from './composants/Formulaire';
@@ -51,10 +52,8 @@ function Tuile({ b }: { b: Boite }) {
 
 export function BoitesPage() {
   const requete = useBoites();
-  const [ajout, setAjout] = useState(false);
-  useActionDemandee('ajouter-boite', () => setAjout(true));
   const ajouter = (
-    <Button variant="primary" className={BOUTON_TACTILE} onClick={() => setAjout(true)}>Ajouter une boîte</Button>
+    <Button variant="primary" className={BOUTON_TACTILE} disabled>Ajout de boîte : bientôt disponible</Button>
   );
   return (
     <div>
@@ -67,7 +66,7 @@ export function BoitesPage() {
         requete={requete}
         contexte="les boîtes d’envoi"
         estVide={(d) => d.length === 0}
-        vide={<EmptyState title="Aucune boîte d’envoi" description="Ajoutez d’abord un domaine, puis une boîte." />}
+        vide={<EmptyState title="Aucune boîte d’envoi" description="Au palier 0, une boîte s’ajoute par commande locale sur le serveur." />}
       >
         {(boites) => (
           <>
@@ -86,7 +85,6 @@ export function BoitesPage() {
           </>
         )}
       </Etats>
-      <DialogueAjouterBoite ouvert={ajout} fermer={() => setAjout(false)} />
     </div>
   );
 }

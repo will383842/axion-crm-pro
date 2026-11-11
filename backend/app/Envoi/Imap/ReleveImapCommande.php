@@ -46,7 +46,8 @@ final class ReleveImapCommande extends Command
                 } catch (Throwable $e) {
                     $echecs++;
                     $this->journaliserPanne((string) $boite, $e);
-                    $this->error('relève impossible : ' . $e::class);
+                    // Message fixe et sans secret pour la fabrique absente ; sinon la classe seule (un message réseau peut porter un hôte).
+                    $this->error($e->getMessage() === FabriqueLecteursNonFournie::MESSAGE ? FabriqueLecteursNonFournie::MESSAGE : 'relève impossible : ' . $e::class);
                 }
             }
         }

@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 const CLE = 'axion-envoi:action-demandee';
 const EVENEMENT = 'axion-envoi:action';
 
-export type ActionDemandee = 'ajouter-ip' | 'ajouter-boite' | 'ajouter-domaine';
+export type ActionDemandee = 'ajouter-ip' | 'ajouter-domaine';
 
 export function demanderAction(action: ActionDemandee, chemin: string): void {
   try {

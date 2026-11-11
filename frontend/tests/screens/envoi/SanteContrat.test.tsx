@@ -39,10 +39,10 @@ describe('SantePage — réponse de la vraie route', () => {
 
 describe('Alertes — libellés des types', () => {
   it('chaque type du contrat a un libellé français', () => {
-    for (const t of ['temoin_indesirable', 'reponses_en_baisse', 'reports_en_hausse', 'homme_mort', 'sante_silencieuse', 'reponses_non_traitees'] as const) {
+    for (const t of ['temoin_indesirable', 'reponses_en_baisse', 'reports_en_hausse', 'homme_mort', 'sante_silencieuse', 'reponses_non_traitees', 'reputation_mauvaise'] as const) {
       expect(LIBELLE_TYPE_ALERTE[t]).toMatch(/[a-zé]/);
     }
-    expect(Object.keys(LIBELLE_TYPE_ALERTE)).toHaveLength(13);
+    expect(Object.keys(LIBELLE_TYPE_ALERTE)).toHaveLength(14);
   });
 
   it('l’écran des alertes affiche le libellé du type quand il est fourni', async () => {

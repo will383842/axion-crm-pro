@@ -422,4 +422,5 @@ const REGLES_ALERTE: RegleAlerte[] = [
   { id: 'reg-11', nom: 'Tableau de bord non validé depuis une semaine', condition: 'homme_mort', seuil: null, canaux: ['console', 'email'], actif: true },
   { id: 'reg-12', nom: 'Santé des envois silencieuse', condition: 'sante_silencieuse', seuil: null, canaux: ['console', 'email'], actif: true },
   { id: 'reg-13', nom: 'Réponses en attente de traitement', condition: 'reponses_non_traitees', seuil: null, canaux: ['console'], actif: true },
+  { id: 'reg-14', nom: 'Réputation de l’envoi dégradée', condition: 'reputation_mauvaise', seuil: null, canaux: ['console', 'email'], actif: true },
 ];

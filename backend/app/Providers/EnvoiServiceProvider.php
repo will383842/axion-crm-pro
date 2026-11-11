@@ -26,6 +26,7 @@ use App\Envoi\Imap\RecepteurRetours;
 use App\Envoi\Imap\RecepteurRetoursCrm;
 use App\Envoi\Imap\RecepteurRetoursEnChaine;
 use App\Envoi\Imap\RecepteurRetoursFreins;
+use App\Envoi\Imap\RecepteurRetoursReponses;
 use App\Envoi\Imap\RecepteurRetoursSequence;
 use App\Envoi\Imap\RegistreMessagesEnvoyes;
 use App\Envoi\Imap\RegistreMessagesEnvoyesDb;
@@ -122,6 +123,7 @@ class EnvoiServiceProvider extends ServiceProvider
             new RecepteurRetoursCrm,
             new RecepteurRetoursFreins($app->make(AppliquerRetour::class)),
             RecepteurRetoursSequence::parDefaut(),
+            $app->make(RecepteurRetoursReponses::class),
         ));
         $this->app->bind(RegistreMessagesEnvoyes::class, fn () => new RegistreMessagesEnvoyesDb(
             static fn (string $espace, string $empreinte): ?string => AdresseParEmpreinteCrm::trouver($espace, $empreinte),

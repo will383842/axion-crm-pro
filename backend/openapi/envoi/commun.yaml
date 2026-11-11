@@ -113,18 +113,30 @@ components:
     StatutBoite:
       type: string
       enum: [prete, ralentie, en_chauffe, suspendue]
+    PalierChauffe:
+      type: string
+      description: Palier de la montée en douceur (P1 le plus bas, P8 le plus haut).
+      enum: [P1, P2, P3, P4, P5, P6, P7, P8]
     Chauffe:
+      description: Position d'un domaine dans la montée en douceur.
       type: object
-      required: [jour, sur, plafond_aujourdhui]
+      required: [palier, jours_effectifs, total_palier, tenu_jusqu_au]
       properties:
-        jour: { type: integer, minimum: 1 }
-        sur: { type: integer, minimum: 1 }
-        plafond_aujourdhui: { type: integer, minimum: 0 }
+        palier: { $ref: '#/components/schemas/PalierChauffe' }
+        jours_effectifs: { type: integer, minimum: 0 }
+        total_palier: { type: integer, minimum: 0 }
+        tenu_jusqu_au:
+          description: Date jusqu'à laquelle le palier est tenu (frein, pause manuelle ou inactivité), sinon nul.
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
     BoiteResume:
+      description: |
+        Boîte d'envoi. Elle n'a plus de chauffe propre : la montée en douceur se
+        lit par domaine et par adresse IP (`GET /envoi/chauffe`). Jamais d'identifiants
+        chiffrés, d'hôte ni de port dans la liste ni dans la fiche.
       type: object
       required:
         [id, adresse, domaine_id, nom_affiche, etat, statut, quota_jour, envoyes_aujourdhui,
-         taux_refus, reponses_7j, chauffe]
+         taux_refus, reponses_7j]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         adresse: { type: string, format: email }
@@ -139,10 +151,6 @@ components:
           minimum: 0
           description: Refus (durs et mous) sur 7 jours, en pourcentage.
         reponses_7j: { type: integer, minimum: 0 }
-        chauffe:
-          oneOf:
-            - $ref: '#/components/schemas/Chauffe'
-            - type: 'null'
     PolitiqueDmarc:
       type: string
       enum: [none, quarantine, reject]

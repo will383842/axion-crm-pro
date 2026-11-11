@@ -29,6 +29,7 @@ export type ListeDomaines = Json<'listerDomaines'>;
 export type FicheBoite = Json<'lireBoite'>;
 export type FicheDomaine = Json<'lireDomaine'>;
 export type Chauffe = Json<'lireChauffe'>;
+export type RessourceChauffe = Chauffe['ressources'][number];
 export type ResultatTest = Json<'testerConnexionBoite'>;
 
 /** Plafond d'envois par boîte et par jour en V0 (décision du responsable du projet). */
@@ -85,4 +86,4 @@ export const useAjouterIp = () =>
 export const useAppliquerConfiguration = () => useGeste((_: void) => poster<Configuration>('/envoi/configuration/appliquer'));
 export const useRevenirConfiguration = () => useGeste((numero: number) => poster<Configuration>(`/envoi/configuration/versions/${numero}/revenir`));
 export const useLancerTest = () => useGeste((id: string) => poster<SanteServeur>(`/envoi/serveurs/${id}/test`));
-export const useReculerChauffe = () => useGeste((id: string) => poster<Boite>(`/envoi/chauffe/${id}/reculer`));
+export const useReculerChauffe = () => useGeste((id: string) => poster<RessourceChauffe>(`/envoi/chauffe/${id}/reculer`));

@@ -15,10 +15,14 @@ export interface components {
             flux: components["schemas"]["FluxEnvoi"];
             statut: components["schemas"]["StatutBoite"];
         };
+        /**
+         * @description Boîte d'envoi. Elle n'a plus de chauffe propre : la montée en douceur se
+         *     lit par domaine et par adresse IP (`GET /envoi/chauffe`). Jamais d'identifiants
+         *     chiffrés, d'hôte ni de port dans la liste ni dans la fiche.
+         */
         BoiteResume: {
             /** Format: email */
             adresse: string;
-            chauffe: components["schemas"]["Chauffe"] | null;
             domaine_id: components["schemas"]["Identifiant"];
             envoyes_aujourdhui: number;
             etat: components["schemas"]["EtatFeu"];
@@ -52,10 +56,13 @@ export interface components {
          * @enum {string}
          */
         CanalAlerte: "console" | "email";
+        /** @description Position d'un domaine dans la montée en douceur. */
         Chauffe: {
-            jour: number;
-            plafond_aujourdhui: number;
-            sur: number;
+            jours_effectifs: number;
+            palier: components["schemas"]["PalierChauffe"];
+            /** @description Date jusqu'à laquelle le palier est tenu (frein, pause manuelle ou inactivité), sinon nul. */
+            tenu_jusqu_au: string | null;
+            total_palier: number;
         };
         CibleCampagne: {
             libelle: string;
@@ -222,6 +229,11 @@ export interface components {
             par_page: number;
             total: number;
         };
+        /**
+         * @description Palier de la montée en douceur (P1 le plus bas, P8 le plus haut).
+         * @enum {string}
+         */
+        PalierChauffe: "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8";
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
         /** @enum {string} */

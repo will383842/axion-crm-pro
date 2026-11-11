@@ -416,4 +416,10 @@ const REGLES_ALERTE: RegleAlerte[] = [
   { id: 'reg-5', nom: 'Test du matin en échec', condition: 'test_matin', seuil: null, canaux: ['console', 'email'], actif: true },
   { id: 'reg-6', nom: 'Réponse intéressée', condition: 'reponse_interessee', seuil: null, canaux: ['console'], actif: true },
   { id: 'reg-7', nom: 'Plafond du jour atteint', condition: 'quota_atteint', seuil: null, canaux: ['console'], actif: false },
+  { id: 'reg-8', nom: 'Message classé en indésirable chez un témoin', condition: 'temoin_indesirable', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-9', nom: 'Réponses en baisse chez une messagerie', condition: 'reponses_en_baisse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-10', nom: 'Reports en hausse chez une messagerie', condition: 'reports_en_hausse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-11', nom: 'Tableau de bord non validé depuis une semaine', condition: 'homme_mort', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-12', nom: 'Santé des envois silencieuse', condition: 'sante_silencieuse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-13', nom: 'Réponses en attente de traitement', condition: 'reponses_non_traitees', seuil: null, canaux: ['console'], actif: true },
 ];

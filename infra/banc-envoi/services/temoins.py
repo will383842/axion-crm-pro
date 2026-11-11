@@ -1,6 +1,6 @@
 """6 boîtes témoins du banc (décision A10) : une par fournisseur, domaines .test uniquement.
 Comportement simulable par boîte : inbox (réception), junk (indésirables), absent (rien reçu)."""
-import secrets
+import hashlib, hmac, os, secrets
 
 COMPORTEMENTS = ("inbox", "junk", "absent")
 
@@ -19,10 +19,20 @@ class AdresseRefusee(Exception):
     pass
 
 
+def adresses():
+    return {t["adresse"] for t in TEMOINS.values()}
+
+
+def mot_de_passe(secret, adresse):
+    """Mot de passe dérivé d'un secret de banc fourni par l'environnement (BANC_SECRET), jamais écrit en dur."""
+    return hmac.new(secret.encode(), adresse.encode(), hashlib.sha256).hexdigest()[:24]
+
+
 class Boite:
-    def __init__(self, adresse, comportement):
+    def __init__(self, adresse, comportement, secret=""):
         self.adresse, self.comportement = adresse, comportement
-        self.mot_de_passe = secrets.token_urlsafe(12)  # généré au démarrage, jamais écrit en dur
+        # dérivé de BANC_SECRET si fourni ; sinon aléatoire (illisible : aucun LOGIN possible)
+        self.mot_de_passe = mot_de_passe(secret, adresse) if secret else secrets.token_urlsafe(12)
         self.contenu = {"inbox": [], "junk": []}
 
     def __getitem__(self, dossier):
@@ -30,8 +40,16 @@ class Boite:
 
 
 class Banc:
-    def __init__(self):
-        self.boites = {t["adresse"]: Boite(t["adresse"], t["defaut"]) for t in TEMOINS.values()}
+    def __init__(self, env=None):
+        """env : BANC_SECRET (mots de passe) et BANC_TEMOIN_<FOURNISSEUR>=inbox|junk|absent (comportement)."""
+        env = os.environ if env is None else env
+        secret = env.get("BANC_SECRET", "")
+        self.boites = {}
+        for cle, t in TEMOINS.items():
+            c = env.get(f"BANC_TEMOIN_{cle.upper()}") or t["defaut"]
+            if c not in COMPORTEMENTS:
+                raise ValueError(f"BANC_TEMOIN_{cle.upper()} : comportement inconnu : {c}")
+            self.boites[t["adresse"]] = Boite(t["adresse"], c, secret)
 
     def regler(self, adresse, comportement):
         if comportement not in COMPORTEMENTS:

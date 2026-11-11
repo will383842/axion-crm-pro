@@ -154,7 +154,9 @@ class TestSixTemoins(unittest.TestCase):
     def test_compose_imap_interne_sans_port(self):
         s = SERVICES["imap-banc"]
         self.assertNotIn("ports", s)
-        self.assertEqual(s["networks"] if "networks" in s else ["banc"], ["banc"])
+        self.assertIn("networks", s, "sans networks, Compose utiliserait le réseau default (non interne)")
+        self.assertEqual(list(s["networks"]), ["banc"])
+        self.assertIs(COMPOSE["networks"]["banc"].get("internal"), True)
 
 
 if __name__ == "__main__":

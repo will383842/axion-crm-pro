@@ -38,9 +38,17 @@ services:
     dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: lent, COMPTEUR_URL: "http://compteur:8080" }
-  imap-banc:
+  imap-banc:  # SMTP (25, mode accepte) + IMAP (143) dans le MÊME processus, sur un Banc partagé
     <<: *banc
     command: python imap_banc.py
+    environment:  # fournis par demarrer-banc.sh, jamais écrits dans le dépôt
+      BANC_SECRET: "${BANC_SECRET:-}"
+      BANC_TEMOIN_GMAIL: "${BANC_TEMOIN_GMAIL:-}"
+      BANC_TEMOIN_GOOGLE_WORKSPACE: "${BANC_TEMOIN_GOOGLE_WORKSPACE:-}"
+      BANC_TEMOIN_OUTLOOK_COM: "${BANC_TEMOIN_OUTLOOK_COM:-}"
+      BANC_TEMOIN_MICROSOFT_365: "${BANC_TEMOIN_MICROSOFT_365:-}"
+      BANC_TEMOIN_YAHOO: "${BANC_TEMOIN_YAHOO:-}"
+      BANC_TEMOIN_ORANGE: "${BANC_TEMOIN_ORANGE:-}"
   compteur:
     <<: *banc
     command: python compteur.py

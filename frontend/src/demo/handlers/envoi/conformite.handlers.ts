@@ -191,6 +191,9 @@ function csv(): string {
   return lignes.map((l) => l.map((c) => `"${c.replaceAll('"', '""')}"`).join(';')).join('\n');
 }
 
+/** Domaines de messagerie grand public : refusés en portée « domaine » (le serveur fait de même). */
+const DOMAINES_GRAND_PUBLIC = ['gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.fr', 'hotmail.com', 'hotmail.fr', 'outlook.com', 'outlook.fr', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'laposte.net'];
+
 const REPONSE_SUCCES = () => HttpResponse.json({ ok: true, message: 'Enregistré.' });
 
 export const handlers: HttpHandler[] = [
@@ -218,8 +221,18 @@ export const handlers: HttpHandler[] = [
     await delai();
     const corps = (await request.json()) as { portee?: Opposition['portee']; valeur?: string; motif?: string };
     const valeur = (corps.valeur ?? '').trim().toLowerCase();
+    const motifTexte = (corps.motif ?? '').trim();
     if (valeur === '' || corps.portee === undefined) return erreur(422, 'validation', 'Indiquez une adresse, une organisation ou un domaine.');
-    return HttpResponse.json(inscrire(corps.portee, valeur, (corps.motif ?? '').trim() || 'Demande RGPD', 'manuel'), { status: 201 });
+    if (motifTexte === '' || motifTexte.length > 500 || motifTexte.includes('@')) {
+      return erreur(422, 'validation', 'Le motif compte 1 à 500 caractères et ne contient aucune adresse e-mail.');
+    }
+    if (corps.portee === 'domaine' && DOMAINES_GRAND_PUBLIC.some((d) => valeur === d || valeur.endsWith(`.${d}`))) {
+      return erreur(422, 'validation', 'Domaine de messagerie grand public : l’inscrire bloquerait des personnes sans rapport. Inscrivez plutôt les adresses concernées.');
+    }
+    // Déjà inscrite (même portée, même valeur) : 200 et la ligne existante, aucun doublon (comme le serveur).
+    const existante = demoDb.opposition.tous().find((o) => o.portee === corps.portee && o.valeur.toLowerCase() === valeur);
+    if (existante) return HttpResponse.json(existante, { status: 200 });
+    return HttpResponse.json(inscrire(corps.portee, valeur, motifTexte, 'manuel'), { status: 201 });
   }),
 
   http.get(api('/envoi/opposition/export'), async () => {

@@ -46,7 +46,9 @@ final class RegistreOppositionManuel
     }
 
     /**
-     * Inscrit (idempotent). @return array{ligne: object, creee: bool}
+     * Inscrit (idempotent).
+     *
+     * @return array{ligne: \stdClass, creee: bool}
      */
     public function inscrire(string $workspaceId, string $portee, string $valeur, string $motif, string $auteur): array
     {
@@ -68,6 +70,9 @@ final class RegistreOppositionManuel
         }
         $ligne = DB::table('envoi_oppositions_registre')
             ->where('workspace_id', $workspaceId)->where('portee', $portee)->where('empreinte', $empreinte)->first();
+        if ($ligne === null) {
+            throw new \RuntimeException('Registre d’opposition : ligne introuvable après inscription.');
+        }
 
         return ['ligne' => $ligne, 'creee' => $inseree === 1];
     }

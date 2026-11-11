@@ -101,7 +101,12 @@ export interface paths {
         /** Registre d'opposition (« ne plus écrire ») */
         get: operations["listerOpposition"];
         put?: never;
-        /** Inscrire une adresse, une organisation ou un domaine */
+        /**
+         * Inscrire une adresse, une organisation ou un domaine
+         * @description Propriétaire seul (`workspaces.manage`). Inscription DÉFINITIVE (aucun retrait par l'écran). `valeur` : adresse
+         *     e-mail, SIREN (organisation) ou domaine. Un domaine de messagerie grand public est refusé (422). Le motif
+         *     (1 à 500 caractères) ne doit contenir aucune adresse. Source toujours `manuel`. N'envoie aucun message.
+         */
         post: operations["inscrireOpposition"];
         delete?: never;
         options?: never;
@@ -818,6 +823,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Déjà inscrite (même portée et même valeur) : la ligne existante est rendue, aucun doublon. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opposition"];
+                };
+            };
             /** @description Ligne inscrite. */
             201: {
                 headers: {
@@ -826,6 +840,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Opposition"];
                 };
+            };
+            /** @description Réservé au propriétaire. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Portée, valeur ou motif refusés (domaine grand public, SIREN invalide, motif avec adresse). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

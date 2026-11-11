@@ -277,7 +277,7 @@ export function genererCollectes(): CollecteDemo[] {
       archived_at: null,
       id,
       workspace_id: 'axion-ia',
-      created_by: 'will',
+      created_by: 'utilisateur-demo',
       name: g.nom,
       description: g.description,
       status: g.statut,

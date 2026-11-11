@@ -3,7 +3,7 @@
  * « companies ») : un nom et les filtres renseignés.
  */
 import { api } from '@/lib/api';
-import { EMPTY_FILTER, type Filter } from '../filtresUrl';
+import { EMPTY_FILTER, filtreDepuisRecherche, type Filter } from '../filtresUrl';
 
 export const ENTITE_VUES = 'companies';
 
@@ -37,11 +37,13 @@ export async function enregistrerVue(nom: string, filtre: Filter): Promise<VueSa
 
 /** Le filtre complet d'une vue : les champs absents repartent de zéro. */
 export function filtreDeLaVue(vue: VueSauvegardee): Filter {
-  // Seules les clés connues du filtre, avec des valeurs texte, sont reprises : le reste est ignoré.
-  const retenu: Partial<Filter> = {};
-  for (const cle of Object.keys(EMPTY_FILTER) as Array<keyof Filter>) {
-    const valeur: unknown = (vue.filters as Record<string, unknown> | null | undefined)?.[cle];
-    if (typeof valeur === 'string') (retenu as Record<string, string>)[cle] = valeur;
+  // Seules les clés connues, avec une valeur TEXTE, sont reprises ; chacune passe par la même validation
+  // que l'adresse (une vue ancienne ou abîmée ne peut pas injecter une valeur que l'écran refuserait).
+  const brut: Record<string, unknown> = {};
+  const source = vue.filters as unknown as Record<string, unknown> | null | undefined;
+  for (const cle of Object.keys(EMPTY_FILTER)) {
+    const valeur = source !== null && source !== undefined && Object.hasOwn(source, cle) ? source[cle] : undefined;
+    if (typeof valeur === 'string') brut[cle] = valeur;
   }
-  return { ...EMPTY_FILTER, ...retenu };
+  return filtreDepuisRecherche(brut);
 }

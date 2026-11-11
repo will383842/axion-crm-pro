@@ -325,6 +325,12 @@ export const handlers: HttpHandler[] = [
   http.put(api('/envoi/reglages/regles'), async ({ request }) => {
     await delai();
     const corps = (await request.json()) as S['Regles'];
+    const nonValides = (['pause_si_refus_pct', 'pause_si_plaintes_pour_mille', 'frein_reponses_par_jour', 'pression_max_par_organisation_30j'] as const).filter(
+      (c) => typeof corps[c] !== 'number' || !Number.isFinite(corps[c]) || corps[c] < 1,
+    );
+    if (nonValides.length > 0) {
+      return erreur(422, 'validation', `Chaque seuil doit être un nombre d’au moins 1 (${nonValides.join(', ')}).`);
+    }
     const refus = verifierDurcissement(lire().regles, corps);
     if (refus.length > 0) {
       return HttpResponse.json({ error: 'assouplissement_refuse', message: `Vous ne pouvez que durcir les règles. ${refus.join(' ')}`, details: { raisons: refus } }, { status: 422 });
@@ -410,7 +416,13 @@ export const handlers: HttpHandler[] = [
     if (force && new URL(request.url).searchParams.get('demo-etat') !== 'vide') return force;
     const dest = destinataireDuJeton(String(params['jeton']));
     if (!dest) return erreur(404, 'non_trouve', 'Ce lien n’est plus valable.');
-    const deja = demoDb.opposition.tous().some((o) => o.portee === 'adresse' && o.valeur.toLowerCase() === dest.adresse.toLowerCase());
+    const deja = demoDb.opposition
+      .tous()
+      .some(
+        (o) =>
+          (o.portee === 'adresse' && o.valeur.toLowerCase() === dest.adresse.toLowerCase()) ||
+          (o.portee === 'organisation' && dest.organisation !== null && o.valeur.toLowerCase() === dest.organisation.toLowerCase()),
+      );
     return HttpResponse.json({
       adresse_masquee: masquerAdresse(dest.adresse),
       expediteur: 'Rhône Prospection',
@@ -428,7 +440,9 @@ export const handlers: HttpHandler[] = [
     const toute = corps.toute_l_organisation === true && dest.organisation !== null;
     if (toute) inscrire('organisation', dest.organisation!, 'Lien de désinscription (toute l’organisation)', 'lien');
     else inscrire('adresse', dest.adresse, 'Lien de désinscription', 'lien');
-    demoDb.destinataires.modifier(dest.id, { etat: 'desinscrit' });
+    // « Toute l'organisation » : tous ses destinataires passent à désinscrit, pas seulement celui du lien.
+    const concernes = toute ? demoDb.destinataires.tous().filter((d) => d.organisation === dest.organisation) : [dest];
+    for (const d of concernes) demoDb.destinataires.modifier(d.id, { etat: 'desinscrit' });
     return REPONSE_SUCCES();
   }),
 ];

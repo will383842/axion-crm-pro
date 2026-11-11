@@ -9,10 +9,13 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { demoDb } from '../../base';
 import { zoneEntreprises, type FicheEntreprise } from '../../donnees/crm/entreprises';
-import type { LigneRoumanie } from '../../donnees/crm/technique';
+import { genererTechniqueDemo, type LigneRoumanie } from '../../donnees/crm/technique';
 import type { Entreprise } from '../../donnees/types';
 import { maintenant } from '../../horloge';
 import { api, delai, erreur, filtrerTexte, paginer, repondreEtatForce } from '../../outils';
+
+/** Longueur maximale du nom d'une vue (même plafond que le serveur réel : max:120). */
+export const NOM_VUE_MAX = 120;
 
 const PAGE_VIDE = { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 100 } };
 
@@ -63,10 +66,11 @@ function fiche(id: string): FicheEntreprise | undefined {
   return zoneEntreprises().fiches.find((f) => String(f.id) === id);
 }
 
-function csv(liste: readonly Entreprise[]): string {
+export function csv(liste: readonly Entreprise[]): string {
   // Neutralise l'injection de formule : une cellule commençant par = + - @ (ou tabulation/retour) est préfixée d'une apostrophe.
-  const echapper = (brut: string) => {
-    const v = /^[=+\-@\t\r]/.test(brut) ? `'${brut}` : brut;
+  const echapper = (brut: string | null | undefined) => {
+    const texte = brut ?? '';
+    const v = /^[=+\-@\t\r]/.test(texte) ? `'${texte}` : texte;
     return /[",\n\r]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v;
   };
   const entete = ['SIREN', 'Dénomination', 'NAF', 'Taille', 'Département', 'Ville', 'Email', 'Téléphone', 'Site web'];
@@ -159,6 +163,8 @@ export const handlers: HttpHandler[] = [
     if (url.searchParams.get('filter[country_code]') === 'RO') {
       const nature = url.searchParams.get('filter[entity_nature]');
       const statut = url.searchParams.get('filter[prospection_status]');
+      // La zone « technique » est créée ici si elle est absente (ne suppose pas que technique.handlers.ts l'a déjà fait).
+      demoDb.etendre('technique', (alea) => genererTechniqueDemo(alea));
       const vivier = demoDb.zone<LigneRoumanie>('technique', 'roumanie').filtrer(
         (l) => (nature === null || nature === '' || l.entity_nature === nature) && (statut === null || statut === '' || l.prospection_status === statut),
       );
@@ -288,7 +294,9 @@ export const handlers: HttpHandler[] = [
     const nom = (corps.name ?? '').trim();
     if (nom === '') return erreur(422, 'nom_vide', 'Donnez un nom à la vue.');
     const vues = demoDb.zone<{ id: number; entity: string; name: string }>('entreprises', 'vues');
-    if (vues.tous().some((v) => v.entity === corps.entity && v.name === nom)) {
+    if (nom.length > NOM_VUE_MAX) return erreur(422, 'nom_trop_long', `Le nom de la vue ne peut pas dépasser ${NOM_VUE_MAX} caractères.`);
+    const minuscule = nom.toLocaleLowerCase('fr');
+    if (vues.tous().some((v) => v.entity === corps.entity && v.name.toLocaleLowerCase('fr') === minuscule)) {
       return erreur(422, 'nom_deja_pris', 'Une vue porte déjà ce nom.');
     }
     const maintenantIso = maintenant().toISOString();

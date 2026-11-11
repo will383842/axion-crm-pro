@@ -11,7 +11,11 @@ import { http, HttpResponse } from 'msw';
 
 import { CompaniesListPage } from '@/features/companies/CompaniesListPage';
 import { CompanyDetailPage } from '@/features/companies/CompanyDetailPage';
-import { handlers } from '@/demo/handlers/crm/entreprises.handlers';
+import { csv, handlers, NOM_VUE_MAX } from '@/demo/handlers/crm/entreprises.handlers';
+import { zoneEntreprises } from '@/demo/donnees/crm/entreprises';
+import { filtreDeLaVue, type VueSauvegardee } from '@/features/companies/vues/vuesSauvegardees';
+import { EMPTY_FILTER } from '@/features/companies/filtresUrl';
+import type { Entreprise } from '@/demo/donnees/types';
 import { handlers as handlersSocle } from '@/demo/handlers/socle/config.handlers';
 import { demoDb } from '@/demo/base';
 import { api } from '@/demo/outils';
@@ -178,7 +182,12 @@ describe('Fiche entreprise : ce qui vient d’Envoi', () => {
   it('montre responsable, affaire, historique et liens entre entreprises', async () => {
     await fiche('actif');
     expect(await screen.findByRole('heading', { name: 'Liens entre entreprises' })).toBeInTheDocument();
-    expect(screen.getByText('Groupe Tilleuls Holding')).toBeInTheDocument();
+    // Un vrai lien vers la fiche de la holding (même nom), pas un simple texte.
+    const holding = demoDb.entreprises.tous().find((e) => e.denomination === 'Groupe Tilleuls Holding')!;
+    expect(holding).toBeDefined();
+    const lien = screen.getByRole('link', { name: 'Groupe Tilleuls Holding' });
+    expect(lien).toHaveAttribute('href', `/companies/${holding.id}`);
+    expect(holding.id).not.toBe(idTilleuls());
     expect(screen.getByText('Société mère')).toBeInTheDocument();
     expect(screen.getByText('Responsable', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Historique' })).toBeInTheDocument();
@@ -208,5 +217,116 @@ describe('Fiche entreprise : ce qui vient d’Envoi', () => {
   it('l’étape posée à la main est annoncée comme définitive pour l’import (elle ne recule jamais seule)', async () => {
     await fiche('actif');
     expect(await screen.findByText(/l’import ne la modifiera plus/)).toBeInTheDocument();
+  });
+});
+
+describe('csv() du faux serveur : la vraie fonction (DM1-ENT)', () => {
+  const une = (surcharge: Partial<Entreprise>): Entreprise => ({ ...demoDb.entreprises.tous()[0]!, ...surcharge });
+
+  it('commence par le BOM, puis l’en-tête', () => {
+    expect(csv([]).startsWith('﻿SIREN,Dénomination,')).toBe(true);
+  });
+
+  it.each(['=1+1', '+33', '-2', '@SOMME(A1)', '\tcellule', '\rcellule'])('neutralise %j en tête de cellule', (brut) => {
+    const sortie = csv([une({ denomination: brut })]);
+    // La cellule porte l'apostrophe devant (entourée de guillemets si elle contient un retour).
+    expect(sortie.includes(`'${brut}`)).toBe(true);
+    expect(sortie.includes(`,${brut}`)).toBe(false);
+    expect(sortie.includes(`,"${brut}`)).toBe(false);
+  });
+
+  it('entoure de guillemets les virgules, retours à la ligne et guillemets (doublés)', () => {
+    const sortie = csv([une({ denomination: 'A, B', city: 'Ligne\nDeux', website: 'dit "oui"' })]);
+    expect(sortie).toContain('"A, B"');
+    expect(sortie).toContain('"Ligne\nDeux"');
+    expect(sortie).toContain('"dit ""oui"""');
+  });
+
+  it('neutralise d’abord, puis entoure : =a,b devient "\'=a,b"', () => {
+    expect(csv([une({ denomination: '=a,b' })])).toContain('"\'=a,b"');
+  });
+
+  it('accepte une valeur absente sans écrire « null » ni « undefined »', () => {
+    const sortie = csv([une({ phone: null as never, email_generic: undefined as never })]);
+    expect(sortie).not.toMatch(/null|undefined/);
+  });
+});
+
+describe('filtreDeLaVue (DM1-ENT)', () => {
+  const vue = (filters: unknown): VueSauvegardee => ({ id: 1, name: 'v', filters: filters as never, is_default: false });
+
+  it('reprend les clés connues valides et repart de zéro pour le reste', () => {
+    expect(filtreDeLaVue(vue({ priority: 'haute' }))).toEqual({ ...EMPTY_FILTER, priority: 'haute' });
+    expect(filtreDeLaVue(vue({}))).toEqual(EMPTY_FILTER);
+  });
+
+  it('ignore les clés inconnues', () => {
+    expect(filtreDeLaVue(vue({ inconnue: 'x', priority: 'haute' }))).toEqual({ ...EMPTY_FILTER, priority: 'haute' });
+  });
+
+  it('ignore __proto__ et ne pollue aucun prototype', () => {
+    const piege = JSON.parse('{"__proto__": {"priority": "haute"}, "constructor": "x"}') as unknown;
+    expect(filtreDeLaVue(vue(piege))).toEqual(EMPTY_FILTER);
+    expect(({} as Record<string, unknown>)['priority']).toBeUndefined();
+  });
+
+  it('ignore les valeurs qui ne sont pas du texte', () => {
+    expect(filtreDeLaVue(vue({ priority: 3, tag: ['a'], naf: { x: 1 }, department_code: 69, fermees: true }))).toEqual(EMPTY_FILTER);
+  });
+
+  it('refuse une valeur texte que l’écran refuserait (même validation que l’adresse)', () => {
+    expect(filtreDeLaVue(vue({ priority: 'nimporte-quoi', cree_apres: 'pas-une-date' }))).toEqual(EMPTY_FILTER);
+  });
+
+  it('une vue nulle ou sans filtres ne casse pas', () => {
+    expect(filtreDeLaVue(vue(null))).toEqual(EMPTY_FILTER);
+    expect(filtreDeLaVue(vue(undefined))).toEqual(EMPTY_FILTER);
+  });
+});
+
+describe('POST /saved-views : nom de vue (DM1-ENT)', () => {
+  const envoyer = (name: string) =>
+    fetch('https://api.localhost/api/v1/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entity: 'companies', name, filters: {} }),
+    });
+
+  beforeEach(() => {
+    demoDb.reinitialiser();
+    zoneEntreprises();
+    server.use(...handlers);
+  });
+
+  it('doublon de nom insensible à la casse', async () => {
+    expect((await envoyer('Priorité Haute')).status).toBe(201);
+    expect((await envoyer('priorité haute')).status).toBe(422);
+    expect((await envoyer('PRIORITÉ HAUTE')).status).toBe(422);
+  });
+
+  it('plafonne la longueur du nom', async () => {
+    expect((await envoyer('x'.repeat(NOM_VUE_MAX))).status).toBe(201);
+    expect((await envoyer('y'.repeat(NOM_VUE_MAX + 1))).status).toBe(422);
+  });
+});
+
+describe('Vivier Roumanie sans technique.handlers.ts (DM1-ENT)', () => {
+  it('la liste RO crée la zone « technique » si elle est absente', async () => {
+    demoDb.reinitialiser();
+    server.use(...handlers);
+    const reponse = await fetch('https://api.localhost/api/v1/companies?filter[country_code]=RO');
+    expect(reponse.status).toBe(200);
+    expect(Array.isArray(((await reponse.json()) as { data: unknown[] }).data)).toBe(true);
+  });
+});
+
+describe('Liens de groupe (DM1-ENT)', () => {
+  it('la holding porte le lien retour « Filiale » vers Boulangerie des Tilleuls', () => {
+    demoDb.reinitialiser();
+    const fiches = zoneEntreprises().fiches;
+    const tilleuls = demoDb.entreprises.tous().find((e) => e.denomination === 'Boulangerie des Tilleuls')!;
+    const holding = demoDb.entreprises.tous().find((e) => e.denomination === 'Groupe Tilleuls Holding')!;
+    expect(fiches.find((f) => f.id === tilleuls.id)!.liens).toContainEqual({ company_id: holding.id, denomination: 'Groupe Tilleuls Holding', lien: 'Société mère' });
+    expect(fiches.find((f) => f.id === holding.id)!.liens).toContainEqual({ company_id: tilleuls.id, denomination: 'Boulangerie des Tilleuls', lien: 'Filiale' });
   });
 });

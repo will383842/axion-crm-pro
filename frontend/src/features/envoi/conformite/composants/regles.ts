@@ -13,14 +13,15 @@ export const CHAMPS_NOMBRE: ChampNombre[] = ['pause_si_refus_pct', 'pause_si_pla
 
 /**
  * Valeur permise pour un seuil, selon `backend/openapi/envoi/conformite.yaml` :
- * - refus (%) et plaintes (pour 1 000) : nombre, minimum contractuel 0, mais 0
- *   couperait tout envoi : on exige > 0 (0,5 reste permis : durcissement légitime) ;
+ * - refus (%) et plaintes (pour 1 000) : nombre fini ≥ 0 (minimum 0 du contrat) ;
+ *   0 est le durcissement maximal légitime (pause dès le premier refus ou la
+ *   première plainte) et 0,5 est permis ;
  * - frein : entier ≥ 0 (minimum 0 du contrat) ;
  * - pression par organisation : entier ≥ 1 (minimum 1 du contrat).
  */
 export function valeurPermise(cle: ChampNombre, n: unknown): boolean {
   if (typeof n !== 'number' || !Number.isFinite(n)) return false;
-  if (cle === 'pause_si_refus_pct' || cle === 'pause_si_plaintes_pour_mille') return n > 0;
+  if (cle === 'pause_si_refus_pct' || cle === 'pause_si_plaintes_pour_mille') return n >= 0;
   if (cle === 'frein_reponses_par_jour') return Number.isInteger(n) && n >= 0;
   return Number.isInteger(n) && n >= 1;
 }
@@ -35,7 +36,7 @@ export function saisiePermise(cle: ChampNombre, t: string | undefined): boolean 
 export function exigence(cle: ChampNombre): string {
   if (cle === 'frein_reponses_par_jour') return 'un nombre entier, 0 ou plus';
   if (cle === 'pression_max_par_organisation_30j') return 'un nombre entier d’au moins 1';
-  return 'un nombre strictement positif (0,5 est permis)';
+  return 'un nombre de 0 ou plus (0,5 est permis)';
 }
 
 function minutes(heure: string): number {

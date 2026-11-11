@@ -22,7 +22,7 @@ const JSON_ENTETE = { 'Content-Type': 'application/json' };
 
 beforeEach(() => demoDb.reinitialiser());
 
-describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistré (#400 I1)', () => {
+describe('Règles de prudence : un champ vidé ou négatif n’est jamais enregistré (#400 I1)', () => {
   async function ouvrir() {
     return renderScreen(<ReglesPrudencePage />, { path: '/envoi/reglages/regles', url: '/envoi/reglages/regles', handlers: conformite });
   }
@@ -39,7 +39,7 @@ describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistr�
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
   });
 
-  it('écran : 0,5 accepté pour plaintes et refus ; 0, vide, négatif refusés', async () => {
+  it('écran : 0 et 0,5 acceptés pour plaintes et refus ; vide, négatif refusés', async () => {
     const user = userEvent.setup();
     await ouvrir();
     for (const nom of [/seuil de plaintes|plainte/i, /adresses refusées/i]) {
@@ -48,10 +48,14 @@ describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistr�
       await user.type(champ, '0.5');
       expect(screen.queryByRole('alert')).toBeNull();
       expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled();
-      for (const saisie of ['0', '-1']) {
+      await user.clear(champ);
+      await user.type(champ, '0');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled();
+      for (const saisie of ['-1']) {
         await user.clear(champ);
         if (saisie !== '') await user.type(champ, saisie);
-        expect(await screen.findByRole('alert')).toHaveTextContent(/strictement positif/i);
+        expect(await screen.findByRole('alert')).toHaveTextContent(/0 ou plus/i);
         expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
       }
       await user.clear(champ);
@@ -61,12 +65,12 @@ describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistr�
     }
   });
 
-  it('faux serveur : mêmes règles que l’écran (422 si refusé, 200 pour 0,5)', async () => {
+  it('faux serveur : mêmes règles que l’écran (422 si refusé, 200 pour 0 et 0,5)', async () => {
     server.use(...conformite);
     const actuel = (await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()) as Record<string, unknown>;
     const put = (corps: unknown) => fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify(corps) });
     for (const cle of ['pause_si_refus_pct', 'pause_si_plaintes_pour_mille']) {
-      for (const valeur of [0, -1, null, undefined, '1']) {
+      for (const valeur of [-1, null, undefined, '1']) {
         expect((await put({ ...actuel, [cle]: valeur })).status, `${cle}=${String(valeur)}`).toBe(422);
       }
     }
@@ -78,12 +82,27 @@ describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistr�
     }
     expect(await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()).toEqual(actuel);
     expect((await put({ ...actuel, pause_si_plaintes_pour_mille: 0.5, pause_si_refus_pct: 0.5 })).status).toBe(200);
+    expect((await put({ ...actuel, pause_si_plaintes_pour_mille: 0, pause_si_refus_pct: 0 })).status).toBe(200);
+    expect((await put({ ...actuel, pause_si_plaintes_pour_mille: 0, pause_si_refus_pct: 0, frein_reponses_par_jour: 0 })).status).toBe(200);
   });
 
-  it('pastille « actives » : un seuil à 0,5 compte comme actif', async () => {
+  it('écran : frein_reponses_par_jour à 0 accepté', async () => {
+    const user = userEvent.setup();
+    await ouvrir();
+    const champ = await screen.findByRole('spinbutton', { name: /réponses/i });
+    await user.clear(champ);
+    await user.type(champ, '0');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled();
+  });
+
+  it('pastille « actives » : un seuil à 0,5 (ou 0) compte comme actif', async () => {
     server.use(...conformite);
     const actuel = (await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()) as Record<string, unknown>;
-    await fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify({ ...actuel, pause_si_plaintes_pour_mille: 0.5 }) });
+    const reponse = await fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify({ ...actuel, pause_si_plaintes_pour_mille: 0.5 }) });
+    expect(reponse.status).toBe(200);
+    const relu = (await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()) as Record<string, unknown>;
+    expect(relu.pause_si_plaintes_pour_mille).toBe(0.5);
     await ouvrir();
     await screen.findByRole('spinbutton', { name: /messages par organisation/i });
     expect(screen.getByText('5 actives')).toBeVisible();

@@ -48,7 +48,7 @@ function Formulaire({ actuel }: { actuel: ReglesPrudence }) {
           id={`${id}-${cle}`}
           type="number"
           inputMode="decimal"
-          min={cle === 'frein_reponses_par_jour' ? 0 : cle === 'pression_max_par_organisation_30j' ? 1 : 0.5}
+          min={cle === 'frein_reponses_par_jour' ? 0 : cle === 'pression_max_par_organisation_30j' ? 1 : 0}
           step={pas}
           value={texte[cle] ?? String(brouillon[cle])}
           onChange={(e) => {

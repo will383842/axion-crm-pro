@@ -332,12 +332,11 @@ test('R07 : un point auto.* refuse toute preuve', function (string $code) {
     expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $code, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
 })->with(FV_AUTO_SANS_SOURCE);
 
-test('R07 : A11 éclaté : trois inscriptions bloquantes, Signal Spam non bloquant ; l’ancien point disparaît', function () {
+test('R07 : A11 éclaté : quatre inscriptions bloquantes (Signal Spam aussi, par prudence) ; l’ancien point disparaît', function () {
     $ws = espaceFeuVert();
-    foreach (['manuel.postmaster_google', 'manuel.snds_jmrp', 'manuel.orange_cfl'] as $c) {
+    foreach (['manuel.postmaster_google', 'manuel.snds_jmrp', 'manuel.orange_cfl', 'manuel.signal_spam'] as $c) {
         expect(point($ws, $c)->bloquant)->toBeTrue($c);
     }
-    expect(point($ws, 'manuel.signal_spam'))->fait->toBeFalse()->bloquant->toBeFalse();
     expect(CatalogueManuels::codes())->not->toContain('manuel.inscriptions');
 });
 
@@ -355,8 +354,8 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 44 points : 13 auto verts, 3 auto sans source, 28 manuels non faits dont Signal Spam non bloquant.
-    expect($bloquants)->toBe(3 + 27);
+    // 44 points : 13 auto verts, 3 auto sans source, 28 manuels non faits.
+    expect($bloquants)->toBe(3 + 28);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });
 

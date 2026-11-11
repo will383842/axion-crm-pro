@@ -45,6 +45,10 @@ class ListeFeuVert
             $auto('auto.signature_absente', $d !== null && $d->feu_vert_signature === null, 'Aucune signature posée.', $d === null ? 'Drapeaux absents.' : 'Une signature existe déjà.'),
             $this->temoins($ws),
             $this->troisJours($ws),
+            // R07 : points sans source (R16 pas posé) : FAUX par construction, jamais « vrai par défaut ».
+            $auto('auto.frein_temoins_branche', false, '', 'Relève des indésirables liée et planifiée : source pas encore posée (R16).'),
+            $auto('auto.frein_reponses_baisse', false, '', 'Évaluation planifiée de reponsesEnBaisse : source pas encore posée.'),
+            $this->separation($ws),
             $auto('auto.arret_entreprise', ! self::estAbsent(app(ArretParEntreprise::class), ArretParEntrepriseAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
             $auto('auto.retrait_file', ! self::estAbsent(app(RetraitEnvoisEnFile::class), RetraitEnvoisEnFileAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
             // Mêmes règles que la vraie garde (JetonDesinscription) : jamais une copie.
@@ -184,5 +188,24 @@ class ListeFeuVert
         }
 
         return self::pointAuto($code, $suite >= 3, $suite >= 3 ? 'Les 6 témoins sont verts depuis 3 jours consécutifs.' : $suite . ' jour(s) vert(s) consécutif(s) sur 3 requis.');
+    }
+
+    /**
+     * A12 : lettre et prospection ne partagent ni domaine ni adresse IP. Les domaines doivent tous porter un flux
+     * (colonne `flux` non NULL) ; les adresses IP n'ont aucune source lisible aujourd'hui : le point reste FAUX
+     * (un constat peut freiner, jamais libérer). Lecture seule.
+     */
+    private function separation(string $ws): PointFeuVert
+    {
+        $code = 'auto.separation_lettre_prospection';
+        if (! Schema::hasColumn('envoi_domaines', 'flux')) {
+            return self::pointAuto($code, false, 'Colonne flux absente (migration R07 pas posée).');
+        }
+        $sans = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->whereNull('flux')->count());
+        if ($sans > 0) {
+            return self::pointAuto($code, false, $sans . ' domaine(s) sans flux étiqueté (prospection ou lettre).');
+        }
+
+        return self::pointAuto($code, false, 'Flux étiquetés, mais la séparation des adresses IP n’a pas encore de source lisible.');
     }
 }

@@ -40,6 +40,15 @@ interface DepotSocle
     /** Commande locale uniquement (artisan). */
     public function eteindreTemoins(string $workspaceId, string $auteur): void;
 
+    /**
+     * Commande locale : ajoute un témoin (empreinte HMAC seulement, jamais l'adresse), journalisé dans la MÊME
+     * transaction. Idempotent : un doublon n'est pas une erreur. Vrai si le témoin est nouveau.
+     */
+    public function ajouterTemoin(string $workspaceId, string $adresse, string $fournisseur, string $libelle, string $auteur): bool;
+
+    /** @return list<array{empreinte: string, libelle: string, fournisseur: string|null, cree_le: string}> */
+    public function listerTemoins(string $workspaceId): array;
+
     /** Commande locale : arme « Tout arrêter » (journalisé). */
     public function armerToutArreter(string $workspaceId, string $auteur): void;
 

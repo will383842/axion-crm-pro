@@ -73,6 +73,22 @@ final class DepotMemoire implements DepotSocle
         $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
     }
 
+    public function ajouterTemoin(string $workspaceId, string $adresse, string $fournisseur, string $libelle, string $auteur): bool
+    {
+        $nouveau = ! $this->estTemoin($workspaceId, $adresse);
+        if ($nouveau) {
+            $this->temoins[] = EmpreinteTemoin::normaliser($adresse);
+        }
+        $this->journaliser($workspaceId, 'temoin_ajoute', $auteur);
+
+        return $nouveau;
+    }
+
+    public function listerTemoins(string $workspaceId): array
+    {
+        return [];
+    }
+
     public function armerToutArreter(string $workspaceId, string $auteur): void
     {
         $this->arret = true;

@@ -68,6 +68,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_30_000200_envoi_relances_effets.php',
     // Envoi L8-F03 : colonne NULLABLE `fournisseur` ajoutée à envoi_temoins (ajout seul) ; la retirer effacerait le fournisseur des témoins ; down() inerte.
     '2026_12_01_000010_envoi_temoins_fournisseur.php',
+    // Envoi L8-F07a : table des reculs de chauffe, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait l'historique des reculs ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_01_000040_envoi_chauffe_reculs.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

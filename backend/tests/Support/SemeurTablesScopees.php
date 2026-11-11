@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -139,6 +139,8 @@ final class SemeurTablesScopees
         'envoi_config_versions',
         'envoi_releves_sante',
         'envoi_constats_sante',
+        // Envoi L8-F07a : reculs de chauffe, ajout seul (trigger) : voir APPEND_SEUL.
+        'envoi_chauffe_reculs',
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
@@ -577,6 +579,14 @@ final class SemeurTablesScopees
             'ressource' => 'zz-etancheite.example.invalid',
             'statut' => 'non_liste',
             'zone' => '*',
+        ]);
+
+        $inserer('envoi_chauffe_reculs', [
+            'ressource_type' => 'ip',
+            'ressource' => 'zz-etancheite',
+            'motif' => 'zz-etancheite',
+            'auteur' => 'zz-etancheite',
+            'date_recul' => '2026-01-01',
         ]);
 
         $inserer('envoi_releves_sante', [

@@ -101,11 +101,11 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
     await expect(page.getByText('Version 16 en service')).toBeVisible();
   });
 
-  test('chauffe : reculer d’un palier ramène la boîte de trois jours', async ({ page }) => {
+  test('chauffe : reculer d’un palier ramène le domaine au palier précédent', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/chauffe', { offre: 'envoi' });
-    const carte = page.getByRole('region', { name: 'Chauffe de paul@prospection-c.example' });
+    const carte = page.getByRole('region', { name: 'Chauffe de prospection-c.example' });
     await carte.getByRole('button', { name: /Reculer d’un palier/ }).click();
-    await expect(carte.getByText('jour 3 sur 30').first()).toBeVisible();
+    await expect(carte.getByText('palier P1, jour 1').first()).toBeVisible();
   });
 
   test('états vide et erreur, propres', async ({ page }) => {

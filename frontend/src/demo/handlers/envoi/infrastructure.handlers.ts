@@ -49,6 +49,7 @@ interface LigneVersion extends VersionConfiguration { id: number }
 interface LigneIp { id: string; serveur_id: string; adresse: string; flux: FluxEnvoi; domaine_id: string; version: number }
 interface LigneReglages extends ReglagesBoite { id: string }
 interface LigneExpiration { id: string; le: string }
+interface LigneRecul { id: string; jour: string }
 interface LigneTest { id: string; fait_le: string; etapes: Array<{ libelle: string; ok: boolean }> }
 
 const LISTES_SURVEILLEES = ['Liste A (grand public)', 'Liste B (spécialisée)'] as const;
@@ -63,6 +64,8 @@ interface DonneesInfra {
   reglages: LigneReglages[];
   expirations: LigneExpiration[];
   tests: LigneTest[];
+  /** Ressources déjà reculées, avec le jour du recul (un seul recul par jour). */
+  reculs: LigneRecul[];
 }
 
 const ETAPES_TEST = ['Connexion au serveur', 'Envoi vers une boîte témoin interne', 'Réception côté boîte témoin', 'Signature DKIM vérifiée'];
@@ -98,7 +101,7 @@ function activite30Jours(alea: Alea, boite: Boite, joursActifs: number): JourAct
 function fabrique(alea: Alea): DonneesInfra {
   const jours: Record<string, JourActivite[]> = {};
   for (const b of demoDb.boites.tous()) {
-    const joursActifs = b.statut === 'suspendue' ? 0 : b.chauffe ? b.chauffe.jour : 30;
+    const joursActifs = b.statut === 'suspendue' ? 0 : (demoDb.domaines.trouver(b.domaine_id)?.chauffe?.jours_effectifs ?? 30);
     jours[b.id] = activite30Jours(alea, b, joursActifs);
   }
 
@@ -140,7 +143,7 @@ function fabrique(alea: Alea): DonneesInfra {
     etapes: ETAPES_TEST.map((libelle) => ({ libelle, ok: true })),
   }));
 
-  return { jours, dns, listes, versions, ips: [], reglages, expirations, tests };
+  return { jours, dns, listes, versions, ips: [], reglages, expirations, tests, reculs: [] };
 }
 
 function donnees(): DonneesInfra {
@@ -152,6 +155,7 @@ const versionsDb = () => (donnees(), demoDb.zone<LigneVersion>('infrastructure',
 const ipsDb = () => (donnees(), demoDb.zone<LigneIp>('infrastructure', 'ips'));
 const reglagesDb = () => (donnees(), demoDb.zone<LigneReglages>('infrastructure', 'reglages'));
 const expirationsDb = () => (donnees(), demoDb.zone<LigneExpiration>('infrastructure', 'expirations'));
+const reculsDb = () => (donnees(), demoDb.zone<LigneRecul>('infrastructure', 'reculs'));
 const testsDb = () => (donnees(), demoDb.zone<LigneTest>('infrastructure', 'tests'));
 
 // ── Règles ─────────────────────────────────────────────────────────────────
@@ -168,7 +172,6 @@ export function estAdresseDeDocumentation(adresse: string): boolean {
 }
 
 const REGEX_DOMAINE_DEMO = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.example$/;
-const REGEX_ADRESSE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function slug(texte: string): string {
   return texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -176,10 +179,6 @@ function slug(texte: string): string {
 
 function utilisateurCourant(): string {
   return demoDb.utilisateurs.tous()[0]?.name ?? 'Camille';
-}
-
-function recalculerBoites(domaineId: string): number {
-  return demoDb.boites.filtrer((b) => b.domaine_id === domaineId).length;
 }
 
 function ipsDuDomaine(domaineId: string): string[] {
@@ -233,21 +232,99 @@ function sommeJours(listes: JourActivite[][]): JourActivite[] {
   }));
 }
 
-/** Plafond de la montée en douceur au jour effectif `jour` : 2 le premier jour, puis +2 par jour d'envoi. */
-export function plafondDuJour(jour: number): number {
-  return Math.min(PLAFOND_BOITE, Math.max(2, 2 * (jour - 1)));
+type PalierChauffe = components['schemas']['PalierTable']['palier'];
+type RessourceChauffe = components['schemas']['RessourceChauffe'];
+type Goulot = components['schemas']['GoulotChauffe'];
+type Termes = components['schemas']['TermesChauffe'];
+type ChauffeDomaine = NonNullable<Domaine['chauffe']>;
+
+/** Table des paliers de la montée en douceur (jours effectifs d'envoi et total quotidien du palier). */
+export const PALIERS: ReadonlyArray<{ palier: PalierChauffe; jours_min: number; jours_max: number; total_jour: number }> = [
+  { palier: 'P1', jours_min: 1, jours_max: 3, total_jour: 10 },
+  { palier: 'P2', jours_min: 4, jours_max: 7, total_jour: 20 },
+  { palier: 'P3', jours_min: 8, jours_max: 10, total_jour: 40 },
+  { palier: 'P4', jours_min: 11, jours_max: 14, total_jour: 60 },
+  { palier: 'P5', jours_min: 15, jours_max: 18, total_jour: 80 },
+  { palier: 'P6', jours_min: 19, jours_max: 23, total_jour: 100 },
+  { palier: 'P7', jours_min: 24, jours_max: 29, total_jour: 125 },
+  { palier: 'P8', jours_min: 30, jours_max: 999, total_jour: 150 },
+];
+/** Plafond du serveur d'envoi et capacité à traiter les réponses, par jour (démo). */
+const PLAFOND_SERVEUR = 400;
+const CAPACITE_REPONSE = 300;
+
+function ressource(id: string, type: 'ip' | 'domaine', libelle: string, c: ChauffeDomaine, envoyes: number, reculeAujourdhui: boolean): RessourceChauffe {
+  const index = Math.max(0, PALIERS.findIndex((p) => p.palier === c.palier));
+  const courant = PALIERS[index] ?? PALIERS[0]!;
+  return {
+    id,
+    type,
+    libelle,
+    palier: c.palier,
+    jours_effectifs: c.jours_effectifs,
+    jours_avant_palier_suivant: index >= PALIERS.length - 1 ? null : Math.max(0, courant.jours_max - c.jours_effectifs + 1),
+    total_palier: c.total_palier,
+    envoyes_aujourdhui: envoyes,
+    tenu_jusqu_au: c.tenu_jusqu_au,
+    motif_tenue: c.tenu_jusqu_au ? 'manuel' : null,
+    peut_reculer: index > 0 && !reculeAujourdhui,
+  };
 }
 
-/** Date de fin prévue : `reste` jours d'envoi (hors week-ends) à partir d'aujourd'hui. */
-function finPrevue(reste: number): string {
-  const d = maintenant();
-  let n = reste;
-  while (n > 0) {
-    d.setUTCDate(d.getUTCDate() + 1);
-    const s = d.getUTCDay();
-    if (s !== 0 && s !== 6) n -= 1;
+/** Ressources en chauffe : les domaines en montée et les adresses IP qui leur sont rattachées. */
+function ressourcesChauffe(): RessourceChauffe[] {
+  const reculs = new Set(reculsDb().filtrer((r) => r.jour === jourIso(0)).map((r) => r.id));
+  const sorties: RessourceChauffe[] = [];
+  for (const d of demoDb.domaines.tous()) {
+    if (!d.chauffe) continue;
+    const envoyes = demoDb.boites.filtrer((b) => b.domaine_id === d.id).reduce((n, b) => n + b.envoyes_aujourdhui, 0);
+    sorties.push(ressource(`domaine:${d.id}`, 'domaine', d.nom, d.chauffe, envoyes, reculs.has(`domaine:${d.id}`)));
   }
-  return d.toISOString().slice(0, 10);
+  for (const serveur of demoDb.serveurs.tous()) {
+    for (const ip of serveur.adresses_ip) {
+      const c = demoDb.domaines.trouver(ip.domaine_id)?.chauffe;
+      if (ip.statut !== 'en_chauffe' || !c) continue;
+      sorties.push(ressource(`ip:${ip.adresse}`, 'ip', ip.adresse, c, ip.envoyes_aujourdhui, reculs.has(`ip:${ip.adresse}`)));
+    }
+  }
+  return sorties;
+}
+
+function minimum(valeurs: number[]): number | null {
+  return valeurs.length === 0 ? null : Math.min(...valeurs);
+}
+
+function budgetEtGoulot(ressources: RessourceChauffe[]): { budget: number; goulot: Goulot; termes: Termes } {
+  const domaines = ressources.filter((r) => r.type === 'domaine');
+  const ips = ressources.filter((r) => r.type === 'ip');
+  const actives = demoDb.boites.filtrer((b) => b.statut !== 'suspendue');
+  const termes: Termes = {
+    courbe_ip: minimum(ips.map((r) => r.total_palier)),
+    courbe_domaine: minimum(domaines.map((r) => r.total_palier)),
+    plafond_boites: actives.reduce((n, b) => n + Math.min(PLAFOND_BOITE, b.quota_jour), 0),
+    plafond_serveur: PLAFOND_SERVEUR,
+    capacite_reponse: CAPACITE_REPONSE,
+  };
+  const ordre = ['courbe_ip', 'courbe_domaine', 'plafond_boites', 'plafond_serveur', 'capacite_reponse'] as const;
+  let terme: (typeof ordre)[number] = 'capacite_reponse';
+  let budget = Number.POSITIVE_INFINITY;
+  for (const t of ordre) {
+    const v = termes[t];
+    if (v !== null && v < budget) {
+      budget = v;
+      terme = t;
+    }
+  }
+  const origine = terme === 'courbe_ip' ? ips : terme === 'courbe_domaine' ? domaines : [];
+  const cible = origine.find((r) => r.total_palier === budget) ?? null;
+  const libelles: Record<(typeof ordre)[number], string> = {
+    courbe_ip: 'La montée d’une adresse IP limite le volume du jour.',
+    courbe_domaine: 'La montée d’un domaine limite le volume du jour.',
+    plafond_boites: 'Le plafond des boîtes limite le volume du jour.',
+    plafond_serveur: 'Le plafond du serveur limite le volume du jour.',
+    capacite_reponse: 'La capacité à traiter les réponses limite le volume du jour.',
+  };
+  return { budget: Number.isFinite(budget) ? budget : 0, goulot: { terme, ressource_id: cible?.id ?? null, libelle: libelles[terme] }, termes };
 }
 
 function configuration(): Configuration {
@@ -298,60 +375,15 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json({ data: demoDb.boites.tous() });
   }),
 
-  http.post(api('/envoi/boites/test-connexion'), async ({ request }) => {
+  // Au palier 0, une boîte s'ajoute par commande locale : ni l'ajout ni le test de connexion ne passent par l'écran.
+  http.post(api('/envoi/boites/test-connexion'), async () => {
     await delai();
-    const corps = (await request.json().catch(() => ({}))) as { adresse?: string; domaine_id?: string };
-    const domaine = corps.domaine_id ? demoDb.domaines.trouver(corps.domaine_id) : undefined;
-    const dnsComplet = domaine ? lignesDns(domaine).every((l) => l.etat === 'ok') : false;
-    const etapes = [
-      { libelle: 'Adresse bien formée', ok: REGEX_ADRESSE.test(corps.adresse ?? '') },
-      { libelle: 'Domaine connu et rattaché à un serveur', ok: domaine !== undefined },
-      { libelle: 'Enregistrements DNS complets (SPF, DKIM, DMARC, retour)', ok: dnsComplet },
-      { libelle: 'Connexion au serveur d’envoi', ok: domaine !== undefined && dnsComplet },
-    ];
-    return HttpResponse.json({ reussi: etapes.every((e) => e.ok), etapes });
+    return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
   }),
 
-  http.post(api('/envoi/boites'), async ({ request }) => {
+  http.post(api('/envoi/boites'), async () => {
     await delai();
-    donnees();
-    const corps = (await request.json().catch(() => ({}))) as {
-      adresse?: string;
-      domaine_id?: string;
-      nom_affiche?: string;
-      signature?: string;
-      mode_absence?: ReglagesBoite['mode_absence'];
-    };
-    const adresse = (corps.adresse ?? '').trim().toLowerCase();
-    const domaine = corps.domaine_id ? demoDb.domaines.trouver(corps.domaine_id) : undefined;
-    if (!REGEX_ADRESSE.test(adresse)) return erreur(422, 'validation', 'Cette adresse e-mail n’est pas valide.');
-    if (!domaine) return erreur(422, 'validation', 'Choisissez un domaine d’envoi.');
-    if (!adresse.endsWith(`@${domaine.nom}`)) return erreur(422, 'validation', `L’adresse doit se terminer par @${domaine.nom}.`);
-    if (demoDb.boites.filtrer((b) => b.adresse === adresse).length > 0) return erreur(422, 'validation', 'Cette boîte existe déjà.');
-    const nom = (corps.nom_affiche ?? '').trim();
-    if (nom === '') return erreur(422, 'validation', 'Indiquez le nom affiché aux destinataires.');
-
-    const id = `boi-${slug(adresse.split('@')[0] ?? 'nouvelle')}`;
-    const boite = demoDb.boites.ajouter({
-      id,
-      adresse,
-      domaine_id: domaine.id,
-      nom_affiche: nom,
-      etat: 'bleu',
-      statut: 'en_chauffe',
-      quota_jour: plafondDuJour(1),
-      envoyes_aujourdhui: 0,
-      taux_refus: 0,
-      reponses_7j: 0,
-      chauffe: { jour: 1, sur: 30, plafond_aujourdhui: plafondDuJour(1) },
-    } satisfies Boite);
-    demoDb.domaines.modifier(domaine.id, { boites: recalculerBoites(domaine.id) });
-    reglagesDb().ajouter({
-      id,
-      signature: corps.signature ?? '',
-      mode_absence: corps.mode_absence ?? { actif: false, jusqu_au: null, message: null },
-    });
-    return HttpResponse.json(boite, { status: 201 });
+    return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
   }),
 
   http.get(api('/envoi/boites/:id'), async ({ request, params }) => {
@@ -401,10 +433,14 @@ export const handlers: HttpHandler[] = [
     await delai();
     const actuelle = demoDb.boites.trouver(String(params['id']));
     if (!actuelle) return erreur(404, 'non_trouve', 'Cette boîte n’existe pas.');
+    if (demoDb.etatEnvois.lire().etat === 'arrete' || actuelle.etat === 'rouge') {
+      return erreur(409, 'pause_active', 'Une pause de frein ou une pause automatique est active : la boîte ne peut pas être réactivée maintenant.');
+    }
+    const enChauffe = Boolean(demoDb.domaines.trouver(actuelle.domaine_id)?.chauffe);
     const boite = demoDb.boites.modifier(actuelle.id, {
-      statut: actuelle.chauffe ? 'en_chauffe' : 'prete',
-      etat: actuelle.chauffe ? 'bleu' : 'vert',
-      quota_jour: actuelle.chauffe ? actuelle.chauffe.plafond_aujourdhui : actuelle.quota_jour > 0 ? actuelle.quota_jour : 40,
+      statut: enChauffe ? 'en_chauffe' : 'prete',
+      etat: enChauffe ? 'bleu' : 'vert',
+      quota_jour: actuelle.quota_jour > 0 ? actuelle.quota_jour : 40,
     });
     return HttpResponse.json(boite);
   }),
@@ -598,28 +634,44 @@ export const handlers: HttpHandler[] = [
   http.get(api('/envoi/chauffe'), async ({ request }) => {
     await delai();
     donnees();
-    const force = await repondreEtatForce(request, { boites: [], courbe: [], fins_prevues: {}, plafond_boite: PLAFOND_BOITE });
-    if (force) return force;
-    const boites = demoDb.boites.tous();
-    return HttpResponse.json({
+    const force = await repondreEtatForce(request, {
+      jour: jourIso(0),
+      budget_du_jour: 0,
       plafond_boite: PLAFOND_BOITE,
-      boites,
-      courbe: Array.from({ length: 30 }, (_, i) => ({ jour: i + 1, plafond: plafondDuJour(i + 1) })),
-      fins_prevues: Object.fromEntries(boites.filter((b) => b.chauffe).map((b) => [b.id, finPrevue((b.chauffe?.sur ?? 30) - (b.chauffe?.jour ?? 0))])),
+      goulot: { terme: 'capacite_reponse', ressource_id: null, libelle: 'Aucune ressource en chauffe.' },
+      termes: { courbe_ip: null, courbe_domaine: null, plafond_boites: null, plafond_serveur: null, capacite_reponse: null },
+      ressources: [],
+      paliers: [],
+    });
+    if (force) return force;
+    const ressources = ressourcesChauffe();
+    const { budget, goulot, termes } = budgetEtGoulot(ressources);
+    return HttpResponse.json({
+      jour: jourIso(0),
+      budget_du_jour: budget,
+      plafond_boite: PLAFOND_BOITE,
+      goulot,
+      termes,
+      ressources,
+      paliers: PALIERS,
     });
   }),
 
   http.post(api('/envoi/chauffe/:id/reculer'), async ({ params }) => {
     await delai();
-    const boite = demoDb.boites.trouver(String(params['id']));
-    if (!boite) return erreur(404, 'non_trouve', 'Cette boîte n’existe pas.');
-    if (!boite.chauffe) return erreur(409, 'pas_en_chauffe', 'Cette boîte a terminé sa montée en douceur : il n’y a rien à reculer.');
-    const jour = Math.max(1, boite.chauffe.jour - 3);
-    const chauffe = { ...boite.chauffe, jour, plafond_aujourdhui: plafondDuJour(jour) };
-    const modifiee = demoDb.boites.modifier(boite.id, { chauffe, quota_jour: chauffe.plafond_aujourdhui });
-    const domaine = demoDb.domaines.trouver(boite.domaine_id);
-    if (domaine?.chauffe) demoDb.domaines.modifier(domaine.id, { chauffe });
-    return HttpResponse.json(modifiee);
+    const id = String(params['id']);
+    const courante = ressourcesChauffe().find((r) => r.id === id);
+    if (!courante) return erreur(404, 'non_trouve', 'Cette ressource n’est pas en chauffe.');
+    const index = PALIERS.findIndex((p) => p.palier === courante.palier);
+    if (index <= 0) return erreur(409, 'deja_au_premier_palier', 'Cette ressource est déjà au premier palier : il n’y a rien à reculer.');
+    // Un second recul le même jour ne recule pas deux fois : la ressource est rendue telle quelle.
+    if (!courante.peut_reculer) return HttpResponse.json(courante);
+    const precedent = PALIERS[index - 1]!;
+    const domaineId = id.startsWith('domaine:') ? id.slice('domaine:'.length) : (demoDb.serveurs.tous().flatMap((s) => s.adresses_ip).find((ip) => `ip:${ip.adresse}` === id)?.domaine_id ?? '');
+    demoDb.domaines.modifier(domaineId, { chauffe: { palier: precedent.palier, jours_effectifs: precedent.jours_min, total_palier: precedent.total_jour, tenu_jusqu_au: null } });
+    reculsDb().ajouter({ id, jour: jourIso(0) });
+    const apres = ressourcesChauffe().find((r) => r.id === id);
+    return HttpResponse.json(apres ?? courante);
   }),
 
   // ── Listes noires ─────────────────────────────────────────────────────────
@@ -655,8 +707,8 @@ function santeDuServeur(id: string): SanteServeur | null {
   const paliers = serveur.adresses_ip
     .filter((ip) => ip.statut === 'en_chauffe')
     .map((ip) => {
-      const chauffe = demoDb.domaines.trouver(ip.domaine_id)?.chauffe ?? { jour: 1, sur: 30, plafond_aujourdhui: plafondDuJour(1) };
-      return { adresse: ip.adresse, jour: chauffe.jour, sur: chauffe.sur, plafond_aujourdhui: chauffe.plafond_aujourdhui };
+      const chauffe = demoDb.domaines.trouver(ip.domaine_id)?.chauffe ?? { palier: 'P1' as const, jours_effectifs: 1, total_palier: PALIERS[0]!.total_jour, tenu_jusqu_au: null };
+      return { adresse: ip.adresse, jour: chauffe.jours_effectifs, sur: 30, plafond_aujourdhui: chauffe.total_palier };
     });
   return {
     serveur_id: id,

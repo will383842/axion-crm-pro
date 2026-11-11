@@ -32,7 +32,7 @@ describe('ResultatsPage — Résultats', () => {
     expect(within(domaines).getByText('prospection-a.example')).toBeVisible();
   });
 
-  it('n’affiche aucune colonne ni mot de clic, et les ouvertures sont une estimation', async () => {
+  it('n’affiche aucune colonne ni mot de clic ni d’ouverture', async () => {
     const user = userEvent.setup();
     const { container } = await monter();
     await screen.findByRole('table', { name: 'Par boîte' });
@@ -41,20 +41,19 @@ describe('ResultatsPage — Résultats', () => {
       const tableau = await screen.findByRole('table', { name: nom });
       for (const colonne of within(tableau).getAllByRole('columnheader')) {
         expect(colonne.textContent ?? '').not.toMatch(/clic/i);
-        if (/ouvert/i.test(colonne.textContent ?? '')) expect(colonne.textContent).toMatch(/estimation/i);
+        expect(colonne.textContent ?? '').not.toMatch(/ouvert/i);
       }
     }
     expect(container.textContent ?? '').not.toMatch(/clic/i);
-    expect(container.textContent ?? '').not.toMatch(/aucun pixel/i);
+    expect(container.textContent ?? '').not.toMatch(/ouverture|pixel/i);
   });
 
-  it('ne montre aucune ouverture estimée, même quand une campagne a activé le pixel', async () => {
-    expect(demoDb.campagnes.tous().some((c) => c.suivre_ouvertures)).toBe(true);
+  it('ne montre aucune ouverture : ni colonne, ni mot, ni phrase d’estimation', async () => {
     const { container } = await monter();
     const tableau = await screen.findByRole('table', { name: 'Par boîte' });
     const entetes = within(tableau).getAllByRole('columnheader').map((c) => c.textContent ?? '');
     expect(entetes.filter((t) => /ouvert/i.test(t))).toEqual([]);
-    expect(container.textContent ?? '').not.toMatch(/ouvertures|automatiques à part/i);
+    expect(container.textContent ?? '').not.toMatch(/ouverture|automatiques à part|estimation/i);
   });
 
   it('le faux serveur ne calcule ni ne renvoie aucune ouverture estimée (le champ est absent)', async () => {
@@ -64,20 +63,6 @@ describe('ResultatsPage — Résultats', () => {
       const corps = (await reponse.json()) as { data: Array<Record<string, unknown>> };
       expect(corps.data.length).toBeGreaterThan(0);
       expect(corps.data.every((l) => !('ouvertures' in l))).toBe(true);
-    }
-  });
-
-  it('n’affiche aucune ouverture quand aucune campagne n’a activé le pixel', async () => {
-    for (const c of demoDb.campagnes.tous()) demoDb.campagnes.modifier(c.id, { suivre_ouvertures: false });
-    const user = userEvent.setup();
-    await monter();
-    await screen.findByRole('table', { name: 'Par boîte' });
-    for (const nom of ['Par boîte', 'Par domaine', 'Par liste', 'Par message type']) {
-      await user.click(screen.getByRole('tab', { name: nom }));
-      const tableau = await screen.findByRole('table', { name: nom });
-      for (const colonne of within(tableau).getAllByRole('columnheader')) {
-        expect(colonne.textContent ?? '').not.toMatch(/ouvert/i);
-      }
     }
   });
 

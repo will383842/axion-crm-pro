@@ -55,19 +55,28 @@ final class ReleveImap
 
     private const CLASSES_REBOND = [ClasseRetour::RebondDur, ClasseRetour::RebondMou];
 
+    private readonly FabriqueLecteurs $lecteurs;
+
+    /**
+     * @param  LecteurBoite|FabriqueLecteurs  $lecteurs  la fabrique rend UN lecteur PAR boîte ; un lecteur seul
+     *                                                   (tests, lecteur mémoire) est enveloppé dans une fabrique fixe
+     */
     public function __construct(
-        private readonly LecteurBoite $lecteur,
+        LecteurBoite|FabriqueLecteurs $lecteurs,
         private readonly RegistreMessagesEnvoyes $registre,
         private readonly RecepteurRetours $recepteur,
         private readonly ?Alerte $alerte = null,
-    ) {}
+    ) {
+        $this->lecteurs = $lecteurs instanceof FabriqueLecteurs ? $lecteurs : new FabriqueLecteurFixe($lecteurs);
+    }
 
     /** Relève courante : uniquement ce qui suit le curseur. */
     public function relever(string $workspaceId, string $boite): BilanReleve
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite): BilanReleve {
             $this->domainesEnCache = []; // un seul SELECT par relève et par espace
-            $validite = $this->lecteur->uidValidity($boite);
+            $lecteur = $this->lecteurs->fabrique($boite); // un lecteur PAR boîte
+            $validite = $lecteur->uidValidity($boite);
             $curseur = DB::table('envoi_curseurs_imap')->where('workspace_id', $workspaceId)->where('boite', $boite)->first();
             $bilan = new BilanReleve;
             $uidApres = 0;
@@ -77,7 +86,7 @@ final class ReleveImap
                 $bilan->uidValiditeChangee = true;
             }
 
-            $lot = $this->lecteur->lire($boite, $uidApres, null, self::LIMITE_LOT);
+            $lot = $lecteur->lire($boite, $uidApres, null, self::LIMITE_LOT);
             $bilan->lotPlein = $lot->suite;
             $premierEchec = $this->traiter($workspaceId, $boite, $validite, $lot->messages, $bilan, false);
             // Le curseur ne dépasse jamais le premier message en échec : il sera relu.
@@ -102,13 +111,14 @@ final class ReleveImap
     public function rattraper(string $workspaceId, string $boite, DateTimeImmutable $sauvegardeLe): BilanReleve
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite, $sauvegardeLe): BilanReleve {
-            $validite = $this->lecteur->uidValidity($boite);
+            $lecteur = $this->lecteurs->fabrique($boite);
+            $validite = $lecteur->uidValidity($boite);
             $depuis = $sauvegardeLe->modify('-' . self::FENETRE_RATTRAPAGE_JOURS . ' days');
             $bilan = new BilanReleve;
             $apres = 0;
             $echec = false;
             do {
-                $lot = $this->lecteur->lire($boite, $apres, $depuis, self::LIMITE_LOT);
+                $lot = $lecteur->lire($boite, $apres, $depuis, self::LIMITE_LOT);
                 $echec = $this->traiter($workspaceId, $boite, $validite, $lot->messages, $bilan, true) !== null || $echec;
                 $suite = $lot->suite && $lot->dernierUid > $apres; // garde-fou : la boucle avance toujours
                 $apres = max($apres, $lot->dernierUid);

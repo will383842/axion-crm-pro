@@ -21,7 +21,11 @@ class EnvoiTemoinAjouter extends Command
 
     private const LIBELLE_LONGUEUR_MAX = 60;
 
-    private const MOTIFS_ADRESSE_REFORMULEE = '/@|\bat\b|\barobase\b|\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}/iu';
+    /**
+     * Prudence : au moindre doute on refuse. « chez » et « point » sont refusés même collés à d'autres
+     * lettres (« moichezexemple », « exemplepointtest »), « dot » seulement comme mot entier.
+     */
+    private const MOTIFS_ADRESSE_REFORMULEE = '/@|\bat\b|\barobase\b|\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|chez|point|\bdot\b|\[\s*dot\s*\]|\(\s*dot\s*\)/iu';
 
     protected $signature = 'envoi:temoin-ajouter {workspace : identifiant du workspace} {fournisseur : gmail, google_workspace, outlook_com, microsoft_365, yahoo ou orange} {--libelle= : libellé libre, jamais une adresse} {--auteur= : qui demande}';
 
@@ -43,7 +47,7 @@ class EnvoiTemoinAjouter extends Command
 
             return self::FAILURE;
         }
-        if (mb_strlen($libelle) > self::LIBELLE_LONGUEUR_MAX || preg_match(self::MOTIFS_ADRESSE_REFORMULEE, $libelle) === 1) {
+        if (mb_strlen($libelle) > self::LIBELLE_LONGUEUR_MAX || $this->libelleRessembleAUneAdresse($libelle)) {
             $this->error('Libellé refusé : ' . self::LIBELLE_LONGUEUR_MAX . ' caractères au plus, et jamais une adresse (même reformulée).');
 
             return self::FAILURE;
@@ -83,5 +87,15 @@ class EnvoiTemoinAjouter extends Command
         $this->info($nouveau ? 'Témoin ajouté (journalisé).' : 'Témoin déjà présent : rien à faire (journalisé).');
 
         return self::SUCCESS;
+    }
+
+    /** Normalise (NFKC : l'arobase pleine largeur U+FF20 devient « @ ») puis cherche une adresse même reformulée. */
+    private function libelleRessembleAUneAdresse(string $libelle): bool
+    {
+        $normalise = class_exists(\Normalizer::class) ? \Normalizer::normalize($libelle, \Normalizer::FORM_KC) : $libelle;
+        $texte = str_replace(["\u{FF20}", "\u{FE6B}"], '@', is_string($normalise) ? $normalise : $libelle);
+
+        return preg_match(self::MOTIFS_ADRESSE_REFORMULEE, $texte) === 1
+            || preg_match(self::MOTIFS_ADRESSE_REFORMULEE, $libelle) === 1;
     }
 }

@@ -6,7 +6,6 @@ import {
   useBoite,
   useEnregistrerReglages,
   useReactiverBoite,
-  useReculerChauffe,
   useSuspendreBoite,
   type FicheBoite,
   type ReglagesBoite,
@@ -16,7 +15,7 @@ import { Etats } from './composants/Etats';
 import { BOUTON_TACTILE, CLASSE_CHAMP, MessageErreur, MessageSucces } from './composants/Formulaire';
 import { dateHeure, LIBELLE_STATUT, messageErreur, nombre, pourcent } from './composants/format';
 import { GraphiqueJours, totaux } from './composants/GraphiqueJours';
-import { Jauge, PastilleFeu } from './composants/Pastilles';
+import { PastilleFeu } from './composants/Pastilles';
 
 const VERDICT: Record<string, string> = {
   vert: 'Tout va bien : la boîte envoie normalement.',
@@ -78,7 +77,6 @@ function FormulaireReglages({ id, depart }: { id: string; depart: ReglagesBoite 
 function Contenu({ fiche }: { fiche: FicheBoite }) {
   const { boite, jours, derniers_refus, reponses, reglages } = fiche;
   const t = totaux(jours);
-  const reculer = useReculerChauffe();
   return (
     <div className="space-y-4">
       <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
@@ -97,16 +95,8 @@ function Contenu({ fiche }: { fiche: FicheBoite }) {
           <GraphiqueJours jours={jours} libelle={boite.adresse} />
         </section>
         <section aria-label="Chauffe" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Chauffe</h2>
-          {boite.chauffe ? (
-            <div className="mt-3 space-y-3">
-              <Jauge libelle="Montée" valeur={boite.chauffe.jour} max={boite.chauffe.sur} texte={`jour ${boite.chauffe.jour} sur ${boite.chauffe.sur}`} />
-              <p className="text-sm text-slate-700">Palier du jour : <strong>{boite.chauffe.plafond_aujourdhui}</strong> envois au plus.</p>
-              <Button variant="secondary" className={BOUTON_TACTILE} loading={reculer.isPending} onClick={() => reculer.mutate(boite.id)}>Reculer d’un palier</Button>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-700">Montée terminée. Plafond de la boîte : <strong>{boite.quota_jour}</strong> par jour.</p>
-          )}
+          <h2 className="text-lg font-bold text-slate-900">Plafond du jour</h2>
+          <p className="mt-3 text-sm text-slate-700"><strong>{boite.envoyes_aujourdhui}</strong> envoyés aujourd’hui sur <strong>{boite.quota_jour}</strong> permis. La montée en douceur se lit par domaine, dans la page Chauffe.</p>
         </section>
       </div>
       <section aria-label="Derniers refus (raison en clair)" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">

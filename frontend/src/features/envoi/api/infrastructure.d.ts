@@ -14,7 +14,11 @@ export interface paths {
         /** Boîtes d'envoi */
         get: operations["listerBoites"];
         put?: never;
-        /** Ajouter une boîte (lance une chauffe de 30 jours) */
+        /**
+         * Ajouter une boîte (non disponible au palier 0)
+         * @description Au palier 0, une boîte s'ajoute par commande locale sur le serveur
+         *     (les identifiants ne transitent jamais par l'écran) : la route répond 501.
+         */
         post: operations["ajouterBoite"];
         delete?: never;
         options?: never;
@@ -48,7 +52,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Réactiver une boîte suspendue */
+        /**
+         * Réactiver une boîte suspendue
+         * @description Permission requise, `workspaces.manage` (403 sinon). Refusée (409) tant
+         *     qu'une pause de frein ou une pause automatique est active.
+         */
         post: operations["reactiverBoite"];
         delete?: never;
         options?: never;
@@ -82,7 +90,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suspendre une boîte */
+        /**
+         * Suspendre une boîte
+         * @description Permission requise, `users.manage` (403 sinon).
+         */
         post: operations["suspendreBoite"];
         delete?: never;
         options?: never;
@@ -99,7 +110,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tester la connexion d'une boîte avant de l'ajouter */
+        /**
+         * Tester la connexion d'une boîte avant de l'ajouter (non disponible au palier 0)
+         * @description Au palier 0, l'ajout se fait par commande locale, la route répond 501.
+         */
         post: operations["testerConnexionBoite"];
         delete?: never;
         options?: never;
@@ -114,7 +128,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chauffe des boîtes et domaines (montée en douceur) */
+        /** Chauffe des domaines et des adresses IP (montée en douceur par palier) */
         get: operations["lireChauffe"];
         put?: never;
         post?: never;
@@ -133,7 +147,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reculer la montée en douceur d'un palier (jours effectifs) */
+        /**
+         * Reculer une ressource d'un palier
+         * @description `id` est l'identifiant opaque d'une ressource de chauffe (ex. `domaine:<ref>`),
+         *     pas l'identifiant d'une boîte. Impossible en P1 (409). Un second recul le même
+         *     jour ne recule pas une seconde fois. Il n'existe aucune route pour avancer.
+         */
         post: operations["reculerChauffe"];
         delete?: never;
         options?: never;
@@ -358,10 +377,14 @@ export interface components {
             flux: components["schemas"]["FluxEnvoi"];
             statut: components["schemas"]["StatutBoite"];
         };
+        /**
+         * @description Boîte d'envoi. Elle n'a plus de chauffe propre : la montée en douceur se
+         *     lit par domaine et par adresse IP (`GET /envoi/chauffe`). Jamais d'identifiants
+         *     chiffrés, d'hôte ni de port dans la liste ni dans la fiche.
+         */
         BoiteResume: {
             /** Format: email */
             adresse: string;
-            chauffe: components["schemas"]["Chauffe"] | null;
             domaine_id: components["schemas"]["Identifiant"];
             envoyes_aujourdhui: number;
             etat: components["schemas"]["EtatFeu"];
@@ -373,10 +396,13 @@ export interface components {
             /** @description Refus (durs et mous) sur 7 jours, en pourcentage. */
             taux_refus: number;
         };
+        /** @description Position d'un domaine dans la montée en douceur. */
         Chauffe: {
-            jour: number;
-            plafond_aujourdhui: number;
-            sur: number;
+            jours_effectifs: number;
+            palier: components["schemas"]["PalierChauffe"];
+            /** @description Date jusqu'à laquelle le palier est tenu (frein, pause manuelle ou inactivité), sinon nul. */
+            tenu_jusqu_au: string | null;
+            total_palier: number;
         };
         /** @enum {string} */
         ClassementReponse: "interesse" | "pas_maintenant" | "question" | "refus" | "stop" | "absence" | "a_rattacher";
@@ -442,6 +468,12 @@ export interface components {
         };
         /** @enum {string} */
         FluxEnvoi: "prospection" | "lettre";
+        /** @description Le terme qui limite le budget du jour. */
+        GoulotChauffe: {
+            libelle: string;
+            ressource_id: string | null;
+            terme: components["schemas"]["TermeGoulot"];
+        };
         /**
          * Format: date-time
          * @description Date et heure ISO 8601 (UTC).
@@ -478,6 +510,17 @@ export interface components {
             jusqu_au: string | null;
             message: string | null;
         };
+        /**
+         * @description Palier de la montée en douceur (P1 le plus bas, P8 le plus haut).
+         * @enum {string}
+         */
+        PalierChauffe: "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8";
+        PalierTable: {
+            jours_max: number;
+            jours_min: number;
+            palier: components["schemas"]["PalierChauffe"];
+            total_jour: number;
+        };
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
         ReglagesBoite: {
@@ -503,6 +546,21 @@ export interface components {
                 confiance: number;
             };
             traitee: boolean;
+        };
+        RessourceChauffe: {
+            envoyes_aujourdhui: number;
+            /** @description Identifiant opaque (ex. `domaine:<ref>`). */
+            id: string;
+            jours_avant_palier_suivant: number | null;
+            jours_effectifs: number;
+            libelle: string;
+            motif_tenue: ("frein" | "manuel" | "inactivite") | null;
+            palier: components["schemas"]["PalierChauffe"];
+            peut_reculer: boolean;
+            tenu_jusqu_au: string | null;
+            total_palier: number;
+            /** @enum {string} */
+            type: "ip" | "domaine";
         };
         SanteServeur: {
             /** @description Messages en attente d'envoi sur ce serveur. */
@@ -533,6 +591,16 @@ export interface components {
         };
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
+        /** @enum {string} */
+        TermeGoulot: "courbe_ip" | "courbe_domaine" | "plafond_boites" | "plafond_serveur" | "capacite_reponse";
+        /** @description Valeur de chaque terme du budget (nul si le terme ne s'applique pas). */
+        TermesChauffe: {
+            capacite_reponse: number | null;
+            courbe_domaine: number | null;
+            courbe_ip: number | null;
+            plafond_boites: number | null;
+            plafond_serveur: number | null;
+        };
         /** @enum {string} */
         TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         VersionConfiguration: {
@@ -633,6 +701,7 @@ export interface operations {
         responses: {
             201: components["responses"]["Boite"];
             422: components["responses"]["Erreur"];
+            501: components["responses"]["Erreur"];
         };
     };
     lireBoite: {
@@ -676,6 +745,9 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Boite"];
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
         };
     };
     enregistrerReglagesBoite: {
@@ -717,6 +789,8 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Boite"];
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
         };
     };
     testerConnexionBoite: {
@@ -751,6 +825,7 @@ export interface operations {
                     };
                 };
             };
+            501: components["responses"]["Erreur"];
         };
     };
     lireChauffe: {
@@ -762,24 +837,23 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Boîtes en chauffe et courbe prévue. */
+            /** @description Budget du jour, goulot, ressources en chauffe et table des paliers. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        boites: components["schemas"]["BoiteResume"][];
-                        courbe: {
-                            jour: number;
-                            plafond: number;
-                        }[];
-                        /** @description Date de fin prévue de la montée de chaque boîte en chauffe (identifiant de la boîte -> date). */
-                        fins_prevues: {
-                            [key: string]: string;
-                        };
+                        /** @description Nombre d'envois permis aujourd'hui, tous termes confondus. */
+                        budget_du_jour: number;
+                        goulot: components["schemas"]["GoulotChauffe"];
+                        /** Format: date */
+                        jour: string;
+                        paliers: components["schemas"]["PalierTable"][];
                         /** @description Plafond d'envois par boîte et par jour (150 en V0). */
                         plafond_boite: number;
+                        ressources: components["schemas"]["RessourceChauffe"][];
+                        termes: components["schemas"]["TermesChauffe"];
                     };
                 };
             };
@@ -790,13 +864,22 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: components["parameters"]["Identifiant"];
+                id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Boite"];
+            /** @description La ressource après le recul. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RessourceChauffe"];
+                };
+            };
+            404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };

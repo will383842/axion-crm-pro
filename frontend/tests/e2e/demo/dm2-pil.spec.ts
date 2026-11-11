@@ -41,11 +41,11 @@ test.describe('pilotage des envois (démo)', () => {
 
   test('Feu vert : marquer un point fait survit au rechargement', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/sante/feu-vert', { offre: 'les-deux' });
-    await expect(page.getByText('13 critères sur 15')).toBeVisible();
+    await expect(page.getByText('14 critères sur 18')).toBeVisible();
     await page.getByRole('button', { name: /Marquer fait : Boucles de retour/ }).click();
-    await expect(page.getByText('14 critères sur 15')).toBeVisible();
+    await expect(page.getByText('15 critères sur 18')).toBeVisible();
     await page.reload();
-    await expect(page.getByText('14 critères sur 15')).toBeVisible();
+    await expect(page.getByText('15 critères sur 18')).toBeVisible();
     await controleAxe(page);
     await passage360(page);
   });

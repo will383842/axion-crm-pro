@@ -4,6 +4,7 @@ namespace App\Envoi\Imap;
 
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -18,6 +19,10 @@ use Throwable;
 final class ReleveImapCommande extends Command
 {
     public const SIGNATURE_PLANIFIEE = 'envoi:releve-imap';
+
+    private const CLE_PANNE = 'envoi:releve-imap:panne:';
+
+    private const DELAI_RELOG_SECONDES = 3600;
 
     protected $signature = self::SIGNATURE_PLANIFIEE;
 
@@ -37,15 +42,37 @@ final class ReleveImapCommande extends Command
             foreach ($boites as $boite) {
                 try {
                     app(ReleveImap::class)->relever((string) $ws, (string) $boite);
+                    $this->journaliserRetablie((string) $boite);
                 } catch (Throwable $e) {
                     $echecs++;
-                    // Classe seulement : le message d'une panne réseau peut porter un hôte.
-                    Log::error('[ENVOI] relève IMAP impossible pour une boîte.', ['exception' => $e::class]);
+                    $this->journaliserPanne((string) $boite, $e);
                     $this->error('relève impossible : ' . $e::class);
                 }
             }
         }
 
         return $echecs > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Une panne n'est journalisée qu'UNE fois par changement d'état (nouvelle panne, ou autre classe d'exception)
+     * et par boîte, puis au plus une fois par heure tant qu'elle dure : pas de Log::error chaque minute.
+     * Classe seulement : le message d'une panne réseau peut porter un hôte.
+     */
+    private function journaliserPanne(string $boite, Throwable $e): void
+    {
+        $cle = self::CLE_PANNE . $boite;
+        if (Cache::get($cle) === $e::class) {
+            return; // même panne, déjà journalisée il y a moins d'une heure
+        }
+        Log::error('[ENVOI] relève IMAP impossible pour une boîte.', ['boite' => $boite, 'exception' => $e::class]);
+        Cache::put($cle, $e::class, self::DELAI_RELOG_SECONDES);
+    }
+
+    private function journaliserRetablie(string $boite): void
+    {
+        if (Cache::pull(self::CLE_PANNE . $boite) !== null) {
+            Log::info('[ENVOI] relève IMAP rétablie pour une boîte.', ['boite' => $boite]);
+        }
     }
 }

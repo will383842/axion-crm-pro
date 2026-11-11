@@ -1,0 +1,136 @@
+openapi: 3.1.0
+info:
+  title: Envoi — séquences
+  version: 0.1.0
+  description: |
+    Séquences de 1 à 3 messages (l'essai A/B est retiré au palier 0) : liste,
+    fiche, pause et reprise. Aucun corps de message et aucune donnée de
+    prospect ne sont exposés. Lot : L8-F03c.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/sequences:
+    get:
+      operationId: listerSequences
+      summary: Séquences
+      responses:
+        '200':
+          description: Séquences.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sequences]
+                properties:
+                  sequences:
+                    type: array
+                    items: { $ref: '#/components/schemas/SequenceResume' }
+  /envoi/sequences/{id}:
+    get:
+      operationId: lireSequence
+      summary: Fiche d'une séquence
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Séquence, étapes et possibilité de reprise.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SequenceDetail' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/sequences/{id}/pause:
+    post:
+      operationId: mettreSequenceEnPause
+      summary: Mettre une séquence en pause
+      description: Permission requise, `users.manage` (403 sinon).
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: La séquence après la pause.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SequenceDetail' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/sequences/{id}/reprise:
+    post:
+      operationId: reprendreSequence
+      summary: Reprendre une séquence en pause
+      description: |
+        Permission requise, `workspaces.manage` (403 sinon). Refusée (409) tant
+        qu'un frein, l'arrêt général ou une pause automatique est actif.
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: La séquence après la reprise.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SequenceDetail' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+components:
+  schemas:
+    StatutSequence:
+      type: string
+      enum: [active, en_pause, terminee]
+    MotifPauseSequence:
+      type: string
+      enum: [manuelle, frein, arret_general, automatique]
+    InscriptionsSequence:
+      type: object
+      required: [total, en_cours, terminees, arretees, reportees]
+      properties:
+        total: { type: integer, minimum: 0 }
+        en_cours: { type: integer, minimum: 0 }
+        terminees: { type: integer, minimum: 0 }
+        arretees: { type: integer, minimum: 0 }
+        reportees: { type: integer, minimum: 0 }
+    SequenceResume:
+      type: object
+      required:
+        [id, nom, statut, motif_pause, reservee_aux_temoins, nb_etapes, inscriptions, prochain_envoi, creee_le]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        nom: { type: string }
+        statut: { $ref: '#/components/schemas/StatutSequence' }
+        motif_pause:
+          oneOf:
+            - $ref: '#/components/schemas/MotifPauseSequence'
+            - type: 'null'
+        reservee_aux_temoins: { type: boolean }
+        nb_etapes: { type: integer, minimum: 1, maximum: 3 }
+        inscriptions: { $ref: '#/components/schemas/InscriptionsSequence' }
+        prochain_envoi:
+          oneOf:
+            - $ref: './commun.yaml#/components/schemas/Horodatage'
+            - type: 'null'
+        creee_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+    EtapeSequence:
+      description: Compteurs d'une étape. Jamais le corps du message.
+      type: object
+      required: [rang, delai_jours, objet, envoyes, reponses, rebonds_durs, desinscriptions]
+      properties:
+        rang: { type: integer, minimum: 1, maximum: 3 }
+        delai_jours: { type: integer, minimum: 0 }
+        objet: { type: string }
+        envoyes: { type: integer, minimum: 0 }
+        reponses: { type: integer, minimum: 0 }
+        rebonds_durs: { type: integer, minimum: 0 }
+        desinscriptions: { type: integer, minimum: 0 }
+    SequenceDetail:
+      allOf:
+        - $ref: '#/components/schemas/SequenceResume'
+        - type: object
+          required: [etapes, peut_reprendre, raison_refus_reprise]
+          properties:
+            etapes:
+              type: array
+              minItems: 1
+              maxItems: 3
+              items: { $ref: '#/components/schemas/EtapeSequence' }
+            peut_reprendre: { type: boolean }
+            raison_refus_reprise:
+              oneOf: [{ type: string }, { type: 'null' }]

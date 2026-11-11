@@ -29,7 +29,7 @@ function Ligne({ d, expire, reference }: { d: Domaine; expire?: string | undefin
         <strong className="break-all text-sm text-slate-900">{d.nom}</strong>
         <PastilleFeu etat={d.etat} />
       </div>
-      <p className="mt-1 text-xs text-slate-600">{d.boites} boîte{d.boites > 1 ? 's' : ''}{d.chauffe ? ` · jour ${d.chauffe.jour} sur ${d.chauffe.sur}` : ''}</p>
+      <p className="mt-1 text-xs text-slate-600">{d.boites} boîte{d.boites > 1 ? 's' : ''}{d.chauffe ? ` · palier ${d.chauffe.palier}, jour ${d.chauffe.jours_effectifs}` : ''}</p>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-slate-500">DMARC</dt>

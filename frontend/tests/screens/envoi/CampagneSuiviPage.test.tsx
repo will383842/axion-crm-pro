@@ -81,13 +81,12 @@ describe('CampagneSuiviPage', () => {
     }
   });
 
-  it('contact exclu (opposé) : aucune ouverture affichée, même si une donnée traînait', async () => {
+  it('contact exclu (opposé) : aucune ouverture affichée', async () => {
     const cible = demoDb.destinataires.tous().find((d) => d.campagne_id === 'cmp-01' && d.adresse.startsWith('mathilde.bertin@'));
     expect(cible).toBeDefined();
     demoDb.destinataires.modifier(cible!.id, {
       etat: 'exclu',
       motif: 'Inscrit au registre d’opposition',
-      ouverture: { nombre: 1, premiere_le: '2027-01-11T10:00:00.000Z', derniere_le: '2027-01-11T10:00:00.000Z', automatique_probable: false, raison_automatique: null },
     });
     const user = userEvent.setup();
     await ouvrir('cmp-01');

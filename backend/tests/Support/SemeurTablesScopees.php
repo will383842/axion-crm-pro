@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -139,6 +139,8 @@ final class SemeurTablesScopees
         'envoi_config_versions',
         'envoi_releves_sante',
         'envoi_constats_sante',
+        // Envoi L8-F07a : reculs de chauffe, ajout seul (trigger) : voir APPEND_SEUL.
+        'envoi_chauffe_reculs',
         // Envoi P0 L5 : l'opposition (clé étrangère vers le lien de désinscription) APRÈS elle — le nettoyage (ordre inverse) la vide d'abord.
         'envoi_liens_desinscription',
         'envoi_oppositions',
@@ -194,6 +196,8 @@ final class SemeurTablesScopees
         // triggers anti-DELETE (voir APPEND_SEUL_AVEC_FK) ; le nettoyage de test les désarme le temps du DELETE.
         'envoi_chauffe_jours',
         'envoi_pauses',
+        // Envoi L8-F04 : preuves du feu vert, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'envoi_feu_vert_preuves',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -579,6 +583,14 @@ final class SemeurTablesScopees
             'zone' => '*',
         ]);
 
+        $inserer('envoi_chauffe_reculs', [
+            'ressource_type' => 'ip',
+            'ressource' => 'zz-etancheite',
+            'motif' => 'zz-etancheite',
+            'auteur' => 'zz-etancheite',
+            'date_recul' => '2026-01-01',
+        ]);
+
         $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',
             'mesure_le' => '2026-01-01 00:00:00+00',
@@ -784,6 +796,11 @@ final class SemeurTablesScopees
         $inserer('envoi_pauses', [
             'portee' => 'global',
             'motif' => 'zz',
+        ]);
+        $inserer('envoi_feu_vert_preuves', [
+            'code' => 'zz',
+            'preuve' => 'zz',
+            'auteur' => 'zz',
         ]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',

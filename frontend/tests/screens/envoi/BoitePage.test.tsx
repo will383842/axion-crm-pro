@@ -1,8 +1,8 @@
 /**
- * DM2-INF — fiche d'une boîte : envois, refus, réponses et palier de chauffe.
+ * DM2-INF — fiche d'une boîte : envois, refus, réponses et plafond du jour.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { BoitePage } from '@/features/envoi/infrastructure/BoitePage';
@@ -33,15 +33,12 @@ describe('BoitePage', () => {
     expect(within(bloc).getAllByRole('listitem').length).toBeGreaterThan(0);
   });
 
-  it('montre le palier de chauffe d’une boîte en montée, et son recul d’un palier', async () => {
-    const u = userEvent.setup();
+  it('montre le plafond du jour d’une boîte, sans chauffe propre', async () => {
     await monter('boi-paul', 'paul@prospection-c.example');
-    const chauffe = await screen.findByRole('region', { name: 'Chauffe' });
-    expect(within(chauffe).getByText(/jour 6 sur 30/i)).toBeInTheDocument();
-    expect(within(chauffe).getByRole('meter')).toHaveAttribute('aria-valuenow', '6');
-    await u.click(within(chauffe).getByRole('button', { name: /Reculer d’un palier/ }));
-    await waitFor(() => expect(demoDb.boites.trouver('boi-paul')?.chauffe?.jour).toBe(3));
-    expect(await within(chauffe).findByText(/jour 3 sur 30/i)).toBeInTheDocument();
+    const bloc = await screen.findByRole('region', { name: 'Chauffe' });
+    expect(within(bloc).getByText(/envoyés aujourd’hui/i)).toBeInTheDocument();
+    expect(within(bloc).queryByRole('button', { name: /Reculer/ })).toBeNull();
+    expect(demoDb.boites.trouver('boi-paul')).not.toHaveProperty('chauffe');
   });
 
   it('enregistre la signature et le mode absence', async () => {

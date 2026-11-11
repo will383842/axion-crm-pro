@@ -46,6 +46,7 @@ function champs(valeur: unknown, cle: string, sortie: unknown[] = []): unknown[]
 
 /** Toute forme de mesure de clic : clic, cliqué, liens_cliques, clicks… */
 const MOTIF_CLIC = /cli(?:c|qu)|click/i;
+const MOTIF_OUVERTURE = /ouverture|pixel|automatique_probable|raison_automatique/i;
 const MOTIF_EMAIL = /[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/g;
 const MOTIF_IPV4 = /\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g;
 const MOTIF_IPV6 = /\b([0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b/gi;
@@ -214,12 +215,12 @@ describe('jeu factice — rien de réel', () => {
 });
 
 describe('jeu factice — rien n’arrive dans le futur', () => {
-  it('réponses, événements d’envoi, et ouvertures sont tous passés', () => {
+  it('réponses et événements d’envoi sont tous passés', () => {
     const maintenantIso = '2027-01-12T08:30:00.000Z';
     const dates = [
       ...demoDb.reponses.tous().map((r) => r.recue_le),
       ...demoDb.evenementsEnvoi.tous().map((e) => e.survenu_le),
-      ...demoDb.destinataires.tous().flatMap((d) => [d.dernier_evenement_le, d.ouverture?.premiere_le, d.ouverture?.derniere_le]),
+      ...demoDb.destinataires.tous().flatMap((d) => [d.dernier_evenement_le]),
       ...demoDb.notifications.tous().map((n) => n.created_at),
     ].filter((d): d is string => typeof d === 'string');
     expect(dates.length).toBeGreaterThan(1500);
@@ -238,7 +239,7 @@ describe('jeu factice — graine fixe', () => {
   });
 });
 
-describe('jeu factice — mesure des ouvertures (décision de Will)', () => {
+describe('jeu factice — aucune mesure de lecture (ni clic, ni ouverture)', () => {
   it('aucun clic n’est suivi : ni champ, ni événement « clic »', () => {
     expect(demoDb.destinataires.tous().some((d) => 'clics' in d)).toBe(false);
     expect(demoDb.campagnes.tous().some((c) => 'clics' in c)).toBe(false);
@@ -253,26 +254,21 @@ describe('jeu factice — mesure des ouvertures (décision de Will)', () => {
     },
   );
 
-  it('une campagne dit si elle suit les ouvertures', () => {
-    const campagnes = demoDb.campagnes.tous();
-    expect(campagnes.every((c) => typeof c.suivre_ouvertures === 'boolean')).toBe(true);
-    expect(campagnes.some((c) => c.suivre_ouvertures)).toBe(true);
-    expect(campagnes.some((c) => !c.suivre_ouvertures)).toBe(true);
+  it('aucune ouverture : ni champ, ni événement, ni mot, ni automatique_probable', () => {
+    const jeu = JSON.stringify(genererJeu());
+    expect(jeu).not.toMatch(MOTIF_OUVERTURE);
+    expect(demoDb.campagnes.tous().some((c) => 'suivre_ouvertures' in c || 'ouvertures' in c)).toBe(false);
+    expect(demoDb.destinataires.tous().some((d) => 'ouverture' in d)).toBe(false);
+    expect(demoDb.evenementsEnvoi.tous().some((e) => (e.type as string) === 'ouverture')).toBe(false);
+    expect(demoDb.evenementsEnvoi.tous().some((e) => 'automatique_probable' in e)).toBe(false);
   });
 
-  it('les ouvertures sont par destinataire, datées, et signalent l’ouverture automatique probable', () => {
-    const suivies = new Set(demoDb.campagnes.tous().filter((c) => c.suivre_ouvertures).map((c) => c.id));
-    const destinataires = demoDb.destinataires.tous();
-    const ouverts = destinataires.filter((d) => d.ouverture !== null);
-    expect(ouverts.length).toBeGreaterThan(20);
-    // Jamais d'ouverture pour une campagne qui ne la suit pas.
-    expect(ouverts.filter((d) => !suivies.has(d.campagne_id))).toEqual([]);
-    for (const d of ouverts) {
-      expect(d.ouverture?.premiere_le).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-      expect(typeof d.ouverture?.automatique_probable).toBe('boolean');
-    }
-    expect(ouverts.some((d) => d.ouverture?.automatique_probable === true)).toBe(true);
-  });
+  it.each(['ouverture', 'suivre_ouvertures', 'automatique_probable', 'raison_automatique', 'pixel'])(
+    'témoin : le motif anti-ouverture rougit sur « %s »',
+    (forme) => {
+      expect(forme).toMatch(MOTIF_OUVERTURE);
+    },
+  );
 });
 
 // ── TÉMOIN : la garde sait rougir ─────────────────────────────────────────

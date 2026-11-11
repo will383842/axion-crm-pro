@@ -193,52 +193,106 @@ paths:
   /envoi/feu-vert:
     get:
       operationId: lireFeuVert
-      summary: Liste « feu vert » avant le premier envoi réel (15 points)
+      summary: Liste « feu vert » avant le premier envoi réel
+      description: |
+        Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
+        portent une preuve humaine. Les verrous sont en lecture seule.
       responses:
         '200':
-          description: Points de contrôle.
+          description: Points de contrôle, bloquants restants et verrous.
           content:
             application/json:
               schema:
                 type: object
-                required: [points, faits, total]
+                required: [points, faits, total, bloquants_restants, verrous]
                 properties:
                   points:
                     type: array
-                    items:
-                      type: object
-                      required: [code, libelle, fait, detail]
-                      properties:
-                        code: { type: string }
-                        libelle: { type: string }
-                        fait: { type: boolean }
-                        detail: { oneOf: [{ type: string }, { type: 'null' }] }
+                    items: { $ref: '#/components/schemas/PointFeuVert' }
                   faits: { type: integer, minimum: 0 }
                   total: { type: integer, minimum: 0 }
+                  bloquants_restants: { type: integer, minimum: 0 }
+                  verrous: { $ref: '#/components/schemas/VerrousFeuVert' }
   /envoi/feu-vert/{code}/fait:
     post:
       operationId: marquerPointFeuVert
-      summary: Marquer un point manuel du feu vert comme fait
+      summary: Poser ou retirer la preuve d'un point manuel du feu vert
+      description: |
+        Permission requise, `workspaces.manage` (403 sinon). 404 si le code est
+        inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit) ou si
+        la preuve contient une adresse e-mail.
       parameters:
         - name: code
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preuve]
+              properties:
+                preuve: { type: string, minLength: 1, maxLength: 500 }
+                fait: { type: boolean, default: true }
       responses:
         '200':
           description: Le point à jour.
           content:
             application/json:
-              schema:
-                type: object
-                required: [code, libelle, fait, detail]
-                properties:
-                  code: { type: string }
-                  libelle: { type: string }
-                  fait: { type: boolean }
-                  detail: { oneOf: [{ type: string }, { type: 'null' }] }
+              schema: { $ref: '#/components/schemas/PointFeuVert' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    PointFeuVert:
+      type: object
+      required: [code, libelle, groupe, nature, etat, fait, bloquant, source, detail, preuve]
+      properties:
+        code:
+          description: Préfixé `auto.` (calculé) ou `manuel.` (preuve humaine).
+          type: string
+          pattern: '^(auto|manuel)\.'
+        libelle: { type: string }
+        groupe:
+          type: string
+          enum: [verrous, banc, dns, serveur, temoins, conformite, exploitation]
+        nature: { type: string, enum: [auto, manuel] }
+        etat: { type: string, enum: [fait, a_faire, attend_serveur_reel] }
+        fait:
+          description: Vrai exactement quand `etat` vaut `fait`.
+          type: boolean
+        bloquant: { type: boolean }
+        source:
+          description: Référence au document de cadrage (ex. « 26§8.5 »).
+          type: string
+        detail:
+          oneOf: [{ type: string }, { type: 'null' }]
+        preuve:
+          oneOf:
+            - type: object
+              required: [texte, par, le]
+              properties:
+                texte: { type: string }
+                par: { type: string }
+                le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+            - type: 'null'
+    VerrousFeuVert:
+      description: État des verrous d'envoi, en lecture seule.
+      type: object
+      required:
+        [envoi_reel_actif, mode_temoins, signature_presente, signature_date,
+         fournisseurs_temoins_couverts, fournisseurs_temoins_requis]
+      properties:
+        envoi_reel_actif: { type: boolean }
+        mode_temoins: { type: boolean }
+        signature_presente: { type: boolean }
+        signature_date:
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+        fournisseurs_temoins_couverts: { type: integer, minimum: 0 }
+        fournisseurs_temoins_requis: { type: integer, const: 6 }
     LigneResultat:
       type: object
       required: [cle, libelle, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, desinscriptions, reponses, reponses_interessees]

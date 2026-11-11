@@ -123,9 +123,6 @@ export function EtapeValidation({
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs text-slate-600">
-        Ouvertures : {saisie.suivreOuvertures ? 'suivies, affichées comme une estimation' : 'non suivies'}.
-      </p>
 
       {phase.nom === 'valide' ? (
         <div role="status" className="mt-5 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-200">

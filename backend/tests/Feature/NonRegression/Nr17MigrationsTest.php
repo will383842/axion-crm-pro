@@ -66,8 +66,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_30_000310_envoi_serveurs_epoque.php',
     // Envoi P0 L5 (suivi) : état de relance des effets d'opposition, en base (ajout seul) ; down() inerte (corps vide).
     '2026_11_30_000200_envoi_relances_effets.php',
+    // Filet modifié : pourquoi — envoi L8-F04 : preuves du feu vert, ajout seul (trigger UPDATE/DELETE/TRUNCATE) ; down() inerte, up() rejouable.
+    '2026_12_01_000020_envoi_feu_vert_preuves.php',
     // Envoi L8-F03 : colonne NULLABLE `fournisseur` ajoutée à envoi_temoins (ajout seul) ; la retirer effacerait le fournisseur des témoins ; down() inerte.
     '2026_12_01_000010_envoi_temoins_fournisseur.php',
+    // Envoi L8-F07a : table des reculs de chauffe, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait l'historique des reculs ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_01_000040_envoi_chauffe_reculs.php',
     // Filet modifié : pourquoi — Envoi L8-F14a : colonne `statut` (défaut `acceptee`, sans UPDATE), index unique des conclusions et fonction
     // de libération du compteur global (ajouts seuls) ; les retirer effacerait l'état des réservations d'injection ; down() inerte, up() rejouable.
     '2026_12_01_000050_envoi_injection_reservation_statut.php',

@@ -2,7 +2,7 @@
  * Démo d'Envoi — pilotage : résultats, santé des envois, chercher un envoi, feu vert (DM2-PIL).
  * Contrat : `backend/openapi/envoi/pilotage.yaml`. Tout est calculé depuis `demoDb`
  * (événements d'envoi, réponses, boîtes) : aucun chiffre écrit en dur, sauf la liste
- * des 15 critères du feu vert. Aucun suivi des clics ; aucune ouverture n'est
+ * des points du feu vert. Aucun suivi des clics ; aucune ouverture n'est
  * donnée (ni mesurée ni estimée) : le contrat ne porte aucun champ d'ouverture.
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
@@ -13,38 +13,58 @@ import { api, delai, erreur, repondreEtatForce } from '../../outils';
 
 type Ligne = components['schemas']['LigneResultat'];
 type Regroupement = 'campagne' | 'boite' | 'domaine' | 'liste' | 'message';
-interface PointFeuVert { id: string; code: string; libelle: string; fait: boolean; detail: string | null; manuel: boolean }
+type PointApi = components['schemas']['PointFeuVert'];
+type VerrousApi = components['schemas']['VerrousFeuVert'];
+interface PointFeuVert extends PointApi { id: string }
 interface TestMatin { id: string; le: string; temoins_ok: number; temoins_total: number }
 
 const JOUR = 86_400_000;
 
-/** Les 15 critères avant le premier envoi ; 13 faits, 2 inscriptions à faire (comme la maquette). */
-const POINTS: ReadonlyArray<Omit<PointFeuVert, 'id'>> = [
-  { code: 'dns', libelle: 'Domaines : DNS au vert', fait: true, detail: '5 contrôles sur 5', manuel: false },
-  { code: 'dmarc', libelle: 'DMARC publié', fait: true, detail: 'Politique « none », montée progressive prévue', manuel: false },
-  { code: 'ptr', libelle: 'Retour (PTR) des adresses IP', fait: true, detail: null, manuel: false },
-  { code: 'temoins', libelle: 'Boîtes témoins reçues', fait: true, detail: null, manuel: false },
-  { code: 'test-matin', libelle: 'Test du matin réussi 7 jours', fait: true, detail: null, manuel: false },
-  { code: 'chauffe', libelle: 'Chauffe terminée (1 boîte au moins)', fait: true, detail: null, manuel: false },
-  { code: 'page-desinscription', libelle: 'Page de désinscription en ligne', fait: true, detail: null, manuel: false },
-  { code: 'en-tete-desinscription', libelle: 'En-tête de désinscription en un geste', fait: true, detail: null, manuel: false },
-  { code: 'bloc-art14', libelle: 'Bloc d’information art. 14', fait: true, detail: null, manuel: false },
-  { code: 'identite', libelle: 'Identité de l’expéditeur remplie', fait: true, detail: null, manuel: false },
-  { code: 'alertes-email', libelle: 'Alertes par e-mail testées', fait: true, detail: null, manuel: false },
-  { code: 'sauvegarde', libelle: 'Sauvegarde vérifiée', fait: true, detail: null, manuel: false },
-  { code: 'tout-arreter', libelle: 'Tout arrêter testé', fait: true, detail: null, manuel: false },
-  { code: 'boucles-retour', libelle: 'Boucles de retour des messageries', fait: false, detail: 'Inscription à faire auprès des messageries', manuel: true },
-  { code: 'tableaux-messageries', libelle: 'Inscription aux tableaux des messageries', fait: false, detail: 'Inscription à faire auprès des messageries', manuel: true },
+const ILYA = (jours: number) => new Date(maintenant().getTime() - jours * JOUR).toISOString();
+
+type Graine = Omit<PointFeuVert, 'id' | 'fait' | 'nature' | 'etat' | 'preuve'>;
+const auto = (g: Graine, etat: PointApi['etat']): PointFeuVert => ({ ...g, id: g.code, nature: 'auto', etat, fait: etat === 'fait', preuve: null });
+const manuel = (g: Graine, preuve: PointApi['preuve']): PointFeuVert => ({ ...g, id: g.code, nature: 'manuel', etat: preuve ? 'fait' : 'a_faire', fait: preuve !== null, preuve });
+
+/** Points du feu vert : `auto.*` calculés (jamais écrits), `manuel.*` avec la preuve d'une personne. */
+const POINTS: readonly PointFeuVert[] = [
+  auto({ code: 'auto.verrou_envoi_reel', libelle: 'Envoi réel verrouillé tant que tout n’est pas prêt', groupe: 'verrous', bloquant: true, source: '26§8.1', detail: null }, 'fait'),
+  auto({ code: 'auto.signature_presente', libelle: 'Signature du responsable présente', groupe: 'verrous', bloquant: true, source: '26§8.2', detail: null }, 'fait'),
+  auto({ code: 'auto.banc_temoins', libelle: 'Banc des boîtes témoins complet', groupe: 'banc', bloquant: true, source: '26§8.3', detail: '4 fournisseurs sur 6' }, 'a_faire'),
+  auto({ code: 'auto.test_matin', libelle: 'Test du matin réussi 7 jours de suite', groupe: 'banc', bloquant: true, source: '26§8.4', detail: null }, 'fait'),
+  auto({ code: 'auto.dns_au_vert', libelle: 'Domaines : DNS au vert', groupe: 'dns', bloquant: true, source: '26§8.5', detail: '5 contrôles sur 5' }, 'fait'),
+  auto({ code: 'auto.dmarc_publie', libelle: 'DMARC publié', groupe: 'dns', bloquant: true, source: '26§8.5', detail: 'Politique « none », montée progressive prévue' }, 'fait'),
+  auto({ code: 'auto.ptr', libelle: 'Retour (PTR) des adresses IP', groupe: 'serveur', bloquant: true, source: '26§8.6', detail: null }, 'fait'),
+  auto({ code: 'auto.serveur_reel', libelle: 'Serveur d’envoi réel branché', groupe: 'serveur', bloquant: true, source: '26§8.6', detail: 'Se vérifie quand le serveur réel est branché' }, 'attend_serveur_reel'),
+  auto({ code: 'auto.temoins_recus', libelle: 'Messages reçus sur chaque boîte témoin', groupe: 'temoins', bloquant: true, source: '26§8.7', detail: null }, 'fait'),
+  auto({ code: 'auto.page_desinscription', libelle: 'Page de désinscription en ligne', groupe: 'conformite', bloquant: true, source: '26§8.8', detail: null }, 'fait'),
+  auto({ code: 'auto.en_tete_desinscription', libelle: 'En-tête de désinscription en un geste', groupe: 'conformite', bloquant: true, source: '26§8.8', detail: null }, 'fait'),
+  auto({ code: 'auto.bloc_art14', libelle: 'Bloc d’information art. 14', groupe: 'conformite', bloquant: true, source: '26§8.9', detail: null }, 'fait'),
+  manuel({ code: 'manuel.identite_expediteur', libelle: 'Identité de l’expéditeur vérifiée', groupe: 'conformite', bloquant: true, source: '26§8.9', detail: null }, { texte: 'Identité relue sur un message de test.', par: 'Camille', le: ILYA(5) }),
+  manuel({ code: 'manuel.alertes_email', libelle: 'Alertes par e-mail testées', groupe: 'exploitation', bloquant: false, source: '26§8.10', detail: null }, { texte: 'Alerte de test reçue.', par: 'Camille', le: ILYA(4) }),
+  manuel({ code: 'manuel.sauvegarde', libelle: 'Sauvegarde vérifiée', groupe: 'exploitation', bloquant: true, source: '26§8.10', detail: null }, { texte: 'Restauration d’essai réussie.', par: 'Camille', le: ILYA(3) }),
+  manuel({ code: 'manuel.arret_general_teste', libelle: 'Arrêt général des envois testé', groupe: 'exploitation', bloquant: true, source: '26§8.11', detail: null }, { texte: 'Arrêt puis reprise constatés.', par: 'Camille', le: ILYA(2) }),
+  manuel({ code: 'manuel.boucles_retour', libelle: 'Boucles de retour des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
+  manuel({ code: 'manuel.tableaux_messageries', libelle: 'Inscription aux tableaux des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
 ];
+
+const verrous = (): VerrousApi => ({
+  envoi_reel_actif: false,
+  mode_temoins: true,
+  signature_presente: true,
+  signature_date: ILYA(9).slice(0, 10),
+  fournisseurs_temoins_couverts: 4,
+  fournisseurs_temoins_requis: 6,
+});
 
 function zone() {
   return demoDb.etendre('pilotage', () => ({
-    points: POINTS.map((p): PointFeuVert => ({ ...p, id: p.code })),
+    points: POINTS.map((p): PointFeuVert => ({ ...p })),
     testMatin: [{ id: 'test', le: new Date(maintenant().getTime() - 2 * 3_600_000).toISOString(), temoins_ok: 4, temoins_total: 4 } satisfies TestMatin],
   }));
 }
 
-const lignePoint = (p: PointFeuVert) => ({ code: p.code, libelle: p.libelle, fait: p.fait, detail: p.detail });
+const lignePoint = ({ id: _id, ...p }: PointFeuVert): PointApi => p;
 
 function vide(cle: string, libelle: string, version?: number): Ligne {
   return { cle, libelle, ...(version === undefined ? {} : { version }), envoyes: 0, remis: 0, rebonds_durs: 0, rebonds_mous: 0, plaintes: 0, desinscriptions: 0, reponses: 0, reponses_interessees: 0 };
@@ -180,7 +200,7 @@ export const handlers: HttpHandler[] = [
     const contact = demoDb.contacts.tous().find((c) => adresseSansAccent(c.email) === q)
       ?? demoDb.contacts.tous().find((c) => adresseSansAccent(c.email).includes(q) || adresseSansAccent(`${c.first_name} ${c.last_name}`).includes(q));
     const adresse = contact?.email ?? q;
-    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse) && e.type !== 'ouverture')
+    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse))
       .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le));
     const rebond = evenements.find((e) => e.type === 'rebond_dur');
     const opposition = demoDb.opposition.filtrer((o) => adresseSansAccent(o.valeur) === adresseSansAccent(adresse))[0];
@@ -195,18 +215,34 @@ export const handlers: HttpHandler[] = [
 
   http.get(api('/envoi/feu-vert'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { points: [], faits: 0, total: 0 });
+    const force = await repondreEtatForce(request, { points: [], faits: 0, total: 0, bloquants_restants: 0, verrous: verrous() });
     if (force) return force;
     const points = zone().points;
-    return HttpResponse.json({ points: points.map(lignePoint), faits: points.filter((p) => p.fait).length, total: points.length });
+    return HttpResponse.json({
+      points: points.map(lignePoint),
+      faits: points.filter((p) => p.fait).length,
+      total: points.length,
+      bloquants_restants: points.filter((p) => p.bloquant && !p.fait).length,
+      verrous: verrous(),
+    });
   }),
 
-  http.post(api('/envoi/feu-vert/:code/fait'), async ({ params }) => {
+  http.post(api('/envoi/feu-vert/:code/fait'), async ({ request, params }) => {
     await delai();
-    const p = demoDb.zone<PointFeuVert>('pilotage', 'points').trouver(String(params['code']));
+    const code = String(params['code']);
+    const p = demoDb.zone<PointFeuVert>('pilotage', 'points').trouver(code);
     if (!p) return erreur(404, 'non_trouve', 'Ce point n’existe pas.');
-    if (!p.manuel) return erreur(409, 'point_automatique', 'Ce point se vérifie tout seul.');
-    const maj = demoDb.zone<PointFeuVert>('pilotage', 'points').modifier(p.id, { fait: true, detail: 'Fait (démo)' });
+    if (code.startsWith('auto.')) return erreur(422, 'point_automatique', 'Ce point se calcule tout seul : il ne s’écrit pas à la main.');
+    const corps = (await request.json().catch(() => ({}))) as { preuve?: unknown; fait?: unknown };
+    const preuve = typeof corps.preuve === 'string' ? corps.preuve.trim() : '';
+    if (preuve.length < 1 || preuve.length > 500) return erreur(422, 'validation', 'La preuve doit faire entre 1 et 500 caractères.');
+    if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(preuve)) return erreur(422, 'validation', 'La preuve ne doit pas contenir d’adresse e-mail.');
+    const fait = corps.fait !== false;
+    const maj = demoDb.zone<PointFeuVert>('pilotage', 'points').modifier(p.id, {
+      fait,
+      etat: fait ? 'fait' : 'a_faire',
+      preuve: fait ? { texte: preuve, par: 'Camille', le: maintenant().toISOString() } : null,
+    });
     return HttpResponse.json(lignePoint(maj!));
   }),
 ];

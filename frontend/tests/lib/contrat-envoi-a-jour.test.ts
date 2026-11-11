@@ -29,7 +29,7 @@ const TYPES = path.join(RACINE_FRONT, 'src', 'features', 'envoi', 'api');
 /** Toute forme de mesure de clic : clic, clics, cliqué, cliquable, nombre_clics, liens_cliques, clicks… */
 const MOTIF_CLIC_LIGNE = /^.*(?:cli(?:c|qu)|click).*$/gim;
 
-const ZONES = ['commun', 'socle', 'campagnes', 'creation', 'pilotage', 'reponses', 'infrastructure', 'conformite'];
+const ZONES = ['commun', 'socle', 'campagnes', 'creation', 'pilotage', 'reponses', 'infrastructure', 'conformite', 'sequences'];
 
 function lancer(args: string[]): { code: number; sortie: string } {
   try {
@@ -94,7 +94,7 @@ describe('garde anti-clic — témoins', () => {
 describe('contrat d’Envoi — à jour et valide', () => {
   it('régénérer les types ne change rien, et tout document est valide', () => {
     const { code, sortie } = lancer(['--verifier']);
-    expect(sortie).toContain('8 documents');
+    expect(sortie).toContain('9 documents');
     expect(code, sortie).toBe(0);
   }, 60_000);
 

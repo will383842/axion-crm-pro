@@ -156,7 +156,9 @@ test('reprise : 409 sous arrêt général, 409 sous pause automatique, 200 sinon
     app(DepotChauffe::class)->ouvrirPause($ws, 'plaintes', null, new DateTimeImmutable('now'), 24);
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/reprise")->assertStatus(409)->assertJsonPath('error', 'frein_pause_automatique');
     expect(DB::table('envoi_campagnes')->where('id', $id)->value('statut'))->toBe('en_pause');
-    DB::table('envoi_pauses')->where('workspace_id', $ws)->update(['levee_le' => now(), 'levee_par' => 'test']);
+    foreach (app(DepotChauffe::class)->pausesActives($ws, new DateTimeImmutable('now')) as $pause) {
+        app(DepotChauffe::class)->leverPause($ws, (int) $pause->id, 'test');
+    }
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/reprise")->assertOk()->assertJsonPath('statut', 'en_cours');
 });
 
@@ -248,6 +250,7 @@ test('course pause contre reprise : deux processus réels sous le verrou de l\'e
         $journal = $proprio->table('envoi_campagnes_journal')->where('campagne_id', $camp)->orderBy('id')->pluck('transition')->all();
         $statut = $proprio->table('envoi_campagnes')->where('id', $camp)->value('statut');
         // Chaîne valide : alternance stricte pause / reprise à partir de « en_cours », et le statut final est le dernier arrivé.
+        expect($journal)->not->toBeEmpty();
         $attendu = 'en_cours';
         foreach ($journal as $t) {
             [$de, $vers] = explode('>', $t);

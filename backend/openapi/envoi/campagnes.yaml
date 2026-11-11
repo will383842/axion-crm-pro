@@ -335,7 +335,7 @@ components:
         etapes: { type: integer, minimum: 1, maximum: 3 }
         envoi_ferme:
           type: boolean
-          description: Vrai tant que l'envoi réel est fermé (palier 0) : aucune campagne ne part.
+          description: "Vrai tant que l'envoi réel est fermé (palier 0): aucune campagne ne part."
         version:
           type: integer
           minimum: 1

@@ -94,6 +94,12 @@ final class DepotCampagnes
         });
     }
 
+    /** Pose la date du prochain envoi (versionnée comme tout changement). L'appelant a vérifié statut et fenêtre. */
+    public function changerDate(string $ws, string $id, int $version, \DateTimeInterface $le): int
+    {
+        return WorkspaceContext::run($ws, fn (): int => $this->ecrire($ws, $id, $version, ['envoi_prevu_le' => $le->format('Y-m-d H:i:sP')]));
+    }
+
     /**
      * Change le statut et journalise (même transaction). Idempotent : une clé déjà journalisée ne rejoue rien (retourne false).
      */

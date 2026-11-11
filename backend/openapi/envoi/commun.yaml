@@ -29,7 +29,12 @@ components:
       enum: [crm, envoi, commun]
     EtatProduit:
       type: string
-      description: Droit d'accès d'un espace à un produit.
+      description: >-
+        Droit d'accès d'un espace à un produit. Le serveur est FERMÉ par défaut : seul `actif` ouvre Envoi ;
+        `suspendu`, `resilie`, `absent` ou toute autre valeur donnent 404 sur chaque route `/envoi/*`.
+        Le frontend peut afficher un état différent (par exemple l'entrée Envoi pour un espace `suspendu`),
+        mais l'ouverture réelle est décidée par le serveur seul. Posé uniquement par la console
+        (`php artisan produits:activer`) ; `PUT /workspace` refuse la clé `settings.produits`.
       enum: [actif, suspendu, resilie, absent]
     EtatFeu:
       type: string

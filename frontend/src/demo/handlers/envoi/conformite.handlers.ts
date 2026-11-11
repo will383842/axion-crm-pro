@@ -227,9 +227,11 @@ export const handlers: HttpHandler[] = [
     return new HttpResponse(csv(), { headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
   }),
 
-  http.get(api('/envoi/puis-je-ecrire'), async ({ request }) => {
+  // POST de lecture : l'adresse est dans le corps JSON, jamais dans l'URL ; rien n'est écrit.
+  http.post(api('/envoi/puis-je-ecrire'), async ({ request }) => {
     await delai();
-    const adresse = new URL(request.url).searchParams.get('adresse') ?? '';
+    const corps = (await request.json().catch(() => ({}))) as { adresse?: unknown };
+    const adresse = typeof corps.adresse === 'string' ? corps.adresse : '';
     if (adresse.trim() === '') return erreur(422, 'validation', 'Saisissez une adresse ou un domaine.');
     // Comme le serveur : seulement `peut` et un motif regroupé (jamais l'adresse ni le détail des raisons).
     const r = puisJeEcrire(adresse);

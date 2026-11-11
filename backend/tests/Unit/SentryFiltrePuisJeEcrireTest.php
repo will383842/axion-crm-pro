@@ -21,9 +21,16 @@ test('avantEnvoi retire la query string et l’adresse de l’URL de puis-je-ecr
         ->and($sorti->getRequest()['url'])->toContain('/envoi/puis-je-ecrire');
 });
 
+test('avantEnvoi retire la query string de toute route /envoi/*', function (string $chemin) {
+    $e = Event::createEvent();
+    $e->setRequest(['url' => 'https://api.exemple.test/api/v1' . $chemin . '?q=zz-valeur', 'method' => 'GET', 'query_string' => 'q=zz-valeur', 'data' => ['x' => 'zz-valeur']]);
+    $req = SentryFiltre::avantEnvoi($e)->getRequest();
+    expect(json_encode($req))->not->toContain('zz-valeur')->and($req['url'])->toEndWith($chemin);
+})->with(['/envoi/desinscriptions', '/envoi/opposition/export', '/envoi/puis-je-ecrire', '/envoi/campagnes/1/destinataires']);
+
 test('avantEnvoi laisse les autres requêtes intactes', function () {
     $e = Event::createEvent();
-    $req = ['url' => 'https://api.exemple.test/api/v1/envoi/desinscriptions?q=a', 'method' => 'GET', 'query_string' => 'q=a'];
+    $req = ['url' => 'https://api.exemple.test/api/v1/crm/entreprises?q=a', 'method' => 'GET', 'query_string' => 'q=a'];
     $e->setRequest($req);
     expect(SentryFiltre::avantEnvoi($e)->getRequest())->toBe($req);
 });

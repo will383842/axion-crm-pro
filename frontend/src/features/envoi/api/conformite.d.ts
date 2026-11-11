@@ -120,15 +120,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * « Puis-je écrire à… ? »
          * @description Rend seulement `peut` et un motif codé REGROUPÉ (jamais le détail d'une garde). Une adresse inconnue de l'espace
          *     et une adresse connue seulement d'un autre espace reçoivent EXACTEMENT la même réponse (aucun oracle « contact connu »).
-         *     Limite : 30 demandes par minute et par compte (429 au-delà). L'adresse (passée dans l'URL) n'est jamais journalisée en clair par l'application ni envoyée à Sentry (`before_send`). Les journaux d'accès du reverse proxy relèvent de l'infrastructure.
+         *     Limite : 30 demandes par minute et par compte (429 au-delà). POST de LECTURE SEULE : rien n'est écrit (ni registre, ni drapeau, ni journal d'audit). L'adresse voyage dans le corps JSON, jamais dans l'URL : elle n'apparaît ni dans les journaux d'accès du proxy ni dans la chaîne de requête envoyée à Sentry (`before_send` retire la chaîne de requête des routes `/envoi/*`), et elle n'est jamais journalisée en clair par l'application.
          */
-        get: operations["puisJeEcrire"];
-        put?: never;
-        post?: never;
+        post: operations["puisJeEcrire"];
         delete?: never;
         options?: never;
         head?: never;
@@ -794,14 +794,19 @@ export interface operations {
     };
     puisJeEcrire: {
         parameters: {
-            query: {
-                adresse: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    adresse: string;
+                };
+            };
+        };
         responses: {
             /** @description La réponse et, si c'est non, le groupe de motif. */
             200: {

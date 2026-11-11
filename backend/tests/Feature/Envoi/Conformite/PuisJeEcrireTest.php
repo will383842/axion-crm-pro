@@ -16,7 +16,7 @@ use Tests\Support\ContratOpenApiEnvoi;
 use Tests\Support\DoublonsFixtures as F;
 
 /**
- * R05b — GET /envoi/puis-je-ecrire?adresse= : `peut` + `motif` codé regroupé, rien d'autre. Aucun oracle « contact connu ».
+ * R05b — POST /envoi/puis-je-ecrire (adresse dans le corps JSON, lecture seule) : `peut` + `motif` codé regroupé, rien d'autre. Aucun oracle « contact connu ».
  */
 uses(BaseRoutesEnvoi::class)->group('envoi');
 
@@ -52,20 +52,24 @@ function r05pFicheEnRegle(object $t, string $adresse): void
 }
 
 test('sans session 401 ; sans produit envoi 404 ; 403 pour operator et viewer', function () {
-    $this->getJson(R05P . '?adresse=a@zz.example.invalid')->assertUnauthorized();
-    $this->actingAs($this->compte($this->espace(false), 'viewer'))->getJson(R05P . '?adresse=a@zz.example.invalid')->assertNotFound();
+    $this->postJson(R05P, ['adresse' => 'a@zz.example.invalid'])->assertUnauthorized();
+    $this->actingAs($this->compte($this->espace(false), 'viewer'))->postJson(R05P, ['adresse' => 'a@zz.example.invalid'])->assertNotFound();
     foreach (['operator', 'viewer'] as $role) {
-        $this->actingAs($this->compte($this->espace, $role))->getJson(R05P . '?adresse=a@zz.example.invalid')->assertForbidden();
+        $this->actingAs($this->compte($this->espace, $role))->postJson(R05P, ['adresse' => 'a@zz.example.invalid'])->assertForbidden();
     }
 });
 
-test('adresse absente ou mal formée : 422', function (string $q) {
-    $this->actingAs($this->admin)->getJson(R05P . $q)->assertUnprocessable();
-})->with(['', '?adresse=', '?adresse=pas-une-adresse', '?adresse[]=a@b.example.invalid']);
+test('adresse absente ou mal formée : 422 ; l’adresse en URL est ignorée', function (array $corps) {
+    $this->actingAs($this->admin)->postJson(R05P, $corps)->assertUnprocessable();
+})->with([[[]], [['adresse' => '']], [['adresse' => 'pas-une-adresse']], [['adresse' => ['a@b.example.invalid']]]]);
+
+test('l’ancienne forme GET ?adresse= n’existe plus (405) : l’adresse ne voyage jamais dans l’URL', function () {
+    $this->actingAs($this->admin)->getJson(R05P . '?adresse=a@zz-client.example.invalid')->assertStatus(405);
+});
 
 test('adresse en règle : peut vrai, motif null, et RIEN d’autre dans la réponse', function () {
     r05pFicheEnRegle($this, 'ok@zz-client.example.invalid');
-    $r = $this->actingAs($this->admin)->getJson(R05P . '?adresse=OK@zz-client.example.invalid')->assertOk();
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'OK@zz-client.example.invalid'])->assertOk();
     expect($r->json())->toBe(['peut' => true, 'motif' => null])
         ->and(ContratOpenApiEnvoi::ecarts('conformite.yaml', 'ReponsePuisJeEcrire', $r->json()))->toBe([]);
 });
@@ -73,7 +77,7 @@ test('adresse en règle : peut vrai, motif null, et RIEN d’autre dans la répo
 test('opposition de l’espace : peut faux, motif « opposition »', function () {
     $ref = InscriptionsEnvoi::creer($this->espace->id, 'non@zz-client.example.invalid');
     app(EnregistrerOpposition::class)->executer($this->espace->id, $ref, 'page');
-    $r = $this->actingAs($this->admin)->getJson(R05P . '?adresse=non@zz-client.example.invalid')->assertOk();
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'non@zz-client.example.invalid'])->assertOk();
     expect($r->json())->toBe(['peut' => false, 'motif' => 'opposition'])
         ->and(ContratOpenApiEnvoi::ecarts('conformite.yaml', 'ReponsePuisJeEcrire', $r->json()))->toBe([]);
 });
@@ -82,7 +86,7 @@ test('motifs regroupés : un contact écarté ou une condition d’envoi non rem
     r05pFicheEnRegle($this, 'ecarte@zz-client.example.invalid');
     DB::table('contacts')->where('email', 'ecarte@zz-client.example.invalid')->update(['email_status' => 'invalid']);
     DB::table('envoi_verdicts_adresse')->where('workspace_id', $this->espace->id)->update(['verdict' => 'invalide']);
-    $r = $this->actingAs($this->admin)->getJson(R05P . '?adresse=ecarte@zz-client.example.invalid')->assertOk()->json();
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'ecarte@zz-client.example.invalid'])->assertOk()->json();
     expect($r['peut'])->toBeFalse()->and($r['motif'])->toBeIn(['contact_ecarte', 'conditions_envoi', 'adresse_non_verifiee', 'opposition'])
         ->and(array_keys($r))->toBe(['peut', 'motif']);
 });
@@ -97,33 +101,39 @@ test('PAS D’ORACLE : adresse inconnue et adresse d’un AUTRE espace donnent u
     $ref = InscriptionsEnvoi::creer($autre->id, 'zoe@zz-autre.example.invalid');
     app(EnregistrerOpposition::class)->executer($autre->id, $ref, 'page');
 
-    $chezAutre = $this->actingAs($autreAdmin)->getJson(R05P . '?adresse=zoe@zz-autre.example.invalid')->assertOk()->json();
+    $chezAutre = $this->actingAs($autreAdmin)->postJson(R05P, ['adresse' => 'zoe@zz-autre.example.invalid'])->assertOk()->json();
     expect($chezAutre['motif'])->toBe('opposition'); // témoin : chez l'autre espace la réponse est bien « opposition »
 
-    $inconnue = $this->actingAs($this->admin)->getJson(R05P . '?adresse=jamais-vue@zz-nulle-part.example.invalid');
-    $autreEspace = $this->actingAs($this->admin)->getJson(R05P . '?adresse=zoe@zz-autre.example.invalid');
+    $inconnue = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'jamais-vue@zz-nulle-part.example.invalid']);
+    $autreEspace = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'zoe@zz-autre.example.invalid']);
     expect($autreEspace->getStatusCode())->toBe($inconnue->getStatusCode())
         ->and($autreEspace->getContent())->toBe($inconnue->getContent())
         ->and($autreEspace->json())->not->toBe($chezAutre);
 });
 
-test('l’adresse n’apparaît jamais en clair dans les journaux ni dans le journal d’audit', function () {
+test('l’adresse n’apparaît jamais en clair dans les journaux, le journal d’audit ni l’URL', function () {
     $vus = [];
     Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$vus) {
         $vus[] = $m->message . json_encode($m->context);
     });
     r05pFicheEnRegle($this, 'secret@zz-client.example.invalid');
-    $this->actingAs($this->admin)->getJson(R05P . '?adresse=secret@zz-client.example.invalid')->assertOk();
-    $this->actingAs($this->admin)->getJson(R05P . '?adresse=secret@zz-client.example.invalid&x=1')->assertOk();
+    $audits = DB::table('audit_logs')->count();
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'secret@zz-client.example.invalid'])->assertOk();
+    $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'secret@zz-client.example.invalid', 'x' => 1])->assertOk();
     expect(implode('|', $vus))->not->toContain('secret@')->not->toContain('zz-client');
+    expect(DB::table('audit_logs')->count())->toBe($audits);
     $audit = DB::table('audit_logs')->get()->map(fn ($x) => json_encode($x))->implode('|');
     expect($audit)->not->toContain('secret@')->and($audit)->not->toContain('secret%40');
+    // L'URL réellement servie ne porte ni chaîne de requête ni adresse.
+    $req = request();
+    expect($req->getQueryString())->toBeNull()->and($req->fullUrl())->not->toContain('secret')->not->toContain('adresse');
+    expect(json_encode($r->json()))->not->toContain('secret');
 });
 
 test('limite par minute : au-delà, 429', function () {
     $dernier = null;
     for ($i = 0; $i < 31; $i++) {
-        $dernier = $this->actingAs($this->admin)->getJson(R05P . '?adresse=n' . $i . '@zz-client.example.invalid');
+        $dernier = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'n' . $i . '@zz-client.example.invalid']);
         if ($dernier->getStatusCode() === 429) {
             break;
         }
@@ -131,11 +141,15 @@ test('limite par minute : au-delà, 429', function () {
     expect($dernier->getStatusCode())->toBe(429)->and($i)->toBe(30);
 });
 
-test('lecture seule : aucune écriture dans les drapeaux, aucun ServeurEnvoi, route en GET seulement', function () {
+test('lecture seule : rien n’est écrit (drapeaux, oppositions, audit, contacts), aucun ServeurEnvoi', function () {
     r05pFicheEnRegle($this, 'ok@zz-client.example.invalid');
-    $d = DB::table('envoi_drapeaux')->count();
-    $o = DB::table('envoi_oppositions')->count();
-    $this->actingAs($this->admin)->getJson(R05P . '?adresse=ok@zz-client.example.invalid')->assertOk();
-    expect(DB::table('envoi_drapeaux')->count())->toBe($d)->and(DB::table('envoi_oppositions')->count())->toBe($o)->and($this->resolutions)->toBe(0);
-    $this->actingAs($this->admin)->postJson(R05P)->assertStatus(405);
+    $tables = ['envoi_drapeaux', 'envoi_oppositions', 'audit_logs', 'contacts', 'envoi_domaines'];
+    $avant = array_map(fn ($t) => DB::table($t)->count(), $tables);
+    $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'ok@zz-client.example.invalid'])->assertOk();
+    $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'inconnue@zz-nulle-part.example.invalid'])->assertOk();
+    $apres = array_map(fn ($t) => DB::table($t)->count(), $tables);
+    expect($apres)->toBe($avant)->and($this->resolutions)->toBe(0);
+    foreach (['put', 'patch', 'delete'] as $m) {
+        $this->actingAs($this->admin)->{$m . 'Json'}(R05P, ['adresse' => 'ok@zz-client.example.invalid'])->assertStatus(405);
+    }
 });

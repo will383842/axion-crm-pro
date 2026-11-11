@@ -20,16 +20,17 @@ final class SentryFiltre
     }
 
     /**
-     * R05 : « Puis-je écrire à… ? » reçoit l'adresse testée dans l'URL. Pour cette route, la query string et l'adresse
-     * (dans l'URL, les données supplémentaires et le contexte) ne partent jamais chez Sentry.
+     * R05 : pour toute route /envoi/*, la chaîne de requête (et les données, cookies) ne part jamais chez Sentry.
+     * « Puis-je écrire à… ? » passe l'adresse dans le corps (POST), mais l'ancien appel GET ?adresse= doit rester sans fuite.
      */
-    public static function avantEnvoi(Event $event, ?EventHint $hint = null): ?Event
+    public static function avantEnvoi(Event $event, ?EventHint $hint = null): Event
     {
         $req = $event->getRequest();
-        if (! str_contains((string) ($req['url'] ?? ''), '/envoi/puis-je-ecrire')) {
+        $url = (string) ($req['url'] ?? '');
+        if (! preg_match('#/envoi(/|\?|$)#', (string) parse_url($url, PHP_URL_PATH))) {
             return $event;
         }
-        $req['url'] = explode('?', (string) $req['url'], 2)[0];
+        $req['url'] = explode('?', $url, 2)[0];
         unset($req['query_string'], $req['data'], $req['cookies']);
         $event->setRequest($req);
         $event->setExtra([]);

@@ -65,7 +65,7 @@ export function useInscrireOpposition() {
 }
 
 export async function demanderPuisJeEcrire(adresse: string): Promise<PuisJeEcrire> {
-  const { peut, motif } = (await api.get<ReponseServeur>('/envoi/puis-je-ecrire', { params: { adresse } })).data;
+  const { peut, motif } = (await api.post<ReponseServeur>('/envoi/puis-je-ecrire', { adresse })).data;
   return {
     adresse: adresse.trim(),
     reponse: peut ? 'oui' : 'non',

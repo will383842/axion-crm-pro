@@ -34,7 +34,7 @@
         ]
     },
     {
-        "methode": "GET",
+        "methode": "POST",
         "uri": "api/v1/envoi/puis-je-ecrire",
         "middlewares": [
             "api",

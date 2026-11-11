@@ -46,7 +46,7 @@ function BlocVerrous({ v }: { v: Verrous }) {
   );
 }
 
-function SaisiePreuve({ point, envoi, erreur, onEnvoyer, onAnnuler }: { point: Point; envoi: boolean; erreur: string | null; onEnvoyer: (t: string) => void; onAnnuler: () => void }) {
+function SaisiePreuve({ point, defaire = false, envoi, erreur, onEnvoyer, onAnnuler }: { point: Point; defaire?: boolean; envoi: boolean; erreur: string | null; onEnvoyer: (t: string) => void; onAnnuler: () => void }) {
   const [texte, setTexte] = useState('');
   const id = useId();
   const longueur = texte.trim().length;
@@ -56,13 +56,13 @@ function SaisiePreuve({ point, envoi, erreur, onEnvoyer, onAnnuler }: { point: P
       onSubmit={(e) => { e.preventDefault(); if (longueur >= PREUVE_MIN) onEnvoyer(texte.trim()); }}
       onKeyDown={(e) => { if (e.key === 'Escape') onAnnuler(); }}
     >
-      <label htmlFor={id} className="block text-sm font-medium text-slate-900">Preuve (ce que vous avez constaté)</label>
-      <p id={`${id}-aide`} className="text-xs text-slate-600">Décrivez ce que vous avez vérifié, entre {PREUVE_MIN} et {PREUVE_MAX} caractères. N’écrivez JAMAIS d’adresse e-mail.</p>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-900">{defaire ? 'Motif (pourquoi vous retirez cette preuve)' : 'Preuve (ce que vous avez constaté)'}</label>
+      <p id={`${id}-aide`} className="text-xs text-slate-600">{defaire ? 'Expliquez pourquoi, entre' : 'Décrivez ce que vous avez vérifié, entre'} {PREUVE_MIN} et {PREUVE_MAX} caractères. N’écrivez JAMAIS d’adresse e-mail.</p>
       <textarea id={id} autoFocus rows={3} maxLength={PREUVE_MAX} value={texte} onChange={(e) => setTexte(e.target.value)} aria-describedby={`${id}-aide ${id}-compteur`} aria-invalid={erreur !== null} className="w-full rounded-lg px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:outline-none focus:ring-2" />
       <p id={`${id}-compteur`} className="text-xs text-slate-600">{longueur} / {PREUVE_MAX}</p>
       {erreur ? <p role="alert" className="text-sm text-rose-700">{erreur}</p> : null}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" className="min-h-11 md:min-h-8" disabled={longueur < PREUVE_MIN} loading={envoi} aria-label="Enregistrer la preuve" title={point.libelle}>Enregistrer</Button>
+        <Button type="submit" size="sm" className="min-h-11 md:min-h-8" disabled={longueur < PREUVE_MIN} loading={envoi} aria-label={defaire ? 'Confirmer le retrait' : 'Enregistrer la preuve'} title={point.libelle}>{defaire ? 'Retirer la preuve' : 'Enregistrer'}</Button>
         <Button type="button" variant="secondary" size="sm" className="min-h-11 md:min-h-8" onClick={onAnnuler}>Annuler</Button>
       </div>
     </form>
@@ -75,6 +75,8 @@ function LignePoint({ p, saisie, confirme, envoi, erreur, onSaisir, onConfirmer,
 }) {
   const manuel = p.nature === 'manuel';
   const Icone = p.etat === 'fait' ? Check : p.etat === 'attend_serveur_reel' ? Clock : Circle;
+  const attendProuve = manuel && p.etat === 'attend_serveur_reel' && p.preuve !== null;
+  const etat = attendProuve ? 'Preuve déposée, attend le serveur réel' : ETATS[p.etat];
   const couleur = p.etat === 'fait' ? 'text-emerald-600' : 'text-amber-600';
   return (
     <li className="flex min-h-11 flex-wrap items-center gap-3 py-2">
@@ -82,24 +84,18 @@ function LignePoint({ p, saisie, confirme, envoi, erreur, onSaisir, onConfirmer,
       <span className="min-w-0 flex-1 text-sm text-slate-900">
         {p.libelle}
         <span className="block text-xs text-slate-600">
-          {ETATS[p.etat]} · {manuel ? 'Manuel' : 'Automatique'}{p.bloquant ? ' · Bloquant' : ''}{p.detail ? ` · ${p.detail}` : ''}
+          {etat} · {manuel ? 'Manuel' : 'Automatique'}{p.bloquant ? ' · Bloquant' : ''}{p.detail ? ` · ${p.detail}` : ''}
         </span>
         {p.preuve ? <span className="block text-xs text-slate-700">Preuve : {p.preuve.texte} — par {p.preuve.par}, le {quand(p.preuve.le)}</span> : null}
       </span>
-      {manuel && p.etat !== 'fait' && !saisie ? (
+      {manuel && p.preuve === null && !saisie ? (
         <Button variant="secondary" size="sm" className="min-h-11 md:min-h-8" aria-label={`Marquer fait : ${p.libelle}`} onClick={onSaisir}>Marquer fait</Button>
       ) : null}
-      {manuel && p.etat === 'fait' && !confirme ? (
+      {manuel && p.preuve !== null && !confirme ? (
         <Button variant="secondary" size="sm" className="min-h-11 md:min-h-8" aria-label={`Défaire : ${p.libelle}`} onClick={onConfirmer}>Défaire</Button>
       ) : null}
-      {confirme ? (
-        <div role="group" aria-label={`Défaire ce point : ${p.libelle}`} className="flex w-full flex-wrap items-center gap-2">
-          <span className="text-sm text-slate-900">Défaire ce point ? Sa preuve sera retirée.</span>
-          <Button size="sm" className="min-h-11 md:min-h-8" loading={envoi} onClick={() => onGeste({ fait: false, preuve: p.preuve?.texte ?? 'Preuve retirée depuis l’écran.' })}>Oui, défaire</Button>
-          <Button variant="secondary" size="sm" className="min-h-11 md:min-h-8" onClick={onFermer}>Annuler</Button>
-        </div>
-      ) : null}
-      {erreur && !saisie ? <p role="alert" className="w-full text-sm text-rose-700">{erreur}</p> : null}
+      {confirme ? <SaisiePreuve point={p} defaire envoi={envoi} erreur={erreur} onAnnuler={onFermer} onEnvoyer={(t) => onGeste({ fait: false, preuve: t })} /> : null}
+      {erreur && !saisie && !confirme ? <p role="alert" className="w-full text-sm text-rose-700">{erreur}</p> : null}
       {saisie ? <SaisiePreuve point={p} envoi={envoi} erreur={erreur} onAnnuler={onFermer} onEnvoyer={(t) => onGeste({ fait: true, preuve: t })} /> : null}
     </li>
   );

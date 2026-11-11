@@ -75,6 +75,24 @@ describe('démo — feu vert : règles de la preuve', () => {
     expect((await poser('manuel.boucles_retour', 'écrit à jean＠exemple.test ok')).statut).toBe(422);
     expect((await poser('manuel.boucles_retour', 'Inscription faite ce jour.')).statut).toBe(200);
   });
+  it('refuse tout @ : en début, en fin, pleine chasse (U+FF20) et petite forme (U+FE6B)', async () => {
+    for (const t of ['@jean puis un texte long', 'un texte assez long fini par @', 'texte long \uFF20 exemple', 'texte long \uFE6B exemple', 'texte long \uFF20', '\uFE6Btexte long ici']) {
+      expect((await poser('manuel.boucles_retour', t)).statut, t).toBe(422);
+    }
+  });
+  it('refuse un motif de défaire de moins de 10 caractères, accepte 10', async () => {
+    await poser('manuel.boucles_retour', 'Inscription faite ce jour.');
+    const defaire = (motif: string) => appeler('POST', '/envoi/feu-vert/manuel.boucles_retour/fait', { preuve: motif, fait: false });
+    expect((await defaire('court')).statut).toBe(422);
+    expect((await defaire('motif @ mail ici')).statut).toBe(422);
+    expect((await defaire('1234567890')).json).toMatchObject({ etat: 'a_faire', preuve: null });
+  });
+  it('contient un point manuel avec preuve qui attend le serveur réel (pas fait)', async () => {
+    const { json } = await appeler('GET', '/envoi/feu-vert');
+    const p = json!['points'].find((x: any) => x.code === 'manuel.essai_serveur_reel');
+    expect(p).toMatchObject({ nature: 'manuel', etat: 'attend_serveur_reel', fait: false });
+    expect(p.preuve).not.toBeNull();
+  });
 });
 
 describe('démo — chauffe', () => {

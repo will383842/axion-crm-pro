@@ -103,18 +103,60 @@ describe('FeuVertPage — écran du feu vert', () => {
     expect(champ).toHaveValue('écrit à jean @ exemple.test ok');
   });
 
-  it('« Défaire » seulement sur un point manuel fait, avec confirmation', async () => {
+  it('« Défaire » seulement sur un point manuel avec preuve, avec motif obligatoire', async () => {
     const user = userEvent.setup();
     await monter();
     expect(within(await ligne('Boucles de retour des messageries')).queryByRole('button', { name: /Défaire/ })).toBeNull();
     expect(within(await ligne('Domaines : DNS au vert')).queryByRole('button', { name: /Défaire/ })).toBeNull();
     await user.click(within(await ligne('Sauvegarde vérifiée')).getByRole('button', { name: /Défaire/ }));
-    expect(screen.getByText(/Défaire ce point/)).toBeVisible();
+    const champ = screen.getByLabelText('Motif (pourquoi vous retirez cette preuve)');
+    const valider = screen.getByRole('button', { name: 'Confirmer le retrait' });
+    expect(valider).toBeDisabled();
+    await user.type(champ, 'court');
+    expect(valider).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Annuler' }));
     expect((await ligne('Sauvegarde vérifiée')).textContent).toContain('Fait');
     await user.click(within(await ligne('Sauvegarde vérifiée')).getByRole('button', { name: /Défaire/ }));
-    await user.click(screen.getByRole('button', { name: 'Oui, défaire' }));
+    await user.type(screen.getByLabelText('Motif (pourquoi vous retirez cette preuve)'), 'Restauration à refaire.');
+    await user.click(screen.getByRole('button', { name: 'Confirmer le retrait' }));
     expect(await screen.findByRole('button', { name: /Marquer fait : Sauvegarde vérifiée/ })).toBeVisible();
+  });
+
+  it('« Défaire » envoie le motif saisi, jamais l’ancienne preuve ni une phrase fixe', async () => {
+    const user = userEvent.setup();
+    let corps: unknown;
+    await renderScreen(<FeuVertPage />, {
+      path: '/envoi/sante/feu-vert',
+      handlers: [http.post('*/envoi/feu-vert/:code/fait', async ({ request }) => { corps = await request.clone().json(); return undefined; }), ...handlers],
+    });
+    await user.click(await screen.findByRole('button', { name: /Défaire : Sauvegarde vérifiée/ }));
+    await user.type(screen.getByLabelText('Motif (pourquoi vous retirez cette preuve)'), 'Mauvaise sauvegarde relue.');
+    await user.click(screen.getByRole('button', { name: 'Confirmer le retrait' }));
+    await screen.findByRole('button', { name: /Marquer fait : Sauvegarde vérifiée/ });
+    expect(corps).toEqual({ preuve: 'Mauvaise sauvegarde relue.', fait: false });
+  });
+
+  it('point manuel prouvé qui attend le serveur réel : preuve visible, pas « fait », « Défaire » et pas « Marquer fait »', async () => {
+    await monter();
+    const l = await ligne('Essai de retour sur le serveur réel');
+    expect(l.textContent).toContain('Preuve déposée, attend le serveur réel');
+    expect(l.textContent).not.toMatch(/Fait/);
+    expect(within(l).getByText(/Preuve : Essai relu sur le banc\./)).toBeVisible();
+    expect(within(l).queryByRole('button', { name: /Marquer fait/ })).toBeNull();
+    expect(within(l).getByRole('button', { name: /Défaire/ })).toBeVisible();
+  });
+
+  it('point manuel sans preuve : « Marquer fait » et pas « Défaire »', async () => {
+    await monter();
+    const l = await ligne('Boucles de retour des messageries');
+    expect(within(l).getByRole('button', { name: /Marquer fait/ })).toBeVisible();
+    expect(within(l).queryByRole('button', { name: /Défaire/ })).toBeNull();
+  });
+
+  it('ne garde aucune phrase fixe de motif dans le code', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/features/envoi/pilotage/FeuVertPage.tsx', 'utf8');
+    expect(src).not.toContain('Preuve retirée depuis');
   });
 
   it('accessibilité clavier : Tab atteint le bouton, Entrée ouvre la saisie, Échap la ferme', async () => {

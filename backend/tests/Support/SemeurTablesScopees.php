@@ -597,7 +597,7 @@ final class SemeurTablesScopees
             'date_recul' => '2026-01-01',
         ]);
 
-        $campagne = (string) Illuminate\Support\Str::uuid();
+        $campagne = (string) Str::uuid();
         $inserer('envoi_campagnes', [
             'id' => $campagne, 'nom' => 'zz-etancheite', 'cible' => '{"type":"liste","reference":"zz","libelle":"zz"}',
             'nb_etapes' => 1, 'cree_par' => 'zz-etancheite',

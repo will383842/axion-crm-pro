@@ -245,7 +245,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
                 };
             case 'reporte':
                 if ($ligne['reporte_au'] !== null && $ligne['reporte_au'] > ($this->horloge)()->getTimestamp()) {
-                    return ResultatInjection::reporte(($this->horloge)()->setTimestamp($ligne['reporte_au']));
+                    return ResultatInjection::reporteEchec(($this->horloge)()->setTimestamp($ligne['reporte_au']));
                 }
         }
 
@@ -273,7 +273,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         $jusqua = ($this->horloge)()->modify('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
         $this->noter($cle, $id, 'reporte', $jeton, $jusqua->getTimestamp());
 
-        return ResultatInjection::reporte($jusqua);
+        return ResultatInjection::reporteEchec($jusqua);
     }
 
     private function incertain(string $cle, string $id, string $jeton): ResultatInjection
@@ -291,7 +291,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         $demain = ($this->horloge)()->modify('tomorrow');
         $this->noter($cle, $id, 'reporte', $jeton, $demain->getTimestamp());
 
-        return ResultatInjection::reporte($demain);
+        return ResultatInjection::reporteEchec($demain);
     }
 
     /** 5xx de connexion (IP non autorisée…) : alerte critique, pause, report au plus tôt demain ; pas un refus du message. */
@@ -308,7 +308,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         $demain = ($this->horloge)()->modify('tomorrow');
         $this->noter($cle, $id, 'reporte', $jeton, $demain->getTimestamp());
 
-        return ResultatInjection::reporte($demain);
+        return ResultatInjection::reporteEchec($demain);
     }
 
     private function noter(string $cle, string $id, string $etat, string $jeton, ?int $reporteAu = null): void

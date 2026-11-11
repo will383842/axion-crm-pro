@@ -10,24 +10,39 @@ final class EnvoiRefuse extends RuntimeException
     /** Code de l'issue incertaine : le message est peut-être parti, il ne repart JAMAIS tout seul. */
     public const ISSUE_INCERTAINE = 4201;
 
-    public static function issueIncertaine(): self
+    /** Code d'un refus d'ATTENTE (porte fermée, qui se rouvre d'elle-même) : report sans compteur ni limite. */
+    public const ATTENTE = 4202;
+
+    /** Vrai si l'alerte « issue incertaine » a déjà été émise par la passerelle pour ce même incident (réservation périmée). */
+    public bool $alerteDejaEmise = false;
+
+    public static function issueIncertaine(bool $alerteDejaEmise = false): self
     {
-        return new self('Issue incertaine d\'une injection précédente (a_verifier) : aucun renvoi automatique.', self::ISSUE_INCERTAINE);
+        $e = new self('Issue incertaine d\'une injection précédente (a_verifier) : aucun renvoi automatique.', self::ISSUE_INCERTAINE);
+        $e->alerteDejaEmise = $alerteDejaEmise;
+
+        return $e;
+    }
+
+    /** Refus d'attente : envoi réel éteint, arrêt général, mode témoins. */
+    public function estAttente(): bool
+    {
+        return $this->getCode() === self::ATTENTE;
     }
 
     public static function envoiReelInactif(): self
     {
-        return new self('Envoi réel inactif (ENVOI_REEL_ACTIF éteint) : aucune connexion tentée.');
+        return new self('Envoi réel inactif (ENVOI_REEL_ACTIF éteint) : aucune connexion tentée.', self::ATTENTE);
     }
 
     public static function toutArreter(): self
     {
-        return new self('Tout arrêter est actif : aucune injection.');
+        return new self('Tout arrêter est actif : aucune injection.', self::ATTENTE);
     }
 
     public static function horsTemoins(): self
     {
-        return new self('Mode témoins : destinataire hors de la liste des témoins.');
+        return new self('Mode témoins : destinataire hors de la liste des témoins.', self::ATTENTE);
     }
 
     public static function cleEmpreinteAbsente(): self

@@ -371,3 +371,46 @@ test('rejeu depuis « a_verifier » : un refus définitif ne libère PAS la plac
     expect(fn () => ($this->passerelle)($serveur)->injecter(($this->msg)()))->toThrow(RefusDefinitifServeur::class);
     expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
 });
+
+// Audit 4, mineur 1 : ligne « acceptee » sans identifiant conservé en SMTP direct => jamais de rappel du serveur.
+test('rejeu d\'une clé « acceptee » SANS identifiant conservé, serveur non dédoublonnant : le serveur n\'est PAS rappelé', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'acceptee', null);
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('ne-doit-pas-arriver'));
+    $res = ($this->passerelle)($serveur)->injecter(($this->msg)());
+    expect($res->accepte)->toBeTrue()->and($res->idInjection)->toBeNull()->and($serveur->appels)->toBe(0);
+});
+
+// Audit 4, mineur 3 : une seule alerte pour un même incident (réservation périmée puis séquenceur).
+test('réservation périmée rejouée en SMTP direct : l\'exception dit que l\'alerte est DÉJÀ émise ; une réservation vivante non', function () {
+    Log::spy();
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour->modify('-3 hours'));
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('x'));
+    try {
+        ($this->passerelle)($serveur)->injecter(($this->msg)());
+        $this->fail('EnvoiRefuse attendue');
+    } catch (EnvoiRefuse $e) {
+        expect($e->getCode())->toBe(EnvoiRefuse::ISSUE_INCERTAINE)->and($e->alerteDejaEmise)->toBeTrue();
+    }
+    Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'injection_a_verifier'))->once();
+
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k2', $this->jour);
+    try {
+        ($this->passerelle)($serveur)->injecter(($this->msg)('k2'));
+        $this->fail('EnvoiRefuse attendue');
+    } catch (EnvoiRefuse $e) {
+        expect($e->alerteDejaEmise)->toBeFalse();
+    }
+    expect($serveur->appels)->toBe(0);
+});
+
+// Audit 4, mineur 5 : la libération SECURITY DEFINER ne vaut que pour l'espace du contexte courant.
+test('envoi_injection_liberer refuse un espace différent du contexte courant ; l\'ancienne fonction du compteur n\'existe plus', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $autre = F::espace('zz-ric-autre');
+    WorkspaceContext::set($autre);
+    expect((bool) DB::selectOne('SELECT envoi_injection_liberer(?::uuid, ?) AS ok', [$this->ws, 'k1'])->ok)->toBeFalse();
+    WorkspaceContext::set($this->ws);
+    expect(DB::selectOne("SELECT to_regprocedure('envoi_compteur_global_liberer(date)') AS f")->f)->toBeNull();
+    expect($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'liberee'))->toBeTrue();
+});

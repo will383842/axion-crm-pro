@@ -2,6 +2,7 @@
 
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
@@ -17,6 +18,7 @@ use App\Envoi\Smtp\SourceMessageSigne;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -402,6 +404,25 @@ test('S21 coupure entre la fin de transmission et l’accusé : zéro doublon, z
         expect($s->injecter(smtpMsg($ws, 'autre'))->accepte)->toBeFalse();
         expect(smtpLignes($ws))->toHaveCount(1)->and(smtpLignes($ws)[0]->etat)->toBe('a_verifier');
         expect($s->etatEnvoi((string) $ligne->id_injection))->toBe(EtatMessage::Inconnu);
+    });
+});
+
+test('audit 4 : boîte bloquée par une ligne a_verifier => report d\'ATTENTE espacé (pas chaque minute), UNE seule alerte par boîte', function () {
+    Log::spy();
+    Cache::flush();
+    smtpAvecFauxServeur('coupure_apres_data', function (int $port, string $fichier) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $s = smtpAdaptateur($ws, $boite);
+        $s->injecter(smtpMsg($ws, 'k-bloquante')); // coupure après DATA : a_verifier
+
+        $debut = new DateTimeImmutable;
+        foreach (['autre1', 'autre2', 'autre3'] as $cle) {
+            $r = $s->injecter(smtpMsg($ws, $cle));
+            expect($r->accepte)->toBeFalse()->and($r->incertain)->toBeFalse()
+                ->and($r->nature)->toBe(NatureReport::Attente)
+                ->and($r->reporteAu->getTimestamp() - $debut->getTimestamp())->toBeGreaterThanOrEqual(30 * 60); // espacé, pas +1 minute
+        }
+        Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'boîte bloquée'))->once();
     });
 });
 

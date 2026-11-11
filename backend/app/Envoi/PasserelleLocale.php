@@ -3,6 +3,7 @@
 namespace App\Envoi;
 
 use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Contrat\ConsultationAcceptation;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
@@ -42,7 +43,7 @@ use Throwable;
  * Le jour est le jour civil d'Europe/Paris (JourEnvoi).
  * Le mode témoins ne s'éteint que par `envoi:temoins-off` (voir DepotSocle).
  */
-final class PasserelleLocale implements ServeurEnvoi
+final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
 {
     /** Borne haute V0 des plafonds (par espace et global) : au-delà, la configuration est rejetée. */
     public const PLAFOND_MAX = 300;
@@ -84,10 +85,15 @@ final class PasserelleLocale implements ServeurEnvoi
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
         // (A) Transaction COURTE sous le verrou du jour : portes, chauffe, plafonds, puis RÉSERVATION (elle compte). COMMIT.
-        $decision = $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur): ResultatInjection|string {
+        $perimee = false; // la réservation de CETTE clé vient d'être périmée ici (alerte déjà émise : le séquenceur n'en émet pas une seconde)
+        $decision = $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur, &$perimee): ResultatInjection|string {
+            $perimee = false;
             // (D) Réservation restée `reservee` trop longtemps (même horloge que la réservation) : issue inconnue => `a_verifier`
             // (compte toujours). L'alerte ne part qu'APRÈS le COMMIT de cette conclusion.
             foreach ($this->depot->perimerReservations($ws, $this->instant()->modify('-' . self::DELAI_RESERVATION_MINUTES . ' minutes')) as $cle) {
+                if ($cle === $message->cleIdempotence || str_starts_with($cle, $message->cleIdempotence . '~')) {
+                    $perimee = true;
+                }
                 DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : réservation restée sans issue, intervention requise.', ['workspace_id' => $ws, 'cle' => $cle]));
             }
             if ($this->depot->toutArreter($ws)) {
@@ -119,7 +125,7 @@ final class PasserelleLocale implements ServeurEnvoi
             return $decision;
         }
         if ($decision !== self::RESERVEE) {
-            return $this->rejouer($message, $decision, $ws, $jour, $fournisseur);
+            return $this->rejouer($message, $decision, $ws, $jour, $fournisseur, $perimee);
         }
 
         // (B) HORS de toute transaction : le seul endroit où le serveur est appelé.
@@ -167,16 +173,18 @@ final class PasserelleLocale implements ServeurEnvoi
      *   - `reservee` / `a_verifier` : renvoi seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS ;
      *     un renvoi CONFIRMÉ (`accepte`) conclut la ligne en `acceptee` (une seule fois) et note la chauffe.
      */
-    private function rejouer(MessageAEnvoyer $message, string $etat, string $ws, DateTimeImmutable $jour, ?string $fournisseur): ResultatInjection
+    private function rejouer(MessageAEnvoyer $message, string $etat, string $ws, DateTimeImmutable $jour, ?string $fournisseur, bool $alerteDejaEmise = false): ResultatInjection
     {
         if ($etat === 'acceptee') {
             $id = $this->depot->idInjection($ws, $message->cleIdempotence);
-            if ($id !== null) {
+            if ($id !== null || ! ($this->serveur instanceof RenvoiParMemeCle)) {
+                // Acceptée : jamais de rappel du serveur. Sans identifiant conservé, on ne rappelle le serveur que s'il
+                // dédoublonne lui-même par clé (jamais en SMTP direct) ; sinon le message est parti, l'identifiant manque.
                 return ResultatInjection::accepte($id);
             }
-            // Ligne ancienne sans identifiant conservé : repli sur le serveur (il dédoublonne par clé).
+            // Ligne ancienne sans identifiant conservé et serveur dédoublonnant : repli sur le serveur.
         } elseif (! ($this->serveur instanceof RenvoiParMemeCle)) {
-            throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
+            throw EnvoiRefuse::issueIncertaine($alerteDejaEmise); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
         try {
             $resultat = $this->serveur->injecter($message);
@@ -206,6 +214,16 @@ final class PasserelleLocale implements ServeurEnvoi
                 $this->chauffe?->noter($message, $jour, $fournisseur);
             }
         });
+    }
+
+    /** Message déjà accepté par cette passerelle pour cette clé (reprise après plantage) : résultat sans rappeler le serveur. */
+    public function dejaAccepte(string $workspaceId, string $cleIdempotence): ?ResultatInjection
+    {
+        if ($this->depot->etatInjection($workspaceId, $cleIdempotence) !== 'acceptee') {
+            return null;
+        }
+
+        return ResultatInjection::accepte($this->depot->idInjection($workspaceId, $cleIdempotence));
     }
 
     public function etatEnvoi(string $idInjection): EtatMessage

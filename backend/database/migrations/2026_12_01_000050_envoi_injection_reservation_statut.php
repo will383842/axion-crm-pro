@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
  *    journal, une seule par réservation : index unique).
  * 2. `envoi_injection_liberer` : un refus ou un report libère la place réservée : conclusion `liberee` et décrément du
  *    compteur global dans le même acte, une seule fois par réservation (jamais sous 0, jamais sans réservation).
+ * 3. (audit 4) l'ancienne `envoi_compteur_global_liberer(DATE)` est retirée (fonction, pas une donnée) ; `envoi_injection_liberer`
+ *    compare `p_ws` à l'espace du contexte courant.
  * down() inerte : colonne, index, fonction et lignes sont conservés.
  */
 return new class extends Migration
@@ -39,11 +41,17 @@ return new class extends Migration
                 WHERE commande = 'injection_confirmee' AND cle_idempotence IS NOT NULL;
             -- Libération : conclusion `liberee` ET décrément du compteur global dans UN seul acte, une fois par réservation
             -- (l'index unique des conclusions fait foi) ; jamais de décrément sans réservation ni sans conclusion posée.
+            -- Ancienne version de la libération (compteur seul, sans journal), remplacée par `envoi_injection_liberer`.
+            DROP FUNCTION IF EXISTS envoi_compteur_global_liberer(DATE);
             CREATE OR REPLACE FUNCTION envoi_injection_liberer(p_ws UUID, p_cle TEXT) RETURNS boolean AS $f$
             DECLARE
                 v_jour DATE;
                 v_n INTEGER;
             BEGIN
+                -- Fonction SECURITY DEFINER : elle ne libère que pour l'espace du contexte courant (jamais celui d'un autre).
+                IF p_ws::TEXT IS DISTINCT FROM NULLIF(current_setting('app.current_workspace_id', true), '') THEN
+                    RETURN false;
+                END IF;
                 SELECT jour INTO v_jour FROM public.envoi_journal_commandes
                     WHERE workspace_id = p_ws AND commande = 'injection' AND cle_idempotence = p_cle;
                 IF v_jour IS NULL THEN

@@ -17,6 +17,7 @@ use App\Envoi\Serveur\Kumo\EsmtpSuiviData;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -197,7 +198,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
                 return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
             case 'reporte':
                 if ($existant->reporte_au !== null && new DateTimeImmutable((string) $existant->reporte_au) > new DateTimeImmutable) {
-                    return ResultatInjection::reporte(new DateTimeImmutable((string) $existant->reporte_au));
+                    return ResultatInjection::reporteEchec(new DateTimeImmutable((string) $existant->reporte_au));
                 }
                 break;
         }
@@ -226,9 +227,16 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $bloquante = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('boite_id', $this->boiteId)->whereIn('etat', ['injection_en_cours', 'a_verifier'])
             ->where('cle_idempotence', '<>', $message->cleIdempotence)->exists());
+        $cleAlerte = 'envoi:boite_bloquee_a_verifier:' . $this->boiteId;
         if ($bloquante) {
-            return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
+            // Report d'ATTENTE, ESPACÉ (jamais chaque minute) et UNE seule alerte par boîte tant que le blocage dure.
+            if (Cache::add($cleAlerte, 1, now()->addDays(30))) {
+                Log::critical('Envoi : boîte bloquée par une injection à vérifier (a_verifier), vérification humaine requise.', ['workspace_id' => $this->workspaceId, 'boite' => $this->boiteId]);
+            }
+
+            return ResultatInjection::reporte(new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_boite_bloquee_minutes', 60)) . ' minutes'));
         }
+        Cache::forget($cleAlerte); // blocage levé : une nouvelle alerte sera de nouveau émise s'il revient
 
         // Transport (résolution + contrôle de l'adresse, épinglée) AVANT l'état : un refus d'hôte ne laisse aucune trace.
         $transport = ($this->fabriqueTransport)($boite);
@@ -277,7 +285,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
             $this->maj($cle, ['etat' => 'reporte', 'code_smtp' => $code, 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
 
-            return ResultatInjection::reporte($delai);
+            return ResultatInjection::reporteEchec($delai);
         }
         if ($code !== null && $code >= 500 && $transport instanceof EsmtpSuiviData && ! $transport->mailEmis && ! $transport->donneesEngagees) {
             // 5xx AVANT MAIL FROM (bannière, EHLO, STARTTLS) : refus de la CONNEXION, pas du message. Rien n'a pu partir :
@@ -294,7 +302,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             $delai = new DateTimeImmutable('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
             $this->maj($cle, ['etat' => 'reporte', 'reporte_au' => $delai->format('c')], ['injection_en_cours']);
 
-            return ResultatInjection::reporte($delai);
+            return ResultatInjection::reporteEchec($delai);
         }
         // Coupure / réponse inconnue : a_verifier, aucun renvoi automatique.
         $this->maj($cle, ['etat' => 'a_verifier', 'code_smtp' => $code], ['injection_en_cours']);
@@ -309,7 +317,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $this->boites->mettreEnPause($this->workspaceId, $this->boiteId, 'refus_connexion_5xx');
         Log::critical('Envoi : connexion SMTP refusée (5xx avant MAIL FROM), boîte mise en pause, message reporté.', ['boite' => $this->boiteId, 'code' => $code]);
 
-        return ResultatInjection::reporte($delai);
+        return ResultatInjection::reporteEchec($delai);
     }
 
     private function pauseSiTrop5xx(): void

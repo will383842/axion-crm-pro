@@ -3,7 +3,9 @@
 namespace App\Envoi\Sequence;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
+use App\Envoi\Contrat\ConsultationAcceptation;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Exceptions\InjectionIncertaine;
@@ -143,7 +145,11 @@ final class Sequenceur
             if ($e->getCode() === EnvoiRefuse::ISSUE_INCERTAINE) {
                 // Issue d'une injection précédente incertaine : JAMAIS de report (il reboucherait chaque jour). Inscription arrêtée
                 // en attente de vérification humaine, UNE alerte ; la ligne reste `a_verifier` côté passerelle.
-                return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
+                return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant, ! $e->alerteDejaEmise), $maintenant);
+            }
+            if ($e->estAttente()) {
+                // Report d'ATTENTE (envoi réel éteint, arrêt général, mode témoins) : ni compteur, ni alerte, ni limite.
+                return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
             }
 
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
@@ -165,6 +171,11 @@ final class Sequenceur
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
         }
         if (! $res->accepte) {
+            if ($res->nature === NatureReport::Attente) {
+                // Plafond du jour, quota de chauffe, pause, frein, boîte occupée : attente, l'inscription reste active sans compteur.
+                return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
+            }
+
             return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
         }
 
@@ -253,28 +264,34 @@ final class Sequenceur
         $references = $ins->fil_references === null || trim((string) $ins->fil_references) === '' ? [] : explode(' ', trim((string) $ins->fil_references));
         $inReplyTo = $references === [] ? null : $references[array_key_last($references)];
 
-        $messageId = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
-        if ($messageId === null) {
-            // Ligne « reserve » récente : une autre exécution est en cours (les lignes anciennes sont reprises par `reserver`).
+        $reservation = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
+        if ($reservation === null) {
+            // Ligne « reserve » récente (une autre exécution est en cours) : on REPOUSSE l'échéance au lieu d'occuper une des
+            // places de `executer` à chaque passage ; les lignes anciennes sont reprises par `reserver`.
+            $this->repousserApresLigneEnCours($ins, $rang, $maintenant);
+
             return self::DEJA;
         }
+        [$messageId, $reprise] = $reservation;
 
         $fiche = $this->fiches->lire($ws, (int) $ins->contact_id);
         if ($fiche === null || ListeSuppression::empreinte($fiche->email) !== trim((string) $ins->empreinte_adresse)) {
-            return $this->refuser($ins, $rang, 'fiche_introuvable_ou_adresse_changee', $maintenant);
+            return $this->refuserSaufDejaParti($ins, $rang, 'fiche_introuvable_ou_adresse_changee', $reprise, $maintenant);
         }
         if ($fiche->exclusion !== null) {
-            return $this->refuser($ins, $rang, $fiche->exclusion, $maintenant);
+            return $this->refuserSaufDejaParti($ins, $rang, $fiche->exclusion, $reprise, $maintenant);
         }
         $verdict = EnvoiAutorise::verifier($this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse), $maintenant);
         if (! $verdict->autorise()) {
             $motif = (string) $verdict->refus;
             // Refus PASSAGER (DNS du jour non vérifié, verdict d'adresse périmé) : on reporte, on n'arrête pas.
             if ($this->passager($ws, $motif, $fiche->email)) {
-                return $this->reporterAvecPlafond($ins, $rang, $motif, $fenetre, $maintenant);
+                $parti = $reprise ? $this->dejaParti($ins, $rang, $maintenant) : false;
+
+                return $parti ? $this->avancerSiActive($ins, $rang, $version, $messageId, $references, $fenetre, $maintenant) : $this->reporterAvecPlafond($ins, $rang, $motif, $fenetre, $maintenant);
             }
 
-            return $this->refuser($ins, $rang, $motif, $maintenant);
+            return $this->refuserSaufDejaParti($ins, $rang, $motif, $reprise, $maintenant);
         }
 
         $sujet = ($rang > 1 && stripos((string) $etape['sujet'], 're:') !== 0) ? 'Re: ' . $etape['sujet'] : (string) $etape['sujet'];
@@ -365,8 +382,70 @@ final class Sequenceur
         return $dernier === 'valide';
     }
 
-    /** Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. */
-    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, DateTimeImmutable $maintenant): ?string
+    /** Une ligne « reserve » ou autre non reprenable : l'inscription n'est pas retraitée avant une heure. */
+    private function repousserApresLigneEnCours(\stdClass $ins, int $rang, DateTimeImmutable $maintenant): void
+    {
+        $ligne = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->first(['statut', 'maj_le']);
+        $base = $ligne !== null && $ligne->statut === 'reserve' ? new DateTimeImmutable((string) $ligne->maj_le) : $maintenant;
+        $quand = $base->modify('+' . self::RESERVATION_REPRISE_HEURES . ' hours +1 minute');
+        $this->echeance($ins, $quand > $maintenant ? $quand : $maintenant->modify('+1 hour'));
+    }
+
+    /**
+     * Reprise après plantage : si la passerelle a DÉJÀ accepté ce message, il est parti. Il se conclut « envoyé » (jamais
+     * « refusé »). Retourne vrai si c'est le cas.
+     */
+    private function dejaParti(\stdClass $ins, int $rang, DateTimeImmutable $maintenant): bool
+    {
+        if (! ($this->serveur instanceof ConsultationAcceptation)) {
+            return false;
+        }
+        $res = $this->serveur->dejaAccepte((string) $ins->workspace_id, 'seq-' . $ins->id . '-' . $rang);
+        if ($res === null) {
+            return false;
+        }
+        DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
+            ->update(['statut' => 'envoye', 'refus' => null, 'id_injection' => $res->idInjection, 'maj_le' => $maintenant->format('c')]);
+
+        return true;
+    }
+
+    /**
+     * Refus DÉFINITIF d'une garde ; sauf si la passerelle avait déjà accepté le message (reprise) : alors « envoyé », puis
+     * l'inscription est arrêtée (la garde le demande) au lieu de passer la ligne « refuse ».
+     */
+    private function refuserSaufDejaParti(\stdClass $ins, int $rang, string $motif, bool $reprise, DateTimeImmutable $maintenant): string
+    {
+        if ($reprise && $this->dejaParti($ins, $rang, $maintenant)) {
+            $this->arreter($ins, 'garde:' . $motif, $maintenant);
+            if ($motif === EligibiliteAdresse::OPPOSITION) {
+                Inscriptions::tracer((string) $ins->workspace_id, $ins, Evenement::OPPOSITION, $maintenant);
+            }
+
+            return self::ARRETEE;
+        }
+
+        return $this->refuser($ins, $rang, $motif, $maintenant);
+    }
+
+    /**
+     * @param  array<string, mixed>  $version
+     * @param  list<string>  $references
+     */
+    private function avancerSiActive(\stdClass $ins, int $rang, array $version, string $messageId, array $references, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string
+    {
+        $this->avancer($ins, $rang, $version, $messageId, $references, $fenetre, $maintenant);
+
+        return self::ENVOYE;
+    }
+
+    /**
+     * Réserve (inscription, étape). null = déjà réservé/envoyé/refusé par une autre exécution. Sinon [Message-ID, reprise] :
+     * reprise vrai si une ligne « reserve » ancienne a été reprise (plantage avant la conclusion).
+     *
+     * @return array{0: string, 1: bool}|null
+     */
+    private function reserver(\stdClass $ins, int $rang, ?string $inReplyTo, DateTimeImmutable $maintenant): ?array
     {
         $messageId = '<' . Str::uuid() . '@' . $this->expedition->domaine . '>';
         $lignes = DB::table('envoi_messages')->insertOrIgnore([
@@ -381,14 +460,14 @@ final class Sequenceur
             'maj_le' => $maintenant->format('c'),
         ]);
         if ($lignes === 1) {
-            return $messageId;
+            return [$messageId, false];
         }
         // Une ligne « reporte » (passerelle pleine) peut être reprise ; toute autre est définitive.
         $repris = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reporte')
             ->update(['statut' => 'reserve', 'message_id' => $messageId, 'in_reply_to' => $inReplyTo, 'maj_le' => $maintenant->format('c')]);
 
         if ($repris === 1) {
-            return $messageId;
+            return [$messageId, false];
         }
         // Ligne « reserve » ancienne : reprise (on réclame la ligne en avançant `maj_le`, une seule exécution gagne) avec le MÊME Message-ID.
         $reprise = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
@@ -397,7 +476,7 @@ final class Sequenceur
         if ($reprise === 1) {
             Log::warning('envoi.sequenceur_reprise_reservation : étape « reserve » reprise par le chemin de rejeu.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang]);
 
-            return (string) DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('message_id');
+            return [(string) DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('message_id'), true];
         }
 
         return null;
@@ -457,9 +536,11 @@ final class Sequenceur
     }
 
     /** Issue incertaine : inscription arrêtée (jamais reportée) et UNE alerte critique. */
-    private function arreterIssueIncertaine(\stdClass $ins, ?string $erreur, DateTimeImmutable $maintenant): string
+    private function arreterIssueIncertaine(\stdClass $ins, ?string $erreur, DateTimeImmutable $maintenant, bool $alerter = true): string
     {
-        $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $erreur]];
+        if ($alerter) { // pas de seconde alerte si la passerelle vient d'en émettre une pour le même incident (réservation périmée)
+            $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $erreur]];
+        }
 
         return $this->arreter($ins, self::MOTIF_ISSUE_INCERTAINE, $maintenant);
     }

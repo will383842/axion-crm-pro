@@ -60,6 +60,8 @@ return [
     ],
     // Délai (minutes) avant nouvelle tentative après une réponse SMTP 4xx.
     'smtp_delai_4xx_minutes' => (int) env('ENVOI_SMTP_DELAI_4XX_MINUTES', 15),
+    // Boîte SMTP bloquée par une ligne a_verifier : report d'attente espacé (minutes), jamais chaque minute.
+    'smtp_delai_boite_bloquee_minutes' => (int) env('ENVOI_SMTP_DELAI_BOITE_BLOQUEE_MINUTES', 60),
     // Dérogations de TEST uniquement. Valeurs littérales (jamais lues dans l'environnement) et, de
     // toute façon, honorées SEULEMENT sous APP_ENV=testing : boucle locale 127.0.0.1 pour le faux
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.

@@ -35,7 +35,7 @@ paths:
                     allOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }]
                   data:
                     type: array
-                    items: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+                    items: { $ref: '#/components/schemas/CampagneSuivi' }
                   meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
                   par_statut:
                     type: object
@@ -94,14 +94,14 @@ paths:
                 required: [maintenant, campagne, sequence, derniers_evenements, compteurs, par_boite, par_jour, ab, fin_prevue_le]
                 properties:
                   maintenant: { $ref: './commun.yaml#/components/schemas/Horodatage' }
-                  campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+                  campagne: { $ref: '#/components/schemas/CampagneSuivi' }
                   sequence:
                     type: array
                     items:
                       type: object
                       required: [etape, message_id, delai_jours, envoyes, reponses, refus]
                       properties:
-                        etape: { type: integer, minimum: 1, maximum: 4 }
+                        etape: { type: integer, minimum: 1, maximum: 3 }
                         message_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
                         delai_jours: { type: integer, minimum: 0 }
                         envoyes: { type: integer, minimum: 0 }
@@ -191,8 +191,10 @@ paths:
       summary: Mettre en pause (rien n'est perdu)
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
       responses:
         '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/reprise:
     post:
@@ -200,8 +202,10 @@ paths:
       summary: Reprendre une campagne en pause
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
       responses:
         '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/terminer:
     post:
@@ -209,8 +213,10 @@ paths:
       summary: Terminer définitivement (relances comprises ; les réponses restent traitées)
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
       responses:
         '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/dupliquer:
     post:
@@ -218,6 +224,7 @@ paths:
       summary: Dupliquer une campagne (brouillon)
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
       requestBody:
         required: true
         content:
@@ -232,12 +239,15 @@ paths:
                 exclure_deja_recus: { type: boolean, default: false }
       responses:
         '201': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/date:
     post:
       operationId: changerDateCampagne
       summary: Changer la date du prochain envoi
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
       requestBody:
         required: true
         content:
@@ -249,6 +259,8 @@ paths:
                 le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
       responses:
         '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/destinataires:
     get:
@@ -283,9 +295,54 @@ paths:
                   meta: { $ref: './commun.yaml#/components/schemas/Pagination' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
+  parameters:
+    CleIdempotence:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+        clé (double clic) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+        Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+      schema: { type: string, minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9._-]+$' }
+  schemas:
+    CampagneSuivi:
+      description: |
+        Campagne telle que le suivi la montre (R09). Par rapport à `CampagneResume` : `ab_objet` est retiré (pas de test A/B)
+        et `etapes` va de 1 à 3. Au palier 0, `envoi_ferme` est vrai : « en_cours » n'existe pas, l'écran dit
+        « programmée, envoi fermé ». Les compteurs restent à 0 tant que la campagne n'a pas de séquence.
+      type: object
+      required:
+        [id, nom, statut, cible, envoyes, total, reponses, reponses_interessees,
+         prochain_envoi_le, cree_le, boites, etapes, envoi_ferme, version]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        nom: { type: string }
+        statut: { $ref: './commun.yaml#/components/schemas/StatutCampagne' }
+        cible: { $ref: './commun.yaml#/components/schemas/CibleCampagne' }
+        envoyes: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+        reponses: { type: integer, minimum: 0 }
+        reponses_interessees: { type: integer, minimum: 0 }
+        prochain_envoi_le:
+          oneOf:
+            - { $ref: './commun.yaml#/components/schemas/Horodatage' }
+            - { type: 'null' }
+        cree_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        boites:
+          type: array
+          items: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        etapes: { type: integer, minimum: 1, maximum: 3 }
+        envoi_ferme:
+          type: boolean
+          description: Vrai tant que l'envoi réel est fermé (palier 0) : aucune campagne ne part.
+        version:
+          type: integer
+          minimum: 1
+          description: Version de la campagne (verrou optimiste).
   responses:
     Campagne:
       description: Campagne après le geste.
       content:
         application/json:
-          schema: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
+          schema: { $ref: '#/components/schemas/CampagneSuivi' }

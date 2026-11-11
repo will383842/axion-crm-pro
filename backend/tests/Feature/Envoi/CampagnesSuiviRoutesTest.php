@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\ContratOpenApiEnvoi;
@@ -157,7 +158,7 @@ test('reprise : 409 sous arrêt général, 409 sous pause automatique, 200 sinon
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/reprise")->assertStatus(409)->assertJsonPath('error', 'frein_pause_automatique');
     expect(DB::table('envoi_campagnes')->where('id', $id)->value('statut'))->toBe('en_pause');
     foreach (app(DepotChauffe::class)->pausesActives($ws, new DateTimeImmutable('now')) as $pause) {
-        app(DepotChauffe::class)->leverPause($ws, (int) $pause->id, 'test');
+        Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'test']);   // chemin journalisé
     }
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/reprise")->assertOk()->assertJsonPath('statut', 'en_cours');
 });

@@ -131,7 +131,11 @@ final class GestesCampagne
         $this->socle->journaliser($ws, $commande, $auteur, $details);
     }
 
-    /** Retrouve un geste déjà journalisé sous cette clé ; une clé prise pour une AUTRE campagne est un refus. @return ?array<string, mixed> */
+    /**
+     * Retrouve un geste déjà journalisé sous cette clé ; une clé prise pour une AUTRE campagne est un refus.
+     *
+     * @return ?array<string, mixed>
+     */
     private function dejaFait(string $ws, string $commande, string $cle, string $campagne): ?array
     {
         $ligne = DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', $commande)

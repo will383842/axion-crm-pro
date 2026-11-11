@@ -25,7 +25,7 @@ final class LectureCampagnes
     {
         return WorkspaceContext::run($ws, function () use ($ws, $statut, $recherche, $page, $parPage): array {
             $base = fn () => DB::table('envoi_campagnes')->where('workspace_id', $ws)
-                ->when($recherche !== null && $recherche !== '', fn ($q) => $q->whereRaw("nom ILIKE ? ESCAPE '\\'", ['%' . addcslashes($recherche, '%_\\') . '%']));
+                ->when($recherche !== null && $recherche !== '', fn ($q) => $q->whereRaw("nom ILIKE ? ESCAPE '\\'", ['%' . addcslashes((string) $recherche, '%_\\') . '%']));
             $parStatut = array_fill_keys(self::STATUTS, 0);
             foreach ($base()->selectRaw('statut, count(*) AS n')->groupBy('statut')->get() as $l) {
                 $parStatut[$l->statut] = (int) $l->n;
@@ -36,7 +36,7 @@ final class LectureCampagnes
             $filtre = $statut === null ? $total : $parStatut[$statut];
 
             return [
-                'data' => $lignes->map(fn ($c) => self::exposer($c))->all(),
+                'data' => array_values($lignes->map(fn ($c) => self::exposer($c))->all()),
                 'meta' => ['page' => $page, 'par_page' => $parPage, 'total' => $filtre, 'pages' => (int) ceil($filtre / $parPage)],
                 'par_statut' => $parStatut,
             ];
@@ -50,11 +50,13 @@ final class LectureCampagnes
      */
     public function calendrier(string $ws, CarbonImmutable $du, CarbonImmutable $au): array
     {
-        return WorkspaceContext::run($ws, fn () => DB::table('envoi_campagnes')->where('workspace_id', $ws)->whereNotNull('envoi_prevu_le')
+        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_campagnes')->where('workspace_id', $ws)->whereNotNull('envoi_prevu_le')
             ->where('envoi_prevu_le', '>=', $du->startOfDay())->where('envoi_prevu_le', '<', $au->addDay()->startOfDay())
             ->orderBy('envoi_prevu_le')->orderBy('id')->get(['id', 'nom', 'statut', 'envoi_prevu_le'])
             ->map(fn ($c) => ['jour' => CarbonImmutable::parse($c->envoi_prevu_le)->format('Y-m-d'), 'campagne_id' => $c->id, 'nom' => $c->nom, 'statut' => $c->statut, 'prevus' => 0, 'envoyes' => 0])
             ->all());
+
+        return array_values($lignes);
     }
 
     /** @return array<string, mixed> forme `lireCampagne` du contrat */

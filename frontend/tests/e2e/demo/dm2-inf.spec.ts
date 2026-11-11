@@ -105,6 +105,7 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
     await ouvrirDemo(page, '/envoi/chauffe', { offre: 'envoi' });
     const carte = page.getByRole('region', { name: 'Chauffe de prospection-c.example' });
     await carte.getByRole('button', { name: /Reculer d’un palier/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Reculer', exact: true }).click();
     await expect(carte.getByText('palier P1, jour 1').first()).toBeVisible();
   });
 

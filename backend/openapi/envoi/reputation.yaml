@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: Envoi — réputation
+  version: 0.1.0
+  description: |
+    Constats de réputation des fournisseurs (Google Postmaster, Microsoft SNDS et JMRP, Orange),
+    saisis à la main d'après les consoles. Un constat « mauvaise » peut freiner (pause vers le
+    fournisseur concerné) ; aucun constat ne lève jamais une pause. Aucune adresse e-mail n'est
+    stockée. Lot : R17.
+servers:
+  - url: /api/v1
+paths:
+  /envoi/reputation:
+    get:
+      operationId: lireReputation
+      summary: Derniers constats de réputation
+      description: Réservé à `users.manage` (owner, admin). Les plus récents d'abord, 100 au plus.
+      responses:
+        '200':
+          description: Les constats.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ConstatReputation' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/reputation/constats:
+    post:
+      operationId: saisirConstatReputation
+      summary: Saisir un constat lu dans une console de réputation
+      description: |
+        Réservé à `workspaces.manage` (owner seul ; 403 sinon). Un constat « mauvaise » ouvre une pause
+        vers le fournisseur concerné (google_postmaster : gmail ; microsoft_snds et microsoft_jmrp :
+        microsoft ; orange : autre) et l'alerte `reputation_mauvaise`. Toute autre valeur n'ouvre rien
+        et ne lève rien. L'en-tête `Idempotency-Key` (facultatif) rend le rejeu inoffensif : sans lui,
+        un constat identique est reconnu par son empreinte. Même clé avec un autre contenu : 409.
+        422 si la preuve (10 à 500 caractères) contient une adresse e-mail.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, minLength: 8, maxLength: 100 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaisieConstatReputation' }
+      responses:
+        '200':
+          description: Rejeu reconnu : le constat déjà enregistré, aucun nouvel effet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConstatReputation' }
+        '201':
+          description: Constat enregistré.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConstatReputation' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+components:
+  schemas:
+    SourceReputation:
+      type: string
+      enum: [google_postmaster, microsoft_snds, microsoft_jmrp, orange]
+    ValeurReputation:
+      type: string
+      enum: [bonne, moyenne, mauvaise, inconnue]
+    SaisieConstatReputation:
+      type: object
+      required: [source, ressource_type, ressource, jour, reputation, preuve]
+      properties:
+        source: { $ref: '#/components/schemas/SourceReputation' }
+        ressource_type: { type: string, enum: [ip, domaine] }
+        ressource: { type: string, minLength: 3, maxLength: 253, description: 'Adresse IP ou nom de domaine (jamais une adresse e-mail).' }
+        jour: { type: string, format: date, description: 'Jour du constat (Paris), pas dans le futur.' }
+        reputation: { $ref: '#/components/schemas/ValeurReputation' }
+        taux_plaintes: { oneOf: [{ type: number, minimum: 0, maximum: 1 }, { type: 'null' }] }
+        erreurs_auth: { oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }] }
+        pieges: { oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }] }
+        preuve: { type: string, minLength: 10, maxLength: 500, description: 'Ce qui a été lu dans la console : sans adresse e-mail.' }
+    ConstatReputation:
+      type: object
+      required: [id, source, ressource_type, ressource, jour, reputation, taux_plaintes, erreurs_auth, pieges, saisie, preuve, auteur, cree_le, pause_ouverte]
+      properties:
+        id: { type: integer, minimum: 1 }
+        source: { $ref: '#/components/schemas/SourceReputation' }
+        ressource_type: { type: string, enum: [ip, domaine] }
+        ressource: { type: string }
+        jour: { type: string, format: date }
+        reputation: { $ref: '#/components/schemas/ValeurReputation' }
+        taux_plaintes: { oneOf: [{ type: number }, { type: 'null' }] }
+        erreurs_auth: { oneOf: [{ type: integer }, { type: 'null' }] }
+        pieges: { oneOf: [{ type: integer }, { type: 'null' }] }
+        saisie: { type: string, enum: [manuelle, automatique] }
+        preuve: { type: string }
+        auteur: { type: string }
+        cree_le: { type: string, format: date-time }
+        pause_ouverte: { type: boolean, description: 'Vrai si CE constat a ouvert une pause (jamais pour un rejeu).' }

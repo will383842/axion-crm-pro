@@ -2,8 +2,8 @@
  * Démo d'Envoi — pilotage : résultats, santé des envois, chercher un envoi, feu vert (DM2-PIL).
  * Contrat : `backend/openapi/envoi/pilotage.yaml`. Tout est calculé depuis `demoDb`
  * (événements d'envoi, réponses, boîtes) : aucun chiffre écrit en dur, sauf la liste
- * des 15 critères du feu vert. Aucun suivi des clics ; les ouvertures ne sont
- * données qu'en ESTIMATION, ouvertures automatiques probables retirées.
+ * des 15 critères du feu vert. Aucun suivi des clics ; aucune ouverture n'est
+ * donnée (ni mesurée ni estimée) : `ouvertures` et `ouvertures_estimees` valent null.
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { components } from '@/features/envoi/api/pilotage';

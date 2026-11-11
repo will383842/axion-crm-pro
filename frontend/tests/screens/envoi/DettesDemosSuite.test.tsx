@@ -39,16 +39,54 @@ describe('Règles de prudence : un champ vidé ou à 0 n’est jamais enregistr�
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
   });
 
-  it('faux serveur : refuse 0 et valeur absente (422), sans rien modifier', async () => {
+  it('écran : 0,5 accepté pour plaintes et refus ; 0, vide, négatif refusés', async () => {
+    const user = userEvent.setup();
+    await ouvrir();
+    for (const nom of [/seuil de plaintes|plainte/i, /adresses refusées/i]) {
+      const champ = await screen.findByRole('spinbutton', { name: nom });
+      await user.clear(champ);
+      await user.type(champ, '0.5');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeEnabled();
+      for (const saisie of ['0', '-1']) {
+        await user.clear(champ);
+        if (saisie !== '') await user.type(champ, saisie);
+        expect(await screen.findByRole('alert')).toHaveTextContent(/strictement positif/i);
+        expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
+      }
+      await user.clear(champ);
+      expect(await screen.findByRole('alert')).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
+      await user.type(champ, '0.5');
+    }
+  });
+
+  it('faux serveur : mêmes règles que l’écran (422 si refusé, 200 pour 0,5)', async () => {
     server.use(...conformite);
     const actuel = (await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()) as Record<string, unknown>;
-    for (const cle of ['pression_max_par_organisation_30j', 'frein_reponses_par_jour', 'pause_si_refus_pct']) {
-      for (const valeur of [0, null, undefined]) {
-        const reponse = await fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify({ ...actuel, [cle]: valeur }) });
-        expect(reponse.status, `${cle}=${String(valeur)}`).toBe(422);
+    const put = (corps: unknown) => fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify(corps) });
+    for (const cle of ['pause_si_refus_pct', 'pause_si_plaintes_pour_mille']) {
+      for (const valeur of [0, -1, null, undefined, '1']) {
+        expect((await put({ ...actuel, [cle]: valeur })).status, `${cle}=${String(valeur)}`).toBe(422);
       }
     }
+    for (const valeur of [-1, 1.5, null, undefined]) {
+      expect((await put({ ...actuel, frein_reponses_par_jour: valeur })).status, `frein=${String(valeur)}`).toBe(422);
+    }
+    for (const valeur of [0, -1, 1.5, null, undefined]) {
+      expect((await put({ ...actuel, pression_max_par_organisation_30j: valeur })).status, `pression=${String(valeur)}`).toBe(422);
+    }
     expect(await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()).toEqual(actuel);
+    expect((await put({ ...actuel, pause_si_plaintes_pour_mille: 0.5, pause_si_refus_pct: 0.5 })).status).toBe(200);
+  });
+
+  it('pastille « actives » : un seuil à 0,5 compte comme actif', async () => {
+    server.use(...conformite);
+    const actuel = (await (await fetch(`${RACINE}/envoi/reglages/regles`)).json()) as Record<string, unknown>;
+    await fetch(`${RACINE}/envoi/reglages/regles`, { method: 'PUT', headers: JSON_ENTETE, body: JSON.stringify({ ...actuel, pause_si_plaintes_pour_mille: 0.5 }) });
+    await ouvrir();
+    await screen.findByRole('spinbutton', { name: /messages par organisation/i });
+    expect(screen.getByText('5 actives')).toBeVisible();
   });
 
   it('pastille « actives » calculée, pas écrite en dur (#400 M2)', async () => {

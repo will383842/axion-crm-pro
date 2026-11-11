@@ -9,7 +9,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { components } from '@/features/envoi/api/conformite';
 import type { components as commun } from '@/features/envoi/api/commun';
-import { verifierDurcissement } from '@/features/envoi/conformite/composants/regles';
+import { CHAMPS_NOMBRE, exigence, valeurPermise, verifierDurcissement } from '@/features/envoi/conformite/composants/regles';
 import { LIBELLE_SOURCE, masquerAdresse } from '@/features/envoi/conformite/composants/format';
 import { demoDb } from '../../base';
 import { ilYa, maintenant } from '../../horloge';
@@ -325,11 +325,9 @@ export const handlers: HttpHandler[] = [
   http.put(api('/envoi/reglages/regles'), async ({ request }) => {
     await delai();
     const corps = (await request.json()) as S['Regles'];
-    const nonValides = (['pause_si_refus_pct', 'pause_si_plaintes_pour_mille', 'frein_reponses_par_jour', 'pression_max_par_organisation_30j'] as const).filter(
-      (c) => typeof corps[c] !== 'number' || !Number.isFinite(corps[c]) || corps[c] < 1,
-    );
+    const nonValides = CHAMPS_NOMBRE.filter((c) => !valeurPermise(c, corps[c]));
     if (nonValides.length > 0) {
-      return erreur(422, 'validation', `Chaque seuil doit être un nombre d’au moins 1 (${nonValides.join(', ')}).`);
+      return erreur(422, 'validation', `Seuil invalide : ${nonValides.map((c) => `${c} (${exigence(c)})`).join(', ')}.`);
     }
     const refus = verifierDurcissement(lire().regles, corps);
     if (refus.length > 0) {

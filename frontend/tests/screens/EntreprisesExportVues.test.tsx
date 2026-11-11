@@ -223,7 +223,7 @@ describe('csv() du faux serveur : la vraie fonction (DM1-ENT)', () => {
   const une = (surcharge: Partial<Entreprise>): Entreprise => ({ ...demoDb.entreprises.tous()[0]!, ...surcharge });
 
   it('commence par le BOM, puis l’en-tête', () => {
-    expect(csv([]).startsWith('﻿SIREN,Dénomination,')).toBe(true);
+    expect(csv([]).startsWith('\uFEFFSIREN,Dénomination,')).toBe(true);
   });
 
   it.each(['=1+1', '+33', '-2', '@SOMME(A1)', '\tcellule', '\rcellule'])('neutralise %j en tête de cellule', (brut) => {

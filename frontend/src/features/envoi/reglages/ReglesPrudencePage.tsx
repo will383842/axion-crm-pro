@@ -8,19 +8,12 @@ import { PageHeader, StatusPill } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { useEnregistrerRegles, useRegles } from '@/features/envoi/conformite/composants/api';
 import { Annonce, Bloc, CLASSE_BOUTON_MOBILE, CLASSE_CHAMP, Etat, Etiquette, messageDErreur } from '@/features/envoi/conformite/composants/commun';
-import { verifierDurcissement, type ReglesPrudence } from '@/features/envoi/conformite/composants/regles';
+import { CHAMPS_NOMBRE, exigence, saisiePermise, valeurPermise, verifierDurcissement, type ChampNombre, type ReglesPrudence } from '@/features/envoi/conformite/composants/regles';
 import { OngletsReglages } from './OngletsReglages';
 
-type Nombre = 'pause_si_refus_pct' | 'pause_si_plaintes_pour_mille' | 'frein_reponses_par_jour' | 'pression_max_par_organisation_30j';
+type Nombre = ChampNombre;
 
-const NOMBRES: Nombre[] = ['pause_si_refus_pct', 'pause_si_plaintes_pour_mille', 'frein_reponses_par_jour', 'pression_max_par_organisation_30j'];
-
-/** Vide, 0, négatif ou non numérique : refusé (minimum 1, comme le contrat). */
-function valeurValide(t: string | undefined): boolean {
-  if (t === undefined || t.trim() === '') return false;
-  const n = Number(t);
-  return Number.isFinite(n) && n >= 1;
-}
+const NOMBRES = CHAMPS_NOMBRE;
 
 const LIBELLES: Record<Nombre, string> = {
   pause_si_refus_pct: 'Seuil d’adresses refusées',
@@ -40,11 +33,11 @@ function Formulaire({ actuel }: { actuel: ReglesPrudence }) {
     setBrouillon(actuel);
     setTexte({});
   }, [actuel]);
-  const invalides = NOMBRES.filter((c) => texte[c] !== undefined && !valeurValide(texte[c]));
+  const invalides = NOMBRES.filter((c) => texte[c] !== undefined && !saisiePermise(c, texte[c]));
 
-  const refus = [...verifierDurcissement(actuel, brouillon), ...invalides.map((c) => `${LIBELLES[c]} : indiquez un nombre d’au moins 1.`)];
-  // Règles réellement actives : seuils renseignés (≥ 1) + test du matin toujours actif.
-  const actives = NOMBRES.filter((c) => actuel[c] >= 1).length + (actuel.test_du_matin_bloquant ? 1 : 0);
+  const refus = [...verifierDurcissement(actuel, brouillon), ...invalides.map((c) => `${LIBELLES[c]} : indiquez ${exigence(c)}.`)];
+  // Règles réellement actives : seuils renseignés (valeur permise, 0,5 compte) + test du matin toujours actif.
+  const actives = NOMBRES.filter((c) => valeurPermise(c, actuel[c])).length + (actuel.test_du_matin_bloquant ? 1 : 0);
   const modifie = JSON.stringify(actuel) !== JSON.stringify(brouillon);
 
   const nombre = (cle: Nombre, etiquette: string, unite: string, pas = 1) => (
@@ -55,13 +48,13 @@ function Formulaire({ actuel }: { actuel: ReglesPrudence }) {
           id={`${id}-${cle}`}
           type="number"
           inputMode="decimal"
-          min={1}
+          min={cle === 'frein_reponses_par_jour' ? 0 : cle === 'pression_max_par_organisation_30j' ? 1 : 0.5}
           step={pas}
           value={texte[cle] ?? String(brouillon[cle])}
           onChange={(e) => {
             const v = e.target.value;
             setTexte((t) => ({ ...t, [cle]: v }));
-            if (valeurValide(v)) setBrouillon((b) => ({ ...b, [cle]: Number(v) }));
+            if (saisiePermise(cle, v)) setBrouillon((b) => ({ ...b, [cle]: Number(v) }));
           }}
           className={`${CLASSE_CHAMP} max-w-28`}
         />

@@ -7,6 +7,7 @@ use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
@@ -50,7 +51,7 @@ use Throwable;
  *  - Tout est cloisonné par espace (registre : clés, pause, compteur de 5xx, séquence des événements).
  * L'état d'injection est écrit AVANT le réseau. Aucun suivi d'ouverture.
  */
-final class ServeurEnvoiKumo implements ServeurEnvoi
+final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
 {
     public const SEUIL_5XX = 3;
 

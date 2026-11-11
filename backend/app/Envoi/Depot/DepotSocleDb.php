@@ -8,6 +8,7 @@ use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -47,6 +48,7 @@ final class DepotSocleDb implements DepotSocle
             ->where('workspace_id', $workspaceId)
             ->where('commande', 'injection')
             ->where('jour', $jour->format('Y-m-d'))
+            ->whereNotExists(fn ($q) => $this->conclusion($q, 'liberee'))
             ->count());
     }
 
@@ -57,11 +59,109 @@ final class DepotSocleDb implements DepotSocle
 
     public function dejaInjecte(string $workspaceId, string $cleIdempotence): bool
     {
-        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_journal_commandes')
-            ->where('workspace_id', $workspaceId)
-            ->where('commande', 'injection')
-            ->where('cle_idempotence', $cleIdempotence)
-            ->exists());
+        return $this->etatInjection($workspaceId, $cleIdempotence) !== null;
+    }
+
+    /** Sous-requête : une conclusion de ce statut existe pour la réservation de la ligne `j` (table du dessus). */
+    private function conclusion(Builder $q, ?string $statut): void
+    {
+        $q->selectRaw('1')->from('envoi_journal_commandes as c')->where('c.commande', 'injection_issue')
+            ->whereColumn('c.workspace_id', 'envoi_journal_commandes.workspace_id')
+            ->whereColumn('c.cle_idempotence', 'envoi_journal_commandes.cle_idempotence');
+        if ($statut !== null) {
+            $q->where('c.statut', $statut);
+        }
+    }
+
+    /**
+     * Clé de journal de la tentative EN COURS : le journal est « ajout seul », une réservation libérée ne se rouvre
+     * pas ; une nouvelle tentative prend donc `<clé>~2`, `<clé>~3`… (le serveur, lui, reçoit toujours la clé d'origine).
+     */
+    private function cleJournal(string $workspaceId, string $cle): string
+    {
+        $liberees = (int) DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
+            ->where('commande', 'injection_issue')->where('statut', 'liberee')
+            ->whereRaw('(cle_idempotence = ? OR starts_with(cle_idempotence, ?))', [$cle, $cle . '~'])->count();
+
+        return $liberees === 0 ? $cle : $cle . '~' . ($liberees + 1);
+    }
+
+    public function etatInjection(string $workspaceId, string $cleIdempotence): ?string
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $cleIdempotence): ?string {
+            $cle = $this->cleJournal($workspaceId, $cleIdempotence);
+            $reservation = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
+                ->where('commande', 'injection')->where('cle_idempotence', $cle)->first();
+            if ($reservation === null) {
+                return null;
+            }
+            $conclusion = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
+                ->where('commande', 'injection_issue')->where('cle_idempotence', $cle)->value('statut');
+
+            return (string) ($conclusion ?? $reservation->statut);
+        });
+    }
+
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence): bool {
+            $insere = DB::affectingStatement(
+                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
+                 VALUES (?, 'injection', 'passerelle', '{}', ?, ?, 'reservee')
+                 ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection' AND cle_idempotence IS NOT NULL DO NOTHING",
+                [$workspaceId, $jour->format('Y-m-d'), $this->cleJournal($workspaceId, $cleIdempotence)],
+            );
+            if ($insere > 0) {
+                DB::select('SELECT envoi_compteur_global_incrementer(?::date)', [$jour->format('Y-m-d')]);
+            }
+
+            return $insere > 0;
+        });
+    }
+
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool
+    {
+        if (! in_array($statut, ['acceptee', 'liberee', 'a_verifier'], true)) {
+            throw new InvalidArgumentException('Conclusion d\'injection inconnue.');
+        }
+
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence, $statut): bool {
+            $cle = $this->cleJournal($workspaceId, $cleIdempotence);
+            // Une conclusion NE se pose que sur une réservation existante ; l'index unique en fait une seule.
+            $insere = DB::affectingStatement(
+                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
+                 SELECT ?, 'injection_issue', 'passerelle', '{}', ?, ?, ?
+                 WHERE EXISTS (SELECT 1 FROM envoi_journal_commandes WHERE workspace_id = ? AND commande = 'injection' AND cle_idempotence = ?)
+                 ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL DO NOTHING",
+                [$workspaceId, $jour->format('Y-m-d'), $cle, $statut, $workspaceId, $cle],
+            );
+            if ($insere > 0 && $statut === 'liberee') {
+                DB::select('SELECT envoi_compteur_global_liberer(?::date)', [$jour->format('Y-m-d')]);
+            }
+
+            return $insere > 0;
+        });
+    }
+
+    public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $avant): array {
+            $lignes = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)->where('commande', 'injection')
+                ->where('statut', 'reservee')->where('cree_le', '<', $avant->format('c'))
+                ->whereNotExists(fn ($q) => $this->conclusion($q, null))->get(['cle_idempotence', 'jour']);
+            $cles = [];
+            foreach ($lignes as $l) {
+                DB::affectingStatement(
+                    "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
+                     VALUES (?, 'injection_issue', 'passerelle', '{}', ?, ?, 'a_verifier')
+                     ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL DO NOTHING",
+                    [$workspaceId, $l->jour, $l->cle_idempotence],
+                );
+                $cles[] = (string) $l->cle_idempotence;
+            }
+
+            return $cles;
+        });
     }
 
     public function sousVerrouInjection(DateTimeImmutable $jour, Closure $f): mixed

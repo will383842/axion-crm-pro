@@ -66,6 +66,60 @@ final class DepotMemoire implements DepotSocle
         return in_array($cleIdempotence, $this->cles, true);
     }
 
+    /** @var array<string, string> clé => statut effectif (clés comptées seulement) */
+    public array $statuts = [];
+
+    public function etatInjection(string $workspaceId, string $cleIdempotence): ?string
+    {
+        return $this->dejaInjecte($workspaceId, $cleIdempotence) ? ($this->statuts[$cleIdempotence] ?? 'acceptee') : null;
+    }
+
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    {
+        if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
+            return false;
+        }
+        $this->cles[] = $cleIdempotence;
+        $this->statuts[$cleIdempotence] = 'reservee';
+        $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
+
+        return true;
+    }
+
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool
+    {
+        if (($this->statuts[$cleIdempotence] ?? null) !== 'reservee') {
+            return false;
+        }
+        if ($statut === 'liberee') {
+            $this->cles = array_values(array_diff($this->cles, [$cleIdempotence]));
+            unset($this->statuts[$cleIdempotence]);
+            $n = $this->injectesLe($workspaceId, $jour) - 1;
+            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = [];
+
+            return true;
+        }
+        $this->statuts[$cleIdempotence] = $statut;
+
+        return true;
+    }
+
+    /** @var list<string> clés à faire passer en `a_verifier` au prochain balayage (simule l'âge d'une réservation) */
+    public array $perimees = [];
+
+    public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array
+    {
+        $faites = [];
+        foreach ($this->perimees as $cle) {
+            if ($this->concluireInjection($workspaceId, $avant, $cle, 'a_verifier')) {
+                $faites[] = $cle;
+            }
+        }
+        $this->perimees = [];
+
+        return $faites;
+    }
+
     public function sousVerrouInjection(DateTimeImmutable $jour, Closure $f): mixed
     {
         $this->verrous++;

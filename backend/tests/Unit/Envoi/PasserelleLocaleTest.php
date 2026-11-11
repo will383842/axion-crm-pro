@@ -122,7 +122,8 @@ test('la passerelle respecte le contrat', function () {
 test('injection : tout se passe sous le verrou du jour', function () {
     $depot = new DepotMemoire;
     passerelle(depot: $depot)->injecter(msg());
-    expect($depot->verrous)->toBe(1);
+    // L8-F14a : deux transactions COURTES sous le verrou (A : réservation ; C : conclusion), le serveur est appelé entre les deux, hors verrou.
+    expect($depot->verrous)->toBe(2);
 });
 
 test('réinjection idempotente (même clé) : le compteur n’avance pas', function () {

@@ -34,6 +34,28 @@ interface DepotSocle
      */
     public function sousVerrouInjection(DateTimeImmutable $jour, Closure $f): mixed;
 
+    /**
+     * État EFFECTIF de la clé : `reservee` | `acceptee` | `a_verifier`, ou null (jamais réservée, ou réservation libérée).
+     * Tout état non null COMPTE dans les plafonds.
+     */
+    public function etatInjection(string $workspaceId, string $cleIdempotence): ?string;
+
+    /** À appeler SOUS le verrou : réserve la place (statut `reservee`, compte dans les plafonds). Vrai si la réservation est nouvelle. */
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool;
+
+    /**
+     * Conclut la réservation en cours : `acceptee` | `liberee` (la place est rendue) | `a_verifier` (elle compte toujours).
+     * Une seule conclusion par réservation : vrai la première fois, faux ensuite (rien ne change).
+     */
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool;
+
+    /**
+     * À appeler SOUS le verrou : toute réservation restée `reservee` depuis avant $avant passe en `a_verifier`.
+     *
+     * @return list<string> clés passées en `a_verifier`
+     */
+    public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array;
+
     /** À appeler SOUS le verrou. Une même clé ne compte qu'une fois. */
     public function noterInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): void;
 

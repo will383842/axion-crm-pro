@@ -7,6 +7,14 @@ use RuntimeException;
 /** Refus de la passerelle locale : rien n'est parti. */
 final class EnvoiRefuse extends RuntimeException
 {
+    /** Code de l'issue incertaine : le message est peut-être parti, il ne repart JAMAIS tout seul. */
+    public const ISSUE_INCERTAINE = 4201;
+
+    public static function issueIncertaine(): self
+    {
+        return new self('Issue incertaine d\'une injection précédente (a_verifier) : aucun renvoi automatique.', self::ISSUE_INCERTAINE);
+    }
+
     public static function envoiReelInactif(): self
     {
         return new self('Envoi réel inactif (ENVOI_REEL_ACTIF éteint) : aucune connexion tentée.');

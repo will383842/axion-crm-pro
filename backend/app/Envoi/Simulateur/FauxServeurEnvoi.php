@@ -7,12 +7,13 @@ use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 
 /** Simulateur en mémoire. Aucune connexion réseau, jamais. */
-final class FauxServeurEnvoi implements ServeurEnvoi
+final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
 {
     /** @var array<string, string> clé d'idempotence => id d'injection */
     private array $parCle = [];

@@ -113,9 +113,9 @@ describe('contrat F03c — énumérations', () => {
 });
 
 describe('contrat F03c — routes et réponses', () => {
-  it('feu vert : corps {preuve 1..500, fait}, 403, 404, 422', () => {
+  it('feu vert : corps {preuve 10..500, fait}, 403, 404, 422', () => {
     const r = route('pilotage', '/envoi/feu-vert/{code}/fait');
-    expect(r).toMatch(/preuve: \{ type: string, minLength: 1, maxLength: 500 \}/);
+    expect(r).toMatch(/preuve: \{ type: string, minLength: 10, maxLength: 500,/);
     expect(r).toMatch(/fait: \{ type: boolean, default: true \}/);
     for (const code of ["'403'", "'404'", "'422'"]) expect(r).toContain(code);
   });

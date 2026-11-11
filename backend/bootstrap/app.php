@@ -14,6 +14,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Spatie\Permission\Exceptions\UnauthorizedException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -163,6 +164,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        // (G) 403 des routes d'envoi : forme du contrat commun.yaml#Erreur ({error, message}, en français).
+        // Limité à /api/*/envoi/* : les autres routes gardent le rendu par défaut de Spatie.
+        $exceptions->render(function (UnauthorizedException $e, Request $request) {
+            if (! $request->is('api/*/envoi/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'error' => 'interdit',
+                'message' => 'Vous n’avez pas la permission d’effectuer cette action.',
+            ], 403);
         });
 
         // (E) UNE REQUETE TROP LONGUE N'EST PAS UNE PANNE. Le filet (D) annule

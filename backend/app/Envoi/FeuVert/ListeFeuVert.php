@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Feu vert : liste CALCULÉE (L8-F04). Lecture seule : elle ne signe jamais, n'écrit jamais `envoi_drapeaux`,
  * ne change aucun réglage. Points automatiques = lus dans le système ; points manuels = jamais automatiques,
- * « fait » seulement si une preuve a été déposée (et, par défaut, « vérifiable seulement avec le vrai serveur »).
+ * « fait » seulement si une preuve a été déposée ET que le point n'attend pas le vrai serveur
+ * (un point qui l'attend reste non fait et bloquant, sa preuve restant affichée).
  *
  * Catalogue versionné unique CatalogueManuels : `auto.*` (calculés) et `manuel.*` (spécification 26 § 8, 18 points).
  */
@@ -58,24 +59,62 @@ class ListeFeuVert
         $preuves = $this->preuves->dernieres($ws);
         foreach (CatalogueManuels::codesManuels() as $code) {
             $p = $preuves[$code] ?? null;
-            $fait = $p !== null && $p['fait'];
+            $depose = $p !== null && $p['fait'];
             $c = CatalogueManuels::POINTS[$code];
             // Aucun signal « K17 fait » n'existe encore dans le code : par prudence, un point qui exige le vrai serveur attend toujours.
+            // Règle : `fait` = (`etat` == « fait »). Un point qui attend le vrai serveur n'est PAS fait (donc bloquant),
+            // même avec une preuve déposée, qui reste affichée.
             $attend = $c['serveur_reel'];
+            $etat = $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($depose ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
             $points[] = new PointFeuVert(
                 $code,
                 $c['libelle'],
                 false,
-                $fait,
-                $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.',
+                $etat === PointFeuVert::ETAT_FAIT,
+                self::detailManuel($attend, $depose),
                 $c['source'],
                 $c['groupe'],
-                $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE),
-                $fait ? $p['preuve'] : null,
+                $etat,
+                $depose ? $p['preuve'] : null,
+                $depose ? $p['par'] : null,
+                $depose ? $p['le'] : null,
             );
         }
 
         return $points;
+    }
+
+    /** « Vrai serveur » seulement si le point attend le serveur réel (dépend de `$attend`). */
+    private static function detailManuel(bool $attend, bool $fait): string
+    {
+        if ($attend) {
+            return $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.';
+        }
+
+        return $fait ? 'Preuve déposée.' : 'Preuve humaine à déposer.';
+    }
+
+    /**
+     * Verrous en LECTURE SEULE (contrat VerrousFeuVert) : aucune écriture, aucune valeur secrète.
+     *
+     * @return array{envoi_reel_actif: bool, mode_temoins: bool, signature_presente: bool, signature_date: ?string, fournisseurs_temoins_couverts: int, fournisseurs_temoins_requis: int}
+     */
+    public function verrous(string $ws): array
+    {
+        $d = WorkspaceContext::run($ws, fn () => DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first());
+        $requis = DepotSocleDb::FOURNISSEURS_TEMOINS;
+        $presents = Schema::hasColumn('envoi_temoins', 'fournisseur')
+            ? WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->where('workspace_id', $ws)->distinct()->pluck('fournisseur')->all())
+            : [];
+
+        return [
+            'envoi_reel_actif' => config('envoi.reel_actif') !== false,
+            'mode_temoins' => $d !== null && (bool) $d->mode_temoins,
+            'signature_presente' => $d !== null && $d->feu_vert_signature !== null,
+            'signature_date' => $d !== null && $d->feu_vert_date !== null ? substr((string) $d->feu_vert_date, 0, 10) : null,
+            'fournisseurs_temoins_couverts' => count(array_intersect($requis, array_map('strval', $presents))),
+            'fournisseurs_temoins_requis' => count($requis),
+        ];
     }
 
     private static function pointAuto(string $code, bool $fait, string $detail): PointFeuVert

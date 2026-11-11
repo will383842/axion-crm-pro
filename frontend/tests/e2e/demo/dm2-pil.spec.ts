@@ -43,6 +43,8 @@ test.describe('pilotage des envois (démo)', () => {
     await ouvrirDemo(page, '/envoi/sante/feu-vert', { offre: 'les-deux' });
     await expect(page.getByText('14 critères sur 18')).toBeVisible();
     await page.getByRole('button', { name: /Marquer fait : Boucles de retour/ }).click();
+    await page.getByLabel('Preuve (ce que vous avez constaté)').fill('Inscription faite auprès des messageries.');
+    await page.getByRole('button', { name: 'Enregistrer la preuve' }).click();
     await expect(page.getByText('15 critères sur 18')).toBeVisible();
     await page.reload();
     await expect(page.getByText('15 critères sur 18')).toBeVisible();

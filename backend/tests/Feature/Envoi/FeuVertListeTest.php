@@ -18,6 +18,9 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
+
+/** R07 : points automatiques dont la source n'existe pas encore (toujours faux). */
+const FV_AUTO_SANS_SOURCE = ['auto.frein_temoins_branche', 'auto.frein_reponses_baisse', 'auto.separation_lettre_prospection'];
 function espaceFeuVert(): string
 {
     $id = (string) Str::uuid();
@@ -113,7 +116,8 @@ test('tout vert : tous les points automatiques sont faits, clé de 32 caractère
     toutVert($ws);
     config(['envoi.cle_desinscription' => str_repeat('a', 32)]);
     foreach (app(ListeFeuVert::class)->points($ws) as $p) {
-        if ($p->automatique) {
+        // R07 : ces points n'ont pas encore de source (R16, IP) : FAUX par construction, jamais « vrai par défaut ».
+        if ($p->automatique && ! in_array($p->code, FV_AUTO_SANS_SOURCE, true)) {
             expect($p->fait)->toBeTrue($p->code);
             expect($p->manuel)->toBeFalse()->and($p->bloquant)->toBeFalse();
         }
@@ -129,7 +133,7 @@ test('les détails et sources ne révèlent aucune valeur secrète', function ()
     }
 });
 
-test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 caractères au plus, 18 manuels', function () {
+test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 caractères au plus, 28 manuels', function () {
     $codes = CatalogueManuels::codes();
     expect(CatalogueManuels::VERSION)->toBeInt()->and(array_unique($codes))->toHaveCount(count($codes));
     foreach ($codes as $c) {
@@ -137,8 +141,8 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
         expect(CatalogueManuels::GROUPES)->toContain(CatalogueManuels::POINTS[$c]['groupe']);
     }
     $manuels = CatalogueManuels::codesManuels();
-    expect($manuels)->toHaveCount(18)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
-    expect(count($codes) - 18)->toBe(13);
+    expect($manuels)->toHaveCount(28)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->not->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
+    expect(count($manuels))->toBe(28)->and(count($codes) - 28)->toBe(16);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
             expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
@@ -152,7 +156,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve de test, réf. exemple-01', 'auteur');
     app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'Preuve de test, réf. exemple-01', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
-    expect($liste)->toHaveCount(31);
+    expect($liste)->toHaveCount(44);
     foreach ($liste as $p) {
         expect(CatalogueManuels::GROUPES)->toContain($p->groupe);
         expect($p->nature)->toBe($p->automatique ? 'auto' : 'manuel')->and(str_starts_with($p->code, $p->nature . '.'))->toBeTrue()->and($p->source)->not->toBe('');
@@ -164,7 +168,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     expect(point($ws, 'manuel.port25'))->fait->toBeFalse()->bloquant->toBeTrue()->etat->toBe('attend_serveur_reel')->source->toBe('26§8.1')->preuve->not->toBeNull();
     expect(point($ws, 'manuel.ptr_fcrdns'))->fait->toBeFalse()->etat->toBe('attend_serveur_reel');
     expect(point($ws, 'manuel.capacite_reponses'))->fait->toBeTrue()->etat->toBe('fait');
-    expect(point($ws, 'manuel.homme_mort')->libelle)->not->toBe('')->and(point($ws, 'manuel.inscriptions')->libelle)->toContain('Signal Spam');
+    expect(point($ws, 'manuel.homme_mort')->libelle)->not->toBe('')->and(point($ws, 'manuel.signal_spam')->libelle)->toContain('Signal Spam');
 });
 
 test('une ligne AUTOMATIQUE insérée directement (fait = true) ne rend jamais le point fait', function () {
@@ -292,4 +296,88 @@ test('la liste ne signe jamais et n’écrit jamais envoi_drapeaux', function ()
     app(DepotPreuves::class)->ajouter($ws, ListeFeuVert::PREMIER, 'Preuve de test, réf. exemple-01', 'auteur');
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
     expect(config('envoi.reel_actif'))->toBeFalse();
+});
+
+const FV_CODES_R07 = [
+    'A4' => ['auto.frein_temoins_branche', 'auto.frein_reponses_baisse', 'manuel.seuils_a4_banc'],
+    'A5' => ['manuel.desinscription_get_sans_effet'],
+    'A6' => ['manuel.anti_doublon_redemarrage'],
+    'A7' => ['manuel.runbook_serveur_perdu', 'manuel.dkim_secours_publie'],
+    'A8' => ['manuel.rattrapage_oppositions'],
+    'A9' => ['manuel.message_compose_conforme'],
+    'A11' => ['manuel.postmaster_google', 'manuel.snds_jmrp', 'manuel.orange_cfl', 'manuel.signal_spam'],
+    'A12' => ['auto.separation_lettre_prospection'],
+];
+
+test('R07 : chaque case A4 à A12 est présente une seule fois, source « 30 Ax », codes stables', function () {
+    $ws = espaceFeuVert();
+    $codes = array_map(fn ($p) => $p->code, app(ListeFeuVert::class)->points($ws));
+    foreach (FV_CODES_R07 as $case => $liste) {
+        foreach ($liste as $code) {
+            expect(array_count_values($codes)[$code] ?? 0)->toBe(1, $code);
+            expect(point($ws, $code)->source)->toBe('30 ' . $case);
+        }
+    }
+});
+
+test('R07 : les points automatiques sans source sont FAUX, même avec tout au vert', function () {
+    $ws = espaceFeuVert();
+    toutVert($ws);
+    foreach (FV_AUTO_SANS_SOURCE as $code) {
+        expect(point($ws, $code))->fait->toBeFalse()->bloquant->toBeTrue()->etat->toBe('a_faire');
+    }
+});
+
+test('R07 : un point auto.* refuse toute preuve', function (string $code) {
+    expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $code, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
+})->with(FV_AUTO_SANS_SOURCE);
+
+test('R07 : A11 éclaté : trois inscriptions bloquantes, Signal Spam non bloquant ; l’ancien point disparaît', function () {
+    $ws = espaceFeuVert();
+    foreach (['manuel.postmaster_google', 'manuel.snds_jmrp', 'manuel.orange_cfl'] as $c) {
+        expect(point($ws, $c)->bloquant)->toBeTrue($c);
+    }
+    expect(point($ws, 'manuel.signal_spam'))->fait->toBeFalse()->bloquant->toBeFalse();
+    expect(CatalogueManuels::codes())->not->toContain('manuel.inscriptions');
+});
+
+test('R07 : les points manuels sans serveur réel se valident par preuve, ceux qui l’exigent attendent K17', function () {
+    $ws = espaceFeuVert();
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.anti_doublon_redemarrage', 'Scénario S21 vert, passage CI réf. exemple-21', 'auteur');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.dkim_secours_publie', 'Sélecteur de secours publié, réf. exemple-07', 'auteur');
+    expect(point($ws, 'manuel.anti_doublon_redemarrage'))->fait->toBeTrue();
+    expect(point($ws, 'manuel.dkim_secours_publie'))->fait->toBeFalse()->etat->toBe('attend_serveur_reel');
+});
+
+test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu', function () {
+    $ws = espaceFeuVert();
+    toutVert($ws);
+    $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
+    $points = app(ListeFeuVert::class)->points($ws);
+    $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
+    // 44 points : 13 auto verts, 3 auto sans source, 28 manuels non faits dont Signal Spam non bloquant.
+    expect($bloquants)->toBe(3 + 27);
+    expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
+});
+
+test('R07 : envoi_domaines.flux accepte NULL, prospection, lettre et refuse le reste', function () {
+    $ws = espaceFeuVert();
+    $ajouter = fn (string $nom, ?string $flux) => WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => $nom, 'achete_le' => '2026-01-01', 'flux' => $flux]));
+    $ajouter('a.exemple.test', null);
+    $ajouter('b.exemple.test', 'prospection');
+    $ajouter('c.exemple.test', 'lettre');
+    expect(fn () => $ajouter('d.exemple.test', 'autre'))->toThrow(QueryException::class);
+});
+
+test('R07 : A12 reste à faire tant qu’un domaine a flux NULL, et tant que la séparation des IP n’est pas lisible', function () {
+    $ws = espaceFeuVert();
+    toutVert($ws);
+    WorkspaceContext::run($ws, function () use ($ws) {
+        DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'p.exemple.test', 'achete_le' => '2026-01-01', 'flux' => 'prospection']);
+        DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'l.exemple.test', 'achete_le' => '2026-01-01', 'flux' => null]);
+    });
+    expect(point($ws, 'auto.separation_lettre_prospection'))->fait->toBeFalse()->detail->toContain('flux');
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('nom', 'l.exemple.test')->update(['flux' => 'lettre']));
+    // Les deux flux sont étiquetés, mais aucune source ne dit encore les adresses IP : prudence, toujours faux.
+    expect(point($ws, 'auto.separation_lettre_prospection')->fait)->toBeFalse();
 });

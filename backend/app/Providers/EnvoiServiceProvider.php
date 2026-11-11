@@ -5,12 +5,15 @@ namespace App\Providers;
 use App\Envoi\Chauffe\CompteurRetours;
 use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\LecteurReports;
+use App\Envoi\Chauffe\LecteurReportsDb;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Chauffe\ResolveurMx;
 use App\Envoi\Chauffe\ToutArreter;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\Depot\DepotTentatives;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\ArretParEntrepriseL1;
@@ -73,7 +76,10 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->singleton(DepotChauffe::class);
         $this->app->singleton(ResolveurFournisseur::class, ResolveurMx::class);
         $this->app->singleton(AppliquerRetour::class, fn ($app) => new CompteurRetours($app->make(DepotChauffe::class), $app->make(ResolveurFournisseur::class)));
-        $this->app->singleton(GardeChauffe::class, fn ($app) => new GardeChauffe($app->make(DepotChauffe::class), $app->make(DepotSocle::class), $app->make(ResolveurFournisseur::class), $app->make(Alerte::class)));
+        // R06 : source réelle des reports (table vide au palier 0 ; frein NON actif avant T2). `AucunReportConnu` reste pour les tests.
+        $this->app->singleton(LecteurReports::class, LecteurReportsDb::class);
+        $this->app->singleton(DepotTentatives::class);
+        $this->app->singleton(GardeChauffe::class, fn ($app) => new GardeChauffe($app->make(DepotChauffe::class), $app->make(DepotSocle::class), $app->make(ResolveurFournisseur::class), $app->make(Alerte::class), $app->make(LecteurReports::class)));
         $this->app->singleton(FauxServeurEnvoi::class);
         $this->app->singleton(ToutArreter::class, fn ($app) => new ToutArreter($app->make(DepotSocle::class), $app->make(ServeurEnvoi::class), $app->make(Alerte::class)));
         // K15 supervision : sonde K1, alerte par le Socle (jamais une boîte de prospection).
@@ -112,6 +118,7 @@ class EnvoiServiceProvider extends ServiceProvider
             fn (): int => (int) config('envoi.plafond_global_jour'),
             fn (): ?string => WorkspaceContext::current(),
             $app->make(GardeChauffe::class),
+            $app->make(DepotTentatives::class),
         ));
 
         // M3 — relève IMAP branchée. Ordre de la chaîne (docs/envoi/rebonds-plaintes-k11.md) : 1. CRM (arrêts permanents,

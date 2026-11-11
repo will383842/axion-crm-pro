@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_tentatives'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,6 +200,8 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
+        // Envoi R06 : tentatives d'envoi par fournisseur, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'envoi_tentatives',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -812,6 +814,11 @@ final class SemeurTablesScopees
             'bouton_vu' => false,
             'post_effectif' => false,
             'auteur' => 'zz',
+        ]);
+        $inserer('envoi_tentatives', [
+            'fournisseur' => 'gmail',
+            'issue' => 'acceptee',
+            'cle_idempotence' => 'zz-seme',
         ]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',

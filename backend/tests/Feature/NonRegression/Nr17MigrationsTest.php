@@ -77,6 +77,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     // Filet modifié : pourquoi — Envoi L8-F14a : colonne `statut` (défaut `acceptee`, sans UPDATE), index unique des conclusions et fonction
     // de libération (ajouts seuls) ; les retirer effacerait l'état des réservations d'injection ; down() inerte, up() rejouable.
     '2026_12_01_000050_envoi_injection_reservation_statut.php',
+    // Envoi R06 : tentatives d'envoi par fournisseur, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait la source du frein « reports » ; down() inerte, up() rejouable.
+    '2026_12_02_000060_envoi_tentatives.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -93,35 +93,39 @@ paths:
     get:
       operationId: exporterOpposition
       summary: Export du registre (CSV)
+      description: |
+        Réservé au propriétaire (`workspaces.manage`) ET à la permission `data.export`. Envoyé en flux, journalisé
+        (qui, quand, combien de lignes ; jamais les adresses). Les cellules commençant par `=`, `+`, `-`, `@` sont
+        neutralisées. Limite : 2 exports par heure (429 au-delà).
       responses:
         '200':
           description: Fichier CSV.
           content:
             text/csv:
               schema: { type: string }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/puis-je-ecrire:
     get:
       operationId: puisJeEcrire
       summary: « Puis-je écrire à… ? »
+      description: |
+        Rend seulement `peut` et un motif codé REGROUPÉ (jamais le détail d'une garde). Une adresse inconnue de l'espace
+        et une adresse connue seulement d'un autre espace reçoivent EXACTEMENT la même réponse (aucun oracle « contact connu »).
+        Limite : 30 demandes par minute et par compte (429 au-delà). L'adresse n'est jamais journalisée en clair.
       parameters:
         - name: adresse
           in: query
           required: true
-          schema: { type: string }
+          schema: { type: string, format: email }
       responses:
         '200':
-          description: Réponse et raisons.
+          description: La réponse et, si c'est non, le groupe de motif.
           content:
             application/json:
-              schema:
-                type: object
-                required: [adresse, reponse, raisons]
-                properties:
-                  adresse: { type: string }
-                  reponse: { type: string, enum: [oui, non, prudence] }
-                  raisons:
-                    type: array
-                    items: { type: string }
+              schema: { $ref: '#/components/schemas/ReponsePuisJeEcrire' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/alertes:
     get:
       operationId: listerAlertesEnvoi
@@ -359,6 +363,16 @@ paths:
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    ReponsePuisJeEcrire:
+      type: object
+      required: [peut, motif]
+      properties:
+        peut: { type: boolean }
+        motif:
+          description: Groupe de motif quand `peut` est faux ; `null` quand c'est oui.
+          oneOf:
+            - { type: string, enum: [opposition, adresse_non_verifiee, contact_ecarte, conditions_envoi] }
+            - { type: 'null' }
     ReglagesAlertes:
       type: object
       description: Règles d'alerte par type et canal (console et e-mail seulement), seconde adresse, regroupement.

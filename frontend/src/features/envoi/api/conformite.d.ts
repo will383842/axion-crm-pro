@@ -98,7 +98,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export du registre (CSV) */
+        /**
+         * Export du registre (CSV)
+         * @description Réservé au propriétaire (`workspaces.manage`) ET à la permission `data.export`. Envoyé en flux, journalisé
+         *     (qui, quand, combien de lignes ; jamais les adresses). Les cellules commençant par `=`, `+`, `-`, `@` sont
+         *     neutralisées. Limite : 2 exports par heure (429 au-delà).
+         */
         get: operations["exporterOpposition"];
         put?: never;
         post?: never;
@@ -115,7 +120,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** « Puis-je écrire à… ? » */
+        /**
+         * « Puis-je écrire à… ? »
+         * @description Rend seulement `peut` et un motif codé REGROUPÉ (jamais le détail d'une garde). Une adresse inconnue de l'espace
+         *     et une adresse connue seulement d'un autre espace reçoivent EXACTEMENT la même réponse (aucun oracle « contact connu »).
+         *     Limite : 30 demandes par minute et par compte (429 au-delà). L'adresse n'est jamais journalisée en clair.
+         */
         get: operations["puisJeEcrire"];
         put?: never;
         post?: never;
@@ -473,6 +483,11 @@ export interface components {
             /** @constant */
             test_du_matin_bloquant: true;
         };
+        ReponsePuisJeEcrire: {
+            /** @description Groupe de motif quand `peut` est faux ; `null` quand c'est oui. */
+            motif: ("opposition" | "adresse_non_verifiee" | "contact_ecarte" | "conditions_envoi") | null;
+            peut: boolean;
+        };
         /** @enum {string} */
         SourceDesinscription: "lien" | "reponse_stop" | "plainte" | "manuel";
         Succes: {
@@ -773,6 +788,8 @@ export interface operations {
                     "text/csv": string;
                 };
             };
+            403: components["responses"]["Erreur"];
+            429: components["responses"]["Erreur"];
         };
     };
     puisJeEcrire: {
@@ -786,20 +803,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Réponse et raisons. */
+            /** @description La réponse et, si c'est non, le groupe de motif. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        adresse: string;
-                        raisons: string[];
-                        /** @enum {string} */
-                        reponse: "oui" | "non" | "prudence";
-                    };
+                    "application/json": components["schemas"]["ReponsePuisJeEcrire"];
                 };
             };
+            422: components["responses"]["Erreur"];
+            429: components["responses"]["Erreur"];
         };
     };
     lireReglagesEnvoi: {

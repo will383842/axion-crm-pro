@@ -127,7 +127,7 @@ Couvert dans `11_carte_france_interactive.md`. Une seule page combinant :
 │ ├─────────────────────────────────────────────────────────────────┤  │
 │ │ ☐ │ Quali │ Taille (6 cat. v1.1)   │ Raison sociale     │ Décideur  │
 │ │ ──┼───────┼─────────────────────────┼─────────────────────┼──────────│
-│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION IA SAS       │ J. Exemple│
+│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION IA SAS       │ Williams │
 │ │ ☐ │  🟢   │ 🏬 ETI                  │ EXEMPLE Industries │ M. Dupont│
 │ │ ☐ │  🟡   │ 👥 TPE                  │ SARL TEST          │ J. Martin│
 │ │ ☐ │  🔴   │ 🔨 Artisan              │ Plomberie Démo     │ —        │

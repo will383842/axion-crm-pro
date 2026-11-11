@@ -233,6 +233,19 @@ test('M2 : un libellé en adresse reformulée ou trop long est refusé', functio
     expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail', 'Gmail de test'))->toBe(0);
 });
 
+test('m3 : arobase pleine largeur, « chez » et « point » (même collés) sont refusés', function () {
+    $ws = espaceTemoin();
+    foreach (["moi\u{FF20}exemple.test", 'moi chez exemple', 'moichezexemple', 'moi point test', 'exemplepointtest', 'moi DOT test', 'moi[dot]test'] as $l) {
+        expect(ajouterTemoin($ws, 'a@exemple.test', 'gmail', $l))->toBe(1, $l);
+    }
+    expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->count()))->toBe(0);
+});
+
+test('m6 : lister refuse un identifiant qui n’est pas un UUID, avec un code non nul', function () {
+    expect(Artisan::call('envoi:temoins-lister', ['workspace' => 'pas-un-uuid']))->toBe(1);
+    expect(Artisan::output())->toContain('identifiant invalide');
+});
+
 // ── M3 : plafond et un seul témoin par fournisseur ───────────────────────────
 
 test('M3 : un 2e témoin pour un fournisseur déjà couvert est refusé avec un message clair', function () {

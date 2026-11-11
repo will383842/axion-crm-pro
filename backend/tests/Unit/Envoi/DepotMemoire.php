@@ -14,6 +14,21 @@ final class DepotMemoire implements DepotSocle
 {
     public bool $arret = false;
 
+    /**
+     * @param  string|null  $temoinInitial  adresse d'un témoin déjà présent (comme un dépôt réel déjà garni) ;
+     *                                      null = valeur historique du double.
+     * @param  string  $fournisseurInitial  fournisseur du témoin initial
+     */
+    public function __construct(?string $temoinInitial = null, string $fournisseurInitial = 'gmail')
+    {
+        if ($temoinInitial !== null) {
+            $this->temoins = [];
+            $this->ajouterTemoin('00000000-0000-0000-0000-000000000000', $temoinInitial, $fournisseurInitial, 'Témoin initial', 'initialisation');
+            $this->journal = [];
+            $this->detailsJournal = [];
+        }
+    }
+
     public bool $temoinsAllumes = true;
 
     /** @var list<string> */

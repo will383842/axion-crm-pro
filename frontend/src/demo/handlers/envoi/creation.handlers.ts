@@ -537,8 +537,6 @@ export const handlers: HttpHandler[] = [
       total: estimation.restant,
       reponses: 0,
       reponses_interessees: 0,
-      suivre_ouvertures: c.suivre_ouvertures === true,
-      ouvertures: null,
       ab_objet: sequence.some((s) => s.objet_b !== undefined && s.objet_b !== null && s.objet_b !== ''),
       prochain_envoi_le: c.debut_le ?? decalage({ minutes: 5 }),
       cree_le: MAINTENANT_ISO,

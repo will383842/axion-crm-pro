@@ -6,7 +6,7 @@ info:
     Assistant de création en 5 étapes (cible, messages, boîtes et rythme,
     programmation, contrôles), brouillon enregistré à chaque étape. Cible par
     liste, audience ou étiquette, exclusions, séquence de 1 à 4 messages, A/B
-    d'objet, case « Suivre les ouvertures » (désactivée par défaut), 7
+    d'objet, 7
     contrôles, validation par code e-mail, annulation possible pendant 5 min.
     Messages types versionnés, aperçu, « m'envoyer un test ». Lot : DM2-ASS.
 servers:
@@ -650,9 +650,6 @@ components:
           type: array
           items: { $ref: './commun.yaml#/components/schemas/Identifiant' }
         plafond_jour: { type: integer, minimum: 1 }
-        suivre_ouvertures:
-          type: boolean
-          description: Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation.
         debut_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         jours: { type: array, items: { type: string, enum: [lun, mar, mer, jeu, ven, sam, dim] } }
         heures:

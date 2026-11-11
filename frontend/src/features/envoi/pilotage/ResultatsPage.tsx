@@ -14,7 +14,11 @@ import { OngletsCampagnes } from '../campagnes/OngletsCampagnes';
 import { Chargement, Panne, Vide } from './composants/Etats';
 import { formaterNombre, formaterPourcent, part, telechargerCsv } from './composants/formats';
 
-type Ligne = components['schemas']['LigneResultat'];
+// Champ d'ouverture RETIRÉ du contrat : lu ici en optionnel jusqu'à la fiche L8-F02,
+// qui supprime la colonne « Ouvertures (estimation) ».
+type Ligne = components['schemas']['LigneResultat'] & {
+  ouvertures?: { estimees: number; automatiques_probables: number; taux_estime: number } | null;
+};
 type Reponse = {
   data: Ligne[]; totaux: Ligne | null; precedent: Ligne | null; periode: { du: string; au: string };
   entonnoir: { envoyes: number; reponses: number; rendez_vous: number; gagnes: number } | null;

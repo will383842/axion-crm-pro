@@ -178,8 +178,6 @@ export interface components {
         EvenementEnvoi: {
             /** Format: email */
             adresse: string;
-            /** @description Pour une ouverture seulement ; nul pour les autres types. */
-            automatique_probable: boolean | null;
             boite_id: components["schemas"]["Identifiant"];
             campagne_id: components["schemas"]["Identifiant"];
             code_serveur: string | null;
@@ -207,8 +205,6 @@ export interface components {
             desinscriptions: number;
             envoyes: number;
             libelle: string;
-            /** @description Estimation ; nul si le groupe ne contient aucune campagne qui suit les ouvertures. */
-            ouvertures: components["schemas"]["ResumeOuvertures"] | null;
             plaintes: number;
             rebonds_durs: number;
             rebonds_mous: number;
@@ -220,18 +216,6 @@ export interface components {
         };
         /** @enum {string} */
         PolitiqueDmarc: "none" | "quarantine" | "reject";
-        /**
-         * @description Ouvertures d'une campagne qui les suit. Toujours affichées comme une
-         *     « estimation » ; `automatiques_probables` est déjà retiré de `estimees`.
-         */
-        ResumeOuvertures: {
-            automatiques_probables: number;
-            estimees: number;
-            /** @constant */
-            mention: "estimation";
-            /** @description Pourcentage des messages remis, ouvertures automatiques retirées. */
-            taux_estime: number;
-        };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
             etat: components["schemas"]["EtatFeu"];
@@ -242,7 +226,7 @@ export interface components {
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
     };
     responses: never;
     parameters: never;
@@ -402,8 +386,6 @@ export interface operations {
                         data: {
                             /** Format: date */
                             jour: string;
-                            /** @description Nul si aucune campagne de la période ne suit les ouvertures. */
-                            ouvertures_estimees: number | null;
                             rebonds: number;
                             remis: number;
                             reponses: number;

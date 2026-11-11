@@ -8,10 +8,12 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { components } from '@/features/envoi/api/pilotage';
 import { demoDb } from '../../base';
+import type { ResumeOuverturesHerite } from '../../donnees/types';
 import { maintenant } from '../../horloge';
 import { api, delai, erreur, repondreEtatForce } from '../../outils';
 
-type Ligne = components['schemas']['LigneResultat'];
+// Champ d'ouverture hérité : à retirer avec la fiche L8-F02.
+type Ligne = components['schemas']['LigneResultat'] & { ouvertures?: ResumeOuverturesHerite | null };
 type Regroupement = 'campagne' | 'boite' | 'domaine' | 'liste' | 'message';
 interface PointFeuVert { id: string; code: string; libelle: string; fait: boolean; detail: string | null; manuel: boolean }
 interface TestMatin { id: string; le: string; temoins_ok: number; temoins_total: number }
@@ -70,7 +72,7 @@ function groupe(par: Regroupement, campagneId: string, boiteId: string): { cle: 
 function calculer(par: Regroupement, depuisMs: number, jusquaMs: number) {
   const lignes = new Map<string, Ligne>();
   const interessees = new Set(demoDb.reponses.filtrer((r) => r.classement === 'interesse').map((r) => r.destinataire_id));
-  const suivies = new Set(demoDb.campagnes.filtrer((c) => c.suivre_ouvertures).map((c) => c.id));
+  const suivies = new Set(demoDb.campagnes.filtrer((c) => c.suivre_ouvertures === true).map((c) => c.id));
   // Jamais de pixel pour un contact déjà opposé : une « ouverture » postérieure à
   // l'inscription au registre d'opposition n'est pas comptée.
   const opposeLe = new Map<string, number>();

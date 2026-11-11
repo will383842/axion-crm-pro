@@ -10,14 +10,12 @@
  * autre en brouillon.
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
-import type { components } from '@/features/envoi/api/campagnes';
 import { demoDb } from '../../base';
 import { decalage, FUSEAU_DEMO, maintenant } from '../../horloge';
 import { api, delai, erreur, etatForce, filtrerTexte, lireRecherche, paginer, repondreEtatForce } from '../../outils';
 
-type Campagne = components['schemas']['CampagneResume'];
-type Destinataire = components['schemas']['Destinataire'];
-type EvenementEnvoi = components['schemas']['EvenementEnvoi'];
+// Types élargis (champs d'ouverture hérités) : à resserrer avec la fiche L8-F02.
+import type { Campagne, Destinataire, EvenementEnvoi } from '../../donnees/types';
 
 /**
  * Décision produit : la démo ne mesure ni ne renvoie aucune ouverture. Toute

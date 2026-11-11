@@ -24,12 +24,26 @@ beforeEach(function () {
     $this->owner = $this->compte($this->ws, 'owner');
 });
 
-/** Crée un brouillon par la route ; rend [id, version]. */
-function creBrouillon($t, $user = null, string $nom = 'Campagne de test'): array
+/** Crée un brouillon par la route (prêt = cible non vide et boîte active, sans contrôle bloquant) ; rend [id, version]. */
+function creBrouillon($t, $user = null, string $nom = 'Campagne de test', bool $pret = true): array
 {
     $r = $t->actingAs($user ?? $t->owner)->postJson(CRE, ['nom' => $nom])->assertCreated();
+    $id = $r->json('id');
+    $v = (int) $r->json('version');
+    if (! $pret) {
+        return [$id, $v];
+    }
+    $ws = $t->ws->id;
+    DB::statement('SET session_replication_role = replica');
+    $audience = DB::table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'Audience ' . Str::random(5), 'member_count' => 1]);
+    DB::table('audience_members')->insert(['audience_id' => $audience, 'company_id' => 1, 'workspace_id' => $ws]);
+    DB::statement('SET session_replication_role = origin');
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $ws, 'adresse' => 'boite@exemple.test', 'hote' => 'smtp.exemple.test', 'port' => 587, 'identifiants_chiffres' => 'x', 'limite_jour' => 20]);
+    $v = (int) creEtape($t, $id, $v, 1, ['cible' => ['type' => 'audience', 'reference' => (string) $audience, 'libelle' => 'Audience']])->assertOk()->json('version');
+    $v = (int) creEtape($t, $id, $v, 3, ['boites' => [$boite], 'plafond_jour' => 10])->assertOk()->json('version');
 
-    return [$r->json('id'), (int) $r->json('version')];
+    return [$id, $v];
 }
 
 function creEtape($t, string $id, int $v, int $etape, array $corps)
@@ -76,7 +90,7 @@ test('GET brouillon : conforme ; autre espace = 404', function () {
 });
 
 test('PUT étape : If-Match obligatoire (428), version périmée 409, succès incrémente la version', function () {
-    [$id, $v] = creBrouillon($this);
+    [$id, $v] = creBrouillon($this, null, 'x', false);
     $this->actingAs($this->owner)->putJson(CRE . "/{$id}/etapes/3", ['plafond_jour' => 20])->assertStatus(428);
     creEtape($this, $id, $v, 3, ['plafond_jour' => 20])->assertOk()->assertJsonPath('version', $v + 1)->assertHeader('ETag', '"' . ($v + 1) . '"');
     creEtape($this, $id, $v, 3, ['plafond_jour' => 25])->assertStatus(409);   // même version lue deux fois
@@ -85,7 +99,7 @@ test('PUT étape : If-Match obligatoire (428), version périmée 409, succès in
 });
 
 test('PUT étape 1 : cible sans adresse, type connu ; étape 2 : 3 messages au plus ; étape hors 1-5 refusée', function () {
-    [$id, $v] = creBrouillon($this);
+    [$id, $v] = creBrouillon($this, null, 'x', false);
     creEtape($this, $id, $v, 1, ['cible' => ['type' => 'liste', 'reference' => 'a@exemple.test', 'libelle' => 'x']])->assertStatus(422);
     creEtape($this, $id, $v, 1, ['cible' => ['type' => 'inconnu', 'reference' => '1', 'libelle' => 'x']])->assertStatus(422);
     $quatre = array_map(fn ($i) => ['etape' => $i, 'message_id' => (string) Str::uuid(), 'delai_jours' => $i === 1 ? 0 : 3], [1, 2, 3, 4]);
@@ -102,11 +116,11 @@ test('PUT étape sur une campagne qui n’est plus un brouillon : 409', function
 });
 
 test('estimation : comptage libellé « estimation », borné à la cible demandée ; 100 000 fiches sous la limite de temps', function () {
-    [$id] = creBrouillon($this);
+    [$id] = creBrouillon($this, null, 'x', false);
     $ws = $this->ws->id;
     DB::statement('SET session_replication_role = replica');
     $audience = DB::table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'Audience R11', 'member_count' => 0]);
-    DB::statement("INSERT INTO audience_members (audience_id, company_id, workspace_id) SELECT ?, g, ? FROM generate_series(1, 100000) g", [$audience, $ws]);
+    DB::statement('INSERT INTO audience_members (audience_id, company_id, workspace_id) SELECT ?, g, ? FROM generate_series(1, 100000) g', [$audience, $ws]);
     DB::statement('SET session_replication_role = origin');
     $debut = microtime(true);
     $r = $this->actingAs($this->owner)->postJson(CRE . "/{$id}/cible/estimation", ['type' => 'audience', 'reference' => (string) $audience])->assertOk();
@@ -118,7 +132,7 @@ test('estimation : comptage libellé « estimation », borné à la cible demand
 });
 
 test('contrôles : 7 contrôles dans l’ordre du contrat, boîtes absentes = bloquant, jamais « ok » sans preuve', function () {
-    [$id] = creBrouillon($this);
+    [$id] = creBrouillon($this, null, 'x', false);
     $r = $this->actingAs($this->owner)->getJson(CRE . "/{$id}/controles")->assertOk();
     expect($r->json('controles'))->toHaveCount(7);
     foreach ($r->json('controles') as $c) {
@@ -134,10 +148,10 @@ test('apercu : rendu sans envoi ; test : 409 envoi_ferme_palier_0 sans aucun eff
     [$id] = creBrouillon($this);
     Mail::fake();
     $avant = DB::table('envoi_campagnes')->count();
-    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/test", ['etape' => 1])->assertStatus(409)->assertJsonPath('code', 'envoi_ferme_palier_0');
+    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/test", ['etape' => 1])->assertStatus(409)->assertJsonPath('error', 'envoi_ferme_palier_0');
     Mail::assertNothingSent();
     expect(DB::table('envoi_campagnes')->count())->toBe($avant)->and($this->resolutions)->toBe(0);
-    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/apercu", ['etape' => 1])->assertStatus(501)->assertJsonPath('code', 'apercu_non_branche');
+    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/apercu", ['etape' => 1])->assertStatus(501)->assertJsonPath('error', 'apercu_non_branche');
 });
 
 test('destinataires-exemples : 3 fiches au plus, champs du contrat seulement ; cibles et boîtes conformes', function () {
@@ -199,7 +213,7 @@ test('valider : bon code = programmée sans séquence ni inscription ; second us
     [$id] = creBrouillon($this);
     $code = creCode($this, $id);
     $r = $this->actingAs($this->owner)->postJson(CRE . "/{$id}/valider", ['code' => $code])->assertOk();
-    expect(ContratOpenApiEnvoi::ecarts('creation.yaml', 'Brouillon', $r->json('campagne')))->not->toBeNull();
+    expect(ContratOpenApiEnvoi::ecarts('commun.yaml', 'CampagneResume', $r->json('campagne')))->toBe([]);
     $ligne = DB::table('envoi_campagnes')->where('id', $id)->first();
     expect($ligne->statut)->toBe('programmee')->and($ligne->sequence_id)->toBeNull()
         ->and(Carbon::parse($r->json('annulable_jusqua'))->diffInSeconds(now(), true))->toBeLessThanOrEqual(300)
@@ -230,4 +244,9 @@ test('aucune route de création n’appelle le Séquenceur ni le serveur d’env
     $code = creCode($this, $id);
     $this->actingAs($this->owner)->postJson(CRE . "/{$id}/valider", ['code' => $code])->assertOk();
     expect($this->resolutions)->toBe(0);
+});
+
+test('code et valider refusés (422) tant qu’un contrôle est bloquant', function () {
+    [$id] = creBrouillon($this, null, 'x', false);
+    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/validation/code")->assertStatus(422)->assertJsonPath('error', 'controles_bloquants');
 });

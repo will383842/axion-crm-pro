@@ -42,4 +42,25 @@ final class CanalEmail
             return false;
         }
     }
+
+    /**
+     * Courriel TRANSACTIONNEL à UNE adresse (celle d'un compte connecté), par le même transport que les alertes : jamais par le
+     * moteur d'envoi ni par une boîte d'envoi. Ne casse jamais son appelant : `false` en cas de panne ou d'adresse invalide.
+     */
+    public function envoyerA(string $adresse, string $objet, string $corps): bool
+    {
+        if (filter_var($adresse, FILTER_VALIDATE_EMAIL) === false) {
+            return false;
+        }
+
+        try {
+            Mail::to($adresse)->send(new CourrielTransactionnel($objet, $corps));
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Courriel transactionnel impossible.', ['exception' => $e::class]);
+
+            return false;
+        }
+    }
 }

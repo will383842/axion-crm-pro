@@ -441,6 +441,9 @@ export interface components {
             id: components["schemas"]["Identifiant"];
             mis_a_jour_le: components["schemas"]["Horodatage"];
             nom: string;
+            statut?: components["schemas"]["StatutCampagne"];
+            /** @description Version à renvoyer dans `If-Match` pour enregistrer une étape (aussi dans l'en-tête `ETag`). */
+            version?: number;
         };
         CampagneResume: {
             /** @description Test A/B sur l'objet du premier message. */
@@ -733,6 +736,7 @@ export interface operations {
                     };
                 };
             };
+            501: components["responses"]["Erreur"];
         };
     };
     estimerCible: {
@@ -757,10 +761,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Toujours vrai, c'est une estimation, pas un compte définitif. */
+                        estimation?: boolean;
                         exclus: number;
                         exclusions: {
                             [key: string]: number;
                         };
+                        /** @description Faux tant que les exclusions ne sont pas évaluées (alors `exclus` vaut 0, par défaut et non par mesure). */
+                        exclusions_evaluees?: boolean;
                         restant: number;
                         total: number;
                     };
@@ -796,7 +804,10 @@ export interface operations {
     enregistrerEtape: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Version du brouillon lue (verrou optimiste) ; 428 si absente, 409 si périmée. */
+                "If-Match": string;
+            };
             path: {
                 etape: number;
                 id: components["parameters"]["Identifiant"];
@@ -810,7 +821,9 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Brouillon"];
+            409: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
+            428: components["responses"]["Erreur"];
         };
     };
     envoyerTest: {
@@ -832,6 +845,15 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Succes"];
+            /** @description Envois fermés au palier 0 (`envoi_ferme_palier_0`) : aucun message ne part, aucun effet. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
         };
     };
     demanderCodeValidation: {
@@ -857,6 +879,10 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
+            429: components["responses"]["Erreur"];
+            503: components["responses"]["Erreur"];
         };
     };
     validerCampagne: {
@@ -888,6 +914,8 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
         };
     };

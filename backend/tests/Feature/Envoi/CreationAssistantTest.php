@@ -250,3 +250,48 @@ test('code et valider refusés (422) tant qu’un contrôle est bloquant', funct
     [$id] = creBrouillon($this, null, 'x', false);
     $this->actingAs($this->owner)->postJson(CRE . "/{$id}/validation/code")->assertStatus(422)->assertJsonPath('error', 'controles_bloquants');
 });
+
+test('deux valider CONCURRENTS avec le même code = un seul succès (processus réels, deux connexions)', function () {
+    $proprio = DB::connection('pgsql_owner');
+    $ws = (string) Str::uuid();
+    $camp = (string) Str::uuid();
+    $boite = (string) Str::uuid();
+    $auteur = 'auteur-concurrent';
+    $proprio->table('workspaces')->insert(['id' => $ws, 'slug' => 'zz-vc-' . substr($ws, 0, 6), 'name' => 'Concurrence valider', 'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+    $proprio->statement("SET session_replication_role = 'replica'");
+    $audience = $proprio->table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'Concurrence', 'member_count' => 1]);
+    $proprio->table('audience_members')->insert(['audience_id' => $audience, 'company_id' => 1, 'workspace_id' => $ws]);
+    $proprio->statement("SET session_replication_role = 'origin'");
+    $proprio->table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $ws, 'adresse' => 'boite@exemple.test', 'hote' => 'smtp.exemple.test', 'port' => 587, 'identifiants_chiffres' => 'x']);
+    $contenu = ['cible' => ['type' => 'audience', 'reference' => (string) $audience, 'libelle' => 'x'], 'plafond_jour' => 5];
+    $proprio->table('envoi_campagnes')->insert(['id' => $camp, 'workspace_id' => $ws, 'nom' => 'x', 'cible' => json_encode(['type' => 'audience', 'reference' => (string) $audience, 'libelle' => 'x']),
+        'boites' => '{' . $boite . '}', 'nb_etapes' => 1, 'saisie' => json_encode(['contenu' => $contenu, 'etapes_faites' => [1, 3]]), 'cree_par' => $auteur]);
+    $proprio->table('envoi_campagnes')->where('id', $camp)->update(['statut' => 'a_valider', 'version' => 2]);
+    $proprio->table('envoi_campagne_codes')->insert(['workspace_id' => $ws, 'campagne_id' => $camp, 'empreinte' => DepotCampagnes::empreinteCode('424242', 1), 'cle_version' => 1, 'expire_le' => now()->addMinutes(10)]);
+    putenv('ENVOI_CLES_CODES_CAMPAGNE=' . json_encode(['1' => CRE_CLE]));
+    try {
+        $depart = microtime(true) + 4;
+        $procs = $tubes = [];
+        foreach ([1, 2, 3] as $i) {
+            $procs[$i] = proc_open([PHP_BINARY, base_path('tests/Support/campagne-valider-concurrent.php'), $ws, $auteur, $camp, '424242', sprintf('%.4F', $depart)], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubes[$i]);
+        }
+        $reussites = 0;
+        foreach ($procs as $i => $p) {
+            $sortie = stream_get_contents($tubes[$i][1]) . stream_get_contents($tubes[$i][2]);
+            $code = proc_close($p);
+            expect($code)->toBeIn([0, 3], $sortie);
+            $reussites += $code === 0 ? 1 : 0;
+        }
+        expect($reussites)->toBe(1)
+            ->and($proprio->table('envoi_campagnes')->where('id', $camp)->value('statut'))->toBe('programmee')
+            ->and($proprio->table('envoi_campagnes_journal')->where('campagne_id', $camp)->where('transition', 'a_valider>programmee')->count())->toBe(1);
+    } finally {
+        putenv('ENVOI_CLES_CODES_CAMPAGNE');
+        $proprio->statement("SET session_replication_role = 'replica'");
+        foreach (['envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_campagnes', 'envoi_boites', 'audience_members', 'email_audiences'] as $t) {
+            $proprio->table($t)->where('workspace_id', $ws)->delete();
+        }
+        $proprio->table('workspaces')->where('id', $ws)->delete();
+        $proprio->statement("SET session_replication_role = 'origin'");
+    }
+});

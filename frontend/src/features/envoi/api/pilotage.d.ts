@@ -67,6 +67,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/reputation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Réputation par fournisseur (un constat peut freiner, jamais libérer) */
+        get: operations["lireReputation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/reputation/saisies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Saisir un constat de réputation (écriture réservée au propriétaire) */
+        post: operations["saisirReputation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/resultats": {
         parameters: {
             query?: never;
@@ -411,6 +445,72 @@ export interface operations {
             422: components["responses"]["Erreur"];
         };
     };
+    lireReputation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une ligne par fournisseur ; `inconnue` tant que rien n'est relevé. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        fournisseurs: {
+                            fournisseur: string;
+                            mesure_le: components["schemas"]["Horodatage"] | null;
+                            /** @enum {string} */
+                            niveau: "bonne" | "moyenne" | "mauvaise" | "inconnue";
+                            source: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    saisirReputation: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fournisseur: string;
+                    /** @enum {string} */
+                    niveau: "bonne" | "moyenne" | "mauvaise";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Constat enregistré (journalisé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Réservé au propriétaire. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
+        };
+    };
     lireResultats: {
         parameters: {
             query: {
@@ -526,6 +626,20 @@ export interface operations {
                             par_heure: number | null;
                         }[];
                         serveurs: components["schemas"]["ServeurResume"][];
+                        /**
+                         * @description Journées témoins relevées par fournisseur sur 14 jours (champ facultatif). Lecture seule :
+                         *     aucune saisie de journée par l'écran. Absent ou vide = non mesuré (jamais « vert »).
+                         */
+                        temoins_par_fournisseur?: {
+                            /** @description Famille de messagerie (gmail */
+                            fournisseur: string;
+                            jours: {
+                                /** @enum {string} */
+                                etat: "ok" | "indesirable" | "absent" | "non_teste";
+                                /** Format: date */
+                                jour: string;
+                            }[];
+                        }[];
                         test_du_matin: {
                             etat: components["schemas"]["EtatFeu"];
                             /** @description Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »). */
@@ -565,6 +679,15 @@ export interface operations {
                         temoins_ok: number;
                         temoins_total: number;
                     };
+                };
+            };
+            /** @description Envois fermés (palier 0), aucun test ne part et rien ne change. Code envoi_ferme_palier_0. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
                 };
             };
         };

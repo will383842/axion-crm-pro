@@ -134,6 +134,24 @@ paths:
                         fin:
                           description: Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine.
                           oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
+                  temoins_par_fournisseur:
+                    description: |
+                      Journées témoins relevées par fournisseur sur 14 jours (champ facultatif). Lecture seule :
+                      aucune saisie de journée par l'écran. Absent ou vide = non mesuré (jamais « vert »).
+                    type: array
+                    items:
+                      type: object
+                      required: [fournisseur, jours]
+                      properties:
+                        fournisseur: { type: string, description: Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre). }
+                        jours:
+                          type: array
+                          items:
+                            type: object
+                            required: [jour, etat]
+                            properties:
+                              jour: { type: string, format: date }
+                              etat: { type: string, enum: [ok, indesirable, absent, non_teste] }
                   volume_jour:
                     type: object
                     required: [possibles, envoyes]
@@ -177,6 +195,59 @@ paths:
                   temoins_ok: { type: integer, minimum: 0 }
                   temoins_total: { type: integer, minimum: 0 }
                   etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
+        '409':
+          description: "Envois fermés (palier 0), aucun test ne part et rien ne change. Code envoi_ferme_palier_0."
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
+  /envoi/reputation:
+    get:
+      operationId: lireReputation
+      summary: Réputation par fournisseur (un constat peut freiner, jamais libérer)
+      responses:
+        '200':
+          description: Une ligne par fournisseur ; `inconnue` tant que rien n'est relevé.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fournisseurs]
+                properties:
+                  fournisseurs:
+                    type: array
+                    items:
+                      type: object
+                      required: [fournisseur, niveau, mesure_le, source]
+                      properties:
+                        fournisseur: { type: string }
+                        niveau: { type: string, enum: [bonne, moyenne, mauvaise, inconnue] }
+                        mesure_le:
+                          oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
+                        source: { oneOf: [{ type: string }, { type: 'null' }] }
+  /envoi/reputation/saisies:
+    post:
+      operationId: saisirReputation
+      summary: Saisir un constat de réputation (écriture réservée au propriétaire)
+      parameters:
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fournisseur, niveau]
+              properties:
+                fournisseur: { type: string }
+                niveau: { type: string, enum: [bonne, moyenne, mauvaise] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '201': { description: Constat enregistré (journalisé, jamais supprimé). }
+        '403':
+          description: Réservé au propriétaire.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/envois/chercher:
     get:
       operationId: chercherEnvoi

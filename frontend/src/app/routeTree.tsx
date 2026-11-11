@@ -93,6 +93,7 @@ import { ServeursPage } from '@/features/envoi/infrastructure/ServeursPage';
 import { ConfigurationPage } from '@/features/envoi/infrastructure/ConfigurationPage';
 import { ChauffePage } from '@/features/envoi/infrastructure/ChauffePage';
 import { SantePage } from '@/features/envoi/pilotage/SantePage';
+import { ReputationPage } from '@/features/envoi/pilotage/ReputationPage';
 import { ChercherEnvoiPage } from '@/features/envoi/pilotage/ChercherEnvoiPage';
 import { FeuVertPage } from '@/features/envoi/pilotage/FeuVertPage';
 import { DesinscriptionsPage } from '@/features/envoi/conformite/DesinscriptionsPage';
@@ -426,6 +427,7 @@ const envoiConfigurationRoute = createRoute({ getParentRoute: () => layoutRoute,
 const envoiChauffeRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/chauffe', beforeLoad: gardeEnvoi, component: ChauffePage });
 const envoiSanteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante', beforeLoad: gardeEnvoi, component: SantePage });
 const envoiChercherRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/chercher', beforeLoad: gardeEnvoi, component: ChercherEnvoiPage });
+const envoiReputationRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/reputation', beforeLoad: gardeEnvoi, component: ReputationPage });
 const envoiFeuVertRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/feu-vert', beforeLoad: gardeEnvoi, component: FeuVertPage });
 const envoiDesinscriptionsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/desinscriptions', beforeLoad: gardeEnvoi, component: DesinscriptionsPage });
 const envoiAlertesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/alertes', beforeLoad: gardeEnvoi, component: AlertesEnvoiPage });
@@ -520,6 +522,7 @@ export const routeTree = rootRoute.addChildren([
     envoiConfigurationRoute,
     envoiChauffeRoute,
     envoiSanteRoute,
+    envoiReputationRoute,
     envoiChercherRoute,
     envoiFeuVertRoute,
     envoiDesinscriptionsRoute,

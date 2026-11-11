@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Tests\Support\ServeurEspion;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -1352,4 +1353,30 @@ test('K7 : un rebond dur en observation n’écrit aucun compteur ni ne freine ;
         $c->appliquer($ws, new EvenementEnvoi('rb-' . $i, 'rebond_dur', 'i' . $i, 'x' . $i . '@societe.fr'));
     }
     expect(array_map(fn ($d) => $d->motif, $garde->evaluer($ws, $maintenant)))->toBe([DecisionFrein::REBONDS]);
+});
+
+test('L8-F14a (mineur 3) : une acceptation TARDIVE (réservation périmée en a_verifier pendant l\'appel) est quand même NOTÉE dans la chauffe', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $tardif = false;
+    $espion = new ServeurEspion(function () use (&$tardif, $ws) {
+        if ($tardif) { // la réservation vieillit plus que le délai pendant que le serveur travaille
+            app(DepotSocle::class)->perimerReservations($ws, new DateTimeImmutable('+1 day'));
+        }
+
+        return ResultatInjection::accepte('id');
+    });
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $p = new PasserelleLocale($espion, app(DepotSocle::class), true, 300, function () use (&$maintenant) {
+        return $maintenant;
+    }, '', 300, null, $garde);
+    $p->sante();
+    foreach (range(1, 9) as $_) {
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    }
+    $tardif = true;
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue(); // 10e : acceptation tardive
+    $tardif = false;
+    // Le quota (10) est atteint : le 11e est reporté. Si la 10e n'avait pas été notée, il partirait.
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($espion->appels)->toBe(10);
 });

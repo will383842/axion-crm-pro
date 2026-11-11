@@ -1,10 +1,13 @@
 <?php
 
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\PasserelleLocale;
+use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,7 +126,7 @@ test('une issue incertaine COMPTE toujours, une alerte part, et il n\'y a AUCUN 
 
 test('une réservation restée « reservee » au-delà du délai passe en a_verifier, compte toujours, et ne repart pas en SMTP direct', function () {
     Log::spy();
-    $ancien = $this->jour->modify('-1 hour')->format('c');
+    $ancien = $this->jour->modify('-2 hours')->format('c'); // au-delà du délai de 60 minutes
     DB::table('envoi_journal_commandes')->insert([
         'workspace_id' => $this->ws, 'commande' => 'injection', 'auteur' => 'passerelle', 'jour' => '2026-11-17',
         'cle_idempotence' => 'k1', 'statut' => 'reservee', 'cree_le' => $ancien,
@@ -165,4 +168,143 @@ test('une réservation ne se conclut qu\'une fois ; sans réservation, aucune co
     expect($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'acceptee'))->toBeTrue()
         ->and($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'liberee'))->toBeFalse()
         ->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee');
+});
+
+test('B2 : un report marqué INCERTAIN (sans exception) garde la place comptée ; le plafond N n\'est jamais dépassé ; alerte', function () {
+    Log::spy();
+    $serveur = new ServeurEspion(fn ($m) => ResultatInjection::incertain(new DateTimeImmutable('2026-11-18')));
+    $p = ($this->passerelle)($serveur, plafond: 2);
+    expect($p->injecter(($this->msg)('k1'))->accepte)->toBeFalse();
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier')
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(1)
+        ->and(($this->compteur)())->toBe(1);
+    Log::shouldHaveReceived('critical')->once();
+    $p->injecter(($this->msg)('k2'));
+    // Plafond 2 atteint par deux incertains : un troisième message n'atteint JAMAIS le serveur.
+    expect($p->injecter(($this->msg)('k3'))->accepte)->toBeFalse()->and($serveur->appels)->toBe(2)
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(2);
+});
+
+test('B2 : refus CERTAIN (report net, EnvoiRefuse, 5xx définitif) libère la place, sans alerte « incertaine »', function () {
+    Log::spy();
+    $cas = [
+        fn () => ResultatInjection::reporte(new DateTimeImmutable('2026-11-18')),
+        fn () => throw EnvoiRefuse::toutArreter(),
+        fn () => throw new RefusDefinitifServeur('5xx définitif'),
+    ];
+    foreach ($cas as $i => $comportement) {
+        $p = ($this->passerelle)(new ServeurEspion($comportement), plafond: 1);
+        try {
+            $p->injecter(($this->msg)('k' . $i));
+        } catch (EnvoiRefuse|RefusDefinitifServeur) {
+        }
+        expect($this->depot->etatInjection($this->ws, 'k' . $i))->toBeNull()
+            ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(0)->and(($this->compteur)())->toBe(0);
+    }
+    Log::shouldNotHaveReceived('critical');
+});
+
+test('mineur 2 : rejouer() d\'un a_verifier que le serveur CONFIRME met le journal à jour (acceptee), sans fausse alerte', function () {
+    Log::spy();
+    $serveur = new class(fn () => throw new RuntimeException('coupure')) extends ServeurEspion implements RenvoiParMemeCle {};
+    $p = ($this->passerelle)($serveur);
+    expect(fn () => $p->injecter(($this->msg)()))->toThrow(RuntimeException::class);
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
+    Log::shouldHaveReceived('critical')->once();
+
+    $confirmant = new class(fn () => ResultatInjection::accepte('id-1')) extends ServeurEspion implements RenvoiParMemeCle {};
+    $p2 = ($this->passerelle)($confirmant);
+    expect($p2->injecter(($this->msg)())->accepte)->toBeTrue();
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee')
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(1);
+    // Une seule confirmation : un second rejeu n'ajoute rien.
+    expect($this->depot->confirmerInjection($this->ws, $this->jour, 'k1'))->toBeFalse();
+    Log::shouldHaveReceived('critical')->once(); // toujours l'alerte d'origine, pas de nouvelle
+});
+
+test('mineur 3 : acceptation TARDIVE (réservation périmée pendant l\'appel) => journal « acceptee » par confirmation, la place ne se libère pas', function () {
+    $serveur = new ServeurEspion(function ($m) {
+        $this->depot->perimerReservations($this->ws, new DateTimeImmutable('+1 day')); // la réservation vieillit pendant l'appel
+        expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
+
+        return ResultatInjection::accepte('id-1');
+    });
+    expect(($this->passerelle)($serveur)->injecter(($this->msg)())->accepte)->toBeTrue();
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee')->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(1);
+});
+
+test('mineur 1 : le compteur de tentatives libérées compte les clés EXACTES « clé » et « clé~n », pas toute clé qui commence par « clé~ »', function () {
+    $serveur = new ServeurEspion(fn () => throw EnvoiRefuse::toutArreter());
+    $p = ($this->passerelle)($serveur, plafond: 5);
+    foreach (['k1~abc', 'k1~'] as $voisine) { // clés voisines libérées : ne doivent pas décaler k1
+        try {
+            $p->injecter(($this->msg)($voisine));
+        } catch (EnvoiRefuse) {
+        }
+    }
+    $ok = ($this->passerelle)(new ServeurEspion(fn () => ResultatInjection::accepte('id')), plafond: 5);
+    $ok->injecter(($this->msg)('k1'));
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('commande', 'injection')->where('cle_idempotence', 'k1')->count())->toBe(1)
+        ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('cle_idempotence', 'k1~2')->count())->toBe(0);
+    // Et la vraie suite ~n fonctionne : k2 libérée une fois repart en « k2~2 », libérée deux fois en « k2~3 ».
+    foreach ([1, 2] as $_) {
+        try {
+            $p->injecter(($this->msg)('k2'));
+        } catch (EnvoiRefuse) {
+        }
+    }
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('commande', 'injection')->whereIn('cle_idempotence', ['k2', 'k2~2'])->count())->toBe(2);
+});
+
+test('mineur 5 : l\'alerte d\'une réservation périmée part APRÈS le COMMIT de la transaction A, pas dedans', function () {
+    $base = DB::transactionLevel();
+    $niveau = null;
+    Log::shouldReceive('critical')->once()->andReturnUsing(function () use (&$niveau) {
+        $niveau = DB::transactionLevel();
+    });
+    DB::table('envoi_journal_commandes')->insert([
+        'workspace_id' => $this->ws, 'commande' => 'injection', 'auteur' => 'passerelle', 'jour' => '2026-11-17',
+        'cle_idempotence' => 'vieille', 'statut' => 'reservee', 'cree_le' => $this->jour->modify('-3 hours')->format('c'),
+    ]);
+    $p = ($this->passerelle)(new ServeurEspion(fn () => ResultatInjection::accepte('id-1')));
+    $p->injecter(($this->msg)('k1'));
+    expect($niveau)->toBe($base);
+});
+
+test('mineur 4 : envoi:perimer-reservations balaie TOUS les espaces (a_verifier, compte toujours) et n\'est PAS planifiée', function () {
+    $autre = F::espace('zz-ric-b');
+    foreach ([$this->ws, $autre] as $ws) {
+        WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->insert([
+            'workspace_id' => $ws, 'commande' => 'injection', 'auteur' => 'passerelle', 'jour' => '2026-11-17',
+            'cle_idempotence' => 'k-old', 'statut' => 'reservee', 'cree_le' => now()->subHours(3)->format('c'),
+        ]));
+    }
+    Log::spy();
+    $this->artisan('envoi:perimer-reservations')->assertExitCode(0);
+    foreach ([$this->ws, $autre] as $ws) {
+        expect($this->depot->etatInjection($ws, 'k-old'))->toBe('a_verifier');
+    }
+    Log::shouldHaveReceived('critical')->twice();
+    expect(file_get_contents(base_path('routes/console.php')))->not->toContain('perimer-reservations');
+});
+
+test('B3 : la passerelle appelle le serveur au niveau de BASE (ServeurEspion::niveaux est lu)', function () {
+    $base = DB::transactionLevel();
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('id-1'));
+    ($this->passerelle)($serveur)->injecter(($this->msg)());
+    expect($serveur->niveaux)->toBe([$base]); // ROUGE si l'appel est remis dans la transaction A ou C
+});
+
+test('B3 : le simulateur refuse d\'injecter dans une transaction englobante (niveau de base de la suite, pas 0) ; réglage explicite possible', function () {
+    $faux = new FauxServeurEnvoi; // construit au niveau de base de la suite (RefreshDatabase : déjà ≥ 1)
+    expect($faux->injecter(($this->msg)())->accepte)->toBeTrue();
+    expect(fn () => DB::transaction(fn () => $faux->injecter(($this->msg)('k2'))))->toThrow(ServeurEnvoiRefuse::class, 'transaction englobante');
+    expect($faux->appels)->toBe(1); // le refus a lieu AVANT tout effet
+    // Réglage de suite : base imposée à 0 — le niveau de RefreshDatabase (≥ 1) est alors déjà « englobant ».
+    expect(fn () => (new FauxServeurEnvoi(true, 0))->injecter(($this->msg)('k3')))->toThrow(ServeurEnvoiRefuse::class);
+    // La passerelle (appel hors transaction) devant le simulateur fonctionne.
+    expect(($this->passerelle)($faux)->injecter(($this->msg)('k4'))->accepte)->toBeTrue();
+    // Et la même passerelle ROUGIT si un décorateur enveloppe injecter() dans DB::transaction.
+    $enveloppe = new ServeurEspion(fn ($m) => DB::transaction(fn () => $faux->injecter($m)));
+    expect(fn () => ($this->passerelle)($enveloppe)->injecter(($this->msg)('k5')))->toThrow(ServeurEnvoiRefuse::class);
 });

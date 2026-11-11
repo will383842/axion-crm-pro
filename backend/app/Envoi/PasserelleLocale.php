@@ -13,6 +13,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -42,8 +43,11 @@ final class PasserelleLocale implements ServeurEnvoi
     /** Borne haute V0 des plafonds (par espace et global) : au-delà, la configuration est rejetée. */
     public const PLAFOND_MAX = 300;
 
-    /** Une réservation sans issue au-delà de ce délai passe en `a_verifier`. */
-    public const DELAI_RESERVATION_MINUTES = 15;
+    /**
+     * Une réservation sans issue au-delà de ce délai passe en `a_verifier`. 60 minutes : bien plus que le délai d'un
+     * appel SMTP lent ou d'une reprise, pour qu'une réservation encore VIVANTE ne soit pas périmée sous les pieds de son worker.
+     */
+    public const DELAI_RESERVATION_MINUTES = 60;
 
     private const RESERVEE = 'reservee_ici';
 
@@ -76,11 +80,10 @@ final class PasserelleLocale implements ServeurEnvoi
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
         // (A) Transaction COURTE sous le verrou du jour : portes, chauffe, plafonds, puis RÉSERVATION (elle compte). COMMIT.
-        $decision = $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur): ResultatInjection|string {
-            // (D) Réservation restée `reservee` trop longtemps : issue inconnue => `a_verifier` (compte toujours), alerte.
-            foreach ($this->depot->perimerReservations($ws, $this->instant()->modify('-' . self::DELAI_RESERVATION_MINUTES . ' minutes')) as $cle) {
-                Log::critical('envoi.injection_a_verifier : réservation restée sans issue, intervention requise.', ['workspace_id' => $ws, 'cle' => $cle]);
-            }
+        $perimees = [];
+        $decision = $this->depot->sousVerrouInjection($jour, function () use ($message, $ws, $jour, $plafond, $global, $fournisseur, &$perimees): ResultatInjection|string {
+            // (D) Réservation restée `reservee` trop longtemps : issue inconnue => `a_verifier` (compte toujours). L'alerte part APRÈS le COMMIT.
+            $perimees = $this->depot->perimerReservations($ws, $this->instant()->modify('-' . self::DELAI_RESERVATION_MINUTES . ' minutes'));
             if ($this->depot->toutArreter($ws)) {
                 throw EnvoiRefuse::toutArreter();
             }
@@ -103,6 +106,7 @@ final class PasserelleLocale implements ServeurEnvoi
 
             return self::RESERVEE;
         });
+        $this->alerterPerimees($ws, $perimees);
         if ($decision instanceof ResultatInjection) {
             return $decision;
         }
@@ -113,35 +117,73 @@ final class PasserelleLocale implements ServeurEnvoi
         // (B) HORS de toute transaction : le seul endroit où le serveur est appelé.
         try {
             $resultat = $this->serveur->injecter($message);
-        } catch (EnvoiRefuse $e) {
-            $this->conclure($ws, $jour, $message, 'liberee'); // refus net : rien n'est parti, la place est rendue
+        } catch (EnvoiRefuse|RefusDefinitifServeur $e) {
+            // Refus CERTAIN (porte du serveur, 5xx définitif) : rien n'est parti, la place est rendue, pas d'alerte « incertaine ».
+            $this->conclure($ws, $jour, $message, 'liberee');
             throw $e;
         } catch (Throwable $e) {
-            // Issue incertaine (coupure après envoi possible) : la place reste prise, une alerte part.
+            // Issue incertaine (coupure après envoi possible) : la place reste prise, une alerte part (après le COMMIT).
             $this->conclure($ws, $jour, $message, 'a_verifier');
             Log::critical('envoi.injection_a_verifier : issue incertaine, intervention requise.', ['workspace_id' => $ws, 'erreur' => $e::class]);
             throw $e;
         }
 
         // (C) Transaction COURTE : la conclusion (et, si acceptée, la chauffe) se notent une seule fois.
-        $this->conclure($ws, $jour, $message, $resultat->accepte ? 'acceptee' : 'liberee', $fournisseur);
+        // Accepté => acceptee ; INCERTAIN (report sans exception : coupure après DATA, réponse inconnue, clé a_verifier ou
+        // injection_en_cours côté serveur) => a_verifier (la place COMPTE toujours, le plafond N n'est jamais dépassé) ;
+        // report CERTAIN (rien n'est parti) => liberee.
+        if ($resultat->accepte) {
+            $statut = 'acceptee';
+        } elseif ($resultat->incertain) {
+            $statut = 'a_verifier';
+        } else {
+            $statut = 'liberee';
+        }
+        $this->conclure($ws, $jour, $message, $statut, $fournisseur);
+        if ($statut === 'a_verifier') {
+            Log::critical('envoi.injection_a_verifier : issue incertaine rapportée par le serveur, intervention requise.', ['workspace_id' => $ws]);
+        }
 
         return $resultat;
     }
 
-    /** Renvoi d'une clé déjà réservée : seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS. */
+    /** @param list<string> $cles */
+    private function alerterPerimees(string $ws, array $cles): void
+    {
+        foreach ($cles as $cle) {
+            Log::critical('envoi.injection_a_verifier : réservation restée sans issue, intervention requise.', ['workspace_id' => $ws, 'cle' => $cle]);
+        }
+    }
+
+    /**
+     * Renvoi d'une clé déjà réservée : seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS.
+     * Si le serveur CONFIRME ensuite un envoi resté `a_verifier`, le journal passe à `acceptee` (ligne ajoutée) et la
+     * chauffe le note : plus de fausse alerte critique ni de place « incertaine » à vie.
+     */
     private function rejouer(MessageAEnvoyer $message, string $etat): ResultatInjection
     {
-        if ($this->serveur instanceof RenvoiParMemeCle || $etat === 'acceptee') {
-            return $this->serveur->injecter($message);
+        if (! ($this->serveur instanceof RenvoiParMemeCle || $etat === 'acceptee')) {
+            throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
-        throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
+        $resultat = $this->serveur->injecter($message);
+        if ($resultat->accepte && $etat === 'a_verifier') {
+            $this->conclure($message->workspaceId, $this->jour(), $message, 'acceptee', $this->chauffe?->preparer($message));
+        }
+
+        return $resultat;
     }
 
     private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null): void
     {
         $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur): void {
-            if ($this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, $statut) && $statut === 'acceptee') {
+            $fait = $this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, $statut);
+            // Acceptation TARDIVE (la réservation a été périmée en `a_verifier` entre-temps, ou rejeu confirmé) : le journal est
+            // « ajout seul », on AJOUTE la confirmation. Option la plus prudente : un message PARTI est toujours compté dans la
+            // chauffe (jamais sauté), quitte à compter une fois de plus ; la place, elle, ne se libère jamais en retard.
+            if (! $fait && $statut === 'acceptee') {
+                $fait = $this->depot->confirmerInjection($ws, $jour, $message->cleIdempotence);
+            }
+            if ($fait && $statut === 'acceptee') {
                 $this->chauffe?->noter($message, $jour, $fournisseur);
             }
         });

@@ -11,6 +11,8 @@ use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
+use App\Envoi\Serveur\ServeurEnvoiRefuse;
+use Illuminate\Support\Facades\DB;
 
 /** Simulateur en mémoire. Aucune connexion réseau, jamais. */
 final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
@@ -28,10 +30,32 @@ final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
 
     public int $appels = 0;
 
-    public function __construct(private readonly bool $temoins = true) {}
+    /**
+     * Niveau de transaction « normal » de l'appelant. Les suites sous RefreshDatabase tournent déjà à un niveau ≥ 1 : le
+     * niveau au moment de la construction fait foi (null) ; une suite peut imposer le sien. Injecter à un niveau PLUS
+     * ÉLEVÉ = injection dans une transaction englobante (comme le refusent Kumo et l'adaptateur SMTP).
+     */
+    private readonly int $niveauDeBase;
+
+    public function __construct(private readonly bool $temoins = true, ?int $niveauDeBase = null)
+    {
+        $this->niveauDeBase = $niveauDeBase ?? self::niveauActuel();
+    }
+
+    private static function niveauActuel(): int
+    {
+        try {
+            return DB::transactionLevel();
+        } catch (\Throwable) {
+            return 0; // hors application (test unitaire pur) : aucune transaction
+        }
+    }
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
     {
+        if (self::niveauActuel() > $this->niveauDeBase) {
+            throw ServeurEnvoiRefuse::motif('injecter() ne s’appelle pas dans une transaction englobante.');
+        }
         $this->appels++;
         if ($this->enPause) {
             return ResultatInjection::reporte(new \DateTimeImmutable('tomorrow'));

@@ -12,6 +12,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\Kumo\EsmtpSuiviData;
 use App\Support\WorkspaceContext;
 use Closure;
@@ -191,10 +192,10 @@ final class AdaptateurSmtp implements ServeurEnvoi
             case 'accepte':
                 return ResultatInjection::accepte((string) $existant->id_injection);
             case 'echec':
-                throw new RuntimeException('Refus définitif (5xx) déjà enregistré pour cette clé.');
+                throw new RefusDefinitifServeur('Refus définitif (5xx) déjà enregistré pour cette clé.');
             case 'injection_en_cours':
             case 'a_verifier':
-                return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+                return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
             case 'reporte':
                 if ($existant->reporte_au !== null && new DateTimeImmutable((string) $existant->reporte_au) > new DateTimeImmutable) {
                     return ResultatInjection::reporte(new DateTimeImmutable((string) $existant->reporte_au));
@@ -241,7 +242,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         // Hors transaction : chaque instruction est commitée IMMÉDIATEMENT, donc AVANT le réseau.
         $pris = $this->maj($message->cleIdempotence, ['etat' => 'injection_en_cours'], ['a_injecter', 'reporte']);
         if (! $pris) {
-            return ResultatInjection::reporte(new DateTimeImmutable('+1 minute'));
+            return ResultatInjection::incertain(new DateTimeImmutable('+1 minute'));
         }
         $id = (string) $this->ligne($message->cleIdempotence)?->id_injection;
 
@@ -253,7 +254,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             // Coupure, délai dépassé, réponse illisible : sort INCERTAIN.
             $this->maj($message->cleIdempotence, ['etat' => 'a_verifier'], ['injection_en_cours']);
 
-            return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+            return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
         } finally {
             try {
                 if ($transport instanceof EsmtpTransport) {
@@ -287,7 +288,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         if ($code !== null && $code >= 500) {
             $this->maj($cle, ['etat' => 'echec', 'code_smtp' => $code], ['injection_en_cours']);
             $this->pauseSiTrop5xx();
-            throw new RuntimeException('Refus définitif du serveur SMTP (' . $code . ').');
+            throw new RefusDefinitifServeur('Refus définitif du serveur SMTP (' . $code . ').');
         }
         if (str_contains($e->getMessage(), 'Connection could not be established')) {
             // Aucune connexion : rien n'a pu être transmis, report simple.
@@ -299,7 +300,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         // Coupure / réponse inconnue : a_verifier, aucun renvoi automatique.
         $this->maj($cle, ['etat' => 'a_verifier', 'code_smtp' => $code], ['injection_en_cours']);
 
-        return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
+        return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
     }
 
     private function refusConnexion(string $cle, int $code): ResultatInjection

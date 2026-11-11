@@ -56,6 +56,20 @@ interface DepotSocle
      */
     public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array;
 
+    /**
+     * Confirmation TARDIVE : le serveur a finalement accepté une injection déjà conclue `a_verifier` (le journal est
+     * « ajout seul » : on AJOUTE une ligne `injection_confirmee`, l'état effectif devient `acceptee`). Vrai la première
+     * fois seulement ; faux si la clé n'est pas `a_verifier` ou déjà confirmée.
+     */
+    public function confirmerInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool;
+
+    /**
+     * Balaie TOUS les espaces : comme `perimerReservations`, pour chacun.
+     *
+     * @return list<array{0: string, 1: string}> couples [espace, clé] passés en `a_verifier`
+     */
+    public function perimerToutesLesReservations(DateTimeImmutable $avant): array;
+
     /** À appeler SOUS le verrou. Une même clé ne compte qu'une fois. */
     public function noterInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): void;
 

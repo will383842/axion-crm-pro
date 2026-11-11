@@ -79,9 +79,10 @@ final class DepotSocleDb implements DepotSocle
      */
     private function cleJournal(string $workspaceId, string $cle): string
     {
+        // Clés EXACTES `<clé>` et `<clé>~<n>` : une autre clé qui commence par `<clé>~` (ex. `<clé>~abc`) ne compte pas.
         $liberees = (int) DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
             ->where('commande', 'injection_issue')->where('statut', 'liberee')
-            ->whereRaw('(cle_idempotence = ? OR starts_with(cle_idempotence, ?))', [$cle, $cle . '~'])->count();
+            ->whereRaw("(cle_idempotence = ? OR (starts_with(cle_idempotence, ?) AND substr(cle_idempotence, ?) ~ '^[0-9]+\$'))", [$cle, $cle . '~', mb_strlen($cle) + 2])->count();
 
         return $liberees === 0 ? $cle : $cle . '~' . ($liberees + 1);
     }
@@ -97,6 +98,9 @@ final class DepotSocleDb implements DepotSocle
             }
             $conclusion = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
                 ->where('commande', 'injection_issue')->where('cle_idempotence', $cle)->value('statut');
+            if ($conclusion === 'a_verifier' && $this->confirmee($workspaceId, $cle)) {
+                return 'acceptee'; // le serveur a confirmé plus tard (ligne `injection_confirmee`)
+            }
 
             return (string) ($conclusion ?? $reservation->statut);
         });
@@ -141,6 +145,46 @@ final class DepotSocleDb implements DepotSocle
 
             return $insere > 0;
         });
+    }
+
+    private function confirmee(string $workspaceId, string $cle): bool
+    {
+        return DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
+            ->where('commande', 'injection_confirmee')->where('cle_idempotence', $cle)->exists();
+    }
+
+    public function confirmerInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence): bool {
+            $cle = $this->cleJournal($workspaceId, $cleIdempotence);
+            if ($this->confirmee($workspaceId, $cle)) {
+                return false;
+            }
+
+            // Seulement sur une conclusion `a_verifier` existante ; la place compte déjà (rien à recompter).
+            return DB::affectingStatement(
+                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
+                 SELECT ?, 'injection_confirmee', 'passerelle', '{}', ?, ?, 'acceptee'
+                 WHERE EXISTS (SELECT 1 FROM envoi_journal_commandes WHERE workspace_id = ? AND commande = 'injection_issue' AND cle_idempotence = ? AND statut = 'a_verifier')",
+                [$workspaceId, $jour->format('Y-m-d'), $cle, $workspaceId, $cle],
+            ) > 0;
+        });
+    }
+
+    public function perimerToutesLesReservations(DateTimeImmutable $avant): array
+    {
+        $espaces = WorkspaceContext::runWithoutScope(
+            'envoi:perimer-reservations : parcourt tous les espaces (lecture des identifiants seulement)',
+            fn (): array => array_values(array_map('strval', DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id')->all())),
+        );
+        $faites = [];
+        foreach ($espaces as $ws) {
+            foreach ($this->perimerReservations($ws, $avant) as $cle) {
+                $faites[] = [$ws, $cle];
+            }
+        }
+
+        return $faites;
     }
 
     public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array

@@ -13,6 +13,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
 use App\Envoi\Serveur\Kumo\EchecAuthentification;
@@ -119,7 +120,8 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         // (état différent de celui que nous avons lu), nous n'envoyons rien.
         $nouvelle = ['id' => $id, 'etat' => 'injection_en_cours', 'reporte_au' => null, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton];
         if (! $this->registre->ecrireSi($this->workspaceId, $cle, $ligne['etat'] ?? null, $ligne['instant'] ?? null, $nouvelle)) {
-            return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
+            // Un autre worker tient la clé : son envoi est peut-être en route, la place reste comptée.
+            return ResultatInjection::incertain(($this->horloge)()->modify('tomorrow'));
         }
 
         try {
@@ -160,7 +162,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             $this->noter($cle, $id, 'echec', $jeton);
             $this->registre->noter5xx($this->workspaceId, ($this->horloge)()->getTimestamp());
             $this->pauseSiTrop5xx();
-            throw new RuntimeException('Refus définitif du serveur d’envoi (' . $code . ').');
+            throw new RefusDefinitifServeur('Refus définitif du serveur d’envoi (' . $code . ').');
         }
 
         return $this->incertain($cle, $id, $jeton); // code inattendu : sort incertain
@@ -231,15 +233,15 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             case 'accepte':
                 return ResultatInjection::accepte($ligne['id']);
             case 'echec':
-                throw new RuntimeException('Refus définitif déjà enregistré pour cette clé.');
+                throw new RefusDefinitifServeur('Refus définitif déjà enregistré pour cette clé.');
             case 'injection_en_cours':
-                return ResultatInjection::reporte($demain);
+                return ResultatInjection::incertain($demain);
             case 'a_verifier':
                 // JAMAIS de renvoi : on interroge, et seul un sort CONNU change l'état.
                 return match ($this->interroger($ligne['id'])) {
                     EtatMessage::Envoye, EtatMessage::EnFile, EtatMessage::Rebond => $this->confirmer($cle, $ligne),
                     EtatMessage::Refuse => $this->refuser($cle, $ligne),
-                    EtatMessage::Inconnu => ResultatInjection::reporte($demain),
+                    EtatMessage::Inconnu => ResultatInjection::incertain($demain),
                 };
             case 'reporte':
                 if ($ligne['reporte_au'] !== null && $ligne['reporte_au'] > ($this->horloge)()->getTimestamp()) {
@@ -263,7 +265,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
     {
         // Sort Refuse LU par interrogation : ce n'est pas un 5xx reçu à l'injection, il ne compte pas pour la pause.
         $this->noter($cle, $ligne['id'], 'echec', $ligne['jeton'] ?? '');
-        throw new RuntimeException('Refus définitif constaté par le serveur d’envoi.');
+        throw new RefusDefinitifServeur('Refus définitif constaté par le serveur d’envoi.');
     }
 
     private function reporter(string $cle, string $id, string $jeton): ResultatInjection
@@ -278,7 +280,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
     {
         $this->noter($cle, $id, 'a_verifier', $jeton);
 
-        return ResultatInjection::reporte(($this->horloge)()->modify('tomorrow'));
+        return ResultatInjection::incertain(($this->horloge)()->modify('tomorrow'));
     }
 
     /** AUTH ou certificat refusé : alerte critique SANS secret ni trace, puis PAUSE ; au plus tôt demain, jamais +15 min. */

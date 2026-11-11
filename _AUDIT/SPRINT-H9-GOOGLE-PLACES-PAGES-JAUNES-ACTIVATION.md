@@ -92,7 +92,7 @@ Doit retourner un array avec `displayName`, `formattedAddress`, etc. Si null →
 
 Dashboard Webshare → **Proxy** → **Endpoint** :
 - Endpoint : ex `p.webshare.io:80`
-- Username : ex `wjullin-rotate`
+- Username : ex `compte-rotate`
 - Password : ex `xy12abc34`
 
 ### Étape 3 — Poser les credentials sur le serveur
@@ -104,7 +104,7 @@ nano /opt/axion-crm-pro/.env
 Ajouter :
 ```
 WEBSHARE_ENABLED=true
-WEBSHARE_USERNAME=wjullin-rotate
+WEBSHARE_USERNAME=compte-rotate
 WEBSHARE_PASSWORD=xy12abc34
 WEBSHARE_ENDPOINT=p.webshare.io:80
 MOCK_SCRAPERS=false

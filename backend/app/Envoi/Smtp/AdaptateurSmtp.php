@@ -122,7 +122,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         }
         self::refuserTransactionEnglobante();
         $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
-            ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
+            ?? throw EnvoiSmtpRefuse::motif('Boîte d\'envoi introuvable.'); // refus CERTAIN, avant tout envoi
 
         // Tout ce qui peut être refusé l'est ICI, avant le moindre état d'injection.
         $enveloppe = self::enveloppe($message, $boite);

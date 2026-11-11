@@ -25,6 +25,9 @@ return new class extends Migration
             CREATE UNIQUE INDEX IF NOT EXISTS envoi_journal_commandes_injection_issue_uniq
                 ON envoi_journal_commandes (workspace_id, cle_idempotence)
                 WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS envoi_journal_commandes_injection_confirmee_uniq
+                ON envoi_journal_commandes (workspace_id, cle_idempotence)
+                WHERE commande = 'injection_confirmee' AND cle_idempotence IS NOT NULL;
             CREATE OR REPLACE FUNCTION envoi_compteur_global_liberer(p_jour DATE) RETURNS integer AS $f$
                 UPDATE public.envoi_compteur_global SET n = n - 1 WHERE jour = p_jour AND n > 0 RETURNING n;
             $f$ LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public;

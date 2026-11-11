@@ -79,12 +79,15 @@ final class DepotSocleDb implements DepotSocle
      */
     private function cleJournal(string $workspaceId, string $cle): string
     {
-        // Clés EXACTES `<clé>` et `<clé>~<n>` : une autre clé qui commence par `<clé>~` (ex. `<clé>~abc`) ne compte pas.
-        $liberees = (int) DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
-            ->where('commande', 'injection_issue')->where('statut', 'liberee')
-            ->whereRaw("(cle_idempotence = ? OR (starts_with(cle_idempotence, ?) AND substr(cle_idempotence, ?) ~ '^[0-9]+\$'))", [$cle, $cle . '~', mb_strlen($cle) + 2])->count();
+        // Une recherche par égalité (index unique des conclusions) par tentative libérée : pas de balayage sous le verrou.
+        $k = 1;
+        $courante = $cle;
+        while (DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)->where('commande', 'injection_issue')
+            ->where('statut', 'liberee')->where('cle_idempotence', $courante)->exists()) {
+            $courante = $cle . '~' . (++$k);
+        }
 
-        return $liberees === 0 ? $cle : $cle . '~' . ($liberees + 1);
+        return $courante;
     }
 
     public function etatInjection(string $workspaceId, string $cleIdempotence): ?string
@@ -98,22 +101,23 @@ final class DepotSocleDb implements DepotSocle
             }
             $conclusion = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
                 ->where('commande', 'injection_issue')->where('cle_idempotence', $cle)->value('statut');
-            if ($conclusion === 'a_verifier' && $this->confirmee($workspaceId, $cle)) {
-                return 'acceptee'; // le serveur a confirmé plus tard (ligne `injection_confirmee`)
+            if ($conclusion === 'a_verifier' && DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
+                ->where('commande', 'injection_confirmee')->where('cle_idempotence', $cle)->exists()) {
+                return 'acceptee'; // renvoi confirmé après une issue incertaine
             }
 
             return (string) ($conclusion ?? $reservation->statut);
         });
     }
 
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence): bool {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence, $instant): bool {
             $insere = DB::affectingStatement(
-                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
-                 VALUES (?, 'injection', 'passerelle', '{}', ?, ?, 'reservee')
+                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut, cree_le)
+                 VALUES (?, 'injection', 'passerelle', '{}', ?, ?, 'reservee', ?)
                  ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection' AND cle_idempotence IS NOT NULL DO NOTHING",
-                [$workspaceId, $jour->format('Y-m-d'), $this->cleJournal($workspaceId, $cleIdempotence)],
+                [$workspaceId, $jour->format('Y-m-d'), $this->cleJournal($workspaceId, $cleIdempotence), $instant->format('c')],
             );
             if ($insere > 0) {
                 DB::select('SELECT envoi_compteur_global_incrementer(?::date)', [$jour->format('Y-m-d')]);
@@ -139,35 +143,21 @@ final class DepotSocleDb implements DepotSocle
                  ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL DO NOTHING",
                 [$workspaceId, $jour->format('Y-m-d'), $cle, $statut, $workspaceId, $cle],
             );
+            if ($insere === 0 && $statut === 'acceptee') {
+                // a_verifier -> acceptee : une ligne de confirmation, une seule (index unique), seulement si la conclusion est a_verifier.
+                $insere = DB::affectingStatement(
+                    "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
+                     SELECT ?, 'injection_confirmee', 'passerelle', '{}', ?, ?, 'acceptee'
+                     WHERE EXISTS (SELECT 1 FROM envoi_journal_commandes WHERE workspace_id = ? AND commande = 'injection_issue' AND cle_idempotence = ? AND statut = 'a_verifier')
+                     ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection_confirmee' AND cle_idempotence IS NOT NULL DO NOTHING",
+                    [$workspaceId, $jour->format('Y-m-d'), $cle, $workspaceId, $cle],
+                );
+            }
             if ($insere > 0 && $statut === 'liberee') {
                 DB::select('SELECT envoi_compteur_global_liberer(?::date)', [$jour->format('Y-m-d')]);
             }
 
             return $insere > 0;
-        });
-    }
-
-    private function confirmee(string $workspaceId, string $cle): bool
-    {
-        return DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)
-            ->where('commande', 'injection_confirmee')->where('cle_idempotence', $cle)->exists();
-    }
-
-    public function confirmerInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
-    {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $cleIdempotence): bool {
-            $cle = $this->cleJournal($workspaceId, $cleIdempotence);
-            if ($this->confirmee($workspaceId, $cle)) {
-                return false;
-            }
-
-            // Seulement sur une conclusion `a_verifier` existante ; la place compte déjà (rien à recompter).
-            return DB::affectingStatement(
-                "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
-                 SELECT ?, 'injection_confirmee', 'passerelle', '{}', ?, ?, 'acceptee'
-                 WHERE EXISTS (SELECT 1 FROM envoi_journal_commandes WHERE workspace_id = ? AND commande = 'injection_issue' AND cle_idempotence = ? AND statut = 'a_verifier')",
-                [$workspaceId, $jour->format('Y-m-d'), $cle, $workspaceId, $cle],
-            ) > 0;
         });
     }
 
@@ -195,13 +185,15 @@ final class DepotSocleDb implements DepotSocle
                 ->whereNotExists(fn ($q) => $this->conclusion($q, null))->get(['cle_idempotence', 'jour']);
             $cles = [];
             foreach ($lignes as $l) {
-                DB::affectingStatement(
+                $fait = DB::affectingStatement(
                     "INSERT INTO envoi_journal_commandes (workspace_id, commande, auteur, details, jour, cle_idempotence, statut)
                      VALUES (?, 'injection_issue', 'passerelle', '{}', ?, ?, 'a_verifier')
                      ON CONFLICT (workspace_id, cle_idempotence) WHERE commande = 'injection_issue' AND cle_idempotence IS NOT NULL DO NOTHING",
                     [$workspaceId, $l->jour, $l->cle_idempotence],
                 );
-                $cles[] = (string) $l->cle_idempotence;
+                if ($fait > 0) {
+                    $cles[] = (string) $l->cle_idempotence; // alerte seulement si la conclusion a réellement été posée
+                }
             }
 
             return $cles;

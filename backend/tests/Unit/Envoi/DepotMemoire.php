@@ -79,9 +79,6 @@ final class DepotMemoire implements DepotSocle
     /** @var array<string, int> clé => tentatives libérées (comme les clés `<clé>~n` du vrai dépôt) */
     public array $liberees = [];
 
-    /** @var array<string, true> clés de journal confirmées après coup (`injection_confirmee`) */
-    public array $confirmees = [];
-
     /** Clé de journal de la tentative EN COURS : `<clé>`, puis `<clé>~2`, `<clé>~3`… après chaque libération. */
     private function cleJournal(string $cle): string
     {
@@ -103,15 +100,11 @@ final class DepotMemoire implements DepotSocle
         if (! $this->dejaInjecte($workspaceId, $cleIdempotence)) {
             return null;
         }
-        $cle = $this->cleJournal($cleIdempotence);
-        if (isset($this->confirmees[$cle])) {
-            return 'acceptee';
-        }
 
-        return $this->statuts[$cle] ?? 'acceptee';
+        return $this->statuts[$this->cleJournal($cleIdempotence)] ?? 'acceptee';
     }
 
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool
     {
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
             return false;
@@ -127,6 +120,11 @@ final class DepotMemoire implements DepotSocle
     public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool
     {
         $cle = $this->cleJournal($cleIdempotence);
+        if (($this->statuts[$cle] ?? null) === 'a_verifier' && $statut === 'acceptee') {
+            $this->statuts[$cle] = 'acceptee'; // renvoi confirmé : une seule fois (le statut n'est plus a_verifier ensuite)
+
+            return true;
+        }
         if (($this->statuts[$cle] ?? null) !== 'reservee') {
             return false;
         }
@@ -135,22 +133,11 @@ final class DepotMemoire implements DepotSocle
             unset($this->statuts[$cle]);
             $this->liberees[$cleIdempotence] = ($this->liberees[$cleIdempotence] ?? 0) + 1;
             $n = $this->injectesLe($workspaceId, $jour) - 1;
-            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = [];
+            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = array_diff_key($this->compteurs, [$jour->format('Y-m-d') => 1]);
 
             return true;
         }
         $this->statuts[$cle] = $statut;
-
-        return true;
-    }
-
-    public function confirmerInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence): bool
-    {
-        $cle = $this->cleJournal($cleIdempotence);
-        if (($this->statuts[$cle] ?? null) !== 'a_verifier' || isset($this->confirmees[$cle])) {
-            return false;
-        }
-        $this->confirmees[$cle] = true;
 
         return true;
     }

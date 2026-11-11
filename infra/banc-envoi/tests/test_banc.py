@@ -102,5 +102,60 @@ class TestPuits(unittest.TestCase):
         self.assertEqual(puits_smtp.delai("accepte"), 0)
 
 
+class TestSixTemoins(unittest.TestCase):
+    """Fiche L8-F13 : 6 boîtes témoins (décision A10), une par fournisseur, domaines .test."""
+    FOURNISSEURS = {"gmail", "google_workspace", "outlook_com", "microsoft_365", "yahoo", "orange"}
+
+    def test_exactement_6_temoins_distincts(self):
+        import temoins
+        self.assertEqual(len(temoins.TEMOINS), 6)
+        self.assertEqual({t["fournisseur"] for t in temoins.TEMOINS.values()}, self.FOURNISSEURS)
+        self.assertEqual(len({t["adresse"] for t in temoins.TEMOINS.values()}), 6)
+
+    def test_adresses_en_test_uniquement(self):
+        import temoins
+        for t in temoins.TEMOINS.values():
+            self.assertRegex(t["adresse"], r"^[a-z0-9._-]+@[a-z0-9.-]+\.test$")
+
+    def test_adresse_hors_des_6_refusee(self):
+        import temoins
+        banc = temoins.Banc()
+        for a in ("inconnu@gmail.test", "x@gmail.com", ""):
+            with self.assertRaises(temoins.AdresseRefusee):
+                banc.livrer(a, "msg")
+
+    def test_scenario_s18_a_6(self):
+        import temoins
+        banc = temoins.Banc()
+        res = {f: banc.livrer(t["adresse"], "s18") for f, t in temoins.TEMOINS.items()}
+        self.assertEqual(set(res.values()), {"inbox", "junk", "absent"})
+        self.assertEqual(sum(len(b["inbox"]) for b in banc.boites.values()), list(res.values()).count("inbox"))
+        self.assertEqual(sum(len(b["junk"]) for b in banc.boites.values()), list(res.values()).count("junk"))
+
+    def test_comportement_simulable_et_invalide_refuse(self):
+        import temoins
+        banc = temoins.Banc()
+        a = temoins.TEMOINS["yahoo"]["adresse"]
+        banc.regler(a, "junk")
+        self.assertEqual(banc.livrer(a, "m"), "junk")
+        with self.assertRaises(ValueError):
+            banc.regler(a, "n_importe_quoi")
+
+    def test_mots_de_passe_generes_et_distincts(self):
+        import temoins
+        mdp = {b.mot_de_passe for b in temoins.Banc().boites.values()}
+        self.assertEqual(len(mdp), 6)
+        self.assertNotIn("", mdp)
+
+    def test_imap_expose_les_6_boites(self):
+        import imap_banc, temoins
+        self.assertEqual(set(imap_banc.BANC.boites), {t["adresse"] for t in temoins.TEMOINS.values()})
+
+    def test_compose_imap_interne_sans_port(self):
+        s = SERVICES["imap-banc"]
+        self.assertNotIn("ports", s)
+        self.assertEqual(s["networks"] if "networks" in s else ["banc"], ["banc"])
+
+
 if __name__ == "__main__":
     unittest.main()

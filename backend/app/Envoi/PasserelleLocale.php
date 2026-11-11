@@ -13,6 +13,7 @@ use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use App\Envoi\Smtp\EnvoiSmtpRefuse;
@@ -138,7 +139,7 @@ final class PasserelleLocale implements ServeurEnvoi
             // L'alerte ne part qu'après le COMMIT de `a_verifier`.
             $this->conclure($ws, $jour, $message, 'a_verifier');
             DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine, intervention requise.', ['workspace_id' => $ws, 'erreur' => $e::class]));
-            throw $e;
+            throw new InjectionIncertaine($e);
         }
 
         // (C) Transaction COURTE : la conclusion (et, si acceptée, la chauffe) se notent une seule fois.
@@ -180,8 +181,8 @@ final class PasserelleLocale implements ServeurEnvoi
         try {
             $resultat = $this->serveur->injecter($message);
         } catch (EnvoiRefuse|RefusDefinitifServeur|EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
-            // Refus CERTAIN au renvoi depuis `reservee` (rien n'est parti : la réservation n'a jamais abouti) : la place est
-            // rendue. Depuis `a_verifier`, l'envoi précédent est peut-être parti : la place reste prise.
+            // Refus CERTAIN d'un rejeu depuis `reservee` : la place est rendue. Depuis `a_verifier`, l'envoi précédent est
+            // peut-être parti : la place reste prise.
             if ($etat === 'reservee' && ! ($e instanceof EnvoiRefuse && $e->getCode() === EnvoiRefuse::ISSUE_INCERTAINE)) {
                 $this->conclure($ws, $jour, $message, 'liberee');
             }

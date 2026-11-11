@@ -1,5 +1,6 @@
 <?php
 
+use App\Envoi\EmpreinteTemoin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ uses(TestCase::class, RefreshDatabase::class);
  * la boîte et ses compteurs notés vivent dans des tables temporaires de chaque ouvrier (voir ouvrier_chauffe.php).
  */
 const CHAUFFE_JOUR = '2026-11-10';
+const CHAUFFE_CLE = 'cle-de-test-chauffe';
 
 function chauffeConcPreparer(): string
 {
@@ -23,12 +25,9 @@ function chauffeConcPreparer(): string
     $ws = (string) Str::uuid();
     $owner->table('workspaces')->insert(['id' => $ws, 'name' => 'ConcChauffe', 'slug' => 'concchauffe-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
-    // Mode témoins éteint par la voie légitime (journal + autorisation locale à la transaction), comme SequenceurConcurrenceTest.
-    $owner->transaction(function () use ($owner, $ws): void {
-        $owner->table('envoi_journal_commandes')->insert(['workspace_id' => $ws, 'commande' => 'temoins_off', 'auteur' => 'test-concurrence', 'details' => '{}', 'jour' => CHAUFFE_JOUR]);
-        $owner->select("SELECT set_config('app.envoi_ecriture_gardee', 'oui', true)");
-        $owner->table('envoi_drapeaux')->insert(['workspace_id' => $ws, 'mode_temoins' => false]);
-    });
+    // Mode témoins CONSERVÉ (comme PlafondConcurrenceTest) : le destinataire est un témoin déclaré. Aucune ligne `temoins_off`
+    // n'est écrite au journal, que d'autres tests comptent.
+    $owner->table('envoi_temoins')->insert(['workspace_id' => $ws, 'empreinte' => EmpreinteTemoin::calculer('temoin@example.test', CHAUFFE_CLE), 'libelle' => 'test']);
 
     return $ws;
 }
@@ -37,7 +36,7 @@ function chauffeConcNettoyer(string $ws): void
 {
     $owner = DB::connection('pgsql_owner');
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
-    $owner->table('envoi_drapeaux')->where('workspace_id', $ws)->delete();
+    $owner->table('envoi_temoins')->where('workspace_id', $ws)->delete();
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
     $owner->table('workspaces')->where('id', $ws)->delete();
     $owner->table('envoi_compteur_global')->where('jour', CHAUFFE_JOUR)->delete(); // compteur agrégé, sans donnée de personne
@@ -48,7 +47,7 @@ function chauffeConcNettoyer(string $ws): void
 function chauffeConcLancer(string $ws, int $notes): array
 {
     $depart = microtime(true) + 3;
-    $env = array_merge(getenv(), ['ENVOI_CLE_EMPREINTE' => 'cle-de-test-chauffe', 'APP_ENV' => 'testing']);
+    $env = array_merge(getenv(), ['ENVOI_CLE_EMPREINTE' => CHAUFFE_CLE, 'APP_ENV' => 'testing']);
     $procs = [];
     foreach (['a', 'b'] as $cle) {
         $cmd = [PHP_BINARY, base_path('tests/Support/ouvrier_chauffe.php'), $ws, CHAUFFE_JOUR, 'cle-' . $cle, (string) $depart, '1.5', (string) $notes];

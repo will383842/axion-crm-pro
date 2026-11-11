@@ -83,7 +83,7 @@ $serveur = new class($faux, (float) $pause) implements RenvoiParMemeCle, Serveur
     }
 };
 $maintenant = new DateTimeImmutable($jour . ' 10:00:00', new DateTimeZone('Europe/Paris'));
-$garde = new GardeChauffe(new DepotChauffe, new DepotSocleDb, new ResolveurEnMemoire(['gmail.com' => 'gmail']), null);
+$garde = new GardeChauffe(new DepotChauffe, new DepotSocleDb, new ResolveurEnMemoire(['example.test' => 'gmail']), null);
 $passerelle = new PasserelleLocale($serveur, new DepotSocleDb, true, 300, fn () => $maintenant, $ws, 300, fn () => WorkspaceContext::current(), $garde);
 // Tables TEMPORAIRES de même nom (pg_temp passe avant public) : `envoi_sante_battement`, `envoi_boites` et
 // `envoi_chauffe_jours` sont en AJOUT SEUL ; une ligne validée ici resterait pour toute la base et fausserait d'autres
@@ -98,6 +98,6 @@ DB::statement("INSERT INTO envoi_chauffe_jours (workspace_id, boite, jour, fourn
 $passerelle->sante(); // un battement à l'heure courante
 
 $resultat = WorkspaceContext::run($ws, fn () => $passerelle->injecter(
-    new MessageAEnvoyer($ws, 'x@gmail.com', 'boite1@example.test', 'S', 'C', $cle),
+    new MessageAEnvoyer($ws, 'temoin@example.test', 'boite1@example.test', 'S', 'C', $cle),
 ));
 echo json_encode(['accepte' => $resultat->accepte]), "\n";

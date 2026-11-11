@@ -602,11 +602,13 @@ final class SemeurTablesScopees
             'id' => $campagne, 'nom' => 'zz-etancheite', 'cible' => '{"type":"liste","reference":"zz","libelle":"zz"}',
             'nb_etapes' => 1, 'cree_par' => 'zz-etancheite',
         ]);
+        // Le journal n'accepte qu'une transition réelle : la campagne passe d'abord à « a_valider » (propriétaire, version 2).
+        $owner->table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'a_valider', 'version' => 2]);
         $inserer('envoi_campagnes_journal', [
             'campagne_id' => $campagne, 'transition' => 'brouillon>a_valider', 'auteur' => 'zz-etancheite',
             'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-' . $marque,
         ]);
-        $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash('sha256', 'zz-etancheite'), 'expire_le' => '2026-01-01 00:00:00+00']);
+        $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash_hmac('sha256', 'zz-etancheite', 'cle-de-semeur-seulement'), 'cle_version' => 1, 'expire_le' => '2026-01-01 00:00:00+00']);
 
         $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',

@@ -29,6 +29,16 @@ final class CampagneRefusee extends RuntimeException
         return new self('Conflit : la campagne a changé depuis votre lecture (version périmée).', self::STATUT_HTTP);
     }
 
+    public static function cleReutilisee(): self
+    {
+        return new self('Clé d\'idempotence déjà utilisée pour une autre campagne ou une autre transition.', self::STATUT_HTTP);
+    }
+
+    public static function cleCodeAbsente(): self
+    {
+        return new self('Codes de campagne indisponibles : clé serveur absente ou trop courte (porte fermée).', 503);
+    }
+
     public static function introuvable(): self
     {
         return new self('Introuvable dans cet espace.', 404);

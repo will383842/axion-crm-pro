@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Envoi R08 — journal des transitions de campagne, AJOUT SEUL (UPDATE/DELETE/TRUNCATE refusés ; droits SELECT + INSERT).
+ * Une ligne n'est insérable que si sa transition figure dans la matrice ET si la campagne est déjà dans l'état d'arrivée
+ * (le dépôt change le statut puis journalise dans la même transaction) : aucune ligne fictive.
  * La clé d'idempotence est unique par espace : rejouer une transition n'écrit pas deux fois. `down()` inerte.
  */
 return new class extends Migration
@@ -38,6 +40,22 @@ return new class extends Migration
             DROP TRIGGER IF EXISTS envoi_campagnes_journal_ajout_seul ON envoi_campagnes_journal;
             CREATE TRIGGER envoi_campagnes_journal_ajout_seul BEFORE UPDATE OR DELETE ON envoi_campagnes_journal
                 FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_journal_ajout_seul();
+            CREATE OR REPLACE FUNCTION envoi_campagnes_journal_verifie() RETURNS trigger AS $f$
+            DECLARE
+                de TEXT := split_part(NEW.transition, '>', 1);
+                vers TEXT := split_part(NEW.transition, '>', 2);
+            BEGIN
+                IF NOT envoi_campagnes_transition_permise(de, vers) THEN
+                    RAISE EXCEPTION 'envoi_campagnes_journal : transition % hors matrice', NEW.transition;
+                END IF;
+                IF (SELECT c.statut FROM envoi_campagnes c WHERE c.id = NEW.campagne_id AND c.workspace_id = NEW.workspace_id) IS DISTINCT FROM vers THEN
+                    RAISE EXCEPTION 'envoi_campagnes_journal : la campagne n''est pas dans l''état % (ligne fictive refusée)', vers;
+                END IF;
+                RETURN NEW;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            DROP TRIGGER IF EXISTS envoi_campagnes_journal_verifie ON envoi_campagnes_journal;
+            CREATE TRIGGER envoi_campagnes_journal_verifie BEFORE INSERT ON envoi_campagnes_journal
+                FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_journal_verifie();
             DROP TRIGGER IF EXISTS envoi_campagnes_journal_pas_de_truncate ON envoi_campagnes_journal;
             CREATE TRIGGER envoi_campagnes_journal_pas_de_truncate BEFORE TRUNCATE ON envoi_campagnes_journal
                 FOR EACH STATEMENT EXECUTE FUNCTION envoi_campagnes_journal_ajout_seul();

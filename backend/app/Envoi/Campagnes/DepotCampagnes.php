@@ -31,6 +31,20 @@ final class DepotCampagnes
 
     public const SAISIE_MAX_OCTETS = 65536;
 
+    /** Marge côté PHP : la base fait foi (octet_length du texte jsonb) ; un écart résiduel devient un refus propre (23514). */
+    public const SAISIE_MARGE_OCTETS = 1024;
+
+    public const CIBLE_MAX_OCTETS = 2048;
+
+    public const CIBLE_MARGE_OCTETS = 64;
+
+    public const BOITES_MAX = 50;
+
+    /** Codes de validation : plafond de tentatives et de codes par campagne (la base porte les mêmes valeurs). */
+    public const CODE_TENTATIVES_MAX = 5;
+
+    public const CODES_PAR_CAMPAGNE_MAX = 10;
+
     private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie'];
 
     public static function autorisee(string $de, string $vers): bool
@@ -49,7 +63,7 @@ final class DepotCampagnes
 
         return WorkspaceContext::run($ws, function () use ($ws, $champs, $auteur): string {
             $id = (string) Str::uuid();
-            DB::table('envoi_campagnes')->insert(['id' => $id, 'workspace_id' => $ws, 'cree_par' => $auteur] + $champs);
+            $this->sansErreurDeMesure(fn () => DB::table('envoi_campagnes')->insert(['id' => $id, 'workspace_id' => $ws, 'cree_par' => $auteur] + $champs));
 
             return $id;
         });
@@ -86,10 +100,13 @@ final class DepotCampagnes
     public function transitionner(string $ws, string $id, string $vers, int $version, string $auteur, string $motif, string $cleIdempotence): bool
     {
         return WorkspaceContext::run($ws, function () use ($ws, $id, $vers, $version, $auteur, $motif, $cleIdempotence): bool {
-            if (DB::table('envoi_campagnes_journal')->where('workspace_id', $ws)->where('cle_idempotence', $cleIdempotence)->exists()) {
+            if ($this->cleDejaJournalisee($ws, $id, $vers, $cleIdempotence)) {
                 return false;
             }
             $c = $this->lire($ws, $id) ?? throw CampagneRefusee::introuvable();
+            if ($c->version !== $version) {
+                throw CampagneRefusee::versionPerimee();   // la version LUE doit être celle que l'appelant a lue
+            }
             if (! self::autorisee($c->statut, $vers)) {
                 throw CampagneRefusee::transition($c->statut, $vers);
             }
@@ -105,7 +122,7 @@ final class DepotCampagnes
                     ]);
                 });
             } catch (QueryException $e) {
-                if ($e->getCode() === '23505') {   // clé d'idempotence prise entre-temps : déjà appliqué
+                if ($e->getCode() === '23505' && $this->cleDejaJournalisee($ws, $id, $vers, $cleIdempotence)) {   // prise entre-temps : déjà appliqué
                     return false;
                 }
                 throw $e;
@@ -115,11 +132,140 @@ final class DepotCampagnes
         });
     }
 
+    /**
+     * @phpstan-impure
+     *
+     * Vrai si la clé a déjà journalisé CETTE transition de CETTE campagne (rejeu) ; une clé prise ailleurs est un refus explicite.
+     */
+    private function cleDejaJournalisee(string $ws, string $id, string $vers, string $cle): bool
+    {
+        $ligne = DB::table('envoi_campagnes_journal')->where('workspace_id', $ws)->where('cle_idempotence', $cle)->first(['campagne_id', 'transition']);
+        if ($ligne === null) {
+            return false;
+        }
+        if ($ligne->campagne_id !== $id || ! str_ends_with($ligne->transition, '>' . $vers)) {
+            throw CampagneRefusee::cleReutilisee();
+        }
+
+        return true;
+    }
+
+    /**
+     * Émet un code de validation (6 chiffres) : on ne garde que son HMAC-SHA256 (clé serveur) et la version de clé.
+     *
+     * @return int identifiant de la ligne
+     */
+    public function emettreCode(string $ws, string $campagneId, string $code, int $validiteMinutes = 10): int
+    {
+        if (! preg_match('/^[0-9]{6}$/', $code)) {
+            throw CampagneRefusee::contenu('le code compte 6 chiffres');
+        }
+        $empreinte = self::empreinteCode($code, $version = (int) config('envoi.cle_codes_campagne_version', 1));
+
+        return WorkspaceContext::run($ws, function () use ($ws, $campagneId, $empreinte, $version, $validiteMinutes): int {
+            $this->lire($ws, $campagneId) ?? throw CampagneRefusee::introuvable();
+            try {
+                return (int) DB::transaction(fn () => DB::table('envoi_campagne_codes')->insertGetId([
+                    'workspace_id' => $ws, 'campagne_id' => $campagneId, 'empreinte' => $empreinte, 'cle_version' => $version,
+                    'expire_le' => DB::raw('now() + make_interval(mins => ' . (int) $validiteMinutes . ')'),
+                ]));
+            } catch (QueryException $e) {
+                if (str_contains($e->getMessage(), '10 codes au plus')) {
+                    throw CampagneRefusee::contenu('10 codes au plus par campagne');
+                }
+                throw $e;
+            }
+        });
+    }
+
+    /**
+     * Consomme un code : vrai UNIQUEMENT si le code est juste ET vivant (non consommé, non expiré, tentatives sous le plafond)
+     * ET qu'une seule ligne a changé (UPDATE conditionnel atomique : deux consommations simultanées, une seule réussit).
+     * Un mauvais code compte une tentative sur les codes vivants de la campagne.
+     */
+    public function consommerCode(string $ws, string $campagneId, string $code): bool
+    {
+        return WorkspaceContext::run($ws, function () use ($ws, $campagneId, $code): bool {
+            $vivants = fn () => DB::table('envoi_campagne_codes')->where('workspace_id', $ws)->where('campagne_id', $campagneId)
+                ->whereNull('consomme_le')->where('expire_le', '>', DB::raw('now()'))->where('tentatives', '<', self::CODE_TENTATIVES_MAX);
+            foreach ($vivants()->get(['id', 'empreinte', 'cle_version']) as $ligne) {
+                try {
+                    $attendue = self::empreinteCode($code, (int) $ligne->cle_version);
+                } catch (CampagneRefusee) {
+                    continue;   // clé de cette version indisponible : ce code ne peut pas être vérifié
+                }
+                if (hash_equals($ligne->empreinte, $attendue)) {
+                    return $vivants()->where('id', $ligne->id)->update(['consomme_le' => DB::raw('now()')]) === 1;
+                }
+            }
+            $vivants()->increment('tentatives');
+
+            return false;
+        });
+    }
+
+    /** HMAC-SHA256 (hex) du code avec la clé serveur de cette version. Clé absente ou de moins de 32 caractères : porte fermée. */
+    public static function empreinteCode(string $code, int $cleVersion): string
+    {
+        $cle = config('envoi.cles_codes_campagne')[(string) $cleVersion] ?? '';
+        if (! is_string($cle) || strlen($cle) < 32) {
+            throw CampagneRefusee::cleCodeAbsente();
+        }
+
+        return hash_hmac('sha256', $code, $cle);
+    }
+
+    /**
+     * Taille EXACTE (octets) du texte jsonb de la base (`octet_length(x::jsonb::text)`) : une espace après chaque « : » et « , »
+     * structurels. Les nombres flottants à exposant s'écrivent plus longs en base : d'où la marge ET la conversion de 23514.
+     *
+     * @param  array<mixed>  $valeur
+     */
+    public static function tailleJsonb(array $valeur): int
+    {
+        $json = json_encode($valeur === [] ? new \stdClass : $valeur, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $taille = strlen($json);
+        $dansChaine = false;
+        for ($i = 0, $n = $taille; $i < $n; $i++) {
+            $c = $json[$i];
+            if ($dansChaine) {
+                if ($c === '\\') {
+                    $i++;
+                } elseif ($c === '"') {
+                    $dansChaine = false;
+                }
+            } elseif ($c === '"') {
+                $dansChaine = true;
+            } elseif ($c === ':' || $c === ',') {
+                $taille++;
+            }
+        }
+
+        return $taille;
+    }
+
+    /**
+     * Une erreur « contrainte violée » (23514) de la base devient un refus propre.
+     *
+     * @param  \Closure(): mixed  $ecriture
+     */
+    private function sansErreurDeMesure(\Closure $ecriture): mixed
+    {
+        try {
+            return DB::transaction($ecriture);   // point de sauvegarde : l'échec n'abîme pas la transaction englobante
+        } catch (QueryException $e) {
+            if ((string) $e->getCode() === '23514') {
+                throw CampagneRefusee::contenu('contenu hors limites (cible 2 Ko, saisie de 64 Ko au plus, mesurés par la base)');
+            }
+            throw $e;
+        }
+    }
+
     /** @param array<string, mixed> $champs */
     private function ecrire(string $ws, string $id, int $version, array $champs): int
     {
-        $n = DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $id)->where('version', $version)
-            ->update($champs + ['version' => $version + 1, 'maj_le' => now()]);
+        $n = $this->sansErreurDeMesure(fn () => DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $id)->where('version', $version)
+            ->update($champs + ['version' => $version + 1, 'maj_le' => now()]));
         if ($n !== 1) {
             throw CampagneRefusee::versionPerimee();
         }
@@ -152,13 +298,19 @@ final class DepotCampagnes
                 || ! in_array($cible['type'] ?? null, ['liste', 'audience', 'etiquette', 'carnet'], true)) {
                 throw CampagneRefusee::contenu('cible = type, reference, libelle seulement');
             }
-            if (str_contains($json, '@') || strlen($json) > 2048) {
-                throw CampagneRefusee::contenu('la cible ne contient aucune adresse e-mail (2 Ko au plus)');
+            if (! is_string($cible['reference']) || ! is_string($cible['libelle']) || trim($cible['reference']) === '' || trim($cible['libelle']) === '') {
+                throw CampagneRefusee::contenu('cible : reference et libelle sont des chaînes non vides');
+            }
+            if (str_contains($json, '@') || self::tailleJsonb($cible) > self::CIBLE_MAX_OCTETS - self::CIBLE_MARGE_OCTETS) {
+                throw CampagneRefusee::contenu('la cible ne contient aucune adresse e-mail (2 Ko au plus, mesuré comme la base)');
             }
             $out['cible'] = $json;
         }
         if (array_key_exists('boites', $c)) {
             $boites = array_values(array_map('strval', (array) $c['boites']));
+            if (count($boites) > self::BOITES_MAX) {
+                throw CampagneRefusee::contenu('50 boîtes au plus');
+            }
             foreach ($boites as $b) {
                 if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $b)) {
                     throw CampagneRefusee::contenu('boîtes = identifiants UUID');
@@ -173,11 +325,14 @@ final class DepotCampagnes
             $out['nb_etapes'] = (int) $c['nb_etapes'];
         }
         if (array_key_exists('saisie', $c)) {
-            $json = json_encode((array) $c['saisie'] ?: new \stdClass, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-            if (strlen($json) > self::SAISIE_MAX_OCTETS) {
-                throw CampagneRefusee::contenu('saisie de 64 Ko au plus');
+            $saisie = $c['saisie'];
+            if (! is_array($saisie) || ($saisie !== [] && array_is_list($saisie))) {
+                throw CampagneRefusee::contenu('saisie = un objet (clés nommées), pas une liste');
             }
-            $out['saisie'] = $json;
+            if (self::tailleJsonb($saisie) > self::SAISIE_MAX_OCTETS - self::SAISIE_MARGE_OCTETS) {
+                throw CampagneRefusee::contenu('saisie de 64 Ko au plus (mesurée comme la base)');
+            }
+            $out['saisie'] = json_encode($saisie === [] ? new \stdClass : $saisie, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         }
         if (! $partiel && count($out) !== count(self::CHAMPS_MODIFIABLES)) {
             throw CampagneRefusee::contenu('champs obligatoires manquants');

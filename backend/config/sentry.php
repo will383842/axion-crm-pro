@@ -26,6 +26,9 @@ return [
     // Les traces de commande envoi:temoin-* ne sont pas envoyées (voir App\Support\SentryFiltre).
     'before_breadcrumb' => [SentryFiltre::class, 'avantBreadcrumb'],
 
+    // « Puis-je écrire à… ? » : l'adresse testée est dans l'URL, elle est retirée des événements (SentryFiltre::avantEnvoi).
+    'before_send' => [SentryFiltre::class, 'avantEnvoi'],
+
     'breadcrumbs' => [
         'logs' => true,
         'cache' => false,

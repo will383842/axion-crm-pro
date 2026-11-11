@@ -610,6 +610,17 @@ final class PersonnesIngestService
         }
 
         $existante = $this->trouver($workspaceId, $event);
+
+        // Fiche déjà MISE À L'ÉCART (`opposition_at` posée, y compris sans
+        // adresse ou par la mise à l'écart, donc sans ligne `opt_out`) : ni
+        // réabonnement, ni réécriture du prénom ou du nom. L'événement est
+        // consigné, rien n'est supprimé (même logique que `evaluerDemande`).
+        if ($existante !== null && ($existante->opposition_at ?? null) !== null) {
+            $this->consigner($event, $workspaceId, $existante, $activityRef, 'Événement ignoré : personne opposée');
+
+            return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
+        }
+
         $inscription = $event->eventType === 'newsletter_optin';
         $abonnement = $existante === null ? null : $this->abonnement((int) $existante->id);
         $base = $this->baseLegaleInscription($event);

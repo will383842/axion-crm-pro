@@ -4,6 +4,7 @@ namespace App\Crm\Personnes;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * RÈGLES DE LECTURE des personnes et de leurs abonnements, écrites UNE fois
@@ -99,6 +100,12 @@ final class Abonnements
      */
     public static function exclureOpposees(Builder $requete): Builder
     {
+        // Fiche mise à l'écart de tout envoi (données gardées, jamais effacées).
+        // Colonne ajoutée par migration : absente pendant une fenêtre de déploiement.
+        if (Schema::hasColumn('personnes', 'opposition_at')) {
+            $requete->whereNull('personnes.opposition_at');
+        }
+
         return $requete
             ->whereNotExists(function (Builder $sous): void {
                 $sous->select(DB::raw('1'))

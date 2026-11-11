@@ -1,5 +1,6 @@
 <?php
 
+use App\Crm\Personnes\Abonnements;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -212,4 +213,57 @@ test('CRM-G2 10 — adresse sur la liste d’opposition (fiche gardée) : un gui
         ->and(json_decode((string) $apres->origines, true))->toHaveCount(1)
         ->and($apres->origines)->toBe($avant->origines)
         ->and(DB::table('personnes')->count())->toBe(1);
+});
+
+test('CRM-G2 11 — sonde A : fiche opposée (opposition_at posée), puis inscription avec un autre nom : rien écrasé, aucun abonnement', function () {
+    g2Poster(g2Evenement())->assertOk();
+    DB::table('personnes')->where('id', g2Personne()->id)->update(['opposition_at' => '2026-11-02 10:00:00']);
+    $avant = g2Personne();
+
+    $inscription = g2Evenement(
+        ['event_type' => 'newsletter_optin', 'source_slug' => 'newsletter', 'person' => ['first_name' => 'Bob', 'last_name' => 'Nouveau']],
+        '2026-11-05T10:00:00Z',
+    );
+    unset($inscription['origines']);
+    g2Poster($inscription)->assertOk();
+
+    $apres = g2Personne();
+    expect($apres->first_name)->toBe($avant->first_name)
+        ->and($apres->last_name)->toBe($avant->last_name)
+        ->and($apres->opposition_at)->toBe($avant->opposition_at)
+        ->and(DB::table('abonnements')->where('statut', '!=', 'desabonne')->count())->toBe(0)
+        ->and(DB::table('personnes')->count())->toBe(1);
+});
+
+test('CRM-G2 12 — sonde B : opposition sans adresse (aucune ligne opt_out), puis inscription : aucun abonnement actif, personne non éligible', function () {
+    g2Poster(g2Evenement())->assertOk();
+    $sansAdresse = g2Evenement(['schema_version' => 2, 'opposition' => ['actif' => true, 'date' => '2026-11-02T10:00:00Z']], '2026-11-02T10:00:00Z');
+    unset($sansAdresse['origines'], $sansAdresse['person']['email']);
+    g2Poster($sansAdresse)->assertOk();
+    expect(g2Personne()->opposition_at)->not->toBeNull()
+        ->and(DB::table('opt_out')->where('scope', 'business')->count())->toBe(0);
+
+    $inscription = g2Evenement(['event_type' => 'newsletter_optin', 'source_slug' => 'newsletter'], '2026-11-05T10:00:00Z');
+    unset($inscription['origines']);
+    g2Poster($inscription)->assertOk();
+
+    $workspaceId = (string) DB::table('workspaces')->where('slug', 'axion-ia')->value('id');
+    expect(DB::table('abonnements')->where('statut', '!=', 'desabonne')->count())->toBe(0)
+        ->and(Abonnements::eligiblesALaDiffusion($workspaceId)->count())->toBe(0)
+        ->and(DB::table('personnes')->count())->toBe(1);
+});
+
+test('CRM-G2 13 — fiche opposée sans opt_out mais abonnée par ailleurs : jamais éligible à la diffusion', function () {
+    g2Poster(g2Evenement())->assertOk();
+    $personne = g2Personne();
+    DB::table('abonnements')->insert([
+        'personne_id' => $personne->id, 'canal' => 'lettre', 'statut' => 'abonne',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $workspaceId = (string) DB::table('workspaces')->where('slug', 'axion-ia')->value('id');
+    expect(Abonnements::eligiblesALaDiffusion($workspaceId)->count())->toBe(1);
+
+    DB::table('personnes')->where('id', $personne->id)->update(['opposition_at' => now()]);
+
+    expect(Abonnements::eligiblesALaDiffusion($workspaceId)->count())->toBe(0);
 });

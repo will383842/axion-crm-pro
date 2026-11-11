@@ -26,12 +26,6 @@ export function AuthShell({
     // utilisateur traverse. Un seul geste les couvre tous, puisqu'ils partagent
     // cette coquille.
     <main className="relative flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-12 dark:bg-slate-950">
-      {/* Subtle decorative orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20" />
-        <div className="absolute -right-32 bottom-1/4 h-72 w-72 rounded-full bg-violet-200/20 blur-3xl dark:bg-violet-900/20" />
-      </div>
-
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#141413] text-white shadow-md dark:bg-white dark:text-slate-900">

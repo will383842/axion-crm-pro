@@ -283,7 +283,8 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
 // pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
 // Filet modifié : pourquoi — PR-C : l'entrée « Effacements demandés » (À traiter, avec la pastille déplacée de « Demandes RGPD »)
 // et, console ouverte, « Origines des contacts » (Ma base). Empreintes recalées ci-dessous.
-const EMPREINTE_BARRE = 'f727efeca75cd33540cf492403a19fd9104f0f5cc4482c878222732634b2400c';
+// Filet modifié : pourquoi — V9-S6 : pastilles du logo de la barre en aplat #B23F16 (charte, dégradé retiré).
+const EMPREINTE_BARRE = '5086f485feca78f6dfe503820b7091079e5c6b951d82b953b9bedc52094ba855';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 
 describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
@@ -326,7 +327,7 @@ const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
   ['/origines', 'Origines des contacts'],
   ...MENU_D_AUJOURD_HUI.slice(5),
 ];
-const EMPREINTE_BARRE_CONSOLE_OUVERTE = '1a490440adcf8051690c98d2d7324e2609706f789d39c5a9d690f49211e7ecee';
+const EMPREINTE_BARRE_CONSOLE_OUVERTE = '99e4fc94293a22e44acaacaed61e7e5f95de7f7bd5c783d6fa36fd780aacc052';
 
 describe('Sans Envoi, console ouverte — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
   it('mêmes entrées, même ordre, mêmes libellés ; même HTML de la barre et de l’en-tête', async () => {

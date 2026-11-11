@@ -15,7 +15,8 @@ services:
   dns-banc:
     <<: *banc
     command: python dns_banc.py
-    environment: { IP_REPONSE: "10.99.0.10" }
+    # IP_REPONSE = imap-banc : le service que vise le DNS DOIT porter le Banc partagé (SMTP + IMAP)
+    environment: { IP_REPONSE: "10.99.0.11" }
     networks: { banc: { ipv4_address: 10.99.0.2 } }
   puits-accepte:
     <<: *banc
@@ -38,9 +39,19 @@ services:
     dns: [10.99.0.2]  # résolveur du banc (dns-banc)
     command: python puits_smtp.py
     environment: { MODE: lent, COMPTEUR_URL: "http://compteur:8080" }
-  imap-banc:
+  imap-banc:  # SMTP (25, mode accepte) + IMAP (143) dans le MÊME processus, sur un Banc partagé
     <<: *banc
     command: python imap_banc.py
+    networks: { banc: { ipv4_address: 10.99.0.11 } }  # cible de dns-banc (IP_REPONSE)
+    environment:  # fournis par demarrer-banc.sh, jamais écrits dans le dépôt
+      COMPTEUR_URL: "http://compteur:8080"  # le SMTP d'imap-banc (mode accepte) alimente aussi le compteur
+      BANC_SECRET: "${BANC_SECRET:-}"
+      BANC_TEMOIN_GMAIL: "${BANC_TEMOIN_GMAIL:-}"
+      BANC_TEMOIN_GOOGLE_WORKSPACE: "${BANC_TEMOIN_GOOGLE_WORKSPACE:-}"
+      BANC_TEMOIN_OUTLOOK_COM: "${BANC_TEMOIN_OUTLOOK_COM:-}"
+      BANC_TEMOIN_MICROSOFT_365: "${BANC_TEMOIN_MICROSOFT_365:-}"
+      BANC_TEMOIN_YAHOO: "${BANC_TEMOIN_YAHOO:-}"
+      BANC_TEMOIN_ORANGE: "${BANC_TEMOIN_ORANGE:-}"
   compteur:
     <<: *banc
     command: python compteur.py
@@ -68,4 +79,4 @@ networks:
     ipam: { config: [{ subnet: 10.98.0.0/24 }] }
   banc:
     internal: true
-    ipam: { config: [{ subnet: 10.99.0.0/24, ip_range: 10.99.0.128/25 }] }  # auto-attribution hors des IP fixes (.2, .10)
+    ipam: { config: [{ subnet: 10.99.0.0/24, ip_range: 10.99.0.128/25 }] }  # auto-attribution hors des IP fixes (.2, .10, .11)

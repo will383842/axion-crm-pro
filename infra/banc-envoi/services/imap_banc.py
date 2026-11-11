@@ -1,29 +1,88 @@
-"""IMAP minimal (boîte vide) pour tester la lecture des retours."""
+"""IMAP minimal du banc, avec les 6 boîtes témoins (A10).
+
+Un seul processus (conteneur imap-banc) héberge DEUX serveurs sur le MÊME objet Banc :
+- le puits SMTP (port 25, mode accepte) qui refuse en 550 tout RCPT hors des 6 témoins et
+  dépose les messages acceptés selon le comportement de chaque boîte (inbox | junk | absent) ;
+- ce serveur IMAP (port 143) qui les relit : LOGIN authentifié, SELECT INBOX|Junk (EXISTS réel ; autre dossier = NO), SEARCH, FETCH (message complet, BODY[]).
+Compteur : COMPTEUR_URL (optionnel) ; le MODE du SMTP d'imap-banc est fixe : accepte.
+Réglage par variables d'environnement : BANC_SECRET (mots de passe dérivés, voir temoins.mot_de_passe)
+et BANC_TEMOIN_<FOURNISSEUR>=inbox|junk|absent. Rien n'est écrit sur disque (read_only conservé)."""
 import asyncio
+import shlex
+
+from temoins import Banc
+from puits_smtp import faire_client
+
+BANC = Banc()  # les 6 boîtes témoins (A10), partagé avec le puits SMTP du même processus
 
 
-async def client(r, w):
-    w.write(b"* OK IMAP banc pret\r\n")
-    while not r.at_eof():
-        l = (await r.readline()).decode(errors="replace").strip()
-        if not l: break
-        tag, _, cmd = l.partition(" ")
-        c = cmd.split(" ")[0].upper()
-        if c == "CAPABILITY": w.write(b"* CAPABILITY IMAP4rev1\r\n")
-        elif c == "SELECT" or c == "EXAMINE": w.write(b"* 0 EXISTS\r\n* 0 RECENT\r\n")
-        elif c == "LIST": w.write(b'* LIST () "/" INBOX\r\n')
-        elif c == "SEARCH": w.write(b"* SEARCH\r\n")
-        if c == "LOGOUT":
-            w.write(b"* BYE\r\n" + tag.encode() + b" OK fin\r\n"); break
-        w.write(tag.encode() + b" OK " + c.encode() + b" fait\r\n")
-        await w.drain()
-    w.close()
+def numeros(seq, total):
+    """Ensemble de séquence IMAP ('1', '1:2', '2:*', '*', '1,3') -> numéros valides, triés."""
+    out = set()
+    for part in seq.split(","):
+        a, _, b = part.partition(":")
+        try:
+            lo = total if a == "*" else int(a)
+            hi = lo if not b else (total if b == "*" else int(b))
+        except ValueError:
+            continue
+        lo, hi = min(lo, hi), max(lo, hi)
+        out.update(range(max(lo, 1), min(hi, total) + 1))
+    return sorted(out)
+
+
+def faire_client_imap(banc):
+    async def client(r, w):
+        w.write(b"* OK IMAP banc pret\r\n")
+        boite = boite_ouverte = None
+        while not r.at_eof():
+            l = (await r.readline()).decode(errors="replace").strip()
+            if not l: break
+            tag, _, cmd = l.partition(" ")
+            try: arg = shlex.split(cmd)  # gère les identifiants entre guillemets
+            except ValueError: arg = []
+            c = arg[0].upper() if arg else ""
+            t = tag.encode()
+            if c == "CAPABILITY": w.write(b"* CAPABILITY IMAP4rev1\r\n")
+            elif c == "LOGIN":
+                b = banc.boites.get(arg[1]) if len(arg) > 2 else None
+                if not b or b.mot_de_passe != arg[2]:
+                    w.write(t + b" NO refuse\r\n"); await w.drain(); continue
+                boite = b
+            elif c in ("SELECT", "EXAMINE", "LIST", "SEARCH", "FETCH") and not boite:
+                w.write(t + b" NO non authentifie\r\n"); await w.drain(); continue
+            elif c in ("SELECT", "EXAMINE"):
+                nom = arg[1].lower() if len(arg) > 1 else ""
+                d = {"inbox": "inbox", "junk": "junk"}.get(nom)
+                if d is None:  # dossier inconnu (ex. Spam) : NO, on ne retombe pas sur INBOX
+                    boite_ouverte = None
+                    w.write(t + b" NO dossier inconnu\r\n"); await w.drain(); continue
+                boite_ouverte = d
+                w.write(f"* {len(boite[d])} EXISTS\r\n* 0 RECENT\r\n".encode())
+            elif c == "LIST": w.write(b'* LIST () "/" INBOX\r\n* LIST () "/" Junk\r\n')
+            elif c == "SEARCH":
+                ids = " ".join(str(i + 1) for i in range(len(boite[boite_ouverte]))) if boite_ouverte else ""
+                w.write(f"* SEARCH {ids}\r\n".encode())
+            elif c == "FETCH":
+                if not boite_ouverte:
+                    w.write(t + b" NO aucun dossier selectionne\r\n"); await w.drain(); continue
+                msgs = boite[boite_ouverte]
+                for n in numeros(arg[1] if len(arg) > 1 else "", len(msgs)):
+                    corps = msgs[n - 1].replace("\r\n", "\n").replace("\n", "\r\n").encode()
+                    w.write(f"* {n} FETCH (BODY[] {{{len(corps)}}}\r\n".encode() + corps + b")\r\n")
+            if c == "LOGOUT":
+                w.write(b"* BYE\r\n" + t + b" OK fin\r\n"); break
+            w.write(t + b" OK " + c.encode() + b" fait\r\n")
+            await w.drain()
+        w.close()
+    return client
 
 
 async def main():
-    srv = await asyncio.start_server(client, "0.0.0.0", 143)
-    async with srv:
-        await srv.serve_forever()
+    smtp = await asyncio.start_server(faire_client("accepte", BANC), "0.0.0.0", 25)
+    imap = await asyncio.start_server(faire_client_imap(BANC), "0.0.0.0", 143)
+    async with smtp, imap:
+        await asyncio.gather(smtp.serve_forever(), imap.serve_forever())
 
 
 if __name__ == "__main__":

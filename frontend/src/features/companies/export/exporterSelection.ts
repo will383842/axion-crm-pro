@@ -8,6 +8,8 @@
  * s'affiche donc que si la réponse de la liste annonce la fonction
  * (`meta.export_selection: true`) : la démo l'annonce, le vrai serveur non,
  * tant que le lot serveur du CRM ne l'a pas ajoutée.
+ *
+ * Le téléchargement lui-même est `telechargerBlob` (`@/features/listes/listes`).
  */
 import { api } from '@/lib/api';
 
@@ -30,16 +32,4 @@ export async function exporterSelection(ids: readonly number[]): Promise<Blob> {
     responseType: 'blob',
   });
   return reponse.data;
-}
-
-/** Propose un fichier au téléchargement. */
-export function proposerFichier(contenu: Blob, nom: string): void {
-  const url = URL.createObjectURL(contenu);
-  const lien = document.createElement('a');
-  lien.href = url;
-  lien.download = nom;
-  document.body.appendChild(lien);
-  lien.click();
-  lien.remove();
-  URL.revokeObjectURL(url);
 }

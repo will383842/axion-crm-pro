@@ -7,6 +7,38 @@ import type { components } from '@/features/envoi/api/conformite';
 
 export type ReglesPrudence = components['schemas']['Regles'];
 
+export type ChampNombre = 'pause_si_refus_pct' | 'pause_si_plaintes_pour_mille' | 'frein_reponses_par_jour' | 'pression_max_par_organisation_30j';
+
+export const CHAMPS_NOMBRE: ChampNombre[] = ['pause_si_refus_pct', 'pause_si_plaintes_pour_mille', 'frein_reponses_par_jour', 'pression_max_par_organisation_30j'];
+
+/**
+ * Valeur permise pour un seuil, selon `backend/openapi/envoi/conformite.yaml` :
+ * - refus (%) et plaintes (pour 1 000) : nombre fini ≥ 0 (minimum 0 du contrat) ;
+ *   0 est le durcissement maximal légitime (pause dès le premier refus ou la
+ *   première plainte) et 0,5 est permis ;
+ * - frein : entier ≥ 0 (minimum 0 du contrat) ;
+ * - pression par organisation : entier ≥ 1 (minimum 1 du contrat).
+ */
+export function valeurPermise(cle: ChampNombre, n: unknown): boolean {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return false;
+  if (cle === 'pause_si_refus_pct' || cle === 'pause_si_plaintes_pour_mille') return n >= 0;
+  if (cle === 'frein_reponses_par_jour') return Number.isInteger(n) && n >= 0;
+  return Number.isInteger(n) && n >= 1;
+}
+
+/** Texte de saisie : vide ou non numérique refusés, puis `valeurPermise`. */
+export function saisiePermise(cle: ChampNombre, t: string | undefined): boolean {
+  if (t === undefined || t.trim() === '') return false;
+  return valeurPermise(cle, Number(t));
+}
+
+/** Phrase d'aide affichée quand la saisie est refusée. */
+export function exigence(cle: ChampNombre): string {
+  if (cle === 'frein_reponses_par_jour') return 'un nombre entier, 0 ou plus';
+  if (cle === 'pression_max_par_organisation_30j') return 'un nombre entier d’au moins 1';
+  return 'un nombre de 0 ou plus (0,5 est permis)';
+}
+
 function minutes(heure: string): number {
   const [h, m] = heure.split(':');
   return Number(h) * 60 + Number(m ?? 0);

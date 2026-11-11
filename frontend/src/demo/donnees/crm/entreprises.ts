@@ -8,6 +8,7 @@
  * ouvertures d'e-mails ne sont jamais mesurées (rien ici n'en parle).
  */
 import { demoDb } from '../../base';
+import { NOM_HOLDING } from '../crm';
 import { ilYa } from '../../horloge';
 import type { Alea } from '../../graine';
 
@@ -86,12 +87,14 @@ function fabriquer(alea: Alea): ZoneEntreprises {
     const etape = repere ? 'opportunite' : alea.choisir(ETAPES);
     const liens: LienEntreprise[] = [];
     // Une entreprise sur douze appartient à un groupe d'une autre fiche.
-    if (!repere && i % 12 === 5) {
+    if (!repere && e.denomination !== NOM_HOLDING && i % 12 === 5) {
       const autre = entreprises[(i + 7) % entreprises.length]!;
       liens.push({ company_id: autre.id, denomination: autre.denomination, lien: alea.choisir(['Société mère', 'Filiale', 'Même groupe'] as const) });
     }
-    // Le lien pointe vers une vraie fiche de la démo (id valide) : le nom affiché est celui de la holding fictive.
-    if (repere && entreprises[1]) liens.push({ company_id: entreprises[1].id, denomination: 'Groupe Tilleuls Holding', lien: 'Société mère' });
+    // Le lien du repère mène à la vraie fiche de la holding (même nom), qui porte le lien retour « Filiale ».
+    const holding = entreprises.find((x) => x.denomination === NOM_HOLDING);
+    if (repere && holding) liens.push({ company_id: holding.id, denomination: holding.denomination, lien: 'Société mère' });
+    if (e === holding && entreprises[0]) liens.push({ company_id: entreprises[0].id, denomination: entreprises[0].denomination, lien: 'Filiale' });
     return {
       id: e.id,
       relation_type: repere ? 'prospect' : alea.choisir(['prospect', 'prospect', 'prospect', 'client', 'partenaire'] as const),

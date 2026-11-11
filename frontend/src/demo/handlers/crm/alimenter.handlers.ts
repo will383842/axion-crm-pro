@@ -182,7 +182,7 @@ function creerCollecte(corps: Record<string, unknown>, statut: 'draft' | 'runnin
     archived_at: null,
     id: collectes().prochainId(),
     workspace_id: 'axion-ia',
-    created_by: 'will',
+    created_by: 'utilisateur-demo',
     name: typeof corps['name'] === 'string' ? corps['name'] : 'Nouvelle collecte',
     description: typeof corps['description'] === 'string' && corps['description'] !== '' ? corps['description'] : null,
     status: statut,

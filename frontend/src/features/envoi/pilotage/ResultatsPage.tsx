@@ -1,8 +1,7 @@
 /**
  * Résultats (DM2-PIL) — par boîte, domaine, liste, message type. L'indicateur
- * principal est la réponse. Aucun suivi des clics ; les ouvertures, quand une
- * campagne les suit, ne sont montrées que comme une ESTIMATION (ouvertures
- * automatiques probables retirées et comptées à part).
+ * principal est la réponse. Aucun suivi des clics et aucune ouverture
+ * estimée : ni calculée, ni renvoyée par le faux serveur, ni affichée.
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,11 +13,7 @@ import { OngletsCampagnes } from '../campagnes/OngletsCampagnes';
 import { Chargement, Panne, Vide } from './composants/Etats';
 import { formaterNombre, formaterPourcent, part, telechargerCsv } from './composants/formats';
 
-// Champ d'ouverture RETIRÉ du contrat : lu ici en optionnel jusqu'à la fiche L8-F02,
-// qui supprime la colonne « Ouvertures (estimation) ».
-type Ligne = components['schemas']['LigneResultat'] & {
-  ouvertures?: { estimees: number; automatiques_probables: number; taux_estime: number } | null;
-};
+type Ligne = components['schemas']['LigneResultat'];
 type Reponse = {
   data: Ligne[]; totaux: Ligne | null; precedent: Ligne | null; periode: { du: string; au: string };
   entonnoir: { envoyes: number; reponses: number; rendez_vous: number; gagnes: number } | null;
@@ -50,12 +45,11 @@ export function ResultatsPage() {
   const onglet = ONGLETS.find((o) => o.id === par)!;
   const d = requete.data;
   const vide = d !== undefined && d.data.length === 0;
-  const avecOuvertures = d?.data.some((l) => l.ouvertures !== null) ?? false;
 
   function exporter() {
     if (!d) return;
-    const entete = [onglet.colonne, ...(par === 'message' ? ['Version'] : []), 'Envoyés', 'Refusés (%)', 'Plaintes', 'Désinscriptions', 'Réponses', 'Intéressées', ...(avecOuvertures ? ['Ouvertures (estimation)'] : [])];
-    const lignes = d.data.map((l) => [l.libelle, ...(par === 'message' ? [l.version ?? ''] : []), l.envoyes, refus(l).toFixed(1), l.plaintes, l.desinscriptions, l.reponses, l.reponses_interessees, ...(avecOuvertures ? [l.ouvertures?.estimees ?? ''] : [])]);
+    const entete = [onglet.colonne, ...(par === 'message' ? ['Version'] : []), 'Envoyés', 'Refusés (%)', 'Plaintes', 'Désinscriptions', 'Réponses', 'Intéressées'];
+    const lignes = d.data.map((l) => [l.libelle, ...(par === 'message' ? [l.version ?? ''] : []), l.envoyes, refus(l).toFixed(1), l.plaintes, l.desinscriptions, l.reponses, l.reponses_interessees]);
     telechargerCsv(`resultats-${par}.csv`, [entete, ...lignes]);
     setExport(`Export prêt : ${d.data.length} ligne${d.data.length > 1 ? 's' : ''}.`);
   }
@@ -88,7 +82,7 @@ export function ResultatsPage() {
               <KpiCard label="Plaintes" value={formaterPourcent(part(d.totaux.plaintes, d.totaux.remis))} sublabel="limite 0,1 %" tone="slate" />
             </div>
             <p className="mt-3 text-xs text-slate-600">
-              Les réponses sont l’indicateur principal. Les ouvertures, quand une campagne les suit, ne sont qu’une estimation : les ouvertures automatiques probables (Apple, relais) sont retirées.
+              Les réponses sont l’indicateur principal.
               {d.precedent && d.precedent.remis > 0 ? <> <Evolution actuel={part(d.totaux.reponses, d.totaux.remis)} avant={part(d.precedent.reponses, d.precedent.remis)} libelle="point de taux de réponse" />.</> : <> Aucun envoi sur la période d’avant : pas de comparaison possible.</>}
             </p>
 
@@ -129,7 +123,6 @@ export function ResultatsPage() {
                       <th scope="col" className="py-2 pr-3 text-right">Réponses</th>
                       <th scope="col" className="py-2 pr-3 text-right">Intéressées</th>
                       {par === 'message' ? <th scope="col" className="py-2 pr-3 text-right">Taux</th> : null}
-                      {avecOuvertures ? <th scope="col" className="py-2 text-right">Ouvertures (estimation)</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -143,11 +136,6 @@ export function ResultatsPage() {
                         <td className="py-2 pr-3 text-right">{l.reponses}</td>
                         <td className="py-2 pr-3 text-right">{l.reponses_interessees}</td>
                         {par === 'message' ? <td className="py-2 pr-3 text-right">{formaterPourcent(part(l.reponses, l.remis))}</td> : null}
-                        {avecOuvertures ? (
-                          <td className="py-2 text-right">
-                            {l.ouvertures ? <>{formaterPourcent(l.ouvertures.taux_estime)}<span className="block text-xs text-slate-600">{l.ouvertures.automatiques_probables} automatiques à part</span></> : '—'}
-                          </td>
-                        ) : null}
                       </tr>
                     ))}
                   </tbody>

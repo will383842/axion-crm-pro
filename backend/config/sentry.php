@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\SentryFiltre;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,9 @@ return [
 
     // Environnement (sera utilisé comme filtre dans GlitchTip)
     'environment' => env('SENTRY_ENVIRONMENT', env('APP_ENV', 'production')),
+
+    // Les traces de commande envoi:temoin-* ne sont pas envoyées (voir App\Support\SentryFiltre).
+    'before_breadcrumb' => [SentryFiltre::class, 'avantBreadcrumb'],
 
     'breadcrumbs' => [
         'logs' => true,

@@ -19,6 +19,35 @@ final class ContratOpenApiEnvoi
     {
         $e = [];
         self::verifier($fichier, ['$ref' => '#/components/schemas/' . $schema], $valeur, $schema, $e);
+        if ($schema === 'PointFeuVert' && is_array($valeur)) {
+            array_push($e, ...self::croiserPoint($valeur));
+        }
+
+        return $e;
+    }
+
+    /** Règle croisée du feu vert : `fait` = (`etat` == « fait »), et un point non fait est bloquant. @return list<string> */
+    private static function croiserPoint(array $p): array
+    {
+        $e = [];
+        if (($p['fait'] ?? null) !== (($p['etat'] ?? null) === 'fait')) {
+            $e[] = ($p['code'] ?? '?') . ' : `fait` doit valoir (etat == fait)';
+        }
+        if (($p['bloquant'] ?? null) !== (($p['fait'] ?? null) === false)) {
+            $e[] = ($p['code'] ?? '?') . ' : `bloquant` doit valoir !fait';
+        }
+
+        return $e;
+    }
+
+    /** Règle croisée de la liste : `faits` et `bloquants_restants` se calculent sur `fait`. @return list<string> */
+    public static function croiserListe(array $liste): array
+    {
+        $faits = count(array_filter($liste['points'], static fn (array $p): bool => $p['fait'] === true));
+        $e = [];
+        if ($liste['faits'] !== $faits || $liste['total'] !== count($liste['points']) || $liste['bloquants_restants'] !== count($liste['points']) - $faits) {
+            $e[] = 'faits / total / bloquants_restants incohérents avec les points';
+        }
 
         return $e;
     }

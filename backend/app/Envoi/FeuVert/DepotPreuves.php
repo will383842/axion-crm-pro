@@ -100,7 +100,7 @@ class DepotPreuves
 
     /**
      * Adresse e-mail, même déguisée : arobase ASCII, pleine chasse (U+FF20) ou petite (U+FE6B) quel que soit
-     * l'espacement, « arobase » en lettres, ou « <nom> chez <domaine>(.|point)<fin> ».
+     * l'espacement, « arobase » en lettres, ou la forme ÉPELÉE « <nom> chez <domaine> point <fin> » (« ouvert chez ovh.com » reste accepté).
      */
     private static function ressembleAUneAdresse(string $s): bool
     {
@@ -111,7 +111,7 @@ class DepotPreuves
 
         return preg_match('/[@\x{FF20}\x{FE6B}]/u', $s) === 1
             || preg_match('/arobase/iu', $s) === 1
-            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s*(\.|point|dot)\s*\p{L}{2,}/iu', $s) === 1;
+            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s+(point|dot)\s+\p{L}{2,}/iu', $s) === 1;
     }
 
     /** Retire les blancs de bord, y compris Unicode (espace insécable, séparateurs, caractères de contrôle). */

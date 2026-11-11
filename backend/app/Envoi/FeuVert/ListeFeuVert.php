@@ -56,22 +56,25 @@ class ListeFeuVert
         $preuves = $this->preuves->dernieres($ws);
         foreach (CatalogueManuels::codesManuels() as $code) {
             $p = $preuves[$code] ?? null;
-            $fait = $p !== null && $p['fait'];
+            $depose = $p !== null && $p['fait'];
             $c = CatalogueManuels::POINTS[$code];
             // Aucun signal « K17 fait » n'existe encore dans le code : par prudence, un point qui exige le vrai serveur attend toujours.
+            // Règle : `fait` = (`etat` == « fait »). Un point qui attend le vrai serveur n'est PAS fait (donc bloquant),
+            // même avec une preuve déposée, qui reste affichée.
             $attend = $c['serveur_reel'];
+            $etat = $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($depose ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
             $points[] = new PointFeuVert(
                 $code,
                 $c['libelle'],
                 false,
-                $fait,
-                self::detailManuel($attend, $fait),
+                $etat === PointFeuVert::ETAT_FAIT,
+                self::detailManuel($attend, $depose),
                 $c['source'],
                 $c['groupe'],
-                $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE),
-                $fait ? $p['preuve'] : null,
-                $fait ? $p['par'] : null,
-                $fait ? $p['le'] : null,
+                $etat,
+                $depose ? $p['preuve'] : null,
+                $depose ? $p['par'] : null,
+                $depose ? $p['le'] : null,
             );
         }
 

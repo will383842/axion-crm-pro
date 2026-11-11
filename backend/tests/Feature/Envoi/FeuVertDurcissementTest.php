@@ -44,17 +44,17 @@ test('durcissement 3 : détection stricte d’adresse e-mail, dans la preuve et 
     'espace après @' => ['jean@ exemple.test'],
     'arobase pleine chasse' => ["jean\u{FF20}exemple.test"],
     'petite arobase' => ["jean\u{FE6B}exemple.test"],
-    'chez' => ['jean chez exemple.test'],
     'chez, point en lettres' => ['jean CHEZ exemple point test'],
     'arobase en lettres' => ['jean arobase exemple.test'],
+    'chez épelé' => ['jean chez exemple point test'],
     'arobase en lettres, majuscules' => ['jean AROBASE exemple point test'],
 ]);
 
-test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', function () {
+test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', function (string $phrase) {
     $ws = espaceFeuVertDur();
-    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Constaté chez l’hébergeur le 10 novembre', 'responsable');
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', $phrase, 'responsable');
     expect(app(DepotPreuves::class)->dernieres($ws)['manuel.port25']['fait'])->toBeTrue();
-});
+})->with(['hébergeur' => ['Constaté chez l’hébergeur le 10 novembre'], 'ticket' => ['Ticket ouvert chez ovh.com'], 'port 25' => ['Port 25 ouvert chez Scaleway']]);
 
 test('durcissement 3 : une chaîne UTF-8 invalide est refusée (preuve et auteur)', function () {
     $ws = espaceFeuVertDur();
@@ -106,7 +106,17 @@ test('durcissement 7 : clé de désinscription vide ou absente → auto.cle_desi
     config(['envoi.cle_desinscription' => $valeur]);
     $p = collect(app(ListeFeuVert::class)->points($ws))->firstWhere('code', 'auto.cle_desinscription');
     expect($p->fait)->toBeFalse()->and($p->bloquant)->toBeTrue()->and($p->detail)->not->toBe('');
-})->with(['chaîne vide' => [''], 'null' => [null], 'blancs seuls' => ['                                '], 'absente' => [null]]);
+})->with(['chaîne vide' => [''], 'null' => [null], 'blancs seuls' => ['                                ']]);
+
+test('durcissement 7 : clé de désinscription ABSENTE (réglage non défini) → non fait', function () {
+    $ws = espaceFeuVertDur();
+    $envoi = (array) config('envoi');
+    unset($envoi['cle_desinscription']);
+    config(['envoi' => $envoi]);
+    expect(config()->has('envoi.cle_desinscription'))->toBeFalse();
+    $p = collect(app(ListeFeuVert::class)->points($ws))->firstWhere('code', 'auto.cle_desinscription');
+    expect($p->fait)->toBeFalse()->and($p->bloquant)->toBeTrue();
+});
 
 test('preuve : `par` et `le` sont lus avec la dernière ligne', function () {
     $ws = espaceFeuVertDur();
@@ -121,5 +131,5 @@ test('auteur affichable : nom propre gardé, e-mail ou invalide → « responsab
 })->with([
     'nom' => ['Williams', 'Williams'], 'nom avec blancs' => ['  Williams  ', 'Williams'], 'e-mail' => ['jean@exemple.test', 'responsable'],
     'null' => [null, 'responsable'], 'vide' => ['', 'responsable'], 'trop long' => [str_repeat('a', 101), 'responsable'],
-    'format' => ["Will\u{200B}iams", 'responsable'], 'chez' => ['jean chez exemple.test', 'responsable'],
+    'format' => ["Will\u{200B}iams", 'responsable'], 'chez épelé' => ['jean chez exemple point test', 'responsable'],
 ]);

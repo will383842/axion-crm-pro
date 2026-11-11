@@ -891,6 +891,14 @@ final class PersonnesIngestService
             if ($demande !== [] && ($existante->{$colonne} ?? null) !== null) {
                 continue;
             }
+            // CRM-G1 — guide-réseau uniquement : un prénom reçu ne remplace le prénom
+            // connu que si l'événement est plus récent (à la seconde) que la dernière
+            // interaction enregistrée, ou si le prénom connu est vide. Les autres
+            // sources gardent leur comportement.
+            if ($colonne === 'first_name' && $event->sourceSlug === 'guide-reseau'
+                && ($existante->first_name ?? null) !== null && $ancien) {
+                continue;
+            }
             if ($valeur !== null) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';

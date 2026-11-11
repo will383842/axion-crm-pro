@@ -642,3 +642,74 @@ test('L4-C relecture — NatureEmail couvre les FAMILLES de l’amendement sous 
     }
     expect(NatureEmail::de(null))->toBe('inconnue');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM-G1 — prénom du guide-réseau : le plus récent gagne, jamais d'effacement
+// ─────────────────────────────────────────────────────────────────────────────
+
+function g1Evenement(string $at, ?string $prenom, string $source = 'guide-reseau'): array
+{
+    return l4cOptinActuel([
+        'occurred_at' => $at,
+        'source_slug' => $source,
+        'person' => ['first_name' => $prenom],
+    ]);
+}
+
+function g1Prenom(): ?string
+{
+    return DB::table('personnes')->value('first_name');
+}
+
+test('CRM-G1 — guide-réseau : un prénom plus récent remplace le prénom connu', function () {
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alicia');
+});
+
+test('CRM-G1 — guide-réseau : un événement plus ancien ne modifie pas le prénom', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia'))->assertOk();
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alicia');
+});
+
+test('CRM-G1 — guide-réseau : un prénom vide n’efface jamais le prénom connu', function () {
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', ''))->assertOk();
+    l4cPost(g1Evenement('2026-09-03T10:00:00Z', null))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});
+
+test('CRM-G1 — guide-réseau : un prénom connu vide reçoit le prénom, même d’un événement plus ancien', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', null))->assertOk();
+    expect(g1Prenom())->toBeNull();
+
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});
+
+test('CRM-G1 — guide-réseau : le rejeu identique ne change rien', function () {
+    $evenement = g1Evenement('2026-09-01T10:00:00Z', 'Alice');
+    l4cPost($evenement)->assertOk();
+    $avant = (array) DB::table('personnes')->first();
+
+    l4cPost(array_replace($evenement, ['event_id' => (string) Str::uuid()]))->assertOk();
+
+    $apres = (array) DB::table('personnes')->first();
+    expect(g1Prenom())->toBe('Alice')
+        ->and($apres['first_name'])->toBe($avant['first_name'])
+        ->and($apres['derniere_interaction_at'])->toBe($avant['derniere_interaction_at'])
+        ->and($apres['field_origins'])->toBe($avant['field_origins'])
+        ->and(DB::table('personnes')->count())->toBe(1);
+});
+
+test('CRM-G1 — TÉMOIN : les autres sources gardent leur comportement (le prénom reçu remplace, même plus ancien)', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia', 'newsletter'))->assertOk();
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice', 'newsletter'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});

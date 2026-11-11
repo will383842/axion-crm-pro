@@ -9,6 +9,7 @@ use App\Envoi\FeuVert\CatalogueManuels;
 use App\Envoi\FeuVert\DepotPreuves;
 use App\Envoi\FeuVert\ListeFeuVert;
 use App\Envoi\FeuVert\PointFeuVert;
+use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +43,10 @@ function toutVert(string $ws): void
         DB::table('envoi_controles_listes')->insert(['workspace_id' => $ws, 'type' => 'domaine', 'ressource' => 'a.exemple.test', 'statut' => 'non_liste', 'zone' => 'z.test', 'pause' => false]);
         foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $i => $f) {
             DB::table('envoi_temoins')->insert(['workspace_id' => $ws, 'empreinte' => str_repeat(dechex($i + 1), 64), 'fournisseur' => $f]);
+            // F15 : 3 jours verts chez chaque fournisseur (point auto.temoins_3_jours).
+            foreach ([0, 1, 2] as $recul) {
+                DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => JourEnvoi::de()->modify("-{$recul} days")->format('Y-m-d'), 'fournisseur' => $f, 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
+            }
         }
     });
 }
@@ -133,7 +138,7 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
     }
     $manuels = CatalogueManuels::codesManuels();
     expect($manuels)->toHaveCount(18)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
-    expect(count($codes) - 18)->toBe(12);
+    expect(count($codes) - 18)->toBe(13);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
             expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'preuve', 'auteur'))->toThrow(InvalidArgumentException::class);
@@ -147,7 +152,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'ok', 'auteur');
     app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'ok', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
-    expect($liste)->toHaveCount(30);
+    expect($liste)->toHaveCount(31);
     foreach ($liste as $p) {
         expect(CatalogueManuels::GROUPES)->toContain($p->groupe);
         expect($p->nature)->toBe($p->automatique ? 'auto' : 'manuel')->and(str_starts_with($p->code, $p->nature . '.'))->toBeTrue()->and($p->source)->not->toBe('');

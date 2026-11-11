@@ -31,6 +31,15 @@ return new class extends Migration
             CREATE POLICY envoi_campagnes_journal_workspace_isolation ON envoi_campagnes_journal FOR ALL
                 USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))
                 WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''));
+            CREATE OR REPLACE FUNCTION envoi_campagnes_journal_valide() RETURNS trigger AS $f$
+            BEGIN
+                IF NOT envoi_campagne_transition_permise(split_part(NEW.transition, '>', 1), split_part(NEW.transition, '>', 2)) THEN
+                    RAISE EXCEPTION 'envoi_campagnes_journal : transition % hors de la matrice', NEW.transition;
+                END IF;
+                RETURN NEW;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            DROP TRIGGER IF EXISTS envoi_campagnes_journal_valide ON envoi_campagnes_journal;
+            CREATE TRIGGER envoi_campagnes_journal_valide BEFORE INSERT ON envoi_campagnes_journal FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_journal_valide();
             CREATE OR REPLACE FUNCTION envoi_campagnes_journal_ajout_seul() RETURNS trigger AS $f$
             BEGIN
                 RAISE EXCEPTION 'envoi_campagnes_journal : ajout seulement (UPDATE/DELETE/TRUNCATE refusés)';

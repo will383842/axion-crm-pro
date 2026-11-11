@@ -4,7 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Envoi R08 — codes de validation d'une campagne : on ne stocke JAMAIS le code, seulement son empreinte (SHA-256, 64 hex).
+ * Envoi R08 — codes de validation d'une campagne : on ne stocke JAMAIS le code, seulement son empreinte.
+ * CONTRAT : empreinte = HMAC-SHA256(code, clé serveur `envoi.cle_empreinte`), 64 hex, jamais un SHA nu (un code à 6 chiffres
+ * se retrouverait en une seconde) ; `cle_version` permet de changer de clé. Au plus 10 codes par campagne, 5 tentatives par code ;
+ * un code expiré ou épuisé ne peut pas être consommé (déclencheur).
  * AJOUT SEUL : jamais de DELETE/TRUNCATE ; seules `tentatives` (qui ne fait que monter) et `consomme_le` (posé une seule
  * fois) évoluent, tout le reste est figé. RLS par espace. `down()` inerte.
  */
@@ -18,8 +21,9 @@ return new class extends Migration
                 workspace_id UUID        NOT NULL REFERENCES workspaces(id),
                 campagne_id  UUID        NOT NULL,
                 empreinte    TEXT        NOT NULL CHECK (empreinte ~ '^[0-9a-f]{64}$'),
+                cle_version  SMALLINT    NOT NULL DEFAULT 1 CHECK (cle_version >= 1),
                 expire_le    TIMESTAMPTZ NOT NULL,
-                tentatives   SMALLINT    NOT NULL DEFAULT 0 CHECK (tentatives BETWEEN 0 AND 100),
+                tentatives   SMALLINT    NOT NULL DEFAULT 0 CHECK (tentatives BETWEEN 0 AND 5),
                 consomme_le  TIMESTAMPTZ NULL,
                 cree_le      TIMESTAMPTZ NOT NULL DEFAULT now(),
                 CONSTRAINT envoi_campagne_codes_campagne FOREIGN KEY (campagne_id, workspace_id) REFERENCES envoi_campagnes (id, workspace_id)
@@ -34,14 +38,24 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION envoi_campagne_codes_garde() RETURNS trigger AS $f$
             BEGIN
                 IF TG_OP = 'UPDATE'
-                   AND (NEW.id, NEW.workspace_id, NEW.campagne_id, NEW.empreinte, NEW.expire_le, NEW.cree_le)
-                       IS NOT DISTINCT FROM (OLD.id, OLD.workspace_id, OLD.campagne_id, OLD.empreinte, OLD.expire_le, OLD.cree_le)
+                   AND (NEW.id, NEW.workspace_id, NEW.campagne_id, NEW.empreinte, NEW.cle_version, NEW.expire_le, NEW.cree_le)
+                       IS NOT DISTINCT FROM (OLD.id, OLD.workspace_id, OLD.campagne_id, OLD.empreinte, OLD.cle_version, OLD.expire_le, OLD.cree_le)
                    AND NEW.tentatives >= OLD.tentatives
-                   AND (OLD.consomme_le IS NULL OR NEW.consomme_le IS NOT DISTINCT FROM OLD.consomme_le) THEN
+                   AND (OLD.consomme_le IS NULL OR NEW.consomme_le IS NOT DISTINCT FROM OLD.consomme_le)
+                   AND (NEW.consomme_le IS NOT DISTINCT FROM OLD.consomme_le OR (OLD.expire_le > now() AND OLD.tentatives < 5)) THEN
                     RETURN NEW;
                 END IF;
                 RAISE EXCEPTION 'envoi_campagne_codes : ajout seulement (seuls tentatives et consomme_le évoluent ; DELETE/TRUNCATE refusés)';
             END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            CREATE OR REPLACE FUNCTION envoi_campagne_codes_plafond() RETURNS trigger AS $f$
+            BEGIN
+                IF (SELECT count(*) FROM envoi_campagne_codes WHERE campagne_id = NEW.campagne_id) >= 10 THEN
+                    RAISE EXCEPTION 'envoi_campagne_codes : 10 codes au plus par campagne';
+                END IF;
+                RETURN NEW;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            DROP TRIGGER IF EXISTS envoi_campagne_codes_plafond ON envoi_campagne_codes;
+            CREATE TRIGGER envoi_campagne_codes_plafond BEFORE INSERT ON envoi_campagne_codes FOR EACH ROW EXECUTE FUNCTION envoi_campagne_codes_plafond();
             DROP TRIGGER IF EXISTS envoi_campagne_codes_garde ON envoi_campagne_codes;
             CREATE TRIGGER envoi_campagne_codes_garde BEFORE UPDATE OR DELETE ON envoi_campagne_codes FOR EACH ROW EXECUTE FUNCTION envoi_campagne_codes_garde();
             DROP TRIGGER IF EXISTS envoi_campagne_codes_pas_de_truncate ON envoi_campagne_codes;

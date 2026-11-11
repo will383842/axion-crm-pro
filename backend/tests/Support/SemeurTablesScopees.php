@@ -606,7 +606,7 @@ final class SemeurTablesScopees
             'campagne_id' => $campagne, 'transition' => 'brouillon>a_valider', 'auteur' => 'zz-etancheite',
             'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-' . $marque,
         ]);
-        $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash('sha256', 'zz-etancheite'), 'expire_le' => '2026-01-01 00:00:00+00']);
+        $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash_hmac('sha256', 'zz-etancheite', 'cle-semeur-seulement'), 'expire_le' => '2026-01-01 00:00:00+00']);
 
         $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',

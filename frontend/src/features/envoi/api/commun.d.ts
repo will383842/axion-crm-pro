@@ -291,12 +291,13 @@ export interface components {
             ok: true;
         };
         /**
-         * @description Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+         * @description Type d'alerte d'envoi. Les sept derniers (ajoutés de façon compatible) sont les motifs de frein
          *     de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
-         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées,
+         *     et (R14) réputation dégradée.
          * @enum {string}
          */
-        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees";
+        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees" | "reputation_mauvaise";
         /** @enum {string} */
         TypeCible: "liste" | "audience" | "etiquette" | "carnet";
         /** @enum {string} */

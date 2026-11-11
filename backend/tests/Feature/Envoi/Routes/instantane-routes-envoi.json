@@ -1,6 +1,28 @@
 [
     {
         "methode": "GET",
+        "uri": "api/v1/envoi/alertes",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/alertes/{id}/regler",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
         "uri": "api/v1/envoi/feu-vert",
         "middlewares": [
             "api",
@@ -17,6 +39,40 @@
             "auth:sanctum",
             "first-login",
             "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/reglages/alertes",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "PUT",
+        "uri": "api/v1/envoi/reglages/alertes",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/reglages/alertes/test",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:6,1",
             "workspace"
         ]
     },

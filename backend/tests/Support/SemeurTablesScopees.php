@@ -596,7 +596,7 @@ final class SemeurTablesScopees
             'date_recul' => '2026-01-01',
         ]);
 
-        $modele = (string) Illuminate\Support\Str::uuid();
+        $modele = (string) Str::uuid();
         $inserer('envoi_modeles', ['id' => $modele, 'nom' => 'zz-etancheite', 'cree_par' => 'zz-etancheite']);
         $inserer('envoi_modele_versions', ['modele_id' => $modele, 'numero' => 1, 'objet' => 'zz', 'corps' => 'zz', 'auteur' => 'zz-etancheite']);
 

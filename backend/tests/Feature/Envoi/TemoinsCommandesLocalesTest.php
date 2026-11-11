@@ -35,7 +35,7 @@ function ajouterTemoin(string $ws, string $adresse, string $fournisseur = 'gmail
 
 function journalTemoin(string $ws, string $commande): array
 {
-    return WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->where('commande', $commande)->get()->all());
+    return WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', $commande)->get()->all());
 }
 
 test('ajout : le témoin est reconnu, avec son fournisseur, et la sortie n’affiche jamais l’adresse', function () {

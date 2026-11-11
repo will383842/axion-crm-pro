@@ -44,9 +44,9 @@ test('durcissement 3 : détection stricte d’adresse e-mail, dans la preuve et 
     'espace après @' => ['jean@ exemple.test'],
     'arobase pleine chasse' => ["jean\u{FF20}exemple.test"],
     'petite arobase' => ["jean\u{FE6B}exemple.test"],
-    'chez, point en lettres (minuscules)' => ['jean chez exemple point test'],
     'chez, point en lettres' => ['jean CHEZ exemple point test'],
     'arobase en lettres' => ['jean arobase exemple.test'],
+    'chez épelé' => ['jean chez exemple point test'],
     'arobase en lettres, majuscules' => ['jean AROBASE exemple point test'],
 ]);
 
@@ -63,7 +63,7 @@ test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', fun
 test('durcissement 3 : le refus « chez » ne vise que les formes épelées (point / dot en lettres)', function (string $texte) {
     $ws = espaceFeuVertDur();
     expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve valable : ' . $texte, 'responsable'))->toThrow(InvalidArgumentException::class);
-})->with(['jean chez exemple point test', 'jean CHEZ exemple dot test', 'jean chez exemple . test']);
+})->with(['jean chez exemple point test', 'jean CHEZ exemple dot test']);
 
 test('durcissement 3 : une chaîne UTF-8 invalide est refusée (preuve et auteur)', function () {
     $ws = espaceFeuVertDur();
@@ -167,5 +167,5 @@ test('auteur affichable : nom propre gardé, e-mail ou invalide → « responsab
 })->with([
     'nom' => ['Responsable Test', 'Responsable Test'], 'nom avec blancs' => ['  Responsable Test  ', 'Responsable Test'], 'e-mail' => ['jean@exemple.test', 'responsable'],
     'null' => [null, 'responsable'], 'vide' => ['', 'responsable'], 'trop long' => [str_repeat('a', 101), 'responsable'],
-    'format' => ["Respon\u{200B}sable", 'responsable'], 'chez' => ['jean chez exemple point test', 'responsable'],
+    'format' => ["Respon\u{200B}sable", 'responsable'], 'chez épelé' => ['jean chez exemple point test', 'responsable'],
 ]);

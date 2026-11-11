@@ -237,7 +237,7 @@ paths:
               type: object
               required: [preuve]
               properties:
-                preuve: { type: string, minLength: 10, maxLength: 500, description: 'Preuve, ou motif quand `fait` vaut false : 10 à 500 caractères.' }
+                preuve: { type: string, minLength: 10, maxLength: 500, description: 'Preuve humaine, ou motif quand `fait` vaut false : 10 à 500 caractères après nettoyage, ni phrase générique ni adresse e-mail.' }
                 fait: { type: boolean, default: true }
       responses:
         '200':

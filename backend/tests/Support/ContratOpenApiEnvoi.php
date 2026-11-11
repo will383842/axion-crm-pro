@@ -19,14 +19,42 @@ final class ContratOpenApiEnvoi
     {
         $e = [];
         self::verifier($fichier, ['$ref' => '#/components/schemas/' . $schema], $valeur, $schema, $e);
+        if ($schema === 'PointFeuVert' && is_array($valeur)) {
+            array_push($e, ...self::croiserPoint($valeur));
+        }
+
+        return $e;
+    }
+
+    /** Règle croisée du feu vert : `fait` = (`etat` == « fait »), et un point non fait est bloquant. @return list<string> */
+    private static function croiserPoint(array $p): array
+    {
+        $e = [];
+        if (($p['fait'] ?? null) !== (($p['etat'] ?? null) === 'fait')) {
+            $e[] = ($p['code'] ?? '?') . ' : `fait` doit valoir (etat == fait)';
+        }
+        if (($p['bloquant'] ?? null) !== (($p['fait'] ?? null) === false)) {
+            $e[] = ($p['code'] ?? '?') . ' : `bloquant` doit valoir !fait';
+        }
+
+        return $e;
+    }
+
+    /** Règle croisée de la liste : `faits` et `bloquants_restants` se calculent sur `fait`. @return list<string> */
+    public static function croiserListe(array $liste): array
+    {
+        $faits = count(array_filter($liste['points'], static fn (array $p): bool => $p['fait'] === true));
+        $e = [];
+        if ($liste['faits'] !== $faits || $liste['total'] !== count($liste['points']) || $liste['bloquants_restants'] !== count($liste['points']) - $faits) {
+            $e[] = 'faits / total / bloquants_restants incohérents avec les points';
+        }
 
         return $e;
     }
 
     /**
-     * Réponse de GET /envoi/feu-vert : chaque point suit le contrat ET les règles croisées (décision d'architecte) :
-     * `fait` === (`etat` === « fait »), `bloquant` === ! `fait`, et les compteurs se calculent sur ces seuls champs.
-     * Un point qui attend le vrai serveur n'est jamais fait, même avec une preuve déposée.
+     * Réponse de GET /envoi/feu-vert : chaque point suit le contrat (règles croisées comprises, voir `ecarts`), la liste
+     * suit `croiserListe`, et un point qui attend le vrai serveur est non fait et bloquant, preuve déposée ou non.
      *
      * @param  array<string, mixed>  $liste
      * @return list<string> écarts
@@ -34,35 +62,13 @@ final class ContratOpenApiEnvoi
     public static function ecartsListeFeuVert(array $liste): array
     {
         $e = [];
-        $points = $liste['points'] ?? [];
-        $faits = 0;
-        $bloquants = 0;
-        foreach ($points as $p) {
-            $code = (string) ($p['code'] ?? '?');
-            foreach (self::ecarts('pilotage.yaml', 'PointFeuVert', $p) as $ecart) {
-                $e[] = $ecart;
-            }
-            if (($p['fait'] ?? null) !== (($p['etat'] ?? null) === 'fait')) {
-                $e[] = "$code : fait doit valoir (etat === fait)";
-            }
-            if (($p['bloquant'] ?? null) !== ! ($p['fait'] ?? false)) {
-                $e[] = "$code : bloquant doit valoir ! fait";
-            }
+        foreach ($liste['points'] ?? [] as $p) {
+            array_push($e, ...self::ecarts('pilotage.yaml', 'PointFeuVert', $p));
             if (($p['etat'] ?? null) === 'attend_serveur_reel' && (($p['fait'] ?? true) !== false || ($p['bloquant'] ?? false) !== true)) {
-                $e[] = "$code : un point qui attend le serveur réel est non fait et bloquant";
+                $e[] = ($p['code'] ?? '?') . ' : un point qui attend le vrai serveur est non fait et bloquant';
             }
-            $faits += ($p['fait'] ?? false) ? 1 : 0;
-            $bloquants += ($p['bloquant'] ?? false) ? 1 : 0;
         }
-        if (($liste['total'] ?? null) !== count($points)) {
-            $e[] = 'total : doit valoir le nombre de points';
-        }
-        if (($liste['faits'] ?? null) !== $faits) {
-            $e[] = 'faits : doit compter les points dont fait est vrai';
-        }
-        if (($liste['bloquants_restants'] ?? null) !== $bloquants) {
-            $e[] = 'bloquants_restants : doit compter les points bloquants';
-        }
+        array_push($e, ...self::croiserListe($liste));
 
         return $e;
     }

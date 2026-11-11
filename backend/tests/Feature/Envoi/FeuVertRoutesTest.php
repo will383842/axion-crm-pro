@@ -71,7 +71,7 @@ test('POST : un propriétaire dépose une preuve ; la réponse suit le contrat e
     $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
     expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $r->json()))->toBe([]);
     expect($r->json('code'))->toBe('manuel.port25')
-        ->and($r->json('fait'))->toBeFalse()->and($r->json('etat'))->toBe('attend_serveur_reel')
+        ->and($r->json('fait'))->toBeFalse()->and($r->json('bloquant'))->toBeTrue()->and($r->json('etat'))->toBe('attend_serveur_reel')
         ->and($r->json('preuve.texte'))->toBe(FV_PREUVE)
         ->and($r->json('preuve.par'))->toBe('Responsable Test')
         ->and($r->json('preuve.par'))->not->toContain('@');
@@ -148,7 +148,7 @@ test('POST : 422 pour une preuve absente, vide, courte, générique, trop longue
     'e-mail' => [['preuve' => 'Voir jean.dupont@exemple.test pour la preuve']],
     'e-mail, espaces autour de @' => [['preuve' => 'Voir jean.dupont @ exemple.test pour la preuve']],
     'arobase pleine chasse' => [['preuve' => "Voir jean.dupont\u{FF20}exemple.test pour la preuve"]],
-    'chez' => [['preuve' => 'Voir jean.dupont chez exemple point test pour la preuve']],
+    'chez, forme épelée' => [['preuve' => 'Voir jean.dupont chez exemple point test pour la preuve']],
     'arobase en toutes lettres' => [['preuve' => 'Voir jean.dupont arobase exemple point test pour la preuve']],
     'espace de largeur nulle' => [['preuve' => "Courrier de l’hébergeur\u{200B} reçu hier"]],
     'inversion de sens' => [['preuve' => "Courrier de l’hébergeur\u{202E} reçu hier"]],
@@ -288,4 +288,29 @@ test('aucune route n’ouvre un verrou, ne signe, ni n’écrit envoi_drapeaux ;
 test('l’écriture exige la permission workspaces.manage (middleware présent sur la route)', function () {
     $route = Route::getRoutes()->match(Request::create('/api/v1/envoi/feu-vert/manuel.port25/fait', 'POST'));
     expect(implode(' ', $route->gatherMiddleware()))->toContain('permission:workspaces.manage');
+});
+
+test('B1 : un point qui attend le vrai serveur n’est pas fait, reste bloquant, et la preuve reste affichée', function () {
+    $u = fvCompte('owner');
+    $avant = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertOk();
+    expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $r->json()))->toBe([])
+        ->and($r->json('fait'))->toBe($r->json('etat') === 'fait')->and($r->json('fait'))->toBeFalse()
+        ->and($r->json('bloquant'))->toBeTrue()->and($r->json('preuve.texte'))->toBe(FV_PREUVE);
+
+    $apres = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect(ContratOpenApiEnvoi::croiserListe($apres->json()))->toBe([])
+        ->and($apres->json('bloquants_restants'))->toBe($avant->json('bloquants_restants'))
+        ->and($apres->json('faits'))->toBe($avant->json('faits'));
+    foreach ($apres->json('points') as $p) {
+        expect($p['fait'])->toBe($p['etat'] === 'fait', $p['code']);
+        if ($p['etat'] === 'attend_serveur_reel') {
+            expect($p['fait'])->toBeFalse()->and($p['bloquant'])->toBeTrue();
+        }
+    }
+
+    // Un point manuel qui n'attend pas le serveur réel devient fait : les compteurs bougent, eux.
+    $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.capacite_reponses/fait', ['preuve' => FV_PREUVE])->assertOk()->assertJsonPath('fait', true)->assertJsonPath('bloquant', false);
+    $fin = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
+    expect($fin->json('bloquants_restants'))->toBe($avant->json('bloquants_restants') - 1)->and(ContratOpenApiEnvoi::croiserListe($fin->json()))->toBe([]);
 });

@@ -385,7 +385,7 @@ export interface operations {
                 "application/json": {
                     /** @default true */
                     fait?: boolean;
-                    /** @description Preuve, ou motif quand `fait` vaut false : 10 à 500 caractères. */
+                    /** @description Preuve humaine, ou motif quand `fait` vaut false : 10 à 500 caractères après nettoyage, ni phrase générique ni adresse e-mail. */
                     preuve: string;
                 };
             };

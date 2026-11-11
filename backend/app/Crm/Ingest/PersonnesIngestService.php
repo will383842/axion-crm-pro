@@ -891,6 +891,14 @@ final class PersonnesIngestService
             if ($demande !== [] && ($existante->{$colonne} ?? null) !== null) {
                 continue;
             }
+            // CRM-G1 — guide-réseau uniquement : un prénom reçu ne remplace le prénom
+            // connu que si l'événement est plus récent (à la seconde) que la dernière
+            // interaction enregistrée, ou si le prénom connu est vide. Les autres
+            // sources gardent leur comportement.
+            if ($colonne === 'first_name' && $this->estGuideReseau($event)
+                && ($existante->first_name ?? null) !== null && $ancien) {
+                continue;
+            }
             if ($valeur !== null) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';
@@ -1137,6 +1145,18 @@ final class PersonnesIngestService
      * Comparer l'instant brut ferait passer pour « plus récent » un événement
      * plus ancien de la même seconde.
      */
+    /**
+     * Contrat réel du site (axion-ia, `guides-reseau/synchro-v3.ts` l.147 et l.230 :
+     * `source_slug = "guide-reseau"` sur l'événement de la page ; l.126 : l'événement
+     * d'origines n'a PAS de `source_slug` mais un `subject_ref` en `site:guide-reseau:`).
+     * Les deux marques reconnaissent la même famille d'événements.
+     */
+    private function estGuideReseau(SiteSyncEvent $event): bool
+    {
+        return $event->sourceSlug === 'guide-reseau'
+            || str_starts_with($event->subjectRef, 'site:guide-reseau:');
+    }
+
     private function plusRecent(DateTimeImmutable $at, mixed $dernier): bool
     {
         $dernier = $this->date($dernier);

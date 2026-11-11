@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 // Les 25 fichiers de `tests/Feature` déclarent eux-mêmes
@@ -75,3 +76,25 @@ pest()->group('non-regression')->in(
     'Feature/Rgpd/PurgeNonDiffusibleVariantesTest.php',
     'Feature/Rgpd/SondeNonDiffusiblesTest.php',
 );
+
+/**
+ * Appelle une commande d'envoi qui lit une adresse de témoin : l'adresse n'est JAMAIS dans les paramètres,
+ * elle arrive par l'entrée standard (flux mémoire), en mode non interactif.
+ *
+ * @param  array<string, mixed>  $parametres
+ */
+function appelerSansAdresseEnArgument(string $commande, array $parametres, ?string $adresseSurStdin): int
+{
+    $flux = fopen('php://memory', 'r+');
+    fwrite($flux, $adresseSurStdin === null ? '' : $adresseSurStdin . "\n");
+    rewind($flux);
+    app()->instance('envoi.flux_entree', $flux);
+
+    try {
+        return Artisan::call($commande, $parametres + ['--no-interaction' => true]);
+    } finally {
+        app()->forgetInstance('envoi.flux_entree');
+        unset(app()['envoi.flux_entree']);
+        fclose($flux);
+    }
+}

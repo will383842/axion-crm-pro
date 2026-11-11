@@ -31,7 +31,7 @@ test.describe('pilotage des envois (démo)', () => {
     await expect(page).toHaveURL(/\/envoi\/sante\/chercher/);
   });
 
-  test('Résultats : pas de clics, ouvertures en estimation, export', async ({ page }) => {
+  test('Résultats : pas de clics, tableau par boîte, accessibilité', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/campagnes/resultats', { offre: 'les-deux' });
     await expect(page.getByRole('table', { name: 'Par boîte' })).toBeVisible();
     await expect(page.locator('main')).not.toContainText(/clic/i);

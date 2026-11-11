@@ -68,6 +68,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_30_000200_envoi_relances_effets.php',
     // Filet modifié : pourquoi — envoi L8-F04 : preuves du feu vert, ajout seul (trigger UPDATE/DELETE/TRUNCATE) ; down() inerte, up() rejouable.
     '2026_12_01_000020_envoi_feu_vert_preuves.php',
+    // Envoi L8-F03 : colonne NULLABLE `fournisseur` ajoutée à envoi_temoins (ajout seul) ; la retirer effacerait le fournisseur des témoins ; down() inerte.
+    '2026_12_01_000010_envoi_temoins_fournisseur.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

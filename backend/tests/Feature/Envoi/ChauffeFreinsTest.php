@@ -352,7 +352,7 @@ test('indésirable chez un témoin Gmail : pause vers Gmail SEULEMENT', function
 
 test('envoi:temoin-indesirable donne un appelant à indesirableChezTemoin (commande locale, journalisée)', function () {
     $ws = espaceChauffe();
-    expect(Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr', '--auteur' => 'will']))->toBe(0);
+    expect(appelerSansAdresseEnArgument('envoi:temoin-indesirable', ['workspace' => $ws, '--auteur' => 'will'], 'temoin@pro-google.fr'))->toBe(0);
     $pauses = app(DepotChauffe::class)->pausesActives($ws, paris('2026-11-10 10:00:00'));
     expect($pauses)->toHaveCount(1)->and($pauses[0]->fournisseur)->toBe('gmail')->and($pauses[0]->motif)->toBe(DecisionFrein::INDESIRABLE_TEMOIN)
         ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->count())->toBe(1);
@@ -1323,13 +1323,13 @@ test('RÉSERVE 3 : app.maintenant n’est posé que par l’environnement de tes
 
 test('RÉSERVE 4 : envoi:temoin-indesirable transmet --auteur au journal (plus « freins » par défaut)', function () {
     $ws = espaceChauffe();
-    Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr', '--auteur' => 'marie']);
+    appelerSansAdresseEnArgument('envoi:temoin-indesirable', ['workspace' => $ws, '--auteur' => 'marie'], 'temoin@pro-google.fr');
     expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->value('auteur'))->toBe('marie');
 });
 
 test('D1b : envoi:temoin-indesirable SANS --auteur journalise « freins » (jamais l\'utilisateur système)', function () {
     $ws = espaceChauffe();
-    Artisan::call('envoi:temoin-indesirable', ['workspace' => $ws, 'adresse' => 'temoin@pro-google.fr']);
+    appelerSansAdresseEnArgument('envoi:temoin-indesirable', ['workspace' => $ws], 'temoin@pro-google.fr');
     expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->value('auteur'))->toBe('freins');
     // get_current_user() dépend du propriétaire du script (vide dans certains conteneurs) : le test de valeur ne suffit pas à le
     // faire rougir partout, d'où cette garde sur la source de la commande.

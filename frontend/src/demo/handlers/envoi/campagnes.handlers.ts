@@ -11,6 +11,7 @@
  */
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { components } from '@/features/envoi/api/campagnes';
+import { gestesPermis } from '@/features/envoi/campagnes/composants/GestesCampagne';
 import { demoDb } from '../../base';
 import { decalage, FUSEAU_DEMO, maintenant } from '../../horloge';
 import { api, delai, erreur, etatForce, filtrerTexte, lireRecherche, paginer, repondreEtatForce } from '../../outils';
@@ -263,13 +264,12 @@ function introuvable() {
   return erreur(404, 'campagne_introuvable', 'Cette campagne n’existe pas.');
 }
 
-const GESTES_OUVERTS: Record<string, readonly Campagne['statut'][]> = {
-  pause: ['en_cours'],
-  reprise: ['en_pause'],
-  terminer: ['en_cours', 'en_pause', 'programmee', 'a_valider'],
-  // Même règle que l'écran (`gestesPermis`) : une campagne en cours se met d'abord en pause.
-  date: ['programmee', 'en_pause'],
-};
+const STATUTS: readonly Campagne['statut'][] = ['brouillon', 'a_valider', 'programmee', 'en_cours', 'en_pause', 'terminee', 'arretee'];
+const GESTES_CLES = ['pause', 'reprise', 'terminer', 'date'] as const;
+// Même règle que l'écran, par construction : dérivée de `gestesPermis` (aucune seconde liste à tenir à jour).
+const GESTES_OUVERTS: Record<string, readonly Campagne['statut'][]> = Object.fromEntries(
+  GESTES_CLES.map((g) => [g, STATUTS.filter((s) => gestesPermis(s)[g])]),
+);
 
 export const handlers: HttpHandler[] = [
   http.get(api('/envoi/campagnes'), async ({ request }) => {

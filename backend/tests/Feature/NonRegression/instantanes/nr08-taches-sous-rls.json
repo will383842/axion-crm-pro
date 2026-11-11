@@ -21,6 +21,7 @@
     "envoi:listes-noires:controler": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:rejouer-commandes": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:relancer-effets-opposition": "jouee",
+    "envoi:releve-imap": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:sante": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "envoi:supervision-sante": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",
     "journalists:scrape-ours": "non jouee : a rejouer par S7 (service exterieur ou donnees lourdes)",

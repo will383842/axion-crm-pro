@@ -59,6 +59,9 @@ const TAILLES: ReadonlyArray<{ code: Entreprise['size_category']; effectif: stri
   { code: 'grand_groupe', effectif: '5 000 salariés et plus', poids: 0.01 },
 ];
 
+/** Nom de la holding fictive du repère (sa fiche existe vraiment, le lien de la fiche mène à elle). */
+export const NOM_HOLDING = 'Groupe Tilleuls Holding';
+
 interface Organisation {
   denomination: string;
   domaine: string;
@@ -102,6 +105,9 @@ function genererEntreprises(): Entreprise[] {
     prises.add(denomination);
     organisations.push({ denomination, domaine, metier, ville });
   }
+
+  // Repère de groupe : la dernière fiche est la holding de « Boulangerie des Tilleuls » (lien « Société mère » / « Filiale »).
+  organisations[organisations.length - 1] = { denomination: NOM_HOLDING, domaine: 'groupe-tilleuls.example', metier: METIERS[0]!, ville: VILLES[0]! };
 
   return organisations.map((o, i) => {
     const tirage = alea.suivant();

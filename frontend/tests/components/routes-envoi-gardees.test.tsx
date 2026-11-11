@@ -82,9 +82,9 @@ async function monter(url: string) {
  * garde « Sans Envoi → introuvable » couvre toujours TOUTES les routes.
  */
 const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
-  ['/envoi/campagnes', 'DM2-CAM'],
-  ['/envoi/campagnes/calendrier', 'DM2-CAM'],
-  ['/envoi/campagnes/c-1', 'DM2-CAM'],
+  ['/envoi/campagnes', 'DM2-CAM', 'Campagnes'],
+  ['/envoi/campagnes/calendrier', 'DM2-CAM', 'Calendrier'],
+  ['/envoi/campagnes/cmp-01', 'DM2-CAM', 'Organisateurs Rhône-Alpes'],
   ['/envoi/campagnes/nouvelle', 'DM2-ASS', 'Nouvelle campagne'],
   ['/envoi/campagnes/messages', 'DM2-ASS', 'Messages types'],
   ['/envoi/campagnes/messages/msg-1', 'DM2-ASS', 'Une idée pour votre prochain salon'],
@@ -94,7 +94,7 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/reponses/a-rattacher', 'DM2-REP', 'Réponses à rattacher'],
   ['/envoi/reponses/traitees', 'DM2-REP', 'Réponses traitées'],
   ['/envoi/boites', 'DM2-INF', 'Boîtes d’envoi'],
-  ['/envoi/boites/boi-will', 'DM2-INF', 'will@prospection-b.example'],
+  ['/envoi/boites/boi-camille', 'DM2-INF', 'camille@prospection-b.example'],
   ['/envoi/domaines', 'DM2-INF', 'Domaines'],
   ['/envoi/domaines/dom-b', 'DM2-INF', 'prospection-b.example'],
   ['/envoi/serveurs', 'DM2-INF', 'Serveurs et adresses IP'],

@@ -2,7 +2,7 @@
  * Démo d'Envoi — la boîte des réponses (DM2-REP).
  * Contrat : `backend/openapi/envoi/reponses.yaml`.
  *
- * Décisions de Will :
+ * Décisions du propriétaire :
  *  · les réponses vivent dans Envoi ; le CRM ne reçoit qu'un RÉSUMÉ
  *    (classement, date, lien, tâche) ;
  *  · une opposition (STOP) met le contact à l'écart des envois, les données

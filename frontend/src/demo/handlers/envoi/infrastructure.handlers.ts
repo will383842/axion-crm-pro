@@ -8,7 +8,7 @@
  * un domaine, une adresse IP, appliquer une version, faire avancer DMARC…)
  * modifient `demoDb` et survivent au rechargement (journal de session).
  *
- * Décisions de Will : un seul serveur d'envoi au début, 150 envois par boîte et
+ * Décisions du propriétaire : un seul serveur d'envoi au début, 150 envois par boîte et
  * par jour au plus en V0, aucun achat ni compte réel, pas de faux échanges de
  * chauffe, pas de BIMI. Adresses IP : plages de documentation seulement.
  */
@@ -31,7 +31,7 @@ type SanteServeur = components['schemas']['SanteServeur'];
 type PolitiqueDmarc = communComponents['schemas']['PolitiqueDmarc'];
 type FluxEnvoi = communComponents['schemas']['FluxEnvoi'];
 
-/** Plafond d'envois par boîte et par jour en V0 (décision de Will). */
+/** Plafond d'envois par boîte et par jour en V0 (décision du propriétaire). */
 export const PLAFOND_BOITE = 150;
 /** Garde anti-dispersion : trois domaines au plus par serveur d'envoi. */
 const DOMAINES_PAR_SERVEUR = 3;
@@ -119,9 +119,9 @@ function fabrique(alea: Alea): DonneesInfra {
   }
 
   const versions: LigneVersion[] = [
-    { id: 15, numero: 15, creee_le: decalage({ heures: -1 }), appliquee_le: null, par: null, resultat: 'prete', changements: [{ sorte: 'modification', libelle: 'Plafond de will@prospection-b.example : 40 → 20 par jour (ralentie)' }] },
-    { id: 14, numero: 14, creee_le: decalage({ jours: -15, heures: 0 }), appliquee_le: decalage({ jours: -15, heures: 0 }), par: 'Will', resultat: 'appliquee', changements: [{ sorte: 'ajout', libelle: 'Domaine prospection-c.example ajouté au flux lettre' }] },
-    { id: 13, numero: 13, creee_le: decalage({ jours: -23 }), appliquee_le: decalage({ jours: -23 }), par: 'Will', resultat: 'remplacee', changements: [{ sorte: 'modification', libelle: 'Montée en douceur de paul@ et hugo@ : démarrage' }] },
+    { id: 15, numero: 15, creee_le: decalage({ heures: -1 }), appliquee_le: null, par: null, resultat: 'prete', changements: [{ sorte: 'modification', libelle: 'Plafond de camille@prospection-b.example : 40 → 20 par jour (ralentie)' }] },
+    { id: 14, numero: 14, creee_le: decalage({ jours: -15, heures: 0 }), appliquee_le: decalage({ jours: -15, heures: 0 }), par: 'Camille', resultat: 'appliquee', changements: [{ sorte: 'ajout', libelle: 'Domaine prospection-c.example ajouté au flux lettre' }] },
+    { id: 13, numero: 13, creee_le: decalage({ jours: -23 }), appliquee_le: decalage({ jours: -23 }), par: 'Camille', resultat: 'remplacee', changements: [{ sorte: 'modification', libelle: 'Montée en douceur de paul@ et hugo@ : démarrage' }] },
     { id: 12, numero: 12, creee_le: decalage({ jours: -31 }), appliquee_le: decalage({ jours: -31 }), par: 'Système', resultat: 'retour_automatique', changements: [{ sorte: 'modification', libelle: 'Version défaillante : retour automatique à la version 11' }] },
   ];
 
@@ -175,7 +175,7 @@ function slug(texte: string): string {
 }
 
 function utilisateurCourant(): string {
-  return demoDb.utilisateurs.tous()[0]?.name ?? 'Will';
+  return demoDb.utilisateurs.tous()[0]?.name ?? 'Camille';
 }
 
 function recalculerBoites(domaineId: string): number {

@@ -19,7 +19,7 @@ describe('BoitePage', () => {
   beforeEach(() => demoDb.reinitialiser());
 
   it('montre les envois sur 30 jours, le quota du jour et les derniers refus en clair', async () => {
-    await monter('boi-will', 'will@prospection-b.example');
+    await monter('boi-camille', 'camille@prospection-b.example');
     expect(screen.getByText('Envoyés (30 j)')).toBeInTheDocument();
     expect(screen.getByText('Quota du jour')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /30 derniers jours/i })).toBeInTheDocument();

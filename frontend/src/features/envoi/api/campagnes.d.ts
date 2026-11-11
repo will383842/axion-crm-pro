@@ -339,6 +339,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CampagneResume"][];
+                        /** @description Heure du serveur (sert à proposer « Demain 9:00 »). */
+                        maintenant: components["schemas"]["Horodatage"];
                         meta: components["schemas"]["Pagination"];
                         par_statut: {
                             [key: string]: number;
@@ -366,13 +368,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Test A/B sur l'objet ; nul si la campagne n'en fait pas. Le critère est les réponses. */
+                        ab: {
+                            choix_automatique_le: components["schemas"]["Horodatage"] | null;
+                            gagnant: ("A" | "B") | null;
+                            versions: {
+                                en_tete: boolean;
+                                envoyes: number;
+                                objet: string;
+                                reponses: number;
+                                taux_reponse: number;
+                                /** @enum {string} */
+                                version: "A" | "B";
+                            }[];
+                        } | null;
                         campagne: components["schemas"]["CampagneResume"];
+                        /** @description Décompte des destinataires par état, et taux de la campagne. */
+                        compteurs: {
+                            /** @description Entreprises dont la suite est arrêtée parce qu'un contact a répondu. */
+                            arretes_entreprise: number;
+                            desinscrits: number;
+                            en_file: number;
+                            /** @description Destinataires en pause (absence du bureau), reprise au retour. */
+                            en_pause_absence: number;
+                            exclus: number;
+                            limite_refus: number;
+                            ont_repondu: number;
+                            partis: number;
+                            refuses: number;
+                            taux_desinscription: number;
+                            taux_refus: number;
+                        };
                         derniers_evenements: components["schemas"]["EvenementEnvoi"][];
+                        fin_prevue_le: components["schemas"]["Horodatage"] | null;
+                        maintenant: components["schemas"]["Horodatage"];
+                        par_boite: {
+                            adresse: string;
+                            boite_id: components["schemas"]["Identifiant"];
+                            envoyes: number;
+                            refus: number;
+                            reponses: number;
+                        }[];
+                        par_jour: {
+                            envoyes: number;
+                            /** Format: date */
+                            jour: string;
+                        }[];
                         sequence: {
                             delai_jours: number;
                             envoyes: number;
                             etape: number;
                             message_id: components["schemas"]["Identifiant"];
+                            refus: number;
+                            reponses: number;
                         }[];
                     };
                 };
@@ -405,8 +453,8 @@ export interface operations {
         parameters: {
             query?: {
                 etat?: components["schemas"]["EtatDestinataire"];
-                /** @description Filtre sur l'ouverture estimée (campagnes qui suivent les ouvertures seulement). */
-                ouvert?: "oui" | "non" | "automatique";
+                /** @description Regroupement affiché sous forme de filtres (les états détaillés restent dans `etat`). */
+                groupe?: "en_file" | "partis" | "refuses" | "ont_repondu" | "arretes" | "exclus";
                 page?: components["parameters"]["Page"];
                 par_page?: components["parameters"]["ParPage"];
                 /** @description Recherche texte (insensible à la casse et aux accents). */
@@ -508,9 +556,10 @@ export interface operations {
     };
     calendrierCampagnes: {
         parameters: {
-            query: {
-                au: string;
-                du: string;
+            query?: {
+                au?: string;
+                /** @description Premier jour (inclus). Sans `du` ni `au`, la semaine en cours (du lundi au dimanche). */
+                du?: string;
             };
             header?: never;
             path?: never;
@@ -525,6 +574,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** Format: date */
+                        au: string;
                         data: {
                             campagne_id: components["schemas"]["Identifiant"];
                             envoyes: number;
@@ -534,6 +585,9 @@ export interface operations {
                             prevus: number;
                             statut: components["schemas"]["StatutCampagne"];
                         }[];
+                        /** Format: date */
+                        du: string;
+                        maintenant: components["schemas"]["Horodatage"];
                     };
                 };
             };

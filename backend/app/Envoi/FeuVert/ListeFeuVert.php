@@ -2,6 +2,7 @@
 
 namespace App\Envoi\FeuVert;
 
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
@@ -16,36 +17,13 @@ use Illuminate\Support\Facades\Schema;
  * ne change aucun réglage. Points automatiques = lus dans le système ; points manuels = jamais automatiques,
  * « fait » seulement si une preuve a été déposée (et, par défaut, « vérifiable seulement avec le vrai serveur »).
  *
- * Spec § 8 absente du dépôt : codes manuels = liste prudente (18 points + A11), à réconcilier avec la spec.
+ * Points manuels : catalogue versionné CatalogueManuels (spécification 26 § 8, 18 points).
  */
 class ListeFeuVert
 {
-    /** Les 6 fournisseurs témoins attendus (colonne `envoi_temoins.fournisseur`, fiche F03). */
-    public const FOURNISSEURS_TEMOINS = ['gmail', 'outlook', 'yahoo', 'orange', 'free', 'proton'];
+    public const PREMIER = CatalogueManuels::PREMIER;
 
-    public const PREMIER = 'm8_01_tls_mutuel';
-
-    public const MANUELS = [
-        'm8_01_tls_mutuel' => 'TLS mutuel entre l’application et le serveur d’envoi vérifié',
-        'm8_02_dkim' => 'Signature DKIM vérifiée sur un message réel de recette',
-        'm8_03_spf' => 'SPF aligné vérifié sur un message réel de recette',
-        'm8_04_dmarc' => 'DMARC aligné et rapports reçus',
-        'm8_05_ptr' => 'DNS inverse (PTR) cohérent avec le nom HELO',
-        'm8_06_liste_unsubscribe' => 'En-têtes List-Unsubscribe et One-Click acceptés par un témoin',
-        'm8_07_desinscription_bout_en_bout' => 'Désinscription de bout en bout avec le vrai serveur',
-        'm8_08_retours_imap' => 'Rebonds et plaintes réellement relevés dans la boîte de retours',
-        'm8_09_plafonds' => 'Plafonds journaliers constatés sur le vrai serveur',
-        'm8_10_chauffe' => 'Courbe de chauffe validée sur le vrai serveur',
-        'm8_11_tout_arreter' => 'Arrêt général éprouvé avec le vrai serveur',
-        'm8_12_reprise_serveur' => 'Reprise après perte du serveur éprouvée (runbook)',
-        'm8_13_supervision_alerte' => 'Alerte de supervision reçue par un humain',
-        'm8_14_sauvegarde' => 'Sauvegarde et restauration du serveur d’envoi éprouvées',
-        'm8_15_mentions_legales' => 'Mentions légales et identité de l’expéditeur validées',
-        'm8_16_base_legale' => 'Base légale et registre des traitements validés',
-        'm8_17_contenu_message' => 'Gabarit de message relu et approuvé',
-        'm8_18_banc_temoins' => 'Banc d’essai sur adresses témoins réussi',
-        'a11_inscriptions' => 'Inscriptions de réputation (A11) faites',
-    ];
+    public const MANUELS = CatalogueManuels::POINTS;
 
     public function __construct(private readonly DepotPreuves $preuves, private readonly DepotSante $sante) {}
 
@@ -82,14 +60,15 @@ class ListeFeuVert
         $preuves = $this->preuves->dernieres($ws);
         foreach (self::MANUELS as $code => $libelle) {
             $p = $preuves[$code] ?? null;
+            $fait = $p !== null && $p['fait'];
             $points[] = new PointFeuVert(
                 $code,
                 $libelle,
                 false,
-                $p !== null,
-                $p !== null ? 'Preuve déposée.' : 'Vérifiable seulement avec le vrai serveur.',
+                $fait,
+                $fait ? 'Preuve déposée, à revalider avec le vrai serveur.' : 'Vérifiable seulement avec le vrai serveur.',
                 'table envoi_feu_vert_preuves',
-                $p,
+                $fait ? $p['preuve'] : null,
             );
         }
 
@@ -105,14 +84,14 @@ class ListeFeuVert
     private function temoins(string $ws): PointFeuVert
     {
         $code = 'temoins_fournisseurs';
-        $libelle = 'Les 6 fournisseurs témoins sont couverts';
+        $libelle = 'Tous les fournisseurs témoins sont couverts';
         $source = 'table envoi_temoins.fournisseur (fiche F03)';
         if (! Schema::hasColumn('envoi_temoins', 'fournisseur')) {
             return new PointFeuVert($code, $libelle, true, false, 'Colonne fournisseur absente (fiche F03 pas encore posée).', $source);
         }
         $presents = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins')->where('workspace_id', $ws)->distinct()->pluck('fournisseur')->all());
-        $manquants = array_values(array_diff(self::FOURNISSEURS_TEMOINS, array_map('strval', $presents)));
+        $manquants = array_values(array_diff(DepotSocleDb::FOURNISSEURS_TEMOINS, array_map('strval', $presents)));
 
-        return new PointFeuVert($code, $libelle, true, $manquants === [], $manquants === [] ? 'Les 6 fournisseurs sont couverts.' : count($manquants) . ' fournisseur(s) sans témoin : ' . implode(', ', $manquants) . '.', $source);
+        return new PointFeuVert($code, $libelle, true, $manquants === [], $manquants === [] ? 'Tous les fournisseurs témoins sont couverts.' : count($manquants) . ' fournisseur(s) sans témoin : ' . implode(', ', $manquants) . '.', $source);
     }
 }

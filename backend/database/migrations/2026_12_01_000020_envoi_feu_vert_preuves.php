@@ -3,7 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-/** Envoi L8 (F04) — preuves des points MANUELS du feu vert. AJOUT SEUL ; UPDATE/DELETE/TRUNCATE refusés ; RLS par espace. */
+/** Envoi L8 (F04) — preuves des points MANUELS du feu vert (`fait` = false : point défait, nouvelle ligne). AJOUT SEUL ; UPDATE/DELETE/TRUNCATE refusés ; RLS par espace. */
 return new class extends Migration
 {
     public function up(): void
@@ -15,8 +15,10 @@ return new class extends Migration
                 code         TEXT        NOT NULL CHECK (char_length(code) BETWEEN 1 AND 64),
                 preuve       TEXT        NOT NULL CHECK (char_length(preuve) BETWEEN 1 AND 500),
                 auteur       TEXT        NOT NULL CHECK (char_length(auteur) BETWEEN 1 AND 100),
-                cree_le      TIMESTAMPTZ NOT NULL DEFAULT now()
+                cree_le      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                fait         BOOLEAN     NOT NULL DEFAULT true
             );
+            ALTER TABLE envoi_feu_vert_preuves ADD COLUMN IF NOT EXISTS fait BOOLEAN NOT NULL DEFAULT true;
             CREATE INDEX IF NOT EXISTS envoi_feu_vert_preuves_ws_code ON envoi_feu_vert_preuves (workspace_id, code, id DESC);
             ALTER TABLE envoi_feu_vert_preuves ENABLE ROW LEVEL SECURITY;
             ALTER TABLE envoi_feu_vert_preuves FORCE ROW LEVEL SECURITY;

@@ -3,15 +3,20 @@
 namespace App\Envoi\Depot;
 
 use App\Envoi\EmpreinteTemoin;
+use App\Envoi\Exceptions\TemoinRefuse;
 use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /** Dépôt Postgres (RLS par workspace). Aucune suppression de ligne, nulle part. */
 final class DepotSocleDb implements DepotSocle
 {
+    /** Les 6 fournisseurs témoins (A10) ; la base porte le même CHECK. */
+    public const FOURNISSEURS_TEMOINS = ['gmail', 'google_workspace', 'outlook_com', 'microsoft_365', 'yahoo', 'orange'];
+
     public function toutArreter(string $workspaceId): bool
     {
         return ($this->ligne($workspaceId)['tout_arreter'] ?? false) === true;
@@ -94,6 +99,58 @@ final class DepotSocleDb implements DepotSocle
                 [$workspaceId],
             ));
         });
+    }
+
+    public function ajouterTemoin(string $workspaceId, string $adresse, string $fournisseur, string $libelle, string $auteur): bool
+    {
+        $empreinte = EmpreinteTemoin::pourDecision($adresse);
+        if ($empreinte === null || ! in_array($fournisseur, self::FOURNISSEURS_TEMOINS, true)) {
+            throw new InvalidArgumentException('Témoin refusé : adresse non ASCII ou fournisseur inconnu.');
+        }
+
+        // UNE transaction : le témoin et sa trace dans le journal vont ensemble ou pas du tout.
+        return DB::transaction(function () use ($workspaceId, $empreinte, $fournisseur, $libelle, $auteur): bool {
+            // Verrou par workspace : deux ajouts simultanés ne dépassent ni le plafond ni « un par fournisseur ».
+            DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['envoi_temoins:' . $workspaceId]);
+            WorkspaceContext::run($workspaceId, function () use ($workspaceId, $empreinte, $fournisseur): void {
+                $existe = DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->where('empreinte', $empreinte)->exists();
+                if ($existe) {
+                    return; // doublon : idempotent, jamais refusé
+                }
+                if (DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->count() >= TemoinRefuse::PLAFOND) {
+                    throw TemoinRefuse::plafondAtteint();
+                }
+                if (DB::table('envoi_temoins')->where('workspace_id', $workspaceId)->where('fournisseur', $fournisseur)->exists()) {
+                    throw TemoinRefuse::fournisseurDejaCouvert($fournisseur);
+                }
+            });
+            $nouveau = WorkspaceContext::run($workspaceId, fn (): bool => DB::affectingStatement(
+                'INSERT INTO envoi_temoins (workspace_id, empreinte, libelle, fournisseur) VALUES (?, ?, ?, ?)
+                 ON CONFLICT (workspace_id, empreinte) DO NOTHING',
+                [$workspaceId, $empreinte, $libelle, $fournisseur],
+            ) > 0);
+            $this->journaliser($workspaceId, 'temoin_ajoute', $auteur, [
+                'empreinte' => substr($empreinte, 0, 12),
+                'fournisseur' => $fournisseur,
+                'nouveau' => $nouveau,
+            ]);
+
+            return $nouveau;
+        });
+    }
+
+    public function listerTemoins(string $workspaceId): array
+    {
+        return array_values(WorkspaceContext::run($workspaceId, fn (): array => DB::table('envoi_temoins')
+            ->where('workspace_id', $workspaceId)
+            ->orderBy('id')
+            ->get(['empreinte', 'libelle', 'fournisseur', 'cree_le'])
+            ->map(fn ($l): array => [
+                'empreinte' => (string) $l->empreinte,
+                'libelle' => (string) $l->libelle,
+                'fournisseur' => $l->fournisseur === null ? null : (string) $l->fournisseur,
+                'cree_le' => (string) $l->cree_le,
+            ])->all()));
     }
 
     public function armerToutArreter(string $workspaceId, string $auteur): void

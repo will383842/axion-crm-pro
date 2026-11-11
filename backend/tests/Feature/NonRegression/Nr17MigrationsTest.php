@@ -66,6 +66,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_30_000310_envoi_serveurs_epoque.php',
     // Envoi P0 L5 (suivi) : état de relance des effets d'opposition, en base (ajout seul) ; down() inerte (corps vide).
     '2026_11_30_000200_envoi_relances_effets.php',
+    // Envoi L8-F03 : colonne NULLABLE `fournisseur` ajoutée à envoi_temoins (ajout seul) ; la retirer effacerait le fournisseur des témoins ; down() inerte.
+    '2026_12_01_000010_envoi_temoins_fournisseur.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

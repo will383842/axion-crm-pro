@@ -3,9 +3,12 @@
 namespace Tests\Unit\Envoi;
 
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\EmpreinteTemoin;
+use App\Envoi\Exceptions\TemoinRefuse;
 use Closure;
 use DateTimeImmutable;
+use InvalidArgumentException;
 
 final class DepotMemoire implements DepotSocle
 {
@@ -16,11 +19,17 @@ final class DepotMemoire implements DepotSocle
     /** @var list<string> */
     public array $temoins = ['temoin@example.test'];
 
+    /** @var list<array{empreinte: string, libelle: string, fournisseur: ?string, cree_le: string}> */
+    public array $detailsTemoins = [];
+
     /** @var array<string, int> */
     public array $compteurs = [];
 
     /** @var list<array{string, string}> */
     public array $journal = [];
+
+    /** @var list<array<string, mixed>> */
+    public array $detailsJournal = [];
 
     public function toutArreter(string $workspaceId): bool
     {
@@ -73,6 +82,36 @@ final class DepotMemoire implements DepotSocle
         $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
     }
 
+    public function ajouterTemoin(string $workspaceId, string $adresse, string $fournisseur, string $libelle, string $auteur): bool
+    {
+        $empreinte = EmpreinteTemoin::pourDecision($adresse);
+        if ($empreinte === null || ! in_array($fournisseur, DepotSocleDb::FOURNISSEURS_TEMOINS, true)) {
+            throw new InvalidArgumentException('Témoin refusé : adresse non ASCII ou fournisseur inconnu.');
+        }
+        $nouveau = ! $this->estTemoin($workspaceId, $adresse);
+        if ($nouveau) {
+            if (count($this->detailsTemoins) >= TemoinRefuse::PLAFOND) {
+                throw TemoinRefuse::plafondAtteint();
+            }
+            foreach ($this->detailsTemoins as $t) {
+                if ($t['fournisseur'] === $fournisseur) {
+                    throw TemoinRefuse::fournisseurDejaCouvert($fournisseur);
+                }
+            }
+            $this->temoins[] = EmpreinteTemoin::normaliser($adresse);
+            $this->detailsTemoins[] = ['empreinte' => $empreinte, 'libelle' => $libelle, 'fournisseur' => $fournisseur, 'cree_le' => '2026-01-01 00:00:00'];
+        }
+        // Comme la base : trace courte (préfixe d'empreinte), jamais l'adresse.
+        $this->journaliser($workspaceId, 'temoin_ajoute', $auteur, ['empreinte' => substr($empreinte, 0, 12), 'fournisseur' => $fournisseur, 'nouveau' => $nouveau]);
+
+        return $nouveau;
+    }
+
+    public function listerTemoins(string $workspaceId): array
+    {
+        return array_values($this->detailsTemoins);
+    }
+
     public function armerToutArreter(string $workspaceId, string $auteur): void
     {
         $this->arret = true;
@@ -99,5 +138,6 @@ final class DepotMemoire implements DepotSocle
     public function journaliser(string $workspaceId, string $commande, string $auteur, array $details = [], ?DateTimeImmutable $jour = null): void
     {
         $this->journal[] = [$commande, $auteur];
+        $this->detailsJournal[] = $details;
     }
 }

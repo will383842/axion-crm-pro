@@ -52,8 +52,13 @@ class DepotReputation
     /** @return list<array<string, mixed>> les plus récents d'abord */
     public function derniers(string $ws): array
     {
-        return WorkspaceContext::run($ws, fn () => DB::table('envoi_reputation_constats')
-            ->where('workspace_id', $ws)->orderByDesc('jour')->orderByDesc('id')->limit(self::MAX_LECTURE)->get()
-            ->map(fn ($l) => (array) $l)->all());
+        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_reputation_constats')
+            ->where('workspace_id', $ws)->orderByDesc('jour')->orderByDesc('id')->limit(self::MAX_LECTURE)->get()->all());
+        $liste = [];
+        foreach ($lignes as $l) {
+            $liste[] = (array) $l;
+        }
+
+        return $liste;
     }
 }

@@ -41,7 +41,7 @@ class EnvoiReputationController extends ApiController
             return $this->erreur('validation', $constat, 422);
         }
         $cle = $request->header('Idempotency-Key');
-        if ($cle !== null && (! is_string($cle) || preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $cle) !== 1)) {
+        if ($cle !== null && (preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $cle) !== 1)) {
             return $this->erreur('validation', 'La clé de rejeu (Idempotency-Key) doit faire de 8 à 100 caractères simples.', 422);
         }
         $empreinte = hash('sha256', json_encode([
@@ -51,7 +51,10 @@ class EnvoiReputationController extends ApiController
         $fournisseur = ConstatReputation::fournisseurDe($constat->source);
 
         $r = $depot->enregistrer(
-            $ws, $constat, $cle ?? 'auto-' . $empreinte, $empreinte,
+            $ws,
+            $constat,
+            $cle ?? 'auto-' . $empreinte,
+            $empreinte,
             fn (): bool => $constat->reputation === ConstatReputation::MAUVAISE
                 && $garde->reputationMauvaise($ws, $fournisseur, new DateTimeImmutable, $constat->auteur),
         );

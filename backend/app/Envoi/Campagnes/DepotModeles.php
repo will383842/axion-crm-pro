@@ -52,6 +52,8 @@ final class DepotModeles
     /** Restaurer la version $numero = recopier son contenu dans une NOUVELLE version ; l'historique reste intact. */
     public function restaurer(string $ws, string $id, int $numero, string $auteur): int
     {
+        $this->verifier(null, null, $auteur);
+
         return WorkspaceContext::run($ws, fn () => DB::transaction(function () use ($ws, $id, $numero, $auteur): int {
             $v = DB::table('envoi_modele_versions')->where('workspace_id', $ws)->where('modele_id', $id)->where('numero', $numero)->first()
                 ?? throw ModeleRefuse::introuvable();
@@ -109,11 +111,15 @@ final class DepotModeles
         return $n;
     }
 
-    private function verifier(string $objet, string $corps, string $auteur, ?string $nom = null): void
+    /** Limites de la base, en CARACTÈRES, vérifiées ici pour un refus propre (jamais un 23514 brut) ; NUL et UTF-8 invalide refusés. */
+    private function verifier(?string $objet, ?string $corps, string $auteur, ?string $nom = null): void
     {
-        foreach ([['objet', $objet, 300], ['corps', $corps, 20000], ['auteur', $auteur, 100], ['nom', $nom ?? 'x', 200]] as [$champ, $valeur, $max]) {
-            if ($valeur === '' || mb_strlen($valeur) > $max) {
-                throw ModeleRefuse::contenu("{$champ} de 1 à {$max} caractères");
+        foreach ([['objet', $objet, 300], ['corps', $corps, 20000], ['auteur', $auteur, 100], ['nom', $nom, 200]] as [$champ, $valeur, $max]) {
+            if ($valeur === null) {
+                continue;
+            }
+            if ($valeur === '' || mb_strlen($valeur) > $max || str_contains($valeur, "\0") || ! mb_check_encoding($valeur, 'UTF-8')) {
+                throw ModeleRefuse::contenu("{$champ} de 1 à {$max} caractères, sans octet nul");
             }
         }
     }

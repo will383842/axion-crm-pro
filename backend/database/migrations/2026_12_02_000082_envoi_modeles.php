@@ -89,7 +89,9 @@ return new class extends Migration
                 IF NEW.statut <> OLD.statut AND NOT envoi_modele_transition_permise(OLD.statut, NEW.statut) THEN
                     RAISE EXCEPTION 'envoi_modeles : transition % -> % interdite', OLD.statut, NEW.statut;
                 END IF;
-                IF NEW.statut = 'valide' AND OLD.statut = 'valide' AND NEW.version_validee IS DISTINCT FROM OLD.version_validee THEN
+                -- la version validée ne bouge qu'AVEC un changement de statut (valide -> brouillon/a_relire l'efface, a_relire -> valide la pose),
+                -- et l'archivage garde celle qui était validée : jamais une autre.
+                IF (NEW.statut = OLD.statut OR NEW.statut = 'archive') AND NEW.version_validee IS DISTINCT FROM OLD.version_validee THEN
                     RAISE EXCEPTION 'envoi_modeles : la version validée est immuable';
                 END IF;
                 IF NEW.archive_le IS DISTINCT FROM OLD.archive_le AND (OLD.archive_le IS NOT NULL OR NEW.archive_le <> now()) THEN

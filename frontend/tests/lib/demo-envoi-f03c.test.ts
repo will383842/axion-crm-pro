@@ -109,6 +109,34 @@ describe('démo — chauffe', () => {
   });
 });
 
+describe('démo — chauffe : l’IP et le domaine de même nom sont indépendants', () => {
+  const chauffeDe = async (id: string) => (await appeler('GET', '/envoi/chauffe')).json!['ressources'].find((r: any) => r.id === id);
+
+  it('reculer l’IP ne touche pas le domaine, et inversement', async () => {
+    const domaineAvant = await chauffeDe('domaine:dom-c');
+    const ipAvant = await chauffeDe('ip:192.0.2.11');
+    expect(domaineAvant.palier).toBe(ipAvant.palier);
+    expect((await appeler('POST', '/envoi/chauffe/ip:192.0.2.11/reculer')).json).toMatchObject({ palier: 'P1' });
+    expect(await chauffeDe('domaine:dom-c')).toEqual(domaineAvant);
+    const ipApres = await chauffeDe('ip:192.0.2.11');
+    expect((await appeler('POST', '/envoi/chauffe/domaine:dom-c/reculer')).json).toMatchObject({ palier: 'P1' });
+    expect(await chauffeDe('ip:192.0.2.11')).toEqual(ipApres);
+  });
+
+  it('le verrou « un recul par jour » est par ressource (type et identifiant)', async () => {
+    demoDb.domaines.modifier('dom-c', { chauffe: { palier: 'P4', jours_effectifs: 12, total_palier: 60, tenu_jusqu_au: null } });
+    await appeler('POST', '/envoi/chauffe/domaine:dom-c/reculer');
+    const ip = await chauffeDe('ip:192.0.2.11');
+    expect(ip.peut_reculer).toBe(true);
+    expect((await chauffeDe('domaine:dom-c')).peut_reculer).toBe(false);
+  });
+
+  it('l’IP reculée ne change pas la chauffe enregistrée du domaine', async () => {
+    await appeler('POST', '/envoi/chauffe/ip:192.0.2.11/reculer');
+    expect(demoDb.domaines.trouver('dom-c')?.chauffe?.palier).toBe('P2');
+  });
+});
+
 describe('démo — boîtes', () => {
   it('liste et fiche sans chauffe, identifiants, hôte ni port', async () => {
     const liste = await appeler('GET', '/envoi/boites');

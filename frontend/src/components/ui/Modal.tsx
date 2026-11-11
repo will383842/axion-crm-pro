@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { cn } from './cn';
 import { IconButton } from './IconButton';
 import { usePiegeFocus } from './useFocusTrap';
@@ -26,6 +26,7 @@ export function Modal({ open, onClose, title, description, size = 'md', children
   // D28-003 — la ref part sur l'élément qui porte `role="dialog"`, pas sur le
   // panneau : « dans le dialogue » doit désigner ce que l'ARIA désigne.
   const refDialogue = usePiegeFocus<HTMLDivElement>(open);
+  const idTitre = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -48,6 +49,7 @@ export function Modal({ open, onClose, title, description, size = 'md', children
       className="fixed inset-0 z-50 flex items-center justify-center p-4 axion-fade-in"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? idTitre : undefined}
     >
       <div
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
@@ -64,7 +66,7 @@ export function Modal({ open, onClose, title, description, size = 'md', children
       >
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
-            {title ? <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2> : null}
+            {title ? <h2 id={idTitre} className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h2> : null}
             {description ? <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
           </div>
           <IconButton label="Fermer" onClick={onClose} size="sm">

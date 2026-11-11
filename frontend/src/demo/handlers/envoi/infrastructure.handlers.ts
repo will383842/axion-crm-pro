@@ -50,6 +50,7 @@ interface LigneIp { id: string; serveur_id: string; adresse: string; flux: FluxE
 interface LigneReglages extends ReglagesBoite { id: string }
 interface LigneExpiration { id: string; le: string }
 interface LigneRecul { id: string; jour: string }
+interface LigneChauffeIp { id: string; chauffe: NonNullable<Domaine['chauffe']> }
 interface LigneTest { id: string; fait_le: string; etapes: Array<{ libelle: string; ok: boolean }> }
 
 const LISTES_SURVEILLEES = ['Liste A (grand public)', 'Liste B (spécialisée)'] as const;
@@ -66,6 +67,8 @@ interface DonneesInfra {
   tests: LigneTest[];
   /** Ressources déjà reculées, avec le jour du recul (un seul recul par jour). */
   reculs: LigneRecul[];
+  /** Chauffe propre à chaque adresse IP (clé `ip:<adresse>`), indépendante de celle du domaine. */
+  chauffes_ip: LigneChauffeIp[];
 }
 
 const ETAPES_TEST = ['Connexion au serveur', 'Envoi vers une boîte témoin interne', 'Réception côté boîte témoin', 'Signature DKIM vérifiée'];
@@ -143,7 +146,7 @@ function fabrique(alea: Alea): DonneesInfra {
     etapes: ETAPES_TEST.map((libelle) => ({ libelle, ok: true })),
   }));
 
-  return { jours, dns, listes, versions, ips: [], reglages, expirations, tests, reculs: [] };
+  return { jours, dns, listes, versions, ips: [], reglages, expirations, tests, reculs: [], chauffes_ip: [] };
 }
 
 function donnees(): DonneesInfra {
@@ -155,6 +158,7 @@ const versionsDb = () => (donnees(), demoDb.zone<LigneVersion>('infrastructure',
 const ipsDb = () => (donnees(), demoDb.zone<LigneIp>('infrastructure', 'ips'));
 const reglagesDb = () => (donnees(), demoDb.zone<LigneReglages>('infrastructure', 'reglages'));
 const expirationsDb = () => (donnees(), demoDb.zone<LigneExpiration>('infrastructure', 'expirations'));
+const chauffesIpDb = () => (donnees(), demoDb.zone<LigneChauffeIp>('infrastructure', 'chauffes_ip'));
 const reculsDb = () => (donnees(), demoDb.zone<LigneRecul>('infrastructure', 'reculs'));
 const testsDb = () => (donnees(), demoDb.zone<LigneTest>('infrastructure', 'tests'));
 
@@ -271,6 +275,17 @@ function ressource(id: string, type: 'ip' | 'domaine', libelle: string, c: Chauf
   };
 }
 
+/** Chauffe d'une adresse IP : sa propre ligne, créée à la première lecture d'après le domaine (copie, jamais partagée). */
+function chauffeIp(ip: { adresse: string; domaine_id: string; statut: string }): ChauffeDomaine | null {
+  const id = `ip:${ip.adresse}`;
+  const propre = chauffesIpDb().trouver(id);
+  if (propre) return propre.chauffe;
+  const depuisDomaine = demoDb.domaines.trouver(ip.domaine_id)?.chauffe;
+  if (ip.statut !== 'en_chauffe' || !depuisDomaine) return null;
+  chauffesIpDb().ajouter({ id, chauffe: { ...depuisDomaine } });
+  return { ...depuisDomaine };
+}
+
 /** Ressources en chauffe : les domaines en montée et les adresses IP qui leur sont rattachées. */
 function ressourcesChauffe(): RessourceChauffe[] {
   const reculs = new Set(reculsDb().filtrer((r) => r.jour === jourIso(0)).map((r) => r.id));
@@ -282,8 +297,8 @@ function ressourcesChauffe(): RessourceChauffe[] {
   }
   for (const serveur of demoDb.serveurs.tous()) {
     for (const ip of serveur.adresses_ip) {
-      const c = demoDb.domaines.trouver(ip.domaine_id)?.chauffe;
-      if (ip.statut !== 'en_chauffe' || !c) continue;
+      const c = chauffeIp(ip);
+      if (!c) continue;
       sorties.push(ressource(`ip:${ip.adresse}`, 'ip', ip.adresse, c, ip.envoyes_aujourdhui, reculs.has(`ip:${ip.adresse}`)));
     }
   }
@@ -667,8 +682,11 @@ export const handlers: HttpHandler[] = [
     // Un second recul le même jour ne recule pas deux fois : la ressource est rendue telle quelle.
     if (!courante.peut_reculer) return HttpResponse.json(courante);
     const precedent = PALIERS[index - 1]!;
-    const domaineId = id.startsWith('domaine:') ? id.slice('domaine:'.length) : (demoDb.serveurs.tous().flatMap((s) => s.adresses_ip).find((ip) => `ip:${ip.adresse}` === id)?.domaine_id ?? '');
-    demoDb.domaines.modifier(domaineId, { chauffe: { palier: precedent.palier, jours_effectifs: precedent.jours_min, total_palier: precedent.total_jour, tenu_jusqu_au: null } });
+    const chauffe = { palier: precedent.palier, jours_effectifs: precedent.jours_min, total_palier: precedent.total_jour, tenu_jusqu_au: null };
+    // Chaque ressource a sa propre donnée : reculer une IP ne touche jamais le domaine de même nom, et inversement.
+    if (id.startsWith('domaine:')) demoDb.domaines.modifier(id.slice('domaine:'.length), { chauffe });
+    else chauffesIpDb().modifier(id, { chauffe });
+    // Le verrou « un recul par jour » est par ressource (type + identifiant, déjà dans `id`).
     reculsDb().ajouter({ id, jour: jourIso(0) });
     const apres = ressourcesChauffe().find((r) => r.id === id);
     return HttpResponse.json(apres ?? courante);

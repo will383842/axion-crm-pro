@@ -34,7 +34,7 @@ export function PageHeader({ title, subtitle, eyebrow, surTitre, badge, actions,
           className={cn(
             'text-2xl font-semibold tracking-tight md:text-3xl',
             gradient
-              ? 'bg-gradient-to-br from-slate-900 to-slate-600 bg-clip-text text-transparent dark:from-white dark:to-slate-300'
+              ? 'text-[#141413] dark:text-white'
               : 'text-slate-900 dark:text-white',
           )}
         >

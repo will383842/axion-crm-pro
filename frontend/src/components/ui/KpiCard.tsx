@@ -22,42 +22,42 @@ const TONE_MAP: Record<KpiTone, { ring: string; chip: string; bar: string; trend
   sky: {
     ring: 'ring-sky-200/60 dark:ring-sky-900/40',
     chip: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
-    bar: 'from-sky-500 to-blue-600',
+    bar: 'bg-[#B23F16]',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
   violet: {
     ring: 'ring-violet-200/60 dark:ring-violet-900/40',
     chip: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
-    bar: 'from-violet-500 to-fuchsia-600',
+    bar: 'bg-[#141413]',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
   emerald: {
     ring: 'ring-emerald-200/60 dark:ring-emerald-900/40',
     chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-    bar: 'from-emerald-500 to-teal-600',
+    bar: 'bg-emerald-600',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
   amber: {
     ring: 'ring-amber-200/60 dark:ring-amber-900/40',
     chip: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-    bar: 'from-amber-500 to-orange-600',
+    bar: 'bg-amber-600',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
   rose: {
     ring: 'ring-rose-200/60 dark:ring-rose-900/40',
     chip: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
-    bar: 'from-rose-500 to-pink-600',
+    bar: 'bg-rose-600',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
   slate: {
     ring: 'ring-slate-200/60 dark:ring-slate-700/60',
     chip: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-    bar: 'from-slate-500 to-slate-700',
+    bar: 'bg-[#5E5D59]',
     trendUp: 'text-emerald-600 dark:text-emerald-400',
     trendDown: 'text-rose-600 dark:text-rose-400',
   },
@@ -96,7 +96,7 @@ export function KpiCard({ label, value, sublabel, tone = 'slate', progress, icon
       {typeof progress === 'number' ? (
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
           <div
-            className={cn('h-full rounded-full bg-gradient-to-r transition-[width] duration-500', t.bar)}
+            className={cn('h-full rounded-full transition-[width] duration-500', t.bar)}
             style={{ width: `${Math.max(2, Math.min(100, progress))}%` }}
           />
         </div>

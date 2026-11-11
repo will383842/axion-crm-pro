@@ -33,8 +33,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'bg-slate-100 text-slate-900 hover:bg-slate-200 active:scale-[0.98] focus-visible:ring-slate-300 ' +
     'dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700',
   destructive:
-    'bg-gradient-to-b from-rose-600 to-rose-700 text-white shadow-sm shadow-rose-900/10 ' +
-    'hover:from-rose-500 hover:to-rose-600 active:scale-[0.98] focus-visible:ring-rose-500',
+    'bg-rose-600 text-white shadow-sm shadow-rose-900/10 ' +
+    'hover:bg-rose-500 active:scale-[0.98] focus-visible:ring-rose-500',
 };
 
 const SIZES: Record<ButtonSize, string> = {

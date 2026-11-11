@@ -147,7 +147,7 @@ export function RootLayout() {
     <div
       data-coquille
       data-produit={produit}
-      className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"
+      className="flex min-h-screen bg-[#FAF9F5] dark:bg-slate-950"
     >
       <a href="#main" className="skip-link">Aller au contenu</a>
 

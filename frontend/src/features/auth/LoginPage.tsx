@@ -25,7 +25,7 @@ export function AuthShell({
     // quatre — aucun repère de région, sur les seuls écrans que TOUT
     // utilisateur traverse. Un seul geste les couvre tous, puisqu'ils partagent
     // cette coquille.
-    <main className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-4 py-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/30">
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-[#FAF9F5] px-4 py-12 dark:bg-slate-950">
       {/* Subtle decorative orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 top-1/3 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-900/20" />
@@ -34,7 +34,7 @@ export function AuthShell({
 
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2 text-slate-900 dark:text-white">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-white dark:to-slate-100 dark:text-slate-900">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#141413] text-white shadow-md dark:bg-white dark:text-slate-900">
             <Sparkles className="h-4 w-4" />
           </div>
           <div className="text-base font-semibold tracking-tight">Axion CRM Pro</div>

@@ -344,7 +344,7 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
         ) : collapsed ? (
           <Link
             to="/"
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-sm"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#B23F16] text-sm font-bold text-white shadow-sm"
             aria-label="Axion CRM Pro — accueil"
           >
             A
@@ -352,7 +352,7 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
         ) : (
           <>
             <Link to="/" className="flex items-center gap-2 px-1 py-0.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-700 text-sm font-bold text-white shadow-sm">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#B23F16] text-sm font-bold text-white shadow-sm">
                 A
               </span>
               <span className="text-sm font-bold tracking-tight text-white">Axion CRM Pro</span>

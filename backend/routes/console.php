@@ -17,6 +17,7 @@ use App\Crm\Annuaire\EnrichissementAnnuaire;
 use App\Crm\EspaceProspection;
 use App\Crm\Insee\MiseAJourMensuelle;
 use App\Envoi\Dns\ControleDnsCommande;
+use App\Envoi\Imap\ReleveImapCommande;
 use App\Support\BattementPlanificateur;
 use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Foundation\Inspiring;
@@ -585,3 +586,16 @@ Schedule::command('envoi:relancer-effets-opposition')
     ->everyMinute()
     ->withoutOverlapping(5)
     ->onOneServer();
+
+// Envoi L8-F12 — relève IMAP des retours (rebonds, plaintes, réponses), chaque minute. Sans elle, la supervision K15
+// (`retours_muets`) passerait en critique et mettrait tout en pause 2 h après le premier envoi réel.
+// DERRIÈRE `ENVOI_RELEVE_ACTIF` (faux par défaut) ET `ENVOI_REEL_ACTIF` : la commande se garde aussi elle-même.
+// Lecture seule de la boîte ; n'écrit que des ajouts (curseur, événements). Aucune migration touchée.
+ConsoleApplication::starting(static function (ConsoleApplication $artisan): void {
+    $artisan->resolve(ReleveImapCommande::class);
+});
+Schedule::command(ReleveImapCommande::SIGNATURE_PLANIFIEE)
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer()
+    ->when(fn (): bool => config('envoi.reel_actif') === true && config('envoi.releve_actif') === true);

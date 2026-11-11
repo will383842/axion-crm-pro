@@ -56,6 +56,9 @@ export function CampagnesPage() {
     const enCours = toutes.filter((c) => c.statut === 'en_cours');
     const programmees = toutes.filter((c) => c.statut === 'programmee').sort((a, b) => (a.prochain_envoi_le ?? '').localeCompare(b.prochain_envoi_le ?? ''));
     const aValider = toutes.filter((c) => c.statut === 'a_valider');
+    // Le contrat ne donne pas de date par réponse : « 30 j » = campagnes créées dans les 30 derniers jours (heure du serveur).
+    const limite = donnees ? new Date(donnees.maintenant).getTime() - 30 * 86_400_000 : 0;
+    const recentes = toutes.filter((c) => new Date(c.cree_le).getTime() >= limite);
     return {
       enCours,
       envoyes: enCours.reduce((n, c) => n + c.envoyes, 0),
@@ -63,8 +66,8 @@ export function CampagnesPage() {
       prochaine: programmees[0],
       programmees: programmees.length,
       aValider,
-      reponses: toutes.reduce((n, c) => n + c.reponses, 0),
-      interessees: toutes.reduce((n, c) => n + c.reponses_interessees, 0),
+      reponses: recentes.reduce((n, c) => n + c.reponses, 0),
+      interessees: recentes.reduce((n, c) => n + c.reponses_interessees, 0),
     };
   }, [donnees]);
 
@@ -117,7 +120,7 @@ export function CampagnesPage() {
             <KpiCard
               label="Réponses (30 j)"
               value={nombre(tuiles.reponses)}
-              sublabel={`${nombre(tuiles.interessees)} intéressées`}
+              sublabel={`${nombre(tuiles.interessees)} intéressées · campagnes des 30 derniers jours`}
             />
           </div>
 

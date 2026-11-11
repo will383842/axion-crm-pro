@@ -11,12 +11,12 @@ info:
     Propriété : DM0-DEMO. Les lots d'écran ne modifient pas ce fichier ; un
     besoin nouveau est noté dans leur PR.
 
-    Mesure des ouvertures (décision de Will, 01/11/2026) : un pixel OPTIONNEL,
+    Mesure des ouvertures (décision du propriétaire, 01/11/2026) : un pixel OPTIONNEL,
     activé campagne par campagne (`suivre_ouvertures`). Une ouverture est une
     ESTIMATION : les ouvertures automatiques (relais d'images des messageries,
     protection de la vie privée d'Apple, antivirus) sont signalées par
     `automatique_probable`. L'indicateur principal reste les réponses.
-    Aucun suivi des clics (décision de Will : ouvertures seulement).
+    Aucun suivi des clics (décision du propriétaire : ouvertures seulement).
 paths: {}
 components:
   schemas:

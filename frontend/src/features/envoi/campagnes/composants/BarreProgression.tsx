@@ -1,6 +1,6 @@
 /** DM2-CAM — barre de progression d'envoi (couleur du produit, texte en clair à côté). */
 export function BarreProgression({ envoyes, total, nom }: { envoyes: number; total: number; nom: string }) {
-  const pct = total === 0 ? 0 : Math.min(100, Math.round((envoyes / total) * 100));
+  const pct = total === 0 ? 0 : Math.min(100, Math.floor((envoyes / total) * 100));
   return (
     <div className="flex min-w-0 items-center gap-3">
       <div

@@ -20,9 +20,15 @@ const dateJour = (jour: string) => new Date(`${jour}T12:00:00.000Z`);
 export function CalendrierEnvoisPage() {
   const [periode, setPeriode] = useState<{ du: string; au: string } | null>(null);
   const requete = useCalendrier(periode?.du ?? null, periode?.au ?? null);
+  // On décale depuis la période DEMANDÉE (fonctionnelle), pas depuis les données affichées :
+  // deux clics rapides avancent bien de deux semaines.
   const decaler = (n: number) => {
-    if (!requete.data) return;
-    setPeriode({ du: ajouterJours(requete.data.du, n), au: ajouterJours(requete.data.au, n) });
+    const base = requete.data?.du;
+    setPeriode((p) => {
+      const du = p?.du ?? base;
+      if (!du) return p;
+      return { du: ajouterJours(du, n), au: ajouterJours(du, n + 6) };
+    });
   };
 
   const donnees = requete.data;
@@ -70,7 +76,7 @@ export function CalendrierEnvoisPage() {
 
           {donnees!.data.length === 0 ? (
             <div className="mt-4">
-              <EmptyState title="Rien à afficher pour le moment" description="Les éléments apparaîtront ici dès qu’il y en aura." />
+              <EmptyState title="Aucun envoi cette semaine" description="Aucune campagne n’envoie sur ces sept jours. Changez de semaine, ou programmez une campagne." />
             </div>
           ) : (
             <>

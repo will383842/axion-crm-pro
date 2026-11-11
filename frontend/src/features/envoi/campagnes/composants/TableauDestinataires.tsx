@@ -69,7 +69,7 @@ export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
   const [recherche, setRecherche] = useState('');
   const [page, setPage] = useState(1);
   const q = useDeferredValue(recherche);
-  const requete = useDestinataires(id, { groupe, ouvert: null, q, page }, true);
+  const requete = useDestinataires(id, { groupe, q, page }, true);
   const colonnes = 'md:grid-cols-[minmax(0,2fr)_9rem_6rem_minmax(0,3fr)]';
 
   const choisir = (g: GroupeDestinataires | null) => {
@@ -122,7 +122,10 @@ export function TableauDestinataires({ fiche }: { fiche: FicheCampagne }) {
       ) : requete.isError ? (
         <QueryErrorState error={requete.error} contexte="les destinataires de cette campagne" onRetry={() => void requete.refetch()} />
       ) : requete.data.data.length === 0 ? (
-        <EmptyState title="Rien à afficher pour le moment" description="Les éléments apparaîtront ici dès qu’il y en aura." />
+        <EmptyState
+          title={recherche.trim() !== '' || groupe !== null ? 'Aucun destinataire ne correspond' : 'Pas encore de destinataire'}
+          description={recherche.trim() !== '' || groupe !== null ? 'Changez de filtre ou de recherche : rien n’a disparu.' : 'Les destinataires apparaîtront ici dès que la liste de la campagne sera prête.'}
+        />
       ) : (
         <>
           <div role="table" aria-label="Destinataires" className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">

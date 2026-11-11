@@ -19,6 +19,18 @@ type Campagne = components['schemas']['CampagneResume'];
 type Destinataire = components['schemas']['Destinataire'];
 type EvenementEnvoi = components['schemas']['EvenementEnvoi'];
 
+/**
+ * Décision produit : la démo ne mesure ni ne renvoie aucune ouverture. Toute
+ * campagne sort sans les champs de suivi des ouvertures (la forme du contrat
+ * commun n'est pas modifiée : le handler se contente de ne rien exposer).
+ */
+function sansOuverture(c: Campagne): Campagne {
+  const copie: Partial<Campagne> = { ...c };
+  delete copie.suivre_ouvertures;
+  delete copie.ouvertures;
+  return copie as Campagne;
+}
+
 /** Objets du test A/B (les deux versions du premier message). */
 const OBJETS_AB = ['Une idée pour votre prochain salon', 'Salon des artisans : on en parle ?'] as const;
 /** Délai, en jours, de chaque message de la séquence. */
@@ -97,15 +109,16 @@ function destinatairesAbsents(campagneId: string): Set<string> {
  * · aucune ouverture n'est jamais exposée (décision produit).
  */
 function vue(d: Destinataire, campagne: Campagne, repondues: Set<string>, absents: Set<string>): Destinataire {
-  const copie: Destinataire = { ...d, ouverture: null };
+  const copie: Partial<Destinataire> = { ...d };
+  delete copie.ouverture;
   const reste = d.etat === 'a_envoyer' || ((d.etat === 'remis' || d.etat === 'envoye') && d.etape < campagne.etapes);
   if (reste && d.organisation && repondues.has(d.organisation)) {
-    return { ...copie, etat: 'relances_annulees', motif: 'Un autre contact de l’entreprise a répondu' };
+    return { ...copie, etat: 'relances_annulees', motif: 'Un autre contact de l’entreprise a répondu' } as Destinataire;
   }
   if (d.etat === 'a_repondu' && absents.has(d.id)) {
-    return { ...copie, motif: 'Absent du bureau : la suite est en pause jusqu’au retour' };
+    return { ...copie, motif: 'Absent du bureau : la suite est en pause jusqu’au retour' } as Destinataire;
   }
-  return copie;
+  return copie as Destinataire;
 }
 
 function destinatairesVus(campagne: Campagne): Destinataire[] {
@@ -213,10 +226,10 @@ function fiche(campagne: Campagne) {
 
   return {
     maintenant: maintenant().toISOString(),
-    campagne,
+    campagne: sansOuverture(campagne),
     sequence,
     derniers_evenements: events
-      .filter((e) => e.type !== 'remis')
+      .filter((e) => e.type !== 'remis' && e.type !== 'ouverture')
       .sort((a, b) => b.survenu_le.localeCompare(a.survenu_le))
       .slice(0, 8),
     compteurs: {
@@ -254,7 +267,8 @@ const GESTES_OUVERTS: Record<string, readonly Campagne['statut'][]> = {
   pause: ['en_cours'],
   reprise: ['en_pause'],
   terminer: ['en_cours', 'en_pause', 'programmee', 'a_valider'],
-  date: ['programmee', 'en_pause', 'en_cours'],
+  // Même règle que l'écran (`gestesPermis`) : une campagne en cours se met d'abord en pause.
+  date: ['programmee', 'en_pause'],
 };
 
 export const handlers: HttpHandler[] = [
@@ -269,7 +283,7 @@ export const handlers: HttpHandler[] = [
     for (const c of toutes) par_statut[c.statut] = (par_statut[c.statut] ?? 0) + 1;
     let liste = filtrerTexte(toutes, lireRecherche(request), ['nom']);
     if (statut) liste = liste.filter((c) => c.statut === statut);
-    return HttpResponse.json({ ...paginer(liste, request, 50), par_statut, maintenant: maintenant().toISOString() });
+    return HttpResponse.json({ ...paginer(liste.map(sansOuverture), request, 50), par_statut, maintenant: maintenant().toISOString() });
   }),
 
   // Avant `/:id` : « calendrier » ne doit pas être pris pour un identifiant.
@@ -304,7 +318,9 @@ export const handlers: HttpHandler[] = [
       for (const p of planning(c)) {
         if (p.jour < du || p.jour > au) continue;
         if (p.jour < aujourdhui) continue;
-        ligne(c, p.jour).prevus += p.prevus;
+        const l = ligne(c, p.jour);
+        // Aujourd'hui, ce qui est déjà parti compte dans le quota du jour : on ne l'ajoute pas deux fois.
+        l.prevus += p.jour === aujourdhui ? Math.max(0, p.prevus - l.envoyes) : p.prevus;
       }
     }
     const data = [...lignes.values()].sort((a, b) => a.jour.localeCompare(b.jour) || a.nom.localeCompare(b.nom, 'fr'));
@@ -332,13 +348,9 @@ export const handlers: HttpHandler[] = [
     const url = new URL(request.url);
     const groupe = url.searchParams.get('groupe');
     const etat = url.searchParams.get('etat');
-    const ouvert = url.searchParams.get('ouvert');
     let liste = destinatairesVus(campagne);
     if (groupe) liste = liste.filter((d) => GROUPES[d.etat] === groupe);
     if (etat) liste = liste.filter((d) => d.etat === etat);
-    if (ouvert === 'oui') liste = liste.filter((d) => d.ouverture !== null && !d.ouverture.automatique_probable);
-    if (ouvert === 'non') liste = liste.filter((d) => d.ouverture === null);
-    if (ouvert === 'automatique') liste = liste.filter((d) => d.ouverture?.automatique_probable === true);
     const q = lireRecherche(request);
     if (q.trim() !== '') {
       const enrichis = liste.map((d) => ({ d, texte: `${d.prenom ?? ''} ${d.nom ?? ''} ${d.organisation ?? ''} ${d.adresse}` }));
@@ -353,7 +365,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['pause']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Seule une campagne en cours peut être mise en pause.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'en_pause', prochain_envoi_le: null }));
+    return HttpResponse.json(sansOuverture(demoDb.campagnes.modifier(c.id, { statut: 'en_pause', prochain_envoi_le: null })!));
   }),
 
   http.post(api('/envoi/campagnes/:id/reprise'), async ({ params }) => {
@@ -361,7 +373,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['reprise']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Seule une campagne en pause peut reprendre.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'en_cours', prochain_envoi_le: decalage({ heures: 1 }) }));
+    return HttpResponse.json(sansOuverture(demoDb.campagnes.modifier(c.id, { statut: 'en_cours', prochain_envoi_le: decalage({ heures: 1 }) })!));
   }),
 
   http.post(api('/envoi/campagnes/:id/terminer'), async ({ params }) => {
@@ -369,7 +381,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['terminer']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Cette campagne ne peut pas être terminée.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'terminee', prochain_envoi_le: null }));
+    return HttpResponse.json(sansOuverture(demoDb.campagnes.modifier(c.id, { statut: 'terminee', prochain_envoi_le: null })!));
   }),
 
   http.post(api('/envoi/campagnes/:id/dupliquer'), async ({ request, params }) => {
@@ -387,14 +399,13 @@ export const handlers: HttpHandler[] = [
       envoyes: 0,
       reponses: 0,
       reponses_interessees: 0,
-      ouvertures: null,
       prochain_envoi_le: null,
       cree_le: maintenant().toISOString(),
       etapes: corps.garder_messages === false ? 1 : c.etapes,
       cible: exclure ? { ...c.cible, total: Math.max(0, c.cible.total - c.envoyes) } : { ...c.cible },
       total: exclure ? Math.max(0, c.total - c.envoyes) : c.total,
     };
-    return HttpResponse.json(demoDb.campagnes.ajouter(copie), { status: 201 });
+    return HttpResponse.json(sansOuverture(demoDb.campagnes.ajouter(copie)), { status: 201 });
   }),
 
   http.post(api('/envoi/campagnes/:id/date'), async ({ request, params }) => {
@@ -406,6 +417,6 @@ export const handlers: HttpHandler[] = [
     if (le === null || Number.isNaN(le.getTime())) return erreur(422, 'date_invalide', 'Cette date n’est pas valide.');
     if (le.getTime() <= maintenant().getTime()) return erreur(422, 'date_passee', 'Choisissez une date à venir.');
     if (!GESTES_OUVERTS['date']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'La date de cette campagne ne peut plus changer.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { prochain_envoi_le: le.toISOString() }));
+    return HttpResponse.json(sansOuverture(demoDb.campagnes.modifier(c.id, { prochain_envoi_le: le.toISOString() })!));
   }),
 ];

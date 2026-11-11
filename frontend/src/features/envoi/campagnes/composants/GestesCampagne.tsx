@@ -4,7 +4,7 @@
  * du suivi. Chaque geste qui coupe quelque chose demande une confirmation ;
  * rien n'est jamais perdu (on met en pause, on termine, on duplique).
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { isAxiosError } from 'axios';
 import { CalendarClock, Copy, Pause, Play, Square } from 'lucide-react';
@@ -54,13 +54,24 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
   const entete = variante === 'entete';
   const nom = (court: string) => (entete ? undefined : `${court} : ${campagne.nom}`);
   const fermer = () => setDialogue(null);
+  const conteneur = useRef<HTMLDivElement>(null);
+  // Après « Reprendre », le bouton disparaît : le focus passe à « Pause » (ou au groupe de gestes), jamais au vide.
+  const reprendre = () =>
+    gestes.reprise.mutate(id, {
+      onSuccess: () => {
+        requestAnimationFrame(() => {
+          const cible = conteneur.current?.querySelector<HTMLElement>('[data-geste="pause"]') ?? conteneur.current;
+          cible?.focus();
+        });
+      },
+    });
 
   return (
     <>
-      <div className={cn('flex flex-wrap items-center gap-2', entete ? 'justify-end' : 'justify-start')}>
+      <div ref={conteneur} tabIndex={-1} className={cn('flex flex-wrap items-center gap-2 outline-none', entete ? 'justify-end' : 'justify-start')}>
         {avant}
         {permis.pause ? (
-          <Button variant="secondary" size="md" className={TACTILE} iconLeft={<Pause className="h-4 w-4" aria-hidden />} aria-label={nom('Pause')} onClick={() => setDialogue('pause')}>
+          <Button variant="secondary" size="md" className={TACTILE} iconLeft={<Pause className="h-4 w-4" aria-hidden />} aria-label={nom('Pause')} data-geste="pause" onClick={() => setDialogue('pause')}>
             {entete ? 'Mettre en pause' : 'Pause'}
           </Button>
         ) : null}
@@ -72,7 +83,7 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
             iconLeft={<Play className="h-4 w-4" aria-hidden />}
             aria-label={nom('Reprendre')}
             loading={gestes.reprise.isPending}
-            onClick={() => gestes.reprise.mutate(id)}
+            onClick={reprendre}
           >
             Reprendre
           </Button>
@@ -183,22 +194,38 @@ function DialogueTerminer({ campagne, onClose }: { campagne: Campagne; onClose: 
   );
 }
 
+type ChoixDate = 'demain' | 'lundi' | 'autre';
+
+/** Au niveau du module : défini dans le rendu, il serait recréé à chaque changement d'état et le clavier perdrait le focus. */
+function OptionDate({ id, choix, onChoisir, children }: { id: ChoixDate; choix: ChoixDate; onChoisir: (c: ChoixDate) => void; children: React.ReactNode }) {
+  return (
+    <Button variant={choix === id ? 'primary' : 'secondary'} className={TACTILE} aria-pressed={choix === id} onClick={() => onChoisir(id)}>
+      {children}
+    </Button>
+  );
+}
+
+/** Au niveau du module, pour la même raison que `OptionDate`. */
+function Case({ valeur, onChange, children }: { valeur: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+  return (
+    <label className="flex min-h-9 items-center gap-2 text-sm text-slate-700 max-md:min-h-11">
+      <input type="checkbox" checked={valeur} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+      {children}
+    </label>
+  );
+}
+
 function DialogueDate({ campagne, maintenant, onClose }: { campagne: Campagne; maintenant: string; onClose: () => void }) {
   const { date } = useGestesCampagne();
   const aujourdhui = jourDe(maintenant);
   const demain = parisVersIso(ajouterJours(aujourdhui, 1), '09:00');
   const lundi = parisVersIso(prochainLundi(aujourdhui), '09:00');
-  const [choix, setChoix] = useState<'demain' | 'lundi' | 'autre'>('demain');
+  const [choix, setChoix] = useState<ChoixDate>('demain');
   const [jour, setJour] = useState(ajouterJours(aujourdhui, 2));
   const [heure, setHeure] = useState('09:00');
+  // `le` est nul tant que le jour ou l'heure est vidé : on calcule `valide` d'abord, rien ne plante.
   const le = choix === 'demain' ? demain : choix === 'lundi' ? lundi : parisVersIso(jour, heure);
-  const valide = choix !== 'autre' || (jour !== '' && heure !== '' && new Date(le).getTime() > new Date(maintenant).getTime());
-
-  const Option = ({ id, children }: { id: typeof choix; children: React.ReactNode }) => (
-    <Button variant={choix === id ? 'primary' : 'secondary'} className={TACTILE} aria-pressed={choix === id} onClick={() => setChoix(id)}>
-      {children}
-    </Button>
-  );
+  const valide = le !== null && (choix !== 'autre' || new Date(le).getTime() > new Date(maintenant).getTime());
 
   return (
     <Modal
@@ -209,16 +236,22 @@ function DialogueDate({ campagne, maintenant, onClose }: { campagne: Campagne; m
       description={`${campagne.nom} · liste et messages inchangés.`}
       footer={
         <PiedDialogue annuler={onClose}>
-          <Button className={TACTILE} disabled={!valide} loading={date.isPending} onClick={() => date.mutate({ id: String(campagne.id), le }, { onSuccess: onClose })}>
+          <Button className={TACTILE} disabled={!valide} loading={date.isPending} onClick={() => le !== null && date.mutate({ id: String(campagne.id), le }, { onSuccess: onClose })}>
             Reprogrammer
           </Button>
         </PiedDialogue>
       }
     >
       <div className="flex flex-wrap gap-2">
-        <Option id="demain">Demain 9:00</Option>
-        <Option id="lundi">Lundi 9:00</Option>
-        <Option id="autre">Autre…</Option>
+        <OptionDate id="demain" choix={choix} onChoisir={setChoix}>
+          Demain 9:00
+        </OptionDate>
+        <OptionDate id="lundi" choix={choix} onChoisir={setChoix}>
+          Lundi 9:00
+        </OptionDate>
+        <OptionDate id="autre" choix={choix} onChoisir={setChoix}>
+          Autre…
+        </OptionDate>
       </div>
       {choix === 'autre' ? (
         <div className="mt-3 grid grid-cols-2 gap-3">
@@ -231,9 +264,12 @@ function DialogueDate({ campagne, maintenant, onClose }: { campagne: Campagne; m
             <input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm max-md:h-11" />
           </label>
         </div>
-      ) : (
+      ) : le !== null ? (
         <p className="mt-3 text-sm text-slate-600">Prochain envoi : {dateRelative(le, maintenant)}.</p>
-      )}
+      ) : null}
+      {choix === 'autre' && !valide ? (
+        <p className="mt-2 text-xs text-slate-500">Choisissez un jour et une heure à venir.</p>
+      ) : null}
       <Erreur erreur={date.error} />
     </Modal>
   );
@@ -245,13 +281,6 @@ function DialogueDupliquer({ campagne, onClose }: { campagne: Campagne; onClose:
   const [garderCible, setGarderCible] = useState(true);
   const [garderMessages, setGarderMessages] = useState(true);
   const [exclure, setExclure] = useState(false);
-
-  const Case = ({ valeur, onChange, children }: { valeur: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) => (
-    <label className="flex min-h-9 items-center gap-2 text-sm text-slate-700 max-md:min-h-11">
-      <input type="checkbox" checked={valeur} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-      {children}
-    </label>
-  );
 
   return (
     <Modal

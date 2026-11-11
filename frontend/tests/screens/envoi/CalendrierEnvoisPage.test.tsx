@@ -55,7 +55,7 @@ describe('CalendrierEnvoisPage', () => {
   it('état vide', async () => {
     definirEtatForce('vide');
     await ouvrir();
-    expect(await screen.findByText(/Rien à afficher pour le moment/)).toBeInTheDocument();
+    expect(await screen.findByText(/Aucun envoi cette semaine/)).toBeInTheDocument();
   });
 
   it('état d’erreur', async () => {

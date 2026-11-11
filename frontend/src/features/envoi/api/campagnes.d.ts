@@ -455,8 +455,6 @@ export interface operations {
                 etat?: components["schemas"]["EtatDestinataire"];
                 /** @description Regroupement affiché sous forme de filtres (les états détaillés restent dans `etat`). */
                 groupe?: "en_file" | "partis" | "refuses" | "ont_repondu" | "arretes" | "exclus";
-                /** @description Filtre sur l'ouverture estimée (campagnes qui suivent les ouvertures seulement). */
-                ouvert?: "oui" | "non" | "automatique";
                 page?: components["parameters"]["Page"];
                 par_page?: components["parameters"]["ParPage"];
                 /** @description Recherche texte (insensible à la casse et aux accents). */

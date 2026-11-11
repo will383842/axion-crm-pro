@@ -21,12 +21,18 @@ export type Calendrier = Reponse<'calendrierCampagnes'>;
 export type PageDestinataires = Reponse<'listerDestinatairesCampagne'>;
 
 export type GroupeDestinataires = 'en_file' | 'partis' | 'refuses' | 'ont_repondu' | 'arretes' | 'exclus';
-export type FiltreOuverture = 'oui' | 'non' | 'automatique';
 
 export const CLE = ['envoi', 'campagnes'] as const;
 
 export async function listerCampagnes(q: string): Promise<ListeCampagnes> {
-  return (await api.get<ListeCampagnes>('/envoi/campagnes', { params: { par_page: 200, ...(q.trim() !== '' ? { q: q.trim() } : {}) } })).data;
+  // Toutes les pages (200 par page) : une liste de plus de 200 campagnes ne doit pas être coupée en silence.
+  const recherche = q.trim() !== '' ? { q: q.trim() } : {};
+  const premiere = (await api.get<ListeCampagnes>('/envoi/campagnes', { params: { par_page: 200, page: 1, ...recherche } })).data;
+  const data = [...premiere.data];
+  for (let page = 2; page <= Math.min(premiere.meta.pages, 25); page += 1) {
+    data.push(...(await api.get<ListeCampagnes>('/envoi/campagnes', { params: { par_page: 200, page, ...recherche } })).data.data);
+  }
+  return { ...premiere, data };
 }
 
 export async function lireCampagne(id: string): Promise<FicheCampagne> {
@@ -40,7 +46,6 @@ export async function lireCalendrier(du: string | null, au: string | null): Prom
 
 export interface ParamsDestinataires {
   groupe: GroupeDestinataires | null;
-  ouvert: FiltreOuverture | null;
   q: string;
   page: number;
 }
@@ -48,7 +53,6 @@ export interface ParamsDestinataires {
 export async function listerDestinataires(id: string, p: ParamsDestinataires): Promise<PageDestinataires> {
   const params: Record<string, string | number> = { page: p.page, par_page: 25 };
   if (p.groupe !== null) params['groupe'] = p.groupe;
-  if (p.ouvert !== null) params['ouvert'] = p.ouvert;
   if (p.q.trim() !== '') params['q'] = p.q.trim();
   return (await api.get<PageDestinataires>(`/envoi/campagnes/${encodeURIComponent(id)}/destinataires`, { params })).data;
 }

@@ -5,8 +5,7 @@ info:
   description: |
     Liste, fiche et suivi des campagnes : filtres par statut, pause, reprise,
     terminer, dupliquer, changer la date, destinataires et état par
-    destinataire (ouvertures estimées comprises quand la campagne les suit),
-    calendrier. Lot d'écran : DM2-CAM.
+    destinataire, calendrier. Lot d'écran : DM2-CAM.
 servers:
   - url: /api/v1
 paths:
@@ -266,13 +265,6 @@ paths:
           required: false
           description: Regroupement affiché sous forme de filtres (les états détaillés restent dans `etat`).
           schema: { type: string, enum: [en_file, partis, refuses, ont_repondu, arretes, exclus] }
-        - name: ouvert
-          in: query
-          required: false
-          description: Filtre sur l'ouverture estimée (campagnes qui suivent les ouvertures seulement).
-          schema:
-            type: string
-            enum: [oui, non, automatique]
         - $ref: './commun.yaml#/components/parameters/Recherche'
         - $ref: './commun.yaml#/components/parameters/Page'
         - $ref: './commun.yaml#/components/parameters/ParPage'

@@ -60,17 +60,6 @@ export const GROUPE_LIBELLE: Record<GroupeDestinataires, string> = {
   exclus: 'Exclus',
 };
 
-const MOTIF_OUVERTURE: Record<string, string> = {
-  protection_apple: 'protection de la vie privée d’Apple',
-  relais_images: 'relais d’images',
-  antivirus: 'antivirus',
-  ouverture_immediate: 'ouverture dans la seconde',
-};
-
-export function libelleMotifAutomatique(raison: string | null): string {
-  return raison !== null && MOTIF_OUVERTURE[raison] !== undefined ? MOTIF_OUVERTURE[raison] : 'relais automatique';
-}
-
 const FUSEAU = 'Europe/Paris';
 
 /** « 12,5 % » : pourcentage à la française. */
@@ -135,11 +124,17 @@ function ecartParis(t: number): number {
   return Math.round((Date.UTC(p['year']!, p['month']! - 1, p['day'], p['hour'], p['minute'], p['second']) - t) / 60_000);
 }
 
-/** Instant ISO (UTC) d'un jour AAAA-MM-JJ et d'une heure « hh:mm » lus à Paris. */
-export function parisVersIso(jour: string, hhmm: string): string {
+/**
+ * Instant ISO (UTC) d'un jour AAAA-MM-JJ et d'une heure « hh:mm » lus à Paris.
+ * `null` si le jour ou l'heure est vide ou invalide (champ vidé dans un dialogue) :
+ * l'appelant décide, rien ne plante.
+ */
+export function parisVersIso(jour: string, hhmm: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jour) || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
   const [a, mo, j] = jour.split('-').map(Number) as [number, number, number];
   const [h, m] = hhmm.split(':').map(Number) as [number, number];
   const local = Date.UTC(a, mo - 1, j, h, m);
+  if (Number.isNaN(local)) return null;
   let t = local - ecartParis(local) * 60_000;
   t = local - ecartParis(t) * 60_000;
   return new Date(t).toISOString();

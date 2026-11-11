@@ -256,11 +256,12 @@ test('CRM-G2 12 — sonde B : opposition sans adresse (aucune ligne opt_out), pu
 test('CRM-G2 13 — fiche opposée sans opt_out mais abonnée par ailleurs : jamais éligible à la diffusion', function () {
     g2Poster(g2Evenement())->assertOk();
     $personne = g2Personne();
+    $workspaceId = (string) DB::table('workspaces')->where('slug', 'axion-ia')->value('id');
     DB::table('abonnements')->insert([
-        'personne_id' => $personne->id, 'canal' => 'lettre', 'statut' => 'abonne',
+        'workspace_id' => $workspaceId, 'personne_id' => $personne->id, 'canal' => 'lettre', 'statut' => 'abonne',
+        'consent_version' => 'v1', 'consent_at' => now(), 'dernier_evenement_at' => now(),
         'created_at' => now(), 'updated_at' => now(),
     ]);
-    $workspaceId = (string) DB::table('workspaces')->where('slug', 'axion-ia')->value('id');
     expect(Abonnements::eligiblesALaDiffusion($workspaceId)->count())->toBe(1);
 
     DB::table('personnes')->where('id', $personne->id)->update(['opposition_at' => now()]);

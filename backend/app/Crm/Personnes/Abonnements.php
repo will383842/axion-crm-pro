@@ -102,7 +102,10 @@ final class Abonnements
     {
         // Fiche mise à l'écart de tout envoi (données gardées, jamais effacées).
         // Colonne ajoutée par migration : absente pendant une fenêtre de déploiement.
-        if (Schema::hasColumn('personnes', 'opposition_at')) {
+        // Seul un résultat POSITIF est gardé en mémoire (comme `colonnesAccordsPresentes()`).
+        static $colonnePresente = false;
+        $colonnePresente = $colonnePresente || Schema::hasColumn('personnes', 'opposition_at');
+        if ($colonnePresente) {
             $requete->whereNull('personnes.opposition_at');
         }
 

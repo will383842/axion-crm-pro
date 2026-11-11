@@ -152,7 +152,8 @@ export interface components {
         BoiteResume: {
             /** Format: email */
             adresse: string;
-            domaine_id: components["schemas"]["Identifiant"];
+            /** @description Identifiant du domaine de la boîte ; nul si ce domaine n'est pas enregistré dans l'espace. */
+            domaine_id: components["schemas"]["Identifiant"] | null;
             envoyes_aujourdhui: number;
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
@@ -160,8 +161,8 @@ export interface components {
             quota_jour: number;
             reponses_7j: number;
             statut: components["schemas"]["StatutBoite"];
-            /** @description Refus (durs et mous) sur 7 jours, en pourcentage. */
-            taux_refus: number;
+            /** @description Refus (durs et mous) sur 7 jours, en pourcentage ; nul tant qu'il n'est pas mesurable (aucun envoi, ou source des refus mous absente). */
+            taux_refus: number | null;
         };
         /** @description Position d'un domaine dans la montée en douceur. */
         Chauffe: {
@@ -175,7 +176,8 @@ export interface components {
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;
-            dmarc: components["schemas"]["PolitiqueDmarc"];
+            /** @description Politique DMARC publiée ; nulle tant qu'elle n'est pas connue. */
+            dmarc: components["schemas"]["PolitiqueDmarc"] | null;
             /** @description DMARC progressif — prochaine politique et date prévue. */
             dmarc_prochaine_etape: {
                 le: components["schemas"]["Horodatage"];
@@ -273,10 +275,14 @@ export interface components {
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
             nom: string;
-            version_configuration: number;
+            /** @description Version de configuration appliquée ; nulle si aucune n'a été appliquée. */
+            version_configuration: number | null;
         };
-        /** @enum {string} */
-        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
+        /**
+         * @description Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
+         * @enum {string}
+         */
+        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue" | "inconnu";
         /** @enum {string} */
         TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         /** @description État des verrous d'envoi, en lecture seule. */

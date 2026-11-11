@@ -5,6 +5,8 @@ namespace App\Envoi\Sante;
 use App\Envoi\Chauffe\BudgetChauffe;
 use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Chauffe\Fournisseur;
+use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\JourEnvoi;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
@@ -25,22 +27,26 @@ final class VueSante
 
     private const MESSAGERIES = [Fournisseur::GMAIL => 'Gmail et Google Workspace', Fournisseur::MICROSOFT => 'Outlook et Microsoft 365', Fournisseur::AUTRE => 'Autres messageries'];
 
-    public function __construct(private readonly DepotSante $sante, private readonly DepotChauffe $chauffe) {}
+    public function __construct(private readonly DepotSante $sante, private readonly DepotChauffe $chauffe, private readonly DepotSocle $socle) {}
 
     /** @return array<string, mixed> */
     public function pour(string $ws, DateTimeImmutable $maintenant): array
     {
         $jour = JourEnvoi::de($maintenant);
         $pauses = $this->chauffe->pausesActives($ws, $maintenant);
-        $pauseGlobale = array_filter($pauses, static fn ($p): bool => $p->portee === 'global') !== [];
+        $arret = $this->socle->toutArreter($ws); // arrêt général armé : plus rien ne part
+        $toutEstFreine = $arret || array_filter($pauses, static fn ($p): bool => $p->portee === 'global') !== [];
         $serveurs = $this->serveurs($ws);
         $constatsEspace = $this->sante->constatsOuverts($ws, SuperviseurSante::ESPACE);
-        $sante_connue = array_filter($serveurs, static fn (array $s): bool => $s['etat'] !== self::GRIS) !== [];
-        $boites = $this->boites($ws, $jour, $pauses, $pauseGlobale, $sante_connue);
-        $domaines = $this->domaines($ws, $boites, $pauseGlobale);
+        $santeConnue = array_filter($serveurs, static fn (array $s): bool => $s['etat'] !== self::GRIS) !== [];
+        $domaines = $this->domaines($ws, $toutEstFreine);
+        $boites = $this->boites($ws, $jour, $domaines, $toutEstFreine, $santeConnue);
         $test = $this->testDuMatin($ws, $jour);
 
+        // Le pire feu l'emporte : rouge > ambre > gris (inconnu) > vert. Aucun serveur déclaré = on ne sait pas (gris), sans masquer un rouge.
         $feux = array_values(array_merge(
+            $serveurs === [] ? [self::GRIS] : [],
+            $arret ? ['rouge'] : [],
             array_column($serveurs, 'etat'),
             array_column($domaines, 'etat'),
             array_column($boites, 'etat'),
@@ -48,23 +54,23 @@ final class VueSante
             array_map(static fn (array $c): string => $c['gravite'] === Constat::CRITIQUE ? 'rouge' : 'ambre', $constatsEspace),
             array_map(static fn ($p): string => $p->portee === 'global' ? 'rouge' : 'ambre', $pauses),
         ));
-        $feu = $serveurs === [] ? self::GRIS : $this->pire($feux);
+        $feu = $this->pire($feux);
         $nbConstats = count($constatsEspace) + array_sum(array_map(fn (array $s): int => $s['_constats'], $serveurs));
         $verifie = array_filter(array_column($serveurs, '_releve_le'));
 
         return [
             'feu' => $feu,
-            'boites' => array_map(static fn (array $b): array => array_diff_key($b, ['_domaine' => 1]), $boites),
-            'domaines' => $domaines,
+            'boites' => $boites,
+            'domaines' => array_map(static fn (array $d): array => array_diff_key($d, ['_cle' => 1]), $domaines),
             'serveurs' => array_map(static fn (array $s): array => array_diff_key($s, ['_constats' => 1, '_releve_le' => 1]), $serveurs),
             'test_du_matin' => $test,
-            'alertes' => $nbConstats + count($pauses),
+            'alertes' => $nbConstats + count($pauses) + ($arret ? 1 : 0),
             'verifie_le' => $verifie === [] ? null : self::iso(max($verifie)),
             'volume_jour' => [
                 'possibles' => array_sum(array_map(static fn (array $b): int => $b['statut'] === 'suspendue' ? 0 : $b['quota_jour'], $boites)),
                 'envoyes' => array_sum(array_column($boites, 'envoyes_aujourdhui')),
             ],
-            'rythme_messageries' => $this->rythme($ws, $jour, $pauses, $pauseGlobale),
+            'rythme_messageries' => $this->rythme($ws, $jour, $pauses, $toutEstFreine),
             'envoyes_14_jours' => $this->quatorzeJours($ws, $jour),
             'pauses' => array_map(static fn ($p): array => [
                 'motif' => (string) $p->motif, 'portee' => (string) $p->portee,
@@ -78,7 +84,8 @@ final class VueSante
     private function serveurs(string $ws): array
     {
         $sources = WorkspaceContext::run($ws, fn () => DB::table('envoi_serveurs')->where('workspace_id', $ws)->orderBy('source')->get(['id', 'source']));
-        $versions = max(1, (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_config_versions')->where('workspace_id', $ws)->where('statut', 'appliquee')->count()));
+        $nb = (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_config_versions')->where('workspace_id', $ws)->where('statut', 'appliquee')->count());
+        $versions = $nb > 0 ? $nb : null; // aucune version appliquée : inconnue, pas « 1 »
         $out = [];
         foreach ($sources as $s) {
             $releve = $this->sante->dernierReleve($ws, (string) $s->source);
@@ -96,44 +103,44 @@ final class VueSante
     }
 
     /**
-     * @param  list<\stdClass>  $pauses
+     * @param  list<array<string, mixed>>  $domaines
      * @return list<array<string, mixed>>
      */
-    private function boites(string $ws, DateTimeImmutable $jour, array $pauses, bool $pauseGlobale, bool $santeConnue): array
+    private function boites(string $ws, DateTimeImmutable $jour, array $domaines, bool $toutEstFreine, bool $santeConnue): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->orderBy('adresse')->get(['id', 'adresse', 'etat', 'limite_jour']));
         $c = $this->chauffe->chiffresParBoite($ws, $jour);
+        $parNom = array_column($domaines, null, '_cle');
         $out = [];
         foreach ($lignes as $b) {
             $m = $c[(string) $b->id] ?? null;
-            $e7 = (int) ($m->e7 ?? 0);
-            $enPause = (string) $b->etat === 'en_pause';
+            $adresse = (string) $b->adresse;
+            $domaine = $parNom[Fournisseur::domaine($adresse)] ?? null;
+            $feuDomaine = $domaine['etat'] ?? self::GRIS; // domaine non enregistré dans l'espace : inconnu
+            // Une pause visant une seule messagerie ne change pas l'état de la boîte : elle se lit dans le rythme par messagerie.
             [$etat, $statut] = match (true) {
-                $enPause => ['rouge', 'suspendue'],
-                $pauseGlobale => ['rouge', 'ralentie'],
-                $pauses !== [] => ['ambre', 'ralentie'],
-                ! $santeConnue => [self::GRIS, 'ralentie'], // aucun relevé de santé : on ne sait pas, donc pas « prête »
+                (string) $b->etat === 'en_pause' => ['rouge', 'suspendue'],
+                $toutEstFreine || $feuDomaine === 'rouge' => ['rouge', 'ralentie'],
+                $feuDomaine === 'ambre' => ['ambre', 'ralentie'],
+                ! $santeConnue || $feuDomaine === self::GRIS => [self::GRIS, 'inconnu'], // on ne sait pas : jamais « prête »
                 default => ['vert', 'prete'],
             };
-            $adresse = (string) $b->adresse;
             $out[] = [
-                'id' => (string) $b->id, 'adresse' => $adresse, 'domaine_id' => Fournisseur::domaine($adresse), 'nom_affiche' => $adresse,
+                'id' => (string) $b->id, 'adresse' => $adresse, 'domaine_id' => $domaine['id'] ?? null, 'nom_affiche' => $adresse,
                 'etat' => $etat, 'statut' => $statut, 'quota_jour' => (int) $b->limite_jour, 'envoyes_aujourdhui' => (int) ($m->e1 ?? 0),
-                'taux_refus' => $e7 === 0 ? 0.0 : round(100 * (int) ($m->r7 ?? 0) / $e7, 1), // rebonds durs seulement : les refus mous ne sont pas comptés ici
-                'reponses_7j' => (int) ($m->a7 ?? 0), '_domaine' => Fournisseur::domaine($adresse),
+                'taux_refus' => null, // refus durs ET mous : la source des refus mous par boîte n'existe pas encore, donc non mesuré
+                'reponses_7j' => (int) ($m->a7 ?? 0),
             ];
         }
 
         return $out;
     }
 
-    /**
-     * @param  list<array<string, mixed>>  $boites
-     * @return list<array<string, mixed>>
-     */
-    private function domaines(string $ws, array $boites, bool $pauseGlobale): array
+    /** @return list<array<string, mixed>> */
+    private function domaines(string $ws, bool $toutEstFreine): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->orderBy('nom')->get(['id', 'nom', 'cree_le']));
+        $nbBoites = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->selectRaw("split_part(lower(adresse), '@', 2) AS d, count(*) AS n")->groupBy('d')->pluck('n', 'd')->all());
         $dns = array_column($this->sante->controlesDns($ws), null, 'domaine');
         $listes = array_filter($this->sante->controlesListes($ws), static fn (array $l): bool => $l['type'] === 'domaine');
         $out = [];
@@ -141,51 +148,60 @@ final class VueSante
             $nom = mb_strtolower((string) $d->nom);
             $statuts = array_column(array_filter($listes, static fn (array $l): bool => mb_strtolower($l['ressource']) === $nom), 'statut');
             $etat = match (true) {
+                $toutEstFreine => 'rouge',
                 ! isset($dns[$nom]) => self::GRIS,
-                ! $dns[$nom]['pret'] || in_array('liste', $statuts, true) || $pauseGlobale => 'rouge',
+                ! $dns[$nom]['pret'] || in_array('liste', $statuts, true) => 'rouge',
                 in_array('non_fiable', $statuts, true) || $dns[$nom]['pause'] => 'ambre',
                 default => 'vert',
             };
             $out[] = [
-                'id' => (string) $d->id, 'nom' => (string) $d->nom, 'etat' => $etat,
-                'boites' => count(array_filter($boites, static fn (array $b): bool => $b['_domaine'] === $nom)),
-                'dmarc' => 'none', // la politique publiée n'est pas conservée (seulement « valide ou non ») : la moins protectrice, jamais une valeur flatteuse
+                'id' => (string) $d->id, 'nom' => (string) $d->nom, 'etat' => $etat, 'boites' => (int) ($nbBoites[$nom] ?? 0),
+                'dmarc' => null, // le contrôle DNS ne garde que « politique valide ou non », pas la politique elle-même : inconnue
                 'dmarc_prochaine_etape' => null, 'listes_noires' => count(array_filter($statuts, static fn (string $s): bool => $s === 'liste')),
                 'ajoute_le' => self::iso((string) $d->cree_le), 'chauffe' => null, // palier de chauffe par domaine : pas encore calculé ici
+                '_cle' => $nom,
             ];
         }
 
         return $out;
     }
 
-    /** @return array{le: ?string, temoins_ok: int, temoins_total: int, etat: string} */
+    /** @return array{le: ?string, temoins_ok: int, temoins_total: int, etat: string} les 6 fournisseurs témoins sont requis */
     private function testDuMatin(string $ws, DateTimeImmutable $jour): array
     {
+        $requis = DepotSocleDb::FOURNISSEURS_TEMOINS;
         $l = WorkspaceContext::run($ws, fn () => DB::select(
             'SELECT DISTINCT ON (fournisseur) fournisseur, jour, reception, auth_alignee, cree_le FROM envoi_temoins_journees
              WHERE workspace_id = ? AND jour = (SELECT max(jour) FROM envoi_temoins_journees WHERE workspace_id = ?) ORDER BY fournisseur, id DESC',
             [$ws, $ws],
         ));
         if ($l === []) {
-            return ['le' => null, 'temoins_ok' => 0, 'temoins_total' => 0, 'etat' => self::GRIS];
+            return ['le' => null, 'temoins_ok' => 0, 'temoins_total' => count($requis), 'etat' => self::GRIS];
         }
-        $ok = count(array_filter($l, static fn ($r): bool => $r->reception === 'inbox' && (bool) $r->auth_alignee));
+        $bons = array_filter($l, static fn ($r): bool => $r->reception === 'inbox' && (bool) $r->auth_alignee && in_array($r->fournisseur, $requis, true));
         $indesirable = array_filter($l, static fn ($r): bool => $r->reception === 'indesirables') !== [];
+        $mauvais = count($l) - count($bons) > 0;
         $perime = (string) $l[0]->jour < $jour->format('Y-m-d'); // pas de test aujourd'hui : on ne l'affirme pas
-        $etat = $perime ? self::GRIS : ($ok === count($l) ? 'vert' : ($indesirable ? 'rouge' : 'ambre'));
+        $etat = match (true) {
+            $perime => self::GRIS,
+            $indesirable => 'rouge',
+            $mauvais => 'ambre',
+            count($bons) === count($requis) => 'vert', // vert seulement si les 6 sont bons
+            default => self::GRIS, // témoins manquants : inconnu
+        };
 
-        return ['le' => self::iso(max(array_map(static fn ($r): string => (string) $r->cree_le, $l))), 'temoins_ok' => $ok, 'temoins_total' => count($l), 'etat' => $etat];
+        return ['le' => self::iso(max(array_map(static fn ($r): string => (string) $r->cree_le, $l))), 'temoins_ok' => count($bons), 'temoins_total' => count($requis), 'etat' => $etat];
     }
 
     /**
      * @param  list<\stdClass>  $pauses
      * @return list<array<string, mixed>>
      */
-    private function rythme(string $ws, DateTimeImmutable $jour, array $pauses, bool $pauseGlobale): array
+    private function rythme(string $ws, DateTimeImmutable $jour, array $pauses, bool $toutEstFreine): array
     {
         $out = [];
         foreach (self::MESSAGERIES as $f => $libelle) {
-            $freine = $pauseGlobale || array_filter($pauses, static fn ($p): bool => $p->fournisseur === $f) !== [];
+            $freine = $toutEstFreine || array_filter($pauses, static fn ($p): bool => $p->fournisseur === $f) !== [];
             $out[] = [
                 'messagerie' => $libelle, 'envoyes' => $this->chauffe->totauxDuJour($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE, $f)['envoyes'],
                 'par_heure' => null, 'etat' => $freine ? 'freine' : 'normal', // le rythme horaire par messagerie n'est pas mesuré

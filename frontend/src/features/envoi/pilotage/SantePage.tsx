@@ -103,7 +103,7 @@ export function SantePage() {
                       <span>{d.boites} boîte{d.boites > 1 ? 's' : ''}</span>
                       {d.chauffe ? <span>palier {d.chauffe.palier}, jour {d.chauffe.jours_effectifs}</span> : null}
                     </span>
-                    <span className="mt-2 block text-xs text-slate-600">DMARC : {d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}{d.listes_noires > 0 ? ` · ${d.listes_noires} liste${d.listes_noires > 1 ? 's' : ''} noire${d.listes_noires > 1 ? 's' : ''}` : ''}</span>
+                    <span className="mt-2 block text-xs text-slate-600">DMARC : {d.dmarc === null ? 'inconnu' : d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}{d.listes_noires > 0 ? ` · ${d.listes_noires} liste${d.listes_noires > 1 ? 's' : ''} noire${d.listes_noires > 1 ? 's' : ''}` : ''}</span>
                   </Link>
                 ))}
               </div>
@@ -116,7 +116,7 @@ export function SantePage() {
                   <caption className="sr-only">Boîtes d’envoi</caption>
                   <thead className="text-xs text-slate-600"><tr><th scope="col" className="py-2 pr-3">Boîte</th><th scope="col" className="py-2 pr-3">État</th><th scope="col" className="py-2 pr-3 text-right">Aujourd’hui</th><th scope="col" className="py-2 pr-3 text-right">Refus (7 j)</th><th scope="col" className="py-2 text-right">Réponses (7 j)</th></tr></thead>
                   <tbody>{s.boites.map((b) => (
-                    <tr key={b.id} className="border-t border-slate-100"><td className="py-2 pr-3 font-medium">{b.adresse}</td><td className="py-2 pr-3"><Feu etat={b.etat} /></td><td className="py-2 pr-3 text-right">{b.envoyes_aujourdhui} / {b.quota_jour}</td><td className="py-2 pr-3 text-right">{formaterPourcent(b.taux_refus)}</td><td className="py-2 text-right">{b.reponses_7j}</td></tr>
+                    <tr key={b.id} className="border-t border-slate-100"><td className="py-2 pr-3 font-medium">{b.adresse}</td><td className="py-2 pr-3"><Feu etat={b.etat} /></td><td className="py-2 pr-3 text-right">{b.envoyes_aujourdhui} / {b.quota_jour}</td><td className="py-2 pr-3 text-right">{b.taux_refus === null ? 'non mesuré' : formaterPourcent(b.taux_refus)}</td><td className="py-2 text-right">{b.reponses_7j}</td></tr>
                   ))}</tbody>
                 </table>
               </div>

@@ -7,7 +7,7 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Validateur minimal d'un contrat OpenAPI 3.1 d'Envoi (`backend/openapi/envoi/*.yaml`) : vérifie une RÉPONSE réelle
  * contre le schéma déclaré. Lecture seule. Couvre ce que le contrat emploie : $ref (fichiers relatifs compris), type
- * (dont 'null'), required, properties, items, enum, oneOf, minimum, format date / date-time.
+ * (dont 'null'), required, properties, items, enum, oneOf, minimum, maxLength, pattern, format date / date-time / email.
  * Les propriétés non déclarées sont tolérées (le contrat n'écrit pas additionalProperties: false).
  */
 final class ContratOpenApiEnvoi
@@ -81,6 +81,15 @@ final class ContratOpenApiEnvoi
         }
         if (($schema['format'] ?? null) === 'date-time' && is_string($v) && (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/', $v) !== 1 || strtotime($v) === false)) {
             $erreurs[] = "{$chemin} : date-heure invalide";
+        }
+        if (($schema['format'] ?? null) === 'email' && is_string($v) && filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
+            $erreurs[] = "{$chemin} : adresse e-mail invalide";
+        }
+        if (isset($schema['maxLength']) && is_string($v) && mb_strlen($v) > $schema['maxLength']) {
+            $erreurs[] = "{$chemin} : trop long";
+        }
+        if (isset($schema['pattern']) && is_string($v) && preg_match('~' . str_replace('~', '\\~', (string) $schema['pattern']) . '~u', $v) !== 1) {
+            $erreurs[] = "{$chemin} : ne respecte pas le motif";
         }
         if (is_array($v) && ($schema['type'] ?? null) === 'object') {
             foreach ($schema['required'] ?? [] as $cle) {

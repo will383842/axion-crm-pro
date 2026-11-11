@@ -11,10 +11,10 @@ import { renderScreen } from '../../helpers/renderScreen';
 /** Réponse de la VRAIE route `GET /envoi/sante` (forme de `pilotage.yaml`) : espace où rien n'est encore mesuré, avec une pause. */
 const REPONSE_CONTRAT = {
   feu: 'gris',
-  boites: [{ id: 'b1', adresse: 'a@prospection.example', domaine_id: 'prospection.example', nom_affiche: 'a@prospection.example', etat: 'gris', statut: 'ralentie', quota_jour: 20, envoyes_aujourdhui: 0, taux_refus: 0, reponses_7j: 0 }],
-  domaines: [{ id: '1', nom: 'prospection.example', etat: 'gris', boites: 1, dmarc: 'none', dmarc_prochaine_etape: null, listes_noires: 0, ajoute_le: '2026-11-01T00:00:00Z', chauffe: null }],
-  serveurs: [{ id: '1', nom: 'src', etat: 'gris', adresses_ip: [], version_configuration: 1 }],
-  test_du_matin: { le: null, temoins_ok: 0, temoins_total: 0, etat: 'gris' },
+  boites: [{ id: 'b1', adresse: 'a@prospection.example', domaine_id: '1', nom_affiche: 'a@prospection.example', etat: 'gris', statut: 'inconnu', quota_jour: 20, envoyes_aujourdhui: 0, taux_refus: null, reponses_7j: 0 }],
+  domaines: [{ id: '1', nom: 'prospection.example', etat: 'gris', boites: 1, dmarc: null, dmarc_prochaine_etape: null, listes_noires: 0, ajoute_le: '2026-11-01T00:00:00Z', chauffe: null }],
+  serveurs: [{ id: '1', nom: 'src', etat: 'gris', adresses_ip: [], version_configuration: null }],
+  test_du_matin: { le: null, temoins_ok: 0, temoins_total: 6, etat: 'gris' },
   alertes: 1,
   verifie_le: null,
   volume_jour: { possibles: 20, envoyes: 0 },
@@ -31,6 +31,8 @@ describe('SantePage — réponse de la vraie route', () => {
     expect(screen.getByText(/test du matin jamais fait/)).toBeVisible();
     expect(screen.getByRole('list', { name: 'Pauses d’envoi actives' })).toHaveTextContent(/Message en indésirables chez un témoin.*gmail.*jusqu’à/);
     expect(screen.getByText('Freinée')).toBeVisible();
+    expect(screen.getByText(/DMARC : inconnu/)).toBeVisible();
+    expect(screen.getByText('non mesuré')).toBeVisible();
     expect(screen.queryByText('Envois normaux')).toBeNull();
   });
 });

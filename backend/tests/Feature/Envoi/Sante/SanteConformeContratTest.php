@@ -1,6 +1,7 @@
 <?php
 
 use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Sante\DepotSanteDb;
 use App\Models\User;
 use Database\Seeders\PermissionsAndRolesSeeder;
@@ -42,13 +43,13 @@ function boiteSanteContrat(string $ws, string $adresse, string $etat = 'active')
 }
 
 /** Espace sain : un serveur avec un relevé OK, un domaine contrôlé, une boîte, un test du matin complet. */
-function espaceSainContrat(string $ws): string
+function espaceSainContrat(string $ws, array $temoins = DepotSocleDb::FOURNISSEURS_TEMOINS): string
 {
     DB::table('envoi_serveurs')->insert(['workspace_id' => $ws, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
     (new DepotSanteDb)->noterReleve($ws, 'src', new DateTimeImmutable('now', new DateTimeZone('UTC')), true, ['disque_libre_pct' => 80.0]);
     DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'prospection.example', 'achete_le' => '2026-01-01']);
     DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'prospection.example', 'controle_le' => now(), 'pret' => true]);
-    foreach (['gmail', 'outlook_com'] as $f) {
+    foreach ($temoins as $f) {
         DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => now('Europe/Paris')->toDateString(), 'fournisseur' => $f, 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
     }
 
@@ -75,7 +76,7 @@ test('espace vide : réponse conforme au contrat, feu inconnu (gris), test du ma
 
     expect($j['feu'])->toBe('gris')
         ->and($j['boites'])->toBe([])->and($j['domaines'])->toBe([])->and($j['serveurs'])->toBe([])
-        ->and($j['test_du_matin'])->toBe(['le' => null, 'temoins_ok' => 0, 'temoins_total' => 0, 'etat' => 'gris'])
+        ->and($j['test_du_matin'])->toBe(['le' => null, 'temoins_ok' => 0, 'temoins_total' => 6, 'etat' => 'gris'])
         ->and($j['pauses'])->toBe([])->and($j['verifie_le'])->toBeNull()
         ->and($j['envoyes_14_jours'])->toHaveCount(14);
 });
@@ -98,9 +99,9 @@ test('espace sain, aucune pause : tout est calculé, feu vert, pauses vides', fu
 
     expect($j['feu'])->toBe('vert')->and($j['pauses'])->toBe([])
         ->and($j['serveurs'][0]['etat'])->toBe('vert')
-        ->and($j['domaines'][0])->toMatchArray(['nom' => 'prospection.example', 'etat' => 'vert', 'boites' => 1])
-        ->and($j['boites'][0])->toMatchArray(['adresse' => 'a@prospection.example', 'etat' => 'vert', 'statut' => 'prete', 'quota_jour' => 20, 'envoyes_aujourdhui' => 4])
-        ->and($j['test_du_matin'])->toMatchArray(['temoins_ok' => 2, 'temoins_total' => 2, 'etat' => 'vert'])
+        ->and($j['domaines'][0])->toMatchArray(['nom' => 'prospection.example', 'etat' => 'vert', 'boites' => 1, 'dmarc' => null])
+        ->and($j['boites'][0])->toMatchArray(['adresse' => 'a@prospection.example', 'etat' => 'vert', 'statut' => 'prete', 'quota_jour' => 20, 'envoyes_aujourdhui' => 4, 'taux_refus' => null, 'domaine_id' => $j['domaines'][0]['id']])
+        ->and($j['test_du_matin'])->toMatchArray(['temoins_ok' => 6, 'temoins_total' => 6, 'etat' => 'vert'])
         ->and($j['volume_jour'])->toBe(['possibles' => 20, 'envoyes' => 4])
         ->and(array_sum(array_column($j['envoyes_14_jours'], 'envoyes')))->toBe(4);
     $gmail = collect($j['rythme_messageries'])->firstWhere('envoyes', 4);
@@ -146,4 +147,64 @@ test('isolement : rien d’un autre espace ; aucun hôte, identifiant ni URL dan
         ->and($brut)->not->toContain('autre-secret')->not->toContain('autre-domaine')->not->toContain('detail-autre-espace')
         ->not->toContain('smtp-secret')->not->toContain('chiffre-secret')->not->toContain('envoi.example.test')->not->toContain('https://');
     expect([DB::table('envoi_pauses')->count(), DB::table('envoi_releves_sante')->count(), DB::table('envoi_constats_sante')->count()])->toBe($avant);
+});
+
+test('arrêt général armé : feu rouge, boîtes rouges, messageries freinées', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    (new DepotSocleDb)->armerToutArreter($ws, 'test');
+    $j = lireSanteContrat($this, $user);
+
+    expect($j['feu'])->toBe('rouge')->and($j['boites'][0]['etat'])->toBe('rouge')->and($j['boites'][0]['statut'])->not->toBe('prete')
+        ->and(collect($j['rythme_messageries'])->pluck('etat')->unique()->all())->toBe(['freine'])
+        ->and($j['alertes'])->toBeGreaterThanOrEqual(1);
+});
+
+test('le rouge passe avant le gris : pause globale ou constat critique sans aucun serveur déclaré', function () {
+    [$ws, $user] = espaceSanteContrat();
+    (new DepotChauffe)->ouvrirPause($ws, 'tableau_de_bord_non_valide', null, new DateTimeImmutable('now'));
+    expect(lireSanteContrat($this, $user)['feu'])->toBe('rouge');
+
+    [$ws2, $user2] = espaceSanteContrat();
+    (new DepotSanteDb)->ouvrir($ws2, '(espace)', 'liste_noire:ip:203.0.113.9', 'critique', 'x', new DateTimeImmutable('now'));
+    expect(lireSanteContrat($this, $user2)['feu'])->toBe('rouge');
+});
+
+test('valeurs non mesurables : dmarc, taux de refus et version de configuration restent null, jamais flatteurs', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    $j = lireSanteContrat($this, $user);
+    expect($j['domaines'][0]['dmarc'])->toBeNull()->and($j['boites'][0]['taux_refus'])->toBeNull()
+        ->and($j['serveurs'][0]['version_configuration'])->toBeNull();
+
+    DB::table('envoi_config_versions')->insert(['workspace_id' => $ws, 'empreinte' => str_repeat('a', 64), 'statut' => 'appliquee']);
+    expect(lireSanteContrat($this, $user)['serveurs'][0]['version_configuration'])->toBe(1);
+});
+
+test('test du matin : 6 témoins requis ; vert seulement si les 6 sont bons, inconnu s’il en manque, rouge si un est en indésirables', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws, ['gmail', 'google_workspace', 'outlook_com', 'microsoft_365']);
+    $j = lireSanteContrat($this, $user);
+    expect($j['test_du_matin'])->toMatchArray(['temoins_ok' => 4, 'temoins_total' => 6, 'etat' => 'gris'])->and($j['feu'])->not->toBe('vert');
+
+    DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => now('Europe/Paris')->toDateString(), 'fournisseur' => 'yahoo', 'reception' => 'indesirables', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
+    $j = lireSanteContrat($this, $user);
+    expect($j['test_du_matin'])->toMatchArray(['temoins_ok' => 4, 'temoins_total' => 6, 'etat' => 'rouge'])->and($j['feu'])->toBe('rouge');
+});
+
+test('boîtes : domaine rouge => boîte non verte ; pause d’une seule messagerie => boîtes inchangées ; santé inconnue => statut « inconnu »', function () {
+    [$ws, $user] = espaceSanteContrat();
+    $boite = espaceSainContrat($ws);
+    (new DepotChauffe)->ouvrirPause($ws, 'reports_en_hausse_sur_une_heure', 'gmail', new DateTimeImmutable('now'), 1);
+    $b = lireSanteContrat($this, $user)['boites'][0];
+    expect($b)->toMatchArray(['etat' => 'vert', 'statut' => 'prete']);
+
+    DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'prospection.example', 'controle_le' => now()->addMinute(), 'pret' => false]);
+    $b = lireSanteContrat($this, $user)['boites'][0];
+    expect($b['etat'])->toBe('rouge')->and($b['statut'])->not->toBe('prete');
+
+    [$ws2, $user2] = espaceSanteContrat();
+    boiteSanteContrat($ws2, 'x@inconnu.example');
+    $b = lireSanteContrat($this, $user2)['boites'][0];
+    expect($b)->toMatchArray(['etat' => 'gris', 'statut' => 'inconnu', 'domaine_id' => null]);
 });

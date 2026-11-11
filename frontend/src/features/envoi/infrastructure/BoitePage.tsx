@@ -151,7 +151,7 @@ export function BoitePage() {
     <div>
       <Entete
         title={boite?.adresse ?? 'Boîte d’envoi'}
-        phrase={boite ? <>Domaine <Link to="/envoi/domaines/$domaineId" params={{ domaineId: boite.domaine_id }} className="font-medium text-produit underline">{requete.data?.boite.adresse.split('@')[1]}</Link> · {LIBELLE_STATUT[boite.statut]}</> : undefined}
+        phrase={boite ? <>Domaine {boite.domaine_id === null ? <span className="font-medium">{requete.data?.boite.adresse.split('@')[1]}</span> : <Link to="/envoi/domaines/$domaineId" params={{ domaineId: boite.domaine_id }} className="font-medium text-produit underline">{requete.data?.boite.adresse.split('@')[1]}</Link>} · {LIBELLE_STATUT[boite.statut]}</> : undefined}
         actions={
           boite ? (
             <>

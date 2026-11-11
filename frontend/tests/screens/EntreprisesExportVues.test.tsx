@@ -16,7 +16,6 @@ import { zoneEntreprises } from '@/demo/donnees/crm/entreprises';
 import { filtreDeLaVue, type VueSauvegardee } from '@/features/companies/vues/vuesSauvegardees';
 import { EMPTY_FILTER } from '@/features/companies/filtresUrl';
 import type { Entreprise } from '@/demo/donnees/types';
-import { handlers as handlersSocle } from '@/demo/handlers/socle/config.handlers';
 import { demoDb } from '@/demo/base';
 import { api } from '@/demo/outils';
 import { exporterSelection } from '@/features/companies/export/exporterSelection';
@@ -158,7 +157,7 @@ describe('Fiche entreprise : ce qui vient d’Envoi', () => {
     return renderScreen(<CompanyDetailPage />, {
       path: '/companies/$companyId',
       url: `/companies/${idTilleuls()}`,
-      handlers: [features, ...handlersSocle.slice(0, 0), ...handlers, ...voisins],
+      handlers: [features, ...handlers, ...voisins],
     });
   }
 

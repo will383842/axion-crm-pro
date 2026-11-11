@@ -58,7 +58,6 @@ function zone() {
           lien_desinscription: true,
           lien_rendez_vous: 'https://rdv.example/prospection-a',
           bloc_information: BLOC_ART_14,
-          bloc_information_ouvertures: '',
         },
         alertes: { seconde_adresse: null, regroupement_minutes: 15 },
         regles: {
@@ -111,7 +110,7 @@ function motif(o: Opposition): string {
 }
 
 /** « Puis-je écrire à… ? » : la réponse et TOUTES ses raisons. */
-function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non' | 'prudence'; raisons: string[]; mesure_ouvertures_permise: boolean } {
+function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non' | 'prudence'; raisons: string[] } {
   const adresse = saisie.trim().toLowerCase();
   const domaine = domaineDe(adresse);
   const raisons: string[] = [];
@@ -149,7 +148,7 @@ function puisJeEcrire(saisie: string): { adresse: string; reponse: 'oui' | 'non'
 
   if (etat.reponse === 'oui') raisons.push('Aucune opposition connue pour cette adresse.');
   if (etat.reponse === 'non') raisons.push('Aucun message ne part vers cette adresse.');
-  return { adresse: saisie.trim(), reponse: etat.reponse, raisons, mesure_ouvertures_permise: etat.reponse !== 'non' };
+  return { adresse: saisie.trim(), reponse: etat.reponse, raisons };
 }
 
 function resumeRegistre() {
@@ -345,7 +344,6 @@ export const handlers: HttpHandler[] = [
       heures: { de: r.heure_de, a: r.heure_a },
       fuseau: 'Europe/Paris',
       pause_si_refus_pct: r.pause_si_refus_pct,
-      suivre_ouvertures_par_defaut: false,
     } satisfies S['Reglages']);
   }),
 
@@ -363,7 +361,7 @@ export const handlers: HttpHandler[] = [
       return erreur(422, 'validation', 'La raison sociale et l’adresse postale sont obligatoires (elles figurent sous chaque message).');
     }
     const actuelle = lire().identite;
-    const identite: S['Identite'] = { ...corps, forme: 'SAS', lien_desinscription: true, bloc_information: actuelle.bloc_information, bloc_information_ouvertures: actuelle.bloc_information_ouvertures };
+    const identite: S['Identite'] = { ...corps, forme: 'SAS', lien_desinscription: true, bloc_information: actuelle.bloc_information };
     return HttpResponse.json(ecrire({ identite }).identite);
   }),
 

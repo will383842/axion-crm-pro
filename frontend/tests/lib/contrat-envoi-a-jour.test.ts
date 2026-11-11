@@ -67,18 +67,12 @@ describe('contrat d’Envoi — fichiers présents', () => {
     }
   });
 
-  it('le contrat prévoit la mesure des ouvertures (décision de Will)', () => {
-    const commun = readFileSync(path.join(SOURCES, 'commun.yaml'), 'utf8');
-    expect(commun).toContain('suivre_ouvertures');
-    expect(commun).toContain('automatique_probable');
-    expect(commun).toMatch(/estimation/i);
-  });
-
-  it('le contrat ne suit aucun clic (décision de Will : ouvertures seulement)', () => {
+  it('le contrat ne suit aucun clic (aucune mesure de lecture ; le retrait des ouvertures est gardé par aucune-ouverture-envoi.test.ts)', () => {
     for (const zone of ZONES) {
       // Seules mentions permises : « aucun suivi des clics » et la désinscription « en un clic ».
       const texte = readFileSync(path.join(SOURCES, `${zone}.yaml`), 'utf8')
         .replace(/aucun suivi des clics/gi, '')
+        .replace(/ni suivi des clics/gi, '')
         .replace(/désinscription \(un clic\)/gi, '');
       expect(texte.match(MOTIF_CLIC_LIGNE) ?? [], zone).toEqual([]);
     }

@@ -393,12 +393,6 @@ export interface components {
             /** @description Bloc d'information des destinataires (art. 14 du RGPD), présent sous chaque message. */
             bloc_information: string;
             /**
-             * @description Phrase AJOUTÉE au bloc quand la campagne mesure les ouvertures par pixel
-             *     (décrit le pixel et rappelle : aucun suivi des clics). Absente des
-             *     messages des campagnes qui ne mesurent pas les ouvertures.
-             */
-            bloc_information_ouvertures: string;
-            /**
              * @description Forme juridique de l'entité d'envoi (SAS française).
              * @example SAS
              */
@@ -441,13 +435,6 @@ export interface components {
             jours: ("lun" | "mar" | "mer" | "jeu" | "ven" | "sam" | "dim")[];
             pause_si_refus_pct: number;
             plafond_jour: number;
-            /**
-             * @description Valeur proposée pour la case « Suivre les ouvertures » d'une nouvelle
-             *     campagne (faux par défaut). La mesure par pixel est optionnelle,
-             *     décidée par campagne, décrite aux destinataires, jamais pour un contact
-             *     opposé ; aucun suivi des clics.
-             */
-            suivre_ouvertures_par_defaut: boolean;
         };
         /** @description Règles d'alerte par type et canal (console et e-mail seulement), seconde adresse, regroupement. */
         ReglagesAlertes: {
@@ -807,8 +794,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         adresse: string;
-                        /** @description Faux dès que la réponse est « non » (contact opposé), car jamais de pixel pour lui. */
-                        mesure_ouvertures_permise: boolean;
                         raisons: string[];
                         /** @enum {string} */
                         reponse: "oui" | "non" | "prudence";
@@ -1034,7 +1019,7 @@ export interface operations {
                         expediteur: string;
                         /** @description Nom de l'organisation du destinataire, si connue (option « toute mon organisation »). */
                         organisation: string | null;
-                        /** @description Texte « pourquoi ce message » (source, données, mesure des ouvertures si la campagne l'a activée, et aucun suivi des clics). */
+                        /** @description Texte « pourquoi ce message » (source, données, et aucun suivi des clics). */
                         pourquoi_ce_message: string;
                     };
                 };

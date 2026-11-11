@@ -11,12 +11,8 @@ info:
     Propriété : DM0-DEMO. Les lots d'écran ne modifient pas ce fichier ; un
     besoin nouveau est noté dans leur PR.
 
-    Mesure des ouvertures (décision du propriétaire, 01/11/2026) : un pixel OPTIONNEL,
-    activé campagne par campagne (`suivre_ouvertures`). Une ouverture est une
-    ESTIMATION : les ouvertures automatiques (relais d'images des messageries,
-    protection de la vie privée d'Apple, antivirus) sont signalées par
-    `automatique_probable`. L'indicateur principal reste les réponses.
-    Aucun suivi des clics (décision du propriétaire : ouvertures seulement).
+    Aucune mesure de lecture des messages : aucun suivi des clics, ni suivi
+    d'ouverture. L'indicateur principal reste les réponses.
 paths: {}
 components:
   schemas:
@@ -84,26 +80,11 @@ components:
           description: Identifiant de la liste ou de l'audience, ou nom de l'étiquette.
         libelle: { type: string }
         total: { type: integer, minimum: 0 }
-    ResumeOuvertures:
-      type: object
-      description: |
-        Ouvertures d'une campagne qui les suit. Toujours affichées comme une
-        « estimation » ; `automatiques_probables` est déjà retiré de `estimees`.
-      required: [estimees, automatiques_probables, taux_estime, mention]
-      properties:
-        estimees: { type: integer, minimum: 0 }
-        automatiques_probables: { type: integer, minimum: 0 }
-        taux_estime:
-          type: number
-          minimum: 0
-          maximum: 100
-          description: Pourcentage des messages remis, ouvertures automatiques retirées.
-        mention: { type: string, const: estimation }
     CampagneResume:
       type: object
       required:
         [id, nom, statut, cible, envoyes, total, reponses, reponses_interessees,
-         suivre_ouvertures, ouvertures, ab_objet, prochain_envoi_le, cree_le, boites, etapes]
+         ab_objet, prochain_envoi_le, cree_le, boites, etapes]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         nom: { type: string }
@@ -113,14 +94,6 @@ components:
         total: { type: integer, minimum: 0 }
         reponses: { type: integer, minimum: 0 }
         reponses_interessees: { type: integer, minimum: 0 }
-        suivre_ouvertures:
-          type: boolean
-          description: Case « Suivre les ouvertures » de la campagne (pixel optionnel, désactivé par défaut).
-        ouvertures:
-          description: Présent seulement si la campagne suit les ouvertures.
-          oneOf:
-            - $ref: '#/components/schemas/ResumeOuvertures'
-            - type: 'null'
         ab_objet:
           type: boolean
           description: Test A/B sur l'objet du premier message.
@@ -225,28 +198,11 @@ components:
     EtatDestinataire:
       type: string
       enum: [a_envoyer, envoye, remis, rebond_mou, rebond_dur, a_repondu, desinscrit, plainte, exclu, relances_annulees]
-    Ouverture:
-      type: object
-      description: |
-        Ouverture estimée d'un message (pixel). `automatique_probable` vaut vrai
-        quand l'ouverture vient probablement d'un relais (protection de la vie
-        privée d'Apple, relais d'images, antivirus) et non d'une personne.
-      required: [premiere_le, derniere_le, nombre, automatique_probable, raison_automatique]
-      properties:
-        premiere_le: { $ref: '#/components/schemas/Horodatage' }
-        derniere_le: { $ref: '#/components/schemas/Horodatage' }
-        nombre: { type: integer, minimum: 1 }
-        automatique_probable: { type: boolean }
-        raison_automatique:
-          oneOf:
-            - type: string
-              enum: [protection_apple, relais_images, antivirus, ouverture_immediate]
-            - type: 'null'
     Destinataire:
       type: object
       required:
         [id, campagne_id, contact_id, adresse, prenom, nom, organisation, etape, etat,
-         dernier_evenement_le, code_serveur, motif, ouverture]
+         dernier_evenement_le, code_serveur, motif]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         campagne_id: { $ref: '#/components/schemas/Identifiant' }
@@ -275,19 +231,14 @@ components:
         motif:
           description: Code serveur traduit en français (ex. « Adresse inexistante »).
           oneOf: [{ type: string }, { type: 'null' }]
-        ouverture:
-          description: Nul si la campagne ne suit pas les ouvertures ou si rien n'a été vu.
-          oneOf:
-            - $ref: '#/components/schemas/Ouverture'
-            - type: 'null'
     TypeEvenementEnvoi:
       type: string
-      enum: [remis, rebond_dur, rebond_mou, plainte, desinscription, ouverture, reponse]
+      enum: [remis, rebond_dur, rebond_mou, plainte, desinscription, reponse]
     EvenementEnvoi:
       type: object
       required:
         [id, survenu_le, type, campagne_id, boite_id, destinataire_id, adresse, code_serveur,
-         libelle, automatique_probable]
+         libelle]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         survenu_le: { $ref: '#/components/schemas/Horodatage' }
@@ -303,9 +254,6 @@ components:
         libelle:
           description: Explication en français (code serveur traduit).
           oneOf: [{ type: string }, { type: 'null' }]
-        automatique_probable:
-          description: Pour une ouverture seulement ; nul pour les autres types.
-          oneOf: [{ type: boolean }, { type: 'null' }]
     ClassementReponse:
       type: string
       enum: [interesse, pas_maintenant, question, refus, stop, absence, a_rattacher]

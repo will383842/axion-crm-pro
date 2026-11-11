@@ -430,8 +430,6 @@ export interface components {
         EvenementEnvoi: {
             /** Format: email */
             adresse: string;
-            /** @description Pour une ouverture seulement ; nul pour les autres types. */
-            automatique_probable: boolean | null;
             boite_id: components["schemas"]["Identifiant"];
             campagne_id: components["schemas"]["Identifiant"];
             code_serveur: string | null;
@@ -536,7 +534,7 @@ export interface components {
         /** @enum {string} */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
         /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "ouverture" | "reponse";
+        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         VersionConfiguration: {
             appliquee_le: components["schemas"]["Horodatage"] | null;
             changements: {

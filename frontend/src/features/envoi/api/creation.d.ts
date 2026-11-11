@@ -453,14 +453,10 @@ export interface components {
             etapes: number;
             id: components["schemas"]["Identifiant"];
             nom: string;
-            /** @description Présent seulement si la campagne suit les ouvertures. */
-            ouvertures: components["schemas"]["ResumeOuvertures"] | null;
             prochain_envoi_le: components["schemas"]["Horodatage"] | null;
             reponses: number;
             reponses_interessees: number;
             statut: components["schemas"]["StatutCampagne"];
-            /** @description Case « Suivre les ouvertures » de la campagne (pixel optionnel, désactivé par défaut). */
-            suivre_ouvertures: boolean;
             total: number;
         };
         ChampUtilise: {
@@ -517,8 +513,6 @@ export interface components {
                 [key: string]: string;
             };
             sequence?: components["schemas"]["EtapeSequence"][];
-            /** @description Case « Suivre les ouvertures » (pixel). Les ouvertures seront affichées comme une estimation. */
-            suivre_ouvertures?: boolean;
         };
         Controle: {
             /** @enum {string} */
@@ -584,18 +578,6 @@ export interface components {
             statut: components["schemas"]["StatutMessage"];
             /** @description Version validée, la seule utilisable dans une campagne. */
             version_validee: number | null;
-        };
-        /**
-         * @description Ouvertures d'une campagne qui les suit. Toujours affichées comme une
-         *     « estimation » ; `automatiques_probables` est déjà retiré de `estimees`.
-         */
-        ResumeOuvertures: {
-            automatiques_probables: number;
-            estimees: number;
-            /** @constant */
-            mention: "estimation";
-            /** @description Pourcentage des messages remis, ouvertures automatiques retirées. */
-            taux_estime: number;
         };
         SaisieMessage: {
             /** @description Ajouter le bloc d'information (art. 14) et le lien de désinscription. */

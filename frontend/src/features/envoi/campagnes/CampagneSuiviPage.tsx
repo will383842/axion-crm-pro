@@ -79,7 +79,7 @@ function Progression({ fiche }: { fiche: FicheCampagne }) {
               {compteurs.en_pause_absence} {compteurs.en_pause_absence > 1 ? 'personnes sont absentes du bureau' : 'personne est absente du bureau'} : la suite est en pause, reprise au retour.
             </li>
           ) : null}
-          {evenements.filter((e) => e.type !== 'ouverture').map((e) => (
+          {evenements.map((e) => (
             <li key={String(e.id)} className="flex flex-wrap items-baseline gap-x-2">
               <span className="text-xs tabular-nums text-slate-500">{dateRelative(e.survenu_le, maintenant)}</span>
               <span>

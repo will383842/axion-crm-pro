@@ -41,13 +41,10 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
 
     $json = $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertOk()->json();
 
-    expect($json['serveurs'])->toHaveCount(1);
-    $s = $json['serveurs'][0];
-    expect($s['source'])->toBe('src')
-        ->and($s['dernier_releve']['ok'])->toBeTrue()
-        ->and($s['dernier_releve']['mesures']['disque_libre_pct'])->toEqual(5.0)
-        ->and(array_column($s['constats'], 'code'))->toBe(['disque'])
-        ->and($s['constats'][0]['gravite'])->toBe('critique');
+    // Forme du contrat (voir SanteConformeContratTest) : un serveur, avec relevé OK mais un constat critique => rouge, 1 alerte.
+    expect($json['serveurs'])->toHaveCount(1)
+        ->and($json['serveurs'][0])->toMatchArray(['nom' => 'src', 'etat' => 'rouge'])
+        ->and($json['feu'])->toBe('rouge')->and($json['alertes'])->toBe(1);
     expect(json_encode($json))->not->toContain('secret-autre-espace');
 });
 

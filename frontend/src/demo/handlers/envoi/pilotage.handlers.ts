@@ -180,6 +180,7 @@ export const handlers: HttpHandler[] = [
         { messagerie: 'Messagerie opérateur B', envoyes: Math.round(total * 0.32), par_heure: 6, etat: 'normal' },
         { messagerie: 'Messagerie pro C', envoyes: Math.round(total * 0.27), par_heure: 3, etat: 'freine' },
       ],
+      pauses: [{ motif: 'reports_en_hausse_sur_une_heure', portee: 'fournisseur', fournisseur: 'autre', fin: new Date(fin + 3_600_000).toISOString() }],
       envoyes_14_jours: Array.from({ length: 14 }, (_, i) => { const jour = new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10); return { jour, envoyes: jour === new Date(fin).toISOString().slice(0, 10) ? total : (par.get(jour) ?? 0) }; }),
     });
   }),

@@ -495,21 +495,35 @@ export interface operations {
                             jour: string;
                         }[];
                         feu: components["schemas"]["EtatFeu"];
+                        /** @description Pauses d'envoi actives (champ facultatif, ajouté de façon compatible). Aucune = liste vide. */
+                        pauses?: {
+                            /** @description Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine. */
+                            fin: components["schemas"]["Horodatage"] | null;
+                            /** @description Famille de messagerie visée ; nulle pour une pause globale. */
+                            fournisseur: ("gmail" | "microsoft" | "autre") | null;
+                            /** @description Code du frein ou de la pause manuelle (ex. `indesirable_chez_un_temoin`). */
+                            motif: string;
+                            /** @enum {string} */
+                            portee: "global" | "fournisseur";
+                        }[];
                         rythme_messageries: {
                             envoyes: number;
                             /** @enum {string} */
                             etat: "normal" | "freine";
                             messagerie: string;
-                            par_heure: number;
+                            /** @description Rythme mesuré sur la dernière heure ; nul tant qu'il n'est pas mesuré. */
+                            par_heure: number | null;
                         }[];
                         serveurs: components["schemas"]["ServeurResume"][];
                         test_du_matin: {
                             etat: components["schemas"]["EtatFeu"];
-                            le: components["schemas"]["Horodatage"];
+                            /** @description Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »). */
+                            le: components["schemas"]["Horodatage"] | null;
                             temoins_ok: number;
                             temoins_total: number;
                         };
-                        verifie_le: components["schemas"]["Horodatage"];
+                        /** @description Dernier relevé de santé reçu ; nul tant qu'aucun relevé n'existe. */
+                        verifie_le: components["schemas"]["Horodatage"] | null;
                         volume_jour: {
                             envoyes: number;
                             possibles: number;

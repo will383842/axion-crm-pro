@@ -241,8 +241,7 @@ export interface components {
         RegleAlerte: {
             actif: boolean;
             canaux: components["schemas"]["CanalAlerte"][];
-            /** @enum {string} */
-            condition: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint";
+            condition: components["schemas"]["TypeAlerte"];
             id: components["schemas"]["Identifiant"];
             nom: string;
             seuil: number | null;
@@ -285,6 +284,13 @@ export interface components {
             /** @constant */
             ok: true;
         };
+        /**
+         * @description Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+         *     de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
+         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+         * @enum {string}
+         */
+        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees";
         /** @enum {string} */
         TypeCible: "liste" | "audience" | "etiquette" | "carnet";
         /** @enum {string} */

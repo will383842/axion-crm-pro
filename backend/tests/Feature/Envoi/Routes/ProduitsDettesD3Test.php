@@ -5,6 +5,7 @@ namespace Tests\Feature\Envoi\Routes;
 use App\Socle\Produits\ProduitsEspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Tests\Support\ContratOpenApiEnvoi;
 
 uses(BaseRoutesEnvoi::class)->group('envoi');
 
@@ -56,8 +57,9 @@ test('/config/features publie produits : crm actif, envoi suivant ProduitsEspace
     if ($etat !== null) {
         $espace->update(['settings' => ['produits' => ['envoi' => $etat]]]);
     }
-    $this->actingAs($this->compte($espace, 'viewer'))->getJson('/api/v1/config/features')
-        ->assertOk()
+    $reponse = $this->actingAs($this->compte($espace, 'viewer'))->getJson('/api/v1/config/features');
+    expect(ContratOpenApiEnvoi::ecarts('commun.yaml', 'Features', $reponse->json()))->toBe([]);
+    $reponse->assertOk()
         ->assertJsonPath('produits.crm', 'actif')
         ->assertJsonPath('produits.envoi', $attendu);
 })->with([[null, 'absent'], ['actif', 'actif'], ['suspendu', 'suspendu'], ['resilie', 'resilie'], ['bizarre', 'absent']]);

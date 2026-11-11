@@ -25,7 +25,7 @@ function espaceR16(): string
 }
 
 /** Les deux lignes (adresse puis mot de passe) arrivent sur l'entrée standard, jamais en argument. */
-function poserAcces(string $ws, string $fournisseur, string $adresse, string $mdp): int
+function poserAccesR16(string $ws, string $fournisseur, string $adresse, string $mdp): int
 {
     $flux = fopen('php://memory', 'r+');
     fwrite($flux, $adresse . "\n" . $mdp . "\n");
@@ -62,7 +62,7 @@ test('Yahoo et Orange se rattachent à « autre » pour la pause', function () {
 test('la commande pose un accès chiffré, sans jamais afficher ni journaliser l’adresse ou le mot de passe', function () {
     $ws = espaceR16();
     Log::spy();
-    expect(poserAcces($ws, 'gmail', 'Alice@exemple.test', 'mdp-super-secret'))->toBe(0);
+    expect(poserAccesR16($ws, 'gmail', 'Alice@exemple.test', 'mdp-super-secret'))->toBe(0);
     $sortie = Artisan::output();
     expect($sortie)->not->toContain('alice')->and($sortie)->not->toContain('exemple.test')->and($sortie)->not->toContain('mdp-super-secret');
     $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_acces')->first());
@@ -80,9 +80,9 @@ test('la commande pose un accès chiffré, sans jamais afficher ni journaliser l
 
 test('la commande refuse un fournisseur hors liste, une option d’hôte et une adresse mal formée', function () {
     $ws = espaceR16();
-    expect(poserAcces($ws, 'serveur-libre', 'a@exemple.test', 'x'))->toBe(1)
-        ->and(poserAcces($ws, 'gmail', 'pas-une-adresse', 'x'))->toBe(1)
-        ->and(poserAcces($ws, 'gmail', 'a@exemple.test', ''))->toBe(1);
+    expect(poserAccesR16($ws, 'serveur-libre', 'a@exemple.test', 'x'))->toBe(1)
+        ->and(poserAccesR16($ws, 'gmail', 'pas-une-adresse', 'x'))->toBe(1)
+        ->and(poserAccesR16($ws, 'gmail', 'a@exemple.test', ''))->toBe(1);
     expect(WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_acces')->count()))->toBe(0);
     expect(fn () => Artisan::call('envoi:temoins-acces', ['workspace' => $ws, 'fournisseur' => 'gmail', '--hote' => 'evil.example.invalid']))
         ->toThrow(InvalidOptionException::class);
@@ -100,14 +100,14 @@ test('la base refuse un hôte hors liste et la table est en ajout seul', functio
 test('un autre espace ne voit pas les accès (RLS)', function () {
     $a = espaceR16();
     $b = espaceR16();
-    poserAcces($a, 'yahoo', 'a@exemple.test', 'mdp');
+    poserAccesR16($a, 'yahoo', 'a@exemple.test', 'mdp');
     expect(app(DepotAccesTemoins::class)->lister($b))->toBeEmpty();
 });
 
 test('poser deux fois le même témoin : la dernière ligne fait foi', function () {
     $ws = espaceR16();
-    poserAcces($ws, 'gmail', 'a@exemple.test', 'ancien');
-    poserAcces($ws, 'gmail', 'a@exemple.test', 'nouveau');
+    poserAccesR16($ws, 'gmail', 'a@exemple.test', 'ancien');
+    poserAccesR16($ws, 'gmail', 'a@exemple.test', 'nouveau');
     $acces = app(DepotAccesTemoins::class)->lister($ws);
     expect($acces)->toHaveCount(1)->and($acces[0]->motDePasse)->toBe('nouveau');
 });

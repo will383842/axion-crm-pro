@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_modeles', 'envoi_modele_versions'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,6 +200,9 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
+        // Envoi R08b : modèles (parent) puis versions : APPEND_SEUL_AVEC_FK.
+        'envoi_modeles',
+        'envoi_modele_versions',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -592,6 +595,10 @@ final class SemeurTablesScopees
             'auteur' => 'zz-etancheite',
             'date_recul' => '2026-01-01',
         ]);
+
+        $modele = (string) Illuminate\Support\Str::uuid();
+        $inserer('envoi_modeles', ['id' => $modele, 'nom' => 'zz-etancheite', 'cree_par' => 'zz-etancheite']);
+        $inserer('envoi_modele_versions', ['modele_id' => $modele, 'numero' => 1, 'objet' => 'zz', 'corps' => 'zz', 'auteur' => 'zz-etancheite']);
 
         $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',

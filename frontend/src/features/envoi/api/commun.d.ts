@@ -156,7 +156,7 @@ export interface components {
          */
         EtatFeu: "vert" | "ambre" | "rouge" | "bleu" | "gris";
         /**
-         * @description Droit d'accès d'un espace à un produit.
+         * @description Droit d'accès d'un espace à un produit. Côté serveur, la garde `produit-envoi` n'ouvre `/envoi/*` (404 sinon) que pour `actif` : `suspendu`, `resilie` et `absent` sont fermés (choix prudent, plus strict que l'affichage du frontend). Source : `workspaces.settings` → `produits.<produit>`, clé réservée à l'exploitation (`PUT /workspace` la refuse et la conserve).
          * @enum {string}
          */
         EtatProduit: "actif" | "suspendu" | "resilie" | "absent";

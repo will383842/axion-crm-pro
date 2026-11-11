@@ -21,7 +21,7 @@ uses(TestCase::class, RefreshDatabase::class)->group('envoi');
 function espaceFeuVert(): string
 {
     $id = (string) Str::uuid();
-    DB::table('workspaces')->insert(['id' => $id, 'name' => 'Test', 'slug' => 'fv-' . substr($id, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('workspaces')->insert(['id' => $id, 'name' => 'Test', 'slug' => 'fv-' . substr($id, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
 
     return $id;
 }

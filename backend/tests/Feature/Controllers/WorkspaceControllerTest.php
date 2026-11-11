@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Socle\Produits\ProduitsEspace;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -99,4 +100,71 @@ test('POST /users refuse une invitation sans nom ni role', function () {
     $this->actingAs($user)
         ->postJson('/api/v1/users', ['email' => 'a@b.com'])
         ->assertStatus(422);
+});
+
+// ═══ CLÉS RÉSERVÉES À LA CONSOLE (`produits`) ═══
+// Un propriétaire ne doit jamais pouvoir s'activer un produit lui-même : l'activation passe par
+// `php artisan produits:activer`, jamais par cette route.
+test('PUT /workspace refuse settings.produits (422 en français), base inchangée, garde envoi toujours fermée', function () {
+    [$user, $workspace] = makeAuthUser();
+
+    $reponse = $this->actingAs($user)
+        ->putJson('/api/v1/workspace', ['settings' => ['produits' => ['envoi' => 'actif']]])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['settings.produits']);
+    expect($reponse->json('errors')['settings.produits'][0])->toContain('réservé');
+
+    expect(DB::table('workspaces')->where('id', $workspace->id)->value('settings'))->not->toContain('actif');
+    $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertNotFound();
+});
+
+test('PUT /workspace : enregistrer d autres réglages CONSERVE settings.produits posé par la console', function () {
+    [$user, $workspace] = makeAuthUser();
+    DB::table('workspaces')->where('id', $workspace->id)
+        ->update(['settings' => json_encode(['produits' => ['envoi' => 'actif'], 'ancien' => 1])]);
+
+    $this->actingAs($user)
+        ->putJson('/api/v1/workspace', ['settings' => ['theme' => 'sombre']])
+        ->assertOk()
+        ->assertJsonPath('data.settings.theme', 'sombre')
+        ->assertJsonPath('data.settings.produits.envoi', 'actif');
+
+    $settings = json_decode((string) DB::table('workspaces')->where('id', $workspace->id)->value('settings'), true);
+    expect($settings)->toEqual(['produits' => ['envoi' => 'actif'], 'theme' => 'sombre']);
+});
+
+test('PUT /workspace : les autres clés de settings gardent leur comportement (remplacement)', function () {
+    [$user, $workspace] = makeAuthUser();
+    DB::table('workspaces')->where('id', $workspace->id)->update(['settings' => json_encode(['a' => 1, 'b' => 2])]);
+
+    $this->actingAs($user)->putJson('/api/v1/workspace', ['settings' => ['a' => 9]])->assertOk();
+
+    $settings = json_decode((string) DB::table('workspaces')->where('id', $workspace->id)->value('settings'), true);
+    expect($settings)->toBe(['a' => 9]);
+});
+
+test('produits:activer active le produit, est idempotente et journalisée', function () {
+    [, $workspace] = makeAuthUser();
+    DB::table('workspaces')->where('id', $workspace->id)->update(['settings' => json_encode(['theme' => 'x'])]);
+
+    $this->artisan('produits:activer', ['espace' => $workspace->slug, 'produit' => 'envoi'])->assertSuccessful();
+    $this->artisan('produits:activer', ['espace' => $workspace->slug, 'produit' => 'envoi'])->assertSuccessful();
+
+    $settings = json_decode((string) DB::table('workspaces')->where('id', $workspace->id)->value('settings'), true);
+    expect($settings)->toBe(['theme' => 'x', 'produits' => ['envoi' => 'actif']]);
+    expect(ProduitsEspace::actif($workspace->id, 'envoi'))->toBeTrue();
+});
+
+test('produits:activer refuse un espace ou un produit inconnu', function () {
+    $this->artisan('produits:activer', ['espace' => 'inexistant', 'produit' => 'envoi'])->assertFailed();
+    [, $workspace] = makeAuthUser();
+    $this->artisan('produits:activer', ['espace' => $workspace->slug, 'produit' => 'nimportequoi'])->assertFailed();
+});
+
+test('FeaturesController : s il publie `produits`, il lit ProduitsEspace (source unique)', function () {
+    $source = (string) file_get_contents(app_path('Http/Controllers/Api/FeaturesController.php'));
+    if (str_contains($source, 'produits')) {
+        expect($source)->toContain('ProduitsEspace');
+    }
+    expect(true)->toBeTrue();
 });

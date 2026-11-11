@@ -1,0 +1,34 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/feu-vert",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/feu-vert/{code}/fait",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/sante",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    }
+]

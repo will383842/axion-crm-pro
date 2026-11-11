@@ -27,8 +27,6 @@ use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
-use App\Http\Controllers\Api\EnvoiFeuVertController;
-use App\Http\Controllers\Api\EnvoiSanteController;
 use App\Http\Controllers\Api\EvenementsController;
 use App\Http\Controllers\Api\FeaturesController;
 use App\Http\Controllers\Api\FederationsController;
@@ -125,16 +123,9 @@ Route::prefix('v1')->group(function () {
         // d'ouvrir chaque ecran a la main et que la console ne tourne pas.
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
-        // K15 : écran « Santé des envois » (lecture seule).
-        // Elle rend domaines d'envoi, listes noires, pauses et état du serveur : réservée à `users.manage` (owner, admin ;
-        // `operator` et `viewer` : 403). `workspaces.manage` exclurait l'admin ; une permission dédiée exigerait une migration de rôles.
-        Route::get('/envoi/sante', [EnvoiSanteController::class, 'index'])
-            ->middleware('permission:users.manage');
-
-        // L8-F05 : feu vert (contrat pilotage.yaml). Lecture ; la preuve d'un point manuel exige `workspaces.manage`.
-        Route::get('/envoi/feu-vert', [EnvoiFeuVertController::class, 'index']);
-        Route::post('/envoi/feu-vert/{code}/fait', [EnvoiFeuVertController::class, 'fait'])
-            ->middleware('permission:workspaces.manage');
+        // R00 : toutes les routes /envoi/* vivent dans routes/envoi.php (un fichier par domaine dans routes/envoi/),
+        // sous la garde serveur `produit-envoi` (404 si l'espace n'a pas le produit). Mêmes middlewares de groupe qu'ici.
+        require __DIR__ . '/envoi.php';
 
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe

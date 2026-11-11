@@ -20,7 +20,7 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
     $ws = (string) Str::uuid();
     $autre = (string) Str::uuid();
     foreach ([$ws, $autre] as $id) {
-        DB::table('workspaces')->insert(['id' => $id, 'name' => 'T', 'slug' => 'k15-' . substr($id, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('workspaces')->insert(['id' => $id, 'name' => 'T', 'slug' => 'k15-' . substr($id, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
     }
     foreach ([$ws, $autre] as $id) {
         DB::table('envoi_serveurs')->insert(['workspace_id' => $id, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
@@ -53,7 +53,7 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
 
 test('S1 : « Santé des envois » est refusée au viewer et à l’operator (403), accordée à l’admin (200) ; un viewer ne lit ni domaines ni listes noires ni pauses', function (string $role, int $statut) {
     $ws = (string) Str::uuid();
-    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'k15s1-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'k15s1-' . substr($ws, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
     $user = User::create([
         'id' => (string) Str::uuid(), 'email' => 'k15s1-' . Str::random(6) . '@example.test', 'name' => 'K15',
         'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),

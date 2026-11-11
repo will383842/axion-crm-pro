@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Http\Middleware\EnforceFirstLoginSetup;
 use App\Http\Middleware\EnsureCrmConsoleV2;
+use App\Http\Middleware\EnsureProduitEnvoi;
 use App\Http\Middleware\EnsureTwoFactorPassed;
 use App\Http\Middleware\LimiteDureeRequetesSql;
 use App\Http\Middleware\SetCurrentWorkspace;
@@ -128,6 +129,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => AuditHashChainLogger::class,
             // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
             'crm-console' => EnsureCrmConsoleV2::class,
+            // Lot R00 : 404 si l'espace n'a pas le produit Envoi (source : ProduitsEspace).
+            'produit-envoi' => EnsureProduitEnvoi::class,
             // Delai SQL elargi pour une route qui en a besoin (exports en flux) :
             // `delai-sql:300`, en secondes.
             'delai-sql' => LimiteDureeRequetesSql::class,

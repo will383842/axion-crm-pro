@@ -152,17 +152,17 @@ test('CRM-G2 7 — une personne opposée reste opposée après l’événement',
 });
 
 test('CRM-G2 8 — opposition reçue d’abord, puis événement guide avec accord : l’opposition l’emporte quel que soit l’ordre', function () {
+    // Personne inconnue : l'opposition est inscrite à la liste d'opposition (aucune fiche créée).
     $opposee = g2Evenement(['schema_version' => 2, 'opposition' => ['actif' => true, 'date' => '2026-11-01T11:00:00Z']], '2026-11-02T10:00:00Z');
     unset($opposee['origines']);
     g2Poster($opposee)->assertOk();
-    $opposition = g2Personne()->opposition_at;
-    expect($opposition)->not->toBeNull();
+    $empreinte = hash('sha256', G2_EMAIL);
+    expect(DB::table('opt_out')->where('scope', 'business')->where('email_hash', $empreinte)->exists())->toBeTrue();
 
+    // L'accord et le guide arrivent APRÈS : aucun abonnement, l'opposition reste posée, rien n'est supprimé.
     g2Poster(g2Evenement(['payload' => ['newsletter_optin' => true]], '2026-11-03T10:00:00Z'))->assertOk();
     g2Poster(g2Evenement([], '2026-11-04T10:00:00Z'))->assertOk();
 
-    $p = g2Personne();
-    expect($p->opposition_at)->toBe($opposition)
-        ->and(DB::table('abonnements')->count())->toBe(0)
-        ->and(DB::table('personnes')->count())->toBe(1);
+    expect(DB::table('abonnements')->count())->toBe(0)
+        ->and(DB::table('opt_out')->where('scope', 'business')->where('email_hash', $empreinte)->count())->toBe(1);
 });

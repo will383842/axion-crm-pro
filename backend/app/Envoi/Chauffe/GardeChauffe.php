@@ -63,8 +63,10 @@ final class GardeChauffe
      * fenêtre), pauses, frein humain, expéditeur connu, quota de la boîte, quota du domaine.
      *
      * @param  ?string  $fournisseur  valeur déjà résolue par `preparer()` ; null = résolu ici (hors passerelle)
+     * @param  array{boite: int, domaine: int}  $enCours  réservations de la passerelle dont l'envoi n'est pas encore noté
+     *                                                    (en vol ou issue incertaine) : elles comptent dans les quotas, sinon deux workers dépasseraient le budget
      */
-    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null): ?string
+    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null, array $enCours = ['boite' => 0, 'domaine' => 0]): ?string
     {
         // Jamais d'envoi hors de la fenêtre [08:00, 19:00[ (Paris) : sans cela, l'homme mort ne jouerait pas.
         if (! Freins::dansFenetreEnvoi($maintenant)) {
@@ -96,15 +98,25 @@ final class GardeChauffe
         if ($humain === Freins::RALENTI) {
             $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
         }
-        if ($this->depot->envoyesBoite($ws, $boite, $jour) >= $quota) {
+        if ($this->depot->envoyesBoite($ws, $boite, $jour) + $enCours['boite'] >= $quota) {
             return self::QUOTA_ATTEINT;
         }
         // Quota du DOMAINE d'envoi : créer des boîtes sur le même domaine ne multiplie pas la montée de chauffe.
-        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) >= Seuils::DOMAINE_FACTEUR * $quota) {
+        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) + $enCours['domaine'] >= Seuils::DOMAINE_FACTEUR * $quota) {
             return self::QUOTA_DOMAINE_ATTEINT;
         }
 
         return null;
+    }
+
+    /**
+     * Boîte réelle et domaine d'envoi du message : conservés avec la réservation pour la compter dans les quotas.
+     *
+     * @return array{boite?: ?string, domaine?: ?string}
+     */
+    public function ressources(MessageAEnvoyer $m): array
+    {
+        return ['boite' => $this->depot->boiteId($m->workspaceId, $m->expediteur), 'domaine' => Fournisseur::domaine($m->expediteur)];
     }
 
     public function noter(MessageAEnvoyer $m, DateTimeImmutable $jour, ?string $fournisseur = null): void

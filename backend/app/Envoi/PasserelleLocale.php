@@ -104,10 +104,13 @@ final class PasserelleLocale implements ServeurEnvoi
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
             // Chauffe et freins (lot L7) : pause ou quota => report, aucune réservation.
-            if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur) !== null) {
+            // Les réservations en vol (ou d'issue incertaine) comptent dans les quotas : sous le même verrou, aucun dépassement.
+            $ressources = $this->chauffe?->ressources($message) ?? [];
+            $enCours = $this->depot->reservationsEnCours($ws, $jour, $ressources['boite'] ?? null, $ressources['domaine'] ?? null);
+            if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur, $enCours) !== null) {
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
-            $this->depot->reserverInjection($ws, $jour, $message->cleIdempotence, $this->instant());
+            $this->depot->reserverInjection($ws, $jour, $message->cleIdempotence, $this->instant(), $ressources);
 
             return self::RESERVEE;
         });
@@ -149,7 +152,7 @@ final class PasserelleLocale implements ServeurEnvoi
         } else {
             $statut = 'liberee';
         }
-        $this->conclure($ws, $jour, $message, $statut, $fournisseur);
+        $this->conclure($ws, $jour, $message, $statut, $fournisseur, $resultat->idInjection);
         if ($statut === 'a_verifier') {
             DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine rapportée par le serveur, intervention requise.', ['workspace_id' => $ws]));
         }
@@ -158,30 +161,38 @@ final class PasserelleLocale implements ServeurEnvoi
     }
 
     /**
-     * Renvoi d'une clé déjà réservée : seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS.
-     * Un renvoi CONFIRMÉ (`accepte`) d'une issue incertaine conclut la ligne en `acceptee` (une seule fois) et note la chauffe.
+     * Rejeu d'une clé déjà réservée.
+     *   - `acceptee` : le message est parti, le serveur n'est PAS rappelé (l'identifiant conservé est rendu) ;
+     *   - `reservee` / `a_verifier` : renvoi seulement si le serveur dédoublonne lui-même (Kumo, simulateur), sinon JAMAIS ;
+     *     un renvoi CONFIRMÉ (`accepte`) conclut la ligne en `acceptee` (une seule fois) et note la chauffe.
      */
     private function rejouer(MessageAEnvoyer $message, string $etat, string $ws, DateTimeImmutable $jour, ?string $fournisseur): ResultatInjection
     {
-        if (! ($this->serveur instanceof RenvoiParMemeCle) && $etat !== 'acceptee') {
+        if ($etat === 'acceptee') {
+            $id = $this->depot->idInjection($ws, $message->cleIdempotence);
+            if ($id !== null) {
+                return ResultatInjection::accepte($id);
+            }
+            // Ligne ancienne sans identifiant conservé : repli sur le serveur (il dédoublonne par clé).
+        } elseif (! ($this->serveur instanceof RenvoiParMemeCle)) {
             throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
         $resultat = $this->serveur->injecter($message);
-        if ($etat === 'a_verifier' && $resultat->accepte) {
-            $this->conclure($ws, $jour, $message, 'acceptee', $fournisseur);
+        if ($etat !== 'acceptee' && $resultat->accepte) {
+            $this->conclure($ws, $jour, $message, 'acceptee', $fournisseur, $resultat->idInjection);
         }
 
         return $resultat;
     }
 
-    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null): void
+    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null, ?string $idInjection = null): void
     {
-        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur): void {
+        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur, $idInjection): void {
             // Acceptation TARDIVE (réservation périmée en `a_verifier` pendant l'appel, ou renvoi confirmé) : `concluireInjection`
             // ajoute la confirmation (journal « ajout seul », transition a_verifier -> acceptee, une seule fois) et rend vrai.
             // Option la plus prudente : un message PARTI est toujours compté dans la chauffe (jamais sauté), quitte à compter
             // une fois de plus ; la place, elle, ne se libère jamais en retard.
-            if ($this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, $statut) && $statut === 'acceptee') {
+            if ($this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, $statut, $idInjection) && $statut === 'acceptee') {
                 $this->chauffe?->noter($message, $jour, $fournisseur);
             }
         });

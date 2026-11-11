@@ -20,7 +20,6 @@ use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -214,7 +213,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             return $deja;
         }
         $boite = $this->boites->trouver($this->workspaceId, $this->boiteId)
-            ?? throw new RuntimeException('Boîte d\'envoi introuvable.');
+            ?? throw EnvoiSmtpRefuse::motif('Boîte d\'envoi introuvable.'); // rien n'est parti : refus CERTAIN
         if ($boite->enPause || $this->limiteAtteinte()) {
             return ResultatInjection::reporte(new DateTimeImmutable('tomorrow'));
         }

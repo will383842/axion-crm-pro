@@ -10,6 +10,8 @@ use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise;
 use App\Envoi\Message\MessageRefuse;
+use App\Envoi\Serveur\ServeurEnvoiRefuse;
+use App\Envoi\Smtp\EnvoiSmtpRefuse;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +63,11 @@ final class Sequenceur
 
     public const MOTIF_REPORTS_EPUISES = 'reports_epuises';
 
+    public const MOTIF_RESERVATION_ORPHELINE = 'reservation_orpheline';
+
+    /** Une étape « reserve » sans issue depuis ce délai est tenue pour orpheline (plantage entre la réservation et l'appel). */
+    public const RESERVATION_ORPHELINE_HEURES = 1;
+
     /** Exception du serveur d'envoi après réservation : le message est peut-être parti, il ne repart jamais. */
     public const MOTIF_ISSUE_INCERTAINE = 'issue_incertaine';
 
@@ -92,8 +99,8 @@ final class Sequenceur
             try {
                 $r = $this->traiter($ws, (string) $id, $maintenant);
             } catch (Throwable $e) {
-                // La transaction de `traiter` (un savepoint si on est déjà dans une transaction) est défaite :
-                // la réservation aussi, l'étape reste reprenable. On note l'échec HORS de cette transaction.
+                // Exception hors temps B (avant la réservation d'étape ou pendant la conclusion) : la transaction
+                // concernée est défaite et l'étape reste reprenable. On note l'échec HORS de toute transaction.
                 $r = $this->echec($ws, (string) $id, $e, $maintenant);
             }
             $bilan[$r] = ($bilan[$r] ?? 0) + 1;
@@ -128,21 +135,27 @@ final class Sequenceur
         try {
             $res = $this->serveur->injecter($plan['message']);
         } catch (EnvoiRefuse $e) {
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
-        } catch (RefusDefinitifServeur $e) {
-            $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], 'refus_definitif_du_serveur', $plan['fenetre'], $maintenant), $maintenant);
-            throw $e;
-        } catch (Throwable $e) {
-            $this->conclure($plan, function (\stdClass $ins) use ($e, $maintenant): string {
-                $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $e::class]];
+            if ($e->getCode() === EnvoiRefuse::ISSUE_INCERTAINE) {
+                // Issue d'une injection précédente incertaine : JAMAIS de report (il reboucherait chaque jour). Inscription arrêtée
+                // en attente de vérification humaine, UNE alerte ; la ligne reste `a_verifier` côté passerelle.
+                return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
+            }
 
-                return $this->arreter($ins, self::MOTIF_ISSUE_INCERTAINE, $maintenant);
-            }, $maintenant);
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
+        } catch (RefusDefinitifServeur) {
+            // Refus définitif (5xx) : refus et arrêt, pas de report quotidien.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->refuser($ins, $plan['rang'], 'refus_definitif_du_serveur', $maintenant), $maintenant);
+        } catch (EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
+            // Refus CERTAIN fait avant toute transmission (déjà libéré par la passerelle) : ni alerte « incertaine », ni arrêt ;
+            // report soumis au plafond.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'refus_avant_envoi', $plan['fenetre'], $maintenant), $maintenant);
+        } catch (Throwable $e) {
+            $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, $e::class, $maintenant), $maintenant);
 
             return self::ARRETEE;
         }
         if (! $res->accepte) {
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], $res->incertain ? 'issue_incertaine_reportee' : 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $res->incertain ? 'issue_incertaine_reportee' : 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
         }
 
         return $this->conclure($plan, function (\stdClass $ins) use ($plan, $res, $maintenant): string {
@@ -232,6 +245,16 @@ final class Sequenceur
 
         $messageId = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
         if ($messageId === null) {
+            // Ligne « reserve » restée sans issue (plantage entre A et B) : le message n'est jamais renvoyé, mais l'étape ne doit pas
+            // rester bloquée en silence : inscription arrêtée et UNE alerte.
+            $orpheline = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
+                ->where('maj_le', '<', $maintenant->modify('-' . self::RESERVATION_ORPHELINE_HEURES . ' hours')->format('c'))->exists();
+            if ($orpheline) {
+                $this->alertes[] = ['envoi.sequenceur_reservation_orpheline : étape réservée sans issue, inscription arrêtée, intervention requise.', ['workspace_id' => $ws, 'inscription_id' => $ins->id, 'etape' => $rang]];
+
+                return $this->arreter($ins, self::MOTIF_RESERVATION_ORPHELINE, $maintenant);
+            }
+
             return self::DEJA;
         }
 
@@ -417,6 +440,14 @@ final class Sequenceur
         DB::table('envoi_inscriptions')->where('id', $ins->id)->update(['reports' => $reports]);
 
         return $this->reporter($ins, $rang, $motif, $fenetre, $maintenant);
+    }
+
+    /** Issue incertaine : inscription arrêtée (jamais reportée) et UNE alerte critique. */
+    private function arreterIssueIncertaine(\stdClass $ins, ?string $erreur, DateTimeImmutable $maintenant): string
+    {
+        $this->alertes[] = ['envoi.sequenceur_issue_incertaine : inscription arrêtée, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'erreur' => $erreur]];
+
+        return $this->arreter($ins, self::MOTIF_ISSUE_INCERTAINE, $maintenant);
     }
 
     private function reporter(\stdClass $ins, int $rang, string $motif, FenetreHoraire $fenetre, DateTimeImmutable $maintenant): string

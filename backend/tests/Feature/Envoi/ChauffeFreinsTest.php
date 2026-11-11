@@ -1380,3 +1380,45 @@ test('L8-F14a (mineur 3) : une acceptation TARDIVE (réservation périmée en a_
     // Le quota (10) est atteint : le 11e est reporté. Si la 10e n'avait pas été notée, il partirait.
     expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($espion->appels)->toBe(10);
 });
+
+// Audit L8-F14a, bloquant 2 : le quota de chauffe compte les réservations EN VOL et d'issue incertaine (aucun dépassement en concurrence).
+test('quota de chauffe : une réservation en vol compte ; un second worker ne dépasse JAMAIS le quota (10 le jour 1)', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $faux = new FauxServeurEnvoi;
+    $p = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $p->sante();
+    foreach (range(1, 9) as $_) {
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue(); // 9 envois notés
+    }
+    $second = null;
+    $espion = new ServeurEspion(function () use (&$second, &$autre, $ws) {
+        $second = $autre->injecter(messageChauffe($ws)); // le 10e est EN VOL (réservé, pas encore noté) : le 11e doit être refusé
+
+        return ResultatInjection::accepte('id-10');
+    });
+    $autre = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $autre->sante();
+    $premier = new PasserelleLocale($espion, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $premier->sante();
+    expect($premier->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    expect($second->accepte)->toBeFalse()->and($faux->appels)->toBe(9);
+    expect(app(DepotChauffe::class)->envoyesBoite($ws, boiteChauffe($ws, 'boite1@example.test'), new DateTimeImmutable('2026-11-10')))->toBe(10);
+});
+
+test('quota de chauffe : une issue INCERTAINE (a_verifier) compte toujours dans le quota', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $faux = new FauxServeurEnvoi;
+    $normale = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $normale->sante();
+    foreach (range(1, 9) as $_) {
+        $normale->injecter(messageChauffe($ws));
+    }
+    $coupure = new PasserelleLocale(new ServeurEspion(fn () => throw new RuntimeException('coupure après envoi possible')), app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $coupure->sante();
+    expect(fn () => $coupure->injecter(messageChauffe($ws)))->toThrow(RuntimeException::class);
+    expect($normale->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(9);
+});

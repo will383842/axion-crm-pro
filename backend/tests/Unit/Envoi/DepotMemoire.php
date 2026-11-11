@@ -104,7 +104,7 @@ final class DepotMemoire implements DepotSocle
         return $this->statuts[$this->cleJournal($cleIdempotence)] ?? 'acceptee';
     }
 
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool
     {
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
             return false;
@@ -112,14 +112,43 @@ final class DepotMemoire implements DepotSocle
         $cle = $this->cleJournal($cleIdempotence);
         $this->cles[] = $cle;
         $this->statuts[$cle] = 'reservee';
+        $this->ressourcesReservees[$cle] = $ressources;
         $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
 
         return true;
     }
 
-    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool
+    /** @var array<string, array<string, ?string>> */
+    public array $ressourcesReservees = [];
+
+    /** @var array<string, string> */
+    public array $ids = [];
+
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array
+    {
+        $n = ['boite' => 0, 'domaine' => 0];
+        foreach ($this->statuts as $cle => $statut) {
+            if ($statut === 'reservee' || $statut === 'a_verifier') {
+                $r = $this->ressourcesReservees[$cle] ?? [];
+                $n['boite'] += $boite !== null && ($r['boite'] ?? null) === $boite ? 1 : 0;
+                $n['domaine'] += $domaine !== null && ($r['domaine'] ?? null) === $domaine ? 1 : 0;
+            }
+        }
+
+        return $n;
+    }
+
+    public function idInjection(string $workspaceId, string $cleIdempotence): ?string
+    {
+        return $this->ids[$this->cleJournal($cleIdempotence)] ?? null;
+    }
+
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut, ?string $idInjection = null): bool
     {
         $cle = $this->cleJournal($cleIdempotence);
+        if ($idInjection !== null && $statut === 'acceptee') {
+            $this->ids[$cle] = $idInjection;
+        }
         if (($this->statuts[$cle] ?? null) === 'a_verifier' && $statut === 'acceptee') {
             $this->statuts[$cle] = 'acceptee'; // renvoi confirmé : une seule fois (le statut n'est plus a_verifier ensuite)
 

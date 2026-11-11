@@ -40,15 +40,31 @@ interface DepotSocle
      */
     public function etatInjection(string $workspaceId, string $cleIdempotence): ?string;
 
-    /** À appeler SOUS le verrou : réserve la place (statut `reservee`, compte dans les plafonds). Vrai si la réservation est nouvelle. */
-    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant): bool;
+    /**
+     * À appeler SOUS le verrou : réserve la place (statut `reservee`, compte dans les plafonds). Vrai si la réservation est nouvelle.
+     * `$ressources` (boîte, domaine d'envoi) sert à compter la réservation dans la chauffe tant qu'elle n'y est pas notée.
+     *
+     * @param  array{boite?: ?string, domaine?: ?string}  $ressources
+     */
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool;
+
+    /**
+     * Réservations qui n'ont PAS (encore) été notées dans la chauffe, sur la boîte et sur le domaine, pour ce jour :
+     * `reservee` et `a_verifier` non confirmée. À lire SOUS le verrou, avec les envois déjà notés.
+     *
+     * @return array{boite: int, domaine: int}
+     */
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array;
+
+    /** Identifiant d'injection conservé à la conclusion `acceptee` (null si inconnu). */
+    public function idInjection(string $workspaceId, string $cleIdempotence): ?string;
 
     /**
      * Conclut la réservation en cours : `acceptee` | `liberee` (la place est rendue) | `a_verifier` (elle compte toujours).
      * Une seule conclusion par réservation : vrai la première fois, faux ensuite (rien ne change).
      * Seule transition permise ensuite : `a_verifier` -> `acceptee` (renvoi confirmé), une seule fois.
      */
-    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut): bool;
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut, ?string $idInjection = null): bool;
 
     /**
      * À appeler SOUS le verrou : toute réservation restée `reservee` depuis avant $avant passe en `a_verifier`.

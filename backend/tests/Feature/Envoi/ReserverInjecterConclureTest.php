@@ -325,3 +325,31 @@ test('B2 : un renvoi CONFIRMÉ (serveur dédoublonnant) après a_verifier conclu
     $p->injecter(($this->msg)()); // un second renvoi ne repose aucune confirmation
     expect(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('commande', 'injection_confirmee')->count())->toBe(1);
 });
+
+test('la libération ne décrémente le compteur global qu\'UNE fois par réservation, et jamais sans réservation', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k2', $this->jour);
+    expect(($this->compteur)())->toBe(2);
+    expect($this->depot->concluireInjection($this->ws, $this->jour, 'jamais', 'liberee'))->toBeFalse();
+    expect($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'liberee'))->toBeTrue()
+        ->and(($this->compteur)())->toBe(1);
+    // Appel direct répété de la fonction SQL : la conclusion existe déjà, rien ne se décrémente de nouveau.
+    $cle = 'k1';
+    expect((bool) DB::selectOne('SELECT envoi_injection_liberer(?::uuid, ?) AS ok', [$this->ws, $cle])->ok)->toBeFalse();
+    expect(($this->compteur)())->toBe(1);
+});
+
+test('rejeu d\'une clé « acceptee » : le serveur n\'est PAS rappelé, l\'identifiant conservé est rendu', function () {
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('id-conserve'));
+    $p = ($this->passerelle)($serveur);
+    expect($p->injecter(($this->msg)())->idInjection)->toBe('id-conserve');
+    expect($p->injecter(($this->msg)())->idInjection)->toBe('id-conserve')
+        ->and($serveur->appels)->toBe(1);
+});
+
+test('rejeu depuis « reservee » avec un serveur dédoublonnant : le renvoi accepté conclut en acceptee', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $serveur = new ServeurEspionDedoublonneur(fn () => ResultatInjection::accepte('id-1'));
+    expect(($this->passerelle)($serveur)->injecter(($this->msg)())->accepte)->toBeTrue();
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee');
+});

@@ -115,9 +115,9 @@ final class Sequenceur
      *   B. l'appel à la passerelle, HORS de toute transaction (aucun verrou de ligne ni de jour tenu pendant le réseau) ;
      *   C. transaction courte : conclusion, idempotente (le message passe de « reserve » à « envoye » UNE fois, et l'étape
      *      n'avance que si cette bascule a eu lieu).
-     * Issue de B : refus net ou report => `reporte` (reprenable) ; refus définitif du serveur => `reporte` et l'exception
-     * remonte (compteur d'échecs) ; toute autre exception = issue INCERTAINE : le message reste « reserve » (il ne repart
-     * jamais) et l'inscription est arrêtée avec alerte. Option la plus prudente : perdre un message plutôt que l'envoyer deux fois.
+     * Issue de B : refus net ou report CERTAIN => `reporte` (reprenable, sous le plafond de reports) ; refus définitif du
+     * serveur (5xx) => refus ET arrêt ; issue INCERTAINE (résultat `incertain`, exception inconnue, ou clé `a_verifier` rejouée)
+     * => inscription arrêtée en attente de vérification humaine, SANS report, UNE alerte ; le message ne repart jamais. Option la plus prudente : perdre un message plutôt que l'envoyer deux fois.
      */
     public function traiter(string $ws, string $inscriptionId, DateTimeImmutable $maintenant): string
     {
@@ -154,8 +154,13 @@ final class Sequenceur
 
             return self::ARRETEE;
         }
+        if ($res->incertain) {
+            // Issue INCERTAINE rapportée sans exception : le message est peut-être parti. Jamais de report (le lendemain, la
+            // passerelle refuserait le renvoi et l'on reboucherait) : inscription arrêtée en attente de vérification humaine, UNE alerte.
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant), $maintenant);
+        }
         if (! $res->accepte) {
-            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], $res->incertain ? 'issue_incertaine_reportee' : 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
+            return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporterAvecPlafond($ins, $plan['rang'], 'reporte_par_la_passerelle', $plan['fenetre'], $maintenant), $maintenant);
         }
 
         return $this->conclure($plan, function (\stdClass $ins) use ($plan, $res, $maintenant): string {

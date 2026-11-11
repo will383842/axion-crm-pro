@@ -353,3 +353,21 @@ test('rejeu depuis « reservee » avec un serveur dédoublonnant : le renvoi acc
     expect(($this->passerelle)($serveur)->injecter(($this->msg)())->accepte)->toBeTrue();
     expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('acceptee');
 });
+
+test('rejeu depuis « reservee » avec un serveur dédoublonnant : un refus DÉFINITIF (5xx) libère la place, une seule fois', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $serveur = new ServeurEspionDedoublonneur(fn () => throw new RefusDefinitifServeur('5xx'));
+    $p = ($this->passerelle)($serveur);
+    expect(fn () => $p->injecter(($this->msg)()))->toThrow(RefusDefinitifServeur::class);
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBeNull() // libérée : plus de réservation vivante
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(0)
+        ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $this->ws)->where('commande', 'injection_issue')->where('statut', 'liberee')->count())->toBe(1);
+});
+
+test('rejeu depuis « a_verifier » : un refus définitif ne libère PAS la place (l\'envoi précédent est peut-être parti)', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'a_verifier', null);
+    $serveur = new ServeurEspionDedoublonneur(fn () => throw new RefusDefinitifServeur('5xx'));
+    expect(fn () => ($this->passerelle)($serveur)->injecter(($this->msg)()))->toThrow(RefusDefinitifServeur::class);
+    expect($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
+});

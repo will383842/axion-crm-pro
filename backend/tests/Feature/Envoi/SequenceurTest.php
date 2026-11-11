@@ -941,12 +941,14 @@ test('B1 : refus net, report ou issue incertaine du serveur => l\'étape n\'avan
     expect($refus->traiter($this->ws, $i1, $this->maintenant))->toBe(Sequenceur::REPORTE);
     expect(seqMessages($i1)[0]->statut)->toBe('reporte')->and((int) seqEtat($i1)->etape_courante)->toBe(1);
 
-    // 2. Report INCERTAIN rapporté sans exception : étape inchangée, message « reporte » (la passerelle garde la place).
+    // 2. Résultat INCERTAIN rapporté sans exception : JAMAIS de report (il reboucherait chaque jour) ; inscription arrêtée
+    //    en attente de vérification humaine, étape inchangée, compteur de reports intact.
     [, $c2] = seqFiche($this, 'b1b@zz-client.example.invalid');
     $i2 = seqInscrire($this, $sid, $c2);
     $inc = seqAvecServeur($this, new ServeurEspion(fn () => ResultatInjection::incertain(new DateTimeImmutable('2026-11-17'))));
-    expect($inc->traiter($this->ws, $i2, $this->maintenant))->toBe(Sequenceur::REPORTE);
-    expect((int) seqEtat($i2)->etape_courante)->toBe(1);
+    expect($inc->traiter($this->ws, $i2, $this->maintenant))->toBe(Sequenceur::ARRETEE);
+    expect((int) seqEtat($i2)->etape_courante)->toBe(1)->and(seqEtat($i2)->motif_arret)->toBe(Sequenceur::MOTIF_ISSUE_INCERTAINE)
+        ->and((int) seqEtat($i2)->reports)->toBe(0);
 
     // 3. Exception inconnue (coupure) : le message ne repart JAMAIS ; alerte émise HORS transaction (niveau de base).
     [, $c3] = seqFiche($this, 'b1c@zz-client.example.invalid');
@@ -1019,21 +1021,39 @@ function seqViaPasserelle(object $t, ServeurEnvoi $serveur): Sequenceur
     );
 }
 
-test('issue incertaine en SMTP direct : reportée UNE fois, puis le lendemain l\'inscription est ARRÊTÉE (pas de report sans fin), une alerte, aucun renvoi', function () {
+test('issue incertaine en SMTP direct : inscription ARRÊTÉE d\'emblée (aucun report), UNE alerte ; rejouée le lendemain : aucun nouvel envoi, aucun report, aucune nouvelle alerte', function () {
     Log::spy();
     $sid = seqSequence($this);
     [, $c] = seqFiche($this, 'inc@zz-client.example.invalid');
     $i = seqInscrire($this, $sid, $c);
     $espion = new ServeurEspion(fn () => ResultatInjection::incertain(new DateTimeImmutable('tomorrow')));
     $seq = seqViaPasserelle($this, $espion);
-    expect($seq->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::REPORTE);
+    expect($seq->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ARRETEE)
+        ->and(seqEtat($i)->motif_arret)->toBe(Sequenceur::MOTIF_ISSUE_INCERTAINE)
+        ->and((int) seqEtat($i)->reports)->toBe(0);
 
     $this->maintenant = $this->lundi->modify('+1 day');
     $seq = seqViaPasserelle($this, $espion);
-    expect($seq->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ARRETEE)
-        ->and(seqEtat($i)->motif_arret)->toBe(Sequenceur::MOTIF_ISSUE_INCERTAINE)
-        ->and($espion->appels)->toBe(1);
+    expect($seq->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::IGNORE)
+        ->and($espion->appels)->toBe(1)
+        ->and((int) seqEtat($i)->reports)->toBe(0)
+        ->and(seqMessages($i)[0]->statut)->not->toBe('reporte');
     Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'sequenceur_issue_incertaine'))->once();
+});
+
+test('issue incertaine LEVÉE par la passerelle (rejeu d\'une clé a_verifier, SMTP direct) : arrêt sans report, une seule alerte', function () {
+    Log::spy();
+    $sid = seqSequence($this);
+    [, $c] = seqFiche($this, 'inc2@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $c);
+    $espion = new ServeurEspion(fn () => throw new RuntimeException('coupure après envoi possible'));
+    expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ARRETEE);
+    // Reprise forcée de l'inscription (réactivée à la main) : la passerelle refuse le renvoi (clé a_verifier), pas de report.
+    DB::table('envoi_inscriptions')->where('id', $i)->update(['statut' => 'active', 'motif_arret' => null, 'prochaine_echeance' => $this->maintenant->format('c')]);
+    DB::table('envoi_messages')->where('inscription_id', $i)->update(['statut' => 'reporte']);
+    expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ARRETEE)
+        ->and((int) seqEtat($i)->reports)->toBe(0)
+        ->and($espion->appels)->toBe(1);
 });
 
 test('refus CERTAIN avant tout envoi (EnvoiSmtpRefuse) : ni arrêt, ni alerte « incertaine » ; la place est rendue', function () {

@@ -177,7 +177,16 @@ final class PasserelleLocale implements ServeurEnvoi
         } elseif (! ($this->serveur instanceof RenvoiParMemeCle)) {
             throw EnvoiRefuse::issueIncertaine(); // `reservee` ou `a_verifier` en SMTP direct : on perd plutôt que de doubler
         }
-        $resultat = $this->serveur->injecter($message);
+        try {
+            $resultat = $this->serveur->injecter($message);
+        } catch (EnvoiRefuse|RefusDefinitifServeur|EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
+            // Refus CERTAIN au renvoi depuis `reservee` (rien n'est parti : la réservation n'a jamais abouti) : la place est
+            // rendue. Depuis `a_verifier`, l'envoi précédent est peut-être parti : la place reste prise.
+            if ($etat === 'reservee' && ! ($e instanceof EnvoiRefuse && $e->getCode() === EnvoiRefuse::ISSUE_INCERTAINE)) {
+                $this->conclure($ws, $jour, $message, 'liberee');
+            }
+            throw $e;
+        }
         if ($etat !== 'acceptee' && $resultat->accepte) {
             $this->conclure($ws, $jour, $message, 'acceptee', $fournisseur, $resultat->idInjection);
         }

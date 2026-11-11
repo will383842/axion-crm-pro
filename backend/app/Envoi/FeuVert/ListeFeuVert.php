@@ -8,6 +8,7 @@ use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
+use App\Envoi\JourEnvoi;
 use App\Envoi\Sante\DepotSante;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class ListeFeuVert
             $auto('auto.mode_temoins_vrai', $d !== null && (bool) $d->mode_temoins, 'Le mode témoins est actif.', 'Mode témoins inactif ou drapeaux absents.'),
             $auto('auto.signature_absente', $d !== null && $d->feu_vert_signature === null, 'Aucune signature posée.', $d === null ? 'Drapeaux absents.' : 'Une signature existe déjà.'),
             $this->temoins($ws),
+            $this->troisJours($ws),
             $auto('auto.arret_entreprise', ! self::estAbsent(app(ArretParEntreprise::class), ArretParEntrepriseAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
             $auto('auto.retrait_file', ! self::estAbsent(app(RetraitEnvoisEnFile::class), RetraitEnvoisEnFileAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
             // Mêmes règles que la vraie garde (JetonDesinscription) : jamais une copie.
@@ -134,5 +136,49 @@ class ListeFeuVert
         $manquants = array_values(array_diff(DepotSocleDb::FOURNISSEURS_TEMOINS, array_map('strval', $presents)));
 
         return self::pointAuto($code, $manquants === [], $manquants === [] ? 'Tous les fournisseurs témoins sont couverts.' : count($manquants) . ' fournisseur(s) sans témoin : ' . implode(', ', $manquants) . '.');
+    }
+
+    /**
+     * F15 : les 6 fournisseurs verts le même jour (réception inbox, authentification alignée, bouton vu, POST effectif)
+     * pendant 3 jours CONSÉCUTIFS se terminant aujourd'hui ou hier. La dernière ligne par jour et fournisseur fait foi ;
+     * un jour rouge, incomplet ou manquant remet le compteur à zéro. Lecture seule.
+     */
+    private function troisJours(string $ws): PointFeuVert
+    {
+        $code = 'auto.temoins_3_jours';
+        if (! Schema::hasTable('envoi_temoins_journees')) {
+            return self::pointAuto($code, false, 'Table des journées témoins absente (fiche F15 pas encore posée).');
+        }
+        $aujourdhui = JourEnvoi::de();
+        $depuis = $aujourdhui->modify('-4 days')->format('Y-m-d');
+        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_journees')
+            ->where('workspace_id', $ws)->where('jour', '>=', $depuis)
+            ->orderBy('id')->get(['jour', 'fournisseur', 'reception', 'auth_alignee', 'bouton_vu', 'post_effectif']));
+        $derniere = [];
+        foreach ($lignes as $l) {
+            $derniere[(string) $l->jour][(string) $l->fournisseur] = $l; // ordre croissant d'id : la dernière écrase
+        }
+        $vert = static function (string $jour) use ($derniere): bool {
+            foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $f) {
+                $l = $derniere[$jour][$f] ?? null;
+                if ($l === null || $l->reception !== 'inbox' || ! $l->auth_alignee || ! $l->bouton_vu || ! $l->post_effectif) {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+        $jour = $aujourdhui;
+        // Aujourd'hui sans aucune ligne : on compte depuis hier. Aujourd'hui avec des lignes : il doit être vert.
+        if (! isset($derniere[$jour->format('Y-m-d')])) {
+            $jour = $jour->modify('-1 day');
+        }
+        $suite = 0;
+        while ($suite < 3 && $vert($jour->format('Y-m-d'))) {
+            $suite++;
+            $jour = $jour->modify('-1 day');
+        }
+
+        return self::pointAuto($code, $suite >= 3, $suite >= 3 ? 'Les 6 témoins sont verts depuis 3 jours consécutifs.' : $suite . ' jour(s) vert(s) consécutif(s) sur 3 requis.');
     }
 }

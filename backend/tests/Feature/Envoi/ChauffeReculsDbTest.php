@@ -90,7 +90,7 @@ test('F07a isolement entre espaces : aucun recul visible, aucun effet sur l\'aut
     chaufferReculs($d, $a, 'ip', 'ip-1', $j, 8);
     chaufferReculs($d, $b, 'ip', 'ip-1', $j, 8);
 
-    $d->reculer($a, 'ip', 'ip-1', 'x', 'responsable', $j);
+    expect($d->reculer($a, 'ip', 'ip-1', 'x', 'responsable', $j))->toBeTrue();
     expect($d->reculsDe($b, 'ip', 'ip-1', $j))->toBe([]);
     expect($d->reculer($b, 'ip', 'ip-1', 'x', 'responsable', $j))->toBeTrue();   // pas bloqué par le recul de $a
     // RLS ENABLE + FORCE + politique sur app.current_workspace_id (la preuve de fuite elle-même est dans le test d'étanchéité, via le semeur)

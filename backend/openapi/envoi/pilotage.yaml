@@ -143,7 +143,7 @@ paths:
                       type: object
                       required: [fournisseur, jours]
                       properties:
-                        fournisseur: { type: string, description: Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre). }
+                        fournisseur: { type: string, description: "Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre)." }
                         jours:
                           type: array
                           items:
@@ -242,7 +242,7 @@ paths:
                 niveau: { type: string, enum: [bonne, moyenne, mauvaise] }
                 note: { type: string, maxLength: 500 }
       responses:
-        '201': { description: Constat enregistré (journalisé, jamais supprimé). }
+        '201': { description: "Constat enregistré (journalisé, jamais supprimé)." }
         '403':
           description: Réservé au propriétaire.
           content:

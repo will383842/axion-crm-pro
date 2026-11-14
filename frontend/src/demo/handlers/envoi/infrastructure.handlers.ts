@@ -84,7 +84,7 @@ function activite30Jours(alea: Alea, boite: Boite, joursActifs: number): JourAct
     if (actif) {
       envoyes = i === 0 ? boite.envoyes_aujourdhui : Math.max(1, Math.round(boite.quota_jour * (0.55 + alea.suivant() * 0.4)));
     }
-    const refus = Math.round((envoyes * boite.taux_refus) / 100);
+    const refus = Math.round((envoyes * (boite.taux_refus ?? 0)) / 100);
     const durs = Math.round(refus * 0.4);
     const mous = refus - durs;
     const reponses = actif && alea.booleen(Math.min(0.9, 0.12 + boite.reponses_7j / 12)) ? alea.entier(0, 2) : 0;
@@ -104,7 +104,7 @@ function activite30Jours(alea: Alea, boite: Boite, joursActifs: number): JourAct
 function fabrique(alea: Alea): DonneesInfra {
   const jours: Record<string, JourActivite[]> = {};
   for (const b of demoDb.boites.tous()) {
-    const joursActifs = b.statut === 'suspendue' ? 0 : (demoDb.domaines.trouver(b.domaine_id)?.chauffe?.jours_effectifs ?? 30);
+    const joursActifs = b.statut === 'suspendue' ? 0 : (demoDb.domaines.trouver(b.domaine_id ?? '')?.chauffe?.jours_effectifs ?? 30);
     jours[b.id] = activite30Jours(alea, b, joursActifs);
   }
 
@@ -451,7 +451,7 @@ export const handlers: HttpHandler[] = [
     if (demoDb.etatEnvois.lire().etat === 'arrete' || actuelle.etat === 'rouge') {
       return erreur(409, 'pause_active', 'Une pause de frein ou une pause automatique est active : la boîte ne peut pas être réactivée maintenant.');
     }
-    const enChauffe = Boolean(demoDb.domaines.trouver(actuelle.domaine_id)?.chauffe);
+    const enChauffe = Boolean(demoDb.domaines.trouver(actuelle.domaine_id ?? '')?.chauffe);
     const boite = demoDb.boites.modifier(actuelle.id, {
       statut: enChauffe ? 'en_chauffe' : 'prete',
       etat: enChauffe ? 'bleu' : 'vert',
@@ -543,7 +543,7 @@ export const handlers: HttpHandler[] = [
       const suivante = domaine.dmarc_prochaine_etape?.politique ?? cible;
       return HttpResponse.json(demoDb.domaines.modifier(domaine.id, { dmarc_prochaine_etape: { politique: suivante, le: corps.rappel_le } }));
     }
-    if (ORDRE_DMARC.indexOf(cible) <= ORDRE_DMARC.indexOf(domaine.dmarc)) {
+    if (ORDRE_DMARC.indexOf(cible) <= ORDRE_DMARC.indexOf(domaine.dmarc ?? 'none')) {
       return erreur(422, 'validation', 'Le DMARC ne peut qu’avancer : none, puis quarantine, puis reject.');
     }
     const suivante = ORDRE_DMARC[ORDRE_DMARC.indexOf(cible) + 1];

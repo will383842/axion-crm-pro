@@ -5,6 +5,7 @@ namespace App\Envoi\Gardes;
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Personnes\NatureEmail;
+use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Envoi\ListesNoires\GardeListes;
 use App\Socle\Espace\FonctionsEspace;
 use App\Support\EligibiliteCampagne;
@@ -70,6 +71,8 @@ final class EnvoiAutorise
     public const DOMAINE_LISTE_NOIRE = 'domaine_envoi_sur_liste_noire';
 
     public const IP_LISTE_NOIRE = 'ip_envoi_sur_liste_noire';
+
+    public const OPPOSITION_REGISTRE = 'opposition_registre_manuel';
 
     public const DATE_FUTURE = 'date_de_collecte_dans_le_futur';
 
@@ -175,6 +178,10 @@ final class EnvoiAutorise
         }
         if (($m = self::garderSegment($d)) !== null) {
             return new VerdictEnvoi($m, $alertes);
+        }
+        // R13, TOUJOURS EN DERNIER (durcissement seul) : domaine ou organisation inscrits au registre d'opposition manuel.
+        if (RegistreOppositionManuel::refuse($d->workspaceId, $d->email, $d->siren)) {
+            return new VerdictEnvoi(self::OPPOSITION_REGISTRE, $alertes);
         }
 
         return new VerdictEnvoi(null, $alertes);

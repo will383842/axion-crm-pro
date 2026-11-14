@@ -225,9 +225,6 @@ class OriginesController extends ConsoleController
 
                     $requete = $personnes->requete($espace, ['source' => null, 'statut_lettre' => null, 'nature' => null, 'rattachee' => null, 'q' => null, 'fermees' => EntreprisesFermees::mode(null)]);
                     $requete = Abonnements::exclureOpposees($requete);
-                    if (Schema::hasColumn('personnes', 'opposition_at')) {
-                        $requete->whereNull('personnes.opposition_at');
-                    }
                     $requete->whereNull('companies.insee_non_diffusible_le');
                     $requete->whereRaw('NOT ' . QuarantaineSite::personneLettreSql('personnes', 'companies'));
                     $requete->whereRaw('NOT ' . ProvenanceTiers::informationInsuffisanteSql('personnes', 'contact_id'));

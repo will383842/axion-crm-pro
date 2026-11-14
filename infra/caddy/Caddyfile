@@ -4,7 +4,9 @@
 #        api.axion-crm-pro.com (backend direct pour curl/debug)
 
 {
-    email williamsjullin@gmail.com
+    # Contact ACME (alertes d'expiration) : adresse de rôle lue dans l'environnement (ACME_EMAIL), jamais écrite dans le dépôt.
+    # Entre guillemets : vide = aucune adresse, Caddy démarre quand même.
+    email "{$ACME_EMAIL}"
     servers {
         # 🔴 `private_ranges` SEUL NE SUFFIT PAS — mesure du 2026-08-27.
         #

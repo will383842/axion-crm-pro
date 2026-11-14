@@ -46,6 +46,11 @@ paths:
           in: path
           required: true
           schema: { type: integer, minimum: 1, maximum: 5 }
+        - name: If-Match
+          in: header
+          required: true
+          description: Version du brouillon lue (verrou optimiste) ; 428 si absente, 409 si périmée.
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -53,7 +58,9 @@ paths:
             schema: { $ref: '#/components/schemas/ContenuEtape' }
       responses:
         '200': { $ref: '#/components/responses/Brouillon' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '428': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/brouillons/{id}/cible/estimation:
     post:
       operationId: estimerCible
@@ -74,6 +81,12 @@ paths:
                 type: object
                 required: [total, exclus, restant, exclusions]
                 properties:
+                  estimation:
+                    type: boolean
+                    description: Toujours vrai, c'est une estimation, pas un compte définitif.
+                  exclusions_evaluees:
+                    type: boolean
+                    description: Faux tant que les exclusions ne sont pas évaluées (alors `exclus` vaut 0, par défaut et non par mesure).
                   total: { type: integer, minimum: 0 }
                   exclus: { type: integer, minimum: 0 }
                   restant: { type: integer, minimum: 0 }
@@ -130,6 +143,7 @@ paths:
                   objet: { type: string }
                   corps: { type: string }
                   de: { type: string }
+        '501': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/brouillons/{id}/test:
     post:
       operationId: envoyerTest
@@ -148,6 +162,11 @@ paths:
                 destinataire_exemple_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
       responses:
         '200': { $ref: './commun.yaml#/components/responses/Succes' }
+        '409':
+          description: 'Envois fermés au palier 0 (`envoi_ferme_palier_0`) : aucun message ne part, aucun effet.'
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/brouillons/{id}/validation/code:
     post:
       operationId: demanderCodeValidation
@@ -165,6 +184,11 @@ paths:
                 properties:
                   envoye_a: { type: string }
                   expire_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '503': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/brouillons/{id}/valider:
     post:
       operationId: validerCampagne
@@ -191,6 +215,8 @@ paths:
                 properties:
                   campagne: { $ref: './commun.yaml#/components/schemas/CampagneResume' }
                   annulable_jusqua: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/annuler-validation:
     post:
@@ -200,6 +226,8 @@ paths:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
         '200': { $ref: '#/components/responses/Brouillon' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/messages:
     get:
@@ -682,6 +710,11 @@ components:
       properties:
         id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
         nom: { type: string }
+        version:
+          type: integer
+          minimum: 1
+          description: Version à renvoyer dans `If-Match` pour enregistrer une étape (aussi dans l'en-tête `ETag`).
+        statut: { $ref: './commun.yaml#/components/schemas/StatutCampagne' }
         etape_courante: { type: integer, minimum: 1, maximum: 5 }
         etapes_faites:
           type: array

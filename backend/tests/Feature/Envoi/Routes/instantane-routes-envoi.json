@@ -144,6 +144,17 @@
     },
     {
         "methode": "GET",
+        "uri": "api/v1/envoi/desinscriptions",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
         "uri": "api/v1/envoi/feu-vert",
         "middlewares": [
             "api",
@@ -160,6 +171,17 @@
             "auth:sanctum",
             "first-login",
             "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
             "workspace"
         ]
     },

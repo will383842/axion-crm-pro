@@ -11,7 +11,7 @@
  * restent tels quels — LF dans l'index, CRLF dans la copie de travail.
  *
  * Et c'est exactement ce qui s'était produit. Mesure du 2026-08-22 sur la copie
- * de travail principale (`C:/Users/willi/Documents/Projets/Axion-CRM-Pro`) :
+ * de travail principale (`<dossier du projet>`) :
  * **huit** scripts sur seize étaient encore en CRLF, alors que le worktree créé
  * après le `.gitattributes` les portait tous en LF.
  *

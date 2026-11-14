@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
  * POURQUOI ce fichier existe (mesuré le 2026-08-18) : il n'y en avait aucun.
  * Vitest, faute de config dans `workers/`, REMONTE l'arborescence jusqu'à en
  * trouver une — y compris HORS du dépôt. Sur le poste de développement, il
- * tombait sur `C:\Users\willi\vitest.config.ts` (config d'un tout autre
+ * tombait sur `<dossier utilisateur>/vitest.config.ts` (config d'un tout autre
  * projet), dont les globs sont `src/**\/*.{test,spec}` + `tests/unit/**` +
  * `tests/schemas/**` : AUCUN des tests de `workers/tests/*.test.ts` n'était
  * collecté, et `--passWithNoTests` rendait la commande VERTE avec zéro test.

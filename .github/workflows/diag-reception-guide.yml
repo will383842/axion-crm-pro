@@ -33,7 +33,7 @@ jobs:
           PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash -s -- "$PROJECT_PATH" <<'REMOTE'
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$USER@$HOST" bash -s -- "$PROJECT_PATH" <<'REMOTE'
           set -euo pipefail
           cd "$1"
           export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
@@ -45,15 +45,19 @@ jobs:
           echo "conteneurs api : $NB_API (attendu 1)"
 
           echo "## Dates (démarrage de api, modification du .env)"
-          API_ID=$(docker compose ps -q api < /dev/null)
-          API_START=$(docker inspect -f '{{.State.StartedAt}}' "$API_ID" < /dev/null)
+          API_ID=$(docker compose ps -q api < /dev/null || true)
           ENV_MTIME=$(stat -c %y .env)
-          echo "api démarré : $API_START"
           echo ".env modifié : $ENV_MTIME"
-          if [ "$(date -d "$ENV_MTIME" +%s)" -gt "$(date -d "$API_START" +%s)" ]; then
-            echo ".env modifié APRÈS le démarrage de api : oui (l'effectif peut différer du fichier)"
+          if [ -n "$API_ID" ]; then
+            API_START=$(docker inspect -f '{{.State.StartedAt}}' "$API_ID" < /dev/null)
+            echo "api démarré : $API_START"
+            if [ "$(date -d "$ENV_MTIME" +%s)" -gt "$(date -d "$API_START" +%s)" ]; then
+              echo ".env modifié APRÈS le démarrage de api : oui (l'effectif peut différer du fichier)"
+            else
+              echo ".env modifié APRÈS le démarrage de api : non"
+            fi
           else
-            echo ".env modifié APRÈS le démarrage de api : non"
+            echo "api démarré : CONTENEUR api ABSENT (la suite continue)"
           fi
 
           echo "## Migrations (session psql en lecture seule)"

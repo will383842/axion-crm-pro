@@ -197,6 +197,8 @@ function lignesDns(domaine: Domaine): EnregistrementDns[] {
     dmarc: { type: 'TXT', nom: `_dmarc.${domaine.nom}`, valeur: `v=DMARC1; p=${domaine.dmarc}; rua=mailto:rapports@${domaine.nom}` },
     ptr: { type: 'PTR', nom: ip, valeur: `mail.${domaine.nom}` },
     mta_sts: { type: 'TXT', nom: `_mta-sts.${domaine.nom}`, valeur: 'v=STSv1; id=20270112T093000' },
+    helo: { type: 'A', nom: `mail.${domaine.nom}`, valeur: ip },
+    tls_rpt: { type: 'TXT', nom: `_smtp._tls.${domaine.nom}`, valeur: `v=TLSRPTv1; rua=mailto:rapports@${domaine.nom}` },
   };
   return dnsDb()
     .filtrer((l) => l.domaine_id === domaine.id)

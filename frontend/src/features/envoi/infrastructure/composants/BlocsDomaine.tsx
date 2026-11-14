@@ -12,6 +12,8 @@ const ROLE: Record<EnregistrementDns['role'], string> = {
   dmarc: 'DMARC',
   ptr: 'Retour (PTR)',
   mta_sts: 'MTA-STS et rapports TLS',
+  helo: 'Nom du serveur (HELO)',
+  tls_rpt: 'Rapports TLS',
 };
 
 export function dnsVerts(dns: EnregistrementDns[]): number {

@@ -185,6 +185,7 @@ paths:
                   envoye_a: { type: string }
                   expire_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
         '429': { $ref: './commun.yaml#/components/responses/Erreur' }
         '503': { $ref: './commun.yaml#/components/responses/Erreur' }
@@ -225,6 +226,8 @@ paths:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
         '200': { $ref: '#/components/responses/Brouillon' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/messages:
     get:

@@ -34,27 +34,32 @@ final class ValidationCampagne
     /** @return array{envoye_a: string, expire_le: string} */
     public function demanderCode(string $ws, string $userId, string $email, string $id, ?string $cle): array
     {
-        $c = $this->auteur($ws, $userId, $id);
-        $this->exigerControles($ws, $c);
-        $recents = WorkspaceContext::run($ws, fn () => DB::table('envoi_campagne_codes')->where('campagne_id', $id)
-            ->where('cree_le', '>', DB::raw("now() - interval '" . self::FENETRE_MINUTES . " minutes'"))->count());
-        if ($recents >= self::CODES_PAR_FENETRE) {
-            throw new ErreurCreation('code_trop_frequent', 'Trois codes ont déjà été envoyés ces 15 dernières minutes : patientez avant d\'en demander un autre.', 429);
+        // Le code est un secret : AVANT toute écriture et tout tirage, on refuse un transport qui le laisserait dans un journal.
+        if (! CanalEmail::transportSur()) {
+            throw new ErreurCreation('transport_courriel_non_sur', 'Le courriel du code ne peut pas partir : le transport d\'authentification n\'est pas sûr (MAIL_MAILER_AUTH). Prévenez l\'administrateur.', 503);
         }
-        $this->avecVerrou($ws, $id, function () use ($ws, $userId, $id, $cle): void {
+        $this->auteur($ws, $userId, $id);
+        $code = sprintf('%06d', random_int(0, 999999));
+        // Contrôles, limite des 3 codes, passage en « à valider » et émission du code : UNE transaction sous verrou (pas de course).
+        $ligne = $this->avecVerrou($ws, $id, function () use ($ws, $userId, $id, $cle, $code): int {
             $c = $this->assistant->lire($ws, $id);
+            $this->exigerControles($ws, $c);
+            $recents = DB::table('envoi_campagne_codes')->where('workspace_id', $ws)->where('campagne_id', $id)
+                ->where('cree_le', '>', DB::raw("now() - interval '" . self::FENETRE_MINUTES . " minutes'"))->count();
+            if ($recents >= self::CODES_PAR_FENETRE) {
+                throw new ErreurCreation('code_trop_frequent', 'Trois codes ont déjà été envoyés ces 15 dernières minutes : patientez avant d\'en demander un autre.', 429);
+            }
             if ($c->statut === 'brouillon') {
                 $this->transitionner($ws, $id, 'a_valider', (int) $c->version, $userId, 'Code de validation demandé', $cle ?? "code:{$id}:{$c->version}");
             } elseif ($c->statut !== 'a_valider') {
                 throw ErreurCreation::conflit('campagne_non_validable', 'Cette campagne est déjà validée ou terminée.');
             }
+            try {
+                return $this->depot->emettreCode($ws, $id, $code, self::CODE_VALIDITE_MINUTES);
+            } catch (CampagneRefusee $e) {
+                throw new ErreurCreation($e->getCode() === 503 ? 'codes_indisponibles' : 'validation', $e->getMessage(), $e->getCode());
+            }
         });
-        $code = sprintf('%06d', random_int(0, 999999));
-        try {
-            $ligne = $this->depot->emettreCode($ws, $id, $code, self::CODE_VALIDITE_MINUTES);
-        } catch (CampagneRefusee $e) {
-            throw new ErreurCreation($e->getCode() === 503 ? 'codes_indisponibles' : 'validation', $e->getMessage(), $e->getCode());
-        }
         $envoye = $this->canal->envoyerA($email, 'Votre code de validation de campagne', "Votre code de validation : {$code}\nIl est valable " . self::CODE_VALIDITE_MINUTES . ' minutes et ne sert qu\'une fois. Si vous n\'êtes pas à l\'origine de cette demande, ignorez ce message.');
         if (! $envoye) {
             throw new ErreurCreation('courriel_indisponible', 'Le courriel du code n\'a pas pu partir : réessayez dans quelques minutes.', 503);
@@ -138,7 +143,10 @@ final class ValidationCampagne
     private function transitionner(string $ws, string $id, string $vers, int $version, string $auteur, string $motif, string $cle): void
     {
         try {
-            $this->depot->transitionner($ws, $id, $vers, $version, $auteur, $motif, substr($cle, 0, 100));
+            if (! $this->depot->transitionner($ws, $id, $vers, $version, $auteur, $motif, substr($cle, 0, 100))) {
+                // Clé déjà journalisée pour cette transition : rien n'a été appliqué. Jamais un faux succès (la transaction du geste est défaite).
+                throw ErreurCreation::conflit('cle_idempotence_reutilisee', 'Cette clé d\'idempotence a déjà servi pour une autre demande : utilisez une clé neuve.');
+            }
         } catch (CampagneRefusee $e) {
             throw new ErreurCreation($e->getCode() === 409 ? 'conflit_version' : 'validation', $e->getMessage(), $e->getCode());
         }
@@ -152,11 +160,7 @@ final class ValidationCampagne
      */
     private function avecVerrou(string $ws, string $id, \Closure $f): mixed
     {
-        return WorkspaceContext::run($ws, fn () => DB::transaction(function () use ($id, $f) {
-            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_campagne:' . $id]);
-
-            return $f();
-        }));
+        return $this->depot->sousVerrou($ws, $id, $f);
     }
 
     private function masquer(string $email): string

@@ -162,7 +162,9 @@ final class CreationController extends Controller
         } catch (ErreurCreation $e) {
             return response()->json(['error' => $e->erreur, 'message' => $e->getMessage()], $e->statut);
         } catch (CampagneRefusee $e) {
-            return response()->json(['error' => $e->getCode() === 404 ? 'non_trouve' : ($e->getCode() === 409 ? 'conflit' : 'validation'), 'message' => $e->getMessage()], $e->getCode());
+            return response()->json(['error' => match ($e->getCode()) {
+                404 => 'non_trouve', 409 => 'conflit', 503 => 'indisponible', default => 'validation'
+            }, 'message' => $e->getMessage()], $e->getCode());
         }
     }
 }

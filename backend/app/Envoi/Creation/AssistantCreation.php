@@ -28,7 +28,7 @@ final class AssistantCreation
     /** @return array<string, mixed> */
     public function creer(string $ws, string $auteur, string $nom): array
     {
-        $id = $this->depot->creer($ws, $nom, ['type' => 'liste', 'reference' => '0', 'libelle' => 'À choisir'], [], 1, ['contenu' => [], 'etapes_faites' => []], $auteur);
+        $id = $this->depot->sousVerrou($ws, null, fn () => $this->depot->creer($ws, $nom, ['type' => 'liste', 'reference' => '0', 'libelle' => 'À choisir'], [], 1, ['contenu' => [], 'etapes_faites' => []], $auteur));
 
         return $this->presenter($this->lire($ws, $id));
     }
@@ -50,6 +50,16 @@ final class AssistantCreation
         if ($version === null) {
             throw new ErreurCreation('version_requise', 'L\'en-tête If-Match (version du brouillon lue) est obligatoire.', 428);
         }
+
+        return $this->depot->sousVerrou($ws, $id, fn () => $this->enregistrerEtapeVerrouillee($ws, $id, $etape, $version, $corps));
+    }
+
+    /**
+     * @param  array<string, mixed>  $corps
+     * @return array{0: array<string, mixed>, 1: int}
+     */
+    private function enregistrerEtapeVerrouillee(string $ws, string $id, int $etape, int $version, array $corps): array
+    {
         $c = $this->lire($ws, $id);
         if ($c->statut !== 'brouillon') {
             throw ErreurCreation::conflit('campagne_figee', 'Seul un brouillon se modifie : cette campagne est en cours de validation.');

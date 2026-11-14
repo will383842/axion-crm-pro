@@ -37,7 +37,7 @@ alors qu'il est suivi ici). Les deux `-f` restent obligatoires, dans cet ordre,
 et la commande se lance depuis le dépôt principal :
 
 ```bash
-cd C:/Users/willi/Documents/Projets/Axion-CRM-Pro
+cd <dossier du projet>
 
 docker compose \
   -f docker-compose.yml \
@@ -203,7 +203,7 @@ liste vide.
 
 ## 5. Fabriquer un compte de vérification
 
-Le seul utilisateur en base est `williamsjullin@gmail.com`, dont le mot de
+Le seul utilisateur en base est `proprietaire@exemple.test`, dont le mot de
 passe n'est pas connu, et qui n'est membre **que** du workspace business — il
 ne peut donc pas ouvrir l'écran vivier. On crée un compte dédié.
 
@@ -330,7 +330,7 @@ docker exec axion-crm-postgres psql -U axion -d axion_crm -c \
 ## 6. Lancer le spec de vérification
 
 Comme au §1, **depuis le dépôt principal** (`cd
-C:/Users/willi/Documents/Projets/Axion-CRM-Pro`) : le spec est versionné dans
+<dossier du projet>`) : le spec est versionné dans
 `frontend/tests/e2e/`, et c'est le code de ce dépôt que la pile Docker sert
 (§9.1).
 
@@ -574,7 +574,7 @@ portée de tout ce qui précède.
 
 ```bash
 docker inspect axion-crm-api --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}'
-# → C:\Users\willi\Documents\Projets\Axion-CRM-Pro\backend -> /var/www/html
+# → <dossier du projet>\backend -> /var/www/html
 ```
 
 Compose résout les chemins relatifs (`./backend`, `context: .`) contre le

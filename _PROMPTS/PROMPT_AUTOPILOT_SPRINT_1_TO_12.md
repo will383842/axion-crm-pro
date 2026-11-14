@@ -1,6 +1,6 @@
 # PROMPT AUTOPILOT — Sprint 1 → S12 (implémentation bout-en-bout)
 
-> **À copier-coller dans une nouvelle conversation Claude Code (CWD = `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`).**
+> **À copier-coller dans une nouvelle conversation Claude Code (CWD = `<dossier du projet>`).**
 > Durée estimée autopilot : 10-15 heures de travail Claude réparties sur plusieurs sessions (Claude Code peut continuer après compaction automatique du contexte).
 > Sortie : codebase Phase 1 complète + 100 % testée mocks + image Docker prête à déployer.
 
@@ -9,7 +9,7 @@
 ## Comment l'utiliser
 
 1. **Sauvegarde** : assure-toi que le repo est clean et pushé (`git status` vide)
-2. Ouvre une **nouvelle conversation** Claude Code dans `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`
+2. Ouvre une **nouvelle conversation** Claude Code dans `<dossier du projet>`
 3. Choisis le **modèle Opus 4.7** (1M tokens) via `/model`
 4. Copie tout le contenu entre `<prompt>` et `</prompt>` (sans les balises)
 5. Colle et envoie
@@ -25,7 +25,7 @@ Tu es **Senior Full-Stack Engineer** sur le projet Axion CRM Pro. Tu vas coder l
 
 ## CONTEXTE — LIS D'ABORD ÇA
 
-**Repo local :** `C:\Users\willi\Documents\Projets\Axion-CRM-Pro` (déjà cloné, déjà pushé sur GitHub).
+**Repo local :** `<dossier du projet>` (déjà cloné, déjà pushé sur GitHub).
 **Repo GitHub :** https://github.com/will383842/axion-crm-pro (public, `main` tracking).
 
 **Documents à lire en premier dans l'ordre (lecture obligatoire avant tout code) :**

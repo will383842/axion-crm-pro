@@ -412,7 +412,7 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(entree, { status: 201 });
   }),
 
-  http.get(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.get('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const force = await repondreEtatForce(request, null);
     if (force && new URL(request.url).searchParams.get('demo-etat') !== 'vide') return force;
@@ -434,7 +434,7 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
-  http.post(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.post('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const dest = destinataireDuJeton(String(params['jeton']));
     if (!dest) return erreur(404, 'non_trouve', 'Ce lien n’est plus valable.');

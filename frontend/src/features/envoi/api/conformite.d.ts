@@ -4,6 +4,24 @@
  * Ne pas modifier à la main : modifier la description, puis régénérer.
  */
 export interface paths {
+    "/desinscription/{jeton}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page publique de désinscription (sans connexion) */
+        get: operations["lirePageDesinscription"];
+        put?: never;
+        /** Confirmer la désinscription (un clic) */
+        post: operations["confirmerDesinscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/alertes": {
         parameters: {
             query?: never;
@@ -292,24 +310,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/public/desinscription/{jeton}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Page publique de désinscription (sans connexion) */
-        get: operations["lirePageDesinscription"];
-        put?: never;
-        /** Confirmer la désinscription (un clic) */
-        post: operations["confirmerDesinscription"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -356,9 +356,15 @@ export interface components {
             derniere_synchro_le: components["schemas"]["Horodatage"] | null;
             etat: components["schemas"]["EtatFeu"];
         };
+        /**
+         * @description Une désinscription ne garde qu'une empreinte de l'adresse : `adresse` n'est
+         *     renseignée que si la fiche du CRM de l'espace la porte encore (et si le compte
+         *     a le droit de voir les coordonnées) ; sinon `null`. `adresse_masquee` est toujours
+         *     présente et ne permet pas de retrouver l'adresse.
+         */
         Desinscription: {
-            /** Format: email */
-            adresse: string;
+            adresse: string | null;
+            adresse_masquee: string;
             campagne_id: components["schemas"]["Identifiant"] | null;
             id: components["schemas"]["Identifiant"];
             source: components["schemas"]["SourceDesinscription"];
@@ -573,6 +579,59 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    lirePageDesinscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jeton: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Adresse masquée et expéditeur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        adresse_masquee: string;
+                        deja_desinscrit: boolean;
+                        expediteur: string;
+                        /** @description Nom de l'organisation du destinataire, si connue (option « toute mon organisation »). */
+                        organisation: string | null;
+                        /** @description Texte « pourquoi ce message » (source, données, et aucun suivi des clics). */
+                        pourquoi_ce_message: string;
+                    };
+                };
+            };
+            404: components["responses"]["Erreur"];
+        };
+    };
+    confirmerDesinscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jeton: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Inscrit aussi l'organisation (portée « organisation » du registre). */
+                    toute_l_organisation?: boolean;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Succes"];
+            404: components["responses"]["Erreur"];
+        };
+    };
     listerAlertesEnvoi: {
         parameters: {
             query?: never;
@@ -1013,59 +1072,6 @@ export interface operations {
         responses: {
             200: components["responses"]["Regles"];
             422: components["responses"]["Erreur"];
-        };
-    };
-    lirePageDesinscription: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                jeton: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Adresse masquée et expéditeur. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        adresse_masquee: string;
-                        deja_desinscrit: boolean;
-                        expediteur: string;
-                        /** @description Nom de l'organisation du destinataire, si connue (option « toute mon organisation »). */
-                        organisation: string | null;
-                        /** @description Texte « pourquoi ce message » (source, données, et aucun suivi des clics). */
-                        pourquoi_ce_message: string;
-                    };
-                };
-            };
-            404: components["responses"]["Erreur"];
-        };
-    };
-    confirmerDesinscription: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                jeton: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** @description Inscrit aussi l'organisation (portée « organisation » du registre). */
-                    toute_l_organisation?: boolean;
-                };
-            };
-        };
-        responses: {
-            200: components["responses"]["Succes"];
-            404: components["responses"]["Erreur"];
         };
     };
 }

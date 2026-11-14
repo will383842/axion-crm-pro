@@ -223,6 +223,7 @@ export const BASE_LEGALE_LABELS: Record<string, string> = {
 export const SOURCE_PERSONNE_LABELS: Record<string, string> = {
   newsletter: 'Newsletter',
   'guide-ia': 'Guide IA entreprise',
+  'guide-reseau': 'Guide reçu via les réseaux sociaux',
 };
 
 export interface PersonneRow {

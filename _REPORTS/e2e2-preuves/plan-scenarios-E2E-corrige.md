@@ -47,7 +47,7 @@
 ### A.1 Démarrer le CRM
 
 ```bash
-cd /c/Users/willi/Documents/Projets/Axion-CRM-Pro
+cd <dossier du projet>
 docker compose up -d
 docker compose ps --format '{{.Name}} {{.State}}'
 ```
@@ -99,7 +99,7 @@ suffit à bloquer TOUT le §A. Si c'est le cas — sauvegarder, puis recréer :
 ```bash
 docker exec axion-crm-postgres sh -c 'pg_dump -U axion -d axion_crm -Fc -f /tmp/avant.dump'
 docker cp axion-crm-postgres:/tmp/avant.dump ./avant-e2e.dump     # filet
-cd /c/Users/willi/Documents/Projets/Axion-CRM-Pro && docker compose stop api horizon scheduler reverb
+cd <dossier du projet> && docker compose stop api horizon scheduler reverb
 docker exec axion-crm-postgres sh -c "psql -U axion -d postgres -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='axion_crm';\"; psql -U axion -d postgres -c 'DROP DATABASE axion_crm;'; psql -U axion -d postgres -c 'CREATE DATABASE axion_crm OWNER axion;'"
 docker compose up -d api
 ```
@@ -148,7 +148,7 @@ existent — chaque commande artisan se termine par ~25 lignes de pile d'appel,
 **y compris quand elle réussit**. Poser `TELESCOPE_ENABLED=false` dans le `.env`
 pour ne pas confondre ce bruit avec une vraie erreur.
 
-Poser les drapeaux locaux dans `/c/Users/willi/Documents/Projets/Axion-CRM-Pro/.env`
+Poser les drapeaux locaux dans `<dossier du projet>/.env`
 (**local uniquement** — c'est l'inverse de la production, où tout part fermé) :
 
 ```
@@ -222,7 +222,7 @@ administrateur** que l'autopilote n'a pas.
 Le dépôt CRM porte désormais une surcouche prévue pour ça :
 
 ```bash
-cd /c/Users/willi/Documents/Projets/Axion-CRM-Pro
+cd <dossier du projet>
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d api
 docker port axion-crm-api          # ATTENDU : 80/tcp -> 0.0.0.0:58080
 ```
@@ -252,7 +252,7 @@ conteneur `bookforge-postgres`. Créer le rôle et la base, **avec le mot de pas
 que porte déjà `.env.local`** :
 
 ```bash
-cd /c/Users/willi/Documents/Projets/Axion-IA/axionia
+cd <dossier du projet>
 # lire (sans l'afficher) l'utilisateur et le mot de passe de DATABASE_URL, puis :
 docker exec bookforge-postgres psql -U <super-utilisateur> -d postgres \
   -c "CREATE ROLE axion_ia LOGIN PASSWORD '<celui de .env.local>';" \
@@ -263,7 +263,7 @@ pnpm prisma migrate deploy
 #### A.2.2 — Lancer le site
 
 ```bash
-cd /c/Users/willi/Documents/Projets/Axion-IA/axionia   # dépôt principal
+cd <dossier du projet>   # dépôt principal
 # ou un worktree DÉDIÉ, à créer explicitement :
 #   git worktree add ../axionia-wt-e2e-crm <branche>
 # ⚠️ `axionia-wt-e2e-crm`, `axionia-wt-crm-l4` et `axionia-wt-crm-l5obs` existent
@@ -918,7 +918,7 @@ Chaque compteur de la barre latérale et du tableau de bord est **égal** au
 **Geste**
 
 ```bash
-docker compose -f /c/Users/willi/Documents/Projets/Axion-CRM-Pro/docker-compose.yml stop caddy api
+docker compose -f <dossier du projet>/docker-compose.yml stop caddy api
 # → soumettre un formulaire sur le site
 ```
 

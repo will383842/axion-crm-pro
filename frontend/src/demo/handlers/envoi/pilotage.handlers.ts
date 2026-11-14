@@ -120,6 +120,8 @@ function calculer(par: Regroupement, depuisMs: number, jusquaMs: number) {
 
 function adresseSansAccent(s: string): string { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
 
+const FOURNISSEURS_DEMO = ['gmail', 'microsoft', 'yahoo', 'orange', 'ovh', 'autre'];
+
 export const handlers: HttpHandler[] = [
   http.get(api('/envoi/resultats'), async ({ request }) => {
     await delai();
@@ -181,16 +183,16 @@ export const handlers: HttpHandler[] = [
         { messagerie: 'Messagerie opérateur B', envoyes: Math.round(total * 0.32), par_heure: 6, etat: 'normal' },
         { messagerie: 'Messagerie pro C', envoyes: Math.round(total * 0.27), par_heure: 3, etat: 'freine' },
       ],
+      temoins_par_fournisseur: FOURNISSEURS_DEMO.map((fournisseur) => ({ fournisseur, jours: Array.from({ length: 14 }, (_, i) => ({ jour: new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10), etat: 'non_teste' })) })),
       pauses: [{ motif: 'reports_en_hausse_sur_une_heure', portee: 'fournisseur', fournisseur: 'autre', fin: new Date(fin + 3_600_000).toISOString() }],
       envoyes_14_jours: Array.from({ length: 14 }, (_, i) => { const jour = new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10); return { jour, envoyes: jour === new Date(fin).toISOString().slice(0, 10) ? total : (par.get(jour) ?? 0) }; }),
     });
   }),
 
+  // Envoi fermé (palier 0) : le test du matin ne part pas, rien ne change.
   http.post(api('/envoi/sante/test'), async () => {
     await delai();
-    const le = maintenant().toISOString();
-    demoDb.zone<TestMatin>('pilotage', 'testMatin').modifier('test', { le, temoins_ok: 4, temoins_total: 4 });
-    return HttpResponse.json({ le, temoins_ok: 4, temoins_total: 4, etat: 'vert' });
+    return erreur(409, 'envoi_ferme_palier_0', 'Les envois sont fermés (palier 0) : aucun test ne peut partir.');
   }),
 
   http.get(api('/envoi/envois/chercher'), async ({ request }) => {

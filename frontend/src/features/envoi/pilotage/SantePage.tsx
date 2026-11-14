@@ -13,6 +13,8 @@ import { OngletsSante } from './OngletsSante';
 import { Chargement, Panne, Vide } from './composants/Etats';
 import { Feu, libelleFeu, type EtatFeu } from './composants/Feu';
 import { libelleMotifPause } from '@/features/envoi/conformite/composants/typesAlerte';
+import { MessageEnvoiFerme } from './composants/EnvoiFerme';
+import { TemoinsFournisseurs, type LigneTemoins } from './composants/TemoinsFournisseurs';
 import { formaterHeure, formaterNombre, formaterPourcent, part } from './composants/formats';
 
 type Sante = {
@@ -21,6 +23,7 @@ type Sante = {
   alertes: number; verifie_le: string | null; volume_jour: { possibles: number; envoyes: number };
   rythme_messageries: { messagerie: string; envoyes: number; par_heure: number | null; etat: 'normal' | 'freine' }[];
   envoyes_14_jours: { jour: string; envoyes: number }[];
+  temoins_par_fournisseur?: LigneTemoins[];
   pauses?: { motif: string; portee: 'global' | 'fournisseur'; fournisseur: string | null; fin: string | null }[];
 };
 
@@ -83,6 +86,7 @@ export function SantePage() {
                 ))}
               </ul>
             ) : null}
+            <MessageEnvoiFerme erreur={test.error} />
             {test.isSuccess ? <p role="status" className="text-sm text-emerald-700">Test lancé à {formaterHeure(test.data.le)} : les boîtes témoins ont répondu.</p> : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -91,6 +95,11 @@ export function SantePage() {
               <Card><div className="text-xs text-slate-600">Test du matin</div><div className="text-2xl font-bold">{s.test_du_matin.temoins_ok}<small className="text-sm font-normal text-slate-600"> / {s.test_du_matin.temoins_total} témoins</small></div><div className="mt-2"><Feu etat={s.test_du_matin.etat} /></div></Card>
               <Card><div className="text-xs text-slate-600">Alertes ouvertes</div><div className="text-2xl font-bold">{s.alertes}</div><div className="mt-2 text-xs text-slate-600">dans la cloche et par e-mail</div></Card>
             </div>
+
+            <section aria-labelledby="h-temoins">
+              <h2 id="h-temoins" className="mb-3 text-lg font-bold text-slate-900">Témoins par fournisseur (14 jours)</h2>
+              <TemoinsFournisseurs lignes={s.temoins_par_fournisseur} />
+            </section>
 
             <section aria-labelledby="h-domaines">
               <h2 id="h-domaines" className="mb-3 text-lg font-bold text-slate-900">Feux par domaine</h2>

@@ -37,7 +37,9 @@ export interface paths {
         /**
          * Liste « feu vert » avant le premier envoi réel
          * @description Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
-         *     portent une preuve humaine. Les verrous sont en lecture seule.
+         *     portent une preuve humaine (catalogue v3 : 16 points automatiques et 28 manuels, 44 au total,
+         *     cases A4 à A12 du plan R07 comprises). Un point automatique sans source est toujours faux.
+         *     Les verrous sont en lecture seule.
          */
         get: operations["lireFeuVert"];
         put?: never;

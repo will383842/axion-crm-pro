@@ -52,6 +52,11 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',
+    // Filet modifié : pourquoi — envoi R12 : texte chiffré des réponses et classements, ajout seul (trigger, REVOKE), down() inerte par conception (S8).
+    '2026_12_02_000120_envoi_reponses.php',
+    '2026_12_02_000121_envoi_reponses_classements.php',
+    // Filet modifié : pourquoi — envoi R12 : canal d'opposition `reponse` (CHECK élargi NOT VALID, aucune donnée touchée) ; la retirer fausserait le registre ; down() inerte, up() rejouable.
+    '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
     '2026_11_10_000063_envoi_echecs_releve.php',
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
@@ -84,6 +89,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000082_envoi_modeles.php',
     // Envoi R13 : registre d'opposition manuel, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000130_envoi_oppositions_registre.php',
+    // Filet modifié : pourquoi — envoi R07 : colonne `envoi_domaines.flux` (ADD COLUMN IF NOT EXISTS, NULL) + CHECK NOT VALID ; la retirer effacerait l'étiquetage des domaines ; down() inerte, up() rejouable.
+    '2026_12_02_000070_envoi_domaines_flux.php',
     // Envoi R09 : colonne `envoi_prevu_le` (ADD COLUMN IF NOT EXISTS, NULL) ; la retirer effacerait les dates prévues ; down() inerte.
     '2026_12_02_000090_envoi_campagnes_date.php',
     // Envoi R16 : accès IMAP des témoins (hôte en liste fermée par CHECK, identifiant chiffré), AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE) ; la retirer effacerait les accès posés ; down() inerte, up() rejouable.

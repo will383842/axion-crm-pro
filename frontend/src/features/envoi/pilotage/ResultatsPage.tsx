@@ -16,7 +16,7 @@ import { formaterNombre, formaterPourcent, part, telechargerCsv } from './compos
 type Ligne = components['schemas']['LigneResultat'];
 type Reponse = {
   data: Ligne[]; totaux: Ligne | null; precedent: Ligne | null; periode: { du: string; au: string };
-  entonnoir: { envoyes: number; reponses: number; rendez_vous: number; gagnes: number } | null;
+  entonnoir: { envoyes: number; reponses: number; rendez_vous: number | null; gagnes: number | null } | null;
 };
 type Par = 'boite' | 'domaine' | 'liste' | 'message';
 const ONGLETS: ReadonlyArray<{ id: Par; libelle: string; colonne: string }> = [
@@ -93,8 +93,8 @@ export function ResultatsPage() {
                   {([['Envoyés', d.entonnoir.envoyes], ['Réponses', d.entonnoir.reponses], ['Rendez-vous', d.entonnoir.rendez_vous], ['Gagnés', d.entonnoir.gagnes]] as const).map(([nom, v], i, tous) => (
                     <li key={nom} className="rounded-lg bg-slate-50 p-3">
                       <div className="text-xs text-slate-600">{i + 1}. {nom}</div>
-                      <div className="text-2xl font-bold text-slate-900">{formaterNombre(v)}</div>
-                      {i > 0 ? <div className="text-xs text-slate-600">{formaterPourcent(part(v, tous[i - 1]![1]))} de l’étape d’avant</div> : null}
+                      <div className="text-2xl font-bold text-slate-900">{v === null ? '—' : formaterNombre(v)}</div>
+                      {i > 0 && v !== null && tous[i - 1]![1] !== null ? <div className="text-xs text-slate-600">{formaterPourcent(part(v, tous[i - 1]![1] as number))} de l’étape d’avant</div> : null}
                     </li>
                   ))}
                 </ol>

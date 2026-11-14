@@ -3,13 +3,16 @@
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Imap\Verp;
+use App\Envoi\PasserelleLocale;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\RegistreInjections;
 use App\Envoi\Serveur\Kumo\RegistreMemoire;
 use App\Envoi\Serveur\Kumo\TransportSmtpTunnel;
 use App\Envoi\Serveur\ServeurEnvoiKumo;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
+use Illuminate\Support\Facades\Log;
 use Tests\Unit\Envoi\DepotMemoire;
 
 require_once __DIR__ . '/../../../Envoi/KitConformiteServeurEnvoi.php';
@@ -601,4 +604,62 @@ test('mineur : le report d’une clé déjà reportée utilise l’horloge injec
     $s->injecter(msgK9('h1'));
     $r = $s->injecter(msgK9('h1'));
     expect($r->reporteAu->getTimezone()->getName())->toBe('Asia/Tokyo');
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// L8-F14a (B2) — le signal `incertain` : la passerelle ne rend la place QUE sur un refus CERTAIN.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Passerelle de test devant un Kumo scripté : plafond $n, mode témoins respecté (témoin@example.test). */
+function kumoPasserelle(ServeurEnvoiKumo $kumo, DepotMemoire $depot, int $n): PasserelleLocale
+{
+    return new PasserelleLocale($kumo, $depot, true, $n, fn () => new DateTimeImmutable('2026-11-17 10:00:00', new DateTimeZone('Europe/Paris')), WS_K9, 300, fn () => WS_K9);
+}
+
+test('B2 Kumo : coupure après DATA => report INCERTAIN, la place reste comptée (plafond 1 jamais dépassé), alerte, aucun renvoi', function () {
+    Log::spy();
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_apres_data'];
+    $depot = new DepotMemoire;
+    $kumo = kumoFabrique($t);
+    expect($kumo->injecter(msgK9('x'))->incertain)->toBeTrue(); // le signal lui-même
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_apres_data', 250];
+    $p = kumoPasserelle(kumoFabrique($t), $depot, 1);
+
+    expect($p->injecter(msgK9('k1'))->accepte)->toBeFalse();
+    expect($depot->etatInjection(WS_K9, 'k1'))->toBe('a_verifier')
+        ->and($depot->injectesLe(WS_K9, new DateTimeImmutable('2026-11-17')))->toBe(1);
+    Log::shouldHaveReceived('critical')->once();
+    // Plafond 1 déjà pris par l'incertain : le suivant est reporté SANS appeler Kumo.
+    expect($p->injecter(msgK9('k2'))->accepte)->toBeFalse()->and($t->connexions)->toBe(1);
+});
+
+test('B2 Kumo : clé injection_en_cours ou a_verifier dans le registre => incertain ; report net (4xx) => PAS incertain', function () {
+    $reg = new RegistreMemoire;
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_apres_data'];
+    $s = kumoFabrique($t, null, null, $reg);
+    $s->injecter(msgK9('a'));                                  // a_verifier
+    expect($s->injecter(msgK9('a'))->incertain)->toBeTrue();   // état inconnu côté serveur
+    $reg->ecrire(WS_K9, 'b', ['id' => 'i', 'etat' => 'injection_en_cours', 'reporte_au' => null, 'instant' => 1, 'jeton' => str_repeat('a', 32)]);
+    expect($s->injecter(msgK9('b'))->incertain)->toBeTrue();   // un autre worker est en route
+    $t->scenario = [451];
+    $net = $s->injecter(msgK9('c'));
+    expect($net->accepte)->toBeFalse()->and($net->incertain)->toBeFalse(); // 4xx : rien n'est parti
+});
+
+test('B2 Kumo : un 4xx (report net) LIBÈRE la place et un 5xx définitif LIBÈRE sans alerte « incertaine »', function () {
+    Log::spy();
+    $depot = new DepotMemoire;
+    $t = new FauxTransportKumo;
+    $t->scenario = [451, 550];
+    $p = kumoPasserelle(kumoFabrique($t), $depot, 1);
+    $jour = new DateTimeImmutable('2026-11-17');
+
+    expect($p->injecter(msgK9('k1'))->accepte)->toBeFalse();
+    expect($depot->etatInjection(WS_K9, 'k1'))->toBeNull()->and($depot->injectesLe(WS_K9, $jour))->toBe(0);
+    expect(fn () => $p->injecter(msgK9('k2')))->toThrow(RefusDefinitifServeur::class);
+    expect($depot->etatInjection(WS_K9, 'k2'))->toBeNull()->and($depot->injectesLe(WS_K9, $jour))->toBe(0);
+    Log::shouldNotHaveReceived('critical');
 });

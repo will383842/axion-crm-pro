@@ -113,3 +113,6 @@ e898999a17cfd512aeb81fffc5257856b771087f:backend/tests/Feature/Usine/PushAgregat
 # ─── STOP-T4-CRM (T4-a) : jeton factice de test dans le premier commit de la PR ───────────────────────────────
 # Chaîne « jeton-de-test-… » (rien de réel), remplacée par une valeur construite à l'exécution dans le commit suivant.
 401aea0747175b11fa024176cf9ab246ca87b15a:backend/tests/Feature/Crm/OppositionsSortantesT4Test.php:generic-api-key:498
+
+# ─── Libellé du guide reçu : secret HMAC factice de test (« secret-de-test-lgr-… », rien de réel) ───
+5d9f0d76faa437999bd07170dcd70a38f179734d:backend/tests/Feature/Crm/LibelleGuideRecuTest.php:generic-api-key:11

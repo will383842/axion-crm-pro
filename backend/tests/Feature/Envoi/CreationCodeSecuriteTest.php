@@ -146,9 +146,11 @@ function csCampagneConcurrente(int $codesDeja): array
         $proprio->table('envoi_campagne_codes')->insert(['workspace_id' => $ws, 'campagne_id' => $camp, 'empreinte' => DepotCampagnes::empreinteCode(sprintf('%06d', 100 + $i), 1), 'cle_version' => 1, 'expire_le' => now()->addMinutes(10)]);
     }
     putenv('ENVOI_CLES_CODES_CAMPAGNE=' . json_encode(['1' => CS_CLE]));
+    putenv('MAIL_MAILER_AUTH=array');   // les sous-processus lisent `.env` (MAIL_MAILER_AUTH vide en CI) : l'environnement l'emporte
 
     return [$ws, $camp, $auteur, function () use ($proprio, $ws): void {
         putenv('ENVOI_CLES_CODES_CAMPAGNE');
+        putenv('MAIL_MAILER_AUTH');
         $proprio->statement("SET session_replication_role = 'replica'");
         foreach (['envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_campagnes', 'envoi_boites', 'audience_members', 'email_audiences'] as $t) {
             $proprio->table($t)->where('workspace_id', $ws)->delete();

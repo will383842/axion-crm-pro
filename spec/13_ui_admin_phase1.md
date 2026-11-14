@@ -127,7 +127,7 @@ Couvert dans `11_carte_france_interactive.md`. Une seule page combinant :
 │ ├─────────────────────────────────────────────────────────────────┤  │
 │ │ ☐ │ Quali │ Taille (6 cat. v1.1)   │ Raison sociale     │ Décideur  │
 │ │ ──┼───────┼─────────────────────────┼─────────────────────┼──────────│
-│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION IA SAS       │ Williams │
+│ │ ☐ │  🟢   │ 🏢 PME                  │ AXION IA SAS       │ le fondateur │
 │ │ ☐ │  🟢   │ 🏬 ETI                  │ EXEMPLE Industries │ M. Dupont│
 │ │ ☐ │  🟡   │ 👥 TPE                  │ SARL TEST          │ J. Martin│
 │ │ ☐ │  🔴   │ 🔨 Artisan              │ Plomberie Démo     │ —        │
@@ -168,7 +168,7 @@ Pour distinguer dirigeants légaux des C-level Direction Finder.
 ├──────────────────────────────────────────────────────────────────────┤
 │ Contacts (4)                                              + Ajouter  │
 │   ┌──────────────────────────────────────────────────────────────┐   │
-│   │ ★ Williams        Président          ⓜ ☎ 🔗 — 🟢      │   │
+│   │ ★ le fondateur        Président          ⓜ ☎ 🔗 — 🟢      │   │
 │   │   Trouvé via : Dirigeant légal (annuaire-entreprises)        │   │
 │   │   responsable@exemple.test   score 88   tel +33...            │   │
 │   │ ─────────────────────────────────────────────────────────── │   │
@@ -379,7 +379,7 @@ Cf. `17_rgpd_aiact_owasp.md` pour le SQL transactional multi-tables.
 │  • Axion-IA  (owner: will@) · 1 user · €245.30 spent this month     │
 │                                                                      │
 │ Users (1 workspace courant)            + Inviter                     │
-│  • Williams · will@... · Owner · 2FA ✅ · Last login il y a 2h│
+│  • le fondateur · will@... · Owner · 2FA ✅ · Last login il y a 2h│
 │  ➕ Invite pending: julie@... (Operator) · expire J+5                │
 └──────────────────────────────────────────────────────────────────────┘
 ```

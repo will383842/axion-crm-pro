@@ -38,7 +38,7 @@ final class Classificateur
     private const MOTS_STOP = [
         'stop', 'desinscri', 'desabonn', 'unsubscribe', 'opt out', 'opt-out', 'optout',
         'ne plus recevoir', 'plus recevoir', 'ne souhaite plus', 'ne veux plus', 'no longer wish', 'no longer want', 'stop emailing', 'stop sending', 'ne plus me contacter', 'ne me contactez plus', 'ne m ecrivez plus',
-        'retirez moi', 'retirez mon', 'supprimez mon', 'supprimer mon adresse', 'remove me',
+        'retirez moi', 'retirez-moi', 'ne plus m ecrire', 'retirez mon', 'supprimez mon', 'supprimer mon adresse', 'remove me',
         'remove my', 'take me off', 'do not contact', 'don t contact', 'do not email',
         'arretez', 'cessez de', 'plus jamais',
     ];
@@ -105,7 +105,7 @@ final class Classificateur
             throw new EchecAnalyse('Texte non UTF-8.');
         }
         $texte = self::normaliser(self::texteNonCite($m->corps) . ' ' . $m->sujet);
-        if (self::estAutoReponseDevinee($m) && mb_strlen(trim(self::normaliser(self::texteNonCite($m->corps)))) > self::TEXTE_COURT_MAX) {
+        if (self::estAutoReponseDevineeForte($m) && mb_strlen(trim(self::normaliser(self::texteNonCite($m->corps)))) > self::TEXTE_COURT_MAX) {
             return ClasseRetour::AutoReponse; // absence / accusé : jamais un STOP ni une plainte (D1)
         }
         if (self::contient($texte, self::MOTS_STOP)) {
@@ -139,6 +139,17 @@ final class Classificateur
         }
 
         return false;
+    }
+
+    private static function estAutoReponseDevineeForte(MessageBrut $m): bool
+    {
+        // Objet d'une RÉPONSE humaine (« Re: », « RE : », « Réf: », « AW: », « SV: », « TR: », « Fwd: ») : il reprend notre objet,
+        // ses mots ne prouvent rien sur l'expéditeur.
+        if (Pcre::correspond('/^\s*(re|ref|aw|sv|tr|fwd?)\s*:/iu', self::normaliser($m->sujet))) {
+            return in_array(strtolower(trim($m->enTetes['precedence'] ?? '')), ['bulk', 'junk'], true);
+        }
+
+        return self::estAutoReponseDevinee($m);
     }
 
     private static function estAutoReponseDevinee(MessageBrut $m): bool

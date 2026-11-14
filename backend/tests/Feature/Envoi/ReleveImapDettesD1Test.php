@@ -201,3 +201,11 @@ test('3e maillon : trois rebonds durs rattachés dans la journée => compteur =>
         ->and($motifs)->toContain(DecisionFrein::REBONDS)
         ->and(collect(app(DepotChauffe::class)->pausesActives($this->ws, $maintenant))->pluck('motif')->all())->toContain(DecisionFrein::REBONDS);
 });
+
+test('absence : une réponse humaine LONGUE dont l\'objet reprend « absence »/« congés » reste un STOP ou une plainte', function (string $sujet, string $corps, ClasseRetour $attendu) {
+    expect(Classificateur::classer(d1Msg(1, $sujet, $corps)))->toBe($attendu);
+})->with([
+    'Re: absence + désinscription' => ['Re: absence de réponse', "Je vous ai déjà demandé de ne plus m'écrire, retirez-moi de vos listes.", ClasseRetour::Desinscription],
+    'RE : congés + STOP long' => ['RE : Offre spéciale congés', 'Merci de ne plus me contacter, je ne suis pas du tout intéressé par votre offre.', ClasseRetour::Desinscription],
+    'Re: accusé + hostile' => ['Re: accusé de réception', 'Si vous continuez à m\'écrire je vais porter plainte, ceci est mon dernier avertissement.', ClasseRetour::Hostile],
+]);

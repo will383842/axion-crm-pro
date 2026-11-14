@@ -2,6 +2,7 @@
 
 use App\Support\SentryFiltre;
 use Sentry\Event;
+use Sentry\ExceptionDataBag;
 
 /** R05b : l'adresse testée par « puis-je écrire » ne part jamais chez Sentry (elle voyage dans l'URL de la requête). */
 test('avantEnvoi retire la query string et l’adresse de l’URL de puis-je-ecrire', function () {
@@ -37,4 +38,23 @@ test('avantEnvoi laisse les autres requêtes intactes', function () {
 
 test('la config Sentry branche before_send sur le filtre', function () {
     expect(config('sentry.before_send'))->toBe([SentryFiltre::class, 'avantEnvoi']);
+});
+
+test('avantEnvoi remplace les adresses dans les valeurs d’exception des routes /envoi/*', function () {
+    $e = Event::createEvent();
+    $e->setRequest(['url' => 'https://api.exemple.test/api/v1/envoi/puis-je-ecrire', 'method' => 'POST']);
+    $bag = new ExceptionDataBag(new RuntimeException('SQLSTATE[57014]: ... (SQL: select * from "contacts" where "email" = secret@zz-client.example.invalid and a = 1)'));
+    $e->setExceptions([$bag]);
+
+    $valeurs = array_map(fn ($b) => $b->getValue(), SentryFiltre::avantEnvoi($e)->getExceptions());
+
+    expect(implode('|', $valeurs))->not->toContain('secret')->not->toContain('zz-client')->toContain('[adresse]');
+});
+
+test('avantEnvoi ne touche pas aux exceptions des autres routes', function () {
+    $e = Event::createEvent();
+    $e->setRequest(['url' => 'https://api.exemple.test/api/v1/crm/entreprises', 'method' => 'GET']);
+    $bag = new ExceptionDataBag(new RuntimeException('erreur pour a@zz.example.invalid'));
+    $e->setExceptions([$bag]);
+    expect(SentryFiltre::avantEnvoi($e)->getExceptions()[0]->getValue())->toContain('a@zz.example.invalid');
 });

@@ -122,10 +122,10 @@ describe('Désinscription « toute l’organisation » (#400 M1)', () => {
     const dest = demoDb.destinataires.tous().find((d) => d.adresse.includes('boulangerie-tilleuls'))!;
     const collegues = demoDb.destinataires.tous().filter((d) => d.organisation === dest.organisation);
     expect(dest.organisation).not.toBeNull();
-    const reponse = await fetch(`${RACINE}/public/desinscription/${JETON_DEMO}`, { method: 'POST', headers: JSON_ENTETE, body: JSON.stringify({ toute_l_organisation: true }) });
+    const reponse = await fetch(`${RACINE.replace('/api/v1', '')}/desinscription/${JETON_DEMO}`, { method: 'POST', headers: JSON_ENTETE, body: JSON.stringify({ toute_l_organisation: true }) });
     expect(reponse.status).toBe(200);
     expect(collegues.every((d) => demoDb.destinataires.trouver(d.id)!.etat === 'desinscrit')).toBe(true);
-    const vue = (await (await fetch(`${RACINE}/public/desinscription/${JETON_DEMO}`)).json()) as { deja_desinscrit: boolean };
+    const vue = (await (await fetch(`${RACINE.replace('/api/v1', '')}/desinscription/${JETON_DEMO}`)).json()) as { deja_desinscrit: boolean };
     expect(vue.deja_desinscrit).toBe(true);
   });
 });

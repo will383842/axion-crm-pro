@@ -37,12 +37,15 @@ final class LienJournalisteContact
     /**
      * Opposition décidée dans la console presse : propage vers `opt_out` et
      * vers le contact lié.
+     *
+     * @return list<string> empreintes des adresses traitées (journaliste + contact lié), dédoublonnées
      */
-    public static function opposer(int $journalisteId): void
+    public static function opposer(int $journalisteId): array
     {
+        $empreintes = [];
         $j = DB::table('journalists')->where('id', $journalisteId)->whereNull('deleted_at')->first(['id', 'email', 'phone', 'contact_id']);
         if ($j === null) {
-            return;
+            return [];
         }
         $contact = $j->contact_id === null ? null
             : DB::table('contacts')->where('id', $j->contact_id)->whereNull('deleted_at')->first(['id', 'email', 'phone', 'metadata']);
@@ -50,6 +53,7 @@ final class LienJournalisteContact
         foreach ([$j->email, $contact?->email] as $email) {
             if (is_string($email) && trim($email) !== '') {
                 self::opposerEmail($email);
+                $empreintes[] = ListeSuppression::empreinte($email);
             }
         }
         foreach ([$j->phone, $contact?->phone] as $telephone) {
@@ -66,6 +70,8 @@ final class LienJournalisteContact
                 DB::table('contacts')->where('id', $contact->id)->update(['metadata' => json_encode($meta, JSON_THROW_ON_ERROR)]);
             }
         }
+
+        return array_values(array_unique($empreintes));
     }
 
     /**

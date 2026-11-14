@@ -13,7 +13,7 @@ import { Jauge, PastilleFeu } from './composants/Pastilles';
 import { OngletsServeurs } from './OngletsServeurs';
 
 const FLUX = { prospection: 'Prospection', lettre: 'Lettre d’information' } as const;
-const STATUT = { prete: 'Prête', ralentie: 'Ralentie', en_chauffe: 'En chauffe', suspendue: 'Suspendue' } as const;
+const STATUT = { prete: 'Prête', ralentie: 'Ralentie', en_chauffe: 'En chauffe', suspendue: 'Suspendue', inconnu: 'État inconnu' } as const;
 
 function BlocServeur({ serveur }: { serveur: Serveur }) {
   const sante = useSanteServeur(serveur.id);
@@ -25,14 +25,18 @@ function BlocServeur({ serveur }: { serveur: Serveur }) {
     <section aria-labelledby={`srv-${serveur.id}`} className="space-y-3 rounded-xl bg-white p-4 ring-1 ring-slate-200">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={`srv-${serveur.id}`} className="text-lg font-bold text-slate-900">{serveur.nom}</h2>
-        <div className="flex items-center gap-2"><PastilleFeu etat={serveur.etat} /><span className="text-xs text-slate-600">configuration version {serveur.version_configuration}</span></div>
+        <div className="flex items-center gap-2"><PastilleFeu etat={serveur.etat} /><span className="text-xs text-slate-600">{serveur.version_configuration === null ? 'configuration inconnue' : `configuration version ${serveur.version_configuration}`}</span></div>
       </div>
       {s ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="En ligne depuis" value={`${s.en_ligne_depuis_jours} jours`} tone="emerald" />
-          <KpiCard label="En file" value={nombre(s.en_file)} sublabel="messages à envoyer" tone="sky" />
+          <KpiCard label="En ligne depuis" value={s.en_ligne_depuis_jours === null ? 'Non mesuré' : `${s.en_ligne_depuis_jours} jours`} tone="emerald" />
+          <KpiCard label="En file" value={s.en_file === null ? 'Non mesuré' : nombre(s.en_file)} sublabel="messages à envoyer" tone="sky" />
           <KpiCard label="Adresses IP" value={serveur.adresses_ip.length} sublabel={`${serveur.adresses_ip.filter((i) => i.statut === 'en_chauffe').length} en chauffe`} tone="slate" />
-          <KpiCard label="Test du matin" value={`${s.test.etapes.filter((e) => e.ok).length}/${s.test.etapes.length}`} sublabel={dateHeure(s.test.fait_le)} tone={s.test.etapes.every((e) => e.ok) ? 'emerald' : 'amber'} />
+          {s.test ? (
+            <KpiCard label="Test du matin" value={`${s.test.etapes.filter((e) => e.ok).length}/${s.test.etapes.length}`} sublabel={dateHeure(s.test.fait_le)} tone={s.test.etapes.every((e) => e.ok) ? 'emerald' : 'amber'} />
+          ) : (
+            <KpiCard label="Test du matin" value="Aucun test" tone="slate" />
+          )}
         </div>
       ) : null}
       <div className="relative overflow-x-auto">
@@ -63,7 +67,7 @@ function BlocServeur({ serveur }: { serveur: Serveur }) {
         </div>
       ) : null}
       <Button variant="secondary" className={BOUTON_TACTILE} loading={test.isPending} onClick={() => test.mutate(serveur.id)}>Lancer le test</Button>
-      {s ? (
+      {s?.test ? (
         <ul className="text-xs text-slate-600" aria-label={`Dernier test de ${serveur.nom}`}>
           {s.test.etapes.map((e) => <li key={e.libelle}>{e.ok ? 'Réussi' : 'À corriger'} : {e.libelle}</li>)}
         </ul>

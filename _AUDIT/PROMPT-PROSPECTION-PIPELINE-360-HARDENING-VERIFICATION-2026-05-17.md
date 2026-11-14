@@ -23,13 +23,13 @@ commande Artisan rescrape-archives.
 
 ## Contexte projet (à connaître impérativement)
 
-- **Repo** : `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`
+- **Repo** : `<dossier du projet>`
 - **GitHub** : `will383842/axion-crm-pro` (public)
 - **Stack** : Laravel 12 + PHP 8.3 + Postgres 16 + Redis + Horizon + React 19 + Vite 6
   + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Williams Jullin (`williamsjullin@gmail.com`, workspace UUID `1db106f5-c8a4-47b0-bf86-930f1ccc9f4a`)
+- **Owner** : Williams (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 - **Sentry DSN** : configuré côté backend (`SENTRY_LARAVEL_DSN`) + frontend (`VITE_SENTRY_DSN`)
 - **Coolify** : autopilot pull main → build → migrate → reload
 - **Branche** : `main` locale (16 commits **en avance** sur `origin/main`)
@@ -334,7 +334,7 @@ Après tous les fix appliqués + re-audit verdict 🟢/🟡 :
 
 ```bash
 # Branche main, 16 commits ahead expected
-cd C:\Users\willi\Documents\Projets\Axion-CRM-Pro
+cd <dossier du projet>
 git status
 git log --oneline origin/main..HEAD | wc -l  # doit = 16
 

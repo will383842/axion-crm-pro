@@ -10,6 +10,7 @@ use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\JourEnvoi;
 use App\Envoi\Sante\DepotSante;
+use App\Envoi\Temoins\ReleveTemoins;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -144,7 +145,8 @@ class ListeFeuVert
 
     /**
      * F15 : les 6 fournisseurs verts le même jour (réception inbox, authentification alignée, bouton vu, POST effectif)
-     * pendant 3 jours CONSÉCUTIFS se terminant aujourd'hui ou hier. La dernière ligne par jour et fournisseur fait foi ;
+     * pendant 3 jours CONSÉCUTIFS se terminant aujourd'hui ou hier. La dernière ligne par jour et fournisseur fait foi, SAUF qu'un constat `releve_auto` « indesirables » rougit la journée
+     * pour de bon (aucune saisie postérieure ne la reverdit) et qu'une ligne `releve_auto` ne verdit jamais rien ;
      * un jour rouge, incomplet ou manquant remet le compteur à zéro. Lecture seule.
      */
     private function troisJours(string $ws): PointFeuVert
@@ -157,12 +159,24 @@ class ListeFeuVert
         $depuis = $aujourdhui->modify('-4 days')->format('Y-m-d');
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_temoins_journees')
             ->where('workspace_id', $ws)->where('jour', '>=', $depuis)
-            ->orderBy('id')->get(['jour', 'fournisseur', 'reception', 'auth_alignee', 'bouton_vu', 'post_effectif']));
+            ->orderBy('id')->get(['jour', 'fournisseur', 'reception', 'auth_alignee', 'bouton_vu', 'post_effectif', 'auteur']));
         $derniere = [];
+        $rouges = []; // jours où la relève automatique a constaté un message en indésirables : rouges quoi qu'il arrive ensuite
         foreach ($lignes as $l) {
+            if ((string) $l->auteur === ReleveTemoins::AUTEUR) {
+                // Un constat automatique peut FREINER, jamais libérer : il rougit la journée et ne la verdit jamais.
+                if ($l->reception === 'indesirables') {
+                    $rouges[(string) $l->jour] = true;
+                }
+
+                continue;
+            }
             $derniere[(string) $l->jour][(string) $l->fournisseur] = $l; // ordre croissant d'id : la dernière écrase
         }
-        $vert = static function (string $jour) use ($derniere): bool {
+        $vert = static function (string $jour) use ($derniere, $rouges): bool {
+            if (isset($rouges[$jour])) {
+                return false;
+            }
             foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $f) {
                 $l = $derniere[$jour][$f] ?? null;
                 if ($l === null || $l->reception !== 'inbox' || ! $l->auth_alignee || ! $l->bouton_vu || ! $l->post_effectif) {
@@ -174,7 +188,7 @@ class ListeFeuVert
         };
         $jour = $aujourdhui;
         // Aujourd'hui sans aucune ligne : on compte depuis hier. Aujourd'hui avec des lignes : il doit être vert.
-        if (! isset($derniere[$jour->format('Y-m-d')])) {
+        if (! isset($derniere[$jour->format('Y-m-d')]) && ! isset($rouges[$jour->format('Y-m-d')])) {
             $jour = $jour->modify('-1 day');
         }
         $suite = 0;

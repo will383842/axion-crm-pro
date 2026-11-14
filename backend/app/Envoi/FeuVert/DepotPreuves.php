@@ -105,7 +105,7 @@ class DepotPreuves
 
     /**
      * Adresse e-mail, même déguisée : arobase ASCII, pleine chasse (U+FF20) ou petite (U+FE6B) quel que soit
-     * l'espacement, « arobase » en lettres, ou la forme ÉPELÉE « <nom> chez <domaine> point <fin> » (« ouvert chez ovh.com » reste accepté).
+     * l'espacement, « arobase » en lettres, « (at) » / « [at] » / « {at} », ou la forme ÉPELÉE « <nom> chez <domaine> point <fin connue> » (« ouvert chez ovh.com » reste accepté).
      */
     public static function ressembleAUneAdresse(string $s): bool
     {
@@ -113,10 +113,14 @@ class DepotPreuves
             return true;
         }
         $mot = '[\p{L}\p{N}_-]+';
+        // Fins de domaine reconnues pour la forme épelée : « chez ovh point final » n'en est pas une.
+        $fin = '(?:com|fr|net|org|eu|io|ch|uk|info|test|invalid|example|local)';
 
         return preg_match('/[@\x{FF20}\x{FE6B}]/u', $s) === 1
             || preg_match('/arobase/iu', $s) === 1
-            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s+(point|dot)\s+\p{L}{2,}/iu', $s) === 1;
+            // « (at) », « [at] », « {at} » (espaces tolérés) ; « at » nu reste accepté (mot courant en anglais).
+            || preg_match('/[(\[{]\s*at\s*[)\]}]/iu', $s) === 1
+            || preg_match('/(^|[^\p{L}\p{N}])chez\s+' . $mot . '\s+(point|dot)\s+' . $fin . '(?![\p{L}\p{N}])/iu', $s) === 1;
     }
 
     /** Retire les blancs de bord, y compris Unicode (espace insécable, séparateurs, caractères de contrôle). */

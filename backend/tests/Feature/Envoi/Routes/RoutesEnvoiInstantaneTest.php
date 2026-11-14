@@ -20,7 +20,12 @@ test('les routes /envoi/* sont identiques à l’instantané d’avant le dépla
     }
     usort($actuel, fn ($a, $b) => [$a['uri'], $a['methode']] <=> [$b['uri'], $b['methode']]);
 
-    $attendu = json_decode((string) file_get_contents(__DIR__ . '/instantane-routes-envoi.json'), true, 512, JSON_THROW_ON_ERROR);
+    // Instantané éclaté par premier segment d'URI (S0) : un fichier par segment, lus par glob trié puis recomposés.
+    $attendu = [];
+    foreach (glob(__DIR__ . '/instantane-routes-envoi/*.json') ?: [] as $fichier) {
+        $attendu = array_merge($attendu, json_decode((string) file_get_contents($fichier), true, 512, JSON_THROW_ON_ERROR));
+    }
+    usort($attendu, fn ($a, $b) => [$a['uri'], $a['methode']] <=> [$b['uri'], $b['methode']]);
     expect($attendu)->not->toBeEmpty()->and($actuel)->toBe($attendu);
 });
 
@@ -36,7 +41,7 @@ test('toute route /envoi/* porte produit-envoi, y compris la santé', function (
 });
 
 test('un fichier de routes par domaine existe, et routes/envoi.php les requiert tous', function () {
-    $domaines = ['sante', 'feu-vert', 'chauffe', 'boites', 'sequences', 'infrastructure', 'resultats', 'conformite', 'campagnes', 'creation', 'reponses', 'reglages', 'reputation'];
+    $domaines = ['sante', 'feu-vert', 'chauffe', 'boites', 'sequences', 'infrastructure', 'resultats', 'conformite', 'campagnes', 'creation', 'reponses', 'reglages', 'reputation', 'socle'];
     $racine = (string) file_get_contents(base_path('routes/envoi.php'));
     foreach ($domaines as $d) {
         expect(file_exists(base_path("routes/envoi/{$d}.php")))->toBeTrue($d);

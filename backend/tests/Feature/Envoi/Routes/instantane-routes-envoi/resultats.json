@@ -1,0 +1,24 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/resultats",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/resultats/courbe",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    }
+]

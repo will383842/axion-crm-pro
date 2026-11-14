@@ -1,0 +1,14 @@
+[
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/puis-je-ecrire",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "throttle:envoi-puis-je-ecrire",
+            "workspace"
+        ]
+    }
+]

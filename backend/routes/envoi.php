@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('produit-envoi')->group(function () {
     foreach ([
         'sante', 'feu-vert', 'chauffe', 'boites', 'sequences', 'infrastructure', 'resultats',
-        'conformite', 'campagnes', 'creation', 'reponses', 'reglages', 'reputation',
+        'conformite', 'campagnes', 'creation', 'reponses', 'reglages', 'reputation', 'socle',
     ] as $domaine) {
         require __DIR__ . "/envoi/{$domaine}.php";
     }

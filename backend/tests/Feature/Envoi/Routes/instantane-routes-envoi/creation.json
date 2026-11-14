@@ -1,0 +1,57 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/boites",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/creation/champs",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/cibles",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/contexte",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/destinataires-exemples",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    }
+]

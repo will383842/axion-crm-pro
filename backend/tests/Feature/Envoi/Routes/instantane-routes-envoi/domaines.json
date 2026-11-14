@@ -1,0 +1,60 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/domaines",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-infra-ecriture",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/domaines/{id}",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines/{id}/dmarc",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-infra-ecriture",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines/{id}/dns/verifier",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-dns-verifier",
+            "workspace"
+        ]
+    }
+]

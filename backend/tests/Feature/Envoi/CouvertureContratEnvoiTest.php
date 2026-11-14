@@ -60,7 +60,7 @@ function couplesDesRoutes(): array
     $cles = [];
     foreach (Route::getRoutes() as $route) {
         $uri = '/' . $route->uri();
-        if (! preg_match('#^/(api/v1/(envoi|notifications|config)|desinscription)#', $uri)) {
+        if (! preg_match('#^/(api/v1/(envoi|notifications|config)(/|$)|desinscription)#', $uri)) {
             continue;
         }
         $uri = preg_replace('#^/api/v1#', '', $uri); // le contrat déclare le serveur /api/v1 ; la page publique n'a pas de préfixe
@@ -78,7 +78,8 @@ function cle(string $couple): string
 }
 
 test('le contrat d’envoi est lu en entier', function () {
-    expect(count(couplesDuContrat()))->toBeGreaterThan(100);
+    expect(glob(dirname(__DIR__, 3) . '/openapi/envoi/*.yaml'))->not->toBeFalse()->and(count(glob(dirname(__DIR__, 3) . '/openapi/envoi/*.yaml')))->toBeGreaterThanOrEqual(10);
+    expect(count(couplesDuContrat()))->toBeGreaterThanOrEqual(108);
 });
 
 test('chaque couple du contrat a une route, une entrée NonServiAuPalier0 ou un trou réel déclaré', function () {
@@ -113,6 +114,7 @@ test('les trous déclarés sont de vrais trous (ni route réelle, ni entrée Non
     foreach (array_keys(TROUS_REELS) as $couple) {
         expect($contrat)->toContain($couple);
         expect($routes)->not->toContain(cle($couple));
+        expect(array_keys(NonServiAuPalier0::entrees()))->not->toContain($couple);
     }
 });
 

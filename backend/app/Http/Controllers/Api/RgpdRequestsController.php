@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Rgpd\SignalementDemandeEffacement;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Models\RgpdRequest;
@@ -12,6 +12,7 @@ use App\Services\Rgpd\GdprPortabilityService;
 use App\Support\MasquageCoordonnees;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -236,8 +237,22 @@ class RgpdRequestsController extends ApiController
             ], 422);
         }
 
+        // STOP-T4-CRM (anti-boucle) : une demande créée par le SITE
+        // (`SiteGdprService`, `metadata.origin = 'site-sync-gdpr'`) puis traitée
+        // ici ne repart JAMAIS vers le site.
+        $demandeDuSite = (((array) $req->metadata)['origin'] ?? null) === 'site-sync-gdpr';
+
         $result = match (true) {
-            $req->type === 'erasure' => $this->erasure->erase($req->subject_email),
+            // L3c-0 : « traiter » met la personne à l'écart, ne supprime rien. L'opposition
+            // (`consent_optout`, jamais `erasure`) part vers le site DANS la transaction de l'effacement,
+            // sauf si la demande vient du site.
+            $req->type === 'erasure' => $this->erasure->erase(
+                $req->subject_email,
+                null,
+                'gdpr_art17',
+                ['motif' => 'rgpd_art17', 'canal' => 'console_rgpd'],
+                $demandeDuSite,
+            ),
 
             // Art. 15 et art. 20 rendent le MEME inventaire, et le service
             // s'appelle deja pour les deux (« l'export des articles 15 et 20 »,
@@ -250,7 +265,7 @@ class RgpdRequestsController extends ApiController
             // donner rendez-vous avec un lien de telechargement mort.
             in_array($req->type, GdprPortabilityService::TYPES_AVEC_EXPORT, true) => $this->portability->export($req->subject_email),
 
-            $req->type === 'opposition' => $this->executerOpposition($req->subject_email, $req->id),
+            $req->type === 'opposition' => $this->executerOpposition($req->subject_email, $demandeDuSite),
 
             // Acte MANUEL, declare ci-dessus. On l'inscrit comme tel : le
             // registre ne dira jamais d'une rectification qu'un automatisme l'a
@@ -263,14 +278,6 @@ class RgpdRequestsController extends ApiController
                 . 'executer ; il vaut mieux echouer bruyamment que repondre « traitee » sans rien faire.',
             ),
         };
-
-        if ($req->type === 'erasure') {
-            // L3c-0 (règle de Will) : « traiter » met la personne à l'écart, il
-            // ne supprime rien — le site n'est donc PAS invité à effacer. On lui
-            // transmet l'opposition (`consent_optout`) : il cesse de la contacter.
-            // Mise en file locale, jamais un POST synchrone (`crm:flush-outbound`).
-            $this->queueOutbound('consent_optout', $req->subject_email, $req->id);
-        }
 
         // 🔴 LE JETON DE TELECHARGEMENT NE SE PERSISTE PAS EN CLAIR.
         //
@@ -337,64 +344,42 @@ class RgpdRequestsController extends ApiController
      * candidature suivante. La liste des univers est prise a la CONSTANTE, jamais
      * reecrite ici.
      *
-     * Puis le signal part vers le site, par la meme mini-outbox que l'effacement.
+     * Puis le signal part vers le site, par la meme mini-outbox que l'effacement
+     * (contrat : `ConsentOutboundRecorder`, via `OppositionSortante` ; type `consent_optout`,
+     * jamais `erasure`).
      * `consent_optout` et non `erasure` : la personne s'oppose au traitement, elle
      * ne demande pas l'effacement — dire au site autre chose que ce qui a ete
      * decide serait, encore, un accuse qui ment.
      *
      * @return array<string, mixed>
      */
-    private function executerOpposition(string $email, int $requestId): array
+    private function executerOpposition(string $email, bool $demandeDuSite): array
     {
-        $this->dedup->addOptOut(
-            $email,
-            null,
-            source: 'gdpr_art21_console',
-            reason: 'gdpr_art21',
-            scopes: DeduplicationService::UNIVERS_OPPOSITION,
-        );
+        // Opposition + signal vers le site DANS la même transaction. Demande venue du site : source
+        // « demande_site » (hors liste blanche CRM) → rien n'est émis, ni à chaud ni par le rattrapage.
+        DB::transaction(function () use ($email, $demandeDuSite): void {
+            $this->dedup->addOptOut(
+                $email,
+                null,
+                source: $demandeDuSite ? OppositionSortante::SOURCE_DEMANDE_SITE : 'gdpr_art21_console',
+                reason: 'gdpr_art21',
+                scopes: DeduplicationService::UNIVERS_OPPOSITION,
+            );
 
-        $this->queueOutbound('consent_optout', $email, $requestId);
+            if ($demandeDuSite) {
+                return;
+            }
+            $sortante = new OppositionSortante;
+            foreach (DeduplicationService::UNIVERS_OPPOSITION as $portee) {
+                $sortante->signalerAdresseSansBloquer($email, $portee, 'rgpd_art21', 'console_rgpd');
+            }
+        });
 
         return [
             'opt_out_added' => true,
             'opt_out_scopes' => DeduplicationService::UNIVERS_OPPOSITION,
             'article' => 21,
         ];
-    }
-
-    /**
-     * Met en file un événement à destination du site (lot L5).
-     *
-     * Enveloppé : une panne de la mini-outbox ne doit JAMAIS faire échouer un
-     * droit RGPD déjà exécuté en base. L'échec est journalisé — pas avalé — et
-     * le batch de réconciliation quotidien (plan §2.9) rattrape la divergence.
-     *
-     * B14-002 : la methode s'appelait `queueOutboundErasure` et ne savait dire
-     * qu'`erasure`. L'opposition art. 21, elle, n'emettait RIEN — le site
-     * continuait d'ecrire a quelqu'un qui s'y etait oppose dans la console.
-     */
-    private function queueOutbound(string $eventType, string $email, int $requestId): void
-    {
-        try {
-            app(ConsentOutboundRecorder::class)->recordForEmail(
-                $eventType,
-                $email,
-                // L'effacement console porte sur le stock commercial
-                // (contacts / journalistes / médias). Le vivier a son propre
-                // canal, `POST /internal/site-sync/gdpr`, dont l'origine est le
-                // SITE — et qui, lui, ne doit rien réémettre.
-                'business',
-                payload: ['surface' => 'console:rgpd_requests', 'rgpd_request_id' => $requestId],
-            );
-        } catch (\Throwable $e) {
-            Log::error('crm.outbound.record_failed', [
-                'event_type' => $eventType,
-                'rgpd_request_id' => $requestId,
-                'exception' => $e->getMessage(),
-            ]);
-            report($e);
-        }
     }
 
     /**

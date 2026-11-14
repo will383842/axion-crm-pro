@@ -87,6 +87,8 @@ jobs:
           echo "## Comptes agrégés (nombres seulement)"
           if [ "$($PSQL -c "SELECT count(*) FROM information_schema.columns WHERE table_name='personnes' AND column_name='origines';" < /dev/null)" = "1" ]; then
             echo "personnes avec origines : $($PSQL -c "SELECT count(*) FILTER (WHERE origines IS NOT NULL) FROM personnes;" < /dev/null)"
+            echo "origines : nombre maximal sur une personne : $($PSQL -c "SELECT coalesce(max(CASE WHEN jsonb_typeof(origines) = 'array' THEN jsonb_array_length(origines) END), 0) FROM personnes;" < /dev/null)"
+            echo "origines : personnes avec au moins 2 origines : $($PSQL -c "SELECT count(*) FROM personnes WHERE jsonb_typeof(origines) = 'array' AND jsonb_array_length(origines) >= 2;" < /dev/null)"
           else
             echo "personnes avec origines : colonne absente"
           fi

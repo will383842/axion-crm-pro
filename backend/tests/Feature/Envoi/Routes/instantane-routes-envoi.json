@@ -231,6 +231,31 @@
     },
     {
         "methode": "GET",
+        "uri": "api/v1/envoi/opposition/export",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:data.export",
+            "permission:workspaces.manage",
+            "throttle:envoi-opposition-export",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/puis-je-ecrire",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "throttle:envoi-puis-je-ecrire",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
         "uri": "api/v1/envoi/sante",
         "middlewares": [
             "api",

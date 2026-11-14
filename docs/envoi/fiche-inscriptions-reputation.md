@@ -8,7 +8,28 @@
 
 **Règle de sécurité** : n'écrivez jamais un mot de passe, une IP ou un domaine réels dans le dépôt, un ticket ou une discussion publique. Notez-les dans votre gestionnaire de mots de passe. Pour trouver chaque service, cherchez son nom (en gras ci-dessous) dans votre moteur de recherche : le dépôt public ne contient pas de liens.
 
+## Ordre à suivre et point du feu vert coché
+
+Les codes ci-dessous sont ceux du catalogue du feu vert (source « 30 A11 »). Le code d'un point ne change jamais : une preuve déjà posée reste valable même si le libellé évolue.
+
+| Ordre | Inscription | Point du feu vert | À faire avant |
+|---|---|---|---|
+| 1 | Yahoo, boucle de plaintes CFL (section 3) | `manuel.yahoo_cfl` (« Inscription Yahoo, boucle de plaintes CFL ») | le premier envoi réel |
+| 1 | Microsoft JMRP, plaintes Outlook/Hotmail (section 2) | `manuel.snds_jmrp` | le premier envoi réel |
+| 2 | Google Postmaster Tools (section 1) | `manuel.postmaster_google` | le palier 2 |
+| 2 | Microsoft SNDS (section 2) | `manuel.snds_jmrp` | le palier 2 |
+| 3 | Orange, prise de contact délivrabilité (section 4) | `manuel.orange_cfl` (« Orange : prise de contact délivrabilité ») | selon votre calendrier |
+| 3 | Signal Spam, seulement s'il est ouvert (section 5) | `manuel.signal_spam` | selon votre calendrier |
+
+À retenir :
+- **La boucle de plaintes (CFL) est celle de Yahoo**, pas celle d'Orange. Orange n'a qu'un **contact délivrabilité** : pas de boucle de plaintes à inscrire.
+- Yahoo et JMRP (les deux sources de plaintes) sont en place **avant le premier envoi** ; Postmaster et SNDS (les tableaux de bord, vides sans volume) **avant le palier 2**.
+- `manuel.snds_jmrp` couvre deux inscriptions : ne le marquez fait que lorsque JMRP **et** SNDS sont faits (JMRP d'abord, SNDS avant le palier 2).
+- Le code `manuel.orange_cfl` garde son ancien nom par compatibilité : il désigne bien la prise de contact Orange.
+- Marquer un point « fait » se fait dans l'écran du feu vert, avec votre preuve. Cette fiche ne coche rien et l'écran « Inscriptions » prévu est en lecture seule : il n'inscrit personne.
+
 ## 1. Google Postmaster Tools (Gmail)
+**Quand** : avant le palier 2. **Point du feu vert** : `manuel.postmaster_google`.
 À quoi ça sert : voir la réputation de vos domaines chez Gmail et le taux de plaintes.
 1. Ouvrez **Google Postmaster Tools** avec un compte Google dédié à l'envoi (pas un compte personnel).
 2. Cliquez sur « Ajouter un domaine » et saisissez `<domaine-1>`.
@@ -18,6 +39,7 @@
 6. Notez : qui regarde, à quelle fréquence (conseillé : chaque jour pendant la chauffe).
 
 ## 2. Microsoft SNDS et JMRP (Outlook, Hotmail)
+**Quand** : JMRP avant le premier envoi, SNDS avant le palier 2. **Point du feu vert** : `manuel.snds_jmrp`.
 À quoi ça sert : SNDS montre l'état de votre IP chez Microsoft ; JMRP vous renvoie les plaintes des utilisateurs.
 **Attention** : Microsoft a migré SNDS vers un **nouveau portail** et l'ancien parcours a changé ; les écrans décrits ci-dessous sont à revérifier à l'inscription. SNDS est **facultatif** pour démarrer (JMRP, lui, reçoit les plaintes) ; comme Postmaster, il ne montre rien tant qu'il n'y a pas de volume.
 1. Créez/utilisez un compte Microsoft dédié. Ouvrez **Smart Network Data Services (SNDS)**.
@@ -27,14 +49,16 @@
 5. À chaque nouvelle IP ajoutée au pool : refaire SNDS et JMRP pour cette IP.
 
 ## 3. Yahoo — boucle de plaintes (CFL, Complaint Feedback Loop)
+**Quand** : avant le premier envoi. **Point du feu vert** : `manuel.yahoo_cfl`. C'est la seule vraie CFL de cette fiche.
 À quoi ça sert : Yahoo (et AOL) vous renvoie les plaintes.
 1. Cherchez **Yahoo Sender Hub** et ouvrez la section « Complaint Feedback Loop ».
 2. Connectez-vous avec un compte Yahoo dédié. Ajoutez chaque `<domaine-N>` (le domaine qui signe en DKIM).
 3. Yahoo vérifie le domaine (DKIM ou TXT). Quand c'est validé, indiquez l'adresse de réception des rapports : la boîte D2.
 4. Les plaintes arrivent en ARF ; elles comptent comme des plaintes dans le CRM (freins de la désinscription et de la santé).
 
-## 4. Orange (Orange / Wanadoo, très présent en France)
-Il n'y a pas de tableau de bord public comparable. Le chemin utile est le contact délivrabilité.
+## 4. Orange (Orange / Wanadoo, très présent en France) : contact délivrabilité
+**Point du feu vert** : `manuel.orange_cfl` (libellé « Orange : prise de contact délivrabilité »).
+Orange n'a **pas de boucle de plaintes (CFL)** à inscrire, ni de tableau de bord public comparable. Le chemin utile est le contact délivrabilité.
 1. Cherchez **Orange Postmaster** (page « postmaster » ou « délivrabilité » d'Orange).
 2. Lisez les conditions : IP avec PTR correct, SPF, DKIM, DMARC, liste de désinscription claire. Tout cela est déjà vérifié par le contrôle K12.
 3. Utilisez le formulaire ou l'adresse indiquée pour vous présenter : nom du domaine, `<ip-envoi>`, type d'envoi (prospection B2B, faible volume, opposition en un clic), adresse de contact (`postmaster@`).
@@ -42,6 +66,7 @@ Il n'y a pas de tableau de bord public comparable. Le chemin utile est le contac
 5. À vérifier par vous : si Orange propose entre-temps un outil d'inscription ou une boucle de plaintes, ajoutez-le ici (cette fiche a été écrite sans accéder à ces services).
 
 ## 5. Signal Spam (France) — seulement s'il est ouvert aux expéditeurs
+**Point du feu vert** : `manuel.signal_spam`.
 Signal Spam est surtout fait pour recevoir les signalements des internautes ; l'accès « expéditeur » (boucle de retour des signalements) n'est pas toujours ouvert à tous.
 1. Cherchez **Signal Spam** et lisez la page destinée aux « professionnels / expéditeurs ».
 2. Si une inscription expéditeur est proposée : suivez-la avec `<domaine-N>` et `<ip-envoi>`, et indiquez la boîte D2 comme adresse de retour.
@@ -52,6 +77,7 @@ Signal Spam est surtout fait pour recevoir les signalements des internautes ; l'
 - Notez dans votre gestionnaire de mots de passe : service, compte, date, domaine/IP concerné.
 - Vérifiez que la boîte D2 reçoit bien : envoyez-vous un message de test depuis un autre compte vers `postmaster@<domaine-1>`.
 - Dites à l'équipe technique « inscription X faite » : elle ouvre le suivi (K15) sans connaître vos identifiants.
+- Posez la preuve sur le point du feu vert correspondant (tableau d'ordre ci-dessus). Les exemples de domaines dans vos notes restent en `*.example.test` tant qu'ils sont dans le dépôt.
 
 ## Ce que cette fiche ne fait pas (dettes nommées)
 - **K14-D1** : aucune capture d'écran ni lien direct (règle du dépôt public : pas de domaine réel). Les écrans des services changent : la fiche est à relire à la première inscription réelle et à corriger.

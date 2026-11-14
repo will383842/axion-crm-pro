@@ -74,7 +74,7 @@ class RgpdRequestsController extends ApiController
         $espaceCourant = $this->espaceCourantOuNull();
 
         // L5 : filtre CALCULÉ (aucune valeur stockée `ouverte`) — `ouverte` = en
-        // attente de la décision de Will (pending + processing).
+        // attente de la décision du fondateur (pending + processing).
         $statut = $r->query('statut');
         if ($statut !== null && ! in_array($statut, self::STATUTS_FILTRE, true)) {
             return response()->json(['error' => 'statut_invalide', 'valeurs' => array_keys(self::STATUTS_FILTRE_VERS_BASE)], 422);
@@ -157,7 +157,7 @@ class RgpdRequestsController extends ApiController
         ]);
 
         // L3c-0 : une demande d'effacement venue de la console est SIGNALÉE à
-        // Will (notification + pastille « Demandes RGPD »), qui décide.
+        // le fondateur (notification + pastille « Demandes RGPD »), qui décide.
         if ($validated['type'] === 'erasure' && $req->workspace_id !== null) {
             SignalementDemandeEffacement::signaler((string) $req->workspace_id, 'console');
         }

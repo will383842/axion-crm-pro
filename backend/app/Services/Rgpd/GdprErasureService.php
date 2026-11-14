@@ -17,13 +17,13 @@ use Illuminate\Support\Facades\Log;
 /**
  * Effacement RGPD art. 17 — transaction multi-tables atomique.
  *
- * ⚠️ L3c-0 (ADR contrat v3 § 6, I3 — règle de Will : AUCUNE suppression de
+ * ⚠️ L3c-0 (ADR contrat v3 § 6, I3 — règle du fondateur : AUCUNE suppression de
  * personne ni de données de personne) : `erase()` ne détruit, n'anonymise et
  * n'écrase RIEN. Personnes, abonnements, contacts, candidats, journalistes,
  * praticiens et comptes sont MASQUÉS de façon réversible (opposition,
  * `deleted_at` doux, `App\Crm\Rgpd\MiseAEcart`) ; un opt-out cross-workspace
  * bloque tout envoi et toute réinsertion. L'effacement définitif n'est pas
- * codé : Will décide. Les commentaires historiques du fichier décrivent
+ * codé : le fondateur décide. Les commentaires historiques du fichier décrivent
  * l'ancien comportement.
  */
 class GdprErasureService
@@ -162,14 +162,14 @@ class GdprErasureService
             $deleted['users'] = DB::table('users')->where('email', $email)->whereNull('deleted_at')
                 ->update(['deleted_at' => now(), 'updated_at' => now()]);
 
-            // CE QUI N'EST PAS TOUCHÉ, ET C'EST VOULU (règle de Will) :
+            // CE QUI N'EST PAS TOUCHÉ, ET C'EST VOULU (règle du fondateur) :
             // `activities`, `email_messages`, `email_verification_logs`,
             // `email_validations`, `notifications`, `rgpd_requests`,
             // `magic_links`, `media`, `sessions`, `invitations`,
             // `password_reset_tokens` et les fiches d'organisation gardent
             // leurs lignes. Aucun envoi ne part vers la personne (opposition,
             // `opt_out`, contacts et personnes masqués) ; l'effacement
-            // définitif de ces tables n'est PAS codé, Will décide.
+            // définitif de ces tables n'est PAS codé, le fondateur décide.
 
             // Audit log — la suppression elle-même
             $this->audit->record([

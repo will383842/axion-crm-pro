@@ -716,7 +716,7 @@ class JournalistsController extends ApiController
      * mis à l'écart, ses coordonnées entrent dans `opt_out` (anti-réinsertion)
      * et `opt_out` est posé. E-mail et téléphone sont GARDÉS ; aucun événement
      * `erasure` n'est émis vers le site : l'effacement définitif n'est pas
-     * codé, c'est Will qui décide.
+     * codé, c'est le fondateur qui décide.
      */
     public function destroy(Journalist $journalist): JsonResponse
     {

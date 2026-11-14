@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
  * ── Ce que ce formulaire n'accepte PAS, et pourquoi ────────────────────────
  * `opt_out` est absent des règles, volontairement. Il a son propre point
  * d'entrée (`POST /journalists/{id}/opt-out`), qui ne se contente pas de
- * basculer la colonne : il émet aussi vers le site, via `ConsentOutboundRecorder`,
+ * basculer la colonne : il émet aussi vers le site, via `OppositionSortante`,
  * pour que l'opposition converge des deux côtés. L'exposer ici en donnerait un
  * second chemin, MUET — la personne serait opposée dans le CRM et le site
  * continuerait de l'adresser, jusqu'à ce que la prochaine synchro la

@@ -98,7 +98,7 @@ jobs:
 
           echo "## Interrupteurs effectifs (conteneur api)"
           echo "VARIABLE | defaut_code | effectif"
-          docker compose exec -T -e TELESCOPE_ENABLED=false api php <<'PHP'
+          if [ -n "$API_ID" ]; then docker compose exec -T -e TELESCOPE_ENABLED=false api php <<'PHP'
           <?php
           chdir('/var/www/html');
           require '/var/www/html/vendor/autoload.php';
@@ -157,6 +157,7 @@ jobs:
           echo 'guide-ia URL sur exemple.invalid : '.((parse_url((string) ($g['url'] ?? ''), PHP_URL_HOST) === 'exemple.invalid') ? 'oui' : 'non')."\n";
           echo 'environnement applicatif : '.$app->environment()." (attendu production)\n";
           PHP
+          else echo "conteneur api absent : section sautée"; fi
 
           echo "## Présence dans le .env du serveur (sans valeur)"
           presence_drapeau() {

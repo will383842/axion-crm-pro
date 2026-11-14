@@ -13,6 +13,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState } from '@/components/ui';
+import { libelleAccord } from '@/features/crm-console/libelleAccord';
 import type { ContenusAccords } from '@/features/crm-console/types';
 import { estRefuse, lire, statutHttp, type Historique, type OrigineEntree } from './api';
 import { AccesRefuse, Chargement, Erreur, Vide } from './Etats';
@@ -117,13 +118,16 @@ function Frise({ actuelle, bloc }: { actuelle: OrigineEntree | undefined; bloc: 
   const parReseau = actuelle.reseau !== null;
   const accord = bloc?.consentements?.[0];
   const guide = bloc?.guides?.[0];
+  // CRM-OPP : « Accord donné » jamais seul quand une opposition existe (elle l'emporte).
+  const avecOpposition = bloc?.opposition?.actif === true ? libelleAccord(bloc.consentements ?? [], bloc.opposition) : null;
+  const etatAccord = avecOpposition !== null ? avecOpposition.texte.charAt(0).toUpperCase() + avecOpposition.texte.slice(1) : accord ? 'Accord donné' : 'En attente';
   const etapes: Array<{ titre: string; date: string | null; etat: string }> = [
     {
       titre: parReseau ? (libelleCanal(actuelle.canal) ?? 'Arrivée par un réseau') : actuelle.famille === 'autre' ? 'Arrivée par import ou collecte' : 'Arrivée par le site',
       date: actuelle.date,
       etat: actuelle.mot !== null ? `Mot ${actuelle.mot.toUpperCase()} reçu` : 'Origine enregistrée',
     },
-    { titre: 'Accord enregistré', date: accord?.date ?? null, etat: accord ? 'Accord donné' : 'En attente' },
+    { titre: 'Accord enregistré', date: accord?.date ?? null, etat: etatAccord },
     { titre: 'Guide envoyé', date: guide?.date ?? null, etat: guide ? 'Envoyé par e-mail' : 'En attente' },
   ];
   return (

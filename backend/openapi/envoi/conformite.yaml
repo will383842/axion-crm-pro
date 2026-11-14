@@ -93,35 +93,43 @@ paths:
     get:
       operationId: exporterOpposition
       summary: Export du registre (CSV)
+      description: |
+        Réservé au propriétaire (`workspaces.manage`) ET à la permission `data.export`. Envoyé en flux, journalisé
+        (qui, quand, combien de lignes ; jamais les adresses). Les cellules commençant par `=`, `+`, `-`, `@` sont
+        neutralisées. Limite : 2 exports par heure (429 au-delà).
       responses:
         '200':
           description: Fichier CSV.
           content:
             text/csv:
               schema: { type: string }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/puis-je-ecrire:
-    get:
+    post:
       operationId: puisJeEcrire
       summary: « Puis-je écrire à… ? »
-      parameters:
-        - name: adresse
-          in: query
-          required: true
-          schema: { type: string }
+      description: |
+        Rend seulement `peut` et un motif codé REGROUPÉ (jamais le détail d'une garde). Une adresse inconnue de l'espace
+        et une adresse connue seulement d'un autre espace reçoivent EXACTEMENT la même réponse (aucun oracle « contact connu »).
+        Limite : 30 demandes par minute et par compte (429 au-delà). POST de LECTURE SEULE : rien n'est écrit (ni registre, ni drapeau, ni journal d'audit). L'adresse voyage dans le corps JSON, jamais dans l'URL : elle n'apparaît ni dans les journaux d'accès du proxy ni dans la chaîne de requête envoyée à Sentry (`before_send` retire la chaîne de requête des routes `/envoi/*`), et elle n'est jamais journalisée en clair par l'application.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adresse]
+              properties:
+                adresse: { type: string, format: email, maxLength: 254 }
       responses:
         '200':
-          description: Réponse et raisons.
+          description: La réponse et, si c'est non, le groupe de motif.
           content:
             application/json:
-              schema:
-                type: object
-                required: [adresse, reponse, raisons]
-                properties:
-                  adresse: { type: string }
-                  reponse: { type: string, enum: [oui, non, prudence] }
-                  raisons:
-                    type: array
-                    items: { type: string }
+              schema: { $ref: '#/components/schemas/ReponsePuisJeEcrire' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/alertes:
     get:
       operationId: listerAlertesEnvoi
@@ -306,7 +314,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EntreeCarnet' }
-  /public/desinscription/{jeton}:
+  /desinscription/{jeton}:
+    servers:
+      - url: /
+        description: Servi par routes/web.php, hors du préfixe /api/v1.
     get:
       operationId: lirePageDesinscription
       summary: Page publique de désinscription (sans connexion)
@@ -359,6 +370,16 @@ paths:
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    ReponsePuisJeEcrire:
+      type: object
+      required: [peut, motif]
+      properties:
+        peut: { type: boolean }
+        motif:
+          description: Groupe de motif quand `peut` est faux ; `null` quand c'est oui.
+          oneOf:
+            - { type: string, enum: [opposition, adresse_non_verifiee, contact_ecarte, conditions_envoi] }
+            - { type: 'null' }
     ReglagesAlertes:
       type: object
       description: Règles d'alerte par type et canal (console et e-mail seulement), seconde adresse, regroupement.

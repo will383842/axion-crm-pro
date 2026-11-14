@@ -227,11 +227,17 @@ export const handlers: HttpHandler[] = [
     return new HttpResponse(csv(), { headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
   }),
 
-  http.get(api('/envoi/puis-je-ecrire'), async ({ request }) => {
+  // POST de lecture : l'adresse est dans le corps JSON, jamais dans l'URL ; rien n'est écrit.
+  http.post(api('/envoi/puis-je-ecrire'), async ({ request }) => {
     await delai();
-    const adresse = new URL(request.url).searchParams.get('adresse') ?? '';
+    const corps = (await request.json().catch(() => ({}))) as { adresse?: unknown };
+    const adresse = typeof corps.adresse === 'string' ? corps.adresse : '';
     if (adresse.trim() === '') return erreur(422, 'validation', 'Saisissez une adresse ou un domaine.');
-    return HttpResponse.json(puisJeEcrire(adresse));
+    // Comme le serveur : seulement `peut` et un motif regroupé (jamais l'adresse ni le détail des raisons).
+    const r = puisJeEcrire(adresse);
+    if (r.reponse === 'oui') return HttpResponse.json({ peut: true, motif: null });
+    const enOpposition = r.raisons.some((x) => x.startsWith('Registre d’opposition') || x.includes('au registre') || x.includes('ne plus écrire'));
+    return HttpResponse.json({ peut: false, motif: enOpposition ? 'opposition' : 'conditions_envoi' });
   }),
 
   http.get(api('/envoi/alertes'), async ({ request }) => {
@@ -406,7 +412,7 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(entree, { status: 201 });
   }),
 
-  http.get(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.get('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const force = await repondreEtatForce(request, null);
     if (force && new URL(request.url).searchParams.get('demo-etat') !== 'vide') return force;
@@ -428,7 +434,7 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
-  http.post(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.post('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const dest = destinataireDuJeton(String(params['jeton']));
     if (!dest) return erreur(404, 'non_trouve', 'Ce lien n’est plus valable.');

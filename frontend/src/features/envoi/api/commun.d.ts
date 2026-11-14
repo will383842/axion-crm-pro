@@ -84,9 +84,15 @@ export interface components {
             plafond_jour: number;
             reponses_a_traiter: number;
         };
+        /**
+         * @description Une désinscription ne garde qu'une empreinte de l'adresse : `adresse` n'est
+         *     renseignée que si la fiche du CRM de l'espace la porte encore (et si le compte
+         *     a le droit de voir les coordonnées) ; sinon `null`. `adresse_masquee` est toujours
+         *     présente et ne permet pas de retrouver l'adresse.
+         */
         Desinscription: {
-            /** Format: email */
-            adresse: string;
+            adresse: string | null;
+            adresse_masquee: string;
             campagne_id: components["schemas"]["Identifiant"] | null;
             id: components["schemas"]["Identifiant"];
             source: components["schemas"]["SourceDesinscription"];

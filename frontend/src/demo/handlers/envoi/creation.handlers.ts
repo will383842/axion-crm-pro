@@ -366,7 +366,7 @@ function controlesDuBrouillon(b: BrouillonDemo): { controles: Controle[]; bloqua
           : { code: 'boites_pretes', libelle: `Boîtes prêtes (${vraiesBoites} sur ${vraiesBoites})`, etat: 'ok', detail: null },
   );
 
-  const domaines = [...new Set(boites.map((x) => x.domaine_id))].map((id) => demoDb.domaines.trouver(id)).filter((d): d is NonNullable<typeof d> => d !== undefined);
+  const domaines = [...new Set(boites.map((x) => x.domaine_id))].map((id) => demoDb.domaines.trouver(id ?? '')).filter((d): d is NonNullable<typeof d> => d !== undefined);
   const rouge = domaines.find((d) => d.etat === 'rouge');
   const ambre = domaines.find((d) => d.etat === 'ambre');
   controles.push(

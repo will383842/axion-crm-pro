@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Conformite;
 
+use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Personnes\NatureEmail;
 use App\Support\ListeSuppression;
 use Illuminate\Support\Facades\Crypt;
@@ -67,6 +68,7 @@ final class RegistreOppositionManuel
         if ($portee === 'adresse') {
             // Même effet que le registre CRM ; idempotent par construction (l'empreinte est unique).
             ListeSuppression::inscrire($norm, ListeSuppression::MANUEL, 'registre_manuel');
+            $this->prevenirLeSite($norm, $empreinte);
         }
         $ligne = DB::table('envoi_oppositions_registre')
             ->where('workspace_id', $workspaceId)->where('portee', $portee)->where('empreinte', $empreinte)->first();
@@ -75,6 +77,29 @@ final class RegistreOppositionManuel
         }
 
         return ['ligne' => $ligne, 'creee' => $inseree === 1];
+    }
+
+    /**
+     * STOP-T4 : une opposition née au CRM doit prévenir le site, par l'enregistreur unique (`OppositionSortante` →
+     * `ConsentOutboundRecorder` → `crm_outbound_events`). ANTI-BOUCLE : si l'adresse est DÉJÀ au registre `opt_out`
+     * (venue du site : `site-sync:*`, `gdpr_erasure_bisystem`, `gdpr_erasure_demande_site`…), on n'écrit rien de plus et
+     * `OppositionSortante` ne signale que les sources nées au CRM : rien ne repart vers le site. Le domaine et le SIREN
+     * n'émettent rien (le site ne connaît que des empreintes d'adresses). Un échec de la file ne défait jamais
+     * l'opposition : `crm:outbound-rattraper` reprend.
+     */
+    private function prevenirLeSite(string $adresseNormalisee, string $empreinte): void
+    {
+        // `opt_out` n'a pas d'unicité : on ne double jamais une ligne existante (surtout celle née du site, qui porte la source).
+        if (! DB::table('opt_out')->where('scope', 'business')->where('email_hash', $empreinte)->exists()) {
+            DB::table('opt_out')->insert([
+                'email' => null,
+                'email_hash' => $empreinte,
+                'scope' => 'business',
+                'source' => 'registre_manuel',
+                'created_at' => now(),
+            ]);
+        }
+        (new OppositionSortante)->signalerSansBloquer($empreinte, 'business', 'registre_manuel', 'registre_manuel');
     }
 
     /** Vrai si le domaine de l'adresse (ou un domaine parent) ou le SIREN est au registre de l'espace. */

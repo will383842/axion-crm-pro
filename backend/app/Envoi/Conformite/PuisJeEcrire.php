@@ -8,7 +8,9 @@ use App\Envoi\Sequence\LecteurFicheDb;
 use App\Models\Workspace;
 use App\Support\ListeSuppression;
 use DateTimeInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * « Puis-je écrire à… ? » (lot R05). LECTURE SEULE : la porte `EnvoiAutorise::verifier` est appelée telle quelle,
@@ -22,6 +24,18 @@ final class PuisJeEcrire
 {
     /** @return array{peut: bool, motif: ?string} */
     public function repondre(string $workspaceId, string $adresse, DateTimeInterface $maintenant): array
+    {
+        try {
+            return $this->lire($workspaceId, $adresse, $maintenant);
+        } catch (QueryException $e) {
+            // Le message d'une QueryException contient les paramètres SQL, donc l'adresse : il part dans laravel.log et chez Sentry.
+            // On ne rend qu'un message neutre, SANS l'exception d'origine en « previous » (Sentry sérialise aussi la chaîne).
+            throw new RuntimeException('puis-je-ecrire : lecture impossible (' . ($e->errorInfo[0] ?? '?') . ')');
+        }
+    }
+
+    /** @return array{peut: bool, motif: ?string} */
+    private function lire(string $workspaceId, string $adresse, DateTimeInterface $maintenant): array
     {
         $adresse = mb_strtolower(trim($adresse));
 

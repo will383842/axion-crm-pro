@@ -5,6 +5,7 @@ namespace App\Support;
 use Sentry\Breadcrumb;
 use Sentry\Event;
 use Sentry\EventHint;
+use Sentry\ExceptionDataBag;
 
 /** Filtres Sentry (appelables statiques : la config reste sérialisable par `config:cache`). */
 final class SentryFiltre
@@ -34,6 +35,12 @@ final class SentryFiltre
         unset($req['query_string'], $req['data'], $req['cookies']);
         $event->setRequest($req);
         $event->setExtra([]);
+        // Le message d'une exception SQL contient les paramètres (donc une adresse) : on masque toute adresse dans les valeurs.
+        $event->setExceptions(array_map(static function (ExceptionDataBag $b): ExceptionDataBag {
+            $b->setValue((string) preg_replace('/[^\s@\'"]+@[^\s@\'")]+/', '[adresse]', $b->getValue()));
+
+            return $b;
+        }, $event->getExceptions()));
 
         return $event;
     }

@@ -469,6 +469,7 @@ components:
         ce_que_le_systeme_a_fait: { type: string }
         que_faire: { type: string }
         niveau: { type: string, enum: [a_faire, attention, nouveau, fait] }
+        type: { $ref: './commun.yaml#/components/schemas/TypeAlerte' }
         survenue_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         lien: { oneOf: [{ type: string }, { type: 'null' }] }
         close: { type: boolean }

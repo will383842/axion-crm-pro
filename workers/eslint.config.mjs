@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
  * alors que `package.json` porte un script `lint` et que `eslint` +
  * `typescript-eslint` sont en devDependencies. ESLint 10, faute de config
  * locale, remonte l'arborescence : sur le poste de développement il tombait
- * sur `C:\Users\willi\eslint.config.mjs` (config d'un projet React sans
+ * sur `<dossier utilisateur>/eslint.config.mjs` (config d'un projet React sans
  * rapport) et plantait — « Error while loading rule 'react/display-name' ».
  * En CI, où aucun ancêtre ne porte de config, la commande aurait échoué
  * autrement. Autrement dit : `pnpm lint` n'a jamais pu tourner ici, et le job

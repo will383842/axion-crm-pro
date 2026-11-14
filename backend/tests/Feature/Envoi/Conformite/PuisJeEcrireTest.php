@@ -7,10 +7,12 @@ use App\Envoi\Desinscription\EnregistrerOpposition;
 use App\Envoi\Desinscription\InscriptionsEnvoi;
 use App\Socle\Espace\FonctionsEspace;
 use App\Support\ListeSuppression;
+use Illuminate\Database\QueryException;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Tests\Feature\Envoi\Routes\BaseRoutesEnvoi;
 use Tests\Support\ContratOpenApiEnvoi;
 use Tests\Support\DoublonsFixtures as F;
@@ -152,4 +154,50 @@ test('lecture seule : rien n’est écrit (drapeaux, oppositions, audit, contact
     foreach (['put', 'patch', 'delete'] as $m) {
         $this->actingAs($this->admin)->{$m . 'Json'}(R05P, ['adresse' => 'ok@zz-client.example.invalid'])->assertStatus(405);
     }
+});
+
+test('une QueryException pendant la lecture ne laisse l’adresse ni dans l’exception rapportée, ni dans ses précédentes, ni dans les journaux', function () {
+    Exceptions::fake();
+    $vus = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$vus) {
+        $vus[] = $m->message . json_encode($m->context);
+    });
+    // Fait échouer la lecture des contacts (DDL transactionnel sous Postgres, annulé en fin de test) : la QueryException d'origine embarque l'adresse.
+    DB::statement('ALTER TABLE contacts RENAME COLUMN email TO email_zz');
+
+    $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'secret@zz-client.example.invalid'])->assertStatus(500);
+
+    // L'exception rapportée est la neutre, sans adresse dans son message ni dans sa chaîne « previous ».
+    Exceptions::assertReported(function (\RuntimeException $e) {
+        for ($c = $e; $c !== null; $c = $c->getPrevious()) {
+            if (str_contains($c->getMessage(), 'secret') || str_contains($c->getMessage(), 'zz-client')) {
+                return false;
+            }
+        }
+
+        return str_contains($e->getMessage(), 'puis-je-ecrire');
+    });
+    Exceptions::assertNotReported(QueryException::class);
+    expect(implode('|', $vus))->not->toContain('secret@')->not->toContain('zz-client');
+});
+
+test('motif « contact_ecarte » pour une adresse invalide', function () {
+    r05pFicheEnRegle($this, 'ecarte@zz-client.example.invalid');
+    DB::table('contacts')->where('email', 'ecarte@zz-client.example.invalid')->update(['email_status' => 'invalid']);
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'ecarte@zz-client.example.invalid'])->assertOk()->json();
+    expect($r)->toBe(['peut' => false, 'motif' => 'contact_ecarte']);
+});
+
+test('motif « conditions_envoi » quand l’espace n’a aucun domaine d’envoi', function () {
+    r05pFicheEnRegle($this, 'ok@zz-client.example.invalid');
+    DB::table('envoi_domaines')->where('workspace_id', $this->espace->id)->delete();
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'ok@zz-client.example.invalid'])->assertOk()->json();
+    expect($r)->toBe(['peut' => false, 'motif' => 'conditions_envoi']);
+});
+
+test('la casse de la fiche ne change pas la réponse (colonne CITEXT)', function () {
+    r05pFicheEnRegle($this, 'ok@zz-client.example.invalid');
+    DB::table('contacts')->where('workspace_id', $this->espace->id)->update(['email' => 'Ok@ZZ-Client.example.invalid']);
+    $r = $this->actingAs($this->admin)->postJson(R05P, ['adresse' => 'ok@zz-client.example.invalid'])->assertOk()->json();
+    expect($r['motif'])->not->toBe('adresse_non_verifiee');
 });

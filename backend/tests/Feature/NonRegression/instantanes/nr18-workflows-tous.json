@@ -11,6 +11,7 @@
     "diag-pharmacies-adresses.yml",
     "diag-pharmacies-finess.yml",
     "diag-pharmacies.yml",
+    "diag-reception-guide.yml",
     "diag-website-status.yml",
     "e2e.yml",
     "finess-sante-enrichir.yml",

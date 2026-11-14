@@ -26,6 +26,23 @@ final class ContratOpenApiEnvoi
         return $e;
     }
 
+    /**
+     * Réponse réelle d'une route : valide le corps contre le schéma de réponse déclaré pour ce chemin, cette méthode et ce statut.
+     *
+     * @return list<string> écarts
+     */
+    public static function ecartsReponse(string $fichier, string $chemin, string $methode, int $statut, mixed $valeur): array
+    {
+        $schema = self::charger($fichier)['paths'][$chemin][strtolower($methode)]['responses'][(string) $statut]['content']['application/json']['schema'] ?? null;
+        if (! is_array($schema)) {
+            return ["aucun schéma de réponse pour $methode $chemin $statut dans $fichier"];
+        }
+        $e = [];
+        self::verifier($fichier, $schema, $valeur, '$', $e);
+
+        return $e;
+    }
+
     /** Règle croisée du feu vert : `fait` = (`etat` == « fait »), et un point non fait est bloquant. @return list<string> */
     private static function croiserPoint(array $p): array
     {
@@ -113,7 +130,7 @@ final class ContratOpenApiEnvoi
         }
         $type = $s['type'] ?? null;
         $ok = match ($type) {
-            'string' => is_string($v), 'integer' => is_int($v), 'boolean' => is_bool($v), 'null' => $v === null,
+            'string' => is_string($v), 'integer' => is_int($v), 'number' => is_int($v) || is_float($v), 'boolean' => is_bool($v), 'null' => $v === null,
             'array' => is_array($v) && array_is_list($v), 'object' => is_array($v) && ! ($v !== [] && array_is_list($v)),
             default => true,
         };
@@ -129,6 +146,9 @@ final class ContratOpenApiEnvoi
             if ((isset($s['minLength']) && mb_strlen($v) < $s['minLength']) || (isset($s['maxLength']) && mb_strlen($v) > $s['maxLength'])) {
                 $e[] = "$chemin : longueur hors bornes";
             }
+            if (($s['format'] ?? '') === 'email' && filter_var($v, FILTER_VALIDATE_EMAIL) === false) {
+                $e[] = "$chemin : adresse e-mail attendue";
+            }
             if (($s['format'] ?? '') === 'date' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) !== 1) {
                 $e[] = "$chemin : date attendue";
             }
@@ -136,7 +156,7 @@ final class ContratOpenApiEnvoi
                 $e[] = "$chemin : date-heure ISO 8601 attendue";
             }
         }
-        if (is_int($v) && ((isset($s['minimum']) && $v < $s['minimum']) || (isset($s['maximum']) && $v > $s['maximum']))) {
+        if ((is_int($v) || is_float($v)) && ((isset($s['minimum']) && $v < $s['minimum']) || (isset($s['maximum']) && $v > $s['maximum']))) {
             $e[] = "$chemin : entier hors bornes";
         }
         if ($type === 'array') {

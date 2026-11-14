@@ -40,8 +40,19 @@ function r13Nominal(object $t, string $ws, string $adresse): DemandeEnvoi
         'achete_le' => $now->modify('-30 days')->format('Y-m-d'), 'dmarc_verifie_le' => $d, 'spf_verifie_le' => $d, 'dkim_verifie_le' => $d,
     ]);
 
-    return new DemandeEnvoi($ws, $adresse, [['verification' => 'valide']], 'FR', '123456782', 'zz-envoi.example.invalid',
-        'ZZ Expediteur SAS', $now->modify('-5 days'), null, 'federations', true);
+    return new DemandeEnvoi(
+        $ws,
+        $adresse,
+        [['verification' => 'valide']],
+        'FR',
+        '123456782',
+        'zz-envoi.example.invalid',
+        'ZZ Expediteur SAS',
+        $now->modify('-5 days'),
+        null,
+        'federations',
+        true,
+    );
 }
 
 function r13Maintenant(): DateTimeImmutable
@@ -153,4 +164,34 @@ test('registre en ajout seul : UPDATE, DELETE et TRUNCATE refusés ; aucune rés
         expect($refus)->toBeTrue($sql);
     }
     expect($this->resolutions)->toBe(0);
+});
+
+// ── STOP-T4 (#521) : une opposition née au CRM doit prévenir le site, via l'enregistreur, sans boucle ──
+
+test('STOP-T4 : une adresse inscrite à la main met UN événement consent_optout en file (sans adresse), rejeu = pas de doublon', function () {
+    $corps = ['portee' => 'adresse', 'valeur' => 'Jean.Stop@ZZ-Client.example.invalid', 'motif' => 'Courrier reçu'];
+    $this->actingAs($this->proprio)->postJson(R13_URI, $corps)->assertCreated();
+    $this->actingAs($this->proprio)->postJson(R13_URI, $corps)->assertOk();
+    $hash = ListeSuppression::empreinte('jean.stop@zz-client.example.invalid');
+    $evenements = DB::table('crm_outbound_events')->where('email_hash', $hash)->get();
+    expect($evenements)->toHaveCount(1)
+        ->and($evenements[0]->event_type)->toBe('consent_optout')
+        ->and($evenements[0]->origin)->toBe('crm')
+        ->and(json_decode((string) $evenements[0]->payload, true))->toEqual(['motif' => 'registre_manuel', 'canal' => 'registre_manuel'])
+        ->and(json_encode($evenements))->not->toContain('zz-client')
+        ->and(DB::table('opt_out')->where('email_hash', $hash)->where('source', 'registre_manuel')->count())->toBe(1);
+});
+
+test('STOP-T4 anti-boucle : une adresse déjà opposée depuis le site ne repart jamais vers le site', function (string $source) {
+    $hash = ListeSuppression::empreinte('boucle@zz-client.example.invalid');
+    DB::table('opt_out')->insert(['email' => null, 'email_hash' => $hash, 'scope' => 'business', 'source' => $source, 'created_at' => now()]);
+    $this->actingAs($this->proprio)->postJson(R13_URI, ['portee' => 'adresse', 'valeur' => 'boucle@zz-client.example.invalid', 'motif' => 'Courrier reçu'])->assertCreated();
+    expect(DB::table('crm_outbound_events')->where('email_hash', $hash)->count())->toBe(0)
+        ->and(DB::table('opt_out')->where('email_hash', $hash)->count())->toBe(1);
+})->with(['site-sync:contact_form', 'gdpr_erasure_bisystem', 'gdpr_erasure_demande_site']);
+
+test('STOP-T4 : un domaine ou un SIREN n’émet rien (le site ne connaît que des empreintes d’adresses)', function () {
+    $this->actingAs($this->proprio)->postJson(R13_URI, ['portee' => 'domaine', 'valeur' => 'zz-client.example.invalid', 'motif' => 'Demande écrite'])->assertCreated();
+    $this->actingAs($this->proprio)->postJson(R13_URI, ['portee' => 'organisation', 'valeur' => '123456782', 'motif' => 'Demande écrite'])->assertCreated();
+    expect(DB::table('crm_outbound_events')->count())->toBe(0);
 });

@@ -541,7 +541,7 @@ uptime-kuma      :3001   — uptime monitoring externe
 | vSwitch | 4010 (privé Axion-IA) | **4011** (privé Axion CRM Pro) |
 | IPs publiques | `178.105.55.15` (CPX42) | nouvelles IPs (allouées au démarrage) |
 | Domaine principal | `axion-ia.com` | **`axion-pro.com`** (à acheter Namecheap/OVH) |
-| DNS | Cloudflare compte CF Axion-IA | **Cloudflare compte CF distinct** (`axion-crm-pro@beeeditions.gmail.com` alias) |
+| DNS | Cloudflare compte CF Axion-IA | **Cloudflare compte CF distinct** (`<alias Cloudflare>`) |
 | DB Postgres | `axion-ia` cluster Coolify | **`axion-crm-pro` cluster dédié** |
 | Redis | dédié axion-ia | **dédié Axion CRM Pro** |
 | Secrets manager | `.secrets/` local dev + Coolify env | **Infisical self-hosted OU Doppler** + `.secrets/` local dev |

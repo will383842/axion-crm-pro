@@ -12,14 +12,16 @@ import type { components as commun } from '@/features/envoi/api/commun';
 import { OngletsSante } from './OngletsSante';
 import { Chargement, Panne, Vide } from './composants/Etats';
 import { Feu, libelleFeu, type EtatFeu } from './composants/Feu';
+import { libelleMotifPause } from '@/features/envoi/conformite/composants/typesAlerte';
 import { formaterHeure, formaterNombre, formaterPourcent, part } from './composants/formats';
 
 type Sante = {
   feu: EtatFeu; boites: commun['schemas']['BoiteResume'][]; domaines: commun['schemas']['DomaineResume'][];
-  serveurs: commun['schemas']['ServeurResume'][]; test_du_matin: { le: string; temoins_ok: number; temoins_total: number; etat: EtatFeu };
-  alertes: number; verifie_le: string; volume_jour: { possibles: number; envoyes: number };
-  rythme_messageries: { messagerie: string; envoyes: number; par_heure: number; etat: 'normal' | 'freine' }[];
+  serveurs: commun['schemas']['ServeurResume'][]; test_du_matin: { le: string | null; temoins_ok: number; temoins_total: number; etat: EtatFeu };
+  alertes: number; verifie_le: string | null; volume_jour: { possibles: number; envoyes: number };
+  rythme_messageries: { messagerie: string; envoyes: number; par_heure: number | null; etat: 'normal' | 'freine' }[];
   envoyes_14_jours: { jour: string; envoyes: number }[];
+  pauses?: { motif: string; portee: 'global' | 'fournisseur'; fournisseur: string | null; fin: string | null }[];
 };
 
 const PHRASE: Record<EtatFeu, string> = { vert: 'Envois normaux', ambre: 'Envois à surveiller', rouge: 'Envois arrêtés', bleu: 'Envois en montée', gris: 'État des envois inconnu' };
@@ -66,10 +68,21 @@ export function SantePage() {
               <Feu etat={s.feu} />
               <div className="min-w-0 flex-1">
                 <strong className="text-sm text-slate-900">{PHRASE[s.feu]}</strong>
-                <span className="block text-xs text-slate-600">{pretes} boîtes prêtes · {ralenties.length} ralentie{ralenties.length > 1 ? 's' : ''} · test du matin {s.test_du_matin.temoins_ok === s.test_du_matin.temoins_total ? 'réussi' : 'à revoir'}</span>
+                <span className="block text-xs text-slate-600">{pretes} boîtes prêtes · {ralenties.length} ralentie{ralenties.length > 1 ? 's' : ''} · test du matin {s.test_du_matin.le === null ? 'jamais fait' : s.test_du_matin.temoins_ok === s.test_du_matin.temoins_total ? 'réussi' : 'à revoir'}</span>
               </div>
-              <span className="text-xs text-slate-600">Vérifié à {formaterHeure(s.verifie_le)}</span>
+              <span className="text-xs text-slate-600">{s.verifie_le === null ? 'Jamais vérifié' : `Vérifié à ${formaterHeure(s.verifie_le)}`}</span>
             </div>
+            {(s.pauses ?? []).length > 0 ? (
+              <ul aria-label="Pauses d’envoi actives" className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                {(s.pauses ?? []).map((p) => (
+                  <li key={`${p.motif}-${p.fournisseur ?? 'global'}`}>
+                    <strong>{libelleMotifPause(p.motif)}</strong>
+                    {' · '}{p.fournisseur === null ? 'tous les envois' : `messagerie « ${p.fournisseur} »`}
+                    {' · '}{p.fin === null ? 'jusqu’à levée par une personne' : `jusqu’à ${formaterHeure(p.fin)}`}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {test.isSuccess ? <p role="status" className="text-sm text-emerald-700">Test lancé à {formaterHeure(test.data.le)} : les boîtes témoins ont répondu.</p> : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,7 +103,7 @@ export function SantePage() {
                       <span>{d.boites} boîte{d.boites > 1 ? 's' : ''}</span>
                       {d.chauffe ? <span>palier {d.chauffe.palier}, jour {d.chauffe.jours_effectifs}</span> : null}
                     </span>
-                    <span className="mt-2 block text-xs text-slate-600">DMARC : {d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}{d.listes_noires > 0 ? ` · ${d.listes_noires} liste${d.listes_noires > 1 ? 's' : ''} noire${d.listes_noires > 1 ? 's' : ''}` : ''}</span>
+                    <span className="mt-2 block text-xs text-slate-600">DMARC : {d.dmarc === null ? 'inconnu' : d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}{d.listes_noires > 0 ? ` · ${d.listes_noires} liste${d.listes_noires > 1 ? 's' : ''} noire${d.listes_noires > 1 ? 's' : ''}` : ''}</span>
                   </Link>
                 ))}
               </div>
@@ -103,7 +116,7 @@ export function SantePage() {
                   <caption className="sr-only">Boîtes d’envoi</caption>
                   <thead className="text-xs text-slate-600"><tr><th scope="col" className="py-2 pr-3">Boîte</th><th scope="col" className="py-2 pr-3">État</th><th scope="col" className="py-2 pr-3 text-right">Aujourd’hui</th><th scope="col" className="py-2 pr-3 text-right">Refus (7 j)</th><th scope="col" className="py-2 text-right">Réponses (7 j)</th></tr></thead>
                   <tbody>{s.boites.map((b) => (
-                    <tr key={b.id} className="border-t border-slate-100"><td className="py-2 pr-3 font-medium">{b.adresse}</td><td className="py-2 pr-3"><Feu etat={b.etat} /></td><td className="py-2 pr-3 text-right">{b.envoyes_aujourdhui} / {b.quota_jour}</td><td className="py-2 pr-3 text-right">{formaterPourcent(b.taux_refus)}</td><td className="py-2 text-right">{b.reponses_7j}</td></tr>
+                    <tr key={b.id} className="border-t border-slate-100"><td className="py-2 pr-3 font-medium">{b.adresse}</td><td className="py-2 pr-3"><Feu etat={b.etat} /></td><td className="py-2 pr-3 text-right">{b.envoyes_aujourdhui} / {b.quota_jour}</td><td className="py-2 pr-3 text-right">{b.taux_refus === null ? 'non mesuré' : formaterPourcent(b.taux_refus)}</td><td className="py-2 text-right">{b.reponses_7j}</td></tr>
                   ))}</tbody>
                 </table>
               </div>
@@ -117,7 +130,7 @@ export function SantePage() {
                     <caption className="sr-only">Rythme par messagerie destinataire</caption>
                     <thead className="text-xs text-slate-600"><tr><th scope="col" className="py-2 pr-3">Messagerie</th><th scope="col" className="py-2 pr-3 text-right">Envoyés</th><th scope="col" className="py-2 pr-3 text-right">Rythme</th><th scope="col" className="py-2">État</th></tr></thead>
                     <tbody>{s.rythme_messageries.map((r) => (
-                      <tr key={r.messagerie} className="border-t border-slate-100"><td className="py-2 pr-3">{r.messagerie}</td><td className="py-2 pr-3 text-right">{r.envoyes}</td><td className="py-2 pr-3 text-right">{r.par_heure} / heure</td><td className="py-2">{r.etat === 'freine' ? 'Freinée' : 'Normal'}</td></tr>
+                      <tr key={r.messagerie} className="border-t border-slate-100"><td className="py-2 pr-3">{r.messagerie}</td><td className="py-2 pr-3 text-right">{r.envoyes}</td><td className="py-2 pr-3 text-right">{r.par_heure === null ? '—' : `${r.par_heure} / heure`}</td><td className="py-2">{r.etat === 'freine' ? 'Freinée' : 'Normal'}</td></tr>
                     ))}</tbody>
                   </table>
                 </div>

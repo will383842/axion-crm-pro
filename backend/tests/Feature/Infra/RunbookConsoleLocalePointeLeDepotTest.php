@@ -9,7 +9,7 @@
  *
  *     docker compose \
  *       -f docker-compose.yml \
- *       -f C:/Users/willi/Documents/Projets/crmpro-wt-etape0/docker-compose.local.yml \
+ *       -f <dossier de travail>/docker-compose.local.yml \
  *       up -d
  *
  * Or `docker-compose.local.yml` est SUIVI et vit a la racine du depot. Trois

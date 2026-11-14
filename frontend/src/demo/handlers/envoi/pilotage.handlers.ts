@@ -44,6 +44,7 @@ const POINTS: readonly PointFeuVert[] = [
   manuel({ code: 'manuel.alertes_email', libelle: 'Alertes par e-mail testées', groupe: 'exploitation', bloquant: false, source: '26§8.10', detail: null }, { texte: 'Alerte de test reçue.', par: 'Camille', le: ILYA(4) }),
   manuel({ code: 'manuel.sauvegarde', libelle: 'Sauvegarde vérifiée', groupe: 'exploitation', bloquant: true, source: '26§8.10', detail: null }, { texte: 'Restauration d’essai réussie.', par: 'Camille', le: ILYA(3) }),
   manuel({ code: 'manuel.arret_general_teste', libelle: 'Arrêt général des envois testé', groupe: 'exploitation', bloquant: true, source: '26§8.11', detail: null }, { texte: 'Arrêt puis reprise constatés.', par: 'Camille', le: ILYA(2) }),
+  { ...manuel({ code: 'manuel.essai_serveur_reel', libelle: 'Essai de retour sur le serveur réel', groupe: 'serveur', bloquant: true, source: '26§8.6', detail: 'Preuve déposée, se confirme quand le serveur réel est branché' }, { texte: 'Essai relu sur le banc.', par: 'Camille', le: ILYA(1) }), etat: 'attend_serveur_reel', fait: false },
   manuel({ code: 'manuel.boucles_retour', libelle: 'Boucles de retour des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
   manuel({ code: 'manuel.tableaux_messageries', libelle: 'Inscription aux tableaux des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
 ];
@@ -180,6 +181,7 @@ export const handlers: HttpHandler[] = [
         { messagerie: 'Messagerie opérateur B', envoyes: Math.round(total * 0.32), par_heure: 6, etat: 'normal' },
         { messagerie: 'Messagerie pro C', envoyes: Math.round(total * 0.27), par_heure: 3, etat: 'freine' },
       ],
+      pauses: [{ motif: 'reports_en_hausse_sur_une_heure', portee: 'fournisseur', fournisseur: 'autre', fin: new Date(fin + 3_600_000).toISOString() }],
       envoyes_14_jours: Array.from({ length: 14 }, (_, i) => { const jour = new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10); return { jour, envoyes: jour === new Date(fin).toISOString().slice(0, 10) ? total : (par.get(jour) ?? 0) }; }),
     });
   }),
@@ -230,13 +232,15 @@ export const handlers: HttpHandler[] = [
   http.post(api('/envoi/feu-vert/:code/fait'), async ({ request, params }) => {
     await delai();
     const code = String(params['code']);
+    // Même ordre que le backend : 422 pour tout code `auto.` (même inconnu), puis 404, puis la preuve.
+    if (code.startsWith('auto.')) return erreur(422, 'point_automatique', 'Ce point se calcule tout seul : il ne s’écrit pas à la main.');
     const p = demoDb.zone<PointFeuVert>('pilotage', 'points').trouver(code);
     if (!p) return erreur(404, 'non_trouve', 'Ce point n’existe pas.');
-    if (code.startsWith('auto.')) return erreur(422, 'point_automatique', 'Ce point se calcule tout seul : il ne s’écrit pas à la main.');
     const corps = (await request.json().catch(() => ({}))) as { preuve?: unknown; fait?: unknown };
     const preuve = typeof corps.preuve === 'string' ? corps.preuve.trim() : '';
-    if (preuve.length < 1 || preuve.length > 500) return erreur(422, 'validation', 'La preuve doit faire entre 1 et 500 caractères.');
-    if (/[^\s@]+@[^\s@]+\.[^\s@]+/.test(preuve)) return erreur(422, 'validation', 'La preuve ne doit pas contenir d’adresse e-mail.');
+    if (preuve.length < 10 || preuve.length > 500) return erreur(422, 'validation', 'La preuve doit faire entre 10 et 500 caractères.');
+    // Adresse e-mail : tout « @ » est refusé, comme le backend (U+FF20 et U+FE6B se replient en « @ » par NFKC).
+    if (preuve.normalize('NFKC').includes('@')) return erreur(422, 'validation', 'La preuve ne doit pas contenir d’adresse e-mail.');
     const fait = corps.fait !== false;
     const maj = demoDb.zone<PointFeuVert>('pilotage', 'points').modifier(p.id, {
       fait,

@@ -53,9 +53,12 @@ export interface paths {
         put?: never;
         /**
          * Poser ou retirer la preuve d'un point manuel du feu vert
-         * @description Permission requise, `workspaces.manage` (403 sinon). 404 si le code est
-         *     inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit) ou si
-         *     la preuve contient une adresse e-mail.
+         * @description Permission requise, `workspaces.manage` (403 sinon, au format `Erreur`). 404 si le
+         *     code est inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit ;
+         *     même réponse que le code existe ou non), si la preuve (ou le motif de retrait)
+         *     fait moins de 10 caractères ou contient une adresse e-mail. La preuve est lue
+         *     dans le corps JSON seulement. Un point qui attend le vrai serveur reste non fait
+         *     (`fait` false, `bloquant` true) : sa preuve est affichée mais ne le valide pas.
          */
         post: operations["marquerPointFeuVert"];
         delete?: never;
@@ -152,7 +155,8 @@ export interface components {
         BoiteResume: {
             /** Format: email */
             adresse: string;
-            domaine_id: components["schemas"]["Identifiant"];
+            /** @description Identifiant du domaine de la boîte ; nul si ce domaine n'est pas enregistré dans l'espace. */
+            domaine_id: components["schemas"]["Identifiant"] | null;
             envoyes_aujourdhui: number;
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
@@ -160,8 +164,8 @@ export interface components {
             quota_jour: number;
             reponses_7j: number;
             statut: components["schemas"]["StatutBoite"];
-            /** @description Refus (durs et mous) sur 7 jours, en pourcentage. */
-            taux_refus: number;
+            /** @description Refus (durs et mous) sur 7 jours, en pourcentage ; nul tant qu'il n'est pas mesurable (aucun envoi, ou source des refus mous absente). */
+            taux_refus: number | null;
         };
         /** @description Position d'un domaine dans la montée en douceur. */
         Chauffe: {
@@ -175,7 +179,8 @@ export interface components {
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;
-            dmarc: components["schemas"]["PolitiqueDmarc"];
+            /** @description Politique DMARC publiée ; nulle tant qu'elle n'est pas connue. */
+            dmarc: components["schemas"]["PolitiqueDmarc"] | null;
             /** @description DMARC progressif — prochaine politique et date prévue. */
             dmarc_prochaine_etape: {
                 le: components["schemas"]["Horodatage"];
@@ -245,13 +250,14 @@ export interface components {
          */
         PalierChauffe: "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8";
         PointFeuVert: {
+            /** @description Vrai exactement quand `fait` est faux. */
             bloquant: boolean;
             /** @description Préfixé `auto.` (calculé) ou `manuel.` (preuve humaine). */
             code: string;
             detail: string | null;
             /** @enum {string} */
             etat: "fait" | "a_faire" | "attend_serveur_reel";
-            /** @description Vrai exactement quand `etat` vaut `fait`. */
+            /** @description Vrai exactement quand `etat` vaut `fait` (jamais pour `attend_serveur_reel`, preuve ou non). */
             fait: boolean;
             /** @enum {string} */
             groupe: "verrous" | "banc" | "dns" | "serveur" | "temoins" | "conformite" | "exploitation";
@@ -273,10 +279,14 @@ export interface components {
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
             nom: string;
-            version_configuration: number;
+            /** @description Version de configuration appliquée ; nulle si aucune n'a été appliquée. */
+            version_configuration: number | null;
         };
-        /** @enum {string} */
-        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
+        /**
+         * @description Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
+         * @enum {string}
+         */
+        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue" | "inconnu";
         /** @enum {string} */
         TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
         /** @description État des verrous d'envoi, en lecture seule. */
@@ -381,6 +391,7 @@ export interface operations {
                 "application/json": {
                     /** @default true */
                     fait?: boolean;
+                    /** @description Preuve humaine, ou motif quand `fait` vaut false : 10 à 500 caractères après nettoyage, ni phrase générique ni adresse e-mail. */
                     preuve: string;
                 };
             };
@@ -495,21 +506,35 @@ export interface operations {
                             jour: string;
                         }[];
                         feu: components["schemas"]["EtatFeu"];
+                        /** @description Pauses d'envoi actives (champ facultatif, ajouté de façon compatible). Aucune = liste vide. */
+                        pauses?: {
+                            /** @description Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine. */
+                            fin: components["schemas"]["Horodatage"] | null;
+                            /** @description Famille de messagerie visée ; nulle pour une pause globale. */
+                            fournisseur: ("gmail" | "microsoft" | "autre") | null;
+                            /** @description Code du frein ou de la pause manuelle (ex. `indesirable_chez_un_temoin`). */
+                            motif: string;
+                            /** @enum {string} */
+                            portee: "global" | "fournisseur";
+                        }[];
                         rythme_messageries: {
                             envoyes: number;
                             /** @enum {string} */
                             etat: "normal" | "freine";
                             messagerie: string;
-                            par_heure: number;
+                            /** @description Rythme mesuré sur la dernière heure ; nul tant qu'il n'est pas mesuré. */
+                            par_heure: number | null;
                         }[];
                         serveurs: components["schemas"]["ServeurResume"][];
                         test_du_matin: {
                             etat: components["schemas"]["EtatFeu"];
-                            le: components["schemas"]["Horodatage"];
+                            /** @description Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »). */
+                            le: components["schemas"]["Horodatage"] | null;
                             temoins_ok: number;
                             temoins_total: number;
                         };
-                        verifie_le: components["schemas"]["Horodatage"];
+                        /** @description Dernier relevé de santé reçu ; nul tant qu'aucun relevé n'existe. */
+                        verifie_le: components["schemas"]["Horodatage"] | null;
                         volume_jour: {
                             envoyes: number;
                             possibles: number;

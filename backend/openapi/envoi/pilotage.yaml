@@ -109,12 +109,31 @@ paths:
                     type: object
                     required: [le, temoins_ok, temoins_total, etat]
                     properties:
-                      le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                      le:
+                        description: Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »).
+                        oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
                       temoins_ok: { type: integer, minimum: 0 }
                       temoins_total: { type: integer, minimum: 0 }
                       etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
                   alertes: { type: integer, minimum: 0 }
-                  verifie_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                  verifie_le:
+                    description: Dernier relevé de santé reçu ; nul tant qu'aucun relevé n'existe.
+                    oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
+                  pauses:
+                    description: Pauses d'envoi actives (champ facultatif, ajouté de façon compatible). Aucune = liste vide.
+                    type: array
+                    items:
+                      type: object
+                      required: [motif, portee, fournisseur, fin]
+                      properties:
+                        motif: { type: string, description: Code du frein ou de la pause manuelle (ex. `indesirable_chez_un_temoin`). }
+                        portee: { type: string, enum: [global, fournisseur] }
+                        fournisseur:
+                          description: Famille de messagerie visée ; nulle pour une pause globale.
+                          oneOf: [{ type: string, enum: [gmail, microsoft, autre] }, { type: 'null' }]
+                        fin:
+                          description: Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine.
+                          oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
                   volume_jour:
                     type: object
                     required: [possibles, envoyes]
@@ -129,7 +148,9 @@ paths:
                       properties:
                         messagerie: { type: string }
                         envoyes: { type: integer, minimum: 0 }
-                        par_heure: { type: integer, minimum: 0 }
+                        par_heure:
+                          description: Rythme mesuré sur la dernière heure ; nul tant qu'il n'est pas mesuré.
+                          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
                         etat: { type: string, enum: [normal, freine] }
                   envoyes_14_jours:
                     type: array
@@ -218,9 +239,12 @@ paths:
       operationId: marquerPointFeuVert
       summary: Poser ou retirer la preuve d'un point manuel du feu vert
       description: |
-        Permission requise, `workspaces.manage` (403 sinon). 404 si le code est
-        inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit) ou si
-        la preuve contient une adresse e-mail.
+        Permission requise, `workspaces.manage` (403 sinon, au format `Erreur`). 404 si le
+        code est inconnu. 422 si le code commence par `auto.` (calculé, jamais écrit ;
+        même réponse que le code existe ou non), si la preuve (ou le motif de retrait)
+        fait moins de 10 caractères ou contient une adresse e-mail. La preuve est lue
+        dans le corps JSON seulement. Un point qui attend le vrai serveur reste non fait
+        (`fait` false, `bloquant` true) : sa preuve est affichée mais ne le valide pas.
       parameters:
         - name: code
           in: path
@@ -234,7 +258,7 @@ paths:
               type: object
               required: [preuve]
               properties:
-                preuve: { type: string, minLength: 1, maxLength: 500 }
+                preuve: { type: string, minLength: 10, maxLength: 500, description: 'Preuve humaine, ou motif quand `fait` vaut false : 10 à 500 caractères après nettoyage, ni phrase générique ni adresse e-mail.' }
                 fait: { type: boolean, default: true }
       responses:
         '200':
@@ -262,9 +286,11 @@ components:
         nature: { type: string, enum: [auto, manuel] }
         etat: { type: string, enum: [fait, a_faire, attend_serveur_reel] }
         fait:
-          description: Vrai exactement quand `etat` vaut `fait`.
+          description: Vrai exactement quand `etat` vaut `fait` (jamais pour `attend_serveur_reel`, preuve ou non).
           type: boolean
-        bloquant: { type: boolean }
+        bloquant:
+          description: Vrai exactement quand `fait` est faux.
+          type: boolean
         source:
           description: Référence au document de cadrage (ex. « 26§8.5 »).
           type: string

@@ -20,7 +20,7 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
     $ws = (string) Str::uuid();
     $autre = (string) Str::uuid();
     foreach ([$ws, $autre] as $id) {
-        DB::table('workspaces')->insert(['id' => $id, 'name' => 'T', 'slug' => 'k15-' . substr($id, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('workspaces')->insert(['id' => $id, 'name' => 'T', 'slug' => 'k15-' . substr($id, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
     }
     foreach ([$ws, $autre] as $id) {
         DB::table('envoi_serveurs')->insert(['workspace_id' => $id, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
@@ -41,19 +41,16 @@ test('l’écran « Santé des envois » rend le dernier relevé, les constats o
 
     $json = $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertOk()->json();
 
-    expect($json['serveurs'])->toHaveCount(1);
-    $s = $json['serveurs'][0];
-    expect($s['source'])->toBe('src')
-        ->and($s['dernier_releve']['ok'])->toBeTrue()
-        ->and($s['dernier_releve']['mesures']['disque_libre_pct'])->toEqual(5.0)
-        ->and(array_column($s['constats'], 'code'))->toBe(['disque'])
-        ->and($s['constats'][0]['gravite'])->toBe('critique');
+    // Forme du contrat (voir SanteConformeContratTest) : un serveur, avec relevé OK mais un constat critique => rouge, 1 alerte.
+    expect($json['serveurs'])->toHaveCount(1)
+        ->and($json['serveurs'][0])->toMatchArray(['nom' => 'src', 'etat' => 'rouge'])
+        ->and($json['feu'])->toBe('rouge')->and($json['alertes'])->toBe(1);
     expect(json_encode($json))->not->toContain('secret-autre-espace');
 });
 
 test('S1 : « Santé des envois » est refusée au viewer et à l’operator (403), accordée à l’admin (200) ; un viewer ne lit ni domaines ni listes noires ni pauses', function (string $role, int $statut) {
     $ws = (string) Str::uuid();
-    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'k15s1-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'k15s1-' . substr($ws, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
     $user = User::create([
         'id' => (string) Str::uuid(), 'email' => 'k15s1-' . Str::random(6) . '@example.test', 'name' => 'K15',
         'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),

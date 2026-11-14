@@ -33,7 +33,7 @@ function Ligne({ d, expire, reference }: { d: Domaine; expire?: string | undefin
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs text-slate-500">DMARC</dt>
-          <dd><span className="font-medium text-slate-900">{d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}</span>{d.dmarc_prochaine_etape ? <span className="text-xs text-slate-600"> · {phraseDmarc(d.dmarc_prochaine_etape)}</span> : null}</dd>
+          <dd><span className="font-medium text-slate-900">{d.dmarc === null ? 'inconnue' : d.dmarc === 'none' ? 'aucune' : d.dmarc === 'quarantine' ? 'quarantaine' : 'rejet'}</span>{d.dmarc_prochaine_etape ? <span className="text-xs text-slate-600"> · {phraseDmarc(d.dmarc_prochaine_etape)}</span> : null}</dd>
         </div>
         <div>
           <dt className="text-xs text-slate-500">Listes noires</dt>

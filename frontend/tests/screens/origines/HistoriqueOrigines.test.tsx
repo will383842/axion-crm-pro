@@ -7,6 +7,7 @@ import { renderScreen } from '../../helpers/renderScreen';
 import type { HttpHandler } from 'msw';
 import { dynamicGet, getJson, getPending, getStatus } from '../../msw/handlers';
 import { HISTORIQUE } from './fixtures';
+import type { ContenusAccords } from '@/features/crm-console/types';
 
 type Hs = HttpHandler[];
 const monter = (handlers: Hs) =>
@@ -69,5 +70,32 @@ describe('HistoriqueOrigines', () => {
     await monter([getStatus('/crm/personnes/2/origines', 500)]);
     const alerte = await screen.findByText(/Impossible de charger/);
     expect(within(alerte.closest('div') as HTMLElement).getByRole('button', { name: /Réessayer/ })).toBeVisible();
+  });
+
+  describe('frise « Accord enregistré » : l’opposition l’emporte, dans les deux ordres', () => {
+    const ACCORD = { nature: 'optin', date: '2026-11-03T12:00:00Z', source: 'confirmation', version: 'M2' };
+    const bloc = (opposition: ContenusAccords['opposition'], consentements: ContenusAccords['consentements'] = [ACCORD]): ContenusAccords => ({ origine: null, guides: [], consentements, opposition });
+    const montrer = (b: ContenusAccords) =>
+      renderScreen(<HistoriqueOrigines personneId="2" bloc={b} />, { path: '/p/$personneId', url: '/p/2', handlers: [getJson('/crm/personnes/2/origines', HISTORIQUE)] });
+
+    it.each([
+      ['accord puis opposition', '2026-11-10T12:00:00Z', /Accord donné le 03\/11\/2026, retiré par opposition le 10\/11\/2026/],
+      ['opposition puis accord', '2026-11-01T12:00:00Z', /Accord donné le 03\/11\/2026, retiré par opposition le 01\/11\/2026/],
+    ])('%s : jamais « Accord donné » seul', async (_n, dateOpp, attendu) => {
+      const { container } = await montrer(bloc({ actif: true, date: dateOpp }));
+      expect(await screen.findByText(attendu)).toBeVisible();
+      expect(screen.queryByText(/^Accord donné$/)).toBeNull();
+      expect(container.textContent).not.toMatch(/Accord donné(?! le)/);
+    });
+
+    it('opposition seule : « Aucun accord donné · opposition reçue le … »', async () => {
+      await montrer(bloc({ actif: true, date: '2026-11-10T12:00:00Z' }, []));
+      expect(await screen.findByText(/Aucun accord donné · opposition reçue le 10\/11\/2026/)).toBeVisible();
+    });
+
+    it('sans opposition : « Accord donné » reste affiché', async () => {
+      await montrer(bloc({ actif: false, date: null }));
+      expect(await screen.findByText(/^Accord donné$/)).toBeVisible();
+    });
   });
 });

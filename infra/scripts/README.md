@@ -4,7 +4,7 @@
 
 ```powershell
 # Dans PowerShell (pas besoin admin)
-cd C:\Users\willi\Documents\Projets\Axion-CRM-Pro\infra\scripts
+cd <dossier du projet>\infra\scripts
 powershell -ExecutionPolicy Bypass -File install-terraform-windows.ps1
 ```
 
@@ -16,7 +16,7 @@ Le script :
 
 Une fois installé, redémarre PowerShell puis :
 ```powershell
-cd C:\Users\willi\Documents\Projets\Axion-CRM-Pro\infra\terraform
+cd <dossier du projet>\infra\terraform
 cp terraform.tfvars.example terraform.tfvars
 # édite terraform.tfvars avec tes credentials
 terraform init

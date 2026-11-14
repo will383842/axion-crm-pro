@@ -186,6 +186,8 @@ test('DEPLOIEMENT-ARGS — les arguments non drapeaux sont valides avant ssh (vi
         expect($bloc)->toContain($nom);
     }
     expect($bloc)->toContain('^[A-Za-z0-9._:-]+$');
+    expect($bloc)->toContain('[[ "$val" =~ $re ]]');
+    expect(substr($script, 0, $garde))->toContain('INSEE_API_KEY="${INSEE_API_KEY%"${INSEE_API_KEY##*[![:space:]]}"}"');
     expect(substr_count($bloc, 'exit 1'))->toBeGreaterThanOrEqual(2);
     // Jamais la valeur dans un message, jamais de trace.
     expect($bloc)->not->toContain('set -x');

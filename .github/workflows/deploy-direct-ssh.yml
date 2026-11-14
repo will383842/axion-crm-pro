@@ -192,6 +192,11 @@ jobs:
           # alors PAS au .env). Les autres sont obligatoires : vide => échec net, jamais de
           # décalage silencieux. Tous doivent suivre ^[A-Za-z0-9._:-]+$ (PROJECT_PATH et GH_DEPOT acceptent
           # en plus `/` : chemin, propriétaire/dépôt). Messages FIXES : jamais la valeur, aucune trace shell.
+          # Blancs en début/fin de la clé INSEE retirés (un secret collé avec un saut de ligne final
+          # passait avant sans bruit ; le motif strict le rejetterait et bloquerait tout déploiement).
+          INSEE_API_KEY="${INSEE_API_KEY:-}"
+          INSEE_API_KEY="${INSEE_API_KEY#"${INSEE_API_KEY%%[![:space:]]*}"}"
+          INSEE_API_KEY="${INSEE_API_KEY%"${INSEE_API_KEY##*[![:space:]]}"}"
           if [ -z "${INSEE_API_KEY:-}" ]; then INSEE_API_KEY='absent'; fi
           for v in PROJECT_PATH SKIP_MIGRATE EXPECTED_SHA INSEE_API_KEY GH_TOKEN_LECTURE GH_DEPOT; do
             val="${!v-}"

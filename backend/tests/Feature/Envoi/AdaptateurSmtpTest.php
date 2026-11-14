@@ -2,8 +2,12 @@
 
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
+use App\Envoi\PasserelleLocale;
 use App\Envoi\Smtp\AdaptateurSmtp;
 use App\Envoi\Smtp\BoitePauseAutomatique;
 use App\Envoi\Smtp\BoiteSmtp;
@@ -14,6 +18,7 @@ use App\Envoi\Smtp\SourceMessageSigne;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -402,6 +407,25 @@ test('S21 coupure entre la fin de transmission et l’accusé : zéro doublon, z
     });
 });
 
+test('audit 4 : boîte bloquée par une ligne a_verifier => report d\'ATTENTE espacé (pas chaque minute), UNE seule alerte par boîte', function () {
+    Log::spy();
+    Cache::flush();
+    smtpAvecFauxServeur('coupure_apres_data', function (int $port, string $fichier) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $s = smtpAdaptateur($ws, $boite);
+        $s->injecter(smtpMsg($ws, 'k-bloquante')); // coupure après DATA : a_verifier
+
+        $debut = new DateTimeImmutable;
+        foreach (['autre1', 'autre2', 'autre3'] as $cle) {
+            $r = $s->injecter(smtpMsg($ws, $cle));
+            expect($r->accepte)->toBeFalse()->and($r->incertain)->toBeFalse()
+                ->and($r->nature)->toBe(NatureReport::Attente)
+                ->and($r->reporteAu->getTimestamp() - $debut->getTimestamp())->toBeGreaterThanOrEqual(30 * 60); // espacé, pas +1 minute
+        }
+        Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'boîte bloquée'))->once();
+    });
+});
+
 test('faux serveur SMTP : accord 250 => accepté', function () {
     smtpAvecFauxServeur('ok', function (int $port, string $fichier) {
         [$ws, $boite] = smtpBoite('127.0.0.1', $port);
@@ -747,4 +771,73 @@ test('RLS : l’adaptateur fonctionne réellement sous le rôle applicatif (lect
         expect(fn () => smtpAdaptateur($autre, $boite, smtpTransport(fn () => null))->injecter(smtpMsg($ws, 'k-x')))->toThrow(EnvoiRefuse::class);
         expect(smtpAdaptateur($autre, $boite)->sante()->ok)->toBeFalse();
     });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// L8-F14a (B2) — signal `incertain` de l'adaptateur et conclusion de la passerelle (base réelle, faux serveur SMTP local).
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Passerelle locale devant l'adaptateur SMTP : plafond $n, jour fixe, mode témoins éteint par la commande locale. */
+function smtpPasserelle(string $ws, AdaptateurSmtp $adaptateur, int $n): PasserelleLocale
+{
+    $depot = new DepotSocleDb;
+    $depot->eteindreTemoins($ws, 'test-smtp-incertain');
+    WorkspaceContext::set($ws);
+
+    return new PasserelleLocale($adaptateur, $depot, true, $n, fn () => new DateTimeImmutable('2026-11-17 10:00:00', new DateTimeZone('Europe/Paris')), $ws, 300, fn () => WorkspaceContext::current());
+}
+
+test('B2 SMTP : coupure après DATA => report INCERTAIN ; la place reste comptée (plafond 1 jamais dépassé), alerte, aucun renvoi', function () {
+    Log::spy();
+    smtpAvecFauxServeur('coupure_apres_data', function (int $port) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $s = smtpAdaptateur($ws, $boite);
+        $p = smtpPasserelle($ws, $s, 1);
+        $jour = new DateTimeImmutable('2026-11-17');
+
+        expect($p->injecter(smtpMsg($ws, 'k1'))->accepte)->toBeFalse();
+        $depot = new DepotSocleDb;
+        expect($depot->etatInjection($ws, 'k1'))->toBe('a_verifier')->and($depot->injectesLe($ws, $jour))->toBe(1);
+        Log::shouldHaveReceived('critical')->once();
+        // Le plafond (1) est pris par l'incertain : le suivant est reporté sans toucher le serveur.
+        expect($p->injecter(smtpMsg($ws, 'k2'))->accepte)->toBeFalse();
+        expect(smtpLignes($ws))->toHaveCount(1)->and($depot->injectesLe($ws, $jour))->toBe(1);
+        WorkspaceContext::clear();
+    });
+});
+
+test('B2 SMTP : clé a_verifier / injection_en_cours rappelée => incertain (le signal vient bien de l\'adaptateur)', function () {
+    smtpAvecFauxServeur('coupure_apres_data', function (int $port) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $s = smtpAdaptateur($ws, $boite);
+        expect($s->injecter(smtpMsg($ws, 'k1'))->incertain)->toBeTrue();   // coupure après DATA
+        expect($s->injecter(smtpMsg($ws, 'k1'))->incertain)->toBeTrue();   // rappel : a_verifier
+        expect($s->injecter(smtpMsg($ws, 'autre'))->incertain)->toBeFalse(); // boîte bloquée par l'incertaine : report net, rien n'est parti
+    });
+});
+
+test('B2 SMTP : report 4xx ou 5xx définitif => refus CERTAIN, la place est rendue ; le 5xx ne déclenche PAS l\'alerte « incertaine »', function () {
+    Log::spy();
+    smtpAvecFauxServeur('550_apres_data', function (int $port) {
+        [$ws, $boite] = smtpBoite('127.0.0.1', $port);
+        $p = smtpPasserelle($ws, smtpAdaptateur($ws, $boite), 1);
+        $depot = new DepotSocleDb;
+        expect(fn () => $p->injecter(smtpMsg($ws, 'k1')))->toThrow(RefusDefinitifServeur::class);
+        expect($depot->etatInjection($ws, 'k1'))->toBeNull()->and($depot->injectesLe($ws, new DateTimeImmutable('2026-11-17')))->toBe(0);
+        Log::shouldNotHaveReceived('critical');
+        WorkspaceContext::clear();
+    });
+});
+
+test('B2 SMTP : un 4xx (report net) libère la place', function () {
+    Log::spy();
+    [$ws, $boite] = smtpBoite();
+    $s = smtpAdaptateur($ws, $boite, smtpTransport(fn () => throw new UnexpectedResponseException('Expected response code "250" but got code "451"', 451)));
+    $p = smtpPasserelle($ws, $s, 1);
+    $r = $p->injecter(smtpMsg($ws, 'k1'));
+    $depot = new DepotSocleDb;
+    expect($r->accepte)->toBeFalse()->and($r->incertain)->toBeFalse()
+        ->and($depot->etatInjection($ws, 'k1'))->toBeNull()->and($depot->injectesLe($ws, new DateTimeImmutable('2026-11-17')))->toBe(0);
+    Log::shouldNotHaveReceived('critical');
+    WorkspaceContext::clear();
 });

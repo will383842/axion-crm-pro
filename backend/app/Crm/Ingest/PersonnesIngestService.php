@@ -1108,13 +1108,38 @@ final class PersonnesIngestService
             'title' => $titre ?? match ($event->eventType) {
                 'newsletter_optin' => 'Inscription à la lettre',
                 'newsletter_optout' => 'Désabonnement de la lettre',
-                'lead_magnet_requested' => 'Guide IA entreprise téléchargé',
+                'lead_magnet_requested' => $this->libelleGuideRecu($event),
                 'email_hard_bounced' => 'Rebond dur',
                 default => str_replace('_', ' ', $event->eventType),
             },
             'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * Libellé d'activité d'une demande de guide : suit le guide réellement reçu
+     * (dernier de `guides_recus`, sinon `origine_contenu.guide`). Sans code ou
+     * avec `guide-ia` : libellé historique inchangé.
+     */
+    private function libelleGuideRecu(SiteSyncEvent $event): string
+    {
+        $defaut = 'Guide IA entreprise téléchargé';
+        $accords = $event->contenusAccords;
+        $guides = $accords === null ? [] : ($accords->guides ?? []);
+        $code = $guides !== [] ? ($guides[array_key_last($guides)]['guide'] ?? null) : null;
+        if ($code === null && $accords !== null) {
+            $code = $accords->origine['guide'] ?? null;
+        }
+
+        if (! is_string($code) || $code === '' || $code === 'guide-ia') {
+            return $defaut;
+        }
+
+        // `nom` = nom affiché du guide (`libelle` sert à la lecture d'écran).
+        $libelle = config('guides.publics.' . $code . '.nom');
+
+        return 'Guide téléchargé : ' . (is_string($libelle) && $libelle !== '' ? $libelle : $code);
     }
 
     // ── Utilitaires ─────────────────────────────────────────────────────────

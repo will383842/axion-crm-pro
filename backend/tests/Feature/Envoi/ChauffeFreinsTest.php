@@ -16,6 +16,7 @@ use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
@@ -35,6 +36,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Tests\Support\ServeurEspion;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -1352,4 +1354,89 @@ test('K7 : un rebond dur en observation n’écrit aucun compteur ni ne freine ;
         $c->appliquer($ws, new EvenementEnvoi('rb-' . $i, 'rebond_dur', 'i' . $i, 'x' . $i . '@societe.fr'));
     }
     expect(array_map(fn ($d) => $d->motif, $garde->evaluer($ws, $maintenant)))->toBe([DecisionFrein::REBONDS]);
+});
+
+test('L8-F14a (mineur 3) : une acceptation TARDIVE (réservation périmée en a_verifier pendant l\'appel) est quand même NOTÉE dans la chauffe', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $tardif = false;
+    $espion = new ServeurEspion(function () use (&$tardif, $ws) {
+        if ($tardif) { // la réservation vieillit plus que le délai pendant que le serveur travaille
+            app(DepotSocle::class)->perimerReservations($ws, new DateTimeImmutable('2030-01-01'));
+        }
+
+        return ResultatInjection::accepte('id');
+    });
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $p = new PasserelleLocale($espion, app(DepotSocle::class), true, 300, function () use (&$maintenant) {
+        return $maintenant;
+    }, '', 300, null, $garde);
+    $p->sante();
+    foreach (range(1, 9) as $_) {
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    }
+    $tardif = true;
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue(); // 10e : acceptation tardive
+    $tardif = false;
+    // Le quota (10) est atteint : le 11e est reporté. Si la 10e n'avait pas été notée, il partirait.
+    expect($p->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($espion->appels)->toBe(10);
+});
+
+// Audit L8-F14a, bloquant 2 : le quota de chauffe compte les réservations EN VOL et d'issue incertaine (aucun dépassement en concurrence).
+test('quota de chauffe : une réservation en vol compte ; un second worker ne dépasse JAMAIS le quota (10 le jour 1)', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $faux = new FauxServeurEnvoi;
+    $p = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $p->sante();
+    foreach (range(1, 9) as $_) {
+        expect($p->injecter(messageChauffe($ws))->accepte)->toBeTrue(); // 9 envois notés
+    }
+    $second = null;
+    $espion = new ServeurEspion(function () use (&$second, &$autre, $ws) {
+        $second = $autre->injecter(messageChauffe($ws)); // le 10e est EN VOL (réservé, pas encore noté) : le 11e doit être refusé
+
+        return ResultatInjection::accepte('id-10');
+    });
+    $autre = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $autre->sante();
+    $premier = new PasserelleLocale($espion, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $premier->sante();
+    expect($premier->injecter(messageChauffe($ws))->accepte)->toBeTrue();
+    expect($second->accepte)->toBeFalse()->and($faux->appels)->toBe(9);
+    expect(app(DepotChauffe::class)->envoyesBoite($ws, boiteChauffe($ws, 'boite1@example.test'), new DateTimeImmutable('2026-11-10')))->toBe(10);
+});
+
+test('quota de chauffe : une issue INCERTAINE (a_verifier) compte toujours dans le quota', function () {
+    $ws = espaceChauffe();
+    $maintenant = paris('2026-11-10 10:00:00');
+    $garde = new GardeChauffe(app(DepotChauffe::class), app(DepotSocle::class), app(ResolveurFournisseur::class), null);
+    $faux = new FauxServeurEnvoi;
+    $normale = new PasserelleLocale($faux, app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $normale->sante();
+    foreach (range(1, 9) as $_) {
+        $normale->injecter(messageChauffe($ws));
+    }
+    $coupure = new PasserelleLocale(new ServeurEspion(fn () => throw new RuntimeException('coupure après envoi possible')), app(DepotSocle::class), true, 300, fn () => $maintenant, '', 300, null, $garde);
+    $coupure->sante();
+    expect(fn () => $coupure->injecter(messageChauffe($ws)))->toThrow(RuntimeException::class);
+    expect($normale->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(9);
+});
+
+// Audit L8-F14a, bloquant 2 : le rejeu d'une clé déjà réservée (serveur dédoublonnant) ne contourne ni pause, ni frein.
+test('rejeu d\'une clé « reservee » : pause de réputation ouverte entre-temps => report d\'attente, ZÉRO appel au serveur, réservation conservée', function () {
+    retraitEnFileBranche();
+    $ws = espaceChauffe();
+    WorkspaceContext::set($ws);
+    $maintenant = paris('2026-11-10 12:00:00');
+    $faux = new FauxServeurEnvoi;
+    $p = passerelleChauffe($faux, $maintenant);
+    $m = messageChauffe($ws);
+    $depot = app(DepotSocle::class);
+    $depot->reserverInjection($ws, JourEnvoi::de($maintenant), $m->cleIdempotence, $maintenant); // plantage entre la réservation et l'appel
+    app(GardeChauffe::class)->reputationMauvaise($ws, 'gmail', $maintenant);
+    $r = $p->injecter($m);
+    expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
+        ->and($faux->appels)->toBe(0)->and($depot->etatInjection($ws, $m->cleIdempotence))->toBe('reservee');
 });

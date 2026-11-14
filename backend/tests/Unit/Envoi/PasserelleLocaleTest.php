@@ -1,7 +1,11 @@
 <?php
 
+use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\PasserelleLocale;
@@ -122,7 +126,8 @@ test('la passerelle respecte le contrat', function () {
 test('injection : tout se passe sous le verrou du jour', function () {
     $depot = new DepotMemoire;
     passerelle(depot: $depot)->injecter(msg());
-    expect($depot->verrous)->toBe(1);
+    // L8-F14a : deux transactions COURTES sous le verrou (A : réservation ; C : conclusion), le serveur est appelé entre les deux, hors verrou.
+    expect($depot->verrous)->toBe(2);
 });
 
 test('réinjection idempotente (même clé) : le compteur n’avance pas', function () {
@@ -189,3 +194,67 @@ test('config : ENVOI_REEL_ACTIF non/off/faux/0/vide = éteint ; seul true/1/on/o
     ['non', false], ['off', false], ['faux', false], ['false', false], ['0', false], ['', false], ['n’importe quoi', false],
     ['true', true], ['1', true], ['on', true],
 ]);
+
+// ── Audit L8-F14a, bloquants : le STOP gagne entre la réservation et l'injection ; le rejeu ne contourne aucune porte L7 ──
+
+test('STOP : une adresse opposée entre la réservation du séquenceur et l\'injection => refus DÉFINITIF, zéro appel, aucune réservation', function () {
+    $depot = new DepotMemoire;
+    $depot->adressesOpposees = ['temoin@example.test'];
+    $faux = new FauxServeurEnvoi;
+    $p = passerelle($faux, $depot, espace: WS);
+    try {
+        $p->injecter(msg());
+        $this->fail('opposition attendue');
+    } catch (EnvoiRefuse $e) {
+        expect($e->estOpposition())->toBeTrue()->and($e->estAttente())->toBeFalse()->and($e->getCode())->toBe(EnvoiRefuse::OPPOSITION);
+    }
+    expect($faux->appels)->toBe(0)->and($depot->injectesLe(WS, new DateTimeImmutable('2026-11-10')))->toBe(0)->and($depot->etatInjection(WS, 'c1'))->toBeNull();
+});
+
+test('STOP sur le REJEU d\'une clé « reservee » : la place est rendue, le serveur dédoublonnant n\'est PAS appelé', function () {
+    $depot = new DepotMemoire;
+    $faux = new FauxServeurEnvoi;
+    $p = passerelle($faux, $depot, espace: WS);
+    $depot->reserverInjection(WS, new DateTimeImmutable('2026-11-10'), 'c1', new DateTimeImmutable('2026-11-10 15:00:00'));
+    $depot->adressesOpposees = ['temoin@example.test'];
+    expect(fn () => $p->injecter(msg()))->toThrow(EnvoiRefuse::class, 'Opposition');
+    expect($faux->appels)->toBe(0)->and($depot->etatInjection(WS, 'c1'))->toBeNull()->and($depot->injectesLe(WS, new DateTimeImmutable('2026-11-10')))->toBe(0);
+});
+
+test('STOP sur le rejeu d\'une clé « a_verifier » : refus, mais la place reste COMPTÉE (le message est peut-être parti)', function () {
+    $depot = new DepotMemoire;
+    $faux = new FauxServeurEnvoi;
+    $p = passerelle($faux, $depot, espace: WS);
+    $jour = new DateTimeImmutable('2026-11-10');
+    $depot->reserverInjection(WS, $jour, 'c1', new DateTimeImmutable('2026-11-10 15:00:00'));
+    $depot->concluireInjection(WS, $jour, 'c1', 'a_verifier');
+    $depot->adressesOpposees = ['temoin@example.test'];
+    expect(fn () => $p->injecter(msg()))->toThrow(EnvoiRefuse::class, 'Opposition');
+    expect($faux->appels)->toBe(0)->and($depot->etatInjection(WS, 'c1'))->toBe('a_verifier')->and($depot->injectesLe(WS, $jour))->toBe(1);
+});
+
+test('rejeu d\'une clé « reservee » avec un serveur dédoublonnant HORS fenêtre (20 h) : report d\'ATTENTE, zéro appel, la réservation n\'est pas libérée', function () {
+    $depot = new DepotMemoire;
+    $faux = new FauxServeurEnvoi;
+    $garde = new GardeChauffe(new DepotChauffe, $depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
+    $soir = fn () => new DateTimeImmutable('2026-11-10 20:00:00', new DateTimeZone('Europe/Paris'));
+    $p = new PasserelleLocale($faux, $depot, true, 5, $soir, WS, 300, null, $garde);
+    $jour = new DateTimeImmutable('2026-11-10', new DateTimeZone('Europe/Paris'));
+    $depot->reserverInjection(WS, $jour, 'c1', $soir());
+    $r = $p->injecter(msg());
+    expect($r->accepte)->toBeFalse()->and($r->incertain)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
+        ->and($faux->appels)->toBe(0)->and($depot->etatInjection(WS, 'c1'))->toBe('reservee')->and($depot->injectesLe(WS, $jour))->toBe(1);
+});
+
+test('rejeu d\'une clé « a_verifier » hors fenêtre : report d\'attente, zéro appel, la ligne reste a_verifier', function () {
+    $depot = new DepotMemoire;
+    $faux = new FauxServeurEnvoi;
+    $garde = new GardeChauffe(new DepotChauffe, $depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
+    $soir = fn () => new DateTimeImmutable('2026-11-10 20:00:00', new DateTimeZone('Europe/Paris'));
+    $p = new PasserelleLocale($faux, $depot, true, 5, $soir, WS, 300, null, $garde);
+    $jour = new DateTimeImmutable('2026-11-10', new DateTimeZone('Europe/Paris'));
+    $depot->reserverInjection(WS, $jour, 'c1', $soir());
+    $depot->concluireInjection(WS, $jour, 'c1', 'a_verifier');
+    $r = $p->injecter(msg());
+    expect($r->accepte)->toBeFalse()->and($faux->appels)->toBe(0)->and($depot->etatInjection(WS, 'c1'))->toBe('a_verifier');
+});

@@ -86,6 +86,9 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000141_envoi_alertes_reglees.php',
     '2026_12_02_000142_envoi_identite_versions.php',
     '2026_12_02_000143_envoi_reglages.php',
+    // Filet modifié : pourquoi — Envoi L8-F14a : colonne `statut` (défaut `acceptee`, sans UPDATE), index unique des conclusions et fonction
+    // de libération (ajouts seuls) ; les retirer effacerait l'état des réservations d'injection ; down() inerte, up() rejouable.
+    '2026_12_02_000180_envoi_injection_reservation_statut.php',
     // Envoi R08 : modèle de données campagne (campagnes, journal, codes), AJOUT SEUL ou colonnes figées par déclencheur ; les retirer effacerait l'historique ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000080_envoi_campagnes.php',
     '2026_12_02_000081_envoi_campagnes_journal.php',

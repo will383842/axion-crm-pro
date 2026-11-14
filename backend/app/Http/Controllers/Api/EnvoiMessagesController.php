@@ -43,9 +43,17 @@ class EnvoiMessagesController extends ApiController
     }
 
     /** PUT : ajoute toujours une NOUVELLE version (ajout seul, rien n'est écrasé : deux saisies simultanées gardent chacune la leur). */
-    public function nouvelleVersion(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id): JsonResponse
     {
-        return $this->ecrire($request, 'version', fn (string $ws, array $s, string $par) => response()->json($this->service->enregistrer($ws, $id, $s['objet'], $s['corps'], $par)), $id);
+        // Verrou par numéro de version : `If-Match: "<version_courante>"` ou champ `version_base` ; absent = comportement d'origine.
+        $base = trim((string) $request->header('If-Match'), 'W/" ');
+        $base = $base !== '' ? $base : $request->json('version_base');
+        if ($base !== null && $base !== '' && filter_var($base, FILTER_VALIDATE_INT) === false) {
+            return $this->erreur('validation', 'La version de base doit être un numéro de version.', 422);
+        }
+        $base = ($base === null || $base === '') ? null : (int) $base;
+
+        return $this->ecrire($request, 'version', fn (string $ws, array $s, string $par) => response()->json($this->service->enregistrer($ws, $id, $s['objet'], $s['corps'], $par, $base)), $id);
     }
 
     public function restaurer(Request $request, string $id, int $numero): JsonResponse
@@ -198,7 +206,7 @@ class EnvoiMessagesController extends ApiController
         try {
             return $f($ws);
         } catch (ModeleRefuse $e) {
-            return $this->erreur(match ($e->getCode()) {
+            return $this->erreur($e->codeMachine ?? match ($e->getCode()) {
                 404 => 'non_trouve', 409 => 'conflit', default => 'validation'
             }, $e->getMessage(), (int) $e->getCode());
         } catch (MessageRefuse $e) {

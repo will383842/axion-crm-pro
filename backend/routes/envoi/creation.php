@@ -19,7 +19,7 @@ Route::middleware('permission:users.manage')->group(function () {
 });
 Route::middleware('permission:workspaces.manage')->group(function () {
     Route::post('/envoi/messages', [EnvoiMessagesController::class, 'store']);
-    Route::put('/envoi/messages/{id}', [EnvoiMessagesController::class, 'nouvelleVersion']);
+    Route::put('/envoi/messages/{id}', [EnvoiMessagesController::class, 'update']);
     Route::post('/envoi/messages/{id}/versions/{numero}/restaurer', [EnvoiMessagesController::class, 'restaurer'])->whereNumber('numero');
     Route::post('/envoi/messages/{id}/versions/{numero}/valider', [EnvoiMessagesController::class, 'valider'])->whereNumber('numero');
     Route::post('/envoi/messages/{id}/archivage', [EnvoiMessagesController::class, 'archivage']);

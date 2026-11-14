@@ -54,6 +54,19 @@ test('PUT crée une nouvelle version, sans jamais modifier l’ancienne', functi
     expect($v)->toBe([1 => 'Bonjour {{prénom|vous}}', 2 => 'Objet deux']);
 });
 
+test('PUT avec If-Match : version de base périmée → 409 version_perimee, une seule version ajoutée', function () {
+    [$owner, , $id] = $this->jeu();
+    $this->actingAs($owner)->withHeaders(['If-Match' => '"1"'])->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet deux']))->assertOk()->assertJsonPath('version_courante', 2);
+    $this->actingAs($owner)->withHeaders(['If-Match' => '"1"'])->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet trois']))
+        ->assertStatus(409)->assertJsonPath('error', 'version_perimee');
+    expect(DB::table('envoi_modele_versions')->where('modele_id', $id)->count())->toBe(2);
+    $this->withoutHeader('If-Match');
+    // Corps : champ `version_base` ; sans en-tête ni champ, comportement inchangé (compatibilité).
+    $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet trois', 'version_base' => 1]))->assertStatus(409)->assertJsonPath('error', 'version_perimee');
+    $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet trois', 'version_base' => 2]))->assertOk()->assertJsonPath('version_courante', 3);
+    $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet quatre']))->assertOk()->assertJsonPath('version_courante', 4);
+});
+
 test('restaurer recopie l’ancienne version dans une nouvelle', function () {
     [$owner, , $id] = $this->jeu();
     $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet deux']))->assertOk();

@@ -28,10 +28,10 @@ class EnsureProduitEnvoi
         $etat = ProduitsEspace::etat(is_string($espace) ? $espace : null, 'envoi');
         if ($etat === 'suspendu' || $etat === 'resilie') {
             return response()->json([
+                'error' => 'produit_' . $etat,
                 'message' => $etat === 'suspendu'
-                    ? 'Le produit Envoi est suspendu pour cet espace. Contactez le responsable du projet.'
-                    : 'Le produit Envoi est résilié pour cet espace. Contactez le responsable du projet.',
-                'code' => 'produit_' . $etat,
+                    ? 'Le produit Envoi est suspendu pour cet espace. Contactez l’administrateur de votre espace.'
+                    : 'Le produit Envoi est résilié pour cet espace. Contactez l’administrateur de votre espace.',
             ], 403);
         }
         if ($etat !== 'actif') {

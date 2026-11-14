@@ -43,7 +43,7 @@ test('produits:suspendre ferme la garde, produits:activer la rouvre ; aucune rou
     $user = $this->compte($espace, 'admin');
     $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertOk();
     $this->artisan('produits:suspendre', ['espace' => $espace->slug, 'produit' => 'envoi'])->assertSuccessful();
-    $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertForbidden()->assertJsonPath('code', 'produit_suspendu');
+    $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertForbidden()->assertJsonPath('error', 'produit_suspendu');
     $this->artisan('produits:activer', ['espace' => $espace->slug, 'produit' => 'envoi'])->assertSuccessful();
     $this->actingAs($user)->getJson('/api/v1/envoi/sante')->assertOk();
 

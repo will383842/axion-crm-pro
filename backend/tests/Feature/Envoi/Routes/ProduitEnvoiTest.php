@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Envoi\Routes;
 
+use Tests\Support\ContratOpenApiEnvoi;
+
 uses(BaseRoutesEnvoi::class)->group('envoi');
 
 test('espace SANS produit envoi : 404 sur chaque URI /envoi/*, même pour un propriétaire', function () {
@@ -32,9 +34,10 @@ test('produit « suspendu » ou « résilié » : 403 clair, code stable, aucun 
     $espace = $this->espace(false);
     $espace->update(['settings' => ['produits' => ['envoi' => $etat]]]);
     $user = $this->compte($espace, 'viewer');
-    $reponse = $this->actingAs($user)->getJson('/api/v1/envoi/feu-vert')->assertForbidden()->assertJsonPath('code', $code);
-    expect($reponse->json('message'))->toContain($mot);
-    $this->actingAs($user)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'x'])->assertForbidden()->assertJsonPath('code', $code);
+    $reponse = $this->actingAs($user)->getJson('/api/v1/envoi/feu-vert')->assertForbidden()->assertJsonPath('error', $code);
+    expect($reponse->json('message'))->toContain($mot)
+        ->and(ContratOpenApiEnvoi::ecarts('commun.yaml', 'Erreur', $reponse->json()))->toBe([]);
+    $this->actingAs($user)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => 'x'])->assertForbidden()->assertJsonPath('error', $code);
     expect($this->resolutions)->toBe(0);
 })->with([['suspendu', 'produit_suspendu', 'suspendu'], ['resilie', 'produit_resilie', 'résilié']]);
 

@@ -18,7 +18,7 @@ function Contenu({ fiche }: { fiche: FicheDomaine }) {
         <KpiCard label="Envoyés (30 j)" value={nombre(t.envoyes)} tone="sky" />
         <KpiCard label="Refusés" value={pourcent(t.tauxRefus)} sublabel="limite 2 %" tone={t.tauxRefus > 2 ? 'amber' : 'emerald'} />
         <KpiCard label="Plaintes" value={t.plaintes} sublabel="limite 0,1 %" tone={t.tauxPlaintes > 0.1 ? 'rose' : 'emerald'} />
-        <KpiCard label="Expire le" value={dateCourte(fiche.expire_le)} sublabel="à renouveler chez l’hébergeur du domaine" tone="slate" />
+        <KpiCard label="Expire le" value={fiche.expire_le ? dateCourte(fiche.expire_le) : 'Non renseignée'} sublabel="à renouveler chez l’hébergeur du domaine" tone="slate" />
       </div>
       <section aria-labelledby="d30" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
         <h2 id="d30" className="mb-2 text-lg font-bold text-slate-900">Historique 30 jours</h2>

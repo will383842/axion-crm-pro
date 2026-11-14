@@ -493,7 +493,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Constat enregistré (journalisé */
+            /** @description Constat enregistré (journalisé, jamais supprimé). */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -631,7 +631,7 @@ export interface operations {
                          *     aucune saisie de journée par l'écran. Absent ou vide = non mesuré (jamais « vert »).
                          */
                         temoins_par_fournisseur?: {
-                            /** @description Famille de messagerie (gmail */
+                            /** @description Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre). */
                             fournisseur: string;
                             jours: {
                                 /** @enum {string} */

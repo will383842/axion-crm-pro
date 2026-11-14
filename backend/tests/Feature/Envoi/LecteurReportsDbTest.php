@@ -95,8 +95,6 @@ test('hors de l\'heure glissante, rien ne compte', function () {
 });
 
 test('annulation de la transaction de conclusion = aucune tentative comptée', function () {
-    $serveur = new ServeurEspion(fn () => ResultatInjection::reporteEchec(new DateTimeImmutable('2026-12-04')));
-    $p = ($this->passerelle)($serveur);
     try {
         DB::transaction(function () {
             $this->depot->sousVerrouInjection($this->maintenant, function () {

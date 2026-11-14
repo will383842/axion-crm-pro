@@ -165,7 +165,7 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             $resultat = $this->serveur->injecter($message);
         } catch (EnvoiRefuse|RefusDefinitifServeur $e) {
             // Refus CERTAIN (porte du serveur, 5xx définitif) : rien n'est parti, la place est rendue, pas d'alerte « incertaine ».
-            $this->conclure($ws, $jour, $message, 'liberee', $fournisseur, null, $e instanceof RefusDefinitifServeur ? DepotTentatives::REFUSEE : null);
+            $this->conclure($ws, $jour, $message, 'liberee', $fournisseur, null, $e instanceof RefusDefinitifServeur ? DepotTentatives::REFUSEE : null, $e instanceof RefusDefinitifServeur ? $e->codeSmtp : null);
             throw $e;
         } catch (EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
             // Refus local fait AVANT toute transmission (enveloppe, expéditeur, message vide, transaction englobante, boîte
@@ -195,7 +195,7 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         // d'attente local (plafond, pause) ne vient pas du fournisseur et n'est pas compté.
         $issue = $statut === 'acceptee' ? DepotTentatives::ACCEPTEE
             : ($statut === 'liberee' && $resultat->nature === NatureReport::Echec ? DepotTentatives::REPORTEE : null);
-        $this->conclure($ws, $jour, $message, $statut, $fournisseur, $resultat->idInjection, $issue);
+        $this->conclure($ws, $jour, $message, $statut, $fournisseur, $resultat->idInjection, $issue, $issue === DepotTentatives::REPORTEE ? $resultat->codeSmtp : null);
         if ($statut === 'a_verifier') {
             DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine rapportée par le serveur, intervention requise.', ['workspace_id' => $ws]));
         }
@@ -239,9 +239,9 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         return $resultat;
     }
 
-    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null, ?string $idInjection = null, ?string $issueTentative = null): void
+    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null, ?string $idInjection = null, ?string $issueTentative = null, ?int $codeSmtp = null): void
     {
-        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur, $idInjection, $issueTentative): void {
+        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur, $idInjection, $issueTentative, $codeSmtp): void {
             // Acceptation TARDIVE (réservation périmée en `a_verifier` pendant l'appel, ou renvoi confirmé) : `concluireInjection`
             // ajoute la confirmation (journal « ajout seul », transition a_verifier -> acceptee, une seule fois) et rend vrai.
             // Option la plus prudente : un message PARTI est toujours compté dans la chauffe (jamais sauté), quitte à compter
@@ -251,7 +251,7 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             }
             // R06 : même transaction que la conclusion (annulée avec elle) ; la clé unique rend le rejeu inoffensif.
             if ($issueTentative !== null && $fournisseur !== null) {
-                $this->tentatives?->noter($ws, $fournisseur, $issueTentative, $message->cleIdempotence, $this->instant());
+                $this->tentatives?->noter($ws, $fournisseur, $issueTentative, $message->cleIdempotence, $this->instant(), $codeSmtp);
             }
         });
     }

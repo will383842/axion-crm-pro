@@ -21,7 +21,7 @@
 | 6 catégories taille (artisan/commercant/tpe/pme/eti/grande) | 🟡 5 catégories seedées (effectif_ranges) — `commercant` séparé non distinct, agrégé sous tpe |
 | Use case `classify_company_axion` mergé | ✅ |
 | Use case `fiche_quality_scoring` retiré | ✅ (jamais ajouté) |
-| `OwnerUserSeeder` email williamsjullin@gmail.com | ✅ env default |
+| `OwnerUserSeeder` email proprietaire@exemple.test | ✅ env default |
 | Métriques business v1.1 (4 gauges) | 🟡 documentées dans alerts.yml — pas exposées côté Laravel |
 | WCAG 2.2 (vs 2.1) | ✅ axe-core tests `withTags(['wcag2a','wcag2aa','wcag22aa'])` |
 | i18next dès S1 | ✅ |

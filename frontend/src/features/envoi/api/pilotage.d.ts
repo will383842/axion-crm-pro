@@ -319,18 +319,11 @@ export interface components {
             /** @description Version de configuration appliquée ; nulle si aucune n'a été appliquée. */
             version_configuration: number | null;
         };
-<<<<<<< ours
-        /** @enum {string} */
-        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
-=======
         /**
          * @description Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
          * @enum {string}
          */
         StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue" | "inconnu";
-        /** @enum {string} */
-        TypeEvenementEnvoi: "remis" | "rebond_dur" | "rebond_mou" | "plainte" | "desinscription" | "reponse";
->>>>>>> theirs
         /** @description État des verrous d'envoi, en lecture seule. */
         VerrousFeuVert: {
             envoi_reel_actif: boolean;

@@ -67,40 +67,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/envoi/reputation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Réputation par fournisseur (un constat peut freiner, jamais libérer) */
-        get: operations["lireReputation"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/envoi/reputation/saisies": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Saisir un constat de réputation (écriture réservée au propriétaire) */
-        post: operations["saisirReputation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/envoi/resultats": {
         parameters: {
             query?: never;
@@ -443,72 +409,6 @@ export interface operations {
             403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
-        };
-    };
-    lireReputation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Une ligne par fournisseur ; `inconnue` tant que rien n'est relevé. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        fournisseurs: {
-                            fournisseur: string;
-                            mesure_le: components["schemas"]["Horodatage"] | null;
-                            /** @enum {string} */
-                            niveau: "bonne" | "moyenne" | "mauvaise" | "inconnue";
-                            source: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    saisirReputation: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    fournisseur: string;
-                    /** @enum {string} */
-                    niveau: "bonne" | "moyenne" | "mauvaise";
-                    note?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Constat enregistré (journalisé, jamais supprimé). */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Réservé au propriétaire. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Erreur"];
-                };
-            };
         };
     };
     lireResultats: {

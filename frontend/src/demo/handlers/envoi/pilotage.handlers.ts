@@ -195,16 +195,6 @@ export const handlers: HttpHandler[] = [
     return erreur(409, 'envoi_ferme_palier_0', 'Les envois sont fermés (palier 0) : aucun test ne peut partir.');
   }),
 
-  http.get(api('/envoi/reputation'), async () => {
-    await delai();
-    return HttpResponse.json({ fournisseurs: FOURNISSEURS_DEMO.map((fournisseur) => ({ fournisseur, niveau: 'inconnue', mesure_le: null, source: null })) });
-  }),
-
-  http.post(api('/envoi/reputation/saisies'), async () => {
-    await delai();
-    return HttpResponse.json({}, { status: 201 });
-  }),
-
   http.get(api('/envoi/envois/chercher'), async ({ request }) => {
     await delai();
     const force = await repondreEtatForce(request, { adresse: '', personne: null, evenements: [], peut_ecrire: true, raison: null });

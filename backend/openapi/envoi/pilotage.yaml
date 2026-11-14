@@ -200,54 +200,6 @@ paths:
           content:
             application/json:
               schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
-  /envoi/reputation:
-    get:
-      operationId: lireReputation
-      summary: Réputation par fournisseur (un constat peut freiner, jamais libérer)
-      responses:
-        '200':
-          description: Une ligne par fournisseur ; `inconnue` tant que rien n'est relevé.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [fournisseurs]
-                properties:
-                  fournisseurs:
-                    type: array
-                    items:
-                      type: object
-                      required: [fournisseur, niveau, mesure_le, source]
-                      properties:
-                        fournisseur: { type: string }
-                        niveau: { type: string, enum: [bonne, moyenne, mauvaise, inconnue] }
-                        mesure_le:
-                          oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
-                        source: { oneOf: [{ type: string }, { type: 'null' }] }
-  /envoi/reputation/saisies:
-    post:
-      operationId: saisirReputation
-      summary: Saisir un constat de réputation (écriture réservée au propriétaire)
-      parameters:
-        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [fournisseur, niveau]
-              properties:
-                fournisseur: { type: string }
-                niveau: { type: string, enum: [bonne, moyenne, mauvaise] }
-                note: { type: string, maxLength: 500 }
-      responses:
-        '201': { description: "Constat enregistré (journalisé, jamais supprimé)." }
-        '403':
-          description: Réservé au propriétaire.
-          content:
-            application/json:
-              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/envois/chercher:
     get:
       operationId: chercherEnvoi

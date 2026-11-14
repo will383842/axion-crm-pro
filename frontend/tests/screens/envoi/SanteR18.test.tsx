@@ -50,20 +50,22 @@ describe('Santé — témoins par fournisseur (R18)', () => {
 });
 
 describe('Réputation (R18)', () => {
-  const REP = { fournisseurs: FOURNISSEURS.map((fournisseur) => ({ fournisseur, niveau: fournisseur === 'gmail' ? 'bonne' : 'inconnue', mesure_le: fournisseur === 'gmail' ? '2026-11-14T06:00:00Z' : null, source: fournisseur === 'gmail' ? 'saisie' : null })) };
+  const CONSTAT = { id: 1, source: 'google_postmaster', ressource_type: 'domaine', ressource: 'prospection.example', jour: '2026-11-14', reputation: 'bonne', taux_plaintes: null, erreurs_auth: null, pieges: null, saisie: 'manuelle', preuve: 'Lu dans la console, tout est vert', auteur: 'responsable', cree_le: '2026-11-14T06:00:00Z', pause_ouverte: false };
+  const lire = (data: unknown[]) => http.get(api('/envoi/reputation'), () => HttpResponse.json({ data }));
 
-  it('chargement puis lecture : une réputation bonne ne lève rien, inconnue reste inconnue', async () => {
-    await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers: [http.get(api('/envoi/reputation'), () => HttpResponse.json(REP))] });
+  it('chargement puis lecture : une réputation bonne n’ouvre aucune pause', async () => {
+    await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers: [lire([CONSTAT])] });
     expect(screen.getByRole('status', { name: /Chargement/ })).toBeVisible();
-    const tableau = await screen.findByRole('table', { name: /Réputation par fournisseur/ });
-    expect(within(tableau).getAllByRole('row')).toHaveLength(7);
+    const tableau = await screen.findByRole('table', { name: /Constats de réputation/ });
+    expect(within(tableau).getAllByRole('row')).toHaveLength(2);
+    expect(within(tableau).getByText('Bonne')).toBeVisible();
     expect(screen.getByText(/ne lève jamais une pause/)).toBeVisible();
-    expect(within(tableau).getAllByText('Inconnue')).toHaveLength(5);
   });
 
-  it('vide, panne et saisie refusée', async () => {
-    await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers: [http.get(api('/envoi/reputation'), () => HttpResponse.json({ fournisseurs: [] }))] });
+  it('vide : message sans tableau', async () => {
+    await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers: [lire([])] });
     expect(await screen.findByText('Aucune réputation relevée')).toBeVisible();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('panne de lecture : message de panne et pas de tableau', async () => {
@@ -72,14 +74,26 @@ describe('Réputation (R18)', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('saisie : envoie le fournisseur et le niveau choisis', async () => {
+  it('saisie : envoie le constat au contrat R17', async () => {
     let recu: unknown = null;
-    const handlers = [http.get(api('/envoi/reputation'), () => HttpResponse.json(REP)), http.post(api('/envoi/reputation/saisies'), async ({ request }) => { recu = await request.json(); return HttpResponse.json({}, { status: 201 }); })];
+    const handlers = [lire([]), http.post(api('/envoi/reputation/constats'), async ({ request }) => { recu = await request.json(); return HttpResponse.json({ ...CONSTAT, reputation: 'mauvaise', pause_ouverte: true }, { status: 201 }); })];
     await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers });
-    await userEvent.selectOptions(await screen.findByLabelText('Messagerie'), 'yahoo');
+    await userEvent.selectOptions(await screen.findByLabelText('Source'), 'orange');
+    await userEvent.type(screen.getByLabelText('Ressource'), 'prospection.example');
     await userEvent.selectOptions(screen.getByLabelText('Niveau constaté'), 'mauvaise');
+    await userEvent.type(screen.getByLabelText(/Ce qui a été lu/), 'Réputation mauvaise lue ce matin');
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer la réputation' }));
     await screen.findByText(/Réputation enregistrée/);
-    expect(recu).toMatchObject({ fournisseur: 'yahoo', niveau: 'mauvaise' });
+    expect(recu).toMatchObject({ source: 'orange', ressource_type: 'domaine', ressource: 'prospection.example', reputation: 'mauvaise' });
+  });
+
+  it('saisie refusée (403) : message pour le propriétaire seul', async () => {
+    const handlers = [lire([]), http.post(api('/envoi/reputation/constats'), () => HttpResponse.json({ error: 'interdit', message: 'x' }, { status: 403 }))];
+    await renderScreen(<ReputationPage />, { path: '/envoi/sante/reputation', handlers });
+    await userEvent.selectOptions(await screen.findByLabelText('Source'), 'orange');
+    await userEvent.type(screen.getByLabelText('Ressource'), 'prospection.example');
+    await userEvent.type(screen.getByLabelText(/Ce qui a été lu/), 'Réputation lue ce matin ok');
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer la réputation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Seul le propriétaire/);
   });
 });

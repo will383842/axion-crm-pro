@@ -48,7 +48,31 @@ test('durcissement 3 : détection stricte d’adresse e-mail, dans la preuve et 
     'arobase en lettres' => ['jean arobase exemple.test'],
     'chez épelé' => ['jean chez exemple point test'],
     'arobase en lettres, majuscules' => ['jean AROBASE exemple point test'],
+    'M3 (at) entre parenthèses' => ['jean(at)exemple.test'],
+    'M3 (at) espacé, majuscules' => ['jean ( AT ) exemple.test'],
+    'M4 [at] entre crochets' => ['jean[at]exemple.test'],
+    'M4 [at] espacé' => ['jean [ at ] exemple point test'],
+    'M4 {at} entre accolades' => ['jean{at}exemple.test'],
+    'M4 (arobase) entre parenthèses' => ['jean(arobase)exemple.test'],
+    'M4 chez épelé avec « dot » et domaine .invalid' => ['jean chez exemple dot invalid'],
 ]);
+
+test('M5 : « chez … point » dans une phrase ordinaire n’est plus un faux positif', function (string $phrase) {
+    $ws = espaceFeuVertDur();
+    app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', $phrase, 'responsable');
+    expect(app(DepotPreuves::class)->dernieres($ws)['manuel.port25']['fait'])->toBeTrue();
+})->with([
+    'point final' => ['Port 25 ouvert chez ovh point final du ticket'],
+    'point de contact' => ['Vu chez scaleway point de contact joignable'],
+    'at dans un mot' => ['Constaté chez l’hébergeur : saturation, format, chat ok'],
+    'at isolé sans crochets' => ['Rendez-vous at 10h chez l’hébergeur, réf. 0042'],
+]);
+
+test('M6 : la détection d’adresse déguisée vaut aussi pour l’auteur', function (string $auteur) {
+    $ws = espaceFeuVertDur();
+    expect(fn () => app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve valable de dix signes', $auteur))->toThrow(InvalidArgumentException::class);
+    expect(DepotPreuves::auteurAffichable($auteur))->toBe('responsable');
+})->with(['jean(at)exemple.test', 'jean[at]exemple.test', 'jean arobase exemple.test']);
 
 test('durcissement 3 : « chez » dans une phrase ordinaire reste accepté', function (string $phrase) {
     $ws = espaceFeuVertDur();

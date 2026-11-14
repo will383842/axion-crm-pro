@@ -19,6 +19,9 @@ return [
     // L8-F12 — relève IMAP planifiée (`envoi:releve-imap`, chaque minute). Interrupteur PROPRE, faux par défaut, EN PLUS de
     // `reel_actif` (les deux doivent être vrais) : éteint, aucun lecteur IMAP n'est instancié, aucune connexion n'est tentée.
     'releve_actif' => filter_var(env('ENVOI_RELEVE_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
+    // R16 — relève automatique des indésirables des témoins (`envoi:temoins-releve`). Interrupteur PROPRE, faux par défaut, EN PLUS
+    // de `reel_actif` (les deux doivent être vrais) : éteint, aucun lecteur IMAP n'est instancié, aucune connexion n'est tentée.
+    'temoins_releve_actif' => filter_var(env('ENVOI_TEMOINS_RELEVE_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
     // Plafond GLOBAL (tous espaces), en plus du plafond par espace.
     'plafond_global_jour' => (int) env('ENVOI_PLAFOND_GLOBAL_JOUR', 20),
     // Clé HMAC des empreintes de témoins. Jamais dans le dépôt : posée dans l'environnement.

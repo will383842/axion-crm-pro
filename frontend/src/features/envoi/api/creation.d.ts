@@ -880,6 +880,7 @@ export interface operations {
                 };
             };
             403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
             429: components["responses"]["Erreur"];
             503: components["responses"]["Erreur"];
@@ -931,6 +932,8 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Brouillon"];
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };

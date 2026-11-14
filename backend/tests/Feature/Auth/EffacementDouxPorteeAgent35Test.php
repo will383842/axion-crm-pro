@@ -554,14 +554,17 @@ test('B10-016-PORTEE COLONNES MORTES — deux tables recoivent un deleted_at par
     // 110 -> 128 et 271 -> 289 le 2026-10-03 (relecture sécurité #316) : la
     // neutralisation des propositions de tiers est insérée au-dessus. Mêmes
     // gestes (`journalists`, `users`) ; seules leurs lignes ont bougé.
+    // STOP-T4-CRM (2026-11-14) : 110 -> 116 et 127/149 -> 140/162 (signature et
+    // retour de `opposer()`, paramètres de `erase()`). Mêmes gestes, aucune
+    // suppression nouvelle : seules les lignes ont bougé.
     expect($sites)->toBe([
         'app/Console/Commands/ImportMediaMerge.php:197',
-        'app/Crm/Presse/LienJournalisteContact.php:110',
+        'app/Crm/Presse/LienJournalisteContact.php:116',
         'app/Crm/Rgpd/MiseAEcart.php:59',
         'app/Crm/Rgpd/MiseAEcart.php:80',
         'app/Crm/Rgpd/SiteGdprService.php:248',
-        'app/Services/Rgpd/GdprErasureService.php:127',
-        'app/Services/Rgpd/GdprErasureService.php:149',
+        'app/Services/Rgpd/GdprErasureService.php:140',
+        'app/Services/Rgpd/GdprErasureService.php:162',
     ]);
 });
 

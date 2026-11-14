@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Crm\Console\ConsoleAccess;
 use App\Models\User;
+use App\Socle\Produits\ProduitsEspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,8 +42,16 @@ class FeaturesController extends ApiController
             $business = ConsoleAccess::businessWorkspaceId($user) !== null;
         }
 
+        // Droits par produit (contrat `Features.produits`). Même source que la garde `produit-envoi` : ProduitsEspace.
+        // CRM : produit d'origine, toujours actif ; Envoi : `workspaces.settings` (fermé par défaut, y compris sans session).
+        $espace = $user instanceof User ? $user->current_workspace_id : null;
+
         return $this->ok([
             'console_v2' => $consoleV2,
+            'produits' => [
+                'crm' => 'actif',
+                'envoi' => ProduitsEspace::etat(is_string($espace) ? $espace : null, 'envoi'),
+            ],
             'universes' => [
                 'business' => $consoleV2 && $business,
                 'vivier' => $consoleV2 && $vivier,

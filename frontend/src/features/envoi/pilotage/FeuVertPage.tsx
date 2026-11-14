@@ -9,6 +9,7 @@ import type { components } from '../api/pilotage';
 import { messageErreur } from '../infrastructure/composants/format';
 import { OngletsSante } from './OngletsSante';
 import { Chargement, Panne, Vide } from './composants/Etats';
+import { avertissementDemo, libelleBloquants } from './feuVertLibelles';
 
 type Point = components['schemas']['PointFeuVert'];
 type Verrous = components['schemas']['VerrousFeuVert'];
@@ -119,6 +120,7 @@ export function FeuVertPage() {
     <div>
       <PageHeader title="Feu vert" surTitre="Envoi" subtitle={f ? `${f.faits} critères sur ${f.total} avant le premier envoi.` : undefined} />
       <OngletsSante />
+      {avertissementDemo(import.meta.env.VITE_DEMO === '1') ? <p role="note" className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{avertissementDemo(true)}</p> : null}
       <div className="mt-4">
         {requete.isLoading ? <Chargement libelle="Chargement du feu vert" /> : requete.isError && f === undefined ? <Panne onReessayer={() => void requete.refetch()} /> : !f || f.points.length === 0 ? <Vide /> : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -151,7 +153,7 @@ export function FeuVertPage() {
               <Card>
                 <h2 className="text-lg font-bold text-slate-900">Avant le premier envoi</h2>
                 <p className="mt-1 text-sm text-slate-700">{f.faits} / {f.total}</p>
-                <p className="mt-3 text-sm"><strong>{restants === 0 ? 'Prêt' : 'Presque prêt'}</strong><span className="block text-slate-600">{restants === 0 ? 'Tous les critères sont remplis.' : `${f.bloquants_restants} point${f.bloquants_restants > 1 ? 's' : ''} bloquant${f.bloquants_restants > 1 ? 's' : ''} à lever`}</span></p>
+                <p className="mt-3 text-sm"><strong>{restants === 0 ? 'Prêt' : 'Presque prêt'}</strong><span className="block text-slate-600">{libelleBloquants(f)}</span></p>
                 {restants > 0 ? <Link to="/envoi/reglages" className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 text-sm font-medium md:min-h-9">Voir les réglages d’envoi</Link> : null}
               </Card>
             </div>

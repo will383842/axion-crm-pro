@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Envoi\Dns\ResolveurDns;
+use App\Envoi\Dns\ResolveurDnsSysteme;
 use App\Envoi\Infrastructure\EcrituresInfrastructure;
 use App\Envoi\Infrastructure\LectureInfrastructure;
 use App\Support\WorkspaceContext;
@@ -66,7 +67,7 @@ class EnvoiInfrastructureEcrituresController extends ApiController
     public function ajouterAdresseIp(Request $request, string $id): JsonResponse
     {
         $v = Validator::make($request->all(), ['adresse' => ['required', 'string', 'max:45'], 'flux' => ['required', 'in:prospection,lettre'], 'domaine_id' => ['required', 'integer', 'min:1']]);
-        if ($v->fails() || filter_var((string) $request->input('adresse'), FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+        if ($v->fails() || ! ResolveurDnsSysteme::adressePublique((string) $request->input('adresse'))) {
             return $this->invalide('Une adresse IP publique, un flux (prospection ou lettre) et un domaine sont attendus.');
         }
         $ws = $this->ws();

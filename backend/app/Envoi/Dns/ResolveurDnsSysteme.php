@@ -93,8 +93,14 @@ final class ResolveurDnsSysteme implements ResolveurDns
                     return null;
                 }
             }
+            $ip = $adresses[0];
+            $epingle = str_contains($ip, ':') ? '[' . $ip . ']' : $ip;
             $r = Http::timeout(5)->withoutRedirecting()->withOptions([
-                'curl' => [CURLOPT_RESOLVE => [$hote . ':443:' . $adresses[0]], CURLOPT_MAXFILESIZE => 65536],
+                'curl' => [
+                    CURLOPT_RESOLVE => [$hote . ':443:' . $epingle],
+                    CURLOPT_MAXFILESIZE => 65536,
+                    CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+                ],
             ])->get('https://' . $hote . '/.well-known/mta-sts.txt');
 
             return $r->successful() ? $r->body() : null;
@@ -103,18 +109,66 @@ final class ResolveurDnsSysteme implements ResolveurDns
         }
     }
 
-    private static function adressePublique(string $ip): bool
+    /** Liste d'AUTORISATION : vrai seulement pour une adresse unicast publique (IPv4 ou IPv6). */
+    public static function adressePublique(string $ip): bool
     {
+        $bin = filter_var($ip, FILTER_VALIDATE_IP) !== false ? inet_pton($ip) : false;
+        if ($bin === false) {
+            return false;
+        }
+        if (strlen($bin) === 16) {
+            // IPv4 mappée (::ffff:a.b.c.d) ou compatible (::a.b.c.d) : contrôler l'IPv4 embarquée.
+            if (self::dansPlage($bin, str_repeat("\0", 10) . "\xff\xff", 96) || self::dansPlage($bin, str_repeat("\0", 12), 96)) {
+                return self::adressePublique(inet_ntop(substr($bin, 12)) ?: '');
+            }
+            if ((ord($bin[0]) & 0xE0) !== 0x20) { // hors 2000::/3
+                return false;
+            }
+            $refusees = [
+                ["\x00\x64\xff\x9b" . str_repeat("\0", 12), 96], // 64:ff9b::/96 (NAT64)
+                ["\x00\x64\xff\x9b\x00\x01" . str_repeat("\0", 10), 48], // 64:ff9b:1::/48
+                ["\x20\x02" . str_repeat("\0", 14), 16], // 2002::/16 (6to4)
+                ["\x20\x01" . str_repeat("\0", 14), 32], // 2001::/32 (Teredo)
+                ["\x20\x01\x0d\xb8" . str_repeat("\0", 12), 32], // 2001:db8::/32
+                ["\x20\x01\x00\x10" . str_repeat("\0", 12), 28], // 2001:10::/28
+            ];
+            foreach ($refusees as [$prefixe, $bits]) {
+                if (self::dansPlage($bin, $prefixe, $bits)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
             return false;
         }
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-            $n = ip2long($ip);
-
-            return $n === false || ($n & 0xFFC00000) !== 0x64400000; // 100.64.0.0/10
+        foreach ([['100.64.0.0', 10], ['192.0.0.0', 24], ['198.18.0.0', 15], ['224.0.0.0', 3]] as [$reseau, $bits]) {
+            if (self::dansPlage($bin, (string) inet_pton($reseau), $bits)) {
+                return false;
+            }
         }
 
         return true;
+    }
+
+    /** Vrai si les $bits premiers bits de $bin et $prefixeBin (même longueur) sont égaux. */
+    private static function dansPlage(string $bin, string $prefixeBin, int $bits): bool
+    {
+        if (strlen($bin) !== strlen($prefixeBin)) {
+            return false;
+        }
+        $octets = intdiv($bits, 8);
+        if (substr($bin, 0, $octets) !== substr($prefixeBin, 0, $octets)) {
+            return false;
+        }
+        $reste = $bits % 8;
+        if ($reste === 0) {
+            return true;
+        }
+        $masque = (0xFF << (8 - $reste)) & 0xFF;
+
+        return (ord($bin[$octets]) & $masque) === (ord($prefixeBin[$octets]) & $masque);
     }
 
     /** @return list<array<string, mixed>> */

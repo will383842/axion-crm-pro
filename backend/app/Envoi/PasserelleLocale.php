@@ -3,16 +3,19 @@
 namespace App\Envoi;
 
 use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\ConsultationAcceptation;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
+use App\Envoi\Depot\DepotTentatives;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
@@ -70,6 +73,10 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         private readonly int|\Closure|null $plafondGlobal = null,
         private readonly ?\Closure $contexteCourant = null,
         private readonly ?GardeChauffe $chauffe = null,
+        /** R06 : journal des tentatives (source du frein « reports »), écrit dans la transaction de conclusion. */
+        private readonly ?DepotTentatives $tentatives = null,
+        /** Résolveur utilisé seulement si aucune garde de chauffe n'est liée (tests). */
+        private readonly ?ResolveurFournisseur $resolveur = null,
     ) {}
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
@@ -84,7 +91,8 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         }
         $jour = $this->jour();
         // Fournisseur résolu UNE fois, AVANT le verrou (jamais de DNS sous verrou), puis réutilisé par refus() et noter().
-        $fournisseur = $this->chauffe?->preparer($message);
+        $fournisseur = $this->chauffe?->preparer($message)
+            ?? ($this->tentatives !== null ? $this->resolveur?->fournisseurDe($message->destinataire, $message->workspaceId) : null);
         $plafond = $this->plafond($this->plafondJour);
         $global = $this->plafond($this->plafondGlobal ?? self::PLAFOND_MAX);
 
@@ -157,7 +165,7 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             $resultat = $this->serveur->injecter($message);
         } catch (EnvoiRefuse|RefusDefinitifServeur $e) {
             // Refus CERTAIN (porte du serveur, 5xx définitif) : rien n'est parti, la place est rendue, pas d'alerte « incertaine ».
-            $this->conclure($ws, $jour, $message, 'liberee');
+            $this->conclure($ws, $jour, $message, 'liberee', $fournisseur, null, $e instanceof RefusDefinitifServeur ? DepotTentatives::REFUSEE : null);
             throw $e;
         } catch (EnvoiSmtpRefuse|ServeurEnvoiRefuse $e) {
             // Refus local fait AVANT toute transmission (enveloppe, expéditeur, message vide, transaction englobante, boîte
@@ -183,7 +191,11 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         } else {
             $statut = 'liberee';
         }
-        $this->conclure($ws, $jour, $message, $statut, $fournisseur, $resultat->idInjection);
+        // Tentative notée dans la même transaction : acceptée, ou REPORT d'échec du serveur (4xx différé) ; un report
+        // d'attente local (plafond, pause) ne vient pas du fournisseur et n'est pas compté.
+        $issue = $statut === 'acceptee' ? DepotTentatives::ACCEPTEE
+            : ($statut === 'liberee' && $resultat->nature === NatureReport::Echec ? DepotTentatives::REPORTEE : null);
+        $this->conclure($ws, $jour, $message, $statut, $fournisseur, $resultat->idInjection, $issue);
         if ($statut === 'a_verifier') {
             DB::afterCommit(fn () => Log::critical('envoi.injection_a_verifier : issue incertaine rapportée par le serveur, intervention requise.', ['workspace_id' => $ws]));
         }
@@ -227,15 +239,19 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
         return $resultat;
     }
 
-    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null, ?string $idInjection = null): void
+    private function conclure(string $ws, DateTimeImmutable $jour, MessageAEnvoyer $message, string $statut, ?string $fournisseur = null, ?string $idInjection = null, ?string $issueTentative = null): void
     {
-        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur, $idInjection): void {
+        $this->depot->sousVerrouInjection($jour, function () use ($ws, $jour, $message, $statut, $fournisseur, $idInjection, $issueTentative): void {
             // Acceptation TARDIVE (réservation périmée en `a_verifier` pendant l'appel, ou renvoi confirmé) : `concluireInjection`
             // ajoute la confirmation (journal « ajout seul », transition a_verifier -> acceptee, une seule fois) et rend vrai.
             // Option la plus prudente : un message PARTI est toujours compté dans la chauffe (jamais sauté), quitte à compter
             // une fois de plus ; la place, elle, ne se libère jamais en retard.
             if ($this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, $statut, $idInjection) && $statut === 'acceptee') {
                 $this->chauffe?->noter($message, $jour, $fournisseur);
+            }
+            // R06 : même transaction que la conclusion (annulée avec elle) ; la clé unique rend le rejeu inoffensif.
+            if ($issueTentative !== null && $fournisseur !== null) {
+                $this->tentatives?->noter($ws, $fournisseur, $issueTentative, $message->cleIdempotence, $this->instant());
             }
         });
     }

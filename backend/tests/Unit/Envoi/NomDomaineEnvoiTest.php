@@ -25,12 +25,9 @@ test('une adresse IP n\'est jamais un domaine', function (string $ip) {
 
 test('domaines internes ou réservés refusés', function (string $nom) {
     expect(fn () => NomDomaineEnvoi::normaliser($nom))->toThrow(InvalidArgumentException::class);
-})->with(['localhost', 'a.localhost', 'serveur.local', 'a.b.internal', 'x.invalid', 'envoi.test', 'envoi.example', 'un-seul-mot', 'a..fr', '-a.fr', 'a b.fr', '']);
+})->with(['localhost', 'a.localhost', 'serveur.local', 'a.b.internal', 'x.invalid', 'envoi.test', 'envoi.example', 'example.com', 'envoi.example.net', 'www.example.org', 'service.onion', 'x.alt', 'poste.localdomain', 'un-seul-mot', 'a..fr', '-a.fr', 'a b.fr', '']);
 
 test('le message d\'erreur ne cite pas la saisie', function () {
-    try {
-        NomDomaineEnvoi::normaliser('secret-saisi.local');
-    } catch (InvalidArgumentException $e) {
-        expect($e->getMessage())->not->toContain('secret-saisi');
-    }
+    expect(fn () => NomDomaineEnvoi::normaliser('secret-saisi.local'))
+        ->toThrow(fn (InvalidArgumentException $e) => expect($e->getMessage())->not->toContain('secret-saisi'));
 });

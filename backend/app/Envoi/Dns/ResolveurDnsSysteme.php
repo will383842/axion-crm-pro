@@ -8,6 +8,15 @@ use Throwable;
 /** Résolveur réel (lecture seule). Jamais utilisé par les tests. */
 final class ResolveurDnsSysteme implements ResolveurDns
 {
+    /** @var (\Closure(string, int): mixed)|null */
+    private readonly ?\Closure $interrogeur;
+
+    /** @param (\Closure(string, int): mixed)|null $interroger Source DNS injectable (tests) ; défaut : dns_get_record. */
+    public function __construct(?\Closure $interroger = null)
+    {
+        $this->interrogeur = $interroger;
+    }
+
     public function txt(string $nom): array
     {
         $sortie = [];
@@ -66,10 +75,27 @@ final class ResolveurDnsSysteme implements ResolveurDns
         return implode('.', array_reverse(str_split(bin2hex($bin)))) . '.ip6.arpa';
     }
 
+    /**
+     * Politique MTA-STS (RFC 8461). Anti-SSRF : l'hôte est d'abord résolu ; si la liste est vide ou si UNE adresse
+     * est privée, réservée ou partagée (100.64.0.0/10), aucune requête HTTP n'est émise. La connexion est ensuite
+     * épinglée sur l'adresse contrôlée (pas de rebond DNS), sans redirection, corps limité à 64 Ko.
+     */
     public function politiqueMtaSts(string $domaine): ?string
     {
         try {
-            $r = Http::timeout(5)->withoutRedirecting()->get('https://mta-sts.' . $domaine . '/.well-known/mta-sts.txt');
+            $hote = 'mta-sts.' . $domaine;
+            $adresses = array_merge($this->a($hote), $this->aaaa($hote));
+            if ($adresses === []) {
+                return null;
+            }
+            foreach ($adresses as $ip) {
+                if (! self::adressePublique($ip)) {
+                    return null;
+                }
+            }
+            $r = Http::timeout(5)->withoutRedirecting()->withOptions([
+                'curl' => [CURLOPT_RESOLVE => [$hote . ':443:' . $adresses[0]], CURLOPT_MAXFILESIZE => 65536],
+            ])->get('https://' . $hote . '/.well-known/mta-sts.txt');
 
             return $r->successful() ? $r->body() : null;
         } catch (Throwable) {
@@ -77,11 +103,25 @@ final class ResolveurDnsSysteme implements ResolveurDns
         }
     }
 
+    private static function adressePublique(string $ip): bool
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            $n = ip2long($ip);
+
+            return $n === false || ($n & 0xFFC00000) !== 0x64400000; // 100.64.0.0/10
+        }
+
+        return true;
+    }
+
     /** @return list<array<string, mixed>> */
     private function interroger(string $nom, int $type): array
     {
-        $r = @dns_get_record($nom, $type);
+        $r = $this->interrogeur !== null ? ($this->interrogeur)($nom, $type) : @dns_get_record($nom, $type);
 
-        return is_array($r) ? $r : [];
+        return is_array($r) ? array_values($r) : [];
     }
 }

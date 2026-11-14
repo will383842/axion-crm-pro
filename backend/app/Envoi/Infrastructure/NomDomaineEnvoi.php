@@ -13,7 +13,7 @@ final class NomDomaineEnvoi
     public const LONGUEUR_MAX = 253;
 
     /** Suffixes qui ne désignent jamais un domaine public (RFC 2606, 6761, 6762, usages internes courants). */
-    private const RESERVES = ['localhost', 'local', 'internal', 'invalid', 'test', 'example', 'lan', 'intranet', 'corp', 'home', 'home.arpa', 'arpa'];
+    private const RESERVES = ['localhost', 'local', 'internal', 'invalid', 'test', 'example', 'lan', 'intranet', 'corp', 'home', 'home.arpa', 'arpa', 'example.com', 'example.net', 'example.org', 'onion', 'alt', 'localdomain'];
 
     /** @throws InvalidArgumentException */
     public static function normaliser(string $saisie): string

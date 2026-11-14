@@ -5,10 +5,12 @@ namespace Tests\Feature\Envoi\Routes;
 use App\Envoi\Configuration\Applicateur;
 use App\Envoi\Configuration\ServeurEnvoiConfiguration;
 use App\Envoi\Dns\ResolveurDns;
+use App\Envoi\Dns\ResolveurDnsSysteme;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\Support\ContratOpenApiEnvoi;
 
 uses(BaseRoutesEnvoi::class)->group('envoi');
@@ -144,7 +146,9 @@ test('POST /envoi/domaines : IP, domaine réservé, flux absent ou inconnu refus
 
 test('chaque POST d’écriture : 403 pour l’opérateur, l’administrateur et le lecteur ; rien n’est écrit', function () {
     $s = semerR15($this);
-    $avant = WorkspaceContext::run($s['espace']->id, fn () => DB::table('envoi_domaines')->count());
+    $tables = ['envoi_domaines', 'envoi_domaines_rappels_dmarc', 'envoi_config_versions', 'envoi_controles_dns'];
+    $compter = fn () => WorkspaceContext::run($s['espace']->id, fn () => array_map(fn ($t) => DB::table($t)->count(), $tables));
+    $avant = $compter();
     $chemins = [
         '/api/v1/envoi/domaines' => ['nom' => 'refuse-fictif-r15.fr', 'flux' => 'prospection'],
         '/api/v1/envoi/domaines/' . $s['domaine'] . '/dns/verifier' => [],
@@ -160,7 +164,17 @@ test('chaque POST d’écriture : 403 pour l’opérateur, l’administrateur et
             $this->actingAs($u)->postJson($chemin, $corps)->assertForbidden();
         }
     }
-    expect(WorkspaceContext::run($s['espace']->id, fn () => DB::table('envoi_domaines')->count()))->toBe($avant);
+    expect($compter())->toBe($avant);
+});
+
+test('POST dns/verifier avec le VRAI résolveur : mta-sts vers une adresse interne, aucune requête HTTP sortante', function () {
+    $s = semerR15($this);
+    Http::fake();
+    $this->app->instance(ResolveurDns::class, new ResolveurDnsSysteme(
+        fn (string $nom, int $type) => $type === DNS_A && $nom === 'mta-sts.' . DOM_R15 ? [['ip' => '127.0.0.1']] : [],
+    ));
+    $this->actingAs($s['owner'])->postJson('/api/v1/envoi/domaines/' . $s['domaine'] . '/dns/verifier')->assertOk();
+    Http::assertNothingSent();
 });
 
 test('POST dns/verifier : ControleurDns avec le résolveur faux ; date de vérification posée si tout est prêt', function () {

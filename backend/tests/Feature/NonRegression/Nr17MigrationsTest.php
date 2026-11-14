@@ -82,6 +82,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000082_envoi_modeles.php',
     // Envoi R13 : registre d'opposition manuel, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000130_envoi_oppositions_registre.php',
+    // Envoi R16 : accès IMAP des témoins (hôte en liste fermée par CHECK, identifiant chiffré), AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE) ; la retirer effacerait les accès posés ; down() inerte, up() rejouable.
+    '2026_12_02_000160_envoi_temoins_acces.php',
+    // Envoi R16 : index UNIQUE PARTIEL (auteur releve_auto) sur les journées témoins, ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_02_000161_envoi_temoins_journees_releve_auto.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

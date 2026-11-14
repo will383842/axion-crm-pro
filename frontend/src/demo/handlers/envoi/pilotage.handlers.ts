@@ -195,24 +195,16 @@ export const handlers: HttpHandler[] = [
 
   http.get(api('/envoi/envois/chercher'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { adresse: '', personne: null, evenements: [], peut_ecrire: true, raison: null });
+    const force = await repondreEtatForce(request, { data: [] });
     if (force) return force;
     const q = adresseSansAccent(new URL(request.url).searchParams.get('adresse') ?? '');
     if (q.length < 2) return erreur(422, 'validation', 'Saisissez une adresse e-mail.');
-    const contact = demoDb.contacts.tous().find((c) => adresseSansAccent(c.email) === q)
-      ?? demoDb.contacts.tous().find((c) => adresseSansAccent(c.email).includes(q) || adresseSansAccent(`${c.first_name} ${c.last_name}`).includes(q));
-    const adresse = contact?.email ?? q;
-    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse))
-      .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le));
-    const rebond = evenements.find((e) => e.type === 'rebond_dur');
-    const opposition = demoDb.opposition.filtrer((o) => adresseSansAccent(o.valeur) === adresseSansAccent(adresse))[0];
-    const raison = rebond ? `${rebond.libelle ?? 'Refus du serveur'} (${rebond.code_serveur ?? '—'})` : opposition ? opposition.motif : contact?.ne_plus_ecrire ? 'Ne plus écrire' : null;
-    const entreprise = contact ? demoDb.entreprises.trouver(contact.company_id) : undefined;
-    return HttpResponse.json({
-      adresse,
-      personne: contact ? { contact_id: contact.id, nom: `${contact.first_name} ${contact.last_name}`, organisation: entreprise?.denomination ?? null } : null,
-      evenements, peut_ecrire: raison === null, raison,
-    });
+    const classes: Record<string, string> = { rebond_dur: 'rebond_dur', rebond_mou: 'rebond_mou', plainte: 'hostile', desinscription: 'desinscription', reponse: 'reponse_humaine' };
+    const data = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === q && classes[e.type] !== undefined)
+      .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le))
+      .slice(0, 50)
+      .map((e) => ({ recu_le: e.survenu_le, classe: classes[e.type], boite: String(e.boite_id) }));
+    return HttpResponse.json({ data });
   }),
 
   http.get(api('/envoi/feu-vert'), async ({ request }) => {

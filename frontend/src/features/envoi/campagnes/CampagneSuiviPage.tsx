@@ -233,7 +233,7 @@ export function CampagneSuiviPage() {
   const onglets: Array<{ id: Onglet; label: string; count?: number }> = [
     { id: 'progression', label: 'Progression' },
     { id: 'destinataires', label: 'Destinataires', count: c.total },
-    ...(c.ab_objet ? [{ id: 'ab' as const, label: 'Test A/B' }] : []),
+    ...(fiche.ab !== null ? [{ id: 'ab' as const, label: 'Test A/B' }] : []),
     { id: 'message', label: 'Par message' },
     { id: 'boite', label: 'Par boîte' },
   ];

@@ -9,8 +9,8 @@ use App\Support\WorkspaceContext;
  * Droit d'un espace à un produit (contrat `EtatProduit` : actif, suspendu, resilie, absent).
  *
  * SOURCE UNIQUE côté serveur : `workspaces.settings` → `produits.<produit>`. Elle suit le schéma `Features.produits`
- * du contrat OpenAPI (backend/openapi/envoi/commun.yaml) ; `FeaturesController` n'exposait pas encore ce champ
- * (le frontend retombe sur « absent » pour envoi). Quand il l'exposera, il devra lire CETTE classe, pas une autre.
+ * du contrat OpenAPI (backend/openapi/envoi/commun.yaml) ; `FeaturesController` publie ce champ (D3)
+ * en lisant CETTE classe, pas une autre. `produits:activer` et `produits:suspendre` sont les seuls chemins d'écriture.
  *
  * FERMÉ PAR DÉFAUT : tout ce qui n'est pas exactement la chaîne « actif » (absent, inconnu, mal typé, espace introuvable)
  * vaut « absent ». Aucun réglage ne peut donc ouvrir Envoi par accident.

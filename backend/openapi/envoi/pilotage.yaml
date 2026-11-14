@@ -30,30 +30,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [data, totaux, precedent, entonnoir, periode]
-                properties:
-                  data:
-                    type: array
-                    items: { $ref: '#/components/schemas/LigneResultat' }
-                  totaux: { $ref: '#/components/schemas/LigneResultat' }
-                  precedent:
-                    description: Totaux de la période d'avant, de même durée (pour la comparaison).
-                    $ref: '#/components/schemas/LigneResultat'
-                  entonnoir:
-                    type: object
-                    required: [envoyes, reponses, rendez_vous, gagnes]
-                    properties:
-                      envoyes: { type: integer, minimum: 0 }
-                      reponses: { type: integer, minimum: 0 }
-                      rendez_vous: { type: integer, minimum: 0 }
-                      gagnes: { type: integer, minimum: 0 }
-                  periode:
-                    type: object
-                    required: [du, au]
-                    properties:
-                      du: { type: string, format: date }
-                      au: { type: string, format: date }
+                $ref: '#/components/schemas/Resultats'
   /envoi/resultats/courbe:
     get:
       operationId: lireCourbeResultats
@@ -69,19 +46,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      required: [jour, remis, rebonds, reponses]
-                      properties:
-                        jour: { type: string, format: date }
-                        remis: { type: integer, minimum: 0 }
-                        rebonds: { type: integer, minimum: 0 }
-                        reponses: { type: integer, minimum: 0 }
+                $ref: '#/components/schemas/CourbeResultats'
   /envoi/sante:
     get:
       operationId: lireSante
@@ -180,44 +145,34 @@ paths:
   /envoi/envois/chercher:
     get:
       operationId: chercherEnvoi
-      summary: Chercher un envoi par adresse (tous les événements)
+      summary: Chercher les retours reçus pour une adresse
+      description: |
+        Recherche par empreinte de l'adresse saisie (aucune adresse n'est stockée ni journalisée).
+        10 recherches par minute et par compte ; chaque recherche est journalisée (qui, quand, empreinte).
+        Une adresse inconnue et une adresse d'un autre espace donnent la même réponse vide (aucun oracle) :
+        la réponse ne dit ni « personne connue » ni « peut-on lui écrire ».
       parameters:
         - name: adresse
           in: query
           required: true
-          schema: { type: string }
+          schema: { type: string, maxLength: 254 }
       responses:
         '200':
-          description: Événements de cette adresse, et peut-on encore lui écrire.
+          description: Retours reçus pour cette adresse (au plus 50, du plus récent au plus ancien).
           content:
             application/json:
-              schema:
-                type: object
-                required: [adresse, personne, evenements, peut_ecrire, raison]
-                properties:
-                  adresse: { type: string }
-                  personne:
-                    description: Fiche du CRM quand l'adresse y est connue ; nul sinon.
-                    oneOf:
-                      - type: object
-                        required: [contact_id, nom, organisation]
-                        properties:
-                          contact_id: { type: integer }
-                          nom: { type: string }
-                          organisation: { oneOf: [{ type: string }, { type: 'null' }] }
-                      - type: 'null'
-                  evenements:
-                    type: array
-                    items: { $ref: './commun.yaml#/components/schemas/EvenementEnvoi' }
-                  peut_ecrire: { type: boolean }
-                  raison: { oneOf: [{ type: string }, { type: 'null' }] }
+              schema: { $ref: '#/components/schemas/RechercheEnvoi' }
+        '422': { description: Adresse absente ou invalide. }
+        '429': { description: Plus de 10 recherches dans la minute. }
   /envoi/feu-vert:
     get:
       operationId: lireFeuVert
       summary: Liste « feu vert » avant le premier envoi réel
       description: |
         Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
-        portent une preuve humaine. Les verrous sont en lecture seule.
+        portent une preuve humaine (catalogue v3 : 16 points automatiques et 28 manuels, 44 au total,
+        cases A4 à A12 du plan R07 comprises). Un point automatique sans source est toujours faux.
+        Les verrous sont en lecture seule.
       responses:
         '200':
           description: Points de contrôle, bloquants restants et verrous.
@@ -319,7 +274,66 @@ components:
           oneOf: [{ type: string, format: date }, { type: 'null' }]
         fournisseurs_temoins_couverts: { type: integer, minimum: 0 }
         fournisseurs_temoins_requis: { type: integer, const: 6 }
+    Resultats:
+      type: object
+      required: [data, totaux, precedent, entonnoir, periode]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/LigneResultat' }
+        totaux: { $ref: '#/components/schemas/LigneResultat' }
+        precedent:
+          description: Totaux de la période d'avant, de même durée (pour la comparaison).
+          $ref: '#/components/schemas/LigneResultat'
+        entonnoir:
+          description: |
+            `rendez_vous` et `gagnes` valent null tant que le lien avec le CRM n'est pas défini
+            (on ne les invente pas).
+          type: object
+          required: [envoyes, reponses, rendez_vous, gagnes]
+          properties:
+            envoyes: { type: integer, minimum: 0 }
+            reponses: { type: integer, minimum: 0 }
+            rendez_vous: { oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }] }
+            gagnes: { oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }] }
+        periode:
+          description: Jours civils d'Europe/Paris, bornes comprises.
+          type: object
+          required: [du, au]
+          properties:
+            du: { type: string, format: date }
+            au: { type: string, format: date }
+    CourbeResultats:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required: [jour, remis, rebonds, reponses]
+            properties:
+              jour: { type: string, format: date }
+              remis: { type: integer, minimum: 0 }
+              rebonds: { type: integer, minimum: 0 }
+              reponses: { type: integer, minimum: 0 }
+    RechercheEnvoi:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required: [recu_le, classe, boite]
+            properties:
+              recu_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+              classe: { type: string, enum: [reponse_humaine, auto_reponse, desinscription, hostile, rebond_dur, rebond_mou] }
+              boite: { type: string }
     LigneResultat:
+      description: |
+        Définition unique, la même que celle des freins : `remis` = `envoyes` moins `rebonds_durs` moins `rebonds_mous`
+        (jamais négatif) ; le taux de réponse se calcule sur les envoyés.
       type: object
       required: [cle, libelle, envoyes, remis, rebonds_durs, rebonds_mous, plaintes, desinscriptions, reponses, reponses_interessees]
       properties:

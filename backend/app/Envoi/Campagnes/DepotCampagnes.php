@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Campagnes (modèle de données seul : aucune route, aucun lien avec les séquences ni les inscriptions).
+ * Campagnes (modèle de données ; les routes de suivi et de gestes sont dans GestesCampagne / LectureCampagnes, R09). Aucun lien avec les séquences ni les inscriptions.
  * AUCUNE méthode n'écrit `sequence_id` : une campagne ne peut pas devenir exécutable par ce dépôt (et le rôle applicatif
  * n'a aucun droit sur cette colonne). Aucune suppression. Tout passe par WorkspaceContext (RLS) ET filtre l'espace.
  */
@@ -119,6 +119,12 @@ final class DepotCampagnes
 
             return $this->ecrire($ws, $id, $version, $champs);
         });
+    }
+
+    /** Pose la date du prochain envoi (versionnée comme tout changement). L'appelant a vérifié statut et fenêtre. */
+    public function changerDate(string $ws, string $id, int $version, \DateTimeInterface $le): int
+    {
+        return WorkspaceContext::run($ws, fn (): int => $this->ecrire($ws, $id, $version, ['envoi_prevu_le' => $le->format('Y-m-d H:i:sP')]));
     }
 
     /**

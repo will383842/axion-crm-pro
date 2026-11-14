@@ -51,7 +51,8 @@ describe('Désinscriptions (DM2-CNF)', () => {
     await user.click(screen.getByRole('button', { name: 'Vérifier' }));
     const reponse = await screen.findByRole('status');
     expect(within(reponse).getByText('Non')).toBeVisible();
-    expect(within(reponse).getByText(new RegExp(opposee.motif.replace(/[()«».]/g, '.'), 'i'))).toBeVisible();
+    // Contrat R05 : le serveur ne rend qu'un motif codé regroupé (ici « opposition »), jamais le détail de la ligne du registre.
+    expect(within(reponse).getByText(/s’est opposée/i)).toBeVisible();
     // Aucune mention d’ouverture ni de pixel, jamais.
     expect(within(reponse).getByText(/aucun message ne part/i)).toBeVisible();
     expect(within(reponse).queryByText(/ouverture|pixel/i)).toBeNull();

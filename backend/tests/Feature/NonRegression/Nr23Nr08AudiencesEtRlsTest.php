@@ -211,6 +211,11 @@ test('NR-08 sous le rôle de production, la relance des effets d’opposition te
             $o->table('envoi_oppositions')->insert([
                 'workspace_id' => $e[$cle], 'lien_id' => $lien, 'empreinte_adresse' => $hashes[$cle], 'canal' => 'one_click',
             ]);
+            // STOP-T4-CRM : le vrai flux écrit aussi `opt_out` (source `desinscription_lien`) AVANT les effets ;
+            // l'événement sortant ne part que pour une opposition née au CRM (anti-boucle, liste blanche).
+            $o->table('opt_out')->insert([
+                'email' => null, 'email_hash' => $hashes[$cle], 'scope' => 'business', 'source' => 'desinscription_lien', 'created_at' => now(),
+            ]);
         }
 
         $code = nr08SousRoleProduction(fn () => Artisan::call('envoi:relancer-effets-opposition'));
@@ -225,6 +230,7 @@ test('NR-08 sous le rôle de production, la relance des effets d’opposition te
         // Les triggers d'ajout seul sont suspendus le temps du nettoyage de CES lignes de test.
         $o->statement("SET session_replication_role = 'replica'");
         $o->table('crm_outbound_events')->whereIn('email_hash', array_values($hashes))->delete();
+        $o->table('opt_out')->whereIn('email_hash', array_values($hashes))->delete();
         $o->table('envoi_oppositions')->whereIn('workspace_id', array_values($e))->delete();
         $o->table('envoi_liens_desinscription')->whereIn('workspace_id', array_values($e))->delete();
         $o->statement("SET session_replication_role = 'origin'");

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Presse\PersonneReelle;
 use App\Crm\Sites\QuarantaineSite;
@@ -690,54 +690,33 @@ class JournalistsController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($journalist);
 
-        $email = $journalist->email;
-
         // Harmonisation presse (relecture sécurité #264) : l'opposition vaut
         // AUSSI pour le contact lié et entre dans `opt_out`, la table que lisent
         // le funnel et la liste de campagne — sans quoi la personne opposée ici
         // resterait joignable par son contact.
+        //
+        // STOP-T4-CRM : l'opposition doit converger vers le site, pour CHAQUE
+        // adresse opposée (journaliste ET contact lié), dans la MÊME transaction
+        // (outbox transactionnelle). Une panne de l'outbox ne fait jamais échouer
+        // l'opposition (point de sauvegarde) ; le rattrapage reprend.
         DB::transaction(function () use ($journalist): void {
             $journalist->update(['opt_out' => true]);
-            LienJournalisteContact::opposer((int) $journalist->id);
+            $this->signalerOpposition(LienJournalisteContact::opposer((int) $journalist->id), 'opposition_presse');
         });
-
-        // Lot L5 — l'opposition décidée DANS la console doit converger vers le
-        // site : sans cela le site continuerait d'adresser une personne que le
-        // CRM a opposée, et la prochaine synchro site → CRM la « rouvrirait ».
-        // Sans email, il n'y a pas de hash — donc rien que le site puisse
-        // rapprocher : on ne met rien en file plutôt qu'un message inexploitable.
-        if (is_string($email) && trim($email) !== '') {
-            try {
-                app(ConsentOutboundRecorder::class)->recordForEmail(
-                    'consent_optout',
-                    $email,
-                    'business',
-                    payload: ['surface' => 'console:journalists', 'journalist_id' => $journalist->id],
-                );
-            } catch (\Throwable $e) {
-                // Une panne de la mini-outbox ne fait pas échouer un droit
-                // d'opposition déjà acté en base. Journalisé, jamais avalé.
-                Log::error('crm.outbound.record_failed', [
-                    'event_type' => 'consent_optout',
-                    'journalist_id' => $journalist->id,
-                    'exception' => $e->getMessage(),
-                ]);
-                report($e);
-            }
-        }
 
         return $this->ok($journalist);
     }
 
     /**
      * Demande d'effacement d'un journaliste (L3c-0, ADR contrat v3 § 6) :
-     * MASQUAGE seulement, rien n'est détruit ni envoyé au site.
+     * MASQUAGE seulement, rien n'est détruit. Le site reçoit l'opposition
+     * (`consent_optout`, décision D1 de STOP-T4-CRM), jamais un `erasure`.
      *
      * La ligne passe en corbeille douce (`deleted_at`), son contact lié est
      * mis à l'écart, ses coordonnées entrent dans `opt_out` (anti-réinsertion)
      * et `opt_out` est posé. E-mail et téléphone sont GARDÉS ; aucun événement
      * `erasure` n'est émis vers le site : l'effacement définitif n'est pas
-     * codé, c'est Will qui décide.
+     * codé, c'est le fondateur qui décide.
      */
     public function destroy(Journalist $journalist): JsonResponse
     {
@@ -747,12 +726,24 @@ class JournalistsController extends ApiController
         $this->refuserHorsEspace($journalist);
 
         DB::transaction(function () use ($journalist): void {
-            LienJournalisteContact::opposer((int) $journalist->id);
+            $empreintes = LienJournalisteContact::opposer((int) $journalist->id);
+            $this->signalerOpposition($empreintes, 'effacement_presse');
             LienJournalisteContact::masquerContactsDe([(int) $journalist->id]);
             $journalist->delete();
             DB::table('journalists')->where('id', $journalist->id)->update(['opt_out' => true]);
         });
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * @param  list<string>  $empreintes  adresses opposées (empreintes sha256)
+     */
+    private function signalerOpposition(array $empreintes, string $motif): void
+    {
+        $sortante = new OppositionSortante;
+        foreach ($empreintes as $empreinte) {
+            $sortante->signalerSansBloquer($empreinte, 'business', $motif, 'console_presse');
+        }
     }
 }

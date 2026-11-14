@@ -47,6 +47,33 @@ final class DepotCampagnes
 
     private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie'];
 
+    /** Clé du verrou consultatif de l'ESPACE : toute écriture de création (brouillon, étape, code, validation) le prend d'abord. */
+    public static function cleVerrouEspace(string $ws): string
+    {
+        return 'envoi_campagnes_espace:' . $ws;
+    }
+
+    /**
+     * Exécute `$f` dans UNE transaction, sous le verrou de l'espace puis, si fournie, celui de la campagne (toujours dans cet
+     * ordre : pas d'interblocage). Relâchés au COMMIT/ROLLBACK.
+     *
+     * @template T
+     *
+     * @param  \Closure(): T  $f
+     * @return T
+     */
+    public function sousVerrou(string $ws, ?string $campagne, \Closure $f): mixed
+    {
+        return WorkspaceContext::run($ws, fn () => DB::transaction(function () use ($ws, $campagne, $f) {
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [self::cleVerrouEspace($ws)]);
+            if ($campagne !== null) {
+                DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_campagne:' . $campagne]);
+            }
+
+            return $f();
+        }));
+    }
+
     public static function autorisee(string $de, string $vers): bool
     {
         return in_array($vers, self::TRANSITIONS[$de] ?? [], true);

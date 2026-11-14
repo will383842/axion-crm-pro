@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const SRC_DIR =
-  "C:/Users/willi/Documents/Projets/Axion-CRM-Pro/.claude/worktrees/prospection-roumanie/_IMPORTS/2026-08-15-implantations-roumanie";
+  "<dossier du projet>/.claude/worktrees/prospection-roumanie/_IMPORTS/2026-08-15-implantations-roumanie";
 const SRC_TXT = join(SRC_DIR, "ccifer-full.txt");
 const SRC_JSON = join(SRC_DIR, "resolution-report.json");
 const OUT = join(HERE, "organismes-roumanie.jsonl");

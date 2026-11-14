@@ -20,7 +20,7 @@
 ## Setup
 
 ```powershell
-cd "C:\Users\willi\Documents\Projets\Axion-CRM-Pro\poc\03_direction_finder"
+cd "<dossier du projet>\poc\03_direction_finder"
 pnpm install
 pnpm exec playwright install chromium       # ~250 MB
 copy .env.example .env

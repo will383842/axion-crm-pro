@@ -16,7 +16,7 @@
 --
 -- USAGE :
 --   docker compose exec -T postgres psql -U axion -d axion_crm \
---     -v workspace_id="'1db106f5-c8a4-47b0-bf86-930f1ccc9f4a'" \
+--     -v workspace_id="'00000000-0000-0000-0000-000000000000'" \
 --     -f /backups/backfill_archived_entreprises_radiees.sql
 --
 -- =============================================================================

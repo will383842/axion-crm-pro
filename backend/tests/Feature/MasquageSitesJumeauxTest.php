@@ -587,6 +587,8 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         'liste' => $this->listeId,
         // 2026-10-03 (N12) : la provenance tiers d'une personne (owner seul).
         'contactId' => $this->contactId,
+        // R03 : domaines et serveurs d'envoi (identifiant numérique de l'infrastructure, lecture seule, aucune coordonnée de contact).
+        'id' => 1,
     ];
 
     $cibles = [];

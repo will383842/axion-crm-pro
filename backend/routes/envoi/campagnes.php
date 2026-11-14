@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\EnvoiCampagnesController;
+use App\Http\Controllers\Envoi\CreationController;
 use Illuminate\Support\Facades\Route;
 
 // R09 : suivi et gestes des campagnes (contrat campagnes.yaml). Lecture `users.manage` (owner, admin) ; gestes `workspaces.manage` (owner seul).
@@ -16,3 +17,5 @@ Route::middleware('permission:workspaces.manage')->group(function () {
         Route::post("/envoi/campagnes/{id}/{$geste}", [EnvoiCampagnesController::class, $geste])->whereUuid('id');
     }
 });
+// Routes Envoi : domaine « campagnes ». R11 : annulation de la validation (5 minutes), écriture réservée au propriétaire.
+Route::post('/envoi/campagnes/{id}/annuler-validation', [CreationController::class, 'annuler'])->whereUuid('id')->middleware('permission:workspaces.manage');

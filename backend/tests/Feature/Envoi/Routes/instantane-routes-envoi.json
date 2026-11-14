@@ -264,6 +264,28 @@
         ]
     },
     {
+        "methode": "POST",
+        "uri": "api/v1/envoi/configuration/appliquer",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/configuration/versions/{numero}/revenir",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
         "methode": "GET",
         "uri": "api/v1/envoi/creation/boites",
         "middlewares": [
@@ -341,6 +363,18 @@
         ]
     },
     {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-infra-ecriture",
+            "workspace"
+        ]
+    },
+    {
         "methode": "GET",
         "uri": "api/v1/envoi/domaines/{id}",
         "middlewares": [
@@ -348,6 +382,30 @@
             "auth:sanctum",
             "first-login",
             "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines/{id}/dmarc",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-infra-ecriture",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/domaines/{id}/dns/verifier",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-dns-verifier",
             "workspace"
         ]
     },
@@ -851,6 +909,18 @@
         ]
     },
     {
+        "methode": "POST",
+        "uri": "api/v1/envoi/serveurs/{id}/adresses-ip",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "throttle:envoi-infra-ecriture",
+            "workspace"
+        ]
+    },
+    {
         "methode": "GET",
         "uri": "api/v1/envoi/serveurs/{id}/sante",
         "middlewares": [
@@ -858,6 +928,17 @@
             "auth:sanctum",
             "first-login",
             "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/serveurs/{id}/test",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
             "workspace"
         ]
     }

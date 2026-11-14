@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -127,6 +127,8 @@ final class SemeurTablesScopees
         // Envoi P0 L3 : verdicts d'adresse et domaines d'envoi (sans clé étrangère entre eux).
         'envoi_verdicts_adresse',
         'envoi_domaines',
+        // Envoi R15 : rappels DMARC (ajout seul + FK workspaces et envoi_domaines) : APPEND_SEUL_AVEC_FK ; APRÈS son domaine parent.
+        'envoi_domaines_rappels_dmarc',
         // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
         'envoi_sequences',
         'envoi_sequence_etapes',
@@ -573,9 +575,14 @@ final class SemeurTablesScopees
             'pas_avant' => now(),
         ]);
 
-        $inserer('envoi_domaines', [
+        $domaineId = $insererAvecId('envoi_domaines', [
             'nom' => 'zz-etancheite.example.invalid',
             'achete_le' => '2026-01-01',
+        ]);
+        $inserer('envoi_domaines_rappels_dmarc', [
+            'domaine_id' => $domaineId,
+            'politique' => 'none',
+            'auteur' => 'zz',
         ]);
 
         $sequence = (string) Str::uuid();

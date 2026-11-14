@@ -10,6 +10,8 @@ use App\Envoi\Chauffe\LecteurReportsDb;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Chauffe\ResolveurMx;
 use App\Envoi\Chauffe\ToutArreter;
+use App\Envoi\Configuration\DepotVersions;
+use App\Envoi\Configuration\DepotVersionsDb;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
@@ -22,6 +24,9 @@ use App\Envoi\Desinscription\JetonDesinscription;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
+use App\Envoi\Dns\DepotControlesDns;
+use App\Envoi\Dns\DepotControlesDnsDb;
+use App\Envoi\Dns\ResolveurDnsSysteme;
 use App\Envoi\Imap\AdresseParEmpreinteCrm;
 use App\Envoi\Imap\FabriqueLecteurs;
 use App\Envoi\Imap\FabriqueLecteursNonFournie;
@@ -73,6 +78,10 @@ class EnvoiServiceProvider extends ServiceProvider
         // K1 — client signé HMAC : tirage par curseur et commandes (interfaces NOUVELLES ;
         // `ServeurEnvoi` n'a reçu aucune méthode).
         $this->app->bind(ResolveurHote::class, ResolveurDns::class);
+        // R15 : résolveur DNS local (lecture seule) du contrôle de domaine ; les tests le remplacent par un faux.
+        $this->app->bind(\App\Envoi\Dns\ResolveurDns::class, ResolveurDnsSysteme::class);
+        $this->app->bind(DepotControlesDns::class, DepotControlesDnsDb::class);
+        $this->app->bind(DepotVersions::class, DepotVersionsDb::class);
         $this->app->bind(ClientServeurEnvoiHmac::class);
         $this->app->bind(TireurEvenements::class, ClientServeurEnvoiHmac::class);
         $this->app->bind(CommandeurServeur::class, ClientServeurEnvoiHmac::class);

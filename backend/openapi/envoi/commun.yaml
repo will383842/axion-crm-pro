@@ -338,9 +338,10 @@ components:
     TypeAlerte:
       type: string
       description: |
-        Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+        Type d'alerte d'envoi. Les sept derniers (ajoutés de façon compatible) sont les motifs de frein
         de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
-        tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+        tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées,
+        et (R14) réputation dégradée.
       enum:
         - taux_refus
         - plainte
@@ -355,6 +356,7 @@ components:
         - homme_mort
         - sante_silencieuse
         - reponses_non_traitees
+        - reputation_mauvaise
     RegleAlerte:
       type: object
       required: [id, nom, condition, seuil, canaux, actif]

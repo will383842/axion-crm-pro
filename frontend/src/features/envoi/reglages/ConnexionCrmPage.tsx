@@ -9,7 +9,7 @@ import { Bloc, CLASSE_BOUTON_MOBILE, Etat } from '@/features/envoi/conformite/co
 import { dateEtHeure } from '@/features/envoi/conformite/composants/format';
 import { OngletsReglages } from './OngletsReglages';
 
-const ADAPTATEUR: Record<ConnexionCrm['adaptateur'], string> = { crm_pro: 'CRM Pro', generique: 'CRM générique', aucun: 'Aucun CRM (carnet d’Envoi)' };
+const ADAPTATEUR: Record<ConnexionCrm['adaptateur'], string> = { interne: 'CRM de l’application (interne)', crm_pro: 'CRM Pro', generique: 'CRM générique', aucun: 'Aucun CRM (carnet d’Envoi)' };
 const SANTE: Record<ConnexionCrm['etat'], { libelle: string; ton: StatusTone }> = {
   vert: { libelle: 'Connexion en bonne santé', ton: 'success' },
   ambre: { libelle: 'Connexion à surveiller', ton: 'warning' },

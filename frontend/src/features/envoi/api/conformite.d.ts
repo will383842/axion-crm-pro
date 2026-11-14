@@ -352,8 +352,11 @@ export interface components {
          */
         CanalAlerte: "console" | "email";
         ConnexionCrm: {
-            /** @enum {string} */
-            adaptateur: "crm_pro" | "generique" | "aucun";
+            /**
+             * @description interne = CRM de la même application (palier 0).
+             * @enum {string}
+             */
+            adaptateur: "interne" | "crm_pro" | "generique" | "aucun";
             /** @description Ce qui ne quitte jamais Envoi ou le CRM. */
             ce_qui_ne_passe_pas: string[];
             /** @description Ce que l'adaptateur échange avec le CRM (phrases courtes). */
@@ -507,12 +510,13 @@ export interface components {
             ok: true;
         };
         /**
-         * @description Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+         * @description Type d'alerte d'envoi. Les sept derniers (ajoutés de façon compatible) sont les motifs de frein
          *     de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
-         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées,
+         *     et (R14) réputation dégradée.
          * @enum {string}
          */
-        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees";
+        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees" | "reputation_mauvaise";
     };
     responses: {
         /** @description État de la connexion au CRM. */

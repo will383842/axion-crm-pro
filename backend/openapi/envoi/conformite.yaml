@@ -519,7 +519,7 @@ components:
           type: array
           description: Ce qui ne quitte jamais Envoi ou le CRM.
           items: { type: string }
-        adaptateur: { type: string, enum: [crm_pro, generique, aucun] }
+        adaptateur: { type: string, enum: [interne, crm_pro, generique, aucun], description: 'interne = CRM de la même application (palier 0).' }
         etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
         derniere_synchro_le:
           oneOf:

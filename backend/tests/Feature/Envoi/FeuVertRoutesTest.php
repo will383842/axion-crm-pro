@@ -22,7 +22,7 @@ beforeEach(function () {
 /** Compte fictif (exemple.test) d'un rôle donné, dans un espace neuf ou celui passé. */
 function fvCompte(string $role, ?string $espace = null, string $nom = 'Responsable Test'): User
 {
-    $espace ??= Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'fvr-' . Str::random(8), 'name' => 'Espace feu vert'])->id;
+    $espace ??= Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'fvr-' . Str::random(8), 'name' => 'Espace feu vert', 'settings' => ['produits' => ['envoi' => 'actif']]])->id;
     $user = User::create([
         'id' => (string) Str::uuid(),
         'email' => $role . '-' . Str::random(6) . '@exemple.test',
@@ -227,15 +227,15 @@ test('POST : la preuve vient du corps JSON seulement (jamais de la query string 
     expect(DB::table('envoi_feu_vert_preuves')->where('fait', false)->count())->toBe(0);
 });
 
-test('POST : current_workspace_id vide → jamais 500 (403 ou 422 propre)', function () {
+test('POST : current_workspace_id vide → jamais 500 (404 de la garde produit : sans espace, pas de produit)', function () {
     $u = fvCompte('owner');
     DB::table('users')->where('id', $u->id)->update(['current_workspace_id' => null]);
     $u->refresh();
     $r = $this->actingAs($u)->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE]);
-    expect($r->status())->toBeIn([403, 422]);
+    expect($r->status())->toBe(404);
     expect($r->json('message'))->toBeString();
     $g = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert');
-    expect($g->status())->toBeIn([403, 422]);
+    expect($g->status())->toBe(404);
     expect(DB::table('envoi_feu_vert_preuves')->count())->toBe(0);
 });
 

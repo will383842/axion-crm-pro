@@ -109,3 +109,7 @@ e898999a17cfd512aeb81fffc5257856b771087f:backend/tests/Feature/Usine/PushAgregat
 # Chaîne factice « secret-de-test-… » (rien de réel). Les commits suivants n'ont plus de littéral à entropie ;
 # seul le commit 1d1c327 de l'historique de la branche le garde.
 1d1c3276ec18914f7af666be173dc861961009ae:backend/tests/Unit/Envoi/Kumo/ServeurEnvoiKumoTest.php:generic-api-key:33
+
+# ─── STOP-T4-CRM (T4-a) : jeton factice de test dans le premier commit de la PR ───────────────────────────────
+# Chaîne « jeton-de-test-… » (rien de réel), remplacée par une valeur construite à l'exécution dans le commit suivant.
+401aea0747175b11fa024176cf9ab246ca87b15a:backend/tests/Feature/Crm/OppositionsSortantesT4Test.php:generic-api-key:498

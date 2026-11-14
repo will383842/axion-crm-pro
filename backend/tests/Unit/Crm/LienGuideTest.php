@@ -61,7 +61,13 @@ test('la table de production livrée est éteinte et ne contient que des adresse
     expect($table['lien_enabled'])->toBeFalse()
         ->and(array_keys($table['publics']))->toBe(['guide-ia'])
         ->and($table['publics']['guide-ia']['url'])->toStartWith('https://exemple.invalid/');
-    expect(file_get_contents(base_path('config/guides.php')))->toContain('À REMPLACER PAR WILL');
+    expect(file_get_contents(base_path('config/guides.php')))->toContain('À REMPLACER PAR LE FONDATEUR');
+});
+
+test('la table livrée nomme le guide de son vrai titre', function () {
+    expect(LienGuide::nom('guide-ia'))->toBe('Guide IA pour TPE-PME')
+        ->and(config('guides.publics.guide-ia.libelle'))->toBe('Guide IA pour TPE-PME (PDF)')
+        ->and(parse_url((string) config('guides.publics.guide-ia.url'), PHP_URL_HOST))->toBeIn(['exemple.invalid', 'axion-ia.com']);
 });
 
 test('statut : éteint avant tout, puis refusé sans droit, sinon disponible', function () {

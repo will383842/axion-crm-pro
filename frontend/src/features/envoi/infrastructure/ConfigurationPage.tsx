@@ -13,6 +13,10 @@ const RESULTAT: Record<VersionConfiguration['resultat'], { mot: string; ton: 'su
   appliquee: { mot: 'Appliquée', ton: 'success' },
   remplacee: { mot: 'Remplacée', ton: 'neutral' },
   retour_automatique: { mot: 'Retour automatique', ton: 'warning' },
+  invalide: { mot: 'Refusée', ton: 'warning' },
+  retour_arriere: { mot: 'Retour arrière', ton: 'warning' },
+  derive_refusee: { mot: 'Dérive refusée', ton: 'warning' },
+  incertaine: { mot: 'À vérifier', ton: 'warning' },
 };
 const SIGNE = { ajout: '+', retrait: '−', modification: '~' } as const;
 const SORTE = { ajout: 'Ajout', retrait: 'Retrait', modification: 'Changement' } as const;

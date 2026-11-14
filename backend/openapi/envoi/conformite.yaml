@@ -306,7 +306,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/EntreeCarnet' }
-  /public/desinscription/{jeton}:
+  /desinscription/{jeton}:
+    servers:
+      - url: /
+        description: Servi par routes/web.php, hors du préfixe /api/v1.
     get:
       operationId: lirePageDesinscription
       summary: Page publique de désinscription (sans connexion)

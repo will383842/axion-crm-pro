@@ -82,7 +82,7 @@ git --version
 
 ```powershell
 # 1. Aller dans le dossier POC
-cd "C:\Users\willi\Documents\Projets\Axion-CRM-Pro\poc\05_dedup_performance"
+cd "<dossier du projet>\poc\05_dedup_performance"
 
 # 2. Installer dépendances
 pnpm install

@@ -17,6 +17,7 @@ import type { components as communs } from '@/features/envoi/api/commun';
 import { demoDb } from '../../base';
 import { ilYa, maintenant } from '../../horloge';
 import { api, delai, erreur, filtrerTexte, lireRecherche, paginer, repondreEtatForce } from '../../outils';
+import { masquerAdresse } from '@/features/envoi/conformite/composants/format';
 
 type Reponse = communs['schemas']['ReponseResume'];
 type Classement = communs['schemas']['ClassementReponse'];
@@ -339,7 +340,7 @@ export const handlers: HttpHandler[] = [
       if (corps['toute_organisation'] === true && maj.organisation) {
         demoDb.opposition.ajouter({ id: `opp-org-${String(maj.id)}`, portee: 'organisation', valeur: maj.organisation, motif: 'Réponse « stop » étendue à l’organisation', inscrite_le: instant, source: 'reponse_stop' });
       }
-      demoDb.desinscriptions.ajouter({ id: `des-rep-${String(maj.id)}`, adresse: maj.de, survenue_le: instant, source: 'reponse_stop', campagne_id: maj.campagne_id });
+      demoDb.desinscriptions.ajouter({ id: `des-rep-${String(maj.id)}`, adresse: maj.de, adresse_masquee: masquerAdresse(maj.de), survenue_le: instant, source: 'reponse_stop', campagne_id: maj.campagne_id });
       const contact = demoDb.contacts.filtrer((c) => c.email === maj.de)[0];
       if (contact) demoDb.contacts.modifier(contact.id, { ne_plus_ecrire: true });
       return HttpResponse.json(apresGeste(maj, resume(maj, classement, null, true)));

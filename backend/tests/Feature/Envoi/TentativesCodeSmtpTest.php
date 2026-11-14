@@ -88,8 +88,8 @@ test('garde : un report d\'attente de pause du serveur n\'écrit aucune tentativ
         ->and(DB::table('envoi_tentatives')->count())->toBe(0);
 });
 
-test('témoin de la garde : le même scénario en échec (sans code) écrit une tentative, la garde peut donc rougir', function () {
-    // Seule la NATURE du report (attente ou échec) décide : l'attente ne note rien, l'échec note `reportee`.
+test('contrôle : un report d\'échec sans code écrit reportee + null', function () {
+    // Contrôle positif seulement : le vrai témoin (retrait du garde-fou de PasserelleLocale qui fait rougir la garde « pause ») est dans la PR.
     $faux = (new FauxServeurEnvoi)->reporterEchec(null);
     ($this->passerelle)($faux)->injecter(($this->msg)('k5'));
 

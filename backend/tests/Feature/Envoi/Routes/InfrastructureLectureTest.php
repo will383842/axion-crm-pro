@@ -77,7 +77,7 @@ test('GET /envoi/domaines suit le contrat, sans secret, et ne montre que son esp
         ->and($j['garde_dispersion']['limite'])->toBeGreaterThanOrEqual(1);
     sansEcart(ContratOpenApiEnvoi::ecarts('commun.yaml', 'DomaineResume', $j['data'][0]));
     // Toute l'enveloppe (data, garde_dispersion, expirations), pas seulement une ligne.
-    sansEcart(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/domaines', 'get', '200', $j));
+    sansEcart(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/domaines', 'get', 200, $j));
     expect($j['expirations'])->toBe([]);
     sansSecret($r->getContent());
     expect($r->getContent())->not->toContain('envoi-b');

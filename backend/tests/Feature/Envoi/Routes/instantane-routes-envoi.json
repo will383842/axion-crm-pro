@@ -12,6 +12,17 @@
     },
     {
         "methode": "GET",
+        "uri": "api/v1/envoi/desinscriptions",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
         "uri": "api/v1/envoi/domaines",
         "middlewares": [
             "api",
@@ -56,6 +67,17 @@
     {
         "methode": "GET",
         "uri": "api/v1/envoi/listes-noires",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition",
         "middlewares": [
             "api",
             "auth:sanctum",

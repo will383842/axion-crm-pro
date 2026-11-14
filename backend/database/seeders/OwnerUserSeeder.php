@@ -37,8 +37,8 @@ class OwnerUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $email = $this->readEnv('OWNER_INITIAL_EMAIL', 'williamsjullin@gmail.com');
-        $name = $this->readEnv('OWNER_INITIAL_NAME', 'Williams Jullin');
+        $email = $this->readEnv('OWNER_INITIAL_EMAIL', 'proprietaire@exemple.test');
+        $name = $this->readEnv('OWNER_INITIAL_NAME', 'Williams');
         $rawPassword = $this->readEnv('OWNER_INITIAL_PASSWORD', '');
         $sansMotDePasse = ($rawPassword === '' || $rawPassword === null);
 
@@ -163,7 +163,7 @@ class OwnerUserSeeder extends Seeder
         $this->avertir(sprintf('  Compte créé SANS mot de passe : %s', $email));
         $this->avertir('  Pour lui en poser un, sur le serveur, en root :');
         $this->avertir("    read -rsp 'Mot de passe : ' P; echo; \\");
-        $this->avertir("      printf '%s' \"\$P\" | bash infra/scripts/definir-mot-de-passe-crm.sh; unset P");
+        $this->avertir(sprintf("      printf '%%s' \"\$P\" | bash infra/scripts/definir-mot-de-passe-crm.sh %s; unset P", $email));
         $this->avertir("  Aucun secret n'est écrit sur disque ni affiché ici : c'est voulu.");
         $this->avertir(str_repeat('=', 72));
     }

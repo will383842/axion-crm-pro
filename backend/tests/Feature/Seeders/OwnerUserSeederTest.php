@@ -21,7 +21,7 @@ beforeEach(function () {
  *
  * ⚠️ `putenv()` SEUL ne suffit pas. `OwnerUserSeeder::readEnv()` interroge
  * d'abord `env()` et ne retombe sur `getenv()` que si `env()` ne rend rien.
- * Or `.env` définit déjà `OWNER_INITIAL_EMAIL=williamsjullin@gmail.com`, valeur
+ * Or `.env` définit déjà `OWNER_INITIAL_EMAIL=proprietaire@exemple.test`, valeur
  * chargée dans `$_ENV`/`$_SERVER` au boot : `env()` la renvoyait, la valeur
  * `putenv()` du test n'était jamais consultée, et le seeder créait l'owner par
  * défaut au lieu de celui attendu. On écrit donc sur les trois canaux que lit

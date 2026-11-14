@@ -162,10 +162,23 @@ final class ServiceMessagesTypes
     }
 
     /** @return Message */
-    public function enregistrer(string $ws, string $id, string $objet, string $corps, string $auteur): array
+    public function enregistrer(string $ws, string $id, string $objet, string $corps, string $auteur, ?int $versionBase = null): array
     {
         $this->exiger($objet, $corps);
-        $this->depot->nouvelleVersion($ws, $id, $objet, $corps, $auteur);
+        if ($versionBase === null) {
+            $this->depot->nouvelleVersion($ws, $id, $objet, $corps, $auteur);
+
+            return $this->lire($ws, $id);
+        }
+        // Verrou par numéro de version : même verrou consultatif que valider() ; une base périmée est refusée (409).
+        WorkspaceContext::run($ws, fn () => DB::transaction(function () use ($ws, $id, $objet, $corps, $auteur, $versionBase): void {
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_modele|' . $ws . '|' . $id]);
+            $courante = $this->lire($ws, $id)['version_courante'];
+            if ($versionBase !== $courante) {
+                throw ModeleRefuse::versionPerimee($versionBase, $courante);
+            }
+            $this->depot->nouvelleVersion($ws, $id, $objet, $corps, $auteur);
+        }));
 
         return $this->lire($ws, $id);
     }

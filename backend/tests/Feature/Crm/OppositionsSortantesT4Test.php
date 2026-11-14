@@ -15,6 +15,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -88,6 +89,15 @@ function t4OptOut(string $email, string $scope, string $source): void
     DB::table('opt_out')->insert([
         'email' => null, 'email_hash' => t4Hash($email), 'scope' => $scope, 'source' => $source, 'created_at' => now(),
     ]);
+}
+
+/** Lit le tableau de compteurs imprimé par `crm:outbound-rattraper`. @return array<string, int> */
+function t4Bilan(array $options): array
+{
+    Artisan::call('crm:outbound-rattraper', $options);
+    preg_match_all('/\|\s*([a-z_0-9]+)\s*\|\s*(\d+)\s*\|/', Artisan::output(), $m, PREG_SET_ORDER);
+
+    return collect($m)->mapWithKeys(fn ($l) => [$l[1] => (int) $l[2]])->all();
 }
 
 function t4Fichier(array $lignes): string
@@ -256,6 +266,41 @@ test('9. ingestion site (newsletter_optout) et SiteGdprService::erase : 0 ligne'
         ->and(DB::table('crm_outbound_events')->count())->toBe(0);
 });
 
+test('9 bis. ingestion site : opposition (opt_out, source site-sync:opt_out), consent_optout refusé, accords opposés → 0 ligne', function () {
+    config([
+        'crm.ingest.enabled' => true, 'crm.ingest.candidates_enabled' => false, 'crm.ingest.personnes_enabled' => true,
+        'crm.ingest.hmac_secret' => 'secret-de-test-' . str_repeat('a1b2', 12), 'crm.ingest.max_clock_skew_seconds' => 300,
+    ]);
+    $poster = function (array $evenement) {
+        $corps = json_encode(array_replace([
+            'schema_version' => 2, 'event_id' => (string) Str::uuid(), 'occurred_at' => '2026-08-14T09:30:00+02:00',
+            'subject_ref' => 'site:submission:' . Str::uuid(),
+            'consent' => ['version' => 'v1-2026-05-24', 'at' => '2026-08-14T09:29:00+02:00', 'text_ref' => 'unified-contact-form'],
+            'tags' => [], 'payload' => ['page' => '/fr/contact'],
+        ], $evenement), JSON_THROW_ON_ERROR);
+        $ts = (string) time();
+
+        return $this->call('POST', '/api/internal/site-sync', [], [], [], [
+            'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTP_X_SITE_TIMESTAMP' => $ts,
+            'HTTP_X_SITE_SIGNATURE' => hash_hmac('sha256', $ts . '.' . $corps, 'secret-de-test-' . str_repeat('a1b2', 12)),
+        ], $corps);
+    };
+    $personne = fn (string $e) => ['person_key' => hash('sha256', $e), 'email' => $e];
+
+    // 1. opposition du site (type `opt_out`)
+    $poster(['event_type' => 'opt_out', 'person' => $personne('site-opt@example.test'), 'payload' => ['reason' => 'test', 'scope' => 'business']])->assertOk();
+    // 2. `consent_optout` n'est PAS un type entrant : refusé, rien n'est écrit, rien n'est émis
+    $poster(['event_type' => 'consent_optout', 'person' => $personne('site-consent@example.test')])->assertStatus(422);
+    // 3. « accords » avec opposition (PersonnesIngestService)
+    $poster(['event_type' => 'lead_magnet_requested', 'person' => $personne('site-accords@example.test'),
+        'opposition' => ['actif' => true, 'date' => '2026-08-14T09:30:00Z']])->assertOk();
+
+    expect(DB::table('opt_out')->where('email_hash', t4Hash('site-opt@example.test'))->value('source'))->toBe('site-sync:opt_out')
+        ->and(DB::table('opt_out')->where('email_hash', t4Hash('site-accords@example.test'))->value('source'))->toBe('site-sync:accords')
+        ->and(DB::table('opt_out')->where('email_hash', t4Hash('site-consent@example.test'))->exists())->toBeFalse()
+        ->and(DB::table('crm_outbound_events')->count())->toBe(0);
+});
+
 test('10. opposition SITE puis opposition console du même journaliste : 0 ligne', function () {
     t4OptOut('deja-site@example.test', 'business', 'site-sync:newsletter_optout');
     $id = t4Journaliste($this->workspace->id, 'deja-site@example.test');
@@ -295,6 +340,44 @@ test('12. rattrapage : sources site, gdpr_erasure_bisystem et inconnues ne sont 
     expect(DB::table('crm_outbound_events')->count())->toBe(1)
         ->and(t4Evenements('crm@example.test', 'business')->count())->toBe(1)
         ->and(json_decode((string) t4Evenements('crm@example.test')->value('payload'), true)['motif'])->toBe('rattrapage');
+});
+
+test('12 bis. rattrapage : gdpr_erasure / gdpr_art21_console exigent la preuve que la demande liée ne vient PAS du site', function () {
+    $ws = $this->workspace->id;
+    // Prouvée console (aucune origine posée) : reprise, y compris avec une casse et des espaces différents.
+    t4OptOut('console@example.test', 'business', 'gdpr_art21_console');
+    t4Demande($ws, 'opposition', ' Console@Example.test ');
+    // Demande venue du site (art. 17 puis art. 21 vivier) : jamais renvoyée.
+    t4OptOut('site17@example.test', 'business', 'gdpr_erasure');
+    t4Demande($ws, 'erasure', 'site17@example.test', ['origin' => 'site-sync-gdpr']);
+    t4OptOut('site21@example.test', 'vivier', 'gdpr_art21_console');
+    t4Demande($ws, 'opposition', 'site21@example.test', ['origin' => 'site-sync-gdpr']);
+    // Aucune demande retrouvée : impossible de prouver, donc exclue.
+    t4OptOut('orpheline@example.test', 'business', 'gdpr_erasure');
+    // Une demande console ET une demande du site : doute, exclue.
+    t4OptOut('mixte@example.test', 'business', 'gdpr_erasure');
+    t4Demande($ws, 'erasure', 'mixte@example.test');
+    t4Demande($ws, 'opposition', 'mixte@example.test', ['origin' => 'site-sync-gdpr']);
+
+    $compte = t4Bilan(['--depuis' => '2000-01-01']);
+    expect($compte['a_rattraper'])->toBe(1)->and($compte['exclues_origine_douteuse'])->toBe(4)
+        ->and(DB::table('crm_outbound_events')->count())->toBe(0);
+
+    $applique = t4Bilan(['--depuis' => '2000-01-01', '--appliquer' => true]);
+
+    expect($applique['rattrapes'])->toBe(1)->and($applique['exclues_origine_douteuse'])->toBe(4)
+        ->and(DB::table('crm_outbound_events')->count())->toBe(1)
+        ->and(t4Evenements('console@example.test', 'business')->count())->toBe(1);
+});
+
+test('12 ter. rattrapage : a_rattraper ne dépasse jamais la limite du lot', function () {
+    foreach (['l1', 'l2', 'l3'] as $n) {
+        t4OptOut("{$n}@example.test", 'business', 'campagne:x');
+    }
+
+    $bilan = t4Bilan(['--depuis' => '2000-01-01', '--appliquer' => true, '--limit' => 2]);
+
+    expect($bilan['a_rattraper'])->toBe(2)->and($bilan['rattrapes'])->toBe(2)->and(DB::table('crm_outbound_events')->count())->toBe(2);
 });
 
 test('13. garde de structure : ni l\'ingestion du site ni SiteGdprService ne nomment l\'émission', function () {
@@ -366,6 +449,7 @@ test('17. deux signaler simultanés : le verrou consultatif est pris et sériali
 
 test('18. rattrapage lancé deux fois : la seconde rend 0 à rattraper ; sans --appliquer il ne compte que', function () {
     t4OptOut('rattrape@example.test', 'business', 'gdpr_art21_console');
+    t4Demande($this->workspace->id, 'opposition', 'rattrape@example.test'); // demande de console : origine prouvée
 
     $this->artisan('crm:outbound-rattraper', ['--depuis' => '2000-01-01'])->assertExitCode(0);
     expect(DB::table('crm_outbound_events')->count())->toBe(0);
@@ -375,7 +459,7 @@ test('18. rattrapage lancé deux fois : la seconde rend 0 à rattraper ; sans --
 
     $this->artisan('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true])
         ->expectsTable(['compteur', 'nombre'], [
-            ['a_rattraper', 0], ['rattrapes', 0], ['ignores_site', 0], ['ignores_deja_en_file', 1], ['ignores_abandonnes', 0], ['erreurs', 0],
+            ['a_rattraper', 0], ['rattrapes', 0], ['ignores_site', 0], ['ignores_deja_en_file', 1], ['ignores_abandonnes', 0], ['exclues_origine_douteuse', 0], ['erreurs', 0],
         ])->assertExitCode(0);
     expect(DB::table('crm_outbound_events')->count())->toBe(1);
 });
@@ -416,33 +500,62 @@ test('19. après C2 puis sent, une inscription du site pour la même empreinte n
         'tags' => [], 'payload' => ['page' => '/fr/contact'],
     ], JSON_THROW_ON_ERROR);
     $ts = (string) time();
-    $this->call('POST', '/api/internal/site-sync', [], [], [], [
+    $personnesAvant = DB::table('personnes')->orderBy('id')->get()->all();
+    // L'ingestion DOIT avoir eu lieu, sinon le test ne prouverait rien : 200 ET verdict « opted_out » (l'opposition
+    // déjà posée gagne : aucune société ni activité n'est créée). Une signature, un schéma ou un drapeau refusés
+    // rendraient 401 / 422 / 503 et feraient rougir ce test.
+    $reponse = $this->call('POST', '/api/internal/site-sync', [], [], [], [
         'CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTP_X_SITE_TIMESTAMP' => $ts,
         'HTTP_X_SITE_SIGNATURE' => hash_hmac('sha256', $ts . '.' . $corps, 'secret-de-test-' . str_repeat('a1b2', 12)),
     ], $corps);
+    $reponse->assertOk()->assertJsonPath('ok', true)->assertJsonPath('result.status', 'opted_out');
+    expect(DB::table('companies')->where('siren', '900000101')->exists())->toBeFalse();
 
-    expect(DB::table('opt_out')->orderBy('id')->get()->all())->toEqual($optOutAvant)
+    expect(DB::table('personnes')->orderBy('id')->get()->all())->toEqual($personnesAvant)
+        ->and(DB::table('opt_out')->orderBy('id')->get()->all())->toEqual($optOutAvant)
         ->and(t4Evenements('zz.test@example.invalid')->count())->toBe(1)
         ->and(t4Evenements('zz.test@example.invalid')->value('status'))->toBe('sent')
         ->and(DB::table('crm_outbound_events')->where('event_type', '!=', 'consent_optout')->count())->toBe(0);
 });
 
-test('20. aucun chemin (flush 2xx, 422, gave_up, rattrapage) ne supprime d\'opt_out ni d\'événement', function () {
+test('20. aucun chemin (flush 2xx, 422, gave_up, 500, rattrapage) ne supprime d\'opt_out ni d\'événement', function () {
     t4Allumer();
     foreach (['a', 'b', 'c'] as $n) {
         t4OptOut("{$n}@example.test", 'business', 'campagne:x');
     }
     $this->artisan('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true])->assertExitCode(0);
     $avant = [DB::table('opt_out')->count(), DB::table('crm_outbound_events')->count()];
+    expect($avant)->toBe([3, 3]);
 
-    foreach ([200, 422, 500] as $statut) {
-        Http::fake([T4_URL => Http::response(['ok' => true], $statut)]);
-        DB::table('crm_outbound_events')->whereIn('status', ['failed'])->update(['next_attempt_at' => now()->subMinute()]);
-        $this->artisan('crm:flush-outbound')->assertExitCode(0);
-    }
-    $this->artisan('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true])->assertExitCode(0);
+    // Une ligne due DISTINCTE par statut : seule l'adresse visée est due, les autres sont repoussées.
+    $uneSeuleDue = function (string $email): void {
+        DB::table('crm_outbound_events')->whereIn('status', ['pending', 'failed'])->update(['next_attempt_at' => now()->addDay()]);
+        t4Evenements($email)->whereIn('status', ['pending', 'failed'])->update(['next_attempt_at' => now()->subMinute()]);
+    };
 
-    expect([DB::table('opt_out')->count(), DB::table('crm_outbound_events')->count()])->toBe($avant);
+    // Une réponse par passage, dans l'ordre : 200, puis 422, puis 500 (un `Http::fake` répété garderait le premier).
+    Http::fake([T4_URL => Http::sequence()->push(['ok' => true], 200)->push(['ok' => false], 422)->push(['ok' => false], 500)]);
+    $uneSeuleDue('a@example.test');
+    $this->artisan('crm:flush-outbound')->assertExitCode(0);
+    expect(t4Evenements('a@example.test')->value('status'))->toBe('sent')
+        ->and(t4Evenements('b@example.test')->value('status'))->toBe('pending');
+
+    $uneSeuleDue('b@example.test');
+    $this->artisan('crm:flush-outbound')->assertExitCode(0);
+    $b = t4Evenements('b@example.test')->first();
+    expect($b->status)->toBe('gave_up')->and($b->last_error)->toStartWith('HTTP 422')
+        ->and(t4Evenements('c@example.test')->value('status'))->toBe('pending');
+
+    $uneSeuleDue('c@example.test');
+    $this->artisan('crm:flush-outbound')->assertExitCode(0);
+    $c = t4Evenements('c@example.test')->first();
+    expect($c->status)->toBe('failed')->and((int) $c->attempts)->toBe(1);
+
+    // Rattrapage après coup : ni le refus 422 ni les lignes déjà posées ne sont repris ni effacés.
+    $this->artisan('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true, '--inclure-abandonnes' => true])->assertExitCode(0);
+
+    expect([DB::table('opt_out')->count(), DB::table('crm_outbound_events')->count()])->toBe($avant)
+        ->and(t4Evenements('b@example.test')->value('status'))->toBe('gave_up');
 });
 
 // ── Panne du tiers et désordre ──────────────────────────────────────────────

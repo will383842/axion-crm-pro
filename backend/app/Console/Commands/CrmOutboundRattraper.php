@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Crm\Outbound\OppositionSortante;
+use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,12 @@ use Throwable;
  * écrite du fondateur). `--appliquer` met en file, par lots (`--limit`), via {@see OppositionSortante}
  * (liste blanche de sources : une opposition venue du site n'est jamais rattrapée).
  *
+ * Les sources `gdpr_erasure` et `gdpr_art21_console` existaient AVANT la source `gdpr_erasure_demande_site` : une
+ * opposition antérieure peut donc venir d'une demande du site, traitée en console. Une telle ligne n'est reprise
+ * QUE si l'on PROUVE qu'une demande RGPD d'erasure/opposition de même empreinte existe et qu'AUCUNE demande de
+ * même empreinte n'a `metadata.origin = site-sync-gdpr`. Sinon (preuve impossible, demande introuvable ou
+ * invisible) elle est exclue et comptée à part (`exclues_origine_douteuse`).
+ *
  * Aucune suppression, aucune modification d'une ligne existante : on ne fait qu'ajouter des lignes d'outbox.
  * Rien ne sort tant que `CRM_OUTBOUND_ENABLED` est faux.
  */
@@ -28,6 +36,40 @@ class CrmOutboundRattraper extends Command
         {--limit=500 : Nombre maximal d\'événements mis en file par passage (avec --appliquer)}';
 
     protected $description = 'Compte (ou rattrape avec --appliquer) les oppositions CRM sans événement sortant. Non planifiée.';
+
+    /** Sources antérieures à `gdpr_erasure_demande_site` : l'origine doit être prouvée par la demande liée. */
+    private const SOURCES_A_PROUVER = ['gdpr_erasure', 'gdpr_art21_console'];
+
+    /**
+     * Empreintes des demandes RGPD d'effacement/opposition, par origine.
+     *
+     * `console` : demande SANS `origin = site-sync-gdpr` ; `site` : demande avec cette origine (toutes natures de
+     * demande : au moindre doute on exclut). `rgpd_requests` a une RLS forcée : lecture espace par espace. Une
+     * demande sans espace ou invisible n'est pas vue, donc la ligne reste exclue (prudence).
+     *
+     * @return array{console: array<string, true>, site: array<string, true>}
+     */
+    private function originesDesDemandes(): array
+    {
+        $r = ['console' => [], 'site' => []];
+        foreach (DB::table('workspaces')->pluck('id')->all() as $espace) {
+            $lignes = WorkspaceContext::run((string) $espace, static fn () => DB::table('rgpd_requests')
+                ->where('workspace_id', (string) $espace)
+                ->whereNotNull('subject_email')
+                ->get(['type', 'subject_email', DB::raw("metadata->>'origin' as origine")])
+                ->all());
+            foreach ($lignes as $d) {
+                $hash = ConsentOutboundRecorder::hashEmail((string) $d->subject_email);
+                if ($d->origine === 'site-sync-gdpr') {
+                    $r['site'][$hash] = true;
+                } elseif (in_array($d->type, ['erasure', 'opposition'], true)) {
+                    $r['console'][$hash] = true;
+                }
+            }
+        }
+
+        return $r;
+    }
 
     public function handle(OppositionSortante $sortante): int
     {
@@ -49,7 +91,8 @@ class CrmOutboundRattraper extends Command
         $inclureAbandonnes = (bool) $this->option('inclure-abandonnes');
         $limite = max(1, (int) $this->option('limit'));
 
-        $bilan = ['a_rattraper' => 0, 'rattrapes' => 0, 'ignores_site' => 0, 'ignores_deja_en_file' => 0, 'ignores_abandonnes' => 0, 'erreurs' => 0];
+        $bilan = ['a_rattraper' => 0, 'rattrapes' => 0, 'ignores_site' => 0, 'ignores_deja_en_file' => 0, 'ignores_abandonnes' => 0, 'exclues_origine_douteuse' => 0, 'erreurs' => 0];
+        $demandes = null; // chargé une seule fois, et seulement si une source ambiguë est rencontrée
 
         // Une ligne par (portée, empreinte) : la plus ancienne, dont la source dit qui a posé l'opposition.
         $lignes = DB::table(DB::raw('(select distinct on (scope, email_hash) scope, email_hash, source, created_at from opt_out '
@@ -64,6 +107,15 @@ class CrmOutboundRattraper extends Command
                 $bilan['ignores_site']++;
 
                 continue;
+            }
+
+            if (in_array((string) $l->source, self::SOURCES_A_PROUVER, true)) {
+                $demandes ??= $this->originesDesDemandes();
+                if (! isset($demandes['console'][$l->email_hash]) || isset($demandes['site'][$l->email_hash])) {
+                    $bilan['exclues_origine_douteuse']++;
+
+                    continue;
+                }
             }
 
             $statuts = DB::table('crm_outbound_events')
@@ -87,12 +139,12 @@ class CrmOutboundRattraper extends Command
                 }
             }
 
+            if ($appliquer && $bilan['rattrapes'] >= $limite) {
+                break; // avant le compteur : a_rattraper ne dépasse pas la limite du lot
+            }
             $bilan['a_rattraper']++;
             if (! $appliquer) {
                 continue;
-            }
-            if ($bilan['rattrapes'] >= $limite) {
-                break;
             }
             try {
                 if ($sortante->signaler((string) $l->email_hash, (string) $l->scope, 'rattrapage', 'rattrapage') !== null) {

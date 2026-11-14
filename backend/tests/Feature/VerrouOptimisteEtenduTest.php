@@ -179,7 +179,10 @@ test('G43-005 — RECENSEMENT : tout update() vivant porte le verrou, ou est nom
      * La liste est vide, et doit le rester. Ce n'est pas une dérogation : c'est
      * le registre de ce qui reste à faire.
      */
-    $justifies = [];
+    $justifies = [
+        // Filet modifié : pourquoi — verrou par numéro de version (`envoi_modele_versions`, modèle non Eloquent) : 409 `version_perimee` testé dans `MessagesTypesTest`.
+        'EnvoiMessagesController.php',
+    ];
 
     // ⚠️ `scandir` recursif : sur le montage Docker de Windows,
     // `RecursiveDirectoryIterator` ne rend qu'une partie des repertoires

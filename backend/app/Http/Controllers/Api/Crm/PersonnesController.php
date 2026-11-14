@@ -7,6 +7,7 @@ use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\ContenusAccords;
 use App\Crm\Ingest\OrigineDictionnaire;
 use App\Crm\Ingest\PersonnesIngestService;
+use App\Crm\Opposition\StatutOpposition;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
@@ -64,10 +65,18 @@ class PersonnesController extends ConsoleController
                 ->orderByDesc('personnes.id')
                 ->cursorPaginate($perPage);
 
+            // Statut d'opposition (D14) : UNE lecture par source pour toute la page, jamais une par ligne.
+            $lignes = [];
+            foreach ($page->items() as $row) {
+                /** @var \stdClass $row */
+                $lignes[(int) $row->id] = ['email' => $this->texte($row->email ?? null), 'siren' => $this->texte($row->siren ?? null)];
+            }
+            $oppositions = (new StatutOpposition)->pourLignes($workspaceId, $lignes);
+
             $data = [];
             foreach ($page->items() as $row) {
                 /** @var \stdClass $row */
-                $data[] = $this->presenter($row);
+                $data[] = $this->presenter($row, $oppositions[(int) $row->id] ?? null);
             }
 
             return $this->ok([
@@ -240,8 +249,12 @@ class PersonnesController extends ConsoleController
                 ->whereNull('deleted_at')
                 ->first(['id', 'denomination', 'siren']);
 
+            $opposition = (new StatutOpposition)->pourLignes($workspaceId, [
+                $id => ['email' => $this->texte($personne->email ?? null), 'siren' => $this->texte($personne->siren ?? null)],
+            ])[$id];
+
             return $this->ok([
-                'personne' => MasquageCoordonnees::masquerTableauSiRequis($this->presenter($personne)),
+                'personne' => MasquageCoordonnees::masquerTableauSiRequis($this->presenter($personne, $opposition)),
                 'abonnement' => $abonnement === null ? null : (array) $abonnement,
                 // PV-6 : lecture seule. Colonnes absentes (migration pas encore
                 // passée) ou vides : le bloc est simplement vide.
@@ -786,10 +799,14 @@ class PersonnesController extends ConsoleController
         return $requete;
     }
 
-    /** @return array<string, mixed> */
-    private function presenter(\stdClass $p): array
+    /**
+     * @param  array{opposee: bool, motifs: list<string>}|null  $opposition  statut D14 (lecture seule), lu par lot par l'appelant
+     * @return array<string, mixed>
+     */
+    private function presenter(\stdClass $p, ?array $opposition = null): array
     {
         return [
+            'opposition' => $opposition ?? ['opposee' => false, 'motifs' => []],
             'id' => (int) $p->id,
             'person_key' => $p->person_key,
             'email' => $p->email,

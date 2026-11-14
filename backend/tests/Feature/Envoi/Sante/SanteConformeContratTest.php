@@ -19,7 +19,7 @@ beforeEach(fn () => $this->seed(PermissionsAndRolesSeeder::class));
 function espaceSanteContrat(): array
 {
     $ws = (string) Str::uuid();
-    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'm2-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'T', 'slug' => 'm2-' . substr($ws, 0, 8), 'settings' => json_encode(['produits' => ['envoi' => 'actif']]), 'created_at' => now(), 'updated_at' => now()]);
     $user = User::create([
         'id' => (string) Str::uuid(), 'email' => 'm2-' . Str::random(6) . '@example.test', 'name' => 'M2',
         'password_hash' => password_hash('MotDePasseDeTest2026!', PASSWORD_BCRYPT, ['cost' => 4]),
@@ -43,14 +43,14 @@ function boiteSanteContrat(string $ws, string $adresse, string $etat = 'active')
 }
 
 /** Espace sain : un serveur avec un relevé OK, un domaine contrôlé, une boîte, un test du matin complet. */
-function espaceSainContrat(string $ws, array $temoins = DepotSocleDb::FOURNISSEURS_TEMOINS): string
+function espaceSainContrat(string $ws, array $temoins = DepotSocleDb::FOURNISSEURS_TEMOINS, ?string $jourTemoins = null): string
 {
     DB::table('envoi_serveurs')->insert(['workspace_id' => $ws, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
     (new DepotSanteDb)->noterReleve($ws, 'src', new DateTimeImmutable('now', new DateTimeZone('UTC')), true, ['disque_libre_pct' => 80.0]);
     DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'prospection.example', 'achete_le' => '2026-01-01']);
     DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'prospection.example', 'controle_le' => now(), 'pret' => true]);
     foreach ($temoins as $f) {
-        DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => now('Europe/Paris')->toDateString(), 'fournisseur' => $f, 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
+        DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => $jourTemoins ?? now('Europe/Paris')->toDateString(), 'fournisseur' => $f, 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
     }
 
     return boiteSanteContrat($ws, 'a@prospection.example');
@@ -84,11 +84,13 @@ test('espace vide : réponse conforme au contrat, feu inconnu (gris), test du ma
 test('feu inconnu : un serveur sans aucun relevé est « gris », jamais vert', function () {
     [$ws, $user] = espaceSanteContrat();
     DB::table('envoi_serveurs')->insert(['workspace_id' => $ws, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
+    DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'prospection.example', 'achete_le' => '2026-01-01']);
+    DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'prospection.example', 'controle_le' => now(), 'pret' => true]);
     boiteSanteContrat($ws, 'a@prospection.example');
     $j = lireSanteContrat($this, $user);
 
     expect($j['serveurs'][0]['etat'])->toBe('gris')->and($j['feu'])->not->toBe('vert')
-        ->and($j['boites'][0]['etat'])->not->toBe('vert');
+        ->and($j['boites'][0])->toMatchArray(['etat' => 'gris', 'statut' => 'inconnu']);
 });
 
 test('espace sain, aucune pause : tout est calculé, feu vert, pauses vides', function () {
@@ -98,7 +100,7 @@ test('espace sain, aucune pause : tout est calculé, feu vert, pauses vides', fu
     $j = lireSanteContrat($this, $user);
 
     expect($j['feu'])->toBe('vert')->and($j['pauses'])->toBe([])
-        ->and($j['serveurs'][0]['etat'])->toBe('vert')
+        ->and($j['serveurs'][0]['etat'])->toBe('vert')->and($j['verifie_le'])->toBeString()
         ->and($j['domaines'][0])->toMatchArray(['nom' => 'prospection.example', 'etat' => 'vert', 'boites' => 1, 'dmarc' => null])
         ->and($j['boites'][0])->toMatchArray(['adresse' => 'a@prospection.example', 'etat' => 'vert', 'statut' => 'prete', 'quota_jour' => 20, 'envoyes_aujourdhui' => 4, 'taux_refus' => null, 'domaine_id' => $j['domaines'][0]['id']])
         ->and($j['test_du_matin'])->toMatchArray(['temoins_ok' => 6, 'temoins_total' => 6, 'etat' => 'vert'])
@@ -204,6 +206,8 @@ test('boîtes : domaine rouge => boîte non verte ; pause d’une seule messager
     expect($b['etat'])->toBe('rouge')->and($b['statut'])->not->toBe('prete');
 
     [$ws2, $user2] = espaceSanteContrat();
+    DB::table('envoi_serveurs')->insert(['workspace_id' => $ws2, 'source' => 'src', 'url_base' => 'https://envoi.example.test']);
+    (new DepotSanteDb)->noterReleve($ws2, 'src', new DateTimeImmutable('now', new DateTimeZone('UTC')), true, ['disque_libre_pct' => 80.0]);
     boiteSanteContrat($ws2, 'x@inconnu.example');
     $b = lireSanteContrat($this, $user2)['boites'][0];
     expect($b)->toMatchArray(['etat' => 'gris', 'statut' => 'inconnu', 'domaine_id' => null]);
@@ -217,4 +221,68 @@ test('arrêt général armé : boîtes suspendues et volume possible du jour à 
 
     expect($j['boites'][0])->toMatchArray(['etat' => 'rouge', 'statut' => 'suspendue'])
         ->and($j['volume_jour']['possibles'])->toBe(0);
+});
+
+test('test du matin de la veille : gris, jamais vert', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws, DepotSocleDb::FOURNISSEURS_TEMOINS, now('Europe/Paris')->subDay()->toDateString()); // la table est en ajout seul : on sème la veille
+    $j = lireSanteContrat($this, $user);
+
+    expect($j['test_du_matin']['etat'])->toBe('gris')->and($j['feu'])->not->toBe('vert');
+});
+
+test('aucun serveur déclaré : feu gris même avec domaine contrôlé et 6 témoins bons', function () {
+    [$ws, $user] = espaceSanteContrat();
+    DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'prospection.example', 'achete_le' => '2026-01-01']);
+    DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'prospection.example', 'controle_le' => now(), 'pret' => true]);
+    foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $f) {
+        DB::table('envoi_temoins_journees')->insert(['workspace_id' => $ws, 'jour' => now('Europe/Paris')->toDateString(), 'fournisseur' => $f, 'reception' => 'inbox', 'auth_alignee' => true, 'bouton_vu' => true, 'post_effectif' => true, 'auteur' => 'test']);
+    }
+    $j = lireSanteContrat($this, $user);
+
+    expect($j['test_du_matin']['etat'])->toBe('vert')->and($j['feu'])->toBe('gris');
+});
+
+test('domaine jamais contrôlé : gris, feu non vert', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'nouveau.example', 'achete_le' => '2026-01-01']);
+    $j = lireSanteContrat($this, $user);
+
+    expect(collect($j['domaines'])->firstWhere('nom', 'nouveau.example')['etat'])->toBe('gris')->and($j['feu'])->toBe('gris');
+});
+
+test('liste noire : domaine rouge, feu rouge, boîte non verte ; liste non fiable : ambre', function () {
+    $liste = fn (string $ws, string $statut) => DB::table('envoi_controles_listes')->insert(['workspace_id' => $ws, 'type' => 'domaine', 'ressource' => 'prospection.example', 'statut' => $statut, 'zone' => 'test', 'controle_le' => now()]);
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    $liste($ws, 'non_fiable');
+    $j = lireSanteContrat($this, $user);
+    expect($j['domaines'][0]['etat'])->toBe('ambre')->and($j['feu'])->toBe('ambre');
+
+    [$ws, $user] = espaceSanteContrat(); // la table est en ajout seul : autre espace pour le second cas
+    espaceSainContrat($ws);
+    $liste($ws, 'liste');
+    $j = lireSanteContrat($this, $user);
+    expect($j['domaines'][0])->toMatchArray(['etat' => 'rouge', 'listes_noires' => 1])
+        ->and($j['feu'])->toBe('rouge')->and($j['boites'][0]['etat'])->not->toBe('vert');
+});
+
+test('contrôle DNS enregistré avec des majuscules : retrouvé, domaine vert', function () {
+    [$ws, $user] = espaceSanteContrat();
+    espaceSainContrat($ws);
+    DB::table('envoi_controles_dns')->update(['domaine' => 'Prospection.Example']);
+
+    expect(lireSanteContrat($this, $user)['domaines'][0]['etat'])->toBe('vert');
+});
+
+test('fournisseur « inconnu » : compté dans « Autres messageries », la somme égale le volume envoyé', function () {
+    [$ws, $user] = espaceSanteContrat();
+    $boite = espaceSainContrat($ws);
+    (new DepotChauffe)->incrementer($ws, $boite, now('Europe/Paris')->toDateTimeImmutable(), 'gmail', 'envoyes', 3);
+    (new DepotChauffe)->incrementer($ws, $boite, now('Europe/Paris')->toDateTimeImmutable(), 'inconnu', 'envoyes', 2);
+    $j = lireSanteContrat($this, $user);
+
+    expect(array_sum(array_column($j['rythme_messageries'], 'envoyes')))->toBe($j['volume_jour']['envoyes'])->toBe(5)
+        ->and(collect($j['rythme_messageries'])->firstWhere('messagerie', 'Autres messageries')['envoyes'])->toBe(2);
 });

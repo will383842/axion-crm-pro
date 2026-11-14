@@ -60,5 +60,6 @@ Index couvrants sur `(workspace_id, source, mesure_le)` pour `max`/`min(mesure_l
 - **K2-suite** : route `GET /v1/sante` côté passerelle (calcul de `file_age_s`, pourcentage mémoire sans division par zéro) et `401` signé `horloge_hors_fenetre`.
 - **K15-D1** : *(livré dans cette PR : canal des retours muet 2 h en campagne, constat `retours_muets`.)*
 - **K15-D4** (M4) : un espace sans serveur actif n'a ni constat DNS ni constat de listes noires (la supervision est tenue par serveur).
+- **Contrat de `GET /api/v1/envoi/sante`** : la forme de la réponse est celle de `backend/openapi/envoi/pilotage.yaml` (calculée par `App\Envoi\Sante\VueSante`) ; ce document ne la décrit plus.
 - **K15-D2** (lot L8) : l'écran « Santé du serveur » du plan 33 n'est pas livré ; seul le point d'API `GET /api/v1/envoi/sante` existe.
 - **K15-D3** : aucune purge des relevés (≈ 288 par jour et par serveur, ajout seul : le trigger refuse tout DELETE). Prévoir partitionnement ou archivage.

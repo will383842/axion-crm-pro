@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\DB;
  *
  * RÈGLE : ce qui ne peut pas être calculé vaut null ou « gris » (inconnu), jamais une valeur inventée ni un vert par défaut.
  * Hors réponse : hôtes, URL, identifiants, adresses IP et détails des constats.
+ *
+ * Choix assumés : un témoin d'un fournisseur hors des 6 requis compte comme « mauvais » (test du matin ambre) ; les lignes de chauffe
+ * au fournisseur `inconnu` sont comptées dans « Autres messageries », pour que la somme des messageries égale `volume_jour.envoyes`.
  */
 final class VueSante
 {
@@ -106,7 +109,7 @@ final class VueSante
      * @param  list<array<string, mixed>>  $domaines
      * @return list<array<string, mixed>>
      */
-    private function boites(string $ws, DateTimeImmutable $jour, array $domaines, bool $toutEstFreine, bool $santeConnue, bool $arretGeneral = false): array
+    private function boites(string $ws, DateTimeImmutable $jour, array $domaines, bool $toutEstFreine, bool $santeConnue, bool $arretGeneral): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->orderBy('adresse')->get(['id', 'adresse', 'etat', 'limite_jour']));
         $c = $this->chauffe->chiffresParBoite($ws, $jour);
@@ -141,7 +144,7 @@ final class VueSante
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->orderBy('nom')->get(['id', 'nom', 'cree_le']));
         $nbBoites = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->selectRaw("split_part(lower(adresse), '@', 2) AS d, count(*) AS n")->groupBy('d')->pluck('n', 'd')->all());
-        $dns = array_column($this->sante->controlesDns($ws), null, 'domaine');
+        $dns = array_column(array_map(static fn (array $c): array => ['domaine' => mb_strtolower((string) $c['domaine'])] + $c, $this->sante->controlesDns($ws)), null, 'domaine');
         $listes = array_filter($this->sante->controlesListes($ws), static fn (array $l): bool => $l['type'] === 'domaine');
         $out = [];
         foreach ($lignes as $d) {
@@ -203,7 +206,8 @@ final class VueSante
         foreach (self::MESSAGERIES as $f => $libelle) {
             $freine = $toutEstFreine || array_filter($pauses, static fn ($p): bool => $p->fournisseur === $f) !== [];
             $out[] = [
-                'messagerie' => $libelle, 'envoyes' => $this->chauffe->totauxDuJour($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE, $f)['envoyes'],
+                'messagerie' => $libelle, 'envoyes' => $this->chauffe->totauxDuJour($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE, $f)['envoyes']
+                    + ($f === Fournisseur::AUTRE ? $this->chauffe->totauxDuJour($ws, $jour, BudgetChauffe::RESSOURCE_DOMAINE, Fournisseur::INCONNU)['envoyes'] : 0),
                 'par_heure' => null, 'etat' => $freine ? 'freine' : 'normal', // le rythme horaire par messagerie n'est pas mesuré
             ];
         }

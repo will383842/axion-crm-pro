@@ -99,6 +99,7 @@ test('courbe : 30 jours continus (zéros compris), conforme au contrat', functio
 });
 
 test('chercher : trouve par empreinte, journalise sans l’adresse, réponse identique pour inconnue et autre espace', function () {
+    config(['envoi.cle_empreinte' => 'cle-de-test-journal']);
     $adresse = 'personne@exemple.test';
     $autre = $this->espace(true);
     foreach ([$this->ws->id, $autre->id] as $i => $ws) {
@@ -119,7 +120,10 @@ test('chercher : trouve par empreinte, journalise sans l’adresse, réponse ide
 
     $journal = DB::table('business_events')->where('action', 'envoi.recherche')->where('workspace_id', $this->ws->id)->first();
     expect($journal)->not->toBeNull()->and($journal->actor_user_id)->toBe($this->admin->id);
-    expect($journal->context)->toContain(ListeSuppression::empreinte($adresse))->not->toContain('personne@')->not->toContain($adresse);
+    // Jamais l'empreinte non salée (retrouvable par dictionnaire) ni le sha256 de l'adresse : un HMAC à clé seulement.
+    expect($journal->context)->not->toContain(ListeSuppression::empreinte($adresse))->not->toContain(hash('sha256', $adresse))
+        ->not->toContain('personne@')->not->toContain($adresse)
+        ->toContain(hash_hmac('sha256', ListeSuppression::empreinte($adresse), 'cle-de-test-journal'));
 });
 
 test('chercher : 10 recherches par minute et par compte, la 11e répond 429', function () {

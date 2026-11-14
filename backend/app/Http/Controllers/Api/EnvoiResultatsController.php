@@ -64,9 +64,15 @@ class EnvoiResultatsController extends ApiController
     {
         $adresse = (string) $request->validate(['adresse' => ['required', 'string', 'max:254', 'email:filter']])['adresse'];
         $ws = (string) WorkspaceContext::current();
-        // MÊME empreinte que les événements de retour (ListeSuppression) : aucune adresse n'est stockée ni journalisée.
+        // MÊME empreinte que les événements de retour (ListeSuppression) pour la recherche seulement : jamais journalisée.
         $empreinte = ListeSuppression::empreinte($adresse);
-        AuditLogger::log('envoi.recherche', ['workspace_id' => $ws, 'resource_type' => 'envoi_recherche', 'empreinte' => $empreinte]);
+        $cle = (string) config('envoi.cle_empreinte');
+        AuditLogger::log('envoi.recherche', [
+            'workspace_id' => $ws,
+            'resource_type' => 'envoi_recherche',
+            // HMAC à clé : relie deux recherches de la même adresse sans permettre de la retrouver.
+            'empreinte' => $cle !== '' ? hash_hmac('sha256', $empreinte, $cle) : null,
+        ]);
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_evenements')
             ->where('workspace_id', $ws)->where('empreinte_destinataire', $empreinte)
             ->orderByDesc('recu_le')->limit(50)->get(['recu_le', 'classe', 'boite']));

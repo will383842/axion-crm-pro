@@ -31,9 +31,9 @@ export interface ConsoleFeatures {
   console_v2: boolean;
   universes: { business: boolean; vivier: boolean };
   /**
-   * DM0-COQ — droits par produit. ABSENT du serveur (cas d'aujourd'hui en
-   * production) = `{ crm: 'actif', envoi: 'absent' }` : le comportement actuel,
-   * sans rien d'Envoi (voir `PRODUITS_PAR_DEFAUT`, `produitsDe`).
+   * DM0-COQ — droits par produit, publiés par `/config/features` (D3, contrat `Features.produits`).
+   * Optionnel côté type par prudence (ancien serveur) : ABSENT = `{ crm: 'actif', envoi: 'absent' }`,
+   * le comportement sans rien d'Envoi (voir `PRODUITS_PAR_DEFAUT`, `produitsDe`).
    */
   produits?: ProduitsEspace;
 }

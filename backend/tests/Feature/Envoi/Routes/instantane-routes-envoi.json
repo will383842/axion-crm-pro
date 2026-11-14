@@ -256,6 +256,28 @@
     },
     {
         "methode": "GET",
+        "uri": "api/v1/envoi/reputation",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/reputation/constats",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
         "uri": "api/v1/envoi/sante",
         "middlewares": [
             "api",

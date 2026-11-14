@@ -29,6 +29,9 @@ abstract class BaseRoutesEnvoi extends TestCase
         parent::setUp();
         $this->seed(PermissionsAndRolesSeeder::class);
         $this->resolutions = 0;
+        // La CI copie `.env.example` (MAIL_MAILER_AUTH vide) : sans ceci, le mailer d'authentification est absent et le code de
+        // validation (R11) refuse de partir (503). Les tests lisent le courriel dans le transport `array`.
+        config(['mail.auth_mailer' => 'array']);
         $this->app->bind(ServeurEnvoi::class, function () {
             $this->resolutions++;
             throw new RuntimeException('Une route d’envoi ne doit pas résoudre ServeurEnvoi.');

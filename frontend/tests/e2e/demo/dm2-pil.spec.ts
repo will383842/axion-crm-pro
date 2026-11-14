@@ -16,9 +16,9 @@ test.describe('pilotage des envois (démo)', () => {
 
   test('P10 : une adresse refusée s’explique en français', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/sante/chercher', { offre: 'les-deux' });
-    await page.getByRole('searchbox', { name: 'Adresse e-mail' }).fill('yves');
+    await page.getByRole('searchbox', { name: 'Adresse e-mail' }).fill('yves@bois-forme.example');
     await page.getByRole('button', { name: 'Chercher', exact: true }).click();
-    await expect(page.getByText(/Refusé : adresse inexistante \(550 5\.1\.1\)/)).toBeVisible();
+    await expect(page.getByText(/Refusé : adresse refusée par le serveur du destinataire/)).toBeVisible();
   });
 
   test('Ctrl K « Chercher un envoi » ouvre la page', async ({ page }) => {

@@ -454,7 +454,7 @@ test('bloquant 2 : rejeu d\'une clé « reservee » HORS fenêtre (20 h) avec un
         ->and($faux->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('reservee');
 });
 
-test('bloquant 2 (jumeau) : réservation de 12 h rejouée à 20 h => périmée en « a_verifier », report d'attente, zéro appel, une alerte', function () {
+test('bloquant 2 (jumeau) : réservation de 12 h rejouée à 20 h => périmée en « a_verifier », report d\'attente, zéro appel, une alerte', function () {
     Log::spy();
     $garde = new GardeChauffe(app(DepotChauffe::class), $this->depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
     $soir = new DateTimeImmutable('2026-11-17 20:00:00', new DateTimeZone('Europe/Paris'));

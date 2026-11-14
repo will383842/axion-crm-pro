@@ -495,12 +495,13 @@ test('24. occurred_at émis = created_at ; deux portées d\'une même empreinte 
 // ── Décision D4 et validations de la classe ─────────────────────────────────
 
 test('D4. une plainte ZeptoMail n\'est jamais émise vers le site', function () {
-    config(['mail.webhooks.zeptomail_token' => 'jeton-de-test-0123456789abcdef0123456789abcdef']);
+    $jeton = 'jeton-de-test-' . str_repeat('ab12', 8); // factice, construit à l'exécution
+    config(['mail.webhooks.zeptomail_token' => $jeton]);
     $corps = ['event_name' => ['complaint'], 'event_message' => [['event_data' => [[
         'event_name' => 'complaint', 'details' => [['bounced_recipient' => 'plainte-zepto@example.test']],
     ]]]]];
 
-    $this->postJson('/api/internal/email/zeptomail?t=jeton-de-test-0123456789abcdef0123456789abcdef', $corps)
+    $this->postJson('/api/internal/email/zeptomail?t=' . $jeton, $corps)
         ->assertOk()->assertJsonPath('counts.complaint', 1);
 
     expect(DB::table('crm_outbound_events')->count())->toBe(0);

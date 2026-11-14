@@ -88,10 +88,11 @@ beforeEach(function () {
 
 // ── LES DEUX FORMES DU MEME CONTROLEUR, DANS LE MEME TEST ───────────────────
 
-test('l\'opposition emet, l\'effacement masque SANS rien emettre ni vider', function () {
+test('l\'opposition ET l\'effacement emettent chacun un consent_optout, jamais un erasure, sans rien vider', function () {
     // L3c-0 (ADR contrat v3 § 6) : `destroy()` ne diffuse plus d'`erasure` vers
-    // le site et ne vide ni e-mail ni telephone. Seule l'opposition (`optOut`)
-    // emet un `consent_optout`.
+    // le site et ne vide ni e-mail ni telephone. STOP-T4-CRM (D1) : l'effacement
+    // emet desormais, comme l'opposition, un `consent_optout` (la personne est
+    // mise a l'ecart, le site cesse de la contacter).
     $oppose = effacementJournalisteFiche($this->workspace->id, 'oppose@example.test');
     $efface = effacementJournalisteFiche($this->workspace->id, 'efface@example.test');
 
@@ -112,10 +113,14 @@ test('l\'opposition emet, l\'effacement masque SANS rien emettre ni vider', func
 
     expect(DB::table('crm_outbound_events')->where('event_type', 'erasure')->count())->toBe(0);
 
-    $opposition = DB::table('crm_outbound_events')->where('event_type', 'consent_optout')->first();
-    expect(DB::table('crm_outbound_events')->count())->toBe(1)
+    $opposition = DB::table('crm_outbound_events')->where('email_hash', effacementJournalisteHash('oppose@example.test'))->first();
+    $effacement = DB::table('crm_outbound_events')->where('email_hash', effacementJournalisteHash('efface@example.test'))->first();
+    expect(DB::table('crm_outbound_events')->count())->toBe(2)
+        ->and(DB::table('crm_outbound_events')->where('event_type', 'consent_optout')->count())->toBe(2)
         ->and($opposition)->not->toBeNull()
-        ->and($opposition->email_hash)->toBe(effacementJournalisteHash('oppose@example.test'));
+        ->and($effacement)->not->toBeNull()
+        ->and(json_decode((string) $opposition->payload, true)['motif'])->toBe('opposition_presse')
+        ->and(json_decode((string) $effacement->payload, true)['motif'])->toBe('effacement_presse');
 });
 
 // ── TEMOIN NEGATIF ──────────────────────────────────────────────────────────

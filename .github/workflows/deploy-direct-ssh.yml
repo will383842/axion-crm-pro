@@ -333,10 +333,12 @@ jobs:
           # La valeur est générée ici, ajoutée au .env et n'est JAMAIS affichée
           # (ni écho, ni mode trace, ni argument SSH, ni secret GitHub).
           if [ -f .env ]; then
-            if grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=[[:space:]]*(""|'"''"')[[:space:]]*$' .env; then
-              echo "ORIGINES_HMAC_KEY : présente mais vide (entre guillemets), rien écrit"
-            elif grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=[[:space:]]*[^[:space:]]' .env; then
-              echo "ORIGINES_HMAC_KEY : déjà présente"
+            if grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=' .env; then
+              if grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=[[:space:]]*(""|'"''"')?[[:space:]]*$' .env; then
+                echo "ORIGINES_HMAC_KEY : présente mais vide, rien écrit"
+              else
+                echo "ORIGINES_HMAC_KEY : déjà présente"
+              fi
             else
               CLE_HMAC=$(openssl rand -hex 32)
               if [ "${#CLE_HMAC}" -ne 64 ]; then echo "ORIGINES_HMAC_KEY : génération échouée, .env non touché"; exit 1; fi

@@ -297,7 +297,7 @@ test('B14-005 : un 422 abandonne toujours immediatement', function () {
 // B14-010 — L'EFFACEMENT N'EMETTAIT RIEN
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('B14-010 (L3c-0) : effacer un journaliste le MASQUE et n\'emet AUCUN erasure vers le site', function () {
+test('B14-010 (L3c-0) : effacer un journaliste le MASQUE et n\'emet AUCUN erasure (seulement consent_optout) vers le site', function () {
     [$workspace, $user] = canalCompte('ws-effacement');
     $this->actingAs($user);
 
@@ -311,9 +311,11 @@ test('B14-010 (L3c-0) : effacer un journaliste le MASQUE et n\'emet AUCUN erasur
     expect($fiche?->deleted_at)->not->toBeNull()
         ->and($fiche?->email)->toBe('a-effacer@example.test');
 
-    // Regle de Will : le site n'est plus jamais invite a effacer.
+    // Le site n'est plus jamais invite a effacer (jamais d'`erasure`) ; il recoit en revanche
+    // l'opposition (`consent_optout`, STOP-T4-CRM D1), une seule ligne pour cette adresse.
     expect(DB::table('crm_outbound_events')->where('event_type', 'erasure')->count())->toBe(0)
-        ->and(DB::table('crm_outbound_events')->count())->toBe(0);
+        ->and(DB::table('crm_outbound_events')->where('event_type', 'consent_optout')->count())->toBe(1)
+        ->and(DB::table('crm_outbound_events')->count())->toBe(1);
 });
 
 test('B14-010 : un journaliste SANS email s\'efface quand meme, sans message inexploitable', function () {

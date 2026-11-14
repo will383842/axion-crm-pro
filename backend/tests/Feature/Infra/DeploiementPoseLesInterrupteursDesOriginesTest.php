@@ -55,11 +55,11 @@ test('ORIGINES-DEPLOI — le lien du guide n est jamais synchronise', function (
 test('ORIGINES-DEPLOI — la cle HMAC est creee sur le serveur, sans fuite ni ecrasement', function (): void {
     $bloc = blocCleHmac();
 
-    // Conditionnee a l'absence d'une valeur non vide.
+    // Conditionnee a l'absence de toute ligne de la cle (export, espaces, vide compris).
     expect($bloc)->toContain('ORIGINES_HMAC_KEY[[:space:]]*=');
-    expect($bloc)->toContain('présente mais vide (entre guillemets), rien écrit');
+    expect($bloc)->toContain('présente mais vide, rien écrit');
     // Un .env sans saut de ligne final ne doit pas coller la cle a la derniere ligne.
-    expect($bloc)->toContain("[ -n \"\$(tail -c1 .env)\" ]");
+    expect($bloc)->toContain('[ -n "$(tail -c1 .env)" ]');
     expect($bloc)->toContain('openssl rand -hex 32');
     expect($bloc)->toContain('ORIGINES_HMAC_KEY : déjà présente');
     expect($bloc)->toContain('ORIGINES_HMAC_KEY : créée (64 caractères hexadécimaux)');

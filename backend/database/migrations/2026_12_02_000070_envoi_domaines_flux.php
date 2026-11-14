@@ -19,8 +19,5 @@ return new class extends Migration
     }
 
     /** Retour arrière INERTE : la colonne et la contrainte sont conservées. */
-    public function down(): void
-    {
-        DB::statement("COMMENT ON COLUMN envoi_domaines.flux IS 'R07 : conservee au retour arriere.'");
-    }
+    public function down(): void {}
 };

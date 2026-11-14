@@ -80,6 +80,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000083_envoi_campagne_codes.php',
     // Envoi R08b : modèles de message versionnés, AJOUT SEUL (versions) et archivage par `archive_le` (jamais de suppression) ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000082_envoi_modeles.php',
+    // Filet modifié : pourquoi — envoi R07 : colonne `envoi_domaines.flux` (ADD COLUMN IF NOT EXISTS, NULL) + CHECK NOT VALID ; la retirer effacerait l'étiquetage des domaines ; down() inerte, up() rejouable.
+    '2026_12_02_000070_envoi_domaines_flux.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

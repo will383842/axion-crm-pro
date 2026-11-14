@@ -6,7 +6,7 @@ namespace App\Envoi\FeuVert;
  * Catalogue VERSIONNÉ UNIQUE des points du feu vert (ADR E4 : la nature se lit dans le préfixe du code).
  *  - `auto.<code>`   : point CALCULÉ (lu dans le système, jamais écrit, jamais prouvé à la main) ;
  *  - `manuel.<code>` : preuve humaine (spécification 26 § 8, puis cases A4 à A12 du plan R07), déposée via DepotPreuves.
- * Les codes sont stables et permanents : on n'en renomme ni n'en supprime jamais ; un ajout incrémente VERSION
+ * Les codes sont stables et permanents : on n'en renomme ni n'en supprime jamais (seule exception, v3 : `manuel.inscriptions` est éclaté puis retiré) ; un ajout incrémente VERSION
  * (v2 : F15 ajoute `auto.temoins_3_jours` ; v3 : R07 ajoute les cases A4 à A12 et éclate `manuel.inscriptions`).
  * Signal Spam (A11) est « non bloquant » dans le plan, mais le contrat impose `bloquant` = non `fait` : par prudence il bloque (noté R07).
  * `serveur_reel` = le point n'est vérifiable qu'avec le vrai serveur (K17).

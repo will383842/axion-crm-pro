@@ -116,7 +116,8 @@ components:
           description: Nombre de messages de la séquence (1 à 4).
     StatutBoite:
       type: string
-      enum: [prete, ralentie, en_chauffe, suspendue]
+      description: Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
+      enum: [prete, ralentie, en_chauffe, suspendue, inconnu]
     PalierChauffe:
       type: string
       description: Palier de la montée en douceur (P1 le plus bas, P8 le plus haut).
@@ -144,16 +145,17 @@ components:
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         adresse: { type: string, format: email }
-        domaine_id: { $ref: '#/components/schemas/Identifiant' }
+        domaine_id:
+          description: Identifiant du domaine de la boîte ; nul si ce domaine n'est pas enregistré dans l'espace.
+          oneOf: [{ $ref: '#/components/schemas/Identifiant' }, { type: 'null' }]
         nom_affiche: { type: string }
         etat: { $ref: '#/components/schemas/EtatFeu' }
         statut: { $ref: '#/components/schemas/StatutBoite' }
         quota_jour: { type: integer, minimum: 0 }
         envoyes_aujourdhui: { type: integer, minimum: 0 }
         taux_refus:
-          type: number
-          minimum: 0
-          description: Refus (durs et mous) sur 7 jours, en pourcentage.
+          description: Refus (durs et mous) sur 7 jours, en pourcentage ; nul tant qu'il n'est pas mesurable (aucun envoi, ou source des refus mous absente).
+          oneOf: [{ type: number, minimum: 0 }, { type: 'null' }]
         reponses_7j: { type: integer, minimum: 0 }
     PolitiqueDmarc:
       type: string
@@ -166,7 +168,9 @@ components:
         nom: { type: string }
         etat: { $ref: '#/components/schemas/EtatFeu' }
         boites: { type: integer, minimum: 0 }
-        dmarc: { $ref: '#/components/schemas/PolitiqueDmarc' }
+        dmarc:
+          description: Politique DMARC publiée ; nulle tant qu'elle n'est pas connue.
+          oneOf: [{ $ref: '#/components/schemas/PolitiqueDmarc' }, { type: 'null' }]
         dmarc_prochaine_etape:
           description: DMARC progressif — prochaine politique et date prévue.
           oneOf:
@@ -206,7 +210,9 @@ components:
         adresses_ip:
           type: array
           items: { $ref: '#/components/schemas/AdresseIp' }
-        version_configuration: { type: integer, minimum: 1 }
+        version_configuration:
+          description: Version de configuration appliquée ; nulle si aucune n'a été appliquée.
+          oneOf: [{ type: integer, minimum: 1 }, { type: 'null' }]
     EtatDestinataire:
       type: string
       enum: [a_envoyer, envoye, remis, rebond_mou, rebond_dur, a_repondu, desinscrit, plainte, exclu, relances_annulees]
@@ -329,15 +335,33 @@ components:
       type: string
       description: Alertes par la cloche de la console et par e-mail seulement.
       enum: [console, email]
+    TypeAlerte:
+      type: string
+      description: |
+        Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+        de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
+        tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+      enum:
+        - taux_refus
+        - plainte
+        - liste_noire
+        - boite_ralentie
+        - test_matin
+        - reponse_interessee
+        - quota_atteint
+        - temoin_indesirable
+        - reponses_en_baisse
+        - reports_en_hausse
+        - homme_mort
+        - sante_silencieuse
+        - reponses_non_traitees
     RegleAlerte:
       type: object
       required: [id, nom, condition, seuil, canaux, actif]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
         nom: { type: string }
-        condition:
-          type: string
-          enum: [taux_refus, plainte, liste_noire, boite_ralentie, test_matin, reponse_interessee, quota_atteint]
+        condition: { $ref: '#/components/schemas/TypeAlerte' }
         seuil: { oneOf: [{ type: number }, { type: 'null' }] }
         canaux:
           type: array

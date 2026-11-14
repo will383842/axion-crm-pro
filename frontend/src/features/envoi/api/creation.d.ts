@@ -590,8 +590,11 @@ export interface components {
             objet: string;
             objet_b?: string | null;
         };
-        /** @enum {string} */
-        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
+        /**
+         * @description Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
+         * @enum {string}
+         */
+        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue" | "inconnu";
         /** @enum {string} */
         StatutCampagne: "brouillon" | "a_valider" | "programmee" | "en_cours" | "en_pause" | "terminee" | "arretee";
         /** @enum {string} */

@@ -191,7 +191,10 @@ test('ces routes ne font qu’une lecture : aucune écriture, aucun ServeurEnvoi
     $avant = DB::table('envoi_drapeaux')->count();
     foreach (['domaines', 'listes-noires', 'serveurs', 'configuration'] as $uri) {
         $this->actingAs($u)->getJson("/api/v1/envoi/$uri")->assertOk();
-        $this->actingAs($u)->postJson("/api/v1/envoi/$uri", [])->assertStatus(405);
+        // R15 : `POST /envoi/domaines` existe désormais (propriétaire seul, voir InfrastructureEcrituresTest) ; les autres restent sans écriture.
+        if ($uri !== 'domaines') {
+            $this->actingAs($u)->postJson("/api/v1/envoi/$uri", [])->assertStatus(405);
+        }
     }
     expect(DB::table('envoi_drapeaux')->count())->toBe($avant)->and($this->resolutions)->toBe(0);
 });

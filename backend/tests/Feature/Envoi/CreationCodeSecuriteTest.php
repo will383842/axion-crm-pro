@@ -3,6 +3,7 @@
 namespace Tests\Feature\Envoi;
 
 use App\Envoi\Campagnes\DepotCampagnes;
+use App\Http\Middleware\AuditHashChainLogger;
 use App\Socle\Alertes\CourrielTransactionnel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -121,6 +122,21 @@ test('journal d’audit : ni code, ni adresse e-mail', function () {
     $this->actingAs($this->owner)->postJson(CS . "/{$id}/valider", ['code' => $code])->assertOk();
     $lignes = json_encode(DB::table('business_events')->where('workspace_id', $this->ws->id)->where('action', 'like', 'envoi.brouillon.%')->get());
     expect($lignes)->not->toContain($code)->not->toContain($this->owner->email)->not->toContain('@');
+});
+
+test('audit_logs.payload_hash du /valider n’est pas une empreinte réversible du code', function () {
+    $id = csPret($this);
+    $code = csCode($this, $id);
+    $this->actingAs($this->owner)->postJson(CS . "/{$id}/valider", ['code' => $code])->assertOk();
+    $lignes = DB::table('audit_logs')->where('path', 'like', '%/valider')->get();
+    expect($lignes)->not->toBeEmpty();
+    foreach ($lignes as $l) {
+        expect($l->payload_hash)->not->toBe(hash('sha256', json_encode(['code' => $code])))
+            ->and(json_encode($l))->not->toContain($code);
+    }
+    // Aucun code de 10⁶ possibles ne redonne l'empreinte : le corps est masqué à la source.
+    $masque = hash('sha256', json_encode(['code' => AuditHashChainLogger::VALEUR_MASQUEE]));
+    expect($lignes->pluck('payload_hash')->all())->toContain($masque);
 });
 
 /**

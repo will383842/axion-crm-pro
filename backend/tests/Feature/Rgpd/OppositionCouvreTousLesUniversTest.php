@@ -296,6 +296,10 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // (portée business ou vivier, passée par l'appelant) pour ne signaler au site
     // que les oppositions nées au CRM (liste blanche de sources). Il n'écrit rien
     // dans cette table et n'en efface jamais une ligne.
+    // R13 (2026-11-14) : +1. `Envoi\Conformite\RegistreOppositionManuel` LIT `opt_out` en portée
+    // `business` (jamais le vivier) avant d'y ajouter l'adresse inscrite à la main, pour ne pas doubler
+    // une ligne existante — notamment celle née du site, dont la source garde l'anti-boucle (STOP-T4).
+    // Il n'efface ni ne modifie jamais une ligne de cette table.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/DossierClientIngest.php',
@@ -308,6 +312,7 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
         'app/Crm/Presse/LienJournalisteContact.php',
         'app/Crm/Rgpd/SiteGdprService.php',
         'app/Crm/Scraping/ScrapedRecordIngestService.php',
+        'app/Envoi/Conformite/RegistreOppositionManuel.php',
         'app/Services/Dedup/DeduplicationService.php',
         'app/Support/EligibiliteCampagne.php',
         'app/Support/ListeSuppression.php',

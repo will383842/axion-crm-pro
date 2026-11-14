@@ -128,7 +128,7 @@ S12  ── Monitoring complet, anomaly detection, polish UI, doc, tests E2E
 - ✅ Migrations toutes les 63 tables Phase 1 exécutent (CREATE TABLE + RLS + partman)
 - ✅ Migrations 35 tables Phase 2 scaffold exécutent
 - ✅ Seed workspace `axion-ia` + 4 rôles RBAC (owner/admin/operator/viewer)
-- ✅ **Seed `OwnerUserSeeder` sécurisé** : lit `OWNER_INITIAL_EMAIL` + `OWNER_INITIAL_PASSWORD` depuis Doppler (jamais Git). Email cible : `williamsjullin@gmail.com`. Password random 32 chars généré et stocké Doppler — **rotaté immédiatement au 1er login via UI** + 2FA TOTP obligatoire. Cf. `15_auth_multitenant_rbac.md` § 10bis.
+- ✅ **Seed `OwnerUserSeeder` sécurisé** : lit `OWNER_INITIAL_EMAIL` + `OWNER_INITIAL_PASSWORD` depuis Doppler (jamais Git). Email cible : `proprietaire@exemple.test`. Password random 32 chars généré et stocké Doppler — **rotaté immédiatement au 1er login via UI** + 2FA TOTP obligatoire. Cf. `15_auth_multitenant_rbac.md` § 10bis.
 - ✅ Auth Sanctum SPA + 2FA TOTP + magic link fonctionnels
 - ✅ Page login + dashboard skeleton React déployée
 - ✅ CI GitHub Actions verte

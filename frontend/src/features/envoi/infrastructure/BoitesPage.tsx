@@ -41,7 +41,7 @@ function Tuile({ b }: { b: Boite }) {
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div><dt className="text-xs text-slate-500">Envoyés</dt><dd className="font-semibold text-slate-900">{b.envoyes_aujourdhui}/{b.quota_jour}</dd></div>
-        <div><dt className="text-xs text-slate-500">Refus</dt><dd className="font-semibold text-slate-900">{pourcent(b.taux_refus)}</dd></div>
+        <div><dt className="text-xs text-slate-500">Refus</dt><dd className="font-semibold text-slate-900">{b.taux_refus === null ? 'non mesuré' : pourcent(b.taux_refus)}</dd></div>
       </dl>
       <div className="mt-3">
         <Jauge libelle="Quota" valeur={b.envoyes_aujourdhui} max={Math.max(1, b.quota_jour)} texte={`${b.envoyes_aujourdhui} / ${b.quota_jour}`} ton={ton} />

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Crm\Outbound\OppositionSortante;
 use App\Services\Dedup\DeduplicationService;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -146,11 +147,14 @@ class CrmCampagneRetours extends Command
         switch ($type) {
             case 'desinscription':
                 $dedup->addOptOut($email, null, $source, 'unsubscribe', ['business']);
+                // STOP-T4-CRM : le retour part vers le site (dans la transaction ; annulé avec elle en --dry-run).
+                (new OppositionSortante)->signalerAdresseSansBloquer($email, 'business', 'retour_campagne_desinscription', 'campagne');
                 $this->bilan['desinscriptions']++;
                 break;
 
             case 'plainte':
                 $dedup->addOptOut($email, null, $source, 'complaint', ['business']);
+                (new OppositionSortante)->signalerAdresseSansBloquer($email, 'business', 'retour_campagne_plainte', 'campagne');
                 ListeSuppression::inscrire($email, ListeSuppression::PLAINTE, $source, 'business');
                 $this->bilan['plaintes']++;
                 break;

@@ -20,7 +20,7 @@
 ## Setup
 
 ```powershell
-cd "C:\Users\willi\Documents\Projets\Axion-CRM-Pro\poc\02_google_search"
+cd "<dossier du projet>\poc\02_google_search"
 pnpm install
 pnpm exec playwright install chromium
 copy .env.example .env

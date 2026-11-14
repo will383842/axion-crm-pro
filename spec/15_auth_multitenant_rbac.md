@@ -589,9 +589,9 @@ class OwnerUserSeeder extends Seeder
 
 ```bash
 # 1. Stockage dans Doppler (jamais Git)
-doppler secrets set OWNER_INITIAL_EMAIL=williamsjullin@gmail.com
+doppler secrets set OWNER_INITIAL_EMAIL=proprietaire@exemple.test
 doppler secrets set OWNER_INITIAL_PASSWORD='<random 32 chars, généré par gestionnaire pwd>'
-doppler secrets set OWNER_INITIAL_NAME='Williams Jullin'
+doppler secrets set OWNER_INITIAL_NAME='Williams'
 
 # 2. Run seeder une seule fois en S1, via Doppler injecteur
 doppler run -- php artisan db:seed --class=OwnerUserSeeder
@@ -639,7 +639,7 @@ class EnforceFirstLoginSetup
 
 | Donnée | Valeur Git-safe |
 |--------|----------------|
-| Email owner | `williamsjullin@gmail.com` (committed OK) |
+| Email owner | `proprietaire@exemple.test` (committed OK) |
 | Workspace slug | `axion-ia` (committed OK) |
 | Rôle | `owner` (committed OK) |
 | Password | **JAMAIS committé.** Injecté via `OWNER_INITIAL_PASSWORD` Doppler au seed-time. Rotaté immédiatement au 1er login via UI. |

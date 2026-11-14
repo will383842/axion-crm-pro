@@ -47,7 +47,7 @@ export function BlocDmarc({ domaine }: { domaine: Domaine }) {
   const avancer = useAvancerDmarc(domaine.id);
   const [erreur, setErreur] = useState<string | null>(null);
   const prochaine = domaine.dmarc_prochaine_etape;
-  const courant = ETAPES.indexOf(domaine.dmarc);
+  const courant = domaine.dmarc === null ? -1 : ETAPES.indexOf(domaine.dmarc);
 
   const agir = async (corps: { politique: PolitiqueDmarc; rappel_le?: string }) => {
     setErreur(null);

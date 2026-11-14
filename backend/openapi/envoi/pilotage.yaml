@@ -74,12 +74,31 @@ paths:
                     type: object
                     required: [le, temoins_ok, temoins_total, etat]
                     properties:
-                      le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                      le:
+                        description: Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »).
+                        oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
                       temoins_ok: { type: integer, minimum: 0 }
                       temoins_total: { type: integer, minimum: 0 }
                       etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
                   alertes: { type: integer, minimum: 0 }
-                  verifie_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                  verifie_le:
+                    description: Dernier relevé de santé reçu ; nul tant qu'aucun relevé n'existe.
+                    oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
+                  pauses:
+                    description: Pauses d'envoi actives (champ facultatif, ajouté de façon compatible). Aucune = liste vide.
+                    type: array
+                    items:
+                      type: object
+                      required: [motif, portee, fournisseur, fin]
+                      properties:
+                        motif: { type: string, description: Code du frein ou de la pause manuelle (ex. `indesirable_chez_un_temoin`). }
+                        portee: { type: string, enum: [global, fournisseur] }
+                        fournisseur:
+                          description: Famille de messagerie visée ; nulle pour une pause globale.
+                          oneOf: [{ type: string, enum: [gmail, microsoft, autre] }, { type: 'null' }]
+                        fin:
+                          description: Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine.
+                          oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
                   volume_jour:
                     type: object
                     required: [possibles, envoyes]
@@ -94,7 +113,9 @@ paths:
                       properties:
                         messagerie: { type: string }
                         envoyes: { type: integer, minimum: 0 }
-                        par_heure: { type: integer, minimum: 0 }
+                        par_heure:
+                          description: Rythme mesuré sur la dernière heure ; nul tant qu'il n'est pas mesuré.
+                          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
                         etat: { type: string, enum: [normal, freine] }
                   envoyes_14_jours:
                     type: array

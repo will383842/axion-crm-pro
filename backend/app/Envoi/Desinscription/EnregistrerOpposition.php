@@ -28,6 +28,9 @@ final class EnregistrerOpposition
 
     public const CANAL_ONE_CLICK = 'one_click';
 
+    /** STOP classé par un humain sur une réponse reçue (R12) : le registre ne prétend pas que le lien a été cliqué. */
+    public const CANAL_REPONSE = 'reponse';
+
     /** Lecture seule : l'opposition de cette inscription est-elle déjà acquise ? */
     public function dejaEnregistree(string $workspaceId, string $reference): bool
     {

@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -221,6 +221,9 @@ final class SemeurTablesScopees
         'envoi_evenements',
         'envoi_curseurs_imap',
         'envoi_rattachements',
+        // Envoi R12 : texte chiffré des réponses et leurs classements (ajout seul + FK workspaces).
+        'envoi_reponses',
+        'envoi_reponses_classements',
         'envoi_echecs_releve',
         'envoi_messages_envoyes',
         'proxy_providers_config',
@@ -898,6 +901,21 @@ final class SemeurTablesScopees
             'id_injection' => $idInjection,
             'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
             'decide_par' => 'zz-revue',
+        ]);
+        $id['envoi_reponses'] = $insererAvecId('envoi_reponses', [
+            'evenement_id' => $id['envoi_evenements'],
+            'objet_chiffre' => 'zz-chiffre',
+            'extrait_chiffre' => 'zz-chiffre',
+            'expediteur_chiffre' => 'zz-chiffre',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recue_le' => now()->toDateTimeString(),
+            'conserver_jusqu_au' => '2031-01-01',
+        ]);
+        $inserer('envoi_reponses_classements', [
+            'reponse_id' => $id['envoi_reponses'],
+            'classement' => 'a_rattacher',
+            'confiance' => 0,
+            'auteur' => 'classificateur',
         ]);
         $inserer('envoi_echecs_releve', [
             'boite' => 'zz-' . $marque,

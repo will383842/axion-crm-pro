@@ -18,6 +18,7 @@ use App\Envoi\Imap\RecepteurRetours;
 use App\Envoi\Imap\RecepteurRetoursCrm;
 use App\Envoi\Imap\RecepteurRetoursEnChaine;
 use App\Envoi\Imap\RecepteurRetoursFreins;
+use App\Envoi\Imap\RecepteurRetoursReponses;
 use App\Envoi\Imap\RecepteurRetoursSequence;
 use App\Envoi\Imap\ReleveImap;
 use App\Envoi\Imap\ReleveImapCommande;
@@ -112,13 +113,13 @@ beforeEach(function () {
     ]);
 });
 
-test('la liaison est dans le conteneur : ReleveImap se résout et le récepteur est la chaîne CRM → freins → séquences', function () {
+test('la liaison est dans le conteneur : ReleveImap se résout et le récepteur est la chaîne CRM → freins → séquences → réponses (R12)', function () {
     $this->app->instance(FabriqueLecteurs::class, new FabriqueLecteurFixe(new LecteurBoiteMemoire));
 
     expect(app(ReleveImap::class))->toBeInstanceOf(ReleveImap::class)
         ->and(app(RecepteurRetours::class))->toBeInstanceOf(RecepteurRetoursEnChaine::class);
     $ordre = (new ReflectionProperty(RecepteurRetoursEnChaine::class, 'recepteurs'))->getValue(app(RecepteurRetours::class));
-    expect(array_map(fn ($r) => $r::class, $ordre))->toBe([RecepteurRetoursCrm::class, RecepteurRetoursFreins::class, RecepteurRetoursSequence::class]);
+    expect(array_map(fn ($r) => $r::class, $ordre))->toBe([RecepteurRetoursCrm::class, RecepteurRetoursFreins::class, RecepteurRetoursSequence::class, RecepteurRetoursReponses::class]);
 });
 
 test('la commande tourne de bout en bout : rebonds, plainte, réponse humaine, absence, désinscription', function () {

@@ -206,7 +206,7 @@ final class ServiceReponses
 
             return $reference;
         });
-        $this->opposition->executer($ws, $reference, EnregistrerOpposition::CANAL_PAGE);
+        $this->opposition->executer($ws, $reference, EnregistrerOpposition::CANAL_REPONSE);
     }
 
     /** @return array{0: string, 1: ?array<string, mixed>}  [état, résultat] : ok | inconnue | inconnue_injection | deja */

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Envoi\Routes;
 
+use App\Crm\Outbound\ConsentOutboundRecorder;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\RecepteurRetoursReponses;
 use App\Envoi\Imap\RetourDetecte;
@@ -102,6 +103,10 @@ test('stop humain rejoué deux fois : une seule opposition, effets idempotents ;
     }
     $n = WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_oppositions')->where('empreinte_adresse', ListeSuppression::empreinte(R12_ADRESSE))->count());
     expect($n)->toBe(1);
+    // Le registre dit vrai : opposition posée par le classement d'une réponse, pas par le lien de désinscription.
+    expect(WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_oppositions')->where('empreinte_adresse', ListeSuppression::empreinte(R12_ADRESSE))->value('canal')))->toBe('reponse');
+    // STOP-T4 : exactement un événement sortant `consent_optout` pour cette empreinte, toujours un seul après le rejeu.
+    expect(DB::table('crm_outbound_events')->where('email_hash', ConsentOutboundRecorder::hashEmail(R12_ADRESSE))->where('event_type', 'consent_optout')->count())->toBe(1);
     expect(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte(R12_ADRESSE))->sum('occurrences'))->toBe(1);
     expect(WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses')->count()))->toBe(1);
     expect(WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses_classements')->where('auteur', 'humain')->count()))->toBe(1);

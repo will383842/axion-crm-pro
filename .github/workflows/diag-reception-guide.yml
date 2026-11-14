@@ -96,6 +96,19 @@ jobs:
             echo "lignes d'archive : table absente"
           fi
 
+          echo "## File d'envoi CRM -> site (nombres seulement, aucune empreinte)"
+          if [ "$($PSQL -c "SELECT to_regclass('public.crm_outbound_events') IS NOT NULL;" < /dev/null)" = "t" ]; then
+            echo "par statut et portée, 24 dernières heures (statut|portée|nombre) :"
+            $PSQL -c "SELECT status, scope, count(*) FROM crm_outbound_events WHERE created_at > now() - interval '24 hours' GROUP BY 1,2 ORDER BY 1,2;" < /dev/null || echo "requête en échec"
+            echo "par statut, total (statut|nombre) :"
+            $PSQL -c "SELECT status, count(*) FROM crm_outbound_events GROUP BY 1 ORDER BY 1;" < /dev/null || echo "requête en échec"
+            echo "codes HTTP lus dans la dernière erreur, 24 h (code|nombre ; seul le nombre qui suit « HTTP » est extrait) :"
+            $PSQL -c "SELECT coalesce(substring(last_error from 'HTTP ([1-5][0-9][0-9])'), 'autre erreur') AS code, count(*) FROM crm_outbound_events WHERE updated_at > now() - interval '24 hours' AND last_error IS NOT NULL GROUP BY 1 ORDER BY 1;" < /dev/null || echo "requête en échec"
+            echo "dernier envoi réussi : $($PSQL -c "SELECT coalesce(max(sent_at)::text, 'aucun') FROM crm_outbound_events;" < /dev/null)"
+          else
+            echo "table crm_outbound_events absente"
+          fi
+
           echo "## Interrupteurs effectifs (conteneur api)"
           echo "VARIABLE | defaut_code | effectif"
           if [ -n "$API_ID" ]; then docker compose exec -T -e TELESCOPE_ENABLED=false api php <<'PHP'

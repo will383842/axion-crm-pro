@@ -26,7 +26,8 @@ final class LectureInfrastructure
     public function domaines(string $ws): array
     {
         $lignes = $this->lignesDomaines($ws);
-        $resumes = array_map(fn (array $d): array => $this->resumeDomaine($ws, $d), $lignes);
+        $contexte = $this->contexteDomaines($ws);
+        $resumes = array_map(fn (array $d): array => $this->resumeDomaine($d, $contexte), $lignes);
         $serveurs = count($this->serveurs($ws));
 
         return [
@@ -42,7 +43,7 @@ final class LectureInfrastructure
     {
         foreach ($this->lignesDomaines($ws) as $d) {
             if ((string) $d['id'] === $id) {
-                $resume = $this->resumeDomaine($ws, $d);
+                $resume = $this->resumeDomaine($d, $this->contexteDomaines($ws));
 
                 // DNS (valeurs publiées) et activité des 30 jours : pas de source lisible ici => listes vides, expire_le null.
                 return [
@@ -81,7 +82,13 @@ final class LectureInfrastructure
     /** @return array<string, mixed> */
     public function serveursResumes(string $ws): array
     {
-        $version = max(1, (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_config_versions')->where('workspace_id', $ws)->where('statut', 'appliquee')->count()));
+        // MÊME définition que `configuration().courante.numero` (voir versionsConfiguration) ; 1 au minimum (contrat) si rien n'est appliqué.
+        $version = 1;
+        foreach ($this->versionsConfiguration($ws) as $v) {
+            if ($v['resultat'] === 'appliquee') {
+                $version = $v['numero'];
+            }
+        }
 
         return ['data' => array_map(fn (array $s): array => [
             'id' => (string) $s['id'], 'nom' => (string) $s['source'], 'etat' => $this->etatServeur($ws, $s),
@@ -109,6 +116,27 @@ final class LectureInfrastructure
      */
     public function configuration(string $ws): array
     {
+        $versions = $this->versionsConfiguration($ws);
+        $courante = null;
+        foreach (array_reverse($versions) as $v) {
+            if ($v['resultat'] === 'appliquee') {
+                $courante = $v;
+                break;
+            }
+        }
+
+        return ['courante' => $courante, 'prete' => null, 'historique' => array_slice(array_reverse($versions), 0, self::HISTORIQUE_MAX)];
+    }
+
+    /**
+     * LA définition du numéro de version : rang (à partir de 1) dans l'historique COMPLET de l'espace, toutes issues confondues
+     * (appliquée, invalide, retour arrière…), par id croissant. La version courante est la dernière « appliquee » ; son numéro est
+     * donc celui que rendent `/configuration` (courante.numero) et `/serveurs` (version_configuration). Jamais un compte des seules appliquées.
+     *
+     * @return list<array{numero: int, par: null, resultat: string, empreinte: string, creee_le: string, appliquee_le: ?string, changements: list<mixed>}>
+     */
+    private function versionsConfiguration(string $ws): array
+    {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_config_versions')->where('workspace_id', $ws)->orderBy('id')->get(['statut', 'empreinte', 'cree_le']));
         $versions = [];
         foreach ($lignes as $i => $v) {
@@ -122,15 +150,8 @@ final class LectureInfrastructure
                 'changements' => [],
             ];
         }
-        $courante = null;
-        foreach (array_reverse($versions) as $v) {
-            if ($v['resultat'] === 'appliquee') {
-                $courante = $v;
-                break;
-            }
-        }
 
-        return ['courante' => $courante, 'prete' => null, 'historique' => array_slice(array_reverse($versions), 0, self::HISTORIQUE_MAX)];
+        return $versions;
     }
 
     /** @return list<array{id: string, nom: string, cree_le: string}> */
@@ -150,24 +171,44 @@ final class LectureInfrastructure
     }
 
     /**
-     * @param  array{id: string, nom: string, cree_le: string}  $d
-     * @return array<string, mixed>
+     * Ce dont tous les domaines ont besoin, lu UNE fois (3 requêtes en tout, quel que soit le nombre de domaines).
+     *
+     * @return array{dns: array<string, array<string, mixed>>, statuts: array<string, list<string>>, boites: array<string, int>}
      */
-    private function resumeDomaine(string $ws, array $d): array
+    private function contexteDomaines(string $ws): array
     {
-        $nom = (string) $d['nom'];
-        $dns = null;
+        $dns = [];
         foreach ($this->sante->controlesDns($ws) as $c) {
-            if ($c['domaine'] === $nom) {
-                $dns = $c;
-            }
+            $dns[(string) $c['domaine']] = $c; // le dernier relevé l'emporte, comme avant
         }
         $statuts = [];
         foreach ($this->sante->controlesListes($ws) as $c) {
-            if ($c['type'] === 'domaine' && $c['ressource'] === $nom) {
-                $statuts[] = $c['statut'];
+            if ($c['type'] === 'domaine') {
+                $statuts[(string) $c['ressource']][] = $c['statut'];
             }
         }
+        $boites = [];
+        $lignes = WorkspaceContext::run($ws, fn () => DB::select(
+            'SELECT lower(split_part(adresse, \'@\', 2)) AS dom, count(*) AS n FROM envoi_boites WHERE workspace_id = ? GROUP BY 1',
+            [$ws],
+        ));
+        foreach ($lignes as $l) {
+            $boites[(string) $l->dom] = (int) $l->n;
+        }
+
+        return ['dns' => $dns, 'statuts' => $statuts, 'boites' => $boites];
+    }
+
+    /**
+     * @param  array{id: string, nom: string, cree_le: string}  $d
+     * @param  array{dns: array<string, array<string, mixed>>, statuts: array<string, list<string>>, boites: array<string, int>}  $ctx
+     * @return array<string, mixed>
+     */
+    private function resumeDomaine(array $d, array $ctx): array
+    {
+        $nom = (string) $d['nom'];
+        $dns = $ctx['dns'][$nom] ?? null;
+        $statuts = $ctx['statuts'][$nom] ?? [];
         $liste = in_array('liste', $statuts, true);
         $etat = match (true) {
             $liste || ($dns['pause'] ?? false) => 'rouge',
@@ -175,7 +216,7 @@ final class LectureInfrastructure
             ! $dns['pret'] || in_array('non_fiable', $statuts, true) => 'ambre',
             default => 'vert',
         };
-        $boites = (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->whereRaw('lower(split_part(adresse, \'@\', 2)) = ?', [mb_strtolower($nom)])->count());
+        $boites = $ctx['boites'][mb_strtolower($nom)] ?? 0;
 
         return [
             'id' => (string) $d['id'], 'nom' => $nom, 'etat' => $etat, 'boites' => $boites,

@@ -101,7 +101,12 @@ export interface paths {
         /** Registre d'opposition (« ne plus écrire ») */
         get: operations["listerOpposition"];
         put?: never;
-        /** Inscrire une adresse, une organisation ou un domaine */
+        /**
+         * Inscrire une adresse, une organisation ou un domaine
+         * @description Propriétaire seul (`workspaces.manage`). Inscription DÉFINITIVE (aucun retrait par l'écran). `valeur` : adresse
+         *     e-mail, SIREN (organisation) ou domaine. Un domaine de messagerie grand public est refusé (422). Le motif
+         *     (1 à 500 caractères) ne doit contenir aucune adresse. Source toujours `manuel`. N'envoie aucun message.
+         */
         post: operations["inscrireOpposition"];
         delete?: never;
         options?: never;
@@ -347,8 +352,11 @@ export interface components {
          */
         CanalAlerte: "console" | "email";
         ConnexionCrm: {
-            /** @enum {string} */
-            adaptateur: "crm_pro" | "generique" | "aucun";
+            /**
+             * @description interne = CRM de la même application (palier 0).
+             * @enum {string}
+             */
+            adaptateur: "interne" | "crm_pro" | "generique" | "aucun";
             /** @description Ce qui ne quitte jamais Envoi ou le CRM. */
             ce_qui_ne_passe_pas: string[];
             /** @description Ce que l'adaptateur échange avec le CRM (phrases courtes). */
@@ -502,12 +510,13 @@ export interface components {
             ok: true;
         };
         /**
-         * @description Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+         * @description Type d'alerte d'envoi. Les sept derniers (ajoutés de façon compatible) sont les motifs de frein
          *     de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
-         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées,
+         *     et (R14) réputation dégradée.
          * @enum {string}
          */
-        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees";
+        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees" | "reputation_mauvaise";
     };
     responses: {
         /** @description État de la connexion au CRM. */
@@ -825,6 +834,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Déjà inscrite (même portée et même valeur) : la ligne existante est rendue, aucun doublon. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opposition"];
+                };
+            };
             /** @description Ligne inscrite. */
             201: {
                 headers: {
@@ -833,6 +851,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Opposition"];
                 };
+            };
+            /** @description Réservé au propriétaire. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Portée, valeur ou motif refusés (domaine grand public, SIREN invalide, motif avec adresse). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

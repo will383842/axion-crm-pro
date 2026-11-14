@@ -17,6 +17,7 @@ export const LIBELLE_TYPE_ALERTE: Record<TypeAlerte, string> = {
   homme_mort: 'Tableau de bord non validé',
   sante_silencieuse: 'Santé des envois silencieuse',
   reponses_non_traitees: 'Réponses non traitées',
+  reputation_mauvaise: 'Réputation dégradée',
 };
 
 /** Motif d'une pause active (code de la garde) → phrase affichable ; un code inconnu s'affiche tel quel, sans invention. */

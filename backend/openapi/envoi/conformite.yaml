@@ -83,12 +83,23 @@ paths:
                 portee: { type: string, enum: [adresse, organisation, domaine] }
                 valeur: { type: string }
                 motif: { type: string }
+      description: |
+        Propriétaire seul (`workspaces.manage`). Inscription DÉFINITIVE (aucun retrait par l'écran). `valeur` : adresse
+        e-mail, SIREN (organisation) ou domaine. Un domaine de messagerie grand public est refusé (422). Le motif
+        (1 à 500 caractères) ne doit contenir aucune adresse. Source toujours `manuel`. N'envoie aucun message.
       responses:
         '201':
           description: Ligne inscrite.
           content:
             application/json:
               schema: { $ref: './commun.yaml#/components/schemas/Opposition' }
+        '200':
+          description: "Déjà inscrite (même portée et même valeur) : la ligne existante est rendue, aucun doublon."
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Opposition' }
+        '403': { description: "Réservé au propriétaire." }
+        '422': { description: "Portée, valeur ou motif refusés (domaine grand public, SIREN invalide, motif avec adresse)." }
   /envoi/opposition/export:
     get:
       operationId: exporterOpposition
@@ -508,7 +519,7 @@ components:
           type: array
           description: Ce qui ne quitte jamais Envoi ou le CRM.
           items: { type: string }
-        adaptateur: { type: string, enum: [crm_pro, generique, aucun] }
+        adaptateur: { type: string, enum: [interne, crm_pro, generique, aucun], description: 'interne = CRM de la même application (palier 0).' }
         etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
         derniere_synchro_le:
           oneOf:

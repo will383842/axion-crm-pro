@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Imap;
 
+use App\Envoi\Reponses\StockerReponse;
 use App\Socle\Alertes\Alerte;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -248,6 +249,9 @@ final class ReleveImap
         }
 
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, $origine, $expediteur ?? $m->expediteur);
+        if ($origine === null) {
+            $this->garderTexte($workspaceId, $m, $classe, $expediteur ?? $m->expediteur);
+        }
 
         // Effet : seulement si rattaché. Nouveau, ou opposition rejouée en rattrapage.
         $opposition = in_array($classe, self::CLASSES_OPPOSITION, true);
@@ -261,6 +265,8 @@ final class ReleveImap
                 $origine->adresse,
                 $opposition && $m->typeArf === null && $expediteur !== null && mb_strtolower($expediteur) !== mb_strtolower(trim($origine->adresse)) ? $expediteur : null,
                 self::empreinteMessage($m), // clé STABLE (ni UID, ni UIDVALIDITY) : un retour n'est compté qu'une fois
+                $m->sujet,
+                $m->corps,
             ));
         }
 
@@ -285,8 +291,19 @@ final class ReleveImap
     {
         $classe = $m->ecarte !== null ? ClasseRetour::ReponseHumaine : Classificateur::classer($m, $this->domainesDEnvoi($workspaceId));
         $insere = $this->inserer($workspaceId, $boite, $validite, $m, $classe, null, self::adresseDe($m->expediteur) ?? $m->expediteur);
+        $m->ecarte === null && $this->garderTexte($workspaceId, $m, $classe, self::adresseDe($m->expediteur) ?? $m->expediteur);
 
         return ['insere' => $insere, 'classe' => $classe->value, 'rattache' => false, 'enErreur' => true];
+    }
+
+    /** R12 : texte chiffré d'une réponse SANS origine (les rattachées passent par le maillon de la chaîne). Jamais bloquant pour la relève. */
+    private function garderTexte(string $workspaceId, MessageBrut $m, ClasseRetour $classe, string $expediteur): void
+    {
+        try {
+            app(StockerReponse::class)->enregistrer($workspaceId, self::empreinteMessage($m), $m->sujet, $m->corps, $expediteur, $classe->value);
+        } catch (\Throwable $e) {
+            Log::warning('envoi.reponse_non_stockee : le texte de la réponse n\'a pas été gardé (rejouable).', ['workspace_id' => $workspaceId]);
+        }
     }
 
     private function inserer(string $workspaceId, string $boite, int $validite, MessageBrut $m, ClasseRetour $classe, ?MessageOrigine $origine, string $expediteur): bool

@@ -115,6 +115,7 @@ const LABELS: Record<string, string> = {
   '/envoi/sante': 'Santé des envois',
   '/envoi/sante/chercher': 'Chercher un envoi',
   '/envoi/sante/feu-vert': 'Feu vert',
+  '/envoi/sante/reputation': 'Réputation',
   '/envoi/desinscriptions': 'Désinscriptions',
   '/envoi/alertes': 'Alertes d’envoi',
   '/envoi/reglages': 'Réglages d’envoi',

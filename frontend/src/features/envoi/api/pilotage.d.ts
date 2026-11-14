@@ -541,6 +541,20 @@ export interface operations {
                             par_heure: number | null;
                         }[];
                         serveurs: components["schemas"]["ServeurResume"][];
+                        /**
+                         * @description Journées témoins relevées par fournisseur sur 14 jours (champ facultatif). Lecture seule :
+                         *     aucune saisie de journée par l'écran. Absent ou vide = non mesuré (jamais « vert »).
+                         */
+                        temoins_par_fournisseur?: {
+                            /** @description Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre). */
+                            fournisseur: string;
+                            jours: {
+                                /** @enum {string} */
+                                etat: "ok" | "indesirable" | "absent" | "non_teste";
+                                /** Format: date */
+                                jour: string;
+                            }[];
+                        }[];
                         test_du_matin: {
                             etat: components["schemas"]["EtatFeu"];
                             /** @description Date du dernier test ; nulle tant qu'aucun test n'a été fait (l'état est alors « gris »). */
@@ -580,6 +594,15 @@ export interface operations {
                         temoins_ok: number;
                         temoins_total: number;
                     };
+                };
+            };
+            /** @description Envois fermés (palier 0), aucun test ne part et rien ne change. Code envoi_ferme_palier_0. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
                 };
             };
         };

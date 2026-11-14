@@ -99,6 +99,24 @@ paths:
                         fin:
                           description: Fin prévue de la pause ; nulle si elle dure jusqu'à une levée humaine.
                           oneOf: [{ $ref: './commun.yaml#/components/schemas/Horodatage' }, { type: 'null' }]
+                  temoins_par_fournisseur:
+                    description: |
+                      Journées témoins relevées par fournisseur sur 14 jours (champ facultatif). Lecture seule :
+                      aucune saisie de journée par l'écran. Absent ou vide = non mesuré (jamais « vert »).
+                    type: array
+                    items:
+                      type: object
+                      required: [fournisseur, jours]
+                      properties:
+                        fournisseur: { type: string, description: "Famille de messagerie (gmail, microsoft, yahoo, orange, ovh, autre)." }
+                        jours:
+                          type: array
+                          items:
+                            type: object
+                            required: [jour, etat]
+                            properties:
+                              jour: { type: string, format: date }
+                              etat: { type: string, enum: [ok, indesirable, absent, non_teste] }
                   volume_jour:
                     type: object
                     required: [possibles, envoyes]
@@ -142,6 +160,11 @@ paths:
                   temoins_ok: { type: integer, minimum: 0 }
                   temoins_total: { type: integer, minimum: 0 }
                   etat: { $ref: './commun.yaml#/components/schemas/EtatFeu' }
+        '409':
+          description: "Envois fermés (palier 0), aucun test ne part et rien ne change. Code envoi_ferme_palier_0."
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/envois/chercher:
     get:
       operationId: chercherEnvoi

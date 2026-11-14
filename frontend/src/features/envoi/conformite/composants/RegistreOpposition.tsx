@@ -31,7 +31,7 @@ function FormulaireInscription({ ouvert, onClose }: { ouvert: boolean; onClose: 
   async function valider() {
     setErreur(null);
     try {
-      await inscrire.mutateAsync({ portee, valeur, motif });
+      await inscrire.mutateAsync({ portee, valeur, motif: motif.trim() || 'Demande RGPD' });
       setValeur('');
       setMotif('');
       onClose();

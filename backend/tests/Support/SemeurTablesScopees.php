@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -206,6 +206,8 @@ final class SemeurTablesScopees
         // Envoi R14 : identité versionnée (ajout seul + FK : APPEND_SEUL_AVEC_FK) et réglages clé/valeur (pas de DELETE : nettoyer() les gère comme envoi_seuils).
         'envoi_identite_versions',
         'envoi_reglages',
+        // Envoi R13 : registre d'opposition manuel, ajout seul (trigger) : APPEND_SEUL_AVEC_FK, pour que le nettoyage de test retire ses lignes.
+        'envoi_oppositions_registre',
         // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
         'envoi_reputation_constats',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
@@ -871,6 +873,14 @@ final class SemeurTablesScopees
         $inserer('envoi_reglages', [
             'cle' => 'zz',
             'valeur' => 'zz',
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_oppositions_registre', [
+            'portee' => 'domaine',
+            'empreinte' => str_repeat('b', 64),
+            'valeur' => 'zz.example.invalid',
+            'motif' => 'zz',
+            'source' => 'manuel',
             'auteur' => 'zz',
         ]);
         $inserer('envoi_reputation_constats', [

@@ -27,7 +27,7 @@ final class MotifRegroupe
     {
         return match (true) {
             $refus === null => null,
-            $refus === EligibiliteAdresse::OPPOSITION => self::OPPOSITION,
+            in_array($refus, [EligibiliteAdresse::OPPOSITION, EnvoiAutorise::OPPOSITION_REGISTRE], true) => self::OPPOSITION,
             in_array($refus, [EligibiliteAdresse::NON_VERIFIEE, EnvoiAutorise::VERDICT_ABSENT], true) => self::NON_VERIFIEE,
             in_array($refus, [
                 EligibiliteAdresse::NON_DIFFUSIBLE, EligibiliteAdresse::ENTREPRISE_FERMEE, EligibiliteAdresse::ENTREPRISE_INDIVIDUELLE,

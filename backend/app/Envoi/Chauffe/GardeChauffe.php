@@ -125,6 +125,18 @@ final class GardeChauffe
     }
 
     /**
+     * R17 : un constat de réputation « mauvaise » ouvre une pause vers CE fournisseur et l'alerte. Ne lève jamais rien.
+     *
+     * @return bool vrai si une pause neuve a été ouverte (false : une pause identique est déjà active)
+     */
+    public function reputationMauvaise(string $ws, string $fournisseur, ?DateTimeImmutable $maintenant = null, ?string $auteur = null): bool
+    {
+        $d = Freins::reputationMauvaise('mauvaise', $fournisseur);
+
+        return $d !== null && $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable(), $auteur);
+    }
+
+    /**
      * Évalue tous les freins mesurables pour la journée de $maintenant et ouvre les pauses.
      *
      * @return list<DecisionFrein> les freins qui ont ouvert une pause neuve

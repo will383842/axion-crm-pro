@@ -190,7 +190,7 @@ function droitEcrire(f: FicheContact, ds: Destinataire[]): DroitEcrire {
   const adresse = normaliser(f.email);
   const opposition = demoDb.opposition.filtrer((o) => normaliser(o.valeur) === adresse)[0];
   if (opposition) return { verdict: 'non', raison: `Registre d’opposition : ${opposition.motif}` };
-  if (demoDb.desinscriptions.filtrer((d) => normaliser(d.adresse) === adresse).length > 0) {
+  if (demoDb.desinscriptions.filtrer((d) => normaliser(d.adresse ?? '') === adresse).length > 0) {
     return { verdict: 'non', raison: 'Désinscrite : ne plus lui écrire' };
   }
   const dur = ds.find((d) => d.etat === 'rebond_dur');

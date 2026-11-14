@@ -87,7 +87,7 @@ SH);
 
     // ⚠️ ET UN FAUX `id`, POUR LA MEME RAISON QUE LE FAUX `docker`.
     //
-    // `definir-mot-de-passe-crm.sh:50` sort immediatement si `id -u` ne rend
+    // `definir-mot-de-passe-crm.sh:52` sort immediatement si `id -u` ne rend
     // pas 0 :
     //
     //     if [ "$(id -u)" -ne 0 ]; then

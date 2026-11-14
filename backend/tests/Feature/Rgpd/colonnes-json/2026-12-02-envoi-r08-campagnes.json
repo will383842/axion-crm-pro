@@ -1,0 +1,4 @@
+{
+    "envoi_campagnes.cible": "hors-portee: désignation de la cible (type, référence de liste/audience/étiquette, libellé), jamais une valeur de personne ; une contrainte en base refuse tout « @ » (aucune adresse e-mail)",
+    "envoi_campagnes.saisie": "hors-portee: brouillon de saisie de l'assistant de création (réglages de la campagne, messages, rythme), borné à 64 Ko ; aucune ligne par personne"
+}

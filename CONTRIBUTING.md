@@ -117,5 +117,5 @@ docker exec axion-crm-app pnpm test
 
 ## Contact
 
-- Maintainer : Will (williamsjullin@gmail.com)
+- Maintainer : le responsable du projet (proprietaire@exemple.test)
 - DPO : contact@axion-ia.com

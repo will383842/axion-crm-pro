@@ -7,8 +7,10 @@
  *  - `useAccesProduit(produit)` : l'accès de l'UTILISATEUR (case « accès à
  *    Envoi » / « accès au CRM »), lu dans `me.acces_produits`. Absent = accès.
  *
- * C'est le serveur qui protège (garde `produit:envoi` sur chaque route) ; ces
- * hooks ne font que décider de ce qu'on AFFICHE.
+ * Côté serveur, la garde `produit-envoi` protège CHAQUE route `/envoi/*` au niveau de l'ESPACE
+ * seulement : 404 dès que l'état n'est pas `actif` (suspendu et résilié compris, donc plus
+ * fermé que l'affichage ci-dessous). L'accès par UTILISATEUR (`me.acces_produits`) n'est PAS
+ * contrôlé côté serveur. Ces hooks ne font que décider de ce qu'on AFFICHE.
  */
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';

@@ -24,7 +24,7 @@
 ## Setup
 
 ```powershell
-cd "C:\Users\willi\Documents\Projets\Axion-CRM-Pro\poc\04_smtp_validation"
+cd "<dossier du projet>\poc\04_smtp_validation"
 pnpm install
 copy .env.example .env
 notepad .env       # ajouter VALIDATOR_FROM_EMAIL et VALIDATOR_HELO_DOMAIN
@@ -44,7 +44,7 @@ Pour avoir un résultat fiable, tu dois remplacer les emails fictifs par de VRAI
 
 ### 30 emails INVALIDES connus
 - Random local-part sur domaines valides : `xkqz9mvr3@gmail.com`, `nonexistent12345@orange.fr`
-- Typos volontaires : `wwiliamsjullin@gmail.com` (double w)
+- Typos volontaires : `proprietaire-faute@exemple.test` (faute volontaire)
 - Domaines inexistants : `test@axion-pro-fake-domain-12345.com`
 
 ### 20 emails CATCH-ALL connus

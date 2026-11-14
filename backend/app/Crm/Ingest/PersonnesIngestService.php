@@ -7,6 +7,7 @@ use App\Crm\Taxonomy;
 use App\Support\ListeSuppression;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -393,6 +394,17 @@ final class PersonnesIngestService
             return;
         }
 
+        // Personne opposée (fiche posée en opposition, ou empreinte sur la liste
+        // d'opposition `business`, donc fiche effacée) : un événement qui ne porte
+        // pas lui-même l'opposition n'écrit RIEN (ni origine, ni guide, ni accord).
+        // Les données déjà là sont GARDÉES, rien n'est supprimé. Un seul journal par
+        // événement (l'ingestion est idempotente : un rejeu n'arrive pas jusqu'ici).
+        if (! $accords->oppose() && $this->personneOpposee($event, $personne)) {
+            Log::info('Événement ignoré : personne opposée', ['event_id' => $event->eventId, 'personne_id' => (int) $personne->id]);
+
+            return;
+        }
+
         $update = [];
 
         $update['origine_contenu'] = $this->json(ContenusAccords::fusionnerOrigine(
@@ -598,6 +610,17 @@ final class PersonnesIngestService
         }
 
         $existante = $this->trouver($workspaceId, $event);
+
+        // Fiche déjà MISE À L'ÉCART (`opposition_at` posée, y compris sans
+        // adresse ou par la mise à l'écart, donc sans ligne `opt_out`) : ni
+        // réabonnement, ni réécriture du prénom ou du nom. L'événement est
+        // consigné, rien n'est supprimé (même logique que `evaluerDemande`).
+        if ($existante !== null && ($existante->opposition_at ?? null) !== null) {
+            $this->consigner($event, $workspaceId, $existante, $activityRef, 'Événement ignoré : personne opposée');
+
+            return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
+        }
+
         $inscription = $event->eventType === 'newsletter_optin';
         $abonnement = $existante === null ? null : $this->abonnement((int) $existante->id);
         $base = $this->baseLegaleInscription($event);
@@ -891,6 +914,14 @@ final class PersonnesIngestService
             if ($demande !== [] && ($existante->{$colonne} ?? null) !== null) {
                 continue;
             }
+            // CRM-G1 — guide-réseau uniquement : un prénom reçu ne remplace le prénom
+            // connu que si l'événement est plus récent (à la seconde) que la dernière
+            // interaction enregistrée, ou si le prénom connu est vide. Les autres
+            // sources gardent leur comportement.
+            if ($colonne === 'first_name' && $this->estGuideReseau($event)
+                && ($existante->first_name ?? null) !== null && $ancien) {
+                continue;
+            }
             if ($valeur !== null) {
                 $update[$colonne] = $valeur;
                 $origins[$colonne] = 'declared';
@@ -1032,6 +1063,17 @@ final class PersonnesIngestService
             ->exists();
     }
 
+    private function personneOpposee(SiteSyncEvent $event, \stdClass $personne): bool
+    {
+        if (($personne->opposition_at ?? null) !== null) {
+            return true;
+        }
+
+        $hash = $event->emailHash();
+
+        return $hash !== null && $this->opposee($hash, 'business');
+    }
+
     private function opposeeAuCanalDepuis(string $emailHash, DateTimeImmutable $consentAt): bool
     {
         return DB::table('opt_out')
@@ -1137,6 +1179,18 @@ final class PersonnesIngestService
      * Comparer l'instant brut ferait passer pour « plus récent » un événement
      * plus ancien de la même seconde.
      */
+    /**
+     * Contrat réel du site (axion-ia, `guides-reseau/synchro-v3.ts` l.147 et l.230 :
+     * `source_slug = "guide-reseau"` sur l'événement de la page ; l.126 : l'événement
+     * d'origines n'a PAS de `source_slug` mais un `subject_ref` en `site:guide-reseau:`).
+     * Les deux marques reconnaissent la même famille d'événements.
+     */
+    private function estGuideReseau(SiteSyncEvent $event): bool
+    {
+        return $event->sourceSlug === 'guide-reseau'
+            || str_starts_with($event->subjectRef, 'site:guide-reseau:');
+    }
+
     private function plusRecent(DateTimeImmutable $at, mixed $dernier): bool
     {
         $dernier = $this->date($dernier);

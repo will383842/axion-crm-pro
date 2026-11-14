@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs', 'envoi_oppositions_registre'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -200,6 +200,8 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
+        // Envoi R13 : registre d'opposition manuel, ajout seul SANS clé étrangère vers `workspaces` : APPEND_SEUL.
+        'envoi_oppositions_registre',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
         'envoi_campagnes',
         'envoi_campagnes_journal',
@@ -836,6 +838,14 @@ final class SemeurTablesScopees
             'auth_alignee' => false,
             'bouton_vu' => false,
             'post_effectif' => false,
+            'auteur' => 'zz',
+        ]);
+        $inserer('envoi_oppositions_registre', [
+            'portee' => 'domaine',
+            'empreinte' => str_repeat('b', 64),
+            'valeur' => 'zz.example.invalid',
+            'motif' => 'zz',
+            'source' => 'manuel',
             'auteur' => 'zz',
         ]);
         $inserer('envoi_temoins_acces', [

@@ -1136,7 +1136,8 @@ final class PersonnesIngestService
             return $defaut;
         }
 
-        $libelle = config('guides.publics.' . $code . '.libelle');
+        // `nom` = nom affiché du guide (`libelle` sert à la lecture d'écran).
+        $libelle = config('guides.publics.' . $code . '.nom');
 
         return 'Guide téléchargé : ' . (is_string($libelle) && $libelle !== '' ? $libelle : $code);
     }

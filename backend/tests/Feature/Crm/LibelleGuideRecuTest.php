@@ -72,8 +72,8 @@ test('LGR c — code sans entrée de config : le code brut', function () {
     expect(lgrTitre(lgrChamps('gde-conversation')))->toBe('Guide téléchargé : gde-conversation');
 });
 
-test('LGR d — code présent dans la config : son libellé', function () {
-    config(['guides.publics.gde-test' => ['nom' => 'N', 'libelle' => 'Guide de test (PDF)', 'url' => 'https://exemple.invalid/g.pdf']]);
+test('LGR d — code présent dans la config : son nom affiché', function () {
+    config(['guides.publics.gde-test' => ['nom' => 'Guide de test', 'libelle' => 'Guide de test (PDF)', 'url' => 'https://exemple.invalid/g.pdf']]);
 
-    expect(lgrTitre(lgrChamps('gde-test')))->toBe('Guide téléchargé : Guide de test (PDF)');
+    expect(lgrTitre(lgrChamps('gde-test')))->toBe('Guide téléchargé : Guide de test');
 });

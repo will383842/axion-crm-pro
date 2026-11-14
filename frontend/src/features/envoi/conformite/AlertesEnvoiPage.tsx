@@ -9,6 +9,7 @@ import { Button, Card, KpiCard, PageHeader, StatusPill, type StatusTone } from '
 import { useAlertes, useRegler, type AlerteEnvoi } from './composants/api';
 import { CLASSE_BOUTON_MOBILE, Etat } from './composants/commun';
 import { dateEtHeure } from './composants/format';
+import { LIBELLE_TYPE_ALERTE } from './composants/typesAlerte';
 
 const NIVEAU: Record<AlerteEnvoi['niveau'], { libelle: string; ton: StatusTone }> = {
   a_faire: { libelle: 'À faire', ton: 'danger' },
@@ -26,6 +27,7 @@ function CarteAlerte({ alerte }: { alerte: AlerteEnvoi }) {
         <div className="flex flex-wrap items-center gap-2">
           <h3 id={`alerte-${alerte.id}`} className="text-sm font-semibold text-slate-900">{alerte.titre}</h3>
           <StatusPill tone={niveau.ton}>{niveau.libelle}</StatusPill>
+          {alerte.type !== undefined ? <span className="text-xs text-slate-600">{LIBELLE_TYPE_ALERTE[alerte.type]}</span> : null}
           <span className="ml-auto text-xs text-slate-500">{dateEtHeure(alerte.survenue_le)}</span>
         </div>
         <dl className="mt-3 space-y-1 text-sm text-slate-700">

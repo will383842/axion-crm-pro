@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,6 +200,13 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
+        // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
+        'envoi_campagnes',
+        'envoi_campagnes_journal',
+        'envoi_campagne_codes',
+        // Envoi R08b : modèles de message (parent) puis leurs versions (FK composite) : APPEND_SEUL_AVEC_FK.
+        'envoi_modeles',
+        'envoi_modele_versions',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -595,6 +602,22 @@ final class SemeurTablesScopees
             'auteur' => 'zz-etancheite',
             'date_recul' => '2026-01-01',
         ]);
+
+        $campagne = (string) Str::uuid();
+        $inserer('envoi_campagnes', [
+            'id' => $campagne, 'nom' => 'zz-etancheite', 'cible' => '{"type":"liste","reference":"zz","libelle":"zz"}',
+            'nb_etapes' => 1, 'cree_par' => 'zz-etancheite',
+        ]);
+        // Le journal n'accepte qu'une transition réelle : la campagne passe d'abord à « a_valider » (propriétaire, version 2).
+        $owner->table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'a_valider', 'version' => 2]);
+        $inserer('envoi_campagnes_journal', [
+            'campagne_id' => $campagne, 'transition' => 'brouillon>a_valider', 'auteur' => 'zz-etancheite',
+            'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-' . $marque,
+        ]);
+        $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash_hmac('sha256', 'zz-etancheite', 'cle-de-semeur-seulement'), 'cle_version' => 1, 'expire_le' => '2026-01-01 00:00:00+00']);
+        $modele = (string) Str::uuid();
+        $inserer('envoi_modeles', ['id' => $modele, 'nom' => 'zz-etancheite', 'cree_par' => 'zz-etancheite']);
+        $inserer('envoi_modele_versions', ['modele_id' => $modele, 'numero' => 1, 'objet' => 'zz', 'corps' => 'zz', 'auteur' => 'zz-etancheite']);
 
         $inserer('envoi_releves_sante', [
             'source' => 'zz-etancheite',

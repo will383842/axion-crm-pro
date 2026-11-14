@@ -92,6 +92,30 @@ final class DepotChauffe
             ->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [$domaine])->sum('c.envoyes'));
     }
 
+    /**
+     * Chiffres de chaque boîte (domaine) sur les 7 jours glissants se terminant à $jour, et du jour même : lecture seule de l'écran de santé.
+     *
+     * @return array<string, \stdClass> clé = identifiant de boîte ; propriétés e7, r7, a7 (7 jours : envoyés, rebonds durs, réponses) et e1 (envoyés du jour)
+     */
+    public function chiffresParBoite(string $ws, DateTimeImmutable $jour): array
+    {
+        return WorkspaceContext::run($ws, fn () => $this->lignesChauffe(BudgetChauffe::RESSOURCE_DOMAINE)->where('workspace_id', $ws)
+            ->whereBetween('jour', [$this->debutFenetre($jour)->format('Y-m-d'), $jour->format('Y-m-d')])->groupBy('boite')
+            ->selectRaw('boite, COALESCE(SUM(envoyes),0) e7, COALESCE(SUM(rebonds_durs),0) r7, COALESCE(SUM(reponses),0) a7, COALESCE(SUM(envoyes) FILTER (WHERE jour = ?),0) e1', [$jour->format('Y-m-d')])
+            ->get()->keyBy('boite')->all());
+    }
+
+    /**
+     * Messages envoyés par jour entre deux jours (inclus), toutes boîtes.
+     *
+     * @return array<string, int> jour (Y-m-d) => envoyés ; les jours sans ligne sont absents
+     */
+    public function envoyesParJour(string $ws, DateTimeImmutable $debut, DateTimeImmutable $fin): array
+    {
+        return array_map('intval', WorkspaceContext::run($ws, fn () => $this->lignesChauffe(BudgetChauffe::RESSOURCE_DOMAINE)->where('workspace_id', $ws)
+            ->whereBetween('jour', [$debut->format('Y-m-d'), $fin->format('Y-m-d')])->groupBy('jour')->selectRaw('jour, SUM(envoyes) n')->pluck('n', 'jour')->all()));
+    }
+
     public function envoyesBoite(string $ws, string $boite, DateTimeImmutable $jour): int
     {
         return (int) WorkspaceContext::run($ws, fn () => $this->lignesChauffe(BudgetChauffe::RESSOURCE_DOMAINE)
@@ -236,14 +260,14 @@ final class DepotChauffe
     /**
      * Pauses actives à $maintenant : non levées ET non expirées.
      *
-     * @return list<\stdClass> lignes {id, portee, fournisseur, motif}
+     * @return list<\stdClass> lignes {id, portee, fournisseur, motif, expire_le}
      */
     public function pausesActives(string $ws, DateTimeImmutable $maintenant): array
     {
         return array_values(WorkspaceContext::run($ws, fn () => DB::table('envoi_pauses')
             ->where('workspace_id', $ws)->whereNull('levee_le')
             ->where(fn ($q) => $q->whereNull('expire_le')->orWhere('expire_le', '>', $maintenant->format('Y-m-d H:i:sP')))
-            ->orderBy('id')->get(['id', 'portee', 'fournisseur', 'motif'])->all()));
+            ->orderBy('id')->get(['id', 'portee', 'fournisseur', 'motif', 'expire_le'])->all()));
     }
 
     /**

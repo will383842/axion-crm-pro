@@ -1,6 +1,6 @@
 # PROMPT AUDIT E2E — Vérification forensique exhaustive post-implémentation Phase 1
 
-> **À copier-coller dans une NOUVELLE conversation Claude Code** (CWD = `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`).
+> **À copier-coller dans une NOUVELLE conversation Claude Code** (CWD = `<dossier du projet>`).
 > **À utiliser APRÈS** que l'autopilot Sprint 1→12 ait terminé son travail (tag `phase1-mocks-complete-*` créé).
 > **Modèle :** Opus 4.7 (1M tokens) — `/model` avant de coller.
 > **Durée estimée :** 4-8h Claude (10 agents //, ~15 000 critères auditables, rapport ~6 000 mots).
@@ -11,7 +11,7 @@
 ## Comment l'utiliser
 
 1. Vérifie que le tag `phase1-mocks-complete-*` existe (`git tag | grep phase1`)
-2. Ouvre une **nouvelle conversation** Claude Code dans `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`
+2. Ouvre une **nouvelle conversation** Claude Code dans `<dossier du projet>`
 3. Sélectionne **Opus 4.7** via `/model`
 4. Copie tout le contenu entre `<prompt>` et `</prompt>` (sans les balises)
 5. Colle et envoie
@@ -29,7 +29,7 @@ Tu n'es PAS le développeur de cette codebase. Tu débarques sur un projet incon
 
 ## CONTEXTE — LECTURE OBLIGATOIRE AVANT TOUT AUDIT
 
-**Repo local :** `C:\Users\willi\Documents\Projets\Axion-CRM-Pro`
+**Repo local :** `<dossier du projet>`
 **Repo GitHub :** https://github.com/will383842/axion-crm-pro
 **Tag implémentation :** `git tag | grep phase1-mocks-complete` (doit exister, sinon STOP)
 
@@ -650,7 +650,7 @@ Placeholder "🟡 Module Phase 2 — bientôt disponible" :
 - 6 catégories taille effectivement implémentées (artisan/commercant ajoutés vs 4 v1.0) ?
 - Use case `classify_company_axion` mergé (vs `ia_maturity_scoring` + `axion_offer_match` séparés) ?
 - Use case `fiche_quality_scoring` retiré ?
-- `OwnerUserSeeder` sécurisé email williamsjullin@gmail.com ?
+- `OwnerUserSeeder` sécurisé email proprietaire@exemple.test ?
 - Métriques business v1.1 présentes ?
 - WCAG 2.2 (vs 2.1) ?
 - i18next dès S1 ?

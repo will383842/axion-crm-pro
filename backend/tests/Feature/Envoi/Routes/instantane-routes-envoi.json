@@ -1,5 +1,192 @@
 [
     {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/brouillons/{id}",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons/{id}/apercu",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons/{id}/cible/estimation",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/brouillons/{id}/controles",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "PUT",
+        "uri": "api/v1/envoi/brouillons/{id}/etapes/{etape}",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons/{id}/test",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons/{id}/validation/code",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/brouillons/{id}/valider",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/campagnes/{id}/annuler-validation",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/configuration",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/boites",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/cibles",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/creation/destinataires-exemples",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/desinscriptions",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/domaines",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/domaines/{id}",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
         "methode": "GET",
         "uri": "api/v1/envoi/feu-vert",
         "middlewares": [
@@ -17,6 +204,53 @@
             "auth:sanctum",
             "first-login",
             "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/listes-noires",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition/export",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:data.export",
+            "permission:workspaces.manage",
+            "throttle:envoi-opposition-export",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/puis-je-ecrire",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "throttle:envoi-puis-je-ecrire",
             "workspace"
         ]
     },
@@ -100,6 +334,28 @@
     {
         "methode": "GET",
         "uri": "api/v1/envoi/sante",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/serveurs",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/serveurs/{id}/sante",
         "middlewares": [
             "api",
             "auth:sanctum",

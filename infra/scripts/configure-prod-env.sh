@@ -84,8 +84,10 @@ set_env "FRANCE_TRAVAIL_CLIENT_SECRET" "75d815fe88856084e392b0f98ffa3853a2026a89
 set_env "MISTRAL_API_KEY"            "hmRulXWj7WoeDqoAougR8gZKfqb3yqNk"
 
 # --- Owner initial ---
-set_env "OWNER_INITIAL_EMAIL"        "williamsjullin@gmail.com"
-set_env "OWNER_INITIAL_NAME"         "Williams Jullin"
+# Valeurs fournies par le responsable au lancement (non versionnées) :
+#   OWNER_INITIAL_EMAIL=... OWNER_INITIAL_NAME="..." bash configure-prod-env.sh
+if [ -n "${OWNER_INITIAL_EMAIL:-}" ]; then set_env "OWNER_INITIAL_EMAIL" "$OWNER_INITIAL_EMAIL"; fi
+if [ -n "${OWNER_INITIAL_NAME:-}" ]; then set_env "OWNER_INITIAL_NAME" "$OWNER_INITIAL_NAME"; fi
 # OWNER_INITIAL_PASSWORD laissé vide → magic-link only au 1er login (plus sécurisé)
 
 # --- Contraintes CPX22 (4 GB RAM) ---

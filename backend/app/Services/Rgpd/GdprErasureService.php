@@ -2,6 +2,7 @@
 
 namespace App\Services\Rgpd;
 
+use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Presse\LienJournalisteContact;
 use App\Crm\Rgpd\EffacementCoordonneesFiches;
 use App\Crm\Rgpd\MiseAEcart;
@@ -16,13 +17,13 @@ use Illuminate\Support\Facades\Log;
 /**
  * Effacement RGPD art. 17 — transaction multi-tables atomique.
  *
- * ⚠️ L3c-0 (ADR contrat v3 § 6, I3 — règle de Will : AUCUNE suppression de
+ * ⚠️ L3c-0 (ADR contrat v3 § 6, I3 — règle du fondateur : AUCUNE suppression de
  * personne ni de données de personne) : `erase()` ne détruit, n'anonymise et
  * n'écrase RIEN. Personnes, abonnements, contacts, candidats, journalistes,
  * praticiens et comptes sont MASQUÉS de façon réversible (opposition,
  * `deleted_at` doux, `App\Crm\Rgpd\MiseAEcart`) ; un opt-out cross-workspace
  * bloque tout envoi et toute réinsertion. L'effacement définitif n'est pas
- * codé : Will décide. Les commentaires historiques du fichier décrivent
+ * codé : le fondateur décide. Les commentaires historiques du fichier décrivent
  * l'ancien comportement.
  */
 class GdprErasureService
@@ -38,11 +39,23 @@ class GdprErasureService
      * due : rien n'est supprimé, il n'y a pas de résidu à rechercher.
      * `personnels` (numéros en clair) n'est jamais archivé ni rendu.
      *
+     * STOP-T4-CRM : `$signalement` (['motif' => …, 'canal' => …]) demande d'envoyer l'opposition au site
+     * (`consent_optout`, les deux portées) DANS cette transaction. `$demandeDuSite` vrai (demande créée par
+     * le site) : source `gdpr_erasure_demande_site`, hors liste blanche, donc RIEN n'est émis (anti-boucle).
+     *
+     * @param  ?array{motif: string, canal: string}  $signalement
      * @return array{deleted: array<string,int>, opt_out_added: bool, verification: string, personnels: list<string>}
      */
-    public function erase(string $subjectEmail, ?string $phone = null, ?string $reason = 'gdpr_art17'): array
-    {
-        return DB::transaction(function () use ($subjectEmail, $phone, $reason) {
+    public function erase(
+        string $subjectEmail,
+        ?string $phone = null,
+        ?string $reason = 'gdpr_art17',
+        ?array $signalement = null,
+        bool $demandeDuSite = false,
+    ): array {
+        $sourceOpposition = $demandeDuSite ? OppositionSortante::SOURCE_DEMANDE_SITE : 'gdpr_erasure';
+
+        return DB::transaction(function () use ($subjectEmail, $phone, $reason, $signalement, $demandeDuSite, $sourceOpposition) {
             $email = strtolower(trim($subjectEmail));
             $deleted = [];
 
@@ -149,14 +162,14 @@ class GdprErasureService
             $deleted['users'] = DB::table('users')->where('email', $email)->whereNull('deleted_at')
                 ->update(['deleted_at' => now(), 'updated_at' => now()]);
 
-            // CE QUI N'EST PAS TOUCHÉ, ET C'EST VOULU (règle de Will) :
+            // CE QUI N'EST PAS TOUCHÉ, ET C'EST VOULU (règle du fondateur) :
             // `activities`, `email_messages`, `email_verification_logs`,
             // `email_validations`, `notifications`, `rgpd_requests`,
             // `magic_links`, `media`, `sessions`, `invitations`,
             // `password_reset_tokens` et les fiches d'organisation gardent
             // leurs lignes. Aucun envoi ne part vers la personne (opposition,
             // `opt_out`, contacts et personnes masqués) ; l'effacement
-            // définitif de ces tables n'est PAS codé, Will décide.
+            // définitif de ces tables n'est PAS codé, le fondateur décide.
 
             // Audit log — la suppression elle-même
             $this->audit->record([
@@ -186,10 +199,19 @@ class GdprErasureService
             $this->dedup->addOptOut(
                 $email,
                 $phone,
-                source: 'gdpr_erasure',
+                source: $sourceOpposition,
                 reason: $reason,
                 scopes: DeduplicationService::UNIVERS_OPPOSITION,
             );
+
+            // Une opposition par univers, après l'écriture `opt_out`, dans la même transaction.
+            // Les numéros seuls ne partent pas (pas d'empreinte d'adresse, hors contrat).
+            if ($signalement !== null && ! $demandeDuSite && trim($email) !== '') {
+                $sortante = new OppositionSortante;
+                foreach (DeduplicationService::UNIVERS_OPPOSITION as $portee) {
+                    $sortante->signalerAdresseSansBloquer($email, $portee, $signalement['motif'], $signalement['canal']);
+                }
+            }
 
             // Chaque AUTRE numéro PERSONNEL est opposé lui aussi : sans cela, le
             // prochain import le remettrait sur la fiche de l'organisation. Un
@@ -203,7 +225,7 @@ class GdprErasureService
                     $this->dedup->addOptOut(
                         null,
                         $telephone,
-                        source: 'gdpr_erasure',
+                        source: $sourceOpposition,
                         reason: $reason,
                         scopes: DeduplicationService::UNIVERS_OPPOSITION,
                     );

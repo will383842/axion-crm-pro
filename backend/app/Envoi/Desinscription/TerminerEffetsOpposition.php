@@ -2,7 +2,7 @@
 
 namespace App\Envoi\Desinscription;
 
-use App\Crm\Outbound\ConsentOutboundRecorder;
+use App\Crm\Outbound\OppositionSortante;
 use App\Support\WorkspaceContext;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +27,8 @@ final class TerminerEffetsOpposition
     public function __construct(?Closure $emettreEvenementSortant = null)
     {
         $this->emettreEvenementSortant = $emettreEvenementSortant ?? static function (string $espace, string $empreinte, string $portee, string $canal): void {
-            (new ConsentOutboundRecorder)->record('consent_optout', $empreinte, $portee, null, ['motif' => 'desinscription_lien', 'canal' => $canal]);
+            // LÈVE en cas d'erreur (rejeu par `effets_termines_le`) ; ne part que si la ligne `opt_out` est née au CRM.
+            (new OppositionSortante)->signaler($empreinte, $portee, 'desinscription_lien', $canal);
         };
     }
 

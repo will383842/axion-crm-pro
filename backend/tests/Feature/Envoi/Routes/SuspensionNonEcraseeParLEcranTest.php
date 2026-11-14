@@ -12,6 +12,7 @@
  * Fixtures FICTIVES (dépôt public).
  */
 
+use App\Http\Middleware\AuditHashChainLogger;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Socle\Produits\ProduitsEspace;
@@ -76,6 +77,9 @@ test('PUT /workspace attend le verrou de ligne et conserve la suspension validé
     expect($tient)->toBeTrue('Le second processus n a pas pris le verrou.');
 
     $avant = microtime(true);
+    // Requête VALIDÉE (pas de RefreshDatabase) : le journal d'audit chaîné n'est pas l'objet du test et une ligne
+    // restante fausserait les tests de chaîne qui attendent un journal vide.
+    $this->withoutMiddleware(AuditHashChainLogger::class);
     $this->actingAs($user)->putJson('/api/v1/workspace', ['settings' => ['theme' => 'b']])->assertOk();
     $duree = microtime(true) - $avant;
 

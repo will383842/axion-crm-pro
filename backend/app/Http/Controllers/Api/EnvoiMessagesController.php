@@ -42,7 +42,8 @@ class EnvoiMessagesController extends ApiController
         return $this->ecrire($request, 'creation', fn (string $ws, array $s, string $par) => response()->json($this->service->creer($ws, $s['nom'], $s['objet'], $s['corps'], $par), 201));
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    /** PUT : ajoute toujours une NOUVELLE version (ajout seul, rien n'est écrasé : deux saisies simultanées gardent chacune la leur). */
+    public function nouvelleVersion(Request $request, string $id): JsonResponse
     {
         return $this->ecrire($request, 'version', fn (string $ws, array $s, string $par) => response()->json($this->service->enregistrer($ws, $id, $s['objet'], $s['corps'], $par)), $id);
     }

@@ -587,9 +587,8 @@ test('BALAYAGE : aucune route GET de l API ne sert une coordonnee en clair a un 
         'liste' => $this->listeId,
         // 2026-10-03 (N12) : la provenance tiers d'une personne (owner seul).
         'contactId' => $this->contactId,
-        // Lot R11 : brouillons de campagne (`/envoi/brouillons/{id}`, `/controles`). Un identifiant inconnu : la route est
-        // visitée (404, aucune coordonnée), ce qui garde le plafond des routes non visitées à 9.
-        'id' => '00000000-0000-4000-8000-000000000000',
+        // R03 : domaines et serveurs d'envoi (identifiant numérique de l'infrastructure, lecture seule, aucune coordonnée de contact).
+        'id' => 1,
     ];
 
     $cibles = [];

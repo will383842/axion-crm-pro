@@ -52,7 +52,10 @@ class CrmOutboundRattraper extends Command
     private function originesDesDemandes(): array
     {
         $r = ['console' => [], 'site' => []];
-        foreach (DB::table('workspaces')->pluck('id')->all() as $espace) {
+        // `deleted_at` est nommé : lecture CONSCIENTE. Les espaces à la corbeille sont inclus exprès, leurs demandes
+        // RGPD (dont celles venues du site) existent toujours et doivent compter dans la preuve d'origine.
+        foreach (DB::table('workspaces')->get(['id', 'deleted_at']) as $espaceLigne) {
+            $espace = $espaceLigne->id;
             $lignes = WorkspaceContext::run((string) $espace, static fn () => DB::table('rgpd_requests')
                 ->where('workspace_id', (string) $espace)
                 ->whereNotNull('subject_email')

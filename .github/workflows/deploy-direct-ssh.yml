@@ -180,6 +180,13 @@ jobs:
           # serveur redémarré), on retombe dans le même angle mort. La vraie
           # robustesse — lancer le script détaché côté serveur puis interroger
           # son état séparément — reste À FAIRE.
+          # Les drapeaux voyagent en arguments que le shell distant redécoupe : une valeur
+          # vide DISPARAÎT et décale les positions, une valeur à métacaractères serait
+          # interprétée. On normalise donc ici : tout ce qui n'est pas true|false devient
+          # `ignore` (le serveur l'ignore déjà : seul true|false est écrit).
+          for v in CRM_INGEST_DOSSIER_ENABLED CRM_SYNC_DOSSIER_CLIENT_STAGE CRM_INGEST_DEMANDES_PERSONNE_ENABLED ORIGINES_V3_ENABLED ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED; do
+            case "${!v}" in true|false) ;; *) printf -v "$v" '%s' 'ignore' ;; esac
+          done
           ssh -o StrictHostKeyChecking=no \
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=10 \
@@ -322,16 +329,18 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::cle ORIGINES_HMAC_KEY dédiée (créée sur le serveur si absente)"
-          # Jamais d'écrasement : si une valeur non vide existe, on ne fait RIEN.
+          # Jamais d'écrasement : si une ligne ORIGINES_HMAC_KEY existe (même vide), on n'écrit RIEN.
           # La valeur est générée ici, ajoutée au .env et n'est JAMAIS affichée
           # (ni écho, ni mode trace, ni argument SSH, ni secret GitHub).
           if [ -f .env ]; then
-            if grep -Eq '^ORIGINES_HMAC_KEY=.+' .env; then
+            if grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=[[:space:]]*(""|'"''"')[[:space:]]*$' .env; then
+              echo "ORIGINES_HMAC_KEY : présente mais vide (entre guillemets), rien écrit"
+            elif grep -Eq '^[[:space:]]*(export[[:space:]]+)?ORIGINES_HMAC_KEY[[:space:]]*=[[:space:]]*[^[:space:]]' .env; then
               echo "ORIGINES_HMAC_KEY : déjà présente"
             else
-              # Une ligne vide `ORIGINES_HMAC_KEY=` éventuelle n'est pas modifiée : la dernière ligne l'emporte.
               CLE_HMAC=$(openssl rand -hex 32)
               if [ "${#CLE_HMAC}" -ne 64 ]; then echo "ORIGINES_HMAC_KEY : génération échouée, .env non touché"; exit 1; fi
+              if [ -s .env ] && [ -n "$(tail -c1 .env)" ]; then printf '\n' >> .env; fi
               printf 'ORIGINES_HMAC_KEY=%s\n' "$CLE_HMAC" >> .env
               unset CLE_HMAC
               echo "ORIGINES_HMAC_KEY : créée (64 caractères hexadécimaux)"

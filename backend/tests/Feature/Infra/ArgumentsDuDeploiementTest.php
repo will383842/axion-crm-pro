@@ -156,3 +156,20 @@ test('DEPLOIEMENT-ARGS — TEMOIN : la garde sait detecter un decalage', functio
     expect(count($envoyes[0]))->toBe(3);
     expect(max(array_map('intval', $lus[1])))->toBe(4);
 });
+
+test('DEPLOIEMENT-ARGS — les drapeaux sont normalises (true|false sinon ignore) avant ssh', function (): void {
+    $script = blocDeploiement();
+    $boucle = strpos($script, 'for v in CRM_INGEST_DOSSIER_ENABLED');
+    expect($boucle)->not->toBeFalse('La boucle de normalisation des drapeaux a disparu.');
+    expect($boucle)->toBeLessThan(strpos($script, "'bash -s'"));
+
+    $ligne = substr($script, $boucle, strpos($script, 'done', $boucle) - $boucle);
+    foreach ([
+        'CRM_INGEST_DOSSIER_ENABLED', 'CRM_SYNC_DOSSIER_CLIENT_STAGE', 'CRM_INGEST_DEMANDES_PERSONNE_ENABLED',
+        'ORIGINES_V3_ENABLED', 'ORIGINES_LECTURE_ENABLED', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED',
+    ] as $nom) {
+        expect($ligne)->toContain($nom);
+    }
+    expect($ligne)->toContain('true|false) ;;');
+    expect($ligne)->toContain("printf -v \"\$v\" '%s' 'ignore'");
+});

@@ -56,7 +56,10 @@ test('ORIGINES-DEPLOI — la cle HMAC est creee sur le serveur, sans fuite ni ec
     $bloc = blocCleHmac();
 
     // Conditionnee a l'absence d'une valeur non vide.
-    expect($bloc)->toContain("grep -Eq '^ORIGINES_HMAC_KEY=.+' .env");
+    expect($bloc)->toContain('ORIGINES_HMAC_KEY[[:space:]]*=');
+    expect($bloc)->toContain('présente mais vide (entre guillemets), rien écrit');
+    // Un .env sans saut de ligne final ne doit pas coller la cle a la derniere ligne.
+    expect($bloc)->toContain("[ -n \"\$(tail -c1 .env)\" ]");
     expect($bloc)->toContain('openssl rand -hex 32');
     expect($bloc)->toContain('ORIGINES_HMAC_KEY : déjà présente');
     expect($bloc)->toContain('ORIGINES_HMAC_KEY : créée (64 caractères hexadécimaux)');

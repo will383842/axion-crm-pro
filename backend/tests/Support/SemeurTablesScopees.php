@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,6 +200,8 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
+        // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
+        'envoi_reputation_constats',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
         'envoi_campagnes',
         'envoi_campagnes_journal',
@@ -835,6 +837,18 @@ final class SemeurTablesScopees
             'bouton_vu' => false,
             'post_effectif' => false,
             'auteur' => 'zz',
+        ]);
+        $inserer('envoi_reputation_constats', [
+            'source' => 'google_postmaster',
+            'ressource_type' => 'domaine',
+            'ressource' => 'zz.example.test',
+            'jour' => '2026-01-01',
+            'reputation' => 'bonne',
+            'saisie' => 'manuelle',
+            'preuve' => 'zz-preuve-zz',
+            'auteur' => 'zz',
+            'cle_rejeu' => 'zz-cle-rejeu-' . $marque,
+            'empreinte' => hash('sha256', 'zz-rep-' . $marque),
         ]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',

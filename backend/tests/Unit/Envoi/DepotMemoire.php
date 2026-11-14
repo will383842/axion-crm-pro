@@ -104,6 +104,14 @@ final class DepotMemoire implements DepotSocle
         return $this->statuts[$this->cleJournal($cleIdempotence)] ?? 'acceptee';
     }
 
+    /** @var list<string> adresses opposées (stop) pour les tests */
+    public array $adressesOpposees = [];
+
+    public function adresseOpposee(string $workspaceId, string $adresse): bool
+    {
+        return in_array(mb_strtolower(trim($adresse)), $this->adressesOpposees, true);
+    }
+
     public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool
     {
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {

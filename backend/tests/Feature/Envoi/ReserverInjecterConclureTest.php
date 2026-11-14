@@ -1,6 +1,10 @@
 <?php
 
+use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Chauffe\GardeChauffe;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
@@ -9,6 +13,7 @@ use App\Envoi\PasserelleLocale;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Envoi\Smtp\EnvoiSmtpRefuse;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -413,4 +418,38 @@ test('envoi_injection_liberer refuse un espace différent du contexte courant ; 
     WorkspaceContext::set($this->ws);
     expect(DB::selectOne("SELECT to_regprocedure('envoi_compteur_global_liberer(date)') AS f")->f)->toBeNull();
     expect($this->depot->concluireInjection($this->ws, $this->jour, 'k1', 'liberee'))->toBeTrue();
+});
+
+// Audit L8-F14a, bloquants 1 et 2 (passerelle seule, base réelle).
+test('bloquant 1 : opposition inscrite avant l\'injection => refus DÉFINITIF (opposition), zéro appel, aucune réservation', function () {
+    ListeSuppression::inscrire('dest@example.test', ListeSuppression::MANUEL, 'test');
+    $serveur = new ServeurEspion(fn () => ResultatInjection::accepte('id-1'));
+    try {
+        ($this->passerelle)($serveur)->injecter(($this->msg)());
+        $this->fail('opposition attendue');
+    } catch (EnvoiRefuse $e) {
+        expect($e->estOpposition())->toBeTrue()->and($e->estAttente())->toBeFalse();
+    }
+    expect($serveur->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBeNull()
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(0)->and(($this->compteur)())->toBe(0);
+});
+
+test('bloquant 1 : opposition arrivée après la réservation, rejeu d\'une clé « reservee » (serveur dédoublonnant) => place libérée, zéro appel', function () {
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    ListeSuppression::inscrire('dest@example.test', ListeSuppression::MANUEL, 'test');
+    $faux = new FauxServeurEnvoi;
+    expect(fn () => ($this->passerelle)($faux)->injecter(($this->msg)()))->toThrow(EnvoiRefuse::class, 'Opposition');
+    expect($faux->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBeNull()
+        ->and($this->depot->injectesLe($this->ws, $this->jour))->toBe(0)->and(($this->compteur)())->toBe(0);
+});
+
+test('bloquant 2 : rejeu d\'une clé « reservee » HORS fenêtre (20 h) avec un serveur dédoublonnant => report d\'attente, zéro appel, réservation conservée', function () {
+    $garde = new GardeChauffe(app(DepotChauffe::class), $this->depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
+    $soir = new DateTimeImmutable('2026-11-17 20:00:00', new DateTimeZone('Europe/Paris'));
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $faux = new FauxServeurEnvoi;
+    $p = new PasserelleLocale($faux, $this->depot, true, 5, fn () => $soir, $this->ws, 300, fn () => WorkspaceContext::current(), $garde);
+    $r = $p->injecter(($this->msg)());
+    expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
+        ->and($faux->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('reservee');
 });

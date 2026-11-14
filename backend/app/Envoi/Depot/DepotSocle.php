@@ -41,6 +41,13 @@ interface DepotSocle
     public function etatInjection(string $workspaceId, string $cleIdempotence): ?string;
 
     /**
+     * Le STOP gagne toujours : l'adresse est-elle opposée (opposition, liste de suppression, désinscription ou
+     * événement STOP / opposition / rebond dur sur cette adresse dans cet espace) ? À relire SOUS le verrou, juste
+     * avant toute réservation ou rejeu.
+     */
+    public function adresseOpposee(string $workspaceId, string $adresse): bool;
+
+    /**
      * À appeler SOUS le verrou : réserve la place (statut `reservee`, compte dans les plafonds). Vrai si la réservation est nouvelle.
      * `$ressources` (boîte, domaine d'envoi) sert à compter la réservation dans la chauffe tant qu'elle n'y est pas notée.
      *

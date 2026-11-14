@@ -227,7 +227,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         $bloquante = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('boite_id', $this->boiteId)->whereIn('etat', ['injection_en_cours', 'a_verifier'])
             ->where('cle_idempotence', '<>', $message->cleIdempotence)->exists());
-        $cleAlerte = 'envoi:boite_bloquee_a_verifier:' . $this->boiteId;
+        $cleAlerte = 'envoi:boite_bloquee_a_verifier:' . $this->workspaceId . ':' . $this->boiteId;
         if ($bloquante) {
             // Report d'ATTENTE, ESPACÉ (jamais chaque minute) et UNE seule alerte par boîte tant que le blocage dure.
             if (Cache::add($cleAlerte, 1, now()->addDays(30))) {

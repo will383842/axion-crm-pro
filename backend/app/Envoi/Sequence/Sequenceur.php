@@ -147,6 +147,11 @@ final class Sequenceur
                 // en attente de vérification humaine, UNE alerte ; la ligne reste `a_verifier` côté passerelle.
                 return $this->conclure($plan, fn (\stdClass $ins): string => $this->arreterIssueIncertaine($ins, null, $maintenant, ! $e->alerteDejaEmise), $maintenant);
             }
+            if ($e->estOpposition()) {
+                // Le STOP gagne : opposition validée entre la réservation et l'injection. Refus DÉFINITIF et arrêt (garde:opposition),
+                // trace pour l'adresse et l'entreprise ; la place de la passerelle est déjà rendue.
+                return $this->conclure($plan, fn (\stdClass $ins): string => $this->refuser($ins, $plan['rang'], EligibiliteAdresse::OPPOSITION, $maintenant), $maintenant);
+            }
             if ($e->estAttente()) {
                 // Report d'ATTENTE (envoi réel éteint, arrêt général, mode témoins) : ni compteur, ni alerte, ni limite.
                 return $this->conclure($plan, fn (\stdClass $ins): string => $this->reporter($ins, $plan['rang'], $e->getMessage(), $plan['fenetre'], $maintenant), $maintenant);
@@ -471,7 +476,7 @@ final class Sequenceur
         }
         // Ligne « reserve » ancienne : reprise (on réclame la ligne en avançant `maj_le`, une seule exécution gagne) avec le MÊME Message-ID.
         $reprise = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
-            ->where('maj_le', '<', $maintenant->modify('-' . self::RESERVATION_REPRISE_HEURES . ' hours')->format('c'))
+            ->where('maj_le', '<', $maintenant->modify('-' . (self::RESERVATION_REPRISE_HEURES * 60 + 1) . ' minutes')->format('c'))
             ->update(['maj_le' => $maintenant->format('c')]);
         if ($reprise === 1) {
             Log::warning('envoi.sequenceur_reprise_reservation : étape « reserve » reprise par le chemin de rejeu.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang]);

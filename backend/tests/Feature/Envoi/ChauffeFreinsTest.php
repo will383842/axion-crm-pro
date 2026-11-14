@@ -16,6 +16,7 @@ use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Contrat\LotEvenements;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
@@ -1421,4 +1422,21 @@ test('quota de chauffe : une issue INCERTAINE (a_verifier) compte toujours dans 
     $coupure->sante();
     expect(fn () => $coupure->injecter(messageChauffe($ws)))->toThrow(RuntimeException::class);
     expect($normale->injecter(messageChauffe($ws))->accepte)->toBeFalse()->and($faux->appels)->toBe(9);
+});
+
+// Audit L8-F14a, bloquant 2 : le rejeu d'une clé déjà réservée (serveur dédoublonnant) ne contourne ni pause, ni frein.
+test('rejeu d\'une clé « reservee » : pause de réputation ouverte entre-temps => report d\'attente, ZÉRO appel au serveur, réservation conservée', function () {
+    retraitEnFileBranche();
+    $ws = espaceChauffe();
+    WorkspaceContext::set($ws);
+    $maintenant = paris('2026-11-10 12:00:00');
+    $faux = new FauxServeurEnvoi;
+    $p = passerelleChauffe($faux, $maintenant);
+    $m = messageChauffe($ws);
+    $depot = app(DepotSocle::class);
+    $depot->reserverInjection($ws, JourEnvoi::de($maintenant), $m->cleIdempotence, $maintenant); // plantage entre la réservation et l'appel
+    app(GardeChauffe::class)->reputationMauvaise($ws, 'gmail', $maintenant);
+    $r = $p->injecter($m);
+    expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
+        ->and($faux->appels)->toBe(0)->and($depot->etatInjection($ws, $m->cleIdempotence))->toBe('reservee');
 });

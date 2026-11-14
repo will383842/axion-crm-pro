@@ -120,6 +120,8 @@ function calculer(par: Regroupement, depuisMs: number, jusquaMs: number) {
 
 function adresseSansAccent(s: string): string { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
 
+const FOURNISSEURS_DEMO = ['gmail', 'microsoft', 'yahoo', 'orange', 'ovh', 'autre'];
+
 export const handlers: HttpHandler[] = [
   http.get(api('/envoi/resultats'), async ({ request }) => {
     await delai();
@@ -181,38 +183,30 @@ export const handlers: HttpHandler[] = [
         { messagerie: 'Messagerie opérateur B', envoyes: Math.round(total * 0.32), par_heure: 6, etat: 'normal' },
         { messagerie: 'Messagerie pro C', envoyes: Math.round(total * 0.27), par_heure: 3, etat: 'freine' },
       ],
+      temoins_par_fournisseur: FOURNISSEURS_DEMO.map((fournisseur) => ({ fournisseur, jours: Array.from({ length: 14 }, (_, i) => ({ jour: new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10), etat: 'non_teste' })) })),
       pauses: [{ motif: 'reports_en_hausse_sur_une_heure', portee: 'fournisseur', fournisseur: 'autre', fin: new Date(fin + 3_600_000).toISOString() }],
       envoyes_14_jours: Array.from({ length: 14 }, (_, i) => { const jour = new Date(fin - (13 - i) * JOUR).toISOString().slice(0, 10); return { jour, envoyes: jour === new Date(fin).toISOString().slice(0, 10) ? total : (par.get(jour) ?? 0) }; }),
     });
   }),
 
+  // Envoi fermé (palier 0) : le test du matin ne part pas, rien ne change.
   http.post(api('/envoi/sante/test'), async () => {
     await delai();
-    const le = maintenant().toISOString();
-    demoDb.zone<TestMatin>('pilotage', 'testMatin').modifier('test', { le, temoins_ok: 4, temoins_total: 4 });
-    return HttpResponse.json({ le, temoins_ok: 4, temoins_total: 4, etat: 'vert' });
+    return erreur(409, 'envoi_ferme_palier_0', 'Les envois sont fermés (palier 0) : aucun test ne peut partir.');
   }),
 
   http.get(api('/envoi/envois/chercher'), async ({ request }) => {
     await delai();
-    const force = await repondreEtatForce(request, { adresse: '', personne: null, evenements: [], peut_ecrire: true, raison: null });
+    const force = await repondreEtatForce(request, { data: [] });
     if (force) return force;
     const q = adresseSansAccent(new URL(request.url).searchParams.get('adresse') ?? '');
     if (q.length < 2) return erreur(422, 'validation', 'Saisissez une adresse e-mail.');
-    const contact = demoDb.contacts.tous().find((c) => adresseSansAccent(c.email) === q)
-      ?? demoDb.contacts.tous().find((c) => adresseSansAccent(c.email).includes(q) || adresseSansAccent(`${c.first_name} ${c.last_name}`).includes(q));
-    const adresse = contact?.email ?? q;
-    const evenements = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === adresseSansAccent(adresse))
-      .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le));
-    const rebond = evenements.find((e) => e.type === 'rebond_dur');
-    const opposition = demoDb.opposition.filtrer((o) => adresseSansAccent(o.valeur) === adresseSansAccent(adresse))[0];
-    const raison = rebond ? `${rebond.libelle ?? 'Refus du serveur'} (${rebond.code_serveur ?? '—'})` : opposition ? opposition.motif : contact?.ne_plus_ecrire ? 'Ne plus écrire' : null;
-    const entreprise = contact ? demoDb.entreprises.trouver(contact.company_id) : undefined;
-    return HttpResponse.json({
-      adresse,
-      personne: contact ? { contact_id: contact.id, nom: `${contact.first_name} ${contact.last_name}`, organisation: entreprise?.denomination ?? null } : null,
-      evenements, peut_ecrire: raison === null, raison,
-    });
+    const classes: Record<string, string> = { rebond_dur: 'rebond_dur', rebond_mou: 'rebond_mou', plainte: 'hostile', desinscription: 'desinscription', reponse: 'reponse_humaine' };
+    const data = demoDb.evenementsEnvoi.filtrer((e) => adresseSansAccent(e.adresse) === q && classes[e.type] !== undefined)
+      .sort((a, b) => Date.parse(b.survenu_le) - Date.parse(a.survenu_le))
+      .slice(0, 50)
+      .map((e) => ({ recu_le: e.survenu_le, classe: classes[e.type], boite: String(e.boite_id) }));
+    return HttpResponse.json({ data });
   }),
 
   http.get(api('/envoi/feu-vert'), async ({ request }) => {

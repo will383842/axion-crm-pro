@@ -20,6 +20,7 @@ use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Gardes\EnvoiAutorise;
+use App\Envoi\JourEnvoi;
 use App\Envoi\ListesNoires\DepotControlesDb;
 use App\Envoi\ListesNoires\Ressource;
 use App\Envoi\ListesNoires\StatutListe;
@@ -46,6 +47,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\ServeurAvantInjection;
 use Tests\Support\ServeurEspion;
 use Tests\TestCase;
 
@@ -1239,4 +1241,41 @@ test('ligne « reserve » ancienne SANS réservation côté passerelle (plantage
     expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ENVOYE)
         ->and($espion->appels)->toBe(1)
         ->and(seqMessages($i)[0]->message_id)->toBe('<m1@' . SEQ_DOMAINE . '>'); // MÊME Message-ID
+});
+
+// Audit L8-F14a, bloquant 1 : le STOP gagne même s'il arrive ENTRE la réservation (temps A) et l'injection (passerelle).
+function seqOppositionEntreReservationEtInjection(object $t, string $email, Closure $opposer): array
+{
+    $sid = seqSequence($t);
+    [, $c] = seqFiche($t, $email);
+    $i = seqInscrire($t, $sid, $c);
+    $espion = new ServeurEspion(fn () => ResultatInjection::accepte('id-ne-doit-pas-partir'));
+    ($t->seq)();
+    $passerelle = new PasserelleLocale($espion, new DepotSocleDb, true, 300, fn () => $t->maintenant, $t->ws, 300, fn () => WorkspaceContext::current());
+    $decorateur = new ServeurAvantInjection($passerelle, fn () => $opposer($i, $c));
+    $seq = new Sequenceur($decorateur, new LecteurFicheDb, $t->composeur, new ParametresExpedition(SEQ_DOMAINE, 'from@' . SEQ_DOMAINE, 'ZZ Expediteur SAS'));
+
+    return [$seq->traiter($t->ws, $i, $t->maintenant), $espion, $i];
+}
+
+test('bloquant 1 : opposition inscrite entre la réservation et l\'injection => zéro appel, message refusé (opposition), inscription arrêtée, aucune place comptée', function () {
+    $email = 'stop1@zz-client.example.invalid';
+    [$res, $espion, $i] = seqOppositionEntreReservationEtInjection($this, $email, fn () => ListeSuppression::inscrire($email, ListeSuppression::MANUEL, 'test'));
+    expect($res)->toBe(Sequenceur::REFUSE)->and($espion->appels)->toBe(0)
+        ->and(seqMessages($i)[0]->statut)->toBe('refuse')->and(seqMessages($i)[0]->refus)->toBe(EligibiliteAdresse::OPPOSITION)
+        ->and(seqEtat($i)->statut)->toBe('arretee')->and(seqEtat($i)->motif_arret)->toBe('garde:' . EligibiliteAdresse::OPPOSITION)
+        ->and((new DepotSocleDb)->injectesLe($this->ws, JourEnvoi::de($this->maintenant)))->toBe(0);
+});
+
+test('bloquant 1 (variante) : STOP reçu sur UNE AUTRE inscription de la même adresse entre la réservation et l\'injection => zéro appel, refus opposition', function () {
+    $email = 'stop2@zz-client.example.invalid';
+    [$res, $espion, $i] = seqOppositionEntreReservationEtInjection($this, $email, function (string $i, int $c) {
+        $sid2 = seqSequence($this);
+        $j = seqInscrire($this, $sid2, $c); // même adresse, autre inscription
+        Inscriptions::tracer($this->ws, seqEtat($j), Evenement::STOP, $this->maintenant);
+    });
+    expect($res)->toBe(Sequenceur::REFUSE)->and($espion->appels)->toBe(0)
+        ->and(seqMessages($i)[0]->statut)->toBe('refuse')->and(seqEtat($i)->statut)->toBe('arretee')
+        ->and(seqEtat($i)->motif_arret)->toBe('garde:' . EligibiliteAdresse::OPPOSITION)
+        ->and((new DepotSocleDb)->injectesLe($this->ws, JourEnvoi::de($this->maintenant)))->toBe(0);
 });

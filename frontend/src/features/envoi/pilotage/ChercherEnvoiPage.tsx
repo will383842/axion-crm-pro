@@ -7,27 +7,26 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { Button, Card, PageHeader } from '@/components/ui';
 import { api } from '@/lib/api';
-import type { components } from '@/features/envoi/api/commun';
+import type { components } from '@/features/envoi/api/pilotage';
 import { OngletsSante } from './OngletsSante';
 import { Chargement, Panne, Vide } from './composants/Etats';
-import { formaterDateHeure, minuscule, telechargerCsv } from './composants/formats';
+import { formaterDateHeure, telechargerCsv } from './composants/formats';
 
-type Evenement = components['schemas']['EvenementEnvoi'];
-interface Resultat { adresse: string; personne: { contact_id: number; nom: string; organisation: string | null } | null; evenements: Evenement[]; peut_ecrire: boolean; raison: string | null }
+type RechercheEnvoi = components['schemas']['RechercheEnvoi'];
+type Ligne = RechercheEnvoi['data'][number];
 
-/** « Refusé : adresse inexistante (550 5.1.1) » : le code du serveur, dit en clair. */
-export function enClair(e: Evenement): string {
-  const code = e.code_serveur ? ` (${e.code_serveur})` : '';
-  const l = e.libelle ? minuscule(e.libelle) : '';
-  switch (e.type) {
-    case 'rebond_dur': return `Refusé : ${l || 'adresse refusée'}${code}`;
-    case 'rebond_mou': return `Refus temporaire : ${l || 'nouvel essai prévu'}${code}`;
-    case 'remis': return 'Accepté par le serveur du destinataire';
-    case 'plainte': return 'Signalé comme indésirable par le destinataire';
-    case 'desinscription': return e.libelle ?? 'Désinscription';
-    case 'reponse': return 'Le destinataire a répondu';
-    default: return e.libelle ?? '';
-  }
+const LIBELLES: Record<Ligne['classe'], string> = {
+  reponse_humaine: 'Le destinataire a répondu',
+  auto_reponse: 'Réponse automatique (absence, accusé)',
+  desinscription: 'Désinscription demandée',
+  hostile: 'Signalé comme indésirable ou réponse hostile',
+  rebond_dur: 'Refusé : adresse refusée par le serveur du destinataire',
+  rebond_mou: 'Refus temporaire : nouvel essai prévu',
+};
+
+/** La classe du serveur, dite en clair. */
+export function enClair(l: Ligne): string {
+  return LIBELLES[l.classe] ?? l.classe;
 }
 
 export function ChercherEnvoiPage() {
@@ -36,27 +35,17 @@ export function ChercherEnvoiPage() {
   const requete = useQuery({
     queryKey: ['envoi', 'chercher', adresse],
     enabled: adresse !== null,
-    queryFn: async () => (await api.get<Resultat>('/envoi/envois/chercher', { params: { adresse } })).data,
+    queryFn: async () => (await api.get<RechercheEnvoi>('/envoi/envois/chercher', { params: { adresse } })).data.data,
   });
-  const noms = useQuery({
-    queryKey: ['envoi', 'chercher-noms'],
-    queryFn: async () => {
-      const [c, s] = await Promise.all([
-        api.get<{ data: { cle: string; libelle: string }[] }>('/envoi/resultats', { params: { par: 'campagne', jours: 90 } }),
-        api.get<{ boites: { id: string; adresse: string }[] }>('/envoi/sante'),
-      ]);
-      return { campagnes: new Map(c.data.data.map((x) => [x.cle, x.libelle])), boites: new Map(s.data.boites.map((b) => [b.id, b.adresse])) };
-    },
-  });
-  const r = requete.data;
+  const lignes = requete.data;
 
   function chercher(ev: FormEvent) {
     ev.preventDefault();
     if (saisie.trim() !== '') setAdresse(saisie.trim());
   }
   function exporter() {
-    if (!r) return;
-    telechargerCsv('envois-adresse.csv', [['Quand', 'Campagne', 'Boîte', 'Réponse du serveur', 'En clair'], ...r.evenements.map((e) => [formaterDateHeure(e.survenu_le), noms.data?.campagnes.get(e.campagne_id) ?? '—', noms.data?.boites.get(e.boite_id) ?? '—', e.code_serveur ?? '—', enClair(e)])]);
+    if (!lignes) return;
+    telechargerCsv('envois-adresse.csv', [['Quand', 'Boîte', 'En clair'], ...lignes.map((l) => [formaterDateHeure(l.recu_le), l.boite, enClair(l)])]);
   }
 
   return (
@@ -76,37 +65,24 @@ export function ChercherEnvoiPage() {
         {adresse === null ? <Vide titre="Saisissez une adresse" description="Le résultat montrera chaque message, la réponse du serveur et la raison." /> :
           requete.isLoading ? <Chargement libelle="Recherche en cours" /> :
           requete.isError ? <Panne onReessayer={() => void requete.refetch()} /> :
-          !r ? null : r.evenements.length === 0 && r.personne === null ? <Vide titre="Aucun message pour cette adresse" description="Cette adresse n’a reçu aucun message d’Envoi." /> : (
-            <div className="space-y-4">
-              <Card>
-                <h2 className="text-lg font-bold text-slate-900">{r.personne ? `${r.personne.nom}${r.personne.organisation ? ` · ${r.personne.organisation}` : ''}` : r.adresse}</h2>
-                <p className="mt-1 text-sm text-slate-700">
-                  {r.personne ? <>Fiche CRM : {r.adresse} · </> : null}
-                  peut-on lui écrire ? <strong>{r.peut_ecrire ? 'Oui' : 'Non'}</strong>{r.raison ? <> ({minuscule(r.raison)})</> : null}.
-                </p>
-              </Card>
-              <Card>
-                <h2 className="mb-3 text-lg font-bold text-slate-900">{r.evenements.length} message{r.evenements.length > 1 ? 's' : ''} pour cette adresse</h2>
-                {r.evenements.length === 0 ? <p className="text-sm text-slate-600">Aucun message n’est parti vers cette adresse.</p> : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-left text-sm">
-                      <caption className="sr-only">Messages</caption>
-                      <thead className="text-xs text-slate-600"><tr><th scope="col" className="py-2 pr-3">Quand</th><th scope="col" className="py-2 pr-3">Campagne</th><th scope="col" className="py-2 pr-3">Boîte</th><th scope="col" className="py-2 pr-3">Réponse du serveur</th><th scope="col" className="py-2">En clair</th></tr></thead>
-                      <tbody>{r.evenements.map((e) => (
-                        <tr key={e.id} className="border-t border-slate-100">
-                          <td className="py-2 pr-3 whitespace-nowrap">{formaterDateHeure(e.survenu_le)}</td>
-                          <td className="py-2 pr-3">{noms.data?.campagnes.get(e.campagne_id) ?? '—'}</td>
-                          <td className="py-2 pr-3">{noms.data?.boites.get(e.boite_id) ?? '—'}</td>
-                          <td className="py-2 pr-3">{e.code_serveur ?? '—'}</td>
-                          <td className="py-2">{enClair(e)}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                )}
-                <div className="mt-3"><Button variant="secondary" className="min-h-11 md:min-h-9" onClick={exporter}>Exporter</Button></div>
-              </Card>
-            </div>
+          !lignes ? null : lignes.length === 0 ? <Vide titre="Aucun message pour cette adresse" description="Cette adresse n’a reçu aucun message d’Envoi, ou elle est inconnue de cet espace." /> : (
+            <Card>
+              <h2 className="mb-3 text-lg font-bold text-slate-900">{lignes.length} événement{lignes.length > 1 ? 's' : ''} pour cette adresse</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-left text-sm">
+                  <caption className="sr-only">Événements</caption>
+                  <thead className="text-xs text-slate-600"><tr><th scope="col" className="py-2 pr-3">Quand</th><th scope="col" className="py-2 pr-3">Boîte</th><th scope="col" className="py-2">En clair</th></tr></thead>
+                  <tbody>{lignes.map((l, i) => (
+                    <tr key={`${l.recu_le}-${i}`} className="border-t border-slate-100">
+                      <td className="py-2 pr-3 whitespace-nowrap">{formaterDateHeure(l.recu_le)}</td>
+                      <td className="py-2 pr-3">{l.boite}</td>
+                      <td className="py-2">{enClair(l)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <div className="mt-3"><Button variant="secondary" className="min-h-11 md:min-h-9" onClick={exporter}>Exporter</Button></div>
+            </Card>
           )}
       </div>
     </div>

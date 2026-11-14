@@ -21,6 +21,16 @@ import type { Campagne, Destinataire, EvenementEnvoi } from '../../donnees/types
 const OBJETS_AB = ['Une idée pour votre prochain salon', 'Salon des artisans : on en parle ?'] as const;
 /** Délai, en jours, de chaque message de la séquence. */
 const DELAIS = [0, 4, 11, 18] as const;
+/**
+ * Forme `CampagneSuivi` du contrat (R09) : sans `ab_objet`, avec `envoi_ferme` et `version`. La démo simule un serveur dont l'envoi est ouvert,
+ * d'où `envoi_ferme: false` (le vrai serveur, au palier 0, répond vrai).
+ */
+function suivi(c: Campagne | undefined) {
+  if (c === undefined) return null;
+  const reste: Partial<Campagne> = { ...c };
+  delete reste.ab_objet;
+  return { ...reste, etapes: Math.min(3, c.etapes), envoi_ferme: false, version: 1 };
+}
 /** Limite de refus affichée à côté du taux (en %). */
 const LIMITE_REFUS = 2;
 /** Plafond de messages par jour pour une campagne, toutes boîtes comprises. */
@@ -210,7 +220,7 @@ function fiche(campagne: Campagne) {
 
   return {
     maintenant: maintenant().toISOString(),
-    campagne: campagne,
+    campagne: suivi(campagne),
     sequence,
     derniers_evenements: events
       .filter((e) => e.type !== 'remis')
@@ -266,7 +276,7 @@ export const handlers: HttpHandler[] = [
     for (const c of toutes) par_statut[c.statut] = (par_statut[c.statut] ?? 0) + 1;
     let liste = filtrerTexte(toutes, lireRecherche(request), ['nom']);
     if (statut) liste = liste.filter((c) => c.statut === statut);
-    return HttpResponse.json({ ...paginer(liste, request, 50), par_statut, maintenant: maintenant().toISOString() });
+    return HttpResponse.json({ ...paginer(liste.map(suivi), request, 50), par_statut, maintenant: maintenant().toISOString() });
   }),
 
   // Avant `/:id` : « calendrier » ne doit pas être pris pour un identifiant.
@@ -348,7 +358,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['pause']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Seule une campagne en cours peut être mise en pause.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'en_pause', prochain_envoi_le: null }));
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { statut: 'en_pause', prochain_envoi_le: null })));
   }),
 
   http.post(api('/envoi/campagnes/:id/reprise'), async ({ params }) => {
@@ -356,7 +366,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['reprise']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Seule une campagne en pause peut reprendre.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'en_cours', prochain_envoi_le: decalage({ heures: 1 }) }));
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { statut: 'en_cours', prochain_envoi_le: decalage({ heures: 1 }) })));
   }),
 
   http.post(api('/envoi/campagnes/:id/terminer'), async ({ params }) => {
@@ -364,7 +374,7 @@ export const handlers: HttpHandler[] = [
     const c = demoDb.campagnes.trouver(String(params['id']));
     if (!c) return introuvable();
     if (!GESTES_OUVERTS['terminer']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'Cette campagne ne peut pas être terminée.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { statut: 'terminee', prochain_envoi_le: null }));
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { statut: 'terminee', prochain_envoi_le: null })));
   }),
 
   http.post(api('/envoi/campagnes/:id/dupliquer'), async ({ request, params }) => {
@@ -388,7 +398,7 @@ export const handlers: HttpHandler[] = [
       cible: exclure ? { ...c.cible, total: Math.max(0, c.cible.total - c.envoyes) } : { ...c.cible },
       total: exclure ? Math.max(0, c.total - c.envoyes) : c.total,
     };
-    return HttpResponse.json(demoDb.campagnes.ajouter(copie), { status: 201 });
+    return HttpResponse.json(suivi(demoDb.campagnes.ajouter(copie)), { status: 201 });
   }),
 
   http.post(api('/envoi/campagnes/:id/date'), async ({ request, params }) => {
@@ -400,6 +410,6 @@ export const handlers: HttpHandler[] = [
     if (le === null || Number.isNaN(le.getTime())) return erreur(422, 'date_invalide', 'Cette date n’est pas valide.');
     if (le.getTime() <= maintenant().getTime()) return erreur(422, 'date_passee', 'Choisissez une date à venir.');
     if (!GESTES_OUVERTS['date']!.includes(c.statut)) return erreur(409, 'statut_incompatible', 'La date de cette campagne ne peut plus changer.');
-    return HttpResponse.json(demoDb.campagnes.modifier(c.id, { prochain_envoi_le: le.toISOString() }));
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { prochain_envoi_le: le.toISOString() })));
   }),
 ];

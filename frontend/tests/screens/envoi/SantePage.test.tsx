@@ -30,11 +30,12 @@ describe('SantePage — Santé des envois', () => {
     expect(view.router.state.location.pathname).toBe('/envoi/domaines/dom-b');
   });
 
-  it('« Lancer un test » met à jour le test du matin', async () => {
+  it('« Lancer un test » : envois fermés (palier 0), le refus 409 s’explique et rien n’est annoncé comme lancé', async () => {
     const user = userEvent.setup();
     await renderScreen(<SantePage />, { path: '/envoi/sante', handlers });
     await screen.findByText('prospection-a.example');
     await user.click(screen.getByRole('button', { name: 'Lancer un test' }));
-    expect(await screen.findByText(/Test lancé à/i)).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Envois fermés \(palier 0\)/);
+    expect(screen.queryByText(/Test lancé à/i)).toBeNull();
   });
 });

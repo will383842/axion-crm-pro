@@ -29,6 +29,7 @@ use App\Envoi\Imap\RecepteurRetours;
 use App\Envoi\Imap\RecepteurRetoursCrm;
 use App\Envoi\Imap\RecepteurRetoursEnChaine;
 use App\Envoi\Imap\RecepteurRetoursFreins;
+use App\Envoi\Imap\RecepteurRetoursReponses;
 use App\Envoi\Imap\RecepteurRetoursSequence;
 use App\Envoi\Imap\RegistreMessagesEnvoyes;
 use App\Envoi\Imap\RegistreMessagesEnvoyesDb;
@@ -56,6 +57,8 @@ use App\Envoi\Serveur\Contrat\TireurEvenements;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Envoi\Smtp\ResolveurDns;
 use App\Envoi\Smtp\ResolveurHote;
+use App\Envoi\Temoins\LecteurIndesirables;
+use App\Envoi\Temoins\LecteurIndesirablesWebklex;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Event;
@@ -129,6 +132,7 @@ class EnvoiServiceProvider extends ServiceProvider
             new RecepteurRetoursCrm,
             new RecepteurRetoursFreins($app->make(AppliquerRetour::class)),
             RecepteurRetoursSequence::parDefaut(),
+            $app->make(RecepteurRetoursReponses::class),
         ));
         $this->app->bind(RegistreMessagesEnvoyes::class, fn () => new RegistreMessagesEnvoyesDb(
             static fn (string $espace, string $empreinte): ?string => AdresseParEmpreinteCrm::trouver($espace, $empreinte),
@@ -141,6 +145,9 @@ class EnvoiServiceProvider extends ServiceProvider
             $app->make(RecepteurRetours::class),
             $app->make(Alerte::class),
         ));
+
+        // R16 — relève des indésirables des témoins : lecteur réel (Webklex, hôtes en liste fermée), résolu seulement derrière les deux interrupteurs.
+        $this->app->bind(LecteurIndesirables::class, LecteurIndesirablesWebklex::class);
 
         // L5 désinscription : liaisons par défaut, remplacées par la file (retrait) et par L1 (arrêt par entreprise).
         $this->app->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);

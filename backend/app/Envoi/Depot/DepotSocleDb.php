@@ -5,6 +5,9 @@ namespace App\Envoi\Depot;
 use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Exceptions\TemoinRefuse;
 use App\Envoi\JourEnvoi;
+use App\Envoi\Sequence\Evenement;
+use App\Support\EligibiliteCampagne;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
@@ -108,6 +111,16 @@ final class DepotSocleDb implements DepotSocle
 
             return (string) ($conclusion ?? $reservation->statut);
         });
+    }
+
+    public function adresseOpposee(string $workspaceId, string $adresse): bool
+    {
+        if (! EligibiliteCampagne::peutRecevoir($adresse, 'business') || ListeSuppression::estSupprimee($adresse, 'business')) {
+            return true;
+        }
+
+        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_inscriptions_evenements')->where('workspace_id', $workspaceId)
+            ->where('empreinte_adresse', ListeSuppression::empreinte($adresse))->whereIn('evenement', Evenement::VALENT_POUR_L_ADRESSE)->exists());
     }
 
     public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool

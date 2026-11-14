@@ -13,7 +13,7 @@ import {
   type ReglagesBoite,
 } from './composants/api';
 import { Entete } from './composants/Entete';
-import { PERMISSION_REACTIVER, PERMISSION_SUSPENDRE, useDroitsBoites } from './composants/permissions';
+import { messageDroits, PERMISSION_REACTIVER, PERMISSION_SUSPENDRE, useDroitsBoites } from './composants/permissions';
 import { Etats } from './composants/Etats';
 import { BOUTON_TACTILE, CLASSE_CHAMP, MessageErreur, MessageSucces } from './composants/Formulaire';
 import { dateHeure, LIBELLE_STATUT, messageErreur, nombre, pourcent } from './composants/format';
@@ -170,7 +170,7 @@ export function BoitePage() {
   const refus = reactiver.isError && isAxiosError(reactiver.error) && reactiver.error.response?.status === 409;
   const erreurGeste = suspendre.isError ? messageErreur(suspendre.error) : reactiver.isError ? (refus ? 'Réactivation impossible pour l’instant : la boîte est sous pause de frein ou pause automatique.' : messageErreur(reactiver.error)) : null;
   const permis = suspendue ? droits.reactiver : droits.suspendre;
-  const raison = suspendue ? `Il vous manque la permission ${PERMISSION_REACTIVER}.` : `Il vous manque la permission ${PERMISSION_SUSPENDRE}.`;
+  const raison = messageDroits(droits, suspendue ? PERMISSION_REACTIVER : PERMISSION_SUSPENDRE);
   return (
     <div>
       <Entete

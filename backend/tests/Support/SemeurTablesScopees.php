@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_tentatives'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_tentatives'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,8 +200,8 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
-        // Envoi R06 : tentatives d'envoi par fournisseur, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
-        'envoi_tentatives',
+        // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
+        'envoi_reputation_constats',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
         'envoi_campagnes',
         'envoi_campagnes_journal',
@@ -209,6 +209,10 @@ final class SemeurTablesScopees
         // Envoi R08b : modèles de message (parent) puis leurs versions (FK composite) : APPEND_SEUL_AVEC_FK.
         'envoi_modeles',
         'envoi_modele_versions',
+        // Envoi R16 : accès IMAP des témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'envoi_temoins_acces',
+        // Envoi R06 : tentatives d'envoi par fournisseur, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'envoi_tentatives',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -219,6 +223,9 @@ final class SemeurTablesScopees
         'envoi_evenements',
         'envoi_curseurs_imap',
         'envoi_rattachements',
+        // Envoi R12 : texte chiffré des réponses et leurs classements (ajout seul + FK workspaces).
+        'envoi_reponses',
+        'envoi_reponses_classements',
         'envoi_echecs_releve',
         'envoi_messages_envoyes',
         'proxy_providers_config',
@@ -838,6 +845,24 @@ final class SemeurTablesScopees
             'post_effectif' => false,
             'auteur' => 'zz',
         ]);
+        $inserer('envoi_reputation_constats', [
+            'source' => 'google_postmaster',
+            'ressource_type' => 'domaine',
+            'ressource' => 'zz.example.test',
+            'jour' => '2026-01-01',
+            'reputation' => 'bonne',
+            'saisie' => 'manuelle',
+            'preuve' => 'zz-preuve-zz',
+            'auteur' => 'zz',
+            'cle_rejeu' => 'zz-cle-rejeu-' . $marque,
+            'empreinte' => hash('sha256', 'zz-rep-' . $marque),
+        ]);
+        $inserer('envoi_temoins_acces', [
+            'empreinte_temoin' => str_repeat('a', 64),
+            'fournisseur' => 'gmail',
+            'hote' => 'imap.gmail.com',
+            'identifiant_chiffre' => 'zz',
+        ]);
         $inserer('envoi_tentatives', [
             'fournisseur' => 'gmail',
             'issue' => 'acceptee',
@@ -883,6 +908,21 @@ final class SemeurTablesScopees
             'id_injection' => $idInjection,
             'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
             'decide_par' => 'zz-revue',
+        ]);
+        $id['envoi_reponses'] = $insererAvecId('envoi_reponses', [
+            'evenement_id' => $id['envoi_evenements'],
+            'objet_chiffre' => 'zz-chiffre',
+            'extrait_chiffre' => 'zz-chiffre',
+            'expediteur_chiffre' => 'zz-chiffre',
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'recue_le' => now()->toDateTimeString(),
+            'conserver_jusqu_au' => '2031-01-01',
+        ]);
+        $inserer('envoi_reponses_classements', [
+            'reponse_id' => $id['envoi_reponses'],
+            'classement' => 'a_rattacher',
+            'confiance' => 0,
+            'auteur' => 'classificateur',
         ]);
         $inserer('envoi_echecs_releve', [
             'boite' => 'zz-' . $marque,

@@ -13,6 +13,9 @@ final class EnvoiRefuse extends RuntimeException
     /** Code d'un refus d'ATTENTE (porte fermée, qui se rouvre d'elle-même) : report sans compteur ni limite. */
     public const ATTENTE = 4202;
 
+    /** Code d'un refus DÉFINITIF pour opposition (STOP, liste de suppression) : ni attente, ni plafond, jamais de renvoi. */
+    public const OPPOSITION = 4203;
+
     /** Vrai si l'alerte « issue incertaine » a déjà été émise par la passerelle pour ce même incident (réservation périmée). */
     public bool $alerteDejaEmise = false;
 
@@ -22,6 +25,17 @@ final class EnvoiRefuse extends RuntimeException
         $e->alerteDejaEmise = $alerteDejaEmise;
 
         return $e;
+    }
+
+    /** Vrai pour une opposition constatée par la passerelle : refus définitif, le stop gagne toujours. */
+    public function estOpposition(): bool
+    {
+        return $this->getCode() === self::OPPOSITION;
+    }
+
+    public static function opposition(): self
+    {
+        return new self('Opposition constatée sur l\'adresse : aucune injection.', self::OPPOSITION);
     }
 
     /** Refus d'attente : envoi réel éteint, arrêt général, mode témoins. */

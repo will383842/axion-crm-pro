@@ -26,6 +26,9 @@ final class DecisionFrein
     /** INF-025 : plus aucun appel à sante() depuis 15 minutes en fenêtre d'envoi. */
     public const SANTE_SILENCIEUSE = 'sante_silencieuse';
 
+    /** R17 : un constat de réputation « mauvaise » (Postmaster, SNDS, JMRP, Orange) => pause vers CE fournisseur seulement. */
+    public const REPUTATION_MAUVAISE = 'reputation_mauvaise';
+
     public function __construct(
         public readonly string $motif,
         public readonly ?string $fournisseur = null,

@@ -33,8 +33,10 @@ use Throwable;
  *   2. message d'un autre espace que le contexte courant => exception ;
  *   puis, SOUS UN VERROU PAR JOUR (transaction + pg_advisory_xact_lock) :
  *   3. Tout arrêter             => exception ;
+ *   3b. le STOP est relu (opposition, liste de suppression, événements de l'adresse) : refus DÉFINITIF `EnvoiRefuse::opposition()`,
+ *       AVANT le rejeu, une place `reservee` est rendue ;
  *   4. mode témoins             => refuse toute adresse hors liste (empreintes) ;
- *   5. rejeu idempotent (même clé) => passe sans recompter ;
+ *   5. rejeu idempotent (même clé) => passe sans recompter, MAIS un renvoi (serveur RenvoiParMemeCle) repasse par les portes L7 sans les quotas ;
  *   5b. (L7) hors fenêtre d'envoi 8 h-19 h, homme mort (silence de sante()), pauses, freins, expéditeur inconnu,
  *       quota de chauffe de la boîte et du domaine => report au lendemain ;
  *   6. plafonds durs du jour (par espace ET global, bornés à 300) => report au lendemain ;
@@ -58,6 +60,8 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
     public const DELAI_RESERVATION_MINUTES = 60;
 
     private const RESERVEE = 'reservee_ici';
+
+    private const OPPOSEE = 'opposee';
 
     public function __construct(
         private readonly ServeurEnvoi $serveur,
@@ -110,9 +114,26 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             if ($this->depot->modeTemoins($ws) && ! $this->depot->estTemoin($ws, $message->destinataire)) {
                 throw EnvoiRefuse::horsTemoins();
             }
+            // Le STOP gagne toujours : l'opposition (ou un STOP sur une autre inscription de la même adresse) a pu être validée
+            // entre la réservation du séquenceur et ici. Relue sous le verrou, AVANT le rejeu et toute réservation.
+            if ($this->depot->adresseOpposee($ws, $message->destinataire)) {
+                // Une place `reservee` est rendue (rien n'est parti) ; `a_verifier` reste comptée (le message est peut-être parti).
+                if ($this->depot->etatInjection($ws, $message->cleIdempotence) === 'reservee') {
+                    $this->depot->concluireInjection($ws, $jour, $message->cleIdempotence, 'liberee');
+                }
+
+                return self::OPPOSEE; // la levée se fait APRÈS le COMMIT : une exception défairait la libération
+            }
             // Rejeu (même clé) : rien n'est recompté, l'appel se fait HORS verrou et hors transaction.
             $etat = $this->depot->etatInjection($ws, $message->cleIdempotence);
             if ($etat !== null) {
+                // Rejeu d'une clé `reservee` / `a_verifier` : un serveur qui dédoublonne par clé ENVERRAIT, il ne doit
+                // donc contourner aucune porte L7 (fenêtre, homme mort, pauses, freins, expéditeur). Sa place est déjà
+                // comptée : on n'applique que les portes, sans recompter les quotas. Une porte fermée = attente, serveur non appelé.
+                if ($etat !== 'acceptee' && $this->serveur instanceof RenvoiParMemeCle && $this->chauffe?->portes($message, $this->instant(), $fournisseur) !== null) {
+                    return ResultatInjection::reporte($jour->modify('+1 day'));
+                }
+
                 return $etat;
             }
             if ($this->depot->injectesLe($ws, $jour) >= $plafond || $this->depot->injectesLeGlobal($jour) >= $global) {
@@ -129,6 +150,9 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
 
             return self::RESERVEE;
         });
+        if ($decision === self::OPPOSEE) {
+            throw EnvoiRefuse::opposition();
+        }
         if ($decision instanceof ResultatInjection) {
             return $decision;
         }

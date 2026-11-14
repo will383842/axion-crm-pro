@@ -11,6 +11,7 @@ use App\Console\Commands\CrmSondePersonnes;
 use App\Console\Commands\CrmUsinePousserAgregats;
 use App\Console\Commands\EnvoiListesNoiresControler;
 use App\Console\Commands\EnvoiRejouerCommandes;
+use App\Console\Commands\EnvoiTemoinsReleve;
 use App\Console\Commands\PartmanMaintenir;
 use App\Console\Commands\RgpdVerificationsEnAttente;
 use App\Crm\Annuaire\EnrichissementAnnuaire;
@@ -599,3 +600,12 @@ Schedule::command(ReleveImapCommande::SIGNATURE_PLANIFIEE)
     ->withoutOverlapping(5)
     ->onOneServer()
     ->when(fn (): bool => config('envoi.reel_actif') === true && config('envoi.releve_actif') === true);
+
+// Envoi R16 — relève automatique des indésirables des témoins (frein « message en indésirables chez un témoin »), toutes les 15 minutes.
+// DERRIÈRE `ENVOI_TEMOINS_RELEVE_ACTIF` (faux par défaut) ET `ENVOI_REEL_ACTIF` : la commande se garde aussi elle-même.
+// Lecture seule des boîtes ; n'écrit que des ajouts (journée `releve_auto`, pause). Un constat freine, il ne libère jamais.
+Schedule::command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)
+    ->everyFifteenMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->when(fn (): bool => config('envoi.reel_actif') === true && config('envoi.temoins_releve_actif') === true);

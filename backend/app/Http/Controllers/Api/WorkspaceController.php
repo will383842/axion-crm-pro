@@ -83,7 +83,15 @@ class WorkspaceController extends ApiController
             abort(404);
         }
 
-        $courant = Workspace::query()->whereKey($espace)->whereNull('deleted_at')->first();
+        // D3 : lecture ET écriture dans UNE transaction, ligne verrouillée (`FOR UPDATE`). Sans cela, une suspension
+        // posée par `produits:suspendre` entre la lecture de `settings` et son écriture était écrasée (la clé réservée
+        // `produits` est recopiée depuis la lecture). Le verrou est le même que celui des commandes `produits:*`.
+        return DB::transaction(fn (): JsonResponse => $this->appliquer($r, $espace));
+    }
+
+    private function appliquer(Request $r, string $espace): JsonResponse
+    {
+        $courant = Workspace::query()->whereKey($espace)->whereNull('deleted_at')->lockForUpdate()->first();
         if ($courant === null) {
             abort(404);
         }

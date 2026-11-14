@@ -173,3 +173,25 @@ test('DEPLOIEMENT-ARGS — les drapeaux sont normalises (true|false sinon ignore
     expect($ligne)->toContain('true|false) ;;');
     expect($ligne)->toContain("printf -v \"\$v\" '%s' 'ignore'");
 });
+
+test('DEPLOIEMENT-ARGS — les arguments non drapeaux sont valides avant ssh (vide => absent ou echec, motif strict)', function (): void {
+    $script = blocDeploiement();
+    $ssh = strpos($script, "'bash -s'");
+    $garde = strpos($script, "INSEE_API_KEY='absent'");
+    expect($garde)->not->toBeFalse('Le jeton `absent` pour INSEE_API_KEY a disparu : une cle vide decalerait les arguments.');
+    expect($garde)->toBeLessThan($ssh);
+
+    $bloc = substr($script, $garde, $ssh - $garde);
+    foreach (['PROJECT_PATH', 'SKIP_MIGRATE', 'EXPECTED_SHA', 'INSEE_API_KEY', 'GH_TOKEN_LECTURE', 'GH_DEPOT'] as $nom) {
+        expect($bloc)->toContain($nom);
+    }
+    expect($bloc)->toContain('^[A-Za-z0-9._:-]+$');
+    expect(substr_count($bloc, 'exit 1'))->toBeGreaterThanOrEqual(2);
+    // Jamais la valeur dans un message, jamais de trace.
+    expect($bloc)->not->toContain('set -x');
+    expect($bloc)->not->toMatch('/echo[^\n]*\$val/');
+    expect($script)->not->toContain('set -x');
+
+    // Le serveur traite `absent` comme « ne pas toucher au .env ».
+    expect($script)->toContain('"$INSEE_API_KEY" != "absent"');
+});

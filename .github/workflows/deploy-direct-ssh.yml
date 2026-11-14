@@ -187,6 +187,25 @@ jobs:
           for v in CRM_INGEST_DOSSIER_ENABLED CRM_SYNC_DOSSIER_CLIENT_STAGE CRM_INGEST_DEMANDES_PERSONNE_ENABLED ORIGINES_V3_ENABLED ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED; do
             case "${!v}" in true|false) ;; *) printf -v "$v" '%s' 'ignore' ;; esac
           done
+          # Arguments NON drapeaux (même risque : OpenSSH recolle, le shell distant redécoupe).
+          # INSEE_API_KEY est facultative : vide => jeton fixe `absent` (le serveur ne touche
+          # alors PAS au .env). Les autres sont obligatoires : vide => échec net, jamais de
+          # décalage silencieux. Tous doivent suivre ^[A-Za-z0-9._:-]+$ (PROJECT_PATH et GH_DEPOT acceptent
+          # en plus `/` : chemin, propriétaire/dépôt). Messages FIXES : jamais la valeur, aucune trace shell.
+          if [ -z "${INSEE_API_KEY:-}" ]; then INSEE_API_KEY='absent'; fi
+          for v in PROJECT_PATH SKIP_MIGRATE EXPECTED_SHA INSEE_API_KEY GH_TOKEN_LECTURE GH_DEPOT; do
+            val="${!v-}"
+            if [ -z "$val" ]; then
+              echo "::error::Argument de déploiement obligatoire vide (nom : $v). Arrêt avant ssh."
+              exit 1
+            fi
+            if [ "$v" = PROJECT_PATH ] || [ "$v" = GH_DEPOT ]; then re='^[A-Za-z0-9._:/-]+$'; else re='^[A-Za-z0-9._:-]+$'; fi
+            if ! [[ "$val" =~ $re ]]; then
+              echo "::error::Argument de déploiement invalide (nom : $v) : caractères non autorisés. Arrêt avant ssh."
+              exit 1
+            fi
+          done
+          unset val
           ssh -o StrictHostKeyChecking=no \
               -o ServerAliveInterval=30 \
               -o ServerAliveCountMax=10 \
@@ -306,7 +325,7 @@ jobs:
           echo "::group::sync INSEE_API_KEY into .env"
           # Upsert la clé INSEE dans le .env serveur (le deploy ne versionne pas .env).
           # Doit précéder le restart pour que le conteneur la lise au démarrage.
-          if [ -f .env ] && [ -n "$INSEE_API_KEY" ]; then
+          if [ -f .env ] && [ -n "$INSEE_API_KEY" ] && [ "$INSEE_API_KEY" != "absent" ]; then
             if grep -q '^INSEE_API_KEY=' .env; then
               sed -i "s|^INSEE_API_KEY=.*|INSEE_API_KEY=$INSEE_API_KEY|" .env
             else

@@ -372,10 +372,19 @@ components:
       enum: [lien, reponse_stop, plainte, manuel]
     Desinscription:
       type: object
-      required: [id, adresse, survenue_le, source, campagne_id]
+      description: |
+        Une désinscription ne garde qu'une empreinte de l'adresse : `adresse` n'est
+        renseignée que si la fiche du CRM de l'espace la porte encore (et si le compte
+        a le droit de voir les coordonnées) ; sinon `null`. `adresse_masquee` est toujours
+        présente et ne permet pas de retrouver l'adresse.
+      required: [id, adresse, adresse_masquee, survenue_le, source, campagne_id]
       properties:
         id: { $ref: '#/components/schemas/Identifiant' }
-        adresse: { type: string, format: email }
+        adresse:
+          oneOf:
+            - { type: string, format: email }
+            - { type: 'null' }
+        adresse_masquee: { type: string }
         survenue_le: { $ref: '#/components/schemas/Horodatage' }
         source: { $ref: '#/components/schemas/SourceDesinscription' }
         campagne_id:

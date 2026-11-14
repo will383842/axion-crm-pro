@@ -20,7 +20,7 @@
 ## Setup
 
 ```powershell
-cd "C:\Users\willi\Documents\Projets\Axion-CRM-Pro\poc\01_google_maps"
+cd "<dossier du projet>\poc\01_google_maps"
 pnpm install
 pnpm exec playwright install chromium
 copy .env.example .env

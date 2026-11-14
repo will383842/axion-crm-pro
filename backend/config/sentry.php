@@ -26,6 +26,9 @@ return [
     // Les traces de commande envoi:temoin-* ne sont pas envoyées (voir App\Support\SentryFiltre).
     'before_breadcrumb' => [SentryFiltre::class, 'avantBreadcrumb'],
 
+    // Routes /envoi/* : la chaîne de requête et le corps sont retirés des événements (SentryFiltre::avantEnvoi).
+    'before_send' => [SentryFiltre::class, 'avantEnvoi'],
+
     'breadcrumbs' => [
         'logs' => true,
         'cache' => false,

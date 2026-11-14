@@ -235,7 +235,11 @@ paths:
                   listes_noires:
                     type: array
                     items: { $ref: '#/components/schemas/ListeNoire' }
-                  expire_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                  expire_le:
+                    description: Nul si la date d'expiration n'est pas conservée.
+                    oneOf:
+                      - $ref: './commun.yaml#/components/schemas/Horodatage'
+                      - type: 'null'
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/domaines/{id}/dns/verifier:
     post:
@@ -492,24 +496,28 @@ components:
       required: [serveur_id, en_ligne_depuis_jours, en_file, test, paliers]
       properties:
         serveur_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
-        en_ligne_depuis_jours: { type: integer, minimum: 0 }
+        en_ligne_depuis_jours:
+          description: Nul si non mesuré.
+          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
         en_file:
-          description: Messages en attente d'envoi sur ce serveur.
-          type: integer
-          minimum: 0
+          description: Messages en attente d'envoi sur ce serveur (nul si non mesuré).
+          oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
         test:
-          type: object
-          required: [fait_le, etapes]
-          properties:
-            fait_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
-            etapes:
-              type: array
-              items:
-                type: object
-                required: [libelle, ok]
-                properties:
-                  libelle: { type: string }
-                  ok: { type: boolean }
+          description: Dernier test du serveur (nul s'il n'est pas conservé).
+          oneOf:
+            - type: object
+              required: [fait_le, etapes]
+              properties:
+                fait_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+                etapes:
+                  type: array
+                  items:
+                    type: object
+                    required: [libelle, ok]
+                    properties:
+                      libelle: { type: string }
+                      ok: { type: boolean }
+            - type: 'null'
         paliers:
           description: Paliers de chauffe des adresses IP en montée.
           type: array
@@ -579,12 +587,16 @@ components:
       required: [numero, creee_le, appliquee_le, par, resultat, changements]
       properties:
         numero: { type: integer, minimum: 1 }
+        empreinte:
+          description: Empreinte SHA-256 du paquet (jamais son contenu).
+          type: string
+          pattern: '^[0-9a-f]{64}$'
         par:
           description: Qui a appliqué la version (prénom, ou « Système »).
           oneOf: [{ type: string }, { type: 'null' }]
         resultat:
           type: string
-          enum: [prete, appliquee, remplacee, retour_automatique]
+          enum: [prete, appliquee, remplacee, retour_automatique, invalide, retour_arriere, derive_refusee, incertaine]
         creee_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
         appliquee_le:
           oneOf:
@@ -602,7 +614,11 @@ components:
       type: object
       required: [courante, prete, historique]
       properties:
-        courante: { $ref: '#/components/schemas/VersionConfiguration' }
+        courante:
+          description: Nulle tant qu'aucune version n'a été appliquée.
+          oneOf:
+            - $ref: '#/components/schemas/VersionConfiguration'
+            - type: 'null'
         prete:
           oneOf:
             - $ref: '#/components/schemas/VersionConfiguration'

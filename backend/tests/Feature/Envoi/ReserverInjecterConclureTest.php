@@ -446,10 +446,23 @@ test('bloquant 1 : opposition arrivée après la réservation, rejeu d\'une clé
 test('bloquant 2 : rejeu d\'une clé « reservee » HORS fenêtre (20 h) avec un serveur dédoublonnant => report d\'attente, zéro appel, réservation conservée', function () {
     $garde = new GardeChauffe(app(DepotChauffe::class), $this->depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
     $soir = new DateTimeImmutable('2026-11-17 20:00:00', new DateTimeZone('Europe/Paris'));
-    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $soir); // réservation toute fraîche : non périmée
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $soir->modify('-10 minutes'));
     $faux = new FauxServeurEnvoi;
     $p = new PasserelleLocale($faux, $this->depot, true, 5, fn () => $soir, $this->ws, 300, fn () => WorkspaceContext::current(), $garde);
     $r = $p->injecter(($this->msg)());
     expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
         ->and($faux->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('reservee');
+});
+
+test('bloquant 2 (jumeau) : réservation de 12 h rejouée à 20 h => périmée en « a_verifier », report d\'attente, zéro appel, une alerte', function () {
+    Log::spy();
+    $garde = new GardeChauffe(app(DepotChauffe::class), $this->depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
+    $soir = new DateTimeImmutable('2026-11-17 20:00:00', new DateTimeZone('Europe/Paris'));
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $faux = new FauxServeurEnvoi;
+    $p = new PasserelleLocale($faux, $this->depot, true, 5, fn () => $soir, $this->ws, 300, fn () => WorkspaceContext::current(), $garde);
+    $r = $p->injecter(($this->msg)());
+    expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Attente)
+        ->and($faux->appels)->toBe(0)->and($this->depot->etatInjection($this->ws, 'k1'))->toBe('a_verifier');
+    Log::shouldHaveReceived('critical')->once();
 });

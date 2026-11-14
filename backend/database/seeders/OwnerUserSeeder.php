@@ -38,7 +38,7 @@ class OwnerUserSeeder extends Seeder
     public function run(): void
     {
         $email = $this->readEnv('OWNER_INITIAL_EMAIL', 'proprietaire@exemple.test');
-        $name = $this->readEnv('OWNER_INITIAL_NAME', 'Williams');
+        $name = $this->readEnv('OWNER_INITIAL_NAME', 'Le fondateur');
         $rawPassword = $this->readEnv('OWNER_INITIAL_PASSWORD', '');
         $sansMotDePasse = ($rawPassword === '' || $rawPassword === null);
 

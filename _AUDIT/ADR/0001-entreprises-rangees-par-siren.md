@@ -2,7 +2,7 @@
 
 - **Statut** : acceptée
 - **Date** : 2026-10-03
-- **Décideur** : Williams (décision du 03/10/2026)
+- **Décideur** : le fondateur (décision du 03/10/2026)
 
 > Premier ADR du dépôt. `spec/00_INDEX.md` prévoit que les propositions
 > d'ADR se remontent dans `_AUDIT/` : ce dossier `_AUDIT/ADR/` les recueille,

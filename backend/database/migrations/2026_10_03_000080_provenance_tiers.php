@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\DB;
  * Les personnes apportées sont ACQUISES par Axion-IA : aucune échéance,
  * aucune mise à l'écart, aucun archivage à 3 ans (décision de Will).
  *
- * RÈGLE ABSOLUE du propriétaire (Williams, 03/10/2026) : on GARDE TOUT, on
+ * RÈGLE ABSOLUE du propriétaire (le fondateur, 03/10/2026) : on GARDE TOUT, on
  * n'efface JAMAIS rien automatiquement ; une demande d'effacement = mise à
  * l'écart + décision humaine au cas par cas. Donc :
  *  - `contact_id` et `workspace_id` en `ON DELETE RESTRICT` : supprimer une

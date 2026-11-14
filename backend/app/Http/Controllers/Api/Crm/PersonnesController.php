@@ -492,7 +492,7 @@ class PersonnesController extends ConsoleController
      * qu'avec `contacts.view_pii` ; les personnes opposées ou à l'adresse
      * morte n'en sortent jamais (même règle que l'éligibilité).
      *
-     * Entrepreneurs individuels (03/10/2026, confirmé par Williams) : une
+     * Entrepreneurs individuels (03/10/2026, confirmé par le fondateur) : une
      * personne rattachée à une fiche dont la catégorie juridique INSEE
      * commence par 1 (`EligibiliteAdresse::estEntrepriseIndividuelle`) n'est
      * jamais destinataire d'une campagne. Elle ne sort donc pas du fichier

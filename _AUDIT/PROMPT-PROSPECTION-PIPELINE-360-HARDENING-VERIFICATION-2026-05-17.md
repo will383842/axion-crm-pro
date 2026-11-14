@@ -29,7 +29,7 @@ commande Artisan rescrape-archives.
   + Tailwind v4 + TanStack Router/Query + MapLibre + lucide-react
 - **Prod** : Hetzner CPX42 Helsinki, `https://app.axion-crm-pro.com`
 - **DB prod** : user=`axion`, db=`axion_crm`
-- **Owner** : Williams (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
+- **Owner** : le fondateur (`proprietaire@exemple.test`, workspace UUID `00000000-0000-0000-0000-000000000000`)
 - **Sentry DSN** : configuré côté backend (`SENTRY_LARAVEL_DSN`) + frontend (`VITE_SENTRY_DSN`)
 - **Coolify** : autopilot pull main → build → migrate → reload
 - **Branche** : `main` locale (16 commits **en avance** sur `origin/main`)

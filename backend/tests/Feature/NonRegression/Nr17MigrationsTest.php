@@ -82,6 +82,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000082_envoi_modeles.php',
     // Filet modifié : pourquoi — envoi D1 : fonction IMMUTABLE + index d'expression sur l'empreinte des contacts (ajout seul, IF NOT EXISTS) ; down() inerte (retirer l'index ne se fait pas dans ce plan), up() rejouable.
     '2026_12_02_000200_contacts_index_empreinte_email.php',
+    // Envoi R16 : accès IMAP des témoins (hôte en liste fermée par CHECK, identifiant chiffré), AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE) ; la retirer effacerait les accès posés ; down() inerte, up() rejouable.
+    '2026_12_02_000160_envoi_temoins_acces.php',
+    // Envoi R16 : index UNIQUE PARTIEL (auteur releve_auto) sur les journées témoins, ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_02_000161_envoi_temoins_journees_releve_auto.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

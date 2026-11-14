@@ -8,7 +8,7 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 /** Libellé d'activité de `lead_magnet_requested` : suit le guide reçu. Adresses en `.test`. */
-const LGR_SECRET = 'secret-de-test-lgr-aaaabbbbccccddddeeeeffff00001111';
+define('LGR_SECRET', 'secret-de-test-lgr-' . str_repeat('a1b2', 12));
 const LGR_EMAIL = 'zz.libelle@example.test';
 
 beforeEach(function () {

@@ -204,6 +204,9 @@ final class SemeurTablesScopees
         'envoi_campagnes',
         'envoi_campagnes_journal',
         'envoi_campagne_codes',
+        // Envoi R08b : modèles de message (parent) puis leurs versions (FK composite) : APPEND_SEUL_AVEC_FK.
+        'envoi_modeles',
+        'envoi_modele_versions',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.

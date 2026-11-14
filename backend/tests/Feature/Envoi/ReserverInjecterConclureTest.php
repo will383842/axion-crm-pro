@@ -446,7 +446,7 @@ test('bloquant 1 : opposition arrivée après la réservation, rejeu d\'une clé
 test('bloquant 2 : rejeu d\'une clé « reservee » HORS fenêtre (20 h) avec un serveur dédoublonnant => report d\'attente, zéro appel, réservation conservée', function () {
     $garde = new GardeChauffe(app(DepotChauffe::class), $this->depot, new ResolveurEnMemoire(['example.test' => 'gmail']));
     $soir = new DateTimeImmutable('2026-11-17 20:00:00', new DateTimeZone('Europe/Paris'));
-    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $this->jour);
+    $this->depot->reserverInjection($this->ws, $this->jour, 'k1', $soir); // réservation toute fraîche : non périmée
     $faux = new FauxServeurEnvoi;
     $p = new PasserelleLocale($faux, $this->depot, true, 5, fn () => $soir, $this->ws, 300, fn () => WorkspaceContext::current(), $garde);
     $r = $p->injecter(($this->msg)());

@@ -1,0 +1,187 @@
+name: Diagnostic — Réception guide réseaux (prod, lecture seule)
+
+# Fiche CRM-G6. LECTURE SEULE STRICTE : aucune écriture, aucun redémarrage.
+# Dépôt et journaux PUBLICS : seulement des booléens, des présences, des noms de
+# migrations et des comptes ; jamais une valeur de secret, une adresse, un
+# identifiant d'espace ou une donnée de personne.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diag-reception-guide
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    name: Diagnostic réception guide sur prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Diagnostic via SSH (lecture seule)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash -s -- "$PROJECT_PATH" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+
+          echo "## Code déployé et conteneurs"
+          echo "SHA public : $(git rev-parse --short HEAD)"
+          docker compose ps --format '{{.Service}} {{.State}} {{.Health}}' api postgres < /dev/null
+          NB_API=$(docker ps -a --format '{{.Names}}' < /dev/null | grep -c axion-crm-api || true)
+          echo "conteneurs api : $NB_API (attendu 1)"
+
+          echo "## Dates (démarrage de api, modification du .env)"
+          API_ID=$(docker compose ps -q api < /dev/null)
+          API_START=$(docker inspect -f '{{.State.StartedAt}}' "$API_ID" < /dev/null)
+          ENV_MTIME=$(stat -c %y .env)
+          echo "api démarré : $API_START"
+          echo ".env modifié : $ENV_MTIME"
+          if [ "$(date -d "$ENV_MTIME" +%s)" -gt "$(date -d "$API_START" +%s)" ]; then
+            echo ".env modifié APRÈS le démarrage de api : oui (l'effectif peut différer du fichier)"
+          else
+            echo ".env modifié APRÈS le démarrage de api : non"
+          fi
+
+          echo "## Migrations (session psql en lecture seule)"
+          PSQL="docker compose exec -T -e PGOPTIONS=-cdefault_transaction_read_only=on postgres psql -U axion -d axion_crm -X -A -t -P pager=off -v ON_ERROR_STOP=1"
+          $PSQL -c "SELECT migration, batch FROM migrations WHERE migration ~ '(personnes|origines|fonctions_espace)' ORDER BY migration;" < /dev/null
+          ATTENDUES="2026_09_24_000001_personnes_et_abonnements
+          2026_11_02_000010_personnes_contenus_et_accords
+          2026_11_03_000010_personnes_opposition_motif
+          2026_11_06_000010_personnes_origines_v3
+          2026_11_07_000010_origines_archive_masque_le
+          2026_11_08_000010_fonctions_espace_origines
+          2026_11_08_000010_personnes_demandes"
+          for M in $ATTENDUES; do
+            LOT=$($PSQL -c "SELECT batch FROM migrations WHERE migration = '$M';" < /dev/null)
+            if [ -n "$LOT" ]; then echo "$M : appliquée (lot $LOT)"; else echo "$M : ABSENTE"; fi
+          done
+          V3=$($PSQL -c "SELECT count(*) FROM migrations WHERE migration = '2026_11_06_000010_personnes_origines_v3';" < /dev/null)
+          if [ "$V3" = "1" ]; then echo "MIGRATION_V3=appliquee"; else echo "MIGRATION_V3=absente"; fi
+
+          echo "## Preuves physiques (catalogue, aucune donnée)"
+          echo "colonne personnes.origines : $($PSQL -c "SELECT count(*) FROM information_schema.columns WHERE table_name='personnes' AND column_name='origines';" < /dev/null)"
+          echo "table personne_origines_archive : $($PSQL -c "SELECT to_regclass('public.personne_origines_archive') IS NOT NULL;" < /dev/null)"
+          echo "colonne masque_le : $($PSQL -c "SELECT count(*) FROM information_schema.columns WHERE table_name='personne_origines_archive' AND column_name='masque_le';" < /dev/null)"
+          echo "index idx_personnes_origines_gin : $($PSQL -c "SELECT count(*) FROM pg_indexes WHERE indexname='idx_personnes_origines_gin';" < /dev/null)"
+          echo "RLS archive (active|forcée) : $($PSQL -c "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname='personne_origines_archive';" < /dev/null)"
+
+          echo "## Comptes agrégés (nombres seulement)"
+          if [ "$($PSQL -c "SELECT count(*) FROM information_schema.columns WHERE table_name='personnes' AND column_name='origines';" < /dev/null)" = "1" ]; then
+            echo "personnes avec origines : $($PSQL -c "SELECT count(*) FILTER (WHERE origines IS NOT NULL) FROM personnes;" < /dev/null)"
+          else
+            echo "personnes avec origines : colonne absente"
+          fi
+          if [ "$($PSQL -c "SELECT to_regclass('public.personne_origines_archive') IS NOT NULL;" < /dev/null)" = "t" ]; then
+            echo "lignes d'archive : $($PSQL -c "SELECT count(*) FROM personne_origines_archive;" < /dev/null)"
+          else
+            echo "lignes d'archive : table absente"
+          fi
+
+          echo "## Interrupteurs effectifs (conteneur api)"
+          echo "VARIABLE | defaut_code | effectif"
+          docker compose exec -T -e TELESCOPE_ENABLED=false api php <<'PHP'
+          <?php
+          chdir('/var/www/html');
+          require '/var/www/html/vendor/autoload.php';
+          $app = require '/var/www/html/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+          function etat_drapeau($v): string
+          {
+              if ($v === true) { return 'true'; }
+              if ($v === false) { return 'false'; }
+              if ($v === null) { return 'null'; }
+              return 'chaine-non-booleenne('.((bool) $v ? 'vraie' : 'fausse').')';
+          }
+          function etat_secret($v): string
+          {
+              $s = is_string($v) ? $v : '';
+              if ($s === '') { return 'absent'; }
+              return 'pose (longueur>=32: '.(strlen($s) >= 32 ? 'oui' : 'non').')';
+          }
+          $liste = [
+              ['crm.ingest.enabled', 'CRM_INGEST_ENABLED', 'drapeau', 'false'],
+              ['crm.ingest.personnes_enabled', 'CRM_INGEST_PERSONNES_ENABLED', 'drapeau', 'false'],
+              ['crm.ingest.demandes_personne_enabled', 'CRM_INGEST_DEMANDES_PERSONNE_ENABLED', 'drapeau', 'false'],
+              ['crm.ingest.dossier_enabled', 'CRM_INGEST_DOSSIER_ENABLED', 'drapeau', 'false'],
+              ['crm.ingest.dossier_client_stage', 'CRM_SYNC_DOSSIER_CLIENT_STAGE', 'drapeau', 'false'],
+              ['crm.ingest.hmac_secret', 'SITE_SYNC_HMAC_SECRET', 'secret', 'vide'],
+              ['crm.ingest.replay_store', 'CRM_INGEST_REPLAY_STORE', 'reglage', 'redis'],
+              ['crm.outbound_enabled', 'CRM_OUTBOUND_ENABLED', 'drapeau', 'false'],
+              ['crm.outbound.site_webhook_url', 'SITE_CRM_WEBHOOK_URL', 'secret', 'vide'],
+              ['origines.v3_enabled', 'ORIGINES_V3_ENABLED', 'drapeau', 'false'],
+              ['origines.lecture_enabled', 'ORIGINES_LECTURE_ENABLED', 'drapeau', 'false'],
+              ['origines.masquage_commentaire_ref_enabled', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED', 'drapeau', 'false'],
+              ['origines.cle_hmac', 'ORIGINES_HMAC_KEY', 'secret', 'vide (repli APP_KEY)'],
+              ['guides.lien_enabled', 'CRM_GUIDE_LIEN_ENABLED', 'drapeau', 'false'],
+              ['guides.hote_autorise', 'CRM_GUIDE_HOTE', 'reglage', 'axion-ia.com'],
+          ];
+          foreach ($liste as [$cle, $var, $nature, $defaut]) {
+              $v = config($cle);
+              if ($nature === 'drapeau') {
+                  $eff = etat_drapeau($v);
+              } elseif ($nature === 'secret') {
+                  $eff = etat_secret($v);
+                  if ($var === 'ORIGINES_HMAC_KEY' && $eff === 'absent') { $eff .= ' (repli APP_KEY)'; }
+              } elseif ($var === 'CRM_GUIDE_HOTE') {
+                  $eff = $v === 'axion-ia.com' ? 'defaut' : 'surcharge';
+              } else {
+                  $eff = in_array($v, ['redis', 'database', 'array'], true) ? $v : 'autre';
+              }
+              echo $var.' | '.$defaut.' | '.$eff."\n";
+          }
+          $pub = config('guides.publics');
+          $pub = is_array($pub) ? $pub : [];
+          echo 'guides.publics : '.count($pub).' entree(s), ids = '.implode(',', array_map('strval', array_keys($pub)))."\n";
+          $g = $pub['guide-ia'] ?? [];
+          echo 'guide-ia nom = Guide IA pour TPE-PME : '.((($g['nom'] ?? null) === 'Guide IA pour TPE-PME') ? 'oui' : 'non')."\n";
+          echo 'guide-ia URL sur exemple.invalid : '.((parse_url((string) ($g['url'] ?? ''), PHP_URL_HOST) === 'exemple.invalid') ? 'oui' : 'non')."\n";
+          echo 'environnement applicatif : '.$app->environment()." (attendu production)\n";
+          PHP
+
+          echo "## Présence dans le .env du serveur (sans valeur)"
+          presence_drapeau() {
+            local L V
+            L=$(grep -E "^$1=" .env | tail -1 || true)
+            if [ -z "$L" ]; then echo "$1 : absent"; return; fi
+            V=${L#*=}
+            V=${V%\"}; V=${V#\"}
+            case "$V" in
+              true) echo "$1 : true" ;;
+              false) echo "$1 : false" ;;
+              "") echo "$1 : vide" ;;
+              *) echo "$1 : autre" ;;
+            esac
+          }
+          presence_secret() {
+            local L V
+            L=$(grep -E "^$1=" .env | tail -1 || true)
+            if [ -z "$L" ]; then echo "$1 : absent"; return; fi
+            V=${L#*=}
+            if [ -z "$V" ]; then echo "$1 : vide"; else echo "$1 : pose"; fi
+          }
+          for N in CRM_INGEST_ENABLED CRM_INGEST_PERSONNES_ENABLED CRM_INGEST_DEMANDES_PERSONNE_ENABLED CRM_INGEST_DOSSIER_ENABLED CRM_SYNC_DOSSIER_CLIENT_STAGE CRM_OUTBOUND_ENABLED ORIGINES_V3_ENABLED ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED CRM_GUIDE_LIEN_ENABLED; do
+            presence_drapeau "$N"
+          done
+          for N in SITE_SYNC_HMAC_SECRET ORIGINES_HMAC_KEY SITE_CRM_WEBHOOK_URL CRM_GUIDE_HOTE CRM_INGEST_REPLAY_STORE; do
+            presence_secret "$N"
+          done
+
+          echo "FIN DU DIAGNOSTIC — aucune écriture, aucun redémarrage."
+          exit 0
+          REMOTE

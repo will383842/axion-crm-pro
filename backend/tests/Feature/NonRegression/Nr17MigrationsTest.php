@@ -80,6 +80,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000083_envoi_campagne_codes.php',
     // Envoi R08b : modèles de message versionnés, AJOUT SEUL (versions) et archivage par `archive_le` (jamais de suppression) ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000082_envoi_modeles.php',
+    // Envoi R13 : registre d'opposition manuel, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_02_000130_envoi_oppositions_registre.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

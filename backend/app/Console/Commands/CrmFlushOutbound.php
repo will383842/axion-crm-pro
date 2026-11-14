@@ -36,6 +36,9 @@ use stdClass;
  *     ces cycles comme des essais ferait abandonner des oppositions
  *     parfaitement valides après une panne ; or une opposition abandonnée,
  *     c'est une divergence RGPD durable. Voir `STATUTS_INDISPONIBILITE`.
+ *   - 401 (signature refusée : secret ou horloge différents) : traité comme une
+ *     indisponibilité (report SANS essai consommé) + `Log::critical`
+ *     `crm.outbound.signature_refusee` à chaque passage — erreur de réglage, pas du message.
  *   - autre (500 applicatif…) : essai CONSOMMÉ, backoff exponentiel plafonné,
  *     puis `gave_up` au plafond d'essais (8 par défaut) — état terminal qui
  *     doit alerter (plan §2.9), jamais un silence.
@@ -269,6 +272,19 @@ class CrmFlushOutbound extends Command
             Log::warning('crm.outbound.gave_up', ['event_id' => $row->event_id, 'status' => 422]);
 
             return 'gave_up';
+        }
+
+        if ($status === 401) {
+            // STOP-T4-CRM (D3) : un 401 est une erreur de RÉGLAGE (secret HMAC différent entre le CRM et le
+            // site, horloge décalée), pas un défaut du message. On attend SANS consommer d'essai, sinon toutes
+            // les oppositions passeraient `gave_up` en quelques heures. L'alerte est critique à chaque passage.
+            Log::critical('crm.outbound.signature_refusee', [
+                'event_id' => (string) $row->event_id,
+                'status' => 401,
+                'indice' => 'Vérifier SITE_SYNC_HMAC_SECRET (identique au site) et l\'horloge (fenêtre 300 s).',
+            ]);
+
+            return $this->reporter($row, 'HTTP 401 (signature refusée par le site : secret ou horloge)');
         }
 
         if (in_array($status, self::STATUTS_INDISPONIBILITE, true)) {

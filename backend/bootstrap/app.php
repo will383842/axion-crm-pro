@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Http\Middleware\EnforceFirstLoginSetup;
 use App\Http\Middleware\EnsureCrmConsoleV2;
+use App\Http\Middleware\EnsureProduitEnvoi;
 use App\Http\Middleware\EnsureTwoFactorPassed;
 use App\Http\Middleware\LimiteDureeRequetesSql;
 use App\Http\Middleware\SetCurrentWorkspace;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Spatie\Permission\Exceptions\UnauthorizedException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -127,6 +129,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => AuditHashChainLogger::class,
             // Lot L6 : drapeau de la console CRM v2 (404 tant qu'il est fermé).
             'crm-console' => EnsureCrmConsoleV2::class,
+            // Lot R00 : 404 si l'espace n'a pas le produit Envoi (source : ProduitsEspace).
+            'produit-envoi' => EnsureProduitEnvoi::class,
             // Delai SQL elargi pour une route qui en a besoin (exports en flux) :
             // `delai-sql:300`, en secondes.
             'delai-sql' => LimiteDureeRequetesSql::class,
@@ -163,6 +167,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        // (G) 403 des routes d'envoi : forme du contrat commun.yaml#Erreur ({error, message}, en français).
+        // Limité à /api/*/envoi/* : les autres routes gardent le rendu par défaut de Spatie.
+        $exceptions->render(function (UnauthorizedException $e, Request $request) {
+            if (! $request->is('api/*/envoi/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'error' => 'interdit',
+                'message' => 'Vous n’avez pas la permission d’effectuer cette action.',
+            ], 403);
         });
 
         // (E) UNE REQUETE TROP LONGUE N'EST PAS UNE PANNE. Le filet (D) annule

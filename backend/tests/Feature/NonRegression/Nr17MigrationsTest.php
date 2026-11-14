@@ -78,6 +78,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000080_envoi_campagnes.php',
     '2026_12_02_000081_envoi_campagnes_journal.php',
     '2026_12_02_000083_envoi_campagne_codes.php',
+    // Envoi R08b : modèles de message versionnés, AJOUT SEUL (versions) et archivage par `archive_le` (jamais de suppression) ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_02_000082_envoi_modeles.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -642,3 +642,142 @@ test('L4-C relecture — NatureEmail couvre les FAMILLES de l’amendement sous 
     }
     expect(NatureEmail::de(null))->toBe('inconnue');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM-G1 — prénom du guide-réseau : le plus récent gagne, jamais d'effacement
+// ─────────────────────────────────────────────────────────────────────────────
+
+function g1Evenement(string $at, ?string $prenom, string $source = 'guide-reseau'): array
+{
+    return l4cOptinActuel([
+        'occurred_at' => $at,
+        'source_slug' => $source,
+        'person' => ['first_name' => $prenom],
+    ]);
+}
+
+function g1Prenom(): ?string
+{
+    return DB::table('personnes')->value('first_name');
+}
+
+test('CRM-G1 — guide-réseau : un prénom plus récent remplace le prénom connu', function () {
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alicia');
+});
+
+test('CRM-G1 — guide-réseau : un événement plus ancien ne modifie pas le prénom', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia'))->assertOk();
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alicia');
+});
+
+test('CRM-G1 — guide-réseau : un prénom vide n’efface jamais le prénom connu', function () {
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', ''))->assertOk();
+    l4cPost(g1Evenement('2026-09-03T10:00:00Z', null))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});
+
+test('CRM-G1 — guide-réseau : un prénom connu vide reçoit le prénom, même d’un événement plus ancien', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', null))->assertOk();
+    expect(g1Prenom())->toBeNull();
+
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});
+
+test('CRM-G1 — guide-réseau : le rejeu identique ne change rien', function () {
+    $evenement = g1Evenement('2026-09-01T10:00:00Z', 'Alice');
+    l4cPost($evenement)->assertOk();
+    $avant = (array) DB::table('personnes')->first();
+
+    l4cPost(array_replace($evenement, ['event_id' => (string) Str::uuid()]))->assertOk();
+
+    $apres = (array) DB::table('personnes')->first();
+    expect(g1Prenom())->toBe('Alice')
+        ->and($apres['first_name'])->toBe($avant['first_name'])
+        ->and($apres['derniere_interaction_at'])->toBe($avant['derniere_interaction_at'])
+        ->and($apres['field_origins'])->toBe($avant['field_origins'])
+        ->and(DB::table('personnes')->count())->toBe(1);
+});
+
+test('CRM-G1 — TÉMOIN : les autres sources gardent leur comportement (le prénom reçu remplace, même plus ancien)', function () {
+    l4cPost(g1Evenement('2026-09-02T10:00:00Z', 'Alicia', 'newsletter'))->assertOk();
+    l4cPost(g1Evenement('2026-09-01T10:00:00Z', 'Alice', 'newsletter'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM-G1 (correction) — charge identique à la fixture du site, et même seconde
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Forme de `charge-crm-v3-page.json` côté site (valeurs fictives). Seul `person_key`
+ * diffère : la fixture du site porte un bouchon `h:…`, le CRM exige le sha256 réel.
+ */
+function g1ChargeSite(string $at, string $prenom): array
+{
+    return [
+        'schema_version' => 3,
+        'event_id' => (string) Str::uuid(),
+        'event_type' => 'lead_magnet_requested',
+        'occurred_at' => $at,
+        'source_slug' => 'guide-reseau',
+        'subject_ref' => 'site:guide_request:' . Str::uuid(),
+        'person' => ['person_key' => l4cKey(L4C_EMAIL), 'email' => L4C_EMAIL, 'first_name' => $prenom],
+        'consentements' => [['nature' => 'optin', 'date' => $at, 'source' => 'page-guide-reseau', 'version' => 'page-guide-2026-11-08']],
+        'guides_recus' => [['guide' => 'guide-ia', 'date' => $at]],
+        'payload' => [
+            'schema_version' => 3, 'verifie' => true, 'aimant' => 'guide-ia-entreprise',
+            'placement' => 'mot-guide:instagram', 'locale' => 'fr', 'email_nature' => 'pro',
+            'base_legale' => 'legitimate_interest_b2b', 'lettre' => 'non_abonne', 'version_mention' => 'm1-v1',
+            'origine_contenu' => ['mot' => 'GUIDE', 'reseau' => 'instagram', 'guide' => 'guide-ia', 'date' => $at],
+            'origines' => [[
+                'mot' => 'GUIDE', 'reseau' => 'instagram', 'guide' => 'guide-ia', 'date' => $at,
+                'post_ref' => 'post_ref_test_01', 'canal' => 'commentaire', 'famille' => 'guide_reseau',
+                'detail' => 'guide_ia', 'compte' => 'page_principale', 'version_texte' => 'm1-v1',
+            ]],
+        ],
+    ];
+}
+
+test('CRM-G1 — charge du site (forme de la fixture) : le prénom le plus récent gagne', function () {
+    config(['origines.v3_enabled' => true]);
+    l4cPost(g1ChargeSite('2026-11-01T10:00:00.000Z', 'Camille'))->assertOk();
+    l4cPost(g1ChargeSite('2026-11-01T10:05:00.000Z', 'Camila'))->assertOk();
+    expect(g1Prenom())->toBe('Camila');
+
+    l4cPost(g1ChargeSite('2026-11-01T09:00:00.000Z', 'Ancienne'))->assertOk();
+    expect(g1Prenom())->toBe('Camila');
+});
+
+test('CRM-G1 — événement d\'origines (sans source_slug, subject_ref du site) : même garde', function () {
+    $e = fn (string $at, string $p) => l4cOptinActuel([
+        'occurred_at' => $at,
+        'subject_ref' => 'site:guide-reseau:run_0001',
+        'person' => ['first_name' => $p],
+    ]);
+    l4cPost($e('2026-09-02T10:00:00Z', 'Alicia'))->assertOk();
+    l4cPost($e('2026-09-01T10:00:00Z', 'Alice'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alicia');
+});
+
+test('CRM-G1 — deux événements dans la même seconde : le premier arrivé garde le prénom, sans erreur', function () {
+    l4cPost(g1Evenement('2026-09-01T10:00:00.100Z', 'Alice'))->assertOk();
+    l4cPost(g1Evenement('2026-09-01T10:00:00.900Z', 'Alicia'))->assertOk();
+
+    expect(g1Prenom())->toBe('Alice')
+        ->and(DB::table('personnes')->count())->toBe(1);
+
+    // La seconde suivante, elle, remplace.
+    l4cPost(g1Evenement('2026-09-01T10:00:01.000Z', 'Alicia'))->assertOk();
+    expect(g1Prenom())->toBe('Alicia');
+});

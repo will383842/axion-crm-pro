@@ -206,6 +206,16 @@ class AuditHashChainLogger
     ];
 
     /**
+     * Clés masquées par comparaison EXACTE (minuscules), jamais en sous-chaîne : `code` seul
+     * désigne le code à usage unique de validation d'une campagne (R11, `/envoi/brouillons/{id}/valider`),
+     * un secret à 10⁶ valeurs que `sha256(json_encode(['code' => 'NNNNNN']))` laisserait retrouver
+     * hors ligne. En sous-chaîne il masquerait aussi `code_postal`, `code_naf`, `country_code`…
+     *
+     * @var list<string>
+     */
+    public const CHAMPS_SENSIBLES_EXACTS = ['code', 'otp_code', 'code_validation', 'verification_code'];
+
+    /**
      * Ce qui remplace la valeur masquee. Une CONSTANTE, identique pour tous :
      * c'est precisement parce qu'elle ne varie pas que l'empreinte cesse de
      * distinguer deux mots de passe.
@@ -289,6 +299,10 @@ class AuditHashChainLogger
     private static function cleEstSensible(string $cle): bool
     {
         $cle = strtolower($cle);
+
+        if (in_array($cle, self::CHAMPS_SENSIBLES_EXACTS, true)) {
+            return true;
+        }
 
         foreach (self::CHAMPS_SENSIBLES as $motif) {
             if (str_contains($cle, $motif)) {

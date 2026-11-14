@@ -407,7 +407,8 @@ export interface components {
         /** @enum {string} */
         ClassementReponse: "interesse" | "pas_maintenant" | "question" | "refus" | "stop" | "absence" | "a_rattacher";
         Configuration: {
-            courante: components["schemas"]["VersionConfiguration"];
+            /** @description Nulle tant qu'aucune version n'a été appliquée. */
+            courante: components["schemas"]["VersionConfiguration"] | null;
             historique: components["schemas"]["VersionConfiguration"][];
             prete: components["schemas"]["VersionConfiguration"] | null;
         };
@@ -563,9 +564,10 @@ export interface components {
             type: "ip" | "domaine";
         };
         SanteServeur: {
-            /** @description Messages en attente d'envoi sur ce serveur. */
-            en_file: number;
-            en_ligne_depuis_jours: number;
+            /** @description Messages en attente d'envoi sur ce serveur (nul si non mesuré). */
+            en_file: number | null;
+            /** @description Nul si non mesuré. */
+            en_ligne_depuis_jours: number | null;
             /** @description Paliers de chauffe des adresses IP en montée. */
             paliers: {
                 adresse: string;
@@ -574,13 +576,14 @@ export interface components {
                 sur: number;
             }[];
             serveur_id: components["schemas"]["Identifiant"];
+            /** @description Dernier test du serveur (nul s'il n'est pas conservé). */
             test: {
                 etapes: {
                     libelle: string;
                     ok: boolean;
                 }[];
                 fait_le: components["schemas"]["Horodatage"];
-            };
+            } | null;
         };
         ServeurResume: {
             adresses_ip: components["schemas"]["AdresseIp"][];
@@ -611,11 +614,13 @@ export interface components {
                 sorte: "ajout" | "retrait" | "modification";
             }[];
             creee_le: components["schemas"]["Horodatage"];
+            /** @description Empreinte SHA-256 du paquet (jamais son contenu). */
+            empreinte?: string;
             numero: number;
             /** @description Qui a appliqué la version (prénom, ou « Système »). */
             par: string | null;
             /** @enum {string} */
-            resultat: "prete" | "appliquee" | "remplacee" | "retour_automatique";
+            resultat: "prete" | "appliquee" | "remplacee" | "retour_automatique" | "invalide" | "retour_arriere" | "derive_refusee" | "incertaine";
         };
     };
     responses: {
@@ -1006,7 +1011,8 @@ export interface operations {
                     "application/json": {
                         dns: components["schemas"]["EnregistrementDns"][];
                         domaine: components["schemas"]["DomaineResume"];
-                        expire_le: components["schemas"]["Horodatage"];
+                        /** @description Nul si la date d'expiration n'est pas conservée. */
+                        expire_le: components["schemas"]["Horodatage"] | null;
                         jours: components["schemas"]["JourActivite"][];
                         listes_noires: components["schemas"]["ListeNoire"][];
                     };

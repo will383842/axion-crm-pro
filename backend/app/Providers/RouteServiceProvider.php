@@ -69,6 +69,9 @@ class RouteServiceProvider extends ServiceProvider
         }
         // Envoi R05 : export du registre d'opposition (2 par heure et par compte) ; « Puis-je écrire à… ? » (30 par minute et par compte).
         RateLimiter::for('envoi-opposition-export', fn (Request $r) => Limit::perHour(2)->by('envoi-opposition-export|' . (optional($r->user())->id ?: $r->ip())));
+        // Envoi R15 : écritures d'infrastructure (30 par minute) et contrôle DNS (6 par minute), par compte.
+        RateLimiter::for('envoi-infra-ecriture', fn (Request $r) => Limit::perMinute(30)->by('envoi-infra-ecriture|' . (optional($r->user())->id ?: $r->ip())));
+        RateLimiter::for('envoi-dns-verifier', fn (Request $r) => Limit::perMinute(6)->by('envoi-dns-verifier|' . (optional($r->user())->id ?: $r->ip())));
         RateLimiter::for('envoi-puis-je-ecrire', fn (Request $r) => Limit::perMinute(30)->by('envoi-puis-je-ecrire|' . (optional($r->user())->id ?: $r->ip())));
         RateLimiter::for(
             'scraper-list',

@@ -186,7 +186,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Appliquer la version prête */
+        /**
+         * Appliquer la version prête (fermé, 409 au palier 0, l'Applicateur n'est jamais appelé)
+         * @description Seul geste qui changerait le vrai serveur ; reste fermé tant qu'un ADR de K17 ne l'ouvre pas. Propriétaire seul.
+         */
         post: operations["appliquerConfiguration"];
         delete?: never;
         options?: never;
@@ -203,7 +206,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revenir à une version précédente */
+        /**
+         * Revenir à une version précédente (fermé, 409 au palier 0, l'Applicateur n'est jamais appelé)
+         * @description Même raison que `appliquer`. Propriétaire seul.
+         */
         post: operations["revenirConfiguration"];
         delete?: never;
         options?: never;
@@ -221,7 +227,13 @@ export interface paths {
         /** Domaines d'envoi */
         get: operations["listerDomaines"];
         put?: never;
-        /** Ajouter un domaine (rend les enregistrements DNS à créer) */
+        /**
+         * Ajouter un domaine (rend les enregistrements DNS à publier à la main)
+         * @description R15 — propriétaire seul (403 sinon). Enregistre le domaine avec son flux ; n'écrit RIEN dans un DNS.
+         *     Le nom est normalisé (minuscules, IDN en punycode) ; une adresse IP, un domaine interne ou réservé
+         *     (`localhost`, `.local`, `.internal`, `.invalid`, `.test`, `.example`…) ou un nom trop long donne 422.
+         *     Rejouer le même domaine ne crée pas de doublon : 200 avec le domaine existant (201 à la création).
+         */
         post: operations["ajouterDomaine"];
         delete?: never;
         options?: never;
@@ -255,7 +267,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** DMARC progressif — passer à la politique suivante ou poser un rappel */
+        /**
+         * DMARC progressif — poser un RAPPEL (la politique se change dans le DNS, par un humain)
+         * @description R15 — propriétaire seul. Enregistre un rappel ; ne publie rien (`applique` vaut toujours faux).
+         */
         post: operations["avancerDmarc"];
         delete?: never;
         options?: never;
@@ -272,7 +287,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Vérifier les enregistrements DNS */
+        /**
+         * Vérifier les enregistrements DNS
+         * @description R15 — propriétaire seul. Lecture par le résolveur local, limitée à 6 appels par minute et par compte (429 au-delà).
+         *     N'interroge que les domaines de l'espace courant : domaine d'un autre espace ou inconnu = 404.
+         */
         post: operations["verifierDns"];
         delete?: never;
         options?: never;
@@ -323,7 +342,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ajouter une adresse IP (prépare une nouvelle version de configuration) */
+        /**
+         * Ajouter une adresse IP (prépare une version « prête » de configuration, n'applique rien)
+         * @description R15 — propriétaire seul. Le paquet est généré et validé, une version `prete` est notée (empreinte seulement) ;
+         *     l'adresse n'est ni conservée ni renvoyée. Serveur ou domaine d'un autre espace = 404 ; flux différent de celui du domaine = 422.
+         */
         post: operations["ajouterAdresseIp"];
         delete?: never;
         options?: never;
@@ -357,7 +380,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Lancer le test du serveur (boîtes témoins internes, aucun envoi réel) */
+        /**
+         * Lancer le test du serveur (fermé au palier 0, 409 « envoi fermé », aucun envoi)
+         * @description R15 — propriétaire seul. Serveur d'un autre espace = 404 ; sinon 409 `envoi_ferme`, sans rien envoyer.
+         */
         post: operations["lancerTestServeur"];
         delete?: never;
         options?: never;
@@ -437,9 +463,9 @@ export interface components {
              * @description Ce que l'enregistrement sert à faire.
              * @enum {string}
              */
-            role: "spf" | "dkim" | "dmarc" | "ptr" | "mta_sts";
+            role: "spf" | "dkim" | "dmarc" | "ptr" | "mta_sts" | "helo" | "tls_rpt";
             /** @enum {string} */
-            type: "TXT" | "CNAME" | "MX" | "PTR";
+            type: "A" | "AAAA" | "TXT" | "CNAME" | "MX" | "PTR";
             valeur: string;
         };
         Erreur: {
@@ -915,7 +941,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Configuration"];
+            403: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };
@@ -930,7 +956,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Configuration"];
+            403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
         };
     };
     listerDomaines: {
@@ -977,11 +1004,24 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    flux: components["schemas"]["FluxEnvoi"];
                     nom: string;
                 };
             };
         };
         responses: {
+            /** @description Domaine déjà enregistré (rejeu) et enregistrements à publier. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dns: components["schemas"]["EnregistrementDns"][];
+                        domaine: components["schemas"]["DomaineResume"];
+                    };
+                };
+            };
             /** @description Domaine et enregistrements à créer. */
             201: {
                 headers: {
@@ -994,6 +1034,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
         };
     };
@@ -1045,15 +1086,27 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Domaine après le geste. */
+            /** @description Rappel enregistré. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DomaineResume"];
+                    "application/json": {
+                        /** @constant */
+                        applique: false;
+                        domaine: components["schemas"]["DomaineResume"];
+                        message: string;
+                        rappel: {
+                            politique: components["schemas"]["PolitiqueDmarc"];
+                            rappel_le: components["schemas"]["Horodatage"] | null;
+                        };
+                    };
                 };
             };
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
         };
     };
     verifierDns: {
@@ -1075,9 +1128,14 @@ export interface operations {
                 content: {
                     "application/json": {
                         dns: components["schemas"]["EnregistrementDns"][];
+                        pause: boolean;
+                        pret: boolean;
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
+            429: components["responses"]["Erreur"];
         };
     };
     listerListesNoires: {
@@ -1144,6 +1202,8 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Configuration"];
+            403: components["responses"]["Erreur"];
+            404: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
         };
     };
@@ -1181,16 +1241,9 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Santé du serveur après le test. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SanteServeur"];
-                };
-            };
+            403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
         };
     };
 }

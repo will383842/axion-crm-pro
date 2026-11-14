@@ -86,6 +86,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000141_envoi_alertes_reglees.php',
     '2026_12_02_000142_envoi_identite_versions.php',
     '2026_12_02_000143_envoi_reglages.php',
+    // Envoi R15 : rappels DMARC (ajout seul : déclencheur, REVOKE) et CHECK de statut des versions élargi à « prete » (aucune ligne touchée) ; down() inerte, up() rejouable.
+    '2026_12_02_000150_envoi_domaines_rappels_dmarc.php',
     // Filet modifié : pourquoi — Envoi L8-F14a : colonne `statut` (défaut `acceptee`, sans UPDATE), index unique des conclusions et fonction
     // de libération (ajouts seuls) ; les retirer effacerait l'état des réservations d'injection ; down() inerte, up() rejouable.
     '2026_12_02_000180_envoi_injection_reservation_statut.php',

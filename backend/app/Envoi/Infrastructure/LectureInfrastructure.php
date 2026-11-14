@@ -125,7 +125,19 @@ final class LectureInfrastructure
             }
         }
 
-        return ['courante' => $courante, 'prete' => null, 'historique' => array_slice(array_reverse($versions), 0, self::HISTORIQUE_MAX)];
+        // « Prête » : la dernière version préparée, tant qu'aucune application ne l'a suivie.
+        $prete = null;
+        foreach (array_reverse($versions) as $v) {
+            if ($v['resultat'] === 'appliquee') {
+                break;
+            }
+            if ($v['resultat'] === 'prete') {
+                $prete = $v;
+                break;
+            }
+        }
+
+        return ['courante' => $courante, 'prete' => $prete, 'historique' => array_slice(array_reverse($versions), 0, self::HISTORIQUE_MAX)];
     }
 
     /**

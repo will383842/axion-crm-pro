@@ -186,18 +186,37 @@ paths:
                     additionalProperties: { $ref: './commun.yaml#/components/schemas/Horodatage' }
     post:
       operationId: ajouterDomaine
-      summary: Ajouter un domaine (rend les enregistrements DNS à créer)
+      summary: Ajouter un domaine (rend les enregistrements DNS à publier à la main)
+      description: |
+        R15 — propriétaire seul (403 sinon). Enregistre le domaine avec son flux ; n'écrit RIEN dans un DNS.
+        Le nom est normalisé (minuscules, IDN en punycode) ; une adresse IP, un domaine interne ou réservé
+        (`localhost`, `.local`, `.internal`, `.invalid`, `.test`, `.example`…) ou un nom trop long donne 422.
+        Rejouer le même domaine ne crée pas de doublon : 200 avec le domaine existant (201 à la création).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [nom]
+              required: [nom, flux]
               properties:
                 nom: { type: string }
+                flux: { $ref: './commun.yaml#/components/schemas/FluxEnvoi' }
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '200':
+          description: Domaine déjà enregistré (rejeu) et enregistrements à publier.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [domaine, dns]
+                properties:
+                  domaine: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  dns:
+                    type: array
+                    items: { $ref: '#/components/schemas/EnregistrementDns' }
         '201':
           description: Domaine et enregistrements à créer.
           content:
@@ -245,6 +264,9 @@ paths:
     post:
       operationId: verifierDns
       summary: Vérifier les enregistrements DNS
+      description: |
+        R15 — propriétaire seul. Lecture par le résolveur local, limitée à 6 appels par minute et par compte (429 au-delà).
+        N'interroge que les domaines de l'espace courant : domaine d'un autre espace ou inconnu = 404.
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
@@ -254,15 +276,21 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [dns]
+                required: [dns, pret, pause]
                 properties:
+                  pret: { type: boolean }
+                  pause: { type: boolean }
                   dns:
                     type: array
                     items: { $ref: '#/components/schemas/EnregistrementDns' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/domaines/{id}/dmarc:
     post:
       operationId: avancerDmarc
-      summary: DMARC progressif — passer à la politique suivante ou poser un rappel
+      summary: DMARC progressif — poser un RAPPEL (la politique se change dans le DNS, par un humain)
+      description: R15 — propriétaire seul. Enregistre un rappel ; ne publie rien (`applique` vaut toujours faux).
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       requestBody:
@@ -277,10 +305,28 @@ paths:
                 rappel_le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
       responses:
         '200':
-          description: Domaine après le geste.
+          description: Rappel enregistré.
           content:
             application/json:
-              schema: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+              schema:
+                type: object
+                required: [domaine, rappel, applique, message]
+                properties:
+                  domaine: { $ref: './commun.yaml#/components/schemas/DomaineResume' }
+                  rappel:
+                    type: object
+                    required: [politique, rappel_le]
+                    properties:
+                      politique: { $ref: './commun.yaml#/components/schemas/PolitiqueDmarc' }
+                      rappel_le:
+                        oneOf:
+                          - $ref: './commun.yaml#/components/schemas/Horodatage'
+                          - type: 'null'
+                  applique: { type: boolean, const: false }
+                  message: { type: string }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/serveurs:
     get:
       operationId: listerServeurs
@@ -313,20 +359,21 @@ paths:
   /envoi/serveurs/{id}/test:
     post:
       operationId: lancerTestServeur
-      summary: Lancer le test du serveur (boîtes témoins internes, aucun envoi réel)
+      summary: Lancer le test du serveur (fermé au palier 0, 409 « envoi fermé », aucun envoi)
+      description: R15 — propriétaire seul. Serveur d'un autre espace = 404 ; sinon 409 `envoi_ferme`, sans rien envoyer.
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
-        '200':
-          description: Santé du serveur après le test.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SanteServeur' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/serveurs/{id}/adresses-ip:
     post:
       operationId: ajouterAdresseIp
-      summary: Ajouter une adresse IP (prépare une nouvelle version de configuration)
+      summary: Ajouter une adresse IP (prépare une version « prête » de configuration, n'applique rien)
+      description: |
+        R15 — propriétaire seul. Le paquet est généré et validé, une version `prete` est notée (empreinte seulement) ;
+        l'adresse n'est ni conservée ni renvoyée. Serveur ou domaine d'un autre espace = 404 ; flux différent de celui du domaine = 422.
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       requestBody:
@@ -342,6 +389,8 @@ paths:
                 domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
       responses:
         '200': { $ref: '#/components/responses/Configuration' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/configuration:
     get:
@@ -352,21 +401,24 @@ paths:
   /envoi/configuration/appliquer:
     post:
       operationId: appliquerConfiguration
-      summary: Appliquer la version prête
+      summary: Appliquer la version prête (fermé, 409 au palier 0, l'Applicateur n'est jamais appelé)
+      description: Seul geste qui changerait le vrai serveur ; reste fermé tant qu'un ADR de K17 ne l'ouvre pas. Propriétaire seul.
       responses:
-        '200': { $ref: '#/components/responses/Configuration' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/configuration/versions/{numero}/revenir:
     post:
       operationId: revenirConfiguration
-      summary: Revenir à une version précédente
+      summary: Revenir à une version précédente (fermé, 409 au palier 0, l'Applicateur n'est jamais appelé)
+      description: Même raison que `appliquer`. Propriétaire seul.
       parameters:
         - name: numero
           in: path
           required: true
           schema: { type: integer, minimum: 1 }
       responses:
-        '200': { $ref: '#/components/responses/Configuration' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/chauffe:
     get:
       operationId: lireChauffe
@@ -563,8 +615,8 @@ components:
         role:
           description: Ce que l'enregistrement sert à faire.
           type: string
-          enum: [spf, dkim, dmarc, ptr, mta_sts]
-        type: { type: string, enum: [TXT, CNAME, MX, PTR] }
+          enum: [spf, dkim, dmarc, ptr, mta_sts, helo, tls_rpt]
+        type: { type: string, enum: [A, AAAA, TXT, CNAME, MX, PTR] }
         nom: { type: string }
         valeur: { type: string }
         etat: { type: string, enum: [ok, absent, different] }

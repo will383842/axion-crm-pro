@@ -60,6 +60,15 @@ final class Freins
     }
 
     /**
+     * Réputation signalée par un fournisseur (R17). Asymétrique par construction : « mauvaise » freine ce fournisseur
+     * seulement (jusqu'à levée humaine) ; « bonne », « moyenne » et « inconnue » ne font RIEN, et surtout ne lèvent rien.
+     */
+    public static function reputationMauvaise(string $reputation, string $fournisseur): ?DecisionFrein
+    {
+        return $reputation === 'mauvaise' ? new DecisionFrein(DecisionFrein::REPUTATION_MAUVAISE, $fournisseur) : null;
+    }
+
+    /**
      * Taux de réponse sous la moitié de la moyenne des 3 fournées précédentes.
      * Minimum 100 envois comparés : fournée courante ET total des 3 précédentes.
      * Sans exactement 3 fournées précédentes, on ne compare pas.

@@ -56,7 +56,6 @@ export function TableauCampagnes({ campagnes, maintenant }: { campagnes: readonl
                   <span>
                     {c.cible.libelle} · {c.cible.total.toLocaleString('fr-FR')}
                   </span>
-                  {c.ab_objet ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">Test A/B</span> : null}
                 </div>
               </div>
               <div role="cell">

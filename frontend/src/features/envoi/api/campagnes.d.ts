@@ -161,14 +161,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        CampagneResume: {
-            /** @description Test A/B sur l'objet du premier message. */
-            ab_objet: boolean;
+        /**
+         * @description Campagne telle que le suivi la montre (R09). Par rapport à `CampagneResume` : `ab_objet` est retiré (pas de test A/B)
+         *     et `etapes` va de 1 à 3. Au palier 0, `envoi_ferme` est vrai : « en_cours » n'existe pas, l'écran dit
+         *     « programmée, envoi fermé ». Les compteurs restent à 0 tant que la campagne n'a pas de séquence.
+         */
+        CampagneSuivi: {
             boites: components["schemas"]["Identifiant"][];
             cible: components["schemas"]["CibleCampagne"];
             cree_le: components["schemas"]["Horodatage"];
+            /** @description Vrai tant que l'envoi réel est fermé (palier 0): aucune campagne ne part. */
+            envoi_ferme: boolean;
             envoyes: number;
-            /** @description Nombre de messages de la séquence (1 à 4). */
             etapes: number;
             id: components["schemas"]["Identifiant"];
             nom: string;
@@ -177,6 +181,8 @@ export interface components {
             reponses_interessees: number;
             statut: components["schemas"]["StatutCampagne"];
             total: number;
+            /** @description Version de la campagne (verrou optimiste). */
+            version: number;
         };
         CibleCampagne: {
             libelle: string;
@@ -258,7 +264,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["CampagneResume"];
+                "application/json": components["schemas"]["CampagneSuivi"];
             };
         };
         /** @description Erreur, avec un message en français. */
@@ -272,6 +278,12 @@ export interface components {
         };
     };
     parameters: {
+        /**
+         * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+         *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+         *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+         */
+        CleIdempotence: string;
         Identifiant: components["schemas"]["Identifiant"];
         Page: number;
         ParPage: number;
@@ -306,7 +318,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["CampagneResume"][];
+                        data: components["schemas"]["CampagneSuivi"][];
                         /** @description Heure du serveur (sert à proposer « Demain 9:00 »). */
                         maintenant: components["schemas"]["Horodatage"];
                         meta: components["schemas"]["Pagination"];
@@ -350,7 +362,7 @@ export interface operations {
                                 version: "A" | "B";
                             }[];
                         } | null;
-                        campagne: components["schemas"]["CampagneResume"];
+                        campagne: components["schemas"]["CampagneSuivi"];
                         /** @description Décompte des destinataires par état, et taux de la campagne. */
                         compteurs: {
                             /** @description Entreprises dont la suite est arrêtée parce qu'un contact a répondu. */
@@ -399,7 +411,14 @@ export interface operations {
     changerDateCampagne: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
             path: {
                 id: components["parameters"]["Identifiant"];
             };
@@ -414,6 +433,8 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
         };
     };
@@ -454,7 +475,14 @@ export interface operations {
     dupliquerCampagne: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
             path: {
                 id: components["parameters"]["Identifiant"];
             };
@@ -475,12 +503,21 @@ export interface operations {
         };
         responses: {
             201: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
         };
     };
     mettreCampagneEnPause: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
             path: {
                 id: components["parameters"]["Identifiant"];
             };
@@ -489,13 +526,21 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };
     reprendreCampagne: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
             path: {
                 id: components["parameters"]["Identifiant"];
             };
@@ -504,13 +549,21 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };
     terminerCampagne: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
             path: {
                 id: components["parameters"]["Identifiant"];
             };
@@ -519,6 +572,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };
     };

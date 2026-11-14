@@ -52,6 +52,7 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // le contrat et retirera ces six lignes. La liste reste fermée : tout autre appel sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
 // ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
+// Filet modifié : pourquoi. R18 : page Réputation d'Envoi, deux appels (lecture, saisie) vers les routes R17 ; la photo NR-20 ne liste aucune route Envoi (module absent en production), mêmes raisons que DM2-PIL. Liste toujours fermée.
 // Filet modifié : pourquoi. DM1-COM : code reçu par e-mail, appareils de confiance, codes de secours et export du
 // registre des oppositions. Servis par le faux serveur de la démo ; les routes serveur sont prévues aux lots S3 et
 // S12 (authentification par code e-mail) et au lot RGPD, qui retireront ces lignes.
@@ -111,6 +112,9 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/sante',
   'POST /api/v1/envoi/feu-vert/{p}/fait',
   'POST /api/v1/envoi/sante/test',
+  // R18 — page Réputation (routes serveur R17, `reputation.yaml`) : la photo NR-20 ne contient aucune route Envoi (module absent en production), comme pour DM2-PIL ci-dessus.
+  'GET /api/v1/envoi/reputation',
+  'POST /api/v1/envoi/reputation/constats',
   'GET /api/v1/envoi/compteurs',
   'GET /api/v1/envoi/etat',
   'GET /api/v1/envoi/reponses',

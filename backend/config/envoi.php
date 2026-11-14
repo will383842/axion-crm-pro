@@ -13,6 +13,9 @@
 
 return [
     // filter_var : « non », « off », « faux », « 0 » => false (un simple (bool) les lisait true).
+    // R09 : fenêtre (jours) dans laquelle la date d'un envoi de campagne peut être choisie (demain à +90 jours).
+    'campagne_date_fenetre_jours' => 90,
+
     'reel_actif' => filter_var(env('ENVOI_REEL_ACTIF', false), FILTER_VALIDATE_BOOLEAN) === true,
     // Bornés à [0, 300] en V0 (App\Envoi\PasserelleLocale::PLAFOND_MAX) : au-delà, injection refusée.
     'plafond_jour' => (int) env('ENVOI_PLAFOND_JOUR', 20),
@@ -68,6 +71,8 @@ return [
     ],
     // Délai (minutes) avant nouvelle tentative après une réponse SMTP 4xx.
     'smtp_delai_4xx_minutes' => (int) env('ENVOI_SMTP_DELAI_4XX_MINUTES', 15),
+    // Boîte SMTP bloquée par une ligne a_verifier : report d'attente espacé (minutes), jamais chaque minute.
+    'smtp_delai_boite_bloquee_minutes' => (int) env('ENVOI_SMTP_DELAI_BOITE_BLOQUEE_MINUTES', 60),
     // Dérogations de TEST uniquement. Valeurs littérales (jamais lues dans l'environnement) et, de
     // toute façon, honorées SEULEMENT sous APP_ENV=testing : boucle locale 127.0.0.1 pour le faux
     // serveur SMTP, et injection dans la transaction englobante de RefreshDatabase.

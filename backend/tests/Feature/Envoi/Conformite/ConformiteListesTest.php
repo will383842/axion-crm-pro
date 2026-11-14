@@ -145,8 +145,9 @@ test('opposition : lignes et résumé conformes au contrat, sans adresse ni empr
 
 test('aucune route de ce lot ne supprime, n’écrit ni ne touche aux drapeaux ou aux envois', function () {
     $uris = array_filter($this->routesEnvoi(), fn (array $r) => in_array($r[1], ['/api/v1/envoi/desinscriptions', '/api/v1/envoi/opposition'], true));
-    foreach ($uris as [$methode]) {
-        expect($methode)->toBe('GET');
+    foreach ($uris as [$methode, $uri]) {
+        // R13 ajoute UNE écriture, et une seule, sur le registre : POST /envoi/opposition (couvert par OppositionManuelleTest).
+        expect($methode)->toBe($methode === 'POST' && $uri === '/api/v1/envoi/opposition' ? 'POST' : 'GET');
     }
     expect($uris)->not->toBeEmpty();
     $drapeaux = DB::table('envoi_drapeaux')->count();

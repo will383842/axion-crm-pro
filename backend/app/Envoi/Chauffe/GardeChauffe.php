@@ -63,8 +63,49 @@ final class GardeChauffe
      * fenêtre), pauses, frein humain, expéditeur connu, quota de la boîte, quota du domaine.
      *
      * @param  ?string  $fournisseur  valeur déjà résolue par `preparer()` ; null = résolu ici (hors passerelle)
+     * @param  array{boite: int, domaine: int}  $enCours  réservations de la passerelle dont l'envoi n'est pas encore noté
+     *                                                    (en vol ou issue incertaine) : elles comptent dans les quotas, sinon deux workers dépasseraient le budget
      */
-    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null): ?string
+    public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null, array $enCours = ['boite' => 0, 'domaine' => 0]): ?string
+    {
+        $portes = $this->controler($m, $maintenant, $fournisseur);
+        if (is_string($portes)) {
+            return $portes;
+        }
+        ['ws' => $ws, 'boite' => $boite, 'humain' => $humain, 's' => $s] = $portes;
+        $quota = CourbeChauffe::quotaBoite($this->jourDeChauffe($ws, $boite, $jour, $s['jour_effectif_part']));
+        if ($humain === Freins::RALENTI) {
+            $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
+        }
+        if ($this->depot->envoyesBoite($ws, $boite, $jour) + $enCours['boite'] >= $quota) {
+            return self::QUOTA_ATTEINT;
+        }
+        // Quota du DOMAINE d'envoi : créer des boîtes sur le même domaine ne multiplie pas la montée de chauffe.
+        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) + $enCours['domaine'] >= Seuils::DOMAINE_FACTEUR * $quota) {
+            return self::QUOTA_DOMAINE_ATTEINT;
+        }
+
+        return null;
+    }
+
+    /**
+     * Les portes SANS les quotas : fenêtre 8 h-19 h, homme mort, pauses, frein humain, expéditeur connu. Sert au rejeu
+     * d'une clé déjà réservée (sa place est déjà comptée : rien à recompter), pour que le renvoi ne contourne aucune pause.
+     * Motif de report, ou null si les portes sont ouvertes.
+     */
+    public function portes(MessageAEnvoyer $m, DateTimeImmutable $maintenant, ?string $fournisseur = null): ?string
+    {
+        $portes = $this->controler($m, $maintenant, $fournisseur);
+
+        return is_string($portes) ? $portes : null;
+    }
+
+    /**
+     * Ordre : fenêtre d'envoi, homme mort (toujours, dans la fenêtre), pauses, frein humain, expéditeur connu.
+     *
+     * @return string|array{ws: string, boite: string, humain: int, s: array<string, float>} motif de refus, ou les valeurs lues pour les quotas
+     */
+    private function controler(MessageAEnvoyer $m, DateTimeImmutable $maintenant, ?string $fournisseur): string|array
     {
         // Jamais d'envoi hors de la fenêtre [08:00, 19:00[ (Paris) : sans cela, l'homme mort ne jouerait pas.
         if (! Freins::dansFenetreEnvoi($maintenant)) {
@@ -92,19 +133,18 @@ final class GardeChauffe
         if ($boite === null) {
             return self::EXPEDITEUR_INCONNU;
         }
-        $quota = CourbeChauffe::quotaBoite($this->jourDeChauffe($ws, $boite, $jour, $s['jour_effectif_part']));
-        if ($humain === Freins::RALENTI) {
-            $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
-        }
-        if ($this->depot->envoyesBoite($ws, $boite, $jour) >= $quota) {
-            return self::QUOTA_ATTEINT;
-        }
-        // Quota du DOMAINE d'envoi : créer des boîtes sur le même domaine ne multiplie pas la montée de chauffe.
-        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) >= Seuils::DOMAINE_FACTEUR * $quota) {
-            return self::QUOTA_DOMAINE_ATTEINT;
-        }
 
-        return null;
+        return ['ws' => $ws, 'boite' => $boite, 'humain' => $humain, 's' => $s];
+    }
+
+    /**
+     * Boîte réelle et domaine d'envoi du message : conservés avec la réservation pour la compter dans les quotas.
+     *
+     * @return array{boite?: ?string, domaine?: ?string}
+     */
+    public function ressources(MessageAEnvoyer $m): array
+    {
+        return ['boite' => $this->depot->boiteId($m->workspaceId, $m->expediteur), 'domaine' => Fournisseur::domaine($m->expediteur)];
     }
 
     public function noter(MessageAEnvoyer $m, DateTimeImmutable $jour, ?string $fournisseur = null): void
@@ -122,6 +162,18 @@ final class GardeChauffe
         $d = $f === Fournisseur::INCONNU ? new DecisionFrein(DecisionFrein::INDESIRABLE_TEMOIN) : Freins::indesirableTemoin($f);
 
         return $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable(), $auteur);
+    }
+
+    /**
+     * R17 : un constat de réputation « mauvaise » ouvre une pause vers CE fournisseur et l'alerte. Ne lève jamais rien.
+     *
+     * @return bool vrai si une pause neuve a été ouverte (false : une pause identique est déjà active)
+     */
+    public function reputationMauvaise(string $ws, string $fournisseur, ?DateTimeImmutable $maintenant = null, ?string $auteur = null): bool
+    {
+        $d = Freins::reputationMauvaise('mauvaise', $fournisseur);
+
+        return $d !== null && $this->declarer($ws, $d, $maintenant ?? now()->toDateTimeImmutable(), $auteur);
     }
 
     /**

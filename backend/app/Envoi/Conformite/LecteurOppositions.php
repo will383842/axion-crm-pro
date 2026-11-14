@@ -59,8 +59,12 @@ final class LecteurOppositions
         $total = DB::table('envoi_oppositions')->where('workspace_id', $workspaceId)->count();
         $ceMois = DB::table('envoi_oppositions')->where('workspace_id', $workspaceId)->where('enregistree_le', '>=', $debutDuMois)->count();
 
-        // Aucune table ne porte de portée « organisation » ou « domaine » (pas de migration dans ce lot) : 0, pas une estimation.
-        return ['total' => $total, 'ce_mois' => $ceMois, 'ce_mois_par_lien' => $ceMois, 'domaines_entiers' => 0, 'organisations' => 0];
+        // R13 : portées « domaine » et « organisation » du registre manuel (les adresses restent comptées dans `total`).
+        $manuel = DB::table('envoi_oppositions_registre')->where('workspace_id', $workspaceId);
+        $domaines = (clone $manuel)->where('portee', 'domaine')->count();
+        $organisations = (clone $manuel)->where('portee', 'organisation')->count();
+
+        return ['total' => $total, 'ce_mois' => $ceMois, 'ce_mois_par_lien' => $ceMois, 'domaines_entiers' => $domaines, 'organisations' => $organisations];
     }
 
     private function base(string $workspaceId): Builder

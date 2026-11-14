@@ -50,6 +50,7 @@ export const EVENEMENTS: Record<string, string> = {
   'audience.refresh.failed': 'Échec de mise à jour d’audience',
   'company.tags_synced': 'Étiquettes synchronisées',
   'company.archived': 'Fiche archivée',
+  'envoi.recherche': 'Recherche d’un envoi par adresse',
   'company.relation.saisie': 'Relation saisie à la main',
   'company.presse_media_incertain_reparee': 'Fiche presse incertaine corrigée',
   'company.presse_provenance_levee': 'Marque de provenance presse retirée',

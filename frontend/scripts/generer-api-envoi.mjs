@@ -22,7 +22,7 @@ import openapiTS, { astToString } from 'openapi-typescript';
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const RACINE_FRONT = path.resolve(ICI, '..');
 
-export const ZONES = ['commun', 'socle', 'campagnes', 'creation', 'pilotage', 'reponses', 'infrastructure', 'conformite', 'sequences'];
+export const ZONES = ['commun', 'socle', 'campagnes', 'creation', 'pilotage', 'reponses', 'infrastructure', 'conformite', 'sequences', 'reputation'];
 
 const ENTETE = (zone) =>
   [

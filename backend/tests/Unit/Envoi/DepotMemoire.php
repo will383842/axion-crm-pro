@@ -76,9 +76,128 @@ final class DepotMemoire implements DepotSocle
         return $this->compteurs[$jour->format('Y-m-d')] ?? 0;
     }
 
+    /** @var array<string, int> clé => tentatives libérées (comme les clés `<clé>~n` du vrai dépôt) */
+    public array $liberees = [];
+
+    /** Clé de journal de la tentative EN COURS : `<clé>`, puis `<clé>~2`, `<clé>~3`… après chaque libération. */
+    private function cleJournal(string $cle): string
+    {
+        $n = $this->liberees[$cle] ?? 0;
+
+        return $n === 0 ? $cle : $cle . '~' . ($n + 1);
+    }
+
     public function dejaInjecte(string $workspaceId, string $cleIdempotence): bool
     {
-        return in_array($cleIdempotence, $this->cles, true);
+        return in_array($this->cleJournal($cleIdempotence), $this->cles, true);
+    }
+
+    /** @var array<string, string> clé de journal => statut effectif (clés comptées seulement) */
+    public array $statuts = [];
+
+    public function etatInjection(string $workspaceId, string $cleIdempotence): ?string
+    {
+        if (! $this->dejaInjecte($workspaceId, $cleIdempotence)) {
+            return null;
+        }
+
+        return $this->statuts[$this->cleJournal($cleIdempotence)] ?? 'acceptee';
+    }
+
+    /** @var list<string> adresses opposées (stop) pour les tests */
+    public array $adressesOpposees = [];
+
+    public function adresseOpposee(string $workspaceId, string $adresse): bool
+    {
+        return in_array(mb_strtolower(trim($adresse)), $this->adressesOpposees, true);
+    }
+
+    public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool
+    {
+        if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
+            return false;
+        }
+        $cle = $this->cleJournal($cleIdempotence);
+        $this->cles[] = $cle;
+        $this->statuts[$cle] = 'reservee';
+        $this->ressourcesReservees[$cle] = $ressources;
+        $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
+
+        return true;
+    }
+
+    /** @var array<string, array<string, ?string>> */
+    public array $ressourcesReservees = [];
+
+    /** @var array<string, string> */
+    public array $ids = [];
+
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array
+    {
+        $n = ['boite' => 0, 'domaine' => 0];
+        foreach ($this->statuts as $cle => $statut) {
+            if ($statut === 'reservee' || $statut === 'a_verifier') {
+                $r = $this->ressourcesReservees[$cle] ?? [];
+                $n['boite'] += $boite !== null && ($r['boite'] ?? null) === $boite ? 1 : 0;
+                $n['domaine'] += $domaine !== null && ($r['domaine'] ?? null) === $domaine ? 1 : 0;
+            }
+        }
+
+        return $n;
+    }
+
+    public function idInjection(string $workspaceId, string $cleIdempotence): ?string
+    {
+        return $this->ids[$this->cleJournal($cleIdempotence)] ?? null;
+    }
+
+    public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut, ?string $idInjection = null): bool
+    {
+        $cle = $this->cleJournal($cleIdempotence);
+        if ($idInjection !== null && $statut === 'acceptee') {
+            $this->ids[$cle] = $idInjection;
+        }
+        if (($this->statuts[$cle] ?? null) === 'a_verifier' && $statut === 'acceptee') {
+            $this->statuts[$cle] = 'acceptee'; // renvoi confirmé : une seule fois (le statut n'est plus a_verifier ensuite)
+
+            return true;
+        }
+        if (($this->statuts[$cle] ?? null) !== 'reservee') {
+            return false;
+        }
+        if ($statut === 'liberee') {
+            $this->cles = array_values(array_diff($this->cles, [$cle]));
+            unset($this->statuts[$cle]);
+            $this->liberees[$cleIdempotence] = ($this->liberees[$cleIdempotence] ?? 0) + 1;
+            $n = $this->injectesLe($workspaceId, $jour) - 1;
+            $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = array_diff_key($this->compteurs, [$jour->format('Y-m-d') => 1]);
+
+            return true;
+        }
+        $this->statuts[$cle] = $statut;
+
+        return true;
+    }
+
+    public function perimerToutesLesReservations(DateTimeImmutable $avant): array
+    {
+        return array_map(fn (string $cle): array => ['', $cle], $this->perimerReservations('', $avant));
+    }
+
+    /** @var list<string> clés à faire passer en `a_verifier` au prochain balayage (simule l'âge d'une réservation) */
+    public array $perimees = [];
+
+    public function perimerReservations(string $workspaceId, DateTimeImmutable $avant): array
+    {
+        $faites = [];
+        foreach ($this->perimees as $cle) {
+            if ($this->concluireInjection($workspaceId, $avant, $cle, 'a_verifier')) {
+                $faites[] = $cle;
+            }
+        }
+        $this->perimees = [];
+
+        return $faites;
     }
 
     public function sousVerrouInjection(DateTimeImmutable $jour, Closure $f): mixed
@@ -93,7 +212,7 @@ final class DepotMemoire implements DepotSocle
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
             return;
         }
-        $this->cles[] = $cleIdempotence;
+        $this->cles[] = $this->cleJournal($cleIdempotence);
         $this->compteurs[$jour->format('Y-m-d')] = $this->injectesLe($workspaceId, $jour) + 1;
     }
 

@@ -465,3 +465,31 @@ test('la commande de backfill pose bien son contexte workspace (correctif du 202
         . '(cf. correctif du 2026-08-15, ScrapingBackfillSrcTags.php:98).',
     );
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Envoi S1-A — les trois tables de fin d'envoi sont sous RLS forcée, un espace ne voit pas l'autre
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('envoi S1-A : RLS forcée et policy d’espace sur la butée, les agrégats de tentatives et les gestes de séquence', function () {
+    foreach (['envoi_compteur_espace', 'envoi_tentatives_jours', 'envoi_sequences_gestes'] as $table) {
+        $t = rlsOwner()->selectOne('SELECT relrowsecurity AS actif, relforcerowsecurity AS force FROM pg_class WHERE oid = ?::regclass', ['public.' . $table]);
+        expect((bool) $t->actif)->toBeTrue("{$table} : RLS inactive")
+            ->and((bool) $t->force)->toBeTrue("{$table} : RLS non forcée");
+        expect(rlsOwner()->selectOne('SELECT count(*) AS n FROM pg_policies WHERE schemaname = ? AND tablename = ?', ['public', $table])->n)->toBeGreaterThanOrEqual(1);
+    }
+
+    [$wsA, $wsB] = rlsSeedTwoWorkspaces();
+
+    try {
+        foreach ([$wsA, $wsB] as $ws) {
+            rlsOwner()->table('envoi_compteur_espace')->insert(['workspace_id' => $ws, 'jour' => '2024-01-02', 'n' => 1]);
+        }
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+        expect(rlsApp()->table('envoi_compteur_espace')->pluck('workspace_id')->all())->toBe([$wsA]);
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        expect(rlsApp()->table('envoi_compteur_espace')->count())->toBe(0);
+    } finally {
+        rlsOwner()->table('envoi_compteur_espace')->whereIn('workspace_id', [$wsA, $wsB])->delete();
+        rlsCleanup([$wsA, $wsB]);
+    }
+});

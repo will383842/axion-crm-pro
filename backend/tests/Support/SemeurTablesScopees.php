@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs', 'envoi_tentatives_jours'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -132,6 +132,7 @@ final class SemeurTablesScopees
         // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
         'envoi_sequences',
         'envoi_sequence_etapes',
+        'envoi_sequences_gestes', // S1-A : après `envoi_sequences` (FK composite).
         'envoi_inscriptions',
         // Envoi P0 L1 : trace des événements d'inscription (ajout seul + FK composite vers `envoi_inscriptions`) : APPEND_SEUL_AVEC_FK.
         'envoi_inscriptions_evenements',
@@ -223,6 +224,9 @@ final class SemeurTablesScopees
         'envoi_temoins_acces',
         // Envoi R06 : tentatives d'envoi par fournisseur, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_tentatives',
+        // Envoi S1-A : conservation agrégée (ajout seul, sans FK : APPEND_SEUL), butée par espace (sans FK, droits seuls), gestes de séquence (ajout seul + FK : APPEND_SEUL_AVEC_FK, APRÈS `envoi_sequences`).
+        'envoi_tentatives_jours',
+        'envoi_compteur_espace',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -914,6 +918,22 @@ final class SemeurTablesScopees
             'fournisseur' => 'gmail',
             'issue' => 'acceptee',
             'cle_idempotence' => 'zz-seme',
+        ]);
+        // Envoi S1-A : agrégat quotidien, butée par espace et geste de séquence (la séquence est semée plus haut).
+        $inserer('envoi_tentatives_jours', [
+            'jour' => '2024-01-02',
+            'fournisseur' => 'gmail',
+            'issue' => 'acceptee',
+            'nombre' => 1,
+        ]);
+        $inserer('envoi_compteur_espace', [
+            'jour' => '2024-01-02',
+            'n' => 1,
+        ]);
+        $inserer('envoi_sequences_gestes', [
+            'sequence_id' => $sequence,
+            'geste' => 'pause',
+            'auteur' => 'zz-etancheite',
         ]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',

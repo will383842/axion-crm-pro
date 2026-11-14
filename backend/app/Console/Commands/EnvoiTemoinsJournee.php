@@ -9,6 +9,7 @@ use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\JourEnvoi;
+use App\Envoi\Temoins\ReleveTemoins;
 use App\Support\WorkspaceContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +69,11 @@ class EnvoiTemoinsJournee extends Command
         $auteur = mb_substr((string) ($this->option('auteur') ?: get_current_user()), 0, 100);
         if ($auteur === '') {
             $auteur = 'inconnu';
+        }
+        if (mb_strtolower(trim($auteur)) === ReleveTemoins::AUTEUR) {
+            $this->error('Auteur refusé : « ' . ReleveTemoins::AUTEUR . ' » est réservé à la relève automatique, il ne peut pas servir à une saisie manuelle.');
+
+            return self::FAILURE;
         }
 
         if ($reception === 'indesirables') {

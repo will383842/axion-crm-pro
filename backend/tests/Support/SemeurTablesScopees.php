@@ -42,7 +42,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs', 'envoi_oppositions_registre'];
+    public const APPEND_SEUL = ['envoi_journal_commandes', 'envoi_controles_listes', 'envoi_config_versions', 'envoi_releves_sante', 'envoi_constats_sante', 'envoi_chauffe_reculs'];
 
     /**
      * Tables en ajout seul qui portent AUSSI une clé étrangère vers `workspaces` : leurs lignes
@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -200,7 +200,7 @@ final class SemeurTablesScopees
         'envoi_feu_vert_preuves',
         // Envoi L8-F15 : journées témoins, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_temoins_journees',
-        // Envoi R13 : registre d'opposition manuel, ajout seul SANS clé étrangère vers `workspaces` : APPEND_SEUL.
+        // Envoi R13 : registre d'opposition manuel, ajout seul (trigger) : APPEND_SEUL_AVEC_FK, pour que le nettoyage de test retire ses lignes.
         'envoi_oppositions_registre',
         // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
         'envoi_reputation_constats',

@@ -8,6 +8,7 @@ use App\Envoi\Desinscription\EnregistrerOpposition;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,6 +17,8 @@ use Illuminate\Support\Str;
  * Lecture et gestes sur les réponses (R12). Aucun envoi, jamais : « répondre » reste fermé (409 au contrôleur).
  * Un geste humain « stop » met l'adresse à l'écart (`EnregistrerOpposition` puis ses effets), sans rien effacer.
  * Chaque geste prend un verrou consultatif PAR RÉPONSE : deux gestes simultanés se suivent.
+ *
+ * @phpstan-type LigneReponse object{id: int, recue_le: string, expediteur_chiffre: string, objet_chiffre: string, extrait_chiffre: string, contact_id: int|null, boite_id: string|null, classement: string, sug_classement: string, sug_confiance: int|string, auteur: string, evenement_id: int, emp_evt: string|null, emp_dest: string|null, rattachee: bool}
  */
 final class ServiceReponses
 {
@@ -46,7 +49,7 @@ final class ServiceReponses
         WHERE r.workspace_id = ?
         SQL;
 
-    /** @return array{data: list<array<string, mixed>>, meta: array<string, int>, par_file: array<string, int>} */
+    /** @return array{data: array<array<string, mixed>>, meta: array<string, int>, par_file: array<string, int>} */
     public function lister(string $ws, string $file, ?string $classement, ?string $recherche, int $page, int $parPage): array
     {
         return WorkspaceContext::run($ws, function () use ($ws, $file, $classement, $recherche, $page, $parPage): array {
@@ -62,17 +65,18 @@ final class ServiceReponses
                 $params[] = ListeSuppression::empreinte($recherche);
             }
             $total = (int) DB::selectOne("SELECT count(*) AS n FROM ({$sql}) y", $params)->n;
+            /** @var list<LigneReponse> $lignes */
             $lignes = DB::select($sql . ' ORDER BY recue_le DESC, id DESC LIMIT ? OFFSET ?', [...$params, $parPage, ($page - 1) * $parPage]);
             $compte = DB::selectOne(
-                "SELECT count(*) FILTER (WHERE " . self::filtreFile('a_traiter') . ") AS a_traiter,
-                        count(*) FILTER (WHERE " . self::filtreFile('a_rattacher') . ") AS a_rattacher,
-                        count(*) FILTER (WHERE " . self::filtreFile('traitees') . ") AS traitees
-                 FROM (" . self::BASE . ') x',
+                'SELECT count(*) FILTER (WHERE ' . self::filtreFile('a_traiter') . ') AS a_traiter,
+                        count(*) FILTER (WHERE ' . self::filtreFile('a_rattacher') . ') AS a_rattacher,
+                        count(*) FILTER (WHERE ' . self::filtreFile('traitees') . ') AS traitees
+                 FROM (' . self::BASE . ') x',
                 [$ws],
             );
 
             return [
-                'data' => array_map(fn (object $l): array => $this->resume($ws, $l), $lignes),
+                'data' => array_map(fn ($l): array => $this->resume($ws, $l), $lignes),
                 'meta' => ['page' => $page, 'par_page' => $parPage, 'total' => $total, 'pages' => (int) ceil($total / $parPage)],
                 'par_file' => ['a_traiter' => (int) $compte->a_traiter, 'a_rattacher' => (int) $compte->a_rattacher, 'traitees' => (int) $compte->traitees],
             ];
@@ -115,12 +119,16 @@ final class ServiceReponses
         return WorkspaceContext::run($ws, fn (): ?array => ($l = $this->ligne($ws, $id)) === null ? null : $this->resume($ws, $l));
     }
 
+    /** @return LigneReponse|null */
     private function ligne(string $ws, int $id): ?object
     {
         return DB::selectOne('SELECT * FROM (' . self::BASE . ') x WHERE id = ?', [$ws, $id]);
     }
 
-    /** @return array<string, mixed> forme `ReponseResume` du contrat */
+    /**
+     * @param  LigneReponse  $l
+     * @return array<string, mixed> forme `ReponseResume` du contrat
+     */
     private function resume(string $ws, object $l): array
     {
         $fiche = $l->contact_id === null ? null : DB::table('contacts as c')
@@ -215,7 +223,7 @@ final class ServiceReponses
             try {
                 $ecrit = DB::transaction(function () use ($ws, $userId, $id, $injection, $l): bool {
                     $this->verrou($ws, $id);
-                    if ($this->ligne($ws, $id)->rattachee) {
+                    if ($this->ligne($ws, $id)?->rattachee === true) {
                         return false;
                     }
                     DB::table('envoi_rattachements')->insert([
@@ -237,7 +245,7 @@ final class ServiceReponses
      * Fiche existante (même adresse) renvoyée telle quelle, sans modification. Sinon création par le service CRM
      * (base légale : intérêt légitime B2B, art. 14 — provenance gardée), dans une organisation DÉJÀ connue.
      *
-     * @return array{0: string, 1: ?array<string, mixed>}  [état, résultat] : ok | inconnue | organisation_inconnue
+     * @return array{0: string, 1: ?array<string, mixed>} [état, résultat] : ok | inconnue | organisation_inconnue
      */
     public function creerFiche(string $ws, int $id, string $prenom, string $nom, ?string $organisation, string $provenance): array
     {
@@ -257,20 +265,32 @@ final class ServiceReponses
                     if ($societe === null) {
                         return ['organisation_inconnue', null];
                     }
-                    $r = $this->contacts->upsert($ws, (int) $societe, ListeSuppression::empreinte($email), null, $email, $prenom, $nom, null,
-                        'legitimate_interest_b2b', discoverySource: 'envoi_reponse');
+                    $r = $this->contacts->upsert(
+                        $ws,
+                        (int) $societe,
+                        ListeSuppression::empreinte($email),
+                        null,
+                        $email,
+                        $prenom,
+                        $nom,
+                        null,
+                        'legitimate_interest_b2b',
+                        discoverySource: 'envoi_reponse',
+                    );
                     if ($r === null) {
                         return ['organisation_inconnue', null];
                     }
                     $contactId = $r[0];
                     if ($r[1] === IngestOutcome::CREATED) {
-                        DB::update("UPDATE contacts SET metadata = metadata || ?::jsonb WHERE id = ? AND workspace_id = ?",
-                            [json_encode(['provenance' => mb_substr($provenance, 0, 200)], JSON_THROW_ON_ERROR), $contactId, $ws]);
+                        DB::update(
+                            'UPDATE contacts SET metadata = metadata || ?::jsonb WHERE id = ? AND workspace_id = ?',
+                            [json_encode(['provenance' => mb_substr($provenance, 0, 200)], JSON_THROW_ON_ERROR), $contactId, $ws],
+                        );
                     }
                 }
                 $courant = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->where('geste', 'classement')->orderByDesc('id')->first();
                 $deja = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->where('geste', 'fiche')->orderByDesc('id')->value('contact_id');
-                if ((int) $deja !== (int) $contactId) {
+                if ($courant !== null && (int) $deja !== (int) $contactId) {
                     DB::table('envoi_reponses_classements')->insert([
                         'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'fiche', 'classement' => $courant->classement,
                         'confiance' => $courant->confiance, 'auteur' => 'humain', 'contact_id' => $contactId, 'cree_le' => now(),
@@ -289,6 +309,6 @@ final class ServiceReponses
 
     private static function iso(mixed $v): string
     {
-        return \Illuminate\Support\Carbon::parse((string) $v)->utc()->format('Y-m-d\TH:i:s\Z');
+        return Carbon::parse((string) $v)->utc()->format('Y-m-d\TH:i:s\Z');
     }
 }

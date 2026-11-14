@@ -3,6 +3,7 @@
 namespace App\Envoi\Reponses;
 
 use App\Envoi\Imap\ExtraitTexte;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +53,7 @@ final class StockerReponse
                      ON CONFLICT (evenement_id) DO NOTHING RETURNING id',
                     [
                         $workspaceId, $evenement->id, Crypt::encryptString(mb_substr($objet, 0, 500)), Crypt::encryptString($texte),
-                        Crypt::encryptString(mb_strtolower(trim($adresse))), \App\Support\ListeSuppression::empreinte($adresse),
+                        Crypt::encryptString(mb_strtolower(trim($adresse))), ListeSuppression::empreinte($adresse),
                         $evenement->recu_le, $evenement->recu_le,
                     ],
                 );

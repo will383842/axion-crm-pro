@@ -3,11 +3,13 @@
 namespace Tests\Feature\Envoi\Routes;
 
 use App\Envoi\Imap\ClasseRetour;
+use App\Envoi\Imap\RecepteurRetoursReponses;
 use App\Envoi\Imap\RetourDetecte;
 use App\Envoi\Reponses\StockerReponse;
 use App\Models\Workspace;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\ContratOpenApiEnvoi;
@@ -69,7 +71,7 @@ test('le maillon de la chaîne stocke la réponse d’un retour détecté', func
         'classe' => 'reponse_humaine', 'statut' => 'a_rattacher', 'empreinte_expediteur' => str_repeat('b', 64), 'recu_le' => now(),
     ]));
     $retour = new RetourDetecte(ClasseRetour::ReponseHumaine, (string) Str::uuid(), R12_ADRESSE, null, $cle, 'Objet', 'Corps');
-    app(\App\Envoi\Imap\RecepteurRetoursReponses::class)->recevoir($this->ws->id, $retour);
+    app(RecepteurRetoursReponses::class)->recevoir($this->ws->id, $retour);
     expect(WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses')->count()))->toBe(1);
 });
 
@@ -171,5 +173,5 @@ test('raccourcis : liste vide au contrat', function () {
 
 test('le journal ajout seul refuse UPDATE et DELETE', function () {
     [$id] = r12Reponse($this->ws);
-    expect(fn () => WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses')->where('id', $id)->delete()))->toThrow(\Illuminate\Database\QueryException::class);
+    expect(fn () => WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses')->where('id', $id)->delete()))->toThrow(QueryException::class);
 });

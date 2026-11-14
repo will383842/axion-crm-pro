@@ -2,8 +2,8 @@
 
 namespace App\Envoi\Imap;
 
-use App\Socle\Alertes\Alerte;
 use App\Envoi\Reponses\StockerReponse;
+use App\Socle\Alertes\Alerte;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;

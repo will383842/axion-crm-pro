@@ -15,8 +15,12 @@ final class RecepteurRetoursReponses implements RecepteurRetours
     public function recevoir(string $workspaceId, RetourDetecte $retour): void
     {
         $this->stockage->enregistrer(
-            $workspaceId, $retour->cle, (string) $retour->objet, (string) $retour->extrait,
-            $retour->adresseExpediteur ?? $retour->adresse, $retour->classe->value,
+            $workspaceId,
+            $retour->cle,
+            (string) $retour->objet,
+            (string) $retour->extrait,
+            $retour->adresseExpediteur ?? $retour->adresse,
+            $retour->classe->value,
         );
     }
 }

@@ -96,6 +96,8 @@ jobs:
             echo "lignes d'archive : table absente"
           fi
 
+          echo "fonction d'espace origines.lecture ouverte : $($PSQL -c "SELECT count(*) FROM fonctions_espace WHERE fonction='origines.lecture' AND ouverte;" < /dev/null || echo 'lecture impossible')"
+
           echo "## Interrupteurs effectifs (conteneur api)"
           echo "VARIABLE | defaut_code | effectif"
           if [ -n "$API_ID" ]; then docker compose exec -T -e TELESCOPE_ENABLED=false api php <<'PHP'
@@ -155,6 +157,9 @@ jobs:
           $g = $pub['guide-ia'] ?? [];
           echo 'guide-ia nom = Guide IA pour TPE-PME : '.((($g['nom'] ?? null) === 'Guide IA pour TPE-PME') ? 'oui' : 'non')."\n";
           echo 'guide-ia URL sur exemple.invalid : '.((parse_url((string) ($g['url'] ?? ''), PHP_URL_HOST) === 'exemple.invalid') ? 'oui' : 'non')."\n";
+          $hmac = config('origines.cle_hmac');
+          $appkey = (string) config('app.key');
+          echo 'ORIGINES_HMAC_KEY distincte de APP_KEY : '.((is_string($hmac) && $hmac !== '' && ! hash_equals($appkey, $hmac)) ? 'oui' : 'non')."\n";
           echo 'environnement applicatif : '.$app->environment()." (attendu production)\n";
           PHP
           else echo "conteneur api absent : section sautée"; fi

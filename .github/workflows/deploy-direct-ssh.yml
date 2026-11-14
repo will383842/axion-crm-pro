@@ -127,6 +127,11 @@ jobs:
           CRM_SYNC_DOSSIER_CLIENT_STAGE: ${{ vars.CRM_SYNC_DOSSIER_CLIENT_STAGE }}
           # Toute demande du site devient une personne du CRM (06/11/2026). Même règle : `true` ou `false`, sinon le .env n'est pas touché.
           CRM_INGEST_DEMANDES_PERSONNE_ENABLED: ${{ vars.CRM_INGEST_DEMANDES_PERSONNE_ENABLED }}
+          # Origines des contacts (v3). Variables GitHub, même règle : `true` ou `false`, sinon le .env n'est pas touché.
+          # Absentes = RIEN ne s'allume. (CRM_GUIDE_LIEN_ENABLED n'est volontairement PAS synchronisé.)
+          ORIGINES_V3_ENABLED: ${{ vars.ORIGINES_V3_ENABLED }}
+          ORIGINES_LECTURE_ENABLED: ${{ vars.ORIGINES_LECTURE_ENABLED }}
+          ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED: ${{ vars.ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED }}
           # Jeton EPHEMERE du run, pour que le serveur puisse lire un depot
           # PRIVE. Il expire a la fin du job ; rien n'est ecrit sur le disque
           # du serveur (voir le bloc `git fetch` plus bas).
@@ -180,7 +185,8 @@ jobs:
               -o ServerAliveCountMax=10 \
               "$USER@$HOST" 'bash -s' -- \
             "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \
-            "$GH_TOKEN_LECTURE" "$GH_DEPOT"             "$CRM_INGEST_DOSSIER_ENABLED" "$CRM_SYNC_DOSSIER_CLIENT_STAGE" "$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" <<'REMOTE' | tee /tmp/deploy-remote.log
+            "$GH_TOKEN_LECTURE" "$GH_DEPOT"             "$CRM_INGEST_DOSSIER_ENABLED" "$CRM_SYNC_DOSSIER_CLIENT_STAGE" "$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" \
+            "$ORIGINES_V3_ENABLED" "$ORIGINES_LECTURE_ENABLED" "$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"
@@ -191,6 +197,9 @@ jobs:
           CRM_INGEST_DOSSIER_ENABLED="${7:-}"
           CRM_SYNC_DOSSIER_CLIENT_STAGE="${8:-}"
           CRM_INGEST_DEMANDES_PERSONNE_ENABLED="${9:-}"
+          ORIGINES_V3_ENABLED="${10:-}"
+          ORIGINES_LECTURE_ENABLED="${11:-}"
+          ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED="${12:-}"
 
           cd "$PROJECT_PATH"
 
@@ -302,7 +311,7 @@ jobs:
 
           echo "::group::sync drapeaux du dossier client into .env"
           # Une valeur vide (variable GitHub absente) ne touche PAS au .env : seul `true`/`false` est écrit.
-          for kv in "CRM_INGEST_DOSSIER_ENABLED=$CRM_INGEST_DOSSIER_ENABLED" "CRM_SYNC_DOSSIER_CLIENT_STAGE=$CRM_SYNC_DOSSIER_CLIENT_STAGE" "CRM_INGEST_DEMANDES_PERSONNE_ENABLED=$CRM_INGEST_DEMANDES_PERSONNE_ENABLED"; do
+          for kv in "CRM_INGEST_DOSSIER_ENABLED=$CRM_INGEST_DOSSIER_ENABLED" "CRM_SYNC_DOSSIER_CLIENT_STAGE=$CRM_SYNC_DOSSIER_CLIENT_STAGE" "CRM_INGEST_DEMANDES_PERSONNE_ENABLED=$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" "ORIGINES_V3_ENABLED=$ORIGINES_V3_ENABLED" "ORIGINES_LECTURE_ENABLED=$ORIGINES_LECTURE_ENABLED" "ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED=$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED"; do
             cle="${kv%%=*}"; val="${kv#*=}"
             case "$val" in true|false) ;; *) continue ;; esac
             if [ -f .env ]; then
@@ -310,6 +319,26 @@ jobs:
               echo "${cle}=${val}"
             fi
           done
+          echo "::endgroup::"
+
+          echo "::group::cle ORIGINES_HMAC_KEY dédiée (créée sur le serveur si absente)"
+          # Jamais d'écrasement : si une valeur non vide existe, on ne fait RIEN.
+          # La valeur est générée ici, ajoutée au .env et n'est JAMAIS affichée
+          # (ni écho, ni mode trace, ni argument SSH, ni secret GitHub).
+          if [ -f .env ]; then
+            if grep -Eq '^ORIGINES_HMAC_KEY=.+' .env; then
+              echo "ORIGINES_HMAC_KEY : déjà présente"
+            else
+              # Une ligne vide `ORIGINES_HMAC_KEY=` éventuelle n'est pas modifiée : la dernière ligne l'emporte.
+              CLE_HMAC=$(openssl rand -hex 32)
+              if [ "${#CLE_HMAC}" -ne 64 ]; then echo "ORIGINES_HMAC_KEY : génération échouée, .env non touché"; exit 1; fi
+              printf 'ORIGINES_HMAC_KEY=%s\n' "$CLE_HMAC" >> .env
+              unset CLE_HMAC
+              echo "ORIGINES_HMAC_KEY : créée (64 caractères hexadécimaux)"
+            fi
+          else
+            echo "ORIGINES_HMAC_KEY : .env absent, rien fait"
+          fi
           echo "::endgroup::"
 
           echo "::group::docker compose build + up"

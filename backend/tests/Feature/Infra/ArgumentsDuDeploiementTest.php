@@ -77,6 +77,7 @@ function blocDeploiement(): string
     test()->fail("Aucune etape n'ouvre la connexion `bash -s` : le balayage ne voit pas ce qu'il croit voir.");
 }
 
+// Les noms contiennent des chiffres (ORIGINES_V3_ENABLED) : les motifs les reconnaissent.
 test('DEPLOIEMENT-ARGS — autant d arguments envoyes que lus', function (): void {
     $script = blocDeploiement();
 
@@ -99,11 +100,11 @@ test('DEPLOIEMENT-ARGS — autant d arguments envoyes que lus', function (): voi
         . 'Ligne fautive : ' . trim($listeArguments),
     );
 
-    preg_match_all('/"\$\{?[A-Z_]+\}?"/', $listeArguments, $envoyes);
+    preg_match_all('/"\$\{?[A-Z0-9_]+\}?"/', $listeArguments, $envoyes);
     $nombreEnvoyes = count($envoyes[0]);
 
     // ── ce qui est LU ──────────────────────────────────────────────────────
-    preg_match_all('/^\s*[A-Z_]+="\$\{?(\d+)(?::-)?\}?"/m', $script, $lus);
+    preg_match_all('/^\s*[A-Z0-9_]+="\$\{?(\d+)(?::-)?\}?"/m', $script, $lus);
     $positionsLues = array_map('intval', $lus[1]);
 
     // TEMOIN : sans lecture vue, l'egalite finale serait vraie sur du neant.
@@ -148,8 +149,8 @@ test('DEPLOIEMENT-ARGS — TEMOIN : la garde sait detecter un decalage', functio
     $apres = substr($faux, $position + strlen("'bash -s' --"));
     $liste = substr($apres, 0, strpos($apres, "<<'REMOTE'"));
 
-    preg_match_all('/"\$\{?[A-Z_]+\}?"/', $liste, $envoyes);
-    preg_match_all('/^\s*[A-Z_]+="\$\{?(\d+)(?::-)?\}?"/m', $faux, $lus);
+    preg_match_all('/"\$\{?[A-Z0-9_]+\}?"/', $liste, $envoyes);
+    preg_match_all('/^\s*[A-Z0-9_]+="\$\{?(\d+)(?::-)?\}?"/m', $faux, $lus);
 
     // 3 envoyes, 4 lus : le decalage DOIT etre visible.
     expect(count($envoyes[0]))->toBe(3);

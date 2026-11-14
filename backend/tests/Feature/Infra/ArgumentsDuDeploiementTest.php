@@ -77,6 +77,7 @@ function blocDeploiement(): string
     test()->fail("Aucune etape n'ouvre la connexion `bash -s` : le balayage ne voit pas ce qu'il croit voir.");
 }
 
+// Les noms contiennent des chiffres (ORIGINES_V3_ENABLED) : les motifs les reconnaissent.
 test('DEPLOIEMENT-ARGS — autant d arguments envoyes que lus', function (): void {
     $script = blocDeploiement();
 
@@ -99,11 +100,11 @@ test('DEPLOIEMENT-ARGS — autant d arguments envoyes que lus', function (): voi
         . 'Ligne fautive : ' . trim($listeArguments),
     );
 
-    preg_match_all('/"\$\{?[A-Z_]+\}?"/', $listeArguments, $envoyes);
+    preg_match_all('/"\$\{?[A-Z0-9_]+\}?"/', $listeArguments, $envoyes);
     $nombreEnvoyes = count($envoyes[0]);
 
     // ── ce qui est LU ──────────────────────────────────────────────────────
-    preg_match_all('/^\s*[A-Z_]+="\$\{?(\d+)(?::-)?\}?"/m', $script, $lus);
+    preg_match_all('/^\s*[A-Z0-9_]+="\$\{?(\d+)(?::-)?\}?"/m', $script, $lus);
     $positionsLues = array_map('intval', $lus[1]);
 
     // TEMOIN : sans lecture vue, l'egalite finale serait vraie sur du neant.
@@ -148,10 +149,51 @@ test('DEPLOIEMENT-ARGS — TEMOIN : la garde sait detecter un decalage', functio
     $apres = substr($faux, $position + strlen("'bash -s' --"));
     $liste = substr($apres, 0, strpos($apres, "<<'REMOTE'"));
 
-    preg_match_all('/"\$\{?[A-Z_]+\}?"/', $liste, $envoyes);
-    preg_match_all('/^\s*[A-Z_]+="\$\{?(\d+)(?::-)?\}?"/m', $faux, $lus);
+    preg_match_all('/"\$\{?[A-Z0-9_]+\}?"/', $liste, $envoyes);
+    preg_match_all('/^\s*[A-Z0-9_]+="\$\{?(\d+)(?::-)?\}?"/m', $faux, $lus);
 
     // 3 envoyes, 4 lus : le decalage DOIT etre visible.
     expect(count($envoyes[0]))->toBe(3);
     expect(max(array_map('intval', $lus[1])))->toBe(4);
+});
+
+test('DEPLOIEMENT-ARGS — les drapeaux sont normalises (true|false sinon ignore) avant ssh', function (): void {
+    $script = blocDeploiement();
+    $boucle = strpos($script, 'for v in CRM_INGEST_DOSSIER_ENABLED');
+    expect($boucle)->not->toBeFalse('La boucle de normalisation des drapeaux a disparu.');
+    expect($boucle)->toBeLessThan(strpos($script, "'bash -s'"));
+
+    $ligne = substr($script, $boucle, strpos($script, 'done', $boucle) - $boucle);
+    foreach ([
+        'CRM_INGEST_DOSSIER_ENABLED', 'CRM_SYNC_DOSSIER_CLIENT_STAGE', 'CRM_INGEST_DEMANDES_PERSONNE_ENABLED',
+        'ORIGINES_V3_ENABLED', 'ORIGINES_LECTURE_ENABLED', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED',
+    ] as $nom) {
+        expect($ligne)->toContain($nom);
+    }
+    expect($ligne)->toContain('true|false) ;;');
+    expect($ligne)->toContain("printf -v \"\$v\" '%s' 'ignore'");
+});
+
+test('DEPLOIEMENT-ARGS — les arguments non drapeaux sont valides avant ssh (vide => absent ou echec, motif strict)', function (): void {
+    $script = blocDeploiement();
+    $ssh = strpos($script, "'bash -s'");
+    $garde = strpos($script, "INSEE_API_KEY='absent'");
+    expect($garde)->not->toBeFalse('Le jeton `absent` pour INSEE_API_KEY a disparu : une cle vide decalerait les arguments.');
+    expect($garde)->toBeLessThan($ssh);
+
+    $bloc = substr($script, $garde, $ssh - $garde);
+    foreach (['PROJECT_PATH', 'SKIP_MIGRATE', 'EXPECTED_SHA', 'INSEE_API_KEY', 'GH_TOKEN_LECTURE', 'GH_DEPOT'] as $nom) {
+        expect($bloc)->toContain($nom);
+    }
+    expect($bloc)->toContain('^[A-Za-z0-9._:-]+$');
+    expect($bloc)->toContain('[[ "$val" =~ $re ]]');
+    expect(substr($script, 0, $garde))->toContain('INSEE_API_KEY="${INSEE_API_KEY%"${INSEE_API_KEY##*[![:space:]]}"}"');
+    expect(substr_count($bloc, 'exit 1'))->toBeGreaterThanOrEqual(2);
+    // Jamais la valeur dans un message, jamais de trace.
+    expect($bloc)->not->toContain('set -x');
+    expect($bloc)->not->toMatch('/echo[^\n]*\$val/');
+    expect($script)->not->toContain('set -x');
+
+    // Le serveur traite `absent` comme « ne pas toucher au .env ».
+    expect($script)->toContain('"$INSEE_API_KEY" != "absent"');
 });

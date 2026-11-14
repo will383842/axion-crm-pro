@@ -30,6 +30,12 @@ const MINUTE = 60_000;
 const MAINTENANT_MS = Date.parse(MAINTENANT_ISO);
 
 /** Codes serveur traduits en français (rebonds). */
+/** Forme masquée d'une adresse (« p***@domaine »), comme le serveur la rend. */
+function masquer(adresse: string): string {
+  const [local, domaine] = adresse.split('@');
+  return `${(local ?? '').slice(0, 1)}***@${domaine ?? ''}`;
+}
+
 export const CODES_SERVEUR: ReadonlyArray<{ code: string; libelle: string; dur: boolean }> = [
   { code: '550 5.1.1', libelle: 'Adresse inexistante', dur: true },
   { code: '554 5.7.1', libelle: 'Refusé par le filtre du destinataire', dur: true },
@@ -278,14 +284,14 @@ export function genererEnvoi(contacts: Contact[], entreprises: Entreprise[]): En
         d.etat = classement === 'stop' ? 'desinscrit' : 'a_repondu';
         evt({ survenu_le: instant(recueMs), type: 'reponse', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Réponse reçue' });
         if (classement === 'stop') {
-          desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, survenue_le: instant(recueMs), source: 'reponse_stop', campagne_id: campagneId });
+          desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, adresse_masquee: masquer(d.adresse), survenue_le: instant(recueMs), source: 'reponse_stop', campagne_id: campagneId });
           opposition.push({ id: `opp-${String(opposition.length + 1).padStart(2, '0')}`, portee: 'adresse', valeur: d.adresse, motif: 'Réponse « stop »', inscrite_le: instant(recueMs), source: 'reponse_stop' });
           evt({ survenu_le: instant(recueMs + MINUTE), type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Inscrit au registre d’opposition' });
         }
       } else if (d.etat === 'remis' && alea.booleen(0.006)) {
         const le = instant(envoiMs + alea.entier(60, 60 * 24) * MINUTE);
         d.etat = 'desinscrit';
-        desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, survenue_le: le, source: 'lien', campagne_id: campagneId });
+        desinscriptions.push({ id: `des-${String(desinscriptions.length + 1).padStart(2, '0')}`, adresse: d.adresse, adresse_masquee: masquer(d.adresse), survenue_le: le, source: 'lien', campagne_id: campagneId });
         opposition.push({ id: `opp-${String(opposition.length + 1).padStart(2, '0')}`, portee: 'adresse', valeur: d.adresse, motif: 'Lien de désinscription', inscrite_le: le, source: 'lien' });
         evt({ survenu_le: le, type: 'desinscription', campagne_id: campagneId, boite_id: boiteId, destinataire_id: id, adresse: d.adresse, code_serveur: null, libelle: 'Désinscrit par le lien' });
       }
@@ -416,4 +422,10 @@ const REGLES_ALERTE: RegleAlerte[] = [
   { id: 'reg-5', nom: 'Test du matin en échec', condition: 'test_matin', seuil: null, canaux: ['console', 'email'], actif: true },
   { id: 'reg-6', nom: 'Réponse intéressée', condition: 'reponse_interessee', seuil: null, canaux: ['console'], actif: true },
   { id: 'reg-7', nom: 'Plafond du jour atteint', condition: 'quota_atteint', seuil: null, canaux: ['console'], actif: false },
+  { id: 'reg-8', nom: 'Message classé en indésirable chez un témoin', condition: 'temoin_indesirable', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-9', nom: 'Réponses en baisse chez une messagerie', condition: 'reponses_en_baisse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-10', nom: 'Reports en hausse chez une messagerie', condition: 'reports_en_hausse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-11', nom: 'Tableau de bord non validé depuis une semaine', condition: 'homme_mort', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-12', nom: 'Santé des envois silencieuse', condition: 'sante_silencieuse', seuil: null, canaux: ['console', 'email'], actif: true },
+  { id: 'reg-13', nom: 'Réponses en attente de traitement', condition: 'reponses_non_traitees', seuil: null, canaux: ['console'], actif: true },
 ];

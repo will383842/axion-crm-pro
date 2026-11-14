@@ -74,6 +74,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_01_000030_envoi_temoins_journees.php',
     // Envoi L8-F07a : table des reculs de chauffe, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; la retirer effacerait l'historique des reculs ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_01_000040_envoi_chauffe_reculs.php',
+    // Envoi R08 : modèle de données campagne (campagnes, journal, codes), AJOUT SEUL ou colonnes figées par déclencheur ; les retirer effacerait l'historique ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_02_000080_envoi_campagnes.php',
+    '2026_12_02_000081_envoi_campagnes_journal.php',
+    '2026_12_02_000083_envoi_campagne_codes.php',
+    // Envoi R08b : modèles de message versionnés, AJOUT SEUL (versions) et archivage par `archive_le` (jamais de suppression) ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_02_000082_envoi_modeles.php',
     // Envoi R16 : accès IMAP des témoins (hôte en liste fermée par CHECK, identifiant chiffré), AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE) ; la retirer effacerait les accès posés ; down() inerte, up() rejouable.
     '2026_12_02_000160_envoi_temoins_acces.php',
     // Envoi R16 : index UNIQUE PARTIEL (auteur releve_auto) sur les journées témoins, ajout d'index seul ; down() inerte, up() rejouable.

@@ -114,7 +114,7 @@ function Contenu({ fiche }: { fiche: FicheBoite }) {
         <section aria-label="Chauffe" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
           <h2 className="text-lg font-bold text-slate-900">Plafond du jour</h2>
           <p className="mt-3 text-sm text-slate-700"><strong>{boite.envoyes_aujourdhui}</strong> envoyés aujourd’hui sur <strong>{boite.quota_jour}</strong> permis. La montée en douceur se lit par domaine, dans la page Chauffe.</p>
-          <ChauffeDomaine domaineId={boite.domaine_id} />
+          {boite.domaine_id === null ? null : <ChauffeDomaine domaineId={boite.domaine_id} />}
         </section>
       </div>
       <section aria-label="Derniers refus (raison en clair)" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
@@ -175,7 +175,7 @@ export function BoitePage() {
     <div>
       <Entete
         title={boite?.adresse ?? 'Boîte d’envoi'}
-        phrase={boite ? <>Domaine <Link to="/envoi/domaines/$domaineId" params={{ domaineId: boite.domaine_id }} className="font-medium text-produit underline">{requete.data?.boite.adresse.split('@')[1]}</Link> · {LIBELLE_STATUT[boite.statut]}</> : undefined}
+        phrase={boite ? <>Domaine {boite.domaine_id === null ? <span className="font-medium">{requete.data?.boite.adresse.split('@')[1]}</span> : <Link to="/envoi/domaines/$domaineId" params={{ domaineId: boite.domaine_id }} className="font-medium text-produit underline">{requete.data?.boite.adresse.split('@')[1]}</Link>} · {LIBELLE_STATUT[boite.statut]}</> : undefined}
         actions={
           boite ? (
             <>

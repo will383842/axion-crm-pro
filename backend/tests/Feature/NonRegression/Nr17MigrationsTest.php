@@ -82,6 +82,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000083_envoi_campagne_codes.php',
     // Envoi R08b : modèles de message versionnés, AJOUT SEUL (versions) et archivage par `archive_le` (jamais de suppression) ; down() inerte, up() rejouable (IF NOT EXISTS).
     '2026_12_02_000082_envoi_modeles.php',
+    // Envoi R09 : colonne `envoi_prevu_le` (ADD COLUMN IF NOT EXISTS, NULL) ; la retirer effacerait les dates prévues ; down() inerte.
+    '2026_12_02_000090_envoi_campagnes_date.php',
     // Envoi R16 : accès IMAP des témoins (hôte en liste fermée par CHECK, identifiant chiffré), AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE) ; la retirer effacerait les accès posés ; down() inerte, up() rejouable.
     '2026_12_02_000160_envoi_temoins_acces.php',
     // Envoi R16 : index UNIQUE PARTIEL (auteur releve_auto) sur les journées témoins, ajout d'index seul ; down() inerte, up() rejouable.

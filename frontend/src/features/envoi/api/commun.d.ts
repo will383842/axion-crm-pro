@@ -23,7 +23,8 @@ export interface components {
         BoiteResume: {
             /** Format: email */
             adresse: string;
-            domaine_id: components["schemas"]["Identifiant"];
+            /** @description Identifiant du domaine de la boîte ; nul si ce domaine n'est pas enregistré dans l'espace. */
+            domaine_id: components["schemas"]["Identifiant"] | null;
             envoyes_aujourdhui: number;
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
@@ -31,8 +32,8 @@ export interface components {
             quota_jour: number;
             reponses_7j: number;
             statut: components["schemas"]["StatutBoite"];
-            /** @description Refus (durs et mous) sur 7 jours, en pourcentage. */
-            taux_refus: number;
+            /** @description Refus (durs et mous) sur 7 jours, en pourcentage ; nul tant qu'il n'est pas mesurable (aucun envoi, ou source des refus mous absente). */
+            taux_refus: number | null;
         };
         CampagneResume: {
             /** @description Test A/B sur l'objet du premier message. */
@@ -83,9 +84,15 @@ export interface components {
             plafond_jour: number;
             reponses_a_traiter: number;
         };
+        /**
+         * @description Une désinscription ne garde qu'une empreinte de l'adresse : `adresse` n'est
+         *     renseignée que si la fiche du CRM de l'espace la porte encore (et si le compte
+         *     a le droit de voir les coordonnées) ; sinon `null`. `adresse_masquee` est toujours
+         *     présente et ne permet pas de retrouver l'adresse.
+         */
         Desinscription: {
-            /** Format: email */
-            adresse: string;
+            adresse: string | null;
+            adresse_masquee: string;
             campagne_id: components["schemas"]["Identifiant"] | null;
             id: components["schemas"]["Identifiant"];
             source: components["schemas"]["SourceDesinscription"];
@@ -114,7 +121,8 @@ export interface components {
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;
-            dmarc: components["schemas"]["PolitiqueDmarc"];
+            /** @description Politique DMARC publiée ; nulle tant qu'elle n'est pas connue. */
+            dmarc: components["schemas"]["PolitiqueDmarc"] | null;
             /** @description DMARC progressif — prochaine politique et date prévue. */
             dmarc_prochaine_etape: {
                 le: components["schemas"]["Horodatage"];
@@ -241,8 +249,7 @@ export interface components {
         RegleAlerte: {
             actif: boolean;
             canaux: components["schemas"]["CanalAlerte"][];
-            /** @enum {string} */
-            condition: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint";
+            condition: components["schemas"]["TypeAlerte"];
             id: components["schemas"]["Identifiant"];
             nom: string;
             seuil: number | null;
@@ -272,12 +279,16 @@ export interface components {
             etat: components["schemas"]["EtatFeu"];
             id: components["schemas"]["Identifiant"];
             nom: string;
-            version_configuration: number;
+            /** @description Version de configuration appliquée ; nulle si aucune n'a été appliquée. */
+            version_configuration: number | null;
         };
         /** @enum {string} */
         SourceDesinscription: "lien" | "reponse_stop" | "plainte" | "manuel";
-        /** @enum {string} */
-        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue";
+        /**
+         * @description Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.
+         * @enum {string}
+         */
+        StatutBoite: "prete" | "ralentie" | "en_chauffe" | "suspendue" | "inconnu";
         /** @enum {string} */
         StatutCampagne: "brouillon" | "a_valider" | "programmee" | "en_cours" | "en_pause" | "terminee" | "arretee";
         Succes: {
@@ -285,6 +296,13 @@ export interface components {
             /** @constant */
             ok: true;
         };
+        /**
+         * @description Type d'alerte d'envoi. Les six derniers (ajoutés de façon compatible) sont les motifs de frein
+         *     de la garde de chauffe : témoin en indésirables, réponses en baisse, reports en hausse,
+         *     tableau de bord non validé (homme mort), santé silencieuse, réponses non traitées.
+         * @enum {string}
+         */
+        TypeAlerte: "taux_refus" | "plainte" | "liste_noire" | "boite_ralentie" | "test_matin" | "reponse_interessee" | "quota_atteint" | "temoin_indesirable" | "reponses_en_baisse" | "reports_en_hausse" | "homme_mort" | "sante_silencieuse" | "reponses_non_traitees";
         /** @enum {string} */
         TypeCible: "liste" | "audience" | "etiquette" | "carnet";
         /** @enum {string} */

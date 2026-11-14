@@ -36,11 +36,11 @@ const BLOC_ART_14 =
 function zone() {
   return demoDb.etendre('conformite', () => ({
     alertes: [
-      { id: 'al-1', titre: 'Boîte « prospection-a@ » ralentie', detail: 'Refus temporaires à 3 % depuis 09:30.', ce_qui_se_passe: 'Refus temporaires à 3 % depuis 09:30.', ce_que_le_systeme_a_fait: 'Volume divisé par 2.', que_faire: 'Rien si ça baisse ; sinon ouvrir la boîte.', niveau: 'attention', survenue_le: ilYa(0, 9, 30), lien: '/envoi/boites', close: false },
+      { id: 'al-1', type: 'boite_ralentie', titre: 'Boîte « prospection-a@ » ralentie', detail: 'Refus temporaires à 3 % depuis 09:30.', ce_qui_se_passe: 'Refus temporaires à 3 % depuis 09:30.', ce_que_le_systeme_a_fait: 'Volume divisé par 2.', que_faire: 'Rien si ça baisse ; sinon ouvrir la boîte.', niveau: 'attention', survenue_le: ilYa(0, 9, 30), lien: '/envoi/boites', close: false },
       { id: 'al-2', titre: 'DMARC : passer à « quarantaine »', detail: 'prospection-b.example est prêt.', ce_qui_se_passe: 'prospection-b.example est prêt pour la politique « quarantaine ».', ce_que_le_systeme_a_fait: 'Rappel posé au 15 janvier.', que_faire: 'Ouvrir le domaine.', niveau: 'nouveau', survenue_le: ilYa(1, 16, 10), lien: '/envoi/domaines', close: false },
-      { id: 'al-3', titre: 'Test du matin réussi', detail: '4 témoins sur 4 à 07:05.', ce_qui_se_passe: '4 témoins sur 4 à 07:05.', ce_que_le_systeme_a_fait: 'Rien.', que_faire: 'Rien.', niveau: 'fait', survenue_le: ilYa(0, 7, 5), lien: null, close: true },
-      { id: 'al-4', titre: 'Réponse intéressée reçue', detail: 'Paul Morin a répondu.', ce_qui_se_passe: 'Paul Morin (Boulangerie des Tilleuls) a répondu avec intérêt.', ce_que_le_systeme_a_fait: 'Relances annulées pour cette personne.', que_faire: 'Lui répondre.', niveau: 'fait', survenue_le: ilYa(2, 11, 40), lien: '/envoi/reponses', close: true },
-      { id: 'al-5', titre: 'Plainte signalée', detail: 'Une plainte sur la campagne « Organisateurs Rhône-Alpes ».', ce_qui_se_passe: 'Une personne a signalé un message comme indésirable.', ce_que_le_systeme_a_fait: 'Adresse inscrite au registre ; campagne surveillée.', que_faire: 'Rien : aucun message ne lui sera plus envoyé.', niveau: 'fait', survenue_le: ilYa(4, 10, 15), lien: '/envoi/desinscriptions', close: true },
+      { id: 'al-3', type: 'test_matin', titre: 'Test du matin réussi', detail: '4 témoins sur 4 à 07:05.', ce_qui_se_passe: '4 témoins sur 4 à 07:05.', ce_que_le_systeme_a_fait: 'Rien.', que_faire: 'Rien.', niveau: 'fait', survenue_le: ilYa(0, 7, 5), lien: null, close: true },
+      { id: 'al-4', type: 'reponse_interessee', titre: 'Réponse intéressée reçue', detail: 'Paul Morin a répondu.', ce_qui_se_passe: 'Paul Morin (Boulangerie des Tilleuls) a répondu avec intérêt.', ce_que_le_systeme_a_fait: 'Relances annulées pour cette personne.', que_faire: 'Lui répondre.', niveau: 'fait', survenue_le: ilYa(2, 11, 40), lien: '/envoi/reponses', close: true },
+      { id: 'al-5', type: 'plainte', titre: 'Plainte signalée', detail: 'Une plainte sur la campagne « Organisateurs Rhône-Alpes ».', ce_qui_se_passe: 'Une personne a signalé un message comme indésirable.', ce_que_le_systeme_a_fait: 'Adresse inscrite au registre ; campagne surveillée.', que_faire: 'Rien : aucun message ne lui sera plus envoyé.', niveau: 'fait', survenue_le: ilYa(4, 10, 15), lien: '/envoi/desinscriptions', close: true },
     ] satisfies S['AlerteEnvoi'][],
     carnet: [
       { id: 'car-1', adresse: 'accueil@salon-vienne.example', prenom: null, nom: null, organisation: 'Salon des artisans de Vienne', etiquettes: ['salon-artisans-2026'], ajoute_le: ilYa(20, 10, 0) },
@@ -227,11 +227,17 @@ export const handlers: HttpHandler[] = [
     return new HttpResponse(csv(), { headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
   }),
 
-  http.get(api('/envoi/puis-je-ecrire'), async ({ request }) => {
+  // POST de lecture : l'adresse est dans le corps JSON, jamais dans l'URL ; rien n'est écrit.
+  http.post(api('/envoi/puis-je-ecrire'), async ({ request }) => {
     await delai();
-    const adresse = new URL(request.url).searchParams.get('adresse') ?? '';
+    const corps = (await request.json().catch(() => ({}))) as { adresse?: unknown };
+    const adresse = typeof corps.adresse === 'string' ? corps.adresse : '';
     if (adresse.trim() === '') return erreur(422, 'validation', 'Saisissez une adresse ou un domaine.');
-    return HttpResponse.json(puisJeEcrire(adresse));
+    // Comme le serveur : seulement `peut` et un motif regroupé (jamais l'adresse ni le détail des raisons).
+    const r = puisJeEcrire(adresse);
+    if (r.reponse === 'oui') return HttpResponse.json({ peut: true, motif: null });
+    const enOpposition = r.raisons.some((x) => x.startsWith('Registre d’opposition') || x.includes('au registre') || x.includes('ne plus écrire'));
+    return HttpResponse.json({ peut: false, motif: enOpposition ? 'opposition' : 'conditions_envoi' });
   }),
 
   http.get(api('/envoi/alertes'), async ({ request }) => {
@@ -406,7 +412,7 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(entree, { status: 201 });
   }),
 
-  http.get(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.get('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const force = await repondreEtatForce(request, null);
     if (force && new URL(request.url).searchParams.get('demo-etat') !== 'vide') return force;
@@ -428,7 +434,7 @@ export const handlers: HttpHandler[] = [
     });
   }),
 
-  http.post(api('/public/desinscription/:jeton'), async ({ params, request }) => {
+  http.post('*/desinscription/:jeton', async ({ params, request }) => {
     await delai();
     const dest = destinataireDuJeton(String(params['jeton']));
     if (!dest) return erreur(404, 'non_trouve', 'Ce lien n’est plus valable.');

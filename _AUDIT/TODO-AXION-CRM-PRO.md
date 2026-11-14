@@ -33,7 +33,7 @@ Légende sévérité :
 
 **Google Cloud** :
 - https://console.cloud.google.com/billing/[nouveau-compte]/budgets
-- Créer budget 5 € → seuils 50/90/100% → email williamsjullin@gmail.com
+- Créer budget 5 € → seuils 50/90/100% → email proprietaire@exemple.test
 - Périmètre : projet `axion-crm-pro` uniquement
 
 **Mistral** :

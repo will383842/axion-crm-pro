@@ -53,7 +53,7 @@
 Le §A.2 ouvre par :
 
 ```bash
-cd /c/Users/willi/Documents/Projets/Axion-IA/axionia-wt-crm-e2e   # ou le worktree de travail
+cd <dossier du projet>   # ou le worktree de travail
 ```
 
 Ce répertoire **n'existe pas**. Le répertoire réel est `axionia-wt-e2e-crm`

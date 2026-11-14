@@ -412,6 +412,8 @@ services:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-}
     depends_on:
       - api
       - app

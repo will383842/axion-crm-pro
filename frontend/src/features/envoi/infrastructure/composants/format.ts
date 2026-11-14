@@ -39,6 +39,7 @@ export const LIBELLE_STATUT: Record<Boite['statut'], string> = {
   ralentie: 'Ralentie',
   en_chauffe: 'En chauffe',
   suspendue: 'Suspendue',
+  inconnu: 'État inconnu',
 };
 
 export const LIBELLE_DMARC: Record<PolitiqueDmarc, string> = {

@@ -292,12 +292,17 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `Pharmacies\TelephonesFiness` lit `opt_out` en portée `business` pour ne
     // jamais poser un téléphone en opposition sur une fiche. Il n'écrit rien
     // dans cette table, et ne lit pas le vivier.
+    // STOP-T4-CRM (2026-11-14) : +1. `Outbound\OppositionSortante` LIT `opt_out`
+    // (portée business ou vivier, passée par l'appelant) pour ne signaler au site
+    // que les oppositions nées au CRM (liste blanche de sources). Il n'écrit rien
+    // dans cette table et n'en efface jamais une ligne.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/DossierClientIngest.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Joignabilite/Joignabilite.php',
+        'app/Crm/Outbound/OppositionSortante.php',
         'app/Crm/Personnes/Abonnements.php',
         'app/Crm/Pharmacies/TelephonesFiness.php',
         'app/Crm/Presse/LienJournalisteContact.php',

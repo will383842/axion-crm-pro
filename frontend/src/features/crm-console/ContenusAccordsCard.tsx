@@ -10,6 +10,7 @@
  */
 import { Card, CardTitle, StatusPill } from '@/components/ui';
 import { libelleReseau } from '@/features/origines/libelles';
+import { libelleAccord } from './libelleAccord';
 import type { ContenusAccords, LienGuide as LienGuideDonnee } from './types';
 
 function date(value: string | null | undefined): string {
@@ -57,9 +58,8 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
   const b = bloc;
   const vide = b === undefined || (b.origine === null && b.guides.length === 0 && b.consentements.length === 0 && !b.opposition.actif);
 
-  // Accord pour de futures campagnes : le dernier choix (accord ou retrait).
-  const accords = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'optin' || c.nature === 'retrait');
-  const accord = accords.length === 0 ? null : accords.reduce((a, c) => ((c.date ?? '') >= (a.date ?? '') ? c : a));
+  // Accord pour de futures campagnes : le dernier choix, l'opposition l'emporte (CRM-OPP).
+  const accord = b === undefined ? null : libelleAccord(b.consentements, b.opposition);
 
   // Consentements d'information (texte reçu à l'inscription) : lisibles en plus de l'accord.
   const informations = b === undefined ? [] : b.consentements.filter((c) => c.nature === 'information');
@@ -159,10 +159,12 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
                   '—'
                 ) : (
                   <>
-                    {accord.nature === 'retrait' ? 'retiré' : 'donné'} le {date(accord.date)}
-                    <span style={{ marginLeft: 10 }}>
-                      source {accord.source ?? '—'} · texte version {accord.version ?? '—'}
-                    </span>
+                    <span data-testid="accord-libelle">{accord.texte}</span>
+                    {accord.retenu !== null && (
+                      <span style={{ marginLeft: 10 }}>
+                        source {accord.retenu.source ?? '—'} · texte version {accord.retenu.version ?? '—'}
+                      </span>
+                    )}
                   </>
                 )}
               </dd>

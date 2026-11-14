@@ -20,7 +20,21 @@ export type ConnexionCrm = S['ConnexionCrm'];
 export type ApercuReglages = S['ApercuReglages'];
 export type ModeAbsence = S['ModeAbsence'];
 export type EntreeCarnet = S['EntreeCarnet'];
-export type PuisJeEcrire = operations['puisJeEcrire']['responses'][200]['content']['application/json'];
+type ReponseServeur = operations['puisJeEcrire']['responses'][200]['content']['application/json'];
+
+/** Ce que l'écran affiche : le serveur ne rend que `peut` et un motif regroupé, jamais l'adresse ni le détail des gardes. */
+export interface PuisJeEcrire {
+  adresse: string;
+  reponse: 'oui' | 'non' | 'prudence';
+  raisons: string[];
+}
+
+const LIBELLE_MOTIF: Record<NonNullable<ReponseServeur['motif']>, string> = {
+  opposition: 'Cette personne s’est opposée : aucun message ne doit lui être envoyé.',
+  adresse_non_verifiee: 'Cette adresse n’est pas connue ou pas encore vérifiée dans votre espace.',
+  contact_ecarte: 'Ce contact est écarté des envois (fiche, adresse ou entreprise non éligible).',
+  conditions_envoi: 'Une condition d’envoi n’est pas remplie (domaine, article 14 du RGPD, segment…).',
+};
 export type RegistreOpposition = operations['listerOpposition']['responses'][200]['content']['application/json'];
 
 export const CLES = {
@@ -51,7 +65,12 @@ export function useInscrireOpposition() {
 }
 
 export async function demanderPuisJeEcrire(adresse: string): Promise<PuisJeEcrire> {
-  return (await api.get<PuisJeEcrire>('/envoi/puis-je-ecrire', { params: { adresse } })).data;
+  const { peut, motif } = (await api.post<ReponseServeur>('/envoi/puis-je-ecrire', { adresse })).data;
+  return {
+    adresse: adresse.trim(),
+    reponse: peut ? 'oui' : 'non',
+    raisons: peut ? ['Aucun obstacle connu pour cette adresse.'] : [LIBELLE_MOTIF[motif ?? 'conditions_envoi'], 'Aucun message ne part vers cette adresse.'],
+  };
 }
 
 /** Télécharge le registre en CSV (preuve) : l'export est produit côté serveur. */

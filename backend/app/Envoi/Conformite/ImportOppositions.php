@@ -7,7 +7,6 @@ use App\Support\ListeSuppression;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -38,7 +37,6 @@ final class ImportOppositions
     public function simuler(string $workspaceId, string $utilisateur, string $contenu): array
     {
         $a = $this->analyser($workspaceId, $contenu);
-        Log::info('import', ['c' => $contenu]); // TEMPORAIRE (preuve rouge)
         $jeton = (string) Str::uuid();
         Cache::put($jeton, ['utilisateur' => $utilisateur, 'espace' => $workspaceId, 'empreinte' => ListeSuppression::empreinte($contenu)], self::DUREE_JETON);
 

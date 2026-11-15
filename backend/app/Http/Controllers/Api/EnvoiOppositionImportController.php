@@ -8,6 +8,7 @@ use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -21,12 +22,20 @@ class EnvoiOppositionImportController extends ApiController
     public function __invoke(Request $request, ImportOppositions $import): JsonResponse
     {
         $request->attributes->set(AuditHashChainLogger::ATTRIBUT_JOURNAL_PROPRE, true);
-        $v = $request->validate([
-            'etape' => ['required', 'string', 'in:simulation,confirmation'],
-            'contenu' => ['required', 'string'],
-            'jeton' => ['nullable', 'string', 'max:64'],
-        ]);
         $ws = (string) WorkspaceContext::current();
+        $etapeBrute = $request->input('etape');
+        $etapeAudit = in_array($etapeBrute, ['simulation', 'confirmation'], true) ? (string) $etapeBrute : 'invalide';
+        try {
+            $v = $request->validate([
+                'etape' => ['required', 'string', 'in:simulation,confirmation'],
+                'contenu' => ['required', 'string'],
+                'jeton' => ['nullable', 'string', 'max:64'],
+            ]);
+        } catch (ValidationException $e) {
+            $this->auditer($request, $ws, $etapeAudit, 422, '');
+
+            throw $e;
+        }
         $uid = $request->user()?->id;
         $auteur = is_string($uid) ? $uid : 'inconnu';
         try {
@@ -37,6 +46,14 @@ class EnvoiOppositionImportController extends ApiController
             $this->auditer($request, $ws, $v['etape'], 409, '');
 
             return response()->json(['message' => $e->getMessage()], 409);
+        } catch (ValidationException $e) {
+            $this->auditer($request, $ws, $v['etape'], 422, '');
+
+            throw $e;
+        } catch (\Throwable $e) {
+            $this->auditer($request, $ws, $v['etape'], 500, '');
+
+            throw $e;
         }
         $this->auditer($request, $ws, $v['etape'], 200, 'valides=' . $r['valides'] . ' deja=' . $r['deja_presentes'] . ' refusees=' . count($r['refusees'])
             . (isset($r['import_id']) ? ' import_id=' . $r['import_id'] : ''));

@@ -104,7 +104,7 @@ class AuditHashChainLogger
                 // SANS MASQUER QUOI QUE CE SOIT. Sur `POST api/v1/auth/login`,
                 // `$request->all()` vaut `{"email":"...","password":"..."}` : le
                 // condense stocke etait donc un ORACLE DE MOT DE PASSE.
-                'payload_hash' => self::empreinteDuCorps($request->all()),
+                'payload_hash' => self::empreinteDuCorps(self::corpsAuditable($request)),
             ]);
         } catch (\Throwable $e) {
             // Ne pas casser la requête sur erreur d'audit ; logger sentry/glitchtip.
@@ -130,6 +130,22 @@ class AuditHashChainLogger
      * donnée ne sort. L'inclure remplirait le journal des sondes de santé et
      * des pré-vols de navigateur.
      */
+    /**
+     * Corps haché dans la ligne générique. Import des listes de refus : `contenu` (fichier d'adresses) et `jeton`
+     * sont EXCLUS, sinon un refus 401/403 d'un fichier d'une seule adresse serait testable par dictionnaire.
+     *
+     * @return array<array-key,mixed>
+     */
+    private static function corpsAuditable(Request $request): array
+    {
+        $corps = $request->all();
+        if ($request->is('api/v1/envoi/opposition/import')) {
+            unset($corps['contenu'], $corps['jeton']);
+        }
+
+        return $corps;
+    }
+
     private static function doitJournaliser(Request $request): bool
     {
         if ($request->attributes->get(self::ATTRIBUT_JOURNAL_PROPRE) === true) {

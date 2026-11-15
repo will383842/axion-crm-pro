@@ -15,6 +15,8 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 
 ## Reste
 - Écran d'import : lot F-LN (vague 5).
+- Aucune ligne d'audit propre pour un refus d'authentification (401/403) : le journal générique l'écrit, sans `contenu` ni `jeton` dans l'empreinte.
+- Le test d'absence de contenu dans les journaux écoute `MessageLogged` (tous niveaux) et relit les fichiers `storage/logs` ; il ne voit pas un journal écrit par un processus externe.
 
 ## Risques
 - Un arrêt du processus entre le COMMIT et l'émission des événements est rattrapé par `crm:outbound-rattraper` (source `registre_manuel`).

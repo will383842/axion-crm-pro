@@ -27,6 +27,11 @@ function plusRecent(liste: Consentement[]): Consentement | null {
   return liste.length === 0 ? null : liste.reduce((a, c) => ((c.date ?? '') >= (a.date ?? '') ? c : a));
 }
 
+/** Retrait le plus récent survenu à la date de l'accord ou après ; `null` s'il n'y en a pas. */
+export function retraitApres(consentements: Consentement[], accord: Consentement): Consentement | null {
+  return plusRecent(consentements.filter((c) => c.nature === 'retrait' && (c.date ?? '') >= (accord.date ?? '')));
+}
+
 /** `null` quand il n'y a ni accord, ni retrait, ni opposition à dire. */
 export function libelleAccord(consentements: Consentement[], opposition: ContenusAccords['opposition']): LibelleAccord | null {
   const choix = consentements.filter((c) => c.nature === 'optin' || c.nature === 'retrait');
@@ -35,7 +40,7 @@ export function libelleAccord(consentements: Consentement[], opposition: Contenu
 
   if (opposition.actif) {
     if (donne !== null) {
-      const retrait = plusRecent(choix.filter((c) => c.nature === 'retrait' && (c.date ?? '') >= (donne.date ?? '')));
+      const retrait = retraitApres(choix, donne);
       if (retrait !== null) {
         return { texte: `accord donné le ${jour(donne.date)}, retiré le ${jour(retrait.date)}, opposition le ${jour(opposition.date)}`, retenu: retrait };
       }

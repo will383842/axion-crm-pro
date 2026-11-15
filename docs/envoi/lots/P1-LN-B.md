@@ -13,6 +13,12 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 ## Test modifié : pourquoi
 `ContratsS2Test` (hors liste initiale) : il exigeait que l’import soit encore un trou (`trous/conformite.php`) ; le plan vide ce fichier dans ce lot, l’assertion devient « n’est plus un trou » (même chemin que K17-FV pour la décision). La déclaration au contrat reste vérifiée.
 
+## Ajouts d'une seconde session (commits `eea148f`, `94cf1ae`, `715eebc`)
+- `TrimStringsSaufImportOpposition` (+ `bootstrap/app.php`) : le contenu du CSV n'est plus rogné par le middleware global, afin que l'empreinte SHA-256 recalculée à la confirmation reste celle du texte envoyé.
+- `AuditHashChainLogger` : l'audit propre est aussi écrit sur 422 et 500, et l'empreinte d'un 403 est calculée sans le contenu.
+- Tests : journaux, rognage et audit 403/422/500 ; `status_code` est le nom réel de la colonne d'audit.
+- Ces trois fichiers sont **hors liste fermée du plan** : validation explicite du relecteur demandée.
+
 ## Reste
 - Écran d'import : lot F-LN (vague 5).
 - Aucune ligne d'audit propre pour un refus d'authentification (401/403) : le journal générique l'écrit, sans `contenu` ni `jeton` dans l'empreinte.

@@ -114,7 +114,11 @@ function concNettoyer(string $ws, string $jour): void
         $owner->table('tags')->where('workspace_id', $ws)->delete();
     });
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-    $owner->table('workspaces')->where('id', $ws)->delete();
+    // L8-COMPO : `envoi_messages_envoyes` et `envoi_injections_locales` sont en ajout seul (empreintes, aucune adresse) et
+    // référencent l'espace : si le séquenceur y a écrit, l'espace reste (identifiant aléatoire, sans donnée de personne).
+    if (! $owner->table('envoi_messages_envoyes')->where('workspace_id', $ws)->exists() && ! $owner->table('envoi_injections_locales')->where('workspace_id', $ws)->exists()) {
+        $owner->table('workspaces')->where('id', $ws)->delete();
+    }
     $owner->table('envoi_compteur_global')->where('jour', $jour)->delete(); // compteur agrégé, sans donnée de personne
 }
 

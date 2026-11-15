@@ -42,6 +42,8 @@ function toutVert(string $ws): void
     app()->instance(RetraitEnvoisEnFile::class, Mockery::mock(RetraitEnvoisEnFile::class));
     DB::table('envoi_drapeaux')->updateOrInsert(['workspace_id' => $ws], ['mode_temoins' => true, 'feu_vert_signature' => null]);
     WorkspaceContext::run($ws, function () use ($ws) {
+        // K17-FV (v5) : un essai à blanc réussi de moins de 7 jours (point auto.essai_a_blanc_recent).
+        DB::table('envoi_essais_blanc')->insert(['workspace_id' => $ws, 'auteur' => 'test', 'debut' => now()->subHour(), 'fin' => now()->subMinutes(30), 'reussi' => true, 'etapes' => '[]']);
         DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'a.exemple.test', 'controle_le' => now(), 'pret' => true, 'pause' => false]);
         DB::table('envoi_controles_listes')->insert(['workspace_id' => $ws, 'type' => 'domaine', 'ressource' => 'a.exemple.test', 'statut' => 'non_liste', 'zone' => 'z.test', 'pause' => false]);
         foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $i => $f) {
@@ -142,7 +144,7 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
     }
     $manuels = CatalogueManuels::codesManuels();
     expect($manuels)->toHaveCount(29)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->not->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
-    expect(count($manuels))->toBe(29)->and(count($codes) - 29)->toBe(16);
+    expect(count($manuels))->toBe(29)->and(count($codes) - 29)->toBe(19);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
             expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
@@ -156,7 +158,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve de test, réf. exemple-01', 'auteur');
     app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'Preuve de test, réf. exemple-01', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
-    expect($liste)->toHaveCount(45);
+    expect($liste)->toHaveCount(48);
     foreach ($liste as $p) {
         expect(CatalogueManuels::GROUPES)->toContain($p->groupe);
         expect($p->nature)->toBe($p->automatique ? 'auto' : 'manuel')->and(str_starts_with($p->code, $p->nature . '.'))->toBeTrue()->and($p->source)->not->toBe('');
@@ -354,7 +356,7 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 45 points : 13 auto verts, 3 auto sans source, 29 manuels non faits.
+    // 48 points : 16 auto verts (toutVert pose l'essai à blanc), 3 auto sans source, 29 manuels non faits.
     expect($bloquants)->toBe(3 + 29);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });

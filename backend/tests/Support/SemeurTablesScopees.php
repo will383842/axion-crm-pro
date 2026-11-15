@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -209,6 +209,8 @@ final class SemeurTablesScopees
         // Envoi R14 : identité versionnée (ajout seul + FK : APPEND_SEUL_AVEC_FK) et réglages clé/valeur (pas de DELETE : nettoyer() les gère comme envoi_seuils).
         'envoi_identite_versions',
         'envoi_reglages',
+        // Envoi S1-C : imports de listes de refus (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK), AVANT le registre (FK composite `import_id`).
+        'envoi_oppositions_imports',
         // Envoi R13 : registre d'opposition manuel, ajout seul (trigger) : APPEND_SEUL_AVEC_FK, pour que le nettoyage de test retire ses lignes.
         'envoi_oppositions_registre',
         // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
@@ -891,6 +893,11 @@ final class SemeurTablesScopees
             'cle' => 'zz',
             'valeur' => 'zz',
             'auteur' => 'zz',
+        ]);
+        $inserer('envoi_oppositions_imports', [
+            'auteur' => 'zz',
+            'empreinte_fichier' => str_repeat('a', 64),
+            'jeton_simulation' => (string) Str::uuid(),
         ]);
         $inserer('envoi_oppositions_registre', [
             'portee' => 'domaine',

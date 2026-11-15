@@ -470,7 +470,7 @@ export const handlers: HttpHandler[] = [
     const force = await repondreEtatForce(request, { data: [], garde_dispersion: { utilises: 0, limite: garde.limite }, expirations: {} });
     if (force) return force;
     return HttpResponse.json({
-      data: demoDb.domaines.tous(),
+      data: demoDb.domaines.tous().map((d) => ({ ...d, adaptateur: 'faux' as const })),
       garde_dispersion: garde,
       expirations: Object.fromEntries(expirationsDb().tous().map((e) => [e.id, e.le])),
     });

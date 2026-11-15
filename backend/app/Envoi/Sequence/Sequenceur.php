@@ -209,6 +209,7 @@ final class Sequenceur
             if ($basculees !== 1) {
                 return self::DEJA;
             }
+            $this->enregistrerEnvoye($ins, $rang, $plan['messageId'], $res->idInjection);
             if ($ins->statut === 'active' && (int) $ins->etape_courante === $rang) {
                 $this->avancer($ins, $rang, $plan['version'], $plan['messageId'], $plan['references'], $plan['fenetre'], $maintenant);
             }
@@ -428,8 +429,51 @@ final class Sequenceur
         }
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
             ->update(['statut' => 'envoye', 'refus' => null, 'id_injection' => $res->idInjection, 'maj_le' => $maintenant->format('c')]);
+        $messageId = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('message_id');
+        if (is_string($messageId)) {
+            $this->enregistrerEnvoye($ins, $rang, $messageId, $res->idInjection);
+        }
 
         return true;
+    }
+
+    /**
+     * Registre des messages envoyés (L8-COMPO), dans la transaction de conclusion, une fois par message accepté : le Message-ID
+     * (empreinte) et l'empreinte du destinataire, sans adresse ni corps, pour que la relève retrouve le message. L'identifiant
+     * rendu par le serveur n'est pas toujours un UUID connu de `envoi_injections_smtp` (faux serveur : « sim-N », Kumo : le sien) :
+     * un UUID local est alors créé dans `envoi_injections_locales` (clé d'idempotence = clé d'injection) ; l'identifiant du
+     * serveur reste dans `envoi_messages.id_injection`. Écriture sous point de sauvegarde : une panne du registre NE DÉFAIT PAS
+     * la conclusion d'un message réellement parti, mais elle n'est jamais silencieuse (alerte critique après le COMMIT).
+     */
+    private function enregistrerEnvoye(\stdClass $ins, int $rang, string $messageId, ?string $idServeur): void
+    {
+        try {
+            DB::transaction(function () use ($ins, $rang, $messageId, $idServeur): void {
+                $ws = (string) $ins->workspace_id;
+                $uuid = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+                $id = null;
+                if ($idServeur !== null && preg_match($uuid, $idServeur) === 1
+                    && DB::table('envoi_injections_smtp')->where('workspace_id', $ws)->where('id_injection', $idServeur)->exists()) {
+                    $id = $idServeur;
+                }
+                if ($id === null) {
+                    $cle = 'seq-' . $ins->id . '-' . $rang;
+                    DB::table('envoi_injections_locales')->insertOrIgnore([
+                        'workspace_id' => $ws, 'cle_idempotence' => $cle,
+                        'adaptateur' => $idServeur !== null && str_starts_with($idServeur, 'sim-') ? 'faux' : 'kumo',
+                    ]);
+                    $id = (string) DB::table('envoi_injections_locales')->where('workspace_id', $ws)->where('cle_idempotence', $cle)->value('id_injection');
+                }
+                DB::table('envoi_messages_envoyes')->insertOrIgnore([
+                    'workspace_id' => $ws,
+                    'message_id_empreinte' => hash('sha256', 'mid:' . trim($messageId, " \t\r\n<>")),
+                    'id_injection' => $id,
+                    'empreinte_destinataire' => trim((string) $ins->empreinte_adresse),
+                ]);
+            });
+        } catch (Throwable $e) {
+            $this->alertes[] = ['envoi.registre_ecriture_echouee : message parti mais absent du registre, intervention requise.', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id, 'etape' => $rang, 'erreur' => $e::class]];
+        }
     }
 
     /**

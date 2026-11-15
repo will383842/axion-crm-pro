@@ -118,6 +118,11 @@ export interface components {
             prenom: string | null;
         };
         DomaineResume: {
+            /**
+             * @description Adaptateur d'envoi du domaine (lecture seule, changé par commande locale).
+             * @enum {string}
+             */
+            adaptateur?: "faux" | "kumo" | "smtp";
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;

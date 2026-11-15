@@ -12,6 +12,7 @@ use App\Envoi\JourEnvoi;
 use App\Envoi\Sante\DepotSante;
 use App\Envoi\Temoins\ReleveTemoins;
 use App\Support\WorkspaceContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -26,6 +27,9 @@ use Illuminate\Support\Facades\Schema;
 class ListeFeuVert
 {
     public const PREMIER = CatalogueManuels::PREMIER;
+
+    /** Point qui décrit le drapeau d'exploitation : ne bloque jamais « accorde », absent de l'empreinte (D12). */
+    public const POINT_EXPLOITATION = 'auto.reel_actif_faux';
 
     public function __construct(private readonly DepotPreuves $preuves, private readonly DepotSante $sante) {}
 
@@ -59,6 +63,9 @@ class ListeFeuVert
             $auto('auto.domaines_prets', $dnsOk, 'Tous les domaines contrôlés sont prêts.', 'Aucun contrôle, ou un domaine pas prêt / en pause.'),
             $auto('auto.listes_noires', $listesOk, 'Aucune ressource listée.', 'Aucun contrôle, ou une ressource listée / non fiable / en pause.'),
             $auto('auto.supervision_k15', config('envoi.sante.actif') === true, 'Supervision active.', 'Supervision éteinte.'),
+            $this->essaiABlancRecent($ws),
+            $this->buteeEnBase(),
+            $this->adaptateursDomaines($ws),
         ];
 
         $preuves = $this->preuves->dernieres($ws);
@@ -120,6 +127,78 @@ class ListeFeuVert
             'fournisseurs_temoins_couverts' => count(array_intersect($requis, array_map('strval', $presents))),
             'fournisseurs_temoins_requis' => count($requis),
         ];
+    }
+
+    /**
+     * Dernière décision de feu vert de l'espace (la plus grande `id` fait foi), ou null.
+     *
+     * @return array{id: int, decision: string, motif: string, le: string}|null
+     */
+    public function derniereDecision(string $ws): ?array
+    {
+        $l = WorkspaceContext::run($ws, fn () => DB::selectOne('SELECT id, decision, motif, cree_le FROM envoi_feu_vert_decisions WHERE workspace_id = ? ORDER BY id DESC LIMIT 1', [$ws]));
+
+        return $l === null ? null : ['id' => (int) $l->id, 'decision' => (string) $l->decision, 'motif' => (string) $l->motif, 'le' => CarbonImmutable::parse((string) $l->cree_le)->utc()->format('Y-m-d\TH:i:s\Z')];
+    }
+
+    /**
+     * Empreinte de l'état exact affiché (D12) : points (code, fait, état, date de la preuve) + identifiant de la dernière décision (ou « aucune »).
+     * Sans `auto.reel_actif_faux` (drapeau d'exploitation que le feu vert ne touche jamais) et sans aucun horodatage de calcul.
+     *
+     * @param  list<PointFeuVert>  $points
+     */
+    public function empreinte(string $ws, array $points): string
+    {
+        $lignes = [];
+        foreach ($points as $p) {
+            if ($p->code !== self::POINT_EXPLOITATION) {
+                $lignes[] = $p->code . '|' . ($p->fait ? '1' : '0') . '|' . $p->etat . '|' . ($p->preuveLe ?? '');
+            }
+        }
+        sort($lignes);
+
+        return hash('sha256', implode("\n", $lignes) . "\ndecision=" . ($this->derniereDecision($ws)['id'] ?? 'aucune'));
+    }
+
+    /** Essai à blanc (D10) réussi, terminé depuis moins de 7 jours : un essai par semaine, voulu. */
+    private function essaiABlancRecent(string $ws): PointFeuVert
+    {
+        $code = 'auto.essai_a_blanc_recent';
+        $fin = WorkspaceContext::run($ws, fn () => DB::table('envoi_essais_blanc')->where('workspace_id', $ws)->where('reussi', true)->max('fin'));
+        $maintenant = CarbonImmutable::now();
+        $ok = $fin !== null && CarbonImmutable::parse((string) $fin)->greaterThanOrEqualTo($maintenant->subDays(7)) && CarbonImmutable::parse((string) $fin)->lessThanOrEqualTo($maintenant);
+
+        return self::pointAuto($code, $ok, $ok ? 'Un essai à blanc réussi date de moins de 7 jours.' : 'Aucun essai à blanc réussi depuis moins de 7 jours.');
+    }
+
+    /** La butée de plafond par espace existe en base (fonction de la migration S1-A) : lecture du catalogue, aucune écriture. */
+    private function buteeEnBase(): PointFeuVert
+    {
+        $presente = DB::selectOne("SELECT to_regprocedure('public.envoi_compteur_espace_reserver(uuid,date,integer)') IS NOT NULL AS p");
+        $ok = $presente !== null && (bool) $presente->p;
+
+        return self::pointAuto('auto.plafond_butee_base', $ok, $ok ? 'La butée de plafond est présente en base.' : 'La butée de plafond est absente de la base.');
+    }
+
+    /** Chaque domaine dont l'adaptateur n'est pas `faux` (D11) a un dernier contrôle DNS prêt, hors pause, daté d'aujourd'hui. */
+    private function adaptateursDomaines(string $ws): PointFeuVert
+    {
+        $code = 'auto.adaptateurs_domaines';
+        $reels = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->where('adaptateur', '<>', 'faux')->pluck('nom')->map(fn ($n): string => (string) $n)->all());
+        if ($reels === []) {
+            return self::pointAuto($code, true, 'Aucun domaine n’utilise un adaptateur réel.');
+        }
+        $aujourdhui = JourEnvoi::de()->format('Y-m-d');
+        $vert = [];
+        foreach ($this->sante->controlesDns($ws) as $c) {
+            $jour = JourEnvoi::de(CarbonImmutable::parse($c['controle_le'])->toDateTimeImmutable())->format('Y-m-d');
+            if ($c['pret'] && ! $c['pause'] && $jour === $aujourdhui) {
+                $vert[$c['domaine']] = true;
+            }
+        }
+        $sans = count(array_filter($reels, static fn (string $d): bool => ! isset($vert[$d])));
+
+        return self::pointAuto($code, $sans === 0, $sans === 0 ? 'Chaque domaine réel a un contrôle DNS vert du jour.' : $sans . ' domaine(s) à adaptateur réel sans contrôle DNS vert du jour.');
     }
 
     private static function pointAuto(string $code, bool $fait, string $detail): PointFeuVert

@@ -193,9 +193,11 @@ paths:
       summary: Liste « feu vert » avant le premier envoi réel
       description: |
         Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
-        portent une preuve humaine (catalogue v3 : 16 points automatiques et 28 manuels, 44 au total,
-        cases A4 à A12 du plan R07 comprises). Un point automatique sans source est toujours faux.
-        Les verrous sont en lecture seule.
+        portent une preuve humaine. Le catalogue est versionné côté serveur : le nombre de points
+        se lit dans `total`. Un point automatique sans source est
+        toujours faux. Les verrous sont en lecture seule. `empreinte_liste` (facultatif)
+        est l'empreinte de l'état exact affiché ; `decision` (facultatif) est la dernière
+        décision de feu vert, nulle s'il n'y en a pas encore.
       responses:
         '200':
           description: Points de contrôle, bloquants restants et verrous.
@@ -212,6 +214,51 @@ paths:
                   total: { type: integer, minimum: 0 }
                   bloquants_restants: { type: integer, minimum: 0 }
                   verrous: { $ref: '#/components/schemas/VerrousFeuVert' }
+                  empreinte_liste:
+                    description: Empreinte de l'état exact affiché ; à renvoyer dans `If-Match`.
+                    type: string
+                  decision:
+                    oneOf: [{ $ref: '#/components/schemas/DecisionFeuVert' }, { type: 'null' }]
+  /envoi/feu-vert/decision:
+    post:
+      operationId: decisionFeuVert
+      summary: Accorder ou retirer le feu vert final
+      description: |
+        Propriétaire seul (`workspaces.manage`, 403 sinon). Le feu vert est nécessaire, pas
+        suffisant : il ne touche jamais `ENVOI_REEL_ACTIF`. Décision consignée en ajout seul
+        avec la photo des points. Les règles suivantes sont **propres à « accorde »** :
+        l'en-tête `If-Match` (valeur de `empreinte_liste` lue à l'écran, avec ou sans
+        guillemets) est obligatoire (428 s'il manque), 412 si l'empreinte est périmée,
+        409 tant qu'un point bloquant est rouge (hors `auto.reel_actif_faux`). `empreinte_liste`
+        inclut la dernière décision et est calculée sans ce point. « retire » est toujours accepté (le stop
+        gagne) : sans en-tête ou avec une empreinte périmée, il ne renvoie jamais 412 ni 428.
+      parameters:
+        - name: If-Match
+          in: header
+          required: false
+          description: '`empreinte_liste` lue à l''écran. Exigé pour « accorde » seulement.'
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, motif]
+              properties:
+                decision: { type: string, enum: [accorde, retire] }
+                motif: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        '200':
+          description: La liste après la décision.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListeFeuVert' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '412': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '428': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/feu-vert/{code}/fait:
     post:
       operationId: marquerPointFeuVert
@@ -249,6 +296,30 @@ paths:
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    DecisionFeuVert:
+      description: Dernière décision de feu vert.
+      type: object
+      required: [decision, motif, le]
+      properties:
+        decision: { type: string, enum: [accorde, retire] }
+        motif: { type: string }
+        le: { $ref: './commun.yaml#/components/schemas/Horodatage' }
+    ListeFeuVert:
+      type: object
+      required: [points, faits, total, bloquants_restants, verrous]
+      properties:
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/PointFeuVert' }
+        faits: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 0 }
+        bloquants_restants: { type: integer, minimum: 0 }
+        verrous: { $ref: '#/components/schemas/VerrousFeuVert' }
+        empreinte_liste:
+          description: Empreinte de l'état exact affiché ; à renvoyer dans `If-Match`.
+          type: string
+        decision:
+          oneOf: [{ $ref: '#/components/schemas/DecisionFeuVert' }, { type: 'null' }]
     PointFeuVert:
       type: object
       required: [code, libelle, groupe, nature, etat, fait, bloquant, source, detail, preuve]

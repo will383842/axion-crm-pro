@@ -88,6 +88,24 @@ function entreeTache(t: TacheDemo): PersonneTimelineEntry {
   return { id: t.id, kind: 'tache', title: t.title, content: null, occurred_at: t.created_at, due_at: t.due_at, done_at: t.done_at, external_ref: null };
 }
 
+// Démo (G4-ACCORD) : un accord pour les personnes dont la base de la lettre est le consentement, sinon « aucun accord ».
+// Lecture seule ; ni `commentaire_ref`, ni `post_ref`, ni `post_url` n'existent dans la démo.
+function accordsDemo(p: PersonneDemo): NonNullable<PersonneFiche['contenus_accords']> {
+  const accord = p.base_lettre === 'consent';
+  return {
+    origine: accord ? { mot: 'guide', reseau: 'instagram', guide: null, date: p.premiere_source_at } : null,
+    guides: [],
+    consentements: !accord
+      ? []
+      : [
+          { nature: 'optin', date: p.abonnement?.abonne_at ?? p.premiere_source_at, source: 'confirmation', version: 'v2' },
+          // Démo : un désabonnement de la lettre est montré comme un retrait d'accord.
+          ...(p.abonnement?.desabonne_at != null ? [{ nature: 'retrait' as const, date: p.abonnement.desabonne_at, source: 'lien', version: 'v2' }] : []),
+        ],
+    opposition: { actif: oppositionDemo(p).opposee, date: oppositionDemo(p).opposee ? p.premiere_source_at : null },
+  };
+}
+
 function ficheDePersonne(p: PersonneDemo): PersonneFiche {
   const siennes = taches().filtrer((t) => t.personne_id === p.id);
   const evenement: PersonneTimelineEntry = {
@@ -120,6 +138,7 @@ function ficheDePersonne(p: PersonneDemo): PersonneFiche {
             motif_desabonnement: p.abonnement.motif,
           },
     entreprise,
+    contenus_accords: accordsDemo(p),
     taches: siennes.filter((t) => t.done_at === null).map(entreeTache),
     timeline: [evenement, ...terminees].sort((a, b) => (b.occurred_at ?? '').localeCompare(a.occurred_at ?? '')),
   };

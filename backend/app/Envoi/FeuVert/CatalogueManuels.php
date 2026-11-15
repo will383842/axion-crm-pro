@@ -8,13 +8,14 @@ namespace App\Envoi\FeuVert;
  *  - `manuel.<code>` : preuve humaine (spécification 26 § 8, puis cases A4 à A12 du plan R07), déposée via DepotPreuves.
  * Les codes sont stables et permanents : on n'en renomme ni n'en supprime jamais (seule exception, v3 : `manuel.inscriptions` est éclaté puis retiré) ; un ajout incrémente VERSION
  * (v2 : F15 ajoute `auto.temoins_3_jours` ; v3 : R07 ajoute les cases A4 à A12 et éclate `manuel.inscriptions` ;
- * v4 : K14-CAT ajoute `manuel.yahoo_cfl` et corrige le libellé d'Orange, dont le code ne change pas : la CFL est celle de Yahoo).
+ * v4 : K14-CAT ajoute `manuel.yahoo_cfl` et corrige le libellé d'Orange, dont le code ne change pas : la CFL est celle de Yahoo ;
+ * v5 : K17-FV ajoute trois points automatiques, `auto.essai_a_blanc_recent`, `auto.plafond_butee_base` et `auto.adaptateurs_domaines`).
  * Signal Spam (A11) est « non bloquant » dans le plan, mais le contrat impose `bloquant` = non `fait` : par prudence il bloque (noté R07).
  * `serveur_reel` = le point n'est vérifiable qu'avec le vrai serveur (K17).
  */
 final class CatalogueManuels
 {
-    public const VERSION = 4;
+    public const VERSION = 5;
 
     public const PREFIXE_AUTO = 'auto.';
 
@@ -42,6 +43,9 @@ final class CatalogueManuels
         'auto.frein_temoins_branche' => ['libelle' => 'Frein « témoins » branché : relève des indésirables liée et planifiée', 'groupe' => 'temoins', 'source' => '30 A4', 'serveur_reel' => false],
         'auto.frein_reponses_baisse' => ['libelle' => 'Frein « réponses en baisse » : évaluation planifiée de reponsesEnBaisse', 'groupe' => 'exploitation', 'source' => '30 A4', 'serveur_reel' => false],
         'auto.separation_lettre_prospection' => ['libelle' => 'Aucun domaine ni adresse IP partagé entre la lettre et la prospection', 'groupe' => 'dns', 'source' => '30 A12', 'serveur_reel' => false],
+        'auto.essai_a_blanc_recent' => ['libelle' => 'Essai à blanc réussi depuis moins de 7 jours', 'groupe' => 'banc', 'source' => 'table envoi_essais_blanc (D10)', 'serveur_reel' => false],
+        'auto.plafond_butee_base' => ['libelle' => 'Butée de plafond par espace présente en base', 'groupe' => 'verrous', 'source' => 'fonction envoi_compteur_espace_reserver (D7)', 'serveur_reel' => false],
+        'auto.adaptateurs_domaines' => ['libelle' => 'Chaque domaine à adaptateur réel a un contrôle DNS vert du jour', 'groupe' => 'dns', 'source' => 'tables envoi_domaines.adaptateur et envoi_controles_dns (D11)', 'serveur_reel' => false],
         'manuel.port25' => ['libelle' => 'Port 25 ouvert par écrit par l’hébergeur et usage déclaré accepté', 'groupe' => 'serveur', 'source' => '26§8.1', 'serveur_reel' => true],
         'manuel.ptr_fcrdns' => ['libelle' => 'PTR réel, PTR = HELO = A', 'groupe' => 'dns', 'source' => '26§8.2', 'serveur_reel' => true],
         'manuel.dns_publies' => ['libelle' => 'Publication DNS réelle SPF, DKIM, DMARC, MTA-STS, TLS-RPT et propagation', 'groupe' => 'dns', 'source' => '26§8.3', 'serveur_reel' => true],

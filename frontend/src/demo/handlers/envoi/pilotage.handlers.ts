@@ -16,6 +16,8 @@ type Regroupement = 'campagne' | 'boite' | 'domaine' | 'liste' | 'message';
 type PointApi = components['schemas']['PointFeuVert'];
 type VerrousApi = components['schemas']['VerrousFeuVert'];
 interface PointFeuVert extends PointApi { id: string }
+type DecisionApi = components['schemas']['DecisionFeuVert'];
+interface DecisionDemo extends DecisionApi { id: string }
 interface TestMatin { id: string; le: string; temoins_ok: number; temoins_total: number }
 
 const JOUR = 86_400_000;
@@ -45,6 +47,11 @@ const POINTS: readonly PointFeuVert[] = [
   manuel({ code: 'manuel.sauvegarde', libelle: 'Sauvegarde vérifiée', groupe: 'exploitation', bloquant: true, source: '26§8.10', detail: null }, { texte: 'Restauration d’essai réussie.', par: 'Camille', le: ILYA(3) }),
   manuel({ code: 'manuel.arret_general_teste', libelle: 'Arrêt général des envois testé', groupe: 'exploitation', bloquant: true, source: '26§8.11', detail: null }, { texte: 'Arrêt puis reprise constatés.', par: 'Camille', le: ILYA(2) }),
   { ...manuel({ code: 'manuel.essai_serveur_reel', libelle: 'Essai de retour sur le serveur réel', groupe: 'serveur', bloquant: true, source: '26§8.6', detail: 'Preuve déposée, se confirme quand le serveur réel est branché' }, { texte: 'Essai relu sur le banc.', par: 'Camille', le: ILYA(1) }), etat: 'attend_serveur_reel', fait: false },
+  manuel({ code: 'manuel.postmaster_google', libelle: 'Inscription Google Postmaster Tools', groupe: 'conformite', bloquant: true, source: '30 A11', detail: 'Inscription à faire auprès de Google' }, null),
+  manuel({ code: 'manuel.snds_jmrp', libelle: 'Inscription SNDS et JMRP (Microsoft)', groupe: 'conformite', bloquant: true, source: '30 A11', detail: 'Inscription à faire auprès de Microsoft' }, null),
+  manuel({ code: 'manuel.yahoo_cfl', libelle: 'Inscription Yahoo, boucle de plaintes CFL', groupe: 'conformite', bloquant: true, source: '30 A11', detail: 'Inscription à faire auprès de Yahoo' }, null),
+  { ...manuel({ code: 'manuel.orange_cfl', libelle: 'Orange : prise de contact délivrabilité', groupe: 'conformite', bloquant: true, source: '30 A11', detail: 'Preuve déposée, se confirme quand le serveur réel est branché' }, { texte: 'Prise de contact faite.', par: 'Camille', le: ILYA(1) }), etat: 'attend_serveur_reel', fait: false },
+  manuel({ code: 'manuel.signal_spam', libelle: 'Inscription Signal Spam (si elle existe)', groupe: 'conformite', bloquant: false, source: '30 A11', detail: null }, { texte: 'Inscription constatée.', par: 'Camille', le: ILYA(2) }),
   manuel({ code: 'manuel.boucles_retour', libelle: 'Boucles de retour des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
   manuel({ code: 'manuel.tableaux_messageries', libelle: 'Inscription aux tableaux des messageries', groupe: 'exploitation', bloquant: false, source: '26§8.12', detail: 'Inscription à faire auprès des messageries' }, null),
 ];
@@ -61,8 +68,63 @@ const verrous = (): VerrousApi => ({
 function zone() {
   return demoDb.etendre('pilotage', () => ({
     points: POINTS.map((p): PointFeuVert => ({ ...p })),
+    decisions: [] as DecisionDemo[],
     testMatin: [{ id: 'test', le: new Date(maintenant().getTime() - 2 * 3_600_000).toISOString(), temoins_ok: 4, temoins_total: 4 } satisfies TestMatin],
   }));
+}
+
+const CLE_FEU_VERT = 'axion-demo:feu-vert';
+
+/** Pose (ou retire, avec `null`) l'état de démo « sans bloquant » du feu vert (sessionStorage, comme `definirEtatForce`). */
+export function definirFeuVertDemo(etat: 'sans-bloquant' | null): void {
+  try {
+    if (etat === null) globalThis.sessionStorage?.removeItem(CLE_FEU_VERT);
+    else globalThis.sessionStorage?.setItem(CLE_FEU_VERT, etat);
+  } catch {
+    // stockage indisponible : l'état ne survit pas au rechargement.
+  }
+}
+
+/** Lu au démarrage : `?demo-feu-vert=sans-bloquant` (ou `normal` pour revenir à l'état d'origine). */
+function lireParametreFeuVert(): void {
+  try {
+    const v = new URLSearchParams(globalThis.location?.search ?? '').get('demo-feu-vert');
+    if (v === 'sans-bloquant') definirFeuVertDemo('sans-bloquant');
+    else if (v === 'normal') definirFeuVertDemo(null);
+  } catch {
+    // pas d'adresse lisible (hors navigateur) : rien à faire.
+  }
+}
+lireParametreFeuVert();
+
+function feuVertSansBloquant(): boolean {
+  try {
+    return globalThis.sessionStorage?.getItem(CLE_FEU_VERT) === 'sans-bloquant';
+  } catch {
+    return false;
+  }
+}
+
+/** Liste du feu vert : points, verrous, empreinte de l'état exact (points + dernière décision) et dernière décision. */
+function listeFeuVert(): components['schemas']['ListeFeuVert'] {
+  zone();
+  const brut = demoDb.zone<PointFeuVert>('pilotage', 'points').tous();
+  // État « sans bloquant » : tous les points se lisent comme faits ; GET et décision passent par ici, donc même empreinte.
+  const points = feuVertSansBloquant() ? brut.map((p): PointFeuVert => ({ ...p, fait: true, etat: 'fait' })) : brut;
+  const decisions = demoDb.zone<DecisionDemo>('pilotage', 'decisions').tous();
+  const derniere = decisions.length > 0 ? decisions[decisions.length - 1]! : null;
+  const etat = points.map((p) => `${p.code}:${p.etat}`).join('|') + `|${derniere?.id ?? 'aucune'}`;
+  let h = 0;
+  for (const c of etat) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return {
+    points: points.map(lignePoint),
+    faits: points.filter((p) => p.fait).length,
+    total: points.length,
+    bloquants_restants: points.filter((p) => p.bloquant && !p.fait).length,
+    verrous: verrous(),
+    empreinte_liste: `demo-${h.toString(16)}`,
+    decision: derniere ? { decision: derniere.decision, motif: derniere.motif, le: derniere.le } : null,
+  };
 }
 
 const lignePoint = ({ id: _id, ...p }: PointFeuVert): PointApi => p;
@@ -213,14 +275,30 @@ export const handlers: HttpHandler[] = [
     await delai();
     const force = await repondreEtatForce(request, { points: [], faits: 0, total: 0, bloquants_restants: 0, verrous: verrous() });
     if (force) return force;
-    const points = zone().points;
-    return HttpResponse.json({
-      points: points.map(lignePoint),
-      faits: points.filter((p) => p.fait).length,
-      total: points.length,
-      bloquants_restants: points.filter((p) => p.bloquant && !p.fait).length,
-      verrous: verrous(),
-    });
+    return HttpResponse.json(listeFeuVert());
+  }),
+
+  http.post(api('/envoi/feu-vert/decision'), async ({ request }) => {
+    await delai();
+    const corps = (await request.json().catch(() => ({}))) as { decision?: unknown; motif?: unknown };
+    const motif = typeof corps.motif === 'string' ? corps.motif.trim() : '';
+    if ((corps.decision !== 'accorde' && corps.decision !== 'retire') || motif.length < 10 || motif.length > 500) {
+      return erreur(422, 'validation', 'Choisissez « accorde » ou « retire » et un motif de 10 à 500 caractères.');
+    }
+    zone();
+    const decisions = demoDb.zone<DecisionDemo>('pilotage', 'decisions');
+    if (corps.decision === 'accorde') {
+      // Propres à « accorde » : 428 sans en-tête, 412 si l'empreinte est périmée, 409 si un bloquant est rouge.
+      const entete = request.headers.get('If-Match');
+      if (!entete) return erreur(428, 'empreinte_requise', 'Lisez d’abord la liste : la décision porte sur l’état exact affiché.');
+      if (entete.replace(/^"|"$/g, '') !== listeFeuVert().empreinte_liste) {
+        return erreur(412, 'empreinte_perimee', 'La liste a changé depuis votre lecture : relisez-la avant de décider.');
+      }
+      if (listeFeuVert().bloquants_restants > 0) return erreur(409, 'bloquant_rouge', 'Un point bloquant n’est pas au vert.');
+    }
+    // « retire » est toujours accepté (le stop gagne) ; l'historique est gardé, jamais effacé.
+    decisions.ajouter({ id: `dec-${decisions.compter() + 1}`, decision: corps.decision, motif, le: maintenant().toISOString() });
+    return HttpResponse.json(listeFeuVert());
   }),
 
   http.post(api('/envoi/feu-vert/:code/fait'), async ({ request, params }) => {

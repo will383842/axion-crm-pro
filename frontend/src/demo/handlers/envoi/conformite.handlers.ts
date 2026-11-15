@@ -35,6 +35,8 @@ const BLOC_ART_14 =
 
 function zone() {
   return demoDb.etendre('conformite', () => ({
+    /** Jetons de simulation de l'import : rattachés à la démo, donc vidés par `reinitialiser()`. */
+    jetons: [] as Array<{ jeton: string; contenu: string }>,
     alertes: [
       { id: 'al-1', type: 'boite_ralentie', titre: 'Boîte « prospection-a@ » ralentie', detail: 'Refus temporaires à 3 % depuis 09:30.', ce_qui_se_passe: 'Refus temporaires à 3 % depuis 09:30.', ce_que_le_systeme_a_fait: 'Volume divisé par 2.', que_faire: 'Rien si ça baisse ; sinon ouvrir la boîte.', niveau: 'attention', survenue_le: ilYa(0, 9, 30), lien: '/envoi/boites', close: false },
       { id: 'al-2', titre: 'DMARC : passer à « quarantaine »', detail: 'prospection-b.example est prêt.', ce_qui_se_passe: 'prospection-b.example est prêt pour la politique « quarantaine ».', ce_que_le_systeme_a_fait: 'Rappel posé au 15 janvier.', que_faire: 'Ouvrir le domaine.', niveau: 'nouveau', survenue_le: ilYa(1, 16, 10), lien: '/envoi/domaines', close: false },
@@ -191,6 +193,9 @@ function csv(): string {
   return lignes.map((l) => l.map((c) => `"${c.replaceAll('"', '""')}"`).join(';')).join('\n');
 }
 
+const REGEX_DOMAINE = /^[a-z0-9.-]+\.[a-z]{2,}$/;
+const REGEX_ADRESSE = /^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+
 /** Domaines de messagerie grand public : refusés en portée « domaine » (le serveur fait de même). */
 const DOMAINES_GRAND_PUBLIC = ['gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.fr', 'hotmail.com', 'hotmail.fr', 'outlook.com', 'outlook.fr', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'laposte.net'];
 
@@ -233,6 +238,46 @@ export const handlers: HttpHandler[] = [
     const existante = demoDb.opposition.tous().find((o) => o.portee === corps.portee && o.valeur.toLowerCase() === valeur);
     if (existante) return HttpResponse.json(existante, { status: 200 });
     return HttpResponse.json(inscrire(corps.portee, valeur, motifTexte, 'manuel'), { status: 201 });
+  }),
+
+  http.post(api('/envoi/opposition/import'), async ({ request }) => {
+    await delai();
+    const corps = (await request.json().catch(() => ({}))) as { etape?: unknown; contenu?: unknown; jeton?: unknown };
+    if ((corps.etape !== 'simulation' && corps.etape !== 'confirmation') || typeof corps.contenu !== 'string') {
+      return erreur(422, 'validation', 'Indiquez l’étape et le texte du fichier.');
+    }
+    // Taille mesurée en octets UTF-8 (limite du serveur) ; lignes numérotées AVANT d'écarter les lignes vides.
+    const octets = new TextEncoder().encode(corps.contenu).length;
+    const lignes = corps.contenu.split(/\r?\n/).map((brut, i) => ({ brut, ligne: i + 1 })).filter((l) => l.brut.trim() !== '');
+    if (octets > 1_048_576 || lignes.length > 5000) return erreur(422, 'validation', 'Fichier trop gros : 5 000 lignes et 1 Mo au plus.');
+    const connus = new Set(demoDb.opposition.tous().map((o) => o.valeur.toLowerCase()));
+    const refusees: S['ImportOppositionsReponse']['refusees'] = [];
+    const nouvelles: Array<{ v: string; portee: Opposition['portee'] }> = [];
+    let dejaPresentes = 0;
+    for (const { brut, ligne } of lignes) {
+      const v = brut.trim().toLowerCase();
+      if (/^[=+\-@\t\r]/.test(brut) || /^[=+\-@]/.test(brut.trim())) refusees.push({ ligne, motif: 'caractère de tête refusé' });
+      else if (DOMAINES_GRAND_PUBLIC.some((d) => v === d || v.endsWith(`@${d}`) || v.endsWith(`.${d}`))) refusees.push({ ligne, motif: 'domaine de messagerie grand public' });
+      else if (connus.has(v) || nouvelles.some((n) => n.v === v)) dejaPresentes += 1;
+      // Valeur invalide (ex. ligne d'en-tête « adresse ») : un domaine ou une adresse bien formés seulement.
+      else if (!(v.includes('@') ? REGEX_ADRESSE : REGEX_DOMAINE).test(v)) refusees.push({ ligne, motif: 'valeur invalide' });
+      // Une valeur sans « @ » est un domaine entier.
+      else nouvelles.push({ v, portee: v.includes('@') ? 'adresse' : 'domaine' });
+    }
+    const reponse = { valides: nouvelles.length, deja_presentes: dejaPresentes, refusees };
+    const jetons = zone().jetons;
+    if (corps.etape === 'simulation') {
+      const jeton = `demo-jeton-${crypto.randomUUID()}`;
+      jetons.push({ jeton, contenu: corps.contenu });
+      return HttpResponse.json({ etape: 'simulation', ...reponse, jeton } satisfies S['ImportOppositionsReponse']);
+    }
+    // Confirmation : jeton valide et consommé une seule fois, sinon 409.
+    const jeton = typeof corps.jeton === 'string' ? corps.jeton : '';
+    const rang = jetons.findIndex((j) => j.jeton === jeton && j.contenu === corps.contenu);
+    if (rang < 0) return erreur(409, 'jeton_invalide', 'Relancez la simulation : le jeton est absent, périmé ou déjà utilisé.');
+    jetons.splice(rang, 1);
+    for (const n of nouvelles) inscrire(n.portee, n.v, 'import démo', 'manuel');
+    return HttpResponse.json({ etape: 'confirmation', ...reponse, import_id: `imp-${demoDb.opposition.compter()}` } satisfies S['ImportOppositionsReponse']);
   }),
 
   http.get(api('/envoi/opposition/export'), async () => {

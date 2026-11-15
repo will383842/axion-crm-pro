@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Depot;
 
+use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Exceptions\TemoinRefuse;
 use App\Envoi\JourEnvoi;
@@ -120,8 +121,11 @@ final class DepotSocleDb implements DepotSocle
             return true;
         }
 
-        return WorkspaceContext::run($workspaceId, fn (): bool => DB::table('envoi_inscriptions_evenements')->where('workspace_id', $workspaceId)
-            ->where('empreinte_adresse', ListeSuppression::empreinte($adresse))->whereIn('evenement', Evenement::VALENT_POUR_L_ADRESSE)->exists());
+        // Lecture seule. Registre R13 de CET espace : domaine de l'adresse et domaines parents (la portée adresse est déjà vue
+        // ci-dessus via `opt_out` et `email_suppressions`). Le SIREN n'est pas relu ici : il est appliqué au temps A par `EnvoiAutorise`.
+        return WorkspaceContext::run($workspaceId, fn (): bool => RegistreOppositionManuel::refuse($workspaceId, $adresse, null)
+            || DB::table('envoi_inscriptions_evenements')->where('workspace_id', $workspaceId)
+                ->where('empreinte_adresse', ListeSuppression::empreinte($adresse))->whereIn('evenement', Evenement::VALENT_POUR_L_ADRESSE)->exists());
     }
 
     public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool

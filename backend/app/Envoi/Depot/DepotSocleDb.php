@@ -5,6 +5,7 @@ namespace App\Envoi\Depot;
 use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Exceptions\TemoinRefuse;
 use App\Envoi\JourEnvoi;
+use App\Envoi\Reglages\ReglesPrudence;
 use App\Envoi\Sequence\Evenement;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
@@ -138,6 +139,26 @@ final class DepotSocleDb implements DepotSocle
 
             return $insere > 0;
         });
+    }
+
+    public function plafondEspace(string $workspaceId): int
+    {
+        $defaut = (int) ReglesPrudence::defauts()['plafond_jour'];
+
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $defaut): int {
+            $v = DB::table('envoi_reglages')->where('workspace_id', $workspaceId)->where('cle', 'regles.plafond_jour')->value('valeur');
+            $n = $v === null ? $defaut : json_decode((string) $v, true);
+
+            return is_int($n) && $n >= 0 ? $n : 0; // réglage illisible : le plus prudent, aucune réservation
+        });
+    }
+
+    public function reserverPlaceEspace(string $workspaceId, DateTimeImmutable $jour, int $plafond): bool
+    {
+        return WorkspaceContext::run($workspaceId, fn (): bool => (bool) (DB::selectOne(
+            'SELECT envoi_compteur_espace_reserver(?::uuid, ?::date, ?::int) AS r',
+            [$workspaceId, $jour->format('Y-m-d'), $plafond],
+        )->r ?? false));
     }
 
     public function concluireInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, string $statut, ?string $idInjection = null): bool

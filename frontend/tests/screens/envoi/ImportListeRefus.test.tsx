@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { DesinscriptionsPage } from '@/features/envoi/conformite/DesinscriptionsPage';
@@ -15,8 +15,12 @@ import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
 
 const ORIGINE = 'https://api.localhost/api/v1';
-const moi = (roles: string[]) =>
-  http.get(`${ORIGINE}/auth/me`, () => HttpResponse.json({ user: { id: 'u-1', name: 'Démo', email: 'demo@example.test', current_workspace_id: 'ws-1' }, roles }));
+/** `etat.repondu` passe à vrai quand le faux serveur a renvoyé la réponse de `/auth/me`. */
+const moi = (roles: string[], etat: { repondu: boolean } = { repondu: false }) =>
+  http.get(`${ORIGINE}/auth/me`, () => {
+    etat.repondu = true;
+    return HttpResponse.json({ user: { id: 'u-1', name: 'Démo', email: 'demo@example.test', current_workspace_id: 'ws-1' }, roles });
+  });
 
 // jsdom n'a pas `Blob.text()` : on le fournit comme un navigateur.
 if (typeof Blob.prototype.text !== 'function') {
@@ -36,8 +40,8 @@ if (typeof Blob.prototype.text !== 'function') {
 const CONTENU = 'un@societe-a.example.test\n=piege@societe-b.example.test\ngmail.com\nautre@societe-c.example.test\n';
 const fichier = (contenu = CONTENU) => new File([contenu], 'liste.csv', { type: 'text/csv' });
 
-async function ouvrir(roles: string[] = ['owner'], extra: ReturnType<typeof http.post>[] = []) {
-  return renderScreen(<DesinscriptionsPage />, { path: '/envoi/desinscriptions', handlers: [moi(roles), ...extra, ...handlers] });
+async function ouvrir(roles: string[] = ['owner'], extra: ReturnType<typeof http.post>[] = [], etat?: { repondu: boolean }) {
+  return renderScreen(<DesinscriptionsPage />, { path: '/envoi/desinscriptions', handlers: [moi(roles, etat), ...extra, ...handlers] });
 }
 
 async function ouvrirFenetre(user: ReturnType<typeof userEvent.setup>) {
@@ -51,11 +55,21 @@ describe('Import des listes de refus (F-LN)', () => {
     definirEtatForce(null);
   });
 
-  it('le propriétaire seul voit le bouton', async () => {
-    await ouvrir(['admin']);
+  it('le propriétaire seul voit le bouton : l’absence est vérifiée APRÈS la réponse de /auth/me', async () => {
+    const etat = { repondu: false };
+    await ouvrir(['admin'], [], etat);
     await screen.findByRole('heading', { level: 1, name: 'Désinscriptions' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Exporter le registre (preuve)' })).toBeVisible());
+    // L'administrateur a `users.manage` mais pas `workspaces.manage` : si le composant demandait le mauvais droit, le bouton apparaîtrait.
+    await waitFor(() => expect(etat.repondu).toBe(true));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
     expect(screen.queryByRole('button', { name: 'Importer une liste de refus' })).toBeNull();
+  });
+
+  it('le propriétaire voit le bouton (témoin positif)', async () => {
+    await ouvrir(['owner']);
+    expect(await screen.findByRole('button', { name: 'Importer une liste de refus' })).toBeVisible();
   });
 
   it('simulation : le texte part en JSON, sans FormData, et le compte rendu est chiffré sans adresse', async () => {
@@ -129,6 +143,91 @@ describe('Import des listes de refus (F-LN)', () => {
     await within(fenetre).findByText(/2 adresses valides/i);
     await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
     expect(await within(fenetre).findByRole('alert')).toHaveTextContent(/jeton est périmé/);
+  });
+
+  it('le focus est replacé sur le compte rendu après la simulation puis après la confirmation', async () => {
+    const user = userEvent.setup();
+    await ouvrir();
+    const fenetre = await ouvrirFenetre(user);
+    await user.upload(within(fenetre).getByLabelText(/Fichier de la liste/), fichier());
+    await user.click(within(fenetre).getByRole('button', { name: 'Simuler l’import' }));
+    const compte = await within(fenetre).findByRole('status');
+    await waitFor(() => expect(compte).toHaveFocus());
+    expect(compte).toHaveAttribute('tabindex', '-1');
+    await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
+    await within(fenetre).findByText(/Import confirmé/i);
+    await waitFor(() => expect(within(fenetre).getByRole('status')).toHaveFocus());
+  });
+
+  it('simulation périmée : champ fichier désactivé pendant l’envoi, réponse de l’ancien fichier ignorée', async () => {
+    const user = userEvent.setup();
+    let liberer: () => void = () => undefined;
+    const bloque = new Promise<void>((resolve) => { liberer = resolve; });
+    let appels = 0;
+    await ouvrir(['owner'], [
+      http.post(`${ORIGINE}/envoi/opposition/import`, async () => {
+        appels += 1;
+        if (appels === 1) {
+          await bloque;
+          return HttpResponse.json({ etape: 'simulation', valides: 7, deja_presentes: 0, refusees: [], jeton: 'jeton-ancien' });
+        }
+        return undefined;
+      }),
+    ]);
+    const fenetre = await ouvrirFenetre(user);
+    const champ = within(fenetre).getByLabelText(/Fichier de la liste/);
+    await user.upload(champ, fichier());
+    await user.click(within(fenetre).getByRole('button', { name: 'Simuler l’import' }));
+    await waitFor(() => expect(champ).toBeDisabled());
+    // Un changement forcé malgré tout (autre fichier) : la réponse de l'ancien fichier ne doit jamais s'afficher.
+    fireEvent.change(champ, { target: { files: [fichier('autre@societe-d.example.test\n')] } });
+    await act(async () => {
+      liberer();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(within(fenetre).queryByText(/7 adresses valides/i)).toBeNull();
+    expect(within(fenetre).queryByRole('status')).toBeNull();
+    expect(within(fenetre).queryByRole('button', { name: 'Confirmer l’import' })).toBeNull();
+    expect(champ).toBeEnabled();
+    await waitFor(() => expect(within(fenetre).getByRole('button', { name: 'Simuler l’import' })).toBeEnabled());
+  });
+
+  it('après un 409, la simulation peut être relancée dans la fenêtre et le même fichier peut être re-choisi', async () => {
+    const user = userEvent.setup();
+    let confirmations = 0;
+    await ouvrir(['owner'], [
+      http.post(`${ORIGINE}/envoi/opposition/import`, async ({ request }) => {
+        const c = (await request.clone().json()) as { etape: string };
+        if (c.etape === 'confirmation' && confirmations++ === 0) return HttpResponse.json({ error: 'jeton_invalide', message: 'Relancez la simulation : le jeton est périmé.' }, { status: 409 });
+        return undefined;
+      }),
+    ]);
+    const fenetre = await ouvrirFenetre(user);
+    const champ = within(fenetre).getByLabelText<HTMLInputElement>(/Fichier de la liste/);
+    await user.upload(champ, fichier());
+    await user.click(within(fenetre).getByRole('button', { name: 'Simuler l’import' }));
+    await within(fenetre).findByText(/2 adresses valides/i);
+    await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
+    await within(fenetre).findByText(/jeton est périmé/);
+    expect(within(fenetre).queryByRole('button', { name: 'Confirmer l’import' })).toBeNull();
+    expect(champ.value).toBe('');
+    // Le même fichier re-choisi déclenche bien onChange, puis la simulation repart.
+    await user.upload(champ, fichier());
+    await user.click(await within(fenetre).findByRole('button', { name: 'Simuler l’import' }));
+    expect(await within(fenetre).findByText(/2 adresses valides/i)).toBeVisible();
+    await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
+    expect(await within(fenetre).findByText(/Import confirmé/i)).toBeVisible();
+  });
+
+  it('fichier vide : refusé à l’écran avant tout appel', async () => {
+    const user = userEvent.setup();
+    let appels = 0;
+    await ouvrir(['owner'], [http.post(`${ORIGINE}/envoi/opposition/import`, () => { appels += 1; return undefined; })]);
+    const fenetre = await ouvrirFenetre(user);
+    await user.upload(within(fenetre).getByLabelText(/Fichier de la liste/), new File([''], 'vide.csv', { type: 'text/csv' }));
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent(/fichier est vide/i);
+    expect(within(fenetre).getByRole('button', { name: 'Simuler l’import' })).toBeDisabled();
+    expect(appels).toBe(0);
   });
 
   it('aucun mot « ouverture » ni « suivi d’ouvertures »', async () => {

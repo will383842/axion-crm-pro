@@ -9,6 +9,8 @@
 - Aucun mot « ouverture » ; les lignes inscrites ne se retirent jamais.
 - `routes.test.ts` : ligne `POST /api/v1/envoi/opposition/import` ajoutée à `ECARTS_CONNUS`, avec « Filet modifié : pourquoi ».
 - Écrit contre le contrat de S2-CONTRATS et le faux serveur de la démo : aucun appel réel. Le backend est la PR #573 (non touchée).
+- Mineurs (suite) : focus replacé sur le compte rendu (`tabIndex=-1`) après la simulation et la confirmation ; champ fichier désactivé pendant l'envoi et réponse d'une requête périmée ignorée ; après un 409, retour à l'étape de simulation et valeur du champ vidée (le même fichier peut être re-choisi) ; fichier vide refusé à l'écran avant tout appel.
+- Test du bouton réservé au propriétaire : attend la réponse de `/auth/me` (drapeau du faux serveur) avant de constater l'absence ; vérifié rouge avec `users.manage` à la place de `workspaces.manage`.
 
 ## Reste
 - Le spec `dm3-listes-refus.spec.ts` (H1 à H4) n'est pas joué en local : la CI de démo le joue.

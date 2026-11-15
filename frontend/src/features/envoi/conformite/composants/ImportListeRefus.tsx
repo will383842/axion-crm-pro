@@ -6,7 +6,7 @@
  * Aucune adresse du fichier n'est réaffichée : seuls des comptes et des numéros de ligne le sont.
  * Contrat : `POST /envoi/opposition/import` (`backend/openapi/envoi/conformite.yaml`). Un fichier est définitif : rien ne s'efface.
  */
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -49,37 +49,57 @@ export function BoutonImporterListe() {
 function FenetreImport({ onClose }: { onClose: () => void }) {
   const client = useQueryClient();
   const idFichier = useId();
+  const champ = useRef<HTMLInputElement>(null);
+  const compteRendu = useRef<HTMLDivElement>(null);
+  /** Numéro de la requête courante : toute réponse d'un numéro périmé est ignorée. */
+  const courante = useRef(0);
   const [contenu, setContenu] = useState<string | null>(null);
   const [simulation, setSimulation] = useState<Reponse | null>(null);
   const [confirmation, setConfirmation] = useState<Reponse | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
 
+  // Les boutons « Simuler » puis « Confirmer » disparaissent en gardant le focus : on le replace sur le compte rendu.
+  useEffect(() => {
+    if (simulation !== null || confirmation !== null) compteRendu.current?.focus();
+  }, [simulation, confirmation]);
+
   async function choisir(fichier: File | undefined) {
+    const numero = ++courante.current;
     setErreur(null);
     setSimulation(null);
     setConfirmation(null);
     setContenu(null);
+    setEnCours(false);
     if (fichier === undefined) return;
     // Refus AVANT toute lecture et tout envoi.
+    if (fichier.size === 0) {
+      setErreur('Le fichier est vide. Choisissez un fichier contenant une adresse ou un domaine par ligne.');
+      return;
+    }
     if (fichier.size > OCTETS_MAX) {
       setErreur('Fichier trop gros : 5 000 lignes et 1 Mo au plus. Découpez-le en plusieurs fichiers.');
       return;
     }
     try {
-      setContenu(await fichier.text());
+      const texte = await fichier.text();
+      if (numero !== courante.current) return;
+      if (texte.trim() === '') setErreur('Le fichier est vide. Choisissez un fichier contenant une adresse ou un domaine par ligne.');
+      else setContenu(texte);
     } catch {
-      setErreur('Le fichier n’a pas pu être lu. Choisissez-en un autre.');
+      if (numero === courante.current) setErreur('Le fichier n’a pas pu être lu. Choisissez-en un autre.');
     }
   }
 
   async function envoyer(etape: 'simulation' | 'confirmation') {
     if (contenu === null) return;
+    const numero = ++courante.current;
     setErreur(null);
     setEnCours(true);
     try {
       const corps = etape === 'simulation' ? { etape, contenu } : { etape, contenu, jeton: simulation?.jeton };
       const { data } = await api.post<Reponse>('/envoi/opposition/import', corps);
+      if (numero !== courante.current) return;
       if (etape === 'simulation') setSimulation(data);
       else {
         setConfirmation(data);
@@ -87,9 +107,16 @@ function FenetreImport({ onClose }: { onClose: () => void }) {
         await client.invalidateQueries({ queryKey: ['envoi', 'opposition'] });
       }
     } catch (e) {
+      if (numero !== courante.current) return;
       setErreur(messageDErreur(e, 'L’import a échoué. Réessayez.'));
+      if (etape === 'confirmation') {
+        // Jeton refusé : on revient à l'étape de simulation, et le même fichier doit pouvoir être re-choisi.
+        setSimulation(null);
+        if (champ.current !== null) champ.current.value = '';
+        champ.current?.focus();
+      }
     } finally {
-      setEnCours(false);
+      if (numero === courante.current) setEnCours(false);
     }
   }
 
@@ -115,11 +142,11 @@ function FenetreImport({ onClose }: { onClose: () => void }) {
       <div className="space-y-4">
         <div>
           <Etiquette htmlFor={idFichier}>Fichier de la liste (CSV, 1 Mo au plus)</Etiquette>
-          <input id={idFichier} type="file" accept=".csv,.txt,text/csv,text/plain" className={CLASSE_CHAMP} onChange={(e) => void choisir(e.target.files?.[0])} />
+          <input ref={champ} id={idFichier} type="file" disabled={enCours} accept=".csv,.txt,text/csv,text/plain" className={CLASSE_CHAMP} onChange={(e) => void choisir(e.target.files?.[0])} />
         </div>
         <Annonce message={erreur} ton="erreur" />
         {compte !== null && (
-          <div role="status" className="space-y-2 text-sm text-slate-700">
+          <div ref={compteRendu} tabIndex={-1} role="status" className="space-y-2 text-sm text-slate-700 focus:outline-none">
             <p className="font-medium text-slate-900">
               {confirmation === null ? 'Simulation : rien n’est encore inscrit.' : 'Import confirmé.'}
             </p>

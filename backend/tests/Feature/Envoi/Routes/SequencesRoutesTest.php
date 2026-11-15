@@ -167,3 +167,17 @@ test('reprise : 409 sous arrêt général, sous pause automatique et sous frein 
     $this->actingAs($u)->postJson(SEQR_BASE . "/{$sid}/reprise")->assertOk()->assertJsonPath('statut', 'active');
     expect(seqrGestes($sid))->toBe(2)->and($this->resolutions)->toBe(0);
 });
+
+test('une séquence SANS étape n\'est ni listée ni lisible ni pausable (le contrat exige nb_etapes entre 1 et 3, jamais un 1 inventé)', function () {
+    $u = seqrCompte('owner');
+    $ws = (string) $u->current_workspace_id;
+    $avecEtapes = seqrSequence($ws);
+    $vide = (string) Str::uuid();
+    DB::table('envoi_sequences')->insert(['id' => $vide, 'workspace_id' => $ws, 'nom' => 'Séquence vide fictive', 'fenetre_debut' => 9, 'fenetre_fin' => 17]);
+
+    $ids = collect($this->actingAs($u)->getJson(SEQR_BASE)->assertOk()->json('sequences'))->pluck('id')->all();
+    expect($ids)->toContain($avecEtapes)->not->toContain($vide);
+    $this->actingAs($u)->getJson(SEQR_BASE . "/{$vide}")->assertNotFound();
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$vide}/pause")->assertNotFound();
+    expect(seqrGestes($vide))->toBe(0);
+});

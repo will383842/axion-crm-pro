@@ -8,6 +8,7 @@ use App\Envoi\Exceptions\CampagneRefusee;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,7 +28,7 @@ final class DepotSequences
         return WorkspaceContext::run($ws, function () use ($ws): array {
             $temoins = $this->socle->modeTemoins($ws);
             $out = [];
-            foreach (DB::table('envoi_sequences')->where('workspace_id', $ws)->orderByDesc('cree_le')->orderBy('id')->limit(500)->get() as $s) {
+            foreach ($this->sequences($ws)->orderByDesc('cree_le')->orderBy('id')->limit(500)->get() as $s) {
                 $out[] = $this->resume($ws, $s, $temoins);
             }
 
@@ -39,7 +40,7 @@ final class DepotSequences
     public function lire(string $ws, string $id): ?array
     {
         return WorkspaceContext::run($ws, function () use ($ws, $id): ?array {
-            $s = DB::table('envoi_sequences')->where('workspace_id', $ws)->where('id', $id)->first();
+            $s = $this->sequences($ws)->where('id', $id)->first();
 
             return $s === null ? null : $this->detail($ws, $s, $this->socle->modeTemoins($ws));
         });
@@ -55,7 +56,7 @@ final class DepotSequences
     {
         return WorkspaceContext::run($ws, fn (): ?array => DB::transaction(function () use ($ws, $id, $geste, $auteur): ?array {
             DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_sequence_geste|' . $ws . '|' . $id]);
-            $s = DB::table('envoi_sequences')->where('workspace_id', $ws)->where('id', $id)->first();
+            $s = $this->sequences($ws)->where('id', $id)->first();
             if ($s === null) {
                 return null;
             }
@@ -73,6 +74,16 @@ final class DepotSequences
 
             return $this->detail($ws, $s, $this->socle->modeTemoins($ws));
         }));
+    }
+
+    /**
+     * Séquences de l'espace QUI ONT AU MOINS UNE ÉTAPE : le contrat veut `nb_etapes` entre 1 et 3, on ne maquille jamais un 0
+     * en 1. Une séquence sans étape n'est ni listée, ni lisible, ni pausable (404).
+     */
+    private function sequences(string $ws): Builder
+    {
+        return DB::table('envoi_sequences')->where('workspace_id', $ws)
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('envoi_sequence_etapes AS e')->whereColumn('e.sequence_id', 'envoi_sequences.id')->whereColumn('e.workspace_id', 'envoi_sequences.workspace_id'));
     }
 
     private function enPause(string $ws, string $id): bool
@@ -109,7 +120,7 @@ final class DepotSequences
             'statut' => $enPause ? 'en_pause' : ($total > 0 && (int) $c->en_cours === 0 ? 'terminee' : 'active'),
             'motif_pause' => $enPause ? 'manuelle' : null,
             'reservee_aux_temoins' => $temoins,
-            'nb_etapes' => max(1, (int) DB::table('envoi_sequence_etapes')->where('workspace_id', $ws)->where('sequence_id', $s->id)->count()),
+            'nb_etapes' => (int) DB::table('envoi_sequence_etapes')->where('workspace_id', $ws)->where('sequence_id', $s->id)->count(),
             'inscriptions' => ['total' => $total, 'en_cours' => (int) $c->en_cours, 'terminees' => (int) $c->terminees, 'arretees' => (int) $c->arretees, 'reportees' => (int) $c->reportees],
             'prochain_envoi' => ! $enPause && $c->prochain !== null ? self::horodatage((string) $c->prochain) : null,
             'creee_le' => self::horodatage((string) $s->cree_le),

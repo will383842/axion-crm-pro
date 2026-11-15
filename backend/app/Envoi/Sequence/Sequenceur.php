@@ -97,13 +97,19 @@ final class Sequenceur
     public function executer(string $ws, DateTimeImmutable $maintenant, int $limite = 100): array
     {
         // Une séquence EN PAUSE (dernier geste de `envoi_sequences_gestes`, D6) est sautée ici : ses inscriptions ne sont pas
-        // traitées, donc leur compteur de reports ne bouge pas. Le geste est lu AVANT le traitement : le stop gagne toujours.
+        // traitées, donc leur compteur de reports ne bouge pas. Le geste est lu AVANT le traitement, puis RELU avant chaque inscription (une pause posée en plein cycle arrête les suivantes) : le stop gagne toujours.
         $ids = DB::table('envoi_inscriptions AS i')->where('i.workspace_id', $ws)->where('i.statut', 'active')
             ->where('i.prochaine_echeance', '<=', $maintenant->format('c'))
             ->whereRaw("COALESCE((SELECT g.geste FROM envoi_sequences_gestes g WHERE g.workspace_id = i.workspace_id AND g.sequence_id = i.sequence_id ORDER BY g.cree_le DESC, g.id DESC LIMIT 1), 'reprise') <> 'pause'")
             ->orderBy('i.prochaine_echeance')->limit($limite)->pluck('i.id')->all();
         $bilan = [];
         foreach ($ids as $id) {
+            // Le filtre ci-dessus ne voit que l'état au début du cycle : une pause posée PENDANT le cycle (jusqu'à `$limite`
+            // inscriptions) doit arrêter les suivantes. On relit donc le dernier geste de la séquence de l'inscription (même
+            // sous-requête indexée) avant chaque traitement ; en pause, on saute sans toucher à `reports`.
+            if ($this->sequenceEnPause($ws, (string) $id)) {
+                continue;
+            }
             try {
                 $r = $this->traiter($ws, (string) $id, $maintenant);
             } catch (Throwable $e) {
@@ -116,6 +122,14 @@ final class Sequenceur
         }
 
         return $bilan;
+    }
+
+    /** Dernier geste de la séquence de l'inscription (`envoi_sequences_gestes`, D6) : `pause` => séquence en pause. */
+    private function sequenceEnPause(string $ws, string $inscriptionId): bool
+    {
+        return DB::table('envoi_inscriptions AS i')->where('i.workspace_id', $ws)->where('i.id', $inscriptionId)
+            ->whereRaw("COALESCE((SELECT g.geste FROM envoi_sequences_gestes g WHERE g.workspace_id = i.workspace_id AND g.sequence_id = i.sequence_id ORDER BY g.cree_le DESC, g.id DESC LIMIT 1), 'reprise') = 'pause'")
+            ->exists();
     }
 
     /**

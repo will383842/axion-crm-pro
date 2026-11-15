@@ -98,6 +98,9 @@ import { ChercherEnvoiPage } from '@/features/envoi/pilotage/ChercherEnvoiPage';
 import { FeuVertPage } from '@/features/envoi/pilotage/FeuVertPage';
 import { DesinscriptionsPage } from '@/features/envoi/conformite/DesinscriptionsPage';
 import { AlertesEnvoiPage } from '@/features/envoi/conformite/AlertesEnvoiPage';
+import { SequencesPage } from '@/features/envoi/sequences/SequencesPage';
+import { SequencePage } from '@/features/envoi/sequences/SequencePage';
+import { InscriptionsPage } from '@/features/envoi/pilotage/InscriptionsPage';
 import { ReglagesEnvoiPage } from '@/features/envoi/reglages/ReglagesEnvoiPage';
 import { IdentitePage } from '@/features/envoi/reglages/IdentitePage';
 import { ReglagesAlertesPage } from '@/features/envoi/reglages/ReglagesAlertesPage';
@@ -429,6 +432,9 @@ const envoiSanteRoute = createRoute({ getParentRoute: () => layoutRoute, path: '
 const envoiChercherRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/chercher', beforeLoad: gardeEnvoi, component: ChercherEnvoiPage });
 const envoiReputationRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/reputation', beforeLoad: gardeEnvoi, component: ReputationPage });
 const envoiFeuVertRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/feu-vert', beforeLoad: gardeEnvoi, component: FeuVertPage });
+const envoiSequencesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sequences', beforeLoad: gardeEnvoi, component: SequencesPage });
+const envoiSequenceRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sequences/$sequenceId', beforeLoad: gardeEnvoi, component: SequencePage });
+const envoiInscriptionsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/sante/inscriptions', beforeLoad: gardeEnvoi, component: InscriptionsPage });
 const envoiDesinscriptionsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/desinscriptions', beforeLoad: gardeEnvoi, component: DesinscriptionsPage });
 const envoiAlertesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/alertes', beforeLoad: gardeEnvoi, component: AlertesEnvoiPage });
 const envoiReglagesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/envoi/reglages', beforeLoad: gardeEnvoi, component: ReglagesEnvoiPage });
@@ -525,6 +531,9 @@ export const routeTree = rootRoute.addChildren([
     envoiReputationRoute,
     envoiChercherRoute,
     envoiFeuVertRoute,
+    envoiSequencesRoute,
+    envoiSequenceRoute,
+    envoiInscriptionsRoute,
     envoiDesinscriptionsRoute,
     envoiAlertesRoute,
     envoiReglagesRoute,

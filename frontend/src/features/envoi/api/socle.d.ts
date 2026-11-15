@@ -21,6 +21,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/arret-general": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Arrêt général — plus aucun message ne part pour l'espace (idempotent)
+         * @description Arme seulement le drapeau d'arrêt de l'espace (permission `users.manage` :
+         *     propriétaire et administrateur). Un second appel répond 200 sans nouvelle
+         *     écriture. La reprise n'est pas une route : commande locale journalisée
+         *     `envoi:reprendre <espace> --auteur=`.
+         *
+         *     Au second appel : aucune nouvelle ligne de journal ; l'alerte est émise comme
+         *     pour la commande ; la pause globale `ServeurEnvoi::pause()` n'est pas utilisée.
+         *     Refus (403) : message « demandez à un administrateur ». Le motif est limité en
+         *     longueur et jamais recopié tel quel dans le journal ni dans l'alerte (T-SOCLE le
+         *     bornera).
+         */
+        post: operations["arretGeneral"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/compteurs": {
         parameters: {
             query?: never;
@@ -55,40 +84,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/envoi/reprendre": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reprendre les envois après « Tout arrêter » */
-        post: operations["reprendreEnvois"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/envoi/tout-arreter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Tout arrêter — plus aucun message ne part, toutes campagnes et boîtes */
-        post: operations["toutArreter"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -106,7 +101,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/notifications/{id}/lue": {
+    "/notifications/{id}/read": {
         parameters: {
             query?: never;
             header?: never;
@@ -257,6 +252,33 @@ export interface operations {
             };
         };
     };
+    arretGeneral: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    motif?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Envois arrêtés. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EtatEnvois"];
+                };
+            };
+            403: components["responses"]["Erreur"];
+        };
+    };
     lireCompteursEnvoi: {
         parameters: {
             query?: never;
@@ -287,53 +309,6 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description État des envois. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EtatEnvois"];
-                };
-            };
-        };
-    };
-    reprendreEnvois: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Envois repris. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EtatEnvois"];
-                };
-            };
-            409: components["responses"]["Erreur"];
-        };
-    };
-    toutArreter: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    motif?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Envois arrêtés. */
             200: {
                 headers: {
                     [name: string]: unknown;

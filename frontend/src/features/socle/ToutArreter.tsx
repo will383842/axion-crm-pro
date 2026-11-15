@@ -7,11 +7,11 @@
  *    réservé à la fenêtre de confirmation : l'écran garde un seul bouton plein.
  *  - DEUX clics : le bouton, puis « Arrêter tous les envois » dans la
  *    confirmation (« Tout arrêter · <espace> ? »). Un clic seul n'arrête rien.
- *  - `POST /envoi/tout-arreter` : plus aucun message ne part, toutes boîtes et
- *    campagnes confondues. Rien n'est perdu.
+ *  - `POST /envoi/arret-general` : plus aucun message ne part pour l'espace.
+ *    Rien n'est perdu.
  *  - Tant que les envois sont arrêtés (`GET /envoi/etat` → `arrete`), un
- *    bandeau rouge PERSISTANT le dit, avec « Reprendre les envois »
- *    (`POST /envoi/reprendre`).
+ *    bandeau rouge PERSISTANT le dit. D1 : AUCUN bouton de reprise ; la reprise
+ *    est une commande locale journalisée (`COMMANDE_REPRISE`), jamais une route.
  *
  * Point ouvert du test de Will : le bouton doit-il AUSSI être dans le CRM ?
  * L'ADR-14 dit « dans les deux espaces », les maquettes validées le montrent
@@ -36,16 +36,22 @@ export function montrerToutArreter(produit: string, envoiVisible: boolean): bool
   return produit === 'envoi' || TOUT_ARRETER_AUSSI_DANS_LE_CRM;
 }
 
-function useChangerEtatEnvois(chemin: '/envoi/tout-arreter' | '/envoi/reprendre', messageErreur: string) {
+/** La reprise reste une commande locale journalisée : le stop gagne, aucun clic ne le lève. */
+export const COMMANDE_REPRISE = 'envoi:reprendre <espace> --auteur=<nom>';
+
+function useArretGeneral() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => (await api.post<EtatEnvois>(chemin)).data,
+    // Appel littéral : le relevé NR-20 le voit (pas de chemin en variable).
+    mutationFn: async () => (await api.post<EtatEnvois>('/envoi/arret-general')).data,
     onSuccess: (etat) => {
       queryClient.setQueryData(CLE_ETAT_ENVOIS, etat);
       void queryClient.invalidateQueries({ queryKey: CLE_COMPTEURS_ENVOI });
     },
     onError: () => {
-      toast.error(messageErreur);
+      toast.error(
+        'Les envois n’ont pas pu être arrêtés. Réessayez ; si cela persiste, suspendez les boîtes une à une ou demandez à un administrateur.',
+      );
     },
   });
 }
@@ -53,10 +59,7 @@ function useChangerEtatEnvois(chemin: '/envoi/tout-arreter' | '/envoi/reprendre'
 /** Le bouton rouge de l'en-tête et sa confirmation. */
 export function ToutArreter() {
   const [confirmation, setConfirmation] = useState(false);
-  const arreter = useChangerEtatEnvois(
-    '/envoi/tout-arreter',
-    'Les envois n’ont pas pu être arrêtés. Réessayez ; si cela persiste, suspendez les boîtes une à une.',
-  );
+  const arreter = useArretGeneral();
 
   return (
     <>
@@ -133,8 +136,9 @@ function ConfirmationToutArreter({
           Tout arrêter · {libelleEspace(me)} ?
         </h2>
         <p className="mt-2 text-sm text-slate-700">
-          Plus aucun message ne part, toutes boîtes et campagnes confondues. Rien n’est perdu : les envois
-          reprennent quand vous cliquez sur « Reprendre les envois ».
+          Plus aucun message ne part, toutes boîtes et campagnes confondues. Rien n’est perdu. La reprise se
+          fait par une commande locale journalisée : <code className="font-mono text-xs">{COMMANDE_REPRISE}</code>, à lancer sur le serveur par l’exploitant de la
+          plateforme ; demandez-lui la reprise.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onAnnuler}>
@@ -158,7 +162,6 @@ function heure(iso: string): string {
 /** Le bandeau rouge persistant, tant que les envois sont arrêtés. */
 export function BandeauEnvoisArretes() {
   const { data } = useEtatEnvois(true);
-  const reprendre = useChangerEtatEnvois('/envoi/reprendre', 'Les envois n’ont pas pu reprendre. Réessayez dans un instant.');
   if (data?.etat !== 'arrete') return null;
   const depuis = heure(data.depuis);
   return (
@@ -169,14 +172,10 @@ export function BandeauEnvoisArretes() {
         {depuis !== '' ? ` depuis ${depuis}` : ''}
         {data.par !== null ? ` par ${data.par}` : ''} : plus aucun message ne part.
       </span>
-      <Button
-        variant="secondary"
-        size="sm"
-        loading={reprendre.isPending}
-        onClick={() => reprendre.mutate()}
-      >
-        Reprendre les envois
-      </Button>
+      <span className="basis-full text-xs font-normal text-rose-100">
+        Pour reprendre, lancez la commande locale <code className="font-mono">{COMMANDE_REPRISE}</code> (journalisée), à lancer sur le serveur par l’exploitant de
+        la plateforme ; demandez-lui la reprise.
+      </span>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Creation;
 
+use App\Crm\Opposition\StatutOpposition;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Exceptions\CampagneRefusee;
 use App\Support\WorkspaceContext;
@@ -78,6 +79,7 @@ final class AssistantCreation
             }
             if (array_key_exists('cible', $corps)) {
                 $contenu['cible'] = $this->cible($corps['cible']);
+                $this->refuserOpposes($ws, $contenu['cible']);
                 $changes['cible'] = array_intersect_key($contenu['cible'], array_flip(['type', 'reference', 'libelle']));
             }
         } elseif ($etape === 2 && array_key_exists('sequence', $corps)) {
@@ -196,8 +198,88 @@ final class AssistantCreation
             throw $e;
         }
 
-        // Les exclusions (opposition, clients, déjà contactés…) ne sont PAS encore évaluées : on le dit, on ne les compte pas à zéro en silence.
-        return ['total' => $total, 'exclus' => 0, 'restant' => $total, 'exclusions' => (object) [], 'estimation' => true, 'exclusions_evaluees' => false];
+        // Seule l'exclusion « opposition » est évaluée (D14). Les autres ne le sont pas : `exclusions_evaluees` reste faux (booléen
+        // global du contrat), jamais un zéro inventé pour elles. Aucun motif par personne n'est rendu.
+        $opposees = $this->compterOpposees($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
+
+        return ['total' => $total, 'exclus' => $opposees, 'restant' => max(0, $total - $opposees), 'exclusions' => ['opposition' => $opposees], 'estimation' => true, 'exclusions_evaluees' => false];
+    }
+
+    /**
+     * Nombre de membres de la cible dont l'adresse (ou le SIREN) est opposée : une ligne par membre compté par `compter`,
+     * lues par lots (jamais N+1). Lecture seule ; mêmes filtres d'espace que `compter`.
+     */
+    private function compterOpposees(string $ws, string $type, string $reference): int
+    {
+        $numerique = ctype_digit($reference) && strlen($reference) < 18;
+        $requete = match (true) {
+            $type === 'liste' && $numerique => DB::table('listes_manuelles_membres as m')
+                ->leftJoin('contacts', 'contacts.id', '=', 'm.contact_id')
+                ->leftJoin('companies', 'companies.id', '=', DB::raw('COALESCE(m.company_id, contacts.company_id)'))
+                ->where('m.workspace_id', $ws)->where('m.liste_id', (int) $reference)->whereNull('m.retire_le')
+                ->select(['m.id as cle', 'contacts.email as email', 'companies.siren as siren']),
+            $type === 'audience' && $numerique => DB::table('audience_members as m')->join('companies', 'companies.id', '=', 'm.company_id')
+                ->where('m.workspace_id', $ws)->where('m.audience_id', (int) $reference)
+                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+            $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->join('companies', 'companies.id', '=', 'company_tag.company_id')
+                ->where('tags.workspace_id', $ws)->where('tags.slug', $reference)
+                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+            $type === 'carnet' && $numerique => DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $reference)
+                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+            default => null,
+        };
+        if ($requete === null) {
+            return 0;
+        }
+
+        return WorkspaceContext::run($ws, function () use ($ws, $requete): int {
+            $n = 0;
+            $requete->orderBy('cle')->chunk(1000, function ($lignes) use ($ws, &$n): bool {
+                $paquet = [];
+                foreach ($lignes as $i => $l) {
+                    $paquet[$i] = ['email' => $l->email, 'siren' => $l->siren];
+                }
+                $n += count(array_filter((new StatutOpposition)->pourLignes($ws, $paquet), static fn (array $s): bool => $s['opposee']));
+
+                return true;
+            });
+
+            return $n;
+        });
+    }
+
+    /**
+     * Identifiants passés explicitement dans la cible (`contact_ids`, ou le carnet visé) : un seul opposé ⇒ 422 `adresse_opposee`.
+     * Le refus ne dit ni lequel ni pourquoi. Les identifiants d'un autre espace sont ignorés (cloisonnement).
+     *
+     * @param  array<string, mixed>  $cible
+     */
+    private function refuserOpposes(string $ws, array $cible): void
+    {
+        $ids = $cible['contact_ids'] ?? [];
+        if (! is_array($ids) || ! array_is_list($ids) || count($ids) > 500 || array_filter($ids, static fn ($i): bool => ! is_int($i) || $i < 1) !== []) {
+            throw ErreurCreation::invalide('validation', 'contact_ids est une liste de 500 identifiants entiers au plus.');
+        }
+        $lignes = [];
+        WorkspaceContext::run($ws, function () use ($ws, $ids, $cible, &$lignes): void {
+            if ($ids !== []) {
+                foreach (DB::table('contacts')->leftJoin('companies', 'companies.id', '=', 'contacts.company_id')->where('contacts.workspace_id', $ws)
+                    ->whereIn('contacts.id', $ids)->get(['contacts.id', 'contacts.email', 'companies.siren']) as $c) {
+                    $lignes['c' . $c->id] = ['email' => $c->email, 'siren' => $c->siren];
+                }
+            }
+            $ref = (string) ($cible['reference'] ?? '');
+            if (($cible['type'] ?? null) === 'carnet' && ctype_digit($ref) && strlen($ref) < 18) {
+                $siren = DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $ref)->value('siren');
+                $lignes['carnet'] = ['email' => null, 'siren' => $siren];
+            }
+        });
+        if ($lignes === []) {
+            return;
+        }
+        if (array_filter((new StatutOpposition)->pourLignes($ws, $lignes), static fn (array $s): bool => $s['opposee']) !== []) {
+            throw ErreurCreation::invalide('adresse_opposee', 'Une adresse choisie est opposée : elle ne peut pas être sélectionnée pour un envoi.');
+        }
     }
 
     public function compter(string $ws, string $type, string $reference): int
@@ -307,15 +389,25 @@ final class AssistantCreation
     }
 
     /**
-     * 3 fiches au plus, champs du contrat seulement ; jamais d'adresse e-mail.
+     * 3 fiches au plus, champs du contrat seulement ; jamais d'adresse e-mail. Une adresse opposée n'est jamais proposée
+     * (les 200 premières fiches sont examinées, par lot).
      *
      * @return array<int, array<string, mixed>>
      */
     public function destinatairesExemples(string $ws): array
     {
-        return WorkspaceContext::run($ws, fn () => DB::table('contacts')->leftJoin('companies', 'companies.id', '=', 'contacts.company_id')
-            ->where('contacts.workspace_id', $ws)->whereNull('contacts.deleted_at')->orderBy('contacts.id')->limit(3)
-            ->get(['contacts.id', 'contacts.first_name', 'companies.denomination'])
-            ->map(fn ($x) => ['id' => (string) $x->id, 'libelle' => 'Exemple ' . $x->id, 'prenom' => $x->first_name, 'organisation' => $x->denomination])->values()->all());
+        return WorkspaceContext::run($ws, function () use ($ws): array {
+            $fiches = DB::table('contacts')->leftJoin('companies', 'companies.id', '=', 'contacts.company_id')
+                ->where('contacts.workspace_id', $ws)->whereNull('contacts.deleted_at')->orderBy('contacts.id')->limit(200)
+                ->get(['contacts.id', 'contacts.first_name', 'contacts.email', 'companies.denomination', 'companies.siren']);
+            $lignes = [];
+            foreach ($fiches as $f) {
+                $lignes[$f->id] = ['email' => $f->email, 'siren' => $f->siren];
+            }
+            $statuts = (new StatutOpposition)->pourLignes($ws, $lignes);
+
+            return $fiches->filter(static fn ($f): bool => ! $statuts[$f->id]['opposee'])->take(3)
+                ->map(fn ($x) => ['id' => (string) $x->id, 'libelle' => 'Exemple ' . $x->id, 'prenom' => $x->first_name, 'organisation' => $x->denomination])->values()->all();
+        });
     }
 }

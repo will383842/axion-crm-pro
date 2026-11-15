@@ -7,13 +7,14 @@ namespace App\Envoi\FeuVert;
  *  - `auto.<code>`   : point CALCULÉ (lu dans le système, jamais écrit, jamais prouvé à la main) ;
  *  - `manuel.<code>` : preuve humaine (spécification 26 § 8, puis cases A4 à A12 du plan R07), déposée via DepotPreuves.
  * Les codes sont stables et permanents : on n'en renomme ni n'en supprime jamais (seule exception, v3 : `manuel.inscriptions` est éclaté puis retiré) ; un ajout incrémente VERSION
- * (v2 : F15 ajoute `auto.temoins_3_jours` ; v3 : R07 ajoute les cases A4 à A12 et éclate `manuel.inscriptions`).
+ * (v2 : F15 ajoute `auto.temoins_3_jours` ; v3 : R07 ajoute les cases A4 à A12 et éclate `manuel.inscriptions` ;
+ * v4 : K14-CAT ajoute `manuel.yahoo_cfl` et corrige le libellé d'Orange, dont le code ne change pas : la CFL est celle de Yahoo).
  * Signal Spam (A11) est « non bloquant » dans le plan, mais le contrat impose `bloquant` = non `fait` : par prudence il bloque (noté R07).
  * `serveur_reel` = le point n'est vérifiable qu'avec le vrai serveur (K17).
  */
 final class CatalogueManuels
 {
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     public const PREFIXE_AUTO = 'auto.';
 
@@ -67,7 +68,8 @@ final class CatalogueManuels
         'manuel.message_compose_conforme' => ['libelle' => 'Message composé conforme (scénario S02 étendu)', 'groupe' => 'conformite', 'source' => '30 A9', 'serveur_reel' => false],
         'manuel.postmaster_google' => ['libelle' => 'Inscription Google Postmaster Tools', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
         'manuel.snds_jmrp' => ['libelle' => 'Inscription SNDS et JMRP (Microsoft)', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
-        'manuel.orange_cfl' => ['libelle' => 'Inscription Orange (boucle de plaintes CFL)', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
+        'manuel.yahoo_cfl' => ['libelle' => 'Inscription Yahoo, boucle de plaintes CFL', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
+        'manuel.orange_cfl' => ['libelle' => 'Orange : prise de contact délivrabilité', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
         'manuel.signal_spam' => ['libelle' => 'Inscription Signal Spam (si elle existe)', 'groupe' => 'conformite', 'source' => '30 A11', 'serveur_reel' => true],
     ];
 

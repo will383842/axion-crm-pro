@@ -226,6 +226,12 @@ export const SOURCE_PERSONNE_LABELS: Record<string, string> = {
   'guide-reseau': 'Guide reçu via les réseaux sociaux',
 };
 
+/** D14 : statut d'opposition lu par le serveur (sans date ni contenu). Absent d'une ancienne API. */
+export interface OppositionStatut {
+  opposee: boolean;
+  motifs: string[];
+}
+
 export interface PersonneRow {
   id: number;
   person_key: string;
@@ -249,6 +255,7 @@ export interface PersonneRow {
   company_id: number | null;
   entreprise: string | null;
   purge_prevue_le: string | null;
+  opposition?: OppositionStatut;
 }
 
 export interface PersonnesCounts {

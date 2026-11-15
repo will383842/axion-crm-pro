@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\EnvoiConformiteController;
 use App\Http\Controllers\Api\EnvoiOppositionExportController;
+use App\Http\Controllers\Api\EnvoiOppositionImportController;
 use App\Http\Controllers\Api\EnvoiOppositionManuelleController;
 use App\Http\Controllers\Api\EnvoiPuisJeEcrireController;
 use Illuminate\Support\Facades\Route;
@@ -22,4 +23,8 @@ Route::post('/envoi/puis-je-ecrire', EnvoiPuisJeEcrireController::class)
 
 // R13 : inscription MANUELLE au registre d'opposition (adresse, organisation, domaine). Propriétaire seul ; n'envoie rien.
 Route::post('/envoi/opposition', EnvoiOppositionManuelleController::class)
+    ->middleware('permission:workspaces.manage');
+
+// P1-LN-B (D8) : import des listes de refus, en deux temps (simulation puis confirmation). Corps JSON, jamais multipart. Propriétaire seul.
+Route::post('/envoi/opposition/import', EnvoiOppositionImportController::class)
     ->middleware('permission:workspaces.manage');

@@ -80,6 +80,52 @@ final class RegistreOppositionManuel
     }
 
     /**
+     * Écriture d'un LOT (import P1-LN-B) : même effet que `inscrire` sur le registre, `email_suppressions` et `opt_out`,
+     * avec `import_id`, mais SANS jamais signaler le site (aucun verrou consultatif pris : 5 000 verrous tenus jusqu'au
+     * COMMIT dépasseraient `max_locks_per_transaction`). L'appelant signale chaque adresse APRÈS le COMMIT.
+     * Idempotent, ajout seul. Les valeurs doivent déjà être normalisées.
+     *
+     * @param  list<array{portee: string, valeur: string}>  $entrees
+     * @return list<string> empreintes des adresses du lot
+     */
+    public function inscrireLot(string $workspaceId, string $importId, array $entrees, string $motif, string $auteur): array
+    {
+        $empreintes = [];
+        foreach (array_chunk($entrees, 500) as $lot) {
+            $lignes = [];
+            foreach ($lot as $e) {
+                $adresse = $e['portee'] === 'adresse';
+                $empreinte = self::empreinte($e['valeur']);
+                $lignes[] = [
+                    'workspace_id' => $workspaceId, 'portee' => $e['portee'], 'empreinte' => $empreinte,
+                    'valeur' => $adresse ? null : $e['valeur'],
+                    'valeur_chiffree' => $adresse ? Crypt::encryptString($e['valeur']) : null,
+                    'motif' => $motif, 'source' => 'manuel', 'auteur' => $auteur, 'import_id' => $importId,
+                ];
+                if ($adresse) {
+                    $empreintes[] = $empreinte;
+                }
+            }
+            DB::table('envoi_oppositions_registre')->insertOrIgnore($lignes);
+        }
+        foreach (array_chunk($empreintes, 500) as $lot) {
+            $presentes = DB::table('opt_out')->where('scope', 'business')->whereIn('email_hash', $lot)->pluck('email_hash')->all();
+            $manquantes = [];
+            foreach (array_diff($lot, $presentes) as $e) {
+                $manquantes[] = ['email' => null, 'email_hash' => $e, 'scope' => 'business', 'source' => 'registre_manuel', 'created_at' => now()];
+            }
+            if ($manquantes !== []) {
+                DB::table('opt_out')->insert($manquantes);
+            }
+        }
+        foreach ($empreintes as $e) {
+            ListeSuppression::inscrireEmpreinte($e, ListeSuppression::MANUEL, 'registre_manuel');
+        }
+
+        return $empreintes;
+    }
+
+    /**
      * STOP-T4 : une opposition née au CRM doit prévenir le site, par l'enregistreur unique (`OppositionSortante` →
      * `ConsentOutboundRecorder` → `crm_outbound_events`). ANTI-BOUCLE : si l'adresse est DÉJÀ au registre `opt_out`
      * (venue du site : `site-sync:*`, `gdpr_erasure_bisystem`, `gdpr_erasure_demande_site`…), on n'écrit rien de plus et

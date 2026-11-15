@@ -78,9 +78,7 @@ final class DepotChauffe
      */
     public function volumesParJourDomaine(string $ws, string $domaine, DateTimeImmutable $jour): array
     {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
-            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.boite', '<>', self::BOITE_RETOURS)
+        $l = WorkspaceContext::run($ws, fn () => $this->lignesDomaineParBoite($ws)->where('c.boite', '<>', self::BOITE_RETOURS)
             ->where('c.jour', '<', $jour->format('Y-m-d'))->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [strtolower($domaine)])
             ->groupBy('c.jour')->havingRaw('SUM(c.envoyes) > 0')->orderBy('c.jour')
             ->selectRaw('c.jour AS jour, SUM(c.envoyes) AS n')->get());
@@ -99,9 +97,7 @@ final class DepotChauffe
      */
     public function domainesDeLEspace(string $ws, DateTimeImmutable $jour): array
     {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
-            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.boite', '<>', self::BOITE_RETOURS)
+        $l = WorkspaceContext::run($ws, fn () => $this->lignesDomaineParBoite($ws)->where('c.boite', '<>', self::BOITE_RETOURS)
             ->whereRaw("split_part(lower(b.adresse), '@', 2) <> ''")
             ->groupByRaw("split_part(lower(b.adresse), '@', 2)")->orderByRaw("split_part(lower(b.adresse), '@', 2)")
             ->selectRaw("split_part(lower(b.adresse), '@', 2) AS domaine, COALESCE(SUM(c.envoyes) FILTER (WHERE c.jour = ?), 0) AS n", [$jour->format('Y-m-d')])->get());
@@ -126,12 +122,18 @@ final class DepotChauffe
         return is_string($id) ? $id : null;
     }
 
+    /** Seule jointure compteurs de domaine / boîtes (alias c = compteur, b = boîte) : filtre `ressource_type` et espace posés ici. */
+    private function lignesDomaineParBoite(string $ws): Builder
+    {
+        return DB::table('envoi_chauffe_jours as c')
+            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
+            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE);
+    }
+
     /** Messages envoyés ce jour-là par TOUTES les boîtes de l'espace qui partagent ce domaine d'envoi. */
     public function envoyesDomaine(string $ws, string $domaine, DateTimeImmutable $jour): int
     {
-        return (int) WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
-            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.jour', $jour->format('Y-m-d'))
+        return (int) WorkspaceContext::run($ws, fn () => $this->lignesDomaineParBoite($ws)->where('c.jour', $jour->format('Y-m-d'))
             ->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [$domaine])->sum('c.envoyes'));
     }
 

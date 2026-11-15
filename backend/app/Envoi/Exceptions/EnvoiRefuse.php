@@ -49,6 +49,15 @@ final class EnvoiRefuse extends RuntimeException
         return new self('Envoi réel inactif (ENVOI_REEL_ACTIF éteint) : aucune connexion tentée.', self::ATTENTE);
     }
 
+    /**
+     * Condition d'envoi réel non remplie (aiguilleur par domaine, D11) : feu vert non accordé, DNS non vert, domaine inconnu ou
+     * resté sur le faux serveur. Code ATTENTE : report SANS compteur (jamais `ServeurEnvoiRefuse`, qui arrêterait l'inscription au 10e report).
+     */
+    public static function conditionNonRemplie(string $raison): self
+    {
+        return new self("Envoi réel refusé par l'aiguilleur : {$raison} (aucune connexion tentée).", self::ATTENTE);
+    }
+
     public static function toutArreter(): self
     {
         return new self('Tout arrêter est actif : aucune injection.', self::ATTENTE);

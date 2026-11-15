@@ -166,12 +166,12 @@ final class LectureInfrastructure
         return $versions;
     }
 
-    /** @return list<array{id: string, nom: string, cree_le: string}> */
+    /** @return list<array{id: string, nom: string, cree_le: string, adaptateur: string}> */
     private function lignesDomaines(string $ws): array
     {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->orderBy('nom')->get(['id', 'nom', 'cree_le']));
+        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->orderBy('nom')->get(['id', 'nom', 'cree_le', 'adaptateur']));
 
-        return array_values(array_map(static fn ($d): array => ['id' => (string) $d->id, 'nom' => (string) $d->nom, 'cree_le' => (string) $d->cree_le], $l->all()));
+        return array_values(array_map(static fn ($d): array => ['id' => (string) $d->id, 'nom' => (string) $d->nom, 'cree_le' => (string) $d->cree_le, 'adaptateur' => (string) $d->adaptateur], $l->all()));
     }
 
     /** @return list<array{id: string, source: string, actif: bool}> */
@@ -212,7 +212,7 @@ final class LectureInfrastructure
     }
 
     /**
-     * @param  array{id: string, nom: string, cree_le: string}  $d
+     * @param  array{id: string, nom: string, cree_le: string, adaptateur: string}  $d
      * @param  array{dns: array<string, array<string, mixed>>, statuts: array<string, list<string>>, boites: array<string, int>}  $ctx
      * @return array<string, mixed>
      */
@@ -235,6 +235,8 @@ final class LectureInfrastructure
             // La politique DMARC publiée n'est pas conservée (seul « valide ou non » l'est) : « none », la moins protectrice, faute de champ nul au contrat.
             'dmarc' => 'none', 'dmarc_prochaine_etape' => null,
             'listes_noires' => $liste ? 1 : 0, 'ajoute_le' => $this->date((string) $d['cree_le']), 'chauffe' => null,
+            // K17-AIG (D11) : serveur d'envoi du domaine (faux, kumo, smtp), en lecture seule.
+            'adaptateur' => (string) $d['adaptateur'],
         ];
     }
 

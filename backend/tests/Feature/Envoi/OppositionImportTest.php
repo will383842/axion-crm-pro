@@ -45,6 +45,21 @@ function impRegistre(object $t): int
     return DB::table('envoi_oppositions_registre')->where('workspace_id', $t->espace->id)->count();
 }
 
+/** @return list<string> tous les fichiers et dossiers sous $racine (parcours récursif) */
+function impArbre(string $racine): array
+{
+    $liste = [];
+    try {
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($racine, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST, RecursiveIteratorIterator::CATCH_GET_CHILD);
+        foreach ($it as $f) {
+            $liste[] = $f->getPathname();
+        }
+    } catch (\Throwable) {
+    }
+
+    return $liste;
+}
+
 function impEvenements(): int
 {
     return DB::table('crm_outbound_events')->where('event_type', 'consent_optout')->count();
@@ -100,10 +115,21 @@ test('confirmation sans jeton, jeton inconnu, jeton d’un autre utilisateur ⇒
     expect(impRegistre($this))->toBe(0);
 });
 
-test('contenu différent (l’empreinte est normalisée : minuscules + rognage, via ListeSuppression::empreinte) ⇒ 409, rien d’écrit', function () {
+test('contenu différent ⇒ 409, rien d’écrit', function () {
     $jeton = impSimuler($this, "a@clients.example.test\n")['jeton'];
     impConfirmer($this, "b@clients.example.test\n", $jeton)->assertStatus(409);
     expect(impRegistre($this))->toBe(0);
+});
+
+test('contenu modifié d’un seul octet (casse, blanc final, saut de ligne) ⇒ 409 : l’empreinte est celle du texte brut', function () {
+    $csv = "a@clients.example.test\n";
+    foreach (["A@clients.example.test\n", 'a@clients.example.test', "a@clients.example.test\n\n", " a@clients.example.test\n", "a@clients.example.test \n"] as $variante) {
+        $jeton = impSimuler($this, $csv)['jeton'];
+        impConfirmer($this, $variante, $jeton)->assertStatus(409);
+    }
+    expect(impRegistre($this))->toBe(0);
+    $jeton = impSimuler($this, $csv)['jeton'];
+    impConfirmer($this, $csv, $jeton)->assertOk();
 });
 
 test('fichier commençant par des lignes vides : la ligne refusée garde son vrai numéro (pas de rognage du champ contenu)', function () {
@@ -148,7 +174,7 @@ test('422 : une ligne d’audit propre est écrite (statut, sans contenu ni adre
 
 test('jeton expiré (15 min) ⇒ 409', function () {
     $jeton = impSimuler($this, "a@clients.example.test\n")['jeton'];
-    Cache::forget($jeton);
+    Cache::forget(ImportOppositions::PREFIXE_CLE . $jeton);
     impConfirmer($this, "a@clients.example.test\n", $jeton)->assertStatus(409);
 });
 
@@ -197,7 +223,7 @@ test('aucune ligne audit_logs ne porte l’empreinte du corps ; la ligne propre 
 });
 
 test('le CSV n’est écrit ni sur disque ni dans un journal (aucun niveau, message ou contexte)', function () {
-    $avant = [glob(sys_get_temp_dir() . '/*') ?: [], glob(storage_path('**/*')) ?: [], glob(storage_path('*/*/*')) ?: []];
+    $avant = [impArbre(sys_get_temp_dir()), impArbre(storage_path())];
     // Écoute réelle de TOUT message journalisé, quel que soit le niveau et le canal (Log::spy() ne contrôlait qu'un niveau).
     $journalises = [];
     Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$journalises) {
@@ -205,8 +231,10 @@ test('le CSV n’est écrit ni sur disque ni dans un journal (aucun niveau, mess
     });
     $csv = "secret-unique@clients.example.test\n";
     $jeton = impSimuler($this, $csv)['jeton'];
+    // le cache ne garde jamais le contenu : lu juste après la simulation (avant l'oubli du jeton à la confirmation)
+    expect(json_encode(Cache::get(ImportOppositions::PREFIXE_CLE . $jeton)))->toContain('empreinte')->not->toContain('secret-unique');
     impConfirmer($this, $csv, $jeton)->assertOk();
-    $apres = [glob(sys_get_temp_dir() . '/*') ?: [], glob(storage_path('**/*')) ?: [], glob(storage_path('*/*/*')) ?: []];
+    $apres = [impArbre(sys_get_temp_dir()), impArbre(storage_path())];
     foreach ($avant as $i => $a) {
         expect(array_values(array_diff($apres[$i], $a)))->toBe([]);
     }
@@ -216,8 +244,6 @@ test('le CSV n’est écrit ni sur disque ni dans un journal (aucun niveau, mess
     foreach (glob(storage_path('logs/*.log')) ?: [] as $f) {
         expect((string) file_get_contents($f))->not->toContain('secret-unique');
     }
-    // le cache ne garde jamais le contenu : valeur = utilisateur, espace, empreinte
-    expect(json_encode(Cache::get($jeton)))->not->toContain('secret-unique');
 });
 
 test('tout ou rien : une erreur en cours d’écriture annule tout, y compris la ligne d’import (le jeton reste utilisable)', function () {
@@ -282,14 +308,17 @@ test('deux confirmations avec le même jeton : une connexion déjà passée ⇒ 
         'id' => (string) Str::uuid(), 'workspace_id' => $ws, 'auteur' => 'u1', 'empreinte_fichier' => hash('sha256', $csv), 'jeton_simulation' => $jeton,
     ]);
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
-    Cache::put($jeton, ['utilisateur' => 'u2', 'espace' => $ws, 'empreinte' => hash('sha256', $csv)], 900);
+    Cache::put(ImportOppositions::PREFIXE_CLE . $jeton, ['utilisateur' => 'u2', 'espace' => $ws, 'empreinte' => hash('sha256', $csv)], 900);
     $import = app(ImportOppositions::class);
     $statut = null;
+    $message = '';
     try {
         WorkspaceContext::run($ws, fn () => $import->confirmer($ws, 'u2', $csv, $jeton));
     } catch (HttpException $e) {
         $statut = $e->getStatusCode();
+        $message = $e->getMessage();
     }
-    expect($statut)->toBe(409);
+    // 409 venu de l'INSERTION (unicité en base), pas du contrôle de simulation/empreinte
+    expect($statut)->toBe(409)->and($message)->toContain('Ce jeton a déjà servi')->not->toContain('Simulation absente');
     expect($owner->table('envoi_oppositions_registre')->where('workspace_id', $ws)->count())->toBe(0);
 });

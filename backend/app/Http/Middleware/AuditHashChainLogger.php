@@ -119,18 +119,6 @@ class AuditHashChainLogger
     }
 
     /**
-     * Cette requête doit-elle laisser une trace ?
-     *
-     * Deux familles, et deux seulement :
-     *   1. elle MODIFIE l'état (POST/PUT/PATCH/DELETE) — le critère historique ;
-     *   2. elle FAIT SORTIR des données nominatives (un export, donc un GET) —
-     *      la famille entière qui manquait (B16-008 / B12-010).
-     *
-     * `HEAD` est délibérément exclu : il ne transporte aucun corps, donc aucune
-     * donnée ne sort. L'inclure remplirait le journal des sondes de santé et
-     * des pré-vols de navigateur.
-     */
-    /**
      * Corps haché dans la ligne générique. Import des listes de refus : `contenu` (fichier d'adresses) et `jeton`
      * sont EXCLUS, sinon un refus 401/403 d'un fichier d'une seule adresse serait testable par dictionnaire.
      *
@@ -146,6 +134,18 @@ class AuditHashChainLogger
         return $corps;
     }
 
+    /**
+     * Cette requête doit-elle laisser une trace ?
+     *
+     * Deux familles, et deux seulement :
+     *   1. elle MODIFIE l'état (POST/PUT/PATCH/DELETE) — le critère historique ;
+     *   2. elle FAIT SORTIR des données nominatives (un export, donc un GET) —
+     *      la famille entière qui manquait (B16-008 / B12-010).
+     *
+     * `HEAD` est délibérément exclu : il ne transporte aucun corps, donc aucune
+     * donnée ne sort. L'inclure remplirait le journal des sondes de santé et
+     * des pré-vols de navigateur.
+     */
     private static function doitJournaliser(Request $request): bool
     {
         if ($request->attributes->get(self::ATTRIBUT_JOURNAL_PROPRE) === true) {

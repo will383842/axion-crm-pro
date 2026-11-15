@@ -3,7 +3,6 @@
 namespace App\Envoi\Conformite;
 
 use App\Crm\Outbound\OppositionSortante;
-use App\Support\ListeSuppression;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,8 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * Import des listes de refus (P1-LN-B, D8) : CSV d'une colonne (adresse ou domaine), en deux temps.
  *
  * - Le texte arrive en JSON et vit en MÉMOIRE seulement : jamais sur disque, jamais dans un journal, jamais en cache.
- * - Simulation : aucune écriture ; pose un jeton (cache, clé = le jeton, valeur = utilisateur, espace, SHA-256 du texte).
- * - Confirmation : le serveur recalcule le SHA-256, consomme le jeton UNE fois (ligne `envoi_oppositions_imports` insérée en
+ * - Simulation : aucune écriture ; pose un jeton (cache, clé = « envoi:import: » + le jeton, valeur = utilisateur, espace, SHA-256 du texte).
+ * - Confirmation : le serveur recalcule le SHA-256 du texte brut (octet pour octet), consomme le jeton UNE fois (ligne `envoi_oppositions_imports` insérée en
  *   premier ; violation d'unicité ⇒ 409), écrit le lot tout ou rien, puis APRÈS le COMMIT signale chaque adresse au site.
  * - Ne fait qu'AJOUTER des refus : le stop gagne, rien n'est jamais retiré.
  */
@@ -29,6 +28,8 @@ final class ImportOppositions
 
     public const DUREE_JETON = 900;
 
+    public const PREFIXE_CLE = 'envoi:import:';
+
     private const MOTIF_TETE = 'caractère de tête refusé';
 
     public function __construct(private readonly RegistreOppositionManuel $registre = new RegistreOppositionManuel) {}
@@ -38,7 +39,7 @@ final class ImportOppositions
     {
         $a = $this->analyser($workspaceId, $contenu);
         $jeton = (string) Str::uuid();
-        Cache::put($jeton, ['utilisateur' => $utilisateur, 'espace' => $workspaceId, 'empreinte' => ListeSuppression::empreinte($contenu)], self::DUREE_JETON);
+        Cache::put(self::PREFIXE_CLE . $jeton, ['utilisateur' => $utilisateur, 'espace' => $workspaceId, 'empreinte' => hash('sha256', $contenu)], self::DUREE_JETON);
 
         return ['etape' => 'simulation', 'valides' => count($a['valides']), 'deja_presentes' => $a['deja'], 'refusees' => $a['refusees'], 'jeton' => $jeton];
     }
@@ -46,8 +47,8 @@ final class ImportOppositions
     /** @return array{etape: string, valides: int, deja_presentes: int, refusees: list<array{ligne: int, motif: string}>, import_id: string} */
     public function confirmer(string $workspaceId, string $utilisateur, string $contenu, ?string $jeton): array
     {
-        $attendu = is_string($jeton) && Str::isUuid($jeton) ? Cache::get($jeton) : null;
-        $empreinte = ListeSuppression::empreinte($contenu);
+        $attendu = is_string($jeton) && Str::isUuid($jeton) ? Cache::get(self::PREFIXE_CLE . $jeton) : null;
+        $empreinte = hash('sha256', $contenu);
         if (! is_array($attendu) || ($attendu['utilisateur'] ?? null) !== $utilisateur || ($attendu['espace'] ?? null) !== $workspaceId
             || ! hash_equals((string) ($attendu['empreinte'] ?? ''), $empreinte)) {
             throw new ConflictHttpException('Simulation absente, périmée ou différente du fichier envoyé : relancez la simulation.');
@@ -74,7 +75,7 @@ final class ImportOppositions
         } catch (UniqueConstraintViolationException) {
             throw new ConflictHttpException('Ce jeton a déjà servi : relancez la simulation.');
         }
-        Cache::forget($jeton);
+        Cache::forget(self::PREFIXE_CLE . $jeton);
         // APRÈS le COMMIT : l'anti-boucle et le dédoublonnage sont décidés par OppositionSortante, jamais ici.
         $sortante = new OppositionSortante;
         foreach ($empreintes as $e) {

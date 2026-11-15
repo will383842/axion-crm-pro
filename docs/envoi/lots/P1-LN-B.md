@@ -4,7 +4,7 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 
 ## Fait
 - `POST /envoi/opposition/import` (propriétaire seul), corps `application/json` `{etape, contenu, jeton?}`, jamais multipart. Le texte reste en mémoire.
-- `ImportOppositions` : simulation (aucune écriture, aucune adresse renvoyée, jeton de 15 min en cache, clé = le jeton, valeur = utilisateur, espace, SHA-256) puis confirmation (SHA-256 recalculé ; ligne `envoi_oppositions_imports` insérée en premier, violation d'unicité = 409 ; tout ou rien dans une transaction).
+- `ImportOppositions` : simulation (aucune écriture, aucune adresse renvoyée, jeton de 15 min en cache, clé = `envoi:import:` + le jeton, valeur = utilisateur, espace, SHA-256 du texte brut) puis confirmation (SHA-256 du texte brut recalculé, octet pour octet : casse, blancs et sauts de ligne comptent ; ligne `envoi_oppositions_imports` insérée en premier, violation d'unicité = 409 ; tout ou rien dans une transaction).
 - Lignes refusées avec numéro et motif : valeur commençant par `=`, `+`, `-`, `@`, tabulation ou retour chariot (« caractère de tête refusé » : une adresse valide commençant par `+` ou `-` s'inscrit par le formulaire R13) ; domaine de messagerie grand public. 422 seulement pour le corps entier (plus de 1 048 576 octets, plus de 5 000 lignes).
 - `RegistreOppositionManuel::inscrireLot` : même effet que `inscrire` (registre, `email_suppressions`, `opt_out`) avec `import_id`, sans `signalerSansBloquer`. Après le COMMIT, `OppositionSortante::signalerSansBloquer` pour chaque adresse (anti-boucle et dédoublonnage décidés par `OppositionSortante`).
 - Le contrôleur pose `ATTRIBUT_JOURNAL_PROPRE` et écrit sa ligne d'audit (étape, nombres, `import_id`, statut), sans le corps ni son empreinte.
@@ -19,7 +19,16 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 - Tests : journaux, rognage et audit 403/422/500 ; `status_code` est le nom réel de la colonne d'audit.
 - Ces trois fichiers sont **hors liste fermée du plan** : validation explicite du relecteur demandée.
 
+## Correctifs de relecture (« PAS PRÊT »)
+- Le test « deux confirmations avec le même jeton » ne pouvait pas rougir : l'empreinte mise en cache n'était pas celle que `confirmer` recalculait, le 409 partait du contrôle d'empreinte avant l'insertion. Maintenant l'empreinte est le SHA-256 brut des deux côtés, et le test exige le message « Ce jeton a déjà servi » (preuve que l'insertion a été tentée). Preuve rouge : sans le `catch UniqueConstraintViolationException`, le test échoue avec `envoi_oppositions_imports_jeton_unique` (sortie dans la PR).
+- Test « contenu modifié d'un octet » : détecte casse, blanc, saut de ligne (empreinte brute).
+- Test « rien sur disque » : parcours récursif ; assertion « le cache ne garde jamais le contenu » faite juste après la simulation.
+- Clé de cache préfixée `envoi:import:`. Commentaires de `AuditHashChainLogger` remis devant leur fonction.
+
 ## Reste
+- À traiter dans la PR de suite des mineurs (réserves de l'audit, non bloquantes) :
+  - une exception en base peut remonter un message contenant des empreintes (`RegistreOppositionManuel.php:210,219` et `EnvoiOppositionImportController.php:290-293`) ;
+  - pas de throttle sur la route d'import (`conformite.php:463-464` ; l'export en a un).
 - Écran d'import : lot F-LN (vague 5).
 - Aucune ligne d'audit propre pour un refus d'authentification (401/403) : le journal générique l'écrit, sans `contenu` ni `jeton` dans l'empreinte.
 - Le test d'absence de contenu dans les journaux écoute `MessageLogged` (tous niveaux) et relit les fichiers `storage/logs` ; il ne voit pas un journal écrit par un processus externe.

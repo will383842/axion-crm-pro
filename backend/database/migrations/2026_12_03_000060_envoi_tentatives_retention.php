@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  *   (sinon un code SMTP NULL permettrait des doublons). Le rôle applicatif n'a que SELECT : seule la fonction écrit.
  * - `envoi_tentatives_archiver(p_ws, p_avant)` (SECURITY DEFINER) : refuse un espace différent du contexte (ou l'absence de contexte)
  *   et une borne plus récente que « aujourd'hui (Paris) - 400 jours » ; agrège PUIS supprime le détail de `p_ws` seul (filtre
- *   explicite : le propriétaire ne contourne la RLS que s'il est SUPERUSER ou BYPASSRLS), dans la même transaction ; jours entiers seulement. Un conflit de clé annule tout
+ *   explicite : le propriétaire contourne la RLS s'il est SUPERUSER ou BYPASSRLS, cas actuel à ne pas supposer), dans la même transaction ; jours entiers seulement. Un conflit de clé annule tout
  *   (rien n'est supprimé sans avoir été compté). La clause SET pose `envoi.archivage_tentatives = 'on'` et la remet à la sortie.
  * - Le déclencheur d'ajout seul de `envoi_tentatives` est remplacé : un DELETE n'y passe que si la variable vaut `on` ET si la ligne
  *   a plus de 400 jours (même borne). La variable n'est jamais une barrière : le filtre de la fonction, ce déclencheur et l'absence

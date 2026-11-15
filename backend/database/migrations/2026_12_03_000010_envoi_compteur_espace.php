@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
  * - Table `envoi_compteur_espace` (espace, jour, n) : SANS clé étrangère vers `workspaces` (comme `envoi_journal_commandes`),
  *   RLS forcée. Le rôle applicatif n'a que SELECT : seule la fonction écrit.
  * - `envoi_compteur_espace_reserver(p_ws, p_jour, p_plafond)` (SECURITY DEFINER) : refuse (faux, rien d'écrit) si `p_ws` diffère
- *   de l'espace du contexte, y compris sans aucun contexte ; plafond NULL ou LEAST(p_plafond, 300) < 1 ⇒ faux sans écrire ;
- *   sinon une seule instruction d'incrément atomique. Le propriétaire ne contourne la RLS que s'il est SUPERUSER ou BYPASSRLS : dans tous les cas le filtre `workspace_id = p_ws` est explicite.
+ *   de l'espace du contexte, y compris sans aucun contexte ; plafond effectif LEAST(p_plafond, 300) < 1 ⇒ faux sans écrire ;
+ *   sinon une seule instruction d'incrément atomique. Le propriétaire des fonctions contourne la RLS s'il est SUPERUSER ou BYPASSRLS (cas actuel, à ne pas supposer) : le filtre `workspace_id = p_ws` est donc explicite.
  *   Aucun CHECK (n <= 300) : la borne vit dans la fonction (relevable par CREATE OR REPLACE, jamais par DROP CONSTRAINT).
  * - `envoi_injection_liberer` est remplacée (CREATE OR REPLACE) : elle décrémente aussi le compteur d'espace, jamais sous 0,
  *   une seule fois par réservation (la conclusion `liberee` est unique par réservation).
@@ -43,7 +43,7 @@ return new class extends Migration
                 IF p_ws IS NULL OR p_jour IS NULL OR p_ws::TEXT IS DISTINCT FROM NULLIF(current_setting('app.current_workspace_id', true), '') THEN
                     RETURN false;
                 END IF;
-                -- LEAST ignore NULL : sans ce test un plafond NULL ouvrirait 300 places.
+                -- LEAST ignore NULL : un plafond NULL s'ouvrirait à 300 ; on le refuse explicitement.
                 IF p_plafond IS NULL OR LEAST(p_plafond, 300) < 1 THEN
                     RETURN false; -- rien d'écrit : un premier INSERT donnerait sinon une place avec un plafond de 0
                 END IF;

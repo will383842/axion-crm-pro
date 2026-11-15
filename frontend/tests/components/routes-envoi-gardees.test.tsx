@@ -110,6 +110,10 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
   ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
   ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
+  // S2-ROUTEUR : pages d'attente, remplies par F-SEQ et K14-ECRAN.
+  ['/envoi/sequences', 'F-SEQ'],
+  ['/envoi/sequences/seq-1', 'F-SEQ'],
+  ['/envoi/sante/inscriptions', 'K14-ECRAN'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {
@@ -190,6 +194,16 @@ describe('Envoi actif — chaque route rend sa page « en attente »', () => {
     server.use(getJson('/config/features', FEATURES_LES_DEUX_PRODUITS), ...handlersEnvoi());
     const { router } = await monter('/envoi');
     await waitFor(() => expect(router.state.location.pathname).toBe('/envoi/campagnes'));
+  });
+});
+
+describe('S2-ROUTEUR — les onglets mènent aux bonnes routes', () => {
+  it('« Séquences » (campagnes) et « Inscriptions » (santé) pointent vers leurs routes', async () => {
+    const { ongletsCampagnes } = await import('@/features/envoi/campagnes/OngletsCampagnes');
+    const { ONGLETS } = await import('@/features/envoi/pilotage/OngletsSante');
+    expect(ongletsCampagnes(true).find((o) => o.libelle === 'Séquences')?.to).toBe('/envoi/sequences');
+    expect(ongletsCampagnes(false).find((o) => o.libelle === 'Séquences')?.to).toBe('/envoi/sequences');
+    expect(ONGLETS.find((o) => o.libelle === 'Inscriptions')?.to).toBe('/envoi/sante/inscriptions');
   });
 });
 

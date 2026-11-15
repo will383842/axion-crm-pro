@@ -68,4 +68,84 @@ final class DepotBoites
             ->where('workspace_id', $workspaceId)->where('id', $boiteId)
             ->update(['etat' => 'active', 'pause_motif' => null, 'maj_le' => now()]));
     }
+
+    /** Motif posé par une suspension faite à la main (le seul que `reactiver` lève). Tout autre motif est une pause automatique. */
+    public const MOTIF_SUSPENSION_MANUELLE = 'suspension_manuelle';
+
+    /**
+     * Boîtes de l'espace pour l'écran : aucune colonne secrète n'est lue. Lecture bornée (la page n'a ni pagination ni filtre au contrat).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function lister(string $workspaceId, int $limite = 200): array
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $limite) {
+            $lignes = DB::table('envoi_boites')->where('workspace_id', $workspaceId)
+                ->orderBy('cree_le')->orderBy('id')->limit(max(1, min($limite, 200)))
+                ->get(['id', 'adresse', 'etat', 'pause_motif', 'limite_jour']);
+
+            return array_values($lignes->map(fn (\stdClass $l) => $this->resume($workspaceId, $l))->all());
+        });
+    }
+
+    /** @return ?array<string, mixed> */
+    public function resumer(string $workspaceId, string $boiteId): ?array
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boiteId) {
+            $l = DB::table('envoi_boites')->where('workspace_id', $workspaceId)->where('id', $boiteId)
+                ->first(['id', 'adresse', 'etat', 'pause_motif', 'limite_jour']);
+
+            return $l === null ? null : $this->resume($workspaceId, $l);
+        });
+    }
+
+    /** Suspension à la main : n'écrit que si la boîte n'est pas déjà en pause (le stop gagne). Rend vrai si elle a écrit. */
+    public function suspendreManuellement(string $workspaceId, string $boiteId): bool
+    {
+        return WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_boites')
+            ->where('workspace_id', $workspaceId)->where('id', $boiteId)->where('etat', '<>', 'en_pause')
+            ->update(['etat' => 'en_pause', 'pause_motif' => self::MOTIF_SUSPENSION_MANUELLE, 'pause_le' => now(), 'maj_le' => now()]) > 0);
+    }
+
+    /**
+     * Réactivation : ne lève QUE `suspension_manuelle`. Rend `absente`, `reactivee`, `deja_active` ou `pause_automatique`
+     * (tout autre motif, y compris `manuelle` posé par « Tout arrêter » : rien n'est écrit).
+     */
+    public function reactiverSuspensionManuelle(string $workspaceId, string $boiteId): string
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boiteId) {
+            $base = fn () => DB::table('envoi_boites')->where('workspace_id', $workspaceId)->where('id', $boiteId);
+            $leve = $base()->where('etat', 'en_pause')->where('pause_motif', self::MOTIF_SUSPENSION_MANUELLE)
+                ->update(['etat' => 'active', 'pause_motif' => null, 'maj_le' => now()]);
+            if ($leve > 0) {
+                return 'reactivee';
+            }
+            $etat = $base()->value('etat');
+
+            return $etat === null ? 'absente' : ($etat === 'active' ? 'deja_active' : 'pause_automatique');
+        });
+    }
+
+    /** @return array<string, mixed> */
+    private function resume(string $workspaceId, \stdClass $l): array
+    {
+        $domaine = strtolower(substr(strrchr((string) $l->adresse, '@') ?: '@', 1));
+        $domaineId = $domaine === '' ? null : DB::table('envoi_domaines')->where('workspace_id', $workspaceId)->where('nom', $domaine)->value('id');
+        $enPause = $l->etat === 'en_pause';
+
+        return [
+            'id' => (string) $l->id,
+            'adresse' => (string) $l->adresse,
+            'domaine_id' => $domaineId === null ? null : (string) $domaineId,
+            'nom_affiche' => (string) $l->adresse,
+            'etat' => $enPause ? 'rouge' : 'vert',
+            'statut' => $enPause ? 'suspendue' : 'prete',
+            'quota_jour' => (int) $l->limite_jour,
+            'envoyes_aujourdhui' => (int) DB::table('envoi_injections_smtp')->where('workspace_id', $workspaceId)->where('boite_id', $l->id)
+                ->where('etat', 'accepte')->whereRaw("(cree_le AT TIME ZONE 'Europe/Paris')::date = (now() AT TIME ZONE 'Europe/Paris')::date")->count(),
+            'taux_refus' => null,
+            'reponses_7j' => (int) DB::table('envoi_evenements')->where('workspace_id', $workspaceId)->where('boite', $l->adresse)
+                ->where('classe', 'like', 'reponse%')->where('recu_le', '>=', now()->subDays(7))->count(),
+        ];
+    }
 }

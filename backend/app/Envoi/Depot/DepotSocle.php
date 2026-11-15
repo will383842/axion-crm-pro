@@ -56,6 +56,19 @@ interface DepotSocle
     public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool;
 
     /**
+     * Plafond du jour propre à l'espace : réglage R14 (`regles.plafond_jour`), à défaut `ENVOI_PLAFOND_JOUR`. Lecture seule ;
+     * la passerelle en prend le minimum avec son propre plafond.
+     */
+    public function plafondEspace(string $workspaceId): int;
+
+    /**
+     * À appeler SOUS le verrou, en DERNIER contrôle juste avant `reserverInjection`, dans la même transaction : butée en base
+     * (`envoi_compteur_espace`, D7). Vrai = une place d'espace est prise ; faux = plafond (borné à 300) atteint ou nul, rien d'écrit.
+     * Une réservation libérée rend sa place par `envoi_injection_liberer`.
+     */
+    public function reserverPlaceEspace(string $workspaceId, DateTimeImmutable $jour, int $plafond): bool;
+
+    /**
      * Réservations qui n'ont PAS (encore) été notées dans la chauffe, sur la boîte et sur le domaine, pour ce jour :
      * `reservee` et `a_verifier` non confirmée. À lire SOUS le verrou, avec les envois déjà notés.
      *

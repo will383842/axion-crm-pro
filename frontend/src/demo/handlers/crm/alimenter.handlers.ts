@@ -28,7 +28,7 @@ import {
 import { ilYa, maintenant } from '../../horloge';
 import { api, delai, erreur, normaliser, paginer, repondreEtatForce } from '../../outils';
 import type { Campaign, CampaignStatsResponse } from '@/features/collectes/types';
-import type { CandidateRow, CountsResponse, PersonneFiche, PersonneTimelineEntry, PersonnesCounts } from '@/features/crm-console/types';
+import type { CandidateRow, CountsResponse, OppositionStatut, PersonneFiche, PersonneTimelineEntry, PersonnesCounts } from '@/features/crm-console/types';
 
 // ── Zone de la démo ───────────────────────────────────────────────────────
 
@@ -78,7 +78,11 @@ function compteursPersonnes(): PersonnesCounts {
   return { total: toutes.length, by_statut_lettre, by_nature, by_source, rattachees, non_rattachees: toutes.length - rattachees };
 }
 
-const sansAbonnement = ({ abonnement: _abonnement, ...ligne }: PersonneDemo): Omit<PersonneDemo, 'abonnement'> => ligne;
+// Démo (D14) : une personne sur cinq est « opposée » (STOP, et art. 21 pour une sur dix) ; lecture seule, rien ne s'écrit.
+const oppositionDemo = (p: Pick<PersonneDemo, 'id'>): OppositionStatut =>
+  Number(p.id) % 5 === 0 ? { opposee: true, motifs: Number(p.id) % 10 === 0 ? ['stop', 'art21'] : ['stop'] } : { opposee: false, motifs: [] };
+
+const sansAbonnement = ({ abonnement: _abonnement, ...ligne }: PersonneDemo) => ({ ...ligne, opposition: oppositionDemo(ligne) });
 
 function entreeTache(t: TacheDemo): PersonneTimelineEntry {
   return { id: t.id, kind: 'tache', title: t.title, content: null, occurred_at: t.created_at, due_at: t.due_at, done_at: t.done_at, external_ref: null };

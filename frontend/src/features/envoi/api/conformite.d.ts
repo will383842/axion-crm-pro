@@ -456,7 +456,7 @@ export interface components {
             signature: string;
         };
         ImportOppositionsDemande: {
-            /** @description Texte du CSV (1 048 576 octets au plus). */
+            /** @description Texte du CSV. La limite qui fait foi est de 1 048 576 octets UTF-8, vérifiée par le serveur (maxLength compte des caractères). */
             contenu: string;
             /** @enum {string} */
             etape: "simulation" | "confirmation";

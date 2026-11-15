@@ -412,7 +412,7 @@ components:
       required: [etape, contenu]
       properties:
         etape: { type: string, enum: [simulation, confirmation] }
-        contenu: { type: string, maxLength: 1048576, description: 'Texte du CSV (1 048 576 octets au plus).' }
+        contenu: { type: string, maxLength: 1048576, description: 'Texte du CSV. La limite qui fait foi est de 1 048 576 octets UTF-8, vérifiée par le serveur (maxLength compte des caractères).' }
         jeton: { type: string, description: 'Jeton rendu par la simulation ; exigé pour la confirmation.' }
     ImportOppositionsReponse:
       type: object

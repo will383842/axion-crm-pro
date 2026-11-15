@@ -68,10 +68,44 @@ function zone() {
   }));
 }
 
+const CLE_FEU_VERT = 'axion-demo:feu-vert';
+
+/** Pose (ou retire, avec `null`) l'état de démo « sans bloquant » du feu vert (sessionStorage, comme `definirEtatForce`). */
+export function definirFeuVertDemo(etat: 'sans-bloquant' | null): void {
+  try {
+    if (etat === null) globalThis.sessionStorage?.removeItem(CLE_FEU_VERT);
+    else globalThis.sessionStorage?.setItem(CLE_FEU_VERT, etat);
+  } catch {
+    // stockage indisponible : l'état ne survit pas au rechargement.
+  }
+}
+
+/** Lu au démarrage : `?demo-feu-vert=sans-bloquant` (ou `normal` pour revenir à l'état d'origine). */
+function lireParametreFeuVert(): void {
+  try {
+    const v = new URLSearchParams(globalThis.location?.search ?? '').get('demo-feu-vert');
+    if (v === 'sans-bloquant') definirFeuVertDemo('sans-bloquant');
+    else if (v === 'normal') definirFeuVertDemo(null);
+  } catch {
+    // pas d'adresse lisible (hors navigateur) : rien à faire.
+  }
+}
+lireParametreFeuVert();
+
+function feuVertSansBloquant(): boolean {
+  try {
+    return globalThis.sessionStorage?.getItem(CLE_FEU_VERT) === 'sans-bloquant';
+  } catch {
+    return false;
+  }
+}
+
 /** Liste du feu vert : points, verrous, empreinte de l'état exact (points + dernière décision) et dernière décision. */
 function listeFeuVert(): components['schemas']['ListeFeuVert'] {
   zone();
-  const points = demoDb.zone<PointFeuVert>('pilotage', 'points').tous();
+  const brut = demoDb.zone<PointFeuVert>('pilotage', 'points').tous();
+  // État « sans bloquant » : tous les points se lisent comme faits ; GET et décision passent par ici, donc même empreinte.
+  const points = feuVertSansBloquant() ? brut.map((p): PointFeuVert => ({ ...p, fait: true, etat: 'fait' })) : brut;
   const decisions = demoDb.zone<DecisionDemo>('pilotage', 'decisions').tous();
   const derniere = decisions.length > 0 ? decisions[decisions.length - 1]! : null;
   const etat = points.map((p) => `${p.code}:${p.etat}`).join('|') + `|${derniere?.id ?? 'aucune'}`;

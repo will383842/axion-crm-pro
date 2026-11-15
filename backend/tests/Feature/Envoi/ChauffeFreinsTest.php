@@ -354,7 +354,7 @@ test('indésirable chez un témoin Gmail : pause vers Gmail SEULEMENT', function
 
 test('envoi:temoin-indesirable donne un appelant à indesirableChezTemoin (commande locale, journalisée)', function () {
     $ws = espaceChauffe();
-    expect(appelerSansAdresseEnArgument('envoi:temoin-indesirable', ['workspace' => $ws, '--auteur' => 'will'], 'temoin@pro-google.fr'))->toBe(0);
+    expect(appelerSansAdresseEnArgument('envoi:temoin-indesirable', ['workspace' => $ws, '--auteur' => 'auteur-test'], 'temoin@pro-google.fr'))->toBe(0);
     $pauses = app(DepotChauffe::class)->pausesActives($ws, paris('2026-11-10 10:00:00'));
     expect($pauses)->toHaveCount(1)->and($pauses[0]->fournisseur)->toBe('gmail')->and($pauses[0]->motif)->toBe(DecisionFrein::INDESIRABLE_TEMOIN)
         ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->count())->toBe(1);
@@ -682,7 +682,7 @@ test('« Tout arrêter » : après la commande, plus AUCUNE injection acceptée 
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;
-    app()->instance(FauxServeurEnvoi::class, $faux);      // le transport derrière le singleton du fournisseur de services
+    app()->instance('envoi.serveur_interne', $faux);      // le transport derrière le singleton du fournisseur de services
     $serveur = app(ServeurEnvoi::class);                  // LE MÊME singleton que celui que la commande résout
     expect($serveur)->toBe(app(ServeurEnvoi::class))->and($serveur)->toBeInstanceOf(PasserelleLocale::class);
     $serveur->sante();
@@ -690,7 +690,7 @@ test('« Tout arrêter » : après la commande, plus AUCUNE injection acceptée 
         ->and($faux->appels)->toBe(1);
 
     $debut = microtime(true);
-    Artisan::call('envoi:tout-arreter', ['workspace' => $ws, '--auteur' => 'will']);
+    Artisan::call('envoi:tout-arreter', ['workspace' => $ws, '--auteur' => 'auteur-test']);
     $refuse = 0;
     foreach (range(1, 20) as $_) {
         try {
@@ -705,7 +705,7 @@ test('« Tout arrêter » : après la commande, plus AUCUNE injection acceptée 
         ->and($refuse)->toBe(20)
         ->and($faux->appels)->toBe(1)                          // aucune connexion de plus
         ->and(app(DepotSocle::class)->toutArreter($ws))->toBeTrue()
-        ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'tout_arreter')->where('auteur', 'will')->count())->toBe(1)
+        ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'tout_arreter')->where('auteur', 'auteur-test')->count())->toBe(1)
         ->and($serveur->etat()->enPause)->toBeTrue()            // ceinture : le serveur lui-même est en pause
         ->and($faux->etat()->enPause)->toBeTrue();
 });
@@ -713,7 +713,7 @@ test('« Tout arrêter » : après la commande, plus AUCUNE injection acceptée 
 test('« Tout arrêter » est PAR ESPACE (drapeau en base) ; la pause du serveur, elle, est globale par contrat', function () {
     $a = espaceChauffe();
     $b = espaceChauffe();
-    Artisan::call('envoi:tout-arreter', ['workspace' => $a, '--auteur' => 'will']);
+    Artisan::call('envoi:tout-arreter', ['workspace' => $a, '--auteur' => 'auteur-test']);
     expect(app(DepotSocle::class)->toutArreter($a))->toBeTrue()
         ->and(app(DepotSocle::class)->toutArreter($b))->toBeFalse();
 });
@@ -724,11 +724,11 @@ test('envoi:reprendre : commande locale journalisée, désarme le drapeau, relan
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;
-    app()->instance(FauxServeurEnvoi::class, $faux);
+    app()->instance('envoi.serveur_interne', $faux);
     $serveur = app(ServeurEnvoi::class);
     $serveur->sante();
-    expect(Artisan::call('envoi:reprendre', ['workspace' => $ws, '--auteur' => 'will']))->toBe(1);   // rien d'armé
-    Artisan::call('envoi:tout-arreter', ['workspace' => $ws, '--auteur' => 'will']);
+    expect(Artisan::call('envoi:reprendre', ['workspace' => $ws, '--auteur' => 'auteur-test']))->toBe(1);   // rien d'armé
+    Artisan::call('envoi:tout-arreter', ['workspace' => $ws, '--auteur' => 'auteur-test']);
     expect(fn () => $serveur->injecter(messageChauffe($ws, 'x@societe.fr')))->toThrow(EnvoiRefuse::class);
 
     expect(Artisan::call('envoi:reprendre', ['workspace' => $ws, '--auteur' => 'marie']))->toBe(0)
@@ -761,10 +761,10 @@ test('envoi:lever-pause : la levée et son journal sont dans UNE transaction (jo
     DB::unprepared("CREATE OR REPLACE FUNCTION test_refuse_levee() RETURNS trigger AS \$f\$ BEGIN
             IF NEW.commande = 'pause_levee' THEN RAISE EXCEPTION 'journal indisponible'; END IF; RETURN NEW; END; \$f\$ LANGUAGE plpgsql");
     DB::unprepared('CREATE TRIGGER test_refuse_levee BEFORE INSERT ON envoi_journal_commandes FOR EACH ROW EXECUTE FUNCTION test_refuse_levee()');
-    expect(fn () => Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'will']))->toThrow(Exception::class)
+    expect(fn () => Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'auteur-test']))->toThrow(Exception::class)
         ->and(app(DepotChauffe::class)->pausesActives($ws, $maintenant))->toHaveCount(1);   // la levée a été annulée avec le journal
     DB::unprepared('DROP TRIGGER test_refuse_levee ON envoi_journal_commandes');
-    expect(Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'will']))->toBe(0)
+    expect(Artisan::call('envoi:lever-pause', ['workspace' => $ws, 'pause' => $pause->id, '--auteur' => 'auteur-test']))->toBe(0)
         ->and(app(DepotChauffe::class)->pausesActives($ws, $maintenant))->toHaveCount(0)
         ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_levee')->count())->toBe(1)
         ->and(DB::table('envoi_pauses')->where('workspace_id', $ws)->count())->toBe(1);   // la ligne reste
@@ -1060,8 +1060,8 @@ test('MAJEUR 5 : une pause ne se lève QUE par le chemin journalisé ou par expi
         expect(sqlRefuse("UPDATE envoi_pauses SET levee_le = current_setting('app.maintenant')::timestamptz, levee_par = 'x' WHERE id = ?", [$id]))->toContain('hors chemin journalisé');
     });
     // 4. le chemin journalisé passe ; la levée datée est ensuite définitive
-    leverPauseJournalisee($ws, $id, 'will');
-    expect(DB::table('envoi_pauses')->where('id', $id)->value('levee_par'))->toBe('will');
+    leverPauseJournalisee($ws, $id, 'auteur-test');
+    expect(DB::table('envoi_pauses')->where('id', $id)->value('levee_par'))->toBe('auteur-test');
     WorkspaceContext::run($ws, fn () => expect(sqlRefuse('UPDATE envoi_pauses SET levee_le = NULL, levee_par = NULL WHERE id = ?', [$id]))->toContain('définitive'));
     // 5. l'expiration réelle est tracée dans le journal
     $depot->ouvrirPause($ws, 'longue', null, $t0->modify('+49 hours'), 48);
@@ -1172,10 +1172,10 @@ test('m3 : un frein levé à la main qui se rouvre le dit à l’opérateur', fu
     $depot->incrementer($ws, 'b@example.test', JourEnvoi_jour($maintenant), 'autre', 'rebonds_durs', 3);
     $garde = new GardeChauffe($depot, app(DepotSocle::class), app(ResolveurFournisseur::class), app(Alerte::class));
     $garde->evaluer($ws, $maintenant);
-    leverPauseJournalisee($ws, (int) $depot->pausesActives($ws, $maintenant)[0]->id, 'will');
+    leverPauseJournalisee($ws, (int) $depot->pausesActives($ws, $maintenant)[0]->id, 'auteur-test');
     $garde->evaluer($ws, $maintenant);                                                           // la cause est toujours là : il se rouvre
     Log::shouldHaveReceived('critical')->withArgs(fn ($m) => str_contains($m, 'levé à la main') || str_contains($m, 'levé à la main, rouvert'))->atLeast()->once();
-    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->orderByDesc('id')->value('details'))->toContain('will');
+    expect(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'pause_auto')->orderByDesc('id')->value('details'))->toContain('auteur-test');
 });
 
 test('m5 : changements d’heure Europe/Paris (29/03 et 25/10/2026) : fenêtre d’envoi et jour d’envoi', function () {
@@ -1264,7 +1264,7 @@ test('fenêtre d’envoi : l’horloge de l’appli figée HORS fenêtre (Paris)
     $ws = espaceChauffe();
     WorkspaceContext::set($ws);
     $faux = new FauxServeurEnvoi;
-    app()->instance(FauxServeurEnvoi::class, $faux);
+    app()->instance('envoi.serveur_interne', $faux);
     $serveur = app(ServeurEnvoi::class);
 
     // 01:30 UTC = 02:30 Paris, et 18:30 UTC = 19:30 Paris : hors fenêtre [08:00, 19:00[ → report, aucune connexion

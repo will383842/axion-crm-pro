@@ -21,27 +21,32 @@ final class SourceExpeditionDb
     public function __construct(private readonly DepotReglages $reglages) {}
 
     /** @throws RuntimeException identité, domaine ou boîte manquant */
-    public function parametresPour(string $ws): ParametresExpedition
+    public function parametresPour(string $ws, ?string $flux = null): ParametresExpedition
     {
         $identite = $this->identiteComplete($ws);
-        [$domaine, $expediteur] = $this->domaineEtBoite($ws);
+        [$domaine, $expediteur] = $this->domaineEtBoite($ws, $flux);
 
         return new ParametresExpedition($domaine, $expediteur, trim($identite['raison_sociale'] . ' ' . $identite['forme']));
     }
 
     /** @throws RuntimeException */
-    public function composeurPour(string $ws): ComposeurSequenceMessage
+    public function composeurPour(string $ws, ?string $flux = null): ComposeurSequenceMessage
     {
         $identite = $this->identiteComplete($ws);
-        [$domaine] = $this->domaineEtBoite($ws);
+        [$domaine] = $this->domaineEtBoite($ws, $flux);
 
         return new ComposeurSequenceMessage(new ComposeurMessage($domaine, null, SignatureDkim::Serveur), $identite);
     }
 
-    /** @throws RuntimeException */
-    public function sequenceurPour(string $ws, ServeurEnvoi $serveur, LecteurFiche $fiches): Sequenceur
+    /**
+     * `$flux` non nul (L8-ORCH : « prospection ») : seul un domaine étiqueté de ce flux est retenu ; un domaine `flux` NULL ou d'un
+     * autre flux est refusé (aucun expéditeur). Nul : comportement inchangé.
+     *
+     * @throws RuntimeException
+     */
+    public function sequenceurPour(string $ws, ServeurEnvoi $serveur, LecteurFiche $fiches, ?string $flux = null): Sequenceur
     {
-        return new Sequenceur($serveur, $fiches, $this->composeurPour($ws), $this->parametresPour($ws));
+        return new Sequenceur($serveur, $fiches, $this->composeurPour($ws, $flux), $this->parametresPour($ws, $flux));
     }
 
     /** @return array<string, mixed> */
@@ -58,10 +63,10 @@ final class SourceExpeditionDb
     }
 
     /** @return array{0: string, 1: string} [domaine d'envoi, adresse d'expéditeur] */
-    private function domaineEtBoite(string $ws): array
+    private function domaineEtBoite(string $ws, ?string $flux = null): array
     {
         $lignes = WorkspaceContext::run($ws, fn (): array => [
-            DB::table('envoi_domaines')->where('workspace_id', $ws)->orderBy('id')->pluck('nom')->all(),
+            DB::table('envoi_domaines')->where('workspace_id', $ws)->when($flux !== null, fn ($q) => $q->where('flux', $flux))->orderBy('id')->pluck('nom')->all(),
             DB::table('envoi_boites')->where('workspace_id', $ws)->where('etat', 'active')->orderBy('cree_le')->pluck('adresse')->all(),
         ]);
         [$domaines, $boites] = $lignes;

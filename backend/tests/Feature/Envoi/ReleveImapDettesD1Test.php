@@ -93,6 +93,25 @@ test('empreinte : une adresse proche (autre casse, même empreinte) d\'un AUTRE 
 test('empreinte : la recherche par empreinte utilise un INDEX (le plan le prouve)', function () {
     F::contact($this->ws, F::fiche($this->ws, 'ZZ index'), 'Zoe', 'Index', ['email' => 'index@client.exemple.test']);
 
+    // PRÉPARATION DÉTERMINISTE (setup seul) : sur une table quasi vide, dont les statistiques dépendent de ce que
+    // les tests précédents de la part ont laissé (lignes mortes, autovacuum), le plan « parcours de contacts_pkey
+    // + filtre » ou un autre index coûte aussi peu que l'index d'empreinte, et le choix change d'une part de CI à
+    // l'autre. Du volume + ANALYZE rendent l'empreinte sélective, comme sur la vraie table.
+    DB::statement("
+        INSERT INTO companies (workspace_id, denomination, siren, created_at, updated_at)
+        SELECT ?, 'ZZ Volume ' || g::text, lpad((810000000 + g)::text, 9, '0'), now(), now()
+          FROM generate_series(1, 2000) g
+        ON CONFLICT DO NOTHING
+    ", [$this->ws]);
+    DB::statement("
+        INSERT INTO contacts (workspace_id, company_id, first_name, last_name, email, created_at, updated_at)
+        SELECT c.workspace_id, c.id, 'Zz', 'ZZVOLUME' || c.siren, 'v' || c.siren || '@volume.exemple.test', now(), now()
+          FROM companies c
+         WHERE c.workspace_id = ? AND c.denomination LIKE 'ZZ Volume %'
+        ON CONFLICT DO NOTHING
+    ", [$this->ws]);
+    DB::statement('ANALYZE contacts');
+
     DB::statement('SET LOCAL enable_seqscan = off');
     DB::statement('SET LOCAL enable_bitmapscan = off');
     $plan = collect(DB::select('EXPLAIN ' . AdresseParEmpreinteCrm::requeteSql(), [$this->ws, ListeSuppression::empreinte('index@client.exemple.test')]))

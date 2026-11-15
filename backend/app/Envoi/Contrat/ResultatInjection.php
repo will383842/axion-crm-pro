@@ -3,6 +3,7 @@
 namespace App\Envoi\Contrat;
 
 use DateTimeImmutable;
+use InvalidArgumentException;
 
 final class ResultatInjection
 {
@@ -14,7 +15,13 @@ final class ResultatInjection
         public readonly bool $incertain = false,
         /** Nature du report (sans objet pour un résultat accepté ou incertain). */
         public readonly NatureReport $nature = NatureReport::Attente,
-    ) {}
+        /** Code SMTP du serveur (200 à 599), facultatif : conservé dans la tentative d'un report d'échec. */
+        public readonly ?int $codeSmtp = null,
+    ) {
+        if ($codeSmtp !== null && ($codeSmtp < 200 || $codeSmtp > 599)) {
+            throw new InvalidArgumentException('Code SMTP hors de 200 à 599.');
+        }
+    }
 
     /** L'identifiant peut manquer pour une ligne ancienne acceptée sans identifiant conservé. */
     public static function accepte(?string $idInjection): self
@@ -29,9 +36,9 @@ final class ResultatInjection
     }
 
     /** Report NET d'ÉCHEC (refus temporaire du serveur, erreur certaine avant envoi) : compté et plafonné par le séquenceur. */
-    public static function reporteEchec(DateTimeImmutable $jour): self
+    public static function reporteEchec(DateTimeImmutable $jour, ?int $codeSmtp = null): self
     {
-        return new self(false, null, $jour, false, NatureReport::Echec);
+        return new self(false, null, $jour, false, NatureReport::Echec, $codeSmtp);
     }
 
     /** Report à issue INCERTAINE : le message est peut-être parti ; la place reste comptée, aucun renvoi automatique. */

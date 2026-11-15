@@ -11,6 +11,7 @@ use App\Envoi\Contrat\RenvoiParMemeCle;
 use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Contrat\SanteServeur;
 use App\Envoi\Contrat\ServeurEnvoi;
+use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +29,14 @@ final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
 
     private bool $enPause = false;
 
+    /** Scénario de test : refus définitif (5xx) avec ce code. */
+    private ?int $refusDefinitif = null;
+
+    /** Scénario de test : report d'échec (avec ou sans code). */
+    private bool $reportEchec = false;
+
+    private ?int $codeReportEchec = null;
+
     public int $appels = 0;
 
     /**
@@ -40,6 +49,21 @@ final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
     public function __construct(private readonly bool $temoins = true, ?int $niveauDeBase = null)
     {
         $this->niveauDeBase = $niveauDeBase ?? self::niveauActuel();
+    }
+
+    public function refuserDefinitivement(int $codeSmtp): self
+    {
+        $this->refusDefinitif = $codeSmtp;
+
+        return $this;
+    }
+
+    public function reporterEchec(?int $codeSmtp): self
+    {
+        $this->reportEchec = true;
+        $this->codeReportEchec = $codeSmtp;
+
+        return $this;
     }
 
     private static function niveauActuel(): int
@@ -57,6 +81,12 @@ final class FauxServeurEnvoi implements RenvoiParMemeCle, ServeurEnvoi
             throw ServeurEnvoiRefuse::motif('injecter() ne s’appelle pas dans une transaction englobante.');
         }
         $this->appels++;
+        if ($this->refusDefinitif !== null) {
+            throw new RefusDefinitifServeur('Refus définitif simulé.', $this->refusDefinitif);
+        }
+        if ($this->reportEchec) {
+            return ResultatInjection::reporteEchec(new \DateTimeImmutable('tomorrow'), $this->codeReportEchec);
+        }
         if ($this->enPause) {
             return ResultatInjection::reporte(new \DateTimeImmutable('tomorrow'));
         }

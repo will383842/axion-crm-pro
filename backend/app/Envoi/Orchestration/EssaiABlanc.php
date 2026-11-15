@@ -5,6 +5,7 @@ namespace App\Envoi\Orchestration;
 use App\Crm\FichesProtegees;
 use App\Crm\Outbound\OppositionSortante;
 use App\Envoi\Depot\DepotSocleDb;
+use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Imap\AdresseParEmpreinteCrm;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\LecteurBoiteMemoire;
@@ -108,7 +109,6 @@ final class EssaiABlanc
         $serveur = $this->fabriqueServeur !== null ? ($this->fabriqueServeur)() : new FauxServeurEnvoi; // APRÈS beginTransaction
         $t = new DateTimeImmutable(self::JOUR_FICTIF . '-03-02 10:00:00', new DateTimeZone('Europe/Paris'));
         $depot = new DepotSocleDb;
-        $depot->eteindreTemoins($ws, 'essai-a-blanc');
         $domaine = 'essai.example.test';
         $boite = $this->poserDomaineEtBoite($ws, $domaine, $t);
         $passerelle = new PasserelleLocale($serveur, $depot, fn (): bool => true, self::PLAFOND_ESSAI, function () use (&$t): DateTimeImmutable {
@@ -132,7 +132,7 @@ final class EssaiABlanc
         $ids = [];
         foreach (['a', 'b', 'c'] as $i => $nom) {
             $adresses[$nom] = "essai-{$nom}-" . Str::lower(Str::random(6)) . '@client.example.test';
-            $ids[$nom] = $inscriptions->inscrire($ws, $sid, $this->poserContact($ws, $adresses[$nom], $t), $t->modify('-' . (3 - $i) . ' minutes'));
+            $ids[$nom] = $inscriptions->inscrire($ws, $sid, $this->poserContact($ws, $adresses[$nom], $t, DepotSocleDb::FOURNISSEURS_TEMOINS[$i]), $t->modify('-' . (3 - $i) . ' minutes'));
         }
         $etapes = [];
         $etapes['inscription'] = $this->essayer(fn (): bool => DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('statut', 'active')->count() === 3);
@@ -172,7 +172,7 @@ final class EssaiABlanc
         $this->reverifierDomaine($ws, $domaine, $t);
         $depot->armerToutArreter($ws, 'essai-a-blanc');
         $adresseD = 'essai-d-' . Str::lower(Str::random(6)) . '@client.example.test';
-        $d = $inscriptions->inscrire($ws, $sid, $this->poserContact($ws, $adresseD, $t), $t);
+        $d = $inscriptions->inscrire($ws, $sid, $this->poserContact($ws, $adresseD, $t, DepotSocleDb::FOURNISSEURS_TEMOINS[3]), $t);
         $avant = $serveur->appels;
         $sequenceur->executer($ws, $t);
         $etapes['arret_general'] = $this->essayer(fn (): bool => $serveur->appels === $avant
@@ -218,7 +218,7 @@ final class EssaiABlanc
     }
 
     /** Une entreprise fictive (fédérations) et son contact éligible : id du contact. */
-    private function poserContact(string $ws, string $adresse, DateTimeImmutable $t): int
+    private function poserContact(string $ws, string $adresse, DateTimeImmutable $t, string $fournisseur): int
     {
         DB::table('fonctions_espace')->updateOrInsert(['espace_id' => $ws, 'fonction' => 'segment.federations'], ['ouverte' => true, 'updated_at' => now()]);
         $slug = FichesProtegees::TAG_FEDERATIONS;
@@ -234,6 +234,8 @@ final class EssaiABlanc
             'workspace_id' => $ws, 'company_id' => $entreprise, 'last_name' => 'Essai', 'email' => $adresse, 'email_status' => 'valid',
             'created_at' => $avant, 'first_info_at' => $avant,
         ]);
+        // Mode témoins : il reste ALLUMÉ (seule la commande dédiée l'éteint) ; l'adresse fictive est témoin, dans la transaction annulée.
+        DB::table('envoi_temoins')->insert(['workspace_id' => $ws, 'empreinte' => EmpreinteTemoin::pourDecision($adresse), 'libelle' => 'essai', 'fournisseur' => $fournisseur]);
         DB::table('envoi_verdicts_adresse')->insert(['workspace_id' => $ws, 'empreinte_adresse' => ListeSuppression::empreinte($adresse), 'verdict' => 'valide', 'verifie_le' => $t->modify('-2 days')->format('c'), 'source' => 'essai']);
 
         return $contact;

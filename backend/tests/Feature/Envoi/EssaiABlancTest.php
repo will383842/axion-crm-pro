@@ -44,7 +44,7 @@ function essaiComptages(): array
 beforeEach(function () {
     $this->ws = F::espace('zz-essai');
     config([
-        'envoi.reel_actif' => false, 'envoi.cle_desinscription' => str_repeat('k', 40), 'envoi.desinscription_hote' => 'app',
+        'envoi.reel_actif' => false, 'envoi.cle_empreinte' => 'cle-de-test-seulement', 'envoi.cle_desinscription' => str_repeat('k', 40), 'envoi.desinscription_hote' => 'app',
         'envoi.desinscription_hotes' => ['app' => 'https://app.example.test', 'api' => 'https://api.example.test'],
     ]);
 });

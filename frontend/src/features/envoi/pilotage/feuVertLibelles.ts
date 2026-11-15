@@ -16,3 +16,23 @@ export function libelleBloquants(r: Recap): string {
 export function avertissementDemo(demo: boolean): string | null {
   return demo ? 'Démonstration : marquer un point « fait » n’a aucun effet réel (aucun envoi, aucune vérification).' : null;
 }
+
+/** Code du point qui décrit le drapeau d'exploitation : le feu vert ne le touche jamais, le serveur l'exclut. */
+export const POINT_DRAPEAU = 'auto.reel_actif_faux';
+
+interface PointBloquant { code: string; bloquant: boolean; fait: boolean }
+
+/** Nombre de points bloquants rouges qui empêchent « Accorder » (le serveur refuse 409 sinon). */
+export function bloquantsRouges(points: ReadonlyArray<PointBloquant>): number {
+  return points.filter((p) => p.bloquant && !p.fait && p.code !== POINT_DRAPEAU).length;
+}
+
+export function libelleAccord(n: number): string {
+  if (n === 0) return 'Aucun point bloquant : l’accord est possible.';
+  return `${n} point${n > 1 ? 's' : ''} bloquant${n > 1 ? 's' : ''} à lever avant d’accorder.`;
+}
+
+/** Rappel affiché à côté des deux gestes : le feu vert est nécessaire, pas suffisant. */
+export const RAPPEL_ENVOI_REEL = 'Accorder le feu vert n’active pas l’envoi réel : l’envoi réel reste une décision d’exploitation, prise hors de cet écran.';
+
+export const AIDE_MOTIF = 'Le motif compte de 10 à 500 caractères. N’écrivez JAMAIS d’adresse e-mail.';

@@ -59,7 +59,7 @@ test('GET feu-vert : empreinte_liste et decision facultatifs, sans nombre de poi
     expect($s['properties'])->toHaveKeys(['empreinte_liste', 'decision']);
     expect($s['required'])->not->toContain('empreinte_liste');
     expect($s['required'])->not->toContain('decision');
-    expect($op['description'])->not->toMatch('/\b44\b|\b16 points|\b28 manuels/')->toContain('version');
+    expect($op['description'])->not->toMatch('/\d+\s+points/')->toContain('total');
 });
 
 test('domaine : champ adaptateur facultatif en lecture', function () {

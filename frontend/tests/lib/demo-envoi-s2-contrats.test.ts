@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment -- les réponses JSON de la démo sont lues telles quelles */
 /** S2-CONTRATS : les gestionnaires de démo suivent les nouveaux chemins du contrat (feu vert, import de refus, adaptateur). */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getResponse } from 'msw';
 import { demoDb } from '@/demo/base';
+import { resetLocation, setLocation } from '../helpers/location';
 import { handlers } from '@/demo/handlers';
 
 async function appeler(methode: string, chemin: string, corps?: unknown, entetes: Record<string, string> = {}) {
@@ -30,6 +31,11 @@ describe('démo — décision du feu vert', () => {
     const b = await appeler('POST', '/envoi/feu-vert/decision', { decision: 'retire', motif: 'Second retrait notable.' });
     expect(b.statut).toBe(200);
     expect(demoDb.zone('pilotage', 'decisions').tous()).toHaveLength(2);
+  });
+
+  it('« retire » avec un If-Match périmé reste accepté (le 412 est propre à « accorde »)', async () => {
+    const r = await appeler('POST', '/envoi/feu-vert/decision', { decision: 'retire', motif: 'Retrait de précaution.' }, { 'If-Match': '"perime"' });
+    expect(r.statut).toBe(200);
   });
 
   it('« accorde » : 428 sans en-tête, 412 si périmé, 409 tant qu’un bloquant est rouge', async () => {
@@ -61,6 +67,54 @@ describe('démo — état « sans bloquant » choisi par l’interface', () => {
     expect(r.statut).toBe(200);
     const apres = await appeler('GET', '/envoi/feu-vert');
     expect(apres.json!['decision']).toMatchObject({ decision: 'accorde', motif: 'Tout est vérifié.' });
+  });
+});
+
+describe('démo — paramètre d’adresse ?demo-feu-vert', () => {
+  const CLE = 'axion-demo:feu-vert';
+  afterEach(() => {
+    resetLocation();
+    sessionStorage.removeItem(CLE);
+  });
+
+  /** Recharge les gestionnaires après avoir posé l'adresse : la lecture du paramètre se fait à l'import. */
+  async function charger(recherche: string) {
+    // `window.location` est un faux objet dans les tests (tests/helpers/location.ts) : history.replaceState ne le met pas à jour.
+    setLocation(`http://localhost:3000/${recherche}`);
+    vi.resetModules();
+    const m = await import('@/demo/handlers');
+    const base = await import('@/demo/base');
+    base.demoDb.reinitialiser();
+    return m.handlers;
+  }
+  async function appelerAvec(hs: typeof handlers, methode: string, chemin: string, corps?: unknown, entetes: Record<string, string> = {}) {
+    const init: RequestInit = { method: methode, headers: { 'content-type': 'application/json', ...entetes } };
+    if (corps !== undefined) init.body = JSON.stringify(corps);
+    const r = await getResponse(hs, new Request(`http://localhost/api/v1${chemin}`, init));
+    const t = await r!.text();
+    return { statut: r!.status, json: t === '' ? null : (JSON.parse(t) as Record<string, any>) };
+  }
+
+  it('?demo-feu-vert=sans-bloquant : plus aucun bloquant, « accorde » rend 200', async () => {
+    const hs = await charger('?demo-feu-vert=sans-bloquant');
+    expect(sessionStorage.getItem(CLE)).toBe('sans-bloquant');
+    const avant = await appelerAvec(hs, 'GET', '/envoi/feu-vert');
+    expect(avant.json!['bloquants_restants']).toBe(0);
+    const r = await appelerAvec(hs, 'POST', '/envoi/feu-vert/decision', { decision: 'accorde', motif: 'Tout est vérifié.' }, { 'If-Match': avant.json!['empreinte_liste'] });
+    expect(r.statut).toBe(200);
+  });
+
+  it('?demo-feu-vert=normal retire la clé', async () => {
+    sessionStorage.setItem(CLE, 'sans-bloquant');
+    await charger('?demo-feu-vert=normal');
+    expect(sessionStorage.getItem(CLE)).toBeNull();
+  });
+
+  it('« Remettre la démo à zéro » retire la clé', async () => {
+    sessionStorage.setItem(CLE, 'sans-bloquant');
+    const { definirFeuVertDemo } = await import('@/demo/handlers/envoi/pilotage.handlers');
+    definirFeuVertDemo(null);
+    expect(sessionStorage.getItem(CLE)).toBeNull();
   });
 });
 
@@ -123,5 +177,21 @@ describe('démo — domaines', () => {
     const { json } = await appeler('GET', '/envoi/domaines');
     expect(json!['data'].length).toBeGreaterThan(0);
     for (const d of json!['data']) expect(d.adaptateur).toBe('faux');
+  });
+});
+
+describe('démo — import : valeurs refusées', () => {
+  const simuler = async (contenu: string) => (await appeler('POST', '/envoi/opposition/import', { etape: 'simulation', contenu })).json!;
+
+  it('caractère de tête testé après trim()', async () => {
+    const json = await simuler(' =x@societe.example.test\n');
+    expect(json['valides']).toBe(0);
+    expect(json['refusees']).toEqual([{ ligne: 1, motif: 'caractère de tête refusé' }]);
+  });
+
+  it('valeur invalide refusée (en-tête « adresse », mot seul, adresse sans domaine)', async () => {
+    const json = await simuler('adresse\nn importe quoi\nx@@y\nsociete.example.test\nx@societe.example.test\n');
+    expect(json['valides']).toBe(2);
+    expect((json['refusees'] as Array<{ ligne: number }>).map((r) => r.ligne)).toEqual([1, 2, 3]);
   });
 });

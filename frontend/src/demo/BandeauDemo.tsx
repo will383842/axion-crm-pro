@@ -13,6 +13,7 @@ import { IDENTIFIANTS_DEMO } from './donnees';
 import { OFFRES, choisirOffre, estOffre, lireOffre } from './offres';
 import { oublierScenarios } from './scenarios';
 import { definirEtatForce } from './outils';
+import { definirFeuVertDemo } from './handlers/envoi/pilotage.handlers';
 
 function recharger(): void {
   window.location.reload();
@@ -64,6 +65,7 @@ export function BandeauDemo() {
             demoDb.reinitialiser();
             oublierScenarios();
             definirEtatForce(null);
+            definirFeuVertDemo(null);
             recharger();
           }}
           className="inline-flex h-11 items-center gap-2 rounded-lg border border-violet-300 bg-white px-3 text-sm font-medium text-violet-950 hover:bg-violet-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:h-9"

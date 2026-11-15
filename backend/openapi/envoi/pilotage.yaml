@@ -193,8 +193,8 @@ paths:
       summary: Liste « feu vert » avant le premier envoi réel
       description: |
         Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
-        portent une preuve humaine. Le catalogue est versionné côté serveur (v4, 45 points) : le nombre de points
-        se lit dans `total`, jamais dans `version`. Un point automatique sans source est
+        portent une preuve humaine. Le catalogue est versionné côté serveur : le nombre de points
+        se lit dans `total`. Un point automatique sans source est
         toujours faux. Les verrous sont en lecture seule. `empreinte_liste` (facultatif)
         est l'empreinte de l'état exact affiché ; `decision` (facultatif) est la dernière
         décision de feu vert, nulle s'il n'y en a pas encore.

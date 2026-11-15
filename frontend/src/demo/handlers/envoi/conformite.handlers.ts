@@ -194,6 +194,9 @@ function csv(): string {
 }
 
 /** Domaines de messagerie grand public : refusés en portée « domaine » (le serveur fait de même). */
+const REGEX_DOMAINE = /^[a-z0-9.-]+\.[a-z]{2,}$/;
+const REGEX_ADRESSE = /^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+
 const DOMAINES_GRAND_PUBLIC = ['gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.fr', 'hotmail.com', 'hotmail.fr', 'outlook.com', 'outlook.fr', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'laposte.net'];
 
 const REPONSE_SUCCES = () => HttpResponse.json({ ok: true, message: 'Enregistré.' });
@@ -253,9 +256,11 @@ export const handlers: HttpHandler[] = [
     let dejaPresentes = 0;
     for (const { brut, ligne } of lignes) {
       const v = brut.trim().toLowerCase();
-      if (/^[=+\-@\t\r]/.test(brut)) refusees.push({ ligne, motif: 'caractère de tête refusé' });
+      if (/^[=+\-@\t\r]/.test(brut) || /^[=+\-@]/.test(brut.trim())) refusees.push({ ligne, motif: 'caractère de tête refusé' });
       else if (DOMAINES_GRAND_PUBLIC.some((d) => v === d || v.endsWith(`@${d}`) || v.endsWith(`.${d}`))) refusees.push({ ligne, motif: 'domaine de messagerie grand public' });
       else if (connus.has(v) || nouvelles.some((n) => n.v === v)) dejaPresentes += 1;
+      // Valeur invalide (ex. ligne d'en-tête « adresse ») : un domaine ou une adresse bien formés seulement.
+      else if (!(v.includes('@') ? REGEX_ADRESSE : REGEX_DOMAINE).test(v)) refusees.push({ ligne, motif: 'valeur invalide' });
       // Une valeur sans « @ » est un domaine entier.
       else nouvelles.push({ v, portee: v.includes('@') ? 'adresse' : 'domaine' });
     }

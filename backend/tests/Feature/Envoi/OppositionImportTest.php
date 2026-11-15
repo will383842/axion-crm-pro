@@ -11,6 +11,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -81,7 +82,7 @@ test('simulation : compte sans écrire, sans adresse dans la réponse, jeton ren
         ->and($r['refusees'][0]['motif'])->toBe('caractère de tête refusé')->and($r['jeton'])->toBeString();
     $brut = json_encode($r);
     expect($brut)->not->toContain('alice')->not->toContain('@')->not->toContain('clients.example');
-    expect(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->count())->toBe(0);
+    expect(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->where('workspace_id', $this->espace->id)->count())->toBe(0);
 });
 
 test('lignes refusées avec numéro et motif : = + - @ tabulation CR, domaine grand public', function () {
@@ -263,7 +264,7 @@ test('tout ou rien : une erreur en cours d’écriture annule tout, y compris la
     $emp = [ListeSuppression::empreinte('a@clients.example.test'), ListeSuppression::empreinte('b@clients.example.test')];
     expect(DB::table('opt_out')->whereIn('email_hash', $emp)->count())->toBe(0)->and(DB::table('email_suppressions')->whereIn('email_hash', $emp)->count())->toBe(0);
     expect(DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->where('status_code', 500)->count())->toBe(1);
-    expect($leve)->toBeTrue()->and(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->count())->toBe(0)->and(impEvenements())->toBe(0);
+    expect($leve)->toBeTrue()->and(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->where('workspace_id', $this->espace->id)->count())->toBe(0)->and(impEvenements())->toBe(0);
 });
 
 test('événements sortants : un par adresse nouvelle, aucun pour une adresse venue du site, émis après le COMMIT, sans verrou restant', function () {
@@ -321,4 +322,64 @@ test('deux confirmations avec le même jeton : une connexion déjà passée ⇒ 
     // 409 venu de l'INSERTION (unicité en base), pas du contrôle de simulation/empreinte
     expect($statut)->toBe(409)->and($message)->toContain('Ce jeton a déjà servi')->not->toContain('Simulation absente');
     expect($owner->table('envoi_oppositions_registre')->where('workspace_id', $ws)->count())->toBe(0);
+});
+
+test('caractère de tête : un VT (\\x0B) ou NUL placé avant = est refusé, même s’il serait retiré ensuite par normaliser()', function () {
+    $r = impSimuler($this, "\x0B=cmd@x.example.test\n\0+b@x.example.test\n \x0B @c@x.example.test\nok@x.example.test\n");
+    expect(array_column($r['refusees'], 'ligne'))->toBe([1, 2, 3])->and($r['valides'])->toBe(1);
+});
+
+/** Provoque une violation d'unicité qui N'EST PAS celle du jeton (index de test sur l'empreinte du fichier). */
+function impViolationAutre(object $t, string $csv): string
+{
+    $jeton = impSimuler($t, $csv)['jeton'];
+    DB::unprepared('CREATE UNIQUE INDEX zz_autre_unique ON envoi_oppositions_imports (empreinte_fichier)');
+    DB::table('envoi_oppositions_imports')->insert([
+        'id' => (string) Str::uuid(), 'workspace_id' => $t->espace->id, 'auteur' => 'u0', 'empreinte_fichier' => hash('sha256', $csv),
+        'jeton_simulation' => (string) Str::uuid(),
+    ]);
+
+    return $jeton;
+}
+
+test('une violation d’unicité d’une autre origine n’est pas traduite en « jeton déjà servi » (relancée, 500)', function () {
+    $csv = "autre@clients.example.test\n";
+    $jeton = impViolationAutre($this, $csv);
+    $r = impConfirmer($this, $csv, $jeton);
+    expect($r->getStatusCode())->toBe(500)->and((string) $r->getContent())->not->toContain('jeton déjà servi')->not->toContain('Ce jeton a déjà servi');
+    expect(impRegistre($this))->toBe(0);
+});
+
+test('une exception en base ne met aucune empreinte ni valeur de la requête dans le journal', function () {
+    $journalises = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$journalises) {
+        $journalises[] = $m->level . ' ' . $m->message . ' ' . json_encode($m->context) . ' ' . ($m->context['exception'] ?? '');
+    });
+    $csv = "secret-base@clients.example.test\n";
+    $jeton = impViolationAutre($this, $csv);
+    $interdits = [hash('sha256', $csv), $jeton, 'secret-base', ListeSuppression::empreinte('secret-base@clients.example.test')];
+    impConfirmer($this, $csv, $jeton);
+    // échec en inscrireLot (trigger) : même exigence
+    $csv2 = "secret-lot@clients.example.test\n";
+    $jeton2 = impSimuler($this, $csv2)['jeton'];
+    DB::unprepared("CREATE OR REPLACE FUNCTION zz_echec() RETURNS trigger AS \$f\$ BEGIN IF NEW.source = 'registre_manuel' THEN RAISE EXCEPTION 'echec voulu'; END IF; RETURN NEW; END \$f\$ LANGUAGE plpgsql");
+    DB::unprepared('CREATE TRIGGER zz_echec BEFORE INSERT ON email_suppressions FOR EACH ROW EXECUTE FUNCTION zz_echec()');
+    impConfirmer($this, $csv2, $jeton2);
+    DB::unprepared('DROP TRIGGER IF EXISTS zz_echec ON email_suppressions');
+    $interdits = array_merge($interdits, [hash('sha256', $csv2), $jeton2, 'secret-lot', ListeSuppression::empreinte('secret-lot@clients.example.test')]);
+    expect($journalises)->not->toBe([]);
+    foreach ($journalises as $ligne) {
+        foreach ($interdits as $x) {
+            expect($ligne)->not->toContain($x);
+        }
+    }
+});
+
+test('route d’import : limiteur dédié, 429 au-delà de 30 requêtes par minute et par compte', function () {
+    RateLimiter::clear('envoi-opposition-import|' . $this->proprio->id);
+    for ($i = 0; $i < 30; $i++) {
+        $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "a{$i}@clients.example.test\n"])->assertOk();
+    }
+    $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "z@clients.example.test\n"])->assertStatus(429);
+    RateLimiter::clear('envoi-opposition-import|' . $this->proprio->id);
 });

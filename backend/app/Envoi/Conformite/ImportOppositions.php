@@ -72,7 +72,12 @@ final class ImportOppositions
 
                 return $this->registre->inscrireLot($workspaceId, $importId, $a['valides'], 'import ' . $importId, $utilisateur);
             });
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $e) {
+            // Seule la contrainte du jeton devient un 409 ; toute autre violation est relancée (le contrôleur la rend générique).
+            if (! str_contains($e->getMessage(), 'envoi_oppositions_imports_jeton_unique')) {
+                throw $e;
+            }
+
             throw new ConflictHttpException('Ce jeton a déjà servi : relancez la simulation.');
         }
         Cache::forget(self::PREFIXE_CLE . $jeton);
@@ -140,12 +145,17 @@ final class ImportOppositions
         return ['lignes' => count($lignes), 'valides' => $valides, 'deja' => $deja, 'refusees' => $refusees];
     }
 
-    /** Une valeur qui commence par = + - @ tabulation ou retour chariot est refusée (précaution contre l'injection CSV). */
+    /**
+     * Une valeur qui commence par = + - @ tabulation, retour chariot ou caractère de contrôle est refusée (injection CSV).
+     * Contrôle fait sur la valeur telle qu'elle sera normalisée (après trim complet) ET sur la valeur brute (espaces seuls ignorés).
+     */
     private function tete(string $v): bool
     {
-        $t = ltrim($v, ' ');
+        $brut = ltrim($v, ' ');
+        $nu = ltrim($v, " \t\n\r\0\x0B");
 
-        return $t !== '' && strpbrk($t[0], "=+-@\t\r") !== false;
+        return ($brut !== '' && strpbrk($brut[0], "=+-@\t\r\0\x0B\f") !== false)
+            || ($nu !== '' && strpbrk($nu[0], '=+-@') !== false);
     }
 
     /**

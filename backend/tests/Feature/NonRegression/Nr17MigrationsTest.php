@@ -111,6 +111,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000160_envoi_temoins_acces.php',
     // Envoi R16 : index UNIQUE PARTIEL (auteur releve_auto) sur les journées témoins, ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_02_000161_envoi_temoins_journees_releve_auto.php',
+    // Filet modifié : pourquoi — envoi S1-A : butée de plafond par espace (table + fonction, protégées par les droits), `envoi_injection_liberer` remplacée ; les retirer rouvrirait le dépassement du plafond ; down() inerte, up() rejouable.
+    '2026_12_03_000010_envoi_compteur_espace.php',
+    // Filet modifié : pourquoi — envoi S1-A : conservation des tentatives (agrégat quotidien en ajout seul, fonction d'archivage, déclencheur d'ajout seul remplacé) ; les retirer effacerait l'historique agrégé ou rouvrirait le DELETE ; down() inerte, up() rejouable.
+    '2026_12_03_000060_envoi_tentatives_retention.php',
+    // Filet modifié : pourquoi — envoi S1-A : gestes de pause et de reprise des séquences, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; les retirer effacerait l'historique ; down() inerte, up() rejouable.
+    '2026_12_03_000070_envoi_sequences_gestes.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

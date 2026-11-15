@@ -81,6 +81,8 @@ set_env "SESSION_SAME_SITE"          "lax"
 # comme le bloc « Owner initial » ci-dessous, et ne sont JAMAIS versionnees :
 #   INSEE_API_KEY=... FRANCE_TRAVAIL_CLIENT_ID=... FRANCE_TRAVAIL_CLIENT_SECRET=...
 #   MISTRAL_API_KEY=... bash configure-prod-env.sh   (meme ligne de commande)
+# Avec `curl ... | bash`, les variables se placent devant `bash`, pas devant curl :
+#   curl -fsSL <url du script> | INSEE_API_KEY=... (etc.) bash
 # Une cle non fournie n'est PAS touchee : la valeur deja presente dans le .env
 # reste en place (jamais ecrasee par du vide). Les anciennes valeurs restent dans
 # l'historique git : seule leur regeneration chez INSEE, France Travail et

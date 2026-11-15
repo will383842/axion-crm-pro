@@ -5,6 +5,7 @@
  * réel : tout se passe dans une transaction annulée ; seule la ligne de résultat (`envoi_essais_blanc`, sans adresse) reste.
  */
 
+use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Imap\RecepteurRetoursCrm;
 use App\Envoi\Orchestration\EssaiABlanc;
 use App\Envoi\Orchestration\RapportEssai;
@@ -42,7 +43,10 @@ function essaiComptages(): array
 
 beforeEach(function () {
     $this->ws = F::espace('zz-essai');
-    config(['envoi.reel_actif' => false]);
+    config([
+        'envoi.reel_actif' => false, 'envoi.cle_desinscription' => str_repeat('k', 40), 'envoi.desinscription_hote' => 'app',
+        'envoi.desinscription_hotes' => ['app' => 'https://app.example.test', 'api' => 'https://api.example.test'],
+    ]);
 });
 
 afterEach(function () {
@@ -76,7 +80,7 @@ test('après l\'essai, aucune ligne nouvelle hors envoi_essais_blanc (STOP, rebo
 });
 
 test('ni ServeurEnvoi du conteneur, ni RecepteurRetoursCrm, ni Alerte ne sont résolus ; aucun courriel, aucune écriture de cache ni fichier temporaire', function () {
-    app()->bind(\App\Envoi\Contrat\ServeurEnvoi::class, fn () => throw new RuntimeException('ServeurEnvoi du conteneur résolu'));
+    app()->bind(ServeurEnvoi::class, fn () => throw new RuntimeException('ServeurEnvoi du conteneur résolu'));
     app()->bind(RecepteurRetoursCrm::class, fn () => throw new RuntimeException('RecepteurRetoursCrm résolu'));
     app()->bind(Alerte::class, fn () => throw new RuntimeException('Alerte réelle résolue'));
     Mail::fake();

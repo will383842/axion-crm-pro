@@ -6,6 +6,7 @@
  */
 
 use App\Envoi\Orchestration\EssaiABlanc;
+use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -38,6 +39,13 @@ final class EspionneFlux
     }
 }
 
+beforeEach(function () {
+    config([
+        'envoi.reel_actif' => false, 'envoi.cle_desinscription' => str_repeat('k', 40), 'envoi.desinscription_hote' => 'app',
+        'envoi.desinscription_hotes' => ['app' => 'https://app.example.test', 'api' => 'https://api.example.test'],
+    ]);
+});
+
 afterEach(function () {
     foreach (['http', 'https'] as $schema) {
         @stream_wrapper_restore($schema);
@@ -66,8 +74,8 @@ test('une requête HTTP perdue pendant l\'essai fait rougir : les requêtes non 
     $essai = new EssaiABlanc(function () {
         Http::get('https://exemple.example.test/'); // levée par `preventStrayRequests`, posée par l'essai
 
-        return new App\Envoi\Simulateur\FauxServeurEnvoi;
+        return new FauxServeurEnvoi;
     });
 
-    expect(fn () => $essai->executer(F::espace('zz-essai-reseau'), 'test-essai'))->toThrow(Throwable::class);
+    expect(fn () => $essai->executer(F::espace('zz-essai-reseau'), 'test-essai'))->toThrow(RuntimeException::class);
 });

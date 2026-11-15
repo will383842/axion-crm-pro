@@ -193,10 +193,10 @@ function csv(): string {
   return lignes.map((l) => l.map((c) => `"${c.replaceAll('"', '""')}"`).join(';')).join('\n');
 }
 
-/** Domaines de messagerie grand public : refusés en portée « domaine » (le serveur fait de même). */
 const REGEX_DOMAINE = /^[a-z0-9.-]+\.[a-z]{2,}$/;
 const REGEX_ADRESSE = /^[^\s@]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
+/** Domaines de messagerie grand public : refusés en portée « domaine » (le serveur fait de même). */
 const DOMAINES_GRAND_PUBLIC = ['gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.fr', 'hotmail.com', 'hotmail.fr', 'outlook.com', 'outlook.fr', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr', 'laposte.net'];
 
 const REPONSE_SUCCES = () => HttpResponse.json({ ok: true, message: 'Enregistré.' });

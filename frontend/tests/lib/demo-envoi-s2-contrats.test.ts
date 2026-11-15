@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getResponse } from 'msw';
 import { demoDb } from '@/demo/base';
-import { resetLocation, setLocation } from '../helpers/location';
+import { navigations, resetLocation, setLocation } from '../helpers/location';
 import { handlers } from '@/demo/handlers';
 
 async function appeler(methode: string, chemin: string, corps?: unknown, entetes: Record<string, string> = {}) {
@@ -110,17 +110,23 @@ describe('démo — paramètre d’adresse ?demo-feu-vert', () => {
     expect(sessionStorage.getItem(CLE)).toBeNull();
   });
 
-  it('« Remettre la démo à zéro » retire la clé', async () => {
+  it('« Remettre la démo à zéro » (bouton du bandeau) retire la clé', async () => {
+    const { render, screen, fireEvent, cleanup } = await import('@testing-library/react');
+    const { createElement } = await import('react');
+    const { BandeauDemo } = await import('@/demo/BandeauDemo');
+    setLocation('http://localhost:3000/');
     sessionStorage.setItem(CLE, 'sans-bloquant');
-    const { definirFeuVertDemo } = await import('@/demo/handlers/envoi/pilotage.handlers');
-    definirFeuVertDemo(null);
+    render(createElement(BandeauDemo));
+    fireEvent.click(screen.getByRole('button', { name: /Remettre la démo à zéro/ }));
+    expect(navigations()).toContain('reload');
     expect(sessionStorage.getItem(CLE)).toBeNull();
+    cleanup();
   });
 });
 
 describe('démo — import des listes de refus', () => {
-  // Partie locale factice (aucune adresse réelle) ; seul le domaine grand public compte pour le refus.
-  const contenu = 'un@societe-a.example.test\n=piege@societe-b.example.test\npartie-locale-factice@gmail.com\n';
+  // Ligne « gmail.com » seule : domaine grand public refusé (aucune adresse réelle).
+  const contenu = 'un@societe-a.example.test\n=piege@societe-b.example.test\ngmail.com\n';
 
   it('simulation : compte et refus par numéro de ligne, jamais d’adresse, rien d’inscrit', async () => {
     const avant = demoDb.opposition.compter();

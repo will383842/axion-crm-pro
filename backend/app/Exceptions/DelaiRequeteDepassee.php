@@ -15,6 +15,6 @@ final class DelaiRequeteDepassee extends RuntimeException
 {
     public function __construct()
     {
-        parent::__construct('Délai de requête SQL dépassé.');
+        parent::__construct('Délai de requête dépassé.');
     }
 }

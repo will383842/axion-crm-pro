@@ -5,7 +5,8 @@
  * code non nul AVANT toute écriture (le démarrage de l'application, la lecture des arguments et les écritures viennent après).
  * Aucune base, aucun réseau : les arguments sont volontairement absents (la garde passe avant leur lecture).
  */
-$ouvriers = ['ouvrier_cycle.php', 'ouvrier_injection.php', 'ouvrier_sequenceur.php', 'ouvrier_feu_vert.php'];
+// Tous les ouvriers présents (y compris un futur) : un ouvrier sans garde fait rougir ce test.
+$ouvriers = array_map('basename', glob(dirname(__DIR__, 2) . '/Support/ouvrier_*.php') ?: []);
 
 /** @return array{code: int, sortie: string, erreur: string} */
 function ouvrierHorsTest(string $script, string $env): array

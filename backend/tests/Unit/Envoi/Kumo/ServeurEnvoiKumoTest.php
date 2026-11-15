@@ -136,6 +136,20 @@ test('4xx : report de tranche, une seule tentative, jamais de boucle', function 
     expect($t->connexions)->toBe(2)->and($reg->lire(WS_K9, 'k1')['etat'])->toBe('accepte');
 });
 
+test('code SMTP conservé : 4xx => report portant le code reçu, 5xx => refus définitif portant le code (issue « refusee »)', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = [451, 550];
+    $s = kumoFabrique($t);
+    expect($s->injecter(msgK9('p1'))->codeSmtp)->toBe(451);
+    $refus = null;
+    try {
+        $s->injecter(msgK9('p2'));
+    } catch (RefusDefinitifServeur $e) {
+        $refus = $e;
+    }
+    expect($refus)->toBeInstanceOf(RefusDefinitifServeur::class)->and($refus->codeSmtp)->toBe(550);
+});
+
 test('coupure après DATA : a_verifier, jamais renvoyé, état consulté avant toute réinjection', function () {
     $t = new FauxTransportKumo;
     $t->scenario = ['coupure_apres_data'];

@@ -29,7 +29,9 @@ uses(TestCase::class, RefreshDatabase::class);
 const REPRISE_PLAFOND = 2;
 
 /**
- * Un lundi lointain (an 2100), fixé par scénario : 7 lundis possibles, un par point d'arrêt. Les compteurs sont écrits pour de bon ;
+ * Un lundi lointain (an 2100), fixé par scénario : 7 lundis possibles, choisis par `crc32(point) % 7`. Deux points peuvent partager le même lundi
+ * (c'est le cas de `apres_temps_A` et `pendant_appel`, tous deux à 0) : sans effet, car `repNettoyer` efface `envoi_compteur_global`
+ * par jour et les tests passent en séquence. Les compteurs sont écrits pour de bon ;
  * d'autres tests de l'envoi tirent aussi des jours en 2100 (au hasard), une rencontre est improbable mais pas exclue, d'où le
  * nettoyage ciblé de `repNettoyer`.
  */
@@ -87,7 +89,11 @@ function repEspace(DateTimeImmutable $lundi): array
     } catch (Throwable $e) {
         // Échec en cours de montage : l'appelant n'a pas reçu l'identifiant, on retire ici ce qui a déjà été validé.
         if ($ws !== null) {
-            repNettoyer($ws, $lundi);
+            try {
+                repNettoyer($ws, $lundi);
+            } catch (Throwable) {
+                // le nettoyage échoue à son tour : on ne masque pas l'exception d'origine
+            }
         }
         throw $e;
     } finally {
@@ -179,7 +185,7 @@ function repPhoto(string $ws, string $run): array
 /**
  * Déroule un scénario : cycle 1 tué au point donné, cycle 2 (+2 h, la réservation est « ancienne »), cycle 3 (+3 h, rien ne doit bouger).
  *
- * @return array{ws: string, ins: list<string>, run: string, photo: array<string, mixed>, apres2: array<string, mixed>, critiques: list<string>, cycle3: array<string, mixed>}
+ * @return array{ws: string, ins: list<string>, run: string, photo: array<string, mixed>, apres2: array<string, mixed>, critiques: list<string>, critiques3: list<string>, cycle3: array<string, mixed>}
  */
 function repScenario(string $point, ?Closure $casserLaReprise = null): array
 {
@@ -201,9 +207,10 @@ function repScenario(string $point, ?Closure $casserLaReprise = null): array
         $apres2 = repPhoto($e['ws'], $run);
         $trois = repOuvrier($e['ws'], $run, 'aucun', $lundi->modify('+3 hours'));
         expect($trois['code'])->toBe(0, 'troisième cycle en échec : ' . $trois['erreur']);
-        $critiques = array_merge($critiques, repCritiques($trois, 'cycle 3')); // le troisième cycle ne doit rien alerter non plus
+        $critiques3 = repCritiques($trois, 'cycle 3');
+        $critiques = array_merge($critiques, $critiques3);
 
-        return $e + ['run' => $run, 'photo' => $photo, 'apres2' => $apres2, 'critiques' => $critiques, 'cycle3' => repPhoto($e['ws'], $run)];
+        return $e + ['run' => $run, 'photo' => $photo, 'apres2' => $apres2, 'critiques' => $critiques, 'critiques3' => $critiques3, 'cycle3' => repPhoto($e['ws'], $run)];
     } finally {
         if ($e !== null) {
             repNettoyer($e['ws'], $lundi);
@@ -246,6 +253,7 @@ test('arrêt brutal pendant l\'appel (rien n\'est parti) : issue incertaine, ins
         ->and($r['cycle3']['inscriptions'][$i1])->not->toBe('active')
         ->and($r['cycle3']['messages'][$i1])->not->toBe('envoye')
         ->and($r['critiques'])->toContain('envoi.injection_a_verifier')
+        ->and($r['critiques3'])->toBe([]) // le troisième cycle n'alerte plus rien
         ->and($r['cycle3']['messages'][$i2])->toBe('envoye');
     repInvariants($r);
 });
@@ -259,6 +267,7 @@ test('arrêt brutal après l\'acceptation du faux serveur : le message n\'est PA
         ->and($r['cycle3']['inscriptions'][$i1])->not->toBe('active')
         ->and($r['cycle3']['messages'][$i1])->not->toBe('envoye')
         ->and($r['critiques'])->toContain('envoi.injection_a_verifier')
+        ->and($r['critiques3'])->toBe([]) // le troisième cycle n'alerte plus rien
         ->and($r['cycle3']['messages'][$i2])->toBe('envoye');
     repInvariants($r);
 });

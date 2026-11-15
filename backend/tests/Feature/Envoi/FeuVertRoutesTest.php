@@ -47,7 +47,7 @@ test('POST /envoi/feu-vert/{code}/fait : 401 sans session', function () {
     $this->postJson('/api/v1/envoi/feu-vert/manuel.port25/fait', ['preuve' => FV_PREUVE])->assertUnauthorized();
 });
 
-test('GET : la réponse suit le contrat pilotage.yaml (45 points, verrous en lecture seule)', function () {
+test('GET : la réponse suit le contrat pilotage.yaml (48 points, verrous en lecture seule)', function () {
     $u = fvCompte('viewer');
     $r = $this->actingAs($u)->getJson('/api/v1/envoi/feu-vert')->assertOk();
     expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $r->json('points.0')))->toBe([]);
@@ -55,7 +55,7 @@ test('GET : la réponse suit le contrat pilotage.yaml (45 points, verrous en lec
         expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'PointFeuVert', $p))->toBe([], $p['code']);
     }
     expect(ContratOpenApiEnvoi::ecarts('pilotage.yaml', 'VerrousFeuVert', $r->json('verrous')))->toBe([]);
-    expect($r->json('points'))->toHaveCount(45)->and($r->json('total'))->toBe(45)
+    expect($r->json('points'))->toHaveCount(48)->and($r->json('total'))->toBe(48)
         ->and($r->json('bloquants_restants'))->toBe(count(array_filter($r->json('points'), fn ($p) => $p['bloquant'])))
         ->and($r->json('faits'))->toBe(count(array_filter($r->json('points'), fn ($p) => $p['fait'])))
         ->and($r->json('verrous.envoi_reel_actif'))->toBeFalse()
@@ -276,7 +276,7 @@ test('aucune route n’ouvre un verrou, ne signe, ni n’écrit envoi_drapeaux ;
         }
     }
     sort($routes);
-    expect($routes)->toBe(['GET api/v1/envoi/feu-vert', 'POST api/v1/envoi/feu-vert/{code}/fait']);
+    expect($routes)->toBe(['GET api/v1/envoi/feu-vert', 'POST api/v1/envoi/feu-vert/decision', 'POST api/v1/envoi/feu-vert/{code}/fait']);
     foreach (Route::getRoutes() as $route) {
         $t = strtolower($route->uri() . ' ' . $route->getActionName());
         if (str_contains($t, 'feu-vert') || str_contains($t, 'feuvert')) {

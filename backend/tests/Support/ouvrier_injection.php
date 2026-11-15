@@ -13,6 +13,7 @@ use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Support\WorkspaceContext;
 use Illuminate\Contracts\Console\Kernel;
 
+require __DIR__ . '/garde_environnement_ouvrier.php'; // avant tout : hors APP_ENV=testing, arrêt code 3
 require __DIR__ . '/../../vendor/autoload.php';
 $app = require __DIR__ . '/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();

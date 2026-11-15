@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 // Avertissements et dépréciations vers STDERR : STDOUT ne porte QUE la ligne JSON du résultat.
 ini_set('display_errors', 'stderr');
 
+require __DIR__ . '/garde_environnement_ouvrier.php'; // avant tout : hors APP_ENV=testing, arrêt code 3
 require __DIR__ . '/../../vendor/autoload.php';
 $app = require __DIR__ . '/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();

@@ -15,6 +15,7 @@ import type { components } from '@/features/envoi/api/creation';
 import { demoDb } from '../../base';
 import { IDENTIFIANTS_DEMO } from '../../donnees';
 import { MAINTENANT_ISO, decalage } from '../../horloge';
+import { ajouterSequenceDeCampagne } from './sequences.handlers';
 import { api, delai, erreur, etatForce, lireRecherche, filtrerTexte, normaliser, repondreEtatForce } from '../../outils';
 
 type S = components['schemas'];
@@ -543,6 +544,7 @@ export const handlers: HttpHandler[] = [
       boites: c.boites ?? [],
       etapes: Math.min(4, Math.max(1, sequence.length)),
     });
+    ajouterSequenceDeCampagne({ id: idCampagne, nom: b.nom, total: estimation.restant, etapes: sequence.length });
     zone().brouillons.modifier(b.id, { campagne_id: idCampagne, annulable_jusqua: annulable, etape_courante: 5, mis_a_jour_le: MAINTENANT_ISO });
     return HttpResponse.json({ campagne, annulable_jusqua: annulable });
   }),

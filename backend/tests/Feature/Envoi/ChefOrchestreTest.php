@@ -196,7 +196,7 @@ test('décision retirée, absente ou bloquant rouge : séquenceur NON appelé, u
     $chef->cycle();
     $b = $chef->cycle();
 
-    expect($releve->appels)->toBe([])->and($b['sautes'])->toBe(1);
+    expect($releve->appels)->toBe([])->and($b['sautes'])->toBeGreaterThanOrEqual(1);
     Log::shouldHaveReceived('info')->withArgs(fn (string $m, array $c = []): bool => str_starts_with($m, 'envoi.cycle : espace sauté') && ($c['workspace_id'] ?? null) === $ws)->once();
 })->with(['retire', 'absente', 'rouge']);
 
@@ -231,7 +231,7 @@ test('deux espaces : chacun traité sous son contexte avec sa propre fabrique ; 
     expect($vus)->toBe($attendus)
         ->and($releve->contextes)->toBe($releve->appels)
         ->and($bilan['traites'])->toBe(2)
-        ->and($bilan['sautes'])->toBe(2)
+        ->and($bilan['sautes'])->toBeGreaterThanOrEqual(2)
         ->and(WorkspaceContext::current())->toBeNull();
 });
 

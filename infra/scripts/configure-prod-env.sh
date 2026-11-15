@@ -76,12 +76,24 @@ set_env "SESSION_SECURE_COOKIE"      "true"
 set_env "SESSION_SAME_SITE"          "lax"
 
 # --- Credentials APIs gouv (gratuites) ---
-set_env "INSEE_API_KEY"              "b98c0d7c-5d66-48db-8c0d-7c5d6618db49"
-set_env "FRANCE_TRAVAIL_CLIENT_ID"   "PAR_axioncrmpro_ac587402c48a18a26d1454b89c6b9da8ce99955c4ef87ebff707dff34bc89f9b"
-set_env "FRANCE_TRAVAIL_CLIENT_SECRET" "75d815fe88856084e392b0f98ffa3853a2026a8901e5b434e9c4fa49deb51863"
-
-# --- LLM Mistral ---
-set_env "MISTRAL_API_KEY"            "hmRulXWj7WoeDqoAougR8gZKfqb3yqNk"
+# 🔴 Ces quatre cles etaient ECRITES EN CLAIR ici depuis le premier commit du
+# fichier (dans un depot PUBLIC). Elles se fournissent desormais au lancement,
+# comme le bloc « Owner initial » ci-dessous, et ne sont JAMAIS versionnees :
+#   INSEE_API_KEY=... FRANCE_TRAVAIL_CLIENT_ID=... FRANCE_TRAVAIL_CLIENT_SECRET=...
+#   MISTRAL_API_KEY=... bash configure-prod-env.sh   (meme ligne de commande)
+# Une cle non fournie n'est PAS touchee : la valeur deja presente dans le .env
+# reste en place (jamais ecrasee par du vide). Les anciennes valeurs restent dans
+# l'historique git : seule leur regeneration chez INSEE, France Travail et
+# Mistral les rend inoffensives.
+for cle in INSEE_API_KEY FRANCE_TRAVAIL_CLIENT_ID FRANCE_TRAVAIL_CLIENT_SECRET MISTRAL_API_KEY; do
+  if [ -n "${!cle:-}" ]; then
+    set_env "$cle" "${!cle}"
+  elif grep -q "^${cle}=." "$ENV_FILE"; then
+    echo "  = ${cle} (deja dans le .env, inchangee)"
+  else
+    echo "  ⚠️  ${cle} absente : fournis-la au lancement (voir ci-dessus)." >&2
+  fi
+done
 
 # --- Owner initial ---
 # Valeurs fournies par le responsable au lancement (non versionnées) :

@@ -29,6 +29,7 @@ import {
 import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { FERMEES_INCLURE } from '@/features/companies/fermees';
+import { BadgeOpposee } from './BadgeOpposee';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
   NATURE_EMAIL_LABELS,
@@ -247,6 +248,7 @@ function PersonnesContent() {
                           {SOURCE_PERSONNE_LABELS[p.premiere_source] ?? p.premiere_source} ·{' '}
                           {NATURE_EMAIL_LABELS[p.email_nature]}
                         </span>
+                        <BadgeOpposee opposition={p.opposition} />
                         {p.rattachee ? (
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                             Rattachée · {p.entreprise ?? 'entreprise'}

@@ -4,6 +4,7 @@ namespace Tests\Feature\Envoi;
 
 use App\Envoi\Conformite\ImportOppositions;
 use App\Envoi\Conformite\RegistreOppositionManuel;
+use App\Exceptions\DelaiRequeteDepassee;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -396,44 +397,75 @@ test('route d’import : limiteur dédié, 429 au-delà de 30 requêtes par minu
 /** Déclencheur sur l'insertion du registre : lève un vrai SQLSTATE (57014 = délai dépassé) ou une erreur ordinaire. */
 function impDeclencheurRegistre(string $corps): void
 {
+    // Le déclencheur est retiré par l'appelant (finally) : voir impRetirerDeclencheurRegistre().
     DB::unprepared("CREATE OR REPLACE FUNCTION zz_echec_c() RETURNS trigger AS \$f\$ BEGIN {$corps} END \$f\$ LANGUAGE plpgsql");
     DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON envoi_oppositions_registre');
     DB::unprepared('CREATE TRIGGER zz_echec_c BEFORE INSERT ON envoi_oppositions_registre FOR EACH ROW EXECUTE FUNCTION zz_echec_c()');
 }
 
+function impRetirerDeclencheurRegistre(): void
+{
+    DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON envoi_oppositions_registre');
+}
+
 const IMP_DELAI = "RAISE EXCEPTION 'canceling statement due to statement timeout secret-valeur' USING ERRCODE = '57014';";
 
-test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requête trop longue », sans valeur dans la réponse', function () {
+test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requête trop longue », sans valeur dans la réponse ni dans les journaux', function () {
+    $journalises = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$journalises) {
+        $trace = [];
+        $e = $m->context['exception'] ?? null;
+        while ($e instanceof \Throwable) {
+            $trace[] = get_class($e) . ' ' . $e->getMessage() . ' ' . $e->getCode();
+            $e = $e->getPrevious();
+        }
+        $ctx = $m->context;
+        unset($ctx['exception']);
+        $journalises[] = $m->level . ' ' . $m->message . ' ' . json_encode($ctx) . ' ' . implode(' | ', $trace);
+    });
     $csv = "secret-valeur@clients.example.test\n";
     $jeton = impSimuler($this, $csv)['jeton'];
     impDeclencheurRegistre(IMP_DELAI);
-
-    $r = impConfirmer($this, $csv, $jeton);
+    try {
+        $r = impConfirmer($this, $csv, $jeton);
+    } finally {
+        impRetirerDeclencheurRegistre();
+    }
 
     $r->assertStatus(503)->assertJsonPath('error', 'requete_trop_longue');
-    expect((string) $r->getContent())->not->toContain('secret-valeur');
+    // Les VRAIES valeurs liées du SQL : empreinte de l'adresse, adresse, hash du fichier, jeton.
+    $interdits = ['secret-valeur', ListeSuppression::empreinte('secret-valeur@clients.example.test'), hash('sha256', $csv), $jeton, 'SQL:', 'insert into'];
+    foreach ($interdits as $x) {
+        expect((string) $r->getContent())->not->toContain($x);
+        foreach ($journalises as $ligne) {
+            expect($ligne)->not->toContain($x);
+        }
+    }
     expect(impRegistre($this))->toBe(0);
 });
 
-test('inscrireLot relance telle quelle une QueryException de délai dépassé, mais masque les autres', function () {
+test('inscrireLot ne relance jamais la QueryException : exception dédiée de délai, sans SQL ni précédente ; les autres sont masquées', function () {
     $entrees = [['portee' => 'adresse', 'valeur' => 'secret-lot@clients.example.test']];
     $registre = app(RegistreOppositionManuel::class);
     $appel = fn () => WorkspaceContext::run($this->espace->id, fn () => DB::transaction(fn () => $registre->inscrireLot($this->espace->id, (string) Str::uuid(), $entrees, 'm', 'a')));
 
-    impDeclencheurRegistre(IMP_DELAI);
-    $code = null;
     try {
-        $appel();
-    } catch (QueryException $e) {
-        $code = $e->errorInfo[0] ?? null;
-    }
-    expect($code)->toBe('57014');
+        impDeclencheurRegistre(IMP_DELAI);
+        try {
+            $appel();
+            $this->fail('attendu');
+        } catch (DelaiRequeteDepassee $e) {
+            expect($e->getPrevious())->toBeNull()->and($e->getMessage())->not->toContain('secret')->not->toContain('SQL');
+        }
 
-    impDeclencheurRegistre("RAISE EXCEPTION 'echec voulu secret-lot';");
-    try {
-        $appel();
-        $this->fail('attendu');
-    } catch (\RuntimeException $e) {
-        expect($e->getMessage())->not->toContain('secret')->and($e)->not->toBeInstanceOf(QueryException::class);
+        impDeclencheurRegistre("RAISE EXCEPTION 'echec voulu secret-lot';");
+        try {
+            $appel();
+            $this->fail('attendu');
+        } catch (\RuntimeException $e) {
+            expect($e->getMessage())->not->toContain('secret')->and($e)->not->toBeInstanceOf(QueryException::class)->not->toBeInstanceOf(DelaiRequeteDepassee::class);
+        }
+    } finally {
+        impRetirerDeclencheurRegistre();
     }
 });

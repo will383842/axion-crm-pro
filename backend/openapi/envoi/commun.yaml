@@ -182,6 +182,10 @@ components:
             - type: 'null'
         listes_noires: { type: integer, minimum: 0 }
         ajoute_le: { $ref: '#/components/schemas/Horodatage' }
+        adaptateur:
+          description: Adaptateur d'envoi du domaine (lecture seule, changé par commande locale).
+          type: string
+          enum: [faux, kumo, smtp]
         chauffe:
           oneOf:
             - $ref: '#/components/schemas/Chauffe'

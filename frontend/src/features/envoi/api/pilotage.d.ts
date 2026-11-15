@@ -37,9 +37,11 @@ export interface paths {
         /**
          * Liste « feu vert » avant le premier envoi réel
          * @description Les points `auto.*` sont calculés et jamais écrits ; les points `manuel.*`
-         *     portent une preuve humaine (catalogue v3 : 16 points automatiques et 28 manuels, 44 au total,
-         *     cases A4 à A12 du plan R07 comprises). Un point automatique sans source est toujours faux.
-         *     Les verrous sont en lecture seule.
+         *     portent une preuve humaine. Le catalogue est versionné côté serveur : le nombre de points
+         *     se lit dans `total`. Un point automatique sans source est
+         *     toujours faux. Les verrous sont en lecture seule. `empreinte_liste` (facultatif)
+         *     est l'empreinte de l'état exact affiché ; `decision` (facultatif) est la dernière
+         *     décision de feu vert, nulle s'il n'y en a pas encore.
          */
         get: operations["lireFeuVert"];
         put?: never;
@@ -69,6 +71,33 @@ export interface paths {
          *     (`fait` false, `bloquant` true) : sa preuve est affichée mais ne le valide pas.
          */
         post: operations["marquerPointFeuVert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/feu-vert/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accorder ou retirer le feu vert final
+         * @description Propriétaire seul (`workspaces.manage`, 403 sinon). Le feu vert est nécessaire, pas
+         *     suffisant : il ne touche jamais `ENVOI_REEL_ACTIF`. Décision consignée en ajout seul
+         *     avec la photo des points. Les règles suivantes sont **propres à « accorde »** :
+         *     l'en-tête `If-Match` (valeur de `empreinte_liste` lue à l'écran, avec ou sans
+         *     guillemets) est obligatoire (428 s'il manque), 412 si l'empreinte est périmée,
+         *     409 tant qu'un point bloquant est rouge (hors `auto.reel_actif_faux`). `empreinte_liste`
+         *     inclut la dernière décision et est calculée sans ce point. « retire » est toujours accepté (le stop
+         *     gagne) : sans en-tête ou avec une empreinte périmée, il ne renvoie jamais 412 ni 428.
+         */
+        post: operations["decisionFeuVert"];
         delete?: never;
         options?: never;
         head?: never;
@@ -192,7 +221,19 @@ export interface components {
                 reponses: number;
             }[];
         };
+        /** @description Dernière décision de feu vert. */
+        DecisionFeuVert: {
+            /** @enum {string} */
+            decision: "accorde" | "retire";
+            le: components["schemas"]["Horodatage"];
+            motif: string;
+        };
         DomaineResume: {
+            /**
+             * @description Adaptateur d'envoi du domaine (lecture seule, changé par commande locale).
+             * @enum {string}
+             */
+            adaptateur?: "faux" | "kumo" | "smtp";
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;
@@ -251,6 +292,16 @@ export interface components {
             reponses_interessees: number;
             /** @description Version du message type (regroupement par message). */
             version?: number;
+        };
+        ListeFeuVert: {
+            bloquants_restants: number;
+            decision?: components["schemas"]["DecisionFeuVert"] | null;
+            /** @description Empreinte de l'état exact affiché ; à renvoyer dans `If-Match`. */
+            empreinte_liste?: string;
+            faits: number;
+            points: components["schemas"]["PointFeuVert"][];
+            total: number;
+            verrous: components["schemas"]["VerrousFeuVert"];
         };
         /**
          * @description Palier de la montée en douceur (P1 le plus bas, P8 le plus haut).
@@ -408,6 +459,9 @@ export interface operations {
                 content: {
                     "application/json": {
                         bloquants_restants: number;
+                        decision?: components["schemas"]["DecisionFeuVert"] | null;
+                        /** @description Empreinte de l'état exact affiché ; à renvoyer dans `If-Match`. */
+                        empreinte_liste?: string;
                         faits: number;
                         points: components["schemas"]["PointFeuVert"][];
                         total: number;
@@ -449,6 +503,42 @@ export interface operations {
             403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
+        };
+    };
+    decisionFeuVert: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description `empreinte_liste` lue à l'écran. Exigé pour « accorde » seulement. */
+                "If-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "accorde" | "retire";
+                    motif: string;
+                };
+            };
+        };
+        responses: {
+            /** @description La liste après la décision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListeFeuVert"];
+                };
+            };
+            403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
+            412: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
+            428: components["responses"]["Erreur"];
         };
     };
     lireResultats: {

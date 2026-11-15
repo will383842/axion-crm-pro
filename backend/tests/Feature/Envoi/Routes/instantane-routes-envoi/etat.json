@@ -1,0 +1,12 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/etat",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "workspace"
+        ]
+    }
+]

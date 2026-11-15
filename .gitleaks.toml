@@ -55,3 +55,20 @@ regexes = [
   '''un-mot-de-passe-vraiment-unique-a35-2026''',
   '''le-mauvais-secret''',
 ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REGLE AJOUTEE LE 2026-11-15 : cles ecrites par `set_env "NOM" "valeur"`.
+#
+# `infra/scripts/configure-prod-env.sh` a porte QUATRE cles reelles en clair
+# (INSEE, France Travail x2, Mistral) depuis son premier commit, et ce job
+# restait VERT : la regle par defaut `generic-api-key` ne reconnait pas ce
+# format (deux chaines entre guillemets separees par des espaces, sans `=` ni
+# `:`). Cette regle le couvre, sans toucher aux autres regles ni a l'allowlist.
+# Une valeur qui commence par `$` (lue dans l'environnement) n'est pas visee.
+# ─────────────────────────────────────────────────────────────────────────────
+[[rules]]
+id = "set-env-secret-en-clair"
+description = "Secret ecrit en clair dans un appel set_env (scripts d'infra)"
+regex = '''set_env\s+"[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|CLIENT_ID)"\s+"([^"$]{8,})"'''
+secretGroup = 1
+keywords = ["set_env"]

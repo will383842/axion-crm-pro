@@ -8,12 +8,13 @@ import { api } from '@/lib/api';
 import type { components } from '../api/pilotage';
 import { messageErreur } from '../infrastructure/composants/format';
 import { OngletsSante } from './OngletsSante';
+import { DecisionFeuVert } from './composants/DecisionFeuVert';
 import { Chargement, Panne, Vide } from './composants/Etats';
 import { avertissementDemo, libelleBloquants } from './feuVertLibelles';
 
 type Point = components['schemas']['PointFeuVert'];
 type Verrous = components['schemas']['VerrousFeuVert'];
-interface FeuVert { points: Point[]; faits: number; total: number; bloquants_restants: number; verrous: Verrous }
+type FeuVert = components['schemas']['ListeFeuVert'];
 interface Geste { code: string; preuve: string; fait: boolean }
 
 const PREUVE_MIN = 10;
@@ -149,6 +150,7 @@ export function FeuVertPage() {
               })}
             </div>
             <div className="space-y-4">
+              <DecisionFeuVert liste={f} />
               <BlocVerrous v={f.verrous} />
               <Card>
                 <h2 className="text-lg font-bold text-slate-900">Avant le premier envoi</h2>

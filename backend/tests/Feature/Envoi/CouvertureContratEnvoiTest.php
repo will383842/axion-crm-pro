@@ -71,7 +71,12 @@ function cle(string $couple): string
 
 test('le contrat d’envoi est lu en entier', function () {
     expect(glob(dirname(__DIR__, 3) . '/openapi/envoi/*.yaml'))->not->toBeFalse()->and(count(glob(dirname(__DIR__, 3) . '/openapi/envoi/*.yaml')))->toBeGreaterThanOrEqual(10);
-    expect(count(couplesDuContrat()))->toBeGreaterThanOrEqual(108);
+    // Test modifié : pourquoi (D1 : un couple retiré du contrat, compensé par une assertion exacte).
+    expect(count(couplesDuContrat()))->toBeGreaterThanOrEqual(107);
+    expect(couplesDuContrat())
+        ->not->toContain('POST /envoi/reprendre')
+        ->not->toContain('POST /envoi/tout-arreter')
+        ->toContain('POST /envoi/arret-general');
 });
 
 test('chaque couple du contrat a une route, une entrée NonServiAuPalier0 ou un trou réel déclaré', function () {

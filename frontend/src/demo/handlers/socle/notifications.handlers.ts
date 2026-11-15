@@ -26,7 +26,7 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json({ data, unread_count: data.filter((n) => n.read_at === null).length });
   }),
 
-  http.post(api('/notifications/:id/lue'), async ({ params }) => {
+  http.post(api('/notifications/:id/read'), async ({ params }) => {
     await delai();
     const n = demoDb.notifications.modifier(String(params['id']), { read_at: maintenant().toISOString() });
     if (!n) return erreur(404, 'non_trouve', 'Cette notification n’existe pas.');

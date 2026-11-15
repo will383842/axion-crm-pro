@@ -223,8 +223,8 @@ export const COMPTEURS_ENVOI = {
 } as const;
 
 /**
- * Les routes du socle d'Envoi (état, « Tout arrêter », « Reprendre »,
- * compteurs), AVEC un état : « Tout arrêter » puis `GET /envoi/etat` rend bien
+ * Les routes du socle d'Envoi (état, arrêt général,
+ * compteurs ; la reprise est une commande locale, sans route), AVEC un état : « Tout arrêter » puis `GET /envoi/etat` rend bien
  * « arrêté ». Pas dans les handlers par défaut : sans Envoi, aucun écran ne
  * doit les appeler (et `onUnhandledRequest: 'error'` le prouve).
  */
@@ -233,12 +233,8 @@ export function handlersEnvoi(): HttpHandler[] {
   return [
     http.get(apiUrl('/envoi/etat'), () => HttpResponse.json(etat as never)),
     http.get(apiUrl('/envoi/compteurs'), () => HttpResponse.json(COMPTEURS_ENVOI as never)),
-    http.post(apiUrl('/envoi/tout-arreter'), () => {
+    http.post(apiUrl('/envoi/arret-general'), () => {
       etat = { etat: 'arrete', feu: 'rouge', depuis: '2027-01-12T10:42:00+01:00', par: 'Will Test', motif: 'Tout arrêter' };
-      return HttpResponse.json(etat as never);
-    }),
-    http.post(apiUrl('/envoi/reprendre'), () => {
-      etat = { ...ETAT_ENVOIS_ACTIF };
       return HttpResponse.json(etat as never);
     }),
   ];

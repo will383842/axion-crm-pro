@@ -4,6 +4,5 @@
 return [
     'GET /envoi/etat' => 'aucune route d’état global',
     'GET /envoi/compteurs' => 'aucune route de compteurs d’en-tête',
-    'POST /envoi/tout-arreter' => 'aucune route « Tout arrêter »',
-    'POST /envoi/reprendre' => 'aucune route « Reprendre »',
+    'POST /envoi/arret-general' => 'aucune route d’arrêt général (vague 3)',
 ];

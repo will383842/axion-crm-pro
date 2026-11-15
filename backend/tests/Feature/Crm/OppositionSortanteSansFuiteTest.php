@@ -36,7 +36,7 @@ function sansFuiteEchec(string $sqlstate, string $empreinte): QueryException
  * @param  null|Closure(string): mixed  $action  geste à lancer pendant la panne (reçoit l'empreinte) ; défaut : signalerSansBloquer
  * @return array{0: list<Throwable>, 1: list<string>}
  */
-function sansFuiteCapter(string $sqlstate, string $empreinte, ?Closure $action = null): array
+function sansFuiteCapter(string $sqlstate, string $empreinte, ?Closure $action = null, bool $transactionLeve = true): array
 {
     $signales = [];
     $journal = [];
@@ -66,32 +66,55 @@ function sansFuiteCapter(string $sqlstate, string $empreinte, ?Closure $action =
     Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$journal) {
         $journal[] = $m->level . ' ' . $m->message . ' ' . json_encode($m->context);
     });
-    $echec = sansFuiteEchec($sqlstate, $empreinte);
-    DB::shouldReceive('transaction')->andThrow($echec);
-    $action ??= static fn (string $e) => expect((new OppositionSortante)->signalerSansBloquer($e, 'business', 'registre_manuel', 'registre_manuel'))->toBeNull();
-    $action($empreinte);
+    // Les arguments d'appel des traces doivent être ignorés (comme en production, voir Dockerfile.laravel) :
+    // forcé ici pour que le test ne dépende pas du php.ini de la machine, puis restauré.
+    $iniAvant = ini_get('zend.exception_ignore_args');
+    ini_set('zend.exception_ignore_args', '1');
+    try {
+        $echec = sansFuiteEchec($sqlstate, $empreinte);
+        if ($transactionLeve) {
+            DB::shouldReceive('transaction')->andThrow($echec);
+        }
+        $action ??= static fn (string $e) => expect((new OppositionSortante)->signalerSansBloquer($e, 'business', 'registre_manuel', 'registre_manuel'))->toBeNull();
+        $action($empreinte);
+    } finally {
+        ini_set('zend.exception_ignore_args', $iniAvant === false ? '' : (string) $iniAvant);
+    }
 
     return [$faux->signales, $journal];
 }
 
 dataset('sqlstates', ['délai dépassé' => ['57014'], 'erreur ordinaire' => ['23505']]);
 
-/** Contrôle commun : 1 seule exception signalée, neuve, sans précédente, sans fuite, y compris dans les arguments de la trace. */
+/** Contrôle commun : 1 seule exception signalée, neuve, sans précédente, sans fuite (message, trace, journal). */
 function sansFuiteVerifier(array $signales, array $journal, string $sqlstate, string $empreinte): void
 {
     expect($signales)->toHaveCount(1);
     $e = $signales[0];
     expect($e)->not->toBeInstanceOf(QueryException::class)
         ->and($e->getPrevious())->toBeNull();
-    // getTraceAsString() coupe déjà les arguments : on contrôle getTrace() (arguments inclus) et le journal.
-    $trace = print_r(array_map(static fn (array $f): array => $f['args'] ?? [], $e->getTrace()), true);
-    $tout = $e->getMessage() . ' ' . $trace . ' ' . implode(' ', $journal);
+    // Précondition : arguments de trace ignorés (forcé par sansFuiteCapter). Sans cela, le premier cadre
+    // (exceptionSansFuite($e, $empreinte)) exposerait la QueryException entière : la vraie protection en production
+    // est zend.exception_ignore_args=On de Dockerfile.laravel, gardée par un test dédié ci-dessous.
+    foreach ($e->getTrace() as $cadre) {
+        // Les cadres include/require gardent toujours leur argument (un chemin de fichier, jamais de donnée).
+        if (! in_array($cadre['function'] ?? '', ['include', 'include_once', 'require', 'require_once'], true)) {
+            expect(array_key_exists('args', $cadre))->toBeFalse();
+        }
+    }
+    $tout = $e->getMessage() . ' ' . $e->getTraceAsString() . ' ' . implode(' ', $journal);
     expect($tout)->not->toContain($empreinte)
         ->not->toContain('a@clients.example.test')
         ->not->toContain('pg_advisory')
         ->not->toContain('select ')
         ->and($e->getMessage())->toContain($sqlstate)->toContain(substr($empreinte, 0, 12));
 }
+
+it('Dockerfile.laravel garde zend.exception_ignore_args=On (arguments de trace jamais envoyés)', function () {
+    $dockerfile = dirname(base_path()) . '/Dockerfile.laravel';
+    expect(is_file($dockerfile))->toBeTrue();
+    expect(file_get_contents($dockerfile))->toContain('zend.exception_ignore_args=On');
+});
 
 it('signalerSansBloquer ne laisse fuir ni empreinte complète, ni adresse, ni SQL, ni précédente', function (string $sqlstate) {
     $empreinte = hash('sha256', 'a@clients.example.test');
@@ -102,17 +125,35 @@ it('signalerSansBloquer ne laisse fuir ni empreinte complète, ni adresse, ni SQ
 it('TerminerEffetsOpposition ne signale jamais la QueryException brute', function (string $sqlstate) {
     $empreinte = hash('sha256', 'a@clients.example.test');
     $ws = (string) Str::uuid();
-    // La transaction d'opposition (verrou, signalement sortant) échoue avec une QueryException brute.
-    [$signales, $journal] = sansFuiteCapter($sqlstate, $empreinte, function (string $e) use ($ws) {
+    // La transaction EXÉCUTE la fermeture (l'empreinte est lue), puis l'émission de l'événement sortant échoue.
+    [$signales, $journal] = sansFuiteCapter($sqlstate, $empreinte, function (string $e) use ($ws, $sqlstate) {
         DB::shouldReceive('connection')->andReturn(Mockery::mock(ConnectionInterface::class)->shouldIgnoreMissing());
-        $effets = new TerminerEffetsOpposition(static function (): void {});
+        DB::shouldReceive('transaction')->andReturnUsing(static fn (Closure $fn) => $fn());
+        DB::shouldReceive('table')->andReturnUsing(static fn () => new class($e)
+        {
+            public function __construct(private string $empreinte) {}
+
+            public function __call($n, $a)
+            {
+                return $this;
+            }
+
+            public function first(): object
+            {
+                return (object) ['id' => 1, 'effets_termines_le' => null, 'empreinte_adresse' => $this->empreinte, 'lien_id' => 1, 'canal' => 'email'];
+            }
+
+            public function value(): string
+            {
+                return 'business';
+            }
+        });
+        $effets = new TerminerEffetsOpposition(static function () use ($sqlstate, $e): void {
+            throw sansFuiteEchec($sqlstate, $e);
+        });
         expect($effets->pour($ws, 1))->toBeFalse();
-    });
-    expect($signales)->toHaveCount(1);
-    expect($signales[0])->not->toBeInstanceOf(QueryException::class)->and($signales[0]->getPrevious())->toBeNull();
-    $tout = $signales[0]->getMessage() . ' ' . print_r(array_map(static fn (array $f): array => $f['args'] ?? [], $signales[0]->getTrace()), true);
-    expect($tout)->not->toContain($empreinte)->not->toContain('pg_advisory')->not->toContain('select ')
-        ->and($signales[0]->getMessage())->toContain($sqlstate);
+    }, false);
+    sansFuiteVerifier($signales, $journal, $sqlstate, $empreinte);
 })->with('sqlstates');
 
 it('crm:outbound-rattraper ne signale jamais la QueryException brute', function (string $sqlstate) {
@@ -139,9 +180,5 @@ it('crm:outbound-rattraper ne signale jamais la QueryException brute', function 
         DB::shouldReceive('raw')->andReturn('x');
         Artisan::call('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true]);
     });
-    expect($signales)->toHaveCount(1);
-    expect($signales[0])->not->toBeInstanceOf(QueryException::class)->and($signales[0]->getPrevious())->toBeNull();
-    $tout = $signales[0]->getMessage() . ' ' . print_r(array_map(static fn (array $f): array => $f['args'] ?? [], $signales[0]->getTrace()), true);
-    expect($tout)->not->toContain($empreinte)->not->toContain('pg_advisory')->not->toContain('select ')
-        ->and($signales[0]->getMessage())->toContain($sqlstate)->toContain(substr($empreinte, 0, 12));
+    sansFuiteVerifier($signales, $journal, $sqlstate, $empreinte);
 })->with('sqlstates');

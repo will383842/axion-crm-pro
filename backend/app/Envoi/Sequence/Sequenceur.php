@@ -96,9 +96,12 @@ final class Sequenceur
      */
     public function executer(string $ws, DateTimeImmutable $maintenant, int $limite = 100): array
     {
-        $ids = DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('statut', 'active')
-            ->where('prochaine_echeance', '<=', $maintenant->format('c'))
-            ->orderBy('prochaine_echeance')->limit($limite)->pluck('id')->all();
+        // Une séquence EN PAUSE (dernier geste de `envoi_sequences_gestes`, D6) est sautée ici : ses inscriptions ne sont pas
+        // traitées, donc leur compteur de reports ne bouge pas. Le geste est lu AVANT le traitement : le stop gagne toujours.
+        $ids = DB::table('envoi_inscriptions AS i')->where('i.workspace_id', $ws)->where('i.statut', 'active')
+            ->where('i.prochaine_echeance', '<=', $maintenant->format('c'))
+            ->whereRaw("COALESCE((SELECT g.geste FROM envoi_sequences_gestes g WHERE g.workspace_id = i.workspace_id AND g.sequence_id = i.sequence_id ORDER BY g.cree_le DESC, g.id DESC LIMIT 1), 'reprise') <> 'pause'")
+            ->orderBy('i.prochaine_echeance')->limit($limite)->pluck('i.id')->all();
         $bilan = [];
         foreach ($ids as $id) {
             try {

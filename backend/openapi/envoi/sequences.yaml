@@ -14,6 +14,7 @@ paths:
       operationId: listerSequences
       summary: Séquences
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '200':
           description: Séquences.
           content:
@@ -32,6 +33,7 @@ paths:
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '200':
           description: Séquence, étapes et possibilité de reprise.
           content:

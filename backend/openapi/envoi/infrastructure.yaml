@@ -15,6 +15,7 @@ paths:
       operationId: listerBoites
       summary: Boîtes d'envoi
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '200':
           description: Boîtes.
           content:
@@ -92,6 +93,7 @@ paths:
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '200':
           description: Boîte, 30 jours d'activité et derniers refus.
           content:
@@ -129,6 +131,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReglagesBoite' }
+        '501': { $ref: './commun.yaml#/components/responses/Erreur' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/boites/{id}/suspendre:
     post:
@@ -424,6 +427,7 @@ paths:
       operationId: lireChauffe
       summary: Chauffe des domaines et des adresses IP (montée en douceur par palier)
       responses:
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '200':
           description: Budget du jour, goulot, ressources en chauffe et table des paliers.
           content:
@@ -468,6 +472,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RessourceChauffe' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
         '409': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/listes-noires:

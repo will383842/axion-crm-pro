@@ -180,6 +180,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
         };
     };
     lireSequence: {
@@ -202,6 +203,7 @@ export interface operations {
                     "application/json": components["schemas"]["SequenceDetail"];
                 };
             };
+            403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
         };
     };

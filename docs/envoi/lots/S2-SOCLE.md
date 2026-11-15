@@ -7,6 +7,8 @@
 - `CouvertureContratEnvoiTest` : seuil 107 + `not->toContain` reprendre / tout-arreter, `toContain` arret-general.
 - Écran : `ToutArreter.tsx` appelle `api.post('/envoi/arret-general')` en littéral ; le bandeau n'a plus de bouton de reprise et donne la commande locale `envoi:reprendre`. Démo, gestionnaires MSW, e2e (A1–A3) et `ECARTS_CONNUS` alignés.
 
+- Écart à la liste fermée (signalé) : `frontend/tests/e2e/demo/dm2-inf.spec.ts` (scénario P9) attendait le bouton « Reprendre » que D1 supprime ; la CI « Démo » rougissait. Test modifié : pourquoi (D1) — l'assertion devient « bandeau sans bouton, avec la commande `envoi:reprendre` ». Aucune autre PR ouverte ne touche ce fichier. À corriger dans le plan.
+
 ## Reste
 - Route serveur `arret-general` (vague 3, audit sécurité) ; aucune route de reprise, voulu.
 

@@ -97,7 +97,7 @@ class EnvoiSocleController extends ApiController
             ->whereIn('commande', $arrete ? ['tout_arreter'] : ['reprise'])->orderByDesc('id')->first(['auteur', 'cree_le']));
         $depuis = $dernier->cree_le
             ?? WorkspaceContext::run($ws, fn () => DB::table('envoi_drapeaux')->where('workspace_id', $ws)->value('mis_a_jour_le'))
-            ?? DB::table('workspaces')->where('id', $ws)->value('created_at');
+            ?? 'now'; // espace jamais arrêté ni repris : le contrat exige un horodatage, c'est l'instant de la lecture
 
         return [
             'etat' => $arrete ? 'arrete' : 'actif',

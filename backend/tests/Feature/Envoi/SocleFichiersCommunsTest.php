@@ -5,6 +5,7 @@ use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\Orchestration\PorteEnvoiReelle;
+use App\Envoi\Serveur\AiguilleurServeurEnvoi;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Providers\Envoi\AiguillageServiceProvider;
 use App\Providers\Envoi\FeuVertDecisionServiceProvider;
@@ -100,8 +101,9 @@ test('chacun des 19 couples R19 est dans un trous/*.php, une route réelle, un n
     expect(count(array_intersect(couplesR19(), $trous)))->toBeGreaterThan(0);
 });
 
-test('envoi.serveur_interne vaut FauxServeurEnvoi par défaut', function () {
-    expect(app('envoi.serveur_interne'))->toBeInstanceOf(FauxServeurEnvoi::class);
+test('envoi.serveur_interne vaut l\'aiguilleur par domaine (K17-AIG), dont le seul adaptateur construit est FauxServeurEnvoi', function () {
+    expect(app('envoi.serveur_interne'))->toBeInstanceOf(AiguilleurServeurEnvoi::class)
+        ->and(app(FauxServeurEnvoi::class))->toBeInstanceOf(FauxServeurEnvoi::class);
 });
 
 test('PorteEnvoiReelle::ouverte() = ancienne fermeture, pour les huit combinaisons', function () {

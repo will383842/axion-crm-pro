@@ -62,11 +62,46 @@ function decoupageGroupesIndissociables(): array
 }
 
 /**
+ * Fichiers INCOMPATIBLES dans une meme part : le premier ecrit pour de bon en
+ * base (hors transaction) et pollue les index que le second inspecte. Chaque
+ * part CI a sa base PostgreSQL neuve : deux parts differentes = aucune pollution.
+ * C'est un contournement d'isolation ; la pollution reste a corriger a la source.
+ *
+ * @return list<list<string>> couples de fichiers qui ne doivent JAMAIS partager une part
+ */
+function decoupageFichiersIncompatibles(): array
+{
+    return [
+        // SequenceurConcurrenceTest ecrit dans companies/contacts ; EffacementServiParDesIndexTest
+        // echoue (index « etranger a l'effacement ») s'il tourne apres lui dans la meme base.
+        ['tests/Feature/Envoi/SequenceurConcurrenceTest.php', 'tests/Feature/Infra/EffacementServiParDesIndexTest.php'],
+    ];
+}
+
+/**
+ * @param  list<string>  $part  fichiers deja dans la part
+ * @param  list<string>  $unite  fichiers a placer
+ * @param  list<list<string>>  $incompatibles
+ */
+function decoupageContientIncompatible(array $part, array $unite, array $incompatibles): bool
+{
+    foreach ($incompatibles as $couple) {
+        if (array_intersect($couple, $unite) !== [] && array_intersect($couple, $part) !== []) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * @param  array<string, int>  $fichiers
+ * @param  list<list<string>>|null  $incompatibles  par defaut : decoupageFichiersIncompatibles()
  * @return array<int, list<string>> numero de part (1..N) => fichiers
  */
-function decoupageRepartir(array $fichiers, int $total): array
+function decoupageRepartir(array $fichiers, int $total, ?array $incompatibles = null): array
 {
+    $incompatibles ??= decoupageFichiersIncompatibles();
     $parts = [];
     $poids = [];
     for ($i = 1; $i <= $total; $i++) {
@@ -99,11 +134,18 @@ function decoupageRepartir(array $fichiers, int $total): array
     usort($unites, fn (array $a, array $b) => [$taille($b), $a[0]] <=> [$taille($a), $b[0]]);
 
     foreach ($unites as $unite) {
-        $cible = 1;
-        for ($i = 2; $i <= $total; $i++) {
-            if ($poids[$i] < $poids[$cible]) {
+        // Part la moins chargee parmi celles qui ne contiennent aucun fichier incompatible.
+        $cible = null;
+        for ($i = 1; $i <= $total; $i++) {
+            if (decoupageContientIncompatible($parts[$i], $unite, $incompatibles)) {
+                continue;
+            }
+            if ($cible === null || $poids[$i] < $poids[$cible]) {
                 $cible = $i;
             }
+        }
+        if ($cible === null) {
+            throw new RuntimeException('Aucune part compatible pour : ' . implode(', ', $unite) . ' (augmenter le nombre de parts).');
         }
         foreach ($unite as $chemin) {
             $parts[$cible][] = $chemin;

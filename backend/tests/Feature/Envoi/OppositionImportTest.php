@@ -418,7 +418,7 @@ test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requêt
 test('inscrireLot relance telle quelle une QueryException de délai dépassé, mais masque les autres', function () {
     $entrees = [['portee' => 'adresse', 'valeur' => 'secret-lot@clients.example.test']];
     $registre = app(RegistreOppositionManuel::class);
-    $appel = fn () => DB::transaction(fn () => WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, (string) Str::uuid(), $entrees, 'm', 'a')));
+    $appel = fn () => WorkspaceContext::run($this->espace->id, fn () => DB::transaction(fn () => $registre->inscrireLot($this->espace->id, (string) Str::uuid(), $entrees, 'm', 'a')));
 
     impDeclencheurRegistre(IMP_DELAI);
     $code = null;

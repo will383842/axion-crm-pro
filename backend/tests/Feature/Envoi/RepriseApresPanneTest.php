@@ -19,6 +19,7 @@ use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\ExpectationFailedException;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\FauxServeurPersistant;
 use Tests\TestCase;
@@ -27,7 +28,13 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const REPRISE_PLAFOND = 2;
 
-/** Un lundi lointain, fixé par scénario (jamais un jour utilisé par un autre test : les compteurs sont écrits pour de bon). */
+/**
+ * Un lundi lointain (an 2100), fixé par scénario : 7 lundis possibles, choisis par `crc32(point) % 7`. Deux points peuvent partager le même lundi
+ * (c'est le cas de `apres_temps_A` et `pendant_appel`, tous deux à 0) : sans effet, car `repNettoyer` efface `envoi_compteur_global`
+ * par jour et les tests passent en séquence. Les compteurs sont écrits pour de bon ;
+ * d'autres tests de l'envoi tirent aussi des jours en 2100 (au hasard), une rencontre est improbable mais pas exclue, d'où le
+ * nettoyage ciblé de `repNettoyer`.
+ */
 function repLundi(string $point): DateTimeImmutable
 {
     return (new DateTimeImmutable('2100-01-04 10:00:00', new DateTimeZone('Europe/Paris')))->modify('+' . (7 * (crc32($point) % 7)) . ' days');
@@ -42,6 +49,7 @@ function repEspace(DateTimeImmutable $lundi): array
 {
     $precedente = DB::getDefaultConnection();
     DB::setDefaultConnection('pgsql_owner'); // connexion hors de la transaction du test : tout est validé pour de bon
+    $ws = null;
     try {
         $ws = F::espace('zz-reprise');
         DB::table('workspaces')->where('id', $ws)->update(['settings' => json_encode(['produits' => ['envoi' => 'actif']])]);
@@ -78,6 +86,16 @@ function repEspace(DateTimeImmutable $lundi): array
         WorkspaceContext::clear();
 
         return ['ws' => $ws, 'ins' => $ids];
+    } catch (Throwable $e) {
+        // Échec en cours de montage : l'appelant n'a pas reçu l'identifiant, on retire ici ce qui a déjà été validé.
+        if ($ws !== null) {
+            try {
+                repNettoyer($ws, $lundi);
+            } catch (Throwable) {
+                // le nettoyage échoue à son tour : on ne masque pas l'exception d'origine
+            }
+        }
+        throw $e;
     } finally {
         DB::setDefaultConnection($precedente);
     }
@@ -109,7 +127,7 @@ function repNettoyer(string $ws, DateTimeImmutable $lundi): void
  */
 function repOuvrier(string $ws, string $run, string $point, DateTimeImmutable $instant): array
 {
-    $env = array_merge(getenv(), ['APP_ENV' => 'testing', 'CACHE_STORE' => 'array', 'ENVOI_REEL_ACTIF' => 'false']);
+    $env = array_merge(getenv(), ['APP_ENV' => 'testing', 'CACHE_STORE' => 'array', 'ENVOI_REEL_ACTIF' => 'false', FauxServeurPersistant::ENV_TABLE => FauxServeurPersistant::table()]);
     $p = proc_open([PHP_BINARY, base_path('tests/Support/ouvrier_cycle.php'), $ws, $run, $point, $instant->format('c'), (string) REPRISE_PLAFOND], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, base_path(), $env);
     expect(is_resource($p))->toBeTrue();
     $out = stream_get_contents($pipes[1]);
@@ -135,6 +153,21 @@ function repOuvrier(string $ws, string $run, string $point, DateTimeImmutable $i
     ];
 }
 
+/**
+ * Alertes critiques d'un cycle. La sortie du fils DOIT être un JSON valide portant la clé `critiques` : sinon `[]` passerait
+ * pour « aucune alerte » alors que rien n'a été lu.
+ *
+ * @param  array{signal: ?int, code: int, sortie: ?array<string, mixed>, erreur: string}  $cycle
+ * @return list<string>
+ */
+function repCritiques(array $cycle, string $nom): array
+{
+    expect(is_array($cycle['sortie']))->toBeTrue("sortie du {$nom} : JSON invalide ou absent : " . $cycle['erreur']);
+    expect(is_array($cycle['sortie']['critiques'] ?? null))->toBeTrue("sortie du {$nom} : clé « critiques » absente : " . $cycle['erreur']);
+
+    return array_values(array_map('strval', $cycle['sortie']['critiques']));
+}
+
 /** @return array<string, mixed> photo de l'état durable (lue sur la connexion propriétaire, sans contexte : le propriétaire contourne la RLS) */
 function repPhoto(string $ws, string $run): array
 {
@@ -152,15 +185,16 @@ function repPhoto(string $ws, string $run): array
 /**
  * Déroule un scénario : cycle 1 tué au point donné, cycle 2 (+2 h, la réservation est « ancienne »), cycle 3 (+3 h, rien ne doit bouger).
  *
- * @return array{ws: string, ins: list<string>, run: string, photo: array<string, mixed>, apres2: array<string, mixed>, critiques: list<string>, cycle3: array<string, mixed>}
+ * @return array{ws: string, ins: list<string>, run: string, photo: array<string, mixed>, apres2: array<string, mixed>, critiques: list<string>, critiques3: list<string>, cycle3: array<string, mixed>}
  */
 function repScenario(string $point, ?Closure $casserLaReprise = null): array
 {
     $lundi = repLundi($point);
     $run = (string) Str::uuid();
-    FauxServeurPersistant::creerTable();
-    $e = repEspace($lundi);
+    $e = null;
     try {
+        FauxServeurPersistant::creerTable();
+        $e = repEspace($lundi);
         $premier = repOuvrier($e['ws'], $run, $point, $lundi);
         expect($premier['signal'])->toBe(9, "le processus devait mourir par SIGKILL ({$point}) : " . $premier['erreur']);
         $photo = repPhoto($e['ws'], $run);
@@ -169,13 +203,18 @@ function repScenario(string $point, ?Closure $casserLaReprise = null): array
         }
         $deux = repOuvrier($e['ws'], $run, 'aucun', $lundi->modify('+2 hours'));
         expect($deux['code'])->toBe(0, 'reprise en échec : ' . $deux['erreur']);
+        $critiques = repCritiques($deux, 'cycle 2');
         $apres2 = repPhoto($e['ws'], $run);
         $trois = repOuvrier($e['ws'], $run, 'aucun', $lundi->modify('+3 hours'));
         expect($trois['code'])->toBe(0, 'troisième cycle en échec : ' . $trois['erreur']);
+        $critiques3 = repCritiques($trois, 'cycle 3');
+        $critiques = array_merge($critiques, $critiques3);
 
-        return $e + ['run' => $run, 'photo' => $photo, 'apres2' => $apres2, 'critiques' => $deux['sortie']['critiques'] ?? [], 'cycle3' => repPhoto($e['ws'], $run)];
+        return $e + ['run' => $run, 'photo' => $photo, 'apres2' => $apres2, 'critiques' => $critiques, 'critiques3' => $critiques3, 'cycle3' => repPhoto($e['ws'], $run)];
     } finally {
-        repNettoyer($e['ws'], $lundi);
+        if ($e !== null) {
+            repNettoyer($e['ws'], $lundi);
+        }
         FauxServeurPersistant::retirerTable();
     }
 }
@@ -214,6 +253,7 @@ test('arrêt brutal pendant l\'appel (rien n\'est parti) : issue incertaine, ins
         ->and($r['cycle3']['inscriptions'][$i1])->not->toBe('active')
         ->and($r['cycle3']['messages'][$i1])->not->toBe('envoye')
         ->and($r['critiques'])->toContain('envoi.injection_a_verifier')
+        ->and($r['critiques3'])->toBe([]) // le troisième cycle n'alerte plus rien
         ->and($r['cycle3']['messages'][$i2])->toBe('envoye');
     repInvariants($r);
 });
@@ -227,6 +267,7 @@ test('arrêt brutal après l\'acceptation du faux serveur : le message n\'est PA
         ->and($r['cycle3']['inscriptions'][$i1])->not->toBe('active')
         ->and($r['cycle3']['messages'][$i1])->not->toBe('envoye')
         ->and($r['critiques'])->toContain('envoi.injection_a_verifier')
+        ->and($r['critiques3'])->toBe([]) // le troisième cycle n'alerte plus rien
         ->and($r['cycle3']['messages'][$i2])->toBe('envoye');
     repInvariants($r);
 });
@@ -270,4 +311,13 @@ test('témoin : sans mémoire durable de la reprise, le message accepté est inj
         $rougit = true;
     }
     expect($rougit)->toBeTrue('le détecteur d\'invariants devait rougir sur un double envoi');
+});
+
+test('garde du détecteur d\'alertes : une sortie du fils illisible ou sans « critiques » fait échouer au lieu de passer pour « aucune alerte »', function () {
+    $vide = ['signal' => null, 'code' => 0, 'sortie' => null, 'erreur' => 'rien'];
+    $sansCle = ['signal' => null, 'code' => 0, 'sortie' => ['bilan' => []], 'erreur' => ''];
+
+    expect(fn () => repCritiques($vide, 'cycle test'))->toThrow(ExpectationFailedException::class)
+        ->and(fn () => repCritiques($sansCle, 'cycle test'))->toThrow(ExpectationFailedException::class)
+        ->and(repCritiques(['signal' => null, 'code' => 0, 'sortie' => ['critiques' => ['envoi.x']], 'erreur' => ''], 'cycle test'))->toBe(['envoi.x']);
 });

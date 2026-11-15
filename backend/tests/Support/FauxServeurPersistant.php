@@ -12,6 +12,7 @@ use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use Closure;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * P1-REPRISE — faux serveur d'envoi dont le REGISTRE survit à la mort du processus (`FauxServeurEnvoi` garde le sien en mémoire).
@@ -22,7 +23,29 @@ use Illuminate\Support\Facades\DB;
  */
 final class FauxServeurPersistant implements ServeurEnvoi
 {
-    public const TABLE = 'zz_p1_faux_serveur';
+    public const PREFIXE_TABLE = 'zz_p1_faux_serveur_';
+
+    /** Variable d'environnement par laquelle le test transmet à l'ouvrier le nom de table de SON exécution. */
+    public const ENV_TABLE = 'FAUX_SERVEUR_TABLE';
+
+    private static ?string $table = null;
+
+    /**
+     * Nom de table propre à CETTE exécution (suffixe aléatoire) : deux exécutions simultanées ne se marchent pas dessus. Le processus
+     * de test le tire ; l'ouvrier le reçoit par `ENV_TABLE` (le nom est validé : il finit dans du SQL).
+     */
+    public static function table(): string
+    {
+        if (self::$table === null) {
+            $recu = getenv(self::ENV_TABLE);
+            self::$table = $recu !== false && $recu !== '' ? $recu : self::PREFIXE_TABLE . bin2hex(random_bytes(6));
+            if (preg_match('/^' . self::PREFIXE_TABLE . '[a-f0-9]{12}$/', self::$table) !== 1) {
+                throw new RuntimeException('Nom de table du faux serveur invalide.');
+            }
+        }
+
+        return self::$table;
+    }
 
     /** Points d'arrêt : appelés avant / après l'écriture du registre (le processus s'y fait tuer). */
     public ?Closure $pendantAppel = null;
@@ -33,19 +56,19 @@ final class FauxServeurPersistant implements ServeurEnvoi
 
     public static function creerTable(): void
     {
-        DB::connection('pgsql_owner')->unprepared('CREATE TABLE IF NOT EXISTS ' . self::TABLE . ' (n BIGSERIAL PRIMARY KEY, run TEXT NOT NULL, cle TEXT NOT NULL, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())');
+        DB::connection('pgsql_owner')->unprepared('CREATE TABLE IF NOT EXISTS ' . self::table() . ' (n BIGSERIAL PRIMARY KEY, run TEXT NOT NULL, cle TEXT NOT NULL, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())');
     }
 
     public static function retirerTable(): void
     {
-        DB::connection('pgsql_owner')->unprepared('DROP TABLE IF EXISTS ' . self::TABLE);
+        DB::connection('pgsql_owner')->unprepared('DROP TABLE IF EXISTS ' . self::table());
     }
 
     /** @return array<string, int> clé d'idempotence => nombre d'appels qui ont « envoyé » */
     public static function appels(string $run): array
     {
         $out = [];
-        foreach (DB::connection('pgsql_owner')->table(self::TABLE)->where('run', $run)->orderBy('n')->pluck('cle') as $cle) {
+        foreach (DB::connection('pgsql_owner')->table(self::table())->where('run', $run)->orderBy('n')->pluck('cle') as $cle) {
             $out[(string) $cle] = ($out[(string) $cle] ?? 0) + 1;
         }
 
@@ -60,7 +83,7 @@ final class FauxServeurPersistant implements ServeurEnvoi
         if ($this->pendantAppel !== null) {
             ($this->pendantAppel)($message->cleIdempotence);
         }
-        $n = (int) DB::connection('pgsql_owner')->table(self::TABLE)->insertGetId(['run' => $this->run, 'cle' => $message->cleIdempotence], 'n');
+        $n = (int) DB::connection('pgsql_owner')->table(self::table())->insertGetId(['run' => $this->run, 'cle' => $message->cleIdempotence], 'n');
         if ($this->apresAcceptation !== null) {
             ($this->apresAcceptation)($message->cleIdempotence);
         }

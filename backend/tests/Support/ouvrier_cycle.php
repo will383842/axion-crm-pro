@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Tests\Support\FauxServeurPersistant;
 
+require __DIR__ . '/garde_environnement_ouvrier.php'; // avant tout : hors APP_ENV=testing, arrêt code 3
 require __DIR__ . '/../../vendor/autoload.php';
 $app = require __DIR__ . '/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();

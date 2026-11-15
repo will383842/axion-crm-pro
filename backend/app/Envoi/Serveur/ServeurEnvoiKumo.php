@@ -156,13 +156,13 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             return ResultatInjection::accepte($id);
         }
         if ($code >= 400 && $code < 500) {
-            return $this->reporter($cle, $id, $jeton);
+            return $this->reporter($cle, $id, $jeton, $code);
         }
         if ($code >= 500 && $code < 600) {
             $this->noter($cle, $id, 'echec', $jeton);
             $this->registre->noter5xx($this->workspaceId, ($this->horloge)()->getTimestamp());
             $this->pauseSiTrop5xx();
-            throw new RefusDefinitifServeur('Refus définitif du serveur d’envoi (' . $code . ').');
+            throw new RefusDefinitifServeur('Refus définitif du serveur d’envoi (' . $code . ').', $code);
         }
 
         return $this->incertain($cle, $id, $jeton); // code inattendu : sort incertain
@@ -268,12 +268,13 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         throw new RefusDefinitifServeur('Refus définitif constaté par le serveur d’envoi.');
     }
 
-    private function reporter(string $cle, string $id, string $jeton): ResultatInjection
+    /** @param ?int $codeSmtp code 4xx reçu ; nul quand aucun code n'a été lu (coupure avant DATA) */
+    private function reporter(string $cle, string $id, string $jeton, ?int $codeSmtp = null): ResultatInjection
     {
         $jusqua = ($this->horloge)()->modify('+' . max(1, (int) config('envoi.smtp_delai_4xx_minutes', 15)) . ' minutes');
         $this->noter($cle, $id, 'reporte', $jeton, $jusqua->getTimestamp());
 
-        return ResultatInjection::reporteEchec($jusqua);
+        return ResultatInjection::reporteEchec($jusqua, $codeSmtp);
     }
 
     private function incertain(string $cle, string $id, string $jeton): ResultatInjection

@@ -125,6 +125,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_03_000050_envoi_feu_vert_decisions.php',
     // Filet modifié : pourquoi — envoi S1-B : injections locales (AJOUT SEUL) et déclencheur `envoi_verifie_id_injection` élargi ; les retirer ferait refuser le registre des messages envoyés ; down() inerte, up() rejouable.
     '2026_12_03_000080_envoi_injections_locales.php',
+    // Filet modifié : pourquoi — envoi S1-C : imports de listes de refus (AJOUT SEUL) et colonne `import_id` du registre ; les retirer effacerait l'historique des imports ou la trace de l'origine d'un refus ; down() inerte, up() rejouable.
+    '2026_12_03_000020_envoi_oppositions_imports.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

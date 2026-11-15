@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
+import { definirFeuVertDemo } from '@/demo/handlers/envoi/pilotage.handlers';
 import { FeuVertPage } from '@/features/envoi/pilotage/FeuVertPage';
 import { handlers } from '@/demo/handlers/envoi/pilotage.handlers';
 import { demoDb } from '@/demo/base';
@@ -175,5 +176,154 @@ describe('FeuVertPage — écran du feu vert', () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync('src/features/envoi/pilotage/FeuVertPage.tsx', 'utf8');
     expect(src).not.toContain('constaté depuis l’écran');
+  });
+
+  // ── F-FV : décision finale ─────────────────────────────────────────────
+  describe('décision finale (F-FV)', () => {
+    const ORIGINE = 'https://api.localhost/api/v1';
+    const moi = (roles: string[]) => http.get(`${ORIGINE}/auth/me`, () => HttpResponse.json({ user: { id: 'u-1', name: 'Démo', email: 'demo@example.test', current_workspace_id: 'ws-1' }, roles }));
+    const proprietaire = () => moi(['owner']);
+    const montrer = (extra: ReturnType<typeof http.post>[] = [], droits = proprietaire()) =>
+      renderScreen(<FeuVertPage />, { path: '/envoi/sante/feu-vert', handlers: [droits, ...extra, ...handlers] });
+    const MOTIF = 'Tout a été relu avec le fondateur.';
+    const erreurServeur = (statut: number, message: string) =>
+      http.post(`${ORIGINE}/envoi/feu-vert/decision`, () => HttpResponse.json({ error: 'x', message }, { status: statut }));
+
+    beforeEach(() => definirFeuVertDemo(null));
+    afterEach(() => definirFeuVertDemo(null));
+
+    it('la page dit que l’accord n’active pas l’envoi réel', async () => {
+      await montrer();
+      expect(await screen.findByText(/n’active pas l’envoi réel/)).toBeVisible();
+    });
+
+    it('droits attendus : aucun bouton avant /auth/me, puis masqués pour un administrateur ou un lecteur', async () => {
+      for (const roles of [['admin'], ['viewer']]) {
+        const vue = await montrer([], moi(roles));
+        const { unmount } = vue;
+        await screen.findByRole('heading', { name: 'Décision finale' });
+        // Droits lus AVANT toute vérification d'absence : sinon « absent » serait vrai pour la mauvaise raison.
+        await waitFor(() => expect(vue.queryClient.getQueryState(['auth', 'me'])?.status).toBe('success'));
+        await screen.findByText(/Aucune décision/);
+        expect(screen.queryByRole('button', { name: 'Accorder le feu vert' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Retirer le feu vert' })).toBeNull();
+        unmount();
+      }
+    });
+
+    it('propriétaire : « Accorder » désactivé tant qu’un bloquant est rouge, « Retirer » possible', async () => {
+      await montrer();
+      expect(await screen.findByRole('button', { name: 'Accorder le feu vert' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Retirer le feu vert' })).toBeEnabled();
+      expect(screen.getByText(/à lever avant d’accorder/)).toBeVisible();
+    });
+
+    it('sans bloquant : motif obligatoire, confirmation explicite, If-Match = empreinte lue', async () => {
+      definirFeuVertDemo('sans-bloquant');
+      const user = userEvent.setup();
+      let entete: string | null = null;
+      let corps: unknown;
+      let lue = '';
+      await montrer([
+        http.post(`${ORIGINE}/envoi/feu-vert/decision`, async ({ request }) => { entete = request.headers.get('If-Match'); corps = await request.clone().json(); return undefined; }),
+      ]);
+      const bouton = await screen.findByRole('button', { name: 'Accorder le feu vert' });
+      await waitFor(() => expect(bouton).toBeEnabled());
+      const lecture = (await (await fetch(`${ORIGINE}/envoi/feu-vert`)).json()) as { empreinte_liste: string };
+      lue = lecture.empreinte_liste;
+      await user.click(bouton);
+      const dialogue = await screen.findByRole('dialog');
+      expect(within(dialogue).getByText(/n’active pas l’envoi réel/)).toBeVisible();
+      const confirmer = within(dialogue).getByRole('button', { name: 'Confirmer l’accord' });
+      expect(confirmer).toBeDisabled();
+      await user.type(within(dialogue).getByLabelText(/Motif/), 'court');
+      expect(confirmer).toBeDisabled();
+      await user.clear(within(dialogue).getByLabelText(/Motif/));
+      await user.type(within(dialogue).getByLabelText(/Motif/), MOTIF);
+      await user.click(confirmer);
+      expect(await screen.findByText(MOTIF)).toBeVisible();
+      expect(corps).toEqual({ decision: 'accorde', motif: MOTIF });
+      expect(entete).toBe(lue);
+      expect(lue).not.toBe('');
+      expect(screen.getByText(/Accordé/)).toBeVisible();
+    });
+
+    it('412 : message en clair, la liste est relue, aucun réessai silencieux', async () => {
+      definirFeuVertDemo('sans-bloquant');
+      const user = userEvent.setup();
+      let appels = 0;
+      let lectures = 0;
+      await montrer([
+        http.post(`${ORIGINE}/envoi/feu-vert/decision`, () => { appels += 1; return HttpResponse.json({ error: 'empreinte_perimee', message: 'La liste a changé depuis votre lecture.' }, { status: 412 }); }),
+        http.get(`${ORIGINE}/envoi/feu-vert`, () => { lectures += 1; return undefined; }),
+      ]);
+      const bouton = await screen.findByRole('button', { name: 'Accorder le feu vert' });
+      await waitFor(() => expect(bouton).toBeEnabled());
+      await user.click(bouton);
+      await user.type(screen.getByLabelText(/Motif/), MOTIF);
+      const avant = lectures;
+      await user.click(screen.getByRole('button', { name: 'Confirmer l’accord' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('La liste a changé depuis votre lecture.');
+      await waitFor(() => expect(lectures).toBeGreaterThan(avant));
+      expect(appels).toBe(1);
+    });
+
+    it.each([[428, 'Lisez d’abord la liste.'], [409, 'Un point bloquant n’est pas au vert.'], [422, 'Le motif ne doit pas contenir d’adresse e-mail.']])('%i : le message du serveur est affiché', async (statut, message) => {
+      definirFeuVertDemo('sans-bloquant');
+      const user = userEvent.setup();
+      await montrer([erreurServeur(statut, message)]);
+      const bouton = await screen.findByRole('button', { name: 'Accorder le feu vert' });
+      await waitFor(() => expect(bouton).toBeEnabled());
+      await user.click(bouton);
+      await user.type(screen.getByLabelText(/Motif/), MOTIF);
+      await user.click(screen.getByRole('button', { name: 'Confirmer l’accord' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    });
+
+    it('« Retirer » : toujours possible, motif requis, pas d’If-Match, motif invalide signalé', async () => {
+      const user = userEvent.setup();
+      let entete: string | null = 'non lu';
+      let corps: unknown;
+      await montrer([
+        http.post(`${ORIGINE}/envoi/feu-vert/decision`, async ({ request }) => { entete = request.headers.get('If-Match'); corps = await request.clone().json(); return undefined; }),
+      ]);
+      await user.click(await screen.findByRole('button', { name: 'Retirer le feu vert' }));
+      const dialogue = await screen.findByRole('dialog');
+      expect(within(dialogue).getByText(/de 10 à 500 caractères/)).toBeVisible();
+      const confirmer = within(dialogue).getByRole('button', { name: 'Confirmer le retrait' });
+      expect(confirmer).toBeDisabled();
+      await user.type(within(dialogue).getByLabelText(/Motif/), 'Arrêt demandé par prudence.');
+      await user.click(confirmer);
+      expect(await screen.findByText('Arrêt demandé par prudence.')).toBeVisible();
+      expect(corps).toEqual({ decision: 'retire', motif: 'Arrêt demandé par prudence.' });
+      expect(entete).toBeNull();
+      expect(screen.getByText(/Retiré/)).toBeVisible();
+    });
+
+    it('« Retirer » refusé 422 : le refus est dit clairement, le stop n’est pas présenté comme acquis', async () => {
+      const user = userEvent.setup();
+      await montrer([erreurServeur(422, 'Le motif ne doit pas contenir d’adresse e-mail.')]);
+      await user.click(await screen.findByRole('button', { name: 'Retirer le feu vert' }));
+      await user.type(screen.getByLabelText(/Motif/), 'écrit à jean @ exemple.test ok');
+      await user.click(screen.getByRole('button', { name: 'Confirmer le retrait' }));
+      const alerte = await screen.findByRole('alert');
+      expect(alerte).toHaveTextContent('Le motif ne doit pas contenir d’adresse e-mail.');
+      expect(alerte).toHaveTextContent(/retrait n’a pas été enregistré/);
+    });
+
+    it('affiche la dernière décision : décision, motif, date — rien d’autre', async () => {
+      definirFeuVertDemo('sans-bloquant');
+      const user = userEvent.setup();
+      await montrer();
+      const bouton = await screen.findByRole('button', { name: 'Accorder le feu vert' });
+      await waitFor(() => expect(bouton).toBeEnabled());
+      await user.click(bouton);
+      await user.type(screen.getByLabelText(/Motif/), MOTIF);
+      await user.click(screen.getByRole('button', { name: 'Confirmer l’accord' }));
+      const bloc = (await screen.findByRole('heading', { name: 'Décision finale' })).closest('section') as HTMLElement;
+      await within(bloc).findByText(MOTIF);
+      expect(bloc.textContent).toMatch(/Accordé.*le \d{1,2}/);
+      expect(bloc.textContent).not.toContain('@');
+    });
   });
 });

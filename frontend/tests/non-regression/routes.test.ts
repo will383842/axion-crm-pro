@@ -166,6 +166,10 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/sequences/{p}',
   'POST /api/v1/envoi/sequences/{p}/pause',
   'POST /api/v1/envoi/sequences/{p}/reprise',
+  // F-FV — décision finale du feu vert : appel littéral dans DecisionFeuVert.tsx ; la route serveur
+  // (K17-FV) est en vague 3 et le filet ne lit pas le contrat d'Envoi.
+  // Filet modifié : pourquoi — un nouvel appel littéral à une route absente du filet d'origine, figé comme les autres.
+  'POST /api/v1/envoi/feu-vert/decision',
 ];
 
 function fichiers(dossier: string): string[] {

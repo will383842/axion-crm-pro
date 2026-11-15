@@ -7,9 +7,10 @@ use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -99,10 +100,50 @@ test('confirmation sans jeton, jeton inconnu, jeton d’un autre utilisateur ⇒
     expect(impRegistre($this))->toBe(0);
 });
 
-test('contenu modifié d’un octet ⇒ 409, rien d’écrit', function () {
+test('contenu différent (l’empreinte est normalisée : minuscules + rognage, via ListeSuppression::empreinte) ⇒ 409, rien d’écrit', function () {
     $jeton = impSimuler($this, "a@clients.example.test\n")['jeton'];
     impConfirmer($this, "b@clients.example.test\n", $jeton)->assertStatus(409);
     expect(impRegistre($this))->toBe(0);
+});
+
+test('fichier commençant par des lignes vides : la ligne refusée garde son vrai numéro (pas de rognage du champ contenu)', function () {
+    $r = impSimuler($this, "\n\n=a@x.example.test\nok@x.example.test\n");
+    expect($r['refusees'])->toHaveCount(1)->and($r['refusees'][0]['ligne'])->toBe(3)->and($r['valides'])->toBe(1);
+});
+
+test('tabulation en tête de la ligne 1 ⇒ refusée (jamais rognée en silence)', function () {
+    $r = impSimuler($this, "\te@x.example.test\nok@x.example.test\n");
+    expect(array_column($r['refusees'], 'ligne'))->toBe([1])->and($r['valides'])->toBe(1);
+});
+
+test('1 048 577 octets finissant par un saut de ligne ⇒ 422 (le plafond ne se contourne pas d’un octet)', function () {
+    $contenu = str_repeat('x', 1048576) . "\n";
+    expect(strlen($contenu))->toBe(1048577);
+    $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => $contenu])->assertStatus(422);
+});
+
+test('valeur entre guillemets commençant par = ⇒ refusée', function () {
+    $r = impSimuler($this, "\"=a@x.example.test\"\nok@x.example.test\n");
+    expect(array_column($r['refusees'], 'ligne'))->toBe([1])->and($r['valides'])->toBe(1);
+});
+
+test('refus avant le contrôleur (403) : payload_hash ne dépend ni du contenu ni du jeton (pas d’oracle par dictionnaire)', function () {
+    $csv = "seule@clients.example.test\n";
+    $this->actingAs($this->compte($this->espace, 'admin'))->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => $csv])->assertForbidden();
+    $l = DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->first();
+    expect($l)->not->toBeNull();
+    expect($l->payload_hash)->not->toBe(AuditHashChainLogger::empreinteDuCorps(['etape' => 'simulation', 'contenu' => $csv]));
+    expect($l->payload_hash)->toBe(AuditHashChainLogger::empreinteDuCorps(['etape' => 'simulation']));
+});
+
+test('422 : une ligne d’audit propre est écrite (statut, sans contenu ni adresse)', function () {
+    $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => str_repeat('secretx', 200000)])->assertStatus(422);
+    $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'nimporte', 'contenu' => 'secretx'])->assertStatus(422);
+    $lignes = DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->get();
+    expect($lignes)->toHaveCount(2);
+    foreach ($lignes as $l) {
+        expect($l->status)->toBe(422)->and(json_encode($l))->not->toContain('secret');
+    }
 });
 
 test('jeton expiré (15 min) ⇒ 409', function () {
@@ -155,9 +196,13 @@ test('aucune ligne audit_logs ne porte l’empreinte du corps ; la ligne propre 
     }
 });
 
-test('le CSV n’est écrit ni sur disque ni dans un journal', function () {
+test('le CSV n’est écrit ni sur disque ni dans un journal (aucun niveau, message ou contexte)', function () {
     $avant = [glob(sys_get_temp_dir() . '/*') ?: [], glob(storage_path('**/*')) ?: [], glob(storage_path('*/*/*')) ?: []];
-    Log::spy();
+    // Écoute réelle de TOUT message journalisé, quel que soit le niveau et le canal (Log::spy() ne contrôlait qu'un niveau).
+    $journalises = [];
+    Event::listen(MessageLogged::class, function (MessageLogged $m) use (&$journalises) {
+        $journalises[] = $m->level . ' ' . $m->message . ' ' . json_encode($m->context);
+    });
     $csv = "secret-unique@clients.example.test\n";
     $jeton = impSimuler($this, $csv)['jeton'];
     impConfirmer($this, $csv, $jeton)->assertOk();
@@ -165,7 +210,9 @@ test('le CSV n’est écrit ni sur disque ni dans un journal', function () {
     foreach ($avant as $i => $a) {
         expect(array_values(array_diff($apres[$i], $a)))->toBe([]);
     }
-    Log::shouldNotHaveReceived('error');
+    foreach ($journalises as $ligne) {
+        expect($ligne)->not->toContain('secret-unique');
+    }
     foreach (glob(storage_path('logs/*.log')) ?: [] as $f) {
         expect((string) file_get_contents($f))->not->toContain('secret-unique');
     }
@@ -187,6 +234,9 @@ test('tout ou rien : une erreur en cours d’écriture annule tout, y compris la
     } finally {
         DB::unprepared('DROP TRIGGER IF EXISTS zz_echec ON email_suppressions');
     }
+    $emp = [ListeSuppression::empreinte('a@clients.example.test'), ListeSuppression::empreinte('b@clients.example.test')];
+    expect(DB::table('opt_out')->whereIn('email_hash', $emp)->count())->toBe(0)->and(DB::table('email_suppressions')->whereIn('email_hash', $emp)->count())->toBe(0);
+    expect(DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->where('status', 500)->count())->toBe(1);
     expect($leve)->toBeTrue()->and(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->count())->toBe(0)->and(impEvenements())->toBe(0);
 });
 

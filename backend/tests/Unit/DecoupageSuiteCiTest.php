@@ -169,3 +169,33 @@ test('DECOUPAGE — repli Pint : un merge-base egal a HEAD retombe sur HEAD^ ; p
     $ci = (array) Yaml::parseFile(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
     expect($ci['jobs']['backend']['timeout-minutes'])->toBe(20);
 });
+
+test('DECOUPAGE — les fichiers incompatibles ne sont JAMAIS dans la meme part', function () {
+    $fichiers = decoupageListerFichiers(racineBackendDecoupage());
+
+    expect(decoupageFichiersIncompatibles())->not->toBeEmpty();
+
+    foreach ([2, 3, 4, 5] as $total) {
+        $parts = decoupageRepartir($fichiers, $total);
+        foreach (decoupageFichiersIncompatibles() as $couple) {
+            foreach ($couple as $chemin) {
+                expect($fichiers)->toHaveKey($chemin);
+            }
+            foreach ($parts as $numero => $liste) {
+                expect(count(array_intersect($couple, $liste)))
+                    ->toBeLessThan(2, "Part {$numero}/{$total} : fichiers incompatibles ensemble : " . implode(', ', $couple));
+            }
+        }
+    }
+});
+
+test('DECOUPAGE — TEMOIN : l\'exclusion s\'applique meme quand la taille les rapprocherait', function () {
+    $fichiers = ['a/ATest.php' => 30, 'b/BTest.php' => 29, 'c/CTest.php' => 1];
+    // Sans exclusion, A et C iraient ensemble ou non selon le hasard de la taille : on force A/B.
+    $parts = decoupageRepartir($fichiers, 2, [['a/ATest.php', 'c/CTest.php']]);
+
+    foreach ($parts as $liste) {
+        expect(count(array_intersect(['a/ATest.php', 'c/CTest.php'], $liste)))->toBeLessThan(2);
+    }
+    expect(decoupageVerifier($parts, array_keys($fichiers)))->toBe([]);
+});

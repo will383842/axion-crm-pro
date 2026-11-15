@@ -24,10 +24,10 @@ function trousDeclares(): array
     return $t;
 }
 
-test('les deux nouveaux chemins sont déclarés au contrat ; l’import reste un trou, la décision du feu vert est servie (K17-FV)', function () {
+test('les deux nouveaux chemins sont déclarés au contrat ; l’import (P1-LN-B) et la décision du feu vert (K17-FV) sont servis', function () {
     expect(yamlEnvoi('conformite')['paths'])->toHaveKey('/envoi/opposition/import');
     expect(yamlEnvoi('pilotage')['paths'])->toHaveKey('/envoi/feu-vert/decision');
-    expect(trousDeclares())->toHaveKey('POST /envoi/opposition/import')->not->toHaveKey('POST /envoi/feu-vert/decision');
+    expect(trousDeclares())->not->toHaveKey('POST /envoi/opposition/import')->not->toHaveKey('POST /envoi/feu-vert/decision');
 });
 
 test('import des oppositions : corps JSON seulement (jamais multipart), 1 048 576 octets au plus', function () {

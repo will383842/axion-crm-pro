@@ -3,7 +3,7 @@
  * simulation puis confirmation, compte rendu chiffré sans aucune adresse, fichier trop gros refusé avant envoi.
  * Données fictives (dépôt public).
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -211,12 +211,40 @@ describe('Import des listes de refus (F-LN)', () => {
     await within(fenetre).findByText(/jeton est périmé/);
     expect(within(fenetre).queryByRole('button', { name: 'Confirmer l’import' })).toBeNull();
     expect(champ.value).toBe('');
-    // Le même fichier re-choisi déclenche bien onChange, puis la simulation repart.
+    // Le focus revient sur le champ fichier (réactivé), pas sur le body.
+    await waitFor(() => expect(champ).toHaveFocus());
+    // Le contenu est vidé : « Simuler » est inactif tant qu'aucun fichier n'est re-choisi.
+    expect(within(fenetre).getByRole('button', { name: 'Simuler l’import' })).toBeDisabled();
+    const lectures = vi.spyOn(Blob.prototype, 'text');
+    // Le même fichier re-choisi déclenche bien onChange (nouvelle lecture), puis la simulation repart.
     await user.upload(champ, fichier());
+    await waitFor(() => expect(lectures).toHaveBeenCalledTimes(1));
+    lectures.mockRestore();
     await user.click(await within(fenetre).findByRole('button', { name: 'Simuler l’import' }));
     expect(await within(fenetre).findByText(/2 adresses valides/i)).toBeVisible();
     await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
     expect(await within(fenetre).findByText(/Import confirmé/i)).toBeVisible();
+  });
+
+  it('une erreur autre que 409 à la confirmation : message d’erreur, simulation et fichier conservés', async () => {
+    const user = userEvent.setup();
+    await ouvrir(['owner'], [
+      http.post(`${ORIGINE}/envoi/opposition/import`, async ({ request }) => {
+        const c = (await request.clone().json()) as { etape: string };
+        if (c.etape === 'confirmation') return HttpResponse.json({ message: 'Service momentanément indisponible.' }, { status: 500 });
+        return undefined;
+      }),
+    ]);
+    const fenetre = await ouvrirFenetre(user);
+    const champ = within(fenetre).getByLabelText<HTMLInputElement>(/Fichier de la liste/);
+    await user.upload(champ, fichier());
+    await user.click(within(fenetre).getByRole('button', { name: 'Simuler l’import' }));
+    await within(fenetre).findByText(/2 adresses valides/i);
+    await user.click(within(fenetre).getByRole('button', { name: 'Confirmer l’import' }));
+    expect(await within(fenetre).findByRole('alert')).toHaveTextContent(/momentanément indisponible/);
+    expect(within(fenetre).getByText(/2 adresses valides/i)).toBeVisible();
+    expect(within(fenetre).getByRole('button', { name: 'Confirmer l’import' })).toBeEnabled();
+    expect(champ.files).toHaveLength(1);
   });
 
   it('fichier vide : refusé à l’écran avant tout appel', async () => {

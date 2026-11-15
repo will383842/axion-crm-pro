@@ -58,11 +58,21 @@ function FenetreImport({ onClose }: { onClose: () => void }) {
   const [confirmation, setConfirmation] = useState<Reponse | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  /** Vrai quand le focus doit revenir sur le champ fichier, dès qu'il est de nouveau actif. */
+  const [focusChamp, setFocusChamp] = useState(false);
 
   // Les boutons « Simuler » puis « Confirmer » disparaissent en gardant le focus : on le replace sur le compte rendu.
   useEffect(() => {
     if (simulation !== null || confirmation !== null) compteRendu.current?.focus();
   }, [simulation, confirmation]);
+
+  // Après un 409 le champ est encore désactivé au moment de l'erreur : on attend le rendu où il est actif.
+  useEffect(() => {
+    if (focusChamp && !enCours) {
+      champ.current?.focus();
+      setFocusChamp(false);
+    }
+  }, [focusChamp, enCours]);
 
   async function choisir(fichier: File | undefined) {
     const numero = ++courante.current;
@@ -109,11 +119,13 @@ function FenetreImport({ onClose }: { onClose: () => void }) {
     } catch (e) {
       if (numero !== courante.current) return;
       setErreur(messageDErreur(e, 'L’import a échoué. Réessayez.'));
-      if (etape === 'confirmation') {
-        // Jeton refusé : on revient à l'étape de simulation, et le même fichier doit pouvoir être re-choisi.
+      if (etape === 'confirmation' && (e as { response?: { status?: number } } | null)?.response?.status === 409) {
+        // Jeton refusé (409) : retour à l'étape de simulation, contenu vidé, le même fichier doit pouvoir être re-choisi.
+        // Les autres erreurs gardent l'état (simulation et fichier) : on peut réessayer.
         setSimulation(null);
+        setContenu(null);
         if (champ.current !== null) champ.current.value = '';
-        champ.current?.focus();
+        setFocusChamp(true);
       }
     } finally {
       if (numero === courante.current) setEnCours(false);

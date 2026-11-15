@@ -18,6 +18,8 @@ type Etape = components['schemas']['EtapeSequence'];
 
 interface LigneSequence extends Resume {
   etapes: Etape[];
+  /** Renseigné pour la séquence née d'une campagne créée par l'assistant (parcours de démo). */
+  campagne_id?: string;
 }
 
 const etape = (rang: number, delai_jours: number, objet: string, envoyes: number, reponses: number, rebonds_durs: number, desinscriptions: number): Etape => ({
@@ -54,17 +56,35 @@ function fabrique(): { lignes: LigneSequence[] } {
 
 const zone = () => (demoDb.etendre('sequences', fabrique), demoDb.zone<LigneSequence & { id: string }>('sequences', 'lignes'));
 
+/**
+ * Parcours de démo (E2E-FIN) : la validation d'une campagne fait apparaître sa séquence.
+ * Aucune personne, aucun corps de message : seulement l'inscription des adresses restantes.
+ */
+export function ajouterSequenceDeCampagne(campagne: { id: string; nom: string; total: number; etapes: number }): void {
+  if (zone().trouver(`seq-${campagne.id}`)) return;
+  const nb = Math.min(3, Math.max(1, campagne.etapes));
+  const delais = [0, 3, 7];
+  zone().ajouter({
+    id: `seq-${campagne.id}`, nom: campagne.nom, statut: 'active', motif_pause: null, reservee_aux_temoins: false, nb_etapes: nb,
+    inscriptions: { total: campagne.total, en_cours: 0, terminees: 0, arretees: 0, reportees: campagne.total },
+    prochain_envoi: null, creee_le: maintenant().toISOString(), campagne_id: campagne.id,
+    etapes: Array.from({ length: nb }, (_x, i) => etape(i + 1, delais[i] ?? 7, `Étape ${i + 1} de la campagne (démo)`, 0, 0, 0, 0)),
+  });
+}
+
 /** Raison pour laquelle la reprise est refusée, ou nul si elle est permise. */
 function raisonRefus(l: LigneSequence): string | null {
   if (demoDb.etatEnvois.lire().etat === 'arrete') return 'L’arrêt général des envois est actif.';
   if (l.statut !== 'en_pause') return 'Cette séquence n’est pas en pause.';
+  // Parcours de démo : le feu vert n'est jamais accordé ici ; la reprise reste sous frein.
+  if (l.campagne_id !== undefined) return 'Un frein est actif : le feu vert n’est pas accordé, la reprise est refusée tant qu’il dure.';
   if (l.motif_pause === 'frein') return 'Un frein est actif : la reprise est refusée tant qu’il dure.';
   if (l.motif_pause === 'arret_general') return 'L’arrêt général des envois est actif.';
   if (l.motif_pause === 'automatique') return 'Une pause automatique est active.';
   return null;
 }
 
-const resume = ({ etapes: _etapes, ...r }: LigneSequence): Resume => r;
+const resume = ({ etapes: _etapes, campagne_id: _campagne, ...r }: LigneSequence): Resume => r;
 const detail = (l: LigneSequence): Detail => {
   const raison = raisonRefus(l);
   return { ...resume(l), etapes: l.etapes, peut_reprendre: l.statut === 'en_pause' && raison === null, raison_refus_reprise: l.statut === 'en_pause' ? raison : null };

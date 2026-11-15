@@ -440,6 +440,11 @@ export interface components {
             prete: components["schemas"]["VersionConfiguration"] | null;
         };
         DomaineResume: {
+            /**
+             * @description Adaptateur d'envoi du domaine (lecture seule, changé par commande locale).
+             * @enum {string}
+             */
+            adaptateur?: "faux" | "kumo" | "smtp";
             ajoute_le: components["schemas"]["Horodatage"];
             boites: number;
             chauffe: components["schemas"]["Chauffe"] | null;
@@ -713,6 +718,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
         };
     };
     ajouterBoite: {
@@ -767,6 +773,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
         };
     };
@@ -812,6 +819,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["Erreur"];
+            501: components["responses"]["Erreur"];
         };
     };
     suspendreBoite: {
@@ -894,6 +902,7 @@ export interface operations {
                     };
                 };
             };
+            403: components["responses"]["Erreur"];
         };
     };
     reculerChauffe: {
@@ -916,6 +925,7 @@ export interface operations {
                     "application/json": components["schemas"]["RessourceChauffe"];
                 };
             };
+            403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
             409: components["responses"]["Erreur"];
         };

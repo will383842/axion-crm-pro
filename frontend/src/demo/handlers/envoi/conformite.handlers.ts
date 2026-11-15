@@ -18,6 +18,9 @@ import { api, delai, erreur, filtrerTexte, lireRecherche, paginer, repondreEtatF
 type S = components['schemas'];
 type Opposition = commun['schemas']['Opposition'];
 
+/** Jetons de simulation de l'import (démo) : jeton → texte simulé. */
+const jetonsImport = new Map<string, string>();
+
 /** Lien de démonstration de la page publique (contact « Boulangerie des Tilleuls »). */
 export const JETON_DEMO = 'demo-tilleuls';
 
@@ -233,6 +236,38 @@ export const handlers: HttpHandler[] = [
     const existante = demoDb.opposition.tous().find((o) => o.portee === corps.portee && o.valeur.toLowerCase() === valeur);
     if (existante) return HttpResponse.json(existante, { status: 200 });
     return HttpResponse.json(inscrire(corps.portee, valeur, motifTexte, 'manuel'), { status: 201 });
+  }),
+
+  http.post(api('/envoi/opposition/import'), async ({ request }) => {
+    await delai();
+    const corps = (await request.json().catch(() => ({}))) as { etape?: unknown; contenu?: unknown; jeton?: unknown };
+    if ((corps.etape !== 'simulation' && corps.etape !== 'confirmation') || typeof corps.contenu !== 'string') {
+      return erreur(422, 'validation', 'Indiquez l’étape et le texte du fichier.');
+    }
+    const lignes = corps.contenu.split(/\r?\n/).filter((l) => l.trim() !== '');
+    if (corps.contenu.length > 1_048_576 || lignes.length > 5000) return erreur(422, 'validation', 'Fichier trop gros : 5 000 lignes et 1 Mo au plus.');
+    const connus = new Set(demoDb.opposition.tous().map((o) => o.valeur.toLowerCase()));
+    const refusees: S['ImportOppositionsReponse']['refusees'] = [];
+    const nouvelles: string[] = [];
+    let dejaPresentes = 0;
+    lignes.forEach((brut, i) => {
+      const v = brut.trim().toLowerCase();
+      if (/^[=+\-@\t\r]/.test(brut)) refusees.push({ ligne: i + 1, motif: 'caractère de tête refusé' });
+      else if (DOMAINES_GRAND_PUBLIC.some((d) => v === d || v.endsWith(`@${d}`) || v.endsWith(`.${d}`))) refusees.push({ ligne: i + 1, motif: 'domaine de messagerie grand public' });
+      else if (connus.has(v) || nouvelles.includes(v)) dejaPresentes += 1;
+      else nouvelles.push(v);
+    });
+    const reponse = { valides: nouvelles.length, deja_presentes: dejaPresentes, refusees };
+    if (corps.etape === 'simulation') {
+      jetonsImport.set(`demo-jeton-${jetonsImport.size + 1}`, corps.contenu);
+      return HttpResponse.json({ etape: 'simulation', ...reponse, jeton: `demo-jeton-${jetonsImport.size}` } satisfies S['ImportOppositionsReponse']);
+    }
+    // Confirmation : jeton valide et consommé une seule fois, sinon 409.
+    const jeton = typeof corps.jeton === 'string' ? corps.jeton : '';
+    if (jetonsImport.get(jeton) !== corps.contenu) return erreur(409, 'jeton_invalide', 'Relancez la simulation : le jeton est absent, périmé ou déjà utilisé.');
+    jetonsImport.delete(jeton);
+    for (const v of nouvelles) inscrire('adresse', v, 'import démo', 'manuel');
+    return HttpResponse.json({ etape: 'confirmation', ...reponse, import_id: `imp-${demoDb.opposition.compter()}` } satisfies S['ImportOppositionsReponse']);
   }),
 
   http.get(api('/envoi/opposition/export'), async () => {

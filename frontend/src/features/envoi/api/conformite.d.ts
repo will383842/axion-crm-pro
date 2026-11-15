@@ -136,6 +136,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/opposition/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Importer une liste de refus (simulation puis confirmation)
+         * @description Propriétaire seul (`workspaces.manage`, 403 sinon). Corps `application/json` seulement,
+         *     jamais `multipart/form-data` : le fichier est lu dans le navigateur et son texte envoyé
+         *     (CSV d'une colonne, adresse ou domaine ; 5 000 lignes et 1 048 576 octets au plus, 422 au-delà).
+         *     Deux temps : `simulation` (compte des lignes valides, déjà présentes et refusées, par numéro de
+         *     ligne, sans jamais renvoyer une adresse ; rend un `jeton` valable 15 minutes), puis `confirmation`
+         *     avec le même texte et le `jeton` (consommé une seule fois ; sans jeton valide : 409). Tout ou rien.
+         *     Une ligne refusée porte son numéro et son motif.
+         */
+        post: operations["importerOpposition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/puis-je-ecrire": {
         parameters: {
             query?: never;
@@ -428,6 +454,29 @@ export interface components {
             lien_rendez_vous: string | null;
             raison_sociale: string;
             signature: string;
+        };
+        ImportOppositionsDemande: {
+            /** @description Texte du CSV (1 048 576 octets au plus). */
+            contenu: string;
+            /** @enum {string} */
+            etape: "simulation" | "confirmation";
+            /** @description Jeton rendu par la simulation ; exigé pour la confirmation. */
+            jeton?: string;
+        };
+        ImportOppositionsReponse: {
+            deja_presentes: number;
+            /** @enum {string} */
+            etape: "simulation" | "confirmation";
+            /** @description Présent à la confirmation. */
+            import_id?: string;
+            /** @description Présent à la simulation. */
+            jeton?: string;
+            /** @description Lignes refusées, par numéro et motif (jamais l'adresse). */
+            refusees: {
+                ligne: number;
+                motif: string;
+            }[];
+            valides: number;
         };
         ModeAbsence: {
             actif: boolean;
@@ -888,6 +937,33 @@ export interface operations {
             };
             403: components["responses"]["Erreur"];
             429: components["responses"]["Erreur"];
+        };
+    };
+    importerOpposition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportOppositionsDemande"];
+            };
+        };
+        responses: {
+            /** @description Résultat de la simulation ou de la confirmation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOppositionsReponse"];
+                };
+            };
+            403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
         };
     };
     puisJeEcrire: {

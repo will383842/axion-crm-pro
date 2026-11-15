@@ -116,6 +116,32 @@ paths:
               schema: { type: string }
         '403': { $ref: './commun.yaml#/components/responses/Erreur' }
         '429': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/opposition/import:
+    post:
+      operationId: importerOpposition
+      summary: Importer une liste de refus (simulation puis confirmation)
+      description: |
+        Propriétaire seul (`workspaces.manage`, 403 sinon). Corps `application/json` seulement,
+        jamais `multipart/form-data` : le fichier est lu dans le navigateur et son texte envoyé
+        (CSV d'une colonne, adresse ou domaine ; 5 000 lignes et 1 048 576 octets au plus, 422 au-delà).
+        Deux temps : `simulation` (compte des lignes valides, déjà présentes et refusées, par numéro de
+        ligne, sans jamais renvoyer une adresse ; rend un `jeton` valable 15 minutes), puis `confirmation`
+        avec le même texte et le `jeton` (consommé une seule fois ; sans jeton valide : 409). Tout ou rien.
+        Une ligne refusée porte son numéro et son motif.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportOppositionsDemande' }
+      responses:
+        '200':
+          description: Résultat de la simulation ou de la confirmation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportOppositionsReponse' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/puis-je-ecrire:
     post:
       operationId: puisJeEcrire
@@ -381,6 +407,31 @@ paths:
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
 components:
   schemas:
+    ImportOppositionsDemande:
+      type: object
+      required: [etape, contenu]
+      properties:
+        etape: { type: string, enum: [simulation, confirmation] }
+        contenu: { type: string, maxLength: 1048576, description: 'Texte du CSV (1 048 576 octets au plus).' }
+        jeton: { type: string, description: 'Jeton rendu par la simulation ; exigé pour la confirmation.' }
+    ImportOppositionsReponse:
+      type: object
+      required: [etape, valides, deja_presentes, refusees]
+      properties:
+        etape: { type: string, enum: [simulation, confirmation] }
+        valides: { type: integer, minimum: 0 }
+        deja_presentes: { type: integer, minimum: 0 }
+        refusees:
+          description: Lignes refusées, par numéro et motif (jamais l'adresse).
+          type: array
+          items:
+            type: object
+            required: [ligne, motif]
+            properties:
+              ligne: { type: integer, minimum: 1 }
+              motif: { type: string }
+        jeton: { type: string, description: 'Présent à la simulation.' }
+        import_id: { type: string, description: 'Présent à la confirmation.' }
     ReponsePuisJeEcrire:
       type: object
       required: [peut, motif]

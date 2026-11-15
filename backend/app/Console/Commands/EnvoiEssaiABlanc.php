@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Envoi\Orchestration\EssaiABlanc;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
+use Throwable;
 
 /**
  * Essai à blanc de bout en bout (D10) : commande LOCALE, aucune route. Données fictives, faux serveur, transaction annulée ;
@@ -21,8 +22,13 @@ class EnvoiEssaiABlanc extends Command
         $auteur = (string) ($this->option('auteur') ?: get_current_user());
         try {
             $rapport = $essai->executer((string) $this->argument('espace'), $auteur);
-        } catch (InvalidArgumentException) {
-            $this->error('Espace inconnu : aucun essai lancé.');
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage() . ' Aucun essai lancé.');
+
+            return self::FAILURE;
+        } catch (Throwable) {
+            // Message propre : jamais celui de l'exception (il pourrait porter une valeur ou une adresse). La ligne rouge est déjà écrite.
+            $this->error('ESSAI ROUGE : le parcours a été interrompu par une erreur ; un résultat rouge a été enregistré.');
 
             return self::FAILURE;
         }

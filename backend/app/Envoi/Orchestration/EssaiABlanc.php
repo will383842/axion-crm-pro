@@ -72,39 +72,65 @@ final class EssaiABlanc
         $this->fabriqueServeur = $fabriqueServeur;
     }
 
-    /** @throws InvalidArgumentException espace inconnu */
+    /** @throws InvalidArgumentException espace inconnu ou auteur contenant un « @ » (refusé AVANT tout essai) */
     public function executer(string $espace, string $auteur): RapportEssai
     {
+        if (str_contains($auteur, '@')) {
+            throw new InvalidArgumentException('Auteur invalide : aucune adresse (« @ ») n\'est admise.');
+        }
         if (! Str::isUuid($espace) || ! DB::table('workspaces')->where('id', $espace)->whereNull('deleted_at')->exists()) {
             throw new InvalidArgumentException('Espace inconnu.');
         }
         $debut = new DateTimeImmutable('now');
         $interdisait = Http::preventingStrayRequests();
         Http::preventStrayRequests();
+        $etapes = [];
+        $erreur = null;
         try {
-            $etapes = WorkspaceContext::run($espace, function () use ($espace): array {
-                DB::beginTransaction();
-                try {
-                    return $this->parcours($espace);
-                } finally {
-                    DB::rollBack();
-                }
-            });
+            // Tout le parcours se fait dans un espace FICTIF créé dans la transaction : les vraies inscriptions de l'espace réel ne sont
+            // ni comptées, ni traitées par le séquenceur, ni composées, ni reportées. La transaction est annulée à la fin.
+            DB::beginTransaction();
+            try {
+                $fictif = $this->creerEspaceFictif();
+                WorkspaceContext::run($fictif, function () use ($fictif, &$etapes): void {
+                    $this->parcours($fictif, $etapes);
+                });
+            } catch (Throwable $e) {
+                $erreur = $e;
+            } finally {
+                DB::rollBack();
+            }
         } finally {
             Http::preventStrayRequests($interdisait);
         }
-        $rapport = new RapportEssai($etapes, $debut, new DateTimeImmutable('now'));
-        // Seule écriture durable : la ligne de résultat (sans adresse).
+        // Une exception non rattrapée par `essayer()` : les étapes non atteintes sont rouges (jamais de valeur ni d'adresse dans la ligne).
+        $rapport = new RapportEssai(array_replace(array_fill_keys(self::ETAPES, false), $etapes), $debut, new DateTimeImmutable('now'));
+        // Seule écriture durable : la ligne de résultat (sans adresse), rattachée à l'espace RÉEL demandé.
         WorkspaceContext::run($espace, fn () => DB::table('envoi_essais_blanc')->insert([
             'workspace_id' => $espace, 'auteur' => mb_substr($auteur, 0, 100), 'debut' => $debut->format('c'), 'fin' => $rapport->fin->format('c'),
-            'reussi' => $rapport->reussi(), 'etapes' => json_encode($rapport->pourBase(), JSON_THROW_ON_ERROR),
+            'reussi' => $erreur === null && $rapport->reussi(), 'etapes' => json_encode($rapport->pourBase(), JSON_THROW_ON_ERROR),
         ]));
+        if ($erreur !== null) {
+            throw $erreur;
+        }
 
         return $rapport;
     }
 
-    /** @return array<string, bool> */
-    private function parcours(string $ws): array
+    /** Espace jetable (annulé avec la transaction) : id seul, jamais lu ailleurs. */
+    private function creerEspaceFictif(): string
+    {
+        $id = (string) Str::uuid();
+        DB::table('workspaces')->insert([
+            'id' => $id, 'slug' => 'essai-a-blanc-' . substr(str_replace('-', '', $id), 0, 12), 'name' => 'Essai a blanc',
+            'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** @param array<string, bool> $etapes rempli au fil du parcours (conservé si une exception l'interrompt) */
+    private function parcours(string $ws, array &$etapes): void
     {
         $serveur = $this->fabriqueServeur !== null ? ($this->fabriqueServeur)() : new FauxServeurEnvoi; // APRÈS beginTransaction
         $t = new DateTimeImmutable(self::JOUR_FICTIF . '-03-02 10:00:00', new DateTimeZone('Europe/Paris'));
@@ -134,7 +160,6 @@ final class EssaiABlanc
             $adresses[$nom] = "essai-{$nom}-" . Str::lower(Str::random(6)) . '@client.example.test';
             $ids[$nom] = $inscriptions->inscrire($ws, $sid, $this->poserContact($ws, $adresses[$nom], $t, DepotSocleDb::FOURNISSEURS_TEMOINS[$i]), $t->modify('-' . (3 - $i) . ' minutes'));
         }
-        $etapes = [];
         $etapes['inscription'] = $this->essayer(fn (): bool => DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('statut', 'active')->count() === 3);
 
         // Lundi : plafond de 2 => A et B partent, C est reportée.
@@ -177,8 +202,6 @@ final class EssaiABlanc
         $sequenceur->executer($ws, $t);
         $etapes['arret_general'] = $this->essayer(fn (): bool => $serveur->appels === $avant
             && ! DB::table('envoi_messages')->where('workspace_id', $ws)->where('inscription_id', $d)->where('statut', 'envoye')->exists());
-
-        return array_replace(array_fill_keys(self::ETAPES, false), $etapes);
     }
 
     private function essayer(Closure $verifie): bool

@@ -77,5 +77,12 @@ test('une requête HTTP perdue pendant l\'essai fait rougir : les requêtes non 
         return new FauxServeurEnvoi;
     });
 
-    expect(fn () => $essai->executer(F::espace('zz-essai-reseau'), 'test-essai'))->toThrow(RuntimeException::class);
+    $ws = F::espace('zz-essai-reseau');
+
+    expect(fn () => $essai->executer($ws, 'test-essai'))->toThrow(RuntimeException::class);
+    // L'exception n'efface pas le résultat : une ligne ROUGE est écrite (sans valeur ni adresse), rattachée à l'espace réel.
+    $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_essais_blanc')->where('workspace_id', $ws)->first());
+    expect($ligne)->not->toBeNull()
+        ->and((bool) $ligne->reussi)->toBeFalse()
+        ->and((string) $ligne->etapes)->not->toContain('@')->and((string) $ligne->etapes)->not->toContain('exemple');
 });

@@ -29,9 +29,9 @@ function pointCatalogueV4(string $ws, string $code): PointFeuVert
     throw new RuntimeException($code);
 }
 
-test('K14-CAT : catalogue v4, 45 points dont 29 manuels', function () {
-    expect(CatalogueManuels::VERSION)->toBe(4)
-        ->and(CatalogueManuels::codes())->toHaveCount(45)
+test('K14-CAT : catalogue v5 (K17-FV : trois points auto.* de plus), 48 points dont 29 manuels', function () {
+    expect(CatalogueManuels::VERSION)->toBe(5)
+        ->and(CatalogueManuels::codes())->toHaveCount(48)
         ->and(CatalogueManuels::codesManuels())->toHaveCount(29);
 });
 

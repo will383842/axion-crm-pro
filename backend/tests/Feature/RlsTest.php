@@ -525,3 +525,32 @@ test('envoi S1-B : RLS forcée et policy d’espace sur les essais, les décisio
         rlsCleanup([$wsA, $wsB]);
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Envoi S1-C — imports de listes de refus : RLS forcée, un espace ne voit pas l'autre
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('envoi S1-C : RLS forcée et policy d’espace sur les imports de listes de refus', function () {
+    $t = rlsOwner()->selectOne('SELECT relrowsecurity AS actif, relforcerowsecurity AS force FROM pg_class WHERE oid = ?::regclass', ['public.envoi_oppositions_imports']);
+    expect((bool) $t->actif)->toBeTrue()->and((bool) $t->force)->toBeTrue();
+    expect(rlsOwner()->selectOne('SELECT count(*) AS n FROM pg_policies WHERE schemaname = ? AND tablename = ?', ['public', 'envoi_oppositions_imports'])->n)->toBeGreaterThanOrEqual(1);
+
+    [$wsA, $wsB] = rlsSeedTwoWorkspaces();
+
+    try {
+        foreach ([$wsA, $wsB] as $ws) {
+            rlsOwner()->table('envoi_oppositions_imports')->insert(['workspace_id' => $ws, 'auteur' => 'rls-s1c', 'empreinte_fichier' => str_repeat('a', 64), 'jeton_simulation' => (string) Str::uuid()]);
+        }
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+        expect(rlsApp()->table('envoi_oppositions_imports')->pluck('workspace_id')->all())->toBe([$wsA]);
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        expect(rlsApp()->table('envoi_oppositions_imports')->count())->toBe(0);
+    } finally {
+        rlsOwner()->transaction(function () use ($wsA, $wsB): void {
+            rlsOwner()->statement('ALTER TABLE envoi_oppositions_imports DISABLE TRIGGER USER');
+            rlsOwner()->table('envoi_oppositions_imports')->whereIn('workspace_id', [$wsA, $wsB])->delete();
+            rlsOwner()->statement('ALTER TABLE envoi_oppositions_imports ENABLE TRIGGER USER');
+        });
+        rlsCleanup([$wsA, $wsB]);
+    }
+});

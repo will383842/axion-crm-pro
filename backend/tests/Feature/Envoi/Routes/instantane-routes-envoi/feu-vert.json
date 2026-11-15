@@ -11,6 +11,17 @@
     },
     {
         "methode": "POST",
+        "uri": "api/v1/envoi/feu-vert/decision",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
         "uri": "api/v1/envoi/feu-vert/{code}/fait",
         "middlewares": [
             "api",

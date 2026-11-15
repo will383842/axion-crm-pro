@@ -2,13 +2,14 @@
 
 namespace App\Providers\Envoi;
 
+use App\Envoi\Depot\RetentionTentatives;
 use Illuminate\Support\ServiceProvider;
 
-/** Vide : rempli par R06-ARCH (socle S0, aucun comportement). */
+/** Conservation des tentatives d'envoi (R06-ARCH, D16). */
 class RetentionServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // rempli par R06-ARCH
+        $this->app->singleton(RetentionTentatives::class);
     }
 }

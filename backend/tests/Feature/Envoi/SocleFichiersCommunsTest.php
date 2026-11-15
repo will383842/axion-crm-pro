@@ -67,6 +67,30 @@ function couplesR19(): array
     ];
 }
 
+/**
+ * Couples R19 perdus : ni trou déclaré, ni route réelle, ni non-servi, et pourtant présents au contrat.
+ *
+ * @param  list<string>  $trous
+ * @param  list<string>  $routes  clés normalisées (« {} » pour les paramètres)
+ * @param  list<string>  $nonServis
+ * @param  list<string>  $contrat
+ * @return list<string>
+ */
+function couplesR19Perdus(array $trous, array $routes, array $nonServis, array $contrat): array
+{
+    $perdus = [];
+    foreach (couplesR19() as $couple) {
+        $cle = preg_replace('/\{[^}]+\}/', '{}', $couple);
+        $ok = in_array($couple, $trous, true) || in_array($cle, $routes, true) || in_array($couple, $nonServis, true)
+            || ! in_array($couple, $contrat, true);
+        if (! $ok) {
+            $perdus[] = $couple;
+        }
+    }
+
+    return $perdus;
+}
+
 test('chacun des 19 couples R19 est dans un trous/*.php, une route réelle, un non-servi, ou retiré du contrat (D1, D2)', function () {
     $trous = [];
     foreach (glob(base_path('tests/Support/Couverture/trous/*.php')) as $f) {
@@ -87,18 +111,30 @@ test('chacun des 19 couples R19 est dans un trous/*.php, une route réelle, un n
             }
         }
     }
-    $perdus = [];
+
+    expect(couplesR19Perdus($trous, $routes, $nonServis, $contrat))->toBe([]);
+
+    // Un couple comblé sort de trous/*.php et devient une route réelle : les deux états sont légitimes.
+    // Chaque couple doit donc être « encore un trou » OU « couvert par une route réelle » (ou non-servi), jamais aucun.
     foreach (couplesR19() as $couple) {
         $cle = preg_replace('/\{[^}]+\}/', '{}', $couple);
-        $ok = in_array($couple, $trous, true) || in_array($cle, $routes, true) || in_array($couple, $nonServis, true)
-            || ! in_array($couple, $contrat, true);
-        if (! $ok) {
-            $perdus[] = $couple;
-        }
+        $etat = in_array($couple, $trous, true) || in_array($cle, $routes, true) || in_array($couple, $nonServis, true);
+        expect($etat || ! in_array($couple, $contrat, true))->toBeTrue($couple);
     }
-    expect($perdus)->toBe([]);
-    // Aujourd'hui les 19 sont des trous déclarés dans les fichiers par domaine.
-    expect(count(array_intersect(couplesR19(), $trous)))->toBeGreaterThan(0);
+
+    // Témoin : retiré à la fois des trous et des routes, un couple du contrat est bien déclaré perdu.
+    $temoins = array_values(array_filter(couplesR19(), fn (string $c) => in_array($c, $contrat, true)));
+    expect($temoins)->not->toBe([]);
+    foreach ($temoins as $temoin) {
+        $cleTemoin = preg_replace('/\{[^}]+\}/', '{}', $temoin);
+        $perdus = couplesR19Perdus(
+            array_values(array_diff($trous, [$temoin])),
+            array_values(array_diff($routes, [$cleTemoin])),
+            array_values(array_diff($nonServis, [$temoin])),
+            $contrat,
+        );
+        expect($perdus)->toContain($temoin);
+    }
 });
 
 test('envoi.serveur_interne vaut l\'aiguilleur par domaine (K17-AIG), dont le seul adaptateur construit est FauxServeurEnvoi', function () {

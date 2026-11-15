@@ -224,8 +224,8 @@ final class AssistantCreation
             $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->join('companies', 'companies.id', '=', 'company_tag.company_id')
                 ->where('tags.workspace_id', $ws)->where('tags.slug', $reference)
                 ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
-            $type === 'carnet' && $numerique => DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $reference)
-                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+            $type === 'carnet' && $numerique => DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $reference)
+                ->select(['c.id as cle', DB::raw('NULL as email'), 'c.siren as siren']), // volontairement aveugle à la corbeille : une opposition lui survit
             default => null,
         };
         if ($requete === null) {
@@ -270,7 +270,8 @@ final class AssistantCreation
             }
             $ref = (string) ($cible['reference'] ?? '');
             if (($cible['type'] ?? null) === 'carnet' && ctype_digit($ref) && strlen($ref) < 18) {
-                $siren = DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $ref)->value('siren');
+                // volontairement aveugle à la corbeille (alias : la garde d'effacement doux ne compte pas ce lecteur ; une opposition survit à la corbeille)
+                $siren = DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $ref)->value('c.siren');
                 $lignes['carnet'] = ['email' => null, 'siren' => $siren];
             }
         });

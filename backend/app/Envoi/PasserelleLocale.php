@@ -146,6 +146,11 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur, $enCours) !== null) {
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }
+            // Butée en base (D7) : DERNIER contrôle avant la réservation, même transaction. Un refus rend un report SANS lever
+            // (une exception défairait les péremptions et leurs alertes) ; aucune ligne de journal ni de compteur global ne reste.
+            if (! $this->depot->reserverPlaceEspace($ws, $jour, min($plafond, $this->depot->plafondEspace($ws), self::PLAFOND_MAX))) {
+                return ResultatInjection::reporte($jour->modify('+1 day'));
+            }
             $this->depot->reserverInjection($ws, $jour, $message->cleIdempotence, $this->instant(), $ressources);
 
             return self::RESERVEE;

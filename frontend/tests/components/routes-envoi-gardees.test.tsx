@@ -110,10 +110,10 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   ['/envoi/sante', 'DM2-PIL', 'Santé des envois'],
   ['/envoi/sante/chercher', 'DM2-PIL', 'Chercher un envoi'],
   ['/envoi/sante/feu-vert', 'DM2-PIL', 'Feu vert'],
-  // S2-ROUTEUR : pages d'attente, remplies par F-SEQ (livrée : titre ci-dessous) et K14-ECRAN.
+  // S2-ROUTEUR : pages d'attente, remplies par F-SEQ et K14-ECRAN (livrées : titre en 3e élément).
   ['/envoi/sequences', 'F-SEQ', 'Séquences'],
   ['/envoi/sequences/seq-01', 'F-SEQ', 'Présentation en trois messages (démo)'],
-  ['/envoi/sante/inscriptions', 'K14-ECRAN'],
+  ['/envoi/sante/inscriptions', 'K14-ECRAN', 'Inscriptions'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {

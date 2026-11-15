@@ -1,0 +1,76 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/boites",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/boites",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/boites/test-connexion",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/boites/{id}",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/boites/{id}/reactiver",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "PUT",
+        "uri": "api/v1/envoi/boites/{id}/reglages",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/boites/{id}/suspendre",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    }
+]

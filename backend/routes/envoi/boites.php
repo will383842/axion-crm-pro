@@ -1,3 +1,17 @@
 <?php
 
-// Routes Envoi : domaine « boites ». Vide pour l'instant (lot R00). Requis par routes/envoi.php.
+use App\Http\Controllers\Api\EnvoiBoitesController;
+use Illuminate\Support\Facades\Route;
+
+// T-BOITES (D3) : contrat openapi/envoi/infrastructure.yaml. Identifiants de boîte = UUID (tout autre format : 404, sans requête).
+Route::middleware('permission:users.manage')->group(function () {
+    Route::get('/envoi/boites', [EnvoiBoitesController::class, 'lister']);
+    Route::get('/envoi/boites/{id}', [EnvoiBoitesController::class, 'lire'])->whereUuid('id');
+    Route::post('/envoi/boites/{id}/suspendre', [EnvoiBoitesController::class, 'suspendre'])->whereUuid('id');
+});
+Route::post('/envoi/boites/{id}/reactiver', [EnvoiBoitesController::class, 'reactiver'])->whereUuid('id')->middleware('permission:workspaces.manage');
+
+// 501 inconditionnels : aucune validation, aucune liaison, aucune lecture de envoi_boites (D3 bis).
+Route::post('/envoi/boites', [EnvoiBoitesController::class, 'serveurReelRequis']);
+Route::post('/envoi/boites/test-connexion', [EnvoiBoitesController::class, 'serveurReelRequis']);
+Route::put('/envoi/boites/{id}/reglages', [EnvoiBoitesController::class, 'serveurReelRequis']);

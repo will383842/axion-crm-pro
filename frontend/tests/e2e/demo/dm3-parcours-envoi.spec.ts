@@ -7,9 +7,9 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { ouvrirDemo } from './outils';
+import { PARTI_EN_REEL } from './annonce-envoi-reel';
 
 const NOM = 'Parcours complet (démo)';
-const PARTI_EN_REEL = /message[s]? (?:est |sont )?(?:parti|envoyé)[s]? en réel|envoi réel (?:activé|en cours)|envoyé[es]? pour de vrai/i;
 
 async function aucunEcranNAnnonceUnEnvoiReel(page: Page, chemins: string[]): Promise<void> {
   for (const chemin of chemins) {
@@ -56,6 +56,8 @@ test.describe('démo — parcours complet d’Envoi (E2E-FIN)', () => {
     await expect(page.getByRole('alert')).toContainText('Un frein est actif');
     await expect(page.getByText('En pause', { exact: true })).toBeVisible();
 
+    // NB : la reprise (étape 5) dépend du frein rattaché à la campagne (`campagne_id`), PAS du feu vert (étape 6) :
+    // deux contrôles distincts. Le feu vert n'est consulté qu'ensuite, et ne débloque pas la reprise à lui seul.
     // 6. Feu vert : non accordé, l'accord reste impossible tant qu'un bloquant est rouge.
     await ouvrirDemo(page, '/envoi/sante/feu-vert', { offre: 'envoi' });
     await expect(page.getByRole('button', { name: 'Accorder le feu vert' })).toBeDisabled();

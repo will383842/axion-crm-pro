@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Envoi;
 
+use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Conformite\RegistreOppositionManuel;
+use App\Envoi\Creation\AssistantCreation;
+use App\Envoi\Creation\ErreurCreation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Feature\Envoi\Routes\BaseRoutesEnvoi;
@@ -185,4 +188,68 @@ test('contact_ids d\'un autre espace ou inexistant ⇒ 422 validation', function
     $put([$propres[0], $etranger])->assertStatus(422)->assertJsonPath('error', 'validation');
     $put([$propres[0], 99999999])->assertStatus(422)->assertJsonPath('error', 'validation');
     $put([$propres[0]])->assertOk();
+});
+
+test('estimation : échéance globale dépassée ⇒ 503 estimation_trop_longue (horloge injectée)', function () {
+    [$liste] = oppListe($this);
+    $t = 0;
+    $horloge = function () use (&$t): int {
+        $t += 4_000_000_000; // chaque lecture de l'horloge avance de 4 s
+
+        return $t;
+    };
+    $assistant = new AssistantCreation(app(DepotCampagnes::class), $horloge);
+
+    expect(fn () => $assistant->estimer($this->ws->id, ['type' => 'liste', 'reference' => (string) $liste]))
+        ->toThrow(fn (ErreurCreation $e) => $e->getCode() === 503 && $e->getMessage() !== '');
+});
+
+test('estimation : plafond de lignes examinées dépassé ⇒ 503 explicite, jamais un chiffre', function () {
+    [$liste] = oppListe($this);
+    $assistant = new AssistantCreation(app(DepotCampagnes::class), null, 5);
+
+    expect(fn () => $assistant->estimer($this->ws->id, ['type' => 'liste', 'reference' => (string) $liste]))
+        ->toThrow(fn (ErreurCreation $e) => $e->getCode() === 503);
+});
+
+test('contrôles : une liste dont tous les membres sont opposés ⇒ cible_non_vide non ok', function () {
+    $ws = $this->ws->id;
+    $liste = (int) DB::table('listes_manuelles')->insertGetId(['workspace_id' => $ws, 'nom' => 'Tous opposés']);
+    DB::statement('SET session_replication_role = replica');
+    foreach ([1, 2] as $i) {
+        $c = (int) DB::table('contacts')->insertGetId(['workspace_id' => $ws, 'company_id' => 800 + $i, 'first_name' => 'A', 'last_name' => 'B', 'email' => "t{$i}@tous.example.test"]);
+        DB::table('listes_manuelles_membres')->insert(['workspace_id' => $ws, 'liste_id' => $liste, 'contact_id' => $c, 'origine' => 'coche']);
+        (new RegistreOppositionManuel)->inscrire($ws, 'adresse', "t{$i}@tous.example.test", 'test', 'test');
+    }
+    DB::statement('SET session_replication_role = origin');
+    [$id, $v] = oppBrouillon($this);
+    $this->actingAs($this->owner)->putJson(OPP_BROUILLONS . "/{$id}/etapes/1", ['cible' => ['type' => 'liste', 'reference' => (string) $liste]], ['If-Match' => (string) $v])->assertOk();
+    $par = array_column($this->actingAs($this->owner)->getJson(OPP_BROUILLONS . "/{$id}/controles")->assertOk()->json('controles'), 'etat', 'code');
+
+    expect($par['cible_non_vide'])->not->toBe('ok')->and($par['opposition_retiree'])->not->toBe('ok');
+});
+
+test('audience : un contact nominatif en STOP compte dans exclus (entreprise propre)', function () {
+    $ws = $this->ws->id;
+    $a = oppEntreprise($this, 'info@propre.example.test', '552100554');
+    DB::statement('SET session_replication_role = replica');
+    $contact = (int) DB::table('contacts')->insertGetId(['workspace_id' => $ws, 'company_id' => $a, 'first_name' => 'N', 'last_name' => 'M', 'email' => 'nominatif@propre.example.test']);
+    DB::statement('SET session_replication_role = origin');
+    $audience = (int) DB::table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'Aud ' . Str::random(4)]);
+    DB::table('audience_members')->insert(['workspace_id' => $ws, 'audience_id' => $audience, 'company_id' => $a, 'contact_id' => $contact]);
+    (new RegistreOppositionManuel)->inscrire($ws, 'adresse', 'nominatif@propre.example.test', 'test', 'test');
+    [$id] = oppBrouillon($this);
+    $r = $this->actingAs($this->owner)->postJson(OPP_BROUILLONS . "/{$id}/cible/estimation", ['type' => 'audience', 'reference' => (string) $audience])->assertOk();
+
+    expect($r->json('total'))->toBe(1)->and($r->json('exclus'))->toBe(1)->and($r->json('restant'))->toBe(0);
+});
+
+test('carnet : entreprise inexistante ou d\'un autre espace ⇒ 422 validation', function () {
+    $autre = $this->espace(true);
+    $etrangere = oppEntreprise($this, 'x@autre.example.test', '552100554', $autre->id);
+    [$id, $v] = oppBrouillon($this);
+    $put = fn (string $e) => $this->actingAs($this->owner)->putJson(OPP_BROUILLONS . "/{$id}/etapes/1", ['cible' => ['type' => 'carnet', 'reference' => $e]], ['If-Match' => (string) $v]);
+
+    $put((string) $etrangere)->assertStatus(422)->assertJsonPath('error', 'validation');
+    $put('99999999')->assertStatus(422)->assertJsonPath('error', 'validation');
 });

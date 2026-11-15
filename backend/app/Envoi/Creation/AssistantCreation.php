@@ -6,6 +6,7 @@ use App\Crm\Opposition\StatutOpposition;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Exceptions\CampagneRefusee;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,20 @@ final class AssistantCreation
 
     private const JOURS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
 
-    public function __construct(private readonly DepotCampagnes $depot) {}
+    /** Échéance globale de l'estimation (comptage du total + opposées), en secondes. */
+    public const ECHEANCE_SECONDES = 3;
+
+    /** Plafond de lignes examinées pour l'estimation : au-delà, 503 explicite plutôt qu'un chiffre inventé. */
+    public const LIGNES_MAX = 200000;
+
+    /**
+     * @param  (\Closure(): (int|float))|null  $horloge  nanosecondes (hrtime) ; injectable pour les tests
+     */
+    public function __construct(
+        private readonly DepotCampagnes $depot,
+        private readonly ?\Closure $horloge = null,
+        private readonly int $lignesMax = self::LIGNES_MAX,
+    ) {}
 
     /** @return array<string, mixed> */
     public function creer(string $ws, string $auteur, string $nom): array
@@ -182,23 +196,15 @@ final class AssistantCreation
     }
 
     /**
-     * Mesure bornée par le temps (3 s) : trop long = 503 explicite, jamais un chiffre inventé.
+     * Mesure bornée : échéance GLOBALE de 3 s (total + opposées, contrôlée entre les lots) et plafond de lignes examinées ;
+     * trop long ou trop gros = 503 explicite, jamais un chiffre inventé.
      *
      * @param  array<string, mixed>  $cible
      * @return array<string, mixed>
      */
     public function estimer(string $ws, array $cible): array
     {
-        try {
-            $total = $this->compter($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
-            // Seule l'exclusion « opposition » est évaluée (D14) ; même délai de 3 s, même 503 explicite.
-            $opposees = $this->compterOpposees($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
-        } catch (QueryException $e) {
-            if ($e->getCode() === '57014') {
-                throw new ErreurCreation('estimation_trop_longue', 'L\'estimation a pris trop de temps : réessayez ou choisissez une cible plus petite.', 503);
-            }
-            throw $e;
-        }
+        [$total, $opposees] = $this->mesurer($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
 
         // Les autres exclusions ne sont pas évaluées : `exclusions_evaluees` reste faux (booléen global du contrat), jamais un zéro
         // inventé pour elles. Aucun motif par personne n'est rendu.
@@ -207,52 +213,114 @@ final class AssistantCreation
     }
 
     /**
-     * Nombre de membres de la cible dont l'adresse (ou le SIREN) est opposée : une ligne par membre compté par `compter`,
-     * lues par lots (jamais N+1). Lecture seule ; mêmes filtres d'espace que `compter`.
+     * Total et opposées lus dans UNE seule transaction (instantané cohérent : exclus ne dépasse jamais total), lecture seule.
+     *
+     * @return array{0: int, 1: int} [total, opposées]
      */
-    private function compterOpposees(string $ws, string $type, string $reference): int
+    private function mesurer(string $ws, string $type, string $reference): array
     {
-        $colonneCle = match (true) {
-            $type === 'liste' => 'm.id',
-            $type === 'carnet' => 'c.id',
-            default => 'companies.id',
-        };
+        $trop = static fn (): ErreurCreation => new ErreurCreation('estimation_trop_longue', 'L\'estimation a pris trop de temps : réessayez ou choisissez une cible plus petite.', 503);
+        $echeance = $this->maintenant() + self::ECHEANCE_SECONDES * 1_000_000_000;
+        $racine = DB::transactionLevel() === 0;
+        try {
+            return WorkspaceContext::run($ws, fn (): array => DB::transaction(function () use ($ws, $type, $reference, $echeance, $racine, $trop): array {
+                if ($racine) {
+                    DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+                }
+                DB::statement("SET LOCAL statement_timeout = '3000'");
+                $total = $this->compterDansTransaction($ws, $type, $reference);
+                $opposees = $this->compterOpposees($ws, $type, $reference, $echeance, $trop);
+
+                return [$total, min($opposees, $total)];
+            }));
+        } catch (QueryException $e) {
+            if ($e->getCode() === '57014') {
+                throw $trop();
+            }
+            throw $e;
+        }
+    }
+
+    private function maintenant(): int|float
+    {
+        return $this->horloge === null ? hrtime(true) : ($this->horloge)();
+    }
+
+    /**
+     * Nombre de membres de la cible dont l'adresse (ou le SIREN) est opposée, lues par lots sur la clé réelle de la table
+     * parcourue (jamais companies.id, jamais N+1). Échéance globale contrôlée entre les lots ; plafond de lignes examinées.
+     * Lecture seule ; mêmes filtres d'espace que `compter`. Audience et étiquette : adresse nominative du contact (s'il y en a un)
+     * ET adresse générique de l'entreprise ET SIREN ; un membre est exclu si l'une d'elles est opposée.
+     */
+    private function compterOpposees(string $ws, string $type, string $reference, int|float $echeance, \Closure $trop): int
+    {
         $numerique = ctype_digit($reference) && strlen($reference) < 18;
+        $colonneCle = 'm.id';
         $requete = match (true) {
             $type === 'liste' && $numerique => DB::table('listes_manuelles_membres as m')
                 ->leftJoin('contacts', 'contacts.id', '=', 'm.contact_id')
                 ->leftJoin('companies', 'companies.id', '=', DB::raw('COALESCE(m.company_id, contacts.company_id)'))
                 ->where('m.workspace_id', $ws)->where('m.liste_id', (int) $reference)->whereNull('m.retire_le')
-                ->select(['m.id as cle', DB::raw('COALESCE(contacts.email, companies.email_generic) as email'), 'companies.siren as siren']),
+                ->select(['m.id as cle', DB::raw('COALESCE(contacts.email, companies.email_generic) as email'), DB::raw('NULL as email2'), 'companies.siren as siren']),
             $type === 'audience' && $numerique => DB::table('audience_members as m')->join('companies', 'companies.id', '=', 'm.company_id')
+                ->leftJoin('contacts', fn ($j) => $j->on('contacts.id', '=', 'm.contact_id')->where('contacts.workspace_id', '=', $ws))
                 ->where('m.workspace_id', $ws)->where('m.audience_id', (int) $reference)
-                ->select(['companies.id as cle', 'companies.email_generic as email', 'companies.siren as siren']),
-            $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->join('companies', 'companies.id', '=', 'company_tag.company_id')
-                ->where('tags.workspace_id', $ws)->where('tags.slug', $reference)
-                ->select(['companies.id as cle', 'companies.email_generic as email', 'companies.siren as siren']),
-            $type === 'carnet' && $numerique => DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $reference)
-                ->select(['c.id as cle', 'c.email_generic as email', 'c.siren as siren']), // volontairement aveugle à la corbeille : une opposition lui survit
+                ->select(['m.id as cle', 'contacts.email as email', 'companies.email_generic as email2', 'companies.siren as siren']),
+            $type === 'etiquette' => $this->requeteEtiquette($ws, $reference),
+            $type === 'carnet' && $numerique => DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $reference)
+                ->select(['id as cle', 'email_generic as email', DB::raw('NULL as email2'), 'siren as siren']), // G4-ENVOI : une opposition survit à la corbeille, cette lecture ignore deleted_at volontairement
             default => null,
         };
         if ($requete === null) {
             return 0;
         }
+        if ($type === 'etiquette') {
+            $colonneCle = 'company_tag.company_id';
+        } elseif ($type === 'carnet') {
+            $colonneCle = 'id';
+        }
 
-        return WorkspaceContext::run($ws, fn (): int => DB::transaction(function () use ($ws, $requete, $colonneCle): int {
-            DB::statement("SET LOCAL statement_timeout = '3000'");
-            $n = 0;
-            $requete->chunkById(1000, function ($lignes) use ($ws, &$n): bool {
-                $paquet = [];
-                foreach ($lignes as $i => $l) {
-                    $paquet[$i] = ['email' => $l->email, 'siren' => $l->siren];
+        $n = 0;
+        $examinees = 0;
+        $requete->chunkById(1000, function ($lignes) use ($ws, &$n, &$examinees, $echeance, $trop): bool {
+            if ($this->maintenant() > $echeance) {
+                throw $trop();
+            }
+            $examinees += count($lignes);
+            if ($examinees > $this->lignesMax) {
+                throw $trop();
+            }
+            $paquet = [];
+            foreach ($lignes as $i => $l) {
+                $paquet['a' . $i] = ['email' => $l->email, 'siren' => $l->siren];
+                if ($l->email2 !== null) {
+                    $paquet['b' . $i] = ['email' => $l->email2, 'siren' => null];
                 }
-                $n += count(array_filter((new StatutOpposition)->pourLignes($ws, $paquet), static fn (array $s): bool => $s['opposee']));
+            }
+            $statuts = (new StatutOpposition)->pourLignes($ws, $paquet);
+            foreach ($lignes as $i => $l) {
+                if (($statuts['a' . $i]['opposee'] ?? false) || ($statuts['b' . $i]['opposee'] ?? false)) {
+                    $n++;
+                }
+            }
 
-                return true;
-            }, $colonneCle, 'cle');
+            return true;
+        }, $colonneCle, 'cle');
 
-            return $n;
-        }));
+        return $n;
+    }
+
+    /** Étiquette : on résout d'abord l'étiquette de l'espace, puis on parcourt `company_tag` sur sa clé (company_id). */
+    private function requeteEtiquette(string $ws, string $slug): ?Builder
+    {
+        $tag = DB::table('tags')->where('workspace_id', $ws)->where('slug', $slug)->value('id');
+        if ($tag === null) {
+            return null;
+        }
+
+        return DB::table('company_tag')->join('companies', 'companies.id', '=', 'company_tag.company_id')
+            ->where('company_tag.tag_id', $tag)
+            ->select(['company_tag.company_id as cle', DB::raw('NULL as email'), 'companies.email_generic as email2', 'companies.siren as siren']);
     }
 
     /**
@@ -269,7 +337,8 @@ final class AssistantCreation
         }
         $lignes = [];
         $trouves = 0;
-        WorkspaceContext::run($ws, function () use ($ws, $ids, $cible, &$lignes, &$trouves): void {
+        $absente = false;
+        WorkspaceContext::run($ws, function () use ($ws, $ids, $cible, &$lignes, &$trouves, &$absente): void {
             if ($ids !== []) {
                 foreach (DB::table('contacts')->leftJoin('companies', 'companies.id', '=', 'contacts.company_id')->where('contacts.workspace_id', $ws)
                     ->whereIn('contacts.id', $ids)->get(['contacts.id', 'contacts.email', 'companies.siren']) as $c) {
@@ -279,14 +348,18 @@ final class AssistantCreation
             }
             $ref = (string) ($cible['reference'] ?? '');
             if (($cible['type'] ?? null) === 'carnet' && ctype_digit($ref) && strlen($ref) < 18) {
-                // volontairement aveugle à la corbeille (alias : la garde d'effacement doux ne compte pas ce lecteur ; une opposition survit à la corbeille)
-                $e = DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $ref)->first(['c.siren', 'c.email_generic']);
-                $lignes['carnet'] = ['email' => $e?->email_generic, 'siren' => $e?->siren];
+                // G4-ENVOI : une opposition survit à la corbeille, ces deux lectures ignorent deleted_at volontairement
+                $e = DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $ref)->first(['siren', 'email_generic']);
+                if ($e === null) {
+                    $absente = true;
+                } else {
+                    $lignes['carnet'] = ['email' => $e->email_generic, 'siren' => $e->siren];
+                }
             }
         });
         // Un identifiant inexistant ou d'un autre espace : même refus, sans dire lequel (cloisonnement).
-        if ($trouves !== count(array_unique($ids))) {
-            throw ErreurCreation::invalide('validation', 'contact_ids contient un identifiant inconnu.');
+        if ($absente || $trouves !== count(array_unique($ids))) {
+            throw ErreurCreation::invalide('validation', 'contact_ids ou la fiche choisie contient un identifiant inconnu.');
         }
         if ($lignes === []) {
             return;
@@ -298,19 +371,25 @@ final class AssistantCreation
 
     public function compter(string $ws, string $type, string $reference): int
     {
-        $numerique = ctype_digit($reference) && strlen($reference) < 18;
-
-        return WorkspaceContext::run($ws, fn (): int => DB::transaction(function () use ($ws, $type, $reference, $numerique): int {
+        return WorkspaceContext::run($ws, fn (): int => DB::transaction(function () use ($ws, $type, $reference): int {
             DB::statement("SET LOCAL statement_timeout = '3000'");
 
-            return match (true) {
-                $type === 'liste' && $numerique => DB::table('listes_manuelles_membres')->where('workspace_id', $ws)->where('liste_id', (int) $reference)->whereNull('retire_le')->count(),
-                $type === 'audience' && $numerique => DB::table('audience_members')->where('workspace_id', $ws)->where('audience_id', (int) $reference)->count(),
-                $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->where('tags.workspace_id', $ws)->where('tags.slug', $reference)->count(),
-                $type === 'carnet' && $numerique => DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $reference)->count(),
-                default => 0,
-            };
+            return $this->compterDansTransaction($ws, $type, $reference);
         }));
+    }
+
+    /** À appeler dans une transaction déjà ouverte (et un contexte d'espace posé). */
+    private function compterDansTransaction(string $ws, string $type, string $reference): int
+    {
+        $numerique = ctype_digit($reference) && strlen($reference) < 18;
+
+        return match (true) {
+            $type === 'liste' && $numerique => DB::table('listes_manuelles_membres')->where('workspace_id', $ws)->where('liste_id', (int) $reference)->whereNull('retire_le')->count(),
+            $type === 'audience' && $numerique => DB::table('audience_members')->where('workspace_id', $ws)->where('audience_id', (int) $reference)->count(),
+            $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->where('tags.workspace_id', $ws)->where('tags.slug', $reference)->count(),
+            $type === 'carnet' && $numerique => DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $reference)->count(),
+            default => 0,
+        };
     }
 
     /**
@@ -325,14 +404,27 @@ final class AssistantCreation
         $nonEvalue = 'Contrôle fait par la porte d\'envoi au moment du départ ; non évalué à la création.';
 
         $cible = $contenu['cible'] ?? null;
-        $total = $cible === null ? 0 : $this->compter($ws, $cible['type'], $cible['reference']);
+        $total = 0;
+        $opposes = null; // null = non évalué (estimation trop longue)
+        if ($cible !== null) {
+            try {
+                [$total, $opposes] = $this->mesurer($ws, $cible['type'], $cible['reference']);
+            } catch (ErreurCreation) {
+                $total = $this->compter($ws, $cible['type'], $cible['reference']);
+            }
+        }
+        $restant = $total - ($opposes ?? 0);
         $boites = $this->boitesChoisies($ws, trim((string) $c->boites, '{}') === '' ? [] : explode(',', trim((string) $c->boites, '{}')));
         $plafond = $contenu['plafond_jour'] ?? null;
         $capacite = array_sum(array_column($boites['trouvees'], 'limite_jour'));
 
         $liste = [
-            $c7('cible_non_vide', 'La cible contient des personnes', $total > 0 ? 'ok' : 'bloquant', $total > 0 ? null : 'Choisissez une cible qui n\'est pas vide.'),
-            $c7('opposition_retiree', 'Les oppositions sont retirées', 'attention', $nonEvalue),
+            $c7('cible_non_vide', 'La cible contient des personnes', $restant > 0 ? 'ok' : 'bloquant', $restant > 0 ? null : 'Choisissez une cible qui n\'est pas vide (les personnes opposées ne comptent pas).'),
+            match (true) {
+                $opposes === null || $total === 0 => $c7('opposition_retiree', 'Les oppositions sont retirées', 'attention', $nonEvalue),
+                $opposes === 0 => $c7('opposition_retiree', 'Les oppositions sont retirées', 'ok'),
+                default => $c7('opposition_retiree', 'Les oppositions sont retirées', 'attention', $opposes . ' personne(s) opposée(s) dans la cible : elles sont écartées de l\'envoi.'),
+            },
             $c7('lien_desinscription', 'Lien de désinscription présent', 'attention', $nonEvalue),
             $c7('identite_expediteur', 'Identité de l\'expéditeur', 'attention', $nonEvalue),
             $c7(

@@ -169,3 +169,39 @@ test('DECOUPAGE — repli Pint : un merge-base egal a HEAD retombe sur HEAD^ ; p
     $ci = (array) Yaml::parseFile(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
     expect($ci['jobs']['backend']['timeout-minutes'])->toBe(20);
 });
+
+test('DECOUPAGE — les fichiers incompatibles ne sont JAMAIS dans la meme part', function () {
+    $fichiers = decoupageListerFichiers(racineBackendDecoupage());
+
+    expect(decoupageFichiersIncompatibles())->not->toBeEmpty();
+
+    foreach ([2, 3, 4, 5] as $total) {
+        $parts = decoupageRepartir($fichiers, $total);
+        foreach (decoupageFichiersIncompatibles() as $couple) {
+            foreach ($couple as $chemin) {
+                expect($fichiers)->toHaveKey($chemin);
+            }
+            foreach ($parts as $numero => $liste) {
+                expect(count(array_intersect($couple, $liste)))
+                    ->toBeLessThan(2, "Part {$numero}/{$total} : fichiers incompatibles ensemble : " . implode(', ', $couple));
+            }
+        }
+    }
+});
+
+test('DECOUPAGE — TEMOIN : l\'exclusion s\'applique meme quand la taille rapprocherait les deux fichiers', function () {
+    $fichiers = ['a/ATest.php' => 10, 'b/BTest.php' => 10, 'c/CTest.php' => 1];
+    $couple = ['a/ATest.php', 'c/CTest.php'];
+    $ensemble = fn (array $parts): bool => collect($parts)
+        ->contains(fn (array $liste) => count(array_intersect($couple, $liste)) === 2);
+
+    // Preuve que le temoin peut rougir : SANS contrainte, A et C sont dans la meme part
+    // (A=10 et B=10 se repartissent en premier, C=1 rejoint la part la moins chargee).
+    $sans = decoupageRepartir($fichiers, 2, []);
+    expect($ensemble($sans))->toBeTrue();
+
+    // AVEC la contrainte, A et C sont separes et rien n'est perdu.
+    $avec = decoupageRepartir($fichiers, 2, [$couple]);
+    expect($ensemble($avec))->toBeFalse();
+    expect(decoupageVerifier($avec, array_keys($fichiers)))->toBe([]);
+});

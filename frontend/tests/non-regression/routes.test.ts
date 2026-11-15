@@ -61,6 +61,10 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // commande `crm:doublons:fusionner --annuler`) : en production, aucun bouton ne l'appelle ; la démo le sert
 // (`src/demo/handlers/crm/a-traiter.handlers.ts`). La route serveur est prévue au lot serveur du CRM, qui
 // retirera cette ligne. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
+// Filet modifié : pourquoi. F-SEQ : liste, fiche, pause et reprise des séquences d'Envoi. Ces appels ne partent que
+// si Envoi est actif (absent en production) et sont servis par le faux serveur de la démo ; les routes serveur
+// existent (T-SEQ) mais la photo NR-20 n'est pas régénérée (elle ne liste aucune route Envoi). Les quatre lignes
+// restent. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
   'POST /api/v1/doublons/fusions/{p}/annuler',
   'GET /api/v1/crm/contacts/corbeille',
@@ -157,6 +161,15 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/messages/{p}/versions/{p}/valider',
   // S2-SOCLE (D1) — arrêt général : appel littéral dans ToutArreter.tsx ; la route serveur n'existe qu'en vague 3.
   'POST /api/v1/envoi/arret-general',
+  // F-SEQ — séquences (liste, fiche, pause, reprise).
+  'GET /api/v1/envoi/sequences',
+  'GET /api/v1/envoi/sequences/{p}',
+  'POST /api/v1/envoi/sequences/{p}/pause',
+  'POST /api/v1/envoi/sequences/{p}/reprise',
+  // F-FV — décision finale du feu vert : appel littéral dans DecisionFeuVert.tsx ; la route serveur
+  // (K17-FV) est en vague 3 et le filet ne lit pas le contrat d'Envoi.
+  // Filet modifié : pourquoi — un nouvel appel littéral à une route absente du filet d'origine, figé comme les autres.
+  'POST /api/v1/envoi/feu-vert/decision',
 ];
 
 function fichiers(dossier: string): string[] {

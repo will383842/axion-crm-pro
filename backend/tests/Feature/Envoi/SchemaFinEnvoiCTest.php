@@ -175,21 +175,52 @@ test('import_id du registre : nullable, accepte un import du même espace, refus
     }
 });
 
-test('garde : une ligne du registre existante n\'est pas modifiée par la migration (import_id reste NULL)', function () {
-    [$a, $b] = s1cDeuxEspaces();
-    try {
-        s1cRegistre($a);
-        $ligne = s1cOwner()->table('envoi_oppositions_registre')->where('workspace_id', $a)->first();
-        expect($ligne->import_id)->toBeNull()->and($ligne->valeur)->toBe('d.example.test')->and($ligne->motif)->toBe('liste');
-    } finally {
-        s1cNettoyer([$a, $b]);
-    }
+/** Ligne du registre + import insérés sur la connexion du test (transaction annulée à la fin) : les ALTER TABLE rejoués y restent. */
+function s1cPreexistant(): string
+{
+    $ws = (string) Str::uuid();
+    DB::table('workspaces')->insert(['id' => $ws, 'name' => 'S1C', 'slug' => 's1c-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('envoi_oppositions_imports')->insert([
+        'workspace_id' => $ws, 'auteur' => 'cli', 'empreinte_fichier' => str_repeat('a', 64), 'jeton_simulation' => (string) Str::uuid(),
+    ]);
+    DB::table('envoi_oppositions_registre')->insert([
+        'workspace_id' => $ws, 'portee' => 'domaine', 'empreinte' => str_repeat('d', 64), 'valeur' => 'd.example.test',
+        'motif' => 'liste', 'source' => 'manuel', 'auteur' => 'cli',
+    ]);
+
+    return $ws;
+}
+
+test('garde : une ligne du registre pré-existante n\'est pas modifiée par la migration (import_id reste NULL)', function () {
+    $ws = s1cPreexistant();
+    $avant = (array) DB::table('envoi_oppositions_registre')->where('workspace_id', $ws)->first();
+    $m = require database_path('migrations/2026_12_03_000020_envoi_oppositions_imports.php');
+    $m->up();
+    $apres = (array) DB::table('envoi_oppositions_registre')->where('workspace_id', $ws)->first();
+    expect($apres['import_id'])->toBeNull()
+        ->and($apres)->toBe($avant)
+        ->and($apres['valeur'])->toBe('d.example.test')->and($apres['motif'])->toBe('liste');
 });
 
-test('la migration 000020 se rejoue deux fois sans erreur et son down() est inerte', function () {
+test('la migration 000020 se rejoue deux fois sans erreur, ne touche aucune ligne et son down() est inerte', function () {
+    $ws = s1cPreexistant();
+    $registreAvant = DB::selectOne('SELECT count(*) AS t FROM envoi_oppositions_registre')->t;
+    $importsAvant = DB::selectOne('SELECT count(*) AS t FROM envoi_oppositions_imports')->t;
+    $ligneAvant = (array) DB::table('envoi_oppositions_registre')->where('workspace_id', $ws)->first();
     $m = require database_path('migrations/2026_12_03_000020_envoi_oppositions_imports.php');
     $m->up();
     $m->up();
     $m->down();
-    expect(DB::selectOne("SELECT to_regclass('public.envoi_oppositions_imports') AS t")->t)->not->toBeNull();
+    $ligneApres = (array) DB::table('envoi_oppositions_registre')->where('workspace_id', $ws)->first();
+    expect(DB::selectOne("SELECT to_regclass('public.envoi_oppositions_imports') AS t")->t)->not->toBeNull()
+        ->and(DB::selectOne('SELECT count(*) AS t FROM envoi_oppositions_registre')->t)->toBe($registreAvant)
+        ->and(DB::selectOne('SELECT count(*) AS t FROM envoi_oppositions_imports')->t)->toBe($importsAvant)
+        ->and($ligneApres['import_id'])->toBeNull()
+        ->and($ligneApres)->toBe($ligneAvant);
+});
+
+test('la fonction envoi_oppositions_imports_ajout_seul a un search_path fixe (pg_catalog, public)', function () {
+    $f = DB::selectOne("SELECT proconfig::text AS cfg FROM pg_proc WHERE proname = 'envoi_oppositions_imports_ajout_seul'");
+    expect($f)->not->toBeNull('fonction absente');
+    expect((string) $f->cfg)->toContain('search_path=pg_catalog, public');
 });

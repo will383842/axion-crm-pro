@@ -27,4 +27,4 @@ Route::post('/envoi/opposition', EnvoiOppositionManuelleController::class)
 
 // P1-LN-B (D8) : import des listes de refus, en deux temps (simulation puis confirmation). Corps JSON, jamais multipart. Propriétaire seul.
 Route::post('/envoi/opposition/import', EnvoiOppositionImportController::class)
-    ->middleware('permission:workspaces.manage');
+    ->middleware(['permission:workspaces.manage', 'throttle:envoi-opposition-import']);

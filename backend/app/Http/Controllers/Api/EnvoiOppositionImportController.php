@@ -6,9 +6,11 @@ use App\Envoi\Conformite\ImportOppositions;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Services\Audit\AuditHashChain;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -50,6 +52,11 @@ class EnvoiOppositionImportController extends ApiController
             $this->auditer($request, $ws, $v['etape'], 422, '');
 
             throw $e;
+        } catch (QueryException) {
+            // Le message SQL contient les valeurs liées (jeton, empreintes) : seul un message générique part au journal.
+            $this->auditer($request, $ws, $v['etape'], 500, '');
+
+            throw new RuntimeException('Échec de l’import des listes de refus (erreur base de données).');
         } catch (\Throwable $e) {
             $this->auditer($request, $ws, $v['etape'], 500, '');
 
@@ -75,8 +82,8 @@ class EnvoiOppositionImportController extends ApiController
                 'user_agent' => substr((string) $request->userAgent(), 0, 255),
                 'payload_hash' => hash('sha256', '[]'),
             ]);
-        } catch (\Throwable $e) {
-            report($e);
+        } catch (\Throwable) {
+            report(new RuntimeException('Échec de l’écriture de la ligne d’audit de l’import.'));
         }
     }
 }

@@ -29,9 +29,7 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 Après la fusion de `main` (#581, P1-REPRISE), `NeDoitPasRegresserTest › ACQUIS 2` échouait (clé étrangère `fonctions_espace_espace_id_fkey` à la restauration du dump). Cause : `repNettoyer` de `RepriseApresPanneTest` supprime l'espace (rôle `replica`) mais pas sa ligne `fonctions_espace` (colonne `espace_id`, pas `workspace_id`) : un orphelin restait en base. `main` ne le voit pas par hasard de répartition des parties. Correctif : une ligne de nettoyage dans ce test. Preuve : RepriseApresPanneTest + NeDoitPasRegresserTest rouge sans la ligne (`1 failed, 14 passed`), vert avec (`15 passed`). Fichier ajouté à la liste de la PR : validation du relecteur demandée.
 
 ## Reste
-- À traiter dans la PR de suite des mineurs (réserves de l'audit, non bloquantes) :
-  - une exception en base peut remonter un message contenant des empreintes (`RegistreOppositionManuel.php:210,219` et `EnvoiOppositionImportController.php:290-293`) ;
-  - pas de throttle sur la route d'import (`conformite.php:463-464` ; l'export en a un).
+- Mineurs B (PR `fix/mineurs-b`) : contrôle du caractère de tête après trim complet ; seule la contrainte `envoi_oppositions_imports_jeton_unique` devient un 409 ; une exception en base n'envoie au journal qu'un message générique (sans empreinte) ; limiteur `envoi-opposition-import` (10 par minute et par compte) ; comptes d'imports du test bornés à l'espace.
 - Écran d'import : lot F-LN (vague 5).
 - Aucune ligne d'audit propre pour un refus d'authentification (401/403) : le journal générique l'écrit, sans `contenu` ni `jeton` dans l'empreinte.
 - Le test d'absence de contenu dans les journaux écoute `MessageLogged` (tous niveaux) et relit les fichiers `storage/logs` ; il ne voit pas un journal écrit par un processus externe.

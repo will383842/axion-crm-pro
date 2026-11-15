@@ -5,9 +5,11 @@ namespace App\Envoi\Conformite;
 use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Personnes\NatureEmail;
 use App\Support\ListeSuppression;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Registre d'opposition MANUEL (lot R13), par espace. AJOUT SEUL : jamais de retrait ni de suppression de contact.
@@ -73,7 +75,7 @@ final class RegistreOppositionManuel
         $ligne = DB::table('envoi_oppositions_registre')
             ->where('workspace_id', $workspaceId)->where('portee', $portee)->where('empreinte', $empreinte)->first();
         if ($ligne === null) {
-            throw new \RuntimeException('Registre d’opposition : ligne introuvable après inscription.');
+            throw new RuntimeException('Registre d’opposition : ligne introuvable après inscription.');
         }
 
         return ['ligne' => $ligne, 'creee' => $inseree === 1];
@@ -89,6 +91,20 @@ final class RegistreOppositionManuel
      * @return list<string> empreintes des adresses du lot
      */
     public function inscrireLot(string $workspaceId, string $importId, array $entrees, string $motif, string $auteur): array
+    {
+        try {
+            return $this->ecrireLot($workspaceId, $importId, $entrees, $motif, $auteur);
+        } catch (QueryException) {
+            // Le message d'une exception SQL embarque les valeurs liées (empreintes, adresses chiffrées) : on ne le propage jamais.
+            throw new RuntimeException('Échec de l’écriture du lot d’opposition en base.');
+        }
+    }
+
+    /**
+     * @param  list<array{portee: string, valeur: string}>  $entrees
+     * @return list<string>
+     */
+    private function ecrireLot(string $workspaceId, string $importId, array $entrees, string $motif, string $auteur): array
     {
         $empreintes = [];
         foreach (array_chunk($entrees, 500) as $lot) {

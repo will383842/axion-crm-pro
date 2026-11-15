@@ -42,6 +42,7 @@
             "auth:sanctum",
             "first-login",
             "permission:workspaces.manage",
+            "throttle:envoi-opposition-import",
             "workspace"
         ]
     }

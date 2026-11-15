@@ -191,6 +191,8 @@ final class AssistantCreation
     {
         try {
             $total = $this->compter($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
+            // Seule l'exclusion « opposition » est évaluée (D14) ; même délai de 3 s, même 503 explicite.
+            $opposees = $this->compterOpposees($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
         } catch (QueryException $e) {
             if ($e->getCode() === '57014') {
                 throw new ErreurCreation('estimation_trop_longue', 'L\'estimation a pris trop de temps : réessayez ou choisissez une cible plus petite.', 503);
@@ -198,9 +200,8 @@ final class AssistantCreation
             throw $e;
         }
 
-        // Seule l'exclusion « opposition » est évaluée (D14). Les autres ne le sont pas : `exclusions_evaluees` reste faux (booléen
-        // global du contrat), jamais un zéro inventé pour elles. Aucun motif par personne n'est rendu.
-        $opposees = $this->compterOpposees($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
+        // Les autres exclusions ne sont pas évaluées : `exclusions_evaluees` reste faux (booléen global du contrat), jamais un zéro
+        // inventé pour elles. Aucun motif par personne n'est rendu.
 
         return ['total' => $total, 'exclus' => $opposees, 'restant' => max(0, $total - $opposees), 'exclusions' => ['opposition' => $opposees], 'estimation' => true, 'exclusions_evaluees' => false];
     }
@@ -211,30 +212,36 @@ final class AssistantCreation
      */
     private function compterOpposees(string $ws, string $type, string $reference): int
     {
+        $colonneCle = match (true) {
+            $type === 'liste' => 'm.id',
+            $type === 'carnet' => 'c.id',
+            default => 'companies.id',
+        };
         $numerique = ctype_digit($reference) && strlen($reference) < 18;
         $requete = match (true) {
             $type === 'liste' && $numerique => DB::table('listes_manuelles_membres as m')
                 ->leftJoin('contacts', 'contacts.id', '=', 'm.contact_id')
                 ->leftJoin('companies', 'companies.id', '=', DB::raw('COALESCE(m.company_id, contacts.company_id)'))
                 ->where('m.workspace_id', $ws)->where('m.liste_id', (int) $reference)->whereNull('m.retire_le')
-                ->select(['m.id as cle', 'contacts.email as email', 'companies.siren as siren']),
+                ->select(['m.id as cle', DB::raw('COALESCE(contacts.email, companies.email_generic) as email'), 'companies.siren as siren']),
             $type === 'audience' && $numerique => DB::table('audience_members as m')->join('companies', 'companies.id', '=', 'm.company_id')
                 ->where('m.workspace_id', $ws)->where('m.audience_id', (int) $reference)
-                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+                ->select(['companies.id as cle', 'companies.email_generic as email', 'companies.siren as siren']),
             $type === 'etiquette' => DB::table('company_tag')->join('tags', 'tags.id', '=', 'company_tag.tag_id')->join('companies', 'companies.id', '=', 'company_tag.company_id')
                 ->where('tags.workspace_id', $ws)->where('tags.slug', $reference)
-                ->select(['companies.id as cle', DB::raw('NULL as email'), 'companies.siren as siren']),
+                ->select(['companies.id as cle', 'companies.email_generic as email', 'companies.siren as siren']),
             $type === 'carnet' && $numerique => DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $reference)
-                ->select(['c.id as cle', DB::raw('NULL as email'), 'c.siren as siren']), // volontairement aveugle à la corbeille : une opposition lui survit
+                ->select(['c.id as cle', 'c.email_generic as email', 'c.siren as siren']), // volontairement aveugle à la corbeille : une opposition lui survit
             default => null,
         };
         if ($requete === null) {
             return 0;
         }
 
-        return WorkspaceContext::run($ws, function () use ($ws, $requete): int {
+        return WorkspaceContext::run($ws, fn (): int => DB::transaction(function () use ($ws, $requete, $colonneCle): int {
+            DB::statement("SET LOCAL statement_timeout = '3000'");
             $n = 0;
-            $requete->orderBy('cle')->chunk(1000, function ($lignes) use ($ws, &$n): bool {
+            $requete->chunkById(1000, function ($lignes) use ($ws, &$n): bool {
                 $paquet = [];
                 foreach ($lignes as $i => $l) {
                     $paquet[$i] = ['email' => $l->email, 'siren' => $l->siren];
@@ -242,10 +249,10 @@ final class AssistantCreation
                 $n += count(array_filter((new StatutOpposition)->pourLignes($ws, $paquet), static fn (array $s): bool => $s['opposee']));
 
                 return true;
-            });
+            }, $colonneCle, 'cle');
 
             return $n;
-        });
+        }));
     }
 
     /**
@@ -261,20 +268,26 @@ final class AssistantCreation
             throw ErreurCreation::invalide('validation', 'contact_ids est une liste de 500 identifiants entiers au plus.');
         }
         $lignes = [];
-        WorkspaceContext::run($ws, function () use ($ws, $ids, $cible, &$lignes): void {
+        $trouves = 0;
+        WorkspaceContext::run($ws, function () use ($ws, $ids, $cible, &$lignes, &$trouves): void {
             if ($ids !== []) {
                 foreach (DB::table('contacts')->leftJoin('companies', 'companies.id', '=', 'contacts.company_id')->where('contacts.workspace_id', $ws)
                     ->whereIn('contacts.id', $ids)->get(['contacts.id', 'contacts.email', 'companies.siren']) as $c) {
                     $lignes['c' . $c->id] = ['email' => $c->email, 'siren' => $c->siren];
+                    $trouves++;
                 }
             }
             $ref = (string) ($cible['reference'] ?? '');
             if (($cible['type'] ?? null) === 'carnet' && ctype_digit($ref) && strlen($ref) < 18) {
                 // volontairement aveugle à la corbeille (alias : la garde d'effacement doux ne compte pas ce lecteur ; une opposition survit à la corbeille)
-                $siren = DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $ref)->value('c.siren');
-                $lignes['carnet'] = ['email' => null, 'siren' => $siren];
+                $e = DB::table('companies as c')->where('c.workspace_id', $ws)->where('c.id', (int) $ref)->first(['c.siren', 'c.email_generic']);
+                $lignes['carnet'] = ['email' => $e?->email_generic, 'siren' => $e?->siren];
             }
         });
+        // Un identifiant inexistant ou d'un autre espace : même refus, sans dire lequel (cloisonnement).
+        if ($trouves !== count(array_unique($ids))) {
+            throw ErreurCreation::invalide('validation', 'contact_ids contient un identifiant inconnu.');
+        }
         if ($lignes === []) {
             return;
         }

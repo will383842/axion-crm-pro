@@ -130,8 +130,59 @@ test('cloisonnement : un domaine du registre d\'un autre espace n\'exclut rien i
 test('lecture seule : l\'estimation n\'écrit rien (ni opposition, ni file vers le site)', function () {
     [$liste] = oppListe($this);
     [$id] = oppBrouillon($this);
-    $avant = [DB::table('envoi_oppositions')->count(), DB::table('envoi_oppositions_registre')->count(), DB::table('opt_out')->count(), DB::table('email_suppressions')->count()];
+    $compte = static fn (): array => [DB::table('envoi_oppositions')->count(), DB::table('envoi_oppositions_registre')->count(), DB::table('opt_out')->count(), DB::table('email_suppressions')->count(), DB::table('crm_outbound_events')->count()];
+    $avant = $compte();
     $this->actingAs($this->owner)->postJson(OPP_BROUILLONS . "/{$id}/cible/estimation", ['type' => 'liste', 'reference' => (string) $liste])->assertOk();
 
-    expect([DB::table('envoi_oppositions')->count(), DB::table('envoi_oppositions_registre')->count(), DB::table('opt_out')->count(), DB::table('email_suppressions')->count()])->toBe($avant);
+    expect($compte())->toBe($avant);
+});
+
+/** Entreprise (adresse générique, SIREN) pour les cibles faites d'entreprises. */
+function oppEntreprise($t, string $generique, string $siren, ?string $ws = null): int
+{
+    $ws ??= $t->ws->id;
+
+    return (int) DB::table('companies')->insertGetId(['workspace_id' => $ws, 'siren' => $siren, 'denomination' => 'Societe ' . Str::random(5), 'email_generic' => $generique]);
+}
+
+test('audience de 2 entreprises dont une adresse générique en STOP ⇒ exclus = 1', function () {
+    $ws = $this->ws->id;
+    $a = oppEntreprise($this, 'info1@ent.example.test', '552100554');
+    $b = oppEntreprise($this, 'info2@ent.example.test', '732829320');
+    $audience = (int) DB::table('email_audiences')->insertGetId(['workspace_id' => $ws, 'name' => 'Aud ' . Str::random(4)]);
+    DB::table('audience_members')->insert([['workspace_id' => $ws, 'audience_id' => $audience, 'company_id' => $a], ['workspace_id' => $ws, 'audience_id' => $audience, 'company_id' => $b]]);
+    $lien = DB::table('envoi_liens_desinscription')->insertGetId(['workspace_id' => $ws, 'empreinte_adresse' => oppHash('info1@ent.example.test'), 'portee' => 'business']);
+    DB::table('envoi_oppositions')->insert(['workspace_id' => $ws, 'lien_id' => $lien, 'empreinte_adresse' => oppHash('info1@ent.example.test'), 'canal' => 'one_click']);
+    [$id] = oppBrouillon($this);
+    $r = $this->actingAs($this->owner)->postJson(OPP_BROUILLONS . "/{$id}/cible/estimation", ['type' => 'audience', 'reference' => (string) $audience])->assertOk();
+
+    expect($r->json('total'))->toBe(2)->and($r->json('exclus'))->toBe(1)->and($r->json('restant'))->toBe(1);
+});
+
+test('carnet : adresse générique inscrite au registre ⇒ 422 ; SIREN au registre ⇒ 422 ; entreprise propre passe', function () {
+    $propre = oppEntreprise($this, 'ok@ent.example.test', '552100554');
+    $adresse = oppEntreprise($this, 'generique@ent.example.test', '732829320');
+    $siren = oppEntreprise($this, 'autre@ent.example.test', '356000000');
+    (new RegistreOppositionManuel)->inscrire($this->ws->id, 'adresse', 'generique@ent.example.test', 'test', 'test');
+    (new RegistreOppositionManuel)->inscrire($this->ws->id, 'organisation', '356000000', 'test', 'test');
+    [$id, $v] = oppBrouillon($this);
+    $put = fn (int $e, int $v) => $this->actingAs($this->owner)->putJson(OPP_BROUILLONS . "/{$id}/etapes/1", ['cible' => ['type' => 'carnet', 'reference' => (string) $e]], ['If-Match' => (string) $v]);
+
+    $put($adresse, $v)->assertStatus(422)->assertJsonPath('error', 'adresse_opposee');
+    $put($siren, $v)->assertStatus(422)->assertJsonPath('error', 'adresse_opposee');
+    $put($propre, $v)->assertOk();
+});
+
+test('contact_ids d\'un autre espace ou inexistant ⇒ 422 validation', function () {
+    $autre = $this->espace(true);
+    DB::statement('SET session_replication_role = replica');
+    $etranger = (int) DB::table('contacts')->insertGetId(['workspace_id' => $autre->id, 'company_id' => 1, 'first_name' => 'A', 'last_name' => 'B', 'email' => 'x@autre.example.test']);
+    DB::statement('SET session_replication_role = origin');
+    [$liste, , $propres] = oppListe($this);
+    [$id, $v] = oppBrouillon($this);
+    $put = fn (array $ids) => $this->actingAs($this->owner)->putJson(OPP_BROUILLONS . "/{$id}/etapes/1", ['cible' => ['type' => 'liste', 'reference' => (string) $liste, 'contact_ids' => $ids]], ['If-Match' => (string) $v]);
+
+    $put([$propres[0], $etranger])->assertStatus(422)->assertJsonPath('error', 'validation');
+    $put([$propres[0], 99999999])->assertStatus(422)->assertJsonPath('error', 'validation');
+    $put([$propres[0]])->assertOk();
 });

@@ -7,12 +7,14 @@ use App\Http\Middleware\EnsureProduitEnvoi;
 use App\Http\Middleware\EnsureTwoFactorPassed;
 use App\Http\Middleware\LimiteDureeRequetesSql;
 use App\Http\Middleware\SetCurrentWorkspace;
+use App\Http\Middleware\TrimStringsSaufImportOpposition;
 use App\Services\Auth\AuthService;
 use App\Support\DelaiRequeteSql;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Exceptions\UnauthorizedException;
@@ -28,6 +30,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Import des listes de refus : le champ `contenu` n'est jamais rogné (voir la classe).
+        $middleware->replace(TrimStrings::class, TrimStringsSaufImportOpposition::class);
+
         // (A) CETTE API N'A PAS D'ECRAN DE CONNEXION COTE SERVEUR.
         //
         // Laravel 12 pose LUI-MEME, dans ApplicationBuilder::withMiddleware(),

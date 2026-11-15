@@ -105,6 +105,8 @@ function repNettoyer(string $ws, DateTimeImmutable $lundi): void
         foreach ($tables as $t) {
             $o->table((string) $t->table_name)->where('workspace_id', $ws)->delete();
         }
+        // `fonctions_espace` est rattachée par `espace_id` (pas `workspace_id`) : sans cette ligne, un orphelin restait et faisait échouer la restauration du dump (ACQUIS 2).
+        $o->table('fonctions_espace')->where('espace_id', $ws)->delete();
         $o->table('workspaces')->where('id', $ws)->delete();
         $o->table('envoi_compteur_global')->where('jour', $lundi->format('Y-m-d'))->delete();
     } finally {

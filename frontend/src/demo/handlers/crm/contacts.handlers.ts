@@ -480,6 +480,8 @@ export const handlers: HttpHandler[] = [
         discovery_source: f.provenance,
         company_id: f.company_id,
         company: { id: f.company_id, denomination: f.organisation },
+        // D14 (démo) : un contact sur sept est « opposé » ; lecture seule.
+        opposition: f.id % 7 === 0 ? { opposee: true, motifs: ['liste_refus'] } : { opposee: false, motifs: [] },
       }));
     return HttpResponse.json(paginer(liste, request, 50));
   }),

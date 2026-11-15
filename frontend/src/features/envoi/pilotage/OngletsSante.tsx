@@ -9,6 +9,7 @@ export const ONGLETS: readonly OngletDeNavigation[] = [
   { to: '/envoi/sante/chercher', libelle: 'Chercher un envoi' },
   { to: '/envoi/sante/feu-vert', libelle: 'Feu vert' },
   { to: '/envoi/sante/reputation', libelle: 'Réputation' },
+  { to: '/envoi/sante/inscriptions', libelle: 'Inscriptions' },
 ];
 
 export function OngletsSante() {

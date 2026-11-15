@@ -133,7 +133,7 @@ test('les détails et sources ne révèlent aucune valeur secrète', function ()
     }
 });
 
-test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 caractères au plus, 28 manuels', function () {
+test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 caractères au plus, 29 manuels', function () {
     $codes = CatalogueManuels::codes();
     expect(CatalogueManuels::VERSION)->toBeInt()->and(array_unique($codes))->toHaveCount(count($codes));
     foreach ($codes as $c) {
@@ -141,8 +141,8 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
         expect(CatalogueManuels::GROUPES)->toContain(CatalogueManuels::POINTS[$c]['groupe']);
     }
     $manuels = CatalogueManuels::codesManuels();
-    expect($manuels)->toHaveCount(28)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->not->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
-    expect(count($manuels))->toBe(28)->and(count($codes) - 28)->toBe(16);
+    expect($manuels)->toHaveCount(29)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->not->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
+    expect(count($manuels))->toBe(29)->and(count($codes) - 29)->toBe(16);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
             expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
@@ -156,7 +156,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve de test, réf. exemple-01', 'auteur');
     app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'Preuve de test, réf. exemple-01', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
-    expect($liste)->toHaveCount(44);
+    expect($liste)->toHaveCount(45);
     foreach ($liste as $p) {
         expect(CatalogueManuels::GROUPES)->toContain($p->groupe);
         expect($p->nature)->toBe($p->automatique ? 'auto' : 'manuel')->and(str_starts_with($p->code, $p->nature . '.'))->toBeTrue()->and($p->source)->not->toBe('');
@@ -354,8 +354,8 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 44 points : 13 auto verts, 3 auto sans source, 28 manuels non faits.
-    expect($bloquants)->toBe(3 + 28);
+    // 45 points : 13 auto verts, 3 auto sans source, 29 manuels non faits.
+    expect($bloquants)->toBe(3 + 29);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });
 

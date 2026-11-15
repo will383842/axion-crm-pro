@@ -117,6 +117,14 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_03_000060_envoi_tentatives_retention.php',
     // Filet modifié : pourquoi — envoi S1-A : gestes de pause et de reprise des séquences, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; les retirer effacerait l'historique ; down() inerte, up() rejouable.
     '2026_12_03_000070_envoi_sequences_gestes.php',
+    // Filet modifié : pourquoi — envoi S1-B : essais à blanc, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; les retirer effacerait l'historique ; down() inerte, up() rejouable.
+    '2026_12_03_000030_envoi_essais_blanc.php',
+    // Filet modifié : pourquoi — envoi S1-B : colonne `adaptateur`, déclencheur de garde sur `envoi_domaines` et fonctions journalisée/lecture ; les retirer rouvrirait le changement direct d'adaptateur (le serveur réel) ; down() inerte, up() rejouable.
+    '2026_12_03_000040_envoi_domaines_adaptateur.php',
+    // Filet modifié : pourquoi — envoi S1-B : décisions de feu vert, AJOUT SEUL ; les retirer effacerait la trace de qui a accordé l'envoi ; down() inerte, up() rejouable.
+    '2026_12_03_000050_envoi_feu_vert_decisions.php',
+    // Filet modifié : pourquoi — envoi S1-B : injections locales (AJOUT SEUL) et déclencheur `envoi_verifie_id_injection` élargi ; les retirer ferait refuser le registre des messages envoyés ; down() inerte, up() rejouable.
+    '2026_12_03_000080_envoi_injections_locales.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

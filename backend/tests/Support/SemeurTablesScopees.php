@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -227,6 +227,10 @@ final class SemeurTablesScopees
         // Envoi S1-A : conservation agrégée (ajout seul, sans FK : APPEND_SEUL), butée par espace (sans FK, droits seuls), gestes de séquence (ajout seul + FK : APPEND_SEUL_AVEC_FK, APRÈS `envoi_sequences`).
         'envoi_tentatives_jours',
         'envoi_compteur_espace',
+        // Envoi S1-B : essais à blanc, décisions de feu vert, injections locales (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK).
+        'envoi_essais_blanc',
+        'envoi_feu_vert_decisions',
+        'envoi_injections_locales',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
@@ -934,6 +938,23 @@ final class SemeurTablesScopees
             'sequence_id' => $sequence,
             'geste' => 'pause',
             'auteur' => 'zz-etancheite',
+        ]);
+        // Envoi S1-B : un essai, une décision de feu vert et une injection locale (aucune adresse).
+        $inserer('envoi_essais_blanc', [
+            'auteur' => 'zz-etancheite',
+            'debut' => '2024-01-02 10:00:00+00',
+            'fin' => '2024-01-02 10:01:00+00',
+            'reussi' => true,
+        ]);
+        $inserer('envoi_feu_vert_decisions', [
+            'decision' => 'retire',
+            'auteur' => 'zz-etancheite',
+            'motif' => 'zz',
+            'empreinte_liste' => str_repeat('c', 64),
+        ]);
+        $inserer('envoi_injections_locales', [
+            'cle_idempotence' => 'zz-seme-locale',
+            'adaptateur' => 'faux',
         ]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',

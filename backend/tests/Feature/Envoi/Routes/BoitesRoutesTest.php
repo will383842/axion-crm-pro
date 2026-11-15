@@ -160,7 +160,7 @@ test('réactiver une boîte active est idempotent (200, rien d’écrit)', funct
 test('POST /envoi/boites, test-connexion et PUT reglages répondent 501 serveur_reel_requis avant toute lecture, sans écrire', function () {
     $s = semerBoites($this);
     $avant = nbBoites($s['espace']->id);
-    foreach (['admin', 'viewer'] as $role) {
+    foreach (['owner'] as $role) {
         $this->actingAs($this->compte($s['espace'], $role), 'sanctum');
         foreach ([
             ['POST', '/api/v1/envoi/boites', []],
@@ -174,6 +174,8 @@ test('POST /envoi/boites, test-connexion et PUT reglages répondent 501 serveur_
             expect($r->json('error'))->toBe('serveur_reel_requis');
         }
     }
+    // Sans workspaces.manage : 403 avant le 501 (la garde F36-001 exige une permission sur toute écriture).
+    $this->actingAs($this->compte($s['espace'], 'viewer'), 'sanctum')->postJson('/api/v1/envoi/boites', [])->assertForbidden();
     expect(nbBoites($s['espace']->id))->toBe($avant)->and(ligneBoite($s['espace']->id, $s['boite'])->limite_jour)->toBe(20);
     expect($this->resolutions)->toBe(0);
 });

@@ -5,7 +5,6 @@ namespace Tests\Feature\Envoi;
 use App\Envoi\Conformite\ImportOppositions;
 use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Http\Middleware\AuditHashChainLogger;
-use App\Support\DelaiRequeteSql;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
@@ -394,47 +393,47 @@ test('route d’import : limiteur dédié, 429 au-delà de 30 requêtes par minu
     $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "z@clients.example.test\n"])->assertStatus(429);
 });
 
-test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requête trop longue », sans valeur dans la réponse', function () {
-    $e = new QueryException('pgsql', 'select secret', ['secret-valeur@x.example.test'], tap(new \PDOException('canceling statement due to statement timeout'), function ($p) {
-        $p->errorInfo = ['57014', 7, 'canceling statement due to statement timeout'];
-    }));
-    expect(DelaiRequeteSql::estDepassement($e))->toBeTrue();
-    $this->mock(ImportOppositions::class)->shouldReceive('simuler')->andThrow($e);
+/** Déclencheur sur l'insertion du registre : lève un vrai SQLSTATE (57014 = délai dépassé) ou une erreur ordinaire. */
+function impDeclencheurRegistre(string $corps): void
+{
+    DB::unprepared("CREATE OR REPLACE FUNCTION zz_echec_c() RETURNS trigger AS \$f\$ BEGIN {$corps} END \$f\$ LANGUAGE plpgsql");
+    DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON envoi_oppositions_registre');
+    DB::unprepared('CREATE TRIGGER zz_echec_c BEFORE INSERT ON envoi_oppositions_registre FOR EACH ROW EXECUTE FUNCTION zz_echec_c()');
+}
 
-    $r = $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "a@clients.example.test\n"]);
+const IMP_DELAI = "RAISE EXCEPTION 'canceling statement due to statement timeout secret-valeur' USING ERRCODE = '57014';";
+
+test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requête trop longue », sans valeur dans la réponse', function () {
+    $csv = "secret-valeur@clients.example.test\n";
+    $jeton = impSimuler($this, $csv)['jeton'];
+    impDeclencheurRegistre(IMP_DELAI);
+
+    $r = impConfirmer($this, $csv, $jeton);
 
     $r->assertStatus(503)->assertJsonPath('error', 'requete_trop_longue');
     expect((string) $r->getContent())->not->toContain('secret-valeur');
+    expect(impRegistre($this))->toBe(0);
 });
 
 test('inscrireLot relance telle quelle une QueryException de délai dépassé, mais masque les autres', function () {
     $entrees = [['portee' => 'adresse', 'valeur' => 'secret-lot@clients.example.test']];
     $registre = app(RegistreOppositionManuel::class);
-    $trigger = function (string $corps): void {
-        DB::unprepared("CREATE OR REPLACE FUNCTION zz_echec_c() RETURNS trigger AS \$f\$ BEGIN {$corps} RETURN NEW; END \$f\$ LANGUAGE plpgsql");
-        DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON email_suppressions');
-        DB::unprepared('CREATE TRIGGER zz_echec_c BEFORE INSERT ON email_suppressions FOR EACH ROW EXECUTE FUNCTION zz_echec_c()');
-    };
-    $import = (string) Str::uuid();
+    $appel = fn () => DB::transaction(fn () => WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, (string) Str::uuid(), $entrees, 'm', 'a')));
 
-    // Vrai dépassement de délai (57014) : la QueryException d'origine passe.
-    $trigger('PERFORM pg_sleep(2);');
-    DB::statement('SET LOCAL statement_timeout = 200');
+    impDeclencheurRegistre(IMP_DELAI);
     $code = null;
     try {
-        WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, $import, $entrees, 'm', 'a'));
+        $appel();
     } catch (QueryException $e) {
         $code = $e->errorInfo[0] ?? null;
     }
     expect($code)->toBe('57014');
 
-    // Autre erreur SQL : message générique, sans valeur.
-    $trigger("RAISE EXCEPTION 'echec voulu secret-lot';");
+    impDeclencheurRegistre("RAISE EXCEPTION 'echec voulu secret-lot';");
     try {
-        WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, $import, $entrees, 'm', 'a'));
+        $appel();
         $this->fail('attendu');
     } catch (\RuntimeException $e) {
         expect($e->getMessage())->not->toContain('secret')->and($e)->not->toBeInstanceOf(QueryException::class);
     }
-    DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON email_suppressions');
 });

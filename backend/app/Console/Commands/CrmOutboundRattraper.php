@@ -155,7 +155,8 @@ class CrmOutboundRattraper extends Command
                 }
             } catch (Throwable $e) {
                 $bilan['erreurs']++;
-                report($e);
+                // Jamais l'exception brute : SQL et valeurs liées (empreinte complète) dans le message.
+                report(OppositionSortante::exceptionSansFuite($e, (string) $l->email_hash));
             }
         }
 

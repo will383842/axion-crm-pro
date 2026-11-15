@@ -140,23 +140,44 @@ final class OppositionSortante
         try {
             return $this->signaler($empreinte, $portee, $motif, $canal);
         } catch (Throwable $e) {
-            // JAMAIS l'exception brute : le message d'une QueryException embarque le SQL et les valeurs liées (empreinte
-            // complète, clé de verrou advisory) ; `report()` les enverrait au journal, à stderr et à Sentry, y compris
-            // via getPrevious(). On ne garde que le SQLSTATE et l'empreinte tronquée, dans une exception neuve.
+            // JAMAIS l'exception brute : voir exceptionSansFuite().
             $court = substr($empreinte, 0, 12);
             Log::error('crm.outbound.record_failed', [
                 'empreinte' => $court,
                 'portee' => $portee,
                 'motif' => $motif,
             ]);
-            report(new RuntimeException(sprintf(
-                'Signalement sortant impossible (SQLSTATE %s, empreinte %s).',
-                self::sqlstateDe($e),
-                $court,
-            )));
+            report(self::exceptionSansFuite($e, $empreinte));
 
             return null;
         }
+    }
+
+    /**
+     * Exception neuve, sans précédente, à donner à `report()` à la place de celle d'un signalement raté : le message
+     * d'une QueryException embarque le SQL et les valeurs liées (empreinte complète, clé de verrou advisory) et
+     * `report()` les enverrait au journal, à stderr et à Sentry, y compris via getPrevious(). Message fixe : SQLSTATE
+     * et empreinte tronquée à 12 caractères seulement.
+     */
+    public static function exceptionSansFuite(Throwable $e, string $empreinte): RuntimeException
+    {
+        return new RuntimeException(sprintf(
+            'Signalement sortant impossible (SQLSTATE %s, empreinte %s).',
+            self::sqlstateDe($e),
+            substr($empreinte, 0, 12),
+        ));
+    }
+
+    /** Vrai si l'exception ou l'une de ses précédentes est une QueryException (SQL et valeurs liées dans le message). */
+    public static function porteUneRequete(Throwable $e): bool
+    {
+        for ($c = $e; $c !== null; $c = $c->getPrevious()) {
+            if ($c instanceof QueryException) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** SQLSTATE (5 caractères) de l'exception ou de sa chaîne, « inconnu » sinon ; jamais de texte libre. */

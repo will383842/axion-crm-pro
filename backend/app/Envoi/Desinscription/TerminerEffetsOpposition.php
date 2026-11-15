@@ -36,12 +36,14 @@ final class TerminerEffetsOpposition
     public function pour(string $workspaceId, int $oppositionId): bool
     {
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $oppositionId): bool {
+            $empreinte = '';
             try {
                 return DB::transaction(function () use ($workspaceId, $oppositionId): bool {
                     $o = DB::table('envoi_oppositions')->where('id', $oppositionId)->where('workspace_id', $workspaceId)->lockForUpdate()->first();
                     if ($o === null || $o->effets_termines_le !== null) {
                         return false;
                     }
+                    $empreinte = (string) $o->empreinte_adresse;
                     $portee = (string) DB::table('envoi_liens_desinscription')->where('workspace_id', $workspaceId)->where('id', $o->lien_id)->value('portee');
                     ($this->emettreEvenementSortant)($workspaceId, (string) $o->empreinte_adresse, $portee, (string) $o->canal);
                     event(new OppositionEnregistree($workspaceId, (string) $o->empreinte_adresse, $portee, (string) $o->canal));
@@ -51,7 +53,8 @@ final class TerminerEffetsOpposition
                 });
             } catch (Throwable $e) {
                 // L'opposition est acquise ; la relance planifiée reprendra.
-                report($e);
+                // Une QueryException porte le SQL et les valeurs liées (empreinte complète) : jamais brute.
+                report(OppositionSortante::porteUneRequete($e) ? OppositionSortante::exceptionSansFuite($e, $empreinte) : $e);
 
                 return false;
             }

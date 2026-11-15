@@ -9,8 +9,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { Pause, Play } from 'lucide-react';
 import { Button, Card, EmptyState, KpiCard, Modal, PageHeader, QueryErrorState, Skeleton, StatusPill } from '@/components/ui';
 import { OngletsCampagnes } from '@/features/envoi/campagnes/OngletsCampagnes';
-import { useDroitsSequences, useGestesSequence, useSequence, type SequenceDetail } from './api';
-import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON } from './libelles';
+import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON, useDroitsSequences, useGestesSequence, useSequence, type SequenceDetail } from './api';
 
 function messageErreur(e: unknown): string {
   if (isAxiosError(e)) {

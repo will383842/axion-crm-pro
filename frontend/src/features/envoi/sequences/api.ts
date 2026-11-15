@@ -5,6 +5,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import type { StatusTone } from '@/components/ui';
 import { PERMISSION_GERER_ESPACE, PERMISSION_GERER_UTILISATEURS, permissionsDe } from '@/features/origines/droits';
 import type { components, operations } from '@/features/envoi/api/sequences';
 
@@ -64,3 +65,14 @@ export function useDroitsSequences(): DroitsSequences {
   const p = permissionsDe(data);
   return { pause: p.has(PERMISSION_GERER_UTILISATEURS), reprise: p.has(PERMISSION_GERER_ESPACE) };
 }
+
+/** Libellés en clair. */
+export const STATUT_LIBELLE: Record<StatutSequence, string> = { active: 'Active', en_pause: 'En pause', terminee: 'Terminée' };
+export const STATUT_TON: Record<StatutSequence, StatusTone> = { active: 'success', en_pause: 'warning', terminee: 'neutral' };
+
+export const nombre = (n: number): string => n.toLocaleString('fr-FR');
+
+export const etapes = (n: number): string => `${n} ${n > 1 ? 'étapes' : 'étape'}`;
+
+const jour = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+export const dateHeure = (iso: string | null): string => (iso === null ? '—' : jour.format(new Date(iso)));

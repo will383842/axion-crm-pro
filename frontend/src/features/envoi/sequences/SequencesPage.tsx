@@ -5,8 +5,7 @@
 import { Link } from '@tanstack/react-router';
 import { EmptyState, PageHeader, QueryErrorState, Skeleton, StatusPill } from '@/components/ui';
 import { OngletsCampagnes } from '@/features/envoi/campagnes/OngletsCampagnes';
-import { useSequences } from './api';
-import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON } from './libelles';
+import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON, useSequences } from './api';
 
 export function SequencesPage() {
   const requete = useSequences();

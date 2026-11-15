@@ -35,7 +35,7 @@ test.describe('listes de refus (démo)', () => {
     await expect(fenetre).toContainText('2 adresses valides');
     await fenetre.getByRole('button', { name: 'Confirmer l’import' }).click();
     await expect(fenetre).toContainText('Import confirmé');
-    await fenetre.getByRole('button', { name: 'Fermer' }).click();
+    await fenetre.getByRole('button', { name: 'Fermer', exact: true }).and(fenetre.getByText('Fermer')).click();
     await expect.poll(total).toBe(avant + 2);
   });
 

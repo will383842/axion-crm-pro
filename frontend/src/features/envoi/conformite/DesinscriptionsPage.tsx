@@ -8,6 +8,7 @@ import { Download } from 'lucide-react';
 import { Button, KpiCard, PageHeader } from '@/components/ui';
 import { exporterRegistre, useRegistre } from './composants/api';
 import { Annonce, CLASSE_BOUTON_MOBILE, messageDErreur } from './composants/commun';
+import { BoutonImporterListe } from './composants/ImportListeRefus';
 import { PuisJeEcrire } from './composants/PuisJeEcrire';
 import { BoutonInscrire, RegistreOpposition } from './composants/RegistreOpposition';
 
@@ -38,6 +39,7 @@ export function DesinscriptionsPage() {
         actions={
           <>
             <BoutonInscrire />
+            <BoutonImporterListe />
             <Button variant="secondary" iconLeft={<Download className="h-4 w-4" aria-hidden />} className={CLASSE_BOUTON_MOBILE} onClick={() => void exporter()}>
               Exporter le registre (preuve)
             </Button>

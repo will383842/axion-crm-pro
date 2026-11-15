@@ -2,13 +2,14 @@
 
 namespace App\Providers\Envoi;
 
+use App\Envoi\Conformite\ImportOppositions;
 use Illuminate\Support\ServiceProvider;
 
-/** Vide : rempli par P1-LN-B (socle S0, aucun comportement). */
+/** P1-LN-B : import des listes de refus (D8). */
 class OppositionsImportServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // rempli par P1-LN-B
+        $this->app->singleton(ImportOppositions::class);
     }
 }

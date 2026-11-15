@@ -170,6 +170,9 @@ const ECARTS_CONNUS: string[] = [
   // (K17-FV) est en vague 3 et le filet ne lit pas le contrat d'Envoi.
   // Filet modifié : pourquoi — un nouvel appel littéral à une route absente du filet d'origine, figé comme les autres.
   'POST /api/v1/envoi/feu-vert/decision',
+  // F-LN — import des listes de refus : appel littéral dans ImportListeRefus.tsx ; la route serveur est la PR #573 (P1-LN-B).
+  // Filet modifié : pourquoi — un nouvel appel littéral à une route absente du filet d'origine, servi par le faux serveur de la démo.
+  'POST /api/v1/envoi/opposition/import',
 ];
 
 function fichiers(dossier: string): string[] {

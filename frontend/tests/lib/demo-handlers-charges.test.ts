@@ -51,8 +51,7 @@ describe('handlers de démo — chargement', () => {
       'GET */api/v1/config/features',
       'GET */api/v1/notifications',
       'GET */api/v1/envoi/etat',
-      'POST */api/v1/envoi/tout-arreter',
-      'POST */api/v1/envoi/reprendre',
+      'POST */api/v1/envoi/arret-general',
       'GET */api/v1/envoi/compteurs',
     ]) {
       expect(cles, attendue).toContain(attendue);
@@ -100,7 +99,7 @@ describe('handlers du socle — servis au client réel (src/lib/api.ts)', () => 
     expect(moi.data.workspace.name).toBe('Axion (démo)');
   });
 
-  it('features selon l’offre, notifications filtrées, tout arrêter puis reprendre', async () => {
+  it('features selon l’offre, notifications filtrées, arrêt général (sans reprise par route)', async () => {
     const { server } = await import('../msw/server');
     const { api: client } = await import('@/lib/api');
     const { choisirOffre } = await import('@/demo/offres');
@@ -121,13 +120,10 @@ describe('handlers du socle — servis au client réel (src/lib/api.ts)', () => 
     const sansCrm = await client.get<{ data: Array<{ produit: string }> }>('/notifications');
     expect(sansCrm.data.data.every((n) => n.produit !== 'crm')).toBe(true);
 
-    await expect(client.post('/envoi/reprendre')).rejects.toMatchObject({ response: { status: 409 } });
-    const arret = await client.post<{ etat: string; feu: string }>('/envoi/tout-arreter', { motif: 'Essai' });
+    const arret = await client.post<{ etat: string; feu: string }>('/envoi/arret-general', { motif: 'Essai' });
     expect(arret.data).toMatchObject({ etat: 'arrete', feu: 'rouge' });
     const compteurs = await client.get<{ en_file: number; boites_total: number }>('/envoi/compteurs');
     expect(compteurs.data).toMatchObject({ en_file: 0, boites_total: 8 });
-    const reprise = await client.post<{ etat: string }>('/envoi/reprendre');
-    expect(reprise.data.etat).toBe('actif');
     demoDb.reinitialiser();
   });
 });

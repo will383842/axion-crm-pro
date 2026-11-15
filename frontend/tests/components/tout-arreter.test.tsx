@@ -3,9 +3,10 @@
  *
  * Ce que la garde tient :
  *  1. deux clics, dont une confirmation : un seul clic n'arrête rien ;
- *  2. après confirmation, `POST /envoi/tout-arreter` part et un bandeau rouge
+ *  2. après confirmation, `POST /envoi/arret-general` part et un bandeau rouge
  *     PERSISTANT dit « Envois arrêtés » ;
- *  3. « Reprendre les envois » (`POST /envoi/reprendre`) retire le bandeau ;
+ *  3. D1 : le bandeau n'a AUCUN bouton de reprise ; il donne la commande locale
+ *     `envoi:reprendre` et rien n'appelle `/envoi/reprendre` ;
  *  4. sans Envoi, le bouton n'existe pas (le CRM de production ne change pas) ;
  *  5. le feu des envois (`GET /envoi/etat`) est dans l'en-tête d'Envoi ;
  *  6. maquette `campagnes.html` : le bouton de l'en-tête est en CONTOUR rouge
@@ -47,7 +48,7 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
     expect(await screen.findByRole('link', { name: /^état des envois : normaux$/i })).toHaveAttribute('href', '/envoi/sante');
   });
 
-  it('2 clics + confirmation → bandeau rouge ; « Reprendre les envois » le retire', async () => {
+  it('2 clics + confirmation → bandeau rouge sans bouton de reprise, avec la commande locale', async () => {
     const posts: string[] = [];
     await monterEnvoi();
     // Espion sur les POST, empilé au-dessus des handlers d'Envoi.
@@ -63,17 +64,22 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
     const dialogue = await screen.findByRole('dialog', { name: /tout arrêter/i });
     expect(posts).toEqual([]);
     expect(within(dialogue).getByText(/plus aucun message ne part/i)).toBeInTheDocument();
+    expect(within(dialogue).getByText(/envoi:reprendre/)).toBeInTheDocument();
+    expect(dialogue.textContent).toMatch(/lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise/);
 
     // Second clic : la confirmation.
     await userEvent.click(within(dialogue).getByRole('button', { name: /^arrêter tous les envois$/i }));
     const bandeau = await screen.findByRole('alert');
     expect(bandeau.textContent).toMatch(/envois arrêtés/i);
-    expect(posts).toContain('/api/v1/envoi/tout-arreter');
+    expect(posts).toContain('/api/v1/envoi/arret-general');
     expect(await screen.findByRole('link', { name: /^état des envois : arrêtés$/i })).toBeInTheDocument();
 
-    await userEvent.click(within(bandeau).getByRole('button', { name: /reprendre les envois/i }));
-    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-    expect(posts).toContain('/api/v1/envoi/reprendre');
+    // D1 : la reprise est une commande locale journalisée, jamais un bouton.
+    expect(within(bandeau).queryByRole('button')).toBeNull();
+    expect(bandeau.textContent).toMatch(/envoi:reprendre/);
+    expect(bandeau.textContent).toMatch(/lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise/);
+    expect(posts).not.toContain('/api/v1/envoi/reprendre');
+    expect(posts).not.toContain('/api/v1/envoi/tout-arreter');
     server.events.removeAllListeners('request:start');
   });
 

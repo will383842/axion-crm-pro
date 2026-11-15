@@ -2,6 +2,7 @@
 
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\MessageAEnvoyer;
+use App\Envoi\Contrat\NatureReport;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Imap\Verp;
@@ -662,4 +663,46 @@ test('B2 Kumo : un 4xx (report net) LIBÈRE la place et un 5xx définitif LIBÈR
     expect(fn () => $p->injecter(msgK9('k2')))->toThrow(RefusDefinitifServeur::class);
     expect($depot->etatInjection(WS_K9, 'k2'))->toBeNull()->and($depot->injectesLe(WS_K9, $jour))->toBe(0);
     Log::shouldNotHaveReceived('critical');
+});
+
+/**
+ * R06 (reste) — le code SMTP lu par l'adaptateur Kumo est PORTÉ par le résultat (4xx) ou l'exception (5xx), pour que la passerelle
+ * l'écrive dans `envoi_tentatives.code_smtp`. Sans code lisible (coupure, état relu), il reste nul. Aucun réseau, aucune base.
+ */
+test('4xx : le report d\'échec porte le code reçu (nature Echec, pas Attente)', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = [451];
+    $r = kumoFabrique($t)->injecter(msgK9());
+
+    expect($r->accepte)->toBeFalse()
+        ->and($r->nature)->toBe(NatureReport::Echec)
+        ->and($r->codeSmtp)->toBe(451);
+});
+
+test('5xx : le refus définitif porte le code reçu', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = [550];
+
+    try {
+        kumoFabrique($t)->injecter(msgK9());
+        $refus = null;
+    } catch (RefusDefinitifServeur $e) {
+        $refus = $e;
+    }
+
+    expect($refus)->toBeInstanceOf(RefusDefinitifServeur::class)->and($refus->codeSmtp)->toBe(550);
+});
+
+test('coupure avant DATA : report d\'échec SANS code (aucun code SMTP n\'a été reçu)', function () {
+    $t = new FauxTransportKumo;
+    $t->scenario = ['coupure_avant_data'];
+    $r = kumoFabrique($t)->injecter(msgK9());
+
+    expect($r->accepte)->toBeFalse()->and($r->nature)->toBe(NatureReport::Echec)->and($r->codeSmtp)->toBeNull();
+});
+
+test('accepté (250) : aucun code conservé', function () {
+    $r = kumoFabrique(new FauxTransportKumo)->injecter(msgK9());
+
+    expect($r->accepte)->toBeTrue()->and($r->codeSmtp)->toBeNull();
 });

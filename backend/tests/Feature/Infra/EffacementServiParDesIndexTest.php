@@ -135,6 +135,31 @@ function esiPeupler(): string
         'email' => ESI_EMAIL, 'phone' => ESI_MOBILE, 'person_key' => 'zz-pk-cible', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    // L'effacement console parcourt TOUS les espaces (`EffacementCoordonneesFiches::espaces()`).
+    // Un espace laissé en base par un autre test (ex. `SequenceurConcurrenceTest` : l'espace
+    // survit à son nettoyage, des empreintes en ajout seul le référencent) est VIDE : après
+    // ANALYZE le planificateur estime à 1 ligne `workspace_id = <cet espace>`, et pour
+    // `workspace_id = ? AND email = ?` il préfère alors `idx_contacts_workspace` /
+    // `idx_companies_workspace_lifecycle_stage` (cout 4,3) à l'index de l'effacement (8,3) :
+    // défaut « index étranger à l'effacement ». En production aucun espace n'est vide de
+    // cette façon. On donne donc à chaque autre espace du volume (sans aucun email ni
+    // téléphone cherché), pour que `workspace_id` y soit peu sélectif, comme dans `$espace`.
+    foreach (DB::table('workspaces')->where('id', '!=', $espace)->pluck('id') as $autre) {
+        DB::statement("
+            INSERT INTO companies (workspace_id, denomination, siren, signals, created_at, updated_at)
+            SELECT ?, 'ZZ Autre ' || g::text, lpad((700000000 + g)::text, 9, '0'), '{}'::jsonb, now(), now()
+              FROM generate_series(1, ?) g
+            ON CONFLICT DO NOTHING
+        ", [$autre, ESI_VOLUME]);
+        DB::statement("
+            INSERT INTO contacts (workspace_id, company_id, first_name, last_name, email, created_at, updated_at)
+            SELECT c.workspace_id, c.id, 'Zz', 'ZZAUTRE' || c.siren, 'a' || c.siren || '@zz-autre.example.invalid', now(), now()
+              FROM companies c
+             WHERE c.workspace_id = ? AND c.denomination LIKE 'ZZ Autre %'
+            ON CONFLICT DO NOTHING
+        ", [$autre]);
+    }
+
     DB::statement('ANALYZE companies');
     DB::statement('ANALYZE contacts');
 

@@ -132,6 +132,7 @@ final class EssaiABlanc
     /** @param array<string, bool> $etapes rempli au fil du parcours (conservé si une exception l'interrompt) */
     private function parcours(string $ws, array &$etapes): void
     {
+        /** @var mixed $serveur le type déclaré de la fabrique n'est pas garanti à l'exécution : contrôlé ci-dessous */
         $serveur = $this->fabriqueServeur !== null ? ($this->fabriqueServeur)() : new FauxServeurEnvoi; // APRÈS beginTransaction
         if (! $serveur instanceof FauxServeurEnvoi) {
             throw new LogicException('L\'essai à blanc exige un FauxServeurEnvoi.');

@@ -13,7 +13,7 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md` (branche `plan/fin-envoi`), fiche S1-A. Ce
 - Appel de la butée par `PasserelleLocale` : P1-PLAFOND. Commande d'archivage et planification à 04:50 : R06-ARCH. Pause/reprise de séquence : T-SEQ.
 
 ## Risques
-- Les fonctions `SECURITY DEFINER` filtrent explicitement l'espace (le propriétaire contourne la RLS). Les barrières de droits ne valent que si `CRM_DB_APP_ROLE_ENABLED=true`.
+- Les fonctions `SECURITY DEFINER` filtrent explicitement l'espace (le propriétaire contourne la RLS s'il est SUPERUSER ou BYPASSRLS, cas actuel à ne pas supposer). Les barrières de droits ne valent que si `CRM_DB_APP_ROLE_ENABLED=true`.
 - Entre la fusion de S1-A et celle de P1-PLAFOND, `envoi_injection_liberer` peut rendre une place d'espace qui n'avait pas été comptée : le plancher à 0 évite toute valeur négative.
 - `envoi_tentatives_archiver` lève une erreur (au lieu de rendre faux) sur un refus : un appel erroné se voit.
 - `ENVOI_REEL_ACTIF=false` : aucun envoi réel, aucune donnée existante modifiée.

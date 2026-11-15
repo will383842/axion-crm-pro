@@ -122,6 +122,8 @@ test('compteur : un plafond inférieur à 1 rend faux sans écrire aucune ligne'
         foreach ([0, -5] as $plafond) {
             expect((bool) s1aOwner()->selectOne('SELECT envoi_compteur_espace_reserver(?, ?, ?) AS r', [$a, $jour, $plafond])->r)->toBeFalse();
         }
+        // Un plafond NULL ne doit pas s'ouvrir à 300 (LEAST ignore NULL).
+        expect((bool) s1aOwner()->selectOne('SELECT envoi_compteur_espace_reserver(?, ?, NULL::integer) AS r', [$a, $jour])->r)->toBeFalse();
         expect(s1aOwner()->table('envoi_compteur_espace')->where('workspace_id', $a)->count())->toBe(0);
     } finally {
         s1aNettoyer([$a, $b]);
@@ -165,16 +167,16 @@ test('compteur : deux processus concurrents n\'obtiennent jamais plus de places 
     $jour = s1aJourLointain();
     try {
         $c = config('database.connections.pgsql_app');
-        $script = '$p=new PDO("pgsql:host=".$argv[1].";port=".$argv[2].";dbname=".$argv[3],$argv[4],$argv[5]);'
-            . '$p->prepare("SELECT set_config(\'app.current_workspace_id\', ?, false)")->execute([$argv[6]]);'
-            . 'while(microtime(true)<(float)$argv[9]){usleep(500);}'
-            . '$s=$p->prepare("SELECT envoi_compteur_espace_reserver(?::uuid, ?::date, ?::int) AS r");$s->execute([$argv[6],$argv[7],(int)$argv[8]]);'
+        $script = '$p=new PDO("pgsql:host=".$argv[1].";port=".$argv[2].";dbname=".$argv[3],$argv[4],getenv("S1A_MDP"));'
+            . '$p->prepare("SELECT set_config(\'app.current_workspace_id\', ?, false)")->execute([$argv[5]]);'
+            . 'while(microtime(true)<(float)$argv[8]){usleep(500);}'
+            . '$s=$p->prepare("SELECT envoi_compteur_espace_reserver(?::uuid, ?::date, ?::int) AS r");$s->execute([$argv[5],$argv[6],(int)$argv[7]]);'
             . 'echo $s->fetchColumn()?"1":"0";';
         $depart = microtime(true) + 2.5;
         $procs = [];
         for ($i = 0; $i < 8; $i++) {
-            $cmd = [PHP_BINARY, '-r', $script, '--', (string) $c['host'], (string) $c['port'], (string) $c['database'], (string) $c['username'], (string) $c['password'], $a, $jour, '3', (string) $depart];
-            $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $cmd = [PHP_BINARY, '-r', $script, '--', (string) $c['host'], (string) $c['port'], (string) $c['database'], (string) $c['username'], $a, $jour, '3', (string) $depart];
+            $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, array_merge(getenv(), ['S1A_MDP' => (string) $c['password']])); // mot de passe par l'environnement, jamais en argument
             expect(is_resource($p))->toBeTrue();
             $procs[] = [$p, $pipes];
         }
@@ -309,6 +311,24 @@ test('tentatives : la borne ne dépend pas du fuseau de la session', function ()
         }
     }
     expect($resultats)->toBe(['UTC' => 1, 'Pacific/Auckland' => 1]);
+});
+
+test('tentatives : propriétaire + variable à on + DELETE d\'une ligne de moins de 400 jours ⇒ refusé, les lignes restent', function () {
+    [$a, $b] = s1aDeuxEspaces();
+    try {
+        $o = s1aOwner();
+        $avant = $o->selectOne("SELECT ((now() AT TIME ZONE 'Europe/Paris')::date - 400) AS d")->d;
+        // À la limite + 1 minute (premier instant gardé) et maintenant.
+        s1aTentative($a, $o->selectOne("SELECT (?::timestamp AT TIME ZONE 'Europe/Paris') + interval '1 minute' AS t", [$avant])->t);
+        s1aTentative($a, now()->toDateTimeString());
+        s1aRefuse(fn () => $o->transaction(function () use ($o, $a) {
+            $o->statement("SET LOCAL envoi.archivage_tentatives = 'on'");
+            $o->statement('DELETE FROM envoi_tentatives WHERE workspace_id = ?', [$a]);
+        }), 'ajout seulement');
+        expect($o->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(2);
+    } finally {
+        s1aNettoyer([$a, $b]);
+    }
 });
 
 test('tentatives : rôle applicatif + variable posée + DELETE direct ⇒ permission refusée', function () {

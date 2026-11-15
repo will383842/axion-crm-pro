@@ -3,9 +3,11 @@
  * Des compteurs seulement : aucune personne n'est affichée.
  */
 import { Link } from '@tanstack/react-router';
-import { EmptyState, PageHeader, QueryErrorState, Skeleton, StatusPill } from '@/components/ui';
+import { EmptyState, PageHeader, QueryErrorState, Skeleton, StatusPill, TableScroll } from '@/components/ui';
 import { OngletsCampagnes } from '@/features/envoi/campagnes/OngletsCampagnes';
 import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON, useSequences } from './api';
+
+const GRID = 'minmax(220px,2.4fr) 112px 96px 80px 80px 140px';
 
 export function SequencesPage() {
   const requete = useSequences();
@@ -28,8 +30,9 @@ export function SequencesPage() {
           <EmptyState title="Aucune séquence pour l’instant" description="Une séquence enchaîne jusqu’à trois messages pour une même cible." />
         </div>
       ) : (
-        <div role="table" aria-label="Séquences" className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-          <div role="row" className="hidden grid-cols-[minmax(0,2.4fr)_8rem_6rem_6rem_7rem_9rem] gap-4 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+        <TableScroll template={GRID} className="mt-4 rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div role="table" aria-label="Séquences">
+          <div role="row" style={{ gridTemplateColumns: GRID }} className="grid gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <div role="columnheader">Séquence</div>
             <div role="columnheader">Statut</div>
             <div role="columnheader">Étapes</div>
@@ -39,8 +42,8 @@ export function SequencesPage() {
           </div>
           <div role="rowgroup" className="divide-y divide-slate-100">
             {lignes.map((s) => (
-              <div key={s.id} role="row" aria-label={s.nom} className="grid grid-cols-2 items-center gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,2.4fr)_8rem_6rem_6rem_7rem_9rem] md:gap-4">
-                <div role="cell" className="col-span-2 min-w-0 md:col-span-1">
+              <div key={s.id} role="row" aria-label={s.nom} style={{ gridTemplateColumns: GRID }} className="grid items-center gap-3 px-4 py-3 text-sm">
+                <div role="cell" className="min-w-0">
                   <Link to="/envoi/sequences/$sequenceId" params={{ sequenceId: s.id }} className="font-semibold text-slate-900 underline-offset-2 hover:underline">
                     {s.nom}
                   </Link>
@@ -57,6 +60,7 @@ export function SequencesPage() {
             ))}
           </div>
         </div>
+        </TableScroll>
       )}
     </div>
   );

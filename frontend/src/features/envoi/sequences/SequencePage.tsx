@@ -7,9 +7,11 @@ import { useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useParams } from '@tanstack/react-router';
 import { Pause, Play } from 'lucide-react';
-import { Button, Card, EmptyState, KpiCard, Modal, PageHeader, QueryErrorState, Skeleton, StatusPill } from '@/components/ui';
+import { Button, Card, EmptyState, KpiCard, Modal, PageHeader, QueryErrorState, Skeleton, StatusPill, TableScroll } from '@/components/ui';
 import { OngletsCampagnes } from '@/features/envoi/campagnes/OngletsCampagnes';
 import { dateHeure, etapes, nombre, STATUT_LIBELLE, STATUT_TON, useDroitsSequences, useGestesSequence, useSequence, type SequenceDetail } from './api';
+
+const GRID_ETAPES = '48px 80px minmax(200px,2fr) repeat(4,80px)';
 
 function messageErreur(e: unknown): string {
   if (isAxiosError(e)) {
@@ -124,8 +126,9 @@ export function SequencePage() {
           </div>
           <Card className="p-4">
             <h2 className="text-lg font-bold text-slate-900">Étapes</h2>
-            <div role="table" aria-label="Étapes" className="mt-3 overflow-x-auto">
-              <div role="row" className="grid min-w-[40rem] grid-cols-[3rem_5rem_minmax(0,2fr)_repeat(4,5rem)] gap-3 border-b border-slate-100 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <TableScroll template={GRID_ETAPES} className="mt-3">
+            <div role="table" aria-label="Étapes">
+              <div role="row" style={{ gridTemplateColumns: GRID_ETAPES }} className="grid gap-3 border-b border-slate-100 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <div role="columnheader">Étape</div>
                 <div role="columnheader">Délai</div>
                 <div role="columnheader">Objet</div>
@@ -135,7 +138,7 @@ export function SequencePage() {
                 <div role="columnheader">Désinsc.</div>
               </div>
               {s.etapes.map((e) => (
-                <div key={e.rang} role="row" className="grid min-w-[40rem] grid-cols-[3rem_5rem_minmax(0,2fr)_repeat(4,5rem)] gap-3 border-b border-slate-50 py-2 text-sm">
+                <div key={e.rang} role="row" style={{ gridTemplateColumns: GRID_ETAPES }} className="grid gap-3 border-b border-slate-50 py-2 text-sm">
                   <div role="cell">{e.rang}</div>
                   <div role="cell">{e.delai_jours === 0 ? 'Tout de suite' : `+${e.delai_jours} j`}</div>
                   <div role="cell" className="min-w-0 truncate">{e.objet}</div>
@@ -146,6 +149,7 @@ export function SequencePage() {
                 </div>
               ))}
             </div>
+            </TableScroll>
           </Card>
         </div>
       )}

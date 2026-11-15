@@ -54,6 +54,51 @@ function NomGuide({ nom, guide }: { nom: string | null | undefined; guide: strin
   return guide === null ? <>—</> : <code>{guide}</code>;
 }
 
+/**
+ * D15 — section « Accord donné » : origine (mot, réseau, guide, date) et accords (date, source, version du texte).
+ * Lecture seule. Champs lus un par un : `commentaire_ref`, `post_ref` et `post_url` ne sont jamais lus.
+ */
+function AccordDonne({ bloc }: { bloc: ContenusAccords | undefined }) {
+  const accords = (bloc?.consentements ?? []).filter((c) => c.nature === 'optin');
+  const origine = bloc?.origine ?? null;
+  return (
+    <section data-testid="accord-donne" aria-label="Accord donné">
+      <h4>Accord donné</h4>
+      <dl>
+        {origine !== null && (
+          <div>
+            <dt>Origine</dt>
+            <dd>
+              Mot « {origine.mot ?? '—'} » · {libelleReseau(origine.reseau) ?? '—'} · {origine.guide === null ? '—' : <code>{origine.guide}</code>}
+              {origine.guide == null && origine.date != null && (
+                <span data-testid="origine-date" style={{ marginLeft: 10 }}>
+                  reçu le {date(origine.date)}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
+        <div>
+          <dt>Accord</dt>
+          <dd>
+            {accords.length === 0 ? (
+              'Aucun accord enregistré'
+            ) : (
+              <ul>
+                {accords.map((c, i) => (
+                  <li key={`${c.date ?? ''}-${c.version ?? ''}-${i}`}>
+                    accord reçu le {date(c.date)} · source : {c.source ?? '—'} · version du texte : {c.version ?? '—'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefined }) {
   const b = bloc;
   const vide = b === undefined || (b.origine === null && b.guides.length === 0 && b.consentements.length === 0 && !b.opposition.actif);
@@ -80,29 +125,13 @@ export function ContenusAccordsCard({ bloc }: { bloc: ContenusAccords | undefine
           <div>Depuis le {date(b.opposition.date)}. Les données sont gardées.</div>
         </div>
       )}
+      <AccordDonne bloc={b} />
       {vide || b === undefined ? (
         <p>Aucune information de contenu ou d’accord reçue pour cette personne.</p>
       ) : (
         <div>
           <p>Origine du contenu et guides reçus.</p>
           <dl>
-            <div>
-              <dt>Origine</dt>
-              <dd>
-                {b.origine === null ? (
-                  '—'
-                ) : (
-                  <>
-                    Mot « {b.origine.mot ?? '—'} » · {libelleReseau(b.origine.reseau) ?? '—'} · {b.origine.guide === null ? '—' : <code>{b.origine.guide}</code>}
-                    {b.origine.guide == null && b.origine.date != null && (
-                      <span data-testid="origine-date" style={{ marginLeft: 10 }}>
-                        reçu le {date(b.origine.date)}
-                      </span>
-                    )}
-                  </>
-                )}
-              </dd>
-            </div>
             {b.origine?.guide != null && (
               <div>
                 <dt>Guide d’origine</dt>

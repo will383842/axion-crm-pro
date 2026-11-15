@@ -62,13 +62,13 @@ test('GET /envoi/chauffe suit le contrat, ne résout pas ServeurEnvoi et ne mont
     expect(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/chauffe', 'get', 200, $j))->toBe([]);
     $ids = array_column($j['ressources'], 'id');
     sort($ids);
-    expect($ids)->toBe(['domaine:' . $s['boite'], 'ip:ip-a', 'ip:ip-neuve'])
+    expect($ids)->toBe(['domaine:chauffe-a.exemple.test', 'ip:ip-a', 'ip:ip-neuve'])
         ->and(json_encode($j))->not->toContain('ip-autre')
         ->and($j['paliers'])->toHaveCount(8)->and($j['budget_du_jour'])->toBeGreaterThanOrEqual(0)
         ->and($j['plafond_boite'])->toBe(150);
     $parId = array_column($j['ressources'], null, 'id');
     expect($parId['ip:ip-a']['palier'])->toBe('P2')->and($parId['ip:ip-a']['peut_reculer'])->toBeTrue()
-        ->and($parId['domaine:' . $s['boite']]['palier'])->toBe('P3')->and($parId['domaine:' . $s['boite']]['libelle'])->toBe('chauffe-a.exemple.test')
+        ->and($parId['domaine:chauffe-a.exemple.test']['palier'])->toBe('P3')->and($parId['domaine:chauffe-a.exemple.test']['libelle'])->toBe('chauffe-a.exemple.test')
         ->and($parId['ip:ip-neuve']['palier'])->toBe('P1')->and($parId['ip:ip-neuve']['peut_reculer'])->toBeFalse();
     expect(json_encode($j))->not->toContain('a@chauffe-a');
 });
@@ -114,10 +114,41 @@ test('aucun geste ne fait monter un palier : une seule action, reculer, et le pa
     expect(array_values($chauffe))->toBe([['GET', '/api/v1/envoi/chauffe'], ['POST', '/api/v1/envoi/chauffe/exemple/reculer']]);
     $proprio = $this->compte($s['ws'], 'owner');
     $avant = array_column($this->actingAs($proprio)->getJson('/api/v1/envoi/chauffe')->json('ressources'), 'palier', 'id');
-    $this->actingAs($proprio)->postJson('/api/v1/envoi/chauffe/domaine:' . $s['boite'] . '/reculer')->assertOk();
+    $this->actingAs($proprio)->postJson('/api/v1/envoi/chauffe/domaine:chauffe-a.exemple.test/reculer')->assertOk();
     $apres = array_column($this->actingAs($proprio)->getJson('/api/v1/envoi/chauffe')->json('ressources'), 'palier', 'id');
     foreach ($avant as $id => $p) {
         expect(rangPalier($apres[$id]))->toBeLessThanOrEqual(rangPalier($p));
     }
-    expect(rangPalier($apres['domaine:' . $s['boite']]))->toBe(2);
+    expect(rangPalier($apres['domaine:chauffe-a.exemple.test']))->toBe(2);
+});
+
+test('les retours (pseudo-boîte) ne sont jamais une ressource : le terme du domaine reste celui de la boîte en P3', function () {
+    $s = semerChauffe($this);
+    app(DepotChauffe::class)->compterRetour($s['ws']->id, 'evt-1', 'reponses', JourEnvoi::de(new DateTimeImmutable('now')), 'autre');
+    $j = $this->actingAs($this->compte($s['ws'], 'admin'))->getJson('/api/v1/envoi/chauffe')->assertOk()->json();
+    $ids = array_column($j['ressources'], 'id');
+    expect($ids)->not->toContain('domaine:' . DepotChauffe::BOITE_RETOURS)
+        ->and(json_encode($j))->not->toContain('(retours)')
+        ->and($j['termes']['courbe_domaine'])->toBe(50);
+});
+
+test('deux boîtes du même domaine forment une seule ressource nommée par le domaine, et un recul vaut pour le domaine', function () {
+    $s = semerChauffe($this);
+    $deuxieme = (string) Str::uuid();
+    WorkspaceContext::run($s['ws']->id, fn () => DB::table('envoi_boites')->insert([
+        'id' => $deuxieme, 'workspace_id' => $s['ws']->id, 'adresse' => 'B@Chauffe-A.exemple.test', 'hote' => 'smtp.exemple.invalid', 'port' => 587,
+        'identifiants_chiffres' => 'x',
+    ]));
+    chaufferRoute($s['ws'], 'domaine', $deuxieme, 12);
+    $proprio = $this->compte($s['ws'], 'owner');
+    $liste = fn () => $this->actingAs($proprio)->getJson('/api/v1/envoi/chauffe')->assertOk()->json('ressources');
+    $domaines = array_values(array_filter($liste(), fn ($r) => $r['type'] === 'domaine'));
+    expect($domaines)->toHaveCount(1)->and($domaines[0]['id'])->toBe('domaine:chauffe-a.exemple.test')
+        ->and($domaines[0]['jours_effectifs'])->toBe(12)
+        ->and(json_encode($liste()))->not->toContain($s['boite'])->not->toContain($deuxieme);
+    $this->actingAs($proprio)->postJson('/api/v1/envoi/chauffe/domaine:chauffe-a.exemple.test/reculer')->assertOk();
+    $apres = array_values(array_filter($liste(), fn ($r) => $r['type'] === 'domaine'));
+    expect($apres)->toHaveCount(1)->and(rangPalier($apres[0]['palier']))->toBeLessThan(3)
+        ->and(WorkspaceContext::run($s['ws']->id, fn () => DB::table('envoi_chauffe_reculs')->where('ressource', 'chauffe-a.exemple.test')->count()))->toBe(1);
+    $this->actingAs($proprio)->postJson('/api/v1/envoi/chauffe/domaine:' . $s['boite'] . '/reculer')->assertNotFound();
 });

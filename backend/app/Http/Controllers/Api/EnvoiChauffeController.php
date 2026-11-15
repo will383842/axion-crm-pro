@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  *
  * `index` lit les compteurs de l'espace courant (jamais `ServeurEnvoi`). `reculer` est le seul geste : il ramène UNE
  * ressource d'un palier (propriétaire seul), il est idempotent pour la même journée et ne peut jamais faire monter.
- * L'identifiant `ip:<clé>` / `domaine:<clé>` est la clé sous laquelle `envoi_chauffe_jours` compte la ressource.
+ * L'identifiant `ip:<clé>` / `domaine:<nom de domaine>` est la clé sous laquelle `envoi_chauffe_jours` compte la ressource.
  * Chaque requête est bornée à l'espace courant, et une ressource d'un autre espace est inconnue (404).
  */
 class EnvoiChauffeController extends ApiController
@@ -106,16 +106,17 @@ class EnvoiChauffeController extends ApiController
     private function ressourcesConnues(string $ws, DateTimeImmutable $jour): array
     {
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $ws)
-            ->groupBy('ressource_type', 'boite')->orderBy('ressource_type')->orderBy('boite')
-            ->selectRaw('ressource_type, boite, COALESCE(SUM(envoyes) FILTER (WHERE jour = ?), 0) AS aujourdhui', [$jour->format('Y-m-d')])->get());
+            ->where('ressource_type', BudgetChauffe::RESSOURCE_IP)->where('boite', '<>', DepotChauffe::BOITE_RETOURS)
+            ->groupBy('boite')->orderBy('boite')
+            ->selectRaw('boite, COALESCE(SUM(envoyes) FILTER (WHERE jour = ?), 0) AS aujourdhui', [$jour->format('Y-m-d')])->get());
         $liste = [];
         foreach ($lignes as $l) {
-            $type = (string) $l->ressource_type;
             $cle = (string) $l->boite;
-            if ($type === BudgetChauffe::RESSOURCE_IP && str_starts_with($cle, 'ip:')) {
-                $cle = substr($cle, 3);
-            }
-            $liste[] = ['type' => $type, 'cle' => $cle, 'envoyes' => (int) $l->aujourdhui];
+            $liste[] = ['type' => BudgetChauffe::RESSOURCE_IP, 'cle' => str_starts_with($cle, 'ip:') ? substr($cle, 3) : $cle, 'envoyes' => (int) $l->aujourdhui];
+        }
+        // Domaines : UNE ressource par nom de domaine (boîtes sommées), jamais l'identifiant d'une boîte ni la pseudo-boîte des retours.
+        foreach ($this->depot->domainesDeLEspace($ws, $jour) as $domaine => $envoyes) {
+            $liste[] = ['type' => BudgetChauffe::RESSOURCE_DOMAINE, 'cle' => (string) $domaine, 'envoyes' => $envoyes];
         }
 
         return $liste;
@@ -127,7 +128,7 @@ class EnvoiChauffeController extends ApiController
     private function vue(string $ws, string $type, string $cle, int $envoyes, DateTimeImmutable $jour): array
     {
         $reculs = $this->depot->reculsDe($ws, $type, $cle, $jour);
-        $effectifs = BudgetChauffe::joursEffectifs($this->depot->volumesParJour($ws, $cle, $jour, $type), Seuils::JOUR_EFFECTIF_PART, $reculs);
+        $effectifs = BudgetChauffe::joursEffectifs($type === BudgetChauffe::RESSOURCE_DOMAINE ? $this->depot->volumesParJourDomaine($ws, $cle, $jour) : $this->depot->volumesParJour($ws, $cle, $jour, $type), Seuils::JOUR_EFFECTIF_PART, $reculs);
         $jc = CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $jour);
         $palier = CourbeChauffe::palierEtendu($jc);
         $fin = null;

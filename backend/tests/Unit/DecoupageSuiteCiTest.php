@@ -189,13 +189,19 @@ test('DECOUPAGE — les fichiers incompatibles ne sont JAMAIS dans la meme part'
     }
 });
 
-test('DECOUPAGE — TEMOIN : l\'exclusion s\'applique meme quand la taille les rapprocherait', function () {
-    $fichiers = ['a/ATest.php' => 30, 'b/BTest.php' => 29, 'c/CTest.php' => 1];
-    // Sans exclusion, A et C iraient ensemble ou non selon le hasard de la taille : on force A/B.
-    $parts = decoupageRepartir($fichiers, 2, [['a/ATest.php', 'c/CTest.php']]);
+test('DECOUPAGE — TEMOIN : l\'exclusion s\'applique meme quand la taille rapprocherait les deux fichiers', function () {
+    $fichiers = ['a/ATest.php' => 10, 'b/BTest.php' => 10, 'c/CTest.php' => 1];
+    $couple = ['a/ATest.php', 'c/CTest.php'];
+    $ensemble = fn (array $parts): bool => collect($parts)
+        ->contains(fn (array $liste) => count(array_intersect($couple, $liste)) === 2);
 
-    foreach ($parts as $liste) {
-        expect(count(array_intersect(['a/ATest.php', 'c/CTest.php'], $liste)))->toBeLessThan(2);
-    }
-    expect(decoupageVerifier($parts, array_keys($fichiers)))->toBe([]);
+    // Preuve que le temoin peut rougir : SANS contrainte, A et C sont dans la meme part
+    // (A=10 et B=10 se repartissent en premier, C=1 rejoint la part la moins chargee).
+    $sans = decoupageRepartir($fichiers, 2, []);
+    expect($ensemble($sans))->toBeTrue();
+
+    // AVEC la contrainte, A et C sont separes et rien n'est perdu.
+    $avec = decoupageRepartir($fichiers, 2, [$couple]);
+    expect($ensemble($avec))->toBeFalse();
+    expect(decoupageVerifier($avec, array_keys($fichiers)))->toBe([]);
 });

@@ -266,6 +266,19 @@ test('un serveur qui n\'est pas un FauxServeurEnvoi est refusé (instanceof), es
     expect($lignes)->toHaveCount(1)->and((bool) $lignes[0]->reussi)->toBeFalse();
 });
 
+test('l\'alerte de l\'essai est construite sans réflexion et reste muette même si les alertes sont actives ; le réglage est restauré', function () {
+    $src = (string) file_get_contents(app_path('Envoi/Orchestration/EssaiABlanc.php'));
+    expect($src)->not->toContain('ReflectionClass')->not->toContain('newInstanceWithoutConstructor');
+    config(['alertes.actif' => true]);
+    Mail::fake();
+
+    app(EssaiABlanc::class)->executer($this->ws, 'test-essai');
+
+    Mail::assertNothingSent();
+    Mail::assertNothingQueued();
+    expect(config('alertes.actif'))->toBeTrue();
+});
+
 test('la commande documente son autorisation (console locale, aucune route)', function () {
     $src = (string) file_get_contents(app_path('Console/Commands/EnvoiEssaiABlanc.php'));
     expect($src)->toContain('AUTORISATION');

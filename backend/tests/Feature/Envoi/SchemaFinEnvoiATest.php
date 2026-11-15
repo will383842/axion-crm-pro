@@ -119,7 +119,7 @@ test('compteur : un plafond inférieur à 1 rend faux sans écrire aucune ligne'
     $jour = s1aJourLointain();
     try {
         s1aContexte(s1aOwner(), $a);
-        foreach ([0, -5] as $plafond) {
+        foreach ([0, -5, null] as $plafond) {
             expect((bool) s1aOwner()->selectOne('SELECT envoi_compteur_espace_reserver(?, ?, ?) AS r', [$a, $jour, $plafond])->r)->toBeFalse();
         }
         expect(s1aOwner()->table('envoi_compteur_espace')->where('workspace_id', $a)->count())->toBe(0);
@@ -165,16 +165,16 @@ test('compteur : deux processus concurrents n\'obtiennent jamais plus de places 
     $jour = s1aJourLointain();
     try {
         $c = config('database.connections.pgsql_app');
-        $script = '$p=new PDO("pgsql:host=".$argv[1].";port=".$argv[2].";dbname=".$argv[3],$argv[4],$argv[5]);'
-            . '$p->prepare("SELECT set_config(\'app.current_workspace_id\', ?, false)")->execute([$argv[6]]);'
-            . 'while(microtime(true)<(float)$argv[9]){usleep(500);}'
-            . '$s=$p->prepare("SELECT envoi_compteur_espace_reserver(?::uuid, ?::date, ?::int) AS r");$s->execute([$argv[6],$argv[7],(int)$argv[8]]);'
+        $script = '$p=new PDO("pgsql:host=".$argv[1].";port=".$argv[2].";dbname=".$argv[3],$argv[4],getenv("S1A_MDP"));'
+            . '$p->prepare("SELECT set_config(\'app.current_workspace_id\', ?, false)")->execute([$argv[5]]);'
+            . 'while(microtime(true)<(float)$argv[8]){usleep(500);}'
+            . '$s=$p->prepare("SELECT envoi_compteur_espace_reserver(?::uuid, ?::date, ?::int) AS r");$s->execute([$argv[5],$argv[6],(int)$argv[7]]);'
             . 'echo $s->fetchColumn()?"1":"0";';
         $depart = microtime(true) + 2.5;
         $procs = [];
         for ($i = 0; $i < 8; $i++) {
-            $cmd = [PHP_BINARY, '-r', $script, '--', (string) $c['host'], (string) $c['port'], (string) $c['database'], (string) $c['username'], (string) $c['password'], $a, $jour, '3', (string) $depart];
-            $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $cmd = [PHP_BINARY, '-r', $script, '--', (string) $c['host'], (string) $c['port'], (string) $c['database'], (string) $c['username'], $a, $jour, '3', (string) $depart];
+            $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, array_merge(getenv(), ['S1A_MDP' => (string) $c['password']]));
             expect(is_resource($p))->toBeTrue();
             $procs[] = [$p, $pipes];
         }
@@ -321,6 +321,65 @@ test('tentatives : rôle applicatif + variable posée + DELETE direct ⇒ permis
             s1aApp()->statement('DELETE FROM envoi_tentatives');
         }), 'permission denied');
         expect(s1aOwner()->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(1);
+    } finally {
+        s1aNettoyer([$a, $b]);
+    }
+});
+
+test('tentatives : propriétaire + variable à on + DELETE d\'une ligne de moins de 400 jours ⇒ refusé ; la ligne plus ancienne passe', function () {
+    [$a, $b] = s1aDeuxEspaces();
+    try {
+        $borne = s1aOwner()->selectOne("SELECT (((now() AT TIME ZONE 'Europe/Paris')::date - 400)::timestamp AT TIME ZONE 'Europe/Paris') AS b")->b;
+        $limiteMoins = s1aOwner()->selectOne("SELECT (?::timestamptz + interval '1 minute')::text AS t", [$borne])->t;
+        $limitePlus = s1aOwner()->selectOne("SELECT (?::timestamptz - interval '1 minute')::text AS t", [$borne])->t;
+        $maintenant = s1aOwner()->selectOne('SELECT now()::text AS t')->t;
+        s1aTentative($a, $limiteMoins);
+        s1aTentative($a, $maintenant);
+        s1aTentative($a, $limitePlus);
+        $supprimer = function (string $cree) use ($a): void {
+            s1aOwner()->transaction(function () use ($a, $cree): void {
+                s1aOwner()->statement("SET LOCAL envoi.archivage_tentatives = 'on'");
+                s1aOwner()->statement('DELETE FROM envoi_tentatives WHERE workspace_id = ? AND cree_le = ?::timestamptz', [$a, $cree]);
+            });
+        };
+        s1aRefuse(fn () => $supprimer($limiteMoins), 'ajout seulement');
+        s1aRefuse(fn () => $supprimer($maintenant), 'ajout seulement');
+        expect(s1aOwner()->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(3);
+        $supprimer($limitePlus); // témoin : plus de 400 jours + variable ⇒ autorisé
+        expect(s1aOwner()->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(2);
+    } finally {
+        s1aNettoyer([$a, $b]);
+    }
+});
+
+test('tentatives : témoin de la garde — avec le droit DELETE accordé, le rôle applicatif passerait ; sans lui, refusé', function () {
+    [$a, $b] = s1aDeuxEspaces();
+    $nom = (string) config('database.connections.pgsql_app.username', 'axion_app');
+    $role = '"' . str_replace('"', '""', $nom) . '"';
+    try {
+        s1aTentative($a, now()->subDays(500)->toDateTimeString());
+        s1aTentative($a, now()->subDays(501)->toDateTimeString());
+        s1aContexte(s1aApp(), $a);
+        s1aRefuse(fn () => s1aApp()->transaction(function (): void {
+            s1aApp()->statement("SET LOCAL envoi.archivage_tentatives = 'on'");
+            s1aApp()->statement('DELETE FROM envoi_tentatives');
+        }), 'permission denied');
+        expect(s1aOwner()->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(2);
+        try {
+            s1aOwner()->statement("GRANT DELETE ON public.envoi_tentatives TO {$role}");
+            s1aApp()->transaction(function (): void {
+                s1aApp()->statement("SET LOCAL envoi.archivage_tentatives = 'on'");
+                s1aApp()->statement('DELETE FROM envoi_tentatives');
+            });
+            expect(s1aOwner()->table('envoi_tentatives')->where('workspace_id', $a)->count())->toBe(0); // le droit est donc bien la barrière
+        } finally {
+            s1aOwner()->statement("REVOKE DELETE ON public.envoi_tentatives FROM {$role}");
+        }
+        s1aTentative($a, now()->subDays(500)->toDateTimeString());
+        s1aRefuse(fn () => s1aApp()->transaction(function (): void {
+            s1aApp()->statement("SET LOCAL envoi.archivage_tentatives = 'on'");
+            s1aApp()->statement('DELETE FROM envoi_tentatives');
+        }), 'permission denied');
     } finally {
         s1aNettoyer([$a, $b]);
     }

@@ -19,6 +19,7 @@ use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\ExpectationFailedException;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\FauxServeurPersistant;
 use Tests\TestCase;
@@ -305,7 +306,7 @@ test('garde du détecteur d\'alertes : une sortie du fils illisible ou sans « c
     $vide = ['signal' => null, 'code' => 0, 'sortie' => null, 'erreur' => 'rien'];
     $sansCle = ['signal' => null, 'code' => 0, 'sortie' => ['bilan' => []], 'erreur' => ''];
 
-    expect(fn () => repCritiques($vide, 'cycle test'))->toThrow(Throwable::class)
-        ->and(fn () => repCritiques($sansCle, 'cycle test'))->toThrow(Throwable::class)
+    expect(fn () => repCritiques($vide, 'cycle test'))->toThrow(ExpectationFailedException::class)
+        ->and(fn () => repCritiques($sansCle, 'cycle test'))->toThrow(ExpectationFailedException::class)
         ->and(repCritiques(['signal' => null, 'code' => 0, 'sortie' => ['critiques' => ['envoi.x']], 'erreur' => ''], 'cycle test'))->toBe(['envoi.x']);
 });

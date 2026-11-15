@@ -6,6 +6,8 @@
  * Usage : php campagne-code-concurrent.php <espace> <campagne> <code> <instant-unix-décimal>
  */
 
+require __DIR__ . '/garde_environnement_ouvrier.php'; // première instruction : hors APP_ENV=testing, arrêt code 3
+
 use App\Envoi\Campagnes\DepotCampagnes;
 use Illuminate\Contracts\Console\Kernel;
 

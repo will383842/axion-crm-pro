@@ -3,13 +3,17 @@
 namespace App\Console\Commands;
 
 use App\Envoi\Orchestration\EssaiABlanc;
+use App\Envoi\Orchestration\RefusAvantEssai;
 use Illuminate\Console\Command;
-use InvalidArgumentException;
 use Throwable;
 
 /**
  * Essai à blanc de bout en bout (D10) : commande LOCALE, aucune route. Données fictives, faux serveur, transaction annulée ;
  * seule la ligne de résultat (sans adresse) est écrite. Code de sortie non nul si une étape est rouge.
+ *
+ * AUTORISATION : aucune route, aucun rôle applicatif. Seule une personne ayant un accès shell au serveur peut la lancer (artisan) ;
+ * elle ne s'exécute jamais depuis le web. `--auteur` est une simple étiquette (sans « @ ») écrite dans la ligne de résultat,
+ * pas une identité vérifiée. Aucun envoi réel : `ENVOI_REEL_ACTIF` reste false.
  */
 class EnvoiEssaiABlanc extends Command
 {
@@ -22,7 +26,7 @@ class EnvoiEssaiABlanc extends Command
         $auteur = (string) ($this->option('auteur') ?: get_current_user());
         try {
             $rapport = $essai->executer((string) $this->argument('espace'), $auteur);
-        } catch (InvalidArgumentException $e) {
+        } catch (RefusAvantEssai $e) {
             $this->error($e->getMessage() . ' Aucun essai lancé.');
 
             return self::FAILURE;

@@ -21,6 +21,20 @@ function ouvrierHorsTest(string $script, string $env): array
     return ['code' => proc_close($p), 'sortie' => $sortie, 'erreur' => $erreur];
 }
 
+test('la liste des scripts ouvriers est EXACTEMENT celle attendue (un ajout ou un retrait doit être décidé ici)', function () use ($ouvriers) {
+    $attendus = ['ouvrier_butee.php', 'ouvrier_chauffe.php', 'ouvrier_cycle.php', 'ouvrier_feu_vert.php', 'ouvrier_injection.php', 'ouvrier_sequenceur.php'];
+    sort($ouvriers);
+    expect($ouvriers)->toBe($attendus);
+});
+
+test('les sous-processus de concurrence posent la garde en première instruction', function () {
+    foreach (['arret-general-concurrent.php', 'opposition-concurrente.php', 'campagne-code-concurrent.php', 'ouvrier_sequenceur.php'] as $script) {
+        $src = (string) file_get_contents(dirname(__DIR__, 2) . '/Support/' . $script);
+        $apresEntete = preg_replace('~^<\?php\s*(?:/\*.*?\*/\s*)?(?:use [^;]+;\s*)*~s', '', $src);
+        expect($apresEntete)->toStartWith("require __DIR__ . '/garde_environnement_ouvrier.php';", "{$script} : la garde doit être la première instruction");
+    }
+});
+
 foreach ($ouvriers as $script) {
     foreach (['local', 'production', 'staging'] as $env) {
         test("{$script} refuse de tourner en environnement « {$env} » (code non nul, message, aucune sortie de résultat)", function () use ($script, $env) {

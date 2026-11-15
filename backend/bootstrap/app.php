@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DelaiRequeteDepassee;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Http\Middleware\EnforceFirstLoginSetup;
 use App\Http\Middleware\EnsureCrmConsoleV2;
@@ -191,6 +192,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // la requete SQL (SQLSTATE 57014) : on le dit a l'ecran, en francais,
         // en 503 — pas un 500 « le serveur est casse ». L'exception reste
         // journalisee (`report` par defaut) : un depassement est un signal.
+        // Exception dédiée (import d'oppositions) : message fixe, aucune QueryException précédente, donc aucun SQL ni valeur liée au journal.
+        $exceptions->render(function (DelaiRequeteDepassee $e, Request $request) {
+            return response()->json([
+                'error' => 'requete_trop_longue',
+                'message' => DelaiRequeteSql::MESSAGE,
+            ], 503);
+        });
         $exceptions->render(function (QueryException $e, Request $request) {
             if (! DelaiRequeteSql::estDepassement($e)) {
                 return null;

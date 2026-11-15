@@ -9,6 +9,8 @@
  * le test compte ainsi les effets, ce qui prouve le verrou de ligne (et pas seulement le dédoublonnage en base).
  */
 
+require __DIR__ . '/garde_environnement_ouvrier.php'; // première instruction : hors APP_ENV=testing, arrêt code 3
+
 use App\Envoi\Desinscription\EnregistrerOpposition;
 use App\Envoi\Desinscription\OppositionEnregistree;
 use Illuminate\Contracts\Console\Kernel;

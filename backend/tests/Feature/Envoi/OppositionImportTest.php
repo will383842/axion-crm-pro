@@ -375,9 +375,9 @@ test('une exception en base ne met aucune empreinte ni valeur de la requête dan
     }
 });
 
-test('route d’import : limiteur dédié, 429 au-delà de 10 requêtes par minute et par compte', function () {
+test('route d’import : limiteur dédié, 429 au-delà de 30 requêtes par minute et par compte', function () {
     RateLimiter::clear('envoi-opposition-import|' . $this->proprio->id);
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < 30; $i++) {
         $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "a{$i}@clients.example.test\n"])->assertOk();
     }
     $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "z@clients.example.test\n"])->assertStatus(429);

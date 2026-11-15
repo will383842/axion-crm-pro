@@ -34,7 +34,7 @@ class RouteServiceProvider extends ServiceProvider
 
             return Limit::perMinute(120)->by('desinscription:' . hash('sha256', (string) $r->route('jeton')));
         });
-        // R04 : recherche d'un envoi par adresse, 10 par minute et par compte.
+        // R04 : recherche d'un envoi par adresse, 30 par minute et par compte.
         RateLimiter::for('envoi-chercher', fn (Request $r) => Limit::perMinute(10)->by('envoi-chercher:' . (optional($r->user())->id ?: $r->ip())));
         RateLimiter::for('login', fn (Request $r) => Limit::perMinute(5)->by($r->ip()));
         RateLimiter::for('magic-link', fn (Request $r) => Limit::perMinute(3)->by($r->ip()));
@@ -69,8 +69,8 @@ class RouteServiceProvider extends ServiceProvider
         }
         // Envoi R05 : export du registre d'opposition (2 par heure et par compte) ; « Puis-je écrire à… ? » (30 par minute et par compte).
         RateLimiter::for('envoi-opposition-export', fn (Request $r) => Limit::perHour(2)->by('envoi-opposition-export|' . (optional($r->user())->id ?: $r->ip())));
-        // Envoi P1-LN-B : import des listes de refus (simulation et confirmation), 10 par minute et par compte.
-        RateLimiter::for('envoi-opposition-import', fn (Request $r) => Limit::perMinute(10)->by('envoi-opposition-import|' . (optional($r->user())->id ?: $r->ip())));
+        // Envoi P1-LN-B : import des listes de refus (simulation et confirmation), 30 par minute et par compte.
+        RateLimiter::for('envoi-opposition-import', fn (Request $r) => Limit::perMinute(30)->by('envoi-opposition-import|' . (optional($r->user())->id ?: $r->ip())));
         // Envoi R15 : écritures d'infrastructure (30 par minute) et contrôle DNS (6 par minute), par compte.
         RateLimiter::for('envoi-infra-ecriture', fn (Request $r) => Limit::perMinute(30)->by('envoi-infra-ecriture|' . (optional($r->user())->id ?: $r->ip())));
         RateLimiter::for('envoi-dns-verifier', fn (Request $r) => Limit::perMinute(6)->by('envoi-dns-verifier|' . (optional($r->user())->id ?: $r->ip())));

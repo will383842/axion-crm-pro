@@ -155,6 +155,8 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/messages/{p}/archivage',
   'POST /api/v1/envoi/messages/{p}/versions/{p}/restaurer',
   'POST /api/v1/envoi/messages/{p}/versions/{p}/valider',
+  // S2-SOCLE (D1) — arrêt général : appel littéral dans ToutArreter.tsx ; la route serveur n'existe qu'en vague 3.
+  'POST /api/v1/envoi/arret-general',
 ];
 
 function fichiers(dossier: string): string[] {

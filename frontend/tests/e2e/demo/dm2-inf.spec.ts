@@ -68,7 +68,11 @@ test.describe('DM2-INF — infrastructure d’envoi', () => {
     await ouvrirDemo(page, '/envoi/boites', { offre: 'envoi' });
     await page.getByRole('button', { name: 'Tout arrêter' }).click();
     await page.getByRole('button', { name: 'Arrêter tous les envois' }).click();
-    await expect(page.getByRole('button', { name: /Reprendre/ }).first()).toBeVisible();
+    // D1 : plus de bouton « Reprendre » ; le bandeau donne la commande locale.
+    const bandeau = page.getByRole('alert').filter({ hasText: 'Envois arrêtés' });
+    await expect(bandeau).toBeVisible();
+    await expect(bandeau).toContainText('envoi:reprendre');
+    await expect(page.getByRole('button', { name: /Reprendre les envois/ })).toHaveCount(0);
   });
 
   test('un domaine ajouté reste après rechargement, avec ses DNS à créer', async ({ page }) => {

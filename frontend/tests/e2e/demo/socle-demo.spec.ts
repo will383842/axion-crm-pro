@@ -68,10 +68,24 @@ test.describe('socle de démo', () => {
     expect(crm.produits).toEqual({ crm: 'actif', envoi: 'absent' });
   });
 
+  test('« Tout arrêter » en 2 clics : bandeau rouge sans « Reprendre », commande locale, survit au rechargement', async ({ page }) => {
+    await ouvrirDemo(page, '/envoi/campagnes');
+    await page.getByRole('button', { name: 'Tout arrêter' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Arrêter tous les envois' }).click();
+    const bandeau = page.getByRole('alert').filter({ hasText: 'Envois arrêtés' });
+    await expect(bandeau).toBeVisible();
+    await expect(bandeau.getByRole('button')).toHaveCount(0);
+    await expect(bandeau).toContainText('envoi:reprendre');
+    await expect(bandeau).toContainText('à lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise');
+    await page.reload();
+    await expect(page.getByRole('alert').filter({ hasText: 'Envois arrêtés' })).toBeVisible();
+    await page.getByRole('button', { name: 'Remettre la démo à zéro' }).click();
+  });
+
   test('« Remettre la démo à zéro » restaure les données', async ({ page }) => {
     await ouvrirDemo(page, '/');
     expect((await appelerApi<EtatEnvois>(page, 'GET', '/envoi/etat')).etat).toBe('actif');
-    await appelerApi(page, 'POST', '/envoi/tout-arreter');
+    await appelerApi(page, 'POST', '/envoi/arret-general');
     expect((await appelerApi<EtatEnvois>(page, 'GET', '/envoi/etat')).etat).toBe('arrete');
 
     // Un rechargement GARDE le geste (persistance de session).

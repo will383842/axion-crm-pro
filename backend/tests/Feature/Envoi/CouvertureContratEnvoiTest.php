@@ -119,3 +119,8 @@ test('les trous déclarés sont de vrais trous (ni route réelle, ni entrée Non
 foreach (trousReels() as $couple => $raison) {
     test("trou réel : $couple a une route")->todo("$raison — à traiter par le lot propriétaire du contrat");
 }
+
+test('le contrat d’arrêt général déclare la réponse 403 (refus faute de permission)', function () {
+    $doc = Yaml::parseFile(dirname(__DIR__, 3) . '/openapi/envoi/socle.yaml');
+    expect($doc['paths']['/envoi/arret-general']['post']['responses'])->toHaveKey('403');
+});

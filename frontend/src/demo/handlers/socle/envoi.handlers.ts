@@ -35,6 +35,9 @@ export const handlers: HttpHandler[] = [
   http.post(api('/envoi/arret-general'), async ({ request }) => {
     await delai();
     const corps = (await request.json().catch(() => ({}))) as { motif?: unknown };
+    const actuel = demoDb.etatEnvois.lire();
+    // Idempotent : déjà arrêté, un second appel ne réécrit ni depuis, ni par, ni motif.
+    if (actuel.etat === 'arrete') return HttpResponse.json(actuel);
     const etat = demoDb.etatEnvois.modifier({
       etat: 'arrete',
       feu: 'rouge',

@@ -76,6 +76,7 @@ test.describe('socle de démo', () => {
     await expect(bandeau).toBeVisible();
     await expect(bandeau.getByRole('button')).toHaveCount(0);
     await expect(bandeau).toContainText('envoi:reprendre');
+    await expect(bandeau).toContainText('à lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise');
     await page.reload();
     await expect(page.getByRole('alert').filter({ hasText: 'Envois arrêtés' })).toBeVisible();
     await page.getByRole('button', { name: 'Remettre la démo à zéro' }).click();

@@ -65,6 +65,7 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
     expect(posts).toEqual([]);
     expect(within(dialogue).getByText(/plus aucun message ne part/i)).toBeInTheDocument();
     expect(within(dialogue).getByText(/envoi:reprendre/)).toBeInTheDocument();
+    expect(dialogue.textContent).toMatch(/lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise/);
 
     // Second clic : la confirmation.
     await userEvent.click(within(dialogue).getByRole('button', { name: /^arrêter tous les envois$/i }));
@@ -76,6 +77,7 @@ describe('« Tout arrêter » dans l’espace Envoi', () => {
     // D1 : la reprise est une commande locale journalisée, jamais un bouton.
     expect(within(bandeau).queryByRole('button')).toBeNull();
     expect(bandeau.textContent).toMatch(/envoi:reprendre/);
+    expect(bandeau.textContent).toMatch(/lancer sur le serveur par l’exploitant de la plateforme ; demandez-lui la reprise/);
     expect(posts).not.toContain('/api/v1/envoi/reprendre');
     expect(posts).not.toContain('/api/v1/envoi/tout-arreter');
     server.events.removeAllListeners('request:start');

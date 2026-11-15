@@ -36,6 +36,12 @@ export interface paths {
          *     propriétaire et administrateur). Un second appel répond 200 sans nouvelle
          *     écriture. La reprise n'est pas une route : commande locale journalisée
          *     `envoi:reprendre <espace> --auteur=`.
+         *
+         *     Au second appel : aucune nouvelle ligne de journal ; l'alerte est émise comme
+         *     pour la commande ; la pause globale `ServeurEnvoi::pause()` n'est pas utilisée.
+         *     Refus (403) : message « demandez à un administrateur ». Le motif est limité en
+         *     longueur et jamais recopié tel quel dans le journal ni dans l'alerte (T-SOCLE le
+         *     bornera).
          */
         post: operations["arretGeneral"];
         delete?: never;

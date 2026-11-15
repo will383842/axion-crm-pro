@@ -137,7 +137,8 @@ function ConfirmationToutArreter({
         </h2>
         <p className="mt-2 text-sm text-slate-700">
           Plus aucun message ne part, toutes boîtes et campagnes confondues. Rien n’est perdu. La reprise se
-          fait par une commande locale journalisée : <code className="font-mono text-xs">{COMMANDE_REPRISE}</code>.
+          fait par une commande locale journalisée : <code className="font-mono text-xs">{COMMANDE_REPRISE}</code>, à lancer sur le serveur par l’exploitant de la
+          plateforme ; demandez-lui la reprise.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onAnnuler}>
@@ -172,7 +173,8 @@ export function BandeauEnvoisArretes() {
         {data.par !== null ? ` par ${data.par}` : ''} : plus aucun message ne part.
       </span>
       <span className="basis-full text-xs font-normal text-rose-100">
-        Pour reprendre, lancez la commande locale <code className="font-mono">{COMMANDE_REPRISE}</code> (journalisée).
+        Pour reprendre, lancez la commande locale <code className="font-mono">{COMMANDE_REPRISE}</code> (journalisée), à lancer sur le serveur par l’exploitant de
+        la plateforme ; demandez-lui la reprise.
       </span>
     </div>
   );

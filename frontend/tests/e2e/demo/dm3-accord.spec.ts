@@ -36,7 +36,11 @@ test.describe('accord donné (G4-ACCORD)', () => {
   });
 
   test('J2 · aucune référence de commentaire ou de post dans le DOM', async ({ page }) => {
-    await accordDeLaFiche(page, 0);
+    let texte = '';
+    for (let rang = 0; rang < 12 && !texte.includes('version du texte'); rang += 1) texte = await accordDeLaFiche(page, rang);
+    // La fiche testée contient bien un accord et une origine : l'absence des références est alors significative.
+    expect(texte).toContain('version du texte');
+    expect(texte).toContain('Origine');
     const html = await page.content();
     expect(html).not.toContain('commentaire_ref');
     expect(html).not.toContain('post_ref');

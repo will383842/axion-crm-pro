@@ -29,6 +29,33 @@ describe('Accord donné (G4-ACCORD)', () => {
     expect(section.textContent).toContain('02/11/2026');
   });
 
+  it('optin puis retrait : la section montre le retrait, jamais un accord nu', () => {
+    const bloc: ContenusAccords = {
+      ...avecAccord,
+      consentements: [
+        { nature: 'optin', date: '2026-11-03T10:00:00Z', source: 'confirmation', version: 'M2' },
+        { nature: 'retrait', date: '2026-11-10T10:00:00Z', source: 'lien', version: 'M2' },
+      ],
+    };
+    render(<ContenusAccordsCard bloc={bloc} />);
+    const texte = screen.getByTestId('accord-donne').textContent ?? '';
+    expect(texte).toContain('retiré le 10/11/2026');
+    expect(texte).not.toMatch(/accord reçu le 03\/11\/2026 · source : confirmation · version du texte : M2(?!.*retiré)/);
+  });
+
+  it('optin + opposition : la section montre l’opposition enregistrée', () => {
+    const bloc: ContenusAccords = { ...avecAccord, opposition: { actif: true, date: '2026-11-12T10:00:00Z' } };
+    render(<ContenusAccordsCard bloc={bloc} />);
+    const texte = screen.getByTestId('accord-donne').textContent ?? '';
+    expect(texte).toContain('opposition enregistrée');
+    expect(texte).toContain('12/11/2026');
+  });
+
+  it('sans origine : la ligne « Origine — » reste', () => {
+    render(<ContenusAccordsCard bloc={sansAccord} />);
+    expect(screen.getByTestId('accord-donne').textContent).toContain('Origine—');
+  });
+
   it('sans accord : « Aucun accord enregistré », jamais une valeur inventée', () => {
     render(<ContenusAccordsCard bloc={sansAccord} />);
     expect(within(screen.getByTestId('accord-donne')).getByText('Aucun accord enregistré')).toBeTruthy();

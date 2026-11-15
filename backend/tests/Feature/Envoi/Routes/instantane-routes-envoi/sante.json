@@ -9,5 +9,16 @@
             "permission:users.manage",
             "workspace"
         ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/sante/test",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
     }
 ]

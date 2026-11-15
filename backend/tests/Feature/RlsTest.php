@@ -493,3 +493,35 @@ test('envoi S1-A : RLS forcée et policy d’espace sur la butée, les agrégats
         rlsCleanup([$wsA, $wsB]);
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Envoi S1-B — essais à blanc, décisions de feu vert et injections locales : RLS forcée, un espace ne voit pas l'autre
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('envoi S1-B : RLS forcée et policy d’espace sur les essais, les décisions de feu vert et les injections locales', function () {
+    foreach (['envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales'] as $table) {
+        $t = rlsOwner()->selectOne('SELECT relrowsecurity AS actif, relforcerowsecurity AS force FROM pg_class WHERE oid = ?::regclass', ['public.' . $table]);
+        expect((bool) $t->actif)->toBeTrue("{$table} : RLS inactive")
+            ->and((bool) $t->force)->toBeTrue("{$table} : RLS non forcée");
+        expect(rlsOwner()->selectOne('SELECT count(*) AS n FROM pg_policies WHERE schemaname = ? AND tablename = ?', ['public', $table])->n)->toBeGreaterThanOrEqual(1);
+    }
+
+    [$wsA, $wsB] = rlsSeedTwoWorkspaces();
+
+    try {
+        foreach ([$wsA, $wsB] as $ws) {
+            rlsOwner()->table('envoi_injections_locales')->insert(['workspace_id' => $ws, 'cle_idempotence' => 'rls-s1b', 'adaptateur' => 'faux']);
+        }
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $wsA]);
+        expect(rlsApp()->table('envoi_injections_locales')->pluck('workspace_id')->all())->toBe([$wsA]);
+        rlsApp()->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        expect(rlsApp()->table('envoi_injections_locales')->count())->toBe(0);
+    } finally {
+        rlsOwner()->transaction(function () use ($wsA, $wsB): void {
+            rlsOwner()->statement('ALTER TABLE envoi_injections_locales DISABLE TRIGGER USER');
+            rlsOwner()->table('envoi_injections_locales')->whereIn('workspace_id', [$wsA, $wsB])->delete();
+            rlsOwner()->statement('ALTER TABLE envoi_injections_locales ENABLE TRIGGER USER');
+        });
+        rlsCleanup([$wsA, $wsB]);
+    }
+});

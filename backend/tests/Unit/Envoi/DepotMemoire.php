@@ -112,6 +112,27 @@ final class DepotMemoire implements DepotSocle
         return in_array(mb_strtolower(trim($adresse)), $this->adressesOpposees, true);
     }
 
+    /** @var array<string, int> places d'espace prises par jour (butée D7) */
+    public array $placesEspace = [];
+
+    public int $plafondEspace = 300;
+
+    public function plafondEspace(string $workspaceId): int
+    {
+        return $this->plafondEspace;
+    }
+
+    public function reserverPlaceEspace(string $workspaceId, DateTimeImmutable $jour, int $plafond): bool
+    {
+        $j = $jour->format('Y-m-d');
+        if (min($plafond, 300) < 1 || ($this->placesEspace[$j] ?? 0) >= min($plafond, 300)) {
+            return false;
+        }
+        $this->placesEspace[$j] = ($this->placesEspace[$j] ?? 0) + 1;
+
+        return true;
+    }
+
     public function reserverInjection(string $workspaceId, DateTimeImmutable $jour, string $cleIdempotence, DateTimeImmutable $instant, array $ressources = []): bool
     {
         if ($this->dejaInjecte($workspaceId, $cleIdempotence)) {
@@ -169,6 +190,8 @@ final class DepotMemoire implements DepotSocle
             $this->cles = array_values(array_diff($this->cles, [$cle]));
             unset($this->statuts[$cle]);
             $this->liberees[$cleIdempotence] = ($this->liberees[$cleIdempotence] ?? 0) + 1;
+            $jj = $jour->format('Y-m-d');
+            $this->placesEspace[$jj] = max(0, ($this->placesEspace[$jj] ?? 0) - 1); // la place d'espace est rendue (jamais sous 0)
             $n = $this->injectesLe($workspaceId, $jour) - 1;
             $n > 0 ? $this->compteurs[$jour->format('Y-m-d')] = $n : $this->compteurs = array_diff_key($this->compteurs, [$jour->format('Y-m-d') => 1]);
 

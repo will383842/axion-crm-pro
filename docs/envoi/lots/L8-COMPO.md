@@ -8,6 +8,8 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche L8-COMPO. `ENVOI_REEL_ACTIF=false` 
 - `Sequenceur` : à la conclusion `acceptee` (et à la reprise d'un message déjà accepté), crée si besoin la ligne `envoi_injections_locales` (clé `seq-<inscription>-<rang>`, idempotente) puis écrit `envoi_messages_envoyes` (empreintes seulement). L'identifiant du serveur reste dans `envoi_messages.id_injection`.
 - Échec d'écriture du registre : écrit sous point de sauvegarde ; la conclusion d'un message réellement parti est conservée, et une alerte critique `envoi.registre_ecriture_echouee` est émise après le COMMIT (jamais silencieux).
 
+- `SequenceurConcurrenceTest` : son nettoyage garde l'espace quand le registre (ajout seul, clé étrangère) y a écrit ; assertions inchangées.
+
 ## Reste
 - Aucun appelant en production : la fabrique est branchée par L8-ORCH (vague 4).
 - Une référence de désinscription est créée à chaque composition (ajout seul) ; un rejeu en crée une de plus.

@@ -94,7 +94,7 @@ test('rejouer le cycle n\'écrit pas deux fois le registre ni l\'injection local
     ($this->cycle)();
     ($this->cycle)();
 
-    expect(DB::table('envoi_messages_envoyes')->count())->toBe(1)->and(DB::table('envoi_injections_locales')->count())->toBe(1);
+    expect(DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)->count())->toBe(1)->and(DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->count())->toBe(1);
 });
 
 test('un échec d\'écriture du registre n\'est JAMAIS perdu en silence : alerte critique, conclusion conservée', function () {
@@ -108,7 +108,7 @@ test('un échec d\'écriture du registre n\'est JAMAIS perdu en silence : alerte
     expect($bilan)->toBe([Sequenceur::ENVOYE => 1])
         ->and($this->faux->appels)->toBe(1)
         ->and(DB::table('envoi_messages')->where('inscription_id', $this->ins)->value('statut'))->toBe('envoye')
-        ->and(DB::table('envoi_messages_envoyes')->count())->toBe(0);
+        ->and(DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)->count())->toBe(0);
     Log::shouldHaveReceived('critical')->withArgs(fn (string $m): bool => str_starts_with($m, 'envoi.registre_ecriture_echouee'))->once();
 });
 

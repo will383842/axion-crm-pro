@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Crm\Opposition\StatutOpposition;
 use App\Models\Contact;
 use App\Support\ContactQueryFilters;
 use App\Support\EntreprisesFermees;
@@ -48,7 +49,7 @@ class ContactsController extends ApiController
                 // profondeur du lot L0 vaut pour les deux couches.
                 ->where('workspace_id', $workspaceId)
                 ->whereNull('deleted_at')
-                ->with('company:id,denomination');
+                ->with('company:id,denomination,siren');
             $qb = QueryBuilder::for($base)
                 ->allowedFilters(...ContactQueryFilters::allowed())
                 ->allowedSorts(...['last_name', 'email_score', 'created_at'])
@@ -71,8 +72,15 @@ class ContactsController extends ApiController
             $page = $qb->paginate($perPage, ['*'], 'page', null, $total)
                 ->appends($r->query());
 
+            // Statut d'opposition (D14) : lu par lot pour la page entière, AVANT tout masquage de l'adresse.
+            $lignes = [];
+            foreach ($page->items() as $c) {
+                $lignes[$c->id] = ['email' => is_string($c->email) ? $c->email : null, 'siren' => $c->company?->siren];
+            }
+            $oppositions = (new StatutOpposition)->pourLignes($workspaceId, $lignes);
+
             return $this->ok([
-                'data' => array_map(fn (Contact $c): array => $this->present($c, $masquer), $page->items()),
+                'data' => array_map(fn (Contact $c): array => $this->present($c, $masquer, $oppositions[$c->id] ?? null), $page->items()),
                 'meta' => $this->meta($page->total(), $page->perPage(), $page->currentPage(), $page->lastPage()),
             ]);
         } catch (\Throwable $e) {
@@ -99,11 +107,13 @@ class ContactsController extends ApiController
      * toute colonne ajoutée par une migration future — y compris des colonnes
      * qui n'ont rien à faire dans une liste (`normalized_hash`, `metadata`…).
      *
+     * @param  array{opposee: bool, motifs: list<string>}|null  $opposition
      * @return array<string, mixed>
      */
-    private function present(Contact $c, bool $masquer): array
+    private function present(Contact $c, bool $masquer, ?array $opposition = null): array
     {
         return [
+            'opposition' => $opposition ?? ['opposee' => false, 'motifs' => []],
             'id' => $c->id,
             'first_name' => $c->first_name,
             'last_name' => $c->last_name,

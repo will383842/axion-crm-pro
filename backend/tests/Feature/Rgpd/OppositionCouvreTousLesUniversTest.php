@@ -300,12 +300,16 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `business` (jamais le vivier) avant d'y ajouter l'adresse inscrite à la main, pour ne pas doubler
     // une ligne existante — notamment celle née du site, dont la source garde l'anti-boucle (STOP-T4).
     // Il n'efface ni ne modifie jamais une ligne de cette table.
+    // G4-API (2026-11-14) : +1. `Crm\Opposition\StatutOpposition` LIT `opt_out` et `email_suppressions`
+    // en portée `business` (jamais le vivier), par lot, pour afficher « opposée » dans le CRM. Lecture
+    // seule : il n'écrit, n'efface ni n'émet rien vers le site.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/DossierClientIngest.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',
         'app/Crm/Joignabilite/Joignabilite.php',
+        'app/Crm/Opposition/StatutOpposition.php',
         'app/Crm/Outbound/OppositionSortante.php',
         'app/Crm/Personnes/Abonnements.php',
         'app/Crm/Pharmacies/TelephonesFiness.php',

@@ -10,6 +10,9 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 - Le contrôleur pose `ATTRIBUT_JOURNAL_PROPRE` et écrit sa ligne d'audit (étape, nombres, `import_id`, statut), sans le corps ni son empreinte.
 - Aucune suppression : l'import ne fait qu'ajouter des refus.
 
+## Test modifié : pourquoi
+`ContratsS2Test` (hors liste initiale) : il exigeait que l’import soit encore un trou (`trous/conformite.php`) ; le plan vide ce fichier dans ce lot, l’assertion devient « n’est plus un trou » (même chemin que K17-FV pour la décision). La déclaration au contrat reste vérifiée.
+
 ## Reste
 - Écran d'import : lot F-LN (vague 5).
 

@@ -53,6 +53,11 @@ function decoupageGroupesIndissociables(): array
     return [
         // AuditHashChainTest lit SECRET_CHAINE_DE_TEST, defini par AuditHashChainExtendedTest.
         ['tests/Unit/Audit/AuditHashChainExtendedTest.php', 'tests/Unit/Audit/AuditHashChainTest.php'],
+        // SequenceurConcurrenceTest ecrit pour de bon dans companies/contacts, hors
+        // transaction (puis nettoie). EffacementServiParDesIndexTest depend de l'etat
+        // de ces tables. Ils doivent toujours tourner dans la MEME part, sinon la CI
+        // n'exerce jamais ce scenario (la repartition par taille les separerait).
+        ['tests/Feature/Envoi/SequenceurConcurrenceTest.php', 'tests/Feature/Infra/EffacementServiParDesIndexTest.php'],
     ];
 }
 

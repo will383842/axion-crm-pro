@@ -91,6 +91,29 @@ function esiConditionServie(array $noeud): bool
     return $exigee === null || str_contains((string) $noeud['Index Cond'], $exigee);
 }
 
+
+function esiDiag(string $etiquette): void
+{
+    $e = static function (string $m): void { fwrite(STDERR, "[ESIDIAG] {$m}\n"); };
+    $e("=== {$etiquette} ===");
+    foreach (['companies', 'contacts'] as $t) {
+        $r = (array) DB::selectOne("SELECT (SELECT count(*) FROM {$t}) AS n, pg_size_pretty(pg_table_size('{$t}')) AS taille, pg_size_pretty(pg_indexes_size('{$t}')) AS taille_idx, pg_relation_size('{$t}')/8192 AS pages, c.reltuples, c.relpages FROM pg_class c WHERE c.oid = '{$t}'::regclass");
+        $e("{$t} : " . json_encode($r));
+        $s = DB::select('SELECT n_live_tup, n_dead_tup, last_analyze, last_autoanalyze, last_vacuum, last_autovacuum, n_mod_since_analyze FROM pg_stat_user_tables WHERE relname = ?', [$t]);
+        $e("{$t} stat : " . json_encode($s));
+        $ws = DB::select("SELECT workspace_id, count(*) AS n FROM {$t} GROUP BY 1 ORDER BY 2 DESC LIMIT 8");
+        $e("{$t} par workspace : " . json_encode($ws));
+        foreach (DB::select('SELECT i.indexrelid::regclass AS idx, i.indisvalid, i.indisready, i.indislive, pg_get_indexdef(i.indexrelid) AS def, pg_relation_size(i.indexrelid) AS octets FROM pg_index i WHERE i.indrelid = ?::regclass ORDER BY 1', [$t]) as $i) {
+            $e("  index " . json_encode($i));
+        }
+        foreach (DB::select("SELECT attname, n_distinct, null_frac, most_common_freqs::text AS mcf FROM pg_stats WHERE tablename = ? AND attname IN ('workspace_id','email','email_generic','person_key','lifecycle_stage')", [$t]) as $st) {
+            $e("  pg_stats " . json_encode($st));
+        }
+    }
+    $e('workspaces : ' . json_encode(DB::select('SELECT slug, id FROM workspaces ORDER BY created_at DESC LIMIT 10')));
+    $e('pg_settings : ' . json_encode(DB::select("SELECT name, setting FROM pg_settings WHERE name IN ('random_page_cost','seq_page_cost','effective_cache_size','enable_seqscan','enable_bitmapscan','enable_indexscan','shared_buffers')")));
+}
+
 function esiPeupler(): string
 {
     config(['crm.ingest.business_workspace' => 'axion-ia']);
@@ -276,7 +299,9 @@ function esiDefauts(array $requetes, array &$vus): array
 test('P1 — effacement et export, site ET console : chaque requete sur companies et contacts est servie par un index', function () {
     $this->mock(AuditHashChain::class)->shouldReceive('record')->andReturn(1);
     Queue::fake();
+    esiDiag('AVANT esiPeupler');
     esiPeupler();
+    esiDiag('APRES esiPeupler');
 
     // Les exports d'abord : l'effacement vide les données qu'ils lisent.
     $requetes = array_merge(
@@ -295,6 +320,17 @@ test('P1 — effacement et export, site ET console : chaque requete sur companie
     DB::statement('SET LOCAL enable_seqscan = off');
     $vus = [];
     $defauts = esiDefauts($requetes, $vus);
+    esiDiag('AVANT ASSERTION');
+    fwrite(STDERR, '[ESIDIAG] nb defauts ' . count($defauts) . "\n");
+    foreach (array_slice($defauts, 0, 3) as $d) {
+        fwrite(STDERR, '[ESIDIAG] defaut : ' . substr($d, 0, 400) . "\n");
+    }
+    foreach ($requetes as $r) {
+        if (esiConcerne($r['sql'])) {
+            $pl = array_map(fn ($l) => ((array) $l)['QUERY PLAN'], DB::select('EXPLAIN ' . $r['sql'], $r['bindings']));
+            fwrite(STDERR, '[ESIDIAG] EXPLAIN ' . substr($r['sql'], 0, 200) . "\n" . implode("\n", $pl) . "\n");
+        }
+    }
 
     expect($defauts)->toBe([]);
     // TÉMOIN DE COUVERTURE : chaque index de l'effacement a servi au moins une fois.

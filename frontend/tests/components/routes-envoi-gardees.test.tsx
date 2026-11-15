@@ -113,7 +113,7 @@ const ROUTES_ENVOI: ReadonlyArray<readonly [string, string, string?]> = [
   // S2-ROUTEUR : pages d'attente, remplies par F-SEQ et K14-ECRAN.
   ['/envoi/sequences', 'F-SEQ'],
   ['/envoi/sequences/seq-1', 'F-SEQ'],
-  ['/envoi/sante/inscriptions', 'K14-ECRAN'],
+  ['/envoi/sante/inscriptions', 'K14-ECRAN', 'Inscriptions'],
 ];
 
 describe('Sans Envoi (défaut du serveur) — chaque route d’Envoi est introuvable', () => {

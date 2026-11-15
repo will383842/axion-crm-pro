@@ -13,28 +13,20 @@ uses(TestCase::class)->group('envoi');
  * Aucune route /envoi/* ne doit exister sans contrat. Aucune route nouvelle ici : le test ne fait que constater.
  */
 
-/** Trous réels constatés au lot R19 (contrat sans route sur main). Voir docs/envoi/lots/R19.md. */
-const TROUS_REELS = [
-    'POST /envoi/boites' => 'routes/envoi/boites.php est vide',
-    'GET /envoi/boites' => 'routes/envoi/boites.php est vide',
-    'GET /envoi/boites/{id}' => 'routes/envoi/boites.php est vide',
-    'POST /envoi/boites/test-connexion' => 'routes/envoi/boites.php est vide',
-    'POST /envoi/boites/{id}/reactiver' => 'routes/envoi/boites.php est vide',
-    'POST /envoi/boites/{id}/suspendre' => 'routes/envoi/boites.php est vide',
-    'PUT /envoi/boites/{id}/reglages' => 'routes/envoi/boites.php est vide',
-    'GET /envoi/chauffe' => 'routes/envoi/chauffe.php est vide',
-    'POST /envoi/chauffe/{id}/reculer' => 'routes/envoi/chauffe.php est vide',
-    'GET /envoi/sequences' => 'routes/envoi/sequences.php est vide',
-    'GET /envoi/sequences/{id}' => 'routes/envoi/sequences.php est vide',
-    'POST /envoi/sequences/{id}/pause' => 'routes/envoi/sequences.php est vide',
-    'POST /envoi/sequences/{id}/reprise' => 'routes/envoi/sequences.php est vide',
-    'GET /envoi/etat' => 'aucune route d’état global',
-    'GET /envoi/compteurs' => 'aucune route de compteurs d’en-tête',
-    'POST /envoi/tout-arreter' => 'aucune route « Tout arrêter »',
-    'POST /envoi/reprendre' => 'aucune route « Reprendre »',
-    'POST /envoi/sante/test' => 'aucune route de test de santé',
-    'POST /notifications/{id}/lue' => 'la route réelle est POST /notifications/{n}/read (autre chemin)',
-];
+/**
+ * Trous réels constatés au lot R19 (contrat sans route sur main), lus dans tests/Support/Couverture/trous/*.php
+ * (un fichier par domaine, glob trié). Voir docs/envoi/lots/R19.md.
+ */
+function trousReels(): array
+{
+    $trous = [];
+    foreach (glob(dirname(__DIR__, 2) . '/Support/Couverture/trous/*.php') ?: [] as $fichier) {
+        $trous = array_merge($trous, require $fichier);
+    }
+    ksort($trous);
+
+    return $trous;
+}
 
 /** @return list<string> couples « MÉTHODE /chemin » de tous les yaml d'envoi */
 function couplesDuContrat(): array
@@ -89,7 +81,7 @@ test('chaque couple du contrat a une route, une entrée NonServiAuPalier0 ou un 
     foreach (couplesDuContrat() as $couple) {
         $ok = in_array(cle($couple), $routes, true)
             || in_array(cle($couple), $nonServis, true)
-            || array_key_exists($couple, TROUS_REELS);
+            || array_key_exists($couple, trousReels());
         if (! $ok) {
             $inconnus[] = $couple;
         }
@@ -111,7 +103,7 @@ test('sens inverse : aucune route /envoi/* sans entrée dans un contrat', functi
 test('les trous déclarés sont de vrais trous (ni route réelle, ni entrée NonServiAuPalier0)', function () {
     $routes = couplesDesRoutes();
     $contrat = couplesDuContrat();
-    foreach (array_keys(TROUS_REELS) as $couple) {
+    foreach (array_keys(trousReels()) as $couple) {
         expect($contrat)->toContain($couple);
         expect($routes)->not->toContain(cle($couple));
         expect(array_keys(NonServiAuPalier0::entrees()))->not->toContain($couple);
@@ -119,6 +111,6 @@ test('les trous déclarés sont de vrais trous (ni route réelle, ni entrée Non
 });
 
 // Trous réels : visibles dans la sortie Pest, CI verte. Un trou comblé doit sortir d'ici (voir R19.md).
-foreach (TROUS_REELS as $couple => $raison) {
+foreach (trousReels() as $couple => $raison) {
     test("trou réel : $couple a une route")->todo("$raison — à traiter par le lot propriétaire du contrat");
 }

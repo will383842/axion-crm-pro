@@ -17,7 +17,6 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Depot\DepotTentatives;
 use App\Envoi\Desinscription\ArretParEntreprise;
-use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
 use App\Envoi\Desinscription\ArretParEntrepriseL1;
 use App\Envoi\Desinscription\EffetsOpposition;
 use App\Envoi\Desinscription\JetonDesinscription;
@@ -46,6 +45,7 @@ use App\Envoi\ListesNoires\ResolveurSysteme;
 use App\Envoi\ListesNoires\SourceRessources;
 use App\Envoi\ListesNoires\SourceRessourcesDb;
 use App\Envoi\ListesNoires\SurveillanceListes;
+use App\Envoi\Orchestration\PorteEnvoiReelle;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Retours\AppliquerRetour;
 use App\Envoi\Sante\CouplageSante;
@@ -64,6 +64,11 @@ use App\Envoi\Smtp\ResolveurDns;
 use App\Envoi\Smtp\ResolveurHote;
 use App\Envoi\Temoins\LecteurIndesirables;
 use App\Envoi\Temoins\LecteurIndesirablesWebklex;
+use App\Providers\Envoi\AiguillageServiceProvider;
+use App\Providers\Envoi\FeuVertDecisionServiceProvider;
+use App\Providers\Envoi\OppositionsImportServiceProvider;
+use App\Providers\Envoi\OrchestrationServiceProvider;
+use App\Providers\Envoi\RetentionServiceProvider;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Event;
@@ -116,14 +121,13 @@ class EnvoiServiceProvider extends ServiceProvider
             array_values(array_map('strval', (array) config('envoi.listes_noires.zones_domaine'))),
             static fn (): \DateTimeImmutable => new \DateTimeImmutable,
         ));
+        // Serveur interne de la passerelle : le faux serveur par défaut (K17-AIG ne relie que ce service). `bind`, jamais `new`.
+        $this->app->bind('envoi.serveur_interne', fn ($app) => $app->make(FauxServeurEnvoi::class));
         $this->app->singleton(ServeurEnvoi::class, fn ($app) => new PasserelleLocale(
-            $app->make(FauxServeurEnvoi::class),
+            $app->make('envoi.serveur_interne'),
             $app->make(DepotSocle::class),
-            // Garde M2 : tant que le retrait des envois en file OU l'arrêt par entreprise est la liaison « absente », une
-            // opposition ne retirerait RIEN (file, collègues de l'entreprise) : l'envoi réel est tenu pour inactif.
-            fn (): bool => (bool) config('envoi.reel_actif')
-                && ! ($app->make(RetraitEnvoisEnFile::class) instanceof RetraitEnvoisEnFileAbsent)
-                && ! ($app->make(ArretParEntreprise::class) instanceof ArretParEntrepriseAbsent),
+            // Garde M2 (retrait des envois en file et arrêt par entreprise branchés) : voir PorteEnvoiReelle.
+            fn (): bool => $app->make(PorteEnvoiReelle::class)->ouverte(),
             fn (): int => (int) config('envoi.plafond_jour'),
             null,
             '',
@@ -161,6 +165,13 @@ class EnvoiServiceProvider extends ServiceProvider
         // L5 désinscription : liaisons par défaut, remplacées par la file (retrait) et par L1 (arrêt par entreprise).
         $this->app->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
         $this->app->bind(ArretParEntreprise::class, ArretParEntrepriseL1::class);
+
+        // S0 : sous-fournisseurs vides, un par PR ultérieure (liste fermée, dans cet ordre).
+        $this->app->register(OrchestrationServiceProvider::class);
+        $this->app->register(AiguillageServiceProvider::class);
+        $this->app->register(OppositionsImportServiceProvider::class);
+        $this->app->register(RetentionServiceProvider::class);
+        $this->app->register(FeuVertDecisionServiceProvider::class);
     }
 
     public function boot(): void

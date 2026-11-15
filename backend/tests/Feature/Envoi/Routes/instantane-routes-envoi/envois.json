@@ -1,0 +1,14 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/envois/chercher",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "throttle:envoi-chercher",
+            "workspace"
+        ]
+    }
+]

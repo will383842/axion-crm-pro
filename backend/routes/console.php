@@ -609,3 +609,7 @@ Schedule::command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)
     ->withoutOverlapping(10)
     ->onOneServer()
     ->when(fn (): bool => config('envoi.reel_actif') === true && config('envoi.temoins_releve_actif') === true);
+
+// Envoi S0 : planifications d'envoi rangées par fichier (vides tant que L8-ORCH et R06-ARCH ne les remplissent pas).
+require __DIR__ . '/console/envoi-orchestration.php';
+require __DIR__ . '/console/envoi-retention.php';

@@ -1,0 +1,37 @@
+[
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:users.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/opposition",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "GET",
+        "uri": "api/v1/envoi/opposition/export",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:data.export",
+            "permission:workspaces.manage",
+            "throttle:envoi-opposition-export",
+            "workspace"
+        ]
+    }
+]

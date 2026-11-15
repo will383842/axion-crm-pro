@@ -142,7 +142,7 @@ test('422 : une ligne d’audit propre est écrite (statut, sans contenu ni adre
     $lignes = DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->get();
     expect($lignes)->toHaveCount(2);
     foreach ($lignes as $l) {
-        expect($l->status)->toBe(422)->and(json_encode($l))->not->toContain('secret');
+        expect($l->status_code)->toBe(422)->and(json_encode($l))->not->toContain('secret');
     }
 });
 
@@ -236,7 +236,7 @@ test('tout ou rien : une erreur en cours d’écriture annule tout, y compris la
     }
     $emp = [ListeSuppression::empreinte('a@clients.example.test'), ListeSuppression::empreinte('b@clients.example.test')];
     expect(DB::table('opt_out')->whereIn('email_hash', $emp)->count())->toBe(0)->and(DB::table('email_suppressions')->whereIn('email_hash', $emp)->count())->toBe(0);
-    expect(DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->where('status', 500)->count())->toBe(1);
+    expect(DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->where('status_code', 500)->count())->toBe(1);
     expect($leve)->toBeTrue()->and(impRegistre($this))->toBe(0)->and(DB::table('envoi_oppositions_imports')->count())->toBe(0)->and(impEvenements())->toBe(0);
 });
 

@@ -22,7 +22,7 @@ test.describe('inscriptions (démo)', () => {
 
   test('G3 : l’onglet « Inscriptions » est atteignable depuis Santé', async ({ page }) => {
     await ouvrirDemo(page, '/envoi/sante', { offre: 'les-deux' });
-    await page.getByRole('link', { name: 'Inscriptions' }).click();
+    await page.getByRole('link', { name: 'Inscriptions', exact: true }).click();
     await expect(page).toHaveURL(/\/envoi\/sante\/inscriptions/);
     await expect(page.getByRole('heading', { level: 3 })).toHaveCount(5);
   });

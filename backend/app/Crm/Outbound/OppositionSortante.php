@@ -2,9 +2,11 @@
 
 namespace App\Crm\Outbound;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -138,15 +140,36 @@ final class OppositionSortante
         try {
             return $this->signaler($empreinte, $portee, $motif, $canal);
         } catch (Throwable $e) {
+            // JAMAIS l'exception brute : le message d'une QueryException embarque le SQL et les valeurs liées (empreinte
+            // complète, clé de verrou advisory) ; `report()` les enverrait au journal, à stderr et à Sentry, y compris
+            // via getPrevious(). On ne garde que le SQLSTATE et l'empreinte tronquée, dans une exception neuve.
+            $court = substr($empreinte, 0, 12);
             Log::error('crm.outbound.record_failed', [
-                'empreinte' => substr($empreinte, 0, 12),
+                'empreinte' => $court,
                 'portee' => $portee,
                 'motif' => $motif,
             ]);
-            report($e);
+            report(new RuntimeException(sprintf(
+                'Signalement sortant impossible (SQLSTATE %s, empreinte %s).',
+                self::sqlstateDe($e),
+                $court,
+            )));
 
             return null;
         }
+    }
+
+    /** SQLSTATE (5 caractères) de l'exception ou de sa chaîne, « inconnu » sinon ; jamais de texte libre. */
+    private static function sqlstateDe(Throwable $e): string
+    {
+        for ($c = $e; $c !== null; $c = $c->getPrevious()) {
+            $code = $c instanceof QueryException ? ($c->errorInfo[0] ?? $c->getCode()) : $c->getCode();
+            if (is_string($code) && preg_match('/^[0-9A-Z]{5}$/', $code) === 1) {
+                return $code;
+            }
+        }
+
+        return 'inconnu';
     }
 
     public function signalerAdresseSansBloquer(string $email, string $portee, string $motif, string $canal): ?string

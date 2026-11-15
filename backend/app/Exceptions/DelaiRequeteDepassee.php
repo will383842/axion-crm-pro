@@ -13,7 +13,8 @@ use RuntimeException;
  */
 final class DelaiRequeteDepassee extends RuntimeException
 {
-    public function __construct()
+    /** @param  ?string  $messageEcran  texte rendu au client (fixe, sans valeur) ; par défaut celui des recherches */
+    public function __construct(public readonly ?string $messageEcran = null)
     {
         parent::__construct('Délai de requête dépassé.');
     }

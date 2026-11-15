@@ -27,6 +27,9 @@ use App\Envoi\Sequence\Sequenceur;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Services\Dedup\DeduplicationService;
 use App\Socle\Alertes\Alerte;
+use App\Socle\Alertes\CanalConsole;
+use App\Socle\Alertes\CanalEmail;
+use App\Socle\Alertes\Regroupement;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Closure;
@@ -36,7 +39,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use LogicException;
-use ReflectionClass;
 use Throwable;
 
 /**
@@ -283,15 +285,23 @@ final class EssaiABlanc
         $lecteur->deposer($boite, $stop);
 
         $chaine = new RecepteurRetoursEnChaine($this->recepteurEssai(), RecepteurRetoursSequence::parDefaut());
-        // `Alerte` est finale : un exemplaire SANS canaux (jamais de courriel ni de cloche), jamais l'alerte réelle du conteneur.
-        $muette = (new ReflectionClass(Alerte::class))->newInstanceWithoutConstructor();
+        // `Alerte` est finale : on la construit EXPLICITEMENT (canaux du conteneur) et on la rend muette en forçant
+        // `alertes.actif` à faux le temps du relevé (elle rend alors false avant tout canal : ni courriel ni cloche,
+        // seul le journal). Le réglage d'origine est restauré quoi qu'il arrive.
+        $muette = new Alerte(app(CanalConsole::class), app(CanalEmail::class), app(Regroupement::class));
         $releve = new ReleveImap(
             $lecteur,
             new RegistreMessagesEnvoyesDb(static fn (string $espace, string $empreinte): ?string => AdresseParEmpreinteCrm::trouver($espace, $empreinte)),
             $chaine,
             $muette,
         );
-        $releve->relever($ws, $boite);
+        $actifAvant = config('alertes.actif');
+        config(['alertes.actif' => false]);
+        try {
+            $releve->relever($ws, $boite);
+        } finally {
+            config(['alertes.actif' => $actifAvant]);
+        }
     }
 
     /** Applique rebond dur et opposition dans la transaction de l'essai (ni commande CRM, ni cache, ni fichier). */

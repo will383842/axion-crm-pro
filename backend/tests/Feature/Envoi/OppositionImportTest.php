@@ -5,6 +5,7 @@ namespace Tests\Feature\Envoi;
 use App\Envoi\Conformite\ImportOppositions;
 use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Exceptions\DelaiRequeteDepassee;
+use App\Http\Controllers\Api\EnvoiOppositionImportController;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -321,15 +322,22 @@ test('deux confirmations avec le même jeton : une connexion déjà passée ⇒ 
         $message = $e->getMessage();
     }
     // La violation provient bien de la contrainte d'unicité Postgres (SQLSTATE 23505) sur le jeton.
+    // Table en FORCE RLS : l'insertion témoin doit se faire sous l'espace (sinon elle échouerait pour une autre raison).
+    $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
     $sqlstate = null;
+    $contrainte = '';
     try {
         $owner->table('envoi_oppositions_imports')->insert([
             'id' => (string) Str::uuid(), 'workspace_id' => $ws, 'auteur' => 'u3', 'empreinte_fichier' => hash('sha256', 'autre'), 'jeton_simulation' => $jeton,
         ]);
     } catch (QueryException $e) {
         $sqlstate = $e->errorInfo[0] ?? null;
+        $contrainte = $e->getMessage();
+    } finally {
+        $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
     }
-    expect($sqlstate)->toBe('23505');
+    // Même contrainte que celle dont confirmer() tire son 409 (il teste le nom de l'index dans l'exception levée).
+    expect($sqlstate)->toBe('23505')->and($contrainte)->toContain('envoi_oppositions_imports_jeton_unique');
     // 409 venu de l'INSERTION (unicité en base), pas du contrôle de simulation/empreinte
     expect($statut)->toBe(409)->and($message)->toContain('Ce jeton a déjà servi')->not->toContain('Simulation absente');
     expect($owner->table('envoi_oppositions_registre')->where('workspace_id', $ws)->count())->toBe(0);
@@ -406,6 +414,7 @@ function impDeclencheurRegistre(string $corps): void
 function impRetirerDeclencheurRegistre(): void
 {
     DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON envoi_oppositions_registre');
+    DB::unprepared('DROP FUNCTION IF EXISTS zz_echec_c()');
 }
 
 const IMP_DELAI = "RAISE EXCEPTION 'canceling statement due to statement timeout secret-valeur' USING ERRCODE = '57014';";
@@ -442,6 +451,22 @@ test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requêt
         }
     }
     expect(impRegistre($this))->toBe(0);
+});
+
+test('délai dépassé dans inscrireLot : l’audit enregistre 503 (comme la réponse), avec le message propre à l’import', function () {
+    $csv = "delai-audit@clients.example.test\n";
+    $jeton = impSimuler($this, $csv)['jeton'];
+    impDeclencheurRegistre(IMP_DELAI);
+    try {
+        $r = impConfirmer($this, $csv, $jeton);
+    } finally {
+        impRetirerDeclencheurRegistre();
+    }
+    $r->assertStatus(503)->assertJsonPath('error', 'requete_trop_longue')->assertJsonPath('message', EnvoiOppositionImportController::MESSAGE_DELAI);
+    expect((string) $r->json('message'))->not->toContain('recherche');
+    $lignes = DB::table('audit_logs')->where('path', 'like', '%opposition/import%')->where('path', 'like', '%confirmation%')->get();
+    expect($lignes->pluck('status_code')->all())->toBe([503]);
+    expect(json_encode($lignes))->not->toContain('delai-audit')->not->toContain('secret-valeur');
 });
 
 test('inscrireLot ne relance jamais la QueryException : exception dédiée de délai, sans SQL ni précédente ; les autres sont masquées', function () {

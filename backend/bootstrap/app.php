@@ -196,7 +196,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (DelaiRequeteDepassee $e, Request $request) {
             return response()->json([
                 'error' => 'requete_trop_longue',
-                'message' => DelaiRequeteSql::MESSAGE,
+                'message' => $e->messageEcran ?? DelaiRequeteSql::MESSAGE,
             ], 503);
         });
         $exceptions->render(function (QueryException $e, Request $request) {

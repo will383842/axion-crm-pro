@@ -25,4 +25,4 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche P1-LN-B. `ENVOI_REEL_ACTIF=false` :
 - Les tests base de données n'ont pas pu tourner dans l'environnement de rédaction (PostGIS, pgvector et pg_partman absents) : seuls PHPStan et Pint y ont tourné ; la CI fait foi.
 
 ## Tests lancés
-`OppositionImportTest` (voir la CI), PHPStan niveau 8 (aucune erreur), Pint (réussi).
+`OppositionImportTest` (voir la CI) ; PHPStan niveau 8 (aucune erreur) ; Pint (réussi). Après les corrections de relecture : les 4 parties Pest de la CI sont vertes sur `715eebc` (la preuve rouge CI n'a pas pu être conservée : run annulé par un push suivant).

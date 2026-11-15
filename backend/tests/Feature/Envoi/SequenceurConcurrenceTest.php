@@ -113,6 +113,9 @@ function concNettoyer(string $ws, string $jour): void
         $owner->table('contacts_retires')->where('workspace_id', $ws)->delete();
         $owner->table('tags')->where('workspace_id', $ws)->delete();
     });
+    // Remet companies/contacts au propre (lignes mortes, statistiques) : sinon le plan de
+    // EffacementServiParDesIndexTest change sous enable_seqscan = off. Connexion owner en auto-commit.
+    $owner->statement('VACUUM ANALYZE companies, contacts');
     $owner->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
     // L8-COMPO : `envoi_messages_envoyes` et `envoi_injections_locales` sont en ajout seul (empreintes, aucune adresse) et
     // référencent l'espace : si le séquenceur y a écrit, l'espace reste (identifiant aléatoire, sans donnée de personne).

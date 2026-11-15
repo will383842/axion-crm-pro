@@ -3,7 +3,7 @@
 **Décision : conserver 400 jours, puis agréger par jour. Aucune suppression de données de personnes.**
 
 - `envoi_tentatives` est une table **technique** (fournisseur, issue, code SMTP, horodatage) : elle ne porte ni adresse
-  ni nom. Sa lecture est en ajout seul (UPDATE, DELETE et TRUNCATE sont refusés par déclencheur).
+  ni nom. La table est en ajout seul : UPDATE et TRUNCATE sont refusés par déclencheur ; le DELETE l'est aussi, sauf au-delà de 400 jours, par la fonction d'archivage seulement (variable `envoi.archivage_tentatives` = `on`), selon le déclencheur de la migration `2026_12_03_000060`.
 - Le détail est gardé `RetentionTentatives::CONSERVATION_JOURS` = **400 jours**. Au-delà, la commande
   `envoi:tentatives-archiver` appelle `envoi_tentatives_archiver(espace, jour)` : la fonction (SECURITY DEFINER, refuse
   un espace différent du contexte et toute borne plus récente que 400 jours) **agrège d'abord** les lignes par

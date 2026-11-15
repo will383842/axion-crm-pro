@@ -4,6 +4,7 @@ namespace App\Envoi\Conformite;
 
 use App\Crm\Outbound\OppositionSortante;
 use App\Crm\Personnes\NatureEmail;
+use App\Support\DelaiRequeteSql;
 use App\Support\ListeSuppression;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
@@ -94,7 +95,11 @@ final class RegistreOppositionManuel
     {
         try {
             return $this->ecrireLot($workspaceId, $importId, $entrees, $motif, $auteur);
-        } catch (QueryException) {
+        } catch (QueryException $e) {
+            // Un délai SQL dépassé (57014) est relancé tel quel : il doit rester un 503 « requête trop longue ».
+            if (DelaiRequeteSql::estDepassement($e)) {
+                throw $e;
+            }
             // Le message d'une exception SQL embarque les valeurs liées (empreintes, adresses chiffrées) : on ne le propage jamais.
             throw new RuntimeException('Échec de l’écriture du lot d’opposition en base.');
         }

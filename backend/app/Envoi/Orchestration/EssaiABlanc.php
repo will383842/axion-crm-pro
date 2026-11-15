@@ -35,7 +35,7 @@ use DateTimeZone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
+use LogicException;
 use ReflectionClass;
 use Throwable;
 
@@ -72,14 +72,14 @@ final class EssaiABlanc
         $this->fabriqueServeur = $fabriqueServeur;
     }
 
-    /** @throws InvalidArgumentException espace inconnu ou auteur contenant un « @ » (refusé AVANT tout essai) */
+    /** @throws RefusAvantEssai espace inconnu ou auteur contenant un « @ » (refusé AVANT tout essai) */
     public function executer(string $espace, string $auteur): RapportEssai
     {
         if (str_contains($auteur, '@')) {
-            throw new InvalidArgumentException('Auteur invalide : aucune adresse (« @ ») n\'est admise.');
+            throw new RefusAvantEssai('Auteur invalide : aucune adresse (« @ ») n\'est admise.');
         }
         if (! Str::isUuid($espace) || ! DB::table('workspaces')->where('id', $espace)->whereNull('deleted_at')->exists()) {
-            throw new InvalidArgumentException('Espace inconnu.');
+            throw new RefusAvantEssai('Espace inconnu.');
         }
         $debut = new DateTimeImmutable('now');
         $interdisait = Http::preventingStrayRequests();
@@ -133,6 +133,9 @@ final class EssaiABlanc
     private function parcours(string $ws, array &$etapes): void
     {
         $serveur = $this->fabriqueServeur !== null ? ($this->fabriqueServeur)() : new FauxServeurEnvoi; // APRÈS beginTransaction
+        if (! $serveur instanceof FauxServeurEnvoi) {
+            throw new LogicException('L\'essai à blanc exige un FauxServeurEnvoi.');
+        }
         $t = new DateTimeImmutable(self::JOUR_FICTIF . '-03-02 10:00:00', new DateTimeZone('Europe/Paris'));
         $depot = new DepotSocleDb;
         $domaine = 'essai.example.test';

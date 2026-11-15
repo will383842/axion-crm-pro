@@ -12,6 +12,7 @@ use App\Envoi\EmpreinteTemoin;
 use App\Envoi\Imap\RecepteurRetoursCrm;
 use App\Envoi\Orchestration\EssaiABlanc;
 use App\Envoi\Orchestration\RapportEssai;
+use App\Envoi\Orchestration\RefusAvantEssai;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
@@ -37,7 +38,7 @@ function essaiComptages(): array
 {
     $tables = collect(DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'envoi\\_%' AND table_name <> 'envoi_essais_blanc' ORDER BY 1"))
         ->pluck('table_name')->all();
-    $tables = array_merge($tables, ['contacts', 'personnes', 'email_suppressions', 'opt_out', 'crm_outbound_events', 'companies']);
+    $tables = array_merge($tables, ['contacts', 'personnes', 'email_suppressions', 'opt_out', 'crm_outbound_events', 'companies', 'workspaces', 'tags', 'company_tag', 'fonctions_espace']);
     $n = [];
     foreach ($tables as $t) {
         if (Schema::hasTable($t)) {
@@ -230,4 +231,38 @@ test('un auteur contenant un @ est refusé AVANT l\'essai : aucun résultat, auc
 
     expect($code)->not->toBe(0)->and($vu)->toBeFalse()
         ->and(DB::table('envoi_essais_blanc')->count())->toBe(0);
+});
+
+test('les deux contrôles préalables lèvent une exception dédiée, et la commande n\'affiche que son message', function () {
+    expect(fn () => app(EssaiABlanc::class)->executer((string) Str::uuid(), 'test-essai'))->toThrow(RefusAvantEssai::class, 'Espace inconnu.');
+    expect(fn () => app(EssaiABlanc::class)->executer($this->ws, 'x@client.example.test'))->toThrow(RefusAvantEssai::class);
+
+    $code = Artisan::call('envoi:essai-a-blanc', ['espace' => (string) Str::uuid(), '--auteur' => 'test-essai']);
+    expect($code)->not->toBe(0)->and(Artisan::output())->toContain('Espace inconnu.')->toContain('Aucun essai lancé.');
+    $code = Artisan::call('envoi:essai-a-blanc', ['espace' => $this->ws, '--auteur' => 'x@client.example.test']);
+    expect($code)->not->toBe(0)->and(Artisan::output())->toContain('Auteur invalide')->toContain('Aucun essai lancé.');
+});
+
+test('une InvalidArgumentException venue du parcours n\'est PAS un refus avant lancement : message fixe, jamais son texte', function () {
+    app()->bind(EssaiABlanc::class, fn () => new EssaiABlanc(function (): FauxServeurEnvoi {
+        throw new InvalidArgumentException('secret-argument@client.example.test');
+    }));
+
+    $code = Artisan::call('envoi:essai-a-blanc', ['espace' => $this->ws, '--auteur' => 'test-essai']);
+
+    expect($code)->not->toBe(0)
+        ->and(Artisan::output())->toContain('ESSAI ROUGE')->not->toContain('secret-argument')->not->toContain('Aucun essai lancé.');
+    $ligne = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_essais_blanc')->where('workspace_id', $this->ws)->first());
+    expect((bool) $ligne->reussi)->toBeFalse();
+});
+
+test('un serveur qui n\'est pas un FauxServeurEnvoi est refusé (instanceof), essai rouge', function () {
+    app()->bind(EssaiABlanc::class, fn () => new EssaiABlanc(fn () => new stdClass));
+
+    expect(fn () => app(EssaiABlanc::class)->executer($this->ws, 'test-essai'))->toThrow(LogicException::class);
+});
+
+test('la commande documente son autorisation (console locale, aucune route)', function () {
+    $src = (string) file_get_contents(app_path('Console/Commands/EnvoiEssaiABlanc.php'));
+    expect($src)->toContain('AUTORISATION');
 });

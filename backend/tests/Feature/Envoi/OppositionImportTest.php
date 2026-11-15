@@ -5,13 +5,14 @@ namespace Tests\Feature\Envoi;
 use App\Envoi\Conformite\ImportOppositions;
 use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Http\Middleware\AuditHashChainLogger;
+use App\Support\DelaiRequeteSql;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -319,14 +320,25 @@ test('deux confirmations avec le même jeton : une connexion déjà passée ⇒ 
         $statut = $e->getStatusCode();
         $message = $e->getMessage();
     }
+    // La violation provient bien de la contrainte d'unicité Postgres (SQLSTATE 23505) sur le jeton.
+    $sqlstate = null;
+    try {
+        $owner->table('envoi_oppositions_imports')->insert([
+            'id' => (string) Str::uuid(), 'workspace_id' => $ws, 'auteur' => 'u3', 'empreinte_fichier' => hash('sha256', 'autre'), 'jeton_simulation' => $jeton,
+        ]);
+    } catch (QueryException $e) {
+        $sqlstate = $e->errorInfo[0] ?? null;
+    }
+    expect($sqlstate)->toBe('23505');
     // 409 venu de l'INSERTION (unicité en base), pas du contrôle de simulation/empreinte
     expect($statut)->toBe(409)->and($message)->toContain('Ce jeton a déjà servi')->not->toContain('Simulation absente');
     expect($owner->table('envoi_oppositions_registre')->where('workspace_id', $ws)->count())->toBe(0);
 });
 
 test('caractère de tête : un VT (\\x0B) ou NUL placé avant = est refusé, même s’il serait retiré ensuite par normaliser()', function () {
-    $r = impSimuler($this, "\x0B=cmd@x.example.test\n\0+b@x.example.test\n \x0B @c@x.example.test\nok@x.example.test\n");
-    expect(array_column($r['refusees'], 'ligne'))->toBe([1, 2, 3])->and($r['valides'])->toBe(1);
+    $r = impSimuler($this, "\x0B=cmd@x.example.test\n\0+b@x.example.test\n \x0Bd@x.example.test\n\fe@x.example.test\nok@x.example.test\n");
+    // Lignes 3 et 4 : le premier caractère non-espace est un VT / un saut de page SUIVI d'une lettre : seul le contrôle sur la valeur brute les refuse.
+    expect(array_column($r['refusees'], 'ligne'))->toBe([1, 2, 3, 4])->and($r['valides'])->toBe(1);
 });
 
 /** Provoque une violation d'unicité qui N'EST PAS celle du jeton (index de test sur l'empreinte du fichier). */
@@ -376,10 +388,53 @@ test('une exception en base ne met aucune empreinte ni valeur de la requête dan
 });
 
 test('route d’import : limiteur dédié, 429 au-delà de 30 requêtes par minute et par compte', function () {
-    RateLimiter::clear('envoi-opposition-import|' . $this->proprio->id);
     for ($i = 0; $i < 30; $i++) {
         $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "a{$i}@clients.example.test\n"])->assertOk();
     }
     $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "z@clients.example.test\n"])->assertStatus(429);
-    RateLimiter::clear('envoi-opposition-import|' . $this->proprio->id);
+});
+
+test('un délai SQL dépassé (57014) pendant l’import reste un 503 « requête trop longue », sans valeur dans la réponse', function () {
+    $e = new QueryException('pgsql', 'select secret', ['secret-valeur@x.example.test'], tap(new \PDOException('canceling statement due to statement timeout'), function ($p) {
+        $p->errorInfo = ['57014', 7, 'canceling statement due to statement timeout'];
+    }));
+    expect(DelaiRequeteSql::estDepassement($e))->toBeTrue();
+    $this->mock(ImportOppositions::class)->shouldReceive('simuler')->andThrow($e);
+
+    $r = $this->actingAs($this->proprio)->postJson(IMP_URI, ['etape' => 'simulation', 'contenu' => "a@clients.example.test\n"]);
+
+    $r->assertStatus(503)->assertJsonPath('error', 'requete_trop_longue');
+    expect((string) $r->getContent())->not->toContain('secret-valeur');
+});
+
+test('inscrireLot relance telle quelle une QueryException de délai dépassé, mais masque les autres', function () {
+    $entrees = [['portee' => 'adresse', 'valeur' => 'secret-lot@clients.example.test']];
+    $registre = app(RegistreOppositionManuel::class);
+    $trigger = function (string $corps): void {
+        DB::unprepared("CREATE OR REPLACE FUNCTION zz_echec_c() RETURNS trigger AS \$f\$ BEGIN {$corps} RETURN NEW; END \$f\$ LANGUAGE plpgsql");
+        DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON email_suppressions');
+        DB::unprepared('CREATE TRIGGER zz_echec_c BEFORE INSERT ON email_suppressions FOR EACH ROW EXECUTE FUNCTION zz_echec_c()');
+    };
+    $import = (string) Str::uuid();
+
+    // Vrai dépassement de délai (57014) : la QueryException d'origine passe.
+    $trigger('PERFORM pg_sleep(2);');
+    DB::statement('SET LOCAL statement_timeout = 200');
+    $code = null;
+    try {
+        WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, $import, $entrees, 'm', 'a'));
+    } catch (QueryException $e) {
+        $code = $e->errorInfo[0] ?? null;
+    }
+    expect($code)->toBe('57014');
+
+    // Autre erreur SQL : message générique, sans valeur.
+    $trigger("RAISE EXCEPTION 'echec voulu secret-lot';");
+    try {
+        WorkspaceContext::run($this->espace->id, fn () => $registre->inscrireLot($this->espace->id, $import, $entrees, 'm', 'a'));
+        $this->fail('attendu');
+    } catch (\RuntimeException $e) {
+        expect($e->getMessage())->not->toContain('secret')->and($e)->not->toBeInstanceOf(QueryException::class);
+    }
+    DB::unprepared('DROP TRIGGER IF EXISTS zz_echec_c ON email_suppressions');
 });

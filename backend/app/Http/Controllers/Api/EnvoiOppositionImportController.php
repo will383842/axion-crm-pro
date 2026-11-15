@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Envoi\Conformite\ImportOppositions;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Services\Audit\AuditHashChain;
+use App\Support\DelaiRequeteSql;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -52,7 +53,13 @@ class EnvoiOppositionImportController extends ApiController
             $this->auditer($request, $ws, $v['etape'], 422, '');
 
             throw $e;
-        } catch (QueryException) {
+        } catch (QueryException $e) {
+            // Un délai SQL dépassé (57014) est relancé tel quel : le gestionnaire global le rend en 503.
+            if (DelaiRequeteSql::estDepassement($e)) {
+                $this->auditer($request, $ws, $v['etape'], 503, '');
+
+                throw $e;
+            }
             // Le message SQL contient les valeurs liées (jeton, empreintes) : seul un message générique part au journal.
             $this->auditer($request, $ws, $v['etape'], 500, '');
 

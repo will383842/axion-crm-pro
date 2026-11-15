@@ -33,24 +33,39 @@ function useProprietaire(): boolean {
   return permissionsDe(data).has(PERMISSION_GERER_ESPACE);
 }
 
-function Saisie({ decision, liste, onFermer }: { decision: Decision; liste: Liste; onFermer: () => void }) {
+export function SaisieDecision({ decision, figee, onFermer, onPerime }: { decision: Decision; figee: string; onFermer: () => void; onPerime: () => void }) {
   const qc = useQueryClient();
   const id = useId();
   const [motif, setMotif] = useState('');
+  const [local, setLocal] = useState<string | null>(null);
   const accorde = decision === 'accorde';
   const longueur = motif.trim().length;
   const envoyer = useMutation({
     mutationFn: async () => {
       const corps = { decision, motif: motif.trim() };
-      if (!accorde || !liste.empreinte_liste) return (await api.post<Liste>('/envoi/feu-vert/decision', corps)).data;
-      return (await api.post<Liste>('/envoi/feu-vert/decision', corps, { headers: { 'If-Match': liste.empreinte_liste } })).data;
+      if (!accorde) return (await api.post<Liste>('/envoi/feu-vert/decision', corps)).data;
+      // « accorde » ne part jamais sans If-Match : l'empreinte est celle figée à l'ouverture de la fenêtre.
+      return (await api.post<Liste>('/envoi/feu-vert/decision', corps, { headers: { 'If-Match': figee } })).data;
     },
     onSuccess: () => { onFermer(); void qc.invalidateQueries({ queryKey: CLE }); },
-    // 412 : la liste a changé depuis la lecture. On la relit (jamais de réessai silencieux) : l'utilisateur redécide.
-    onError: (e) => { if (isAxiosError(e) && e.response?.status === 412) void qc.invalidateQueries({ queryKey: CLE }); },
+    // 412 : l'état a changé depuis l'ouverture. On relit la liste et on FERME la fenêtre : il faut la rouvrir
+    // depuis la liste relue, sinon un second clic enverrait la nouvelle empreinte sur une liste que l'on n'a pas vue.
+    onError: (e) => {
+      if (isAxiosError(e) && e.response?.status === 412) {
+        void qc.invalidateQueries({ queryKey: CLE });
+        onPerime();
+      }
+    },
   });
-  const refus = envoyer.isError ? messageErreur(envoyer.error, 'La décision n’a pas abouti. Rien n’a été enregistré. Réessayez dans un instant.') : null;
-  const perime = envoyer.isError && isAxiosError(envoyer.error) && envoyer.error.response?.status === 412;
+  const confirmer = () => {
+    if (accorde && !figee) { setLocal('Aucune empreinte de la liste : relisez la liste avant d’accorder. Rien n’a été envoyé.'); return; }
+    if (motif.normalize('NFKC').includes('@')) { setLocal('Le motif ne doit pas contenir d’adresse e-mail (aucun « @ »). Rien n’a été envoyé.'); return; }
+    setLocal(null);
+    envoyer.mutate();
+  };
+  const statut = envoyer.isError && isAxiosError(envoyer.error) ? envoyer.error.response?.status : undefined;
+  const refusServeur = envoyer.isError ? messageErreur(envoyer.error, 'La décision n’a pas abouti. Rien n’a été enregistré. Réessayez dans un instant.') : null;
+  const refus = local ?? refusServeur;
   return (
     <Modal
       open
@@ -60,7 +75,7 @@ function Saisie({ decision, liste, onFermer }: { decision: Decision; liste: List
       footer={
         <>
           <Button variant="ghost" onClick={onFermer}>Annuler</Button>
-          <Button disabled={longueur < MOTIF_MIN} loading={envoyer.isPending} onClick={() => envoyer.mutate()}>
+          <Button disabled={longueur < MOTIF_MIN} loading={envoyer.isPending} onClick={confirmer}>
             {accorde ? 'Confirmer l’accord' : 'Confirmer le retrait'}
           </Button>
         </>
@@ -75,8 +90,9 @@ function Saisie({ decision, liste, onFermer }: { decision: Decision; liste: List
         {refus ? (
           <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {refus}
-            {perime ? ' La liste a été relue : vérifiez-la puis décidez de nouveau.' : ''}
-            {!accorde ? ' Le retrait n’a pas été enregistré : le feu vert reste en l’état tant que le motif n’est pas valide.' : ''}
+            {!accorde && local === null ? (statut === 422
+              ? ' Le retrait n’a pas été enregistré : le feu vert reste en l’état tant que le motif n’est pas valide.'
+              : ' Le retrait n’a pas été enregistré : le feu vert reste en l’état.') : ''}
           </p>
         ) : null}
       </div>
@@ -86,7 +102,10 @@ function Saisie({ decision, liste, onFermer }: { decision: Decision; liste: List
 
 export function DecisionFeuVert({ liste }: { liste: Liste }) {
   const proprietaire = useProprietaire();
-  const [ouverte, setOuverte] = useState<Decision | null>(null);
+  // Fenêtre ouverte : décision + empreinte figées à l'ouverture (jamais relues depuis la liste qui change ensuite).
+  const [ouverte, setOuverte] = useState<{ decision: Decision; figee: string } | null>(null);
+  const [perime, setPerime] = useState(false);
+  const ouvrir = (decision: Decision) => { setPerime(false); setOuverte({ decision, figee: liste.empreinte_liste ?? '' }); };
   const rouges = bloquantsRouges(liste.points);
   const d = liste.decision ?? null;
   return (
@@ -105,11 +124,12 @@ export function DecisionFeuVert({ liste }: { liste: Liste }) {
         <p className="mt-2 text-sm text-slate-700">{libelleAccord(rouges)}</p>
         {proprietaire ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button className="min-h-11 md:min-h-9" disabled={rouges > 0 || !liste.empreinte_liste} onClick={() => setOuverte('accorde')}>Accorder le feu vert</Button>
-            <Button variant="secondary" className="min-h-11 md:min-h-9" onClick={() => setOuverte('retire')}>Retirer le feu vert</Button>
+            <Button className="min-h-11 md:min-h-9" disabled={rouges > 0 || !liste.empreinte_liste} onClick={() => ouvrir('accorde')}>Accorder le feu vert</Button>
+            <Button variant="secondary" className="min-h-11 md:min-h-9" onClick={() => ouvrir('retire')}>Retirer le feu vert</Button>
           </div>
         ) : null}
-        {ouverte ? <Saisie decision={ouverte} liste={liste} onFermer={() => setOuverte(null)} /> : null}
+        {perime ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">Pendant que la fenêtre était ouverte, l’état a changé, relisez-le puis recommencez. Rien n’a été enregistré.</p> : null}
+        {ouverte ? <SaisieDecision decision={ouverte.decision} figee={ouverte.figee} onFermer={() => setOuverte(null)} onPerime={() => { setOuverte(null); setPerime(true); }} /> : null}
       </Card>
     </section>
   );

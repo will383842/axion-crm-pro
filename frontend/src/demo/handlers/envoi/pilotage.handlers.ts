@@ -30,7 +30,7 @@ const manuel = (g: Graine, preuve: PointApi['preuve']): PointFeuVert => ({ ...g,
 
 /** Points du feu vert : `auto.*` calculés (jamais écrits), `manuel.*` avec la preuve d'une personne. */
 const POINTS: readonly PointFeuVert[] = [
-  auto({ code: 'auto.verrou_envoi_reel', libelle: 'Envoi réel verrouillé tant que tout n’est pas prêt', groupe: 'verrous', bloquant: true, source: '26§8.1', detail: null }, 'fait'),
+  auto({ code: 'auto.reel_actif_faux', libelle: 'Envoi réel verrouillé tant que tout n’est pas prêt', groupe: 'verrous', bloquant: true, source: '26§8.1', detail: null }, 'fait'),
   auto({ code: 'auto.signature_presente', libelle: 'Signature du responsable présente', groupe: 'verrous', bloquant: true, source: '26§8.2', detail: null }, 'fait'),
   auto({ code: 'auto.banc_temoins', libelle: 'Banc des boîtes témoins complet', groupe: 'banc', bloquant: true, source: '26§8.3', detail: '4 fournisseurs sur 6' }, 'a_faire'),
   auto({ code: 'auto.test_matin', libelle: 'Test du matin réussi 7 jours de suite', groupe: 'banc', bloquant: true, source: '26§8.4', detail: null }, 'fait'),
@@ -120,7 +120,8 @@ function listeFeuVert(): components['schemas']['ListeFeuVert'] {
     points: points.map(lignePoint),
     faits: points.filter((p) => p.fait).length,
     total: points.length,
-    bloquants_restants: points.filter((p) => p.bloquant && !p.fait).length,
+    // Comme le backend (DecisionFeuVert.php) : le drapeau d'exploitation n'est jamais un bloquant à lever.
+    bloquants_restants: points.filter((p) => p.bloquant && !p.fait && p.code !== 'auto.reel_actif_faux').length,
     verrous: verrous(),
     empreinte_liste: `demo-${h.toString(16)}`,
     decision: derniere ? { decision: derniere.decision, motif: derniere.motif, le: derniere.le } : null,
@@ -282,9 +283,13 @@ export const handlers: HttpHandler[] = [
     await delai();
     const corps = (await request.json().catch(() => ({}))) as { decision?: unknown; motif?: unknown };
     const motif = typeof corps.motif === 'string' ? corps.motif.trim() : '';
+    // Droit réservé à workspaces.manage (propriétaire) : 403 sinon, avant toute validation, comme le backend.
+    if (demoDb.utilisateurs.tous()[0]?.role !== 'Propriétaire') return erreur(403, 'interdit', 'Cette décision demande la permission workspaces.manage.');
     if ((corps.decision !== 'accorde' && corps.decision !== 'retire') || motif.length < 10 || motif.length > 500) {
       return erreur(422, 'validation', 'Choisissez « accorde » ou « retire » et un motif de 10 à 500 caractères.');
     }
+    // Tout « @ » est refusé (U+FF20 et U+FE6B se replient en « @ » par NFKC), comme le backend.
+    if (motif.normalize('NFKC').includes('@')) return erreur(422, 'validation', 'Le motif ne doit pas contenir d’adresse e-mail.');
     zone();
     const decisions = demoDb.zone<DecisionDemo>('pilotage', 'decisions');
     if (corps.decision === 'accorde') {

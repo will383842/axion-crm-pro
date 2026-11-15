@@ -13,6 +13,7 @@ export function ongletsCampagnes(avecCrm: boolean): OngletDeNavigation[] {
     { to: '/envoi/campagnes', libelle: 'Campagnes', sousPages: true },
     { to: '/envoi/campagnes/calendrier', libelle: 'Calendrier' },
     { to: '/envoi/campagnes/messages', libelle: 'Messages types', sousPages: true },
+    { to: '/envoi/sequences', libelle: 'Séquences', sousPages: true },
     { to: '/envoi/campagnes/resultats', libelle: 'Résultats' },
     ...(avecCrm ? [] : [{ to: '/envoi/campagnes/destinataires', libelle: 'Destinataires' }]),
   ];

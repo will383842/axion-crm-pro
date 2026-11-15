@@ -20,6 +20,8 @@ import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { COUNTRY_OPTIONS, JOIGNABILITE_OPTIONS, PROSPECTION_STATUS_OPTIONS } from '@/lib/prospection-referentiels';
 import { JOIGNABILITES } from '@/lib/referentiels.generated';
+import { BadgeOpposee } from '@/features/crm-console/BadgeOpposee';
+import type { OppositionStatut } from '@/features/crm-console/types';
 import { AjouterAUneListe } from '@/features/listes/AjouterAUneListe';
 
 interface Contact {
@@ -37,6 +39,7 @@ interface Contact {
   discovery_source?: string | null;
   company_id?: number | null;
   company?: { id: number; denomination?: string | null } | null;
+  opposition?: OppositionStatut;
 }
 
 interface ContactsResponse {
@@ -312,6 +315,11 @@ export function ContactsListPage() {
                       <div className="truncate font-medium text-slate-900 dark:text-white">
                         {name}
                       </div>
+                      {c.opposition?.opposee === true ? (
+                        <div className="mt-1">
+                          <BadgeOpposee opposition={c.opposition} />
+                        </div>
+                      ) : null}
                       {c.company?.denomination ? (
                         <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                           {c.company.denomination}

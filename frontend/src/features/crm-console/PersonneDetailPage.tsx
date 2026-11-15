@@ -14,6 +14,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { Button, Card, CardTitle, EmptyState, Input, PageHeader, QueryErrorState, StatusPill } from '@/components/ui';
 import { api, messageApiLisible } from '@/lib/api';
+import { BadgeOpposee } from './BadgeOpposee';
 import { ContenusAccordsCard } from './ContenusAccordsCard';
 import { HistoriqueOrigines } from '@/features/origines/HistoriqueOrigines';
 import { ChoixEntreprise, type EntrepriseChoisie } from './ChoixEntreprise';
@@ -156,7 +157,9 @@ function PersonneDetailContent() {
           <Card>
             <CardTitle>Identité</CardTitle>
             <dl className="mt-2 flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-300">
-              <div>{personne.email ?? '—'}</div>
+              <div>
+                {personne.email ?? '—'} <BadgeOpposee opposition={personne.opposition} />
+              </div>
               <div className="text-slate-400">{NATURE_EMAIL_LABELS[personne.email_nature]}</div>
               <div className="text-slate-400">Base légale : {baseLegale(personne.legal_basis)}</div>
               <div className="text-slate-400">Conservée : aucune suppression automatique</div>

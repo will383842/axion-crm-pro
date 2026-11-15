@@ -13,4 +13,13 @@ class EnvoiSanteController extends ApiController
     {
         return response()->json($vue->pour((string) WorkspaceContext::current(), now()->toDateTimeImmutable()));
     }
+
+    /**
+     * Test du matin : fermé au palier 0 (D4). Aucun message ne part, rien n'est écrit, aucune lecture :
+     * `ServeurEnvoi` n'est jamais résolu. Le stop gagne : ni envoi, ni levée de pause ou de frein.
+     */
+    public function test(): JsonResponse
+    {
+        return response()->json(['error' => 'envoi_ferme_palier_0', 'message' => 'Les envois sont fermés au palier 0 : le test du matin ne part pas et rien n’a changé.'], 409);
+    }
 }

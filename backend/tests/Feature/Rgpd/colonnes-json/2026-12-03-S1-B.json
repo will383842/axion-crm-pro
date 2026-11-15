@@ -1,0 +1,4 @@
+{
+    "envoi_essais_blanc.etapes": "hors-portee: étapes de l'essai à blanc (nom, résultat, durée), jamais une valeur de personne ; une contrainte en base refuse tout « @ » (aucune adresse e-mail)",
+    "envoi_feu_vert_decisions.points": "hors-portee: photo des points du feu vert au moment de la décision (identifiant, état), jamais une valeur de personne ; une contrainte en base refuse tout « @ » (aucune adresse e-mail)"
+}

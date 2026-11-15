@@ -950,6 +950,7 @@ test('MAJEUR 3 : un expéditeur qui n’est pas une boîte d’envoi est refusé
 
 test('MAJEUR 3 : le quota est compté par identifiant de boîte, et PAR DOMAINE d’envoi (créer des boîtes ne contourne pas la montée)', function () {
     $ws = espaceChauffe();
+    config(['envoi.plafond_jour' => 300]); // P1-PLAFOND : le plafond d'espace effectif (min R14, ENVOI_PLAFOND_JOUR, 300) ne doit pas masquer le quota de domaine (30)
     $maintenant = paris('2026-11-10 10:00:00');
     $p = passerelleChauffe($faux = new FauxServeurEnvoi, $maintenant);
     $acceptes = 0;

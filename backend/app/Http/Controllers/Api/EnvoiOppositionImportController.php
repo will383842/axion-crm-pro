@@ -23,6 +23,9 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  */
 class EnvoiOppositionImportController extends ApiController
 {
+    /** Message 503 propre à l'import (la recherche d'écran n'est pas en cause). */
+    public const MESSAGE_DELAI = 'L’import prend trop de temps : réessayez dans un instant, ou découpez le fichier en plusieurs.';
+
     public function __invoke(Request $request, ImportOppositions $import): JsonResponse
     {
         $request->attributes->set(AuditHashChainLogger::ATTRIBUT_JOURNAL_PROPRE, true);
@@ -59,12 +62,17 @@ class EnvoiOppositionImportController extends ApiController
             if (DelaiRequeteSql::estDepassement($e)) {
                 $this->auditer($request, $ws, $v['etape'], 503, '');
 
-                throw new DelaiRequeteDepassee;
+                throw new DelaiRequeteDepassee(self::MESSAGE_DELAI);
             }
             // Le message SQL contient les valeurs liées (jeton, empreintes) : seul un message générique part au journal.
             $this->auditer($request, $ws, $v['etape'], 500, '');
 
             throw new RuntimeException('Échec de l’import des listes de refus (erreur base de données).');
+        } catch (DelaiRequeteDepassee) {
+            // Levée par RegistreOppositionManuel::inscrireLot (déjà sans SQL) : le client reçoit 503, l'audit aussi.
+            $this->auditer($request, $ws, $v['etape'], 503, '');
+
+            throw new DelaiRequeteDepassee(self::MESSAGE_DELAI);
         } catch (\Throwable $e) {
             $this->auditer($request, $ws, $v['etape'], 500, '');
 

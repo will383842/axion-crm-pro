@@ -260,6 +260,10 @@ test('un serveur qui n\'est pas un FauxServeurEnvoi est refusé (instanceof), es
     app()->bind(EssaiABlanc::class, fn () => new EssaiABlanc(fn () => new stdClass));
 
     expect(fn () => app(EssaiABlanc::class)->executer($this->ws, 'test-essai'))->toThrow(LogicException::class);
+
+    // L'essai rouge laisse une trace durable : une ligne reussi = false, rattachée à l'espace demandé.
+    $lignes = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_essais_blanc')->where('workspace_id', $this->ws)->get());
+    expect($lignes)->toHaveCount(1)->and((bool) $lignes[0]->reussi)->toBeFalse();
 });
 
 test('la commande documente son autorisation (console locale, aucune route)', function () {

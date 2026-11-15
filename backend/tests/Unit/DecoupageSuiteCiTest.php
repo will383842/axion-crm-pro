@@ -169,3 +169,14 @@ test('DECOUPAGE — repli Pint : un merge-base egal a HEAD retombe sur HEAD^ ; p
     $ci = (array) Yaml::parseFile(dirname(__DIR__, 3) . '/.github/workflows/ci.yml');
     expect($ci['jobs']['backend']['timeout-minutes'])->toBe(20);
 });
+
+it('garde SequenceurConcurrenceTest et EffacementServiParDesIndexTest dans la meme part', function () {
+    $fichiers = decoupageListerFichiers(racineBackendDecoupage());
+    $parts = decoupageRepartir($fichiers, 4);
+    $a = 'tests/Feature/Envoi/SequenceurConcurrenceTest.php';
+    $b = 'tests/Feature/Infra/EffacementServiParDesIndexTest.php';
+
+    $partDe = fn (string $c): ?int => collect($parts)->search(fn (array $l) => in_array($c, $l, true)) ?: null;
+
+    expect($partDe($a))->not->toBeNull()->and($partDe($a))->toBe($partDe($b));
+});

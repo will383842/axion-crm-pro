@@ -71,49 +71,6 @@ final class DepotChauffe
     }
 
     /**
-     * Messages envoyés par jour (Paris), STRICTEMENT avant $jour, par un NOM DE DOMAINE : somme de toutes les boîtes de
-     * l'espace qui le partagent (même jointure que {@see self::envoyesDomaine()}). La pseudo-boîte des retours n'y est jamais.
-     *
-     * @return array<string, int>
-     */
-    public function volumesParJourDomaine(string $ws, string $domaine, DateTimeImmutable $jour): array
-    {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
-            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.boite', '<>', self::BOITE_RETOURS)
-            ->where('c.jour', '<', $jour->format('Y-m-d'))->whereRaw("split_part(lower(b.adresse), '@', 2) = ?", [strtolower($domaine)])
-            ->groupBy('c.jour')->havingRaw('SUM(c.envoyes) > 0')->orderBy('c.jour')
-            ->selectRaw('c.jour AS jour, SUM(c.envoyes) AS n')->get());
-        $v = [];
-        foreach ($l as $r) {
-            $v[(string) $r->jour] = (int) $r->n;
-        }
-
-        return $v;
-    }
-
-    /**
-     * Noms de domaine d'envoi de l'espace avec leurs envois du jour (une ligne par domaine, boîtes sommées).
-     *
-     * @return array<string, int> domaine => envoyés à $jour
-     */
-    public function domainesDeLEspace(string $ws, DateTimeImmutable $jour): array
-    {
-        $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_chauffe_jours as c')
-            ->join('envoi_boites as b', fn ($j) => $j->on('b.workspace_id', '=', 'c.workspace_id')->whereRaw('b.id::TEXT = c.boite'))
-            ->where('c.workspace_id', $ws)->where('c.ressource_type', BudgetChauffe::RESSOURCE_DOMAINE)->where('c.boite', '<>', self::BOITE_RETOURS)
-            ->whereRaw("split_part(lower(b.adresse), '@', 2) <> ''")
-            ->groupByRaw("split_part(lower(b.adresse), '@', 2)")->orderByRaw("split_part(lower(b.adresse), '@', 2)")
-            ->selectRaw("split_part(lower(b.adresse), '@', 2) AS domaine, COALESCE(SUM(c.envoyes) FILTER (WHERE c.jour = ?), 0) AS n", [$jour->format('Y-m-d')])->get());
-        $r = [];
-        foreach ($l as $x) {
-            $r[(string) $x->domaine] = (int) $x->n;
-        }
-
-        return $r;
-    }
-
-    /**
      * Identifiant de la boîte d'envoi (`envoi_boites`) de cette adresse expéditeur dans cet espace, ou null
      * (expéditeur inconnu : `a+1@dom`, « Nom <a@dom> »… ne sont PAS des boîtes). Comparaison exacte, casse ignorée.
      */
@@ -508,13 +465,7 @@ final class DepotChauffe
                 return false;
             }
         }
-        $volumes = $this->volumesParJour($ws, $ressource, $civil, $ressourceType);
-        if ($ressourceType === BudgetChauffe::RESSOURCE_DOMAINE) {
-            foreach ($this->volumesParJourDomaine($ws, $ressource, $civil) as $j => $n) { // nom de domaine : boîtes sommées
-                $volumes[$j] = ($volumes[$j] ?? 0) + $n;
-            }
-        }
-        $effectifs = BudgetChauffe::joursEffectifs($volumes, Seuils::JOUR_EFFECTIF_PART, $reculs);
+        $effectifs = BudgetChauffe::joursEffectifs($this->volumesParJour($ws, $ressource, $civil, $ressourceType), Seuils::JOUR_EFFECTIF_PART, $reculs);
         if (CourbeChauffe::palierEtendu(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $civil)) === 'P1') {
             throw ReculRefuse::dejaAuPlusBas($ressourceType, $ressource);
         }

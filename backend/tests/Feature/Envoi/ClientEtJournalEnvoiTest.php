@@ -326,7 +326,8 @@ test('m5 : source inactive, adresse absente ou hôte refusé = AUCUNE intention 
 
 test('m1 : liste blanche des commandes, nom réservé « injection » interdit', function (string $nom, bool $ok) {
     Http::fake(['*' => envoiReponseSignee([])]);
-    $appel = fn () => app(CommandeurServeur::class)->commander($this->ws, 'srv1', envoiCmd(), $nom);
+    // Contrat v3 (C3-3) : un retrait porte ses cibles ; les autres commandes n'en ont jamais.
+    $appel = fn () => app(CommandeurServeur::class)->commander($this->ws, 'srv1', envoiCmd(), $nom, $nom === 'retrait' ? [(string) Str::uuid()] : []);
     if ($ok) {
         expect($appel())->toBeTrue();
     } else {
@@ -398,7 +399,8 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $livree = envoiCmd();
     $client = app(CommandeurServeur::class);
     // E4 : une pause perdue suivie d'une reprise livrée n'est plus rejouée (état périmé, cf. tests E4) ; un RETRAIT, lui, l'est toujours.
-    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'retrait'))->toThrow(ServeurEnvoiRefuse::class);
+    $cible = (string) Str::uuid(); // contrat v3 : un retrait porte ses cibles (le rejeu les relit du journal)
+    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'retrait', [$cible]))->toThrow(ServeurEnvoiRefuse::class);
     $panne = false;
     $client->commander($this->ws, 'srv1', $livree, 'reprise');
     Http::assertSentCount(2);
@@ -406,7 +408,7 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $bilan = app(RejoueurCommandes::class)->rejouer();
     expect($bilan)->toBe(['rejouees' => 1, 'echecs' => 0]);
     Http::assertSentCount(3);
-    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_ends_with($r->url(), '/v1/commandes/retrait'));
+    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_contains($r->body(), $cible) && str_ends_with($r->url(), '/v1/commandes/retrait'));
 
     // Idempotent : plus rien à rejouer, aucun nouvel appel, aucun doublon d'acquittement.
     expect(app(RejoueurCommandes::class)->rejouer())->toBe(['rejouees' => 0, 'echecs' => 0]);

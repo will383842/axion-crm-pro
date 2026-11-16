@@ -16,25 +16,51 @@ final class JournalCommandes
 {
     public const ACQUITTEMENT = 'acquittement-serveur';
 
-    /** Pose l'intention. Vrai = nouvelle ligne ; faux = déjà connue (même corps). Corps différent = refus + alerte. */
-    public function enregistrer(string $workspaceId, string $commandeId, string $commande, string $source): bool
+    /**
+     * Pose l'intention. Vrai = nouvelle ligne ; faux = déjà connue (même corps). Corps différent = refus + alerte.
+     * Contrat v3 : pour un retrait, `details` = {corps_sha256 : empreinte du corps JSON exact, cibles : [...]} ; la même
+     * commande avec d'autres cibles est un autre corps (refus : la passerelle répondrait 409).
+     *
+     * @param  list<string>  $cibles
+     */
+    public function enregistrer(string $workspaceId, string $commandeId, string $commande, string $source, array $cibles = []): bool
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commandeId, $commande, $source): bool {
+        $details = $cibles === []
+            ? ['corps_sha256' => hash('sha256', $commande)]
+            : ['corps_sha256' => hash('sha256', ClientServeurEnvoiHmac::corps($commandeId, $commande, $cibles)), 'cibles' => array_values($cibles)];
+
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commandeId, $commande, $source, $details): bool {
             $pose = DB::affectingStatement(
                 'INSERT INTO envoi_journal_commandes (workspace_id, commande_id, commande, source, auteur, details) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (workspace_id, commande_id) DO NOTHING',
-                [$workspaceId, $commandeId, $commande, $source, 'serveur-k1', json_encode(['corps_sha256' => hash('sha256', $commande)], JSON_THROW_ON_ERROR)],
+                [$workspaceId, $commandeId, $commande, $source, 'serveur-k1', json_encode($details, JSON_THROW_ON_ERROR)],
             ) === 1;
             if ($pose) {
                 return true;
             }
-            $existante = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)->where('commande_id', $commandeId)->value('commande');
-            if ($existante !== $commande) {
+            $existante = DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)->where('commande_id', $commandeId)->first(['commande', 'details']);
+            $memeCorps = $existante !== null && $existante->commande === $commande
+                && (! isset($details['cibles']) || (json_decode((string) $existante->details, true)['corps_sha256'] ?? null) === $details['corps_sha256']);
+            if (! $memeCorps) {
                 Log::critical('envoi.commande_id_reutilise_avec_autre_corps', ['workspace_id' => $workspaceId, 'commande_id' => $commandeId]);
                 throw ServeurEnvoiRefuse::motif('commande_id déjà utilisé avec un autre corps (refus, alerte levée).');
             }
 
             return false;
         });
+    }
+
+    /**
+     * Cibles écrites dans le journal pour ce `commande_id` (retrait v3), dans l'ordre d'origine ; null si aucune.
+     *
+     * @return list<string>|null
+     */
+    public function cibles(string $workspaceId, string $commandeId): ?array
+    {
+        $details = WorkspaceContext::run($workspaceId, fn () => DB::table('envoi_journal_commandes')
+            ->where('workspace_id', $workspaceId)->where('commande_id', $commandeId)->value('details'));
+        $cibles = is_string($details) ? (json_decode($details, true)['cibles'] ?? null) : null;
+
+        return is_array($cibles) && $cibles !== [] ? array_values(array_map('strval', $cibles)) : null;
     }
 
     public function estAcquittee(string $workspaceId, string $commandeId): bool

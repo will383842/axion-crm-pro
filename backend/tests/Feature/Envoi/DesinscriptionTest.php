@@ -490,6 +490,8 @@ test('M2 opposition -> envoi réel : refusé tant que le retrait des envois en f
     $m = new MessageAEnvoyer($ws, 'a@example.test', 'f@example.test', 'S', 'C', 'k');
     $this->post($this->chemin)->assertOk();
     config(['envoi.reel_actif' => true]);
+    // C3-3 lie le retrait réel par défaut (TransportServiceProvider) : la liaison « absente » de EnvoiServiceProvider est reposée ici.
+    app()->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
 
     // Retrait « absent » branché : l'envoi réel est tenu pour inactif, rien ne part.
     expect(app(RetraitEnvoisEnFile::class))->toBeInstanceOf(RetraitEnvoisEnFileAbsent::class);

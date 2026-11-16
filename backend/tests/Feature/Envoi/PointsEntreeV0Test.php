@@ -38,8 +38,8 @@ test('chaque fichier routes/console/envoi-*.php de V0 existe, est requis par rou
         $chemin = base_path("routes/console/envoi-{$f}.php");
         expect(file_exists($chemin))->toBeTrue($f)
             ->and($console)->toContain("/console/envoi-{$f}.php")
-            // `verdicts` porte désormais UNE tâche (VERDICTS-CODE-2) ; les autres restent vides.
-            ->and(substr_count((string) file_get_contents($chemin), 'Schedule::'))->toBe($f === 'verdicts' ? 1 : 0)
+            // `verdicts` (VERDICTS-CODE-2) et `transport` (C3-3, envoi des retraits) portent chacun UNE tâche ; les autres restent vides.
+            ->and(substr_count((string) file_get_contents($chemin), 'Schedule::'))->toBe(in_array($f, ['verdicts', 'transport'], true) ? 1 : 0)
             ->and(substr_count($console, "/console/envoi-{$f}.php"))->toBe(1);
     }
     // Même ordre que le modèle : orchestration, retention, puis les cinq de V0.
@@ -55,12 +55,13 @@ test('le planificateur ne contient aucune tâche venue des fichiers V0', functio
     foreach ($evenements as $e) {
         // Seule exception : la tâche de VERDICTS-CODE-2 (une seule, nommée exactement).
         $commande = (string) $e->command;
-        if (str_contains($commande, 'envoi:verdicts:rafraichir')) {
+        if (str_contains($commande, 'envoi:verdicts:rafraichir') || str_contains($commande, 'envoi:retraits:envoyer')) {
             continue;
         }
         expect($commande)->not->toMatch('/materialisation|verdicts|transport|releve-retours|reactions/i');
     }
     expect(count(array_filter($evenements, fn ($e) => str_contains((string) $e->command, 'envoi:verdicts:rafraichir'))))->toBe(1);
+    expect(count(array_filter($evenements, fn ($e) => str_contains((string) $e->command, 'envoi:retraits:envoyer'))))->toBe(1);
     // Les instantanés NR-07 et NR-20 restent la référence du nombre de tâches et de routes (une entrée de plus pour VERDICTS-CODE-2).
     $instantane = json_decode((string) file_get_contents(base_path('tests/Feature/NonRegression/instantanes/nr07-taches-planifiees.json')), true);
     expect(count($evenements))->toBe(count($instantane['taches'] ?? $instantane));

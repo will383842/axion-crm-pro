@@ -31,6 +31,9 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
 
     public const MAX_CORPS_OCTETS = 1_048_576;
 
+    /** Même plafond que la passerelle (contrat v3, C3-1) et que `envoi_retraits_demandes.cibles_nb`. */
+    public const MAX_CIBLES_RETRAIT = 100;
+
     /** Liste blanche des commandes. « injection » est un nom RÉSERVÉ (journal local) : jamais émis vers le serveur. */
     public const COMMANDES_AUTORISEES = ['pause', 'reprise', 'retrait'];
 
@@ -136,7 +139,7 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         return $json;
     }
 
-    public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+    public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
     {
         // TOUS les contrôles locaux (interrupteurs, source active, adresse, garde d'hôte, TLS) AVANT toute trace :
         // une erreur de configuration ou d'appel doit se voir tout de suite, sans intention orpheline.
@@ -147,17 +150,53 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         if (! in_array($commande, self::COMMANDES_AUTORISEES, true)) {
             throw ServeurEnvoiRefuse::motif('commande hors liste blanche.');
         }
+        self::controlerCibles($commande, $cibles);
         // Intention journalisée (avec sa source) AVANT le réseau : si l'appel échoue, la commande reste « non
         // acquittée » et sera rejouée avec le MÊME commande_id (le serveur est idempotent). Jamais perdue.
-        $this->journal->enregistrer($workspaceId, $commandeId, $commande, $source);
+        $corps = self::corps($commandeId, $commande, $cibles);
+        $this->journal->enregistrer($workspaceId, $commandeId, $commande, $source, $cibles);
         if ($this->journal->estAcquittee($workspaceId, $commandeId)) {
             return false;
         }
-        $corps = json_encode(['commande_id' => $commandeId, 'commande' => $commande], JSON_THROW_ON_ERROR);
         $this->appeler($prep, $workspaceId, 'POST', SignatureEnvoi::PREFIXE_COMMANDES . $commande, $corps, $corps);
         $this->journal->acquitter($workspaceId, $commandeId);
 
         return true;
+    }
+
+    /**
+     * Corps JSON EXACT d'une commande (contrat v3) : `cibles` n'existe que pour `retrait`. Le rejeu rend les mêmes octets.
+     *
+     * @param  list<string>  $cibles
+     */
+    public static function corps(string $commandeId, string $commande, array $cibles): string
+    {
+        $donnees = ['commande_id' => $commandeId, 'commande' => $commande];
+        if ($commande === 'retrait') {
+            $donnees['cibles'] = array_values($cibles);
+        }
+
+        return json_encode($donnees, JSON_THROW_ON_ERROR);
+    }
+
+    /** Un retrait sans cible n'a aucun sens sûr : refusé ICI, avant toute trace et tout réseau. */
+    private static function controlerCibles(string $commande, array $cibles): void
+    {
+        if ($commande !== 'retrait') {
+            if ($cibles !== []) {
+                throw ServeurEnvoiRefuse::motif('cibles interdites hors retrait.');
+            }
+
+            return;
+        }
+        if ($cibles === [] || ! array_is_list($cibles) || count($cibles) > self::MAX_CIBLES_RETRAIT || count(array_unique($cibles)) !== count($cibles)) {
+            throw ServeurEnvoiRefuse::motif('retrait : 1 à ' . self::MAX_CIBLES_RETRAIT . ' cibles distinctes exigées.');
+        }
+        foreach ($cibles as $cible) {
+            if (! is_string($cible) || ! SignatureEnvoi::estUuid($cible)) {
+                throw ServeurEnvoiRefuse::motif('retrait : chaque cible est un identifiant d’injection (UUID).');
+            }
+        }
     }
 
     private function controlesGeneraux(): void

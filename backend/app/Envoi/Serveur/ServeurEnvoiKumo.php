@@ -17,6 +17,7 @@ use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Kumo\CoupureTransport;
 use App\Envoi\Serveur\Kumo\EchecAuthentification;
+use App\Envoi\Serveur\Kumo\InjectionRetiree;
 use App\Envoi\Serveur\Kumo\InterrogeurEtat;
 use App\Envoi\Serveur\Kumo\RefusConnexion;
 use App\Envoi\Serveur\Kumo\RegistreInjections;
@@ -114,7 +115,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
 
         // Jeton PAR message : dérivé de la clé (HMAC), donc identique à chaque renvoi de la même clé.
         $jeton = $this->jetonPour($message);
-        $id = $ligne['id'] ?? self::idDepuisJeton($jeton);
+        $id = $message->idInjection ?? ($ligne['id'] ?? self::idDepuisJeton($jeton));
 
         // L'état est écrit AVANT le réseau, et de façon CONDITIONNELLE : si un autre worker a déjà pris la clé
         // (état différent de celui que nous avons lu), nous n'envoyons rien.
@@ -132,6 +133,11 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             }
 
             return $this->incertain($cle, $id, $jeton);
+        } catch (InjectionRetiree) {
+            // 409 `retire` : adresse en liste de retrait. Ni report ni 5xx compté (le message n'est pas en cause) :
+            // état echec, puis opposition (le séquenceur arrête l'inscription).
+            $this->noter($cle, $id, 'echec', $jeton);
+            throw EnvoiRefuse::opposition();
         } catch (EchecAuthentification) {
             return $this->authEchouee($cle, $id, $jeton);
         } catch (RefusConnexion) {
@@ -172,11 +178,14 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
      * Jeton interne X-Envoi-Jeton : 128 bits (32 hex), HMAC de l'espace et de la clé d'idempotence. Un jeton par
      * message ; le même pour un renvoi de la même clé. Il sert au dédoublonnage et, mis en forme d'UUID, d'identifiant
      * d'injection : l'adresse de rebond `rb-<jeton>` (Verp) se rattache donc à l'injection. Le transport SMTP pose ce VERP
-     * en chemin de retour et X-Envoi-Source (testé : TransportSmtpTunnelTest). Le ComposeurMessage (List-Unsubscribe,
-     * pied art. 14) n'est PAS utilisé : dette nommée dans docs/envoi/K9-adaptateur-kumo.md.
+     * en chemin de retour et X-Envoi-Source (testé : TransportSmtpTunnelTest). Avec un `idInjection` (C1), le jeton est cet UUID sans tirets
+     * et le transport HTTPS signé envoie le message composé tel quel (dette 6 soldée).
      */
     private function jetonPour(MessageAEnvoyer $message): string
     {
+        if ($message->idInjection !== null) {
+            return str_replace('-', '', $message->idInjection); // identifiant C1 : aucun secret nouveau, VERP et id restent liés
+        }
         $jeton = substr(hash_hmac('sha256', 'envoi-jeton:' . $this->workspaceId . ':' . $message->cleIdempotence, $this->jeton), 0, 32);
         if (preg_match('/^[0-9a-f]{32}$/', $jeton) !== 1) {
             throw new RuntimeException('Jeton d’envoi invalide.'); // inatteignable : garde de forme

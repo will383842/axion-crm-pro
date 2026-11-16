@@ -1,0 +1,3 @@
+{
+    "envoi_campagnes_materialisations.compteurs": "hors-portee: compteurs d'avancement de la matérialisation d'une campagne (nom -> nombre), jamais une valeur de personne ; une contrainte en base n'accepte que des nombres (objet plat, 2048 octets au plus), donc aucune adresse e-mail"
+}

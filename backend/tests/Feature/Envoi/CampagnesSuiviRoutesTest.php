@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\ContratOpenApiEnvoi;
+use Tests\Support\LienCampagneSequence;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
@@ -48,11 +49,11 @@ function suivCampagne(string $ws, string $statut = 'brouillon', string $nom = 'C
     DB::table('envoi_campagnes')->insert(['id' => $id, 'workspace_id' => $ws, 'nom' => $nom, 'cible' => json_encode(['type' => 'liste', 'reference' => 'liste-fictive', 'libelle' => 'Liste fictive']),
         'boites' => '{' . (string) Str::uuid() . '}', 'nb_etapes' => 2, 'saisie' => json_encode(['objet' => 'Bonjour']), 'cree_par' => 'responsable']);
     $v = 1;
-    if ($chemins[$statut] !== []) {
-        DB::table('envoi_campagnes')->where('id', $id)->update(['sequence_id' => (string) Str::uuid(), 'version' => ++$v]);
-    }
     foreach ($chemins[$statut] as $etape) {
         DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $etape, 'version' => ++$v]);
+        if ($etape === 'programmee') {   // chemin légal (X1-L1) : séquence créée avec campagne_id, puis lien
+            $v = LienCampagneSequence::poser(DB::connection(), $ws, $id, $v, 2)['version'];
+        }
     }
 
     return $id;
@@ -216,10 +217,11 @@ test('les gestes ne touchent ni sequence_id, ni les séquences, ni les inscripti
     $ws = suivEspace($u);
     $id = suivCampagne($ws, 'en_cours');
     $avant = DB::table('envoi_campagnes')->where('id', $id)->value('sequence_id');
+    $sequences = DB::table('envoi_sequences')->count();   // 1 : créée par le chemin légal (X1-L1) ; les gestes n'en créent aucune
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/pause")->assertOk();
     $this->actingAs($u)->postJson(SUIV_BASE . "/{$id}/terminer")->assertOk();
     expect(DB::table('envoi_campagnes')->where('id', $id)->value('sequence_id'))->toBe($avant);
-    expect(DB::table('envoi_sequences')->count())->toBe(0)->and(DB::table('envoi_inscriptions')->count())->toBe(0);
+    expect(DB::table('envoi_sequences')->count())->toBe($sequences)->and(DB::table('envoi_inscriptions')->count())->toBe(0);
     foreach (['DepotCampagnes', 'GestesCampagne', 'LectureCampagnes'] as $classe) {
         $src = (string) file_get_contents(app_path("Envoi/Campagnes/{$classe}.php"));
         expect($src)->not->toContain('sequence_id\' =>')->and($src)->not->toContain('ServeurEnvoi');
@@ -234,9 +236,11 @@ test('course pause contre reprise : deux processus réels sous le verrou de l\'e
     $proprio->table('workspaces')->insert(['id' => $ws, 'slug' => 'zz-r09-' . substr($ws, 0, 6), 'name' => 'Course R09', 'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
     $proprio->table('envoi_campagnes')->insert(['id' => $camp, 'workspace_id' => $ws, 'nom' => 'x', 'cible' => json_encode(['type' => 'liste', 'reference' => 'r', 'libelle' => 'l']), 'nb_etapes' => 1, 'cree_par' => 'r']);
     $v = 1;
-    $proprio->table('envoi_campagnes')->where('id', $camp)->update(['sequence_id' => (string) Str::uuid(), 'version' => ++$v]);
     foreach (['a_valider', 'programmee', 'en_cours'] as $etape) {
         $proprio->table('envoi_campagnes')->where('id', $camp)->update(['statut' => $etape, 'version' => ++$v]);
+        if ($etape === 'programmee') {   // chemin légal (X1-L1) : séquence créée avec campagne_id, puis lien
+            $v = LienCampagneSequence::poser($proprio, $ws, $camp, $v, 1)['version'];
+        }
     }
     try {
         $depart = microtime(true) + 4;
@@ -262,7 +266,10 @@ test('course pause contre reprise : deux processus réels sous le verrou de l\'e
     } finally {
         $proprio->statement("SET session_replication_role = 'replica'");
         $proprio->table('envoi_campagnes_journal')->where('workspace_id', $ws)->delete();
+        $proprio->table('envoi_sequences_gestes')->where('workspace_id', $ws)->delete();   // X1-L1 : la séquence liée, ses étapes et ses gestes sont committés aussi
+        $proprio->table('envoi_sequence_etapes')->where('workspace_id', $ws)->delete();
         $proprio->table('envoi_campagnes')->where('workspace_id', $ws)->delete();
+        $proprio->table('envoi_sequences')->where('workspace_id', $ws)->delete();
         $proprio->table('workspaces')->where('id', $ws)->delete();
         $proprio->statement("SET session_replication_role = 'origin'");
     }

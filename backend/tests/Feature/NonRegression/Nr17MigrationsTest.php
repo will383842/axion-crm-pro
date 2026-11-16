@@ -127,6 +127,14 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_03_000080_envoi_injections_locales.php',
     // Filet modifié : pourquoi — envoi S1-C : imports de listes de refus (AJOUT SEUL) et colonne `import_id` du registre ; les retirer effacerait l'historique des imports ou la trace de l'origine d'un refus ; down() inerte, up() rejouable.
     '2026_12_03_000020_envoi_oppositions_imports.php',
+    // Filet modifié : pourquoi — envoi X1-L1 : colonne `envoi_sequences.campagne_id`, clé étrangère, index unique partiel et gardes (déclencheurs) du lien campagne -> séquence ; les retirer rouvrirait des séquences sans campagne et des campagnes reliées à n'importe quoi ; down() inerte, up() rejouable.
+    '2026_12_04_000010_envoi_sequences_campagne.php',
+    // Filet modifié : pourquoi — envoi X1-L1 : état de matérialisation des campagnes (SANS suppression : déclencheur DELETE/TRUNCATE, droits par colonne) ; la retirer effacerait l'avancement des campagnes ; down() inerte, up() rejouable.
+    '2026_12_04_000020_envoi_campagnes_materialisations.php',
+    // Filet modifié : pourquoi — envoi X1-L1 : clé étrangère campagne -> séquence et garde `envoi_campagnes_garde()` élargie ; remettre l'ancienne garde rouvrirait la pose d'un lien sans contrôle ; down() inerte (corps vide), up() rejouable.
+    '2026_12_04_000030_envoi_campagnes_lien_sequence.php',
+    // Filet modifié : pourquoi — envoi X1-L1 : index partiel des inscriptions actives (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_04_000040_envoi_inscriptions_contact_actif_index.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

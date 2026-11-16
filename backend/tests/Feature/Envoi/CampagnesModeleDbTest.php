@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\LienCampagneSequence;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -40,7 +41,11 @@ function campCle(): void
     config(['envoi.cles_codes_campagne' => ['1' => CAMP_CLE, '2' => 'seconde-cle-de-test-seulement-9876543210'], 'envoi.cle_codes_campagne_version' => 1]);
 }
 
-/** Crée une campagne dans l'état voulu par le CHEMIN LÉGAL (l'insertion directe d'un autre état est refusée). */
+/**
+ * Crée une campagne dans l'état voulu par le CHEMIN LÉGAL (l'insertion directe d'un autre état est refusée) : programmee,
+ * création de la séquence AVEC campagne_id, liaison (une seule fois), puis le reste du chemin. Dès « programmee » la campagne est
+ * donc reliée (X1-L1) ; brouillon et a_valider ne le sont pas.
+ */
 function campEtat(string $ws, string $statut): string
 {
     $chemins = [
@@ -50,10 +55,12 @@ function campEtat(string $ws, string $statut): string
     ];
     $id = (string) Str::uuid();
     DB::table('envoi_campagnes')->insert(['id' => $id, 'workspace_id' => $ws, 'nom' => 'x', 'cible' => json_encode(campCible()), 'nb_etapes' => 1, 'cree_par' => 'r']);
-    DB::table('envoi_campagnes')->where('id', $id)->update(['sequence_id' => (string) Str::uuid(), 'version' => 2]);   // propriétaire : isole la règle de transition
-    $v = 2;
+    $v = 1;
     foreach ($chemins[$statut] as $etape) {
         DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $etape, 'version' => ++$v]);
+        if ($etape === 'programmee') {
+            $v = LienCampagneSequence::poser(DB::connection(), $ws, $id, $v, 1)['version'];
+        }
     }
 
     return $id;
@@ -114,7 +121,10 @@ test('R08 transitions : la matrice PHP et la base disent la même chose pour les
             $id = campEtat($ws, $de);
             $v = (int) DB::table('envoi_campagnes')->where('id', $id)->value('version');
             $code = campEchec(fn () => DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $vers, 'version' => $v + 1]));
-            expect($code === null)->toBe(DepotCampagnes::autorisee($de, $vers), "{$de} -> {$vers}");
+            // X1-L1 : une campagne « programmee » est reliée à sa séquence ; la reculer à « a_valider » est alors refusée par la base
+            // (pour corriger : l'arrêter puis la dupliquer). C'est le seul couple où la base est plus stricte que la matrice du dépôt.
+            $attendu = DepotCampagnes::autorisee($de, $vers) && ! ($de === 'programmee' && $vers === 'a_valider');
+            expect($code === null)->toBe($attendu, "{$de} -> {$vers}");
         }
     }
 });
@@ -258,7 +268,7 @@ test('R08 contrôles du dépôt : 50 boîtes au plus, chaînes, saisie en liste 
         ->and($d->modifier($ws, $id, 1, ['saisie' => []]))->toBe(2);   // objet vide = accepté
 });
 
-test('R08 aucune écriture de sequence_id : ni par le dépôt, ni par le rôle applicatif, aucun lien avec séquences/inscriptions', function () {
+test('R08 sequence_id s\'écrit uniquement via un lien unique, une seule fois, au statut programmee, vers la séquence de la même campagne', function () {
     $ws = campEspace();
     $id = campCreer($ws);
     expect(fn () => app(DepotCampagnes::class)->modifier($ws, $id, 1, ['sequence_id' => (string) Str::uuid()]))->toThrow(CampagneRefusee::class, 'non modifiable');
@@ -266,13 +276,32 @@ test('R08 aucune écriture de sequence_id : ni par le dépôt, ni par le rôle a
     // la source du dépôt n'écrit pas la colonne (elle ne la mentionne que pour la lire ou la refuser)
     $source = (string) file_get_contents(app_path('Envoi/Campagnes/DepotCampagnes.php'));
     expect($source)->not->toContain("'sequence_id' =>")->and($source)->not->toContain("['sequence_id']");
-    // droits par colonne : le rôle applicatif ne peut ni poser ni changer sequence_id
-    expect(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->where('id', $id)->update(['sequence_id' => (string) Str::uuid(), 'version' => 2]))))->toBe('42501');
+    // INSERT : jamais de sequence_id (aucun droit de colonne pour le rôle applicatif : 42501)
     expect(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->insert([
         'workspace_id' => $ws, 'nom' => 'x', 'cible' => json_encode(campCible()), 'nb_etapes' => 1, 'cree_par' => 'r', 'sequence_id' => (string) Str::uuid(),
     ]))))->toBe('42501');
+    // UPDATE direct par le rôle applicatif : tout ce qui n'est pas le lien légitime est refusé par la garde (P0001), plus par les droits (42501)
+    $aleatoire = fn (string $c, int $v) => fn () => DB::table('envoi_campagnes')->where('id', $c)->update(['sequence_id' => (string) Str::uuid(), 'version' => $v + 1]);
+    expect(campEchec(fn () => campCommeApp($ws, $aleatoire($id, 1))))->toBe('P0001')               // brouillon, séquence inexistante
+        ->and(campEchec($aleatoire($id, 1)))->toBe('P0001');                                         // propriétaire : même garde
+    $v = 1;
+    foreach (['a_valider', 'programmee'] as $etape) {
+        DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $etape, 'version' => ++$v]);
+    }
+    expect(campEchec(fn () => campCommeApp($ws, $aleatoire($id, $v))))->toBe('P0001');              // programmee, séquence inexistante
+    $autre = campEtat($ws, 'programmee');                                                           // reliée à SA séquence
+    $seqAutre = (string) DB::table('envoi_campagnes')->where('id', $autre)->value('sequence_id');
+    $vAutre = (int) DB::table('envoi_campagnes')->where('id', $autre)->value('version');
+    expect(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->where('id', $id)->update(['sequence_id' => $seqAutre, 'version' => $v + 1]))))->toBe('P0001')   // séquence d'une AUTRE campagne
+        ->and(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->where('id', $autre)->update(['sequence_id' => null, 'version' => $vAutre + 1]))))->toBe('P0001')   // retrait
+        ->and(campEchec(fn () => campCommeApp($ws, $aleatoire($autre, $vAutre))))->toBe('P0001');   // seconde liaison
+    // le lien légitime, lui, passe : séquence créée avec campagne_id, puis liaison par le rôle applicatif
+    $propre = LienCampagneSequence::creerSequence(DB::connection(), $ws, $id, 2);
+    expect(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->where('id', $id)->update(['sequence_id' => $propre, 'version' => $v + 1]))))->toBeNull();
+    // liens : envoi_campagnes pointe désormais aussi vers envoi_sequences (et les séquences vers envoi_campagnes), rien vers les inscriptions
     $liens = DB::select("SELECT confrelid::regclass::text AS t FROM pg_constraint WHERE contype = 'f' AND conrelid IN ('envoi_campagnes'::regclass, 'envoi_campagnes_journal'::regclass, 'envoi_campagne_codes'::regclass)");
-    expect(collect($liens)->pluck('t')->diff(['workspaces', 'envoi_campagnes'])->all())->toBe([]);
+    expect(collect($liens)->pluck('t')->diff(['workspaces', 'envoi_campagnes', 'envoi_sequences'])->all())->toBe([])
+        ->and(collect($liens)->pluck('t')->contains('envoi_sequences'))->toBeTrue();
 });
 
 test('R08 cible : une adresse e-mail est refusée par le dépôt ET par la base', function () {

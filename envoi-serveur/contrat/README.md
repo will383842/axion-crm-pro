@@ -62,6 +62,4 @@ Règles de lecture côté CRM :
   `{"erreur":"horloge_hors_fenetre","workspace_id":"<uuid de l'en-tête>"}` (comme toute réponse signée, `workspace_id` est EXIGÉ : le CRM refuse une réponse
   sans lui, ce 401 compris, et la traite alors comme un refus ordinaire) ; le CRM classe ce refus « horloge » critique (pas « serveur muet »). Un `401` non signé reste un refus ordinaire.
 
-**Dette K2-suite (nommée) : la route `/v1/sante` n'existe pas encore côté passerelle**, pas plus que le `401` signé `horloge_hors_fenetre`
-(`infra/serveur-envoi/passerelle/src/Passerelle.php`, `FENETRE_HORODATAGE`). Tant qu'elle manque, `ENVOI_SANTE_ACTIF` doit rester faux
-et l'envoi réel éteint (voir `docs/envoi/supervision-k15.md`, couplage avec l'homme mort).
+Livré (C2-1) : la passerelle répond à `GET /v1/sante` et rend le `401` signé `horloge_hors_fenetre`. `file_age_s` et `tunnel_ok` sont omis tant que l'API d'administration KumoMTA n'est pas liée (le CRM les classe « mesure absente », jamais vert).

@@ -43,8 +43,8 @@ de requête » signée est vide), réponse signée liée au nonce, `workspace_id
 | Champ | Type et unité | Plage acceptée par le CRM | Qui le calcule |
 | --- | --- | --- | --- |
 | `file_age_s` | entier, secondes | 0 à 31 536 000 | la passerelle : `maintenant − date du plus ancien message en file` (0 si la file est vide) |
-| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume des files / octets totaux × 100 |
-| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : mémoire disponible / `memory_limit`. **`memory_limit` peut valoir 0 ou −1 (illimitée) : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
+| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume du dossier de la base / octets totaux × 100 |
+| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : `MemAvailable` / `MemTotal` de `/proc/meminfo`, × 100. **Si `MemTotal` est nul ou illisible : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
 | `certificat_jours` | entier, jours entiers restants avant l'échéance du plus proche certificat (TLS du serveur ou client) | −36 500 à 36 500 (négatif = expiré) | la passerelle |
 | `tunnel_ok` | booléen | — | la passerelle : le lien d'administration répond |
 | `ntp_synchro` | booléen | — | la passerelle : l'horloge est synchronisée (NTP) |
@@ -62,6 +62,32 @@ Règles de lecture côté CRM :
   `{"erreur":"horloge_hors_fenetre","workspace_id":"<uuid de l'en-tête>"}` (comme toute réponse signée, `workspace_id` est EXIGÉ : le CRM refuse une réponse
   sans lui, ce 401 compris, et la traite alors comme un refus ordinaire) ; le CRM classe ce refus « horloge » critique (pas « serveur muet »). Un `401` non signé reste un refus ordinaire.
 
-**Dette K2-suite (nommée) : la route `/v1/sante` n'existe pas encore côté passerelle**, pas plus que le `401` signé `horloge_hors_fenetre`
-(`infra/serveur-envoi/passerelle/src/Passerelle.php`, `FENETRE_HORODATAGE`). Tant qu'elle manque, `ENVOI_SANTE_ACTIF` doit rester faux
-et l'envoi réel éteint (voir `docs/envoi/supervision-k15.md`, couplage avec l'homme mort).
+Livré (C2-1) : la passerelle répond à `GET /v1/sante` et rend le `401` signé `horloge_hors_fenetre`. `file_age_s` et `tunnel_ok` sont omis tant que l'API d'administration KumoMTA n'est pas liée (le CRM les classe « mesure absente », jamais vert).
+
+## `POST /v1/injections` — injection d'un message (C2-2, faux serveur seulement)
+
+Charge signée comme toute requête (corps exact). L'espace vient de la **signature** : un `workspace_id` dans le corps est refusé (`400 corps`).
+Corps JSON, exactement ces quatre clés (adresses d'exemple : `*.example.test`) :
+
+```json
+{ "id_injection": "<uuid>", "mail_from": "rb-<42 hex>@bounce.exemple.example.test", "rcpt_to": "contact@client.example.test", "message": "<RFC 5322 en base64>" }
+```
+
+| Contrôle | Refus |
+| --- | --- |
+| JSON, clés, types | `400 corps` |
+| `id_injection` UUID minuscule | `400 id_injection` |
+| `mail_from` VERP `rb-<42 hex>@bounce.<domaine>` | `400 mail_from` |
+| `rcpt_to` : UNE adresse ASCII nue (ni virgule, ni nom, ni CR/LF) | `400 rcpt_to` |
+| `message` base64 strict ; décodé ≤ 1 048 576 octets | `400 message` / `400 message_trop_gros` |
+| fins de ligne CRLF seulement (LF nu ou CR nu refusé : anti « SMTP smuggling ») | `400 fin_de_ligne` |
+| aucun `X-Envoi-*`, aucun `DKIM-Signature` ; `List-Unsubscribe` ET `List-Unsubscribe-Post: List-Unsubscribe=One-Click` | `422 conformite` |
+| domaine de `From:` = parent de `bounce.<domaine>` du `mail_from` | `422 alignement` |
+
+Plafond avant authentification : 1 500 000 octets pour ce seul chemin (2 × 65 536 ailleurs) ; au-delà, `401` non signé.
+
+Idempotence : la passerelle réserve `(espace, id_injection)` AVANT d'appeler le moteur. Même id et même corps exact (empreinte
+SHA-256) ⇒ réponse rejouée, un seul appel ; même id et autre corps ⇒ `409 id_injection_deja_utilise` ; un espace n'en voit jamais un
+autre. Succès : `202 {"id_injection", "etat": "en_file"}`. Moteur injoignable avant acceptation : `503 indisponible`, réservation rendue
+(rejouable). La table ne garde ni adresse ni message, et n'est jamais vidée. Le message n'est jamais journalisé ni rendu.
+`POST /v1/commandes/injecter` reste `404`. À venir (C2-3) : `GET /v1/injections/{id}`, codes SMTP 4xx/5xx, `504`.

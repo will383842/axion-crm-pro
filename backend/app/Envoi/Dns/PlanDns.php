@@ -9,7 +9,7 @@ namespace App\Envoi\Dns;
 final class PlanDns
 {
     /**
-     * Les 20 points de contrôle, dans l'ordre d'exécution de ControleurDns.
+     * Les 22 points de contrôle, dans l'ordre d'exécution de ControleurDns.
      *
      * @return list<string>
      */
@@ -22,6 +22,7 @@ final class PlanDns
             'helo_est_un_nom', 'ptr_existe', 'ptr_egal_helo', 'helo_a_vers_ip',
             'mta_sts_enregistrement', 'mta_sts_politique', 'mta_sts_mode_testing',
             'tls_rpt',
+            'bounce_mx_present', 'bounce_spf_autorise_ip',
         ];
     }
 
@@ -39,6 +40,9 @@ final class PlanDns
             new EnregistrementDns('TXT', '_dmarc.' . $c->domaine, 'v=DMARC1; p=none; rua=mailto:{BOITE_RAPPORTS_DMARC}', 'DMARC'),
             new EnregistrementDns('TXT', '_mta-sts.' . $c->domaine, 'v=STSv1; id={IDENTIFIANT_POLITIQUE}', 'MTA-STS'),
             new EnregistrementDns('TXT', '_smtp._tls.' . $c->domaine, 'v=TLSRPTv1; rua=mailto:{BOITE_RAPPORTS_TLS}', 'TLS-RPT'),
+            // Domaine de rebond (chemin de retour VERP) : sans MX ni SPF, les rebonds sont perdus ou refusés.
+            new EnregistrementDns('MX', 'bounce.' . $c->domaine, '10 {HOTE_RECEPTION_REBONDS}.', 'MX rebonds'),
+            new EnregistrementDns('TXT', 'bounce.' . $c->domaine, 'v=spf1 ' . ($v6 ? 'ip6' : 'ip4') . ':{IP_ENVOI} -all', 'SPF rebonds'),
         ];
     }
 

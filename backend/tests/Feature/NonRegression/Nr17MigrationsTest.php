@@ -57,6 +57,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000121_envoi_reponses_classements.php',
     // Filet modifié : pourquoi — envoi R12 : canal d'opposition `reponse` (CHECK élargi NOT VALID, aucune donnée touchée) ; la retirer fausserait le registre ; down() inerte, up() rejouable.
     '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
+    // Filet modifié : pourquoi — envoi D1-L1 : accès IMAP chiffrés des boîtes, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; les retirer effacerait les accès posés ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_05_000400_envoi_boites_acces_imap.php',
     // Filet modifié : pourquoi — VERDICTS : colonne motif nullable + CHECK NOT VALID ; la retirer effacerait le pourquoi des verdicts ; down() inerte, up() rejouable.
     '2026_12_05_000500_envoi_verdicts_adresse_motif.php',
     // Filet modifié : pourquoi — VERDICTS : REVOKE UPDATE/DELETE du rôle applicatif sur les verdicts (ajout seul) ; rendre ces droits rouvrirait la réécriture des verdicts ; down() inerte, up() rejouable.
@@ -151,6 +153,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_05_000200_envoi_messages_id_injection_serveur.php',
     // Filet modifié : pourquoi — envoi C1-0 : deux index partiels d'`envoi_messages` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_05_000210_envoi_messages_index_injection.php',
+    // Filet modifié : pourquoi — envoi C3-0 : boîte des retraits (empreintes, états finals figés, DELETE/TRUNCATE refusés) ; la retirer effacerait des demandes de retrait ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_05_000300_envoi_retraits_demandes.php',
+    // Filet modifié : pourquoi — envoi C3-0 : registre Kumo durable (3 tables, ni DELETE ni TRUNCATE, seq figé, 5xx en ajout seul) ; le retirer effacerait des injections ; down() inerte, up() rejouable.
+    '2026_12_05_000310_envoi_registre_kumo.php',
+    // Filet modifié : pourquoi — envoi C3-0 : fonction de lecture des couples (espace, domaine, adaptateur) non « faux » pour la pause globale (CREATE OR REPLACE) ; down() inerte (un appelant futur en dépendra), up() rejouable.
+    '2026_12_05_000320_envoi_couples_reels_portes.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

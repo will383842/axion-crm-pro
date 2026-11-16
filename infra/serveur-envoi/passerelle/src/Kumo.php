@@ -18,6 +18,9 @@ interface Kumo
     public function delaiMaximal(): int;
 
     /**
+     * Opérations : `pause`, `reprise`, `retrait` (params vides) et `injecter` (C2-2, params `mail_from`, `rcpt_to`,
+     * `message` = octets RFC 5322 décodés ; jamais journalisés). `injecter` n'est PAS une commande K1.
+     *
      * @param array<string,mixed> $params
      * @return array<string,mixed>
      *

@@ -13,6 +13,9 @@ final class Passerelle
 
     public const TAILLE_MAX_CORPS = 65536;
 
+    /** Plafond AVANT authentification pour le seul chemin /v1/injections (message ≤ 1 Mio en base64 + JSON). */
+    public const TAILLE_MAX_INJECTION_BRUTE = 1_500_000;
+
     public const LIMITE_EVENEMENTS = 500;
 
     /** Commandes autorisées : les noms de K1 (ClientServeurEnvoiHmac::COMMANDES_AUTORISEES). Le reste est refusé. */
@@ -45,6 +48,7 @@ final class Passerelle
      * @param \Closure():int|null    $horloge
      * @param \Closure(int):mixed|null $dormir pause en millisecondes (injectable pour les tests)
      * @param \Closure(string,array<string,string>):mixed|null $alerte alerte de dérive (26 § 1.8) ; défaut : error_log
+     * @param Sante\Mesureur|null $mesureur mesures de GET /v1/sante ; défaut : `horloge_unix` seulement
      */
     public function __construct(
         private readonly Stockage|\Closure $base,
@@ -53,6 +57,7 @@ final class Passerelle
         ?\Closure $horloge = null,
         ?\Closure $dormir = null,
         ?\Closure $alerte = null,
+        private readonly ?Sante\Mesureur $mesureur = null,
     ) {
         if ($kumo->delaiMaximal() >= Stockage::DELAI_RESERVATION || $kumo->delaiMaximal() > Kumo::DELAI_MAX_SECONDES) {
             // K4c : un client plus lent que la réservation ferait exécuter une commande deux fois.
@@ -83,6 +88,7 @@ final class Passerelle
     public function traiter(Requete $r): Reponse
     {
         try {
+            $plafond = explode('?', $r->chemin, 2)[0] === '/v1/injections' ? self::TAILLE_MAX_INJECTION_BRUTE : self::TAILLE_MAX_CORPS * 2;
             $ws = $r->entete('x-envoi-workspace');
             $ts = $r->entete('x-envoi-timestamp');
             $nonce = $r->entete('x-envoi-nonce');
@@ -92,7 +98,7 @@ final class Passerelle
                 || ! Signature::estUuid($ws) || ! Signature::estUuid($nonce)
                 || preg_match('/^\d{1,12}$/', $ts) !== 1
                 || ! isset($this->cles[$ws])
-                || strlen($r->corps) > self::TAILLE_MAX_CORPS * 2
+                || strlen($r->corps) > $plafond
             ) {
                 return $this->nonAutorise();
             }
@@ -111,7 +117,8 @@ final class Passerelle
                 return $this->nonAutorise();
             }
             if (abs(($this->horloge)() - (int) $ts) > self::FENETRE_HORODATAGE) {
-                return $this->nonAutorise();
+                // Signature VALIDE : refus signé (le CRM le classe « horloge »). Ni base ouverte, ni nonce retenu.
+                return $this->signer(Reponse::json(401, ['erreur' => 'horloge_hors_fenetre']), $cle, $ws, $nonce, (string) $cleId);
             }
         } catch (\Throwable) {
             return Reponse::erreur(500, 'erreur_interne'); // jamais de trace dans la réponse
@@ -152,6 +159,20 @@ final class Passerelle
 
     private function router(Requete $r, string $chemin, string $requete, string $ws): Reponse
     {
+        if ($chemin === '/v1/sante') {
+            if ($r->methode !== 'GET') {
+                return Reponse::erreur(405, 'methode');
+            }
+
+            return $requete === '' ? $this->sante() : Reponse::erreur(400, 'requete');
+        }
+        if ($chemin === '/v1/injections') {
+            if ($r->methode !== 'POST') {
+                return Reponse::erreur(405, 'methode');
+            }
+
+            return $requete === '' ? $this->injecter($ws, $r->corps) : Reponse::erreur(400, 'requete');
+        }
         if ($chemin === '/v1/evenements') {
             return $r->methode === 'GET' ? $this->evenements($ws, $requete) : Reponse::erreur(405, 'methode');
         }
@@ -160,6 +181,26 @@ final class Passerelle
         }
 
         return Reponse::erreur(404, 'introuvable');
+    }
+
+    private const MESURES_CONTRAT = ['file_age_s', 'disque_libre_pct', 'memoire_libre_pct', 'certificat_jours', 'tunnel_ok', 'ntp_synchro'];
+
+    /** Lecture seule. Une clé inconnue, non finie ou d'un autre type est omise ; une panne du mesureur n'est jamais un 500. */
+    private function sante(): Reponse
+    {
+        $mesures = [];
+        try {
+            foreach ($this->mesureur?->mesurer() ?? [] as $cle => $v) {
+                if (in_array($cle, self::MESURES_CONTRAT, true) && (is_bool($v) || is_int($v) || (is_float($v) && is_finite($v)))) {
+                    $mesures[$cle] = $v;
+                }
+            }
+        } catch (\Throwable) {
+            $mesures = [];
+        }
+        $mesures['horloge_unix'] = ($this->horloge)();
+
+        return Reponse::json(200, ['mesures' => $mesures]);
     }
 
     private function commande(string $ws, string $operation, string $corps, string $requete): Reponse
@@ -223,6 +264,52 @@ final class Passerelle
         }
         $rep = Reponse::json(200, ['workspace_id' => $ws, 'commande_id' => $id, 'statut' => 'ok', 'resultat' => $resultat]);
         $this->stockage()->terminerCommande($ws, $id, $operation, $rep->statut, $rep->corps);
+
+        return $rep;
+    }
+
+    /**
+     * POST /v1/injections (C2-2). L'espace vient de la SIGNATURE. Réservation AVANT l'appel au moteur : une seule exécution
+     * par (espace, id_injection). Le message n'est ni journalisé ni rendu ; seule l'empreinte du corps est gardée.
+     */
+    private function injecter(string $ws, string $corps): Reponse
+    {
+        try {
+            $d = Injection\Validateur::valider($corps);
+        } catch (\DomainException $e) {
+            return Reponse::erreur($e->getCode(), $e->getMessage());
+        }
+        $id = $d['id_injection'];
+        $empreinte = hash('sha256', $corps);
+
+        for ($essai = 0; ; $essai++) {
+            $res = $this->stockage()->reserverInjection($ws, $id, $empreinte);
+            if ($res['action'] === 'conflit') {
+                return Reponse::erreur(409, 'id_injection_deja_utilise');
+            }
+            if ($res['action'] === 'rejouer') {
+                return new Reponse($res['statut'] ?? 200, $res['reponse'] ?? '{}', ['Content-Type' => 'application/json']);
+            }
+            if ($res['action'] === 'executer') {
+                break;
+            }
+            if ($essai >= self::ATTENTES) {
+                return Reponse::erreur(503, 'injection_en_cours'); // réessayable avec le même id_injection
+            }
+            ($this->dormir)(self::PAUSE_MS);
+        }
+
+        try {
+            $this->kumo->executer($ws, 'injecter', ['mail_from' => $d['mail_from'], 'rcpt_to' => $d['rcpt_to'], 'message' => $d['message']]);
+        } catch (\RuntimeException) {
+            $this->stockage()->rendreInjection($ws, $id); // rien n'a été accepté : l'id reste rejouable
+            return Reponse::erreur(503, 'indisponible');
+        } catch (\Throwable $e) {
+            $this->stockage()->rendreInjection($ws, $id);
+            throw $e;
+        }
+        $rep = Reponse::json(202, ['id_injection' => $id, 'etat' => 'en_file']);
+        $this->stockage()->terminerInjection($ws, $id, 'en_file', $rep->statut, $rep->corps);
 
         return $rep;
     }

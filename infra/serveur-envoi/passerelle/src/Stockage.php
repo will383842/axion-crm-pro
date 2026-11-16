@@ -122,6 +122,13 @@ CREATE TRIGGER IF NOT EXISTS loghook_journal_no_update BEFORE UPDATE ON loghook_
   BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
 CREATE TRIGGER IF NOT EXISTS loghook_journal_no_delete BEFORE DELETE ON loghook_journal
   BEGIN SELECT RAISE(ABORT, 'journal en ajout seul'); END;
+CREATE TABLE IF NOT EXISTS injections (
+  workspace_id TEXT NOT NULL, id_injection TEXT NOT NULL, empreinte TEXT NOT NULL,
+  etat TEXT NOT NULL CHECK (etat IN ('en_cours','en_file','refuse','incertain','retire')),
+  statut INTEGER, reponse TEXT, instant INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, id_injection)) WITHOUT ROWID;
+CREATE TRIGGER IF NOT EXISTS injections_no_delete BEFORE DELETE ON injections
+  BEGIN SELECT RAISE(ABORT, 'injections en ajout seul'); END;
 CREATE TABLE IF NOT EXISTS purge_etat (ouverte INTEGER NOT NULL);
 INSERT INTO purge_etat SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM purge_etat);
 CREATE TRIGGER IF NOT EXISTS evenements_no_update BEFORE UPDATE ON evenements
@@ -236,6 +243,58 @@ SQL);
     {
         $this->pdo->prepare("UPDATE commandes_etat SET etat='echec', maj_le=? WHERE workspace_id=? AND commande_id=? AND etat='en_cours'")
             ->execute([$this->now(), $ws, $id]);
+    }
+
+    /**
+     * Réserve l'id_injection AVANT tout appel à KumoMTA (même schéma que les commandes). La table ne garde ni adresse ni
+     * message : seulement l'empreinte du corps exact. « executer » = cette requête appelle le moteur ; « attendre » = une
+     * autre est en cours ; « rejouer » = réponse déjà connue (un état « incertain » n'est JAMAIS ré-exécuté) ;
+     * « conflit » = même id, autre corps.
+     *
+     * @return array{action:'executer'|'attendre'|'conflit'|'rejouer',statut?:int,reponse?:string}
+     */
+    public function reserverInjection(string $ws, string $id, string $empreinte): array
+    {
+        /** @var array{action:'executer'|'attendre'|'conflit'|'rejouer',statut?:int,reponse?:string} */
+        return $this->transaction(function () use ($ws, $id, $empreinte): array {
+            $st = $this->pdo->prepare('SELECT empreinte, etat, statut, reponse, instant FROM injections WHERE workspace_id=? AND id_injection=?');
+            $st->execute([$ws, $id]);
+            $r = $st->fetch();
+            if ($r === false) {
+                $this->pdo->prepare("INSERT INTO injections (workspace_id, id_injection, empreinte, etat, instant) VALUES (?,?,?,'en_cours',?)")
+                    ->execute([$ws, $id, $empreinte, $this->now()]);
+
+                return ['action' => 'executer'];
+            }
+            if (! hash_equals((string) $r['empreinte'], $empreinte)) {
+                return ['action' => 'conflit'];
+            }
+            if ($r['etat'] !== 'en_cours') {
+                return ['action' => 'rejouer', 'statut' => (int) ($r['statut'] ?? 200), 'reponse' => (string) ($r['reponse'] ?? '{}')];
+            }
+            if ($this->now() - (int) $r['instant'] <= self::DELAI_RESERVATION) {
+                return ['action' => 'attendre'];
+            }
+            // Réservation abandonnée (processus disparu) ou rendue : on reprend.
+            $this->pdo->prepare("UPDATE injections SET instant=? WHERE workspace_id=? AND id_injection=? AND etat='en_cours'")
+                ->execute([$this->now(), $ws, $id]);
+
+            return ['action' => 'executer'];
+        });
+    }
+
+    /** Issue connue : réponse définitive gardée pour le rejeu. Seule une ligne « en_cours » change. */
+    public function terminerInjection(string $ws, string $id, string $etat, int $statut, string $reponse): void
+    {
+        $this->pdo->prepare("UPDATE injections SET etat=?, statut=?, reponse=?, instant=? WHERE workspace_id=? AND id_injection=? AND etat='en_cours'")
+            ->execute([$etat, $statut, $reponse, $this->now(), $ws, $id]);
+    }
+
+    /** Rend la réservation (panne avant acceptation) sans rien effacer : elle devient immédiatement reprenable. */
+    public function rendreInjection(string $ws, string $id): void
+    {
+        $this->pdo->prepare("UPDATE injections SET instant=0 WHERE workspace_id=? AND id_injection=? AND etat='en_cours'")
+            ->execute([$ws, $id]);
     }
 
     public function nombreCommandes(): int

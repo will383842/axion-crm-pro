@@ -648,14 +648,11 @@ test('B10-016-PORTEE PORTES MORTES — UNE des neuf portes DELETE de l API ne su
     // `tests/Feature/Api/EcrituresQuiRepondaient501Test.php`). On ne relache
     // donc RIEN : on retire deux entrees d'une liste de defauts.
     //
-    // 🔴 `contacts/{contact}` RESTE, et ce n'est pas un oubli. Sa reparation
-    // depend de `I48-001`, dont la fiche d'audit dit que le correctif ne peut
-    // pas etre ecrit avant l'arbitrage « ou vit le type » et `I48-003`
-    // (`contacts.company_id` et `contacts.last_name` sont tous deux NOT NULL).
-    // C'est une decision de conception, elle revient a Will.
-    expect($mortes)->toBe([
-        'api/v1/contacts/{contact}',
-    ]);
+    // 2026-12 — DE UNE A ZERO (lot G1-B, cahier #619). `contacts/{contact}` ne rend plus
+    // `notImplemented` : il retire le contact en corbeille DOUCE (un UPDATE qui pose `deleted_at`
+    // et une marque, jamais d'effacement). La liste se vide, comme cette garde l'annoncait. Le
+    // plancher de portes balayees ci-dessus, lui, reste entier : on ne relache RIEN.
+    expect($mortes)->toBe([]);
 });
 
 // ───────────────────────────────────────────── LE MECANISME, DEMONTRE

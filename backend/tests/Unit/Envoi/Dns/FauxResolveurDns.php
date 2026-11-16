@@ -19,6 +19,9 @@ final class FauxResolveurDns implements ResolveurDns
     /** @var array<string, list<string>> */
     public array $ptr = [];
 
+    /** @var array<string, list<string>> hôtes MX par nom */
+    public array $mx = [];
+
     /** @var array<string, string> */
     public array $politiques = [];
 
@@ -53,6 +56,13 @@ final class FauxResolveurDns implements ResolveurDns
         return $this->ptr[$ip] ?? [];
     }
 
+    public function mx(string $nom): array
+    {
+        $this->requetes[] = "MX $nom";
+
+        return $this->mx[$nom] ?? [];
+    }
+
     public function politiqueMtaSts(string $domaine): ?string
     {
         $this->requetes[] = "STS $domaine";
@@ -72,6 +82,9 @@ final class FauxResolveurDns implements ResolveurDns
         $f->txt["_mta-sts.$domaine"] = ['v=STSv1; id=20260101'];
         $f->politiques[$domaine] = "version: STSv1\nmode: testing\nmx: $helo\nmax_age: 86400\n";
         $f->txt["_smtp._tls.$domaine"] = ["v=TLSRPTv1; rua=mailto:tls@$domaine"];
+        // Domaine de rebond (C1-3) : MX vers l'hôte de réception, SPF qui autorise l'IP d'envoi.
+        $f->mx["bounce.$domaine"] = ['reception.rebonds.example.test'];
+        $f->txt["bounce.$domaine"] = ["v=spf1 ip4:$ip -all"];
 
         return $f;
     }

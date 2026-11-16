@@ -84,6 +84,7 @@ final class Sequenceur
         private readonly LecteurFiche $fiches,
         private readonly ComposeurSequence $composeur,
         private readonly ParametresExpedition $expedition,
+        private readonly RegistreInjectionsSequence $registre = new RegistreInjectionsSequence,
     ) {}
 
     /** @var list<array{0: string, 1: array<string, mixed>}> alertes critiques en attente du COMMIT de la transaction en cours */
@@ -205,11 +206,11 @@ final class Sequenceur
             $rang = $plan['rang'];
             // Idempotent : seule la bascule « reserve » -> « envoye » avance l'étape, une seule fois.
             $basculees = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
-                ->update(['statut' => 'envoye', 'refus' => null, 'id_injection' => $res->idInjection, 'maj_le' => $maintenant->format('c')]);
+                ->update(['statut' => 'envoye', 'refus' => null, ...$this->colonnesIdentifiants($plan['idRegistre'], $res->idInjection), 'maj_le' => $maintenant->format('c')]);
             if ($basculees !== 1) {
                 return self::DEJA;
             }
-            $this->enregistrerEnvoye($ins, $rang, $plan['messageId'], $res->idInjection);
+            $this->enregistrerEnvoye($ins, $rang, $plan['messageId'], $plan['idRegistre'], $res->idInjection);
             if ($ins->statut === 'active' && (int) $ins->etape_courante === $rang) {
                 $this->avancer($ins, $rang, $plan['version'], $plan['messageId'], $plan['references'], $plan['fenetre'], $maintenant);
             }
@@ -221,7 +222,7 @@ final class Sequenceur
     /**
      * Temps C : transaction courte, ligne d'inscription relue sous verrou, alertes émises après le COMMIT.
      *
-     * @param  array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer}  $plan
+     * @param  array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer, idRegistre: ?string}  $plan
      */
     private function conclure(array $plan, \Closure $f, DateTimeImmutable $maintenant): string
     {
@@ -252,7 +253,7 @@ final class Sequenceur
     /**
      * Temps A (dans la transaction ouverte par `traiter`).
      *
-     * @return string|array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer}
+     * @return string|array{ins: \stdClass, rang: int, version: array<string, mixed>, messageId: string, references: list<string>, fenetre: FenetreHoraire, message: MessageAEnvoyer, idRegistre: ?string}
      */
     private function reserverEtPreparer(string $ws, string $inscriptionId, DateTimeImmutable $maintenant): string|array
     {
@@ -317,6 +318,12 @@ final class Sequenceur
             return $this->refuserSaufDejaParti($ins, $rang, $motif, $reprise, $maintenant);
         }
 
+        // C1 : identifiant STABLE choisi par le CRM avant le réseau (même clé => même UUID), dans la transaction du temps A.
+        $cle = 'seq-' . $ins->id . '-' . $rang;
+        $inj = $this->registre->reserver($ws, $cle, $this->expedition->domaine);
+        $this->alertes = [...$this->alertes, ...$this->registre->alertes];
+        $this->registre->alertes = [];
+
         $sujet = ($rang > 1 && stripos((string) $etape['sujet'], 're:') !== 0) ? 'Re: ' . $etape['sujet'] : (string) $etape['sujet'];
         $brut = $this->composeur->composer(new DemandeComposition(
             $ws,
@@ -331,7 +338,8 @@ final class Sequenceur
 
         return [
             'ins' => $ins, 'rang' => $rang, 'version' => $version, 'messageId' => $messageId, 'references' => $references, 'fenetre' => $fenetre,
-            'message' => new MessageAEnvoyer($ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, 'seq-' . $ins->id . '-' . $rang),
+            'message' => new MessageAEnvoyer($ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, $cle, $inj['id'] ?? null, $inj['cheminRetour'] ?? null),
+            'idRegistre' => $inj['id'] ?? null,
         ];
     }
 
@@ -423,36 +431,57 @@ final class Sequenceur
         if (! ($this->serveur instanceof ConsultationAcceptation)) {
             return false;
         }
-        $res = $this->serveur->dejaAccepte((string) $ins->workspace_id, 'seq-' . $ins->id . '-' . $rang);
+        $cle = 'seq-' . $ins->id . '-' . $rang;
+        $res = $this->serveur->dejaAccepte((string) $ins->workspace_id, $cle);
         if ($res === null) {
             return false;
         }
+        // Même identifiant qu'au premier passage : relu (jamais retiré au sort) dans le registre.
+        $idRegistre = $this->registre->reserver((string) $ins->workspace_id, $cle, $this->expedition->domaine)['id'] ?? null;
+        $this->alertes = [...$this->alertes, ...$this->registre->alertes];
+        $this->registre->alertes = [];
         DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->where('statut', 'reserve')
-            ->update(['statut' => 'envoye', 'refus' => null, 'id_injection' => $res->idInjection, 'maj_le' => $maintenant->format('c')]);
+            ->update(['statut' => 'envoye', 'refus' => null, ...$this->colonnesIdentifiants($idRegistre, $res->idInjection), 'maj_le' => $maintenant->format('c')]);
         $messageId = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('message_id');
         if (is_string($messageId)) {
-            $this->enregistrerEnvoye($ins, $rang, $messageId, $res->idInjection);
+            $this->enregistrerEnvoye($ins, $rang, $messageId, $idRegistre, $res->idInjection);
         }
 
         return true;
     }
 
     /**
-     * Registre des messages envoyés (L8-COMPO), dans la transaction de conclusion, une fois par message accepté : le Message-ID
-     * (empreinte) et l'empreinte du destinataire, sans adresse ni corps, pour que la relève retrouve le message. L'identifiant
-     * rendu par le serveur n'est pas toujours un UUID connu de `envoi_injections_smtp` (faux serveur : « sim-N », Kumo : le sien) :
-     * un UUID local est alors créé dans `envoi_injections_locales` (clé d'idempotence = clé d'injection) ; l'identifiant du
-     * serveur reste dans `envoi_messages.id_injection`. Écriture sous point de sauvegarde : une panne du registre NE DÉFAIT PAS
-     * la conclusion d'un message réellement parti, mais elle n'est jamais silencieuse (alerte critique après le COMMIT).
+     * Les deux colonnes d'identifiant de `envoi_messages` (C1) : `id_injection` = identifiant du REGISTRE quand il existe (celui
+     * que la relève et le VERP rendent), sinon celui du serveur (smtp, domaine inconnu : chemin d'avant) ;
+     * `id_injection_serveur` = identifiant rendu par le serveur seulement s'il diffère de celui du registre.
+     *
+     * @return array{id_injection: ?string, id_injection_serveur: ?string}
      */
-    private function enregistrerEnvoye(\stdClass $ins, int $rang, string $messageId, ?string $idServeur): void
+    private function colonnesIdentifiants(?string $idRegistre, ?string $idServeur): array
+    {
+        return [
+            'id_injection' => $idRegistre ?? $idServeur,
+            'id_injection_serveur' => $idRegistre !== null && $idServeur !== null && $idServeur !== $idRegistre ? $idServeur : null,
+        ];
+    }
+
+    /**
+     * Registre des messages envoyés (L8-COMPO), dans la transaction de conclusion, une fois par message accepté : le Message-ID
+     * (empreinte) et l'empreinte du destinataire, sans adresse ni corps, pour que la relève retrouve le message. Depuis C1,
+     * l'identifiant du registre est choisi par le CRM avant l'envoi (`RegistreInjectionsSequence`) : il est écrit tel quel, aussi
+     * dans `envoi_messages.id_injection` (plus de devinette « sim- => faux »). Sans identifiant de registre (domaine sur smtp ou
+     * inconnu de l'espace), le chemin d'avant s'applique : UUID de `envoi_injections_smtp` ou UUID local. Écriture sous point de
+     * sauvegarde : une panne du registre NE DÉFAIT PAS la conclusion d'un message réellement parti, mais elle n'est jamais
+     * silencieuse (alerte critique après le COMMIT).
+     */
+    private function enregistrerEnvoye(\stdClass $ins, int $rang, string $messageId, ?string $idRegistre, ?string $idServeur): void
     {
         try {
-            DB::transaction(function () use ($ins, $rang, $messageId, $idServeur): void {
+            DB::transaction(function () use ($ins, $rang, $messageId, $idRegistre, $idServeur): void {
                 $ws = (string) $ins->workspace_id;
                 $uuid = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
-                $id = null;
-                if ($idServeur !== null && preg_match($uuid, $idServeur) === 1
+                $id = $idRegistre;
+                if ($id === null && $idServeur !== null && preg_match($uuid, $idServeur) === 1
                     && DB::table('envoi_injections_smtp')->where('workspace_id', $ws)->where('id_injection', $idServeur)->exists()) {
                     $id = $idServeur;
                 }

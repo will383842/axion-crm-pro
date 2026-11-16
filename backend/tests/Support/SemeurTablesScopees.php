@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -235,10 +235,17 @@ final class SemeurTablesScopees
         'envoi_essais_blanc',
         'envoi_feu_vert_decisions',
         'envoi_injections_locales',
+        // Envoi C3-0 : retraits et registre Kumo (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK).
+        'envoi_retraits_demandes',
+        'envoi_kumo_injections',
+        'envoi_kumo_etat',
+        'envoi_kumo_5xx',
         'envoi_seuils',
         // Envoi P0 L4 : boîtes SMTP puis injections (clé étrangère composite vers la boîte).
         // Ajout seul (trigger) ET clé étrangère vers `workspaces` : voir APPEND_SEUL_AVEC_FK.
         'envoi_boites',
+        // Envoi D1-L1 : accès IMAP des boîtes, ajout seul, boîte du même espace vérifiée par déclencheur : APPEND_SEUL_AVEC_FK, APRÈS `envoi_boites`.
+        'envoi_boites_acces_imap',
         'envoi_injections_smtp',
         'envoi_controles_dns',
         // Envoi P0 L6 : retours IMAP (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK) et curseurs.
@@ -967,6 +974,18 @@ final class SemeurTablesScopees
             'cle_idempotence' => 'zz-seme-locale',
             'adaptateur' => 'faux',
         ]);
+        $inserer('envoi_retraits_demandes', [
+            'empreinte_adresse' => str_repeat('d', 64),
+        ]);
+        $inserer('envoi_kumo_injections', [
+            'cle_idempotence' => 'zz-seme-kumo',
+            'id_injection' => (string) Str::uuid(),
+            'etat' => 'a_injecter',
+            'instant' => 1,
+            'jeton' => str_repeat('e', 32),
+        ]);
+        $inserer('envoi_kumo_etat', []);
+        $inserer('envoi_kumo_5xx', ['instant' => 1]);
         $inserer('envoi_seuils', [
             'nom' => 'zz',
             'valeur' => 1,
@@ -980,6 +999,14 @@ final class SemeurTablesScopees
             'port' => 587,
             'chiffrement' => 'starttls',
             'identifiants_chiffres' => 'zz-chiffre',
+        ]);
+        $inserer('envoi_boites_acces_imap', [
+            'boite_id' => $boiteId,
+            'hote' => 'imap.gmail.com',
+            'port' => 993,
+            'dossier' => 'INBOX',
+            'identifiant_chiffre' => 'zz',
+            'actif' => true,
         ]);
         $idInjection = (string) Str::uuid();
         $inserer('envoi_injections_smtp', [

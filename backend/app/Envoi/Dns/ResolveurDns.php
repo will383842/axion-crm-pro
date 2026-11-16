@@ -17,6 +17,9 @@ interface ResolveurDns
     /** @return list<string> noms PTR, minuscules, sans point final */
     public function ptr(string $ip): array;
 
+    /** @return list<string> hôtes MX, par priorité croissante, minuscules, sans point final */
+    public function mx(string $nom): array;
+
     /** Texte de la politique MTA-STS publiée, ou null si absente. */
     public function politiqueMtaSts(string $domaine): ?string;
 }

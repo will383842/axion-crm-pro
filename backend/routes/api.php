@@ -583,7 +583,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/taches', [TachesController::class, 'index'])->middleware('permission:companies.view');
             Route::post('/taches', [TachesController::class, 'store'])->middleware('permission:companies.update');
             Route::put('/taches/rappel-matin', [TachesController::class, 'rappelMatin'])->middleware('permission:companies.update');
-            Route::patch('/taches/{id}', [TachesController::class, 'update'])->whereNumber('id')->middleware('permission:companies.update');
+            Route::patch('/taches/{id}', [TachesController::class, 'marquer'])->whereNumber('id')->middleware('permission:companies.update');
 
             // Lot L4-C — « Personnes (lettre et guide) ». Les segments fixes
             // (`counts`, `export`) précèdent `{id}`, contraint aux chiffres.

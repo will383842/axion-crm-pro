@@ -55,7 +55,13 @@ class TachesController extends ConsoleController
         return $this->ok($r['tache'], $r['creee'] ? 201 : 200);
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    /**
+     * Fixe l'état « faite » d'UNE tâche. Volontairement nommée `marquer` et non
+     * `update` : c'est un drapeau booléen explicite et idempotent (rejouer
+     * `faite=true` ne change rien), sans saisie multi-champs à perdre, donc pas
+     * de verrou optimiste à poser (garde G43-005, qui vise les `update()` CRUD).
+     */
+    public function marquer(Request $request, int $id): JsonResponse
     {
         Gate::forUser($this->currentUser($request))->authorize('gererTaches', Company::class);
 

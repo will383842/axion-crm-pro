@@ -41,10 +41,13 @@ final class ToutArreter
         if (! $this->depot->leverToutArreter($workspaceId, $auteur)) {
             return false;
         }
-        if ($this->serveur !== null) {
-            WorkspaceContext::run($workspaceId, fn () => $this->serveur->reprise()); // jamais hors contexte : Kumo resterait en pause
+        try {
+            $this->serveur !== null && WorkspaceContext::run($workspaceId, fn () => $this->serveur->reprise()); // jamais hors contexte : Kumo resterait en pause
+        } finally {
+            // Le drapeau est déjà levé et journalisé : l'alerte part même si le serveur est injoignable (il reste alors
+            // en pause, état sûr ; le rejoueur renverra la reprise). L'échec est relancé tel quel, sans détail ajouté.
+            $this->alerte?->envoyer('Tout arrêter levé', "Auteur : {$auteur}. L’envoi peut reprendre pour cet espace (les freins et le quota restent appliqués).", 'envoi', 'critique');
         }
-        $this->alerte?->envoyer('Tout arrêter levé', "Auteur : {$auteur}. L’envoi peut reprendre pour cet espace (les freins et le quota restent appliqués).", 'envoi', 'critique');
 
         return true;
     }

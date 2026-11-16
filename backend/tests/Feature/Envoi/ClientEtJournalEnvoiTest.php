@@ -611,3 +611,12 @@ test('E4 : le filtre est propre à la source et le journal reste en ajout seul',
     expect(envoiRejouables($this->ws))->toBe([$a, $b]);
     expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->count()))->toBe($avant);
 });
+
+test('E4 : pause non acquittée puis retrait seul => le journal à rejouer vaut [pause, retrait]', function () {
+    $j = app(JournalCommandes::class);
+    [$p, $x] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $x, 'retrait', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$p, $x]); // un retrait n'est pas une pause/reprise : il ne périme pas la pause
+});

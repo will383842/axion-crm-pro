@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { messageErreur } from '../../infrastructure/composants/format';
 import { useRaccourcis, useRepondre } from './requetes';
 
 /** « Répondre » : même fil, même boîte. Réponses rapides, attribution à un collègue. */
@@ -83,7 +84,7 @@ export function FormulaireReponse({ id, onEnvoyee }: { id: string; onEnvoyee?: (
       </div>
       {repondre.isError ? (
         <p role="alert" className="text-sm text-rose-700">
-          La réponse n’a pas pu partir. Rien n’est perdu : réessayez dans un instant.
+          {messageErreur(repondre.error, 'La réponse n’a pas pu partir. Rien n’est perdu : réessayez dans un instant.')}
         </p>
       ) : null}
     </form>

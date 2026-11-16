@@ -16,12 +16,15 @@ export function EtapeCible({
   cibles,
   brouillonId,
   suite,
+  rechoisir = false,
 }: {
   saisie: Saisie;
   modifier: (patch: Partial<Saisie>) => void;
   cibles: readonly CibleProposee[];
   brouillonId: string | null;
   suite: () => void;
+  /** Brouillon rouvert sans cible (copie sans ses destinataires) : on invite à la choisir de nouveau. */
+  rechoisir?: boolean;
 }) {
   const types = useMemo(() => (['etiquette', 'audience', 'liste', 'carnet'] as const).filter((t) => cibles.some((c) => c.type === t)), [cibles]);
   const [typeChoisi, setTypeChoisi] = useState<TypeAffiche>(saisie.cible?.type ?? types[0] ?? 'etiquette');
@@ -87,7 +90,10 @@ export function EtapeCible({
 
       <div className="mt-4 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200" role="status" aria-live="polite">
         {saisie.cible === null ? (
-          <p className="text-sm text-slate-600">Choisissez une cible pour voir combien d’adresses sont joignables.</p>
+          <p className="text-sm text-slate-600">
+            {rechoisir ? <strong className="block text-slate-900">Choisissez de nouveau les destinataires.</strong> : null}
+            Choisissez une cible pour voir combien d’adresses sont joignables.
+          </p>
         ) : e === undefined ? (
           <Skeleton className="h-10 w-full" />
         ) : (
@@ -123,7 +129,6 @@ export function EtapeCible({
         />
         <span>
           Revérifier les adresses vues il y a plus de 30 jours avant l’envoi
-          {e ? <span className="block text-xs text-slate-600">Environ {Math.round(e.restant * 0.12).toLocaleString('fr-FR')} adresses concernées.</span> : null}
         </span>
       </label>
 

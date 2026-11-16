@@ -315,14 +315,16 @@ describe('FeuVertPage — écran du feu vert', () => {
       expect(alerte).toHaveTextContent(/tant que le motif n’est pas valide/);
     });
 
-    it.each([[403, 'Droits insuffisants.'], [500, 'Erreur interne.']])('« Retirer » refusé %i : vraie cause, sans prétendre que le motif est en cause', async (statut, message) => {
+    // 4xx : le message du serveur ; 5xx : le texte français générique (jamais le texte technique du serveur).
+    it.each([[403, 'Droits insuffisants.', 'Droits insuffisants.'], [500, 'Erreur interne.', 'Le serveur a rencontré un problème. Réessayez dans un instant.']])('« Retirer » refusé %i : vraie cause, sans prétendre que le motif est en cause', async (statut, message, affiche) => {
       const user = userEvent.setup();
       await montrer([erreurServeur(statut, message)]);
       await user.click(await screen.findByRole('button', { name: 'Retirer le feu vert' }));
       await user.type(screen.getByLabelText(/Motif/), 'Arrêt demandé par prudence.');
       await user.click(screen.getByRole('button', { name: 'Confirmer le retrait' }));
       const alerte = await screen.findByRole('alert');
-      expect(alerte).toHaveTextContent(message);
+      expect(alerte).toHaveTextContent(affiche);
+      if (statut >= 500) expect(alerte.textContent).not.toContain(message);
       expect(alerte.textContent).not.toMatch(/motif n’est pas valide/);
       expect(alerte.textContent).not.toMatch(/retiré/i);
     });

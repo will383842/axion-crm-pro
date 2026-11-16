@@ -51,7 +51,7 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     await page.getByRole('tab', { name: /^Destinataires/ }).click();
     await page.getByRole('button', { name: /^Refusés/ }).click();
     const yves = page.getByRole('row', { name: /Yves Roche/ });
-    await expect(yves).toContainText('Refusé');
+    await expect(yves).toContainText('Adresse invalide');
     await expect(yves).toContainText('Adresse inexistante');
 
     expect(Date.now() - debut).toBeLessThan(4 * 60_000);
@@ -63,9 +63,28 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     const dialogue = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Dupliquer la campagne' }) });
     await expect(dialogue.getByRole('textbox', { name: 'Nom de la copie' })).toHaveValue('Clubs d’entreprises Savoie (copie)');
     await dialogue.getByRole('button', { name: 'Créer la copie (brouillon)' }).click();
-    const copie = page.getByRole('row', { name: /Clubs d’entreprises Savoie \(copie\)/ });
-    await expect(copie).toBeVisible();
-    await expect(copie.getByText('Brouillon')).toBeVisible();
+    // La copie s'ouvre aussitôt, en brouillon, avec « Reprendre la création ».
+    await expect(page.getByRole('heading', { level: 1, name: 'Clubs d’entreprises Savoie (copie)' })).toBeVisible();
+    await expect(page.getByText('Brouillon').first()).toBeVisible();
+    // Un vrai clic : « Reprendre la création » charge l'assistant (pas de « brouillon introuvable »).
+    await page.getByRole('link', { name: 'Reprendre la création' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Nouvelle campagne' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continuer : message/ })).toBeVisible();
+    await expect(page.getByText('Ce brouillon n’existe pas')).toHaveCount(0);
+  });
+
+  test('un brouillon de la liste s’ouvre dans l’assistant ; une campagne à valider mène au suivi', async ({ page }) => {
+    await ouvrirDemo(page, '/envoi/campagnes', { offre: 'envoi' });
+    const brouillons = await appelerApi<PageCampagnes>(page, 'GET', '/envoi/campagnes?statut=brouillon');
+    const nom = brouillons.data[0]!.nom;
+    await page.getByRole('row', { name: new RegExp(nom) }).getByRole('link', { name: /^Ouvrir/ }).click();
+    await expect(page.getByRole('button', { name: /Continuer : message/ })).toBeVisible();
+    await expect(page.getByText('Ce brouillon n’existe pas')).toHaveCount(0);
+
+    await page.goBack();
+    await page.getByRole('row', { name: /Presse régionale AURA/ }).getByRole('link', { name: /^Relire et valider/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Presse régionale AURA' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Reprendre la création' })).toHaveCount(0);
   });
 
   test('P7 · le suivi d’une campagne : réponses en tête, aucune ouverture, aucun clic', async ({ page }) => {

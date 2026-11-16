@@ -99,6 +99,7 @@ test.describe('messages types et éditeur (DM2-ASS)', () => {
     await passage360(page);
 
     await page.getByRole('button', { name: 'Archiver Relance douce' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Archiver le message' }).click();
     await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole('link', { name: 'Relance douce', exact: true })).toHaveCount(0);

@@ -299,8 +299,28 @@ export function rendre(texte: string, exemple: Exemple, repli: Record<string, st
 
 // ── Brouillons ────────────────────────────────────────────────────────────
 
+/**
+ * Un brouillon de l'assistant, ou la campagne au statut « brouillon » de la
+ * liste (y compris la copie créée par « Dupliquer ») : elle devient alors un
+ * brouillon de l'assistant, au même identifiant, avec sa cible.
+ */
 function lireBrouillon(id: string): BrouillonDemo | undefined {
-  return zone().brouillons.trouver(id);
+  const trouve = zone().brouillons.trouver(id);
+  if (trouve) return trouve;
+  const campagne = demoDb.campagnes.trouver(id);
+  if (!campagne || campagne.statut !== 'brouillon') return undefined;
+  const cible = campagne.cible;
+  const b: BrouillonDemo = {
+    id: String(campagne.id),
+    nom: campagne.nom,
+    etape_courante: 1,
+    etapes_faites: [],
+    contenu: { nom: campagne.nom, cible: { type: cible.type, reference: cible.reference, libelle: cible.libelle } },
+    mis_a_jour_le: MAINTENANT_ISO,
+    campagne_id: null,
+    annulable_jusqua: null,
+  };
+  return zone().brouillons.ajouter(b);
 }
 
 function versionValidee(messageId: string): S['MessageTypeEtat']['versions'][number] | undefined {

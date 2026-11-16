@@ -54,11 +54,26 @@ export function phraseDmarc(prochaine: { politique: PolitiqueDmarc; le: string }
   return `passer à ${LIBELLE_DMARC[prochaine.politique]} le ${dateCourte(prochaine.le)}`;
 }
 
-/** Le message français d'une erreur de l'API (corps `Erreur`), sinon un texte de repli. */
+/** Messages techniques connus, remplacés à l'affichage par une phrase simple. */
+const PHRASES_SIMPLES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/If-Match/i, 'Cette campagne a été modifiée ailleurs. Rechargez la page.'],
+  [/Clé d.idempotence/i, 'Cette action a déjà été envoyée. Rechargez la page.'],
+  [/Transition de campagne interdite/i, 'Ce geste n’est pas possible dans l’état actuel de la campagne.'],
+];
+
+export const MESSAGE_SERVEUR_GENERIQUE = 'Le serveur a rencontré un problème. Réessayez dans un instant.';
+
+/**
+ * Le message français d'une erreur de l'API (corps `Erreur`), sinon un texte de repli.
+ * Le message du serveur n'est montré que pour une erreur 4xx ; en 5xx, un texte
+ * générique. Les messages techniques connus deviennent une phrase simple.
+ */
 export function messageErreur(erreur: unknown, repli = 'Le geste n’a pas pu être fait. Rien n’a été modifié. Réessayez dans un instant.'): string {
-  if (isAxiosError(erreur)) {
-    const message = (erreur.response?.data as { message?: unknown } | undefined)?.message;
-    if (typeof message === 'string' && message !== '') return message;
-  }
-  return repli;
+  if (!isAxiosError(erreur)) return repli;
+  const statut = erreur.response?.status;
+  if (statut !== undefined && statut >= 500) return MESSAGE_SERVEUR_GENERIQUE;
+  const message = (erreur.response?.data as { message?: unknown } | undefined)?.message;
+  if (statut === undefined || statut < 400 || typeof message !== 'string' || message === '') return repli;
+  const simple = PHRASES_SIMPLES.find(([technique]) => technique.test(message));
+  return simple ? simple[1] : message;
 }

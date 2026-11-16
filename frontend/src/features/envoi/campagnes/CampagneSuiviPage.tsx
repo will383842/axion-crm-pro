@@ -6,7 +6,7 @@
  * ouverture n'est affichée (décision produit).
  */
 import { useState, type ReactNode } from 'react';
-import { useParams } from '@tanstack/react-router';
+import { Link, useParams } from '@tanstack/react-router';
 import { Card, EmptyState, KpiCard, PageHeader, QueryErrorState, Skeleton, StatusPill, Tabs } from '@/components/ui';
 import { useCampagne, type FicheCampagne } from './api';
 import { BarreProgression } from './composants/BarreProgression';
@@ -245,7 +245,24 @@ export function CampagneSuiviPage() {
         surTitre="Envoi"
         badge={<StatusPill tone={STATUT_TON[c.statut]} pulse={c.statut === 'en_cours'}>{STATUT_LIBELLE[c.statut]}</StatusPill>}
         subtitle={`${nombre(c.envoyes)} envoyés sur ${nombre(c.total)} · ${nombre(c.reponses)} ${c.reponses > 1 ? 'réponses' : 'réponse'}${fiche.fin_prevue_le !== null ? ` · fin prévue le ${jourEtMois(fiche.fin_prevue_le)}` : ''}`}
-        actions={<GestesCampagne campagne={c} maintenant={fiche.maintenant} variante="entete" />}
+        actions={
+          <GestesCampagne
+            campagne={c}
+            maintenant={fiche.maintenant}
+            variante="entete"
+            avant={
+              c.statut === 'brouillon' ? (
+                <Link
+                  to="/envoi/campagnes/nouvelle"
+                  search={{ brouillon: String(c.id) }}
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-produit px-4 text-sm font-medium text-white shadow-produit hover:bg-produit-fonce max-md:h-11"
+                >
+                  Reprendre la création
+                </Link>
+              ) : null
+            }
+          />
+        }
       />
       <div className="mb-4 max-w-full overflow-x-auto">
         <Tabs items={onglets} value={onglet} onChange={setOnglet} />

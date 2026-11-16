@@ -78,6 +78,11 @@ describe('CampagnesPage — liste', () => {
     await ouvrir();
     const vienne = await ligne(/Commerces de Vienne/);
     await user.click(within(vienne).getByRole('button', { name: /^Reprendre/ }));
+    // Confirmation avant de relancer les envois.
+    const dialogue = await screen.findByRole('dialog');
+    expect(within(dialogue).getByRole('heading', { name: 'Reprendre la campagne ?' })).toBeInTheDocument();
+    expect(demoDb.campagnes.trouver('cmp-04')?.statut).toBe('en_pause');
+    await user.click(within(dialogue).getByRole('button', { name: 'Reprendre la campagne' }));
     await waitFor(() => expect(demoDb.campagnes.trouver('cmp-04')?.statut).toBe('en_cours'));
   });
 
@@ -108,7 +113,8 @@ describe('CampagnesPage — liste', () => {
     const copie = demoDb.campagnes.tous().find((c) => c.nom === 'Organisateurs Rhône-Alpes (copie)');
     expect(copie?.statut).toBe('brouillon');
     expect(copie?.envoyes).toBe(0);
-    expect(await ligne(/Organisateurs Rhône-Alpes \(copie\)/)).toBeInTheDocument();
+    // La copie s'ouvre aussitôt.
+    expect(await screen.findByTestId('landing')).toHaveAttribute('data-path', '/envoi/campagnes/$campagneId');
   });
 
   it('Terminer est définitif et demande confirmation', async () => {

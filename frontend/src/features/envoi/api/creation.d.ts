@@ -470,8 +470,14 @@ export interface components {
             /** @description Nom du champ sans accolades, ex. `prénom`. */
             nom: string;
             obligatoire: boolean;
+            /** @description Faux sans `brouillon_id` (la cible n'est pas parcourue). */
+            manquants_connus?: boolean;
+            /** @description Vrai si le compte porte sur les 5 000 premiers destinataires seulement. */
+            partiel?: boolean;
             /** @description Valeur de repli retenue (saisie ou écrite dans le message). */
             repli: string | null;
+            /** @description Destinataires retenus parcourus pour le compte (0 si `manquants_connus` est faux). */
+            sur?: number;
         };
         Cible: {
             exclusions?: ("deja_contactes_90j" | "clients" | "desinscrits" | "opposition" | "rebonds_durs" | "sans_adresse" | "autres_campagnes_en_cours")[];

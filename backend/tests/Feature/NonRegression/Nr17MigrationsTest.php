@@ -59,6 +59,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
     // Filet modifié : pourquoi — VERDICTS : colonne motif nullable + CHECK NOT VALID ; la retirer effacerait le pourquoi des verdicts ; down() inerte, up() rejouable.
     '2026_12_05_000500_envoi_verdicts_adresse_motif.php',
+    // Filet modifié : pourquoi — VERDICTS : REVOKE UPDATE/DELETE du rôle applicatif sur les verdicts (ajout seul) ; rendre ces droits rouvrirait la réécriture des verdicts ; down() inerte, up() rejouable.
+    '2026_12_05_000510_envoi_verdicts_adresse_revoke_ud.php',
     '2026_11_10_000063_envoi_echecs_releve.php',
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.
@@ -137,6 +139,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_04_000030_envoi_campagnes_lien_sequence.php',
     // Filet modifié : pourquoi — envoi X1-L1 : index partiel des inscriptions actives (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_04_000040_envoi_inscriptions_contact_actif_index.php',
+    // Filet modifié : pourquoi — envoi P2-A : colonnes `population` et `personne_id`, deux CHECK, contact/entreprise nullables et déclencheur de garde des inscriptions typées (ajout seul, inerte : aucune ligne « personnes » possible) ; les retirer rouvrirait des inscriptions incohérentes ; down() inerte, up() rejouable.
+    '2026_12_05_000100_envoi_inscriptions_population.php',
+    // Filet modifié : pourquoi — envoi P2-A : index unique partiel par personne (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_05_000110_envoi_inscriptions_personne_index.php',
+    // Filet modifié : pourquoi — envoi P2-A : garde de la clé `envoi.population_personnes` (propriétaire seul, true/false) ; la retirer laisserait l'application allumer l'interrupteur ; down() inerte, up() rejouable.
+    '2026_12_05_000120_envoi_reglages_interrupteur_population.php',
     // Filet modifié : pourquoi — envoi C1-0 : colonne `id_injection_serveur` (ADD COLUMN IF NOT EXISTS, NULL) + CHECK ; la retirer effacerait les identifiants serveur ; down() inerte, up() rejouable.
     '2026_12_05_000200_envoi_messages_id_injection_serveur.php',
     // Filet modifié : pourquoi — envoi C1-0 : deux index partiels d'`envoi_messages` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.

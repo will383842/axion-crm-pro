@@ -192,7 +192,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
             case 'accepte':
                 return ResultatInjection::accepte((string) $existant->id_injection);
             case 'echec':
-                throw new RefusDefinitifServeur('Refus définitif (5xx) déjà enregistré pour cette clé.');
+                throw new RefusDefinitifServeur('Refus définitif (5xx) déjà enregistré pour cette clé.', self::codeValide($existant->code_smtp ?? null));
             case 'injection_en_cours':
             case 'a_verifier':
                 return ResultatInjection::incertain(new DateTimeImmutable('tomorrow'));
@@ -204,6 +204,12 @@ final class AdaptateurSmtp implements ServeurEnvoi
         }
 
         return null;
+    }
+
+    /** Code SMTP relu en base : n'est rendu que s'il est dans 200..599 (sinon null, jamais d'exception). */
+    private static function codeValide(mixed $code): ?int
+    {
+        return is_numeric($code) && (int) $code >= 200 && (int) $code < 600 ? (int) $code : null;
     }
 
     private function injecterSousVerrou(MessageAEnvoyer $message, Envelope $enveloppe): ResultatInjection
@@ -295,7 +301,7 @@ final class AdaptateurSmtp implements ServeurEnvoi
         if ($code !== null && $code >= 500) {
             $this->maj($cle, ['etat' => 'echec', 'code_smtp' => $code], ['injection_en_cours']);
             $this->pauseSiTrop5xx();
-            throw new RefusDefinitifServeur('Refus définitif du serveur SMTP (' . $code . ').');
+            throw new RefusDefinitifServeur('Refus définitif du serveur SMTP (' . $code . ').', $code);
         }
         if (str_contains($e->getMessage(), 'Connection could not be established')) {
             // Aucune connexion : rien n'a pu être transmis, report simple.
@@ -358,10 +364,10 @@ final class AdaptateurSmtp implements ServeurEnvoi
             ->update($valeurs + ['maj_le' => now()])) > 0;
     }
 
-    /** @return (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string})|null */
+    /** @return (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string, code_smtp?: int|string|null})|null */
     private function ligne(string $cle): ?object
     {
-        /** @var (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string})|null $ligne */
+        /** @var (\stdClass&object{etat: string, id_injection: string, reporte_au: ?string, code_smtp?: int|string|null})|null $ligne */
         $ligne = WorkspaceContext::run($this->workspaceId, fn () => DB::table('envoi_injections_smtp')
             ->where('workspace_id', $this->workspaceId)->where('cle_idempotence', $cle)->first());
 

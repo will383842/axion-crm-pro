@@ -11,7 +11,7 @@ use RuntimeException;
  */
 final class RegistreMemoire implements RegistreInjections
 {
-    /** @var array<string, array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}>> */
+    /** @var array<string, array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int}>> */
     private array $lignes = [];
 
     /** @var array<string, bool> */

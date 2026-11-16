@@ -17,14 +17,14 @@ namespace App\Envoi\Serveur\Kumo;
  *
  * `seq` : numéro de séquence STABLE, assigné une seule fois quand la ligne devient `accepte` (curseur des événements).
  *
- * @phpstan-type Ligne array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}
+ * @phpstan-type Ligne array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int}
  */
 interface RegistreInjections
 {
-    /** @return array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}|null */
+    /** @return array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int}|null */
     public function lire(string $workspaceId, string $cle): ?array;
 
-    /** @param array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int} $ligne */
+    /** @param array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int} $ligne */
     public function ecrire(string $workspaceId, string $cle, array $ligne): void;
 
     /**
@@ -33,11 +33,11 @@ interface RegistreInjections
      * l'instant, un worker lent verrait « reporte » et écraserait un cycle reporte → injection_en_cours → reporte
      * fait entre-temps par un autre (ABA). Rend vrai si l'écriture a eu lieu.
      *
-     * @param  array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}  $ligne
+     * @param  array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int}  $ligne
      */
     public function ecrireSi(string $workspaceId, string $cle, ?string $etatAttendu, ?int $instantAttendu, array $ligne): bool;
 
-    /** @return array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int}> */
+    /** @return array<string, array{id: string, etat: string, reporte_au: ?int, instant: int, jeton: string, seq?: int, code?: int}> */
     public function tout(string $workspaceId): array;
 
     public function enPause(string $workspaceId): bool;

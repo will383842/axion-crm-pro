@@ -73,7 +73,7 @@ RUN pnpm build
 # >= 1.18.7 : CVE-2026-63209 ; au 2026-11-16 ; precedemment Go >= 1.26.6, x/crypto >= 0.55.0,
 # x/net >= 0.56.0, x/text >= 0.39.0, grpc >= 1.83.2), toutes epinglees ;
 # go-jose v4.1.6 (CVE-2026-116587, DoS sur les JWK RSA ; Caddy v2.11.4 tire
-# v4.1.4) ; x/net 0.62.0 et x/text 0.41.0 car grpc 1.83.2 et x/crypto 0.55.0 les exigent.
+# v4.1.4) ; x/net 0.62.0, x/crypto 0.58.0 et x/text 0.43.0 car x/net 0.62.0 exige les deux derniers (grpc 1.83.2 exige x/text >= 0.41.0).
 # Au reexamen : si une image `caddy:2-alpine` recompilee corrige ces avis,
 # ce stade peut disparaitre (et le `COPY --from=caddy-build` avec lui).
 # -----------------------------------------------------------------------------
@@ -93,9 +93,9 @@ RUN printf '%s\n' \
     && go mod init caddy \
     && go get \
         github.com/caddyserver/caddy/v2@${CADDY_VERSION} \
-        golang.org/x/crypto@v0.55.0 \
+        golang.org/x/crypto@v0.58.0 \
         golang.org/x/net@v0.62.0 \
-        golang.org/x/text@v0.41.0 \
+        golang.org/x/text@v0.43.0 \
         google.golang.org/grpc@v1.83.2 \
         github.com/go-jose/go-jose/v4@v4.1.6 \
         github.com/klauspost/compress@v1.18.7 \

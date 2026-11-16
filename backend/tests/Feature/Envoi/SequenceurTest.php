@@ -172,6 +172,15 @@ function seqInscrire(object $t, string $sequence, int $contact): string
     return (new Inscriptions(new LecteurFicheDb))->inscrire($t->ws, $sequence, $contact, $t->maintenant);
 }
 
+/** Depuis P2-B la base refuse deux inscriptions ACTIVES pour une même adresse : la seconde est créée TERMINÉE (copie de la première). */
+function seqInscrireTerminee(string $modele, string $sequence): string
+{
+    $id = (string) Str::uuid();
+    DB::table('envoi_inscriptions')->insert(['id' => $id, 'sequence_id' => $sequence, 'statut' => 'terminee'] + (array) DB::table('envoi_inscriptions')->where('id', $modele)->first());
+
+    return $id;
+}
+
 function seqMessages(string $inscription): array
 {
     return DB::table('envoi_messages')->where('inscription_id', $inscription)->orderBy('etape')->get()->all();
@@ -456,13 +465,14 @@ test('un contact inscrit aux séquences A et B qui répond STOP sur A ne reçoit
     $b = seqSequence($this, 3);
     [, $c] = seqFiche($this, "ab-{$evenement}@zz-client.example.invalid");
     $insA = seqInscrire($this, $a, $c);
-    $insB = seqInscrire($this, $b, $c);
+    $insB = seqInscrireTerminee($insA, $b); // P2-B : une seule active par adresse
 
     (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, $evenement, $this->maintenant);
     expect(($this->seq)()->executer($this->ws, $this->maintenant))->toBe([])
         ->and(seqMessages($insA))->toBe([])->and(seqMessages($insB))->toBe([])
         ->and($this->faux->appels)->toBe(0)
-        ->and(DB::table('envoi_inscriptions')->where('id', $insB)->value('statut'))->toBe('arretee');
+        ->and(DB::table('envoi_inscriptions')->where('id', $insA)->value('statut'))->toBe('arretee')
+        ->and(DB::table('envoi_inscriptions')->where('id', $insB)->value('statut'))->toBe('terminee');
 })->with([Evenement::STOP, Evenement::OPPOSITION, Evenement::REBOND_DUR]);
 
 test('STOP : refusé aussi pour une inscription créée APRÈS le STOP (sans passer par evenement()) — filet dans traiter()', function () {
@@ -480,9 +490,10 @@ test('STOP : refusé aussi pour une inscription créée APRÈS le STOP (sans pas
 test('une réponse arrête, par l\'entreprise, les autres séquences de la même personne', function () {
     $a = seqSequence($this, 1);
     $b = seqSequence($this, 1);
-    [, $c] = seqFiche($this, 'rep@zz-client.example.invalid');
+    [$e, $c] = seqFiche($this, 'rep@zz-client.example.invalid');
+    [, $c2] = seqFiche($this, 'rep2@zz-client.example.invalid', $e); // autre personne, même entreprise (une seule active par adresse, P2-B)
     $insA = seqInscrire($this, $a, $c);
-    $insB = seqInscrire($this, $b, $c);
+    $insB = seqInscrire($this, $b, $c2);
     (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, Evenement::REPONSE, $this->maintenant);
 
     expect(DB::table('envoi_inscriptions')->where('id', $insB)->value('motif_arret'))->toBe(Evenement::MOTIF_ENTREPRISE);
